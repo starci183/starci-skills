@@ -1,14 +1,15 @@
-from,to,allowed,measured_count,rule
-atom,anything,no,0,"An atom that imports another tier is arranging children. It is a composite wearing the wrong name."
-behavior,anything,no,0,"A behavior has no shape, so it has nothing to compose."
-frame,atom,"only for its own chrome",1,"Stack imports Divider to place a rule BETWEEN children. The divider is the frame's own chrome, not content the caller passed. A frame never hand-rolls what an atom already owns."
-frame,composite,no,0,"A frame that reaches upward is reacting to content it must not know about."
-composite,atom,yes,45,"The normal direction. A composite assembles atoms."
-composite,frame,yes,39,"A composite arranges its atoms inside frames rather than hand-rolling flex."
-composite,block,no,0,"A composite that knows a domain entity is a block."
-block,atom,yes,285,"Blocks reach every tier below them."
-block,composite,yes,214,
-block,frame,yes,156,
-block,behavior,yes,3,
-page,block,yes,-,"A page is a list of functions: which blocks, in which frames, fed which data."
-page,atom,"discouraged",-,"A page reaching straight for an atom usually means a block is missing."
+from,to,allowed,rule,why
+atom,anything,no,"An atom imports no other tier.","An atom that imports another tier is arranging children. It is a composite with the wrong name."
+behavior,anything,no,"A behavior imports no other tier.","A behavior has no shape, so it has nothing to compose."
+frame,atom,"only for its own chrome","A frame may import an atom only to place an element the frame itself owns — a divider between children, for example. Test: is the imported thing something the caller handed in? If yes, the frame is doing a composite's job.","A frame never hand-rolls what an atom already owns, and never reacts to what its children are."
+frame,composite,no,"A frame does not reach upward.","A frame reaching upward is reacting to content it must not know about."
+composite,atom,yes,"The normal direction.",""
+composite,frame,yes,"A composite arranges its atoms inside frames.","Hand-rolling flex at composite level puts the same spacing decision at every call site."
+composite,block,no,"A composite does not know a domain.","A composite that knows a domain entity is a block, whatever folder it sits in."
+block,atom,yes,"",""
+block,frame,yes,"",""
+block,composite,yes,"",""
+block,behavior,yes,"",""
+page,block,yes,"A page names blocks and feeds them typed data.",""
+page,atom,discouraged,"Legal but a smell.","A page reaching two tiers down usually means a block is missing, and the shape it builds inline is invisible to every other screen that will need it."
+any,vendor,"only at atom and frame","Vendor components are wrapped at the bottom and never imported above it.","A block importing a vendor component lets that vendor's constraints leak into domain code, and the house system can no longer constrain it back."

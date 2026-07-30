@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-// Query the storybook architecture tables. Never open a CSV whole.
+// Query the tier rules. These are universal; for the numbers of a specific repo use scan.mjs.
 //
-//   node scripts/search.mjs tier atom
-//   node scripts/search.mjs group composite
-//   node scripts/search.mjs import frame atom
 //   node scripts/search.mjs tiers
+//   node scripts/search.mjs tier atom
+//   node scripts/search.mjs import frame atom
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -32,33 +31,24 @@ function read(name) {
     return lines.slice(1).map((l) => Object.fromEntries(split(l).map((v, i) => [head[i], v])));
 }
 
-const show = (row, skip = []) => {
-    for (const [k, v] of Object.entries(row)) {
-        if (!v || v === "-" || skip.includes(k)) continue;
-        console.log(`  ${k.padEnd(14)} ${v}`);
-    }
-};
-
 const [cmd, a, b] = process.argv.slice(2);
 
 if (!cmd || cmd === "tiers") {
-    for (const r of read("tiers")) console.log(`${r.tier.padEnd(10)} ${String(r.count).padStart(4)}  ${r.owns}`);
-    console.log("\nnode scripts/search.mjs tier <name> | group <tier> | import <from> <to>");
+    for (const r of read("tiers")) console.log(`${r.tier.padEnd(12)} ${r.owns}`);
+    console.log("\nnode scripts/search.mjs tier <name> | import <from> <to>");
+    console.log("For a specific repo's numbers: node scripts/scan.mjs <path-to-repo>");
     process.exit(0);
 }
 
 if (cmd === "tier") {
     const hit = read("tiers").find((r) => r.tier === a);
     if (!hit) { console.error(`unknown tier: ${a}`); process.exit(1); }
-    console.log(`# ${hit.tier}  ${hit.folder}  (${hit.count} files)`);
-    show(hit, ["tier", "folder", "count"]);
-    process.exit(0);
-}
-
-if (cmd === "group") {
-    const rows = read("groups").filter((r) => r.tier === a);
-    if (!rows.length) { console.error(`no groups for tier: ${a}`); process.exit(1); }
-    for (const r of rows) console.log(`${(r.group === "-" ? "(flat)" : r.group).padEnd(14)} ${String(r.count).padStart(4)}  ${r.holds}`);
+    console.log(`# ${hit.tier}`);
+    console.log(`  owns          ${hit.owns}`);
+    console.log(`  never         ${hit.never}`);
+    console.log(`  may import    ${hit.may_import}`);
+    console.log(`  belongs here  ${hit.signal_it_belongs_here}`);
+    console.log(`  misplaced if  ${hit.signal_it_is_misplaced}`);
     process.exit(0);
 }
 
@@ -71,11 +61,13 @@ if (cmd === "import") {
     }
     for (const r of rows) {
         const verdict = r.allowed === "yes" ? "ALLOWED" : r.allowed === "no" ? "FORBIDDEN" : r.allowed.toUpperCase();
-        console.log(`${r.from} -> ${r.to}   ${verdict}${r.measured_count && r.measured_count !== "-" ? `   (${r.measured_count} in the real tree)` : ""}`);
+        console.log(`${r.from} -> ${r.to}   ${verdict}`);
         if (r.rule) console.log(`  ${r.rule}`);
+        if (r.why) console.log(`  why: ${r.why}`);
     }
     process.exit(0);
 }
 
 console.error(`unknown command: ${cmd}`);
+console.error("commands: tiers | tier <name> | import <from> <to>");
 process.exit(1);
