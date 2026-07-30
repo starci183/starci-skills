@@ -1,0 +1,9 @@
+tier,folder,count,owns,never,imports_from,heroui_files
+atom,components/atoms,47,"one indivisible unit: a value it renders and the states of that value","knows nothing about data; never arranges children","nothing",42
+behavior,components/behaviors,2,"a capability with no shape of its own — hover, press, focus wiring","never renders a visible element","nothing",2
+frame,components/frames,9,"direction, seam, alignment, and its own chrome between children","never asks what its children are","atoms, only to place its own chrome",9
+composite,components/composites,48,"a reusable shape assembled from atoms inside frames","knows nothing about the app's domain","atoms, frames",41
+block,components/<app>/blocks,123,"domain data and its async decisions; takes an entity, not loose fields","draws no shape of its own","atoms, composites, frames, behaviors",varies
+layout,components/<app>/layouts,5,"the shell a whole route sits in","owns no content","composites, frames",varies
+overlay,components/<app>/overlays,10,"a surface that covers the page: modal, drawer, popover shell","owns no domain data","composites, frames",varies
+page,components/<app>/pages,21,"a list of functions: which blocks, in which frames, fed which typed data","draws no shape of its own","blocks, composites, frames",varies

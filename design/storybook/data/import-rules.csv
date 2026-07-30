@@ -1,0 +1,14 @@
+from,to,allowed,measured_count,rule
+atom,anything,no,0,"An atom that imports another tier is arranging children. It is a composite wearing the wrong name."
+behavior,anything,no,0,"A behavior has no shape, so it has nothing to compose."
+frame,atom,"only for its own chrome",1,"Stack imports Divider to place a rule BETWEEN children. The divider is the frame's own chrome, not content the caller passed. A frame never hand-rolls what an atom already owns."
+frame,composite,no,0,"A frame that reaches upward is reacting to content it must not know about."
+composite,atom,yes,45,"The normal direction. A composite assembles atoms."
+composite,frame,yes,39,"A composite arranges its atoms inside frames rather than hand-rolling flex."
+composite,block,no,0,"A composite that knows a domain entity is a block."
+block,atom,yes,285,"Blocks reach every tier below them."
+block,composite,yes,214,
+block,frame,yes,156,
+block,behavior,yes,3,
+page,block,yes,-,"A page is a list of functions: which blocks, in which frames, fed which data."
+page,atom,"discouraged",-,"A page reaching straight for an atom usually means a block is missing."
