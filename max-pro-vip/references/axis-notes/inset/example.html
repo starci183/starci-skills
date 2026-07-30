@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>INSET — vét cạn 6 cặp, render thật SAI vs ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+  .watch{font-size:12.5px;background:color-mix(in srgb,var(--warn) 10%,transparent);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .watch b{color:var(--warn)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── inset-riêng: khung viền để thấy PADDING thật, và khối minh hoạ seam đối chiếu ── */
+  .surf{border:1.5px dashed color-mix(in srgb,var(--accent) 55%,transparent);border-radius:12px;background:var(--app-surface)}
+  .surf-in{background:var(--app-surface2);border-radius:8px}
+  .padtag{position:absolute;font-family:ui-monospace,monospace;font-size:9.5px;color:var(--accent);background:var(--bg);padding:0 4px;border-radius:3px}
+  .wrap-rel{position:relative}
+  .gaptag{font-family:ui-monospace,monospace;font-size:9.5px;color:var(--warn);background:var(--bg);padding:0 4px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>INSET — vét cạn 6 cặp, render thật SAI cạnh ĐÚNG</h1>
+  <p class="sub">Trục này trả lời đúng một câu: <b>padding bên trong một bề mặt là bao nhiêu</b>. Không phải khoảng cách GIỮA hai thứ (đó là <code>seam</code>). Mọi khung dưới đây là HTML render thật với đúng số px của thang, không phải ảnh chụp hay mô tả.</p>
+
+  <h2>0. Thang bốn bậc</h2>
+  <div class="rules">
+    <div class="scale">
+      <div class="srow"><span class="sname">flush</span><span class="spx">0px</span><span class="sbar" style="width:1px"></span><span class="sdesc">nội dung chạm viền — ảnh cover, media, bảng cuộn ngang</span></div>
+      <div class="srow"><span class="sname">cozy</span><span class="spx">12px</span><span class="sbar" style="width:48px"></span><span class="sdesc">mặt trong của MỘT card — luật nhà mặc định của <code>SurfaceCard</code></span></div>
+      <div class="srow"><span class="sname">roomy</span><span class="spx">24px</span><span class="sbar" style="width:96px"></span><span class="sdesc">khung đo / <code>Container</code> bao NHIỀU card con</span></div>
+      <div class="srow"><span class="sname">airy</span><span class="spx">32px</span><span class="sbar" style="width:128px"></span><span class="sdesc">hero, empty-state — khu vực CỐ Ý nhấn không gian</span></div>
+    </div>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">Chỉ <b>bốn</b> bậc, không phải sáu như <code>SeamScale</code>. 46 call-site padding thật trên toàn cây, đúng <code>0·12·24·32</code>, không cái nào dùng 4px hay 8px — hai bậc đó không được đưa vào thang chỉ vì Tailwind có sẵn class.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — vì sao dừng ở 6 và không phải con số khác</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Thang có <b>4</b> giá trị, một quyết định inset sai luôn là <b>chọn nhầm bậc này thành bậc kia</b>, nên tập lỗi có thể có là tập <b>CẶP</b>: <b>C(4,2) = 6</b>. Liệt kê đủ 6 rồi phân nhóm, đó là lúc được phép dừng.</p>
+    <table class="mx">
+      <tr><th class="empty"></th><th>flush</th><th>cozy</th><th>roomy</th><th>airy</th></tr>
+      <tr><th>flush</th><td class="diag">—</td><td class="adj">1</td><td class="near">2</td><td class="far">3</td></tr>
+      <tr><th>cozy</th><td class="diag"></td><td class="diag">—</td><td class="adj">4</td><td class="near">5</td></tr>
+      <tr><th>roomy</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">6</td></tr>
+      <tr><th>airy</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">3 kề nhau</span>
+      mỗi cặp có một phép phân định dứt khoát — mục 2 render đủ cả ba, mỗi cặp <b>hai chiều sai</b>, cộng một cặp đặc biệt về nhầm trục.
+      &nbsp;
+      <span style="background:color-mix(in srgb,var(--warn) 22%,transparent);padding:1px 7px;border-radius:4px">2 cách một bậc</span>
+      không có phép thử riêng; phân vân ở đây là một câu hỏi cấp trên chưa trả lời.
+      &nbsp;
+      <span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">1 cách ≥2 bậc</span>
+      <b>cố ý không có phép thử.</b> Phân vân giữa <code>flush</code> và <code>airy</code> là dấu hiệu đang so hai TẦNG khác nhau, không phải chọn sai giá trị.
+    </p>
+  </div>
+
+  <h2>2. Ba cặp kề nhau — mỗi cặp render hai chiều sai, cộng một cặp đặc biệt về nhầm TRỤC</h2>
+
+  <!-- CẶP 1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · <code>flush</code> ↔ <code>cozy</code></h3><span class="pair">0px ↔ 12px</span></div>
+    <div class="test"><b>Phép phân định:</b> nội dung có <b>tự vẽ nền/viền của chính nó</b> và cần chạm sát mép không (ảnh, media, bảng)? Có ⇒ <code>flush</code> — padding sẽ đè lên chính hình. Nội dung là chữ/control (label, nút, field) cần khoảng thở tối thiểu để không dính viền ⇒ <code>cozy</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · card ảnh cover dùng cozy <span class="measure">12px</span></span>
+        <div class="mock bad surf" style="padding:12px">
+          <div class="surf-in" style="height:96px;background:linear-gradient(135deg,#2e5b6b,#8b7bff);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">ảnh cover khoá học</div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · flush <span class="measure">0px</span></span>
+        <div class="mock good surf" style="padding:0;overflow:hidden">
+          <div style="height:96px;background:linear-gradient(135deg,#2e5b6b,#8b7bff);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">ảnh cover khoá học</div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ảnh <b>tự vẽ mép</b> của chính nó — viền card và viền ảnh phải là MỘT đường. Ở 12px, dải nền của card lộ ra quanh ảnh như một khung tranh không mời, và bo góc của card không còn cắt đúng vào ảnh (<code>SurfaceCard.tsx:333</code> giữ <code>overflow-hidden</code> thay vì <code>p-0</code> thô chính vì lý do bo góc này).</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · hàng thiết lập dùng flush <span class="measure">0px</span></span>
+        <div class="mock bad surf" style="padding:0">
+          <div class="fc" style="gap:4px"><span class="ttl">Thông báo email</span><span class="sub2">Nhận email khi có bài mới</span></div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · cozy <span class="measure">12px</span></span>
+        <div class="mock good surf" style="padding:12px">
+          <div class="fc" style="gap:4px"><span class="ttl">Thông báo email</span><span class="sub2">Nhận email khi có bài mới</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> chữ không tự vẽ viền — ở 0px, "Thông báo email" dính sát vào cạnh khung, mắt đọc thấy chữ sắp tràn ra ngoài chứ không phải "một hàng thiết lập gọn gàng". <code>cozy</code> là khoảng thở tối thiểu để khung còn đọc được như một bề mặt.</p>
+    <div class="prin"><b>Nguyên lý:</b> vật liệu quyết định bậc. Hình tự vẽ biên thì <code>flush</code>, chữ/control cần khoảng thở thì <code>cozy</code> — không có bậc trung gian cho "hơi giống ảnh".</div>
+  </div>
+
+  <!-- CẶP 2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · <code>cozy</code> ↔ <code>roomy</code> <span class="note">309 call-site nằm ở đúng hai bậc này</span></h3><span class="pair">12px ↔ 24px</span></div>
+    <div class="test"><b>Phép phân định — BIÊN CỦA AI:</b> biên nhìn thấy ngay của bề mặt này có phải chính là biên của ĐÚNG MỘT card/tile không ⇒ <code>cozy</code>. Đây là khung đo bao NHIỀU thứ con (trong đó có thể có nhiều card khác) ⇒ <code>roomy</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · card hàng thiết lập dùng roomy <span class="measure">24px</span></span>
+        <div class="mock bad surf" style="padding:24px">
+          <div class="fc" style="gap:4px"><span class="ttl">Thông báo email</span><span class="sub2">Nhận email khi có bài mới</span></div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · cozy <span class="measure">12px</span></span>
+        <div class="mock good surf" style="padding:12px">
+          <div class="fc" style="gap:4px"><span class="ttl">Thông báo email</span><span class="sub2">Nhận email khi có bài mới</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là ĐÚNG MỘT card — biên card chính là biên padding, mặc định của <code>SurfaceCard.tsx:317</code> là <code>cozy</code>. Ở 24px, hai dòng chữ trôi vào giữa một khoảng trắng quá lớn so với lượng nội dung, trông như card đang chờ thêm nội dung chưa load xong.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · Container khung trang dùng cozy <span class="measure">12px</span></span>
+        <div class="mock bad surf" style="padding:12px">
+          <div class="fc" style="gap:12px">
+            <div class="card"><span class="ttl">Nộp bài</span></div>
+            <div class="card"><span class="ttl">Thảo luận</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · roomy <span class="measure">24px</span></span>
+        <div class="mock good surf" style="padding:24px">
+          <div class="fc" style="gap:12px">
+            <div class="card"><span class="ttl">Nộp bài</span></div>
+            <div class="card"><span class="ttl">Thảo luận</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là khung đo bao NHIỀU card, mặc định của <code>Container.tsx:137</code> là <code>roomy</code>. Ở 12px, viền ngoài của khung đo và viền của card con gần như dính nhau — mắt không phân biệt được "khung trang" với "card" nào là bề mặt chứa cái nào.</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>cozy</code> là luật nhà của CHÍNH một card, <code>roomy</code> là luật nhà của khung đo BAO NGOÀI nhiều card — một màn hình điển hình lồng cả hai, không phải chọn một cho toàn màn.</div>
+  </div>
+
+  <!-- CẶP 3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 3 · <code>roomy</code> ↔ <code>airy</code></h3><span class="pair">24px ↔ 32px</span></div>
+    <div class="test"><b>Phép phân định:</b> đây là nội dung/trang <b>BÌNH THƯỜNG</b> hay một khu vực <b>CỐ Ý NHẤN không gian</b> để tạo cảm giác trống/sang trọng (hero bán hàng, empty-state, trạng thái khoá)? Bình thường ⇒ <code>roomy</code>. Cố ý nhấn ⇒ <code>airy</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · hero bán hàng dùng roomy <span class="measure">24px</span></span>
+        <div class="mock bad surf" style="padding:24px;max-width:320px;margin:0 auto">
+          <div class="fc" style="gap:8px;align-items:center;text-align:center">
+            <i class="ph-fill ph-lock-key" style="color:var(--app-accent);font-size:26px"></i>
+            <span class="ttl">Mở khoá toàn bộ khoá học</span>
+            <span class="sub2">Truy cập không giới hạn mọi bài giảng</span>
+            <span class="btn p" style="margin-top:6px">Đăng ký ngay</span>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · airy <span class="measure">32px</span></span>
+        <div class="mock good surf" style="padding:32px;max-width:320px;margin:0 auto">
+          <div class="fc" style="gap:8px;align-items:center;text-align:center">
+            <i class="ph-fill ph-lock-key" style="color:var(--app-accent);font-size:26px"></i>
+            <span class="ttl">Mở khoá toàn bộ khoá học</span>
+            <span class="sub2">Truy cập không giới hạn mọi bài giảng</span>
+            <span class="btn p" style="margin-top:6px">Đăng ký ngay</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>EnrollGate.tsx:152</code> là card bán hàng, cố ý nhấn không gian để trông "cao cấp". Ở 24px nó co lại thành một card thiết lập bình thường, mất hẳn cảm giác "đáng để bỏ tiền ra".</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · khung trang settings bình thường dùng airy <span class="measure">32px</span></span>
+        <div class="mock bad surf" style="padding:32px">
+          <div class="fc" style="gap:12px">
+            <span class="ttl">Cài đặt tài khoản</span>
+            <div class="row">Tên hiển thị</div>
+            <div class="row">Email</div>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · roomy <span class="measure">24px</span></span>
+        <div class="mock good surf" style="padding:24px">
+          <div class="fc" style="gap:12px">
+            <span class="ttl">Cài đặt tài khoản</span>
+            <div class="row">Tên hiển thị</div>
+            <div class="row">Email</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> trang cài đặt không cố ý nhấn gì cả — nó chỉ là khung đo bình thường (<code>SettingsLayout.tsx:134</code> dùng đúng <code>roomy</code>). Ở 32px, khoảng trắng dư ra khiến người dùng ngờ rằng có nội dung nào đó chưa hiển thị hoặc bị lỗi CSS.</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>airy</code> là một QUYẾT ĐỊNH có chủ đích (bán hàng, khoá, trống), không phải "card quan trọng hơn thì cộng thêm 8px". Nhầm chiều nào cũng làm sai cảm giác mà bề mặt đó cần truyền tải.</div>
+  </div>
+
+  <!-- CẶP ĐẶC BIỆT: INSET vs SEAM -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp đặc biệt · <code>inset</code> bị đọc nhầm thành <code>seam</code> <span class="note">khác trục, không phải khác bậc</span></h3><span class="pair">TRONG một thứ ↔ GIỮA hai thứ</span></div>
+    <div class="test"><b>Phép phân định:</b> con số đang đo đang trả lời "bề mặt này HỞ ra bao nhiêu từ chính viền của nó" (inset) hay "hai bề mặt riêng biệt CÁCH nhau bao nhiêu" (seam)? Một element ⇒ inset. Khoảng trống giữa hai element độc lập ⇒ seam — hai câu hỏi khác nhau dù cùng dùng chữ trong <code>_spacing.ts</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · gọi khoảng GIỮA hai card là "padding=24px"</span>
+        <div class="mock bad wrap-rel" style="padding:0">
+          <div class="fc" style="gap:24px;padding:8px">
+            <div class="card"><span class="ttl">Nộp bài</span></div>
+            <div class="card"><span class="ttl">Thảo luận</span></div>
+          </div>
+          <span class="padtag" style="top:44%;left:8px">"padding: 24px" ✕</span>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · gọi đúng tên: đây là gap giữa hai card, mỗi card tự có padding riêng</span>
+        <div class="mock good wrap-rel" style="padding:0">
+          <div class="fc" style="gap:24px;padding:8px">
+            <div class="card" style="position:relative"><span class="ttl">Nộp bài</span><span class="gaptag" style="position:absolute;bottom:-19px;left:6px">gap (seam) = 24px</span></div>
+            <div class="card"><span class="ttl">Thảo luận</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao đây là lỗi thật đã cắn:</b> <code>Container</code> từng có slot <code>gap</code>. <code>CourseContents</code> viết <code>gap="page"</code> <b>tưởng đó là padding của chính khung đo</b> — nhưng <code>gap</code> đo khoảng CÁCH GIỮA các con, không phải khoảng HỞ từ viền khung vào nội dung. Khi truyền <code>children</code> thẳng (không qua slot), prop này không áp lên đâu cả, và số đo thật ở viền khung là <b>0px</b> — không lỗi biên dịch, không lỗi lint.</p>
+    <div class="prin"><b>Nguyên lý:</b> "một chữ chung bảng <code>_spacing.ts</code>" không có nghĩa "một câu hỏi chung". Nhìn thấy đúng con số không đủ — phải biết con số đó đang trả lời câu nào. Bẫy 1 ở mục 3 dưới đây render lại chính ca thật này ở cấp code.</p>
+  </div>
+
+  <h2>3. Năm bẫy cấu trúc — chọn đúng bậc nhưng vẫn sai</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · nhầm INSET với SEAM ngay trong code, không phải chỉ trong đầu</h3><span class="pair">code ghi <code>gap="page"</code>, đo ra 0px</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ <code>&lt;Container gap="page"&gt;{children}&lt;/Container&gt;</code> — đo viền = 0px</span>
+        <div class="mock bad surf" style="padding:0">
+          <div class="card" style="border-radius:0;border:none"><span class="ttl">Nội dung ChallengePage</span></div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ tách trách nhiệm: <code>&lt;Container padding="roomy"&gt;&lt;StackV gap="page"&gt;</code></span>
+        <div class="mock good surf" style="padding:24px">
+          <div class="card"><span class="ttl">Nội dung ChallengePage</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>Container</code> chỉ áp <code>gap</code> ở nhánh dùng slot <code>header</code>/<code>footer</code>; truyền <code>children</code> thẳng thì prop bị bỏ im lặng. Sửa thật: bỏ hẳn <code>gap</code>/slot khỏi <code>Container</code>, khung đo chỉ giữ đúng MỘT trách nhiệm là <code>padding</code>; nhịp giữa các con chuyển hẳn cho <code>Container &gt; StackV</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> một khung không được vừa là "chủ của seam" vừa là "chủ của inset" cùng lúc nếu tên prop không tách bạch — người viết code sẽ đọc nhầm y như người đọc mắt ở mục 2.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · <code>@container</code> và <code>padding</code> đứng chung một element</h3><span class="pair">content-box bị trừ mất padding trước khi đo</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ một div vừa mở <code>@container</code> vừa có <code>p-8</code></span>
+        <div class="mock bad" style="border:1.5px dashed var(--danger);padding:32px">
+          <div class="row">size="xl" cap = 1280px — nhưng đo container-query trừ mất 64px hai bên, <code>@app-xl</code> KHÔNG BAO GIỜ fire</div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ tách 2 lớp: ngoài giữ @container+max-w, trong giữ padding</span>
+        <div class="mock good" style="border:1.5px dashed var(--success);padding:0">
+          <div style="padding:32px"><div class="row">size="xl" cap = 1280px — container-query đo đúng full width, <code>@app-xl</code> fire đúng ngưỡng</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> khi <code>@container</code> và <code>padding</code> cùng một element, trình duyệt đo content-box của chính container query đó — đã trừ padding của chính nó. Bug này <b>im lặng</b>, không tsc, không lint, chỉ lộ khi đo DOM ở đúng viewport cap (neo: <code>SplitWorkspace</code> kẹt <code>flex-col</code> ở 1920px).</p>
+    <div class="prin"><b>Nguyên lý:</b> bất cứ khung nào tự mở <code>@container</code> VÀ tự có <code>padding</code> phải tách 2 element — đây là luật không gate được, chỉ có kỷ luật.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · <code>InsetScale</code> chỉ biểu diễn padding ĐỀU bốn cạnh</h3><span class="pair">src thật có padding bất đối xứng, thang thì không</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ làm tròn <code>px-4 pb-6</code> về roomy đối xứng, im lặng</span>
+        <div class="mock bad" style="padding:24px">
+          <div class="fc" style="gap:8px"><span class="ttl">Mở khoá toàn bộ khoá học</span><span class="sub2">đã "tròn" cả 4 cạnh thành 24px, không ai biết nguồn lệch</span></div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ port có Ý THỨC + ghi chú lệch tại chỗ (<code>EnrollGate.tsx</code>)</span>
+        <div class="mock good" style="padding:16px 24px 24px 24px">
+          <div class="fc" style="gap:8px"><span class="ttl">Mở khoá toàn bộ khoá học</span><span class="sub2">comment: "the ONE deviation from a byte-for-byte port, scale is symmetric"</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>CollapsibleSidebar</code> (<code>px-3 py-6</code> rail khác <code>p-6</code> panel) và <code>EnrollGate</code> (<code>px-4 pb-6</code> port về <code>roomy</code> đối xứng) là hai neo cùng loại. Khi <code>src</code> lệch trục ngang/dọc, phải chọn giữa port xấp xỉ có ghi chú, hoặc rơi khỏi khung viết class tay — không được làm tròn rồi im lặng.</p>
+    <div class="prin"><b>Nguyên lý:</b> một comment tại chỗ port là bằng chứng duy nhất phân biệt "đã cân nhắc và chấp nhận lệch" với "vô tình làm tròn".</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · gate dùng thang của SEAM để chấm INSET</h3><span class="pair"><code>p-1</code>/<code>p-2</code> lọt qua dù không có trong InsetScale</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ <code>check-padding.mjs</code> báo "hợp lệ" cho <code>p-1</code></span>
+        <div class="mock bad">
+          <div class="fc" style="gap:6px">
+            <span class="chip">SCALE gate = {0,1,2,3,6,8}</span>
+            <span class="bd">class="p-1" → nằm trong SCALE ⇒ <span style="color:var(--danger)">PASS (sai)</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ đúng ra phải chấm theo InsetScale thật</span>
+        <div class="mock good">
+          <div class="fc" style="gap:6px">
+            <span class="chip">InsetScale thật = {0,3,6,8}</span>
+            <span class="bd">class="p-1" → không có trong InsetScale ⇒ <span style="color:var(--success)">phải FAIL</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đọc code gate: <code>SCALE = new Set(["0","1","2","3","6","8"])</code> áp cho cả nhánh <code>p[trblxy]?-</code> — đây là bảng 6 giá trị của <code>SeamScale</code>, không phải 4 giá trị của <code>InsetScale</code>. Một <code>p-1</code>/<code>p-2</code> viết tay (không qua prop <code>padding</code>) sẽ được coi là hợp lệ dù không hề tồn tại trong thang inset thật.</p>
+    <div class="watch"><b>⚠️ Lỗ hổng thật, chưa vá:</b> đây không phải suy đoán — gate đang chạy sai thang cho đúng file nó tự nhận là kiểm inset. Grep thủ công <code>\bp[trblxy]?-[12]\b</code> ở tầng <code>frame</code> trở lên nếu nghi ngờ, đừng tin report "0 lỗi" của gate cho trường hợp này.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · tưởng atom cũng phải theo InsetScale</h3><span class="pair"><code>Input.tsx</code> viết <code>pr-9</code> thẳng — đây KHÔNG phải vi phạm</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ "sửa lại" pr-9 của Input thành padding="cozy" cho đồng bộ</span>
+        <div class="mock bad" style="padding:12px">
+          <div class="row" style="position:relative">giá trị nhập <i class="ph-fill ph-eye ic" style="position:absolute;right:12px;top:9px"></i></div>
+          <span class="sub2" style="margin-top:4px;display:block">icon mắt bị đẩy ra ngoài padding cozy, không còn nằm cạnh field</span>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ giữ nguyên: atom tự lo hình học nội bộ của chính nó</span>
+        <div class="mock good" style="padding:0">
+          <div class="row" style="position:relative;padding-right:36px">giá trị nhập <i class="ph-fill ph-eye ic" style="position:absolute;right:12px;top:9px"></i></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>check-padding.mjs</code> chỉ quét từ tầng <code>frame</code> trở lên (<code>GUARDED = {frame, composite, design, block, screen, viewer}</code>); <code>atom</code>/<code>util</code> bị loại có chủ đích — <code>Input.tsx</code>, <code>Select.tsx</code> viết <code>pr-9</code> để chừa đúng chỗ cho nút mắt/icon, con số này không nằm trong <code>InsetScale</code> và không cần nằm trong đó.</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>InsetScale</code> quản lý padding của BỀ MẶT (card, container), không quản lý hình học nội bộ của một atom tự sở hữu layout của chính nó.</div>
+  </div>
+
+  <h2>4. Ba lỗi thật đã cắn — và điều lộ ra khi xếp cạnh nhau</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:24%">Chỗ</th><th style="width:38%">Chuyện gì</th><th style="width:18%">Loại lỗi</th><th>Ngày</th></tr></thead>
+      <tbody>
+        <tr><td><code>Container.tsx</code></td><td><code>@container</code> + <code>padding</code> chung 1 div → content-box trừ mất padding, <code>size="xl"</code> không bao giờ chạm <code>@app-xl</code></td><td class="numc" style="color:var(--warn)">cấu trúc (bẫy 2)</td><td>2026-07-26</td></tr>
+        <tr><td><code>Container.tsx</code></td><td><code>CourseContents</code> viết <code>gap="page"</code> tưởng là padding khung đo, đo ra literal 0px</td><td class="numc" style="color:var(--warn)">nhầm trục inset/seam (bẫy 1)</td><td>2026-07-27</td></tr>
+        <tr><td><code>ContentCommentComposer</code></td><td>nút pill viết <code>px-4</code> lệch thang, gate bắt được ngay lần chạy, sửa về <code>px-3</code></td><td class="numc" style="color:var(--success)">chọn sai giá trị (thang)</td><td>2026-07-29</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0"><b>Điều chỉ hiện ra khi xếp cả ba cạnh nhau:</b> hai trong ba lỗi thật là lỗi <b>CẤU TRÚC</b> (nhầm trục, hoặc double-count padding) — chỉ một lỗi là "chọn sai giá trị trong thang" theo đúng nghĩa cổ điển. Ngược hẳn với trục <code>seam</code>, nơi cả bốn lỗi thật đều là chọn nhầm bậc kề nhau. Với <code>inset</code>, gate <code>check-padding.mjs</code> đã khá tốt ở việc bắt SAI THANG (bắt được ca thứ ba ngay lần chạy đầu), nhưng <b>không có gate nào bắt được hai lỗi cấu trúc kia</b> — chúng chỉ lộ ra khi đo DOM ở đúng viewport hoặc đọc kỹ luồng slot. Kết luận: với trục này, rủi ro thật nằm ở BẪY (mục 3) nhiều hơn ở việc chọn nhầm bậc (mục 2).</p>
+  </div>
+
+  <h2>5. Ba cặp không render — vì sao</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Hai cặp cách một bậc</b> (<code>flush↔roomy</code> · <code>cozy↔airy</code>): không viết phép thử riêng.</p>
+    <p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">— <code>flush↔roomy</code>: phân vân ở đây nghĩa là câu hỏi §2 "nội dung có tự vẽ mép cần chạm viền không" chưa được trả lời dứt khoát. Trả lời câu đó trước, đừng nhảy thẳng vào so <code>flush</code> với <code>roomy</code>.</p>
+    <p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">— <code>cozy↔airy</code>: phân vân ở đây nghĩa là câu hỏi "đây có phải MẶT card thường không" chưa xong. Một card thường không bao giờ nhảy thẳng lên <code>airy</code> mà không qua bước xác định nó có phải khu vực cố ý nhấn không gian hay không.</p>
+    <p style="margin:0"><b>Một cặp cách ≥2 bậc</b> (<code>flush↔airy</code>): <b>cố ý không có phép thử, và không render.</b> Một nội dung chạm-viền và một khu vực-thở-rộng không bao giờ là cùng một quyết định — nếu đang so hai cái này, có thể đang so hai TẦNG khác nhau (nội dung bên trong một card <code>airy</code> chính nó lại có một vùng media <code>flush</code> — đó là 2 padding của 2 element khác nhau, không phải 1 lựa chọn). Viết phép phân định cho cặp này là hợp thức hoá một lỗi cấu trúc.</p>
+  </div>
+
+  <h2>6. Neo code thật — đã đọc lại tận nơi, không chép lại</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Giá trị dưới đây đọc trực tiếp từ file ngày <b>2026-07-29</b>. Số dòng của <code>.storybook</code> trôi theo mỗi lần sửa; tìm theo pattern <code>padding="…"</code> trong đúng file nếu lệch.</p>
+    <table>
+      <thead><tr><th style="width:12%">Bậc</th><th style="width:34%">Hình</th><th>Neo</th></tr></thead>
+      <tbody>
+        <tr><td class="numc" style="color:var(--muted)">flush</td><td>mặt card cho ảnh bleed-edge tràn mép</td><td><code>SurfaceCard.tsx:333</code> — <code>padding === "flush" ? "overflow-hidden" : PADDING_CLASS[padding]</code></td></tr>
+        <tr><td class="numc" style="color:var(--muted)">flush</td><td>card bọc ảnh cover trong danh sách liên quan</td><td><code>RelatedContentList.tsx:140</code> — <code>&lt;SurfaceCard variant="nested" padding="flush"&gt;</code></td></tr>
+        <tr><td class="numc" style="color:var(--success)">cozy</td><td>mặt trong mặc định của MỌI SurfaceCard</td><td><code>SurfaceCard.tsx:317</code> — <code>padding = "cozy"</code> (default)</td></tr>
+        <tr><td class="numc" style="color:var(--success)">cozy</td><td>card nested panel lịch sử AI quota</td><td><code>AiQuotaHistoryPanel.tsx:167</code> — <code>&lt;SurfaceCard variant="nested" padding="cozy"&gt;</code></td></tr>
+        <tr><td class="numc" style="color:var(--success)">cozy</td><td>hàng bước thiết lập playground</td><td><code>PlaygroundSetupSteps.tsx:197</code> — <code>&lt;StackV gap="related" padding="cozy"&gt;</code></td></tr>
+        <tr><td class="numc" style="color:var(--accent)">roomy</td><td>mặc định của khung đo Container</td><td><code>Container.tsx:137</code> — <code>padding = "roomy"</code> (default)</td></tr>
+        <tr><td class="numc" style="color:var(--accent)">roomy</td><td>khung trang settings</td><td><code>SettingsLayout.tsx:134</code> — <code>padding="roomy"</code></td></tr>
+        <tr><td class="numc" style="color:var(--accent)">roomy</td><td>khung đo mọi page thật</td><td>grep <code>padding="roomy"</code> trong <code>pages/**</code> — hơn 15 call-site, luôn kèm <code>Container size="md|lg|xl"</code></td></tr>
+        <tr><td class="numc" style="color:var(--warn)">airy</td><td>card hero bán hàng</td><td><code>EnrollGate.tsx:152</code> — <code>&lt;SurfaceCard padding="airy" className="mx-auto w-full max-w-[480px]"&gt;</code></td></tr>
+        <tr><td class="numc" style="color:var(--warn)">airy</td><td>card bọc empty-state khoá hồ sơ</td><td><code>ProfileLockedState.tsx:94</code> — <code>&lt;SurfaceCard padding="airy"&gt;</code> bọc <code>FeedbackEmpty</code></td></tr>
+      </tbody>
+    </table>
+    <p style="margin:14px 0 0;font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">Neo <code>src/**</code> thật — InsetScale KHÔNG chảy ngược vào đó:</b> <code>PressableCard/index.tsx:57</code> ghi thẳng "concentric <code>rounded-3xl</code>, fixed <code>px-4 py-3</code>", <code>GroupPressableCard/index.tsx:92-94</code> cùng họ. <code>InsetScale</code> là vốn từ chỉ sống trong <code>.storybook</code>; khi port từ <code>src</code>, gọi tên bậc là bước DỊCH, không phải sao chép.</p>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Chạy trong iframe của story, đo padding thật của một node:</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">const el = document.querySelector('[data-anat-part="SurfaceCard"]')
+const cs = getComputedStyle(el)
+;[cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft]</pre>
+    <p style="margin:12px 0 6px"><b>Hai thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>khung vừa mở <code>@container</code> vừa có <code>padding</code></td><td>đo <code>getBoundingClientRect().width</code> ở ĐÚNG viewport cap của <code>size</code> — nếu tier <code>@app-*</code> trên cùng không bao giờ fire dù resize hết cỡ, đó là bẫy 2, không phải "chưa đủ rộng màn hình test"</td></tr>
+        <tr><td>gate có chấm đúng thang không</td><td><code>check-padding.mjs</code> dùng <code>SCALE = {0,1,2,3,6,8}</code> — grep thủ công <code>\bp[trblxy]?-[12]\b</code> ở tầng <code>frame</code> trở lên vì gate không bắt được (bẫy 4)</td></tr>
+      </tbody>
+    </table>
+    <pre style="margin:12px 0 0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">node scripts/check-padding.mjs          # report, exit 1 khi có lỗi
+node scripts/check-padding.mjs --json   # máy đọc</pre>
+  </div>
+
+  <p class="note">Tổng: 3 cặp kề nhau render đủ hai chiều sai · 1 cặp đặc biệt inset↔seam · 5 bẫy cấu trúc render · 3 lỗi thật · 2 cặp cách một bậc giải thích không render · 1 cặp cách ≥2 bậc cố ý loại · 10 neo <code>src</code> đã đọc lại. <b>6/6 cặp có chỗ đứng</b>, không cặp nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>

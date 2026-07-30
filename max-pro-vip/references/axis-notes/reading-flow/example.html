@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>READING-FLOW — hai thang vuông góc, render thật SAI cạnh ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:100px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── mocks riêng của reading-flow ── */
+  .btn-native{font:inherit;background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);padding:10px 14px;border-radius:10px;width:100%;cursor:pointer}
+  .btn-native.override{text-align:start}
+  .app-pressable{display:block;width:100%;background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:12px}
+
+  /* demo CSS layer thật cho bẫy 3 (specificity) */
+  .vendor-cell{ text-align:left; background:var(--app-surface); border:1px solid var(--app-border); border-radius:8px; padding:10px 12px; color:var(--app-fg); font-size:13px; }
+  @layer demoUtilities { .u-end-demo{ text-align:end; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>READING-FLOW — hai thang vuông góc, render thật SAI cạnh ĐÚNG</h1>
+  <p class="sub">Mọi khung dưới đây là HTML render thật, kể cả bẫy CSS-layer ở §3 (dùng đúng cơ chế <code>@layer</code> mà Tailwind v4 dùng thật, không phải ảnh chụp). Nguồn <code>principles.md</code> §3 <b>bản lịch sử</b> tự ghi DRAFT (neo dòng số hiện đã chết — file đó bị rã 2026-07-29 thành bản đồ chuyển hướng, xem <code>context.md</code>). Rà lại từng câu 2026-07-29: 3/4 câu treo cũ đã tự đóng bằng luật/đo code (§1, §5) — chỉ còn 1 câu thật sự cần thầy (modal xác nhận 1 nút, §5).</p>
+
+  <h2>0. Hai thang</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Thang A — TEXT-ALIGN</b> (canh CHỮ trong khung văn bản của chính nó, prop <code>Typography.align</code>):</p>
+    <div class="scale">
+      <div class="srow"><span class="sname">start</span><span class="spx">text-start</span><span class="sbar" style="width:24px"></span><span class="sdesc">mặc định — theo flow cha</span></div>
+      <div class="srow"><span class="sname">center</span><span class="spx">text-center</span><span class="sbar" style="width:64px"></span><span class="sdesc">chỉ 4 ngoại lệ ở §1 context.md</span></div>
+      <div class="srow"><span class="sname">end</span><span class="spx">text-end</span><span class="sbar" style="width:104px;margin-left:auto"></span><span class="sdesc">số / tiền / mốc thời gian cuối hàng</span></div>
+    </div>
+    <p style="margin:14px 0 10px"><b>Thang B — BLOCK-POSITION</b> (canh KHỐI trong track cha, dọc theo trục NGANG — hướng đọc). Cùng 1 thang ngữ nghĩa nhưng khoác 2 tên prop khác nhau tuỳ track:</p>
+    <table>
+      <thead><tr><th>Track</th><th>Trục ngang là</th><th>Prop</th><th>Giá trị có</th></tr></thead>
+      <tbody>
+        <tr><td><code>StackH</code> / <code>Cluster</code> (NGANG)</td><td>main-axis</td><td class="numc">justify</td><td class="numc">start · center · end · between</td></tr>
+        <tr><td><code>StackV</code> (DỌC)</td><td>cross-axis</td><td class="numc">align</td><td class="numc">start · center · end · stretch</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted)"><code>ml-auto</code> tay trên MỘT con là lối thứ ba, không nằm trong prop track nào — đẩy đúng 1 phần tử về cuối, không đổi <code>justify</code> của cả track.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — 11 cặp, đếm được</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Thang A có <b>3</b> giá trị ⇒ <code>C(3,2) = 3</code> cặp. Thang B có <b>4</b> giá trị ngữ nghĩa ⇒ <code>C(4,2) = 6</code> cặp. Cộng <b>2</b> cặp XUYÊN THANG (không tính vào <code>C(N,2)</code> vì khác thang, nhưng là chỗ gõ nhầm nhiều nhất: cùng chữ "center" nhưng khác thuộc tính CSS, hoặc khác prop tuỳ hướng track). Tổng <b>3 + 6 + 2 = 11</b>.</p>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div>
+        <p style="margin:0 0 6px;font-size:11px;color:var(--muted)">Thang A (3×3)</p>
+        <table class="mx">
+          <tr><th class="empty"></th><th>start</th><th>center</th><th>end</th></tr>
+          <tr><th>start</th><td class="diag">—</td><td class="adj">1</td><td class="near">3</td></tr>
+          <tr><th>center</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td></tr>
+          <tr><th>end</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+        </table>
+      </div>
+      <div>
+        <p style="margin:0 0 6px;font-size:11px;color:var(--muted)">Thang B (4×4, ngữ nghĩa)</p>
+        <table class="mx">
+          <tr><th class="empty"></th><th>start</th><th>center</th><th>end</th><th>between/stretch</th></tr>
+          <tr><th>start</th><td class="diag">—</td><td class="adj">1</td><td class="near">4</td><td class="near">6</td></tr>
+          <tr><th>center</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td><td class="near">5</td></tr>
+          <tr><th>end</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">3</td></tr>
+          <tr><th>between/stretch</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+        </table>
+      </div>
+    </div>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">Mục 2 render đủ 5 cặp bằng chứng nhất (2 của Thang A, 2 của Thang B, 1 xuyên thang). Mục 3 render 5 bẫy cấu trúc (không phải chọn sai giá trị mà đọc sai cấu trúc xung quanh). Mục 5 nói rõ vì sao các cặp còn lại không render.</p>
+  </div>
+
+  <h2>2. Năm cặp dễ lẫn nhất — mỗi cặp render hai chiều sai</h2>
+
+  <!-- CẶP 1 — Thang A start<->center -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · Thang A · <code>start</code> ↔ <code>center</code></h3><span class="pair">đoạn văn nhiều dòng</span></div>
+    <div class="test"><b>Phép phân định:</b> nội dung có <b>≥2 dòng CHỮ CHẠY</b> không? Có ⇒ <code>start</code> bắt buộc. Không (≤2 dòng ngắn, khớp 1 trong 4 ngoại lệ) ⇒ <code>center</code> được phép.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · mô tả 3 dòng dùng text-center <span class="measure">content chính</span></span>
+        <div class="mock bad"><p class="bd" style="text-align:center;margin:0">Middleware là hàm chạy TRƯỚC route handler chính, dùng để xác thực token, ghi log request, hoặc chặn sớm khi thiếu quyền truy cập trước khi vào logic nghiệp vụ thật sự.</p></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · text-start</span>
+        <div class="mock good"><p class="bd" style="text-align:start;margin:0">Middleware là hàm chạy TRƯỚC route handler chính, dùng để xác thực token, ghi log request, hoặc chặn sớm khi thiếu quyền truy cập trước khi vào logic nghiệp vụ thật sự.</p></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ở bản center, mép TRÁI của mỗi dòng nằm một chỗ khác nhau (răng cưa) — mắt phải DÒ LẠI điểm bắt đầu dòng mới mỗi lần xuống dòng, thay vì quay thẳng về đúng 1 cột như đọc sách. Bản start giữ mép trái CỐ ĐỊNH, mắt chỉ cần rơi thẳng xuống.</p>
+    <div class="prin"><b>Nguyên lý:</b> center chỉ rẻ (không mất công đọc) khi có ≤2 dòng NGẮN đứng riêng — nhiều dòng luôn trả giá bằng tốc độ đọc.</div>
+  </div>
+
+  <!-- CẶP 2 — Thang A center<->end -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · Thang A · <code>center</code> ↔ <code>end</code></h3><span class="pair">số cuối hàng</span></div>
+    <div class="test"><b>Phép phân định:</b> đây có phải <b>SỐ/tiền/mốc thời gian ở CUỐI hàng</b>, cần thẳng cột khi nhiều hàng xếp chồng không? Có ⇒ <code>end</code> + <code>tabularNums</code>. Không (nhãn/caption đứng riêng 1 mình) ⇒ <code>center</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · cột điểm dùng text-center <span class="measure">3 hàng lệch cột</span></span>
+        <div class="mock bad"><div class="fc" style="gap:4px">
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài kiểm tra 1</span><span class="num" style="font-size:14px;text-align:center;width:56px">8.5</span></div>
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài kiểm tra 12</span><span class="num" style="font-size:14px;text-align:center;width:56px">10</span></div>
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài kiểm tra 3</span><span class="num" style="font-size:14px;text-align:center;width:56px">9.25</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · text-end + tabular-nums <span class="measure">thẳng cột</span></span>
+        <div class="mock good"><div class="fc" style="gap:4px">
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài kiểm tra 1</span><span class="num" style="font-size:14px;text-align:end;width:56px;font-variant-numeric:tabular-nums">8.5</span></div>
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài kiểm tra 12</span><span class="num" style="font-size:14px;text-align:end;width:56px;font-variant-numeric:tabular-nums">10</span></div>
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài kiểm tra 3</span><span class="num" style="font-size:14px;text-align:end;width:56px;font-variant-numeric:tabular-nums">9.25</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ở bản center, mỗi số nằm giữa ô của riêng nó nên KHÔNG thẳng cột — chữ số hàng chục của "10" lệch khỏi hàng đơn vị của "8.5". Bản end neo tất cả vào mép phải, cột số đọc thẳng xuống được ngay. Neo thật: <code>Table.tsx</code> <code>TableAlign</code> chỉ định nghĩa <code>start</code>|<code>end</code>, cố ý KHÔNG có <code>center</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> số nhiều hàng luôn <code>end</code>, không bao giờ <code>center</code> — center chỉ hợp với 1 con số ĐỨNG MỘT MÌNH không có hàng nào bên cạnh để so.</div>
+  </div>
+
+  <!-- CẶP 3 — Thang B ngang start<->center -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 3 · Thang B (track NGANG) · <code>justify="start"</code> ↔ <code>justify="center"</code></h3><span class="pair">nav item</span></div>
+    <div class="test"><b>Phép phân định:</b> đây là <b>content chính</b> (danh sách, nav mở rộng) hay <b>1 khối focal đơn lẻ</b> (icon một mình khi thu gọn)? Content chính ⇒ <code>start</code>. Focal đơn ⇒ <code>center</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · nav MỞ RỘNG dùng justify-center <span class="measure">icon+nhãn trôi giữa</span></span>
+        <div class="mock bad" style="width:220px"><div class="fx" style="justify-content:center;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:var(--app-surface)"><i class="ph-fill ph-books" style="color:var(--app-muted)"></i><span class="bd">Khoá học của tôi</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · justify-start <span class="measure">nav MỞ RỘNG</span></span>
+        <div class="mock good" style="width:220px"><div class="fx" style="justify-content:start;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:var(--app-surface)"><i class="ph-fill ph-books" style="color:var(--app-muted)"></i><span class="bd">Khoá học của tôi</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> một danh sách nav có N mục xếp chồng — center làm mỗi mục neo vào một điểm ngang KHÁC NHAU tuỳ độ dài nhãn, mắt phải dò lại vị trí icon mỗi hàng. Neo thật: <code>SettingsSidebarNav.tsx:199</code> — <code>justify={collapsed ? "center" : "start"}</code> — CHỈ center khi <code>collapsed</code> (sidebar thu gọn còn đúng 1 icon, đổi thành khối focal đơn), còn lại luôn <code>start</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> "content chính" và "trạng thái thu gọn của CHÍNH content đó" là hai ngữ cảnh khác nhau — cùng 1 component nhưng đổi cây quyết định theo state, không phải chọn cố định lúc viết code.</div>
+  </div>
+
+  <!-- CẶP 4 — Thang B dọc center<->stretch -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 4 · Thang B (track DỌC) · <code>align="stretch"</code> ↔ <code>align="center"</code></h3><span class="pair">hero card</span></div>
+    <div class="test"><b>Phép phân định:</b> nội dung con có cần <b>chiếm ĐỦ bề ngang</b> track (input, danh sách, nút full-width) không? Có ⇒ <code>stretch</code> (mặc định của <code>StackV</code>). Không (khối co theo nội dung, cần đứng GIỮA — hero/empty-state) ⇒ <code>center</code>, PHẢI khai tường minh.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · hero card giữ mặc định stretch <span class="measure">lệch trái</span></span>
+        <div class="mock bad"><div class="card" style="max-width:260px;margin:0 auto"><div class="fc" style="gap:8px;align-items:stretch;text-align:center">
+          <i class="ph-fill ph-lock-simple-open" style="font-size:22px;color:var(--app-accent)"></i>
+          <span class="ttl">Mở khoá bài học</span>
+          <button class="btn p" style="width:100%">Ghi danh ngay</button>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · align="center" tường minh</span>
+        <div class="mock good"><div class="card" style="max-width:260px;margin:0 auto"><div class="fc" style="gap:8px;align-items:center;text-align:center">
+          <i class="ph-fill ph-lock-simple-open" style="font-size:22px;color:var(--app-accent)"></i>
+          <span class="ttl">Mở khoá bài học</span>
+          <button class="btn p" style="width:60%">Ghi danh ngay</button>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> icon và tiêu đề co theo nội dung (không full-width) nhưng ở bản trái, track vẫn <code>align="stretch"</code> mặc định nên icon/tiêu đề bị kéo dính mép trái của track dù chữ bên trong có <code>text-align:center</code> — khối và chữ đá nhau. Neo thật: <code>EnrollGate.tsx:156,193</code> khai <code>align="center"</code> TƯỜNG MINH cho đúng lý do này, không dựa <code>stretch</code> mặc định của <code>StackV</code> (<code>Stack.tsx:129</code>).</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>text-align:center</code> (Thang A, canh CHỮ) không kéo theo khối cha cũng center (Thang B, canh KHỐI) — hai thuộc tính CSS độc lập, phải khai CẢ HAI khi cần cả hai.</div>
+  </div>
+
+  <!-- CẶP 5 — xuyên thang -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 5 · XUYÊN THANG · <code>text-center</code> (Thang A) ↔ <code>align="center"</code> (Thang B)</h3><span class="pair">hàng icon+nhãn</span></div>
+    <div class="test"><b>Phép phân định:</b> đang cần canh CHỮ trong khung của chính nó, hay canh VỊ TRÍ của khối con so với track cha? Icon+nhãn cao khác nhau trong 1 hàng ⇒ đây là canh VỊ TRÍ (cross-axis) ⇒ <code>align="center"</code> (→ <code>items-center</code>), KHÔNG PHẢI <code>text-center</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · dùng text-center cho cả hàng <span class="measure">icon dính mép trên</span></span>
+        <div class="mock bad"><div class="fx" style="gap:8px;text-align:center;align-items:flex-start"><i class="ph-fill ph-check-circle" style="color:var(--success);font-size:22px"></i><span class="bd" style="text-align:center">Đã hoàn thành 8 trên tổng 20 bài học của module này</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · align="center" (items-center)</span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success);font-size:22px"></i><span class="bd">Đã hoàn thành 8 trên tổng 20 bài học của module này</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>text-center</code> chỉ set thuộc tính <code>text-align</code> — không hề ảnh hưởng vị trí THEO CHIỀU DỌC của icon so với dòng chữ (bản trái icon vẫn dính mép trên vì thiếu <code>items-center</code>). Muốn icon và dòng chữ đầu tiên ngang hàng nhau phải set <code>align</code> (cross-axis) của TRACK, một thuộc tính CSS hoàn toàn khác (<code>align-items</code>).</p>
+    <div class="prin"><b>Nguyên lý:</b> chữ "center" xuất hiện ở CẢ HAI thang không có nghĩa chúng thay thế được nhau — luôn hỏi "đang chỉnh CHỮ hay chỉnh KHỐI" trước khi gõ class.</div>
+  </div>
+
+  <h2>3. Năm bẫy cấu trúc — chọn đúng bậc nhưng vẫn sai</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · <code>&lt;button&gt;</code> có <code>text-align:center</code> MẶC ĐỊNH của trình duyệt</h3><span class="pair">không viết center ở đâu, vẫn ra giữa</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ quên đè · button KHÔNG set text-align</span>
+        <div class="mock bad"><button class="btn-native">Xem chi tiết bài nộp</button></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ tự đè text-start</span>
+        <div class="mock good"><button class="btn-native override">Xem chi tiết bài nộp</button></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> UA stylesheet của trình duyệt tự set <code>text-align:center</code> cho phần tử <code>&lt;button&gt;</code> — không một dòng code nào trong repo viết "center", nhưng chữ vẫn ra giữa nếu không tự đè lại. Neo thật (9 chỗ sống PHẢI tự đè): <code>SurfaceCard.tsx:386,609,624,1346,1427,1626,1681</code> · <code>Stepper.tsx:206</code> · <code>SettingsSidebarNav.tsx:194</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> phần tử semantic (<code>button</code>, không phải <code>div</code>) có thể tự mang style ẩn — phải BIẾT UA stylesheet của thẻ đang dùng, không chỉ đọc CSS tự viết.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · Vật lý (<code>text-left</code>) và logic (<code>text-start</code>) cùng giải Bẫy 1, viết 2 kiểu ở 2 nơi</h3><span class="pair">cùng nhu cầu, khác vốn từ</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ vật lý · 8 chỗ sống <span class="measure">text-left</span></span>
+        <div class="mock bad"><div class="app-pressable" style="text-align:left"><span class="ttl">SurfaceCard.tsx:386</span><br/><span class="tm">.storybook/components/composites/cards/SurfaceCard</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ logic · 2 chỗ sống <span class="measure">text-start</span></span>
+        <div class="mock good"><div class="app-pressable" style="text-align:start"><span class="ttl">SettingsSidebarNav.tsx:194</span><br/><span class="tm">.storybook/components/starci/blocks/navigation</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao cả hai TRÔNG giống hệt nhau</b> (app hiện chỉ chạy LTR): về mặt hình ảnh không phân biệt được. Nhưng <code>Typography.tsx:98-105</code> đã CHỐT lý do chọn logic (<code>start</code>/<code>end</code>) cho cả hệ — khớp HeroUI, tự lật RTL. Hai file kia đi ra ngoài quy ước đó bằng tay, và không lỗi biên dịch/lint nào bắt được — Tailwind hỗ trợ song song cả hai cú pháp.</p>
+    <div class="prin"><b>Nguyên lý:</b> một quy ước KHÔNG có gate là một quy ước sẽ trôi — verify code thật lộ ra 2 vốn từ cùng tồn tại cho cùng 1 mục đích, không phải giả định "chắc đâu cũng vậy".</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · CSS layer thắng bất kể class nào được viết</h3><span class="pair">render CSS <code>@layer</code> THẬT, không mô tả</span></div>
+    <div class="test"><b>Cơ chế thật</b> (<code>Table.tsx:25-28</code>): CSS un-layered của HeroUI (<code>.table__column{text-align:left}</code>) luôn thắng utility Tailwind v4 nằm trong <code>@layer utilities</code>, BẤT KỂ độ đặc hiệu selector — thứ tự LAYER quyết định trước, specificity chỉ xét trong CÙNG layer.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ set trực tiếp trên "ô" — thua layer <span class="measure">vẫn LEFT</span></span>
+        <div class="vendor-cell u-end-demo">1.234.000₫</div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ set trên SPAN con — thắng kế thừa <span class="measure">END thật</span></span>
+        <div class="vendor-cell"><span class="u-end-demo" style="display:block">1.234.000₫</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao (đây là CSS THẬT của chính trang này, không phải hình vẽ):</b> class <code>.vendor-cell</code> mô phỏng CSS bundle HeroUI — không nằm trong <code>@layer</code> nào. Class <code>.u-end-demo</code> mô phỏng utility Tailwind — nằm trong <code>@layer demoUtilities</code>. Ô trái áp CẢ HAI class lên CÙNG phần tử ⇒ layer un-layered thắng ⇒ vẫn <code>text-align:left</code>. Ô phải đặt <code>.u-end-demo</code> lên <b>SPAN CON</b> — span đó không bị <code>.vendor-cell</code> chạm tới (selector đó chỉ nhắm phần tử ngoài), nên giá trị trực tiếp trên span thắng giá trị KẾ THỪA, không cần <code>!important</code>. Neo thật: <code>Table.tsx:97-98</code> (<code>CellBox</code>) làm chính xác điều này.</p>
+    <div class="prin"><b>Nguyên lý:</b> thứ tự khai báo <code>@layer</code> đứng TRƯỚC specificity trong thuật toán cascade — 1 class đơn ngoài layer luôn thắng 1 class đơn trong layer, viết thêm class mạnh hơn ở bên trong layer cũng vô ích.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · Ba cơ chế đẩy-phải nhìn giống hệt khi chỉ có 2 phần tử</h3><span class="pair">justify-end · justify-between · ml-auto</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ 2 phần tử · CẢ BA cách đều ra hình giống nhau</span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><div class="fx" style="justify-content:space-between"><span class="bd">Tệp đính kèm</span><button class="btn">Tải xuống</button></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl bad">✕ thêm phần tử thứ 3 mới lộ SAI ý định <span class="measure">justify-end dồn cả cụm</span></span>
+        <div class="mock bad"><div class="fx" style="justify-content:flex-end;gap:8px"><span class="bd">Tệp đính kèm</span><span class="tm">2.4 MB</span><button class="btn">Tải xuống</button></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> với 2 phần tử, <code>justify="end"</code> (dồn cả hàng qua phải rồi 2 phần tử tự tách theo <code>gap</code>), <code>justify="between"</code> (đẩy 2 đầu), và <code>ml-auto</code> trên phần tử thứ 2 (chỉ đẩy nó) đều RA HÌNH Y HỆT. Thêm phần tử thứ 3 ("Tệp đính kèm" · "2.4 MB" · nút) mới lộ: <code>justify="end"</code> kéo LUÔN "Tệp đính kèm" dạt sang phải theo, sai ý định ban đầu là "chỉ nút cần dạt phải, tên tệp vẫn ở đầu". Neo <code>ml-auto</code> đúng ý định: <code>UserCell.tsx:129</code>, <code>SurfaceCard.tsx:1158,1393,1695</code>, <code>List.tsx:188</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> test 1 cơ chế đẩy-phải phải test với ≥3 phần tử, không phải 2 — 2 phần tử che giấu hết khác biệt.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · Gate chỉ bắt <code>justify-*</code> khi đi kèm <code>gap-*</code></h3><span class="pair"><code>check-seams.mjs:122</code> đòi cả hai mảnh regex</span></div>
+    <table>
+      <thead><tr><th style="width:40%">Chỗ</th><th style="width:30%">className</th><th>Có <code>gap-*</code>?</th><th>Gate bắt?</th></tr></thead>
+      <tbody>
+        <tr><td>Page.tsx:261</td><td class="numc">flex items-center justify-between gap-3</td><td class="numc" style="color:var(--success)">có</td><td class="numc" style="color:var(--success)">✅ bắt</td></tr>
+        <tr><td>surface-card-header.tsx:71</td><td class="numc">flex items-center justify-between gap-3</td><td class="numc" style="color:var(--success)">có</td><td class="numc" style="color:var(--success)">✅ bắt</td></tr>
+        <tr><td>PlaygroundSetupSteps.tsx:194</td><td class="numc">flex items-center justify-between border-b…</td><td class="numc" style="color:var(--danger)">KHÔNG</td><td class="numc" style="color:var(--danger)">⛔ lọt</td></tr>
+      </tbody>
+    </table>
+    <p class="why" style="margin-top:8px"><b>Vì sao:</b> regex của gate (<code>check-seams.mjs:122</code>) đòi className khớp CẢ <code>/\bgap-[\d.]+/</code> LẪN <code>/\b(flex|grid)\b/</code> mới báo <code>hand-rolled-layout</code>. Dòng thứ ba viết bố cục tay y hệt hai dòng trên (tầng <code>composite</code>, đáng lẽ phải qua <code>Flex</code>/<code>StackH</code>) nhưng không cần <code>gap</code> (2 phần tử dồn 2 đầu, không cần khoảng cách khai báo) nên thoát gate hoàn toàn.</p>
+    <div class="prin"><b>Nguyên lý:</b> một gate viết cho MỘT trục (seam) không tự động phủ trục khác (reading-flow) dùng chung className — mỗi trục cần gate RIÊNG, dùng chung regex là để lọt.</div>
+  </div>
+
+  <h2>4. Lỗi thật đã cắn — và một neo cũ đã chết</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:30%">Chỗ</th><th style="width:24%">Hiện trạng</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>vật lý vs logic override <code>&lt;button&gt;</code></td><td class="numc" style="color:var(--warn)">drift, chưa sửa</td><td><code>SurfaceCard.tsx</code>×7 + <code>Stepper.tsx</code>×1 dùng <code>text-left</code>; <code>SettingsSidebarNav.tsx</code> + <code>ChipButtonList.tsx</code> dùng <code>text-start</code> cho CÙNG mục đích — Bẫy 2</td></tr>
+        <tr><td><code>principles.md</code> §3 dòng 159 (bản lịch sử) — neo "CourseCard $58.99"</td><td class="numc" style="color:var(--success)">✅ ĐÃ CHỐT: CHẾT, không cần thay 1-1</td><td>File đã dọn sang <code>_legacy/designs/cards/CourseCard/</code>; thay thế sống <code>PriceTag.tsx</code> KHÔNG còn dòng hint đó, cũng không center-align nào ở đó (đo lại 2026-07-29). Không dùng lại neo cũ — nguyên lý nó minh hoạ (số/giá không center) đã có neo sống mạnh hơn ngay trong tài liệu này: <code>Table.tsx</code> <code>TableAlign</code> (§1 Cặp 2). Mất ví dụ, không mất luật.</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">Khác biệt với trục <code>seam</code>:</b> trục đó có 4 lỗi "chọn SAI bậc" ghi sổ. Trục này, grep trực tiếp <code>.storybook/components</code> KHÔNG lộ ra ca "chọn sai center/start/end" nào — phần lớn <code>text-center</code>/<code>justify-center</code> sống (16/29 chỗ, sau khi loại <code>_legacy</code>) đều rơi đúng 1 trong 4 ngoại lệ. Lỗi thật duy nhất tìm được là DRIFT VỐN TỪ (Bẫy 2), không phải chọn sai giá trị — ghi trung thực, không bịa thêm ca cho đủ khuôn.</p>
+  </div>
+
+  <h2>5. Sáu cặp còn lại — vì sao không render — và 1 ngoại lệ còn treo</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Thang A · <code>start</code> ↔ <code>end</code>:</b> chưa cắn — 2 bậc này hiếm lẫn vì mô tả 2 hướng ngược nhau rõ ràng (đầu hàng vs cuối hàng của 1 hàng có ≥2 field); không có ca thật nào lẫn.</p>
+    <p style="margin:0 0 10px"><b>Thang B · <code>start</code>↔<code>between</code> · <code>end</code>↔<code>between</code>:</b> không render riêng vì cùng một câu hỏi đã trả lời ở Cặp 3/5 rồi ("có phần tử nào cần đứng yên trong khi phần khác bị đẩy không") — thêm ví dụ chỉ lặp lại phép thử, không thêm thông tin.</p>
+    <p style="margin:0 0 10px"><b>3/4 ngoại lệ ở §0/§1 (empty-state/lỗi, hero focal, loading/spinner):</b> ✅ ĐÃ CHỐT phạm vi bằng đo code 2026-07-29 — <code>Feedback.tsx:280,305,330</code>, <code>EnrollGate.tsx:156,193</code>, <code>LearnShell.tsx:201-202</code> đều cho thấy ngoại lệ áp dụng cho CẢ hai thang, đúng như draft cũ khẳng định. Không cần hỏi thầy cho 3 cái này nữa.</p>
+    <p style="margin:0"><b>⚠️ Còn treo đúng 1 — ngoại lệ "modal xác nhận 1 nút"</b> (kế thừa nguyên văn từ <code>principles.md</code> §3 bản lịch sử): grep lại 2026-07-29 trên TOÀN <code>.storybook/components</code> (không chỉ <code>overlays/**</code>) vẫn KHÔNG tìm được component <code>ConfirmDialog</code>/<code>ConfirmModal</code> độc lập nào để đọc neo — hệ compose confirm-dialog từ <code>ButtonGroup</code>+<code>Button</code> (ghi trong memory canon), không phải 1 file riêng có pattern center rõ ràng để render. Đây KHÔNG đo được vì THIẾU đối tượng để đo, không phải vì thiếu công đọc — giữ nguyên nhãn treo, viết lại câu hỏi cho gọn: <b>ngoại lệ này còn áp dụng khi component thật được dựng, hay nên bỏ khỏi danh sách 4 vì chưa từng có ca sống?</b></p>
+  </div>
+
+  <h2>6. Neo code thật — đã đọc lại tận nơi</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Đọc trực tiếp ngày <b>2026-07-29</b>. Số dòng của <code>.storybook</code> trôi theo mỗi lần sửa — tìm theo pattern nêu trong từng file khi số dòng lệch.</p>
+    <table>
+      <thead><tr><th style="width:34%">File</th><th style="width:12%">Dòng</th><th>Vai trò trong trục này</th></tr></thead>
+      <tbody>
+        <tr><td class="numc">Typography.tsx</td><td class="numc">98-113</td><td>định nghĩa <code>TypographyAlign</code> (Thang A), chốt vốn từ logic + lý do</td></tr>
+        <tr><td class="numc">Table.tsx</td><td class="numc">25-33, 83-98</td><td><code>TableAlign</code> (2 bậc, không có center) + bẫy specificity + <code>CellBox</code> né bằng span con</td></tr>
+        <tr><td class="numc">frames/_spacing.ts</td><td class="numc">85-114</td><td><code>LayoutAlign</code>/<code>LayoutJustify</code> (Thang B) + class map + lịch sử thêm <code>baseline</code></td></tr>
+        <tr><td class="numc">frames/Stack/Stack.tsx</td><td class="numc">127-177</td><td>mặc định <code>align</code>: <code>StackV</code>→<code>stretch</code>, <code>StackH</code>→<code>center</code> (cross-axis, KHÔNG phải center Thang A)</td></tr>
+        <tr><td class="numc">SurfaceCard.tsx</td><td class="numc">386,609,624,1346,1427,1626,1681</td><td>7 chỗ <code>text-left</code> (vật lý) đè UA default <code>&lt;button&gt;</code> — Bẫy 1+2</td></tr>
+        <tr><td class="numc">Stepper.tsx</td><td class="numc">206</td><td><code>text-left</code> — cùng mẫu Bẫy 1+2</td></tr>
+        <tr><td class="numc">SettingsSidebarNav.tsx</td><td class="numc">194, 199</td><td><code>text-start</code> (logic, khác SurfaceCard) + <code>justify={collapsed?"center":"start"}</code> — Cặp 3</td></tr>
+        <tr><td class="numc">ChipButtonList.tsx</td><td class="numc">77-78</td><td><code>justify-start text-start</code> — vốn từ logic ở tầng composite</td></tr>
+        <tr><td class="numc">EnrollGate.tsx</td><td class="numc">156, 193, 233, 256</td><td><code>align="center"</code> + <code>justify="center"</code> tường minh cho hero focal — Cặp 4, ngoại lệ §1</td></tr>
+        <tr><td class="numc">KeyValueList / KeyValue.tsx</td><td class="numc">74-75, 94, 105</td><td>label trái · value phải = <code>justify-between</code> (raw, có <code>gap-2</code> nên đã bị gate bắt)</td></tr>
+        <tr><td class="numc">PlaygroundSetupSteps.tsx</td><td class="numc">194</td><td><code>justify-between</code> KHÔNG kèm <code>gap</code> — lọt gate, Bẫy 5</td></tr>
+        <tr><td class="numc">ml-auto (đẩy 1 con)</td><td class="numc">UserCell.tsx:129 · SurfaceCard.tsx:1158,1393,1695 · List.tsx:188</td><td>Bẫy 4 — cơ chế thứ ba, ngoài prop track</td></tr>
+        <tr><td class="numc">Feedback.tsx</td><td class="numc">274-280</td><td><code>text-center</code> cho empty/error toàn trang — ngoại lệ §1 "empty-state"</td></tr>
+        <tr><td class="numc">scripts/check-seams.mjs</td><td class="numc">122</td><td>regex đòi cả <code>gap-*</code> lẫn <code>flex</code>/<code>grid</code> — giải thích Bẫy 5</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Chạy trong iframe của story:</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">[...document.querySelectorAll('[data-anat-part]')].map(e =&gt; ({
+    part: e.getAttribute('data-anat-part'),
+    tag: e.tagName.toLowerCase(),
+    textAlign: getComputedStyle(e).textAlign,
+    justifyContent: getComputedStyle(e).justifyContent,
+    alignItems: getComputedStyle(e).alignItems,
+}))</pre>
+    <p style="margin:12px 0 6px"><b>Ba thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>phần tử là <code>&lt;button&gt;</code>/<code>&lt;a&gt;</code> pressable</td><td>đo <code>textAlign</code> ra <b>center</b> dù code không viết <code>text-center</code> ở đâu ⇒ quên đè UA default (Bẫy 1)</td></tr>
+        <tr><td>ô bảng (<code>&lt;td&gt;</code>/<code>&lt;th&gt;</code>) đọc từ hệ khác (HeroUI/vendor)</td><td>set class <code>text-end</code> trực tiếp trên ô mà đo ra vẫn <b>left</b> ⇒ thua layer un-layered (Bẫy 3), phải chuyển vào span con</td></tr>
+        <tr><td>track có ≥3 phần tử và 1 trong số đó cần "dạt phải"</td><td>đo <code>justifyContent</code> của cả track: nếu là <code>flex-end</code> mà phần tử ĐẦU cũng bị đẩy theo ⇒ nên dùng <code>ml-auto</code> trên đúng 1 con thay vì đổi <code>justify</code> cả track (Bẫy 4)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Tổng: 5 cặp render đủ hai chiều sai · 6 cặp giải thích không render · 5 bẫy cấu trúc render (kể cả 1 demo CSS <code>@layer</code> THẬT) · 2 lỗi thật (1 drift đang sống, 1 neo cũ đã chết — nay ĐÃ CHỐT không cần thay) · 14 neo <code>src</code> đã đọc lại. <b>11/11 cặp có chỗ đứng</b>, không cặp nào bị bỏ quên. Rà lại 2026-07-29: 3/4 câu treo cũ ĐÃ CHỐT bằng luật/đo code; chỉ còn 1 câu thật sự treo — ngoại lệ "modal 1 nút" chưa có component sống để đo, xem §5.</p>
+
+</div>
+</body>
+</html>

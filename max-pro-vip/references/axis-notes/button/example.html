@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BUTTON — vét cạn 21 cặp, mô hình 4 tầng, render thật SAI vs ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── thêm riêng cho trục button ── */
+  .btn.sec{background:#3a3a3a;border:1px solid #3a3a3a;color:var(--app-fg);font-weight:600}
+  .btn.tert{background:transparent;border:1px solid var(--app-border);color:var(--app-fg);font-weight:500}
+  .btn.outl{background:transparent;border:1.5px solid var(--app-accent);color:var(--app-accent);font-weight:600}
+  .btn.ghost{background:transparent;border:1px solid transparent;color:var(--app-muted);font-weight:500}
+  .btn.ghost-hov{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-weight:500}
+  .btn.dgr{background:var(--danger);border:1px solid var(--danger);color:#fff;font-weight:700}
+  .btn.dgrsoft{background:color-mix(in srgb,var(--danger) 16%,transparent);border:1px solid color-mix(in srgb,var(--danger) 40%,transparent);color:var(--danger);font-weight:600}
+  .hover-tag{font-size:9.5px;color:var(--muted);font-style:italic}
+
+  .watch{background:color-mix(in srgb,var(--warn) 10%,var(--panel));border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line));border-radius:12px;padding:14px 16px}
+  .watch b{color:var(--warn)}
+  .q{font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--warn) 30%,transparent);color:var(--warn);font-weight:700}
+
+  .tierbadge{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:9.5px;font-family:ui-monospace,monospace;margin-right:4px}
+  .scaletbl td{vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BUTTON — vét cạn 21 cặp trong 7 variant, mô hình 4 tầng, render thật SAI cạnh ĐÚNG</h1>
+  <p class="sub">Trục này trả lời đúng một câu: <b>nút này <code>variant</code> gì</b>. Mọi khung dưới đây là HTML render thật với đúng class/màu của token, không phải mô tả. Neo nguồn: <code>button-tokens.ts</code>, đối chiếu <code>src</code> thật ngày 2026-07-29.</p>
+
+  <h2>0. Thang bảy giá trị — render cạnh nhau</h2>
+  <div class="rules">
+    <div class="fx" style="gap:10px;flex-wrap:wrap;padding:14px;background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;margin-bottom:14px">
+      <button class="btn p" style="border:none">Primary</button>
+      <button class="btn sec" style="border:none">Secondary</button>
+      <button class="btn tert" style="border:none">Tertiary</button>
+      <button class="btn outl" style="border:none">Outline</button>
+      <button class="btn ghost" style="border:none">Ghost</button>
+      <button class="btn dgr" style="border:none">Danger</button>
+      <button class="btn dgrsoft" style="border:none">Danger-soft</button>
+    </div>
+    <table class="scaletbl">
+      <thead><tr><th style="width:14%">Variant</th><th style="width:12%">Call-site</th><th style="width:34%">Ý nghĩa</th><th>Khi nào</th></tr></thead>
+      <tbody>
+        <tr><td><button class="btn p" style="border:none;padding:4px 10px;font-size:11px">Primary</button></td><td class="numc">136</td><td>CTA CHÍNH DUY NHẤT của 1 khối/trang</td><td>Xoá đi thì người dùng KHÔNG còn cách nào khác tới mục tiêu chính</td></tr>
+        <tr><td><button class="btn sec" style="border:none;padding:4px 10px;font-size:11px">Secondary</button></td><td class="numc">86</td><td>Hành động quan trọng thứ 2 — cạnh primary HOẶC đứng một mình khi là hành động chính của 1 cụm nhỏ</td><td>Tự nó có trọng lượng quyết định, không chỉ là tiện ích cục bộ</td></tr>
+        <tr><td><button class="btn tert" style="border:none;padding:4px 10px;font-size:11px">Tertiary</button></td><td class="numc">77</td><td>Hành động phụ, không cần nổi — phổ biến NHẤT nhưng atom từng THIẾU tới 2026-07-29</td><td>Phụ trợ/lùi lại cho hành động chính cạnh nó, cụm chỉ 2 tầng</td></tr>
+        <tr><td><button class="btn outl" style="border:none;padding:4px 10px;font-size:11px">Outline</button></td><td class="numc">6</td><td>Viền rõ, nền trong suốt — hiếm</td><td>Nút đứng ĐƠN LẺ trên nền cần tách biệt (nền màu/ảnh, không phải card trắng mặc định)</td></tr>
+        <tr><td><button class="btn ghost" style="border:none;padding:4px 10px;font-size:11px">Ghost</button></td><td class="numc">38</td><td>Không viền không nền, chỉ hiện khi hover — tầng THẤP NHẤT của thang nhấn</td><td>Cụm có ≥3 mức nhấn mạnh cần phân biệt rõ</td></tr>
+        <tr><td><button class="btn dgr" style="border:none;padding:4px 10px;font-size:11px">Danger</button></td><td class="numc">3</td><td>Phá huỷ, nổi bật (nền đỏ đặc)</td><td>Chưa qua bước xác nhận nào khác — cần cảnh giác NGAY tại nút</td></tr>
+        <tr><td><button class="btn dgrsoft" style="border:none;padding:4px 10px;font-size:11px">Danger-soft</button></td><td class="numc">10</td><td>Phá huỷ nhưng nhẹ hơn</td><td>Đã/sẽ qua modal xác nhận riêng</td></tr>
+      </tbody>
+    </table>
+    <p class="note" style="margin:10px 0 0"><code>ButtonSize</code> (<code>sm</code>/<code>md</code>/<code>lg</code>) KHÔNG có phép vét cạn C(3,2) riêng — chưa tìm được bằng chứng drift thật nào giữa 3 giá trị này (khác hẳn <code>variant</code>, nơi có 4 lỗi thật §4). Chọn theo mật độ khung chứa, không phải cây quyết định riêng.</p>
+  </div>
+
+  <div class="watch">
+    <div class="fx" style="align-items:center;gap:8px;margin-bottom:8px"><span class="q">⚠ chờ thầy chốt</span><b>Canon tự đá nhau ở đúng trục này</b></div>
+    <p style="margin:0 0 8px">Mô hình 4 tầng (giảm dần <code>primary→secondary→tertiary→ghost</code>, <code>ghost</code> là TẦNG thấp hơn <code>tertiary</code> chứ không phải "khác hình cùng cấp") đã <b>✅ CHỐT</b> — thầy chốt 2026-07-29, xem <code>context.md</code> §2 câu 3-6, <code>ghost-vs-tertiary-system.html</code> mục 3. Nhưng <code>button-variant-system.html</code> mục 6 và vạch cấm #2/#3 của <code>context.md</code> §6 vẫn ghi <b>⬜ CHƯA — gate cần viết</b>: chưa có đợt quét lại toàn bộ <code>ghost</code>/<code>secondary</code> hiện có trên diện rộng (luật 4 tầng chỉ áp cho XÂY MỚI, không hồi tố), và chưa có script lọc <code>variant</code> theo import trước khi đếm. Trang này KHÔNG tự quyết hộ phạm vi quét — hiện nguyên trạng để thầy chốt tiếp.</p>
+    <p style="margin:0;color:var(--muted);font-size:12.5px">Nói cách khác: <b>luật đã có, phạm vi áp luật thì chưa</b>. Case đặc biệt ở §2 và Bẫy 3/Bẫy 5 ở §3 dưới đây render trực tiếp khoảng trống này.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — vì sao 21 và không phải con số khác</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Thang có <b>7</b> giá trị, một quyết định <code>variant</code> sai luôn là <b>chọn nhầm giá trị này thành giá trị kia</b>, nên tập lỗi có thể có là tập <b>CẶP</b>: <b>C(7,2) = 21</b>. Nhưng 7 giá trị không phẳng — chúng chia làm <b>hai họ khác trục</b>: HỌ NHẤN MẠNH (<code>primary/secondary/tertiary/outline/ghost</code>, đúng thứ tự khai trong <code>button-tokens.ts:22</code>) và HỌ PHÁ HUỶ (<code>danger/danger-soft</code>). C(5,2)=10 trong họ nhấn mạnh + C(2,2)=1 trong họ phá huỷ + 5×2=10 cặp CHÉO 2 họ = <b>21</b>.</p>
+    <table class="mx">
+      <tr><th class="empty"></th><th>primary</th><th>secondary</th><th>tertiary</th><th>outline</th><th>ghost</th><th>danger</th><th>danger-soft</th></tr>
+      <tr><th>primary</th><td class="diag">—</td><td class="adj">1</td><td class="near">2</td><td class="near">3</td><td class="near">4</td><td class="far">5</td><td class="far">6</td></tr>
+      <tr><th>secondary</th><td class="diag"></td><td class="diag">—</td><td class="adj">7</td><td class="near">8</td><td class="near">9</td><td class="far">10</td><td class="far">11</td></tr>
+      <tr><th>tertiary</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">12</td><td class="near">13</td><td class="far">14</td><td class="far">15</td></tr>
+      <tr><th>outline</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">16</td><td class="far">17</td><td class="far">18</td></tr>
+      <tr><th>ghost</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="far">19</td><td class="far">20</td></tr>
+      <tr><th>danger</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">21</td></tr>
+      <tr><th>danger-soft</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">5 kề nhau</span>
+      trong CHUỖI token (<code>primary→secondary→tertiary→outline→ghost</code>) cộng cặp <code>danger↔danger-soft</code> — mỗi cặp có phép phân định dứt khoát, §2 render đủ.
+      &nbsp;
+      <span style="background:color-mix(in srgb,var(--warn) 22%,transparent);padding:1px 7px;border-radius:4px">6 cùng họ nhưng cách ≥2 bậc</span>
+      không có phép thử riêng — phân vân ở đây là dấu hiệu đã bỏ qua một câu hỏi cấp trên trong cây §2 của <code>context.md</code>.
+      &nbsp;
+      <span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">10 cặp chéo 2 họ</span>
+      <b>cố ý không có phép thử</b> — một bên là Ý ĐỊNH (phá huỷ hay không), một bên là MỨC NHẤN MẠNH, khác trục hoàn toàn.
+    </p>
+    <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">Lưu ý neo:</b> ô <span class="measure">13</span> (<code>tertiary↔ghost</code>) rơi vào vùng cam "cùng họ, cách 2 bậc" theo đúng vị trí trong chuỗi token — nhưng đây lại là cặp có nhiều va chạm THẬT nhất trong toàn bộ audit. Xem case đặc biệt ngay dưới §2.</p>
+  </div>
+
+  <h2>2. Năm cặp kề nhau + 1 case thực chiến nặng nhất</h2>
+
+  <!-- CẶP 1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · <code>primary</code> ↔ <code>secondary</code></h3><span class="pair">mục tiêu CHÍNH ↔ hành động thứ 2</span></div>
+    <div class="test"><b>Phép phân định:</b> xoá nút này, người dùng còn cách nào khác tới <b>mục tiêu CHÍNH của cả trang/khối lớn</b> không? KHÔNG còn cách nào khác ⇒ <code>primary</code>. Đây chỉ là 1 tiện ích cục bộ (dù đứng một mình) ⇒ <code>secondary</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "Lưu thay đổi" dùng secondary</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:12px">
+          <span class="ttl">Cài đặt tài khoản</span>
+          <span class="sub2">Đổi tên hiển thị, email liên hệ</span>
+          <div class="fx" style="justify-content:flex-end"><button class="btn sec">Lưu thay đổi</button></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · primary</span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:12px">
+          <span class="ttl">Cài đặt tài khoản</span>
+          <span class="sub2">Đổi tên hiển thị, email liên hệ</span>
+          <div class="fx" style="justify-content:flex-end"><button class="btn p">Lưu thay đổi</button></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "Lưu thay đổi" là con đường DUY NHẤT để hoàn tất mục tiêu chính của cả màn cài đặt. Ở <code>secondary</code> nó đọc như một hành động tuỳ chọn, trong khi thực ra không nộp thì mọi thay đổi mất trắng.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · ép "Kết thúc phiên" thành primary vì đứng một mình</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="justify-content:space-between;align-items:center"><span class="ttl">Buổi làm việc · 42:10</span><button class="btn p" style="padding:4px 10px;font-size:11px">Kết thúc</button></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · secondary dù không có primary nào cạnh nó</span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="justify-content:space-between;align-items:center"><span class="ttl">Buổi làm việc · 42:10</span><button class="btn sec" style="padding:4px 10px;font-size:11px">Kết thúc</button></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> mục tiêu chính của trang này là LÀM VIỆC, không phải kết thúc phiên. "Kết thúc" là hành động quan trọng thứ 2 dù không có primary nào đứng cạnh nó ngay trong header — neo thật <code>WorkSessionHeader.tsx:133</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> đơn độc trên hàng chỉ là HÌNH THỨC, không phải NGỮ NGHĨA. Phép thử luôn là "còn cách nào khác tới mục tiêu CHÍNH của khối lớn hơn", không phải "có bao nhiêu nút cạnh nó".</div>
+  </div>
+
+  <!-- CẶP 2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · <code>secondary</code> ↔ <code>tertiary</code> <span class="note">đã cắn thật 2 lần, cả 2 hướng</span></h3><span class="pair">trọng lượng kinh doanh thật ↔ thao tác lùi lại</span></div>
+    <div class="test"><b>Phép phân định:</b> nút phụ này <b>tự nó có trọng lượng quyết định ngang một lựa chọn kinh doanh thật</b> (vd "Try free" cạnh "Enroll") ⇒ <code>secondary</code>. Nút phụ chỉ là <b>thao tác lùi lại/phụ trợ</b> cho hành động chính cạnh nó (vd "Huỷ" cạnh "Gửi") ⇒ <code>tertiary</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI (đã cắn) · <code>ContentCommentComposer.tsx:159</code> từng dùng ghost</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:10px">
+          <div class="row" style="background:transparent;padding:0"><span class="bd" style="color:var(--app-muted)">Viết bình luận…</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end"><button class="btn ghost" style="padding:6px 12px">Huỷ</button><button class="btn p">Gửi</button></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · sửa về tertiary</span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:10px">
+          <div class="row" style="background:transparent;padding:0"><span class="bd" style="color:var(--app-muted)">Viết bình luận…</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end"><button class="btn tert">Huỷ</button><button class="btn p">Gửi</button></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ở <code>ghost</code>, "Huỷ" gần như biến mất — người dùng phải hover mới thấy có 1 lối thoát khỏi composer. Đây là chiều sai <b>quá yếu</b>.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI (đã cắn) · <code>CourseQaComposer.tsx:220</code> từng dùng secondary</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:10px">
+          <div class="row" style="background:transparent;padding:0"><span class="bd" style="color:var(--app-muted)">Đặt câu hỏi cho giảng viên…</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end"><button class="btn sec">Huỷ</button><button class="btn p">Gửi</button></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · sửa về tertiary</span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:10px">
+          <div class="row" style="background:transparent;padding:0"><span class="bd" style="color:var(--app-muted)">Đặt câu hỏi cho giảng viên…</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end"><button class="btn tert">Huỷ</button><button class="btn p">Gửi</button></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ở <code>secondary</code>, "Huỷ" cạnh tranh thị giác ngang hàng với "Gửi" — hai nút trông như hai lựa chọn kinh doanh ngang nhau, trong khi "Huỷ" chỉ là lùi lại. Đây là chiều sai <b>quá mạnh</b>.</p>
+    <div class="prin"><b>Nguyên lý:</b> xoá "Huỷ" thì "Gửi" vẫn đứng được hoàn chỉnh — "Huỷ" không đáng biến mất (<code>ghost</code>) cũng không đáng ngang hàng (<code>secondary</code>). <code>tertiary</code> là điểm hội tụ đúng của "phụ trợ nhìn thấy được nhưng không cạnh tranh", và hai va chạm thật tới từ <b>hai phía đối lập</b> của chính điểm hội tụ này.</div>
+  </div>
+
+  <!-- CASE ĐẶC BIỆT -->
+  <div class="case" style="border-color:color-mix(in srgb,var(--warn) 55%,var(--line))">
+    <div class="case-h"><h3>Case đặc biệt · <code>tertiary</code> ↔ <code>ghost</code> <span class="q">nặng nhất thực chiến</span></h3><span class="pair">mô hình 4 TẦNG</span></div>
+    <p class="why" style="margin:0"><b>Vì sao case này nằm NGOÀI 5 cặp kề nhau ở trên:</b> theo đúng chuỗi token <code>primary→secondary→tertiary→outline→ghost</code>, <code>tertiary</code> và <code>ghost</code> cách nhau 2 bậc (qua <code>outline</code>) — ma trận §1 xếp nó vào ô cam <span class="measure">13</span>, "cùng họ nhưng cách ≥2 bậc, không có phép thử riêng, quay lại câu hỏi cấp trên". Câu hỏi cấp trên đó là <b>câu 3 của cây quyết định</b>: cụm chứa nút này có ≥3 mức nhấn mạnh cần phân biệt rõ không? Toàn bộ 2 va chạm thật còn sống (Cặp 2 ở trên) VÀ ca mẫu ĐÚNG duy nhất của cả audit (<code>MockInterviewScorecard.tsx</code>) đều xoay quanh đúng ranh giới này — nên dù không "kề nhau trên giấy", đây là cặp <b>thực chiến nặng nhất</b>.</p>
+    <div class="prin"><b>Mô hình 4 tầng đã CHỐT:</b> <code>primary → secondary → tertiary → ghost</code> là một chuỗi giảm dần 4 mức nhấn mạnh. <code>ghost</code> là TẦNG THẤP HƠN <code>tertiary</code>, không phải "khác hình cùng cấp". <code>outline</code> đứng NGOÀI chuỗi này — nó được chọn theo tiêu chí khác hẳn (đơn lẻ trên nền cần tách biệt), không theo số tầng của cụm.</div>
+    <p class="why" style="margin:0"><b>Cơ chế quyết định:</b> đếm số mức nhấn mạnh thật sự khác nhau trong cụm. Đúng <b>2 mức</b> (chính + phụ) ⇒ mức phụ dừng ở <code>tertiary</code>. Đủ <b>3 mức trở lên</b> ⇒ mức yếu nhất tụt xuống <code>ghost</code>, mức giữa mới là <code>tertiary</code>.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ minh hoạ SAI · cụm chỉ 2 tầng nhưng đếm nhầm thành cần ghost</span>
+        <div class="mock bad"><div class="fc" style="gap:6px">
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">1</span><span class="tm">Gửi — mức chính</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">2</span><span class="tm">Huỷ — mức phụ DUY NHẤT còn lại</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn ghost">Huỷ</button><button class="btn p">Gửi</button></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · đúng 2 tầng → phụ dừng ở tertiary</span>
+        <div class="mock good"><div class="fc" style="gap:6px">
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">1</span><span class="tm">Gửi — mức chính</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">2</span><span class="tm">Huỷ — mức phụ DUY NHẤT còn lại</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn tert">Huỷ</button><button class="btn p">Gửi</button></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ minh hoạ SAI · cụm có 3 tầng nhưng mức yếu nhất vẫn để tertiary</span>
+        <div class="mock bad"><div class="fc" style="gap:6px">
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">1</span><span class="tm">Ôn lại phần yếu — mức chính</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">2</span><span class="tm">Làm dự án cá nhân — mức phụ</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">3</span><span class="tm">Phỏng vấn lại — mức yếu NHẤT, vẫn tertiary</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn tert">Phỏng vấn lại</button><button class="btn sec">Làm dự án cá nhân</button><button class="btn p">Ôn lại phần yếu</button></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · neo thật <code>MockInterviewScorecard.tsx:357-383</code></span>
+        <div class="mock good"><div class="fc" style="gap:6px">
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">1</span><span class="tm">Ôn lại phần yếu — mức chính</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">2</span><span class="tm">Làm dự án cá nhân — mức phụ</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><span class="tierbadge">3</span><span class="tm">Phỏng vấn lại — mức yếu NHẤT, tụt xuống ghost</span></div>
+          <div class="fx" style="gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn ghost">Phỏng vấn lại</button><button class="btn sec">Làm dự án cá nhân</button><button class="btn p">Ôn lại phần yếu</button></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đúng 3 hàng chữ giống hệt nhau về CẤU TRÚC câu lệnh (mức chính/phụ/yếu nhất), nhưng SỐ TẦNG của cụm quyết định mức yếu nhất dừng ở <code>tertiary</code> hay tụt xuống <code>ghost</code>. Đây chính là lý do context.md xếp cặp này vào "cách ≥2 bậc, quay lại câu hỏi cấp trên" — không có phép thử pairwise trực tiếp giữa <code>tertiary</code> và <code>ghost</code>, chỉ có phép ĐẾM TẦNG của cả cụm.</p>
+    <div class="prin"><b>Nguyên lý:</b> khi 2 giá trị cách xa nhau trong chuỗi, câu hỏi đúng không phải "chọn cái nào trong 2 cái đó" mà là "cụm này có bao nhiêu tầng" — trả lời câu hỏi cấp trên rồi giá trị tự rơi ra, không cần so trực tiếp.</div>
+  </div>
+
+  <!-- CẶP 3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 3 · <code>tertiary</code> ↔ <code>outline</code></h3><span class="pair">trong cụm nhiều nút ↔ đứng đơn lẻ</span></div>
+    <div class="test"><b>Phép phân định:</b> nút đứng <b>ĐƠN LẺ</b> trên nền cần tách biệt (không cạnh nút khác cùng hàng) ⇒ <code>outline</code>. Nút đứng <b>TRONG một cụm nhiều nút</b>, vai trò phụ ⇒ <code>tertiary</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · CTA đơn lẻ trong card giá dùng tertiary</span>
+        <div class="mock bad"><div class="card" style="background:linear-gradient(135deg,#2a1f3d,#1c1c1c)"><div class="fc" style="gap:10px">
+          <span class="ttl">Gói Pro</span><span class="num" style="font-size:18px">299.000<span class="unit">₫/tháng</span></span>
+          <button class="btn tert" style="width:100%;text-align:center">Chọn gói này</button>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · outline, neo <code>PricingCard.stories.tsx:114</code></span>
+        <div class="mock good"><div class="card" style="background:linear-gradient(135deg,#2a1f3d,#1c1c1c)"><div class="fc" style="gap:10px">
+          <span class="ttl">Gói Pro</span><span class="num" style="font-size:18px">299.000<span class="unit">₫/tháng</span></span>
+          <button class="btn outl" style="width:100%;text-align:center">Chọn gói này</button>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> nền card có gradient tối, nếu để <code>tertiary</code> (viền mờ như <code>app-border</code>) nút gần như tan vào nền. Đứng đơn lẻ trên nền cần tách biệt đòi viền RÕ ở trạng thái tĩnh ⇒ <code>outline</code>.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · nút phụ trong toolbar 3 nút bị ép outline</span>
+        <div class="mock bad"><div class="fx" style="gap:8px"><button class="btn outl" style="padding:6px 10px;font-size:11px">Sắp xếp</button><button class="btn tert" style="padding:6px 10px;font-size:11px">Lọc</button><button class="btn p" style="padding:6px 10px;font-size:11px">Thêm mới</button></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · cả 2 nút phụ đều tertiary vì đứng TRONG cụm</span>
+        <div class="mock good"><div class="fx" style="gap:8px"><button class="btn tert" style="padding:6px 10px;font-size:11px">Sắp xếp</button><button class="btn tert" style="padding:6px 10px;font-size:11px">Lọc</button><button class="btn p" style="padding:6px 10px;font-size:11px">Thêm mới</button></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "Sắp xếp" không đứng đơn lẻ — nó là 1 trong 3 nút của cùng một toolbar. Viền RÕ tĩnh (<code>outline</code>) ở đây tạo cảm giác nó quan trọng ngang "Thêm mới", sai vai trò.</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>outline</code> trả lời câu "nút này có phải điểm neo thị giác DUY NHẤT trên nền hay không", không liên quan tới mức nhấn mạnh — một nút <code>outline</code> vẫn có thể "phụ" về ý nghĩa nhưng "chính" về vị trí độc lập.</div>
+  </div>
+
+  <!-- CẶP 4 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 4 · <code>outline</code> ↔ <code>ghost</code></h3><span class="pair">viền tĩnh ↔ viền chỉ khi hover</span></div>
+    <div class="test"><b>Phép phân định:</b> nút có <b>viền nhìn thấy ở trạng thái TĨNH</b> (không cần hover mới thấy) ⇒ <code>outline</code>. Viền/nền <b>chỉ hiện khi hover</b>, thường icon-only cạnh nội dung khác ⇒ <code>ghost</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · icon action trong navbar dùng outline tĩnh</span>
+        <div class="mock bad"><div class="row" style="display:flex;justify-content:space-between;align-items:center"><span class="nm">StarCi Academy</span><div class="fx" style="gap:6px">
+          <button class="btn outl" style="padding:5px 8px"><i class="ph ph-bell"></i></button>
+          <button class="btn outl" style="padding:5px 8px"><i class="ph ph-user"></i></button>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · ghost, neo <code>Navbar.tsx:262,418,478,523,604</code></span>
+        <div class="mock good"><div class="row" style="display:flex;justify-content:space-between;align-items:center"><span class="nm">StarCi Academy</span><div class="fx" style="gap:6px">
+          <button class="btn ghost" style="padding:5px 8px"><i class="ph ph-bell"></i></button>
+          <button class="btn ghost" style="padding:5px 8px"><i class="ph ph-user"></i></button>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> 2 icon action cạnh logo và các mục nav khác — viền tĩnh trên cả 2 tạo 2 "hộp" cạnh tranh chú ý với chính thương hiệu. Chúng chỉ cần hiện diện khi người dùng có ý định tương tác (hover) ⇒ <code>ghost</code>.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · ô giả-input đứng đơn lẻ dùng ghost</span>
+        <div class="mock bad"><button class="btn ghost" style="width:100%;text-align:left;padding:9px 12px"><i class="ph ph-magnifying-glass" style="margin-right:6px"></i>Tìm khoá học…</button></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · outline, neo <code>InputButtonLike.tsx:101</code></span>
+        <div class="mock good"><button class="btn outl" style="width:100%;text-align:left;padding:9px 12px"><i class="ph ph-magnifying-glass" style="margin-right:6px"></i>Tìm khoá học…</button></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ô giả-input đứng một mình, không có ngữ cảnh nào khác báo hiệu "đây là chỗ bấm được". Ở <code>ghost</code>, người dùng không biết đây là 1 điều khiển cho tới khi vô tình hover trúng.</p>
+    <div class="prin"><b>Nguyên lý:</b> ẩn/hiện viền không phải thẩm mỹ — nó mã hoá câu hỏi "nút này có phải điểm neo DUY NHẤT mắt cần tìm ngay hay không". Viền tĩnh cho điểm neo cô độc, viền-khi-hover cho điều khiển đã có ngữ cảnh khác dẫn đường.</p>
+    <div class="fx" style="gap:8px;align-items:center;margin-top:2px"><span class="hover-tag">mô phỏng trạng thái hover của ghost:</span><button class="btn ghost-hov" style="padding:5px 8px"><i class="ph ph-bell"></i></button></div>
+  </div>
+
+  <!-- CẶP 5 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 5 · <code>danger</code> ↔ <code>danger-soft</code></h3><span class="pair">cảnh giác NGAY tại nút ↔ đã qua xác nhận riêng</span></div>
+    <div class="test"><b>Phép phân định:</b> hành động cần người dùng <b>DỪNG LẠI VÀ CẢNH GIÁC NGAY TẠI NÚT</b>, chưa qua bước xác nhận nào khác trước đó ⇒ <code>danger</code>. Đã/sẽ qua modal xác nhận riêng, hoặc mức độ nhẹ hơn ⇒ <code>danger-soft</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "Xoá tài khoản" (điểm cảnh báo ĐẦU TIÊN) dùng danger-soft</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:8px">
+          <span class="ttl">Vùng nguy hiểm</span>
+          <span class="sub2">Xoá tài khoản sẽ mất toàn bộ dữ liệu, không thể hoàn tác</span>
+          <div class="fx" style="justify-content:flex-end"><button class="btn dgrsoft">Xoá tài khoản</button></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · danger, neo <code>ModalShell.stories.tsx:239,249</code></span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:8px">
+          <span class="ttl">Vùng nguy hiểm</span>
+          <span class="sub2">Xoá tài khoản sẽ mất toàn bộ dữ liệu, không thể hoàn tác</span>
+          <div class="fx" style="justify-content:flex-end"><button class="btn dgr">Xoá tài khoản</button></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là ĐIỂM CHẠM ĐẦU TIÊN của hành động phá huỷ — chưa có modal nào xác nhận trước. Ở <code>danger-soft</code>, độ nghiêm trọng bị hạ thấp đúng lúc cần cảnh giác nhất.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "Remove from list" (đã qua modal riêng) vẫn dùng danger đặc</span>
+        <div class="mock bad"><div class="row" style="display:flex;justify-content:space-between;align-items:center"><span class="bd">Khoá học đã lưu · 12 mục</span><button class="btn dgr" style="padding:5px 10px;font-size:11px">Remove from list</button></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · danger-soft, neo <code>Button.stories.tsx:123,398</code></span>
+        <div class="mock good"><div class="row" style="display:flex;justify-content:space-between;align-items:center"><span class="bd">Khoá học đã lưu · 12 mục</span><button class="btn dgrsoft" style="padding:5px 10px;font-size:11px">Remove from list</button></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> hành động này đã/sẽ có modal xác nhận riêng phía sau. Lặp lại mức đỏ đặc ở CẢ hai bước là "báo động giả" liên tục, làm người dùng chai lì với màu đỏ ở đúng những chỗ cần nó nhất.</p>
+    <div class="prin"><b>Nguyên lý:</b> mức độ đỏ không đo bằng "hành động này có phá huỷ không" (cả hai đều phá huỷ) mà đo bằng <b>đây có phải điểm cảnh báo ĐẦU TIÊN hay không</b>.</div>
+  </div>
+
+  <h2>3. Năm bẫy cấu trúc — chọn đúng giá trị mà vẫn sai</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · tin giả thuyết tự nghĩ thay vì đọc code thật</h3><span class="pair">"secondary chỉ đi kèm primary" — BỊ BÁC BỎ</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ theo giả thuyết cũ · ép về tertiary vì "không có primary cạnh nó"</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="justify-content:space-between;align-items:center"><span class="ttl">Trạng thái hệ thống</span><span class="chip" style="background:color-mix(in srgb,var(--success) 18%,transparent);color:var(--success);border:none">Hoạt động</span></div>
+          <div class="fx" style="justify-content:flex-end"><button class="btn tert">Xem chi tiết</button></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · giữ secondary, neo <code>SystemStatus/index.tsx:67-75</code></span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="justify-content:space-between;align-items:center"><span class="ttl">Trạng thái hệ thống</span><span class="chip" style="background:color-mix(in srgb,var(--success) 18%,transparent);color:var(--success);border:none">Hoạt động</span></div>
+          <div class="fx" style="justify-content:flex-end"><button class="btn sec">Xem chi tiết</button></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ≥8 ca thật (xem <code>context.md</code> §2 câu 2) bác bỏ giả thuyết "đứng một mình thì phải hạ xuống <code>tertiary</code>". Hành động vẫn quan trọng — chỉ vì không có <code>primary</code> đứng cạnh không có nghĩa nó là phụ.</p>
+    <div class="prin"><b>Nguyên lý:</b> câu hỏi đúng luôn là "hành động này có tự nó nặng ký không", không phải "có primary nào đứng cạnh nó không".</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · suy variant từ 1 component "trông giống" trong <code>src</code></h3><span class="pair">cùng hình icon-only, hai variant, cả hai đều đúng</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ nút reorder icon-only · ngữ cảnh A dùng ghost</span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><div class="fx" style="gap:6px"><button class="btn ghost" style="padding:5px 8px"><i class="ph ph-arrows-out-cardinal"></i></button><span class="bd">Kéo để sắp xếp thứ tự bài học</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ nút "Huỷ" cạnh Confirm · ngữ cảnh B dùng tertiary</span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><div class="fx" style="gap:8px;justify-content:flex-end"><button class="btn tert">Huỷ</button><button class="btn p">Xác nhận</button></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao cả hai đều ĐÚNG:</b> hai component này trông giống hệt nhau — cùng là "nút phụ, không cần nổi" — nhưng mỗi cái port từ một <code>src</code> khác nhau, và bản thân <code>src</code> KHÔNG nhất quán ở đúng ranh giới <code>ghost</code>↔<code>tertiary</code> (<code>ghost-vs-tertiary-system.html</code> mục 1-2). Suy chéo variant từ 1 chỗ "giống hình" là cách chắc chắn nhất để sai, vì nguồn đó có thể tự nó đã sai.</p>
+    <div class="prin"><b>Nguyên lý:</b> với riêng cặp <code>tertiary</code>↔<code>ghost</code>, <code>src</code> KHÔNG được dùng làm neo tuyệt đối — dùng mô hình 4 tầng đã chốt (case đặc biệt §2) thay vì soi component "trông giống".</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · tưởng luật 4 tầng nghĩa là phải quét sửa DIỆN RỘNG</h3><span class="pair">luật áp cho XÂY MỚI, không hồi tố</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · quét lại toàn bộ ghost/secondary hiện có trên diện rộng</span>
+        <div class="mock bad"><div class="fc" style="gap:6px">
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-warning-circle" style="color:var(--danger)"></i><span class="bd">135 file có prop <code style="font-size:11px">variant</code></span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph ph-arrow-right" style="color:var(--danger)"></i><span class="tm">sửa hàng loạt không phân biệt component nào là Button thật</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-x-circle" style="color:var(--danger)"></i><span class="tm">rủi ro: phá vỡ chỗ ĐANG đúng, không có gate nào bắt được hồi quy</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · chỉ vá 2 va chạm CỤ THỂ đã phát hiện</span>
+        <div class="mock good"><div class="fc" style="gap:6px">
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success)"></i><span class="bd"><code style="font-size:11px">ContentCommentComposer.tsx:159</code></span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success)"></i><span class="bd"><code style="font-size:11px">CourseQaComposer.tsx:220</code></span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph ph-info" style="color:var(--warn)"></i><span class="tm">phần còn lại: chờ va chạm cụ thể tiếp theo lộ ra khi đối chiếu</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> luật 4 tầng thầy chốt CHỈ áp cho công việc VỀ SAU (build/sửa block mới), không kích hoạt một đợt quét toàn bộ <code>ghost</code>/<code>secondary</code> hiện có (xem cảnh báo ⚠️ đầu <code>context.md</code>, dòng "Luật áp dụng CHO CÔNG VIỆC VỀ SAU"). Đây chính là khoảng trống ⚠️ ở đầu trang: luật đã chốt, phạm vi áp thì chưa.</p>
+    <div class="prin"><b>Nguyên lý:</b> chốt một luật không tự động ra lệnh hồi tố toàn bộ code cũ — phạm vi áp dụng là một quyết định RIÊNG, và quyết định đó vẫn đang treo.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · neo cũ đã CHẾT — code trôi nhanh hơn tài liệu</h3><span class="pair"><code>SubmissionAttemptsDrawer.tsx</code> dòng 214/222</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ ĐÃ CHẾT · tài liệu cũ vẫn trích 2 nút riêng</span>
+        <div class="mock bad" style="opacity:.6"><div class="fc" style="gap:8px">
+          <span class="row">Lần nộp #3 · 08:12 22/07</span>
+          <div class="fx" style="gap:8px;justify-content:flex-end"><button class="btn tert" style="padding:5px 10px;font-size:11px">Xem chi tiết</button><button class="btn ghost" style="padding:5px 10px;font-size:11px">Xem bài nộp</button></div>
+        </div></div>
+        <p class="note" style="margin:2px 0 0">dòng 214/222 — <b>không còn tồn tại</b> trong file hiện tại</p>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ THẬT · hiện tại (grep lại 2026-07-29)</span>
+        <div class="mock good"><div class="fc" style="gap:8px">
+          <div class="row" style="cursor:pointer;border:1px solid var(--app-border);display:flex;justify-content:space-between;align-items:center"><span class="bd">Lần nộp #3 · 08:12 22/07</span><i class="ph ph-caret-right ic"></i></div>
+        </div></div>
+        <p class="note" style="margin:2px 0 0">cả hàng là 1 <code>SurfaceCardList</code>, <code>onPress</code> chọn + đóng drawer cùng gesture — không còn <code>Button</code> variant nào để so</p>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> file bị <b>REBUILT TOÀN BỘ</b> cùng ngày 2026-07-29. Tài liệu cũ (<code>principles.md</code> §15b, <code>ghost-vs-tertiary-system.html</code> mục ①) trích 2 nút "Xem chi tiết"/"Xem bài nộp" làm ví dụ va chạm <code>tertiary</code> cạnh <code>ghost</code> — nhưng đối chiếu lại thật thì mô hình đã đổi hẳn sang "cả hàng LÀ hành động chọn".</p>
+    <div class="prin"><b>Nguyên lý:</b> trước khi trích 1 neo từ tài liệu, PHẢI grep lại file thật — code trôi theo mỗi lần sửa, tài liệu thì không tự trôi theo.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · đếm <code>variant="…"</code> không lọc theo component</h3><span class="pair">296 occurrence thô ≠ 20 call-site Button thật</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · grep mù toàn repo</span>
+        <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.7;overflow-x:auto;color:var(--danger)">Select.tsx:1        variant="bordered"
+Input.tsx:2         variant="flat"
+Tabs.stories.tsx:3  variant="underlined"
+Button.tsx:88       variant="secondary"   ← lẫn vào 296 occurrence</pre>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · lọc theo import Button/HeroButton trước khi đếm</span>
+        <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.7;overflow-x:auto;color:var(--success)">import { Button } from "@/atoms/buttons/Button"
+...
+Button.tsx:88       variant="secondary"   ← 1/20 call-site THẬT</pre>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> prop tên <code>variant</code> trùng tên xuất hiện ở nhiều component KHÔNG liên quan <code>ButtonVariant</code> — <code>Select</code>, <code>Input</code>, <code>TextField</code>, <code>Tabs</code>, <code>InputGroup</code> đều tự có <code>variant</code> riêng. Đếm mù ra 296 occurrence thô (135 file), trong khi call-site <code>Button</code> thật chỉ khoảng 20 trong số đó.</p>
+    <div class="prin"><b>Nguyên lý:</b> script phải giới hạn theo IMPORT cụ thể trước khi đếm giá trị prop — đây là 1 trong 2 gate còn <b>⬜ CHƯA viết</b> (xem watch-box đầu trang).</div>
+  </div>
+
+  <h2>4. Bốn lỗi thật đã cắn — mẫu hình lộ ra khi xếp cạnh nhau</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:30%">Chỗ</th><th style="width:13%">Đã viết</th><th style="width:13%">Sửa thành</th><th style="width:22%">Cặp lẫn</th><th>Trạng thái neo</th></tr></thead>
+      <tbody>
+        <tr><td><code>ContentCommentComposer.tsx:159</code></td><td class="numc" style="color:var(--danger)">ghost</td><td class="numc" style="color:var(--success)">tertiary</td><td class="numc">secondary↔tertiary (quá yếu)</td><td>còn sống</td></tr>
+        <tr><td><code>CourseQaComposer.tsx:220</code></td><td class="numc" style="color:var(--danger)">secondary</td><td class="numc" style="color:var(--success)">tertiary</td><td class="numc">secondary↔tertiary (quá mạnh)</td><td>còn sống</td></tr>
+        <tr><td><code>SubmissionAttemptsDrawer.tsx:214</code></td><td class="numc" style="color:var(--danger)">secondary</td><td class="numc" style="color:var(--success)">tertiary</td><td class="numc">đợt audit 20 call-site</td><td><b style="color:var(--warn)">NEO CHẾT</b> — file rebuilt, xem Bẫy 4</td></tr>
+        <tr><td><code>SubmissionAttemptsDrawer.tsx:222</code></td><td class="numc" style="color:var(--danger)">ghost</td><td class="numc" style="color:var(--muted)">(không còn nút)</td><td class="numc">tertiary↔ghost</td><td><b style="color:var(--warn)">NEO CHẾT</b> — file rebuilt, xem Bẫy 4</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0"><b>Điều chỉ hiện ra khi xếp cả bốn cạnh nhau:</b></p>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">a.</b> Cả 2 ca CÒN SỐNG đều hạ cánh xuống <b>đúng cùng một điểm</b> — <code>tertiary</code> — nhưng đến từ <b>hai phía đối lập</b>: một từ <code>ghost</code> đi lên (quá yếu), một từ <code>secondary</code> đi xuống (quá mạnh). <code>tertiary</code> không phải "giá trị tự nhiên đúng", mà là điểm hội tụ của cụm CHỈ 2 tầng — xem case đặc biệt §2.</p>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">b.</b> Cả 4 ca đều nằm trong đúng <b>vùng va chạm hẹp</b> quanh <code>tertiary</code> (secondary↔tertiary, tertiary↔ghost) — không ca nào lệch sang <code>outline</code>/<code>danger</code>/<code>primary</code>. Nghĩa là 2/5 cặp kề nhau của §2 gánh gần như toàn bộ rủi ro thật, và 2 ca ở dòng cuối bảng đã CHẾT vì file bị rebuilt — kiểm chứng lại tận nơi trước khi trích, đừng tin bảng này mãi mãi.</p>
+  </div>
+
+  <h2>5. Mười sáu cặp không render — vì sao</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Sáu cặp cùng họ nhấn mạnh, cách ≥2 bậc</b> (<code>primary↔tertiary</code> · <code>primary↔outline</code> · <code>primary↔ghost</code> · <code>secondary↔outline</code> · <code>secondary↔ghost</code> · <code>tertiary↔ghost</code>): không viết phép thử riêng (ngoại lệ duy nhất — <code>tertiary↔ghost</code> — đã render như case đặc biệt §2 vì bằng chứng thật đòi hỏi). Phân vân ở 5 cặp còn lại nghĩa là một câu hỏi cấp trên trong cây §2 của <code>context.md</code> chưa được trả lời — ví dụ phân vân <code>primary↔ghost</code> nghĩa là chưa trả lời rõ câu 2 (đây có phải con đường duy nhất) và câu 3 (cụm có ≥3 mức không).</p>
+    <p style="margin:0"><b>Mười cặp chéo 2 họ</b> (mọi cặp giữa {<code>primary,secondary,tertiary,outline,ghost</code>} và {<code>danger,danger-soft</code>}): <b>cố ý không có phép thử, và không render.</b> Một bên trả lời câu hỏi Ý ĐỊNH (phá huỷ hay không — câu 1 của cây), một bên trả lời câu hỏi MỨC NHẤN MẠNH (câu 2-6) — hai trục khác nhau hoàn toàn. Phân vân giữa <code>secondary</code> và <code>danger-soft</code> nghĩa là CHƯA trả lời câu 1, không phải chưa chọn đúng mức nhấn mạnh. Viết phép phân định giữa 2 trục khác nhau là hợp thức hoá một câu hỏi bị bỏ sót.</p>
+  </div>
+
+  <h2>6. Neo code thật — đã grep lại tận nơi, không chép lại</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Đọc trực tiếp từ file ngày <b>2026-07-29</b>. Số dòng <code>.storybook</code>/<code>src</code> trôi theo mỗi lần sửa — nếu lệch, tìm theo pattern <code>variant="…"</code> trong đúng file, đừng tin số dòng cũ (xem Bẫy 4).</p>
+    <table>
+      <thead><tr><th style="width:16%">Variant</th><th style="width:34%">Neo</th><th>Vai trò tại chỗ đó</th></tr></thead>
+      <tbody>
+        <tr><td class="numc" style="color:var(--success)">primary</td><td><code>ContentCommentComposer.tsx:144</code></td><td>Nút "Gửi" — CTA duy nhất của composer</td></tr>
+        <tr><td class="numc" style="color:var(--success)">secondary</td><td><code>WorkSessionHeader.tsx:133</code></td><td>Hành động thứ 2 của header phiên làm việc</td></tr>
+        <tr><td class="numc" style="color:var(--success)">secondary (đứng một mình)</td><td><code>ConsultantProfileBody.tsx:182</code>, <code>LeaderboardToolbar.tsx:129</code></td><td>Không có primary cạnh, vẫn secondary vì không phải hành động lặt vặt</td></tr>
+        <tr><td class="numc" style="color:var(--success)">tertiary</td><td><code>AsyncContent.tsx:114</code></td><td>Nút "Retry" trong khối lỗi</td></tr>
+        <tr><td class="numc" style="color:var(--success)">tertiary (đã sửa)</td><td><code>ContentCommentComposer.tsx:159</code>, <code>CourseQaComposer.tsx:220</code></td><td>Hai nút "Huỷ" — sửa từ ghost/secondary về tertiary theo luật 4 tầng</td></tr>
+        <tr><td class="numc" style="color:var(--success)">outline</td><td><code>InputButtonLike.tsx:101</code>, <code>PricingCard.stories.tsx:114,171,202,231,295,319</code></td><td>Ô giả-input đơn lẻ; CTA full-width trong card giá</td></tr>
+        <tr><td class="numc" style="color:var(--success)">ghost</td><td><code>MockInterviewScorecard.tsx:378</code></td><td>Nút yếu nhất trong hàng 3 nút — neo mẫu ĐÚNG của mô hình 4 tầng</td></tr>
+        <tr><td class="numc" style="color:var(--success)">ghost</td><td><code>Navbar.tsx:262,418,478,523,604</code></td><td>Icon-only cạnh nội dung khác (nav actions)</td></tr>
+        <tr><td class="numc" style="color:var(--danger)">danger</td><td><code>ModalShell.stories.tsx:239,249</code></td><td>Nút "Unenroll" trong footer modal xác nhận</td></tr>
+        <tr><td class="numc" style="color:var(--danger)">danger-soft</td><td><code>Button.stories.tsx:123,398</code></td><td><code>label="Remove from list"</code> — phá huỷ nhẹ, đã có ngữ cảnh xác nhận khác</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Không có cổng máy kiểm cho ĐÚNG/SAI của <code>variant</code></b> — đây là quyết định ngữ cảnh (vạch cấm §6 #4-6 của <code>context.md</code>, "không gate được — kỷ luật"). Cách kiểm hiện tại là ĐỌC + ĐẾM thủ công:</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">grep -rn 'variant="tertiary"\|variant="outline"\|variant="ghost"\|variant="danger-soft"' .storybook \
+  | grep -v '.stories.tsx' \
+  # rồi đối chiếu thủ công từng file có import ButtonBase/Button/HeroButton
+  # KHÔNG đếm mù toàn repo — Select/Input/Tabs/TextField/InputGroup tự có variant riêng (Bẫy 5)</pre>
+    <p style="margin:12px 0 6px"><b>Ba thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>viết ngoài union</td><td><code>tsc --noEmit</code> xác nhận không ai viết <code>variant</code>/<code>size</code> ngoài 7/3 giá trị — nhưng KHÔNG xác nhận chọn đúng bậc, việc đó vẫn cần đọc ngữ cảnh</td></tr>
+        <tr><td>đếm cụm ≥3 nút</td><td>đếm số <code>Button</code> anh em trong cùng 1 <code>StackH</code>/<code>Cluster</code>/footer bằng <code>read_page</code>/DOM — nếu có 1 <code>ghost</code> trong cụm chỉ 2 nút ⇒ báo đỏ (gate #2, hiện <b>⬜ CHƯA viết</b>)</td></tr>
+        <tr><td>lọc theo import trước khi đếm</td><td>script phải giới hạn theo <code>import Button/HeroButton/ButtonBase</code> trước khi đếm <code>variant="…"</code> (gate #3, hiện <b>⬜ CHƯA viết</b>) — cả hai gate còn thiếu cần parser AST như <code>check-one-instance-per-state.mjs</code>, không phải 1 regex đơn</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Tổng: 5 cặp kề nhau render đủ (4 trong họ nhấn mạnh + <code>danger↔danger-soft</code>) · 1 case đặc biệt <code>tertiary↔ghost</code> render ngoài khuôn vì bằng chứng thật đòi hỏi · 5 bẫy cấu trúc render · 4 lỗi thật (2 còn sống, 2 neo đã chết) · 11 neo <code>src</code> đã grep lại · 2 gate còn <b>⬜ CHƯA viết</b> (#2 đếm cụm, #3 lọc import) · 1 khoảng trống canon đang <span class="q">⚠ chờ thầy chốt</span> (phạm vi hồi tố). <b>21/21 cặp có chỗ đứng</b>, không cặp nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>

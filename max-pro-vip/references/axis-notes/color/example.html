@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>COLOR — vét cạn 15 cặp, tô hay không tô, render thật SAI cạnh ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── bổ sung riêng cho trục color (không đổi theme, chỉ thêm atom) ── */
+  .cbar{width:44px;height:16px;border-radius:5px;border:1px solid var(--app-border);flex:0 0 auto}
+  .cname{width:74px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .ccls{width:190px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .watch{font-size:12.5px;line-height:1.6;background:color-mix(in srgb,var(--warn) 10%,transparent);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .watch b{color:var(--warn)}
+  .alertbox{border-radius:10px;padding:11px 13px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px}
+  .tierbar{display:flex;gap:2px;height:10px;border-radius:3px;overflow:hidden}
+  .tierseg{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>COLOR — vét cạn 15 cặp, render thật tô SAI cạnh KHÔNG tô ĐÚNG</h1>
+  <p class="sub">Trục này KHÔNG hỏi "màu nào đẹp hơn". Nó hỏi đúng một câu nhị phân: <b>chỗ chữ/icon
+  này có được tô accent/semantic không, hay để mặc định</b>. Ca khó nhất không phải "chọn nhầm màu"
+  mà là "tô hay KHÔNG tô" — 3 trong 5 cặp kề nhau dưới đây có một bên là <code>default</code>
+  (không khai <code>color</code> gì cả). Mọi khung là HTML render thật, không phải ảnh chụp.</p>
+
+  <h2>0. Thang sáu giá trị — không tô cũng là một giá trị, không phải "quên tô"</h2>
+  <div class="rules">
+    <div class="scale">
+      <div class="srow"><span class="cname">default</span><span class="cbar" style="background:var(--app-fg)"></span><span class="ccls">null — không khai color</span><span class="sdesc">chữ CHÍNH: tiêu đề, giá trị, câu đọc, số liệu MANG giá trị thông tin thật</span></div>
+      <div class="srow"><span class="cname">muted</span><span class="cbar" style="background:var(--app-muted)"></span><span class="ccls">text-muted</span><span class="sdesc">chữ PHỤ: hint/mô tả/caption/meta/timestamp/trivia đứng riêng</span></div>
+      <div class="srow"><span class="cname">accent</span><span class="cbar" style="background:var(--app-accent)"></span><span class="ccls">text-accent</span><span class="sdesc">tín hiệu THƯƠNG HIỆU/TƯƠNG TÁC: link, "của tôi", active — KHÔNG báo cáo 1 trạng thái dữ liệu</span></div>
+      <div class="srow"><span class="cname">success</span><span class="cbar" style="background:var(--success)"></span><span class="ccls">text-success (soft: -foreground)</span><span class="sdesc">trạng thái ĐÚNG/hoàn tất/tích cực</span></div>
+      <div class="srow"><span class="cname">warning</span><span class="cbar" style="background:var(--warn)"></span><span class="ccls">text-warning (soft: -foreground)</span><span class="sdesc">trạng thái CẦN CHÚ Ý/sắp chạm ngưỡng</span></div>
+      <div class="srow"><span class="cname">danger</span><span class="cbar" style="background:var(--danger)"></span><span class="ccls">text-danger (soft: -foreground)</span><span class="sdesc">trạng thái LỖI/xoá/không hoàn tác</span></div>
+    </div>
+    <p class="note" style="margin:12px 0 0">SSOT: <code>TypographyColor</code> (<code>Typography.tsx:33</code>, map class <code>COLOR_CLS:78-85</code>).
+    <code>AlertStatus</code> (<code>Alert.tsx:43</code>) và <code>ChipTone</code> (<code>ChipBase.tsx:48</code>) lặp lại ĐÚNG 5/6 giá trị —
+    <b>bỏ <code>muted</code></b>, vì bản thân Alert/Chip đã là khối tô màu, không cần mờ thêm một lớp nữa.
+    Chip đặt tên nhánh trung tính là <code>"neutral"</code> chứ không phải <code>"default"</code> — xem bẫy #3 ở §3, đó là khác TÊN chứ không phải hai khái niệm khác nhau.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — vì sao dừng ở 15 và không phải con số khác</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Thang có <b>6</b> giá trị, một quyết định color sai luôn là <b>chọn nhầm giá trị này thành giá trị kia</b>,
+    nên tập lỗi có thể có là tập <b>CẶP</b>: <b>C(6,2) = 15</b>. Nhưng đây không phải thang cường độ số (px)
+    mà là khoảng cách trong <b>CÂY QUYẾT ĐỊNH</b> (§2 context.md): hỏi lần lượt "có báo trạng thái dữ liệu thật
+    không → có phải tín hiệu tương tác không → có phải chữ phụ không → còn lại là chữ chính". Thứ tự dùng để
+    chia nhóm theo đó là <code>muted → default → accent → success → warning → danger</code> (chìm nhất → báo động nhất,
+    đi đúng thứ tự 4 câu hỏi của cây) — <b>không phải</b> thứ tự liệt kê ở §0 (§0 liệt kê theo mức phổ biến, §1 liệt kê theo khoảng cách cây).</p>
+    <table class="mx">
+      <tr><th class="empty"></th><th>muted</th><th>default</th><th>accent</th><th>success</th><th>warning</th><th>danger</th></tr>
+      <tr><th>muted</th><td class="diag">—</td><td class="adj">1</td><td class="near">2</td><td class="far">3</td><td class="far">4</td><td class="far">5</td></tr>
+      <tr><th>default</th><td class="diag"></td><td class="diag">—</td><td class="adj">6</td><td class="near">7</td><td class="far">8</td><td class="far">9</td></tr>
+      <tr><th>accent</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">10</td><td class="near">11</td><td class="far">12</td></tr>
+      <tr><th>success</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">13</td><td class="near">14</td></tr>
+      <tr><th>warning</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">15</td></tr>
+      <tr><th>danger</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">5 kề nhau</span>
+      đây là toàn bộ trận đánh — mục 2 render đủ cả năm, mỗi cặp cố gắng hai chiều sai.
+      &nbsp;
+      <span style="background:color-mix(in srgb,var(--warn) 22%,transparent);padding:1px 7px;border-radius:4px">4 cách một bậc</span>
+      không có phép thử riêng; phân vân ở đây là một câu hỏi cấp trên trong cây chưa được trả lời dứt khoát.
+      &nbsp;
+      <span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">6 cách ≥2 bậc</span>
+      <b>cố ý không có phép thử.</b> Một chữ không thể vừa "phụ mờ" vừa "báo lỗi nguy hiểm" mà không đi qua các câu hỏi ở giữa — viết phép thử cho chúng là hợp thức hoá việc đọc sai câu hỏi 1.
+    </p>
+  </div>
+
+  <h2>2. Năm cặp kề nhau — mỗi cặp render hai chiều sai</h2>
+
+  <!-- CẶP 1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · <code>muted</code> ↔ <code>default</code> <span class="note">ca khó nhất của cả trục</span></h3><span class="pair">không tô ↔ text-muted</span></div>
+    <div class="test"><b>Phép phân định — ĐỦ 2 LỚP, không gộp thành 1 câu:</b> con số/câu chữ này có <b>DÍNH LIỀN cấu trúc với 1 control đang active</b>
+    <b>và</b> <b>mang GIÁ TRỊ THÔNG TIN thật</b> không? Cả hai đúng ⇒ <code>default</code> (ăn theo trọng lượng control).
+    Đứng RIÊNG, không dính control nào, và chỉ là trivia ⇒ <code>muted</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tổng lượt react "128" tô muted, dù dính liền nút active</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:center">
+          <span class="btn p" style="background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600;padding:6px 12px;border-radius:8px;font-size:12px">❤ Bày tỏ cảm xúc</span>
+          <span class="bd" style="color:var(--app-muted)">128</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · default — không khai color</span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:center">
+          <span class="btn p" style="background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600;padding:6px 12px;border-radius:8px;font-size:12px">❤ Bày tỏ cảm xúc</span>
+          <span class="bd">128</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "128" nằm ngay cạnh nút react đang active, và nó mang giá trị bằng-chứng-xã-hội thật —
+    đổi dữ liệu (128 → 129) thì con số đổi và người đọc phải thấy sự đổi đó rõ ràng như control. Tô mờ nó đi là giấu
+    một thông tin đang gắn với hành động chính của hàng.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "1.2k lượt xem" tô default, dù đứng riêng và là trivia</span>
+        <div class="mock bad"><span class="bd">1.2k lượt xem</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · muted</span>
+        <div class="mock good"><span class="bd" style="color:var(--app-muted)">1.2k lượt xem</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "lượt xem" không dính liền một control nào đang active — nó đứng một mình, đọc xong không
+    ai bấm gì cả. Xem 1.2k hay 120 lượt cũng không đổi quyết định đọc tiếp. Tô đậm nó lên ngang hàng chữ chính là kéo
+    mắt vào một con số không đáng kéo.</p>
+    <div class="prin"><b>Nguyên lý:</b> phép thử là <b>hai câu hỏi riêng</b> ("dính control?" + "mang giá trị thật?"), không phải
+    một câu gộp "có đứng cạnh 1 hành động không". Gộp thành 1 câu là đúng bẫy đã cắn cả canon — xem §3 Bẫy 1.</p>
+  </div>
+
+  <!-- CẶP 2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · <code>default</code> ↔ <code>accent</code></h3><span class="pair">không tô ↔ text-accent</span></div>
+    <div class="test"><b>Phép phân định:</b> phần tử này có <b>BẤM ĐƯỢC / là trạng thái active-chọn</b> mà <b>không phản ánh
+    1 outcome dữ liệu</b> không? CÓ ⇒ <code>accent</code>. Chỉ là câu chữ đọc bình thường dù đang là tiêu đề/giá trị ⇒ <code>default</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · link "Xem chi tiết khoá học" tô default</span>
+        <div class="mock bad"><span class="bd">Xem chi tiết khoá học →</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · accent, isLink</span>
+        <div class="mock good"><span class="bd" style="color:var(--app-accent);text-decoration:underline">Xem chi tiết khoá học →</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là một link — bấm là điều hướng, không phải kết quả của dữ liệu nào cả. Tô default
+    làm nó trông y hệt một câu mô tả, người đọc không biết bấm được.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tiêu đề card khoá học tô accent dù không phải link riêng</span>
+        <div class="mock bad"><span class="ttl" style="color:var(--app-accent)">Thiết kế hệ thống phân tán</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · default</span>
+        <div class="mock good"><span class="ttl">Thiết kế hệ thống phân tán</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> tiêu đề card không tự nó là điểm bấm — cả card mới là vùng bấm được (qua stretched-link).
+    Tô accent cho tiêu đề tạo cảm giác có 2 tầng link lồng nhau, và đây chính là mầm accent-flood nếu lặp lại nhiều nơi (§3 Bẫy 6).</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>accent</code> mã hoá "bấm được", không mã hoá "quan trọng". Một tiêu đề quan trọng
+    vẫn có thể là <code>default</code> nếu bản thân nó không phải điểm tương tác.</div>
+  </div>
+
+  <!-- CẶP 3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 3 · <code>accent</code> ↔ <code>success</code></h3><span class="pair">text-accent ↔ text-success</span></div>
+    <div class="test"><b>Phép phân định:</b> đổi dữ liệu (thất bại thay vì thành công) thì màu có <b>BẮT BUỘC</b> đổi theo không?
+    CÓ ⇒ <code>success</code> (đang báo 1 outcome thật). KHÔNG, nó luôn giữ màu này bất kể kết quả ⇒ <code>accent</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · toggle "Xem 12 câu trả lời" tô success</span>
+        <div class="mock bad"><span class="bd" style="color:var(--success);text-decoration:underline">Xem 12 câu trả lời</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · accent</span>
+        <div class="mock good"><span class="bd" style="color:var(--app-accent);text-decoration:underline">Xem 12 câu trả lời</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây chỉ là mở/đóng một danh sách — bấm luôn cho cùng một hành vi bất kể có 12 hay 0 câu trả
+    lời. Không có "outcome đúng/sai" nào ở đây để success báo cáo. Tô success ngầm gán cho nó một ý nghĩa "đã xong" không tồn tại.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · badge "Đã đọc" tô accent</span>
+        <div class="mock bad"><span class="chip" style="color:var(--app-accent);border-color:var(--app-accent)"><i class="ph-fill ph-check-circle"></i>&nbsp;Đã đọc</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · success</span>
+        <div class="mock good"><span class="chip" style="color:var(--success);border-color:var(--success)"><i class="ph-fill ph-check-circle"></i>&nbsp;Đã đọc</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "Đã đọc" là một outcome thật — nếu bài chưa đọc, chip này không xuất hiện hoặc đổi hẳn nội
+    dung/màu. Đây đúng là trường hợp "đổi dữ liệu thì màu bắt buộc đổi theo" ⇒ success, không phải accent chung chung.</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>accent</code> là hằng số bất kể kết quả; <code>success</code> là hàm của kết quả.
+    Hỏi "nếu dữ liệu khác đi, màu này có buộc phải đổi không" tách được hai cái ngay lập tức.</div>
+  </div>
+
+  <!-- CẶP 4 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 4 · <code>success</code> ↔ <code>warning</code></h3><span class="pair">text-success ↔ text-warning</span></div>
+    <div class="test"><b>Phép phân định:</b> trạng thái đã <b>HOÀN TẤT/ĐÚNG hẳn</b> hay còn <b>ĐANG TIẾN TỚI 1 ngưỡng</b>
+    cần lưu ý sớm? Hoàn tất ⇒ <code>success</code>. Còn cơ hội/cần chú ý ⇒ <code>warning</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "còn 2 ngày" (sắp hết hạn nộp) tô success</span>
+        <div class="mock bad"><div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-clock" style="color:var(--success)"></i><span class="bd" style="color:var(--success)">Còn 2 ngày để nộp bài</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · warning</span>
+        <div class="mock good"><div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-clock" style="color:var(--warn)"></i><span class="bd" style="color:var(--warn)">Còn 2 ngày để nộp bài</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là <code>ContinueCard.timeLeft</code> leo tone khi urgent — hạn nộp đang tới gần, còn
+    cơ hội hành động nhưng cần chú ý sớm. Tô success báo sai rằng mọi thứ đã ổn, người học mất cảnh giác.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · dải "Đã thành thạo" trong mastery strip tô warning</span>
+        <div class="mock bad"><div class="fc" style="gap:6px"><div class="tierbar"><span class="tierseg" style="background:var(--warn)"></span><span class="tierseg" style="background:var(--app-border)"></span><span class="tierseg" style="background:var(--app-border)"></span></div><span class="sub2" style="color:var(--warn)">Đã thành thạo · 34 thẻ</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · success</span>
+        <div class="mock good"><div class="fc" style="gap:6px"><div class="tierbar"><span class="tierseg" style="background:var(--success)"></span><span class="tierseg" style="background:var(--app-border)"></span><span class="tierseg" style="background:var(--app-border)"></span></div><span class="sub2" style="color:var(--success)">Đã thành thạo · 34 thẻ</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "đã thành thạo" là dải ĐÃ hoàn tất trong <code>FlashcardMasteryStrip</code> — không còn gì
+    cần chú ý thêm ở dải này. Tô warning báo sai rằng phần đã xong vẫn còn treo lơ lửng.</p>
+    <div class="prin"><b>Nguyên lý:</b> câu hỏi không phải "tích cực hay tiêu cực" mà là <b>"đã khép lại hay còn đang mở"</b>.
+    Một tin tốt vẫn có thể là warning nếu nó còn đang chạy đến hạn (đếm ngược), và một dải đã đóng vẫn là success dù nó
+    chỉ là bước giữa của một tiến trình dài hơn.</div>
+  </div>
+
+  <!-- CẶP 5 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 5 · <code>warning</code> ↔ <code>danger</code></h3><span class="pair">text-warning ↔ text-danger</span></div>
+    <div class="test"><b>Phép phân định:</b> hậu quả đã <b>XẢY RA/không thể hoàn tác</b> hay còn <b>CƠ HỘI xử lý</b> trước khi
+    thành lỗi? Đã xảy ra ⇒ <code>danger</code>. Còn cơ hội ⇒ <code>warning</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · lỗi nộp form thất bại thật tô warning</span>
+        <div class="mock bad"><div class="alertbox" style="background:color-mix(in srgb,var(--warn) 14%,var(--app-surface));border:1px solid var(--warn)"><i class="ph-fill ph-warning" style="color:var(--warn)"></i><span class="bd">Không thể gửi phỏng vấn thử. Vui lòng thử lại.</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · danger</span>
+        <div class="mock good"><div class="alertbox" style="background:color-mix(in srgb,var(--danger) 14%,var(--app-surface));border:1px solid var(--danger)"><i class="ph-fill ph-x-circle" style="color:var(--danger)"></i><span class="bd">Không thể gửi phỏng vấn thử. Vui lòng thử lại.</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là <code>FeedbackCallout status="danger"</code> trong <code>MockInterviewSetup</code> —
+    request submit đã thất bại thật, chuyện đã xảy ra rồi. Tô warning giảm nhẹ mức nghiêm trọng, người dùng tưởng vẫn còn
+    thời gian trong khi thực ra phải thử lại ngay.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "sắp hết dung lượng lưu trữ" (chưa xảy ra) tô danger</span>
+        <div class="mock bad"><div class="alertbox" style="background:color-mix(in srgb,var(--danger) 14%,var(--app-surface));border:1px solid var(--danger)"><i class="ph-fill ph-x-circle" style="color:var(--danger)"></i><span class="bd">Dung lượng lưu trữ sắp đầy, còn 4%.</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · warning</span>
+        <div class="mock good"><div class="alertbox" style="background:color-mix(in srgb,var(--warn) 14%,var(--app-surface));border:1px solid var(--warn)"><i class="ph-fill ph-warning" style="color:var(--warn)"></i><span class="bd">Dung lượng lưu trữ sắp đầy, còn 4%.</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> chưa có gì hỏng — người dùng còn 4% và còn thời gian xử lý trước khi mất dữ liệu. Tô danger
+    gây hoảng loạn không cần thiết cho một cảnh báo còn cơ hội.</p>
+    <div class="prin"><b>Nguyên lý:</b> đúng như <code>Alert.STATUS_ICON</code> chọn <code>WarningIcon</code> (tam giác, còn
+    cảnh báo) khác hẳn <code>XCircleIcon</code> (đã sai) cho <code>danger</code> — icon phải khớp đúng thì đúng ĐÃ XẢY RA hay
+    CÒN CƠ HỘI, không khớp theo cường độ cảm xúc của câu chữ.</div>
+  </div>
+
+  <h2>3. Sáu bẫy cấu trúc — chọn đúng/sai giá trị nhưng lỗi nằm ở cách đọc, không phải ở bảng tra</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · phép thử CŨ gộp 2 lớp câu hỏi thành 1 rổ "phụ" — canon tự sửa lưng chính nó</h3><span class="pair">2026-07-29</span></div>
+    <div class="watch"><b>Đây là lỗi từng nằm ngay trong trang color-system trước đây.</b> Phép thử cũ chỉ hỏi một câu:
+    "con số này có phải LÝ DO nhìn vào hàng, hay chỉ là sự kiện phụ đi kèm 1 hành động khác?" — nghe hợp lý nhưng gộp NHẦM
+    hai thứ khác hẳn nhau vào chung một rổ, vì cả hai đều "đứng cạnh 1 icon/hành động".</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ PHÉP THỬ CŨ (1 câu) · cả hai đều ra "cạnh 1 icon ⇒ muted"</span>
+        <div class="mock bad"><div class="fc" style="gap:10px">
+          <div class="fx" style="gap:8px;align-items:center"><span class="btn p" style="background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600;padding:6px 12px;border-radius:8px;font-size:12px">❤ Cảm xúc</span><span class="bd" style="color:var(--app-muted)">128</span></div>
+          <div class="fx" style="gap:8px;align-items:center"><i class="ph ph-eye" style="color:var(--app-muted)"></i><span class="bd" style="color:var(--app-muted)">1.2k lượt xem</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ PHÉP THỬ MỚI (2 câu riêng) · tách ra được hai kết quả khác nhau</span>
+        <div class="mock good"><div class="fc" style="gap:10px">
+          <div class="fx" style="gap:8px;align-items:center"><span class="btn p" style="background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600;padding:6px 12px;border-radius:8px;font-size:12px">❤ Cảm xúc</span><span class="bd">128</span></div>
+          <div class="fx" style="gap:8px;align-items:center"><i class="ph ph-eye" style="color:var(--app-muted)"></i><span class="bd" style="color:var(--app-muted)">1.2k lượt xem</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao 1 câu sai:</b> "128" (số lượt react, mang giá trị bằng-chứng-xã-hội + dính control active) và
+    "1.2k lượt xem" (trivia, đứng riêng) đều "đứng cạnh một icon/hành động" theo nghĩa đen, nên phép thử cũ xếp cả hai vào
+    <code>muted</code>. Phải hỏi RIÊNG hai câu — "có mang giá trị thông tin thật?" và "có dính liền control đang active?" —
+    thiếu một trong hai câu là sai. Đây chính là Cặp 1 ở §2, viết lại ở đây để nhấn: <b>lỗi không nằm ở việc tra sai bảng
+    màu, mà ở việc rút gọn 2 câu hỏi thành 1</b>.</p>
+    <div class="prin"><b>Nguyên lý:</b> khi một phép thử "nghe hợp lý" mà gộp hai tiêu chí độc lập thành một câu, nghi ngờ
+    chính phép thử trước khi tin kết quả nó ra.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · TIER (dải liên tục ≥4 bậc) bị ép nhầm vào 3 token trạng thái</h3><span class="pair"><code>DifficultyChip</code> 4 bậc</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · ép 4 bậc độ khó vào success/warning/danger — 2 bậc cuối trùng màu</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;flex-wrap:wrap">
+          <span class="chip" style="color:var(--success);border-color:var(--success)">Beginner</span>
+          <span class="chip" style="color:var(--warn);border-color:var(--warn)">Intermediate</span>
+          <span class="chip" style="color:var(--danger);border-color:var(--danger)">Advanced</span>
+          <span class="chip" style="color:var(--danger);border-color:var(--danger)">Insane</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · dải Tailwind riêng, 4 bậc phân biệt được hết</span>
+        <div class="mock good"><div class="fx" style="gap:8px;flex-wrap:wrap">
+          <span class="chip" style="color:#10b981;border-color:#10b981">Beginner</span>
+          <span class="chip" style="color:#f59e0b;border-color:#f59e0b">Intermediate</span>
+          <span class="chip" style="color:#f97316;border-color:#f97316">Advanced</span>
+          <span class="chip" style="color:#f43f5e;border-color:#f43f5e">Insane</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> thang 6 giá trị của trục color chỉ có 3 token trạng thái (success/warning/danger). Độ khó
+    có 4 bậc THỨ TỰ liên tục — ép vào 3 token thì <code>advanced</code> và <code>insane</code> buộc phải trùng
+    <code>danger</code>, mất phân biệt ngay khi nhìn. <code>DifficultyChip.tsx</code> cố tình dùng dải riêng
+    (<code>emerald→amber→orange→rose</code>) thay vì đi qua thang này.</p>
+    <div class="prin"><b>Nguyên lý:</b> thang có <b>≥4 bậc thứ tự liên tục</b> (không phải 1 trạng thái nhị/tam phân) là
+    TIER, không đi qua cây quyết định 6 giá trị của trục color — hai trục khác nhau, đừng ép chung.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · <code>neutral</code> (Chip) và <code>default</code> (Typography/Alert) — cùng khái niệm, khác TÊN</h3><span class="pair">không phải bug cần hợp nhất</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ Chip tone="neutral"</span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><span class="chip">Docker</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ Typography color="default" (không khai)</span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><span class="bd">Docker</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao cả hai đều ĐÚNG:</b> cả hai đều là "không tô gì cả" — cùng một khái niệm. Đọc nhầm cấu trúc dễ
+    tưởng <code>ChipTone</code> thiếu nhánh <code>"default"</code> hoặc hai union đang đá nhau, và đi "sửa" cho khớp tên.
+    Thực ra <code>ChipBase</code> tự map <code>neutral → "default"</code> nội bộ (<code>TONE_COLOR</code>,
+    <code>ChipBase.tsx:51-57</code>) vì chip có quy ước đặt tên riêng ("trung tính" thay vì "mặc định").</p>
+    <div class="prin"><b>Nguyên lý:</b> khác tên không có nghĩa khác nghĩa. Trước khi "hợp nhất" hai union, kiểm map nội bộ
+    xem chúng có đang trỏ về cùng một giá trị hay không.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · hover đổi màu KHÔNG có nghĩa màu THẬT của phần tử đổi</h3><span class="pair"><code>CommentItem.tsx:165</code></span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · khai cứng color="danger" vì "thấy hover ra đỏ"</span>
+        <div class="mock bad"><span class="tm" style="color:var(--danger)"><i class="ph ph-trash"></i>&nbsp;Xoá</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · nghỉ = muted, hover mới xem-trước danger</span>
+        <div class="fc" style="gap:6px">
+          <div class="mock good"><span class="tm" style="color:var(--app-muted)"><i class="ph ph-trash"></i>&nbsp;Xoá <span class="note">(trạng thái nghỉ)</span></span></div>
+          <div class="mock good" style="outline:2px dashed var(--danger)"><span class="tm" style="color:var(--danger)"><i class="ph ph-trash"></i>&nbsp;Xoá <span class="note">(đang hover, xem trước)</span></span></div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> nút xoá bình luận là <code>text-muted</code> lúc nghỉ, chỉ ĐỔI sang
+    <code>hover:text-danger-soft-foreground</code> khi rê chuột. Hành động xoá CHƯA xảy ra — <code>danger</code> chỉ là
+    XEM TRƯỚC lúc hover, không phải trạng thái đã có của dữ liệu. Khai cứng <code>color="danger"</code> qua prop tĩnh là
+    đọc nhầm một hiệu ứng tương tác thành một trạng thái dữ liệu.</p>
+    <div class="prin"><b>Nguyên lý:</b> câu hỏi 1a của cây quyết định ("đây có đang báo cáo trạng thái THẬT không") chỉ áp
+    dụng cho màu Ở TRẠNG THÁI NGHỈ. Hover/focus là lớp tương tác riêng, không đi qua prop <code>color</code> tĩnh.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · icon MANG NGHĨA TRẠNG THÁI bị khoá cứng theo màu label</h3><span class="pair"><code>SurfaceCard.leadingIcon</code></span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · checkmark ăn theo màu label (đen/default), mất tín hiệu trạng thái</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--app-fg)"></i><span class="bd">Đã triển khai 4 sản phẩm thật</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · leadingIconColor="success" riêng, độc lập với màu label</span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success)"></i><span class="bd">Đã triển khai 4 sản phẩm thật</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> icon checkmark ở đây MANG NGHĨA "outcome đã đạt được" — nó phải đi qua <code>AlertStatus</code>
+    như mọi tín hiệu trạng thái khác, không phải mặc định "theo màu chữ cạnh nó". Bug thật: khoá cứng theo màu label làm
+    checkmark ra màu đen thay vì xanh, người đọc mất hẳn tín hiệu "đây là điều đã đạt được".</p>
+    <div class="prin"><b>Nguyên lý:</b> icon trạng thái cần MỘT prop màu RIÊNG (<code>leadingIconColor?: AlertStatus</code>),
+    không được ăn theo màu của phần tử đứng cạnh nó dù trông "tiện" hơn.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 6 · mỗi giá trị đúng CỤC BỘ nhưng CẢ VÙNG quá nhiều điểm nổi (accent-flood)</h3><span class="pair"><code>CourseCard</code> 2026-07-22</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · 4-5 điểm nổi cùng lúc, không điểm nào sai giá trị nhưng cả cụm mất tác dụng "nổi"</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success)"></i><span class="bd" style="color:var(--success)">3 dự án thực chiến</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success)"></i><span class="bd" style="color:var(--success)">Chứng chỉ hoàn thành</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success)"></i><span class="bd" style="color:var(--success)">Hỗ trợ trọn đời</span></div>
+          <span class="chip" style="color:var(--success);border-color:var(--success)">−55%</span>
+          <div class="fx" style="justify-content:flex-end"><span class="btn p" style="background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a">Đăng ký ngay</span></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · hạ 3 check về muted, chỉ giữ 1-2 điểm nổi thật (giá + CTA)</span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph ph-check-circle" style="color:var(--app-muted)"></i><span class="bd" style="color:var(--app-muted)">3 dự án thực chiến</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph ph-check-circle" style="color:var(--app-muted)"></i><span class="bd" style="color:var(--app-muted)">Chứng chỉ hoàn thành</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph ph-check-circle" style="color:var(--app-muted)"></i><span class="bd" style="color:var(--app-muted)">Hỗ trợ trọn đời</span></div>
+          <span class="chip">−55%</span>
+          <div class="fx" style="justify-content:flex-end"><span class="btn p" style="background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a">Đăng ký ngay</span></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> từng điểm bên trái tra bảng đều "đúng" theo cây quyết định — 3 gạch đầu dòng thật sự là
+    tính năng tích cực, giảm giá thật sự là ưu đãi. Nhưng khi cả 3 check + chip + CTA cùng nổi trong một card, mắt không
+    biết nhìn vào đâu trước — "nổi" chỉ có tác dụng khi hiếm. Bẫy này KHÔNG sửa được bằng cây §2 (cây chỉ quyết 1 chỗ), phải
+    nhìn CẢ VÙNG rồi bớt lại.</p>
+    <div class="prin"><b>Nguyên lý:</b> đúng-từng-điểm không đảm bảo đúng-cả-vùng. Sau khi tra cây cho từng chỗ, phải lùi lại
+    đếm số điểm tô trong 1 khung nhìn — quá 2 là dấu hiệu cần hạ bớt.</div>
+  </div>
+
+  <h2>4. Ba lỗi thật đã cắn — và điều chỉ lộ ra khi xếp cạnh nhau</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:26%">Chỗ</th><th style="width:20%">Đã viết</th><th style="width:20%">Đúng phải là</th><th>Bài học</th></tr></thead>
+      <tbody>
+        <tr><td><code>ReactionButton.tsx</code> cụm "128"</td><td class="numc" style="color:var(--danger)">color="muted"</td><td class="numc" style="color:var(--success)">default (bỏ hẳn muted)</td><td>Phép thử 1 lớp cũ gộp nhầm số reaction (mang giá trị) và số view (trivia) chung 1 rổ — §3 Bẫy 1</td></tr>
+        <tr><td><code>SurfaceCard.leadingIcon</code> (outcomes list)</td><td class="numc" style="color:var(--danger)">khoá theo màu label</td><td class="numc" style="color:var(--success)">leadingIconColor="success"</td><td>Icon mang nghĩa trạng thái không được ăn theo màu ngữ cảnh khác — §3 Bẫy 5</td></tr>
+        <tr><td><code>CourseCard</code> (2026-07-22)</td><td class="numc" style="color:var(--danger)">3 check + chip + CTA cùng nổi</td><td class="numc" style="color:var(--success)">hạ check về muted</td><td>Đúng cục bộ, sai cả vùng — accent-flood, §3 Bẫy 6</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0"><b>Điều chỉ hiện ra khi xếp cả ba cạnh nhau:</b></p>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">a.</b> Hai trong ba lỗi
+    (<code>ReactionButton</code>, <code>SurfaceCard</code>) là lỗi <b>đọc sai cấu trúc ở MỘT điểm</b> — thiếu một lớp câu
+    hỏi. Lỗi thứ ba (<code>CourseCard</code>) là lỗi <b>đúng từng điểm nhưng sai cả vùng</b> — hai loại lỗi này đòi hai
+    cách rà khác nhau: loại 1 rà bằng cây quyết định từng chỗ, loại 2 rà bằng đếm điểm nổi trong một khung nhìn.</p>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">b.</b> Không có lỗi nào
+    trong ba lỗi này là chọn nhầm giữa hai giá trị CÁCH XA nhau trong cây (vd muted↔danger) — tất cả đều là lệch <b>gần</b>
+    (muted↔default, hoặc đúng giá trị nhưng sai mật độ). Củng cố lại đúng phát hiện của §1: giá trị nằm ở cặp KỀ NHAU, không
+    ở cặp xa.</p>
+  </div>
+
+  <h2>5. Chín cặp không render — vì sao</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Bốn cặp cách một bậc</b> — không viết phép thử riêng, phân vân ở đây chỉ ra một câu hỏi
+    cấp trên trong cây (§2 context.md) chưa được trả lời dứt khoát:</p>
+    <table>
+      <thead><tr><th style="width:22%">Cặp</th><th>Đọc thế nào</th></tr></thead>
+      <tbody>
+        <tr><td><code>muted</code> ↔ <code>accent</code></td><td>Phân vân nghĩa là câu 2 (có phải tín hiệu tương tác không) chưa trả lời dứt khoát — quay lại câu 2 trước khi hỏi tiếp phụ hay không.</td></tr>
+        <tr><td><code>default</code> ↔ <code>success</code></td><td>Phân vân nghĩa là câu 1 (đây có đang báo cáo 1 trạng thái dữ liệu thật không) chưa trả lời — một câu chữ không thể vừa "chỉ là chữ chính" vừa "đang báo 1 outcome" cùng lúc.</td></tr>
+        <tr><td><code>accent</code> ↔ <code>warning</code></td><td>Đang so "tín hiệu chung" với "báo động cụ thể" mà chưa chốt câu 1 — nếu đã xác định KHÔNG phải trạng thái dữ liệu thì warning không còn là ứng viên nữa.</td></tr>
+        <tr><td><code>success</code> ↔ <code>danger</code></td><td>Cách nhau 1 bậc trong dải 3 semantic vì BỎ QUA mất trạng thái trung gian warning — hỏi lại "có mức nửa chừng không" trước khi chọn 1 trong 2 đầu mút.</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:14px 0 10px"><b>Sáu cặp cách ≥2 bậc</b> — <code>muted</code>↔<code>success</code> ·
+    <code>muted</code>↔<code>warning</code> · <code>muted</code>↔<code>danger</code> · <code>default</code>↔<code>warning</code> ·
+    <code>default</code>↔<code>danger</code> · <code>accent</code>↔<code>danger</code>: <b>cố ý không có phép thử, và
+    không render.</b> Phân vân giữa hai giá trị cách nhau ≥2 bậc là dấu hiệu <b>CÂU HỎI 1 đọc SAI</b>, không phải chọn
+    nhầm. Một chữ không thể vừa "phụ mờ/chữ chính trung tính" vừa "báo lỗi nguy hiểm" mà không đi qua câu 1-2 trước. Việc
+    phải làm là quay lại câu hỏi 1, không phải chọn màu.</p>
+  </div>
+
+  <h2>6. Neo code thật — ba bảng SSOT + mỗi giá trị một neo</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Ba bảng map nơi 6 giá trị THẬT sinh ra class. Đọc lại tận nơi ngày <b>2026-07-29</b>. Không có
+    bảng thứ tư — mọi component semantic khác đi XUYÊN QUA một trong ba bảng này.</p>
+    <table>
+      <thead><tr><th style="width:32%">File</th><th style="width:34%">Bảng</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td class="numc">Typography.tsx:78-85</td><td class="numc">COLOR_CLS</td><td class="numc">default:null · muted:text-muted · accent:text-accent · success:text-success · warning:text-warning · danger:text-danger</td></tr>
+        <tr><td class="numc">Alert.tsx:65-71</td><td class="numc">STATUS_TINT</td><td class="numc">default:bg-default · accent:bg-accent-soft · success:bg-success-soft · warning:bg-warning-soft · danger:bg-danger-soft</td></tr>
+        <tr><td class="numc">ChipBase.tsx:51-57</td><td class="numc">TONE_COLOR</td><td class="numc">neutral:default · success · warning · danger · accent</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Mỗi giá trị, ít nhất một neo render thật</h3>
+    <table>
+      <thead><tr><th style="width:12%">Giá trị</th><th style="width:44%">Neo</th><th>Vì sao đúng</th></tr></thead>
+      <tbody>
+        <tr><td class="numc">default</td><td class="numc">ReactionButton.tsx:182</td><td>tổng lượt reaction, dính liền cụm nút active</td></tr>
+        <tr><td class="numc">muted</td><td class="numc">ContentReaction.tsx:84</td><td>"lượt xem", trivia đứng riêng</td></tr>
+        <tr><td class="numc">accent</td><td class="numc">ContentCommentThread.tsx:262-268</td><td>toggle "Xem N câu trả lời", không phản ánh outcome</td></tr>
+        <tr><td class="numc">success</td><td class="numc">ContentHeader.tsx:158,197</td><td>chip "Đã đọc" + checkmark outcome</td></tr>
+        <tr><td class="numc">warning</td><td class="numc">FlashcardMasteryStrip.tsx:141</td><td>dải "Đang học", chưa xong</td></tr>
+        <tr><td class="numc">danger</td><td class="numc">MockInterviewSetup.tsx:242-247</td><td>lỗi submit đã xảy ra thật</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Neo <code>src</code> gốc · <code>Discussion/CommentItem.tsx</code></h3>
+    <table>
+      <thead><tr><th style="width:10%">Dòng</th><th style="width:44%">Class</th><th>Đọc ra giá trị nào</th></tr></thead>
+      <tbody>
+        <tr><td class="numc">113</td><td class="numc">text-accent-soft-foreground</td><td>accent — icon tín hiệu, không phải trạng thái</td></tr>
+        <tr><td class="numc">116,120</td><td class="numc">text-muted</td><td>muted — timestamp + "(đã sửa)"</td></tr>
+        <tr><td class="numc">138</td><td class="numc">text-foreground</td><td>default — nội dung chính bình luận</td></tr>
+        <tr><td class="numc">165</td><td class="numc">text-muted hover:text-danger-soft-foreground</td><td>muted lúc nghỉ, xem trước danger khi hover (§3 Bẫy 4)</td></tr>
+      </tbody>
+    </table>
+    <p class="note" style="margin-top:8px">Neo TIER: <code>_legacy/designs/chips/DifficultyChip/DifficultyChip.tsx:12-27</code> (§3 Bẫy 2). Neo naming
+    "neutral"/"default": <code>ChipBase.tsx:51-57</code> (§3 Bẫy 3). Neo accent-flood: <code>CourseCard</code>, bàn giao
+    2026-07-22 (§3 Bẫy 6, §4).</p>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Đếm phân bố giá trị <code>color</code>/<code>tone</code>/<code>status</code> thật trong toàn
+    bộ Storybook (PowerShell, không cần Node):</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">Get-ChildItem -Recurse "C:\Repositories\starci-academy\.storybook\components" -Include *.tsx |
+  Select-String -Pattern 'color="(muted|accent|success|warning|danger)"' -AllMatches |
+  ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } |
+  Group-Object | Sort-Object Count -Descending</pre>
+    <p style="margin:12px 0 6px"><b>Ba thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Cách kiểm / dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>token có THẬT SỰ áp dụng không</td><td><code>getComputedStyle(el).color</code> trong iframe story, so với biến theme thật — đọc mắt không thấy token bị <code>!important</code> khác đè</td></tr>
+        <tr><td>class màu viết TAY ngoài 3 bảng SSOT</td><td><code>Select-String -Pattern 'text-(muted|accent|danger|success|warning)(-soft-foreground)?'</code> loại trừ <code>Typography.tsx</code>/<code>ChipBase.tsx</code>/<code>Alert.tsx</code> — có hit là vi phạm vạch cấm #1/#3</td></tr>
+        <tr><td>TIER bị ép vào 3 token (Bẫy 2)</td><td>quét prop nhận enum &gt;3 giá trị nhưng map trực tiếp vào <code>AlertStatus</code>/<code>COLOR_CLS</code> — có &gt;3 nhánh mà chỉ ra 3 màu là dấu hiệu collision</td></tr>
+      </tbody>
+    </table>
+    <div class="watch" style="margin-top:12px"><b>Gate còn thiếu (chưa tự động hoá được, ghi rõ để không tưởng đã có):</b>
+    vạch cấm #1 (class màu tay thay prop), #3 (giá trị ngoài thang viết thẳng className), #5 (TIER ép vào 3 token) đều
+    <b>CHƯA có script <code>check-color.mjs</code></b> — hiện tại chỉ kiểm bằng lệnh PowerShell/JS ở trên, chạy tay mỗi lần
+    audit, không chạy tự động trong CI.</div>
+  </div>
+
+  <p class="note">Tổng: 5 cặp render đủ hai chiều sai · 4 cặp giải thích không render · 6 cặp cố ý loại · 6 bẫy cấu trúc
+  render (gồm 1 bẫy là chính phép thử cũ tự sửa lưng) · 3 lỗi thật · 13 neo <code>src</code>/component đã đọc lại.
+  <b>15/15 cặp có chỗ đứng</b>, không cặp nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>

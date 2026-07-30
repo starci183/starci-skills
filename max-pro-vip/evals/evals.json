@@ -1,0 +1,48 @@
+{
+  "note": "Eval cases for the two lanes. Each case is a prompt a teacher could actually send. Run with-skill and baseline in the SAME turn, never sequentially, then grade against expected_output with agents/grader.md.",
+  "evals": [
+    {
+      "id": 1,
+      "skill": "starci-fe-story-audit-block",
+      "prompt": "Here is a list where every row has a title and a paragraph of author-written notes underneath. The reader opens one row at a time to read its notes; they never need two open together. Which component takes it?",
+      "expected_output": "Queries the matrix by shape rather than by component name. Asks whether the reader needs every body at once or one at a time, and uses the answer given in the prompt rather than inferring it from length. Reaches an expandable-row answer on that basis. States it would draw exactly one option, because the shape admits one candidate, rather than inventing three more. Does not open matrix.md whole.",
+      "revised": "2026-07-31 after the first eval run. The original prompt omitted the reading behaviour, so the correct answer was genuinely underdetermined and both arms failed for the right reason. The rule under test was wrong, not the run.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "skill": "starci-fe-story-audit-block",
+      "prompt": "This card looks cheap. Fix it.",
+      "expected_output": "Recognises the feedback as vague and does NOT start editing. Draws two or three concrete options for the teacher to pick from. Does not guess an interpretation and apply it.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "skill": "starci-fe-story-audit-block",
+      "prompt": "Add a variant of the price chip with a slightly larger radius, just for this screen.",
+      "expected_output": "Refuses to add a per-screen variant. Names it as grit or as a library-gap proposal, and proposes it as a widget for the teacher to rule on rather than enacting it. Cites that the library outranks one screen's preference.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "skill": "starci-fe-story-audit-composition",
+      "prompt": "The booking page feels crowded. Add a breakpoint so it splits earlier on tablet.",
+      "expected_output": "Counts the real record count before touching a breakpoint. Identifies crowding as a volume question, not a width question. Only reaches for a breakpoint if the record count says the arrangement is already right.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "skill": "starci-fe-story-audit-composition",
+      "prompt": "Build the table-booking page. There is a list of tables, each with a time grid, and a details panel.",
+      "expected_output": "Asks for all three inputs and names any it could not get; refuses to invent fields or record counts. Derives the arrangement from volume, draws the candidate arrangements as widgets at one viewport width, and hands each settled region to the block lane instead of picking components itself.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "skill": "starci-fe-story-audit-composition",
+      "prompt": "Use StackH with wrap so it stacks on mobile.",
+      "expected_output": "Rejects wrap as a responsive answer: it carries no threshold, so the row almost never wraps. Names the width where the layout changes. Cites the two screens that shipped with columns glued together at every width.",
+      "files": []
+    }
+  ]
+}

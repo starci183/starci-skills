@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TEXT — hai thang giao nhau, vét cạn size×weight, render thật SAI vs ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── bổ sung riêng cho trục text: size/weight thật ── */
+  .tx-xs{font-size:12px} .tx-sm{font-size:14px} .tx-base{font-size:16px} .tx-lg{font-size:18px}
+  .tx-h5{font-size:20px} .tx-h4{font-size:24px} .tx-h3{font-size:28px} .tx-h2{font-size:32px} .tx-h1{font-size:36px}
+  .tx-code{font-size:13px;font-family:ui-monospace,monospace;background:var(--app-surface2);padding:2px 7px;border-radius:5px}
+  .tw-regular{font-weight:400} .tw-medium{font-weight:500} .tw-semibold{font-weight:600} .tw-bold{font-weight:700}
+  .t-fg{color:var(--app-fg)} .t-muted{color:var(--app-muted)}
+  .watch{background:color-mix(in srgb,var(--warn) 10%,transparent);border:1px solid var(--warn);border-radius:12px;padding:14px 16px}
+  .watch b{color:var(--warn)}
+  .qlbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;color:var(--warn);display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .tier{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TEXT — hai thang giao nhau, vét cạn size×weight, render thật SAI cạnh ĐÚNG</h1>
+  <p class="sub">Mọi khung dưới đây là HTML render thật với đúng size/weight của thang, không phải ảnh chụp hay mô tả. Trục này trả lời "cỡ chữ, độ đậm, màu chữ" — hai thang <code>size</code> và <code>weight</code> GIAO NHAU, chọn size không tự động đúng weight.</p>
+
+  <h2>0. Hai thang thô + một thang tổng hợp (tier)</h2>
+
+  <div class="rules">
+    <h3>0a. SIZE — 10 giá trị thật, 3 nhóm render khác cơ chế</h3>
+    <p class="note" style="margin:0 0 10px">Đọc từ <code>TypographySize</code>, <code>Typography.tsx:43</code>. KHÔNG có giá trị thứ 11.</p>
+    <div class="scale">
+      <div class="srow"><span class="sname">xs</span><span class="spx">12px</span><span class="sbar" style="width:36px"></span><span class="tx-xs t-fg">Chữ cỡ xs</span><span class="sdesc">body · meta/nhãn phụ</span></div>
+      <div class="srow"><span class="sname">sm</span><span class="spx">14px</span><span class="sbar" style="width:42px"></span><span class="tx-sm t-fg">Chữ cỡ sm</span><span class="sdesc">body · phổ biến nhất</span></div>
+      <div class="srow"><span class="sname">base</span><span class="spx">16px</span><span class="sbar" style="width:48px"></span><span class="tx-base t-fg">Chữ cỡ base</span><span class="sdesc">body · mặc định khi không khai size</span></div>
+      <div class="srow"><span class="sname">lg</span><span class="spx">18px</span><span class="sbar" style="width:54px"></span><span class="tx-lg t-fg">Chữ cỡ lg</span><span class="sdesc">body · hiếm, 5 call-site thật toàn hệ thống</span></div>
+      <div class="srow"><span class="sname">h5</span><span class="spx">20px</span><span class="sbar" style="width:60px;background:var(--warn)"></span><span class="tx-h5 t-fg tw-bold">Heading h5</span><span class="sdesc">heading · cũng là nấc port <code>h6</code> thật</span></div>
+      <div class="srow"><span class="sname">h4</span><span class="spx">24px</span><span class="sbar" style="width:72px;background:var(--warn)"></span><span class="tx-h4 t-fg tw-bold">Heading h4</span><span class="sdesc">heading</span></div>
+      <div class="srow"><span class="sname">h3</span><span class="spx">28px</span><span class="sbar" style="width:84px;background:var(--warn)"></span><span class="tx-h3 t-fg tw-bold">Heading h3</span><span class="sdesc">heading</span></div>
+      <div class="srow"><span class="sname">h2</span><span class="spx">32px</span><span class="sbar" style="width:96px;background:#5c6880"></span><span class="tx-h2 t-fg tw-bold">Heading h2</span><span class="sdesc">heading · gần như KHÔNG dùng (1 lần: mã lỗi trang)</span></div>
+      <div class="srow"><span class="sname">h1</span><span class="spx">36px</span><span class="sbar" style="width:108px;background:#5c6880"></span><span class="tx-h1 t-fg tw-bold">Heading h1</span><span class="sdesc">heading · gần như KHÔNG dùng (1 lần: skeleton)</span></div>
+      <div class="srow"><span class="sname">code</span><span class="spx">13px</span><span class="sbar" style="width:39px;background:#5c6880"></span><span class="tx-code t-fg">const x = 1</span><span class="sdesc">wrap <code>HeroTypography type="code"</code> · <b style="color:var(--danger)">weight bị LỜ</b></span></div>
+    </div>
+  </div>
+
+  <div class="rules">
+    <h3>0b. WEIGHT — 4 giá trị hiệu lực (type chỉ khai 3, giá trị thứ 4 là KHÔNG khai)</h3>
+    <p class="note" style="margin:0 0 10px"><code>weight?: "medium" | "semibold" | "bold"</code> (<code>Typography.tsx:178</code>). Bậc thứ 4 <b style="color:var(--ink)">không truyền prop</b> = regular — không nằm trong union nhưng là trạng thái thật, có render riêng.</p>
+    <table>
+      <thead><tr><th style="width:16%">Giá trị</th><th style="width:24%">Render thật</th><th style="width:30%">Ý nghĩa</th><th>Áp dụng</th></tr></thead>
+      <tbody>
+        <tr><td class="numc"><i>(không khai)</i></td><td><span class="tx-base t-fg tw-regular">Văn xuôi dài</span></td><td>regular — mặc định</td><td>mọi nhóm</td></tr>
+        <tr><td class="numc">medium</td><td><span class="tx-base t-fg tw-medium">Nhãn nổi hơn</span></td><td>nhấn LÀM VIỆC — nhãn/tên/giá trị cỡ-body</td><td>body + heading + isButton</td></tr>
+        <tr><td class="numc">semibold</td><td><span class="tx-base t-fg tw-semibold">Tiêu đề khối</span></td><td>tiêu đề CẤP KHỐI — modal header, tổng tiền, verdict</td><td>CHỈ có nghĩa riêng ở heading; ở body <b style="color:var(--warn)">FOLD về medium</b></td></tr>
+        <tr><td class="numc">bold</td><td><span class="tx-base t-fg tw-bold">Số lớn/heading</span></td><td>heading/display/số lớn</td><td>CHỈ đi với heading; KHÔNG BAO GIỜ ở body-sm/body-xs</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="rules">
+    <h3>0c. Tier vai trò — cây quyết định áp size+weight cùng lúc, cộng một ngoại lệ có tên</h3>
+    <table>
+      <thead><tr><th style="width:10%">Tier</th><th style="width:20%">size × weight</th><th style="width:30%">Dùng khi</th><th>Render thật</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tier">A</span></td><td class="numc">h3–h5, luôn <b>bold</b></td><td>đứng MỘT MÌNH làm tâm điểm 1 khối/card/lưới</td><td><span class="tx-h5 t-fg tw-bold">Tên khối tâm điểm</span></td></tr>
+        <tr><td><span class="tier">B</span></td><td class="numc">sm + medium</td><td>1 HÀNG trong list/table dày đặc</td><td><span class="tx-sm t-fg tw-medium">Tên trong 1 hàng</span></td></tr>
+        <tr><td><span class="tier">C</span></td><td class="numc">sm/base, regular, thường muted</td><td>câu/đoạn mô tả dưới 1 title</td><td><span class="tx-sm t-muted tw-regular">Câu mô tả đọc liền phía dưới.</span></td></tr>
+        <tr><td><span class="tier">D</span></td><td class="numc">xs, regular</td><td>meta/nhãn phụ: timestamp, caption tầng 2</td><td><span class="tx-xs t-muted tw-regular">2 giờ trước</span></td></tr>
+        <tr><td><span class="tier" style="background:color-mix(in srgb,var(--warn) 24%,transparent);color:var(--warn)">Ngoại lệ</span></td><td class="numc">base + semibold</td><td>Tiêu đề Modal — luật riêng, dễ lẫn Tier A nhất</td><td><span class="tx-base t-fg tw-semibold">Xác nhận thanh toán</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="watch">
+    <div class="qlbl"><i class="ph-fill ph-warning-circle"></i>✅ ĐÃ CHỐT — <code>h6</code> không tồn tại trong <code>TypographySize</code></div>
+    <p style="margin:0;font-size:12.5px;color:var(--ink);line-height:1.6"><code>HEADING_LEVEL</code> (<code>Typography.tsx:48</code>) dừng ở <code>h5</code>, dù HeroUI gốc CÓ <code>h6</code> thật (<code>typography.styles.ts:39</code>) và <code>src</code> thật dùng nó (<code>CourseCard/index.tsx:285</code> ghi <code>type="h6"</code>). Quy ước tạm: port <code>h6</code> → hạ về <code>size="h5"</code> (nấc gần nhất, không có lựa chọn khác). <b>✅ Chốt 2026-07-29: luôn hạ về <code>h5</code>, KHÔNG thêm bậc <code>h6</code> vào atom.</b> Đếm thật trong <code>src</code>: <code>h6</code> dùng <b>8 lần</b> so với <code>h5</code> <b>14 lần</b>, và cả 8 đều là tiêu đề thẻ trong lưới — cùng một vai, không phải một bậc riêng. Áp đúng luật đã dùng cho <code>InsetScale</code>: <b>một bậc chỉ sinh ra khi có người chọn nó vì nó KHÁC</b>, không phải vì thư viện có sẵn. Tám chỗ dùng cùng một vai với bậc trên nó là bằng chứng thừa bậc, không phải thiếu bậc.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — hai thang C(4,2)=6, cộng ma trận tổ hợp 6 nhánh × 4 giá trị</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Trục này có <b>hai</b> thang có thứ tự (tier A-B-C-D, weight regular-medium-semibold-bold), mỗi thang 4 bậc ⇒ mỗi thang có <b>C(4,2) = 6</b> cặp có thể lẫn. Cộng thêm một chiều vét cạn KHÁC HẲN — không phải cặp giá trị mà là <b>nhánh render × giá trị</b>, vì <code>Typography.tsx</code> có đúng 6 nhánh code đọc <code>weight</code> theo cách khác nhau.</p>
+
+    <h3 style="margin:14px 0 8px">1a. Ma trận Tier — A · B · C · D</h3>
+    <table class="mx">
+      <tr><th class="empty"></th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
+      <tr><th>A</th><td class="diag">—</td><td class="adj">1</td><td class="near">3</td><td class="far">6</td></tr>
+      <tr><th>B</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td><td class="near">5</td></tr>
+      <tr><th>C</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">4</td></tr>
+      <tr><th>D</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:10px 0 16px;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">3 kề nhau</span>
+      (A↔B, B↔C, C↔D) có phép phân định dứt khoát — render đủ ở mục 2.
+      &nbsp;<span style="background:color-mix(in srgb,var(--warn) 22%,transparent);padding:1px 7px;border-radius:4px">2 cách 1 bậc</span>
+      (A↔C, B↔D) không có phép thử riêng.
+      &nbsp;<span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">1 cách 2 bậc</span>
+      (A↔D) cố ý không có phép thử.
+    </p>
+
+    <h3 style="margin:14px 0 8px">1b. Ma trận Weight — regular · medium · semibold · bold</h3>
+    <table class="mx">
+      <tr><th class="empty"></th><th>regular</th><th>medium</th><th>semibold</th><th>bold</th></tr>
+      <tr><th>regular</th><td class="diag">—</td><td class="adj">1</td><td class="near">3</td><td class="far">6</td></tr>
+      <tr><th>medium</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td><td class="near">5</td></tr>
+      <tr><th>semibold</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">4</td></tr>
+      <tr><th>bold</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:10px 0 16px;font-size:12.5px;color:var(--muted)">
+      Cùng cấu trúc 3/2/1: <b style="color:var(--ink)">regular↔medium, medium↔semibold, semibold↔bold</b> render ở mục 2; <b style="color:var(--ink)">regular↔semibold, medium↔bold</b> không có phép thử riêng; <b style="color:var(--ink)">regular↔bold</b> cố ý không render.
+    </p>
+
+    <h3 style="margin:14px 0 8px">1c. Ma trận tổ hợp size×weight — tiêu chí vét cạn KHÁC, dừng khi đủ 24 ô</h3>
+    <p style="margin:0 0 10px;font-size:12.5px;color:var(--muted)"><code>Typography.tsx</code> có đúng <b style="color:var(--ink)">6 nhánh render</b> đọc/không đọc <code>weight</code> khác nhau (bỏ skeleton vì không có <code>text</code>). <b style="color:var(--ink)">6 × 4 = 24 ô</b>, đây là tập đóng — không có nhánh thứ 7 nào khác trong file.</p>
+    <table>
+      <thead><tr><th style="width:24%">Nhánh render</th><th>regular</th><th>medium</th><th>semibold</th><th>bold</th></tr></thead>
+      <tbody>
+        <tr><td><b>body, không icon</b></td><td style="color:var(--success)">✅ không đậm</td><td style="color:var(--success)">✅ font-medium</td><td style="color:var(--warn)">⚠️ FOLD → y hệt medium</td><td style="color:var(--success)">✅ font-bold</td></tr>
+        <tr><td><b>body, CÓ prefix/suffix icon</b></td><td style="color:var(--danger)">⛔ ép font-medium</td><td style="color:var(--danger)">⛔ (trùng ép)</td><td style="color:var(--danger)">⛔ vô tác dụng</td><td style="color:var(--danger)">⛔ bị hạ xuống medium</td></tr>
+        <tr><td><b>isLink</b></td><td style="color:var(--danger)">⛔ không đọc weight</td><td style="color:var(--danger)">⛔</td><td style="color:var(--danger)">⛔</td><td style="color:var(--danger)">⛔</td></tr>
+        <tr><td><b>isButton</b></td><td style="color:var(--success)">✅ không đậm</td><td style="color:var(--success)">✅ font-medium</td><td style="color:var(--warn)">⚠️ FOLD → font-medium</td><td style="color:var(--success)">✅ font-bold</td></tr>
+        <tr><td><b>heading (h1–h5)</b></td><td style="color:var(--success)">✅ mặc định HeroUI</td><td style="color:var(--success)">✅ thật, không fold</td><td style="color:var(--success)">✅ thật, không fold</td><td style="color:var(--success)">✅ thật, không fold</td></tr>
+        <tr><td><b>size="code"</b></td><td style="color:var(--danger)">⛔</td><td style="color:var(--danger)">⛔ không đọc weight</td><td style="color:var(--danger)">⛔</td><td style="color:var(--danger)">⛔</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">Đọc bảng:</b> ô ⛔ không phải lỗi biên dịch — code nhận mọi giá trị, âm thầm bỏ qua. Đây chính là nguồn của bẫy 1-3 ở mục 3.</p>
+  </div>
+
+  <h2>2. Sáu cặp dễ lẫn — ba cặp tier kề nhau + ba cặp weight kề nhau</h2>
+
+  <!-- CẶP T1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp T1 · Tier <span class="tier">A</span> ↔ Tier <span class="tier">B</span></h3><span class="pair">h5 bold ↔ sm medium</span></div>
+    <div class="test"><b>Phép phân định:</b> text này có ĐỨNG RIÊNG được không, hay LUÔN xuất hiện kèm N hàng giống nó? Đứng riêng ⇒ <span class="tier">A</span>. Luôn là 1 hàng trong danh sách ⇒ <span class="tier">B</span>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tiêu đề card đứng riêng dùng Tier B <span class="measure">sm medium</span></span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:8px">
+          <span class="tx-sm t-fg tw-medium">Thiết kế hệ thống phân tán</span>
+          <span class="tx-xs t-muted tw-regular">42 bài · 12 giờ học</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier A <span class="measure">h5 bold</span></span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:8px">
+          <span class="tx-h5 t-fg tw-bold">Thiết kế hệ thống phân tán</span>
+          <span class="tx-xs t-muted tw-regular">42 bài · 12 giờ học</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là tiêu đề của MỘT card đứng độc lập trong lưới — không có N card giống hệt xếp thành hàng ngay dưới nó để so sánh cùng cấp. Ở Tier B, tiêu đề trông nhẹ hơn một dòng meta bên dưới nó nên mất luôn vai trò "tâm điểm khối".</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · 1 hàng trong bảng dày đặc dùng Tier A <span class="measure">h5 bold</span></span>
+        <div class="mock bad"><div class="fc" style="gap:4px">
+          <div class="fx" style="gap:10px;align-items:center"><div class="avatar">🙂</div><span class="tx-h5 t-fg tw-bold">Minh Anh</span><span class="tx-xs t-muted" style="margin-left:auto">98 điểm</span></div>
+          <div class="fx" style="gap:10px;align-items:center"><div class="avatar">🙋</div><span class="tx-h5 t-fg tw-bold">Hoàng Nam</span><span class="tx-xs t-muted" style="margin-left:auto">91 điểm</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier B <span class="measure">sm medium</span></span>
+        <div class="mock good"><div class="fc" style="gap:4px">
+          <div class="fx" style="gap:10px;align-items:center"><div class="avatar">🙂</div><span class="tx-sm t-fg tw-medium">Minh Anh</span><span class="tx-xs t-muted" style="margin-left:auto">98 điểm</span></div>
+          <div class="fx" style="gap:10px;align-items:center"><div class="avatar">🙋</div><span class="tx-sm t-fg tw-medium">Hoàng Nam</span><span class="tx-xs t-muted" style="margin-left:auto">91 điểm</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> bảng xếp hạng có N hàng giống nhau lặp lại — mỗi tên là một hàng, không phải một tâm điểm. Ở Tier A, mỗi tên to bằng tiêu đề khối, hàng nào cũng "hét" ngang nhau và bảng mất tôn ti.</p>
+    <div class="prin"><b>Nguyên lý:</b> phép thử là "có N cái giống nó không", không phải "nó có quan trọng không" — một tên trong bảng xếp hạng vẫn quan trọng, nhưng vẫn là Tier B vì nó lặp lại theo hàng.</div>
+  </div>
+
+  <!-- CẶP T2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp T2 · Tier <span class="tier">B</span> ↔ Tier <span class="tier">C</span></h3><span class="pair">sm medium ↔ sm/base regular muted</span></div>
+    <div class="test"><b>Phép phân định:</b> text này có phải TÊN/NHÃN của một thực thể, hay là CÂU MÔ TẢ đọc liền? Tên/nhãn ngắn, nổi hơn dòng xung quanh ⇒ <span class="tier">B</span>. Câu văn xuôi dài, giọng phụ ⇒ <span class="tier">C</span>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tên user trong hàng dùng Tier C <span class="measure">sm regular muted</span></span>
+        <div class="mock bad"><div class="row"><div class="fx" style="gap:10px;align-items:center">
+          <div class="avatar">🙂</div><span class="tx-sm t-muted tw-regular">Minh Anh</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier B <span class="measure">sm medium</span></span>
+        <div class="mock good"><div class="row"><div class="fx" style="gap:10px;align-items:center">
+          <div class="avatar">🙂</div><span class="tx-sm t-fg tw-medium">Minh Anh</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "Minh Anh" là tên định danh — nó phải nổi hơn phần còn lại của hàng để mắt bắt được ai đang nói. Ở Tier C, tên chìm màu muted y hệt một câu mô tả, hàng mất trọng tâm.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · câu mô tả khoá học dùng Tier B <span class="measure">sm medium</span></span>
+        <div class="mock bad"><div class="fc" style="gap:8px">
+          <span class="tx-h5 t-fg tw-bold">Thiết kế hệ thống phân tán</span>
+          <span class="tx-sm t-fg tw-medium">Học cách chia nhỏ một hệ thống lớn thành các dịch vụ độc lập, giao tiếp qua message queue.</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier C <span class="measure">sm regular muted</span></span>
+        <div class="mock good"><div class="fc" style="gap:8px">
+          <span class="tx-h5 t-fg tw-bold">Thiết kế hệ thống phân tán</span>
+          <span class="tx-sm t-muted tw-regular">Học cách chia nhỏ một hệ thống lớn thành các dịch vụ độc lập, giao tiếp qua message queue.</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là văn xuôi đọc liền một câu, không phải một nhãn ngắn cần bắt mắt. Ở Tier B, cả câu mô tả đậm ngang tiêu đề phía trên, hai tầng thông tin trông như cùng một cấp quan trọng.</p>
+    <div class="prin"><b>Nguyên lý:</b> phép thử là hỏi bản chất của cụm chữ (tên riêng vs câu văn), không phải đếm độ dài — một tên dài vẫn là Tier B, một câu ngắn vẫn có thể là Tier C nếu nó đọc như mô tả.</div>
+  </div>
+
+  <!-- CẶP T3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp T3 · Tier <span class="tier">C</span> ↔ Tier <span class="tier">D</span></h3><span class="pair">sm/base regular muted ↔ xs regular</span></div>
+    <div class="test"><b>Phép phân định:</b> xoá dòng này, phần còn lại có MẤT Ý CHÍNH không, hay chỉ mất 1 chi tiết vụn? Mất ý chính ⇒ <span class="tier">C</span>. Chỉ mất meta ⇒ <span class="tier">D</span>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · mô tả khoá học dùng Tier D <span class="measure">xs</span></span>
+        <div class="mock bad"><div class="fc" style="gap:8px">
+          <span class="tx-h5 t-fg tw-bold">Thiết kế hệ thống phân tán</span>
+          <span class="tx-xs t-muted tw-regular">Học cách chia nhỏ một hệ thống lớn thành các dịch vụ độc lập, giao tiếp qua message queue.</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier C <span class="measure">sm</span></span>
+        <div class="mock good"><div class="fc" style="gap:8px">
+          <span class="tx-h5 t-fg tw-bold">Thiết kế hệ thống phân tán</span>
+          <span class="tx-sm t-muted tw-regular">Học cách chia nhỏ một hệ thống lớn thành các dịch vụ độc lập, giao tiếp qua message queue.</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> xoá câu này, người đọc không còn biết khoá học nói về cái gì — đây là Ý CHÍNH thứ hai của card, không phải chi tiết vụn. Ở Tier D nó bị thu nhỏ ngang một timestamp, đọc như phụ chú có thể lờ đi.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · timestamp dùng Tier C <span class="measure">sm</span></span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:center">
+          <span class="nm">Minh Anh</span><span class="tx-sm t-muted tw-regular">2 giờ trước</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier D <span class="measure">xs</span></span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:center">
+          <span class="nm">Minh Anh</span><span class="tx-xs t-muted tw-regular">2 giờ trước</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> xoá "2 giờ trước" thì bình luận vẫn đầy đủ ý — chỉ mất một chi tiết thời gian phụ. Ở Tier C, timestamp to ngang tên tác giả, cạnh tranh chú ý với chính danh tính người viết.</p>
+    <div class="prin"><b>Nguyên lý:</b> phép thử "xoá rồi đọc lại" phân biệt NỘI DUNG (dù ngắn) với META (dù đứng gần nội dung chính) — vị trí không quyết định tier, vai trò thông tin mới quyết định.</div>
+  </div>
+
+  <!-- CẶP W1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp W1 · weight <code>(không khai)</code> ↔ <code>medium</code></h3><span class="pair">regular ↔ medium</span></div>
+    <div class="test"><b>Phép phân định:</b> chữ này có phải NHÃN/TÊN cần nổi hơn xung quanh không (Tier B), hay chỉ là văn xuôi/meta (Tier C/D)? Nổi hơn ⇒ <code>medium</code>. Không ⇒ không khai <code>weight</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tên trong hàng dùng regular <span class="measure">không khai weight</span></span>
+        <div class="mock bad"><div class="row"><div class="fx" style="gap:10px;align-items:center">
+          <div class="avatar">🙂</div><span class="tx-sm t-fg tw-regular">Minh Anh</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · medium <span class="measure">font-medium</span></span>
+        <div class="mock good"><div class="row"><div class="fx" style="gap:10px;align-items:center">
+          <div class="avatar">🙂</div><span class="tx-sm t-fg tw-medium">Minh Anh</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> tên là nhãn định danh trong một hàng dày đặc — cần nổi hơn phần còn lại để mắt bắt trước tiên. Ở regular, tên hoà lẫn vào các cột số liệu khác, hàng mất neo thị giác.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · câu mô tả dùng medium <span class="measure">font-medium</span></span>
+        <div class="mock bad"><span class="tx-sm t-muted tw-medium">Học cách chia nhỏ một hệ thống lớn thành các dịch vụ độc lập.</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · không khai <span class="measure">regular</span></span>
+        <div class="mock good"><span class="tx-sm t-muted tw-regular">Học cách chia nhỏ một hệ thống lớn thành các dịch vụ độc lập.</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là văn xuôi giọng phụ, không phải nhãn cần nhấn. Ở medium, cả câu mô tả nổi lên ngang một tiêu đề phụ, tranh chú ý với Tier A/B đứng trên nó.</p>
+    <div class="prin"><b>Nguyên lý:</b> <code>medium</code> đánh dấu "cái này cần bắt mắt trước" — dùng cho mọi câu văn xuôi là làm mọi thứ đều "quan trọng", tức là không có gì quan trọng nữa.</div>
+  </div>
+
+  <!-- CẶP W2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp W2 · weight <code>medium</code> ↔ <code>semibold</code></h3><span class="pair">ở BODY: render y hệt nhau · ở HEADING: khác nhau thật</span></div>
+    <div class="test"><b>Phép phân định:</b> đang ở cỡ HEADING (h3-h5) hay cỡ BODY? Ở BODY, <code>semibold</code> FOLD về <code>medium</code> — hai giá trị này render <b>giống hệt nhau</b>. Ở HEADING, hai giá trị khác nhau thật.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ code ghi weight="medium" <span class="measure">body-sm</span></span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><span class="tx-sm t-fg tw-medium">Xác nhận thanh toán</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good" style="color:var(--warn)">◆ code ghi weight="semibold" <span class="measure">body-sm, FOLD</span></span>
+        <div class="mock" style="outline:2px solid var(--warn);outline-offset:-1px"><span class="tx-sm t-fg tw-medium">Xác nhận thanh toán</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao cả hai đều render GIỐNG HỆT:</b> ở cỡ body, nhánh <code>Typography.tsx</code> fold <code>semibold</code> về cùng class <code>font-medium</code> như <code>medium</code>. Viết <code>semibold</code> ở body không sai chức năng nhưng KHÔNG đạt được gì hơn — nên đừng phân vân, viết <code>medium</code> cho rõ ý người đọc code sau.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ HIẾM DÙNG · heading weight medium <span class="measure">h4 medium</span></span>
+        <div class="mock bad"><span class="tx-h4 t-fg tw-medium">Học phí gói Pro</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ THẬT DÙNG · heading weight semibold <span class="measure">h4 semibold</span></span>
+        <div class="mock good"><span class="tx-h4 t-fg tw-semibold">Học phí gói Pro</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ở cỡ HEADING, <code>medium</code> và <code>semibold</code> KHÔNG fold — chúng là hai class đậm khác nhau thật. <code>medium</code> ở heading gần như không xuất hiện trong <code>src</code>; <code>semibold</code> ở heading là ca có tên (verdict cấp khối) chứ không phải mặc định — đây là chỗ mâu thuẫn với chính 2 neo Tier A thật, xem cảnh báo ở mục 6.</p>
+    <div class="prin"><b>Nguyên lý:</b> cùng một cặp giá trị nhưng CƠ CHẾ RENDER phụ thuộc vào size đi kèm nó — hỏi "size nào" trước khi hỏi "weight nào" cho cặp này.</div>
+  </div>
+
+  <!-- CẶP W3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp W3 · weight <code>semibold</code> ↔ <code>bold</code></h3><span class="pair">tiêu đề Modal/verdict ↔ Tier A đứng riêng</span></div>
+    <div class="test"><b>Phép phân định:</b> đây có phải Tier A (đứng riêng làm tâm điểm) không? CÓ ⇒ <code>bold</code>. Đây có phải tiêu đề Modal/verdict/tổng tiền không? CÓ ⇒ <code>semibold</code>, không bao giờ <code>bold</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tiêu đề Modal dùng bold <span class="measure">base bold</span></span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:12px">
+          <span class="tx-base t-fg tw-bold">Xác nhận thanh toán</span>
+          <span class="tx-sm t-muted">Gói Pro · 299.000đ/tháng</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Ngoại lệ Modal semibold <span class="measure">base semibold</span></span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:12px">
+          <span class="tx-base t-fg tw-semibold">Xác nhận thanh toán</span>
+          <span class="tx-sm t-muted">Gói Pro · 299.000đ/tháng</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> tiêu đề Modal thuộc Ngoại lệ có tên (§0c) — luôn <code>base + semibold</code>, KHÔNG BAO GIỜ là heading hay <code>bold</code>. Bản năng "to đậm nhất trong Modal" hay bị đọc nhầm thành Tier A, xem bẫy 5 ở mục 3.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · số liệu tâm điểm dùng semibold <span class="measure">h3 semibold</span></span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:4px">
+          <span class="tx-h3 t-fg tw-semibold">14 ngày</span>
+          <span class="tx-xs t-muted">còn lại đến deadline</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · Tier A bold <span class="measure">h3 bold</span></span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:4px">
+          <span class="tx-h3 t-fg tw-bold">14 ngày</span>
+          <span class="tx-xs t-muted">còn lại đến deadline</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> số liệu đứng một mình làm tâm điểm khối (neo <code>DeadlineCallout/index.tsx:57</code>, thật <code>bold</code>) là Tier A đúng nghĩa. Hai neo khác mà canon từng trích cho Tier A (<code>PricingCard</code>, <code>MetricCard</code>) đọc lại ra <code>semibold</code> — nhưng đó <b>không phải phản chứng</b>: chúng nằm trong <code>src</code>, tức CÔNG TRÌNH, được phép lệch bản vẽ (<code>rules/0-boundary.md</code>). Luật §3b đã tự trả lời: Tier A đứng riêng làm tâm điểm ⇒ <code>bold</code>; <code>semibold</code> chỉ dành cho tiêu đề Modal, verdict, tổng tiền. Việc phải làm là <b>bỏ hai neo trích nhầm</b>, không phải đổi luật.</p>
+    <div class="prin"><b>Nguyên lý:</b> "to đậm" không phải một trục liên tục — <code>bold</code> dành riêng cho Tier A, <code>semibold</code> dành riêng cho nhóm ngoại lệ có tên. Không có bậc trung gian nào giữa hai vai trò này.</div>
+  </div>
+
+  <h2>3. Sáu bẫy cấu trúc — chọn đúng tier/weight nhưng vẫn sai</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · <code>weight</code> không ai nhận ở <code>size="code"</code></h3><span class="pair">truyền bold, đo ra không đậm gì</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ code truyền <code>weight="bold"</code>, khung bỏ im lặng</span>
+        <div class="mock bad"><span class="tx-code t-fg tw-regular">npm run build --prod</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ render thật của <code>size="code"</code> luôn vậy, bất kể weight</span>
+        <div class="mock good"><span class="tx-code t-fg tw-regular">npm run build --prod</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> nhánh <code>size === "code"</code> (<code>Typography.tsx:338-354</code>) build className chỉ từ <code>color/align/lineClamp/underlineOnGroupHover</code> — <b>không có <code>weight</code></b> trong danh sách. Không lỗi biên dịch, không cảnh báo, chỉ đơn giản là prop bị bỏ qua.</p>
+    <div class="prin"><b>Nguyên lý:</b> đọc prop truyền vào không chứng minh được gì — phải đo class/weight ĐÃ RENDER (xem mục 7), vì code nhận và im lặng bỏ.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · <code>weight</code> không ai nhận ở <code>isLink</code></h3><span class="pair">link "in đậm" không thể qua prop weight</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ kỳ vọng <code>isLink weight="bold"</code> ra link đậm</span>
+        <div class="mock bad"><span class="tx-sm t-fg tw-regular" style="color:var(--app-accent);text-decoration:underline">Xem chi tiết khoá học</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ weight mặc định của HeroLink, không đổi dù truyền gì</span>
+        <div class="mock good"><span class="tx-sm t-fg tw-regular" style="color:var(--app-accent);text-decoration:underline">Xem chi tiết khoá học</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> nhánh <code>isLink</code> (<code>Typography.tsx:372-391</code>) build className chỉ từ <code>TEXT_CLS[bodySize]/color/cursor-pointer/underlineOnHover</code> — không có nhánh nào đọc <code>weight</code>. Một link "in đậm" phải tự quyết bằng cách khác (không phải prop <code>weight</code>).</p>
+    <div class="prin"><b>Nguyên lý:</b> không phải bug, nhưng dễ tưởng bug khi weight "biến mất" — phải biết trước đây là hành vi có chủ đích của nhánh <code>isLink</code>, không phải lỗi cần vá.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · icon ép <code>font-medium</code>, đè mọi <code>weight</code> khác</h3><span class="pair">bold cạnh icon vẫn ra medium</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ truyền <code>prefixIcon</code> + <code>weight="bold"</code>, kỳ vọng đậm</span>
+        <div class="mock bad"><div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:#38d39f;font-size:16px"></i><span class="tx-sm t-fg tw-medium">Đã hoàn thành</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ render thật — icon LUÔN ép medium bất kể weight truyền vào</span>
+        <div class="mock good"><div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:#38d39f;font-size:16px"></i><span class="tx-sm t-fg tw-medium">Đã hoàn thành</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>Typography.tsx:417-423</code> viết <code>hasIcons ? "font-medium" : (weight === "bold" ? "font-bold" : ...)</code> — <code>hasIcons</code> thắng TUYỆT ĐỐI, không nhánh nào đọc <code>weight</code> khi có icon, kể cả <code>bold</code>. Đây là ĐÚNG THIẾT KẾ (comment tại chỗ: "icon strokes fit medium text"), không phải bug.</p>
+    <div class="prin"><b>Nguyên lý:</b> icon đi kèm chữ luôn khoá weight về <code>medium</code> — đừng cố ép <code>bold</code> cạnh icon bằng prop, kết quả sẽ luôn giống nhau.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · <code>semibold</code> từng CÂM hoàn toàn ở body (đã vá 2026-07-29)</h3><span class="pair">7 file / 9 call-site mất đậm âm thầm</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ TRƯỚC KHI VÁ · rơi vào <code>null</code>, mất đậm hoàn toàn</span>
+        <div class="mock bad"><span class="tx-sm t-fg tw-regular">Tên tác giả bình luận</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ SAU KHI VÁ · fold đúng về font-medium</span>
+        <div class="mock good"><span class="tx-sm t-fg tw-medium">Tên tác giả bình luận</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> 2 nhánh render body-scale từng rơi <code>weight === "semibold"</code> vào <code>null</code> thay vì fold <code>font-medium</code> — sai 9 chỗ ở 7 file (<code>ContentPaywall</code>, <code>MindMapContinueButton</code>, <code>ModuleContinueBand</code>, <code>PersonalProjectDashboard</code>, <code>PersonalProjectResultScreen</code>, <code>QuizProgressPanel</code>, <code>TaskBriefBody</code>×3) trước khi bị bắt qua 1 câu feedback về tên tác giả thiếu đậm ở <code>ContentCommentThread</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> một fold-rule đúng ở 1 nhánh không chứng minh nó đúng ở nhánh còn lại — sau khi sửa, phải grep lại MỌI call-site <code>weight="semibold"</code> ở body scale để chắc không còn nhánh thứ 3 sót fold.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · "to đậm" ⇒ bản năng chọn heading, nhưng Modal header KHÔNG BAO GIỜ là heading</h3><span class="pair">base+semibold, không phải h4</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tiêu đề Modal port thành heading <span class="measure">h4 bold</span></span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:10px">
+          <span class="tx-h4 t-fg tw-bold">Xác nhận rời khoá học</span>
+          <span class="tx-sm t-muted">Tiến độ của bạn sẽ được lưu lại.</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · neo <code>PaymentModal:460</code>, <code>CookieConsentModal:45</code> <span class="measure">base semibold</span></span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:10px">
+          <span class="tx-base t-fg tw-semibold">Xác nhận rời khoá học</span>
+          <span class="tx-sm t-muted">Tiến độ của bạn sẽ được lưu lại.</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> 5/5 lỗi thật ghi trong canon 2026-07-29 (<code>MilestoneUpNextCard</code>, <code>EnrollGate</code>, <code>LeaderboardBoard</code>, <code>ContentPaywall</code>, <code>VoiceHero</code>) đều là TỰ Ý NÂNG size so với <code>src</code>, không ca nào hạ nhầm — chi tiết ở mục 4.</p>
+    <div class="prin"><b>Nguyên lý:</b> "to và đậm" không đồng nghĩa với "heading" — nhóm ngoại lệ Modal có tên riêng, đứng ngoài cây tier, phải nhận diện bằng NGỮ CẢNH (đây có phải tiêu đề Modal không) chứ không phải bằng cảm giác thị giác.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 6 · <code>text-xl font-semibold</code> viết trần ở <code>src</code> = <code>h4</code> (24px heading), KHÔNG PHẢI <code>lg</code> body (18px)</h3><span class="pair">hai thang khác nhau, dễ lẫn vì cả hai "to hơn sm"</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ ĐỌC NHẦM · port thành body lg <span class="measure">18px</span></span>
+        <div class="mock bad"><span class="tx-lg t-fg tw-semibold">Bạn cần nâng cấp gói Pro</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · neo <code>EnrollGate</code> thật là h4 heading <span class="measure">24px</span></span>
+        <div class="mock good"><span class="tx-h4 t-fg tw-semibold">Bạn cần nâng cấp gói Pro</span></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> Tailwind <code>text-xl</code> = 20-24px tuỳ scale, không khớp trực tiếp với con số nào của <code>TypographySize</code> body — nó là dấu hiệu của <b>heading</b> viết trần, không qua component <code>Typography</code>. Neo: <code>EnrollGate</code> dùng <code>type="h4"</code> thật qua component; <code>ContentPaywall</code> viết trần <code>text-xl font-semibold</code> không qua <code>Typography</code> — cùng một hình nhưng một cái có neo type, một cái không.</p>
+    <div class="prin"><b>Nguyên lý:</b> class Tailwind viết trần không tự khai nó thuộc thang nào — phải quy về prop <code>type</code> của <code>Typography</code> trước khi so, nếu không sẽ so nhầm hai thang khác nhau.</div>
+  </div>
+
+  <h2>4. Lỗi thật đã cắn — và thiên lệch có hệ thống lộ ra khi xếp cạnh nhau</h2>
+  <div class="rules">
+    <h3 style="margin:0 0 8px">4a. Năm chỗ tự nâng size so với <code>src</code> (canon 2026-07-29)</h3>
+    <table>
+      <thead><tr><th style="width:34%">Chỗ</th><th style="width:22%">Loại lệch</th><th>Hướng lệch</th></tr></thead>
+      <tbody>
+        <tr><td><code>MilestoneUpNextCard</code></td><td>tự nâng size so với <code>src</code></td><td>nâng, không hạ</td></tr>
+        <tr><td><code>EnrollGate</code></td><td>tự nâng size so với <code>src</code></td><td>nâng, không hạ</td></tr>
+        <tr><td><code>LeaderboardBoard</code></td><td>tự nâng size so với <code>src</code></td><td>nâng, không hạ</td></tr>
+        <tr><td><code>ContentPaywall</code></td><td>tự nâng size so với <code>src</code></td><td>nâng, không hạ</td></tr>
+        <tr><td><code>VoiceHero</code></td><td>tự nâng size so với <code>src</code></td><td>nâng, không hạ</td></tr>
+      </tbody>
+    </table>
+    <h3 style="margin:16px 0 8px">4b. Bảy file / chín call-site <code>semibold</code> câm ở body (đã vá)</h3>
+    <table>
+      <thead><tr><th style="width:34%">File</th><th style="width:22%">Đã render (sai)</th><th>Đúng ra phải là</th></tr></thead>
+      <tbody>
+        <tr><td><code>ContentPaywall</code></td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+        <tr><td><code>MindMapContinueButton</code></td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+        <tr><td><code>ModuleContinueBand</code></td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+        <tr><td><code>PersonalProjectDashboard</code></td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+        <tr><td><code>PersonalProjectResultScreen</code></td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+        <tr><td><code>QuizProgressPanel</code></td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+        <tr><td><code>TaskBriefBody</code> (×3 call-site)</td><td class="numc" style="color:var(--danger)">null — mất đậm</td><td class="numc" style="color:var(--success)">font-medium</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:14px 0 0"><b>Hai điều chỉ hiện ra khi xếp cả hai bảng cạnh nhau:</b></p>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">a.</b> Bảng 4a toàn bộ là lỗi <b>size</b>, bảng 4b toàn bộ là lỗi <b>weight</b> — hai trục con của cùng một trục <code>text</code> hỏng theo hai cơ chế khác nhau hoàn toàn (kỷ luật đối chiếu <code>src</code> vs bug ở chính atom), nên gate cho size và gate cho weight không thể gộp làm một.</p>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">b.</b> Bảng 4a: <b>không ca nào hạ nhầm</b>, toàn bộ đều nâng — thiên lệch có hệ thống của người dựng, giống hệt pattern đã thấy ở trục <code>seam</code> (luôn chọn chặt hơn/nổi hơn nguồn thật). Bảng 4b: cả 9 call-site đều CÙNG một nguyên nhân gốc (2 nhánh code sai), tức là một lỗi ở atom lan ra 7 file khác nhau chỉ vì tất cả đều port qua đúng một component dùng chung.</p>
+  </div>
+
+  <h2>5. Các cặp không render — vì sao</h2>
+  <div class="rules">
+    <h3 style="margin:0 0 8px">5a. Thang Tier</h3>
+    <p style="margin:0 0 10px"><b>Hai cặp cách 1 bậc</b> (<code>A↔C</code>, <code>B↔D</code>): không viết phép thử riêng. Phân vân ở đây nghĩa là một câu hỏi cấp trên (đứng riêng hay lặp hàng? là tên hay là câu mô tả?) chưa được trả lời dứt khoát — quay lại cặp kề nó trước.</p>
+    <p style="margin:0"><b>Một cặp cách 2 bậc</b> (<code>A↔D</code>): <b>cố ý không có phép thử.</b> Tier A (đậm nhất, đứng riêng) và Tier D (nhạt nhất, meta phụ) không bao giờ là hai lựa chọn hợp lý cho CÙNG một dòng chữ. Phân vân ở đây là dấu hiệu đọc sai cấu trúc (ví dụ tưởng nhầm một con số phụ là điểm nhấn của khối), không phải chọn sai tier.</p>
+    <h3 style="margin:16px 0 8px">5b. Thang Weight</h3>
+    <p style="margin:0 0 10px"><b>Hai cặp cách 1 bậc</b> (<code>regular↔semibold</code>, <code>medium↔bold</code>): không có phép thử riêng — quay lại xác định trước: đây có phải Tier A hay ngoại lệ Modal không?</p>
+    <p style="margin:0"><b>Một cặp cách 2 bậc</b> (<code>regular↔bold</code>): <b>cố ý không có phép thử.</b> Một dòng chữ phân vân giữa "không đậm gì cả" và "đậm nhất trang" là dấu hiệu chưa xác định được tier, không phải chọn sai weight.</p>
+  </div>
+
+  <h2>6. Neo code thật — đã đọc lại tận nơi, không chép lại</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Đọc trực tiếp từ file ngày <b>2026-07-29</b>. Số dòng của <code>src/**</code> trôi theo mỗi lần sửa — nếu lệch, tìm theo pattern <code>type="…"</code> trong đúng file, đừng tin số dòng.</p>
+    <table>
+      <thead><tr><th style="width:10%">Tier</th><th style="width:44%">Neo</th><th>Giá trị thật</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tier">A</span></td><td class="numc">CourseCard/index.tsx:285</td><td><code>type="h6" weight="bold"</code> — tiêu đề card độc lập trong lưới</td></tr>
+        <tr><td><span class="tier">A</span></td><td class="numc">DeadlineCallout/index.tsx:57</td><td><code>type="h3" weight="bold"</code> — số liệu nổi bật</td></tr>
+        <tr><td><span class="tier">A</span></td><td class="numc">PaymentModal/index.tsx:601</td><td><code>type="h4" weight="bold"</code> — giá membership</td></tr>
+        <tr><td><span class="tier">B</span></td><td class="numc">ListRow/index.tsx:78</td><td><code>type="body-sm" weight="medium" truncate</code> — tên trong hàng dày đặc</td></tr>
+        <tr><td><span class="tier">B</span></td><td class="numc">UserCell/index.tsx:62</td><td><code>type="body-sm" weight="medium" truncate</code></td></tr>
+        <tr><td><span class="tier">C</span></td><td class="numc">CourseCard/index.tsx:222</td><td><code>type="body-sm" color="muted"</code> — mô tả tầng 1</td></tr>
+        <tr><td><span class="tier">D</span></td><td class="numc">FeedItem/index.tsx:51</td><td><code>type="body-xs" color="muted"</code> — timestamp, nhất quán TUYỆT ĐỐI mọi file soi</td></tr>
+        <tr><td>Ngoại lệ</td><td class="numc">PaymentModal/index.tsx:460</td><td><code>type="body" weight="semibold"</code> — tiêu đề Modal</td></tr>
+        <tr><td>Ngoại lệ</td><td class="numc">CookieConsentModal/index.tsx:45</td><td><code>type="body" weight="semibold" className="pr-8"</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="watch">
+    <div class="qlbl"><i class="ph-fill ph-warning-circle"></i>✅ ĐÃ CHỐT — luật §3b đã trả lời; 2 neo kia là trích NHẦM, không phải phản chứng</div>
+    <p style="margin:0 0 10px;font-size:12.5px;color:var(--ink);line-height:1.6">Canon từng trích <code>PricingCard/index.tsx:108</code> và <code>MetricCard/index.tsx:67</code> làm ví dụ Tier A ("giá tiền CHÍNH", "số liệu nổi bật") với công thức <code>h3/h4 + bold</code>. Đọc lại tận nơi hôm nay ra kết quả KHÁC:</p>
+    <table>
+      <thead><tr><th style="width:26%">File</th><th style="width:10%">Dòng</th><th style="width:22%">Canon ghi</th><th>Đọc lại thật</th></tr></thead>
+      <tbody>
+        <tr><td><code>PricingCard/index.tsx</code></td><td class="numc">108</td><td class="numc" style="color:var(--danger)">h3 bold</td><td class="numc" style="color:var(--warn)"><code>type="h3" weight="semibold"</code></td></tr>
+        <tr><td><code>MetricCard/index.tsx</code></td><td class="numc">67</td><td class="numc" style="color:var(--danger)">h4 bold</td><td class="numc" style="color:var(--warn)"><code>type="h4" weight="semibold"</code></td></tr>
+        <tr><td><code>DeadlineCallout/index.tsx</code></td><td class="numc">57</td><td class="numc">—</td><td class="numc" style="color:var(--success)"><code>type="h3" weight="bold"</code> — ĐÚNG bold</td></tr>
+        <tr><td><code>PaymentModal/index.tsx</code></td><td class="numc">601</td><td class="numc">—</td><td class="numc" style="color:var(--success)"><code>type="h4" weight="bold"</code> — ĐÚNG bold</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:10px 0 0;font-size:12.5px;color:var(--ink);line-height:1.6"><b>Đã đóng, không phải hai khả năng chờ chọn:</b> luật §3b đã trả lời dứt khoát — "Tier A đứng riêng làm tâm điểm ⇒ <code>bold</code>". <code>PricingCard</code>/<code>MetricCard</code> đọc ra <code>semibold</code> vì chúng nằm trong <code>src</code> (CÔNG TRÌNH), được phép lệch bản vẽ (<code>rules/0-boundary.md</code>) — không phải phản chứng đòi thêm nhánh con hay đổi <code>bold</code> thành <code>semibold</code>. Việc phải làm là <b>bỏ hai neo trích nhầm</b> khỏi vị trí minh hoạ Tier A, không phải sửa luật.</p>
+  </div>
+
+  <div class="rules">
+    <h3 style="margin:0 0 8px">6a. Neo mapping <code>h6</code> thật → <code>h5</code> Storybook</h3>
+    <table>
+      <thead><tr><th style="width:44%">Nguồn</th><th>Ghi nhận</th></tr></thead>
+      <tbody>
+        <tr><td><code>Typography.tsx:48</code></td><td><code>HEADING_LEVEL: Record&lt;string,1|2|3|4|5&gt;</code> — dừng ở 5, không có <code>h6</code></td></tr>
+        <tr><td><code>typography.styles.ts:39</code> (HeroUI gốc)</td><td>CÓ <code>h6</code> thật: <code>type.h6: "typography--h6"</code></td></tr>
+        <tr><td><code>CourseCard/index.tsx:285</code></td><td><code>src</code> thật dùng <code>type="h6"</code> — khi port vào Storybook phải hạ xuống <code>size="h5"</code>, không có lựa chọn nào khác</td></tr>
+      </tbody>
+    </table>
+    <h3 style="margin:16px 0 8px">6b. Neo "càng lồng sâu, chữ càng nhỏ" — quan sát, không phải lỗi</h3>
+    <table>
+      <thead><tr><th style="width:44%">File</th><th style="width:26%">Giá trị</th><th>Độ sâu</th></tr></thead>
+      <tbody>
+        <tr><td><code>CommunityPostCard/index.tsx:71</code></td><td class="numc">body-sm semibold</td><td>cấp 1 (post gốc)</td></tr>
+        <tr><td><code>CommunityCommentRow/index.tsx:57</code></td><td class="numc">body-xs semibold</td><td>reply lồng sâu hơn</td></tr>
+      </tbody>
+    </table>
+    <p class="why" style="margin-top:8px">Cả hai đọc lại đúng như canon trích — không lệch, khác hẳn tình huống <code>PricingCard</code>/<code>MetricCard</code> ở khối cảnh báo phía trên. Ghi lại để không tự gộp hai hiện tượng khác nhau làm một.</p>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Chạy trong iframe của story — đọc weight/size <b>ĐÃ RENDER</b>, không đọc prop truyền vào:</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">[...document.querySelectorAll('[data-anat-part]')].map(e =&gt; ({
+    part: e.getAttribute('data-anat-part'),
+    fontSize: getComputedStyle(e).fontSize,
+    fontWeight: getComputedStyle(e).fontWeight,
+    color: getComputedStyle(e).color,
+}))</pre>
+    <p style="margin:12px 0 6px"><b>Hai thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>truyền <code>weight="bold"</code> cạnh icon / <code>isLink</code> / <code>size="code"</code></td><td>đo <code>fontWeight</code> ra khác kỳ vọng ⇒ đúng bẫy 1-3 ở mục 3, không phải bug lạ</td></tr>
+        <tr><td>so <code>fontSize</code> đo được với bảng vai trò §0c</td><td>không tự tin "nhìn ổn" khi chưa đo — nhất là ranh giới <code>lg</code> body (18px) vs <code>h5</code> heading (20px), chỉ lệch 2px bằng mắt</td></tr>
+        <tr><td>call-site vừa có <code>size="code"</code>/<code>isLink</code> vừa có <code>weight=</code></td><td>prop thừa, vô tác dụng — gate §6 vạch cấm #5 (canon <code>context.md</code>) CHƯA viết, phải tự grep tạm</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Tổng: 3+3 = 6 cặp render đủ hai chiều sai (3 tier · 3 weight) · 3+3 = 6 cặp giải thích không render (2+1 tier · 2+1 weight) · 1 ma trận tổ hợp 24 ô (6 nhánh × 4 giá trị) · 6 bẫy cấu trúc render · 2 bảng lỗi thật (5 ca size + 7 file/9 call-site weight) · 9 neo <code>src</code> theo tier · 2 khối từng treo — nay <b>ĐÃ CHỐT cả hai</b> (mapping <code>h6</code> → luôn hạ về <code>h5</code>; Tier A luôn <code>bold</code>, <code>PricingCard</code>/<code>MetricCard</code> là 2 neo trích nhầm cần bỏ, không phải phản chứng). <b>12/12 cặp (6 tier + 6 weight) có chỗ đứng</b>, không cặp nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>

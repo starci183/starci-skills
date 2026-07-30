@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SURFACE — vét cạn 6 cặp, render thật SAI vs ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+  .q{background:color-mix(in srgb,var(--warn) 10%,transparent);border:1px dashed var(--warn);border-radius:0 8px 8px 0;border-left:3px solid var(--warn);padding:9px 12px;font-size:12.5px;color:var(--ink);line-height:1.6}
+  .q b{color:var(--warn)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── mặt SURFACE thật: bo/viền/bóng/nền, không dùng .card cho các mock này ── */
+  .shadow-real{box-shadow:0 10px 28px -8px rgba(0,0,0,.55)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SURFACE — vét cạn 6 cặp, render thật SAI cạnh ĐÚNG</h1>
+  <p class="sub">Trục này trả lời đúng một câu: bo góc bao nhiêu, có viền không, có bóng không, nền màu gì. Mọi khung dưới đây render thật với đúng con số của thang (24px/16px/12px, border 1px/2px-dashed, box-shadow thật), không phải ảnh chụp hay mô tả.</p>
+
+  <h2>0. Thang — không phải số, mà là 4 hình dạng mặt tăng dần TRỌNG LƯỢNG</h2>
+  <div class="rules">
+    <p style="margin:0 0 12px">Chỉ <code>surface</code>/<code>nested</code> là giá trị của một prop chung (<code>SurfaceCardVariant</code>). Nhưng "bo góc/viền/bóng/nền" của cả cụm <code>SurfaceCard.*</code> thật ra có <b>4 hình dạng mặt</b> phân biệt được bằng mắt và bằng code, xếp theo trọng lượng mặt tăng dần: không chrome → chỉ viền đứt → viền liền → viền/bóng đầy đủ.</p>
+    <div class="split" style="grid-template-columns:repeat(4,1fr)">
+      <div class="side">
+        <span class="lbl" style="color:var(--muted)">1 · <code>bare</code> (ROW)</span>
+        <div class="mock"><div class="row" style="background:transparent;padding:0"><span class="bd">Bài 3 · Viết route đầu tiên</span></div></div>
+        <span class="sdesc">không viền, không bóng, không bo riêng — mượn khung cha</span>
+      </div>
+      <div class="side">
+        <span class="lbl" style="color:var(--muted)">2 · <code>placeholder</code></span>
+        <div class="mock" style="padding:0"><div style="border:2px dashed var(--app-border);border-radius:24px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--app-muted)"><i class="ph ph-plus-circle" style="font-size:18px"></i><span class="sub2">Thêm bài học</span></div></div>
+        <span class="sdesc">viền ĐỨT NÉT <span class="measure">border-2 dashed</span>, không nền, không bóng</span>
+      </div>
+      <div class="side">
+        <span class="lbl" style="color:var(--muted)">3 · <code>nested</code></span>
+        <div class="mock" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:18px"><span class="ttl">Chương 2</span></div></div>
+        <span class="sdesc">viền LIỀN NÉT <span class="measure">border 1px</span>, không bóng</span>
+      </div>
+      <div class="side">
+        <span class="lbl" style="color:var(--muted)">4 · <code>surface</code></span>
+        <div class="mock" style="padding:0"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:18px"><span class="ttl">Tiến độ khoá học</span></div></div>
+        <span class="sdesc">bóng <span class="measure">shadow-surface</span> + nền riêng, không viền</span>
+      </div>
+    </div>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">Phụ — <code>radius</code>:</b> chỉ tồn tại trên <code>.Nested</code>, 2 giá trị: <code>3xl</code> (24px, mặc định) và <code>xl</code> (12px, ngữ cảnh chật như chat bubble). Cơ số thật <code>--radius: 0.5rem</code> (8px), <code>rounded-3xl = 3×</code>, <code>rounded-2xl = 2×</code> (16px, dùng cho media), <code>rounded-xl = 1.5×</code> (12px, dùng cho field).</p>
+    <p style="margin:12px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink)"><b style="color:var(--success)">✅ ĐÃ CHỐT 2026-07-29 — tokenize <code>SurfaceRadiusRole</code>: LÀM.</b> Áp đúng luật vừa chốt cho <code>InsetScale</code> thêm <code>snug</code> và <code>h6</code> KHÔNG thêm cùng ngày: <b>một bậc/token chỉ sinh ra khi có người CHỌN nó vì nó KHÁC, không phải vì thư viện có sẵn.</b> Ba vai (media→<code>2xl</code>, field→<code>xl</code>, pill→<code>full</code>) không lẫn nhau ở bất kỳ call-site nào — 200 call-site chia đúng 3 vai tách bạch là bằng chứng cùng loại với 34 call-site <code>p-2</code> từng đòi <code>snug</code>.</p>
+    <p style="margin:8px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink)"><b style="color:var(--success)">✅ ĐÃ CHỐT — <code>shadow-lg</code>: KHÔNG xoá.</b> Đọc lại cả 3 chỗ sống (<code>FloatingActionButton.tsx:54</code>, <code>ContentAiSelectionAsk.tsx:91</code>, <code>MindMapContinueButton.tsx:128,138</code>) — cả ba đều là mặt NỔI TRÊN nội dung khác (FAB cố định, chip nổi, panel nổi trên canvas ReactFlow), không phải card phẳng trên trang. <code>MindMapContinueButton.tsx:39-45</code> tự ghi rõ đây là JUDGEMENT CALL — <i>"the shadow is what tells the eye this is on top of the canvas, not part of it"</i> — tức được CHỌN vì khác <code>shadow-surface</code>, không phải tiện tay dùng số Tailwind có sẵn. Đây là VAI RIÊNG ("floating"), không phải drift.</p>
+    <div class="q" style="margin-top:10px"><b>⚠️ CHỜ THẦY CHỐT (thu hẹp):</b> <code>shadow-sm</code> — đếm "4" ở trên gộp cả code chết: 2/4 chỗ (<code>_legacy/designs/rendering/RagSourceGraph/RagSourceGraph.tsx</code>) không tính là nguồn sống (quy ước trục <code>press</code>/<code>reading-flow</code>). Chỉ còn 2 chỗ sống thật: <code>QRCode.tsx:37</code> (viền quanh logo giữa QR, biến thể pill nhỏ) và <code>FlowDiagram.tsx:55</code> (node sơ đồ, đã có <code>border</code> cùng lúc — nghi double-fill). Hai chỗ KHÔNG rõ chung một vai, không có comment chủ ý như <code>shadow-lg</code>. Hai lựa chọn: (a) migrate về <code>shadow-field</code> (vai đã có, nhưng lệch ngữ nghĩa field=input/button) hay (b) giữ nguyên, không tokenize (đúng ngữ cảnh hơn nhưng để 2 call-site trôi ngoài từ vựng)?</div>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — 4 hình dạng có thứ tự ⇒ <code>C(4,2) = 6</code> cặp</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Bốn hình dạng xếp theo trọng lượng tăng dần tạo thành một thang có thứ tự, nên áp được đúng cách đếm <code>C(N,2)</code> như trục <code>seam</code>: <b>C(4,2) = 6</b>. Đã grep hết <code>rounded-|shadow-|border</code> trong <code>SurfaceCard.tsx</code> — không tìm thấy hình dạng thứ 5.</p>
+    <table class="mx">
+      <tr><th class="empty"></th><th>bare</th><th>placeholder</th><th>nested</th><th>surface</th></tr>
+      <tr><th>bare</th><td class="diag">—</td><td class="adj">1</td><td class="near">4</td><td class="far">6</td></tr>
+      <tr><th>placeholder</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td><td class="near">5</td></tr>
+      <tr><th>nested</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">3</td></tr>
+      <tr><th>surface</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">3 kề nhau</span>
+      mỗi cặp một phép phân định dứt khoát — mục 2 render đủ cả ba.
+      &nbsp;
+      <span style="background:color-mix(in srgb,var(--warn) 22%,transparent);padding:1px 7px;border-radius:4px">2 cách một bậc</span>
+      không có phép thử riêng; phân vân ở đó là câu hỏi cấp trên chưa trả lời.
+      &nbsp;
+      <span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">1 cách xa</span>
+      cố ý không có phép thử — phân vân ở đây là đọc sai CẤP cha-con.
+    </p>
+  </div>
+
+  <h2>2. Ba cặp kề nhau — mỗi cặp render hai chiều sai</h2>
+
+  <!-- CẶP 1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · <code>bare</code> (ROW) ↔ <code>placeholder</code></h3><span class="pair">§7b ROW≠CARD</span></div>
+    <div class="test"><b>Phép phân định:</b> đây là <b>HÀNG DỮ LIỆU THẬT</b> trong danh sách, hay một <b>Ô TRỐNG mời thêm mới</b>? Dữ liệu thật ⇒ <code>bare</code>, không bo/viền/bóng riêng, mượn khung của khung cha. Trống, tĩnh, chờ bấm ⇒ <code>placeholder</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · hàng dữ liệu thật tự vẽ viền riêng</span>
+        <div class="mock bad"><div class="fc" style="gap:8px">
+          <div style="border:1px solid var(--app-border);border-radius:12px;padding:10px 12px"><span class="bd">Bài 1 · Khởi tạo dự án</span></div>
+          <div style="border:1px solid var(--app-border);border-radius:12px;padding:10px 12px"><span class="bd">Bài 2 · Cấu hình môi trường</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · hàng phẳng, mượn khung cha</span>
+        <div class="mock good" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:16px;padding:6px"><div class="fc" style="gap:0">
+          <div class="row" style="background:transparent"><span class="bd">Bài 1 · Khởi tạo dự án</span></div>
+          <div class="hr"></div>
+          <div class="row" style="background:transparent"><span class="bd">Bài 2 · Cấu hình môi trường</span></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> mỗi ROW đã có khung cha (<code>NestedSection</code>) vẽ viền/bo/bg một lần cho cả danh sách. Cho mỗi ROW tự vẽ thêm <code>border-radius</code>/<code>border</code> riêng thì mỗi hàng thành một "card mini" cạnh tranh với card cha — đúng ca §7b ROW≠CARD, khung cha đã có, con không được lặp lại.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · ô trống render như hàng phẳng đã có data</span>
+        <div class="mock bad" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:16px;padding:6px">
+          <div class="row" style="background:transparent"><span class="bd" style="color:var(--app-muted)">Thêm bài học</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · placeholder viền đứt, tách biệt hẳn</span>
+        <div class="mock good" style="padding:0"><div style="border:2px dashed var(--app-border);border-radius:24px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--app-muted)"><i class="ph ph-plus-circle" style="font-size:18px"></i><span class="sub2">Thêm bài học</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> render "Thêm bài học" y hệt một ROW dữ liệu khiến người dùng đọc nhầm đó là mục thứ ba đã có sẵn (rỗng, hỏng). Viền đứt + bố cục icon-giữa báo ngay "đây là hành động, không phải dữ liệu" — không cần đọc chữ mới hiểu.</p>
+    <div class="prin"><b>Nguyên lý:</b> phép thử là hỏi <b>dữ liệu thật hay lời mời hành động</b>, không phải đếm xem có mấy hàng. ROW không bao giờ tự vẽ chrome của chính nó, kể cả khi đứng một mình.</div>
+  </div>
+
+  <!-- CẶP 2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · <code>placeholder</code> ↔ <code>nested</code></h3><span class="pair">viền đứt ↔ viền liền</span></div>
+    <div class="test"><b>Phép phân định:</b> viền này có kèm <b>NỘI DUNG THẬT</b> bên trong không, hay chỉ báo "chỗ này trống, bấm để thêm"? Có nội dung thật, đang lồng trong một mặt cha ⇒ <code>nested</code>. Trống, tĩnh, chờ hành động ⇒ <code>placeholder</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · chương đã có bài học vẫn vẽ viền đứt</span>
+        <div class="mock bad" style="padding:0"><div style="border:2px dashed var(--app-border);border-radius:24px;padding:16px"><div class="fc" style="gap:8px">
+          <span class="ttl">Chương 2 · Xác thực</span>
+          <span class="sub2">4 bài · 2 đã hoàn thành</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · nested, viền liền</span>
+        <div class="mock good" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:16px"><div class="fc" style="gap:8px">
+          <span class="ttl">Chương 2 · Xác thực</span>
+          <span class="sub2">4 bài · 2 đã hoàn thành</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> viền đứt là ngôn ngữ của "trống, mời bấm". Chương đã có 4 bài với tiến độ thật không hề trống — vẽ nó bằng viền đứt khiến người học tưởng mục này chưa có nội dung và bỏ qua.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · ô "thêm chương mới" vẽ như nội dung thật</span>
+        <div class="mock bad" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:16px"><div class="fc" style="gap:8px">
+          <span class="ttl" style="color:var(--app-muted)">Thêm chương mới</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · placeholder, viền đứt + không nền</span>
+        <div class="mock good" style="padding:0"><div style="border:2px dashed var(--app-border);border-radius:24px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--app-muted)"><i class="ph ph-plus-circle" style="font-size:18px"></i><span class="sub2">Thêm chương mới</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> cho ô mời-thêm một nền <code>bg-surface</code> và viền liền khiến nó trông có trọng lượng ngang bằng các chương đã có nội dung thật, phá vỡ thứ bậc "cái nào đã xong, cái nào chưa".</p>
+    <div class="prin"><b>Nguyên lý:</b> viền ĐỨT hay LIỀN không phải chọn theo gu thẩm mỹ — nó mã hoá "có dữ liệu thật hay không", và người dùng đọc mã đó trước khi đọc chữ.</div>
+  </div>
+
+  <!-- CẶP 3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 3 · <code>nested</code> ↔ <code>surface</code> <span class="note">đã cắn thật 2 lần</span></h3><span class="pair">viền liền ↔ bóng+nền</span></div>
+    <div class="test"><b>Phép phân định — cây §2 câu 1:</b> mặt này có một mặt cha (<code>bg-surface</code>/modal/drawer/page-card) bọc <b>NGAY TRỰC TIẾP</b> quanh nó không? KHÔNG ⇒ mặt NGOÀI CÙNG ⇒ <code>surface</code> (bóng thay viền). CÓ ⇒ <code>nested</code> (viền thay bóng, vì bóng biến mất ở dark mode).</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · mặt ngoài cùng của trang vẽ nested (bug thật x2)</span>
+        <div class="mock bad" style="background:var(--app-bg)"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:18px"><div class="fc" style="gap:6px">
+          <span class="ttl">Bạn sẽ học được gì</span>
+          <span class="sub2">Thiết kế REST API, viết middleware, deploy container</span>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · surface, bóng nổi khỏi nền trang</span>
+        <div class="mock good" style="background:var(--app-bg)"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:18px"><div class="fc" style="gap:6px">
+          <span class="ttl">Bạn sẽ học được gì</span>
+          <span class="sub2">Thiết kế REST API, viết middleware, deploy container</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây chính là <code>ContentHeader</code> và <code>ContentRelatedList.tsx:131</code> — cả hai từng đặt <code>variant="nested"</code> dù không có mặt cha nào bọc quanh. Không nền trang phẳng nào bọc trực tiếp card này, nên nó phải TỰ NỔI bằng bóng. Vẽ viền liền khiến nó trông mảnh, thiếu trọng lượng, như đang chờ một khung khác bọc quanh mà không có.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · mặt lồng trong surface lại tự vẽ surface</span>
+        <div class="mock bad" style="padding:0"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:18px"><div class="fc" style="gap:12px">
+          <span class="ttl">Tiến độ khoá học</span>
+          <div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:16px"><span class="bd">8/20 bài hoàn thành</span></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · mặt lồng dùng nested, viền thay bóng</span>
+        <div class="mock good" style="padding:0"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:18px"><div class="fc" style="gap:12px">
+          <span class="ttl">Tiến độ khoá học</span>
+          <div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:16px"><span class="bd">8/20 bài hoàn thành</span></div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> hai bóng chồng lên nhau (card ngoài + card trong đều <code>shadow-surface</code>) cộng dồn thành một quầng tối dày bất thường, và ở dark mode bóng gần như vô hình nên mặt trong "biến mất" khỏi mặt ngoài. Viền liền vẽ ranh giới rõ ràng mà không cần ánh sáng giả.</p>
+
+    <h3 style="margin-top:6px">Phép thử TỈ LỆ — surface lồng surface chỉ hợp lệ khi NHỎ so với cha</h3>
+    <div class="test"><b>Phép phân định — cây §2 câu 2:</b> phần lồng có chiếm gần <b>TRỌN THÂN</b> mặt cha không? Gần trọn ⇒ khung lồng là THỪA, bỏ khung, để cha thành mặt DUY NHẤT. Chỉ một phần nhỏ ⇒ <code>nested</code> hợp lệ.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · khung lồng chiếm ~90% thân cha</span>
+        <div class="mock bad" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:10px">
+          <div style="border:1px solid var(--app-border);background:var(--app-surface2);border-radius:20px;padding:16px"><div class="fc" style="gap:6px">
+            <span class="ttl">Nộp bài</span>
+            <span class="sub2">https://github.com/hocvien/api-design</span>
+          </div></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · bỏ khung lồng thừa, cha là mặt duy nhất</span>
+        <div class="mock good" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:18px"><div class="fc" style="gap:6px">
+          <span class="ttl">Nộp bài</span>
+          <span class="sub2">https://github.com/hocvien/api-design</span>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> khung lồng chiếm gần trọn thân cha thì hai đường viền gần như trùng nhau, chỉ cách nhau vài px — mắt đọc thành MỘT viền bị vẽ hai lần, không phải "một mặt lồng trong mặt khác". Phép thử là TỈ LỆ (bao nhiêu % thân cha), không phải VỊ TRÍ (có nằm bên trong hay không).</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · tile nhỏ nhưng bị bỏ khung (phẳng lẫn vào cha)</span>
+        <div class="mock bad" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:18px"><div class="fc" style="gap:10px">
+          <span class="ttl">Kỹ năng đã đạt</span>
+          <div class="fx" style="gap:10px"><span class="bd">Docker</span><span class="bd">Kubernetes</span></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · tile nhỏ, nested hợp lệ vì chỉ chiếm 1 phần</span>
+        <div class="mock good" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:18px"><div class="fc" style="gap:10px">
+          <span class="ttl">Kỹ năng đã đạt</span>
+          <div class="fx" style="gap:10px">
+            <span class="chip" style="border-radius:16px;background:var(--app-surface2)">Docker</span>
+            <span class="chip" style="border-radius:16px;background:var(--app-surface2)">Kubernetes</span>
+          </div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> ngược lại với ca trên — hai chip chỉ chiếm một phần nhỏ thân card, và mỗi chip LÀ một mặt lồng hợp lệ (mini nested). Bỏ khung ở đây làm chúng lẫn vào nền, mất ranh giới "đây là một đơn vị kỹ năng riêng".</p>
+
+    <h3 style="margin-top:6px">Bán kính đồng tâm — bo trong = bo ngoài trừ padding</h3>
+    <div class="test"><b>Phép phân định:</b> phần tử lồng bên trong có <b>ăn theo padding của cha</b> không, hay tự chọn một bo góc độc lập? Công thức: <code>radius trong = radius ngoài − padding</code>, đã khớp đúng với field/input thật.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · trong và ngoài CÙNG BO 24px</span>
+        <div class="mock bad" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:12px">
+          <div style="border-radius:24px;background:var(--app-surface2);padding:10px 12px"><span class="bd" style="color:var(--app-muted)">Nhập tên khoá học…</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · trong 12px = 24px − 12px padding</span>
+        <div class="mock good" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:12px">
+          <div style="border-radius:12px;background:var(--app-surface2);padding:10px 12px"><span class="bd" style="color:var(--app-muted)">Nhập tên khoá học…</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> số đo thật — card ngoài <code>rounded-3xl</code> (24px) + padding <code>cozy</code> (<code>p-3</code> = 12px) ⇒ công thức cho <code>24 − 12 = 12px = rounded-xl</code>, khớp đúng <code>Input.tsx:687</code>. Ở bản SAI, góc trong 24px lớn hơn khoảng cách 12px tới viền ngoài nên phần cong của bo trong bị viền ngoài "cắt", tạo ra một lưỡi liềm hở góc — hai đường cong không đồng tâm. Ở bản ĐÚNG, hai cung tròn cùng tâm, khoảng cách viền-viền đều 12px ở mọi điểm.</p>
+    <div class="prin"><b>Nguyên lý:</b> công thức đồng tâm chỉ có bằng chứng khớp cho <b>phần tử field</b> bên trong một khung; KHÔNG áp cho khung mặt lồng (<code>nested</code> giữ nguyên 3xl bất kể padding — xem Bẫy 5) và không khớp cho media (<code>CoverImage</code> luôn cố định 16px). Ba câu hỏi khác nhau, ba câu trả lời khác nhau, đừng suy chéo.</p>
+  </div>
+
+  <h2>3. Năm bẫy cấu trúc — chọn đúng giá trị mà vẫn sai</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · <code>className</code> rơi sai wrapper ⇒ "card ma"</h3><span class="pair">đã cắn thật</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ restyle rơi vào <code>&lt;section&gt;</code> ngoài, lộ card ma phía sau</span>
+        <div class="mock bad" style="padding:0"><div style="border-radius:16px;padding:6px;background:transparent"><div class="shadow-real" style="border-radius:16px;box-shadow:0 8px 20px -6px rgba(0,0,0,.5);padding:6px 6px 14px 14px">
+          <div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:16px"><span class="ttl">Bài học 4.2</span></div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ restyle rơi đúng <code>contentClassName</code>, chỉ một card</span>
+        <div class="mock good" style="padding:0"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:16px"><span class="ttl">Bài học 4.2</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>.Base</code> có 2 prop tách tầng — <code>className</code> luôn rơi vào <code>&lt;section&gt;</code> NGOÀI CÙNG (không nền), <code>contentClassName</code> rơi vào khung thẻ THẬT. <code>PressableGroup</code>'s tile builder từng truyền <code>TILE_CHROME</code> (<code>"rounded-2xl shadow-field"</code>) qua <code>className</code> nhầm — <code>box-shadow</code> không cần nền vẫn vẽ được nên section ngoài (bo 16px, bóng riêng) hiện ra như một card thứ hai nấp sau thẻ thật (bo 24px).</p>
+    <div class="prin"><b>Nguyên lý:</b> đo <code>outerHTML</code>/<code>getComputedStyle</code>, không suy luận CSS lý thuyết. Đã fix + quét lại 88 file gọi <code>SurfaceCard.*</code>, không ra ca thứ hai.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · chọn <code>nested</code> mà chưa hỏi "có mặt cha không"</h3><span class="pair">2 lần thật · <code>ContentHeader</code> · <code>ContentRelatedList.tsx:131</code></span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ đặt <code>variant="nested"</code> theo phản xạ, không kiểm cha</span>
+        <div class="mock bad" style="background:var(--app-bg)"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:16px"><span class="ttl">Bài viết liên quan</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ hỏi cây §2 câu 1 trước, ra <code>surface</code></span>
+        <div class="mock good" style="background:var(--app-bg)"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:16px"><span class="ttl">Bài viết liên quan</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao đây là BẪY chứ không phải Cặp 3 lặp lại:</b> lỗi không nằm ở "chọn nhầm giữa 2 giá trị rõ ràng" — nó nằm ở việc <b>không hỏi câu hỏi cấu trúc trước khi tới bước chọn giá trị</b>. Cùng một lỗi này lặp lại nguyên vẹn ở hai file khác nhau, nghĩa là quy trình dựng thiếu bước "kiểm cha", không phải một lần lỡ tay.</p>
+    <div class="prin"><b>Nguyên lý:</b> câu hỏi #1 của cây (có mặt cha bọc trực tiếp không) phải được hỏi TRƯỚC, không phải suy luận sau khi đã gõ <code>variant=</code>.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · ring chọn không tắt bóng đi kèm ⇒ ring bị nuốt</h3><span class="pair">2 lớp box-shadow không cộng dồn</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · <code>ring-2</code> thêm vào mà thiếu <code>!shadow-none</code></span>
+        <div class="mock bad" style="padding:0"><div class="shadow-real" style="background:var(--app-surface2);border-radius:24px;padding:16px"><span class="ttl">Đã chọn — nhưng ring vô hình</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · <code>!shadow-none</code> đi kèm, ring hiện rõ</span>
+        <div class="mock good" style="padding:0"><div style="background:var(--app-surface2);border-radius:24px;padding:16px;outline:2px solid var(--app-accent);outline-offset:2px"><span class="ttl">Đã chọn — ring hiện đúng</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>.shadow-surface</code> biên dịch thành <code>box-shadow</code> literal, KHÔNG đi qua chuỗi biến <code>--tw-shadow</code>/<code>--tw-ring-shadow</code> mà Tailwind dùng để cộng dồn ring+shadow. Hai utility cùng đặt <code>box-shadow</code> trên một phần tử thì một cái NUỐT cái kia theo thứ tự trong stylesheet — không theo thứ tự viết trong <code>className</code>.</p>
+    <div class="q" style="border-color:var(--success);background:color-mix(in srgb,var(--success) 8%,transparent)"><b style="color:var(--success)">✅ ĐÃ XÁC NHẬN 2026-07-29 bằng đọc code — không còn là nghi vấn:</b> <code>.SelectableGroup</code> xử lý đúng — dùng <code>outline</code> (không phải Tailwind <code>ring-*</code>) VÀ <code>!shadow-none</code> đi kèm lúc chọn (<code>SurfaceCard.tsx:1153</code>, comment dòng 1110-1113). Đọc lại cả 3 nhánh của <code>.Base</code> (<code>SurfaceCard.tsx:370, 390, 440</code>) xác nhận cả 3 ghép <code>surfaceFrame(variant)</code> với <code>isSelected && "ring-2 ring-accent"</code> mà KHÔNG có <code>!shadow-none</code> — đúng công thức <code>.SelectableGroup</code> từng mắc trước khi sửa. BUG THẬT, không phải suy đoán — nhưng fix nằm ở <code>.storybook</code>, ngoài phạm vi canon này; câu hỏi của canon đến đây là hết, phần còn lại là backlog code.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · <code>Nested</code> không gọi <code>surfaceFrame()</code> — chủ ý, không lệch</h3><span class="pair" style="background:color-mix(in srgb,var(--success) 18%,transparent);color:var(--success)">✅ ĐÃ CHỐT 2026-07-29</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl good">✓ helper <code>surfaceFrame("nested")</code> — GIỮ <code>bg-surface</code> (dùng cho <code>.Base</code>, KHÔNG chắc có cha tô màu)</span>
+        <div class="mock good" style="background:var(--app-bg)"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:16px"><span class="ttl">Chương 2</span></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ <code>Nested</code> tự viết — <code>bg-transparent</code> (hợp đồng riêng: LUÔN có cha đã tô màu)</span>
+        <div class="mock good" style="background:var(--app-bg)"><div style="border:1px solid var(--app-border);background:transparent;border-radius:24px;padding:16px"><span class="ttl">Chương 2</span></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao cả hai đều ĐÚNG dù khác nhau:</b> helper dùng chung <code>surfaceFrame()</code> (<code>surface-card-header.tsx:135-136</code>) phục vụ <code>.Base</code> — thẻ ĐỘC LẬP, không có ràng buộc phải nằm trong mặt cha đã tô màu — nên LUÔN giữ <code>bg-surface</code> để tự đứng vững ở bất cứ đâu. <code>Nested</code> (<code>SurfaceCard.tsx:648-680</code>, docblock dòng 640-644) là một component KHÁC — "card-inside-card" — với hợp đồng ghi thẳng trong JSDoc của chính nó: <i>"Parent context drives the shell: any filled parent surface → variant="nested""</i>. Với ràng buộc CHỈ được gọi khi cha đã tô màu sẵn, <code>bg-transparent</code> là lựa chọn đúng: tránh chồng hai lớp <code>bg-surface</code> vô nghĩa, viền vẫn đủ phân định ranh giới trên nền cha có sẵn.</p>
+    <div class="q" style="border-color:var(--success);background:color-mix(in srgb,var(--success) 8%,transparent)"><b style="color:var(--success)">✅ ĐÃ CHỐT:</b> hai hàm cho hai kết quả khác nhau vì phục vụ hai HỢP ĐỒNG sử dụng khác nhau (<code>.Base</code> không đảm bảo có cha tô màu, <code>Nested</code> đảm bảo có) — không phải một lỗi lặp code cần hợp nhất.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · áp công thức đồng tâm nhầm cho KHUNG mặt lồng thay vì PHẦN TỬ field</h3><span class="pair" style="background:color-mix(in srgb,var(--success) 18%,transparent);color:var(--success)">✅ ĐÃ CHỐT</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · nested card bước bo xuống 12px theo công thức</span>
+        <div class="mock bad" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:12px">
+          <div style="border-radius:12px;border:1px solid var(--app-border);padding:14px"><span class="ttl">Chương 2</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · nested card GIỮ 24px bất kể padding</span>
+        <div class="mock good" style="padding:0"><div style="border:1px solid var(--app-border);background:var(--app-surface);border-radius:24px;padding:12px">
+          <div style="border-radius:24px;border:1px solid var(--app-border);padding:14px"><span class="ttl">Chương 2</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao đây là bẫy khác Bẫy 4 concentric ở Cặp 3:</b> ở Cặp 3 công thức áp cho PHẦN TỬ field (Input) và đã CÓ bằng chứng khớp (<code>Input.tsx:687</code>). Ở đây đối tượng lồng là một KHUNG MẶT khác (<code>nested</code> card, không phải field) — luật riêng của canon <a href="../surface/context.md"><code>principles/surface/context.md</code></a> §1b (chính trục này) nói khung mặt lồng GIỮ <code>3xl</code>, không bước xuống theo công thức. Áp nhầm công thức vào đúng chỗ luật §1b đã loại trừ là bẫy.</p>
+    <div class="q" style="border-color:var(--success);background:color-mix(in srgb,var(--success) 8%,transparent)"><b style="color:var(--success)">✅ ĐÃ CHỐT:</b> công thức đồng tâm và luật "nested giữ 3xl" trả lời HAI câu khác nhau (phần tử field bên trong vs khung mặt lồng), không mâu thuẫn — chỉ cần đọc đúng đối tượng đang hỏi. Cả media (<code>CoverImage</code>, cố định 16px, không theo công thức dù <code>padding="flush"</code> cho ra 24px lý thuyết) cũng là một loại đối tượng riêng, KHÔNG áp công thức. <b>⬜ NỢ còn lại (công cụ, không phải quyết định):</b> chưa có gate tự động phân biệt hai loại đối tượng này trước khi áp công thức — đã thêm vào bảng §6 vạch cấm của <code>context.md</code>.</div>
+  </div>
+
+  <h2>4. Ba lỗi thật đã cắn — điều chỉ lộ ra khi xếp cạnh nhau</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:30%">Chỗ</th><th style="width:16%">Đã viết</th><th style="width:20%">Đúng ra phải là</th><th style="width:18%">Loại lỗi</th><th>Nguồn</th></tr></thead>
+      <tbody>
+        <tr><td>Card "Bạn sẽ học được gì" — <code>ContentHeader</code></td><td class="numc" style="color:var(--danger)">variant="nested"</td><td class="numc" style="color:var(--success)">variant="surface"</td><td>đọc sai cấu trúc (Bẫy 2)</td><td class="numc">steps/13 160-163</td></tr>
+        <tr><td><code>ContentRelatedList.tsx:131</code></td><td class="numc" style="color:var(--danger)">variant="nested"</td><td class="numc" style="color:var(--success)">variant="surface"</td><td>đọc sai cấu trúc (Bẫy 2) — lặp lại ĐÚNG lỗi #1</td><td class="numc">steps/13 627-629</td></tr>
+        <tr><td><code>PressableGroup</code> tile builder</td><td class="numc" style="color:var(--danger)">className=TILE_CHROME</td><td class="numc" style="color:var(--success)">contentClassName=TILE_CHROME</td><td>rơi sai wrapper, card ma (Bẫy 1)</td><td class="numc">steps/13 780-824</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0"><b>Điều chỉ hiện ra khi xếp cả ba cạnh nhau:</b></p>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">a.</b> Cả ba lỗi thật đều là <b>bẫy cấu trúc</b> (đọc sai cha-con hoặc đọc sai wrapper) — <b>không có lỗi thật nào là chọn nhầm GIÁ TRỊ</b> giữa hai lựa chọn rõ ràng (chưa từng bắt được ca thật nào lẫn <code>bare</code>↔<code>placeholder</code> hay <code>placeholder</code>↔<code>nested</code>). Nghĩa là rủi ro thật của trục surface nằm ở việc <b>đọc cấu trúc trước khi chọn</b>, không nằm ở phân biệt giữa các giá trị — ba cặp ở mục 2 là bài tập tư duy đúng đắn, nhưng gate cần ưu tiên viết cho mục 3 (bẫy) trước.</p>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">b.</b> Hai trong ba lỗi (#1, #2) là <b>CÙNG MỘT lỗi lặp lại ở hai file khác nhau</b> — <code>variant="nested"</code> chọn theo phản xạ mà không kiểm mặt cha. Đó không phải trùng hợp mà là <b>thiếu một bước trong quy trình dựng</b>: câu hỏi #1 của cây (§2) chưa từng được hỏi thành lời trước khi gõ prop.</p>
+  </div>
+
+  <h2>5. Ba cặp không render — vì sao</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Hai cặp cách một bậc</b> (<code>bare↔nested</code> · <code>placeholder↔surface</code>): không viết phép thử riêng. <code>bare↔nested</code> — phân vân nghĩa là chưa trả lời được "đây có phải MỘT KHUNG hoàn chỉnh tự đứng được không, hay chỉ là một dòng trong danh sách của khung khác"; một ROW không bao giờ tự đứng thành card, trả lời câu đó trước. <code>placeholder↔surface</code> — phân vân nghĩa là đang nhầm "ô trống mời thêm" với "thẻ đã có dữ liệu thật"; kiểm props truyền vào là <code>icon</code>+<code>label</code> tĩnh của <code>Placeholder</code>, hay là data thật của một card.</p>
+    <p style="margin:0"><b>Một cặp cách xa</b> (<code>bare↔surface</code>): <b>cố ý không có phép thử, và không render.</b> Một cái là ROW mượn khung của khung khác, một cái CHÍNH LÀ khung. Phân vân ở đây là dấu hiệu đọc sai CẤP cha-con (đang so một PHẦN với CÁI CHỨA nó), không phải chọn sai giá trị. Việc phải làm là dừng lại vẽ lại cây cha-con, không phải chọn hình dạng mặt. Viết phép phân định cho cặp này là hợp thức hoá một lỗi cấu trúc.</p>
+  </div>
+
+  <h2>6. Neo code thật — đã đọc lại tận nơi, không chép lại</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Giá trị dưới đây đọc trực tiếp từ file ngày <b>2026-07-29</b>. Số dòng của <code>.storybook</code> trôi theo mỗi lần sửa; tìm theo pattern <code>surfaceFrame\(</code> hoặc <code>variant === "nested"</code> trong đúng file, đừng tin số dòng cũ.</p>
+
+    <h3 style="margin:14px 0 6px">Mỗi hình dạng mặt một neo render thật</h3>
+    <table>
+      <thead><tr><th style="width:22%">Hình dạng</th><th style="width:34%">Neo</th><th>Class thật</th></tr></thead>
+      <tbody>
+        <tr><td><code>surface</code> (mặc định)</td><td class="numc">SurfaceCard.tsx:369 (.Base)</td><td class="numc">rounded-3xl bg-surface shadow-surface</td></tr>
+        <tr><td><code>nested</code> (qua helper)</td><td class="numc">surface-card-header.tsx:135-136</td><td class="numc">rounded-3xl bg-surface border border-default</td></tr>
+        <tr><td><code>nested</code> (tự vẽ, LỆCH — Bẫy 4)</td><td class="numc">SurfaceCard.tsx:677 (Nested)</td><td class="numc">rounded-3xl border border-default bg-transparent</td></tr>
+        <tr><td><code>bare</code> (ROW)</td><td class="numc">NestedSection, SurfaceCard.tsx:582-636</td><td class="numc">p-3, không rounded/border/shadow riêng</td></tr>
+        <tr><td><code>placeholder</code></td><td class="numc">Placeholder, SurfaceCard.tsx:2002-2040</td><td class="numc">rounded-3xl border-2 border-dashed p-6, không bg</td></tr>
+        <tr><td><code>radius="xl"</code></td><td class="numc">SurfaceCard.tsx:656,676 (Nested)</td><td class="numc">radius==="xl" ? rounded-xl : rounded-3xl</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Neo <code>src</code> thật — component đã port, còn tên prop CŨ</h3>
+    <table>
+      <thead><tr><th style="width:34%">File</th><th style="width:12%">Dòng</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>SurfaceListCard/index.tsx</code></td><td class="numc">55</td><td><code>bordered?: boolean</code> — tên prop TRƯỚC 2026-07-26, nay là <code>variant?: SurfaceCardVariant</code> (1-1: bordered=true ⇔ variant="nested")</td></tr>
+        <tr><td><code>SurfaceListCard/index.tsx</code></td><td class="numc">73-77</td><td><code>cn("...rounded-3xl bg-surface", bordered ? "border border-default" : "shadow-surface")</code> — CHÍNH XÁC cùng công thức <code>surfaceFrame()</code> hiện tại, xác nhận đây là bản gốc</td></tr>
+        <tr><td><code>src/app/globals.css</code></td><td class="numc">215</td><td><code>--radius: 0.5rem</code> (8px) — cơ số của toàn bộ thang bo góc</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Công thức đồng tâm — khớp field, KHÔNG khớp media</h3>
+    <table>
+      <thead><tr><th style="width:30%">Phần tử</th><th style="width:14%">Radius ngoài</th><th style="width:12%">Padding</th><th style="width:16%">ngoài−padding</th><th style="width:14%">Radius thật</th><th>Khớp?</th></tr></thead>
+      <tbody>
+        <tr><td>Field trong surface (padding cozy, 12px)</td><td class="numc">24px</td><td class="numc">12px</td><td class="numc">12px</td><td class="numc">rounded-xl (Input.tsx:687)</td><td style="color:var(--success)">✅ khớp</td></tr>
+        <tr><td>Media trong surface (padding flush, 0px)</td><td class="numc">24px</td><td class="numc">0px</td><td class="numc">24px</td><td class="numc">rounded-2xl cố định (CoverImage.tsx:49,56)</td><td style="color:var(--danger)">❌ không khớp</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Chạy trong iframe của story:</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">[...document.querySelectorAll('[data-anat-part]')].map(e =&gt; {
+    const s = getComputedStyle(e)
+    return {
+        part: e.getAttribute('data-anat-part'),
+        radius: s.borderRadius,
+        border: s.borderWidth + ' ' + s.borderStyle,
+        shadow: s.boxShadow,
+        bg: s.backgroundColor,
+    }
+})</pre>
+    <p style="margin:12px 0 6px"><b>Ba thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:30%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>Card ma</td><td>đếm số phần tử có <code>box-shadow</code>/<code>border</code> lồng nhau tại đúng 1 vị trí DOM — nếu ra 2 lớp bo góc khác nhau (vd 24px và 16px) xếp chồng, <code>className</code> đang rơi vào wrapper ngoài thay vì <code>contentClassName</code> (Bẫy 1)</td></tr>
+        <tr><td>Ring bị nuốt</td><td>khi <code>isSelected</code> bật, đọc <code>boxShadow</code> — nếu chỉ thấy MỘT giá trị (của <code>shadow-surface</code>) mà không thấy vệt <code>ring-accent</code> chồng lên, ring đã bị nuốt (Bẫy 3); cần <code>!shadow-none</code> đi kèm</td></tr>
+        <tr><td>Sau khi đổi <code>variant</code></td><td>chạy lại <code>tsc</code> — không script nào trong <code>scripts/*.mjs</code> quét <code>rounded-*</code>/<code>shadow-*</code> hiện nay (§6 vạch cấm context.md), im lặng ở đây là RỦI RO thật, không phải cổng đã xanh</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Tổng: 3 cặp render đủ hai chiều sai + 2 phép thử phụ (tỉ lệ, đồng tâm) · 2 cặp giải thích không render · 1 cặp cố ý loại · 5 bẫy cấu trúc render · 3 lỗi thật · neo <code>src</code> đã đọc lại. <b>2026-07-29: 3/4 câu CHỜ THẦY CHỐT của trục này đã chốt</b> (Bẫy 3 ring/shadow-none, Bẫy 4 Nested bg-transparent, Bẫy 5 công thức đồng tâm) bằng luật đã có + đọc code thật; còn <b>1 câu thu hẹp</b> (§0 <code>shadow-sm</code>, chỉ còn 2 call-site sống thật). <b>6/6 cặp có chỗ đứng</b>, không cặp nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>

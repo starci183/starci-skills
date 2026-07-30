@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PROMINENCE — vét cạn 6 cặp, render thật SAI cạnh ĐÚNG</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── mock riêng cho prominence ── */
+  .acc{color:var(--app-accent);font-size:12.5px;font-weight:500}
+  .chip-tone-success{background:color-mix(in srgb,var(--success) 20%,var(--app-surface));border-color:color-mix(in srgb,var(--success) 40%,var(--app-border));color:var(--success)}
+  .chip-tone-warning{background:color-mix(in srgb,var(--warn) 20%,var(--app-surface));border-color:color-mix(in srgb,var(--warn) 40%,var(--app-border));color:var(--warn)}
+  .chip-icon{display:inline-flex;align-items:center;gap:4px}
+  .doc-vs-code{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.doc-vs-code{grid-template-columns:1fr}}
+  .docbox{background:#1c1420;border:1px solid #3a2540;border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--muted)}
+  .docbox b{color:#e59bd6}
+  .codebox{background:#0f1c18;border:1px solid #234034;border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--muted)}
+  .codebox b{color:var(--success)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PROMINENCE — bốn cơ chế nổi, render thật SAI cạnh ĐÚNG</h1>
+  <p class="sub">Mọi khung dưới đây là HTML render thật với đúng cơ chế thật (chữ mờ · chữ tín hiệu · pill đóng khung · hình nút), không phải ảnh chụp.</p>
+
+  <h2>0. Thang bốn cơ chế</h2>
+  <div class="rules">
+    <div class="scale">
+      <div class="srow"><span class="sname">muted</span><span class="spx">chữ</span><span class="sbar" style="width:16px;opacity:.45"></span><span class="sdesc">chữ mờ, không khung — trung tính/phụ</span></div>
+      <div class="srow"><span class="sname">accent</span><span class="spx">chữ</span><span class="sbar" style="width:40px"></span><span class="sdesc">chữ tín hiệu, không khung — link/của tôi/active</span></div>
+      <div class="srow"><span class="sname">chip</span><span class="spx">khung</span><span class="sbar" style="width:72px;border-radius:999px"></span><span class="sdesc">token đóng khung — enum/status/badge</span></div>
+      <div class="srow"><span class="sname">button</span><span class="spx">nút</span><span class="sbar" style="width:110px;border-radius:8px"></span><span class="sdesc">hình nút thật — hành động xảy ra khi bấm</span></div>
+    </div>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">Lưu ý:</b> đây KHÔNG phải thang cỡ chữ hay thang màu — cả bốn có thể cùng dùng tông <code>accent</code>/<code>success</code>, khác nhau ở <b>CƠ CHẾ VẼ</b>: có khung hay không, khung có phải hình nút hay không.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — vì sao dừng ở 6 và không phải con số khác</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Thang có <b>4</b> cơ chế, một quyết định prominence sai luôn là <b>chọn nhầm cơ chế này thành cơ chế kia</b>, nên tập lỗi có thể có là tập <b>CẶP</b>: <b>C(4,2) = 6</b>. Liệt kê đủ 6 rồi phân nhóm theo KHOẢNG CÁCH trong cây quyết định, đó là lúc được phép dừng.</p>
+    <table class="mx">
+      <tr><th class="empty"></th><th>muted</th><th>accent</th><th>chip</th><th>button</th></tr>
+      <tr><th>muted</th><td class="diag">—</td><td class="adj">1</td><td class="near">4</td><td class="far">6</td></tr>
+      <tr><th>accent</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td><td class="near">5</td></tr>
+      <tr><th>chip</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td><td class="adj">3</td></tr>
+      <tr><th>button</th><td class="diag"></td><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">3 kề nhau</span>
+      mỗi cặp có một phép phân định dứt khoát — mục 2 render đủ cả ba, mỗi cặp <b>hai chiều sai</b>. Cặp <code>accent↔chip</code> là trận NẶNG NHẤT (mục 2, cặp 2).
+      &nbsp;
+      <span style="background:color-mix(in srgb,var(--warn) 22%,transparent);padding:1px 7px;border-radius:4px">2 cách một bậc</span>
+      không có phép thử riêng; chỉ ra một câu hỏi cấp trên chưa trả lời.
+      &nbsp;
+      <span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">1 cách xa (2 đầu mút)</span>
+      <b>cố ý không có phép thử.</b> Phân vân ở đó là dấu hiệu bỏ qua cả 2 câu hỏi giữa, không phải chọn sai.
+    </p>
+  </div>
+
+  <h2>2. Ba cặp kề nhau — mỗi cặp render hai chiều sai</h2>
+
+  <!-- CẶP 1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · <code>muted</code> ↔ <code>accent</code></h3><span class="pair">chữ mờ ↔ chữ tín hiệu</span></div>
+    <div class="test"><b>Phép phân định:</b> chữ này có mang <b>tín hiệu tương tác/thương hiệu</b> không, hay chỉ là dữ kiện trung tính đứng riêng? Có tín hiệu ⇒ <code>accent</code>. Trung tính ⇒ <code>muted</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · số học viên tô accent</span>
+        <div class="mock bad"><div class="fx" style="gap:12px;align-items:center">
+          <span class="ttl">Thiết kế API RESTful</span>
+          <span class="fx" style="gap:4px;align-items:center;color:var(--app-accent);font-size:11.5px"><i class="ph-fill ph-users"></i>482 học viên</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · muted <span class="measure">CourseCard.tsx:300</span></span>
+        <div class="mock good"><div class="fx" style="gap:12px;align-items:center">
+          <span class="ttl">Thiết kế API RESTful</span>
+          <span class="fx" style="gap:4px;align-items:center;color:var(--app-muted);font-size:11.5px"><i class="ph-fill ph-users"></i>482 học viên</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "482 học viên" là một con số trung tính — đổi khoá học khác thì nó vẫn chỉ là dữ kiện đếm, không mang tín hiệu "hãy chú ý vào đây" nào. Tô accent làm mắt tưởng đây là link hoặc trạng thái đặc biệt, trong khi nó chỉ là thống kê nền.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · nhãn "Đã ghim" dùng muted</span>
+        <div class="mock bad"><div class="fc" style="gap:0">
+          <span class="ttl">Chuẩn REST hay dùng nhất là gì?</span>
+          <span style="color:var(--app-muted);font-size:11.5px">📌 Đã ghim · Hoàng Nam</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · accent <span class="measure">CourseQaQuestionList.tsx:311</span></span>
+        <div class="mock good"><div class="fc" style="gap:0">
+          <span class="ttl">Chuẩn REST hay dùng nhất là gì?</span>
+          <span class="acc">📌 Đã ghim · Hoàng Nam</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "Đã ghim" là một TÍN HIỆU chủ động (admin/mod đã can thiệp) — làm mờ nó xuống <code>muted</code> giấu mất lý do câu hỏi này đứng đầu danh sách. Neo thật: <code>PushPinIcon</code> + <code>SealCheckIcon</code> đều render <code>text-accent-soft-foreground</code>, không phải <code>text-muted</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> câu hỏi không phải "chữ có quan trọng không" mà là "chữ có mang TÍN HIỆU thay đổi cách người đọc hành xử không". Trung tính luôn là <code>muted</code>, kể cả khi số lớn.</div>
+  </div>
+
+  <!-- CẶP 2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · <code>accent</code> ↔ <code>chip</code> <span class="note">cặp NẶNG NHẤT — dễ lẫn nhất</span></h3><span class="pair">chữ tín hiệu ↔ token đóng khung</span></div>
+    <div class="test"><b>Phép phân định:</b> ý nghĩa này có bị <b>ràng buộc vào một tập giá trị cố định</b> (enum/status/category) cần TÁCH khỏi dòng chữ để mắt nhận ngay "đây là một NHÃN"? Ràng buộc + cần tách ⇒ <code>chip</code>. Chỉ là một chữ đọc liền trong câu, không phải danh mục ⇒ <code>accent</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · "−45%" viết chữ accent trần</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:baseline">
+          <span class="num">299.000₫</span>
+          <span style="color:var(--app-accent);font-size:12.5px;font-weight:600">−45%</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · chip <span class="measure">PriceTag.tsx:141</span></span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:baseline">
+          <span class="num">299.000₫</span>
+          <span class="chip chip-tone-success">−45%</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "−45%" là một BADGE khuyến mãi — một giá trị RỜI RẠC (giảm hay không giảm, và giảm bao nhiêu phần trăm), không phải một chữ tính từ chảy trong câu. Viết chữ trần khiến nó đọc như một mô tả phụ của giá, thay vì một nhãn có thể click để xem chi tiết (breakdown popover).</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · trạng thái "đã chọn" đóng thành chip</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:center">
+          <span class="bd">Module 3 · Xác thực JWT</span>
+          <span class="chip chip-tone-success"><i class="ph-fill ph-check-circle"></i>&nbsp;Đã chọn</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · accent, icon trần <span class="measure">SurfaceCard.tsx:1398</span></span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:center">
+          <span class="bd">Module 3 · Xác thực JWT</span>
+          <i class="ph-fill ph-check-circle" style="color:var(--app-accent);font-size:18px"></i>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "đã chọn" trong một danh sách single-select không phải một DANH MỤC cố định cần dán nhãn chữ — nó là một tín hiệu tức thời của MỘT hàng đang active, đủ nghĩa bằng một icon accent trần cạnh nội dung. Đóng khung nó thành chip biến một tín hiệu thoáng qua thành một "badge" nặng nề không cần thiết, và tạo cảm giác sai rằng "đã chọn" là một enum như <code>difficulty</code>.</p>
+    <div class="prin"><b>Nguyên lý:</b> hỏi "đây có phải MỘT GIÁ TRỊ TRONG MỘT TẬP HỮU HẠN cần người đọc nhận diện NGAY LẬP TỨC là nhãn" hay "đây chỉ là MỘT TỪ mang màu trong câu". Nhầm chiều nào cũng làm người đọc học sai từ vựng thị giác của hệ thống — 5/5 ca thật đã đối chiếu đều rơi đúng vào ranh giới này.</div>
+  </div>
+
+  <!-- CẶP 3 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 3 · <code>chip</code> ↔ <code>button</code></h3><span class="pair">token đóng khung ↔ hình nút</span></div>
+    <div class="test"><b>Phép phân định:</b> bấm vào có tạo ra một <b>HÀNH ĐỘNG THẬT</b> (không chỉ mở thêm chi tiết của chính token đó) và hình vẽ ra có phải <b>hình nút</b> (nền/viền/padding riêng của atom <code>Button</code>) không? Cả hai đúng ⇒ <code>button</code>. Chỉ mở popover xem thêm, hình vẫn là pill mềm ⇒ <code>chip</code>.</div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · chip "−45%" vẽ thành hình nút</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:baseline">
+          <span class="num">299.000₫</span>
+          <button class="btn" style="background:color-mix(in srgb,var(--success) 25%,var(--app-surface2));border-color:var(--success);color:var(--success);padding:4px 12px">−45%</button>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · vẫn là chip, bọc Popover.Trigger <span class="measure">PriceTag.tsx:64,136</span></span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:baseline">
+          <span class="num">299.000₫</span>
+          <span class="chip chip-tone-success" style="cursor:pointer">−45%</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> bấm vào "−45%" CÓ mở popover thật (xem breakdown giá) — nhưng hành động đó chỉ XEM THÊM VỀ CHÍNH TOKEN, không tạo side-effect nào khác. `src` thật cố tình giữ nó là <code>Chip</code> bọc <code>Popover.Trigger</code>, KHÔNG đổi sang atom <code>Button</code> — "there is exactly ONE interactive element" (comment gốc), và element đó là trigger, không phải chip tự thành nút.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · nút react cảm xúc vẽ thành chip</span>
+        <div class="mock bad"><div class="fx" style="gap:8px;align-items:center">
+          <span class="chip" style="padding:6px 14px;border-radius:999px">👍&nbsp;Bày tỏ cảm xúc</span>
+          <span style="color:var(--app-fg);font-size:13px">128</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · button <span class="measure">ReactionButton.tsx:153</span></span>
+        <div class="mock good"><div class="fx" style="gap:8px;align-items:center">
+          <button class="btn" style="border-radius:999px">👍&nbsp;Bày tỏ cảm xúc</button>
+          <span style="color:var(--app-fg);font-size:13px">128</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> bấm vào nút react MỞ MỘT BỘ CHỌN 6 cảm xúc và GHI LẠI phản ứng của người dùng — một hành động thật thay đổi dữ liệu, không chỉ xem thêm. `src` thật render nó bằng <code>HeroButton variant="tertiary"</code>, đúng hình nút. Số "128" cạnh nó vẫn là chữ <code>default</code> (không chip, không muted) — một hàng có thể trộn NHIỀU cơ chế, mỗi phần tử tự quyết riêng.</p>
+    <div class="prin"><b>Nguyên lý:</b> "bấm được" là điều kiện CẦN nhưng không ĐỦ cho <code>button</code>. Phải hỏi thêm "hành động có thật và hình có phải hình nút" — thiếu một trong hai vẫn dừng ở <code>chip</code>.</div>
+  </div>
+
+  <h2>3. Sáu bẫy cấu trúc — chọn đúng bậc nhưng vẫn sai</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · chip bọc control bấm được không tự thăng cấp</h3><span class="pair">interactivity ≠ cơ chế</span></div>
+    <p class="why">Đã render đầy đủ ở <b>Cặp 3</b> phía trên (PriceTag). Nhắc lại nguyên lý riêng: trục này hỏi <b>HÌNH VẼ RA LÀ GÌ</b>, tuyệt đối không hỏi "phần tử này có event handler không". Một `Chip` có `onPress` qua wrapper vẫn là chip; một `Button` không có `onPress` (hiếm, nhưng có thể là link) vẫn là button vì hình của nó là hình nút.</p>
+    <div class="prin"><b>Nguyên lý:</b> cơ chế = HÌNH, không phải HÀNH VI. Đọc code để tìm xem file render atom nào (`Chip` hay `Button`), không suy từ việc có `onClick` hay không.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · nhiều điểm nổi ĐÚNG cục bộ, SAI cả vùng (accent-flood)</h3><span class="pair">CourseCard 2026-07-22 · 4-5 điểm nổi cùng lúc</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · 3 check + chip −55% + CTA cùng nổi</span>
+        <div class="mock bad"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success);font-size:15px"></i><span class="bd">Có phụ đề tiếng Việt</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success);font-size:15px"></i><span class="bd">Cấp chứng chỉ hoàn thành</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--success);font-size:15px"></i><span class="bd">Học trọn đời</span></div>
+          <div class="fx" style="gap:8px;align-items:center;justify-content:space-between">
+            <span class="chip chip-tone-success">−55%</span>
+            <button class="btn p">Đăng ký ngay</button>
+          </div>
+        </div></div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · check hạ về muted, còn 2 điểm nổi</span>
+        <div class="mock good"><div class="card"><div class="fc" style="gap:8px">
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--app-muted);font-size:15px"></i><span class="sub2">Có phụ đề tiếng Việt</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--app-muted);font-size:15px"></i><span class="sub2">Cấp chứng chỉ hoàn thành</span></div>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-check-circle" style="color:var(--app-muted);font-size:15px"></i><span class="sub2">Học trọn đời</span></div>
+          <div class="fx" style="gap:8px;align-items:center;justify-content:space-between">
+            <span class="chip chip-tone-success">−55%</span>
+            <button class="btn p">Đăng ký ngay</button>
+          </div>
+        </div></div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> mỗi dấu check ĐỨNG MỘT MÌNH đúng là "hoàn tất" (semantic hợp lý), chip −55% đúng vì là badge khuyến mãi, CTA đúng vì là hành động chính — <b>không phần tử nào SAI GIÁ TRỊ</b>. Nhưng xếp cả 5 cạnh nhau, mắt nhận 4-5 tín hiệu "nhìn tôi đây" cùng lúc và không đáp được cái nào là chính. Hạ 3 dấu check về <code>muted</code> (chữ tự nhiên đã đủ khẳng định, không cần tô màu) trả lại đúng 2 điểm nổi: badge khuyến mãi và CTA.</p>
+    <div class="prin"><b>Nguyên lý:</b> cây quyết định §2 chỉ quyết được 1 chỗ tại một thời điểm — bẫy này đòi hỏi lùi lại nhìn CẢ VÙNG rồi mới quay lại sửa từng chỗ.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · cặp trái–phải phải LỆCH bậc, trừ peer-row</h3><span class="pair">phân cấp thật ↔ đồng cấp (ngoại lệ)</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · title và meta cùng tô accent "cho cân"</span>
+        <div class="mock bad"><div class="fx" style="justify-content:space-between;align-items:baseline">
+          <span class="acc" style="font-weight:700;font-size:14px">Thiết kế API RESTful</span>
+          <span class="acc">2 giờ trước</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · 1 nổi (title default) + 1 chìm (meta muted)</span>
+        <div class="mock good"><div class="fx" style="justify-content:space-between;align-items:baseline">
+          <span class="ttl">Thiết kế API RESTful</span>
+          <span class="sub2">2 giờ trước</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> title và meta có PHÂN CẤP thật (title mang nội dung, meta chỉ là mốc thời gian phụ) — tô cả hai cùng một cấp làm mắt không biết bên nào là chính. Bên MANG TÍN HIỆU (ở đây là title) phải nổi hơn, bên còn lại chìm xuống.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · ép hai tag ngang hàng thành 1 nổi 1 chìm</span>
+        <div class="mock bad"><div class="fx" style="gap:8px">
+          <span class="chip" style="border-color:var(--app-accent);color:var(--app-accent)">Docker</span>
+          <span class="chip">Kubernetes</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · peer-row, đồng bậc OK</span>
+        <div class="mock good"><div class="fx" style="gap:8px">
+          <span class="chip">Docker</span>
+          <span class="chip">Kubernetes</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> hai tag công nghệ ĐỒNG CẤP thật — không cái nào là "chủ" của cái kia. Đây là ngoại lệ duy nhất của luật: peer-row được phép đồng bậc, ép một cái nổi hơn tạo phân cấp giả không có thật.</p>
+    <div class="prin"><b>Nguyên lý:</b> luật "1 nổi 1 chìm" chỉ áp khi có phân cấp THẬT trong ý nghĩa — không áp máy móc lên mọi cặp đứng cạnh nhau.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · đổi CƠ CHẾ theo state thay vì đổi TONE (§2d)</h3><span class="pair">ContinueCard 2026-07-22 · timeLeft</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · state thường = text muted, state gấp = chip</span>
+        <div class="mock bad"><div class="fc" style="gap:8px">
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài 4 · Middleware</span><span class="sub2">40 minutes left</span></div>
+          <div class="hr"></div>
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài 9 · Deploy</span><span class="chip chip-tone-warning">2 minutes left</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · luôn là chip, chỉ đổi tone</span>
+        <div class="mock good"><div class="fc" style="gap:8px">
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài 4 · Middleware</span><span class="chip">40 minutes left</span></div>
+          <div class="hr"></div>
+          <div class="fx" style="justify-content:space-between"><span class="bd">Bài 9 · Deploy</span><span class="chip chip-tone-warning">2 minutes left</span></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> "thời gian còn lại" là MỘT loại info-type xuất hiện ở mọi hàng — người đọc phải học ĐÚNG MỘT chỗ để nhìn (luôn là cái pill cuối hàng), rồi tự đọc màu để biết mức độ gấp. Ở bản sai, hàng thường render bằng TEXT còn hàng gấp render bằng CHIP — hai cơ chế khác nhau cho cùng một loại dữ kiện, người đọc phải học lại cách tìm nó mỗi khi state đổi.</p>
+    <div class="prin"><b>Nguyên lý:</b> escalate mức nổi theo TONE của MỘT cơ chế cố định (neutral → warning → danger), không đổi chính cơ chế đó.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 5 · icon theo màu label, trừ khi tự mang nghĩa trạng thái</h3><span class="pair">SurfaceCard.leadingIcon / leadingIconColor</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · icon danh mục ép muted "vì icon phụ"</span>
+        <div class="mock bad"><div class="fx" style="gap:10px;align-items:center">
+          <i class="ph-fill ph-book-open" style="color:var(--app-muted);font-size:18px"></i>
+          <span class="acc">Module đang mở: Xác thực</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · icon theo màu label (accent)</span>
+        <div class="mock good"><div class="fx" style="gap:10px;align-items:center">
+          <i class="ph-fill ph-book-open" style="color:var(--app-accent);font-size:18px"></i>
+          <span class="acc">Module đang mở: Xác thực</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> icon minh hoạ đứng cạnh một label KHÔNG tự động chìm xuống muted "vì nó chỉ là icon" — mặc định nó BÁM màu của label để đọc như một khối. Ép icon muted trong khi label vẫn accent làm cặp icon+label trông như hai quyết định khác nhau.</p>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · icon "đã hoàn thành" ăn theo màu label thường</span>
+        <div class="mock bad"><div class="fx" style="gap:10px;align-items:center">
+          <i class="ph-fill ph-check-circle" style="color:var(--app-fg);font-size:18px"></i>
+          <span class="bd">Bài 3 · Đã hoàn thành</span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · leadingIconColor="success" thắng màu label</span>
+        <div class="mock good"><div class="fx" style="gap:10px;align-items:center">
+          <i class="ph-fill ph-check-circle" style="color:var(--success);font-size:18px"></i>
+          <span class="bd">Bài 3 · Đã hoàn thành</span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> khi icon MANG NGHĨA TRẠNG THÁI riêng (đúng/sai/hoàn tất) — không phải minh hoạ — nó phải THẮNG màu của label bằng prop riêng (<code>leadingIconColor</code>), không ăn theo. Neo bug thật: checkmark từng ra màu đen vì khoá cứng theo label, sửa bằng prop tách riêng.</p>
+    <div class="prin"><b>Nguyên lý:</b> mặc định = ăn theo label (một khối); ngoại lệ = khi icon TỰ có nghĩa trạng thái, tách riêng bằng prop tường minh.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 6 · canon cũ nói khác code thật — hai lệch cùng lúc</h3><span class="pair">principles.md §2a ĐÃ TRÔI</span></div>
+    <div class="doc-vs-code">
+      <div class="docbox"><b>Canon cũ khai:</b><br/>"STRICT — Chip = TEXT-ONLY, KHÔNG icon/logo (kể cả brand icon)". Ngoại lệ duy nhất: dot màu.<br/><br/>"Typography chip = <code>text-xs font-normal</code>, override trong <code>globals.css</code> (<code>.chip{...!important}</code>)".</div>
+      <div class="codebox"><b>Code thật render:</b><br/><span class="chip chip-icon"><i class="ph-fill ph-lock-simple"></i>&nbsp;Locked</span> — 4 ca <code>icon={...}</code> chính là story chuẩn của atom (<code>Chip.stories.tsx:150-169</code>).<br/><br/>Chữ chip thật: <code>text-xs</code> ✓ nhưng <code>font-medium</code> (500), KHÔNG phải normal — và KHÔNG file nào có rule <code>.chip{...}</code> ghi đè (đã grep <code>.storybook/**</code> + <code>src/app/globals.css</code>).</div>
+    </div>
+    <p class="why" style="margin-top:10px"><b>Vì sao ghi cả hai cạnh nhau:</b> trang này KHÔNG tự chọn bên nào đúng thay thầy — nó CHỈ ĐO. Icon-trên-chip là một mở rộng có vẻ chủ đích (nằm ngay trong story chuẩn của atom), còn "font-normal + override globals.css" giống một câu mô tả CHƯA từng được bake, hoặc đã bị revert mà tài liệu quên cập nhật. Theo LUẬT của trục này (§5 NEO THẬT #1): code thật thắng, và đây là chỗ cụ thể để thầy chốt lại câu chữ canon cũ.</p>
+    <div class="prin"><b>Nguyên lý:</b> tài liệu trôi nhanh hơn code khi không ai grep lại mỗi lần trích — xem đúng file trước khi copy một luật cũ sang chỗ mới.</div>
+  </div>
+
+  <h2>4. Bốn lỗi/lệch thật đã cắn</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:26%">Chỗ</th><th style="width:20%">Canon/bản trước nói</th><th style="width:20%">Code/thực tế thật</th><th style="width:16%">Loại lệch</th><th>Trạng thái</th></tr></thead>
+      <tbody>
+        <tr><td>CourseCard (grid) 2026-07-22</td><td class="numc">3 check xanh + chip xanh + CTA hồng cùng lúc</td><td class="numc" style="color:var(--success)">check hạ về muted</td><td class="numc">accent-flood (§2c)</td><td>đã sửa</td></tr>
+        <tr><td>ContinueCard.timeLeft 2026-07-22</td><td class="numc">có chỗ text muted, có chỗ chip</td><td class="numc" style="color:var(--success)">luôn Chip, escalate bằng tone</td><td class="numc">đổi element sai (§2d)</td><td>đã sửa</td></tr>
+        <tr><td>ChipBase — ô glyph dẫn đầu</td><td class="numc" style="color:var(--danger)">"TEXT-ONLY, không icon"</td><td class="numc" style="color:var(--success)">hỗ trợ <code>icon</code> song song <code>dotColor</code></td><td class="numc">canon lệch code</td><td>chờ thầy chốt</td></tr>
+        <tr><td>Chip — typography</td><td class="numc" style="color:var(--danger)"><code>font-normal</code>, override <code>globals.css</code></td><td class="numc" style="color:var(--success)"><code>font-medium</code>, không override nào tồn tại</td><td class="numc">canon lệch code</td><td>chờ thầy chốt</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">Điều lộ ra khi xếp 4 dòng cạnh nhau:</b> hai dòng đầu là lỗi NGƯỜI DỰNG (áp sai cây/luật vào một component cụ thể, đã sửa xong). Hai dòng sau là lỗi TÀI LIỆU (canon nói một đằng, code làm một nẻo, không ai grep lại) — loại lỗi này nguy hiểm hơn vì nó ÂM THẦM dạy người đọc sau một luật sai cho tới khi có người đối chiếu.</p>
+  </div>
+
+  <h2>5. Ba cặp còn lại — vì sao không render</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>Hai cặp cách một bậc</b> (<code>muted↔chip</code> · <code>accent↔button</code>): không viết phép thử riêng. Phân vân ở đây nghĩa là một câu hỏi cấp trên (câu 2 hoặc câu 1 của cây §2) chưa được trả lời dứt khoát — quay lại ba cặp kề nhau và trả lời câu đó trước.</p>
+    <p style="margin:0"><b>Một cặp cách xa</b> (<code>muted↔button</code>): <b>cố ý không có phép thử, và không render.</b> Một chữ trung tính không thể nhảy thẳng thành một nút hành động mà không đi qua "có tín hiệu?" rồi "có phải token cố định?" trước — phân vân ở đây nghĩa là đã bỏ qua nguyên cả hai câu hỏi giữa. Việc phải làm là quay lại đầu cây, không phải chọn cơ chế.</p>
+  </div>
+
+  <h2>6. Neo code thật — đã đọc lại tận nơi, không chép lại</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Bốn nguồn <code>src</code> đọc trực tiếp ngày <b>2026-07-29</b>. Số dòng của <code>.storybook</code> trôi theo mỗi lần sửa; tìm theo tên hàm/prop trong đúng file nếu số dòng lệch.</p>
+    <table>
+      <thead><tr><th style="width:34%">File</th><th style="width:14%">Dòng</th><th>Xác nhận gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">atoms/chips/Chip/ChipBase.tsx</td><td class="numc">109-138, 150-169</td><td>ô glyph dẫn đầu = <code>icon</code> HOẶC <code>dotColor</code>/<code>dotClassName</code>, loại trừ nhau ở kiểu — KHÔNG text-only</td></tr>
+        <tr><td class="mono">stories/atoms/chips/Chip/Chip.stories.tsx</td><td class="numc">150-169, 291-304</td><td>4 ca chuẩn <code>icon={...}</code>, kể cả trên nhánh skeleton</td></tr>
+        <tr><td class="mono">node_modules/@heroui/styles/.../chip.css</td><td class="numc">3</td><td><code>.chip</code> gốc = <code>text-xs leading-5 font-medium</code> — không có bậc <code>font-normal</code></td></tr>
+        <tr><td class="mono">starci/blocks/commerce/PriceTag/PriceTag.tsx</td><td class="numc">64-65, 113-114, 136-145</td><td>chip <code>−X%</code> luôn bọc <code>Popover.Trigger</code>, KHÔNG đổi atom sang <code>Button</code></td></tr>
+        <tr><td class="mono">composites/cards/SurfaceCard/SurfaceCard.tsx</td><td class="numc">1359-1372, 1398</td><td><code>metaText</code> = accent trần; <code>leadingIcon</code> ăn theo màu label trừ khi có <code>leadingIconColor</code></td></tr>
+        <tr><td class="mono">starci/blocks/learn/ReactionButton/ReactionButton.tsx</td><td class="numc">153-163, 182</td><td>nút react = <code>HeroButton variant="tertiary"</code>; số cạnh nó = <code>Typography</code> không màu (default)</td></tr>
+        <tr><td class="mono">_legacy/designs/cards/CourseCard/CourseCard.tsx</td><td class="numc">299-309, 336-344</td><td>"482 học viên" = <code>color="muted"</code>; CTA = <code>Button variant="primary"</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Chạy trong iframe của story để phân biệt CƠ CHẾ THẬT đang render, không phải màu:</p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">[...document.querySelectorAll('[data-anat-part]')].map(e => {
+    const cs = getComputedStyle(e)
+    return {
+        part: e.getAttribute('data-anat-part'),
+        tag: e.tagName.toLowerCase(),
+        bg: cs.backgroundColor,          // chip/button có nền; text-only = transparent
+        radius: cs.borderRadius,          // chip ~999px pill; button theo ButtonSize
+        fontWeight: cs.fontWeight,        // 400 = normal, 500 = medium — đối chiếu bẫy 6
+        role: e.getAttribute('role'),     // button/trigger thật có role
+        clickable: getComputedStyle(e).cursor === 'pointer',
+    }
+})</pre>
+    <p style="margin:12px 0 6px"><b>Ba thứ hay chết im lặng, kiểm luôn:</b></p>
+    <table>
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>chip có bị nhầm với button không</td><td><code>backgroundColor</code> đo ra transparent trong khi mắt tưởng "nút" — hoặc ngược lại, một <code>&lt;button&gt;</code> thật render <code>border-radius:999px</code> giống hệt chip khiến audit nhầm chiều</td></tr>
+        <tr><td><code>fontWeight</code> của chip</td><td>đo ra <b>500</b> (font-medium) — nếu tài liệu đang chép "font-normal (400)" thì đó là canon lệch, không phải bug (bẫy 6)</td></tr>
+        <tr><td>một vùng có bao nhiêu điểm nổi</td><td>đếm số phần tử KHÔNG phải <code>muted</code>/<code>default</code> trong một node cha — ≥3 điểm cùng lúc là dấu hiệu accent-flood (bẫy 2), phải nhìn cả khối chứ không phải từng phần tử</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Tổng: 3 cặp render đủ hai chiều sai · 2 cặp giải thích không render · 1 cặp cố ý loại · 6 bẫy cấu trúc render (gồm 1 bẫy đối chiếu doc-vs-code) · 4 lỗi/lệch thật · 7 neo <code>src</code> đã đọc lại. <b>6/6 cặp có chỗ đứng</b>, không cặp nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>

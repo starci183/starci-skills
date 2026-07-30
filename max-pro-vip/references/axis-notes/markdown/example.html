@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MARKDOWN — 3 tầng lồng nhau, vét cạn theo tầng + theo loại field</title>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#151c2b; --ink:#e7edf5; --muted:#8b98a9; --line:#233049;
+    --accent:#8b7bff; --success:#38d39f; --warn:#f5a524; --danger:#f31260;
+    --app-bg:#141414; --app-surface:#1c1c1c; --app-surface2:#242424; --app-border:#2c2c2c;
+    --app-fg:#f5f5f5; --app-muted:#9a9a9a; --app-accent:#ff6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:28px}
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+  h3{font-size:14px;margin:0 0 4px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0}
+  code,.mono{font-family:ui-monospace,monospace}
+  .note{font-size:12px;color:var(--muted)}
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .rules b{color:var(--ink)}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid #1b2436;vertical-align:middle}
+  .numc{font-family:ui-monospace,monospace}
+
+  /* ── thang ── */
+  .scale{display:flex;flex-direction:column;gap:6px}
+  .srow{display:flex;align-items:center;gap:12px}
+  .sname{width:78px;font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);font-weight:600}
+  .spx{width:52px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
+  .sbar{height:10px;border-radius:3px;background:var(--accent)}
+  .sdesc{font-size:12px;color:var(--muted)}
+
+  /* ── ma trận vét cạn ── */
+  .mx{border-collapse:collapse;font-size:11px;width:auto}
+  .mx td,.mx th{border:1px solid var(--line);padding:6px 8px;text-align:center;font-family:ui-monospace,monospace}
+  .mx th{background:var(--panel2);color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+  .mx .diag{background:#0e1420;color:#39445c}
+  .mx .adj{background:color-mix(in srgb,var(--danger) 26%,transparent);color:#fff;font-weight:700}
+  .mx .near{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+  .mx .far{background:#131a28;color:#5c6880}
+  .mx .empty{background:transparent;border:none}
+
+  /* ── ca render ── */
+  .case{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .case-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .pair{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.split{grid-template-columns:1fr}}
+  .side{display:flex;flex-direction:column;gap:7px}
+  .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lbl.bad{color:var(--danger)} .lbl.good{color:var(--success)}
+  .mock{background:var(--app-bg);border:1px solid var(--app-border);border-radius:10px;padding:16px;font-family:ui-sans-serif,system-ui}
+  .mock.bad{outline:2px solid var(--danger);outline-offset:-1px}
+  .mock.good{outline:2px solid var(--success);outline-offset:-1px}
+  .why{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .why b{color:var(--ink)}
+  .prin{font-size:12.5px;line-height:1.6;background:#0e1420;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .prin b{color:var(--accent)}
+  .test{font-size:12.5px;background:color-mix(in srgb,var(--success) 8%,transparent);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:9px 12px;color:var(--muted)}
+  .test b{color:var(--success)}
+
+  /* ── mock atoms ── */
+  .fx{display:flex} .fc{display:flex;flex-direction:column}
+  .avatar{width:34px;height:34px;border-radius:999px;background:#2e5b6b;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .nm{color:var(--app-fg);font-size:13px;font-weight:600}
+  .tm{color:var(--app-muted);font-size:11.5px}
+  .bd{color:var(--app-fg);font-size:12.5px;line-height:1.55}
+  .chip{background:var(--app-surface);border:1px solid var(--app-border);color:var(--app-fg);font-size:11px;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .ttl{color:var(--app-fg);font-size:13.5px;font-weight:600}
+  .sub2{color:var(--app-muted);font-size:11.5px}
+  .btn{background:var(--app-surface2);border:1px solid var(--app-border);color:var(--app-fg);font-size:12px;padding:6px 12px;border-radius:8px}
+  .btn.p{background:var(--app-accent);border-color:var(--app-accent);color:#1a1a1a;font-weight:600}
+  .ic{color:var(--app-muted);font-size:15px;line-height:1}
+  .row{background:var(--app-surface);border-radius:8px;padding:9px 11px;color:var(--app-fg);font-size:12.5px}
+  .card{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:13px}
+  .hr{height:1px;background:var(--app-border)}
+  .badge{color:var(--app-accent);font-size:12px;line-height:1}
+  .num{color:var(--app-fg);font-size:22px;font-weight:600;line-height:1}
+  .unit{color:var(--app-muted);font-size:12px}
+  .measure{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);padding:1px 6px;border-radius:4px}
+
+  /* ── phụ thêm cho trục markdown (không sáng theme mới, chỉ mock chữ thật) ── */
+  .md-h4{color:var(--app-fg);font-size:14.5px;font-weight:700;margin:0 0 6px}
+  .md-ul{margin:0;padding-left:18px;color:var(--app-fg);font-size:12.5px;line-height:1.7}
+  .md-code-fence{background:#0e1420;border:1px solid var(--app-border);border-radius:8px;padding:8px 10px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted);white-space:pre;overflow-x:auto}
+  .md-inline-code{background:var(--app-surface2);border:1px solid var(--app-border);border-radius:4px;padding:1px 5px;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--app-fg)}
+  .md-b{font-weight:700;color:var(--app-fg)}
+  .md-i{font-style:italic;color:var(--app-fg)}
+  .md-a{color:var(--app-accent);text-decoration:underline}
+  .literal{color:var(--app-muted)}
+  .tierpill{font-family:ui-monospace,monospace;font-size:10.5px;padding:2px 8px;border-radius:999px;font-weight:700}
+  .tierpill.title{background:color-mix(in srgb,var(--danger) 20%,transparent);color:#ff9dbf}
+  .tierpill.rt{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+  .tierpill.md{background:color-mix(in srgb,var(--success) 20%,transparent);color:var(--success)}
+  .btnfake{display:block;width:100%;text-align:left;white-space:normal;background:var(--app-surface2);border:1px solid var(--app-border);border-radius:8px;padding:10px 12px;cursor:pointer;color:var(--app-fg);font:inherit}
+  .watch{background:color-mix(in srgb,var(--warn) 10%,transparent);border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--ink)}
+  .watch b{color:var(--warn)}
+  .term{background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.7;color:var(--muted);overflow-x:auto}
+  .term .cmd{color:var(--accent)}
+  .term .hit{color:var(--success)}
+  .term .miss{color:var(--danger)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MARKDOWN — chuỗi chữ này render markdown tới mức nào</h1>
+  <p class="sub">Mọi khung dưới đây là HTML render thật — cùng một chuỗi nguồn đi qua đúng cơ chế của từng tầng (<code>parseInlineCode</code> / <code>RichText</code> / <code>MarkdownContent</code>) chứ không phải ảnh minh hoạ. Trục này KHÔNG trả lời cỡ chữ hay màu chữ.</p>
+
+  <h2>0. Thang ba tầng — lồng nhau, không có tầng thứ tư</h2>
+  <div class="rules">
+    <p style="margin:0 0 12px">Không phải thang số (px) — là thang <b>NĂNG LỰC RENDER</b>. Tầng sau luôn cho phép mọi thứ tầng trước cho phép, cộng thêm. Chuỗi test dùng chung cho cả ba tầng: <code class="mono">`PR #42` **rất quan trọng** cần sửa theo _hướng dẫn_ tại [đây](#)</code>.</p>
+
+    <div class="scale" style="gap:14px">
+      <div class="srow" style="align-items:flex-start">
+        <span class="sname" style="width:110px">title</span>
+        <div class="fc" style="gap:6px;flex:1">
+          <span class="sdesc">CHỈ <code>`backtick`</code> → <code>&lt;code&gt;</code>. Bold/italic/link/block đều hiện <b>nguyên văn ký tự</b>. Cơ chế: <code>Typography</code> prop <code>parseInlineCode</code>.</span>
+          <div class="mock" style="padding:12px">
+            <button class="btnfake"><span class="ttl">Xem <span class="md-inline-code">PR #42</span>, <span class="literal">**rất quan trọng**</span>, cần sửa theo <span class="literal">_hướng dẫn_</span> tại <span class="literal">[đây](#)</span>.</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="srow" style="align-items:flex-start">
+        <span class="sname" style="width:110px">richtext nhỏ</span>
+        <div class="fc" style="gap:6px;flex:1">
+          <span class="sdesc">Cộng thêm <b>bold</b> · <i>italic</i> · <code>[link]</code> · xuống dòng <code>\n</code>. KHÔNG heading/list/bảng — cơ chế: composite <code>RichText</code>, mảng <code>RULES</code>.</span>
+          <div class="mock" style="padding:12px">
+            <span class="bd">Xem <span class="md-inline-code">PR #42</span>, <span class="md-b">rất quan trọng</span>, cần sửa theo <span class="md-i">hướng dẫn</span> tại <a class="md-a" href="#">đây</a>.</span>
+          </div>
+        </div>
+      </div>
+      <div class="srow" style="align-items:flex-start">
+        <span class="sname" style="width:110px">bài viết</span>
+        <div class="fc" style="gap:6px;flex:1">
+          <span class="sdesc">Cộng thêm heading · list · code fence · bảng · mermaid · directive (<code>:::tab</code>/<code>:::accordion</code>/<code>:::chip</code>/<code>:::muted</code>) — cơ chế: <code>MarkdownContent</code> qua <code>ReactMarkdown</code> + <code>REMARK_PLUGINS</code>.</span>
+          <div class="mock" style="padding:14px">
+            <div class="fc" style="gap:10px">
+              <span class="bd">Xem <span class="md-inline-code">PR #42</span>, <span class="md-b">rất quan trọng</span>, cần sửa theo <span class="md-i">hướng dẫn</span> tại <a class="md-a" href="#">đây</a>.</span>
+              <div class="md-h4"># Việc cần làm</div>
+              <ul class="md-ul"><li>Sửa migration trước khi deploy</li><li>Chạy lại <span class="md-inline-code">check-seams</span></li></ul>
+              <div class="md-code-fence">```ts
+type Tier = "title" | "richtext" | "article"
+```</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin:12px 0 0">Lý do kỹ thuật của <code>title</code> không phải gu trình bày: nó luôn nằm trong 1 element có <b>ràng buộc HTML</b> (<code>&lt;button&gt;</code> trigger, header nén 1 dòng) — <code>MarkdownContent</code> phát ra markup block-level mà lồng vào <code>&lt;button&gt;</code> là HTML không hợp lệ.</p>
+  </div>
+
+  <h2>1. Nguyên lý vét cạn — HAI trục riêng, cả hai đều đếm được</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px"><b>1a. Trục TẦNG:</b> thang chỉ có <b>3</b> giá trị ⇒ <b>C(3,2) = 3</b> cặp — không hơn không kém. Với 3 bậc, "kề nhau" là 2 cặp và "cách xa" là 1 cặp; <b>không có nhóm "cách 1 bậc" trung gian</b> vì không đủ bậc để tạo nhóm đó (khác trục seam có 6 bậc → 4 nhóm).</p>
+    <table class="mx" style="margin-bottom:14px">
+      <tr><th class="empty"></th><th>title</th><th>richtext nhỏ</th><th>bài viết</th></tr>
+      <tr><th>title</th><td class="diag">—</td><td class="adj">1</td><td class="far">3</td></tr>
+      <tr><th>richtext nhỏ</th><td class="diag"></td><td class="diag">—</td><td class="adj">2</td></tr>
+      <tr><th>bài viết</th><td class="diag"></td><td class="diag"></td><td class="diag">—</td></tr>
+    </table>
+    <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted)">
+      <span style="background:color-mix(in srgb,var(--danger) 26%,transparent);padding:1px 7px;border-radius:4px;color:#fff;font-weight:700">2 kề nhau</span>
+      mỗi cặp có phép phân định dứt khoát — render đủ cả hai, mỗi cặp hai chiều sai, ở mục 2.
+      &nbsp;
+      <span style="background:#131a28;padding:1px 7px;border-radius:4px;color:#5c6880">1 cách xa</span>
+      (<code>title ↔ bài viết</code>) <b>cố ý không có phép thử theo cặp</b> — phân vân ở đây nghĩa là đang đọc SAI VAI TRÒ của field, không phải chọn nhầm bậc. Xem mục 3 (bẫy) và mục 5 (vì sao không render ở đây).
+    </p>
+
+    <p style="margin:0 0 10px"><b>1b. Trục LOẠI FIELD:</b> tiêu chí dừng — đã liệt kê đủ <b>8</b> tên field chữ-tác-giả grep ra được thật trong <code>.storybook/components/**</code> (<code>title</code>, <code>label</code>, <code>subtitle</code>, <code>description</code>, <code>caption</code>, <code>hint</code>, <code>body</code>, <code>message</code>). Liệt kê thêm tên field không tồn tại trong code là bịa, nên dừng ở 8.</p>
+    <table>
+      <thead><tr><th style="width:14%">Field</th><th style="width:16%">Tầng ĐÚNG</th><th style="width:20%">Thực trạng code</th><th>Vì sao</th></tr></thead>
+      <tbody>
+        <tr><td><code>title</code> (item trong mảng, trong button/header nén)</td><td><span class="tierpill title">title</span></td><td style="color:var(--success)">✅ đã đúng sau 2026-07-29</td><td>identifier, ràng buộc HTML</td></tr>
+        <tr><td><code>title</code> (root prop composite, ngoài control)</td><td><span class="tierpill md">bài viết</span> nhưng còn <code>ReactNode</code></td><td style="color:var(--warn)">⬜ chưa xiết ở 12 chỗ</td><td>slot tự do, chưa ai xiết kiểu</td></tr>
+        <tr><td><code>label</code></td><td colspan="2" style="color:var(--muted)">NGOÀI PHẠM VI trục này</td><td>chữ hệ thống/form, không phải nội dung tác giả</td></tr>
+        <tr><td><code>subtitle</code></td><td><span class="tierpill rt">richtext nhỏ</span></td><td style="color:var(--warn)">lệch — 1 nơi đúng, nhiều nơi còn <code>ReactNode</code></td><td>đi kèm title, mô tả thêm 1 dòng</td></tr>
+        <tr><td><code>description</code></td><td><span class="tierpill rt">richtext nhỏ</span></td><td style="color:var(--warn)">type đúng <code>string</code> nhưng render qua <code>Typography</code> trần</td><td>xem bẫy 2 — type đúng ≠ cơ chế đúng</td></tr>
+        <tr><td><code>caption</code></td><td><span class="tierpill rt">richtext nhỏ</span></td><td style="color:var(--muted)">type đúng, cơ chế render chưa xác minh</td><td><code>MermaidDiagram</code>/<code>LessonVideoModal</code></td></tr>
+        <tr><td><code>hint</code></td><td colspan="2" style="color:var(--muted)">NGOÀI PHẠM VI trục này</td><td>chữ hệ thống form, như <code>label</code></td></tr>
+        <tr><td><code>body</code> (slot <code>ReactNode</code>)</td><td colspan="2" style="color:var(--muted)">KHÔNG PHẢI field-1-tầng — là SLOT</td><td>caller tự quyết định tier khi soạn children</td></tr>
+        <tr><td><code>body</code>/<code>markdownBody()</code> (chuỗi tài liệu dài)</td><td><span class="tierpill md">bài viết</span></td><td style="color:var(--success)">✅ đúng, qua <code>MarkdownContent</code></td><td><code>ChallengeBrief</code>, <code>ContentArticle</code></td></tr>
+        <tr><td><code>message</code></td><td colspan="2" style="color:var(--muted)">PHỤ THUỘC NGỮ CẢNH — không có tầng cố định cho riêng tên field</td><td><code>SubmissionFindingsList</code> từng sai, xem bẫy 1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>2. Hai cặp kề nhau — mỗi cặp render hai chiều sai</h2>
+
+  <!-- CẶP 1 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 1 · <span class="tierpill title">title</span> ↔ <span class="tierpill rt">richtext nhỏ</span> <span class="note">đã cắn thật 2 lần</span></h3><span class="pair">parseInlineCode ↔ RichText.RULES</span></div>
+    <div class="test"><b>Phép phân định:</b> field có nằm trong 1 element có <b>ràng buộc HTML</b> (button trigger, header nén) VÀ là <b>định danh</b> không? Xoá hết bold/italic/link, người đọc <b>vẫn nhận ra đang xem cái gì</b> ⇒ <code>title</code>. Định dạng đó <b>tự nó mang thông tin</b> (link dẫn trang khác, bold nhấn từ khoá cần đọc) ⇒ <code>richtext nhỏ</code>.</div>
+
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · title item nhận đủ quyền richtext nhỏ <span class="measure">ReactNode</span></span>
+        <div class="mock bad">
+          <button class="btnfake"><span class="ttl">Đã nộp, <span class="md-b">cần sửa gấp</span> theo <a class="md-a" href="#">góp ý</a></span></button>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · title chỉ backtick <span class="measure">parseInlineCode</span></span>
+        <div class="mock good">
+          <button class="btnfake"><span class="ttl">Đã nộp, cần sửa gấp theo <span class="md-inline-code">góp ý</span></span></button>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây đúng ca thật <code>SurfaceCardAccordionItem.title</code> trước khi xiết — khai <code>ReactNode</code> nên trigger nhận cả bold lẫn link. Xoá bold/link đi thì "Đã nộp, cần sửa gấp theo góp ý" <b>vẫn</b> là một định danh đọc được trọn vẹn — nghĩa là bold/link ở đây không mang thêm thông tin gì, chỉ là trang trí thừa mà lại nằm trong <code>&lt;button&gt;</code>.</p>
+
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · description bị ép xuống tầng title <span class="measure">Typography trần</span></span>
+        <div class="mock bad">
+          <span class="bd">Khoá học này <span class="literal">**miễn phí 7 ngày**</span>, sau đó tự động thu phí trừ khi bạn <span class="literal">[huỷ trước hạn](#)</span>.</span>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · description ở đúng richtext nhỏ <span class="measure">composite RichText</span></span>
+        <div class="mock good">
+          <span class="bd">Khoá học này <span class="md-b">miễn phí 7 ngày</span>, sau đó tự động thu phí trừ khi bạn <a class="md-a" href="#">huỷ trước hạn</a>.</span>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đây là ca thật của bẫy 2 — <code>TrialEnrollNudge.description</code> khai kiểu <code>string</code> ĐÚNG tầng <code>richtext nhỏ</code>, nhưng render qua <code>Typography</code> trần (bằng cơ chế của <code>title</code>) vì composite <code>RichText</code> không có consumer nào gọi tới. Người đọc thấy dấu <code>**</code>/<code>[]()</code> trơ ra — <b>chặt hơn</b> tầng mà chính type đã hứa.</p>
+
+    <div class="prin"><b>Nguyên lý:</b> hai chiều sai đối xứng nhau — cho <code>title</code> quyền của <code>richtext nhỏ</code> thì thừa trang trí trong 1 chỗ có ràng buộc HTML; giữ <code>richtext nhỏ</code> ở cơ chế của <code>title</code> thì cắt mất thông tin mà chính field đã hứa qua type. <b>Type đúng không bảo đảm cơ chế render đúng</b> — phải kiểm cả hai.</div>
+  </div>
+
+  <!-- CẶP 2 -->
+  <div class="case">
+    <div class="case-h"><h3>Cặp 2 · <span class="tierpill rt">richtext nhỏ</span> ↔ <span class="tierpill md">bài viết</span> <span class="note">chưa ghi nhận ca lẫn thật</span></h3><span class="pair">RichText.RULES ↔ REMARK_PLUGINS</span></div>
+    <div class="test"><b>Phép phân định:</b> field có cần hiển thị <b>CẤU TRÚC BLOCK</b> — heading riêng dòng, list nhiều mục, code fence nhiều dòng, bảng, mermaid, hay bất kỳ directive <code>:::</code> — không? YES ⇒ <code>bài viết</code>. Chỉ cần 1 dòng có thể có bold/italic/link ⇒ <code>richtext nhỏ</code>.</div>
+
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · mô tả ngắn bị ép lên tầng bài viết <span class="measure">MarkdownContent</span></span>
+        <div class="mock bad card" style="max-width:340px">
+          <div class="fc" style="gap:8px">
+            <div class="md-h4" style="font-size:13px">Ghi chú</div>
+            <ul class="md-ul"><li>Nộp trước 23:59</li></ul>
+            <span class="bd">Chỉ 1 dòng thật sự cần nói.</span>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · richtext nhỏ, 1 dòng <span class="measure">RichText</span></span>
+        <div class="mock good card" style="max-width:340px">
+          <span class="bd">Ghi chú: nộp trước <span class="md-b">23:59</span>, xem thêm <a class="md-a" href="#">quy chế</a>.</span>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> nội dung thật chỉ là một câu ghi chú ngắn — dùng <code>MarkdownContent</code> tạo ra heading + list cho một ý duy nhất, card vỡ thành nhiều khối rời trong khi không có cấu trúc nào thật để chia.</p>
+
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · bài viết nhiều đoạn bị ép xuống richtext nhỏ <span class="measure">RichText.RULES</span></span>
+        <div class="mock bad card" style="max-width:420px">
+          <span class="bd">
+            <span class="literal"># Việc cần làm</span><br/>
+            <span class="literal">- Sửa migration trước khi deploy</span><br/>
+            <span class="literal">- Chạy lại check-seams</span>
+          </span>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · bài viết, block thật <span class="measure">MarkdownContent</span></span>
+        <div class="mock good card" style="max-width:420px">
+          <div class="fc" style="gap:8px">
+            <div class="md-h4" style="font-size:13px"># Việc cần làm</div>
+            <ul class="md-ul"><li>Sửa migration trước khi deploy</li><li>Chạy lại <span class="md-inline-code">check-seams</span></li></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>RichText.RULES</code> chỉ khớp backtick/bold/italic/link bằng regex đơn dòng — không có luật nào hiểu <code>#</code> đầu dòng là heading hay <code>-</code> là list item, nên tất cả hiện nguyên văn ký tự, kể cả xuống dòng cũng chỉ là 1 dòng dài nếu không tự chèn <code>&lt;br/&gt;</code>.</p>
+
+    <div class="prin"><b>Nguyên lý:</b> cặp này <b>chưa cắn thật</b> vì <code>RichText</code> gần như chưa ai gọi (xem bẫy 2) — không phải vì ranh giới dễ, mà vì chưa có đủ consumer để mà lẫn. Đừng đọc "chưa cắn" thành "an toàn".</div>
+  </div>
+
+  <h2>3. Bốn bẫy cấu trúc — chọn đúng giá trị nhưng vẫn sai vai trò</h2>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 1 · field cùng TÊN không cùng VAI TRÒ <span class="note">ca nặng nhất, thật 100%</span></h3><span class="pair">SubmissionFindingsList.message</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ SAI · MarkdownContent block-level NGAY TRONG &lt;button&gt;</span>
+        <div class="mock bad">
+          <button class="btnfake">
+            <div class="fc" style="gap:6px">
+              <span class="ttl" style="display:flex;gap:6px;align-items:center"><i class="ph-fill ph-warning-circle" style="color:var(--danger)"></i> Lỗi kiểm tra kiểu</span>
+              <div class="md-h4" style="font-size:12.5px;margin:0">Nguyên nhân</div>
+              <ul class="md-ul" style="font-size:11.5px"><li>Biến <span class="md-inline-code">userId</span> có thể <span class="md-b">undefined</span></li></ul>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ ĐÚNG · icon tách sang titleStart, title ở lại string</span>
+        <div class="mock good">
+          <button class="btnfake" style="display:flex;align-items:center;gap:8px">
+            <i class="ph-fill ph-warning-circle" style="color:var(--danger);flex:0 0 auto"></i>
+            <span class="ttl">Lỗi kiểm tra kiểu · biến <span class="md-inline-code">userId</span> có thể undefined</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>message</code> từng được author như "nội dung markdown" và render thẳng bằng <code>&lt;MarkdownContent&gt;</code> — nhưng nó đang giữ vai trò <b>title của 1 accordion item</b>, tức nằm trong <code>&lt;button&gt;</code>. Đọc theo TÊN field (<code>message</code> "nghe như" nội dung dài) mà không đọc NGỮ CẢNH RENDER (đang ở trong button hay không) là cách chắc chắn để lẫn <code>title ↔ bài viết</code> — chính là cặp <b>cách xa nhất</b> trên thang, đáng lẽ không thể lẫn.</p>
+    <div class="prin"><b>Nguyên lý:</b> tên field không quyết định tầng — <b>ngữ cảnh render (đang ở trong control ràng buộc HTML hay không) mới quyết định.</b> Field cùng tên (<code>title</code> root prop vs <code>title</code> item-trong-mảng) có thể mang hai bộ ràng buộc hoàn toàn khác nhau.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 2 · composite tầng giữa được XÂY nhưng KHÔNG AI DÙNG</h3><span class="pair">RichText — 0 consumer thật</span></div>
+    <div class="term"><span class="cmd">grep -rn "import.*RichText" .storybook --include=*.tsx</span>
+<span class="hit">.storybook/stories/composites/viewers/RichText/RichText.stories.tsx</span>  <span class="miss">← DUY NHẤT, chính là story của nó</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ 5 field description type đúng, cơ chế sai</span>
+        <div class="mock bad"><div class="fc" style="gap:6px">
+          <span class="bd">TrialEnrollNudge: <span class="literal">**miễn phí 7 ngày**</span></span>
+          <span class="bd">EnrollGate: <span class="literal">[xem thêm](#)</span></span>
+          <span class="bd">PremiumGateModal: <span class="literal">_giới hạn 1 lần_</span></span>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ nếu qua đúng composite RichText</span>
+        <div class="mock good"><div class="fc" style="gap:6px">
+          <span class="bd">TrialEnrollNudge: <span class="md-b">miễn phí 7 ngày</span></span>
+          <span class="bd">EnrollGate: <a class="md-a" href="#">xem thêm</a></span>
+          <span class="bd">PremiumGateModal: <span class="md-i">giới hạn 1 lần</span></span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> cả 5 field (<code>TrialEnrollNudge</code>, <code>EnrollGate</code>, <code>MilestoneUpNextCard</code>, <code>ProfileNotFoundState</code>, <code>PremiumGateModal</code>) khai đúng kiểu <code>string</code> ở tầng <code>richtext nhỏ</code>, nhưng render qua <code>Typography</code> trần chứ không qua <code>RichText</code> — vì <code>RichText</code> gần như bị "mồ côi". <b>Type đúng KHÔNG bảo đảm cơ chế render đúng.</b></p>
+    <div class="prin"><b>Nguyên lý:</b> phải kiểm CẢ HAI — type khai đúng tầng, VÀ component thật đang render nó có đúng cơ chế của tầng đó không.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 3 · <code>ReactNode</code> là cửa mời, không phải một tầng</h3><span class="pair">12 component còn <code>title: ReactNode</code></span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ ReactNode mời bất cứ thứ gì, kể cả sai chỗ</span>
+        <div class="mock bad"><div class="fc" style="gap:8px">
+          <span class="tm">title?: ReactNode</span>
+          <div class="fx" style="gap:6px;align-items:center"><i class="ph-fill ph-siren" style="color:var(--danger)"></i><span class="ttl">Bất kỳ JSX nào, <span class="md-b">markdown</span>, <a class="md-a" href="#">link</a> — không ai chặn</span></div>
+        </div></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ xiết còn string, chỉ backtick qua parseInlineCode</span>
+        <div class="mock good"><div class="fc" style="gap:8px">
+          <span class="tm">title: string</span>
+          <span class="ttl">Chỉ chữ trần, cùng lắm <span class="md-inline-code">code</span></span>
+        </div></div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> <code>ReactNode</code> không nằm trong thang §0 — nó là một <b>SLOT</b>, caller tự quyết định tự nhét gì cũng được, kể cả nhét <code>MarkdownContent</code> vào bên trong 1 accordion trigger. Bẫy chỉ lộ ra khi có 1 consumer thật làm vậy, đúng như bẫy 1.</p>
+    <div class="watch"><b>⬜ Nợ CHƯA xác nhận lỗi (đọc như sử, đừng suy diễn):</b> <code>Alert</code>, <code>Accordion</code> (atom), <code>Toast</code>, <code>AsyncContent</code>, <code>Feedback</code>, <code>Form</code>, <code>Disclosure</code>, <code>DrawerShell</code>, <code>ModalShell</code>, <code>Page</code>, <code>Section</code>, <code>List</code>, <code>TitledText</code> — 12 component còn <code>title: ReactNode</code>/<code>title?: ReactNode</code> chưa xiết như <code>SurfaceCardAccordionItem</code>. Chưa có bằng chứng consumer nào ĐANG lạm dụng — sửa 1 chỗ (<code>SurfaceCard</code>) không tự lan sang chỗ trông giống.</div>
+    <div class="prin"><b>Nguyên lý:</b> xiết kiểu (<code>ReactNode</code> → <code>string</code>) là hành động <b>sửa lỗi thật</b>, không phải dọn kiểu cho đẹp — nhưng cũng không suy diễn nợ thành lỗi đã xảy ra khi chưa grep ra consumer thật.</div>
+  </div>
+
+  <div class="case">
+    <div class="case-h"><h3>Bẫy 4 · quét-theo-DỮ-LIỆU không thay được quét-theo-KIỂU</h3><span class="pair">0 hit dữ liệu ≠ an toàn</span></div>
+    <div class="split">
+      <div class="side">
+        <span class="lbl bad">✕ chỉ quét dữ liệu → kết luận SAI "an toàn"</span>
+        <div class="term"><span class="cmd">grep -rn "\*\*\|\[.*\](" .storybook/stories/**/*.stories.tsx</span>
+<span class="miss">0 hit trong field title</span>
+"⇒ an toàn" <span class="miss">← KẾT LUẬN SAI</span></div>
+      </div>
+      <div class="side">
+        <span class="lbl good">✓ quét kiểu → thấy đúng lỗ hổng</span>
+        <div class="term"><span class="cmd">grep -rn "title.*ReactNode" .storybook/components/**/*.tsx</span>
+<span class="hit">13 match</span> ← quyền vẫn còn mở, dữ liệu hiện tại chỉ chưa DÙNG tới quyền đó</div>
+      </div>
+    </div>
+    <p class="why"><b>Vì sao:</b> đợt quét story chỉ tìm cú pháp markdown literal trong dữ liệu — 0 hit. Nhưng nợ không nằm ở DỮ LIỆU story mà ở KIỂU của component: <code>ReactNode</code> cho phép, dữ liệu hiện tại chỉ chưa ai dùng tới quyền đó. Ngày mai 1 consumer mới có thể dùng ngay.</p>
+    <div class="prin"><b>Nguyên lý:</b> "0 hit dữ liệu ⇒ an toàn" là kết luận sai nếu chỉ quét dữ liệu mà không quét kiểu. Quét kiểu mới bắt được QUYỀN, quét dữ liệu chỉ bắt được VIỆC ĐÃ DÙNG.</div>
+  </div>
+
+  <h2>4. Ba lỗi thật đã cắn — điều chỉ lộ ra khi xếp cạnh nhau</h2>
+  <div class="rules">
+    <table>
+      <thead><tr><th style="width:30%">Chỗ</th><th style="width:16%">Đã viết</th><th style="width:16%">Đúng ra</th><th style="width:20%">Cặp lẫn</th><th>Ngày</th></tr></thead>
+      <tbody>
+        <tr><td><code>RichText.tsx:145</code> JSDoc</td><td class="numc" style="color:var(--danger)">liệt kê "titles" là ví dụ dùng RichText</td><td class="numc" style="color:var(--success)">title không dùng RichText</td><td class="numc">title ↔ richtext nhỏ</td><td>2026-07-29</td></tr>
+        <tr><td><code>SurfaceCardAccordionItem.title</code></td><td class="numc" style="color:var(--danger)">ReactNode</td><td class="numc" style="color:var(--success)">string qua parseInlineCode</td><td class="numc">title ↔ richtext nhỏ</td><td>2026-07-29</td></tr>
+        <tr><td><code>SubmissionFindingsList</code> field <code>message</code></td><td class="numc" style="color:var(--danger)">MarkdownContent full trong &lt;button&gt;</td><td class="numc" style="color:var(--success)">titleStart tách icon, message→title string</td><td class="numc">title ↔ bài viết</td><td>2026-07-29</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0"><b>Hai điều chỉ hiện ra khi xếp cả ba cạnh nhau:</b></p>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">a.</b> Cả ba lỗi đều đi <b>MỘT CHIỀU</b>: tầng <code>title</code> luôn bị cho <b>nhiều quyền hơn</b> nó nên có (richtext hoặc cả bài viết tràn vào). Chưa ghi nhận ca ngược lại — field đáng lẽ <code>richtext nhỏ</code>/<code>bài viết</code> bị ép xuống còn <code>title</code> mà đã bị bắt quả tang trong code thật (bẫy 2 là type đúng/cơ chế sai, một dạng khác, không tính vào bảng này).</p>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink)">b.</b> Cặp lẫn nặng nhất (<code>title ↔ bài viết</code>) — cặp mà §1 nói "cố ý không có phép thử vì quá xa để lẫn" — <b>lại chính là ca thật nghiêm trọng nhất</b>. Đó không phải mâu thuẫn: field lẫn được không phải vì hai tầng gần nhau, mà vì <b>đọc sai TÊN field thành sai VAI TRÒ</b> (bẫy 1) — một lỗi cấu trúc, không phải lỗi chọn bậc.</p>
+  </div>
+
+  <h2>5. Một cặp không render theo kiểu vét cạn-cặp — vì sao</h2>
+  <div class="rules">
+    <p style="margin:0"><b><code>title ↔ bài viết</code></b> (cặp cách xa duy nhất trên thang 3 bậc): không có phép thử dạng "chọn bậc nào" vì hai đầu thang mô tả hai NGỮ CẢNH RENDER không thể lẫn nếu đọc đúng — một cái luôn nằm trong element ràng buộc HTML (button/header nén), một cái luôn là thân tài liệu nhiều khối. Phân vân giữa chúng nghĩa là <b>chưa xác định field đó thực sự đóng vai trò gì</b> (tên hay nội dung), không phải câu hỏi "0px hay 32px". Việc phải làm là quay lại xác định vai trò field (mục 2 context, câu hỏi 1), không phải chọn giữa hai đầu thang. Ca thật duy nhất của cặp này (<code>SubmissionFindingsList</code>) đã render đầy đủ ở <b>bẫy 1</b> — cố tình không lặp lại ở đây để tránh dạy sai rằng đây là một "lựa chọn bậc" bình thường.</p>
+  </div>
+
+  <h2>6. Neo code thật — đã đọc lại tận nơi, không chép lại</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Ba nguồn <code>src</code> gốc cho ba tầng, xác minh trực tiếp ngày <b>2026-07-29</b> trên <code>C:/Repositories/starci-academy</code>. Số dòng <code>.storybook</code> trôi theo mỗi lần sửa — tìm theo pattern ở cột "Neo", đừng tin số dòng cứng.</p>
+
+    <h3 style="margin:14px 0 6px">Cơ chế mỗi tầng</h3>
+    <table>
+      <thead><tr><th style="width:16%">Tầng</th><th style="width:22%">Component</th><th>Neo</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tierpill title">title</span></td><td><code>Typography</code></td><td><code>atoms/text/Typography/Typography.tsx</code> — hàm <code>renderInlineCode</code>, pattern <code>split(/(`[^`]+`)/g)</code>, hằng <code>INLINE_CODE_CLS</code></td></tr>
+        <tr><td><span class="tierpill rt">richtext nhỏ</span></td><td><code>RichText</code></td><td><code>composites/viewers/RichText/RichText.tsx</code> — mảng <code>RULES</code> (backtick/bold/link/italic, 4 regex đơn dòng)</td></tr>
+        <tr><td><span class="tierpill md">bài viết</span></td><td><code>MarkdownContent</code></td><td><code>composites/viewers/MarkdownContent/MarkdownContent.tsx</code> — <code>ReactMarkdown</code> + <code>REMARK_PLUGINS</code>, dòng ~224</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Ba ca fix thật</h3>
+    <table>
+      <thead><tr><th style="width:26%">Chỗ</th><th style="width:22%">Neo dòng</th><th>Cách đo lại</th></tr></thead>
+      <tbody>
+        <tr><td><code>SurfaceCard.tsx</code> — <code>SurfaceCardAccordionItem</code></td><td class="numc">~1533-1630, <code>titleStart</code>/<code>parseInlineCode</code></td><td><code>grep -n "titleStart\|parseInlineCode" SurfaceCard.tsx</code></td></tr>
+        <tr><td><code>SubmissionFindingsList.tsx</code></td><td class="numc">JSDoc ~181, wiring ~293</td><td>render 1 finding có <code>**bold**</code> trong <code>message</code> — phải hiện nguyên văn <code>**bold**</code></td></tr>
+        <tr><td><code>ChallengeDeliverableList.tsx</code></td><td class="numc">JSDoc ~35, wiring ~298</td><td>ca thứ 3/3 cùng dạng: icon lẽ ra ở <code>titleStart</code> lại nhét chung <code>title</code></td></tr>
+        <tr><td><code>RichText.tsx</code> JSDoc</td><td class="numc">~148</td><td>câu "NOT for title/headline fields..." — trước đó liệt kê "titles" là ví dụ dùng được, đã xoá</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Bẫy 2 — 0 consumer thật của RichText</h3>
+    <div class="term" style="margin-bottom:8px"><span class="cmd">grep -rn "import.*RichText" .storybook --include=*.tsx</span> → <span class="hit">1 hit duy nhất</span> = chính story nó</div>
+    <table>
+      <thead><tr><th style="width:50%">File</th><th style="width:20%">Field</th><th>Kiểu</th></tr></thead>
+      <tbody>
+        <tr><td><code>starci/blocks/commerce/TrialEnrollNudge/TrialEnrollNudge.tsx:56</code></td><td>description</td><td class="numc">string</td></tr>
+        <tr><td><code>starci/blocks/learn/EnrollGate/EnrollGate.tsx:97</code></td><td>description</td><td class="numc">string</td></tr>
+        <tr><td><code>starci/blocks/learn/MilestoneUpNextCard/MilestoneUpNextCard.tsx:54</code></td><td>description</td><td class="numc">string</td></tr>
+        <tr><td><code>starci/blocks/profile/ProfileNotFoundState/ProfileNotFoundState.tsx:59</code></td><td>description</td><td class="numc">string</td></tr>
+        <tr><td><code>starci/overlays/modals/PremiumGateModal/PremiumGateModal.tsx:138</code></td><td>description</td><td class="numc">string</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin:16px 0 6px">Bẫy 3 — nợ 12 component còn <code>title: ReactNode</code></h3>
+    <div class="term"><span class="cmd">grep -rn "title: ReactNode\|title?: ReactNode" .storybook/components --include=*.tsx</span>
+<span class="hit">Alert.tsx:138-139 · Accordion.tsx:34 · Toast.tsx:45 · AsyncContent.tsx:54 · Feedback.tsx:78,189,352 · Form.tsx:133 · Disclosure.tsx:42 · DrawerShell.tsx:39 · ModalShell.tsx:42 · Page.tsx:98,107 · Section.tsx:75 · List.tsx:50 · TitledText.tsx:85</span></div>
+  </div>
+
+  <h2>7. Cách đo — không đọc mắt</h2>
+  <div class="rules">
+    <p style="margin:0 0 10px">Không có <code>getComputedStyle</code> cho trục này (trục NGỮ NGHĨA chữ, không phải layout) — đo bằng RENDER + ĐỐI CHIẾU cú pháp.</p>
+    <p style="margin:0 0 6px"><b>Bước 1 — nhét chuỗi test chứa đủ 4 dấu hiệu + 1 block:</b></p>
+    <pre style="margin:0 0 10px;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">`code` **bold** _italic_ [link](#)
+xuống dòng
+# H (heading)</pre>
+    <table>
+      <thead><tr><th style="width:34%">Quan sát bản render</th><th>Kết luận đang ở tầng nào</th></tr></thead>
+      <tbody>
+        <tr><td>Chỉ <code>code</code> được hiểu, còn lại hiện nguyên văn ký tự</td><td><span class="tierpill title">title</span></td></tr>
+        <tr><td><code>code</code>/<code>bold</code>/<code>italic</code>/<code>link</code> đều render, <code># H</code> hiện nguyên văn</td><td><span class="tierpill rt">richtext nhỏ</span></td></tr>
+        <tr><td>Tất cả kể cả <code># H</code> thành heading thật</td><td><span class="tierpill md">bài viết</span></td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 6px"><b>Bước 2 — xác nhận ràng buộc HTML bằng devtools:</b></p>
+    <pre style="margin:0;background:#0e1420;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;overflow-x:auto;color:var(--muted)">// chạy trong iframe của story, sau khi nhét chuỗi test vào field
+document.querySelector('[data-testid="target"]')?.closest('button')
+// null = an toàn cấu trúc · trả về Element = đang lồng vào control, nếu tầng là richtext/bài viết ⇒ đúng bẫy 1</pre>
+    <table style="margin-top:12px">
+      <thead><tr><th style="width:34%">Kiểm gì</th><th>Dấu hiệu hỏng</th></tr></thead>
+      <tbody>
+        <tr><td>type đúng nhưng cơ chế render sai</td><td><code>description: string</code> nhưng dấu <code>**</code>/<code>[]()</code> hiện trơ ⇒ đang qua <code>Typography</code> trần thay vì <code>RichText</code> (bẫy 2)</td></tr>
+        <tr><td>quét dữ liệu thay quét kiểu</td><td>0 hit cú pháp markdown trong story data KHÔNG chứng minh field an toàn nếu type khai <code>ReactNode</code> (bẫy 4)</td></tr>
+        <tr><td>đổi kiểu 1 field mà không tsc toàn repo</td><td>consumer khác cùng tên field (vd 3 nơi cùng dùng <code>title</code>) không được bắt ra ⇒ luôn chạy <code>tsc --noEmit</code> toàn repo sau khi xiết 1 field</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Tổng: 2 cặp tầng render đủ hai chiều sai · 1 cặp tầng cố ý không render theo kiểu chọn-bậc (giải thích ở mục 5, ca thật render ở bẫy 1) · 4 bẫy cấu trúc render thật · 3 lỗi thật đã cắn · 8 loại field vét cạn theo tiêu chí khách quan · 9 neo <code>src</code> đã đọc lại. <b>3/3 cặp tầng có chỗ đứng, 8/8 loại field có chỗ đứng</b>, không cặp/field nào bị bỏ quên.</p>
+
+</div>
+</body>
+</html>
