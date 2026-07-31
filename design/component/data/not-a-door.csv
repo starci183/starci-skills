@@ -1,0 +1,7 @@
+name,belongs_to,only_touch_when
+Flex,frame,editing frames/Stack
+"SurfaceCardHeader, surfaceFrame, surfaceSectionGap",composite,"hand-building a non-card cluster that still must match the label row"
+FieldFrame,atom,writing a NEW FORM ATOM
+ProgressMeterTargetMark,composite,"hand-building a different track that needs the exact target mark"
+"buildMarkdownRenderers, TabsBlock, TabPane, MarkdownTable*, flattenMarkdownTableHeaderChildren, isMarkdownHeaderTableRowNode",composite,editing markdown GRAMMAR in map.tsx
+"MarkdownMeasure, FLOW_DIAGRAM_CARD_NODE_TYPE, FlowDiagramCardNodeData",type/constant,"declaring a prop or building data — do not hardcode a string in their place"

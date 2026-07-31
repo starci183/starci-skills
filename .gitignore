@@ -1,0 +1,3 @@
+# Per-machine paths and URLs, written by scripts/workspace-setup.mjs.
+# Every machine answers this differently, so the answer never belongs in git.
+.context/

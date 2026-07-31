@@ -1,0 +1,137 @@
+id,section,you_have,choose,entry_point,dont_choose
+surface-card-01,surface-card,"ONE free-form block: a paragraph, markdown, a JSX cluster I assembled myself",SurfaceCard,"children / body (+ header, footer)",SurfaceCardList — an array of length 1 is the wrong concept at the DATA-SHAPE level
+surface-card-02,surface-card,The whole block is PRESSABLE (a card that links somewhere),SurfaceCard + onPress / href,isPressable is inferred automatically,don't look for SurfaceCard.Pressable — that export no longer exists
+surface-card-03,surface-card,"A FLAT array of rows, one row per line, usually pressable",SurfaceCardList,"items[] — title/subtitle/leadingIcon/metaText/trailingIcon, or free-form content",SurfaceCardAccordion if the row doesn't expand; ListLabeled if a card surface is NOT needed
+surface-card-04,surface-card,An array of EXPANDABLE rows (trigger + hidden body),SurfaceCardAccordion,items[] — id · title (plain string) · body,Disclosure if there is only ONE collapsible region
+surface-card-05,surface-card,An array of READ-ONLY rows carrying a check / cross / pending mark,SurfaceCardCrossList,items[] — text + mark: check|cross|pending|none + tone,"SurfaceCardList — the source states plainly ""Read-only; for CLICKABLE rows use SurfaceCardList"""
+surface-card-06,surface-card,"An array of sections, each with a multi-line BODY, needing a QUIET label bar INSIDE the frame",SurfaceCardNested,"items[] — eyebrow/title/content, or children",SurfaceCardList — Nested deliberately has NO leading/meta/trailing/selected/verdict
+surface-card-07,surface-card,"A GRID of press-and-done tiles (rate a level, pick an entry point, a large-tile menu)",SurfaceCardPressableGroup,items[] + onPress/href + ariaLabel,SurfaceCardSelectableGroup if you don't need one-of-N selection rules
+surface-card-08,surface-card,A GRID of tiles that is a real one-of-N selection CONTROL,SurfaceCardSelectableGroup,items[] + value + onChange + ariaLabel,"SurfaceCardPressableGroup — a different DOM contract, not a different style"
+surface-card-09,surface-card,"A dashed ""create new"" tile at the end of a card grid",SurfaceCardPlaceholder,icon + label + onPress (no children),using it as an empty state is wrong — List/Accordion already have their own emptyState
+list-01,list,"EXACTLY ONE GitHub-style row, placed into a frame I already have",ListRow,props leading/title/subtitle/meta/trailing (+ href/onPress),don't .map it N times to fake a list
+list-02,list,"A label + an ARRAY of short rows (+ one button), placed somewhere that ALREADY has an outer surface",ListLabeled,items[] (= ListRowProps + key) + label/icon/action/emptyState,SurfaceCardList if this cluster needs its own surface
+list-03,list,"A few meta fragments on ONE line, joined with ·",ListMeta,chip? + items[] — each element is one fragment,don't hand-type · + mx-1 at the call site
+list-04,list,A settings row: name + explanation + a switch,ListToggleRow,props label/description/checked/onCheckedChange,"ListRow if the right side is a chip/number/caret, not a switch"
+list-05,list,Content authored by ONE PERSON: avatar + identity line + body/nested replies,IdentityContentRow,byline (node) + children (node); nested draws the indent guide,don't expect it to draw a card surface — wrap SurfaceCard if you need one
+disclosure-01,disclosure,"ONE collapsible region, NO border needed",Disclosure (composites/layout/Disclosure),title (inline trigger label) + body / children,SurfaceCardAccordion — it's a real card surface; with one item the label says itself twice
+disclosure-02,disclosure,"≥2 uniform regions, WITH a card surface",SurfaceCardAccordion,items[] + label/description/emptyState,"Disclosure — it doesn't repeat, has no items"
+disclosure-03,disclosure,"≥2 uniform regions, NO card surface needed","Accordion (atom, atoms/navigation/Accordion)",items[] — key/title/content,SurfaceCardAccordion if you don't want a surface
+disclosure-04,disclosure,"Clicking opens a panel OUTSIDE, not an inline region",ListRow (pressable row) + DrawerShell,ListRow trailing caret; content lives in the drawer,Disclosure — the source names TaskSubmissionPanel as exactly this case
+text-01,text,"A PLAIN string, no markers at all",Typography (atom),text (ReactNode) — not children,RichText — adds a pointless parsing layer
+text-02,text,"A string that may contain backtick, but MUST stay inline (inside a <button>, a trigger)",Typography + parseInlineCode,text,MarkdownContent — block-level markup inside a <button> is invalid HTML
+text-03,text,A string carrying a small CLOSED set of markers: code · bold · _italic_ · link · \n,RichText (composites/viewers),text: string + size/color,MarkdownContent — this string has no block content at all
+text-04,text,The string is a DOCUMENT: heading · bullet · table · fence · house directive,MarkdownContent,source: string + measure: reading|compact,RichText — it doesn't emit block-level markup
+text-05,text,"A field schema declared as type ""text"" whose author typed markers into it anyway",stripMarkdown (atoms/text/_markdown.ts) then feed into Typography,parameter markdown: string → string,"don't ""clean it up"" and still expect formatting to render — it STRIPS, it doesn't convert"
+text-06,text,A PAIR (or triplet) of text lines that read as ONE idea: title + subtitle (+ hint),TitledText (composites/text),props title/subtitle/hint + size: row|header|stat,don't stack two or three Typography next to each other by hand
+text-07,text,"ONE horizontal line: a leading icon + a label, the SAME tone",InlineIconLabel (composites/text),icon (bare node) + children + tone/size,Chip if the value belongs to a CLOSED set; TitledText if the axis is VERTICAL
+text-08,text,"A NUMBER + unit in a trailing slot: ""N points""",ScoreValue (composites/text),points: number (+ unit),NEVER Chip
+viewer-01,viewer,A markdown string with full block content (even if it's just a single fenced command),MarkdownContent,source: string + measure,don't hand-build a <pre> — a bash fence already has its own copy button + mono chrome
+viewer-02,viewer,"A code block that doesn't come from markdown (API response, a hand-built snippet)",CodeToHtml,code + language + theme,don't call it when the code is already inside a fence — map.tsx already dispatches it
+viewer-03,viewer,"TWO already-rendered nodes: a demo + a source, flipping between them",CodePreviewTabs,preview + code (ReactNode),don't call it when all you have is a markdown string containing :::tab
+viewer-04,viewer,"A mermaid diagram as TEXT, standing on its own",MermaidDiagram,code: string + UI labels passed via prop,"don't call it when the mermaid is inside a document — it's already auto-dispatched, calling it by hand duplicates it"
+viewer-05,viewer,"Graph DATA with ready-made nodes/edges, needing drag-zoom",FlowDiagram,nodes[] + edges[]; nodes use FLOW_DIAGRAM_CARD_NODE_TYPE,MermaidDiagram — it takes TEXT and outputs a static SVG
+viewer-06,viewer,"A path to a PDF file, viewed right on the page",PDFView,src + title,"MarkdownContent — this is a binary file, not text content"
+label-01,label,"ONE short label with a FREE value (a lone tag, a color-dot chip)","Chip (atom, atoms/chips/Chip/ChipBase.tsx)","text (REQUIRED, children forbidden) + icon (component ref) or dotColor/dotClassName",EnumChip if there's a mapping table
+label-02,label,"N labels at the SAME LEVEL, same tone, needing an overflow +N cutoff",ChipGroup (atom),items[] (key/text) + maxVisible + tone shared across the whole row,don't use it if each label has its own tone — a rainbow row
+label-03,label,ONE value from a CLOSED set + a value→color/label mapping table,EnumChip (composite),"value + map (a missing entry THROWS, no silent fallback)","Chip — wherever there's a map, the color rule lives there"
+label-04,label,"A NUMBER + unit printed INSIDE THE SAME pill (""24 Modules"")",HighlightChip,value + label (+ icon),Chip — it only takes a single text
+label-05,label,"ONE ALREADY-SELECTED item, a full-width bordered row, with a Change / × button",RemovableToken,label + icon (bare) + onEdit/onRemove,Chip + onRemove — that's a 24px pill; using it here blows out the row
+label-06,label,"A pure scalar/count (""482 students"")",muted text (Typography),,"NO chip, NO icon (README atom §1)"
+measure-01,measure,"ONE ratio over ONE total, read as a thin horizontal bar",ProgressMeter (composites/stats),"value (+ max, label, showValue, target)",SegmentBar — that's multiple components
+measure-02,measure,The same ratio but needs to be a round FOCAL block with a number in the middle,ProgressRing,"value (+ label, caption, size)","ProgressMeter — different placement, not different data"
+measure-03,measure,MULTIPLE categories with the SAME unit sharing ONE common total,SegmentBar,segments[] + ariaLabel required,CourseProgressBar — equal-width lanes would lie about the composition
+measure-04,measure,"MULTIPLE dimensions, each with its OWN total, on different scales of unit",CourseProgressBar,dims[] (completed/total) + ariaLabel,"SegmentBar — the JSDoc states plainly ""Deliberately NOT SegmentBar"""
+measure-05,measure,"A color-meaning key, with the colored shape living SOMEWHERE ELSE",Legend,items[] (label/color/suffix),don't add it when SegmentBar/CourseProgressBar are already in use — they render their own Legend
+measure-06,measure,"A number+label pair, placed somewhere that ALREADY has a surface",StatPair,value + label + valueType,MetricCard — frame nested inside frame
+measure-07,measure,"ONE metric standing alone, needing its own card frame",MetricCard,value + label (+ hint),don't line up N of them side by side to fake a ribbon
+measure-08,measure,3-4 numbers at the SAME LEVEL reading as ONE continuous ribbon,StatRibbon,"items[] locked to {value,label}",StatGridCard if every cell really is just a number-label pair
+measure-09,measure,"MULTIPLE cells, each more complex than a number-label pair (icon + meter + multiple lines)",StatGridCard,items[] with free-form content: ReactNode,StatRibbon — its items is locked down
+measure-10,measure,"A task that's CURRENTLY RUNNING, ratio known or unknown",ProgressBar / ProgressCircle (atom),value + max + isIndeterminate,ProgressGauge — it has no indeterminate state
+measure-11,measure,"A static, always-determinate MEASUREMENT (storage, battery, score)",ProgressGauge (atom),value + max,ProgressBar — picking wrong makes the screen reader announce the wrong role (meter vs progressbar)
+pair-01,pair,"EXACTLY ONE ""one name, one number"" row (or one standalone TOTAL row)",KeyValueRow (composites/data/KeyValue),"label + value (+ hint, emphasis, divider)",don't .map it into N rows
+pair-02,pair,"MULTIPLE ""one name, one number"" rows of the same kind",KeyValueList,items[] + gap (SeamScale) + divider,Table — columns + a header is overkill for two columns
+pair-03,pair,"N records, each with ≥3 fields that need to LINE UP IN COLUMNS",Table (composites/data/Table),columns[] + items[] + ariaLabel required,KeyValueList — it has no columns/header
+frame-01,frame,Several DIFFERENT-KIND blocks stacked VERTICALLY,StackV,children; gap REQUIRED,"Flex direction=""col"" — StackV already forwards padding and as"
+frame-02,frame,Several DIFFERENT-KIND things on ONE row,StackH,children (+ wrap),Cluster if it's N elements of the same kind
+frame-03,frame,"An ARRAY of SMALL, SAME-KIND elements that wrap on their own (chips, tags, a row of buttons)",Cluster,items[] (key/content); separator turns on the · mark,"StackH — the §13b test decides this, not the eye"
+frame-04,frame,An ARRAY of UNIFORM cells divided by COLUMN COUNT at container-query steps,Grid,items[] (+ span?: 1|2); columns REQUIRED,Cluster if the cells keep their own intrinsic width
+frame-05,frame,A row that needs to CHANGE DISPLAY TYPE by step (narrow grid → flex splitting width evenly),ResponsiveRow,items[] + columns (cap 1|2) + at,"Grid — its display is fixed, can't split evenly"
+frame-06,frame,EXACTLY TWO NAMED SIDES: leading ↔ trailing,Split,slot start / end (no children),"StackH justify=""between"" — only looks alike to the EYE"
+frame-07,frame,TWO PAGE-SIZE regions: a reading column + a 360px STICKY rail from @app-xl,SplitWorkspace,slot main / aside,StackH wrap + two StackV — that fake version is a BUG documented in the file
+frame-08,frame,A region needing a READABLE WIDTH CAP,Container,slot body (children is shorthand),StackV — it has no max-w/mx-auto
+frame-09,frame,An internal flex box for the frame layer,Flex,,NEVER call it from outside components/frames/
+frame-10,frame,Declaring gap,SeamScale,flush · tight · related · grouped · section · page (+ baseline),don't hand-type gap-4/gap-5/gap-1.5 — can't be typed
+frame-11,frame,Declaring padding,InsetScale,flush · snug · cozy · roomy · airy,"don't use SeamScale's vocabulary for padding, and vice versa"
+page-01,page,Opening a ROUTE: breadcrumb · page name · description · trailing button · meta strip,PageHeader (composites/layout/Page),breadcrumb/title/description/actions/meta + size: page|compact,SectionHeader — it has no breadcrumb/meta
+page-02,page,"The heading of a REGION inside a page, needing to step down a level when nested",SectionHeader (composites/layout/Section),eyebrow/title/description/action + level: 1|2|3,PageHeader — count how many appear on one page
+page-03,page,"""A region heading + one content block (+ a closing line)"" stacked vertically at one rhythm",Section,header (props OR node) · body · footer · gap,SectionCard if you need a bordered SURFACE — Section is the frame AROUND a surface
+page-04,page,A CTA row pinned to the bottom of the VIEWPORT,PageBottomBar,"body (leading, usually a price) + actions",the shell's footer — that anchors to a dialog
+page-05,page,"A short self-contained flow that needs to block the screen, width set by size",ModalShell,title+description OR header (node) · body · footer,"DrawerShell — it has placement, not size"
+page-06,page,A LONG panel sliding in from the EDGE of the screen,DrawerShell,same as above + placement + contentClassName,ModalShell — a drawer runs full-bleed along the edge
+page-07,page,"Content that is exactly ""one question + its consequence + two buttons""",FeedbackConfirm (composites/feedback),title/description/confirmLabel/cancelLabel/tone/isConfirming,"ModalShell — but the moment you add ANYTHING beyond those three things, switch to ModalShell"
+async-01,async,"A data-loading region that needs all four branches in ONE place, and I'm at the BLOCK layer",AsyncContent (composites/async),"content (children) · skeleton (node) · emptyContent/errorContent (PROPS, not a node) + isLoading/isEmpty/error",don't use it at the SCREEN layer
+async-02,async,"""Nothing here yet"" + at most one way out",AsyncContentEmpty,"props title/description/icon (component ref)/action, or onRetry+retryLabel",bare FeedbackEmpty if that region is an async region
+async-03,async,"""Fetching data failed, try again""",AsyncContentError,same as above; usually declared as const errorContent: AsyncContentErrorProps = {…},rendering it directly at the screen layer
+async-04,async,An EMPTY HOLE where I want to CHOOSE the size myself (compact one-liner / default / a 404 page with a code),FeedbackEmpty,code/icon/title/description/body/action + size/tone,AsyncContentEmpty if it isn't an async region
+async-05,async,"A toned note sitting INSIDE a surface, CTA is a text label",FeedbackCallout,status/title/description/body + actionLabel+onAction,"bare Alert — Callout already picked tone=""soft"" + builds its own button"
+async-06,async,"Need the exact house alert SURFACE, and decide placement myself",Alert (atom),status/tone/title/description/body/action (node),"don't import { Alert } from ""@heroui/react"""
+async-07,async,A FLOATING result notification,Toast (atom),status (picks its own icon) + title + description + action,Popover — that's a click-to-open panel
+async-08,async,"Just need to say ""running"", no ratio at all",Spinner (atom),size + tone (current follows the parent's text color) + label,isSkeleton if the loading shape should MIRROR the frame about to appear
+async-09,async,Shimmer for the shape a component draws itself,that component's own isSkeleton,"a prop, flowing straight down to the atom",there is no shared skeleton component (§12c)
+form-01,form,A SHORT one-line string,InputText,value + onValueChange,InputSearch if it's a query
+form-02,form,A LONG multi-line block of text,InputTextarea,value + rows,InputText
+form-03,form,"A countable NUMBER, with a stepper",InputNumber,value: number + min/max/step,InputCurrency if it's money
+form-04,form,A MONEY amount the user enters,InputCurrency,value: number + currency,PricePoint — that's a display atom
+form-05,form,A DATE (segments + a calendar popover),InputDate,value: DateValue|null,InputTime
+form-06,form,"A TIME of day, no calendar",InputTime,value: TimeValue|null,InputDate
+form-07,form,"A QUERY string, with results shown SOMEWHERE ELSE",InputSearch,value + onValueChange,SelectCombobox/SearchAutocomplete if you need a dropdown
+form-08,form,"A SECRET string, masked characters + an eye toggle",InputPassword,value,InputText
+form-09,form,A verification code typed one character per box,InputOtp,value: string + length,InputNumber
+form-10,form,An ARRAY of FREE labels the user makes up themselves,InputTags,value: string[],SelectMulti if the set is fixed
+form-11,form,"A FIXED option set, picking EXACTLY ONE, collapsed into a compact trigger",SelectSingle,options[] + value,ChoiceRadioGroup if there are 2-4 choices that need to all stay visible
+form-12,form,"A fixed option set, choosing MULTIPLE",SelectMulti,options[] + value: string[],InputTags if there's no fixed list
+form-13,form,"A long list that's ALREADY on the client, type to filter then pick one",SelectCombobox,options[] + value; react-aria filters on its own,SearchAutocomplete — it does NOT filter
+form-14,form,"Suggestions FETCHED per keystroke, each row has a description, needs a spinner",SearchAutocomplete,inputValue + items[] + onSelect + isLoading; the parent handles filtering/fetching,SelectCombobox — it filters locally on its own
+form-15,form,A BOOLEAN the user checks before submitting,ChoiceCheckbox,isSelected + label,ChoiceSwitch
+form-16,form,"2-5 MUTUALLY EXCLUSIVE choices, all visible at once",ChoiceRadioGroup,options[] + value + groupLabel,ButtonRadioGroup if it's a row of config buttons
+form-17,form,A toggle setting that takes effect IMMEDIATELY,ChoiceSwitch,isSelected + label,ChoiceCheckbox
+form-18,form,"ANY file of any type, I declare the mime + size myself",Dropzone,file + acceptedMimeTypes + maxSizeInBytes + hint,ImageDropzone if it's definitely an image
+form-19,form,"An IMAGE file, the image rules already known in advance",ImageDropzone,onFile + label + hint + icon (component),Dropzone — it makes you re-declare the rules
+form-20,form,A field cluster that needs Enter-to-submit + locking the whole cluster while submitting,Form,body (children) + actions + gap + onSubmit,don't expect it to handle validation
+form-21,form,A long form needing field GROUPS with a title,FormSection,title + description + body,using it as a display card — it has no surface
+form-22,form,"The final button row of a form, needing right-alignment or sticking to a modal's bottom",FormActions,items[] (same shape as ButtonGroup) + align + sticky,ButtonGroup if the button row sits in the middle of the content
+form-23,form,Writing a NEW FORM ATOM,FieldFrame,label/hint/errorMessage + children (control),don't use it at the block/page layer
+button-01,button,EXACTLY ONE action the user clicks to do,Button (atom),label (children forbidden) + prefixIcon/suffixIcon (component) + onPress,ButtonGroup if there are N actions on the same row
+button-02,button,A button with only an icon,Button + isIconOnly,"prefixIcon + ariaLabel (both required), omit label",don't look for Button.Icon — DELETED 2026-07-26
+button-03,button,A row of 2-3 SEPARATE actions side by side (Cancel · Save),ButtonGroup,items[] + size at the CLUSTER level,ButtonRadioGroup if the row carries a SELECTED state
+button-04,button,"A row of CONFIG/FILTER buttons, press-to-SELECT, wraps onto new lines",ButtonRadioGroup,items[] + value/onChange (or values/onToggle) + itemAction,ChoiceRadioGroup if this is a field with a label/error
+button-05,button,"A ROW of same-shaped suggestion buttons (sample-question chips, quick-ask)",ChipButtonList (composites/buttons),items[] + direction: wrap|column,"ButtonGroup — this is a uniform row, not 2-3 different roles"
+button-06,button,A FLOATING round button in the bottom-right corner that opens an overlay,FloatingActionButton,icon (bare) + ariaLabel + onPress,Button isIconOnly — a FAB hardcodes fixed + shadow + z-index
+button-07,button,A box that LOOKS like a field but clicking opens a command palette,InputButtonLike,placeholder + icon + suffix + onPress,InputSearch — this one holds no value at all
+button-08,button,"""See more →"" / ""Continue →"" next to a group heading",LinkSeeMore (atom),label + onPress/href + decorative,"Button — this is a text-link, not a button"
+button-09,button,"EXACTLY ONE way back, in the top-left corner",LinkBack (atom),label or target + onPress,Breadcrumbs if you need the full ancestor trail
+nav-01,nav,"2-5 panels at the SAME LEVEL, tabs only need text (+ icon/count)",Tabs (atom),items[] + selectedKey + ariaLabel,TabsExtended if the tabs don't need their own chrome
+nav-02,nav,"Tabs where EACH tab carries its own surface details (muted tone, hidden label on mobile)",TabsExtended (atom),children = the tree Tabs.ListContainer > Tabs.List > Tabs.Tab,Tabs — TabItem can't carry the caller's three axes
+nav-03,nav,TWO tab groups at either end of one row (+ an action cluster),Toolbar (composites/navigation),leftTabs/rightTabs (data) + leftEnd (node),don't expect a background/border/radius from it — it's a BARE flex row
+nav-04,nav,That tab row LIVES INSIDE a card surface,DoubleTabsCard,same as Toolbar + children is the card body,don't hand-assemble SurfaceCard + Toolbar yourself
+nav-05,nav,"The ANCESTOR chain root → current, clickable back up",Breadcrumbs (atom),items[] + maxItems/collapseOnMobile/collapseFrom,LinkBack if you only need ONE destination to go back to
+nav-06,nav,"A paginated list, TOTAL PAGE COUNT known",Pagination (atom),currentPage + totalPages + siblings,Stepper — that's an ordered flow
+nav-07,nav,"A sequential multi-STEP flow, showing which step you're on",Stepper (composites/navigation),steps[] + currentIndex; onStepPress only on steps ALREADY DONE,Tabs — steps don't switch freely
+nav-08,nav,A single numbered step badge sitting alone inside content,StepBadge (atom),number + state: done|active|muted,Badge — that's an unread count hanging off a corner
+nav-09,nav,A set of separate ACTIONS collapsed into a trigger button,Menu (atom),items[] or sections[] + onAction + triggerLabel,Popover if what opens is a content panel
+nav-10,nav,A secondary content block that only shows on CLICK,Popover (atom),content (node) + heading + triggerLabel,"Tooltip — that's hover, doesn't accept interaction"
+nav-11,nav,A short annotation on HOVER/focus over an existing element,Tooltip (atom),children = TRIGGER + label,Popover — tooltip is max-width 260px
+identity-01,identity,"The face of ONE person, image not guaranteed",Avatar (atom),src + seed/name + icon; fallback chain image→DiceBear→initials→icon,UserCell if you need the whole row of name + handle
+identity-02,identity,MULTIPLE overlapping faces + an overflow count,AvatarGroup (atom),items[] + max + total; size at the CLUSTER level,don't set size on each item (§12d)
+identity-03,identity,An identity ROW for one person in a list (+ a button/chip on the right),UserCell (atom),username + displayName/avatar/handle + trailing,Avatar if all you need is the face
+identity-04,identity,"An image URL that might be missing/broken, needing shimmer + fallback",Image (atom),src + alt + ratio + fallbackSrc,CoverImage if it's definitely a 16:9 cover
+identity-05,identity,"The COVER image of an entity, house-standard frame",CoverImage (atom),src + alt (hardcoded 16:9 + rounded-2xl),Image — CoverImage doesn't accept ratio/fallbackSrc
+identity-06,identity,A tinted square signifying a TYPE/topic,IconTile (atom),icon (component) or src + tone + size,Avatar if it's a human face
+identity-07,identity,A string payload that needs to be phone-scannable,QRCode (atom),data + size + icon,"a bitmap generated by an external CDN, requiring NETWORK access"
+identity-08,identity,The StarCi brand mark,Logo (atom),only className (size + position),don't pass color/variant — there is exactly one color
+identity-09,identity,An unread count / presence dot hanging off the corner of an element,Badge (atom),children (the element it hangs off of) + count/dot + placement,StepBadge — that's a stateful STEP number
+identity-10,identity,"A dividing line between two blocks (or an ""OR"" line)",Divider (atom),label (optional) + orientation,ThreadConnector if it's a curved line connecting avatars
+identity-11,identity,A curved path connecting a parent avatar down to a reply row,ThreadConnector (atom),only className (position); height hardcoded to h-4,don't change it to self-stretch
+identity-12,identity,"A short line that needs a quick copy (a command, an API key)",SnippetIcon (atom),copyString + isCopied (pinned),don't use it inside a multi-line code block — that needs a Toast
+identity-13,identity,"The price of a PACKAGE/TIER, already formatted",PricePoint (atom),amount + original + period + size,InputCurrency — that's an input field
+identity-14,identity,A cluster that is NOT a SurfaceCard and needs a sweeping highlight ring,HighlightCard (composite),children (wraps a whole already-built tree),if what I'm wrapping IS a SurfaceCard ⇒ the isHighlight prop
