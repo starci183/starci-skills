@@ -56,6 +56,22 @@ a `--how` that can be read against the diff. Read a `--why` as "this is what the
 believed at the time", never as "this was verified". If it says a fix is blocked, confirm the block
 still exists before repeating the conclusion.
 
+## Why the ledger is committed rather than ignored
+
+The first cut ignored `debt/`, reasoning that entries name your trees and this skill set is public.
+That got it backwards. A deferral only one machine can see is a deferral the next person
+rediscovers by walking into it — which is the exact failure the whole tool exists to prevent. The
+audience for a debt entry is *somebody else, later*, and an audience of one is no audience.
+
+It is also what makes role-relative paths pay off. They were built so an entry written on one
+machine still resolves on another; ignoring the folder meant no entry ever crossed a machine, and
+that property was never exercised.
+
+The cost is real and worth naming: entries say what is unfinished, in files named out loud, and
+they travel wherever the skill set travels. Write each one as something a stranger may read. A
+single entry that genuinely must not leave the machine can be ignored on its own — turning the
+whole ledger private to hide one line trades the tool for the secret.
+
 ## Why closing keeps the file
 
 A closed entry answers a question an empty folder cannot: was this considered? Deleting it leaves

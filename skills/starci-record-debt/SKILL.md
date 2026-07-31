@@ -1,6 +1,6 @@
 ---
 name: starci-record-debt
-description: Records work that was deliberately left undone — the files, the rule it breaks, and the reason it was deferred — into a per-machine debt folder, and reads it back later. Use this skill whenever a fix is knowingly postponed or a shortcut is knowingly taken: "skip this for now", "leave it, note it down", "we'll do this later", "park it", "record the debt", "what did we defer", "what's still outstanding", "is there anything known-broken here before I change it". Use it also at the START of work on an unfamiliar area, to check whether the odd-looking code in front of you was already weighed and deferred rather than never noticed. Not a bug tracker and not a backlog — an entry needs named files and a stated reason; something with neither is a task, not debt.
+description: Records work that was deliberately left undone — the files, the rule it breaks, and the reason it was deferred — into a shared debt ledger under .claude/debt/, and reads it back later. Use this skill whenever a fix is knowingly postponed or a shortcut is knowingly taken: "skip this for now", "leave it, note it down", "we'll do this later", "park it", "record the debt", "what did we defer", "what's still outstanding", "is there anything known-broken here before I change it". Use it also at the START of work on an unfamiliar area, to check whether the odd-looking code in front of you was already weighed and deferred rather than never noticed. Not a bug tracker and not a backlog — an entry needs named files and a stated reason; something with neither is a task, not debt.
 ---
 
 # Recording debt
@@ -115,10 +115,15 @@ one now.
 | Path | What it is |
 |---|---|
 | `.claude/scripts/record-technical-debt.mjs` | the whole tool |
-| `.claude/debt/<id>.md` | one entry, gitignored, per machine |
+| `.claude/debt/<id>.md` | one entry, committed with the skill set |
 | `README.md` | why this is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-record-debt/test.mjs` |
 
-Entries are gitignored because they name your trees and your unfinished work, and this skill set is
-public. A private workspace can un-ignore `debt/` — that is a one-line change and the format is
-already made for review.
+Entries are **committed**, not ignored. A deferral that only one machine can see is a deferral the
+next person rediscovers the hard way — and the entry is written in role-relative paths precisely so
+it still resolves on somebody else's checkout.
+
+Know what that means before you write one: an entry names real files and says what is unfinished in
+them, and it travels wherever the skill set travels. Write it as something a stranger may read. If a
+particular deferral should not leave the machine, ignore that one file rather than turning the
+ledger private — a ledger nobody shares stops being a ledger.

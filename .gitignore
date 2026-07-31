@@ -5,10 +5,6 @@ context/
 # san test tam, tao roi xoa trong moi lan chay
 .testtmp/
 
-# So no ky thuat, viet boi scripts/record-technical-debt.mjs. Moi ban ghi neu ten cay code
-# va viec con dang do cua MAY nay — repo nay public, nen chung khong len git.
-debt/
-
 # ---- tu 2026-07-31, thu muc nay LA .claude cua may, va repo nay PUBLIC ----
 # Nhung file duoi day la cua MAY, khong phai cua bo skill. Chung roi vao day
 # vi Claude Code doc chung o .claude/, khong phai vi chung thuoc ve repo.
