@@ -80,6 +80,36 @@ That gradient is the architecture made visible. Run
 `scripts/scan-storybook-architecture.mjs` on your own repo — if `className` is as common in your
 blocks as in your atoms, the tiers are folders, not layers.
 
+## Inspection: a name belongs to whoever knows it
+
+A design system needs to be able to point at its own parts — an overlay that badges each rendered
+piece with what it is. That badge needs a name, and **which tier supplies the name is not a
+convention, it follows from what each tier is allowed to know**:
+
+| Tier | The switch | The name |
+|---|---|---|
+| `atom` | takes it | **supplies its own**, hard-coded. It knows what it is — a badge, a chip, a rule |
+| `frame` | takes it | **takes it from the caller**. It has no idea what it is arranging, and that is its defining rule |
+
+The frame half is the same rule as "it never asks what its children are", read from the other
+direction. `StackV` in a card header and `StackV` in a footer are two different parts of a screen,
+and the only thing that can tell them apart is the caller. A frame naming itself would be a frame
+claiming to know its own contents.
+
+The atom half is the same rule as "appearance is a prop, not a class". A caller passing an atom its
+name is a caller describing the atom — the identical failure as passing it `text-red-500`, one
+level over. The atom is the only thing that knows it is a rule and not a spacer.
+
+Both tiers take the **switch**, because whether the badges are on is a property of the session, not
+of the component. The switch travels down; the name does not travel at all.
+
+> **Test:** could a second caller reasonably want a different name for this? For a frame, always —
+> so it takes one. For an atom, never — so it must not.
+
+Two failures this rules out, both invisible without it: an atom that accepts a name lets two callers
+label the same component two ways, and the overlay stops being a map. A frame that hard-codes one
+labels every `StackV` on the page identically, and the overlay stops saying anything.
+
 ## Where a new component goes
 
 Ask in order, stop at the first yes:

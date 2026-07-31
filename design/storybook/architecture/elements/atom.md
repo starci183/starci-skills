@@ -60,18 +60,25 @@ in both directions — it exempts one that should shimmer, and demands a shimmer
 and a wrong exemption is invisible until a row jumps in production. Writing the tag costs one line
 and makes the claim reviewable.
 
-**The width of a shimmer is a named step, never a number.**
+**The width of a shimmer is a fraction of its container, never a fixed number.**
 
 ```ts
-skeletonWidth?: "tiny" | "short" | "medium" | "long"
+/** A subset of AllowedClassName. `w-full` is excluded: a shimmer at full width is a bar, not a hint. */
+export type SkeletonWidth = "w-1/4" | "w-1/3" | "w-1/2" | "w-2/3" | "w-3/4"
 ```
 
-The caller knows what will land there — a count, a word, a phrase, a line. It does not know how
-many rem that is, and a caller writing `w-24` on a skeleton has taken over a shape the atom owns.
-A closed scale keeps the decision with the caller and the measurement with the atom.
+The caller knows roughly how much of the line the real value will fill — a quarter, a half, most of
+it. It does not know how many rem that is on this screen at this breakpoint, and neither does the
+atom: the answer depends on the container, which is why a fixed `w-24` is wrong even when the atom
+writes it.
 
-Height is never passable. The line box is the thing a skeleton exists to preserve, and only the
-atom knows it.
+A fraction is the only form that survives the container changing. It also keeps this scale a subset
+of `AllowedClassName` rather than a second, parallel vocabulary of sizes — an abstract scale like
+`"short" | "long"` would have to be mapped back to real widths somewhere, and that mapping is a
+fixed number wearing a different name.
+
+Height is never passable. The line box is the thing a skeleton exists to preserve, and only the atom
+knows it.
 
 **ATOM-5 · The prop is `classNames: Array<AllowedClassName>`, never `className: string`.**
 
@@ -159,6 +166,29 @@ review.
 Where a `Base` file sits beside a plain name, the `Base` holds the vendor import and the plain name
 is the house version with the vendor's freedom removed. Everything above talks to the plain name, so
 the library underneath can be swapped in one file.
+
+**ATOM-10 · It takes the inspection switch and NOT the part name — it already knows what it is.**
+
+```ts
+showAnatomy?: boolean          // is the inspection overlay on
+// no anatPart — the atom writes its own name
+data-anat-part={showAnatomy ? "Chip" : undefined}
+```
+
+The switch travels down because whether the badges are on is a property of the session. The name
+does not travel at all, because an atom is the one thing in the system that knows it is a rule and
+not a spacer, a chip and not a badge.
+
+A caller passing the name in is a caller describing the atom — the same failure as passing it
+`text-red-500`, one level over, and it fails the same way: two callers label the same component two
+different things, and an overlay meant to be a map of the system becomes a record of what each
+author happened to call it that day.
+
+An atom is the floor. Nothing below it can supply a better answer, so there is nobody to ask.
+
+Contrast with [`frame.md`](frame.md) FRAME-11 — a frame takes both, because it genuinely cannot know
+what it is arranging. Full reasoning in [`../concept.md`](../concept.md) — *a name belongs to
+whoever knows it*.
 
 ## Notes
 
