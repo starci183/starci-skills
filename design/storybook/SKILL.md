@@ -6,13 +6,13 @@ argument-hint: "[tier|component|import|scan] [context]"
 
 # Storybook architecture
 
-Eight tiers, one import direction. The rules here are universal; **the numbers are not** — read
+Seven tiers, one import direction. The rules here are universal; **the numbers are not** — read
 them from the repo you are in.
 
 ## Step 0, before anything else
 
 ```bash
-node scripts/scan.mjs <path-to-repo>
+node .claude/scripts/scan-storybook-architecture.mjs <path-to-repo>
 ```
 
 | What it says | What that means |
@@ -27,12 +27,16 @@ outranks anything written here; the job then is to judge a component against **i
 
 | You are asking | Handler |
 |---|---|
-| what does this repo actually look like | `node scripts/scan.mjs <repo>` |
-| does anything break the direction | `node scripts/scan.mjs <repo> --violations` |
-| which tier does this belong to | `node scripts/search.mjs tier <name>` |
-| can X import Y | `node scripts/search.mjs import <from> <to>` |
+| what does this repo actually look like | `node .claude/scripts/scan-storybook-architecture.mjs <repo>` |
+| does anything break the direction | `node .claude/scripts/scan-storybook-architecture.mjs <repo> --violations` |
+| which tier does this belong to | `node .claude/design/storybook/scripts/search-tier-rules.mjs tier <name>` |
+| can X import Y | `node .claude/design/storybook/scripts/search-tier-rules.mjs import <from> <to>` |
+| what the tiers are, and the className rule | `architecture/concept.md` |
+| one tier in depth | `architecture/elements/<tier>.md` |
+| that tier in a real system | `architecture/examples/<tier>.md` |
 | why a boundary sits where it does | `references/tier-boundaries.md` |
-| what a healthy tree looks like | `references/reference-measurement.md` |
+| which tiers are shared and which are per app | `references/shared-layers.md` |
+| how to read what the scan printed | `references/how-to-read-a-scan.md` |
 | which component a data shape demands | **not this skill** |
 
 Never open a CSV whole. Ask it.
@@ -71,7 +75,7 @@ file sits beside `X`, the `Base` holds the vendor import and the plain name is t
 house version — the rest of the system talks to the plain name, so the vendor can be swapped in one
 file.
 
-**A block importing a vendor component is a missing atom**, not a shortcut. `scan.mjs` counts them.
+**A block importing a vendor component is a missing atom**, not a shortcut. `scan-storybook-architecture.mjs` counts them.
 
 The failure this prevents is specific: some vendors bake styles unlayered, so a utility class
 written at the call site **loses silently** — no error, no warning, the class simply does nothing.
@@ -84,7 +88,6 @@ Ask in order, stop at the first yes:
 | # | Ask | Then |
 |---|---|---|
 | 1 | Does it render a value and nothing else? | `atom` |
-| 2 | Is it a capability with no shape at all? | `behavior` |
 | 3 | Does it only decide direction, seam, alignment? | `frame` |
 | 4 | Does it assemble atoms without knowing any domain? | `composite` |
 | 5 | Does it own domain data and its async decisions? | `block` |
@@ -102,7 +105,7 @@ caller with nowhere to go, and the behaviour ends up hand-rolled at each call si
 | Forbidden | Caught by |
 |---|---|
 | an import against the direction | `scan.mjs --violations` |
-| a block importing a vendor for a shape an atom could own | `scan.mjs`, counted |
+| a block importing a vendor for a shape an atom could own | `scan-storybook-architecture.mjs`, counted |
 | a frame prop that asks what the children are | discipline |
 | a page importing an atom directly | discipline — it usually means a block is missing |
 

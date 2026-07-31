@@ -5,22 +5,22 @@
  * WHY THIS EXISTS
  * Every skill that needs a path asks here instead of writing one down. A skill set shared
  * across projects cannot name a repo or a folder: which trees to use is a per-project answer,
- * and where they sit is a per-machine one. Both live in `.context/workspace.json`, which is
+ * and where they sit is a per-machine one. Both live in `context/workspace.json`, which is
  * gitignored and was measured on the machine that is running right now.
  *
  * The file is a registry — `{ current, projects: { <name>: { fe, be } } }` — and every read
  * here resolves against `current`, so a skill asks for `fe.path` and gets the FE of whatever
- * project this machine is pointed at. Switch with `workspace-setup.mjs --use <name>`.
+ * project this machine is pointed at. Switch with `register-workspace-source.mjs --use <name>`.
  *
- * WHY IT IS A SEPARATE FILE FROM workspace-setup.mjs
+ * WHY IT IS A SEPARATE FILE FROM register-workspace-source.mjs
  * Reading happens constantly and must be cheap and free of side effects. Writing happens once
  * per machine and touches the disk. Keeping them apart means a skill can read the context with
  * no chance of rewriting it, and the read path stays small enough to trust at a glance.
  *
  * USAGE
- *   node scripts/workspace.mjs              everything, laid out for a human
- *   node scripts/workspace.mjs fe.path      one value, bare — safe inside $(...)
- *   node scripts/workspace.mjs --json       the whole record, for another script to parse
+ *   node scripts/read-workspace-context.mjs              everything, laid out for a human
+ *   node scripts/read-workspace-context.mjs fe.path      one value, bare — safe inside $(...)
+ *   node scripts/read-workspace-context.mjs --json       the whole record, for another script to parse
  *
  * EXIT CODES
  *   0  the value (or the record) was printed
@@ -34,15 +34,15 @@ import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-/** Root of this skill set — the folder holding `scripts/` and `.context/`. */
+/** Root of this skill set — the folder holding `scripts/` and `context/`. */
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CONTEXT_FILE = join(REPO, ".context", "workspace.json");
+const CONTEXT_FILE = join(REPO, "context", "workspace.json");
 
 // No context means this machine has never been set up. Say so with the exact command that
 // fixes it, rather than printing an empty record that reads like a valid answer.
 if (!existsSync(CONTEXT_FILE)) {
     console.error("This machine has no workspace context yet.");
-    console.error("Run:  node scripts/workspace-setup.mjs");
+    console.error("Run:  node scripts/register-workspace-source.mjs");
     process.exit(1);
 }
 
@@ -54,12 +54,25 @@ const argv = process.argv.slice(2);
 const project = registry.projects?.[registry.current];
 if (!project) {
     console.error("The workspace context has no current project.");
-    console.error("Run:  node scripts/workspace-setup.mjs --list");
+    console.error("Run:  node scripts/register-workspace-source.mjs --list");
     process.exit(1);
 }
 
-/** What a caller sees: the current project's roles, plus which project answered. */
-const ctx = { ...project, project: registry.current, written_at: registry.written_at };
+/**
+ * What a caller sees: the current project's roles, plus which project answered.
+ *
+ * `design_system` is deliberately NOT per project. One storybook serves every source in the
+ * ledger — a new app does not lack a design system, it borrows the ecosystem's. Keeping it at
+ * the registry level is what stops each project growing its own copy and drifting apart.
+ * `fe.design_system` still means something different and narrower: does THIS project happen to
+ * carry a `.storybook/` folder of its own.
+ */
+const ctx = {
+    ...project,
+    design_system: registry.design_system ?? null,
+    project: registry.current,
+    written_at: registry.written_at,
+};
 
 // ---- the whole record, for another script --------------------------------
 
@@ -112,4 +125,4 @@ for (const tree of ["fe", "be"]) {
 // Which project answered, and when it was measured — a stale record is then visible without
 // having to run --check.
 console.log(`\nproject  ${ctx.project}   recorded ${ctx.written_at}`);
-console.log("one value:  node scripts/workspace.mjs fe.path");
+console.log("one value:  node scripts/read-workspace-context.mjs fe.path");

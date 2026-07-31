@@ -8,12 +8,13 @@ from something that actually broke.
 
 An atom renders one value and the states of that value. It arranges nothing.
 
-The measurement that makes this real: **0 of 47 atoms import any other tier.** Not "rarely" — zero.
+The measurement that makes this real, in the repo this was written against: **no atom imports any
+other tier.** Not "rarely" — zero.
 That is not discipline, it is the definition. The moment an atom arranges children it has become a
 composite, and the only thing left to decide is what to rename it.
 
 Where a `Base` file sits next to a plain name — `ButtonBase` beside `Button`, `ChipBase` beside
-`Chip` — the `Base` holds the HeroUI import and the plain name is the constrained house version.
+`Chip` — the `Base` holds the vendor import and the plain name is the constrained house version.
 The rest of the system talks to the plain name, so the vendor can be swapped in one file.
 
 ## Frame — direction, and nothing about content
@@ -68,17 +69,19 @@ A page importing an atom directly is not illegal, but it is a smell with a speci
 block is missing**. The page needed a shape, no block offered it, so the page reached down two
 tiers and built it inline. That inline shape is invisible to every other screen that will need it.
 
-## HeroUI
+## The vendor
 
-The vendor lives at the bottom: 42 of 47 atoms and 9 of 9 frames touch `@heroui/react`.
+The vendor lives at the bottom. Nearly every atom and frame touches it; nothing above them should.
+Run `scan-storybook-architecture.mjs` for this repo's own counts rather than trusting any number written here — a count in
+a document is a snapshot, and it starts rotting the day after it is taken.
 
-**36 of 159 files at block level and above import it directly.** Each of those is a missing atom,
-not a shortcut — and not a precedent either. When a block imports a vendor component, that
-component's constraints leak into domain code and nothing in the house system can constrain it back.
+**Every file at block level or above that imports a vendor directly is a missing atom**, not a
+shortcut — and not a precedent either. When a block imports a vendor component, that component's
+constraints leak into domain code and nothing in the house system can constrain it back.
 
-The specific failure this causes: HeroUI bakes some styles unlayered, so a Tailwind utility written
-at the call site **loses silently**. No error, no warning, the class simply does nothing. An atom
-that wraps the vendor can encode that; a block that imports it directly cannot.
+The specific failure this causes: some component libraries bake styles unlayered, so a utility
+class written at the call site **loses silently**. No error, no warning, the class simply does
+nothing. An atom that wraps the vendor can encode that; a block that imports it directly cannot.
 
 ## When two tiers both fit
 

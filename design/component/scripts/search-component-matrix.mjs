@@ -134,15 +134,41 @@ if (cmd === "shape") {
     const q = rest.join(" ").toLowerCase().split(/\s+/).filter(Boolean);
     if (!q.length) { console.error("shape needs words: search.mjs shape \"expandable rows\""); process.exit(1); }
 
-    // Score by how many of the asked-for words a row mentions. Deliberately crude: the goal is
-    // to surface a handful of candidates for a human to decide between, not to pick for them.
-    // `dont_choose` is excluded from the haystack on purpose — a row that merely warns against
-    // a word is not a row about that word.
-    const scored = read("matrix")
-        .map((r) => {
-            const hay = `${r.you_have} ${r.choose} ${r.entry_point}`.toLowerCase();
-            return { r, score: q.filter((w) => hay.includes(w)).length };
-        })
+    const rows = read("matrix");
+
+    /**
+     * The words of a row, as whole words. `dont_choose` is left out on purpose — a row that
+     * merely warns against a word is not a row about that word. Whole words rather than
+     * substrings, or "of" matches inside "proof" and every short word matches everything.
+     */
+    const wordsOf = (r) => new Set(`${r.you_have} ${r.choose} ${r.entry_point}`.toLowerCase().match(/[a-z]+/g) ?? []);
+    const bag = rows.map((r) => ({ r, words: wordsOf(r) }));
+
+    // Two filters, both measured rather than listed, because a hand-written stopword list rots
+    // as rows are added:
+    //   - a token of one or two letters is grammar, not a data shape
+    //   - a word a quarter of the rows contain cannot tell those rows apart
+    // Measured on the shipped data: "a" 70%, "the" 37%, "one" 25% — all noise. "paragraph",
+    // "ring" and "tabs" sit at 1-2 rows each and are exactly what a query should turn on.
+    const COMMON = 0.25;
+    const informative = q
+        .filter((w) => w.length > 2)
+        .filter((w) => bag.filter((b) => b.words.has(w)).length < rows.length * COMMON);
+
+    if (!informative.length) {
+        console.log("Every word in that query is either grammar or appears all over the table,");
+        console.log("so none of them can pick a row. Describe the DATA: how many of the thing,");
+        console.log("what each one carries, what stays hidden until asked for.");
+        process.exit(1);
+    }
+
+    // Any informative word matching is enough. A stricter rule was tried and reverted: a query
+    // phrased in full sentences lands only one or two of its words in cells this terse, so
+    // demanding a proportion rejected "one paragraph of author prose" — a shape the table
+    // answers plainly. Candidates are for a human to choose between; the cost of one extra
+    // candidate is a glance, the cost of a missed row is a component invented for no reason.
+    const scored = bag
+        .map(({ r, words }) => ({ r, score: informative.filter((w) => words.has(w)).length }))
         .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);

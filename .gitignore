@@ -1,3 +1,30 @@
 # Per-machine paths and URLs, written by scripts/workspace-setup.mjs.
 # Every machine answers this differently, so the answer never belongs in git.
-.context/
+context/
+
+# san test tam, tao roi xoa trong moi lan chay
+.testtmp/
+
+# So no ky thuat, viet boi scripts/record-technical-debt.mjs. Moi ban ghi neu ten cay code
+# va viec con dang do cua MAY nay — repo nay public, nen chung khong len git.
+debt/
+
+# ---- tu 2026-07-31, thu muc nay LA .claude cua may, va repo nay PUBLIC ----
+# Nhung file duoi day la cua MAY, khong phai cua bo skill. Chung roi vao day
+# vi Claude Code doc chung o .claude/, khong phai vi chung thuoc ve repo.
+
+# danh sach lenh duoc phep chay - lo ra la lo thoi quen lam viec ca may
+settings.local.json
+settings.json
+
+# cau hinh dev server cua tung project
+launch.json
+
+# Claude Code tu tao khi chay
+worktrees/
+todos/
+shell-snapshots/
+statsig/
+projects/
+history.jsonl
+ide/

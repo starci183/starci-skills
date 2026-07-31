@@ -36,7 +36,7 @@ const [cmd, a, b] = process.argv.slice(2);
 if (!cmd || cmd === "tiers") {
     for (const r of read("tiers")) console.log(`${r.tier.padEnd(12)} ${r.owns}`);
     console.log("\nnode scripts/search.mjs tier <name> | import <from> <to>");
-    console.log("For a specific repo's numbers: node scripts/scan.mjs <path-to-repo>");
+    console.log("For a specific repo's numbers: node .claude/scripts/scan-storybook-architecture.mjs <path-to-repo>");
     process.exit(0);
 }
 

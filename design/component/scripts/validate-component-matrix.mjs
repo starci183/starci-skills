@@ -3,7 +3,7 @@
 // a component named in "don't choose" that exists nowhere else — none of these break tsc,
 // and none of them are visible when the table is read as markdown.
 //
-//   node scripts/validate_data.mjs
+//   node scripts/validate-component-matrix.mjs
 //
 // FAIL exits 1. WARN is printed and exits 0 — a warning is a question, not a verdict.
 

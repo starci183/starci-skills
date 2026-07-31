@@ -38,12 +38,12 @@ markdown table this replaced.
 | You are asking | Command |
 |---|---|
 | which component does this shape demand | `search.mjs shape "<words>"` |
-| what are the 15 doors and their deciding tests | `search.mjs` |
+| what are the 15 doors and their deciding tests | `search-tier-rules.mjs` |
 | every case in one section | `search.mjs section <slug>` |
 | one row, in full | `search.mjs row <id>` |
 | what bites in this section | `search.mjs traps <slug>` |
 | is this component the right one — **audit only** | `search.mjs used-by <Name>` |
-| did the data itself break | `node scripts/validate_data.mjs` |
+| did the data itself break | `node scripts/validate-component-matrix.mjs` |
 | why the table is shaped this way | `references/general-rules.md` |
 
 Sections: `surface-card` · `list` · `disclosure` · `text` · `viewer` · `label` · `measure` ·
@@ -87,7 +87,7 @@ site then draws the row slightly differently.
 That is a real outcome, not a failure of searching. It means one of three things, in this order:
 
 1. The shape was described as a picture. Describe the data and search again.
-2. The shape belongs to a section you did not think to look in. `search.mjs` lists all 15.
+2. The shape belongs to a section you did not think to look in. `search-tier-rules.mjs` lists all 15.
 3. The set genuinely has no door for it.
 
 Only in the third case is there a proposal to make, and it is **drawn as a widget for the teacher
@@ -101,8 +101,8 @@ the clothes of a rule.
 | entering from a component name while building | discipline — `used-by` prints the warning itself |
 | `items` whose length is always 1 | discipline; the trap block of `surface-card` |
 | a second label inside a frame that already draws one | discipline |
-| markdown inside a cell the script reads | `validate_data.mjs` |
-| a row whose id drifted from its section | `validate_data.mjs` |
+| markdown inside a cell the script reads | `validate-component-matrix.mjs` |
+| a row whose id drifted from its section | `validate-component-matrix.mjs` |
 | adding a component to the set without the teacher | `boundary` rule, not a script |
 
 When a script fails, fix the data rather than working around the script.

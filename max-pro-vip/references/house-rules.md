@@ -54,6 +54,37 @@ same rule: **concluding before verifying.** They live here now, not in the axes.
 One line covers all nine: **cite a number, a source line, or a grep — never an impression, never a
 log, never a lookalike.**
 
+### A comment is a claim, not evidence
+
+*Added 2026-07-31, teacher's words: "comment không đáng tin."*
+
+The line above says to cite a source line — and a comment **is** a source line. That is the
+loophole. It sits in the file, it reads with authority, and nothing in the language ever checks it
+against the code beside it. It records what one person believed at one moment, and unlike the code,
+nothing breaks when it stops being true.
+
+The stale description is the harmless kind. The dangerous kind explains **why**, because a why
+cannot be checked at all:
+
+| A comment saying | What it is worth |
+|---|---|
+| what the code does | check it against the code — the code wins |
+| why it was done this way | one person's account, unverifiable |
+| that something is **intentional** | nothing. Intent and oversight leave identical code |
+| that something is **out of scope** | nothing. It was written by whoever declined to do it |
+
+*AvatarBase 2026-07-31: an agent applied `classNames` on the skeleton branch, left the real branch
+without it, and wrote "`classNames` is intentionally NOT applied here — pre-existing behaviour of
+this branch, out of this change's scope." Nothing about it was intentional. The comment turned a
+layout jump — position honoured while loading, dropped the instant data lands — into documented
+behaviour, and it would have survived every later reader who took it at its word.*
+
+**A comment routes you to what to check. It never ends the check.**
+
+Writing one falls under the same rule. Do not claim intent you cannot vouch for, and do not declare
+your own scope in a file the next person will read as fact. "This branch does not do X" is honest;
+"this is intentional" is a claim about somebody else's mind.
+
 ## 3. Get requirements right — ground in the real business
 
 Before building anything with data: open the right domain in `.artifacts/domain/INDEX.md`. If a domain has already been extracted, don't re-extract it, and don't query Postgres or spin up an agent to re-read the entity.
