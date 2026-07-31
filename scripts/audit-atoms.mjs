@@ -124,6 +124,14 @@ const allFiles = walk(root);
 const rel = (f) => relative(repo, f).replace(/\\/g, "/");
 
 /** Component names this repo's atoms export — the vocabulary ATOM-5 protects. */
+/**
+ * Drop comments before looking for rendered tags. A JSDoc saying "renders a `ButtonBase` per item"
+ * would otherwise be read as the code doing it — the rule would then fire on files that merely
+ * describe the shape it forbids.
+ */
+const stripBlockComments = (t) =>
+    t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
 const atomNames = new Set();
 for (const f of atomFiles) {
     const text = readFileSync(f, "utf8");
@@ -136,7 +144,7 @@ for (const f of atomFiles) {
     for (const m of text.matchAll(/export\s+(?:const|function|class)\s+([A-Z]\w*)/g)) atomNames.add(m[1]);
 }
 
-const findings = { "ATOM-3": [], "ATOM-4": [], "ATOM-5": [], "ATOM-5-type": [] };
+const findings = { "ATOM-3": [], "ATOM-4": [], "ATOM-5": [], "ATOM-5-type": [], "ATOM-8": [] };
 
 // ---- ATOM-3 · an atom imports no other tier -------------------------------
 
@@ -147,6 +155,59 @@ for (const f of atomFiles) {
     for (const m of text.matchAll(new RegExp(OTHER_TIERS, "g"))) {
         findings["ATOM-3"].push({ file: rel(f), detail: `imports ${m[1]}` });
     }
+}
+
+// ---- ATOM-8 · an atom that renders another atom is a composite -------------
+//
+// ATOM-3 catches an atom reaching to ANOTHER TIER. It cannot catch the commonest version of the
+// same mistake: a `Group` sitting in the same folder as the atom it repeats. `ButtonGroup` renders
+// N `ButtonBase`, imports nothing from outside atoms/, and passes every other gate — while being a
+// composite by every rule that matters.
+//
+// The distinction that makes this checkable: taking `items` is NOT the signal. A vendor tabs or
+// menu is one element whose options are its data, and those are real atoms. Rendering ANOTHER ATOM
+// is the signal — that is placing atoms side by side, which is a composite's whole job.
+
+/** Atom component names, from what the tier exports. Built once, reused below. */
+const renderedAtom = new RegExp(`<(${[...atomNames].join("|")})\\b`, "g");
+
+for (const f of atomFiles) {
+    const text = stripBlockComments(readFileSync(f, "utf8"));
+    const self = f.split(/[\\/]/).pop().replace(/\.tsx?$/, "");
+
+    // REPETITION is the checkable half. An atom rendering another atom ONCE is usually its own
+    // chrome — Alert's close button, Button's pending spinner — and telling that apart from a
+    // genuine composite needs a person. An atom rendering another atom N TIMES FROM A LIST is not
+    // ambiguous: that is placing atoms side by side, which is the definition of the tier above.
+    //
+    // Firing on the single case too would bury the certain findings under judgement calls, and a
+    // gate whose output has to be triaged stops being read.
+    // Only the file's OWN name is exempt. Being in the same folder is NOT a defence once we are
+    // inside a `.map()`: `Chip.tsx` rendering `ChipBase` once is one component split across two
+    // files, but `ChipGroup.tsx` rendering `ChipBase` per item is the arrangement itself — and
+    // both live in `chips/Chip/`. An earlier cut exempted the whole folder and went green on all
+    // four `*Group` files, which are the clearest violations in the tier.
+    const isSelf = (n) => n === self || n.startsWith("_");
+
+    const repeated = new Set();
+    for (const m of text.matchAll(/\.map\(/g)) {
+        // Scan the map callback: from `.map(` to the end of its balanced parens.
+        let depth = 0;
+        let i = m.index + m[0].length - 1;
+        for (; i < text.length; i++) {
+            if (text[i] === "(") depth++;
+            else if (text[i] === ")" && --depth === 0) break;
+        }
+        for (const hit of text.slice(m.index, i).matchAll(renderedAtom)) {
+            if (!isSelf(hit[1])) repeated.add(hit[1]);
+        }
+    }
+    if (!repeated.size) continue;
+
+    findings["ATOM-8"].push({
+        file: rel(f),
+        detail: `renders ${[...repeated].map((n) => `\`${n}\``).join(", ")} once per item — repeating an atom from a list is a composite`,
+    });
 }
 
 // ---- ATOM-4 · every atom exposes isSkeleton -------------------------------
@@ -343,6 +404,7 @@ const RULES = {
     "ATOM-4": "every atom exposes `isSkeleton` — only the atom knows the space its value will occupy",
     "ATOM-5": "`className` on an atom carries POSITION only — appearance is already a prop",
     "ATOM-5-type": "the prop should be `classNames?: Array<AllowedClassName>` — a free string cannot be constrained",
+    "ATOM-8": "an atom that renders ANOTHER atom is a composite — taking `items` is not the signal, rendering an atom is",
 };
 
 let total = 0;
@@ -363,7 +425,7 @@ for (const [rule, list] of Object.entries(findings)) {
 
 if (!only) {
     console.log("Not checked here, because they need judgement rather than parsing:");
-    console.log("  ATOM-1 is it one element · ATOM-2 does it know data · ATOM-6/7/8/9");
+    console.log("  ATOM-1 is it one element · ATOM-2 does it know data · ATOM-6/7/9");
     console.log("  See design/storybook/architecture/elements/atom.md\n");
 }
 

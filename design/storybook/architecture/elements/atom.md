@@ -143,9 +143,20 @@ only that one.
 > Position classes stop making sense — which is why they belong to the caller. Appearance classes
 > would still apply — which is exactly why they must not be passed.
 
-**Migration.** An atom still declaring `className?: string` has the old escape hatch open;
-`scripts/audit-atoms.mjs` lists them, along with any call site currently passing appearance
-through it.
+**There is no `@deprecated` stage.** A prop marked deprecated is a door that is still open with a
+sign on it. Every caller can still walk through, the compiler still allows it, and the only thing
+that changed is that the rule now has a documented exception — which is worse than no rule, because
+a green gate beside a deprecated prop reads as compliance.
+
+It also hides the real cost. Marking `className` deprecated makes the migration look finished when
+the decisions it was blocked on are all still unmade. Deleting the prop is what forces each one to
+be answered, and the answers are the actual work.
+
+So the old prop is deleted in the same change that introduces the new one. If some caller cannot
+move yet, that caller is the finding — record it as debt with the reason, and leave the prop only
+for as long as that entry is open.
+
+`scripts/audit-atoms.mjs` reports any atom still declaring `className?: string`, deprecated or not.
 
 **ATOM-6 · It composes classes for its own appearance.**
 
@@ -156,10 +167,26 @@ finished vocabulary; the class strings behind them are private.
 
 Use this to confirm a placement, not to argue one.
 
-**ATOM-8 · It is in the wrong tier when: it arranges children.**
+**ATOM-8 · It is in the wrong tier when: it arranges children — and rendering another atom is how you spot it.**
 
-Then it is a composite with the wrong name. This is the detection signal — the thing to look for in
-review.
+Then it is a composite with the wrong name.
+
+The reliable signal is not "does it take a list" — plenty of real atoms take `items`, because a
+vendor tabs or menu is **one element** whose options are its data. The signal is: **does it render
+another atom?**
+
+```
+Group renders N × ButtonBase   ⇒ it is placing atoms side by side ⇒ composite
+Tabs  renders one HeroTabs     ⇒ the list is that element's data  ⇒ atom
+```
+
+This catches the case ATOM-3 cannot. ATOM-3 looks for an import from another *tier*, so an atom
+reaching up is caught immediately — but a `Group` sitting in the same folder as the atom it repeats
+imports nothing from anywhere else, and passes. A file named `XGroup.tsx` beside `XBase.tsx` is the
+shape to check first: the suffix is usually the confession.
+
+> **Test:** could you delete this file and hand-write its output from the atom next to it plus one
+> frame? If yes, it was a composite all along.
 
 **ATOM-9 · The vendor stops here.**
 
