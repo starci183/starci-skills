@@ -8,10 +8,18 @@ const config = {
   title: "StarCi · Claude Canon",
   tagline: "The canon, patterns and skills an AI reads to build safely — explore vs enforce.",
   favicon: "img/favicon.ico",
-  url: "https://starci.local",
-  baseUrl: "/",
 
+  // GitHub Pages — https://<org>.github.io/<project>/
+  url: "https://starci183.github.io",
+  baseUrl: "/starci-claude-skills/",
+  organizationName: "starci183",
+  projectName: "starci-claude-skills",
+  trailingSlash: false,
+
+  // The canon uses plain relative .md links and headings not shaped for Docusaurus routing — warn,
+  // do not fail the build, so the site publishes even before every link is Docusaurus-perfect.
   onBrokenLinks: "warn",
+  onBrokenAnchors: "warn",
   markdown: { format: "detect", hooks: { onBrokenMarkdownLinks: "warn" } },
 
   presets: [
