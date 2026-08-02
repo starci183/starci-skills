@@ -15,6 +15,53 @@ The runner is `scripts/runner/test-runner.ts`. It resolves its vocabulary from t
 `canon/fe/explore/registry.mjs` rather than holding a table of its own, so a change to the registry makes
 the tests go out of date loudly — failing everywhere at once — instead of drifting quietly.
 
+## Storybook-first, so the story is the only test surface
+
+This codebase is storybook-first: `enforce/tiers/story.md` requires every atom, frame, composite,
+and block to carry a `BlockAnatomy` story that renders the whole set of a prop's values, one state
+per value, each with the `code` that produced it — "full coverage, per prop", not one value shown and
+the rest assumed. That rule is the reason a separate component test is redundant before it is even
+written: the story already renders the component in every state it can be in, and the runner above
+already re-renders every one of those stories after every commit and measures the box the browser
+produced — the real gap, the real padding, the `data-principles` tokens — against the registry.
+
+Add a component-level test on top of that — React Testing Library, Vitest, whatever the label — and
+it can only do one of two things. Render the same props the story already renders, in which case it
+duplicates the story's `states[]` under a second API that nothing keeps in sync with the first, so
+the two drift and a reader has no way to tell which one is current. Or render props the story does
+not cover, in which case `story.md`'s full-coverage rule is broken, and the fix is to add the missing
+state to the story — where the next reader will actually see it — not to patch the gap in a file nobody
+reading the storymap will ever open.
+
+So: **the FE has one kind of test, and this is it.** Not an omission and not a coverage gap waiting
+to be closed with a unit-test layer — a deliberate refusal to let a second test surface exist that
+could tell a different story than the one in the storybook. The runner proves what the story renders
+actually measures out the way its `data-principles` tokens claim; the source gates under
+`scripts/gates/` (listed below) prove the questions no render can answer at all — an import direction,
+whether a story matches its component, the shape of a story file. Between the two, a design-system
+component is covered without a third layer duplicating either.
+
+### Where genuinely-connected logic would be tested, if it ever needed it
+
+Not every line in the FE app is a presentational component with a story. `canon/fe/sync.md` draws the
+line: the design system holds the presentational half, and the app's own `src/` tree holds a thin
+*connected* twin around it — the fetch, the store slice, the translation. No `data-tier` is ever put
+on that wiring, so there is nothing there for the runner to render or measure, and no `code` state for
+a story to enumerate, because a fetch or a Zustand store is not a rendered tree — it has no box for
+`getComputedStyle` to read.
+
+If a store's own logic — the branch inside `set((state) => …)` in
+`enforce/authoring/state-management.md` §5, a selector, a reducer-like transform — ever grew complex
+enough to need proof separate from the component that calls it, that would be a plain unit test of a
+function: no DOM, no story, no runner, the same shape as any backend unit test. It would not be a
+"component test" and it would not compete with this contract, because it would not be testing a
+rendered box — it would be testing a function that happens to live in `src/hooks/zustand/`. As of this
+writing, no store in that tree has reached that point: every one of them is the plumbing
+`state-management.md` describes — a narrow selector, a direct patch, a per-key accessor — not a
+computation that needs a proof of its own. The boundary is honest rather than absolute: the day a
+store grows a real computation, its test lives beside it as a function test, not as a rewrite of the
+component's story.
+
 ## The three attributes
 
 Three attributes carry the contract, and they do different jobs. Confusing them is the commonest

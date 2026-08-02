@@ -1,9 +1,10 @@
 # `authoring/` — how a line of back-end code is spelled
 
-Seven files, all about the text of the code rather than the design behind it: where a thing lives
-and what it is called, how a failure is represented on its way out, what may accept input and how it
-is guarded, which types are allowed to survive, how configuration and secrets are read, and how
-imports and comments are written. Together they cover the decisions a stranger is most likely to get
+Eight files. Seven are about the text of the code rather than the design behind it: where a thing
+lives and what it is called, how a failure is represented on its way out, what may accept input and
+how it is guarded, which types are allowed to survive, how configuration and secrets are read, and
+how imports and comments are written. The eighth, `testing.md`, is how that code is checked — the
+three kinds of test this backend runs. Together they cover the decisions a stranger is most likely to get
 wrong in the first hour — which folder this belongs in, what to do with the error they just caught,
 and how the line itself is spelled.
 
@@ -28,6 +29,7 @@ each example is what travels.
 | [`config-and-env.md`](config-and-env.md) | that `process.env` is read in exactly one place — the `parseEnv*` helpers in `src/modules/env/utils/parse-env.ts` — so no service or provider touches the environment directly and loses its typing and defaults, and that secrets live behind that same boundary rather than being scattered across the codebase |
 | [`imports-and-format.md`](imports-and-format.md) | that a `.ts` file under `src/**` is formatted the way `eslint.config.mjs` dictates — four-space indent, double quotes, no semicolons, one array element and one argument per line — that imports go through the `@modules` / `@features` aliases in a fixed order, and that eslint, not the root `.prettierrc` (which governs only `apps/**` and `libs/**`), is the single authority `npm run lint` must pass clean |
 | [`comments.md`](comments.md) | that a comment answers WHY the code must be the way it is and never restates WHAT it does, that WHY comments — business constraints, workarounds, non-obvious decisions — are written densely while WHAT comments and commented-out code stay at zero, that an inline `//` sits directly above the line it concerns, and that every comment and JSDoc is written in English |
+| [`testing.md`](testing.md) | the three kinds of backend test — unit (Jest, the unit isolated with its dependencies mocked), e2e (the real app booted against real dependencies in Docker via Testcontainers), and the harness (AI features run with every paid LLM provider overridden to a Claude client on Claude Code OAuth, the non-deterministic output graded by a Claude judge) — what each proves and when to reach for which |
 
 ## Reading order
 
