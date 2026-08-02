@@ -157,7 +157,7 @@ The whole round touched one lookup, one prop, and one widget. It opened no reaso
 Grit is the common one and it is worth naming precisely, because it is the verdict people soften. A
 number typed straight into a class rather than taken from the scale is grit; so is a wrapper added
 around a library entry to nudge its spacing. Both mean the same thing: change it in the set, or do
-not change it at all. The scale, and why each step is the number it is, is `canon/fe/principles.md`;
+not change it at all. The scale, and why each step is the number it is, is `canon/fe/principles/spacing.md`;
 the values a test compares against live in `patterns/fe/patterns.mjs`.
 
 ## A gap is proposed, never enacted

@@ -13,7 +13,7 @@ A rule that lives only in prose decays quietly. A rule that lives only in a scri
 something nobody can argue with, which is worse — people route around a gate they do not
 understand. So each rule lives in both places, once, and `patterns/fe/gates/check-canon-sync.mjs`
 holds the two halves to the same numbers: every pattern in the registry that commits to a pixel
-must have that pixel written down in `canon/fe/principles.md`, in the paragraph that names it.
+must have that pixel written down in `canon/fe/principles/spacing.md`, in the paragraph that names it.
 When somebody widens a seam to make a test pass, the gate says so before the essay and the
 machine have been disagreeing for a month.
 

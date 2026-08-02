@@ -99,7 +99,7 @@ presentational component, however small the word is.
      the icon's meaning changes with state; a status carries a second channel besides colour.
    - *Width* — a shape that changes names the width it changes at, as a prop, on the four container
      steps and nowhere else: `design/storybook/architecture/principles/responsive.md` and
-     `canon/fe/principles.md`. A seam or an inset that has to move moves by its named concept, not
+     `canon/fe/principles/spacing.md`. A seam or an inset that has to move moves by its named concept, not
      by a hand-written class, and `patterns/fe/patterns.mjs` holds what each concept must compute
      to.
 
@@ -146,7 +146,7 @@ back as a finding that matches the work.
 | `canon/fe/architecture.md` | Storybook first, the tiers, and where `className` stops |
 | `canon/fe/authoring/i18n.md` | how a copy fix is spelled, and where it lands |
 | `canon/fe/authoring/styling-tailwind.md` | the paired colour tokens a contrast fix uses |
-| `canon/fe/principles.md` | the named seams, insets and container widths |
+| `canon/fe/principles/spacing.md` | the named seams, insets and container widths |
 | `design/storybook/architecture/principles/responsive.md` | naming the width a shape changes at |
 | `canon/fe/authoring/storybook-stories.md` | how the change is demonstrated before it ships |
 | `patterns/fe/gates/` | the source gates, run before this is called done |

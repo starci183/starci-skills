@@ -148,7 +148,7 @@ Then the gates above, and — when the sync touched spacing, seams or truncation
 run, which measures computed style rather than reading source: `patterns/fe/runner/test-runner.ts`,
 against the vocabulary in `patterns/fe/patterns.mjs`, with the contract explained in
 `canon/fe/testing.md`. Last, open the routes whose call sites moved. A twin can type-check, pass every
-gate, and still be the wrong shell; `canon/fe/principles.md` is what a screen is read against.
+gate, and still be the wrong shell; `canon/fe/principles/spacing.md` is what a screen is read against.
 
 ## When the connected half needs something the API does not have
 

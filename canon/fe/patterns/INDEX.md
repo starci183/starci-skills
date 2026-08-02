@@ -6,7 +6,7 @@ it waits, where a surface lands when it is opened. Most of these were settled on
 screen that got it wrong, and the ruling is written with that case named — which is what lets a reader
 tell whether their case is the same case.
 
-Do not confuse this shelf with `design-principles/`. A principle states a test that applies
+Do not confuse this shelf with `principles/`. A principle states a test that applies
 everywhere; a pattern states a shape that recurs and the anatomy it always has.
 
 | File | Decides |

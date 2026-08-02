@@ -53,7 +53,7 @@ is drawn means rewriting the blueprint.
 | what a page owns | `design/storybook/architecture/elements/page.md` |
 | what a layout shell owns, and what an overlay owns | `design/storybook/architecture/elements/layout.md`, `design/storybook/architecture/elements/overlay.md` |
 | which component a shape of data becomes | `design/component/SKILL.md`, and the "Which component a data shape becomes" section of `canon/fe/architecture.md` |
-| what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/principles.md`, with `patterns/fe/patterns.mjs` as the authority on the values |
+| what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/principles/spacing.md`, with `patterns/fe/patterns.mjs` as the authority on the values |
 | how an async surface is written, and what its loading state owes the reader | `canon/fe/authoring/async-data.md`, `canon/fe/authoring/loading-and-skeleton.md` |
 | how a modal, drawer or toast behaves as code | `canon/fe/authoring/overlay-and-feedback.md` |
 | what already exists to compose with | the design-system folder at `fe.design_system`, read directly |
@@ -62,7 +62,7 @@ Two of those deserve emphasis while sketching. Responsive shape in this codebase
 question, not a viewport question — the same card sits in a full-width page, in a split pane and in
 a narrow drawer, and its shape follows the box it was given. Sketch the narrow form of a surface as
 "this region became narrow", never as "this is the phone". And a shape that changes names the width
-it changes at, from the four named container widths in `canon/fe/principles.md`; "it wraps when it
+it changes at, from the four named container widths in `canon/fe/principles/spacing.md`; "it wraps when it
 gets tight" is not a design decision, it is the absence of one.
 
 When canon does not cover a pattern — and it does not cover persuasion, funnels, or onboarding

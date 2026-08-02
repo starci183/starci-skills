@@ -86,7 +86,7 @@ comparison-table shape a skeleton reference story takes, are
      rows, not one block standing in for many.
    - *Rhythm*: the same seams and insets, declared with the **same** named concept as the node it
      stands in for. A skeleton that declares a different concept from its loaded twin is a jump that
-     is already written down — `canon/fe/principles.md` states this directly, and
+     is already written down — `canon/fe/principles/spacing.md` states this directly, and
      `patterns/fe/patterns.mjs` holds the values.
    - *Shape*: approximate height, width and radius per node, matched by picking the piece that
      corresponds to the real node rather than sizing a bare box by eye.
@@ -140,7 +140,7 @@ has no structure to mirror, that is a layout finding: record it rather than abso
 | `canon/fe/authoring/loading-and-skeleton.md` | how an async state is spelled, with real examples |
 | `canon/fe/authoring/async-data.md` | where the flags come from |
 | `canon/fe/authoring/storybook-stories.md` | how the loading state is demonstrated in a story |
-| `canon/fe/principles.md` | the named seams and insets a mirror must repeat |
+| `canon/fe/principles/spacing.md` | the named seams and insets a mirror must repeat |
 | `canon/fe/architecture.md` | the presentational and connected halves, and what each may know |
 | `patterns/fe/gates/check-skeleton-prop.mjs` | the shimmer prop is `isSkeleton`, everywhere |
 | `patterns/fe/gates/check-story-coverage.mjs` | nothing ships without a story |

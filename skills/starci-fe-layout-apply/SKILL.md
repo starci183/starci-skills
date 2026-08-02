@@ -58,7 +58,7 @@ Then read the canon the build will be graded against, before writing code rather
 | tier, import direction, the presentational and connected split | `canon/fe/architecture.md`, `design/storybook/architecture/split.md` |
 | what a page, a layout shell and an overlay each own | `design/storybook/architecture/elements/page.md`, `design/storybook/architecture/elements/layout.md`, `design/storybook/architecture/elements/overlay.md` |
 | what a story must render, and how the file is spelled | `design/storybook/architecture/story.md`, `canon/fe/authoring/storybook-stories.md` |
-| seams, insets, and the named container widths | `canon/fe/principles.md`, with `patterns/fe/patterns.mjs` as the authority on values |
+| seams, insets, and the named container widths | `canon/fe/principles/spacing.md`, with `patterns/fe/patterns.mjs` as the authority on values |
 | fetching, and what the loading state owes the reader | `canon/fe/authoring/async-data.md`, `canon/fe/authoring/loading-and-skeleton.md` |
 | modal, drawer and toast as code | `canon/fe/authoring/overlay-and-feedback.md` |
 | file placement, prop declaration, class writing, translated strings | `canon/fe/authoring/INDEX.md` and the file it points at |

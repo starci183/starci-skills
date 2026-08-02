@@ -74,7 +74,7 @@ context exits non-zero and prints the command that fixes it.
    ```
 
    The routing for the rest of the tier questions is `design/storybook/SKILL.md`. Two rules ride
-   along: the seam between regions comes from the scale in `canon/fe/principles.md`, never from a
+   along: the seam between regions comes from the scale in `canon/fe/principles/spacing.md`, never from a
    number typed into a class, and a width that changes with the container is named at the width where
    it changes, `design/storybook/architecture/principles/responsive.md`. A gap picked by eye is grit
    even when it happens to land on a step.

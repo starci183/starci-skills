@@ -13,7 +13,7 @@ second source of truth that is wrong the day the first one changes.
 
 The division has a practical test. If a claim can fail a build, it lives in `patterns/`. If it can
 only be argued with, it lives in `canon/`. Where prose has to name a number — the pixel values in
-`canon/fe/principles.md` — the prose says plainly that the registry is authoritative and the prose is
+`canon/fe/principles/spacing.md` — the prose says plainly that the registry is authoritative and the prose is
 the side that is stale.
 
 Paths below are written relative to the canon root, the `.claude/` directory this file sits under.
@@ -25,7 +25,7 @@ Three files carry the reasoning, and they answer three different questions.
 | File | Answers |
 |---|---|
 | [`canon/fe/architecture.md`](fe/architecture.md) | which tier a component belongs to, what it may import, how a data-owning component is split into a presentational twin and a connected twin, and which component a shape of data becomes |
-| [`canon/fe/principles.md`](fe/principles.md) | why a seam or an inset is the number it is — the named layout concepts, in prose, beside the registry that holds their values |
+| [`canon/fe/principles/spacing.md`](fe/principles/spacing.md) | why a seam or an inset is the number it is — the named layout concepts, in prose, beside the registry that holds their values |
 | [`canon/fe/testing.md`](fe/testing.md) | how the contract is checked: `data-tier`, `data-component`, `data-principles`, and the rendered-tree runner that measures computed style |
 
 Those three decide **what** to build. `canon/fe/authoring/` decides **how the resulting code is
@@ -59,7 +59,7 @@ long enough that a copy of its table here would drift from the folder within a m
 | Shelf | Answers |
 |---|---|
 | [`canon/fe/foundations/`](fe/foundations/INDEX.md) | which value out of a deliberately closed scale an element gets: gap, colour token, radius, elevation, breakpoint, z-index, motion, type, sticky offset, scrollbar gutter, and how wide content overflows |
-| [`canon/fe/design-principles/`](fe/design-principles/INDEX.md) | what the interface is allowed to say and do: accent as signal, one primary action, honest persuasion, hover affordance, design restraint, content voice, accessibility, and building for the data that exists |
+| [`canon/fe/principles/`](fe/principles/INDEX.md) | what the interface is allowed to say and do: accent as signal, one primary action, honest persuasion, hover affordance, design restraint, content voice, accessibility, and building for the data that exists |
 | [`canon/fe/layouts/`](fe/layouts/INDEX.md) | which shell a surface gets and how its regions behave — the job-to-shell rule, the shell decision tree, the region vocabulary, responsive and adaptive behaviour, and one file per archetype grounded in a real route |
 | [`canon/fe/patterns/`](fe/patterns/INDEX.md) | the recurring behaviours inside a shell: list anatomy, form flow, the three tiers of loading feedback, empty states, drawers, where a surface lands, and how a progress block is composed |
 

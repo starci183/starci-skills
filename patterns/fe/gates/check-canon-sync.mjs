@@ -5,7 +5,7 @@
  * WHY THIS EXISTS
  * There are two places a number can live. `patterns/fe/patterns.mjs` is the executable one: the
  * test runner measures a rendered node against it, so whatever it says is what the app is held
- * to. `canon/fe/principles.md` is the one a person reads before writing a component, and it is
+ * to. `canon/fe/principles/spacing.md` is the one a person reads before writing a component, and it is
  * the only one anybody quotes in review.
  *
  * Nothing keeps them equal. Someone widens a block seam from 24 to 32 in the registry because a
@@ -50,7 +50,7 @@ const argRoot = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const ROOT = argRoot ? resolve(argRoot) : DEFAULT_ROOT;
 
 const REGISTRY = join(ROOT, "patterns", "fe", "patterns.mjs");
-const CANON = join(ROOT, "canon", "fe", "principles.md");
+const CANON = join(ROOT, "canon", "fe", "principles", "spacing.md");
 
 /** Paths are printed with forward slashes so a message reads the same on every platform. */
 const show = (p) => p.replace(/\\/g, "/");
@@ -75,7 +75,7 @@ if (!existsSync(CANON)) {
     console.log(`  registry  ${show(REGISTRY)}`);
     console.log(`  canon     ${show(CANON)}  does not exist`);
     console.log("\nPixels live in patterns/; the prose that explains them lives in canon/.");
-    console.log("Write canon/fe/principles.md, or point this gate at a root that has one.");
+    console.log("Write canon/fe/principles/spacing.md, or point this gate at a root that has one.");
     process.exit(1);
 }
 

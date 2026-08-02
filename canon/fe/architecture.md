@@ -114,7 +114,7 @@ by whoever called it.
 > classes stop making sense, which is why they belong to the caller. Appearance classes would still
 > apply, which is exactly why they must not be passed.
 
-Spacing has its own vocabulary and its own reasoning; that is `canon/fe/principles.md`.
+Spacing has its own vocabulary and its own reasoning; that is `canon/fe/principles/spacing.md`.
 
 ## The split: a presentational twin and a connected twin
 

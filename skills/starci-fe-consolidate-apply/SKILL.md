@@ -48,7 +48,7 @@ another and place every difference deliberately. Each kind lands somewhere speci
 |---|---|
 | the text or the data shown | a prop — this is the difference the component exists to absorb |
 | colour, weight, size, density | a `tone` · `size` · `variant` owned by the design system, `canon/fe/architecture.md` |
-| the seam or the inset between parts | a named concept from `canon/fe/principles.md`, never a hand-written class |
+| the seam or the inset between parts | a named concept from `canon/fe/principles/spacing.md`, never a hand-written class |
 | where the thing sits in its parent | the position union, `design/storybook/architecture/principles/position.md` |
 | one fetches, the other takes props | the split — the presentational twin is the shared thing, `design/storybook/architecture/split.md` |
 | what happens on interaction, per call site | nothing here: they are two components, and this cluster was wrong |

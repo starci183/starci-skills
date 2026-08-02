@@ -35,7 +35,7 @@ ancestors in the DOM, and no parent can mistype a child's identity or let it dri
 renders; it names **why** a gap or an inset is what it is, so a measurement can be checked against a
 meaning. It is a space-separated list read like `class`, because one element usually makes several
 layout decisions at once — it pads itself and sets the seam between its groups. The concepts and
-their values are `canon/fe/principles.md`.
+their values are `canon/fe/principles/spacing.md`.
 
 Story scaffolding is marked with a tier of `fixture` and deliberately carries no `data-component`.
 That makes it transparent to every check below: never a component that forgot its marker, and never a

@@ -141,7 +141,7 @@ Record anything left unfixed rather than remembering it, through `skills/starci-
 | `patterns/fe/runner/test-runner.ts` | the rendered-tree audit, run after every story |
 | `patterns/fe/patterns.mjs` | the registry the runner resolves every token against |
 | `patterns/fe/gates/` | the source-reading gates, one per rule a file can answer |
-| `canon/fe/principles.md` | what each named seam and inset means, beside its value |
+| `canon/fe/principles/spacing.md` | what each named seam and inset means, beside its value |
 | `canon/fe/architecture.md` | the tiers, the import direction, and emitted identity |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-contract/test.mjs` |

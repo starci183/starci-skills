@@ -104,7 +104,7 @@ requires, with the files it was read from and the day it was measured.
 
 The four container steps, why they are container queries rather than viewport queries, and what a
 responsive value may look like are `design/storybook/architecture/principles/responsive.md` and the
-widths section of `canon/fe/principles.md`. The runner already sweeps ten widths and proves that a
+widths section of `canon/fe/principles/spacing.md`. The runner already sweeps ten widths and proves that a
 frame changes shape only at a named one — `canon/fe/testing.md` — and it also states plainly what it
 cannot prove: that the frame changes at the *right* one of the four.
 
@@ -195,7 +195,7 @@ Anything real but out of scope for this review is recorded rather than carried i
 | `canon/fe/authoring/i18n.md` | how translation is spelled, and what a missing key does |
 | `canon/fe/architecture.md` | which half resolves text, and the Storybook-first law |
 | `canon/fe/authoring/styling-tailwind.md` | the paired colour tokens contrast depends on |
-| `canon/fe/principles.md` | the four container widths, and what a responsive value may be |
+| `canon/fe/principles/spacing.md` | the four container widths, and what a responsive value may be |
 | `design/storybook/architecture/principles/responsive.md` | why the breakpoints are container queries |
 | `canon/fe/testing.md` | what the runner proves, and what it states it cannot |
 | `patterns/fe/gates/` | the source gates to run before grading anything by hand |
