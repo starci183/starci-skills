@@ -40,6 +40,10 @@ const config = {
             "worktrees/**",       // throwaway git worktrees
             "_canon_tmp/**",      // legacy, retired
             "max-pro-vip/**",     // separate system
+            // Skills carry Claude-skill frontmatter (a one-line `description:` with colons and quotes)
+            // that Docusaurus' strict YAML parser rejects. The canon is the book this site renders;
+            // skills stay operational. To publish them too, their frontmatter must be quoted first.
+            "skills/**",
             "README.md",
           ],
         },
