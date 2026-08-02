@@ -39,7 +39,7 @@ is judgement. Before grading anything, run what runs by itself: the source gates
 `patterns/fe/gates/` and the rendered-tree runner `patterns/fe/runner/test-runner.ts`. Between them
 they already own a large share of two of these axes — the gap that is off the scale, the concept
 token nothing can resolve, the responsive switch that fires at a width nobody named, the story that
-does not exist. What each check can and cannot prove is written out in `canon/fe/testing.md`, and it
+does not exist. What each check can and cannot prove is written out in `canon/fe/enforce/testing.md`, and it
 is worth reading the *cannot* column, because that column is this skill's territory.
 
 What is left over is the whole point: **the failure that type-checks, lints clean, passes every gate
@@ -54,8 +54,8 @@ than the English it was measured against. No machine reports any of those, and n
 
 How translation is spelled — `next-intl`, the hook, the key shape, the ban on a hard-coded
 user-facing string, ICU rather than concatenation, and the rule that both catalogs mirror each other
-— is `canon/fe/authoring/i18n.md`. Where the resolution happens is a tier question and lives in
-`canon/fe/architecture.md`: text is data, so the connected half resolves it and the presentational
+— is `canon/fe/enforce/authoring/i18n.md`. Where the resolution happens is a tier question and lives in
+`canon/fe/enforce/tiers/architecture.md`: text is data, so the connected half resolves it and the presentational
 half is handed the finished string. A presentational file that calls a translation hook has reached
 past its props, and it can no longer be rendered in a story.
 
@@ -69,7 +69,7 @@ Read the catalogs, not the screen. The findings that only a reader of the real s
 - Labels in one group drifting apart in length and grammatical shape, so a row of peers stops
   reading as a row of peers.
 - Emoji, and shouting capitals, in any string a user reads.
-- A locale ternary choosing between two UI strings in the component. `canon/fe/authoring/i18n.md`
+- A locale ternary choosing between two UI strings in the component. `canon/fe/enforce/authoring/i18n.md`
   records this as an anti-pattern that still exists in older route files and must not spread.
 
 ### Accessibility
@@ -77,7 +77,7 @@ Read the catalogs, not the screen. The findings that only a reader of the real s
 There is no accessibility page in `canon/` yet, and pretending otherwise would be worse than saying
 so. Two parts of this axis are already grounded, and the rest is graded against the criteria below.
 
-Contrast is grounded, in `canon/fe/authoring/styling-tailwind.md`: a background and its foreground
+Contrast is grounded, in `canon/fe/enforce/authoring/styling-tailwind.md`: a background and its foreground
 travel together as a pair, and the vendor's own paired variant is preferred over a hand-mixed tint
 because its contrast is already tuned. That file carries the anchor that makes the rule real — a
 hand-mixed translucent hue over a matching text colour, which failed contrast, in the source, with
@@ -103,9 +103,9 @@ requires, with the files it was read from and the day it was measured.
 ### Width
 
 The four container steps, why they are container queries rather than viewport queries, and what a
-responsive value may look like are `design/storybook/architecture/principles/responsive.md` and the
-widths section of `canon/fe/principles/spacing.md`. The runner already sweeps ten widths and proves that a
-frame changes shape only at a named one — `canon/fe/testing.md` — and it also states plainly what it
+responsive value may look like are `canon/fe/enforce/spacing/responsive.md` and the
+widths section of `canon/fe/enforce/spacing/overview.md`. The runner already sweeps ten widths and proves that a
+frame changes shape only at a named one — `canon/fe/enforce/testing.md` — and it also states plainly what it
 cannot prove: that the frame changes at the *right* one of the four.
 
 So the human half of this axis is content, not geometry:
@@ -182,7 +182,7 @@ It will not change code, and it will not open the fix "since it was right there"
 a component or a state to make a surface easier to grade — a surface missing a state is a finding,
 routed to the build lane that owns it. It will not re-report what a gate already fails, and it will
 not grade a component that has no story: a component that reached the app without ever being a
-component and a story in the design system is a `canon/fe/architecture.md` violation, and reporting
+component and a story in the design system is a `canon/fe/enforce/tiers/architecture.md` violation, and reporting
 it as a copy finding buries the real problem.
 
 Anything real but out of scope for this review is recorded rather than carried in someone's head —
@@ -192,12 +192,12 @@ Anything real but out of scope for this review is recorded rather than carried i
 
 | Path | Holds |
 |---|---|
-| `canon/fe/authoring/i18n.md` | how translation is spelled, and what a missing key does |
-| `canon/fe/architecture.md` | which half resolves text, and the Storybook-first law |
-| `canon/fe/authoring/styling-tailwind.md` | the paired colour tokens contrast depends on |
-| `canon/fe/principles/spacing.md` | the four container widths, and what a responsive value may be |
-| `design/storybook/architecture/principles/responsive.md` | why the breakpoints are container queries |
-| `canon/fe/testing.md` | what the runner proves, and what it states it cannot |
+| `canon/fe/enforce/authoring/i18n.md` | how translation is spelled, and what a missing key does |
+| `canon/fe/enforce/tiers/architecture.md` | which half resolves text, and the Storybook-first law |
+| `canon/fe/enforce/authoring/styling-tailwind.md` | the paired colour tokens contrast depends on |
+| `canon/fe/enforce/spacing/overview.md` | the four container widths, and what a responsive value may be |
+| `canon/fe/enforce/spacing/responsive.md` | why the breakpoints are container queries |
+| `canon/fe/enforce/testing.md` | what the runner proves, and what it states it cannot |
 | `patterns/fe/gates/` | the source gates to run before grading anything by hand |
 | `patterns/fe/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
 | `skills/starci-fe-review-apply` | the half that builds the approved findings |

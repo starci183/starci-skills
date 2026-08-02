@@ -46,7 +46,7 @@ place, and one place does not feel like a component.
 It always becomes several places. The house rule that no component reaches the app without first
 being a component and a story in the design system is not a formality here: a reference link has
 states — resolved, unresolvable, loading — and the app-local version invariably implements the first
-one only, which is precisely the dead-link defect the finding was raised about. `canon/fe/architecture.md`
+one only, which is precisely the dead-link defect the finding was raised about. `canon/fe/enforce/tiers/architecture.md`
 carries the reasoning; `patterns/fe/gates/check-story-coverage.mjs` holds the line.
 
 ## Why verification is per surface and includes a click-through

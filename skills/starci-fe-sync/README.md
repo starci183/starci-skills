@@ -24,7 +24,7 @@ gate can see.
 It is not a policy choice. A connected file calls SWR, reads a Zustand slice and resolves text through
 `next-intl` — three sources of truth a story cannot supply. Put that file in the design system and it
 becomes the one component the design system cannot render, which is the same problem the split was
-invented to remove (`design/storybook/architecture/split.md`).
+invented to remove (`canon/fe/enforce/tiers/split.md`).
 
 So the sync produces exactly one new file, and only for the tiers where data enters. For an atom or a
 composite it produces none: the mirror is the whole job, and adding a connected half there would be an

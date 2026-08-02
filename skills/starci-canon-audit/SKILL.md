@@ -41,7 +41,7 @@ Application code is read and never edited. The subject of this audit is the cano
 | Axis | What it looks like | How it is decided |
 |---|---|---|
 | dead cross-reference | a canon file sends a reader to `canon/…`, `patterns/…` or `design/…` that is not there | mechanically — the path either resolves or it does not |
-| wrong shelf | a rule about how code is spelled sitting in `canon/fe/architecture.md`; a `.md` that makes an argument sitting under `patterns/` | by reading, against the division stated in `canon/INDEX.md` |
+| wrong shelf | a rule about how code is spelled sitting in `canon/fe/enforce/tiers/architecture.md`; a `.md` that makes an argument sitting under `patterns/` | by reading, against the division stated in `canon/INDEX.md` |
 | stale against source | a rule describing a tier, component, entity, route or token that no longer exists under that name | grep the real tree; never from memory |
 | duplication | two canon files stating the same rule, so a later edit fixes one of them | by reading |
 | coverage gap | a part of the source that no rule covers at all | grep the real tree, plus the coverage gates |
@@ -79,7 +79,7 @@ whole list feel like noise.
 
 1c. Sweep the cross-references and the index by hand or by script: every `canon/…`, `patterns/…`
 and `design/…` path named inside the canon must resolve, and the tables in `canon/INDEX.md` must
-match what `canon/fe/`, `canon/fe/authoring/` and `canon/be/*/` actually hold.
+match what `canon/fe/`, `canon/fe/enforce/authoring/` and `canon/be/*/` actually hold.
 
 1d. Where a coverage question is already machine-decidable, let the machine decide it rather than
 arguing it in prose: `patterns/fe/gates/check-story-coverage.mjs` for the Storybook-first law,
@@ -87,7 +87,7 @@ arguing it in prose: `patterns/fe/gates/check-story-coverage.mjs` for the Storyb
 rules that are supposed to have a written counterpart.
 
 **2. Read one shelf at a time, grounded.** Take the shelves separately — `canon/fe/` top level,
-`canon/fe/authoring/`, `canon/be/contracts/`, `canon/be/modules/`, `canon/be/conventions/` — and
+`canon/fe/enforce/authoring/`, `canon/be/contracts/`, `canon/be/modules/`, `canon/be/conventions/` — and
 for each, read the files against the real tree. Wrong-shelf, semantic staleness, duplication and
 coverage gaps are decided here.
 
@@ -129,7 +129,7 @@ Debt that is found and consciously not paid belongs in the ledger, not in the re
 ## Storybook-first is one of the things audited
 
 No component reaches the app that was never a component and a story in the design-system folder
-first. The reasoning is in `canon/fe/architecture.md`; the enforcement is
+first. The reasoning is in `canon/fe/enforce/tiers/architecture.md`; the enforcement is
 `patterns/fe/gates/check-story-coverage.mjs`. On the coverage axis this cuts both ways, and both
 are findings: a component in the app with no story behind it, and a tier or a pattern that the
 design-system folder now carries with no rule in `canon/fe/` describing when to reach for it.
@@ -161,6 +161,6 @@ design-system folder now carries with no rule in `canon/fe/` describing when to 
 | `patterns/verify.mjs` | the mechanical half — anchors and counts, per role |
 | `patterns/fe/patterns.mjs` · `patterns/fe/runner/test-runner.ts` | the registry and the rendered-tree runner a canon number must agree with |
 | `patterns/fe/gates/check-canon-sync.mjs` | holds the prose and the registry to the same values |
-| `design/storybook/` · `design/component/` | the longer material the canon was consolidated from, and the right place to argue a boundary rather than apply one |
+| `canon/fe/` · `canon/fe/explore/component/` | the longer material the canon was consolidated from, and the right place to argue a boundary rather than apply one |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-canon-audit/test.mjs` |

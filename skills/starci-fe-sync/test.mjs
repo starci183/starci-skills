@@ -54,8 +54,8 @@ t.expect(
     { code: 0, out: cited.join("\n") },
     {
         has: [
-            "canon/fe/architecture.md",
-            "design/storybook/architecture/split.md",
+            "canon/fe/enforce/tiers/architecture.md",
+            "canon/fe/enforce/tiers/split.md",
             "patterns/fe/gates/check-src-sb-import.mjs",
         ],
     },

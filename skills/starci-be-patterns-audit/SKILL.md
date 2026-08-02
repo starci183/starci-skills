@@ -152,7 +152,7 @@ independent sources and belongs in the canon-writing lane, not in an audit repor
 
 The front end is not in scope, and its central law is enforced elsewhere: no component reaches the
 app that was never a component and a story in the design-system folder first — the reasoning sits in
-`canon/fe/architecture.md`, the enforcement in `patterns/fe/gates/check-story-coverage.mjs`, and
+`canon/fe/enforce/tiers/architecture.md`, the enforcement in `patterns/fe/gates/check-story-coverage.mjs`, and
 neither is this skill's business.
 
 ## When this runs wide

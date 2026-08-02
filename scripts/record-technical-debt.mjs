@@ -111,10 +111,14 @@ function fail(message, ...extra) {
  * own notes, and there is nothing here that needs it.
  */
 function parseEntry(text, id) {
-    const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    // `\r?\n`, not `\n`. Git on Windows checks these files out with CRLF endings, so a parser
+    // anchored to bare `\n` matched nothing, `.filter(Boolean)` dropped every entry, and `list`
+    // printed "No debt recorded on this machine" over a folder holding twelve of them. Silent,
+    // and it reads as a clean slate — the worst way for a ledger to fail.
+    const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
     if (!match) return null;
     const meta = { id };
-    for (const line of match[1].split("\n")) {
+    for (const line of match[1].split(/\r?\n/)) {
         const at = line.indexOf(":");
         if (at === -1) continue;
         const key = line.slice(0, at).trim();

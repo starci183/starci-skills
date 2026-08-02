@@ -46,7 +46,7 @@ inline. All three are gone:
 |---|---|
 | a literal repository path | `node .claude/scripts/read-workspace-context.mjs fe.path` |
 | a `debug` prop to freeze the loading branch | the story, plus a throttled reload for the app |
-| rule text copied from the canon | citations to `canon/fe/authoring/loading-and-skeleton.md` and the gates |
+| rule text copied from the canon | citations to `canon/fe/enforce/authoring/loading-and-skeleton.md` and the gates |
 
 The last one is the substantive change. The original restated the formula, the mirror rule and the
 piece-picking rule in its own words, so there were two versions of each and no way to tell which was

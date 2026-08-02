@@ -20,11 +20,11 @@ if (!existsSync(root)) {
     console.log(`No .storybook/components in ${repo}.`);
     console.log("");
     console.log("This repo has no tier architecture of its own yet. Two ways forward:");
-    console.log("  - it is a new repo    -> adopt the tiers in design/storybook/data/tiers.csv as they stand");
+    console.log("  - it is a new repo    -> adopt the tiers in patterns/fe/data/tiers.csv as they stand");
     console.log("  - it has components elsewhere -> point this script at that folder instead");
     console.log("");
     console.log("How to read a scan once you have one:");
-    console.log("  design/storybook/references/how-to-read-a-scan.md");
+    console.log("  canon/fe/enforce/tiers/references/how-to-read-a-scan.md");
     process.exit(0);
 }
 

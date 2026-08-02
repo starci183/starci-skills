@@ -1,6 +1,6 @@
 ---
 name: starci-fe-story-audit-block
-description: Decides which library entry one shape of data demands — you arrive holding a single block (a component name, a cropped screenshot, a Storybook story id, or a sentence describing a feature), and it reads the shape out of the back-end code, looks it up in the component matrix, and draws the candidates as widgets instead of listing them in prose. Use it whenever exactly one block is on the table: "audit this card", "what component for this", "is this an accordion or a list", "this block looks wrong", "sai rules", "dựng cái card này", "build the findings block", or a feature sentence like "this is the table-booking part". Use it too when nothing in the set answers the shape, because the outcome then is a proposed entry drawn for a person to rule on rather than a component invented on the spot. Not for arranging several blocks across a page, an overlay, or a route — that is starci-fe-story-audit-composition; not for deciding which tier a component belongs to, which is the tier material under design/storybook.
+description: Decides which library entry one shape of data demands — you arrive holding a single block (a component name, a cropped screenshot, a Storybook story id, or a sentence describing a feature), and it reads the shape out of the back-end code, looks it up in the component matrix, and draws the candidates as widgets instead of listing them in prose. Use it whenever exactly one block is on the table: "audit this card", "what component for this", "is this an accordion or a list", "this block looks wrong", "sai rules", "dựng cái card này", "build the findings block", or a feature sentence like "this is the table-booking part". Use it too when nothing in the set answers the shape, because the outcome then is a proposed entry drawn for a person to rule on rather than a component invented on the spot. Not for arranging several blocks across a page, an overlay, or a route — that is starci-fe-story-audit-composition; not for deciding which tier a component belongs to, which is the tier material under canon/fe/storybook.md.
 ---
 
 # Auditing a block
@@ -33,7 +33,7 @@ if hiding followed from length. It does not, and an agent following it reached t
 conclusion by noticing that nothing in the data said "hidden" — correctly. The rule was asserting a
 reading behaviour the data never carried.
 
-The reasoning behind the lookup itself lives in `canon/fe/architecture.md`, under *Which component a
+The reasoning behind the lookup itself lives in `canon/fe/enforce/tiers/architecture.md`, under *Which component a
 data shape becomes*. Do not restate it here; open it when a row is close but not obviously right.
 
 ## Three inputs, none optional
@@ -76,21 +76,21 @@ A missing context exits non-zero and prints the command that fixes it; registeri
 
    2b. The cardinality and the timing: one record or an array, how many at typical load, which parts
    arrive late. A field that resolves after the first paint is a state, and states are part of the
-   shape — see `canon/fe/authoring/async-data.md` and
-   `canon/fe/authoring/loading-and-skeleton.md`.
+   shape — see `canon/fe/enforce/authoring/async-data.md` and
+   `canon/fe/enforce/authoring/loading-and-skeleton.md`.
 
 3. **Look the shape up.** Describe the data in your own words, never the picture:
 
    ```bash
-   node .claude/design/component/scripts/search-component-matrix.mjs shape "an array of rows where each row hides a body"
+   node .claude/scripts/search-component-matrix.mjs shape "an array of rows where each row hides a body"
    ```
 
-   Never open `design/component/data/matrix.csv` whole, and never enter by a component name you
+   Never open `canon/fe/explore/component/data/matrix.csv` whole, and never enter by a component name you
    already have in mind — reading the table backwards is how the wrong shell survives a review, and a
    wrong shell makes every correct detail inside it worthless. The routing for the other questions the
-   table answers, and the fifteen sections it is divided into, are in `design/component/SKILL.md`;
-   what bites inside a section is `design/component/references/traps.md`; why the table is shaped this
-   way is `design/component/references/general-rules.md`. Write down every candidate the lookup
+   table answers, and the fifteen sections it is divided into, are in `canon/fe/explore/component/`;
+   what bites inside a section is `canon/fe/explore/component/references/traps.md`; why the table is shaped this
+   way is `canon/fe/explore/component/references/general-rules.md`. Write down every candidate the lookup
    returns, not only the first.
 
 4. **Draw the candidates as widgets. Never ask in prose which one to use.**
@@ -157,7 +157,7 @@ The whole round touched one lookup, one prop, and one widget. It opened no reaso
 Grit is the common one and it is worth naming precisely, because it is the verdict people soften. A
 number typed straight into a class rather than taken from the scale is grit; so is a wrapper added
 around a library entry to nudge its spacing. Both mean the same thing: change it in the set, or do
-not change it at all. The scale, and why each step is the number it is, is `canon/fe/principles/spacing.md`;
+not change it at all. The scale, and why each step is the number it is, is `canon/fe/enforce/spacing/overview.md`;
 the values a test compares against live in `patterns/fe/patterns.mjs`.
 
 ## A gap is proposed, never enacted
@@ -167,8 +167,8 @@ state set, its skeleton. A person decides whether it enters the set. Two entries
 job is also a gap — propose the merge, do not merge on your own authority.
 
 A proposed entry is the one case that earns the expensive reading. Open the tier material in
-`design/storybook/architecture/elements/block.md` for what a block may own, and the closed sets under
-`design/storybook/architecture/principles/` for the scales it may use, before drawing it. That cost
+`canon/fe/enforce/tiers/block.md` for what a block may own, and the closed sets under
+`canon/fe/enforce/spacing/` for the scales it may use, before drawing it. That cost
 is deliberate: a wrong entry is wrong on every screen that ever uses it, whereas a wrong block is
 wrong once.
 
@@ -180,9 +180,9 @@ That bar, and how to write the rule that follows, is `canon/HOW-TO-WRITE.md`.
 
 **No component reaches the app that was never a component and a story in the design-system folder
 first.** An entry that skipped it has no state matrix anybody can read, which means the state set you
-drew in step 4 exists only in the widget. The reasoning is in `canon/fe/architecture.md`; how a story
-file is spelled is `canon/fe/authoring/storybook-stories.md`; what a story has to render is
-`design/storybook/architecture/story.md`. It is not left to discipline —
+drew in step 4 exists only in the widget. The reasoning is in `canon/fe/enforce/tiers/architecture.md`; how a story
+file is spelled is `canon/fe/enforce/authoring/storybook-stories.md`; what a story has to render is
+`canon/fe/enforce/tiers/story.md`. It is not left to discipline —
 `patterns/fe/gates/check-story-coverage.mjs` requires a story at the mirror path,
 `patterns/fe/gates/check-doc-parity.mjs` requires the component's leading spec block and its story's
 to be identical, and `patterns/fe/gates/check-one-instance-per-state.mjs` requires each state to be
@@ -197,7 +197,7 @@ the same picture can both be correct at different values because each is anchore
 Check the viewport before trusting any measurement. With the document hidden or the width at zero,
 every rectangle comes back zero and healthy code looks exactly like broken code. The rendered-tree
 runner that does this properly, after every story, is `patterns/fe/runner/test-runner.ts`, and the
-contract it reads off the DOM is `canon/fe/testing.md`.
+contract it reads off the DOM is `canon/fe/enforce/testing.md`.
 
 A comment is a claim, not evidence. It sits in the file, it reads with authority, and nothing in the
 language ever checks it against the code beside it — least of all a comment saying that something is

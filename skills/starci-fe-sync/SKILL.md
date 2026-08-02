@@ -1,6 +1,6 @@
 ---
 name: starci-fe-sync
-description: Mirrors a component out of the design-system folder — where it was authored, storied and gated — into the app's own `src` tree as a twin, and writes the connected half on the app side: the wrapper that holds the request, the store slice and the translation, and renders the presentational file through `@/components/*` rather than `@sb-components/*`. Reach for it when a design-system component has to start doing real work in the app, when the app is reaching into the design system to get one, or when a component changed shape upstream and the app copy stayed behind: "wire this card to real data", "bring the storybook block into the app", "connect this block to SWR", "the twin is missing", "why is src importing @sb-components", "dựng trang X", "sửa layout", "component này có story rồi mà app chưa dùng", "tạo twin cho block này". Not for authoring the component or its story in the first place — that happens in the design system, before anything is synced — and not for deciding which component a shape of data becomes, which is the lookup in `design/component/`. Registering the two roots is `starci-setup-workspace-fe`.
+description: Mirrors a component out of the design-system folder — where it was authored, storied and gated — into the app's own `src` tree as a twin, and writes the connected half on the app side: the wrapper that holds the request, the store slice and the translation, and renders the presentational file through `@/components/*` rather than `@sb-components/*`. Reach for it when a design-system component has to start doing real work in the app, when the app is reaching into the design system to get one, or when a component changed shape upstream and the app copy stayed behind: "wire this card to real data", "bring the storybook block into the app", "connect this block to SWR", "the twin is missing", "why is src importing @sb-components", "dựng trang X", "sửa layout", "component này có story rồi mà app chưa dùng", "tạo twin cho block này". Not for authoring the component or its story in the first place — that happens in the design system, before anything is synced — and not for deciding which component a shape of data becomes, which is the lookup in `canon/fe/explore/component/`. Registering the two roots is `starci-setup-workspace-fe`.
 ---
 
 # Syncing a design-system component into the app
@@ -8,8 +8,8 @@ description: Mirrors a component out of the design-system folder — where it wa
 A component is authored where it can be seen: in the design-system folder, beside a story that puts
 its states side by side, under gates that read both. It is used where it cannot be seen: in the app,
 against a live server, a session, a locale. Those are two different jobs, and the file that does both
-at once can be rendered in neither place honestly — `canon/fe/architecture.md` sets out why, and
-`design/storybook/architecture/split.md` works the divide out in full.
+at once can be rendered in neither place honestly — `canon/fe/enforce/tiers/architecture.md` sets out why, and
+`canon/fe/enforce/tiers/split.md` works the divide out in full.
 
 So the app does not import the design system. It carries a **twin**: the same presentational file,
 mirrored, plus a connected file that only the app can write. The sync runs one way. The design system
@@ -62,16 +62,16 @@ node .claude/patterns/fe/gates/check-story-coverage.mjs
 - **2a.** Decide the tier from what the file *knows*, not from the folder it sits in. A component that
   takes `items`, `title`, `onPress` is vocabulary; one that takes an entity, or an id it intends to
   resolve, is a block whatever the path says. The tier table and the deciding signals are in
-  `canon/fe/architecture.md`.
+  `canon/fe/enforce/tiers/architecture.md`.
 - **2b.** List, in words, what the connected half will have to supply: which query or facade hook,
   which store slice, which translation keys. Writing that list first is what keeps the connected file
   from growing a second job. If a key does not exist yet in both message catalogs, it is part of this
-  change — `canon/fe/authoring/i18n.md`.
+  change — `canon/fe/enforce/authoring/i18n.md`.
 
 **3. Mirror the presentational file.** Copy it to the same sub-path under `src/components/`, then
 rewrite its imports: every `@sb-components/` becomes `@/components/`, and the repeated folder segment
 collapses, because a component folder in the app is reached through its `index.tsx`
-(`canon/fe/authoring/structure-and-naming.md`). Change nothing else. A diff that also improves the
+(`canon/fe/enforce/authoring/structure-and-naming.md`). Change nothing else. A diff that also improves the
 component is a diff nobody can review, and the improvement belongs upstream where the story would
 have shown it.
 
@@ -79,16 +79,16 @@ have shown it.
 the request and derives the status, resolves the text, and renders the presentational export with
 already-resolved props:
 
-- the request through the SWR and facade-hook layering in `canon/fe/authoring/async-data.md` — a
+- the request through the SWR and facade-hook layering in `canon/fe/enforce/authoring/async-data.md` — a
   component never reaches the module layer;
 - loading, error and mutating flags taken from the hook rather than mirrored into a `useState`, which
   is the same file's rule and the one most often broken by hand;
-- store reads by selector, per `canon/fe/authoring/state-management.md`;
+- store reads by selector, per `canon/fe/enforce/authoring/state-management.md`;
 - text through `next-intl`, resolved here and passed down as strings.
 
 The order of the async switch is fixed and belongs to the presentational half: error, then loading,
 then empty, then content. The connected half decides *what the status is*; it does not re-decide what
-to render. `canon/fe/authoring/loading-and-skeleton.md` spells the states out.
+to render. `canon/fe/enforce/authoring/loading-and-skeleton.md` spells the states out.
 
 A presentational parent composes **connected** children — `_Screen` renders `Block`, never `_Block`.
 Threading a child's data through its parent is the prop-drilling the tiers exist to prevent.
@@ -142,13 +142,13 @@ npx eslint . --max-warnings=0
 ```
 
 Lint is not advisory here — formatting is decided by ESLint and the pre-commit gate runs it at
-`--max-warnings=0` (`canon/fe/authoring/imports-and-format.md`).
+`--max-warnings=0` (`canon/fe/enforce/authoring/imports-and-format.md`).
 
 Then the gates above, and — when the sync touched spacing, seams or truncation — the rendered-tree
 run, which measures computed style rather than reading source: `patterns/fe/runner/test-runner.ts`,
 against the vocabulary in `patterns/fe/patterns.mjs`, with the contract explained in
-`canon/fe/testing.md`. Last, open the routes whose call sites moved. A twin can type-check, pass every
-gate, and still be the wrong shell; `canon/fe/principles/spacing.md` is what a screen is read against.
+`canon/fe/enforce/testing.md`. Last, open the routes whose call sites moved. A twin can type-check, pass every
+gate, and still be the wrong shell; `canon/fe/enforce/spacing/overview.md` is what a screen is read against.
 
 ## When the connected half needs something the API does not have
 
@@ -164,10 +164,10 @@ lives. Until the field exists, the honest move is to record the gap rather than 
 - **Putting `t()` in the presentational half** because the string was right there. That file can no
   longer be rendered from a story with no locale, which was the entire point of splitting it.
 - **A connected half that also draws.** If it composes classes or lays anything out, a composite is
-  missing. `canon/fe/architecture.md` states why a block takes no `className`.
+  missing. `canon/fe/enforce/tiers/architecture.md` states why a block takes no `className`.
 - **Syncing a component nobody picked.** Which component a shape of data becomes is a lookup, entered
-  from the data and read rightward: `design/component/data/matrix.csv` and
-  `design/component/data/sections.csv`. Reading backward from a name you already had in mind is how a
+  from the data and read rightward: `canon/fe/explore/component/data/matrix.csv` and
+  `canon/fe/explore/component/data/sections.csv`. Reading backward from a name you already had in mind is how a
   type-valid, gate-green, wrong shell survives review.
 - **Half a migration.** Two spellings of one component in one app is the state this skill exists to
   end, not a stage it is allowed to stop in.
@@ -176,9 +176,9 @@ lives. Until the field exists, the honest move is to record the gap rather than 
 
 | Path | What it is |
 |---|---|
-| `canon/fe/architecture.md` | the tiers, the import direction, the split |
-| `design/storybook/architecture/split.md` | the two files, worked out in full |
-| `design/storybook/architecture/story.md` | what the story upstream has to be |
+| `canon/fe/enforce/tiers/architecture.md` | the tiers, the import direction, the split |
+| `canon/fe/enforce/tiers/split.md` | the two files, worked out in full |
+| `canon/fe/enforce/tiers/story.md` | what the story upstream has to be |
 | `patterns/fe/gates/` | the gates that hold each line |
 | `.claude/scripts/read-workspace-context.mjs` | where the two roots actually are |
 | `test.mjs` | `node .claude/skills/starci-fe-sync/test.mjs` |

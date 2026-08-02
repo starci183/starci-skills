@@ -33,7 +33,7 @@ a known failure:
 tree that no longer exists, and the next scan re-raises what was already handled or misses what was
 quietly changed.
 
-**A class on a block to correct its appearance.** `canon/fe/architecture.md` explains the mechanism
+**A class on a block to correct its appearance.** `canon/fe/enforce/tiers/architecture.md` explains the mechanism
 better than a summary would: the escape hatch produces an undocumented variant living at one call
 site, and five of those is five files nobody can find. Dropping one tier is more work in the moment
 and the only version that other screens inherit.

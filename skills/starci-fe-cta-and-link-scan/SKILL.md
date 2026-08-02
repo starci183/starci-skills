@@ -52,7 +52,7 @@ demos. "Nothing here yet" with no link to where content gets made is the single 
 finding this scan produces.
 
 Enumerate the full state set before grading anything. The states a component is obliged to render
-are the same ones its story must show — [`design/storybook/architecture/story.md`](../../design/storybook/architecture/story.md)
+are the same ones its story must show — [`canon/fe/enforce/tiers/story.md`](../../canon/fe/enforce/tiers/story.md)
 — so an existing story is the fastest inventory of what a surface can become, and a state the story
 omits is worth a look on its own.
 
@@ -164,7 +164,7 @@ states are preserved, and anything already done drops out. That is what makes th
 Some findings cannot be fixed by editing the app. Turning a plain-text mention into a real reference
 link, when no such component exists, is not a copy change — it is a new component, and **no component
 reaches the app that was never a component and a story in the design-system folder first**
-([`canon/fe/architecture.md`](../../canon/fe/architecture.md), enforced by
+([`canon/fe/enforce/tiers/architecture.md`](../../canon/fe/enforce/tiers/architecture.md), enforced by
 [`patterns/fe/gates/check-story-coverage.mjs`](../../patterns/fe/gates/check-story-coverage.mjs)).
 
 Say so in the proposal. A finding priced as a one-line copy edit that actually needs a component and

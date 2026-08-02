@@ -36,7 +36,7 @@ That reading is only available when you can see which lane went red and how broa
 ## What is cited and what is not
 
 Nothing in the body restates a rule. The five audits, the attribute table, the hard-versus-
-information split and the honest limits are `canon/fe/testing.md`, and the body points at it rather
+information split and the honest limits are `canon/fe/enforce/testing.md`, and the body points at it rather
 than paraphrasing, because a paraphrase of a rule is a second source of truth that is wrong the day
 the first one changes. What the body adds is the part canon does not carry: the operational
 sequence, the working-directory trap, and a triage order for reading findings.

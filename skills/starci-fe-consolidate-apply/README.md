@@ -24,7 +24,7 @@ The failure that produces is specific: the sixth call site needs a variant, has 
 either invents one or copies the component. The consolidation then reproduces the duplication it was
 built to remove, one tier higher up and harder to see.
 
-`canon/fe/architecture.md` states the law and this file does not restate it — the point of writing it
+`canon/fe/enforce/tiers/architecture.md` states the law and this file does not restate it — the point of writing it
 here is only that this skill has a standing temptation to skip it, since the component already exists
 in five copies and writing a story for it feels like paperwork.
 
@@ -48,7 +48,7 @@ They are blind in different directions, and each is worthless against the other'
 
 `tsc` proves the wiring and nothing about the shape: a block that forwards its props and draws nothing
 compiles perfectly. The source gates prove the shape of the files and can be fooled by a string that
-merely looks like markup — `canon/fe/testing.md` records roughly ten false readings from one session
+merely looks like markup — `canon/fe/enforce/testing.md` records roughly ten false readings from one session
 of that kind of gate. The runner measures the boxes the browser produced and cannot see an import
 direction at all.
 

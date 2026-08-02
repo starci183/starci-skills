@@ -13,7 +13,7 @@ is a rewrite that never gets scheduled. Author them first, in the design system,
 into what a page is supposed to be — an arrangement.
 
 That is the law this phase exists to keep, and canon states it without qualification in
-`canon/fe/architecture.md`:
+`canon/fe/enforce/tiers/architecture.md`:
 **No component reaches the app that was never a component and a story in the design-system folder first.**
 
 The second shape is the unit. A proposal is applied whole, not block by block, because the flow's
@@ -55,13 +55,13 @@ Then read the canon the build will be graded against, before writing code rather
 
 | For | Read |
 |---|---|
-| tier, import direction, the presentational and connected split | `canon/fe/architecture.md`, `design/storybook/architecture/split.md` |
-| what a page, a layout shell and an overlay each own | `design/storybook/architecture/elements/page.md`, `design/storybook/architecture/elements/layout.md`, `design/storybook/architecture/elements/overlay.md` |
-| what a story must render, and how the file is spelled | `design/storybook/architecture/story.md`, `canon/fe/authoring/storybook-stories.md` |
-| seams, insets, and the named container widths | `canon/fe/principles/spacing.md`, with `patterns/fe/patterns.mjs` as the authority on values |
-| fetching, and what the loading state owes the reader | `canon/fe/authoring/async-data.md`, `canon/fe/authoring/loading-and-skeleton.md` |
-| modal, drawer and toast as code | `canon/fe/authoring/overlay-and-feedback.md` |
-| file placement, prop declaration, class writing, translated strings | `canon/fe/authoring/INDEX.md` and the file it points at |
+| tier, import direction, the presentational and connected split | `canon/fe/enforce/tiers/architecture.md`, `canon/fe/enforce/tiers/split.md` |
+| what a page, a layout shell and an overlay each own | `canon/fe/enforce/tiers/page.md`, `canon/fe/enforce/tiers/layout.md`, `canon/fe/enforce/tiers/overlay.md` |
+| what a story must render, and how the file is spelled | `canon/fe/enforce/tiers/story.md`, `canon/fe/enforce/authoring/storybook-stories.md` |
+| seams, insets, and the named container widths | `canon/fe/enforce/spacing/overview.md`, with `patterns/fe/patterns.mjs` as the authority on values |
+| fetching, and what the loading state owes the reader | `canon/fe/enforce/authoring/async-data.md`, `canon/fe/enforce/authoring/loading-and-skeleton.md` |
+| modal, drawer and toast as code | `canon/fe/enforce/authoring/overlay-and-feedback.md` |
+| file placement, prop declaration, class writing, translated strings | `canon/fe/enforce/authoring/INDEX.md` and the file it points at |
 | anything on the back end | `canon/be/INDEX.md` |
 
 ## 3. Write the implementation spec before touching code
@@ -85,7 +85,7 @@ half-built surfaces is the most expensive ordering mistake available here.
 author each one there as a component and a story at the tier the proposal named — the story being a
 storymap rather than a demo: one prop per leaf, every value of that prop rendered, each state
 carrying the sentence that says when to reach for it. Which component a shape of data becomes is
-`design/component/SKILL.md`, not a fresh judgement. Run the gates on each component as it lands
+`canon/fe/explore/component/`, not a fresh judgement. Run the gates on each component as it lands
 instead of saving them all for the end; a tier mistake found after five components have been built
 on top of it is five rewrites.
 
@@ -117,7 +117,7 @@ A green build is not a working surface, and the two failures look nothing alike.
    the design-system tree instead of its own twin.
 3. The rendered-tree runner, `patterns/fe/runner/test-runner.ts`, which measures computed style
    against the registry after every story. What it checks and how to read a failure is
-   `canon/fe/testing.md`.
+   `canon/fe/enforce/testing.md`.
 4. The app itself, walked along the proposal's verify plan — the whole flow, and every state in the
    matrix, not the happy path. Capture what you saw.
 5. When the back end was touched, the back end at runtime: run the action, read the log, and

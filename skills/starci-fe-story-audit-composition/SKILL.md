@@ -1,6 +1,6 @@
 ---
 name: starci-fe-story-audit-composition
-description: Decides what arrangement a volume of data forces — you arrive holding a whole page, overlay, route or layout rather than one component, and it counts the records from the data layer, derives how many regions there are and which of them shrink, draws the workable arrangements as widgets, and then hands each settled region to the block lane. Use it whenever the question is how things sit together: "how should this page be arranged", "this screen feels crowded", "should this be a drawer or a modal", "where does this block go", "build the booking page", "dựng trang X", "sửa layout", "màn hình này chật quá", a full-screen screenshot rather than a cropped one, or any brief describing a whole feature instead of a single component. Not for judging one block on its own or picking which component fills a region — that is starci-fe-story-audit-block; not for deciding which tier a component belongs to, which is the tier material under design/storybook.
+description: Decides what arrangement a volume of data forces — you arrive holding a whole page, overlay, route or layout rather than one component, and it counts the records from the data layer, derives how many regions there are and which of them shrink, draws the workable arrangements as widgets, and then hands each settled region to the block lane. Use it whenever the question is how things sit together: "how should this page be arranged", "this screen feels crowded", "should this be a drawer or a modal", "where does this block go", "build the booking page", "dựng trang X", "sửa layout", "màn hình này chật quá", a full-screen screenshot rather than a cropped one, or any brief describing a whole feature instead of a single component. Not for judging one block on its own or picking which component fills a region — that is starci-fe-story-audit-block; not for deciding which tier a component belongs to, which is the tier material under canon/fe/storybook.md.
 ---
 
 # Auditing a composition
@@ -22,10 +22,10 @@ Two screens with the same volume share an arrangement, and that is the only reas
 ever match; two screens that merely belong to the same product are not evidence of anything.
 
 The arrangement is not a taste call and not a template borrowed from a screen you liked. What a shell
-around a route may own, and what it may never own, is `design/storybook/architecture/elements/layout.md`;
-the reusable shapes below it are `design/storybook/architecture/elements/composite.md`; a route's own
-tier is `design/storybook/architecture/elements/page.md`; and an overlay is a tier of its own with its
-own constraints, `design/storybook/architecture/elements/overlay.md`.
+around a route may own, and what it may never own, is `canon/fe/enforce/tiers/layout.md`;
+the reusable shapes below it are `canon/fe/enforce/tiers/composite.md`; a route's own
+tier is `canon/fe/enforce/tiers/page.md`; and an overlay is a tier of its own with its
+own constraints, `canon/fe/enforce/tiers/overlay.md`.
 
 ## Three inputs, none optional
 
@@ -63,20 +63,20 @@ context exits non-zero and prints the command that fixes it.
 
    2b. Count the regions: how many the feature really has, which are optional, which are empty for a
    new account, and which arrive after the first paint. An async region is a region — see
-   `canon/fe/authoring/async-data.md` and `canon/fe/authoring/loading-and-skeleton.md` — and a region
+   `canon/fe/enforce/authoring/async-data.md` and `canon/fe/enforce/authoring/loading-and-skeleton.md` — and a region
    that is empty for most users changes the arrangement more than a region that is merely long.
 
 3. **Derive the arrangement from that count, then go looking for it.** The tier the arrangement lands
    in decides what it is allowed to own, and that is a lookup rather than an opinion:
 
    ```bash
-   node .claude/design/storybook/scripts/search-tier-rules.mjs tier layout
+   node .claude/scripts/search-tier-rules.mjs tier layout
    ```
 
-   The routing for the rest of the tier questions is `design/storybook/SKILL.md`. Two rules ride
-   along: the seam between regions comes from the scale in `canon/fe/principles/spacing.md`, never from a
+   The routing for the rest of the tier questions is `canon/fe/storybook.md`. Two rules ride
+   along: the seam between regions comes from the scale in `canon/fe/enforce/spacing/overview.md`, never from a
    number typed into a class, and a width that changes with the container is named at the width where
-   it changes, `design/storybook/architecture/principles/responsive.md`. A gap picked by eye is grit
+   it changes, `canon/fe/enforce/spacing/responsive.md`. A gap picked by eye is grit
    even when it happens to land on a step.
 
 4. **Draw the arrangements as widgets. Never ask in prose which layout to use.**
@@ -121,7 +121,7 @@ with no visible defect until somebody measured. The fix was a real arrangement w
 breakpoint, and the lesson became a written rule rather than a fixed screen.
 
 **Reflect.** There was no responsive material at all while this was shipping. That absence is why
-`design/storybook/architecture/principles/responsive.md` exists now — written after its traps had
+`canon/fe/enforce/spacing/responsive.md` exists now — written after its traps had
 already bitten twice.
 
 ## Verdicts
@@ -149,15 +149,15 @@ and how to write the rule that follows, is `canon/HOW-TO-WRITE.md`.
 If you find yourself choosing between two components, stop: you crossed the line. Hand the region
 over. The modal-or-drawer question stays here because it is an arrangement question — how much room
 the content needs and whether the route underneath survives — and how the resulting code is spelled
-once decided is `canon/fe/authoring/overlay-and-feedback.md`.
+once decided is `canon/fe/enforce/authoring/overlay-and-feedback.md`.
 
 ## Storybook first, without exception
 
 **No component reaches the app that was never a component and a story in the design-system folder
 first**, and an arrangement is a component. A layout with no story has no state matrix anybody can
 read, which means the empty region and the narrow width you drew in step 4 exist only in the widget.
-The reasoning is `canon/fe/architecture.md`, what a story has to render is
-`design/storybook/architecture/story.md`, and the line is held by
+The reasoning is `canon/fe/enforce/tiers/architecture.md`, what a story has to render is
+`canon/fe/enforce/tiers/story.md`, and the line is held by
 `patterns/fe/gates/check-story-coverage.mjs` rather than by discipline.
 
 ## Measure, do not look
@@ -167,7 +167,7 @@ record count.
 
 Spacing comes from a measurement, not from a look. The rendered-tree runner
 `patterns/fe/runner/test-runner.ts` measures the computed box against the registry in
-`patterns/fe/patterns.mjs`, and the contract it reads off the DOM is `canon/fe/testing.md`; the
+`patterns/fe/patterns.mjs`, and the contract it reads off the DOM is `canon/fe/enforce/testing.md`; the
 source-reading half is `patterns/fe/gates/check-seams.mjs` and
 `patterns/fe/gates/check-pattern-coverage.mjs`. Check the viewport before trusting any measurement:
 with the document hidden or the width at zero, every rectangle comes back zero and healthy code looks

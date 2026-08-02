@@ -62,8 +62,8 @@ function pair(name, { registry = REGISTRY, canon = AGREE }) {
         writeFileSync(join(root, "patterns", "fe", "patterns.mjs"), registry);
     }
     if (canon !== null) {
-        mkdirSync(join(root, "canon", "fe"), { recursive: true });
-        writeFileSync(join(root, "canon", "fe", "principles.md"), canon);
+        mkdirSync(join(root, "canon", "fe", "enforce", "spacing"), { recursive: true });
+        writeFileSync(join(root, "canon", "fe", "enforce", "spacing", "overview.md"), canon);
     }
     return t.run(GATE, [root]);
 }
@@ -124,7 +124,7 @@ try {
     // trace from an import learns nothing about what to write.
     t.expect("no canon at all exits 1 naming the path it looked for",
         pair("nocanon", { canon: null }),
-        { exit: 1, has: ["canon/fe/principles/spacing.md", "does not exist", "prose that explains them lives in canon/"] });
+        { exit: 1, has: ["canon/fe/enforce/spacing/overview.md", "does not exist", "prose that explains them lives in canon/"] });
 
     t.expect("no registry at all exits 1 naming the path it looked for",
         pair("noregistry", { registry: null }),

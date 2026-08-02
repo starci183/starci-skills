@@ -49,20 +49,20 @@ is drawn means rewriting the blueprint.
 
 | Question in front of you | Where it is already answered |
 |---|---|
-| which tier a surface or a piece of it belongs to, and what it may import | `canon/fe/architecture.md` |
-| what a page owns | `design/storybook/architecture/elements/page.md` |
-| what a layout shell owns, and what an overlay owns | `design/storybook/architecture/elements/layout.md`, `design/storybook/architecture/elements/overlay.md` |
-| which component a shape of data becomes | `design/component/SKILL.md`, and the "Which component a data shape becomes" section of `canon/fe/architecture.md` |
-| what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/principles/spacing.md`, with `patterns/fe/patterns.mjs` as the authority on the values |
-| how an async surface is written, and what its loading state owes the reader | `canon/fe/authoring/async-data.md`, `canon/fe/authoring/loading-and-skeleton.md` |
-| how a modal, drawer or toast behaves as code | `canon/fe/authoring/overlay-and-feedback.md` |
+| which tier a surface or a piece of it belongs to, and what it may import | `canon/fe/enforce/tiers/architecture.md` |
+| what a page owns | `canon/fe/enforce/tiers/page.md` |
+| what a layout shell owns, and what an overlay owns | `canon/fe/enforce/tiers/layout.md`, `canon/fe/enforce/tiers/overlay.md` |
+| which component a shape of data becomes | `canon/fe/explore/component/`, and the "Which component a data shape becomes" section of `canon/fe/enforce/tiers/architecture.md` |
+| what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/enforce/spacing/overview.md`, with `patterns/fe/patterns.mjs` as the authority on the values |
+| how an async surface is written, and what its loading state owes the reader | `canon/fe/enforce/authoring/async-data.md`, `canon/fe/enforce/authoring/loading-and-skeleton.md` |
+| how a modal, drawer or toast behaves as code | `canon/fe/enforce/authoring/overlay-and-feedback.md` |
 | what already exists to compose with | the design-system folder at `fe.design_system`, read directly |
 
 Two of those deserve emphasis while sketching. Responsive shape in this codebase is a **container**
 question, not a viewport question — the same card sits in a full-width page, in a split pane and in
 a narrow drawer, and its shape follows the box it was given. Sketch the narrow form of a surface as
 "this region became narrow", never as "this is the phone". And a shape that changes names the width
-it changes at, from the four named container widths in `canon/fe/principles/spacing.md`; "it wraps when it
+it changes at, from the four named container widths in `canon/fe/enforce/spacing/overview.md`; "it wraps when it
 gets tight" is not a design decision, it is the absence of one.
 
 When canon does not cover a pattern — and it does not cover persuasion, funnels, or onboarding
@@ -98,7 +98,7 @@ nothing yet, exactly one, the ordinary many, more than fits, mixed or partially 
 loading, and failed. Each one changes which region matters, and at least one of them usually reveals
 that the chosen shell was wrong. These are not optional later: the build is graded on them by
 `patterns/fe/gates/check-one-instance-per-state.mjs` and by the rendered-tree runner described in
-`canon/fe/testing.md`, so a state left out of the proposal is a state somebody has to design during
+`canon/fe/enforce/testing.md`, so a state left out of the proposal is a state somebody has to design during
 a build.
 
 **5. Put the conversion lens through every state.** Canon says nothing about this, so the judgement

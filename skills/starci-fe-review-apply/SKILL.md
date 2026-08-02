@@ -49,21 +49,21 @@ Two rules decide this, and between them they answer most of the "where do I put 
 before they are asked.
 
 **Storybook first, without exception.** No component reaches the app that was never a component and
-a story in the design system first — `canon/fe/architecture.md`. A review fix never gives birth to a
+a story in the design system first — `canon/fe/enforce/tiers/architecture.md`. A review fix never gives birth to a
 component at a call site. If the honest fix is a piece that does not exist yet, this skill stops and
 hands the work to the build lane; the fix that stays here is the one that lands on a piece already
 there.
 
 **`className` stops at the vocabulary.** An atom, a frame and a composite take a class from their
-caller; a block does not, and a page composes none — also `canon/fe/architecture.md`. So an
+caller; a block does not, and a page composes none — also `canon/fe/enforce/tiers/architecture.md`. So an
 appearance fix aimed at a block is a fix one tier down, in the composite or the atom, where every
 other screen inherits it. A class squeezed onto a block to correct its look is the exact escape
 hatch the tier rule exists to close, and it produces an undocumented variant that only that call
 site knows about.
 
 Text is the third case and follows the same logic from the other side. Translation is data, so it is
-resolved in the connected half and handed down as a finished string — `canon/fe/architecture.md`,
-with the spelling in `canon/fe/authoring/i18n.md`. A copy fix therefore lands in the catalogs and,
+resolved in the connected half and handed down as a finished string — `canon/fe/enforce/tiers/architecture.md`,
+with the spelling in `canon/fe/enforce/authoring/i18n.md`. A copy fix therefore lands in the catalogs and,
 where the key itself is wrong, in the connected file. It never lands as a literal in a
 presentational component, however small the word is.
 
@@ -84,7 +84,7 @@ presentational component, however small the word is.
 3. **Make the change in the design system first, then let the app see it.** Where a component and a
    story exist, the story is where the change is made and looked at: it is the only place the states
    sit side by side with no server. How a story is written is
-   `canon/fe/authoring/storybook-stories.md`; that it exists at all is gated by
+   `canon/fe/enforce/authoring/storybook-stories.md`; that it exists at all is gated by
    `patterns/fe/gates/check-story-coverage.mjs`, and that its spec block still matches the
    component's by `patterns/fe/gates/check-doc-parity.mjs`.
 
@@ -92,20 +92,20 @@ presentational component, however small the word is.
    - *Copy* — the key exists in both catalogs and they mirror each other, interpolation is ICU in
      the JSON rather than concatenation in the component, and the Vietnamese reads as something a
      person would say rather than as the English sentence with the words replaced. All of this is
-     `canon/fe/authoring/i18n.md`.
+     `canon/fe/enforce/authoring/i18n.md`.
    - *Accessibility* — a colour pair comes from the paired tokens in
-     `canon/fe/authoring/styling-tailwind.md` rather than a hand-mixed tint; a focus ring is
+     `canon/fe/enforce/authoring/styling-tailwind.md` rather than a hand-mixed tint; a focus ring is
      distinct from the hover style; an icon-only control's label names the action and changes when
      the icon's meaning changes with state; a status carries a second channel besides colour.
    - *Width* — a shape that changes names the width it changes at, as a prop, on the four container
-     steps and nowhere else: `design/storybook/architecture/principles/responsive.md` and
-     `canon/fe/principles/spacing.md`. A seam or an inset that has to move moves by its named concept, not
+     steps and nowhere else: `canon/fe/enforce/spacing/responsive.md` and
+     `canon/fe/enforce/spacing/overview.md`. A seam or an inset that has to move moves by its named concept, not
      by a hand-written class, and `patterns/fe/patterns.mjs` holds what each concept must compute
      to.
 
 5. **Prove it, on the axis you touched.** Type-check and lint, then run the contract: the source
    gates in `patterns/fe/gates/` and the rendered-tree runner `patterns/fe/runner/test-runner.ts`,
-   whose reach and limits are `canon/fe/testing.md`. Then look, because the runner does not read:
+   whose reach and limits are `canon/fe/enforce/testing.md`. Then look, because the runner does not read:
    a copy fix is read in both locales; an accessibility fix is tabbed to with a keyboard and its
    contrast measured; a width fix is resized through the four steps with real strings in both
    languages, not fixture text. A fix nobody watched work is a fix nobody knows works.
@@ -143,12 +143,12 @@ back as a finding that matches the work.
 | Path | Holds |
 |---|---|
 | `skills/starci-fe-review-scan` | the half that decides, and writes the ledger this one reads |
-| `canon/fe/architecture.md` | Storybook first, the tiers, and where `className` stops |
-| `canon/fe/authoring/i18n.md` | how a copy fix is spelled, and where it lands |
-| `canon/fe/authoring/styling-tailwind.md` | the paired colour tokens a contrast fix uses |
-| `canon/fe/principles/spacing.md` | the named seams, insets and container widths |
-| `design/storybook/architecture/principles/responsive.md` | naming the width a shape changes at |
-| `canon/fe/authoring/storybook-stories.md` | how the change is demonstrated before it ships |
+| `canon/fe/enforce/tiers/architecture.md` | Storybook first, the tiers, and where `className` stops |
+| `canon/fe/enforce/authoring/i18n.md` | how a copy fix is spelled, and where it lands |
+| `canon/fe/enforce/authoring/styling-tailwind.md` | the paired colour tokens a contrast fix uses |
+| `canon/fe/enforce/spacing/overview.md` | the named seams, insets and container widths |
+| `canon/fe/enforce/spacing/responsive.md` | naming the width a shape changes at |
+| `canon/fe/enforce/authoring/storybook-stories.md` | how the change is demonstrated before it ships |
 | `patterns/fe/gates/` | the source gates, run before this is called done |
 | `patterns/fe/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
 | `skills/starci-record-debt` | where a deliberate deferral goes |

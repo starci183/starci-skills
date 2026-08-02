@@ -75,7 +75,7 @@ shared tier under an app — the one move that quietly ends the sharing.
 
 Keep the import direction downward in whatever you add. `scan.mjs --violations` names any file
 that breaks it, and why each boundary sits where it does is in
-`design/storybook/references/tier-boundaries.md`.
+`canon/fe/enforce/tiers/references/tier-boundaries.md`.
 
 ## After fetching
 

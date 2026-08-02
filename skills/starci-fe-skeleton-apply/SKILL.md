@@ -46,9 +46,9 @@ that re-labels the shimmer flag, because a subtree that receives `isLoading` and
 `isSkeleton` has quietly created a second vocabulary for one concept.
 
 Why `isLoading` is not enough on its own, and the exact formula that replaces a bare one, is
-`canon/fe/authoring/loading-and-skeleton.md`. The hooks that produce the flag are
-`canon/fe/authoring/async-data.md`. Which half of a split component holds which is
-`canon/fe/architecture.md` and `design/storybook/architecture/split.md`.
+`canon/fe/enforce/authoring/loading-and-skeleton.md`. The hooks that produce the flag are
+`canon/fe/enforce/authoring/async-data.md`. Which half of a split component holds which is
+`canon/fe/enforce/tiers/architecture.md` and `canon/fe/enforce/tiers/split.md`.
 
 ## Storybook first, always
 
@@ -60,7 +60,7 @@ again until a user does.
 The loading state is demonstrated through the real wrapper, at the presentational twin `_Name`, with
 one instance per state rather than four near-copies. The story conventions, including the
 comparison-table shape a skeleton reference story takes, are
-`canon/fe/authoring/storybook-stories.md`; the coverage is gated by
+`canon/fe/enforce/authoring/storybook-stories.md`; the coverage is gated by
 `patterns/fe/gates/check-story-coverage.mjs` and `patterns/fe/gates/check-doc-parity.mjs`.
 
 ## The loop
@@ -73,7 +73,7 @@ comparison-table shape a skeleton reference story takes, are
 2. **Route each region through the async wrapper.**
    - 2a. A region holding a hand-rolled chain of `if (error) … if (isLoading) …` gets migrated. The
      priority order is not a preference and does not belong copied into a feature; it lives in one
-     place, and the reasoning is in `canon/fe/authoring/loading-and-skeleton.md`.
+     place, and the reasoning is in `canon/fe/enforce/authoring/loading-and-skeleton.md`.
    - 2b. When the content branch needs heavy derivation from the resolved data, split it out so the
      connected file holds the request and the switch, and the presentational file receives data that
      is already non-null. A branch that has to guard against `undefined` inside the content arm is a
@@ -86,13 +86,13 @@ comparison-table shape a skeleton reference story takes, are
      rows, not one block standing in for many.
    - *Rhythm*: the same seams and insets, declared with the **same** named concept as the node it
      stands in for. A skeleton that declares a different concept from its loaded twin is a jump that
-     is already written down — `canon/fe/principles/spacing.md` states this directly, and
+     is already written down — `canon/fe/enforce/spacing/overview.md` states this directly, and
      `patterns/fe/patterns.mjs` holds the values.
    - *Shape*: approximate height, width and radius per node, matched by picking the piece that
      corresponds to the real node rather than sizing a bare box by eye.
 
    Where the skeleton lives — its own co-located folder or inline at the call site — is decided by
-   size, and the split is written in `canon/fe/authoring/loading-and-skeleton.md`.
+   size, and the split is written in `canon/fe/enforce/authoring/loading-and-skeleton.md`.
 
 4. **Watch it load.** A skeleton nobody has seen fire is not known to fire. Throttle the network in
    the browser's dev tools and hard-reload, or hold the fetcher briefly and **remove the hold
@@ -137,11 +137,11 @@ has no structure to mirror, that is a layout finding: record it rather than abso
 
 | Path | Holds |
 |---|---|
-| `canon/fe/authoring/loading-and-skeleton.md` | how an async state is spelled, with real examples |
-| `canon/fe/authoring/async-data.md` | where the flags come from |
-| `canon/fe/authoring/storybook-stories.md` | how the loading state is demonstrated in a story |
-| `canon/fe/principles/spacing.md` | the named seams and insets a mirror must repeat |
-| `canon/fe/architecture.md` | the presentational and connected halves, and what each may know |
+| `canon/fe/enforce/authoring/loading-and-skeleton.md` | how an async state is spelled, with real examples |
+| `canon/fe/enforce/authoring/async-data.md` | where the flags come from |
+| `canon/fe/enforce/authoring/storybook-stories.md` | how the loading state is demonstrated in a story |
+| `canon/fe/enforce/spacing/overview.md` | the named seams and insets a mirror must repeat |
+| `canon/fe/enforce/tiers/architecture.md` | the presentational and connected halves, and what each may know |
 | `patterns/fe/gates/check-skeleton-prop.mjs` | the shimmer prop is `isSkeleton`, everywhere |
 | `patterns/fe/gates/check-story-coverage.mjs` | nothing ships without a story |
 | `README.md` | why this skill is shaped the way it is |

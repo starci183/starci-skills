@@ -12,7 +12,7 @@ real CSS and real computed style, and measures it.
 
 That gives two lanes with a clean division of labour. *What does this file say* is a source gate.
 *What did the browser do* is the runner. The reasoning behind the split, the five audits, and the
-things each audit explicitly cannot prove are `canon/fe/testing.md`; this skill is how the two lanes
+things each audit explicitly cannot prove are `canon/fe/enforce/testing.md`; this skill is how the two lanes
 are actually run and how a red result is read.
 
 The sentence to hold while reading one: **a red result is a seam that declares a principle and
@@ -47,7 +47,7 @@ that explains a confusing runner failure is regularly in a gate nobody thought t
 with no story at all, an import that crosses a tier boundary, a presentational file that still names
 a retired prop.
 
-Which questions belong to this lane, and which gate answers each, is listed in `canon/fe/testing.md`
+Which questions belong to this lane, and which gate answers each, is listed in `canon/fe/enforce/testing.md`
 under the source-reading section — import direction, story existence and parity, story shape,
 declarations no render exposes.
 
@@ -64,7 +64,7 @@ quietly. A run that fails on nearly every story usually means the registry moved
 regressed overnight — check the registry's history before opening a single component.
 
 Information findings are printed alongside a failure, or on demand through the verbose environment
-switch named in `canon/fe/testing.md`. Reach for it when a story passes and you still do not believe
+switch named in `canon/fe/enforce/testing.md`. Reach for it when a story passes and you still do not believe
 it: the concepts the DOM cannot expose, and the truncation that never fired, are recorded there
 rather than counted as passes.
 
@@ -92,7 +92,7 @@ sees: an inline style, a third-party class, a value computed at runtime. When th
 looks correct and the computed value is not, the value is arriving from somewhere the file does not
 mention. A frame with nothing to space apart is not a finding at all.
 
-**A tier nesting violation.** Read it against `canon/fe/architecture.md` before touching anything.
+**A tier nesting violation.** Read it against `canon/fe/enforce/tiers/architecture.md` before touching anything.
 Two of these are especially worth recognising: a half-written identity marker, which reads as
 compliance in a diff and is why the pairing is checked at all; and anything found beneath an atom,
 which is the one case where *contains* and *imports* are the same fact, so the finding is real
@@ -137,11 +137,11 @@ Record anything left unfixed rather than remembering it, through `skills/starci-
 
 | Path | Holds |
 |---|---|
-| `canon/fe/testing.md` | why the two lanes exist, the five audits, and what each cannot prove |
+| `canon/fe/enforce/testing.md` | why the two lanes exist, the five audits, and what each cannot prove |
 | `patterns/fe/runner/test-runner.ts` | the rendered-tree audit, run after every story |
 | `patterns/fe/patterns.mjs` | the registry the runner resolves every token against |
 | `patterns/fe/gates/` | the source-reading gates, one per rule a file can answer |
-| `canon/fe/principles/spacing.md` | what each named seam and inset means, beside its value |
-| `canon/fe/architecture.md` | the tiers, the import direction, and emitted identity |
+| `canon/fe/enforce/spacing/overview.md` | what each named seam and inset means, beside its value |
+| `canon/fe/enforce/tiers/architecture.md` | the tiers, the import direction, and emitted identity |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-contract/test.mjs` |

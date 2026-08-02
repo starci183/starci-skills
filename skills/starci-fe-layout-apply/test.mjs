@@ -125,11 +125,11 @@ t.expect(
 
 // The quote above is only worth anything while canon still says it. If canon rewords the rule,
 // this fails and forces the skill to be re-read against it rather than quietly quoting history.
-const canon = readFileSync(join(REPO, "canon", "fe", "architecture.md"), "utf8").replace(/\s+/g, " ");
+const canon = readFileSync(join(REPO, "canon", "fe", "enforce", "tiers", "architecture.md"), "utf8").replace(/\s+/g, " ");
 
 t.expect(
     "canon still states the invariant this skill quotes it from",
-    check(canon.includes(INVARIANT) ? "present" : "canon/fe/architecture.md no longer says it",
+    check(canon.includes(INVARIANT) ? "present" : "canon/fe/enforce/tiers/architecture.md no longer says it",
         canon.includes(INVARIANT)),
     { exit: 0, lacks: ["no longer"] },
 );

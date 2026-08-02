@@ -47,10 +47,10 @@ another and place every difference deliberately. Each kind lands somewhere speci
 | The copies differ in | Where the difference belongs |
 |---|---|
 | the text or the data shown | a prop — this is the difference the component exists to absorb |
-| colour, weight, size, density | a `tone` · `size` · `variant` owned by the design system, `canon/fe/architecture.md` |
-| the seam or the inset between parts | a named concept from `canon/fe/principles/spacing.md`, never a hand-written class |
-| where the thing sits in its parent | the position union, `design/storybook/architecture/principles/position.md` |
-| one fetches, the other takes props | the split — the presentational twin is the shared thing, `design/storybook/architecture/split.md` |
+| colour, weight, size, density | a `tone` · `size` · `variant` owned by the design system, `canon/fe/enforce/tiers/architecture.md` |
+| the seam or the inset between parts | a named concept from `canon/fe/enforce/spacing/overview.md`, never a hand-written class |
+| where the thing sits in its parent | the position union, `canon/fe/enforce/spacing/position.md` |
+| one fetches, the other takes props | the split — the presentational twin is the shared thing, `canon/fe/enforce/tiers/split.md` |
 | what happens on interaction, per call site | nothing here: they are two components, and this cluster was wrong |
 
 The last row is a real outcome and reaching it is not a failure. Record it in the proposal with the
@@ -72,19 +72,19 @@ anybody can read, and the first person to need a fourth variant has nothing to r
 gaining exactly one state for the value that was added. Never copy it next to itself under a new name.
 
 **Extracting a new target.** Author it under the tier the proposal named, spelled the house way:
-`canon/fe/authoring/structure-and-naming.md` for where it goes and what it is called,
-`canon/fe/authoring/props-and-types.md` for how the props are declared,
-`canon/fe/authoring/imports-and-format.md` for the import block. A data-owning tier is one folder with
-two files, the presentational `_Name` and the connected `Name` — `canon/fe/architecture.md` and
-`design/storybook/architecture/split.md`. Translation is data and belongs to the connected half:
-`canon/fe/authoring/i18n.md`.
+`canon/fe/enforce/authoring/structure-and-naming.md` for where it goes and what it is called,
+`canon/fe/enforce/authoring/props-and-types.md` for how the props are declared,
+`canon/fe/enforce/authoring/imports-and-format.md` for the import block. A data-owning tier is one folder with
+two files, the presentational `_Name` and the connected `Name` — `canon/fe/enforce/tiers/architecture.md` and
+`canon/fe/enforce/tiers/split.md`. Translation is data and belongs to the connected half:
+`canon/fe/enforce/authoring/i18n.md`.
 
 Then the story, which is a storymap and not a demo — one prop per leaf, every value of that prop
 rendered, each state carrying the sentence that says when to reach for it:
-`design/storybook/architecture/story.md`, spelled per `canon/fe/authoring/storybook-stories.md`.
+`canon/fe/enforce/tiers/story.md`, spelled per `canon/fe/enforce/authoring/storybook-stories.md`.
 
 If the copies had loading states, the skeleton mirrors the loaded shape and declares the **same**
-spacing concepts, so nothing jumps when data lands: `canon/fe/authoring/loading-and-skeleton.md`.
+spacing concepts, so nothing jumps when data lands: `canon/fe/enforce/authoring/loading-and-skeleton.md`.
 
 ## 4. Replace every call site, then delete
 
@@ -123,7 +123,7 @@ Then the gates that this kind of change breaks most often:
 
 Finally the rendered-tree runner, `patterns/fe/runner/test-runner.ts`, which resolves its vocabulary
 from `patterns/fe/patterns.mjs` and measures the boxes the browser produced rather than the strings
-the files contain. What each audit can and cannot prove is `canon/fe/testing.md` — read it before
+the files contain. What each audit can and cannot prove is `canon/fe/enforce/testing.md` — read it before
 treating a green run as more than it is.
 
 Then look at the screens. A consolidation that type-checks, passes every gate and renders the wrong

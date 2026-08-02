@@ -11,7 +11,7 @@
  *
  * WHAT IT CANNOT SEE
  * Whether the frame is *correct*, only whether it is *legal*. A frame passing every gate here can
- * still be arranging the wrong thing. See design/storybook/architecture/elements/frame.md.
+ * still be arranging the wrong thing. See canon/fe/enforce/tiers/frame.md.
  *
  * USAGE
  *   node scripts/audit-frames.mjs <repo>            all checkable rules
@@ -33,13 +33,28 @@ if (!repo) {
     process.exit(1);
 }
 
+const arg = (flag) => {
+    const i = process.argv.indexOf(flag);
+    return i === -1 ? null : (process.argv[i + 1] ?? "");
+};
+/** `--rule 10` is what a person types; the tier is not in doubt once this script was chosen. */
 const only = (() => {
-    const i = process.argv.indexOf("--rule");
-    return i === -1 ? null : (process.argv[i + 1] ?? "").toUpperCase();
+    const raw = (arg("--rule") ?? "").trim();
+    return raw ? `FRAME-${raw.replace(/^(?:frame|rule)[-\s]*/i, "")}` : null;
 })();
 const quiet = process.argv.includes("--quiet");
+const showSuspects = process.argv.includes("--suspects");
 
-const root = join(repo, ".storybook", "components");
+/**
+ * Which tree. The blueprint carries the inspection overlay; the copy the app imports carries none,
+ * and FRAME-12 is the rule that says so.
+ */
+const tree = (arg("--tree") ?? "storybook").toLowerCase();
+if (!["storybook", "src"].includes(tree)) {
+    console.error(`--tree takes "storybook" or "src", not "${tree}"`);
+    process.exit(1);
+}
+const root = tree === "src" ? join(repo, "src", "components") : join(repo, ".storybook", "components");
 const FRAMES_DIR = join(root, "frames");
 if (!existsSync(FRAMES_DIR)) {
     console.error(`no frame tier at ${FRAMES_DIR}`);
@@ -64,14 +79,29 @@ const rel = (f) => relative(repo, f).replace(/\\/g, "/");
 /** Every frame source. Files starting `_` are shared tables, not components. */
 const frameFiles = walk(FRAMES_DIR).filter((f) => !f.split(/[\\/]/).pop().startsWith("_"));
 
+/**
+ * EVERY RULE IS REPORTED. NOT EVERY RULE IS A VERDICT.
+ *
+ * An earlier cut checked six and named the rest in one closing line as "needs judgement". A rule
+ * nobody reports is a rule nobody enforces — that is how FRAME-11 and FRAME-9 both went green over
+ * a tree that broke them. So the judgement rules print their candidates and hand them to a person,
+ * counted separately and never failing the gate.
+ */
 const findings = {
+    "FRAME-1": [],
+    "FRAME-2": [],
     "FRAME-3": [],
     "FRAME-4": [],
+    "FRAME-5": [],
     "FRAME-8": [],
     "FRAME-9": [],
     "FRAME-10": [],
     "FRAME-11": [],
+    "FRAME-12": [],
 };
+
+/** Reported with evidence, never counted — these need a person, not a parser. */
+const SUSPECT = new Set(["FRAME-1", "FRAME-2", "FRAME-5"]);
 
 // ---- helpers --------------------------------------------------------------
 
@@ -141,8 +171,17 @@ for (const file of frameFiles) {
 for (const file of frameFiles) {
     const text = stripComments(readFileSync(file, "utf8"));
     const props = declaredProps(text);
-    if (props.has("className") && !props.has("classNames")) {
-        findings["FRAME-4"].push({ file: rel(file), detail: "declares `className?: string` and no `classNames` — should be `classNames?: Array<AllowedClassName>`" });
+    // Declaring BOTH is the state this rule most needs to catch, and the earlier `&& !classNames`
+    // guard let it through — every frame in the tier held two doors, one of them the closed union
+    // and one of them a free string, and the gate read that as compliance. Canon is explicit that
+    // there is no `@deprecated` stage: the old prop goes in the same change the new one arrives.
+    if (props.has("className")) {
+        findings["FRAME-4"].push({
+            file: rel(file),
+            detail: props.has("classNames")
+                ? "declares `className?: string` BESIDE `classNames` — a second door, still open"
+                : "declares `className?: string` — should be `classNames?: Array<AllowedClassName>`",
+        });
     }
 }
 
@@ -258,6 +297,21 @@ for (const file of frameFiles) {
     const text = stripComments(readFileSync(file, "utf8"));
     const props = declaredProps(text);
 
+    // On the app's copy the rule inverts. There is no overlay there to feed, so a frame carrying
+    // `anatPart` is drift from the blueprint rather than a frame doing its job — the same shape as
+    // ATOM-10 read against `--tree src`. Demanding the prop on that tree would have every frame in
+    // the app fail a rule it is right to break.
+    if (tree === "src") {
+        const carried = ["showAnatomy", "anatPart", "data-anat-part"].filter((k) => text.includes(k));
+        if (carried.length) {
+            findings["FRAME-11"].push({
+                file: rel(file),
+                detail: `carries ${carried.join(", ")} — this tree has no inspection overlay to feed`,
+            });
+        }
+        continue;
+    }
+
     if (!props.has("anatPart")) {
         findings["FRAME-11"].push({
             file: rel(file),
@@ -276,10 +330,138 @@ for (const file of frameFiles) {
     }
 }
 
+// ---- FRAME-1 / FRAME-2 / FRAME-5 · the judgement three ---------------------
+//
+// FRAME-7 is the detection signal for FRAME-2, so both are answered by the same evidence: a prop
+// that makes the CALLER DESCRIBE ITS OWN CONTENT. `title`, `label`, `icon`, `description` are the
+// shapes of that failure — a frame taking one has stopped being indifferent to what it arranges.
+// Reported rather than counted, because a `label` on a frame can legitimately name the region for
+// assistive tech rather than describe the content.
+
+const CONTENT_PROPS = /^(title|label|text|description|caption|heading|subtitle|icon|image|avatar|value)$/i;
+const ARRANGEMENT_PROPS = /^(gap|direction|align|justify|wrap|at|columns|rows|padding|inset|dividers?|reverse|as|items|children|anatPart|showAnatomy|classNames)$/;
+
+for (const file of frameFiles) {
+    const text = stripComments(readFileSync(file, "utf8"));
+    const props = [...declaredProps(text)];
+
+    const content = props.filter((p) => CONTENT_PROPS.test(p));
+    if (content.length) {
+        findings["FRAME-2"].push({
+            file: rel(file),
+            detail: `takes ${content.map((p) => `\`${p}\``).join(", ")} — a prop that makes the caller describe its own content`,
+        });
+    }
+
+    // FRAME-1 owns direction, seam, alignment and its own chrome. A prop that is neither an
+    // arrangement word nor a named slot is the cheapest sign that something else moved in here.
+    const stray = props.filter((p) => !ARRANGEMENT_PROPS.test(p) && !CONTENT_PROPS.test(p) && !/^(start|end|rail|body|main|aside|header|footer|top|bottom|leading|trailing)$/.test(p));
+    if (stray.length) {
+        findings["FRAME-1"].push({
+            file: rel(file),
+            detail: `prop(s) outside arrangement and slots: ${stray.map((p) => `\`${p}\``).join(", ")} — confirm each is direction, seam, alignment, or the frame's own chrome`,
+        });
+    }
+
+    // FRAME-5 is about WHAT a frame composes, not whether it composes. Arrangement is its job;
+    // appearance is the atom's word. The checkable half is the appearance token appearing in a
+    // frame's own class strings — legal only when it is chrome the frame draws itself, which is a
+    // call a person makes. Measured on a healthy tier, eight of nine frames have none of these.
+    const appearance = new Set();
+    for (const m of text.matchAll(/"([^"]*)"/g)) {
+        for (const cls of m[1].split(/\s+/)) {
+            const bare = cls.replace(/^(?:[\w@.-]+:)+/, "");
+            if (/^(border|bg-|rounded|shadow|ring-|text-(?!start|center|end)|font-|opacity-|italic|uppercase)/.test(bare)) appearance.add(bare);
+        }
+    }
+    if (appearance.size) {
+        findings["FRAME-5"].push({
+            file: rel(file),
+            detail: `composes appearance: ${[...appearance].join(" ")} — legal only as chrome the frame draws itself, and by FRAME-8 chrome with an atom must import it`,
+        });
+    }
+}
+
+// ---- FRAME-12 · the app's copy is the blueprint minus the overlay ----------
+//
+// Kept identical to ATOM-11's comparison, deliberately: two gates disagreeing about what "the same
+// file" means would be worse than either being slightly wrong.
+
+const BLUEPRINT_FRAMES = join(repo, ".storybook", "components", "frames");
+const COPY_FRAMES = join(repo, "src", "components", "frames");
+
+if (existsSync(BLUEPRINT_FRAMES) && existsSync(COPY_FRAMES)) {
+    const foldEntry = (p) => {
+        const parts = p.split("/");
+        const file = parts[parts.length - 1].replace(/\.tsx?$/, "");
+        const folder = parts[parts.length - 2];
+        return file === "index" || file === folder ? [...parts.slice(0, -1), "·entry"].join("/") : p;
+    };
+    const listing = (base) =>
+        new Map(walk(base).map((f) => {
+            const key = relative(base, f).replace(/\\/g, "/");
+            return [foldEntry(key), { key, file: f }];
+        }));
+
+    const blueprint = listing(BLUEPRINT_FRAMES);
+    const copy = listing(COPY_FRAMES);
+
+    for (const [folded, v] of copy) {
+        if (folded.endsWith("·entry") && !/(^|\/)index\.tsx?$/.test(v.key)) {
+            findings["FRAME-12"].push({
+                file: `src/components/frames/${v.key}`,
+                detail: "the app's entry file is `index.tsx` — a call site imports the folder, not the name twice",
+            });
+        }
+    }
+    for (const [folded, v] of blueprint) {
+        if (!copy.has(folded)) findings["FRAME-12"].push({ file: `.storybook/components/frames/${v.key}`, detail: "in the blueprint, missing from the app's copy — the change never crossed" });
+    }
+    for (const [folded, v] of copy) {
+        if (!blueprint.has(folded)) findings["FRAME-12"].push({ file: `src/components/frames/${v.key}`, detail: "in the app's copy, absent from the blueprint — nobody designed it" });
+    }
+
+    const normalise = (t) =>
+        stripComments(t)
+            .replace(/\s*data-anat-part=\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, "")
+            .replace(/\s*\b(?:showAnatomy|anatPart)\s*=\s*(?:\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|"[^"]*")/g, "")
+            // Stops at `)` too — a typed parameter otherwise swallows its own signature's tail.
+            .replace(/\b(?:showAnatomy|anatPart)\s*\??\s*:\s*[^;,)\n}]+/g, "")
+            .replace(/\b(?:showAnatomy|anatPart)\b\s*(?:=\s*(?:\{[^{}]*\}|"[^"]*"|[\w.]+))?\s*,?/g, "")
+            .replace(/,\s*,/g, ",")
+            .replace(/([{(])\s*,/g, "$1")
+            .replace(/,\s*([})])/g, "$1")
+            .replace(/\{\s*\}/g, "")
+            .replace(/(["'])@sb-components\//g, "$1@/components/")
+            .replace(/(["'][^"']*\/(\w+))\/\2(["'])/g, "$1$3")
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+    const flat = (lines) => lines.join(" ").replace(/\s+/g, " ").replace(/\s*([<>{}()[\],;:])\s*/g, "$1").trim();
+
+    for (const [folded, v] of blueprint) {
+        const twin = copy.get(folded);
+        if (!twin) continue;
+        const a = normalise(readFileSync(v.file, "utf8"));
+        const b = normalise(readFileSync(twin.file, "utf8"));
+        if (flat(a) === flat(b)) continue;
+        const inCopy = new Set(b);
+        const inBlueprint = new Set(a);
+        findings["FRAME-12"].push({
+            file: `frames/${v.key}`,
+            detail: `the two trees differ beyond the overlay — ${a.filter((l) => !inCopy.has(l)).length} line(s) only in the blueprint, ${b.filter((l) => !inBlueprint.has(l)).length} only in the app's copy`,
+        });
+    }
+}
+
 // ---- report ---------------------------------------------------------------
 
 const RULES = {
+    "FRAME-1": "it owns direction, seam, alignment, and its own chrome — nothing else",
+    "FRAME-2": "it never asks what its children are — FRAME-7 is this rule's detection signal",
     "FRAME-3": "imports run downward only — a frame reaching up is arranging what it was handed",
+    "FRAME-5": "composing classes is this tier's work",
+    "FRAME-12": "the app's copy is the blueprint minus the overlay — and a change lands in both",
     "FRAME-4": "the prop is `classNames: Array<AllowedClassName>` — the same closed union an atom takes",
     "FRAME-8": "chrome that exists as an atom is imported, never hand-drawn",
     "FRAME-9": "`items` or named slots — never `children`, which no later type can constrain",
@@ -287,27 +469,39 @@ const RULES = {
     "FRAME-11": "every frame takes `anatPart`; only a frame with chrome takes `showAnatomy` — and must READ it",
 };
 
-console.log(`${repo}\n`);
+console.log(`${repo}`);
+console.log(`tree: ${relative(repo, root).replace(/\\/g, "/")}\n`);
 console.log(`frames found: ${frameFiles.length} file(s)\n`);
 
-let total = 0;
+let violations = 0;
+let suspects = 0;
 for (const [rule, list] of Object.entries(findings)) {
     if (only && rule !== only) continue;
-    total += list.length;
-    console.log(`${rule}  ${list.length === 0 ? "ok" : `${list.length} violation(s)`}\n        ${RULES[rule]}`);
-    if (!quiet) {
-        for (const v of list.slice(0, 40)) console.log(`        ${v.file}\n            ${v.detail}`);
-        if (list.length > 40) console.log(`        … and ${list.length - 40} more`);
+    const isSuspect = SUSPECT.has(rule);
+    if (isSuspect) suspects += list.length;
+    else violations += list.length;
+
+    const label = list.length === 0 ? "ok" : isSuspect ? `${list.length} to judge` : `${list.length} violation(s)`;
+    console.log(`${rule}  ${label}\n        ${RULES[rule]}`);
+
+    const show = !quiet && (!isSuspect || showSuspects || only === rule);
+    if (show) {
+        const cap = only ? list.length : 40;
+        for (const v of list.slice(0, cap)) console.log(`        ${v.file}\n            ${v.detail}`);
+        if (list.length > cap) console.log(`        … and ${list.length - cap} more`);
+    } else if (isSuspect && list.length && !quiet) {
+        console.log(`        (run with --suspects, or --rule ${rule.replace(/^FRAME-/, "")}, to read them)`);
     }
     console.log("");
 }
 
 if (!only) {
-    console.log("Not checked here, because they need judgement rather than parsing:");
-    console.log("  FRAME-1 does it own arrangement · FRAME-2 does it ask what its children are");
-    console.log("  FRAME-5/6/7, and the first half of FRAME-8 (was the atom handed in by the caller)");
-    console.log("  See design/storybook/architecture/elements/frame.md\n");
+    console.log("FRAME-6 / FRAME-7  derived");
+    console.log("        FRAME-6 confirms a placement and FRAME-7 detects a wrong one — both are");
+    console.log("        answered by FRAME-1 and FRAME-2 above. The first half of FRAME-8 (was the");
+    console.log("        atom handed in by the caller?) still needs a person.\n");
 }
 
-console.log(total ? `${total} violation(s)` : "no violation of a checkable rule");
-process.exit(total ? 1 : 0);
+console.log(violations ? `${violations} violation(s)` : "no violation of a checkable rule");
+if (suspects) console.log(`${suspects} candidate(s) needing judgement — these do not fail the gate`);
+process.exit(violations ? 1 : 0);

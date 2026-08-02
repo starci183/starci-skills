@@ -50,7 +50,7 @@ demoted so one action leads; a plain-text entity mention wired to the app's real
 an honest fallback when it cannot resolve; a deep link pointed at the module the surface already
 identified rather than at a general page; a fabricated fallback number removed so the component shows
 nothing rather than something untrue. These are edits inside one component. Spell them the way the
-rest of the tree is spelled — [`canon/fe/authoring/INDEX.md`](../../canon/fe/authoring/INDEX.md)
+rest of the tree is spelled — [`canon/fe/enforce/authoring/INDEX.md`](../../canon/fe/enforce/authoring/INDEX.md)
 decides that, and nothing about being an "audit fix" exempts a line from it. In particular, do not
 hand-roll a new primitive inside a block to get the fix done; that trades one finding for a worse one.
 
@@ -66,8 +66,8 @@ deliberately.
 **3. Built in the design system first.** When the fix needs a component that does not exist, or a
 state of one that was never storied, it does not start in the app. **No component reaches the app
 that was never a component and a story in the design-system folder first** —
-[`canon/fe/architecture.md`](../../canon/fe/architecture.md), with the story's obligations in
-[`design/storybook/architecture/story.md`](../../design/storybook/architecture/story.md) and coverage
+[`canon/fe/enforce/tiers/architecture.md`](../../canon/fe/enforce/tiers/architecture.md), with the story's obligations in
+[`canon/fe/enforce/tiers/story.md`](../../canon/fe/enforce/tiers/story.md) and coverage
 held by [`patterns/fe/gates/check-story-coverage.mjs`](../../patterns/fe/gates/check-story-coverage.mjs).
 Author it under `fe.design_system`, story it with its full state matrix, then bring it across as a
 twin with `starci-fe-sync`. A reference link component invented directly in `src` because it was

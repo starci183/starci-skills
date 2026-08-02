@@ -13,7 +13,7 @@ second source of truth that is wrong the day the first one changes.
 
 The division has a practical test. If a claim can fail a build, it lives in `patterns/`. If it can
 only be argued with, it lives in `canon/`. Where prose has to name a number — the pixel values in
-`canon/fe/principles/spacing.md` — the prose says plainly that the registry is authoritative and the prose is
+`canon/fe/enforce/spacing/overview.md` — the prose says plainly that the registry is authoritative and the prose is
 the side that is stale.
 
 Paths below are written relative to the canon root, the `.claude/` directory this file sits under.
@@ -24,11 +24,11 @@ Three files carry the reasoning, and they answer three different questions.
 
 | File | Answers |
 |---|---|
-| [`canon/fe/architecture.md`](fe/architecture.md) | which tier a component belongs to, what it may import, how a data-owning component is split into a presentational twin and a connected twin, and which component a shape of data becomes |
-| [`canon/fe/principles/spacing.md`](fe/principles/spacing.md) | why a seam or an inset is the number it is — the named layout concepts, in prose, beside the registry that holds their values |
-| [`canon/fe/testing.md`](fe/testing.md) | how the contract is checked: `data-tier`, `data-component`, `data-principles`, and the rendered-tree runner that measures computed style |
+| [`canon/fe/enforce/tiers/architecture.md`](fe/architecture.md) | which tier a component belongs to, what it may import, how a data-owning component is split into a presentational twin and a connected twin, and which component a shape of data becomes |
+| [`canon/fe/enforce/spacing/overview.md`](fe/principles/spacing.md) | why a seam or an inset is the number it is — the named layout concepts, in prose, beside the registry that holds their values |
+| [`canon/fe/enforce/testing.md`](fe/testing.md) | how the contract is checked: `data-tier`, `data-component`, `data-principles`, and the rendered-tree runner that measures computed style |
 
-Those three decide **what** to build. `canon/fe/authoring/` decides **how the resulting code is
+Those three decide **what** to build. `canon/fe/enforce/authoring/` decides **how the resulting code is
 spelled**, so that a file written today reads like the file next to it:
 
 | File | Decides |
@@ -49,7 +49,7 @@ spelled**, so that a file written today reads like the file next to it:
 | [`comments.md`](fe/authoring/comments.md) | when a comment is worth writing |
 
 One law spans all of them: **no component reaches the app that was never a component and a story in
-the design-system folder first.** The reasoning is in `canon/fe/architecture.md`; the enforcement is
+the design-system folder first.** The reasoning is in `canon/fe/enforce/tiers/architecture.md`; the enforcement is
 `patterns/fe/gates/check-story-coverage.mjs`.
 
 Four further shelves sit beside those, holding the material that decides what a screen may look like
@@ -58,10 +58,10 @@ long enough that a copy of its table here would drift from the folder within a m
 
 | Shelf | Answers |
 |---|---|
-| [`canon/fe/foundations/`](fe/foundations/INDEX.md) | which value out of a deliberately closed scale an element gets: gap, colour token, radius, elevation, breakpoint, z-index, motion, type, sticky offset, scrollbar gutter, and how wide content overflows |
-| [`canon/fe/principles/`](fe/principles/INDEX.md) | what the interface is allowed to say and do: accent as signal, one primary action, honest persuasion, hover affordance, design restraint, content voice, accessibility, and building for the data that exists |
-| [`canon/fe/layouts/`](fe/layouts/INDEX.md) | which shell a surface gets and how its regions behave — the job-to-shell rule, the shell decision tree, the region vocabulary, responsive and adaptive behaviour, and one file per archetype grounded in a real route |
-| [`canon/fe/patterns/`](fe/patterns/INDEX.md) | the recurring behaviours inside a shell: list anatomy, form flow, the three tiers of loading feedback, empty states, drawers, where a surface lands, and how a progress block is composed |
+| [`canon/fe/explore/foundations/`](fe/foundations/INDEX.md) | which value out of a deliberately closed scale an element gets: gap, colour token, radius, elevation, breakpoint, z-index, motion, type, sticky offset, scrollbar gutter, and how wide content overflows |
+| [`canon/fe/explore/principles/`](fe/principles/INDEX.md) | what the interface is allowed to say and do: accent as signal, one primary action, honest persuasion, hover affordance, design restraint, content voice, accessibility, and building for the data that exists |
+| [`canon/fe/explore/layouts/`](fe/layouts/INDEX.md) | which shell a surface gets and how its regions behave — the job-to-shell rule, the shell decision tree, the region vocabulary, responsive and adaptive behaviour, and one file per archetype grounded in a real route |
+| [`canon/fe/explore/patterns/`](fe/patterns/INDEX.md) | the recurring behaviours inside a shell: list anatomy, form flow, the three tiers of loading feedback, empty states, drawers, where a surface lands, and how a progress block is composed |
 
 ## Back end
 
@@ -126,13 +126,13 @@ than applying:
 
 | Path | Holds |
 |---|---|
-| `design/storybook/architecture/elements/` | one file per tier, in full, with its numbered rules |
-| `design/storybook/architecture/examples/` | real components at each tier, one worked example each |
-| `design/storybook/architecture/principles/` | the closed sets — gap, padding, margin, position, responsive — and the reasoning under each |
-| `design/storybook/architecture/split.md` · `story.md` | the presentational split, and what a story must render |
-| `design/storybook/references/` | why each boundary sits where it does, which tiers are shared, how to read a scan |
-| `design/storybook/data/` | the tier table and the import matrix, queryable |
-| `design/component/` | which component a data shape becomes: the matrix, its fifteen sections, and the traps per section |
+| `canon/fe/enforce/tiers/` | one file per tier, in full, with its numbered rules |
+| `canon/fe/enforce/examples/` | real components at each tier, one worked example each |
+| `canon/fe/enforce/spacing/` | the closed sets — gap, padding, margin, position, responsive — and the reasoning under each |
+| `canon/fe/enforce/tiers/split.md` · `story.md` | the presentational split, and what a story must render |
+| `canon/fe/enforce/tiers/references/` | why each boundary sits where it does, which tiers are shared, how to read a scan |
+| `patterns/fe/data/` | the tier table and the import matrix, queryable |
+| `canon/fe/explore/component/` | which component a data shape becomes: the matrix, its fifteen sections, and the traps per section |
 
 ## Reading order
 

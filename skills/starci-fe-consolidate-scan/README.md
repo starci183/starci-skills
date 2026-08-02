@@ -61,7 +61,7 @@ because in practice people answer one of them and skip the other two.
 
 The `className` test is the load-bearing one and the least intuitive. It converts a design question
 into a mechanical one: if the only way to serve both callers is an escape hatch, the callers wanted
-two things. `canon/fe/architecture.md` argues that at length and this skill deliberately does not
+two things. `canon/fe/enforce/tiers/architecture.md` argues that at length and this skill deliberately does not
 restate the argument — a copied rule rots, and the copy is always the one that gets read.
 
 ## Why call sites are counted as imports

@@ -15,9 +15,13 @@
  * spending a gate on it.
  *
  * USAGE
- *   node scripts/audit-composites.mjs <repo>
+ *   node scripts/audit-composites.mjs <repo>                 # the blueprint tree (.storybook/components)
+ *   node scripts/audit-composites.mjs <repo> --tree src      # the app tree (src/components) — same rules
  *   node scripts/audit-composites.mjs <repo> --rule COMPOSITE-3
  *   node scripts/audit-composites.mjs <repo> --quiet
+ *
+ * The same rules hold on both trees: the app copy is the blueprint minus its anatomy overlay, so a
+ * COMPOSITE-4/8/10/3 violation is a violation wherever it renders. Run BOTH before calling it done.
  *
  * EXIT CODES
  *   0  no violation of a checkable rule
@@ -39,11 +43,15 @@ const only = (() => {
     return i === -1 ? null : (process.argv[i + 1] ?? "").toUpperCase();
 })();
 const quiet = process.argv.includes("--quiet");
+const tree = (() => {
+    const i = process.argv.indexOf("--tree");
+    return i !== -1 && (process.argv[i + 1] ?? "").toLowerCase() === "src" ? "src" : "blueprint";
+})();
 
-const root = join(repo, ".storybook", "components");
+const root = tree === "src" ? join(repo, "src", "components") : join(repo, ".storybook", "components");
 const DIR = join(root, "composites");
 if (!existsSync(DIR)) {
-    console.error(`no composite tier at ${DIR}`);
+    console.error(`no composite tier at ${DIR} (tree: ${tree})`);
     process.exit(1);
 }
 
@@ -129,9 +137,9 @@ for (const file of files) {
 // takes whatever a caller hands over, and forwards it into an atom whose own union says nothing
 // about what happened one level up.
 
-function propBlocks(text) {
+function propBlocks(text, kinds = "Props") {
     const out = [];
-    const re = /(?:export\s+)?(?:interface|type)\s+\w*Props\w*\s*(?:extends\s+[\w<>,\s]+)?=?\s*\{/g;
+    const re = new RegExp(`(?:export\\s+)?(?:interface|type)\\s+\\w*(?:${kinds})\\w*\\s*(?:extends\\s+[\\w<>,\\s]+)?=?\\s*\\{`, "g");
     for (const m of [...text.matchAll(re)]) {
         let depth = 1;
         let i = m.index + m[0].length;
@@ -210,13 +218,17 @@ for (const file of files) {
     const text = strip(readFileSync(file, "utf8"));
     if (!/\bisSkeleton\b/.test(text)) continue;
 
+    // Scan Props AND the item/slot shapes a composite renders (`*Item*`/`*Slot*`) — a `ReactNode`
+    // field one level in, inside `items[]`, is the same trap as one on the top-level props
+    // (COMPOSITE-8, "the same trap, one level in"). `children` is exempt: on an internal wrapper it
+    // is a genuine pass-through the composite adds nothing to.
     const nodes = [];
-    for (const block of propBlocks(text)) {
+    for (const block of propBlocks(text, "Props|Item|Slot")) {
         let depth = 0;
         for (const line of block.split("\n")) {
             if (depth === 0) {
                 const m = line.trim().match(/^(\w+)\s*\??\s*:\s*ReactNode\b/);
-                if (m) nodes.push(m[1]);
+                if (m && m[1] !== "children") nodes.push(m[1]);
             }
             depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
         }
@@ -261,7 +273,7 @@ if (!only) {
     console.log("Not checked here, because they need judgement rather than parsing:");
     console.log("  COMPOSITE-1 is it a reusable shape · COMPOSITE-2/7 does a prop name a domain entity");
     console.log("  COMPOSITE-5/6/8/9");
-    console.log("  See design/storybook/architecture/elements/composite.md\n");
+    console.log("  See canon/fe/enforce/tiers/composite.md\n");
 }
 
 console.log(total ? `${total} violation(s)` : "no violation of a checkable rule");

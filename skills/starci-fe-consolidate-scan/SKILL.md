@@ -1,6 +1,6 @@
 ---
 name: starci-fe-consolidate-scan
-description: Finds duplicated and near-duplicate component code across a stated scope of the front end, groups it into clusters anchored at real call sites, names one canonical target per cluster — an existing component to reuse, or a new one to extract — and writes that as a ranked proposal beside the tree it describes, without editing a line. Use it whenever the job is to find the duplication rather than to fix it: "scan for duplicate components", "where is this card copy-pasted", "what should we consolidate next", "is there already a component for this before I write another one", "tìm component trùng", "quét lặp code trang khoá học", or before a redesign, when nobody yet knows how many copies of a shape exist. Use it also when a screen feels heavy for what it does and the suspicion is copied markup rather than logic. Not the half that changes code — the proposal it writes is built by starci-fe-consolidate-apply. Not for deciding which component a fresh data shape becomes (that lookup is `design/component/data/matrix.csv`) and not for auditing one screen against canon.
+description: Finds duplicated and near-duplicate component code across a stated scope of the front end, groups it into clusters anchored at real call sites, names one canonical target per cluster — an existing component to reuse, or a new one to extract — and writes that as a ranked proposal beside the tree it describes, without editing a line. Use it whenever the job is to find the duplication rather than to fix it: "scan for duplicate components", "where is this card copy-pasted", "what should we consolidate next", "is there already a component for this before I write another one", "tìm component trùng", "quét lặp code trang khoá học", or before a redesign, when nobody yet knows how many copies of a shape exist. Use it also when a screen feels heavy for what it does and the suspicion is copied markup rather than logic. Not the half that changes code — the proposal it writes is built by starci-fe-consolidate-apply. Not for deciding which component a fresh data shape becomes (that lookup is `canon/fe/explore/component/data/matrix.csv`) and not for auditing one screen against canon.
 ---
 
 # Finding duplicate components
@@ -74,7 +74,7 @@ Shape is what a sweep can see. Meaning is what decides, and there are three test
 every case.
 
 **Does either copy know a domain entity, and is it the same entity?** A component taking `courseId`
-is a block whatever folder it sits in — `canon/fe/architecture.md`. Two blocks over two different
+is a block whatever folder it sits in — `canon/fe/enforce/tiers/architecture.md`. Two blocks over two different
 entities that render identically are two blocks with one composite hiding inside them, and the
 composite is the real finding.
 
@@ -84,10 +84,10 @@ and leave the rest alone.
 
 **Would the merged component need a `className` to serve both callers?** Then it is not a
 consolidation. A block takes no `className`, and handing one out is how a single component grows five
-undocumented variants living in five call sites — the failure `canon/fe/architecture.md` spells out at
+undocumented variants living in five call sites — the failure `canon/fe/enforce/tiers/architecture.md` spells out at
 length. A difference in appearance belongs one tier down as a `tone`, a `size` or a `variant`; a
 difference in placement belongs to the position union in
-`design/storybook/architecture/principles/position.md`.
+`canon/fe/enforce/spacing/position.md`.
 
 When two copies genuinely differ in meaning, record that they were compared and kept apart. An
 unexplained near-duplicate is re-proposed by the next scan, and refused again, forever.
@@ -101,14 +101,14 @@ exists is the cheapest row in the proposal and the easiest to get wrong, because
 component is usually one prop short of fitting and it is tempting to write a second one instead.
 
 **Extract.** Enter the lookup from the shape of the data in your hand and read across to exactly one
-component: `design/component/data/matrix.csv`, with its deciding tests in
-`design/component/data/sections.csv` and the section-by-section traps in
-`design/component/references/traps.md`. Never read backward from a name you already had in mind — the
+component: `canon/fe/explore/component/data/matrix.csv`, with its deciding tests in
+`canon/fe/explore/component/data/sections.csv` and the section-by-section traps in
+`canon/fe/explore/component/references/traps.md`. Never read backward from a name you already had in mind — the
 failure that produces is type-valid and renders fine.
 
-Then the tier, from `canon/fe/architecture.md` and the machine-readable table
-`design/storybook/data/tiers.csv`. When two tiers both fit, pick the lower one. Where a boundary looks
-arbitrary, the reason it sits there is in `design/storybook/references/tier-boundaries.md`.
+Then the tier, from `canon/fe/enforce/tiers/architecture.md` and the machine-readable table
+`patterns/fe/data/tiers.csv`. When two tiers both fit, pick the lower one. Where a boundary looks
+arbitrary, the reason it sits there is in `canon/fe/enforce/tiers/references/tier-boundaries.md`.
 
 A proposed target is a **component and a story in the design system**, in that order, always — no
 component reaches the app that was never a component and a story there first. The scan only names it;

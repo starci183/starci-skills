@@ -92,7 +92,7 @@ Whichever source you write into:
 - **unsure between two tiers, pick the lower one.** Promoting is a rename; demoting leaves every
   caller stranded
 
-Why each boundary sits where it does: `design/storybook/references/tier-boundaries.md`.
+Why each boundary sits where it does: `canon/fe/enforce/tiers/references/tier-boundaries.md`.
 
 ## Before trusting the recorded one
 
