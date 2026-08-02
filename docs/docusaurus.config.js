@@ -44,6 +44,7 @@ const config = {
             // that Docusaurus' strict YAML parser rejects. The canon is the book this site renders;
             // skills stay operational. To publish them too, their frontmatter must be quoted first.
             "skills/**",
+            "patches/**",         // paste-into-another-session prompts, not canon
             "README.md",
           ],
         },
