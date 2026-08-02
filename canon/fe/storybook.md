@@ -79,7 +79,7 @@ and composite both takes `className` and composes classes; a minority of blocks 
 neither, at all**.
 
 That gradient is the architecture made visible. Run
-`scripts/scan-storybook-architecture.mjs` on your own repo — if `className` is as common in your
+`scripts/audit/scan-storybook-architecture.mjs` on your own repo — if `className` is as common in your
 blocks as in your atoms, the tiers are folders, not layers.
 
 ## Inspection: a name belongs to whoever knows it

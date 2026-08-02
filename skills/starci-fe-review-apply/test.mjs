@@ -23,7 +23,7 @@ const text = readFileSync(join(REPO, "skills", "starci-fe-review-apply", "SKILL.
 
 /** Every in-repo reference the document makes, trailing sentence punctuation removed. */
 const cited = [...new Set(
-    (text.match(/(?:canon|patterns|design|skills)\/[A-Za-z0-9._/-]+/g) ?? [])
+    (text.match(/(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._/-]+/g) ?? [])
         .map((p) => p.replace(/[.,;:)]+$/, "")),
 )];
 

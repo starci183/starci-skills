@@ -54,9 +54,9 @@ No path is written down anywhere in this set, because a path is true on exactly 
 failure looks like success. Ask:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A missing context exits non-zero and prints the command that fixes it; registering a source is
@@ -82,7 +82,7 @@ A missing context exits non-zero and prints the command that fixes it; registeri
 3. **Look the shape up.** Describe the data in your own words, never the picture:
 
    ```bash
-   node .claude/scripts/search-component-matrix.mjs shape "an array of rows where each row hides a body"
+   node .claude/scripts/search/search-component-matrix.mjs shape "an array of rows where each row hides a body"
    ```
 
    Never open `canon/fe/explore/component/data/matrix.csv` whole, and never enter by a component name you
@@ -158,7 +158,7 @@ Grit is the common one and it is worth naming precisely, because it is the verdi
 number typed straight into a class rather than taken from the scale is grit; so is a wrapper added
 around a library entry to nudge its spacing. Both mean the same thing: change it in the set, or do
 not change it at all. The scale, and why each step is the number it is, is `canon/fe/enforce/spacing/overview.md`;
-the values a test compares against live in `patterns/fe/patterns.mjs`.
+the values a test compares against live in `canon/fe/explore/registry.mjs`.
 
 ## A gap is proposed, never enacted
 
@@ -183,9 +183,9 @@ first.** An entry that skipped it has no state matrix anybody can read, which me
 drew in step 4 exists only in the widget. The reasoning is in `canon/fe/enforce/tiers/architecture.md`; how a story
 file is spelled is `canon/fe/enforce/authoring/storybook-stories.md`; what a story has to render is
 `canon/fe/enforce/tiers/story.md`. It is not left to discipline —
-`patterns/fe/gates/check-story-coverage.mjs` requires a story at the mirror path,
-`patterns/fe/gates/check-doc-parity.mjs` requires the component's leading spec block and its story's
-to be identical, and `patterns/fe/gates/check-one-instance-per-state.mjs` requires each state to be
+`scripts/gates/check-story-coverage.mjs` requires a story at the mirror path,
+`scripts/gates/check-doc-parity.mjs` requires the component's leading spec block and its story's
+to be identical, and `scripts/gates/check-one-instance-per-state.mjs` requires each state to be
 rendered once rather than bundled into a demo.
 
 ## Measure, do not look
@@ -196,7 +196,7 @@ the same picture can both be correct at different values because each is anchore
 
 Check the viewport before trusting any measurement. With the document hidden or the width at zero,
 every rectangle comes back zero and healthy code looks exactly like broken code. The rendered-tree
-runner that does this properly, after every story, is `patterns/fe/runner/test-runner.ts`, and the
+runner that does this properly, after every story, is `scripts/runner/test-runner.ts`, and the
 contract it reads off the DOM is `canon/fe/enforce/testing.md`.
 
 A comment is a claim, not evidence. It sits in the file, it reads with authority, and nothing in the
@@ -218,7 +218,7 @@ have answered.
 | the material taught the opposite of what you measured | fix it, with a dated anchor and the before and after |
 
 A rule no machine can catch belongs in prose, in `canon/fe/` beside the rules it sits with; a rule a
-script can decide belongs in `patterns/fe/gates/`, not in prose, because a prose copy of a checkable
+script can decide belongs in `scripts/gates/`, not in prose, because a prose copy of a checkable
 fact is a second source of truth that is wrong the day the first one changes. A fix you are
 deliberately not making right now belongs in the debt ledger with its reason, not in a comment.
 `canon/HOW-TO-WRITE.md` governs all of this, including the rule that a change to a rule changes its

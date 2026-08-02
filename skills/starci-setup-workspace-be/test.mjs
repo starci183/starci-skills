@@ -53,9 +53,9 @@ function commitAll(dir) {
 
 function sandboxRunner(root) {
     const skillset = join(root, "skillset");
-    mkdirSync(join(skillset, "scripts"), { recursive: true });
+    mkdirSync(join(skillset, "scripts", "workspace"), { recursive: true });
     for (const f of ["register-workspace-source.mjs", "read-workspace-context.mjs"]) {
-        cpSync(join(REPO, "scripts", f), join(skillset, "scripts", f));
+        cpSync(join(REPO, "scripts", "workspace", f), join(skillset, "scripts", "workspace", f));
     }
     return (script, args = []) => t.run(join(skillset, script), args, root);
 }
@@ -67,7 +67,7 @@ try {
     {
         const ws = sandboxRunner(join(SANDBOX, "fresh"));
         t.expect("asking before setup exits 1 with the command that fixes it",
-            ws("scripts/read-workspace-context.mjs", ["be.url"]), { exit: 1, has: ["register-workspace-source.mjs"] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["be.url"]), { exit: 1, has: ["register-workspace-source.mjs"] });
     }
 
     // ---------------------------------------------------------------------
@@ -84,7 +84,7 @@ try {
             },
         });
         t.expect("with no .env, the port is the code's own default, and it says which file said so",
-            ws("scripts/register-workspace-source.mjs", ["--dry", "--project", "d", "--be", fromCode]),
+            ws("scripts/workspace/register-workspace-source.mjs", ["--dry", "--project", "d", "--be", fromCode]),
             { exit: 0, has: ["http://localhost:3001", "CORE_PORT default in"] });
 
         // .env wins, because overriding the default is precisely what an .env is for.
@@ -96,20 +96,20 @@ try {
             },
         });
         t.expect("an .env port beats the code default",
-            ws("scripts/register-workspace-source.mjs", ["--dry", "--project", "e", "--be", fromEnv]),
+            ws("scripts/workspace/register-workspace-source.mjs", ["--dry", "--project", "e", "--be", fromEnv]),
             { exit: 0, has: ["http://localhost:4100", "CORE_PORT in .env"] });
 
         // Not every project calls it CORE_PORT.
         const plainPort = makeRepo(join(root, "api-plain"), { env: "PORT=8080\n" });
         t.expect("a project that simply says PORT is read too",
-            ws("scripts/register-workspace-source.mjs", ["--dry", "--project", "p", "--be", plainPort]),
+            ws("scripts/workspace/register-workspace-source.mjs", ["--dry", "--project", "p", "--be", plainPort]),
             { exit: 0, has: ["http://localhost:8080"] });
 
         // Silence beats a guess: a made-up port fails at call time, far from its cause.
         const noPort = makeRepo(join(root, "api-silent"));
-        ws("scripts/register-workspace-source.mjs", ["--project", "s", "--be", noPort]);
+        ws("scripts/workspace/register-workspace-source.mjs", ["--project", "s", "--be", noPort]);
         t.expect("a project that states no port answers null rather than inventing one",
-            ws("scripts/read-workspace-context.mjs", ["be.url"]), { exit: 1, has: ["no value at"] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["be.url"]), { exit: 1, has: ["no value at"] });
     }
 
     // ---------------------------------------------------------------------
@@ -122,19 +122,19 @@ try {
             env: "CORE_PORT=4000\n",
         }));
 
-        const r = ws("scripts/register-workspace-source.mjs", ["--project", "shop", "--be", be]);
+        const r = ws("scripts/workspace/register-workspace-source.mjs", ["--project", "shop", "--be", be]);
         t.expect("a repo named nothing like ours is accepted, and annotated by its dependency", r,
             { exit: 0, has: ["shop-api", "depends on @nestjs/core"] });
         t.expect("the last commit is recorded, so a stale checkout is visible at a glance", r,
             { exit: 0, has: ["fixture"] });
         t.expect("one value prints bare, with no label to strip",
-            ws("scripts/read-workspace-context.mjs", ["be.url"]), { exit: 0, has: ["4000"], lacks: ["url  "] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["be.url"]), { exit: 0, has: ["4000"], lacks: ["url  "] });
         t.expect("--check passes for a project that states only a back end",
-            ws("scripts/register-workspace-source.mjs", ["--check"]), { exit: 0, has: ["ok"] });
+            ws("scripts/workspace/register-workspace-source.mjs", ["--check"]), { exit: 0, has: ["ok"] });
 
         rmSync(be, { recursive: true, force: true });
         t.expect("--check fails once the recorded tree is gone",
-            ws("scripts/register-workspace-source.mjs", ["--check"]), { exit: 1, has: ["does not exist"] });
+            ws("scripts/workspace/register-workspace-source.mjs", ["--check"]), { exit: 1, has: ["does not exist"] });
     }
 
     // ---------------------------------------------------------------------
@@ -144,18 +144,18 @@ try {
         const ws = sandboxRunner(root);
 
         t.expect("a path that does not exist is refused, and says which path",
-            ws("scripts/register-workspace-source.mjs", ["--dry", "--be", join(root, "nope")]),
+            ws("scripts/workspace/register-workspace-source.mjs", ["--dry", "--be", join(root, "nope")]),
             { exit: 1, has: ["does not exist", "nope"] });
 
         // This is the case that once recorded the backend as the front end as well, because it
         // carries vite to build an internal dashboard — and every FE lookup then hit the API.
         const both = makeRepo(join(root, "monolith"), { deps: { "@nestjs/core": "10", vite: "5" } });
         t.expect("one folder cannot be registered as both roles",
-            ws("scripts/register-workspace-source.mjs", [both, both]), { exit: 1, has: ["same folder"] });
+            ws("scripts/workspace/register-workspace-source.mjs", [both, both]), { exit: 1, has: ["same folder"] });
 
         const express = makeRepo(join(root, "legacy-api"), { deps: { express: "4" } });
         t.expect("a non-Nest server is recognised as a back end too",
-            ws("scripts/register-workspace-source.mjs", ["--dry", "--project", "l", "--be", express]),
+            ws("scripts/workspace/register-workspace-source.mjs", ["--dry", "--project", "l", "--be", express]),
             { exit: 0, has: ["depends on express"] });
     }
 } finally {

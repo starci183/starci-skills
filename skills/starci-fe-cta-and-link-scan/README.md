@@ -6,7 +6,7 @@ Notes for whoever changes it. `SKILL.md` is the interface; this is the reasoning
 
 Every other check in this repo answers a question about a file. Is this gap on the scale, does this
 component have a story, does this block earn its layer, is this prop typed. All of them can be
-decided by reading one file, which is why they are scripts under `patterns/fe/gates/` rather than
+decided by reading one file, which is why they are scripts under `scripts/gates/` rather than
 prose.
 
 The defect this skill hunts is not in a file. Two buttons of identical weight are individually

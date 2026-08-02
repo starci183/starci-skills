@@ -50,7 +50,7 @@ spelled**, so that a file written today reads like the file next to it:
 
 One law spans all of them: **no component reaches the app that was never a component and a story in
 the design-system folder first.** The reasoning is in `canon/fe/enforce/tiers/architecture.md`; the enforcement is
-`patterns/fe/gates/check-story-coverage.mjs`.
+`scripts/gates/check-story-coverage.mjs`.
 
 Four further shelves sit beside those, holding the material that decides what a screen may look like
 and do — a layer above spelling and below architecture. Each carries its own index, because each is
@@ -92,11 +92,11 @@ to open first. Its table is [`canon/be/concepts/INDEX.md`](be/concepts/INDEX.md)
 
 | Path | What it is |
 |---|---|
-| `patterns/fe/patterns.mjs` | the registry: every named layout concept, the property it governs, and the value it must compute to |
-| `patterns/fe/runner/test-runner.ts` | the rendered-tree audit that measures the registry against the browser, after every story |
-| `patterns/fe/gates/check-*.mjs` | the source-reading gates, one per rule that can be decided by reading a file |
+| `canon/fe/explore/registry.mjs` | the registry: every named layout concept, the property it governs, and the value it must compute to |
+| `scripts/runner/test-runner.ts` | the rendered-tree audit that measures the registry against the browser, after every story |
+| `scripts/gates/check-*.mjs` | the source-reading gates, one per rule that can be decided by reading a file |
 | `patterns/be/gates/` | the same idea on the back end |
-| `patterns/verify.mjs` | checks that the canon still describes the source it claims to describe |
+| `scripts/verify.mjs` | checks that the canon still describes the source it claims to describe |
 
 `verify.mjs` is the one to reach for before trusting a file you did not just write. Canon earns its
 authority by naming a real file and a real count, and that is exactly what rots: the source moves,
@@ -110,9 +110,9 @@ Never write a machine path into any file here. A path is true on exactly one mac
 looks like success: files open, greps return, conclusions get drawn from the wrong tree. Ask instead:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Registering a source is `starci-setup-workspace-fe` and `starci-setup-workspace-be`. A missing context
@@ -131,7 +131,7 @@ than applying:
 | `canon/fe/enforce/spacing/` | the closed sets — gap, padding, margin, position, responsive — and the reasoning under each |
 | `canon/fe/enforce/tiers/split.md` · `story.md` | the presentational split, and what a story must render |
 | `canon/fe/enforce/tiers/references/` | why each boundary sits where it does, which tiers are shared, how to read a scan |
-| `patterns/fe/data/` | the tier table and the import matrix, queryable |
+| `scripts/search/data/` | the tier table and the import matrix, queryable |
 | `canon/fe/explore/component/` | which component a data shape becomes: the matrix, its fifteen sections, and the traps per section |
 
 ## Reading order

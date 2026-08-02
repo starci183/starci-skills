@@ -16,13 +16,13 @@ So nothing here remembers. You state the source once per machine; every skill af
 
 ```bash
 # register the front end (folder, or a git URL to clone)
-node .claude/scripts/register-workspace-source.mjs --fe <dir-or-git-url> [--project <name>]
+node .claude/scripts/workspace/register-workspace-source.mjs --fe <dir-or-git-url> [--project <name>]
 
 # use it
-node .claude/scripts/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
 ```
 
-Then work against `$(node .claude/scripts/read-workspace-context.mjs fe.path)` rather than a literal path.
+Then work against `$(node .claude/scripts/workspace/read-workspace-context.mjs fe.path)` rather than a literal path.
 
 ## What you can ask for
 
@@ -37,9 +37,9 @@ Then work against `$(node .claude/scripts/read-workspace-context.mjs fe.path)` r
 | `fe.remote` · `fe.name` | origin URL, package name |
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs              # everything, for a human
-node .claude/scripts/read-workspace-context.mjs fe.path      # one value, bare — safe in $(...)
-node .claude/scripts/read-workspace-context.mjs --json       # the whole record
+node .claude/scripts/workspace/read-workspace-context.mjs              # everything, for a human
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path      # one value, bare — safe in $(...)
+node .claude/scripts/workspace/read-workspace-context.mjs --json       # the whole record
 ```
 
 A missing context exits 1 and prints the command that fixes it. Honour that exit code: continuing
@@ -48,9 +48,9 @@ with an empty string builds a path like `/src/app` and then fails somewhere far 
 ## Registering
 
 ```bash
-node .claude/scripts/register-workspace-source.mjs --fe ../shop-web --project shop
-node .claude/scripts/register-workspace-source.mjs --fe https://github.com/acme/shop-web.git --into ~/Repositories
-node .claude/scripts/register-workspace-source.mjs <fe-dir> <be-dir>     # positional: front end first
+node .claude/scripts/workspace/register-workspace-source.mjs --fe ../shop-web --project shop
+node .claude/scripts/workspace/register-workspace-source.mjs --fe https://github.com/acme/shop-web.git --into ~/Repositories
+node .claude/scripts/workspace/register-workspace-source.mjs <fe-dir> <be-dir>     # positional: front end first
 ```
 
 A git URL is cloned — into the current directory, or into `--into <dir>`. Running it again reuses
@@ -83,7 +83,7 @@ you said it is.
 ## Before trusting a recorded path
 
 ```bash
-node .claude/scripts/register-workspace-source.mjs --check
+node .claude/scripts/workspace/register-workspace-source.mjs --check
 ```
 
 Paths rot: trees get moved, renamed, deleted, or switched to another branch. `--check` costs
@@ -107,8 +107,8 @@ while another is checked out will mislead you, so read the warning.
 
 | Path | What it is |
 |---|---|
-| `.claude/scripts/register-workspace-source.mjs` | writes the record |
-| `.claude/scripts/read-workspace-context.mjs` | reads it |
+| `.claude/scripts/workspace/register-workspace-source.mjs` | writes the record |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | reads it |
 | `.claude/context/workspace.json` | the record, gitignored, per machine |
 | `README.md` | why this is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-setup-workspace-fe/test.mjs` |

@@ -45,9 +45,9 @@ language-picker endonym (`{ code: "vi", label: "Tiếng Việt" }`) — a langua
 
 ## Enforced by
 
-- [`check-story-anatomy.mjs`](../../../../scripts/check-story-anatomy.mjs) — a story under a required
+- [`check-story-anatomy.mjs`](../../../../scripts/gates/check-story-anatomy.mjs) — a story under a required
   tier that does not use `BlockAnatomy` is a violation.
-- [`check-no-vietnamese.mjs`](../../../../scripts/check-no-vietnamese.mjs) — any Vietnamese in a story
+- [`check-no-vietnamese.mjs`](../../../../scripts/gates/check-no-vietnamese.mjs) — any Vietnamese in a story
   or component (outside the sanctioned endonym) is a violation.
 
 ---

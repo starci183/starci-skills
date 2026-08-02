@@ -15,8 +15,8 @@ the app depends on the book, the book can no longer be changed without a release
 nobody can change is a design system nobody edits.
 
 A mirrored copy keeps both trees free. The cost is drift, and drift is exactly what a gate can catch
-— `patterns/fe/gates/check-src-sb-import.mjs` for the boundary,
-`patterns/fe/gates/check-doc-parity.mjs` for the spec block. The alternative's failure mode is one no
+— `scripts/gates/check-src-sb-import.mjs` for the boundary,
+`scripts/gates/check-doc-parity.mjs` for the spec block. The alternative's failure mode is one no
 gate can see.
 
 ## Why the connected half is written in the app and nowhere else

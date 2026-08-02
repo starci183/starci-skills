@@ -18,11 +18,11 @@
 
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { harness, REPO } from "../../scripts/test-harness.mjs";
+import { harness, REPO } from "../test-harness.mjs";
 
 const t = harness("patterns-canon-sync");
 
-const GATE = "patterns/fe/gates/check-canon-sync.mjs";
+const GATE = "scripts/gates/check-canon-sync.mjs";
 const SANDBOX = join(REPO, ".testtmp", "canon-sync");
 
 /** A registry with one gap, one symmetric padding, one asymmetric padding, one pixel-less token. */
@@ -58,8 +58,8 @@ what makes a pill read as a pill.
 function pair(name, { registry = REGISTRY, canon = AGREE }) {
     const root = join(SANDBOX, name);
     if (registry !== null) {
-        mkdirSync(join(root, "patterns", "fe"), { recursive: true });
-        writeFileSync(join(root, "patterns", "fe", "patterns.mjs"), registry);
+        mkdirSync(join(root, "canon", "fe", "explore"), { recursive: true });
+        writeFileSync(join(root, "canon", "fe", "explore", "registry.mjs"), registry);
     }
     if (canon !== null) {
         mkdirSync(join(root, "canon", "fe", "enforce", "spacing"), { recursive: true });
@@ -128,7 +128,7 @@ try {
 
     t.expect("no registry at all exits 1 naming the path it looked for",
         pair("noregistry", { registry: null }),
-        { exit: 1, has: ["patterns/fe/patterns.mjs", "does not exist"] });
+        { exit: 1, has: ["canon/fe/explore/registry.mjs", "does not exist"] });
 
     t.expect("a registry that cannot be loaded exits 1 rather than crashing the gate",
         pair("brokenregistry", { registry: "export const PATTERNS = { unclosed:\n" }),

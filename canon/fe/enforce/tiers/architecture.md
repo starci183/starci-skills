@@ -26,7 +26,7 @@ it know a domain entity?*
 | `page` | which blocks, in which frames, fed which data | draws a shape of its own | sentences |
 
 The machine-readable form of that table — including the *signal it belongs here* and *signal it is
-misplaced* column for each tier — is `patterns/fe/data/tiers.csv`, and each tier is written out
+misplaced* column for each tier — is `scripts/search/data/tiers.csv`, and each tier is written out
 in full in `canon/fe/enforce/tiers/<tier>.md` with worked examples beside it in
 `canon/fe/enforce/examples/<tier>.md`.
 
@@ -41,7 +41,7 @@ atom  <-  frame  <-  composite  <-  block  <-  page
 ```
 
 A higher tier may import a lower one. Never the reverse. The full matrix, pair by pair with the
-reason attached to each, is `patterns/fe/data/import-rules.csv`.
+reason attached to each, is `scripts/search/data/import-rules.csv`.
 
 The moment an atom imports a composite, that atom can no longer be used anywhere the composite is
 absent — it has stopped being a word. That is why the rule is stated as a direction rather than as a
@@ -181,7 +181,7 @@ tell them apart.
 
 This replaced an earlier overlay that drilled a `showAnatomy` switch through every level and hand-set
 badge attributes on children. That scaffolding is removed, and its removal is gated rather than
-remembered: `patterns/fe/gates/check-orphan-parts.mjs` and the purity gate reject a presentational
+remembered: `scripts/gates/check-orphan-parts.mjs` and the purity gate reject a presentational
 file that names the retired props.
 
 ## Which component a data shape becomes
@@ -232,17 +232,17 @@ can read.
 Resolve the two roots rather than remembering them:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
 ```
 
 A story is a storymap, not a demo: one prop per leaf, every value of that prop rendered, each state
 carrying the sentence that says when to reach for it. The rules for writing one are
 `canon/fe/enforce/tiers/story.md`, and how a story file is spelled is
 `canon/fe/enforce/authoring/storybook-stories.md`. Coverage is not left to discipline —
-`patterns/fe/gates/check-story-coverage.mjs` requires a story at the mirror path for every canonical
-component, `patterns/fe/gates/check-doc-parity.mjs` requires the component's leading spec block and
-its story's to be identical, and `patterns/fe/gates/check-src-sb-import.mjs` stops app code importing
+`scripts/gates/check-story-coverage.mjs` requires a story at the mirror path for every canonical
+component, `scripts/gates/check-doc-parity.mjs` requires the component's leading spec block and
+its story's to be identical, and `scripts/gates/check-src-sb-import.mjs` stops app code importing
 the design-system tree instead of its own twin.
 
 ## When two tiers both fit
@@ -255,6 +255,6 @@ at each call site — the exact state the tiers exist to prevent.
 
 Prose states the reason; a gate holds the line. The DOM-contract side of this — how `data-tier` and
 `data-component` are read back off the rendered tree and checked against each tier's allowed set — is
-`canon/fe/enforce/testing.md`. The source-side gates live in `patterns/fe/gates/`, and
-`patterns/fe/gates/check-passthrough-block.mjs` in particular enforces the one thing no rendered tree
+`canon/fe/enforce/testing.md`. The source-side gates live in `scripts/gates/`, and
+`scripts/gates/check-passthrough-block.mjs` in particular enforces the one thing no rendered tree
 can see: that a block earns its layer instead of forwarding.

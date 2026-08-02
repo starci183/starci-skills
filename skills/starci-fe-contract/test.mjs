@@ -3,7 +3,7 @@
  * Tests for starci-fe-contract.
  *
  * This skill ships no script of its own — it drives the runner and the gates that already live in
- * `patterns/fe/`. So there is nothing to execute here and no sandbox to build. What it ships is a
+ * `scripts/gates/`. So there is nothing to execute here and no sandbox to build. What it ships is a
  * document that POINTS somewhere, and the two ways such a document rots are both checkable: a
  * citation whose file has moved, and a machine path that crept back in.
  *
@@ -29,7 +29,7 @@ const SKILL = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "SKILL.
  * A glob is skipped: `check-*.mjs` names a family, not a file.
  */
 const cited = [...new Set(
-    (SKILL.match(/(?:canon|patterns|design|skills)\/[A-Za-z0-9._/-]+/g) ?? [])
+    (SKILL.match(/(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._/-]+/g) ?? [])
         .map((p) => p.replace(/[.,;:)]+$/, ""))
         .filter((p) => !p.includes("*")),
 )];

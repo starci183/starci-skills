@@ -8,7 +8,7 @@ decision that makes one storybook serve several products instead of one.
 the repo:
 
 ```bash
-node .claude/scripts/scan-storybook-architecture.mjs <path-to-repo>
+node .claude/scripts/audit/scan-storybook-architecture.mjs <path-to-repo>
 ```
 
 It reports the tiers it found at the top level (shared) and the app namespaces beneath them

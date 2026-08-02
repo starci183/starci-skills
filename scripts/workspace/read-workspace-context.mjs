@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 /** Root of this skill set — the folder holding `scripts/` and `context/`. */
-const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CONTEXT_FILE = join(REPO, "context", "workspace.json");
 
 // No context means this machine has never been set up. Say so with the exact command that

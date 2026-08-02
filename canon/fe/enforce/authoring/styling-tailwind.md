@@ -1,6 +1,6 @@
 # Styling and Tailwind — STRICT
 
-How to WRITE Tailwind classes in the FE source (`node .claude/scripts/read-workspace-context.mjs fe.path`):
+How to WRITE Tailwind classes in the FE source (`node .claude/scripts/workspace/read-workspace-context.mjs fe.path`):
 semantic tokens, `cn()`, the spacing and radius scales, variant-follows-background, phosphor icons.
 This is class code-style, not the design system — which specific colour or spacing to use is a
 design decision, made elsewhere.

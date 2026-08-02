@@ -11,7 +11,7 @@ The rule that makes this checkable:
 **Nothing reaches `src/` that was never a component and a story in the design system first**, and
 **`src/` renders the presentational file through `@/components/*`, never `@sb-components/*`.**
 
-The second half is a gate: `patterns/fe/gates/check-src-sb-import.mjs` fails any `src/` file that
+The second half is a gate: `scripts/gates/check-src-sb-import.mjs` fails any `src/` file that
 reaches into the storybook tree. It exists because that import is invisible in review — the code
 runs, the component renders — and ships design-system-only tooling to real users.
 

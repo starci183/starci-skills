@@ -33,7 +33,7 @@ t.group("it points outward, and every pointer still lands");
 
 // Any reference into the canon, the gates, the design material or a sibling skill — written
 // bare or with the `.claude/` prefix, in prose or inside a table cell.
-const CITATION = /(?:\.claude\/)?((?:canon|patterns|design|skills)\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(?:md|mjs|ts|tsx|csv|json))/g;
+const CITATION = /(?:\.claude\/)?((?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(?:md|mjs|ts|tsx|csv|json))/g;
 const cited = [...new Set([...skill.matchAll(CITATION)].map((m) => m[1]))].sort();
 
 t.expect("the skill cites the canon instead of restating it",

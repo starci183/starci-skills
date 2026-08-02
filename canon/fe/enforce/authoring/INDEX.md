@@ -12,15 +12,15 @@ those two decisions is spelled.
 Never hardcode a path. Ask:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Every rule below is grounded in that source — a real file, a real count. That grounding is also
 what rots, so before trusting a rule:
 
 ```bash
-node .claude/patterns/verify.mjs        # every anchor still resolves?
+node .claude/scripts/verify.mjs        # every anchor still resolves?
 ```
 
 ## Front end

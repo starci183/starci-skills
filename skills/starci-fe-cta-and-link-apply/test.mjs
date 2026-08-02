@@ -32,7 +32,7 @@ t.group("the citations still point at something");
 
 // This half routes work to other lanes and defers to canon for how a line is spelled. Every
 // one of those pointers is a promise, and a moved file breaks it without saying so.
-const CITATION = /\b(?:canon|patterns|design|skills)\/[A-Za-z0-9._*-]+(?:\/[A-Za-z0-9._*-]+)*\.(?:md|mjs|ts|csv)/g;
+const CITATION = /\b(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._*-]+(?:\/[A-Za-z0-9._*-]+)*\.(?:md|mjs|ts|csv)/g;
 const cited = [...new Set([...skill.matchAll(CITATION)].map((m) => m[0]))];
 
 /** A citation may name one file, or a family of them (`check-*.mjs`); both have to resolve. */
@@ -58,8 +58,8 @@ t.expect("it points outward rather than restating canon in place",
     { exit: 0 });
 
 t.expect("the storybook-first law is cited where the fix needs a component that does not exist",
-    verdict(cited.includes("patterns/fe/gates/check-story-coverage.mjs"),
-        cited.includes("patterns/fe/gates/check-story-coverage.mjs")
+    verdict(cited.includes("scripts/gates/check-story-coverage.mjs"),
+        cited.includes("scripts/gates/check-story-coverage.mjs")
             ? "story coverage is named as the gate that holds the line"
             : "the storybook-first gate is not cited"),
     { exit: 0, has: ["holds the line"] });

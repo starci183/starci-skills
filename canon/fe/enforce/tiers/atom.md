@@ -178,7 +178,7 @@ So the old prop is deleted in the same change that introduces the new one. If so
 move yet, that caller is the finding — record it as debt with the reason, and leave the prop only
 for as long as that entry is open.
 
-`scripts/audit-atoms.mjs` reports any atom still declaring `className?: string`, deprecated or not.
+`scripts/audit/audit-atoms.mjs` reports any atom still declaring `className?: string`, deprecated or not.
 
 **ATOM-6 · It composes classes for its own appearance.**
 
@@ -312,7 +312,7 @@ until it touches the other.
 > blueprint file. Is what remains the app's file? If not, the two have drifted, and the difference
 > is either a fix that never crossed or a decision nobody wrote down.
 
-`scripts/audit-atoms.mjs` compares the two trees: a file present in one and not the other, an entry
+`scripts/audit/audit-atoms.mjs` compares the two trees: a file present in one and not the other, an entry
 file not renamed to `index.tsx` on the app side, and any line that differs once the inspection
 tooling is removed.
 

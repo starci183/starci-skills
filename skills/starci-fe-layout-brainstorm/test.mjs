@@ -42,7 +42,7 @@ t.group("every path it cites still resolves");
  * not matched: they live on a machine this suite knows nothing about, which is why they are
  * written as `<fe.path>/...` rather than as a path at all.
  */
-const cited = [...text.matchAll(/(?:canon|patterns|design|skills)\/[A-Za-z0-9_.*\/-]+/g)]
+const cited = [...text.matchAll(/(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9_.*\/-]+/g)]
     .map((m) => m[0].replace(/[.,;:)]+$/, ""))
     .filter((p, i, all) => all.indexOf(p) === i);
 

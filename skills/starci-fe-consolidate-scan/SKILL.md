@@ -24,9 +24,9 @@ and nobody reviewing the proposal can check it.
 Never write a path down. Ask, every session:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.artifacts
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.artifacts
 ```
 
 A missing context exits non-zero and prints the command that fixes it; `starci-setup-workspace-fe`
@@ -107,7 +107,7 @@ component: `canon/fe/explore/component/data/matrix.csv`, with its deciding tests
 failure that produces is type-valid and renders fine.
 
 Then the tier, from `canon/fe/enforce/tiers/architecture.md` and the machine-readable table
-`patterns/fe/data/tiers.csv`. When two tiers both fit, pick the lower one. Where a boundary looks
+`scripts/search/data/tiers.csv`. When two tiers both fit, pick the lower one. Where a boundary looks
 arbitrary, the reason it sits there is in `canon/fe/enforce/tiers/references/tier-boundaries.md`.
 
 A proposed target is a **component and a story in the design system**, in that order, always — no
@@ -182,7 +182,7 @@ handover and reads the same in a session next month.
 
 | Path | What it is |
 |---|---|
-| `.claude/scripts/read-workspace-context.mjs` | resolves both trees, per machine |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | resolves both trees, per machine |
 | `<fe.artifacts>/consolidate/<scope>.md` | the proposal, beside the tree it describes |
 | `.claude/skills/starci-fe-consolidate-apply/SKILL.md` | the half that builds it |
 | `README.md` | why this is shaped the way it is |

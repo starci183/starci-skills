@@ -1,6 +1,6 @@
 ---
 name: starci-fe-consolidate-apply
-description: Consolidates one batch of duplicated components into a single canonical component and rewires the call sites, working from a proposal written by starci-fe-consolidate-scan — it reuses or extracts the target as a component and a story in the design system first, replaces every call site the cluster names, deletes the code that was duplicated, verifies with the type checker, the source gates under `patterns/fe/gates/` and the rendered-tree runner, then records what landed. Use it when the finding already exists and the work is to land it: "apply the consolidation", "do the first batch in the proposal", "merge these three cards into one component", "gom component đã chốt", "chốt gom theo proposal", "replace the copies with the block we extracted". Use it also when a scan and an apply happen in different sessions, because the proposal is the whole handover. Not for finding duplication or for changing what a proposal says — that is starci-fe-consolidate-scan, and a consolidation you would rather do differently goes back there first. Not for authoring a component nobody has asked for yet.
+description: Consolidates one batch of duplicated components into a single canonical component and rewires the call sites, working from a proposal written by starci-fe-consolidate-scan — it reuses or extracts the target as a component and a story in the design system first, replaces every call site the cluster names, deletes the code that was duplicated, verifies with the type checker, the source gates under `scripts/gates/` and the rendered-tree runner, then records what landed. Use it when the finding already exists and the work is to land it: "apply the consolidation", "do the first batch in the proposal", "merge these three cards into one component", "gom component đã chốt", "chốt gom theo proposal", "replace the copies with the block we extracted". Use it also when a scan and an apply happen in different sessions, because the proposal is the whole handover. Not for finding duplication or for changing what a proposal says — that is starci-fe-consolidate-scan, and a consolidation you would rather do differently goes back there first. Not for authoring a component nobody has asked for yet.
 ---
 
 # Consolidating duplicates
@@ -20,9 +20,9 @@ been deleted.
 ## Where the code is
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.artifacts
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.artifacts
 ```
 
 The proposal is `consolidate/<scope>.md` under the artifacts folder. It was written beside the tree it
@@ -92,7 +92,7 @@ Work the call sites in the order the proposal lists them, and delete the duplica
 is replaced rather than at the end. A deletion deferred to the end is a deletion that gets forgotten
 under a passing type check — the old code still compiles, still renders, and is now the fourth copy.
 
-The app imports its own twin, never the design-system tree directly; `patterns/fe/gates/check-src-sb-import.mjs`
+The app imports its own twin, never the design-system tree directly; `scripts/gates/check-src-sb-import.mjs`
 holds that line. Nothing above the vocabulary tiers gains a `className` in the process, and no page
 composes a class at all.
 
@@ -102,7 +102,7 @@ Three layers, and they see different things. The type checker proves the wiring;
 prove the shape of the files; the runner proves what the browser actually produced.
 
 ```bash
-FE=$(node .claude/scripts/read-workspace-context.mjs fe.path)
+FE=$(node .claude/scripts/workspace/read-workspace-context.mjs fe.path)
 npx tsc --noEmit -p "$FE"
 npm --prefix "$FE" run lint
 ```
@@ -111,18 +111,18 @@ Then the gates that this kind of change breaks most often:
 
 | Gate | What it catches here |
 |---|---|
-| `patterns/fe/gates/check-story-coverage.mjs` | a target that reached the app without a story |
-| `patterns/fe/gates/check-doc-parity.mjs` | the component's spec block and its story's drifting apart |
-| `patterns/fe/gates/check-src-sb-import.mjs` | app code importing the design system instead of its twin |
-| `patterns/fe/gates/check-passthrough-block.mjs` | a "consolidated" block that only forwards |
-| `patterns/fe/gates/check-deps-coverage.mjs` | a call site the rewiring missed |
-| `patterns/fe/gates/check-seams.mjs` · `patterns/fe/gates/check-padding.mjs` | spacing hand-written while merging |
-| `patterns/fe/gates/check-pattern-coverage.mjs` | a seam realised in the new target and never named |
-| `patterns/fe/gates/check-one-instance-per-state.mjs` · `patterns/fe/gates/check-no-namespace.mjs` | the story written as a demo |
-| `patterns/fe/gates/check-skeleton-prop.mjs` · `patterns/fe/gates/check-inline-types.mjs` | declarations no render exposes |
+| `scripts/gates/check-story-coverage.mjs` | a target that reached the app without a story |
+| `scripts/gates/check-doc-parity.mjs` | the component's spec block and its story's drifting apart |
+| `scripts/gates/check-src-sb-import.mjs` | app code importing the design system instead of its twin |
+| `scripts/gates/check-passthrough-block.mjs` | a "consolidated" block that only forwards |
+| `scripts/gates/check-deps-coverage.mjs` | a call site the rewiring missed |
+| `scripts/gates/check-seams.mjs` · `scripts/gates/check-padding.mjs` | spacing hand-written while merging |
+| `scripts/gates/check-pattern-coverage.mjs` | a seam realised in the new target and never named |
+| `scripts/gates/check-one-instance-per-state.mjs` · `scripts/gates/check-no-namespace.mjs` | the story written as a demo |
+| `scripts/gates/check-skeleton-prop.mjs` · `scripts/gates/check-inline-types.mjs` | declarations no render exposes |
 
-Finally the rendered-tree runner, `patterns/fe/runner/test-runner.ts`, which resolves its vocabulary
-from `patterns/fe/patterns.mjs` and measures the boxes the browser produced rather than the strings
+Finally the rendered-tree runner, `scripts/runner/test-runner.ts`, which resolves its vocabulary
+from `canon/fe/explore/registry.mjs` and measures the boxes the browser produced rather than the strings
 the files contain. What each audit can and cannot prove is `canon/fe/enforce/testing.md` — read it before
 treating a green run as more than it is.
 
@@ -146,7 +146,7 @@ it, because the proposal did not ask for it.
    new entry instead, with the reason, so no future scan spends its budget on it.
 3. **The canon, only if the change taught something.** A rule earns its place by describing what the
    code already does, and it carries the file it was read from and the day it was measured —
-   `canon/HOW-TO-WRITE.md`. Re-ground the anchors afterwards with `patterns/verify.mjs`.
+   `canon/HOW-TO-WRITE.md`. Re-ground the anchors afterwards with `scripts/verify.mjs`.
 
 ## Constraints
 
@@ -157,7 +157,7 @@ silently inside a diff that claims to be applying an approved plan.
 
 ## Common mistakes
 
-- **Leaving one call site.** The reason for the whole skill. `patterns/fe/gates/check-deps-coverage.mjs`
+- **Leaving one call site.** The reason for the whole skill. `scripts/gates/check-deps-coverage.mjs`
   and a grep of the deleted markup both find it in seconds.
 - **Keeping the old code beside the new component "until it settles".** It never settles; it gets
   imported.
@@ -174,7 +174,7 @@ silently inside a diff that claims to be applying an approved plan.
 
 | Path | What it is |
 |---|---|
-| `.claude/scripts/read-workspace-context.mjs` | resolves both trees, per machine |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | resolves both trees, per machine |
 | `<fe.artifacts>/consolidate/<scope>.md` | the proposal being applied, and where the result is recorded |
 | `.claude/skills/starci-fe-consolidate-scan/SKILL.md` | the half that finds and proposes |
 | `README.md` | why this is shaped the way it is |

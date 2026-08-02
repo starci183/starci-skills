@@ -21,7 +21,7 @@ node .claude/scripts/choose-design-system.mjs generate --into C:/Repositories
 Afterwards, and from then on:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs design_system.path
+node .claude/scripts/workspace/read-workspace-context.mjs design_system.path
 ```
 
 ## What it does, in order
@@ -67,7 +67,7 @@ no app and are shared by all of them.
 Ask the book you just fetched what its shape is, rather than trusting a description:
 
 ```bash
-node .claude/scripts/scan-storybook-architecture.mjs "$(node .claude/scripts/read-workspace-context.mjs design_system.path)/.."
+node .claude/scripts/audit/scan-storybook-architecture.mjs "$(node .claude/scripts/workspace/read-workspace-context.mjs design_system.path)/.."
 ```
 
 It reports which tiers are shared, which app namespaces exist, and whether anyone has copied a
@@ -104,7 +104,7 @@ brings it forward; the clone keeps that line home, which a copied folder would n
 | Path | What it is |
 |---|---|
 | `.claude/scripts/choose-design-system.mjs` | fetches, registers, records, checks |
-| `.claude/scripts/read-workspace-context.mjs` | reads it back — `design_system.path` |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | reads it back — `design_system.path` |
 | `.claude/context/workspace.json` | the ledger, gitignored, per machine |
 | `test.mjs` | `node .claude/skills/starci-setup-storybook-generate/test.mjs` |
 

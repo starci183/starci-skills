@@ -80,5 +80,5 @@ rebuilt out of raw parts.
 
 ---
 
-Read from a live tree with `scripts/scan-storybook-architecture.mjs`. Another repo answers with
+Read from a live tree with `scripts/audit/scan-storybook-architecture.mjs`. Another repo answers with
 different names, and its answer outranks this file.

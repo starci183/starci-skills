@@ -44,7 +44,7 @@ partway through the measurement, and every finding written before the edit was g
 ruler that no longer exists.
 
 The rule change is real work with its own procedure — read the source first, change the rule, the
-anchor and the date together, then `patterns/verify.mjs`. It happens after the report, not inside
+anchor and the date together, then `scripts/verify.mjs`. It happens after the report, not inside
 it.
 
 ## Running the tests

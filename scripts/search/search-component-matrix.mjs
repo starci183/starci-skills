@@ -33,7 +33,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 /** Root of this skill — the folder holding `data/`, `references/`, `scripts/`. */
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
  * Read a CSV from `data/` into an array of row objects keyed by the header.

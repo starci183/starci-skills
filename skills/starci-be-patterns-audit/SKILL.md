@@ -1,6 +1,6 @@
 ---
 name: starci-be-patterns-audit
-description: Re-grounds the back-end canon against the backend source it claims to describe — dead anchors, counts that no longer recount, and rules whose file still exists but whose idiom the code has quietly stopped following — then records what it found so the next run reads only what changed since the last one. Use this skill whenever the back-end rules need to be trusted or are suspected of having gone stale: "audit the backend canon", "is canon/be still true", "check the be rules against the source", "does this rule still describe the code", "re-ground the exceptions doc", "soi patterns be", "dong bo canon backend voi code", "canon be con dung khong", and before leaning on a back-end rule in a review or a generated module. Reach for it also after a large backend refactor, when folders moved and nothing announced it. Not for changing application code — this skill reads the backend and never writes it; not for the front-end canon, whose lane is the FE audit and the gates under patterns/fe/; and not for recording a deferral, which is starci-record-debt.
+description: Re-grounds the back-end canon against the backend source it claims to describe — dead anchors, counts that no longer recount, and rules whose file still exists but whose idiom the code has quietly stopped following — then records what it found so the next run reads only what changed since the last one. Use this skill whenever the back-end rules need to be trusted or are suspected of having gone stale: "audit the backend canon", "is canon/be still true", "check the be rules against the source", "does this rule still describe the code", "re-ground the exceptions doc", "soi patterns be", "dong bo canon backend voi code", "canon be con dung khong", and before leaning on a back-end rule in a review or a generated module. Reach for it also after a large backend refactor, when folders moved and nothing announced it. Not for changing application code — this skill reads the backend and never writes it; not for the front-end canon, whose lane is the FE audit and the gates under scripts/gates/; and not for recording a deferral, which is starci-record-debt.
 ---
 
 # Auditing the back-end canon
@@ -12,7 +12,7 @@ an idiom recorded in July stops being how the tenth module spells it — and non
 sound. The document still reads as authoritative, and a reader quoting it is quoting a claim nobody
 can reproduce.
 
-Half of that decay a machine can see. `patterns/verify.mjs` walks every `.md` under `canon/be/`,
+Half of that decay a machine can see. `scripts/verify.mjs` walks every `.md` under `canon/be/`,
 resolves each path the prose names against the registered backend, and recounts every `N files`
 claim that has a symbol beside it. Run it and you learn which anchors are dead.
 
@@ -31,7 +31,7 @@ does not restate it — read it before changing a single rule.
 
 | Failure | How it reads | What catches it |
 |---|---|---|
-| the anchor is gone | the rule names a path that no longer exists in the source | `patterns/verify.mjs`, as FAIL |
+| the anchor is gone | the rule names a path that no longer exists in the source | `scripts/verify.mjs`, as FAIL |
 | the count drifted | a `N files` claim recounts to a different number | the same run, as WARN — but only when a backticked symbol sits on that line |
 | the count is written in words | `contracts/exceptions.md` says real running code contains **zero** `throw new Error`; `conventions/config-and-env.md` says `process.env` is read in one file with three named exceptions | nothing mechanical. A person recounts these |
 | the idiom moved | the anchor resolves and the file no longer does what the rule describes | nothing. A person reads the file |
@@ -44,10 +44,10 @@ to delete freely.
 ## Quick start
 
 ```bash
-node .claude/scripts/register-workspace-source.mjs --check
-node .claude/patterns/verify.mjs be
+node .claude/scripts/workspace/register-workspace-source.mjs --check
+node .claude/scripts/verify.mjs be
 
-BE=$(node .claude/scripts/read-workspace-context.mjs be.path)
+BE=$(node .claude/scripts/workspace/read-workspace-context.mjs be.path)
 cat "$BE/.artifacts/states/patterns-audit-be.json"
 ```
 
@@ -62,7 +62,7 @@ costs nothing. A branch change is a warning rather than a failure, but read it: 
 against a branch where half the modules have not landed yet produces confident nonsense in both
 directions.
 
-**2. Run the mechanical half first, and clear it first.** `node .claude/patterns/verify.mjs be`
+**2. Run the mechanical half first, and clear it first.** `node .claude/scripts/verify.mjs be`
 exits 1 on a dead anchor. Fix those before reading anything downstream — every later step reads
 these same documents, and a rule pointing at a deleted folder cannot be judged, only re-grounded or
 removed.
@@ -119,7 +119,7 @@ rediscovered by walking into it.
 independent places to begin with. One occurrence is an anchor to that case, not a law — say so in
 the rule or delete it. When a finding recurs in run after run and is mechanically decidable, the
 right answer is to stop auditing it by hand and promote it to a gate, alongside the shape of
-`patterns/fe/gates/check-canon-sync.mjs`, which holds the front-end prose and its registry to the
+`scripts/gates/check-canon-sync.mjs`, which holds the front-end prose and its registry to the
 same numbers.
 
 ## The state lives in the audited tree
@@ -152,7 +152,7 @@ independent sources and belongs in the canon-writing lane, not in an audit repor
 
 The front end is not in scope, and its central law is enforced elsewhere: no component reaches the
 app that was never a component and a story in the design-system folder first — the reasoning sits in
-`canon/fe/enforce/tiers/architecture.md`, the enforcement in `patterns/fe/gates/check-story-coverage.mjs`, and
+`canon/fe/enforce/tiers/architecture.md`, the enforcement in `scripts/gates/check-story-coverage.mjs`, and
 neither is this skill's business.
 
 ## When this runs wide
@@ -185,9 +185,9 @@ twice is not.
 
 | Path | What it is |
 |---|---|
-| `.claude/patterns/verify.mjs` | the mechanical half: anchors and counts |
-| `.claude/scripts/read-workspace-context.mjs` | where the backend is, on this machine |
-| `.claude/scripts/register-workspace-source.mjs` | `--check`, before trusting that answer |
+| `.claude/scripts/verify.mjs` | the mechanical half: anchors and counts |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | where the backend is, on this machine |
+| `.claude/scripts/workspace/register-workspace-source.mjs` | `--check`, before trusting that answer |
 | `.claude/scripts/record-technical-debt.mjs` | where a deferred finding goes |
 | `.claude/canon/be/INDEX.md` | the three shelves, and which question each answers |
 | `.claude/canon/HOW-TO-WRITE.md` | how a rule is changed, and when it is deleted |

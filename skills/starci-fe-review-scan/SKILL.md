@@ -20,9 +20,9 @@ Nothing here changes code. The output is a ranked proposal; the change is the ap
 ## Before anything: resolve the source
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.artifacts
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.artifacts
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour the exit code — see
@@ -36,7 +36,7 @@ not a failure; ask where the proposal should live rather than inventing a folder
 
 A review that re-checks what a gate already fails wastes the only expensive thing in the room, which
 is judgement. Before grading anything, run what runs by itself: the source gates in
-`patterns/fe/gates/` and the rendered-tree runner `patterns/fe/runner/test-runner.ts`. Between them
+`scripts/gates/` and the rendered-tree runner `scripts/runner/test-runner.ts`. Between them
 they already own a large share of two of these axes — the gap that is off the scale, the concept
 token nothing can resolve, the responsive switch that fires at a width nobody named, the story that
 does not exist. What each check can and cannot prove is written out in `canon/fe/enforce/testing.md`, and it
@@ -198,8 +198,8 @@ Anything real but out of scope for this review is recorded rather than carried i
 | `canon/fe/enforce/spacing/overview.md` | the four container widths, and what a responsive value may be |
 | `canon/fe/enforce/spacing/responsive.md` | why the breakpoints are container queries |
 | `canon/fe/enforce/testing.md` | what the runner proves, and what it states it cannot |
-| `patterns/fe/gates/` | the source gates to run before grading anything by hand |
-| `patterns/fe/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
+| `scripts/gates/` | the source gates to run before grading anything by hand |
+| `scripts/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
 | `skills/starci-fe-review-apply` | the half that builds the approved findings |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-review-scan/test.mjs` |

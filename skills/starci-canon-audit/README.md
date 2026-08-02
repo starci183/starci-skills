@@ -18,7 +18,7 @@ passes.
 
 ## Why the mechanical half runs first, and why it is a separate program
 
-`patterns/verify.mjs` is not part of this skill. It is a standalone check that anyone can run
+`scripts/verify.mjs` is not part of this skill. It is a standalone check that anyone can run
 before trusting a canon file they did not just write, and it must stay that way — a check that only
 exists inside an audit gets run only when someone remembers to audit.
 

@@ -7,7 +7,7 @@ description: Reads a scope of the front end as a conversion and navigation graph
 
 A page can pass every gate in this repo and still be a dead end. The tier is right, the seams sit on
 the ladder, the story exists, the types check — and the person who arrived has no idea what to do
-next, or has two equally loud buttons and therefore picks neither. Nothing in `patterns/fe/gates/`
+next, or has two equally loud buttons and therefore picks neither. Nothing in `scripts/gates/`
 can catch that, because it is not a property of a file. It is a property of the graph the files add
 up to.
 
@@ -23,9 +23,9 @@ Thursday, in another session, by someone who was not there.
 ## Where the source is
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Ask every run rather than remembering — the reasoning is
@@ -165,7 +165,7 @@ Some findings cannot be fixed by editing the app. Turning a plain-text mention i
 link, when no such component exists, is not a copy change — it is a new component, and **no component
 reaches the app that was never a component and a story in the design-system folder first**
 ([`canon/fe/enforce/tiers/architecture.md`](../../canon/fe/enforce/tiers/architecture.md), enforced by
-[`patterns/fe/gates/check-story-coverage.mjs`](../../patterns/fe/gates/check-story-coverage.mjs)).
+[`scripts/gates/check-story-coverage.mjs`](../../scripts/gates/check-story-coverage.mjs)).
 
 Say so in the proposal. A finding priced as a one-line copy edit that actually needs a component and
 its full state matrix is the kind of estimate that turns an approved batch into an abandoned one.

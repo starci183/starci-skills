@@ -22,9 +22,9 @@ measurement that disagree, and the interesting question is which of the two is w
 ## 1. Resolve the roots
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.storybook_url
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.storybook_url
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour that exit code:
@@ -38,7 +38,7 @@ the reason the roots are resolved first rather than assumed.
 
 ## 2. Run the source gates
 
-The gates live in `patterns/fe/gates/`, one per rule that can be decided by reading a file. Each
+The gates live in `scripts/gates/`, one per rule that can be decided by reading a file. Each
 exits non-zero on a violation and prints the file and line; most also take `--json` for a
 machine-readable list, and a few take `--report` to enumerate without failing.
 
@@ -53,11 +53,11 @@ declarations no render exposes.
 
 ## 3. Run the rendered-tree runner
 
-The runner is `patterns/fe/runner/test-runner.ts`, wired as the story test-runner's configuration.
+The runner is `scripts/runner/test-runner.ts`, wired as the story test-runner's configuration.
 It needs a Storybook actually serving at `fe.storybook_url`, because it drives a real browser: each
 story is visited, the tree is read, and five audits run against it.
 
-It resolves its vocabulary from the registry `patterns/fe/patterns.mjs` rather than holding a table
+It resolves its vocabulary from the registry `canon/fe/explore/registry.mjs` rather than holding a table
 of its own. That is deliberate and worth knowing before you debug a wall of red: a change to the
 registry makes the audits go out of date **loudly**, failing everywhere at once, instead of drifting
 quietly. A run that fails on nearly every story usually means the registry moved, not that the app
@@ -138,9 +138,9 @@ Record anything left unfixed rather than remembering it, through `skills/starci-
 | Path | Holds |
 |---|---|
 | `canon/fe/enforce/testing.md` | why the two lanes exist, the five audits, and what each cannot prove |
-| `patterns/fe/runner/test-runner.ts` | the rendered-tree audit, run after every story |
-| `patterns/fe/patterns.mjs` | the registry the runner resolves every token against |
-| `patterns/fe/gates/` | the source-reading gates, one per rule a file can answer |
+| `scripts/runner/test-runner.ts` | the rendered-tree audit, run after every story |
+| `canon/fe/explore/registry.mjs` | the registry the runner resolves every token against |
+| `scripts/gates/` | the source-reading gates, one per rule a file can answer |
 | `canon/fe/enforce/spacing/overview.md` | what each named seam and inset means, beside its value |
 | `canon/fe/enforce/tiers/architecture.md` | the tiers, the import direction, and emitted identity |
 | `README.md` | why this skill is shaped the way it is |

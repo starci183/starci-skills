@@ -33,7 +33,7 @@ t.group("the citations still point at something");
 
 // Pointing outward is the whole design: canon states the rule once and this file names where.
 // The failure that design invites is a reference outliving the file it names, silently.
-const CITATION = /\b(?:canon|patterns|design|skills)\/[A-Za-z0-9._*-]+(?:\/[A-Za-z0-9._*-]+)*\.(?:md|mjs|ts|csv)/g;
+const CITATION = /\b(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._*-]+(?:\/[A-Za-z0-9._*-]+)*\.(?:md|mjs|ts|csv)/g;
 const cited = [...new Set([...skill.matchAll(CITATION)].map((m) => m[0]))];
 
 /** A citation may name one file, or a family of them (`check-*.mjs`); both have to resolve. */

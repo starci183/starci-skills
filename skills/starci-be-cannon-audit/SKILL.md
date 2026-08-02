@@ -21,7 +21,7 @@ edits the tree it is grading.** The repair is a separate, approved act, and it b
 The backend lives at a different absolute path on every machine, so nothing here remembers one.
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A non-zero exit means this machine has never stated where its backend is; it prints the command
@@ -111,7 +111,7 @@ proposal, and leave the count of findings untouched.
 **It does not edit the canon.** Discovering that a rule is stale is a normal outcome — the source
 wins, says `canon/be/INDEX.md` — but changing a rule has its own procedure in
 `canon/HOW-TO-WRITE.md`, which starts by reading the source the rule describes and ends with
-`patterns/verify.mjs`. Doing that mid-audit rewrites the ruler while measuring with it.
+`scripts/verify.mjs`. Doing that mid-audit rewrites the ruler while measuring with it.
 
 **It does not guess an anchor.** A rule you believe is broken but cannot point a line at goes in a
 "needs verification" list. A confident finding with an invented line number costs more than the
@@ -127,7 +127,7 @@ them trains readers to skim past the blocking findings.
 |---|---|
 | `canon/be/INDEX.md` | the three shelves, and which question each answers |
 | `canon/HOW-TO-WRITE.md` | what makes a rule a rule, and how one is changed |
-| `.claude/scripts/read-workspace-context.mjs` | where the backend actually is on this machine |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | where the backend actually is on this machine |
 | `.claude/scripts/record-technical-debt.mjs` | the ledger for what is knowingly left undone |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-be-cannon-audit/test.mjs` |

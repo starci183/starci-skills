@@ -44,12 +44,12 @@ import { dirname, join, resolve } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** `.claude/` — this file sits at `patterns/fe/gates/`. */
-const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
+const DEFAULT_ROOT = resolve(HERE, "..", "..");
 
 const argRoot = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const ROOT = argRoot ? resolve(argRoot) : DEFAULT_ROOT;
 
-const REGISTRY = join(ROOT, "patterns", "fe", "patterns.mjs");
+const REGISTRY = join(ROOT, "canon", "fe", "explore", "registry.mjs");
 const CANON = join(ROOT, "canon", "fe", "enforce", "spacing", "overview.md");
 
 /** Paths are printed with forward slashes so a message reads the same on every platform. */

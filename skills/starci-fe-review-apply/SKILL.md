@@ -21,9 +21,9 @@ said. Either way it is written down before the edit, not after.
 ## Before anything: resolve the source
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.storybook_url
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.storybook_url
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour the exit code — see
@@ -85,8 +85,8 @@ presentational component, however small the word is.
    story exist, the story is where the change is made and looked at: it is the only place the states
    sit side by side with no server. How a story is written is
    `canon/fe/enforce/authoring/storybook-stories.md`; that it exists at all is gated by
-   `patterns/fe/gates/check-story-coverage.mjs`, and that its spec block still matches the
-   component's by `patterns/fe/gates/check-doc-parity.mjs`.
+   `scripts/gates/check-story-coverage.mjs`, and that its spec block still matches the
+   component's by `scripts/gates/check-doc-parity.mjs`.
 
 4. **Fix the axis on its own terms.**
    - *Copy* — the key exists in both catalogs and they mirror each other, interpolation is ICU in
@@ -100,11 +100,11 @@ presentational component, however small the word is.
    - *Width* — a shape that changes names the width it changes at, as a prop, on the four container
      steps and nowhere else: `canon/fe/enforce/spacing/responsive.md` and
      `canon/fe/enforce/spacing/overview.md`. A seam or an inset that has to move moves by its named concept, not
-     by a hand-written class, and `patterns/fe/patterns.mjs` holds what each concept must compute
+     by a hand-written class, and `canon/fe/explore/registry.mjs` holds what each concept must compute
      to.
 
 5. **Prove it, on the axis you touched.** Type-check and lint, then run the contract: the source
-   gates in `patterns/fe/gates/` and the rendered-tree runner `patterns/fe/runner/test-runner.ts`,
+   gates in `scripts/gates/` and the rendered-tree runner `scripts/runner/test-runner.ts`,
    whose reach and limits are `canon/fe/enforce/testing.md`. Then look, because the runner does not read:
    a copy fix is read in both locales; an accessibility fix is tabbed to with a keyboard and its
    contrast measured; a width fix is resized through the four steps with real strings in both
@@ -149,8 +149,8 @@ back as a finding that matches the work.
 | `canon/fe/enforce/spacing/overview.md` | the named seams, insets and container widths |
 | `canon/fe/enforce/spacing/responsive.md` | naming the width a shape changes at |
 | `canon/fe/enforce/authoring/storybook-stories.md` | how the change is demonstrated before it ships |
-| `patterns/fe/gates/` | the source gates, run before this is called done |
-| `patterns/fe/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
+| `scripts/gates/` | the source gates, run before this is called done |
+| `scripts/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
 | `skills/starci-record-debt` | where a deliberate deferral goes |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-review-apply/test.mjs` |

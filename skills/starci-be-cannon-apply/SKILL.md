@@ -21,7 +21,7 @@ the tempting adjacent fix that nobody asked for does not.
 ## 1. Resolve the source
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A non-zero exit means this machine has never stated where its backend is, and it prints the
@@ -100,7 +100,7 @@ silent exception becomes precedent the next time somebody greps for how this is 
 
 **It does not edit the canon to match the code it just wrote.** That inverts the whole
 arrangement. A rule changes through `canon/HOW-TO-WRITE.md` — read the source first, change the
-rule, the anchor and the date together, then `patterns/verify.mjs` — and never in the same breath
+rule, the anchor and the date together, then `scripts/verify.mjs` — and never in the same breath
 as the code that would benefit from the change.
 
 **It does not widen the scope on its own.** Adjacent drift noticed while working is either
@@ -123,7 +123,7 @@ summary — it spends the reviewer's trust on nothing.
 |---|---|
 | `canon/be/INDEX.md` | the three shelves, and which question each answers |
 | `canon/HOW-TO-WRITE.md` | what makes a rule a rule, and how one is changed |
-| `.claude/scripts/read-workspace-context.mjs` | where the backend actually is on this machine |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | where the backend actually is on this machine |
 | `.claude/scripts/record-technical-debt.mjs` | the ledger for what is knowingly left undone |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-be-cannon-apply/test.mjs` |

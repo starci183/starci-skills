@@ -21,7 +21,7 @@ a rule a machine can check is not a matter of taste.
 | `explore/patterns/` | the shape a recurring situation takes: when a drawer, a form flow, the three tiers of loading, a search-filter-list surface |
 | `explore/layouts/` | which shell a surface's job calls for, and how its regions collapse |
 | `explore/foundations/` | the tokens the above are spent in — colour, radius, typography, the spacing scale |
-| `explore/component/` | which component a shape of data becomes — `data/matrix.csv` is the lookup, read one row at a time via `scripts/search-component-matrix.mjs`. The matrix feeds the judgement; it does not replace it. |
+| `explore/component/` | which component a shape of data becomes — `data/matrix.csv` is the lookup, read one row at a time via `scripts/search/search-component-matrix.mjs`. The matrix feeds the judgement; it does not replace it. |
 
 Nothing here has a gate. A rule in this lane that acquires one has stopped belonging here.
 
@@ -30,12 +30,12 @@ Nothing here has a gate. A rule in this lane that acquires one has stopped belon
 | Shelf | What a gate holds you to |
 |---|---|
 | `enforce/tiers/` | which tier a component is, what it may import, the presentational and connected split, what a story must render |
-| `enforce/spacing/` | the pixel a named seam or inset must compute to — `overview.md` is the prose, `patterns/fe/patterns.mjs` the values, kept equal by `patterns/fe/gates/check-canon-sync.mjs` |
+| `enforce/spacing/` | the pixel a named seam or inset must compute to — `overview.md` is the prose, `canon/fe/explore/registry.mjs` the values, kept equal by `scripts/gates/check-canon-sync.mjs` |
 | `enforce/authoring/` | how a line of code is spelled — imports, props, async data, forms, comments, i18n |
 | `enforce/examples/` | one worked example per tier |
 | `enforce/testing.md` | the DOM contract: how the rendered-tree runner measures a story against the registry |
 
-Every file here names the `patterns/fe/gates/check-*.mjs` that enforces it. A rule with no gate,
+Every file here names the `scripts/gates/check-*.mjs` that enforces it. A rule with no gate,
 and no gate a person could write, is in the wrong lane.
 
 ## The two files beside the lanes

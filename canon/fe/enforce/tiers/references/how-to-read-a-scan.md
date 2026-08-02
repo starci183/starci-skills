@@ -7,7 +7,7 @@ There are deliberately no counts here. A count belongs to one repo on one day, a
 into a document starts rotting the day after it was taken.
 
 ```bash
-node scripts/scan-storybook-architecture.mjs <path-to-repo>
+node scripts/audit/scan-storybook-architecture.mjs <path-to-repo>
 ```
 
 ## Failures — the shape is broken

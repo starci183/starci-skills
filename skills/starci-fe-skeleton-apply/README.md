@@ -32,7 +32,7 @@ the state the reviewer happened to open.
 
 The table is first in the body because the rest of the procedure reads differently once the reader
 knows that the branch input and the shimmer flag are two different questions. The machine half of
-that rule is `patterns/fe/gates/check-skeleton-prop.mjs`, which is why the body states the concept
+that rule is `scripts/gates/check-skeleton-prop.mjs`, which is why the body states the concept
 and points at the gate instead of restating what the gate already enforces — a prose copy of a rule
 a script owns is a second source of truth, wrong the day the first one changes.
 
@@ -44,7 +44,7 @@ inline. All three are gone:
 
 | Dropped | Replaced by |
 |---|---|
-| a literal repository path | `node .claude/scripts/read-workspace-context.mjs fe.path` |
+| a literal repository path | `node .claude/scripts/workspace/read-workspace-context.mjs fe.path` |
 | a `debug` prop to freeze the loading branch | the story, plus a throttled reload for the app |
 | rule text copied from the canon | citations to `canon/fe/enforce/authoring/loading-and-skeleton.md` and the gates |
 

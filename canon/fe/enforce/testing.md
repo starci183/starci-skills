@@ -11,8 +11,8 @@ visits, the runner reads the tree the browser actually produced — real CSS, re
 scroll geometry — and measures it. It cannot be fooled by a string that merely looks like markup,
 because it is not looking at strings.
 
-The runner is `patterns/fe/runner/test-runner.ts`. It resolves its vocabulary from the registry
-`patterns/fe/patterns.mjs` rather than holding a table of its own, so a change to the registry makes
+The runner is `scripts/runner/test-runner.ts`. It resolves its vocabulary from the registry
+`canon/fe/explore/registry.mjs` rather than holding a table of its own, so a change to the registry makes
 the tests go out of date loudly — failing everywhere at once — instead of drifting quietly.
 
 ## The three attributes
@@ -139,21 +139,21 @@ story that renders more than one thing still points at exactly which one.
 ## Where the source-reading gates still belong
 
 The rendered tree is the stronger evidence, but it cannot see everything, and the source gates in
-`patterns/fe/gates/` cover what a render structurally cannot:
+`scripts/gates/` cover what a render structurally cannot:
 
 - an import direction, and whether a frame imported a shape or was handed one —
-  `patterns/fe/gates/check-seams.mjs`, `patterns/fe/gates/check-passthrough-block.mjs`
+  `scripts/gates/check-seams.mjs`, `scripts/gates/check-passthrough-block.mjs`
 - whether a component exists in the design system at all, and whether its story matches it —
-  `patterns/fe/gates/check-story-coverage.mjs`, `patterns/fe/gates/check-doc-parity.mjs`,
-  `patterns/fe/gates/check-story-ids.mjs`
+  `scripts/gates/check-story-coverage.mjs`, `scripts/gates/check-doc-parity.mjs`,
+  `scripts/gates/check-story-ids.mjs`
 - whether a frame that realises a seam actually named it —
-  `patterns/fe/gates/check-pattern-coverage.mjs`
+  `scripts/gates/check-pattern-coverage.mjs`
 - the shape of a story: one prop per leaf, one instance per state, no namespace —
-  `patterns/fe/gates/check-one-instance-per-state.mjs`,
-  `patterns/fe/gates/check-member-as-state.mjs`, `patterns/fe/gates/check-no-namespace.mjs`
-- declarations that no render exposes — `patterns/fe/gates/check-inline-types.mjs`,
-  `patterns/fe/gates/check-skeleton-prop.mjs`, `patterns/fe/gates/check-src-sb-import.mjs`,
-  `patterns/fe/gates/check-deps-coverage.mjs`, `patterns/fe/gates/check-orphan-parts.mjs`
+  `scripts/gates/check-one-instance-per-state.mjs`,
+  `scripts/gates/check-member-as-state.mjs`, `scripts/gates/check-no-namespace.mjs`
+- declarations that no render exposes — `scripts/gates/check-inline-types.mjs`,
+  `scripts/gates/check-skeleton-prop.mjs`, `scripts/gates/check-src-sb-import.mjs`,
+  `scripts/gates/check-deps-coverage.mjs`, `scripts/gates/check-orphan-parts.mjs`
 
 The division is worth holding in mind when adding a check. If the question is *what does this file
 say*, it is a source gate. If the question is *what did the browser do*, it belongs in the runner,
@@ -165,9 +165,9 @@ Resolve the roots rather than remembering them, then run the runner against the 
 context names:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.storybook_url
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.storybook_url
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour that exit code:

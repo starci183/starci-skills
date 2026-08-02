@@ -19,7 +19,7 @@ node .claude/scripts/choose-design-system.mjs choose     # adopt the one usable 
 Then every skill asks for it the same way, whichever project is current:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs design_system.path
+node .claude/scripts/workspace/read-workspace-context.mjs design_system.path
 ```
 
 ## Adopting your own
@@ -74,7 +74,7 @@ The book is the source of truth for its own architecture, so ask it rather than 
 written down:
 
 ```bash
-node .claude/scripts/scan-storybook-architecture.mjs "$(node .claude/scripts/read-workspace-context.mjs fe.path)"
+node .claude/scripts/audit/scan-storybook-architecture.mjs "$(node .claude/scripts/workspace/read-workspace-context.mjs fe.path)"
 ```
 
 It reports which tiers sit at the top level — **shared, belonging to no app** — and which app
@@ -119,7 +119,7 @@ always reported.
 | Path | What it is |
 |---|---|
 | `.claude/scripts/choose-design-system.mjs` | chooses, records, checks |
-| `.claude/scripts/read-workspace-context.mjs` | reads it back — `design_system.path` |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | reads it back — `design_system.path` |
 | `.claude/context/workspace.json` | the ledger, gitignored, per machine |
 | `test.mjs` | `node .claude/skills/starci-setup-storybook-choose/test.mjs` |
 

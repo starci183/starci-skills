@@ -40,7 +40,7 @@ t.group("every reference still points at something");
  * like `check-*.mjs` names a family rather than a file, and resolving one is not the claim.
  */
 const cited = [...new Set(
-    (skill.match(/(?:canon|patterns|design|skills)\/[A-Za-z0-9._/-]+/g) ?? [])
+    (skill.match(/(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._/-]+/g) ?? [])
         .filter((p) => !p.includes("*"))
         .map((p) => p.replace(/[./]+$/, "")),
 )].sort();

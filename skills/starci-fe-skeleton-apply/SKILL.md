@@ -20,9 +20,9 @@ that is already there.
 ## Before anything: resolve the source
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs fe.storybook_url
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.storybook_url
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour the exit code — see
@@ -41,7 +41,7 @@ three flags are booleans and all three are about waiting. They are not interchan
 
 The connected half owns *when*: it derives the condition under whatever local name reads best and
 injects it once, at the top, as `isSkeleton={…}`. Everything below takes the prop and passes it on
-under the same name. `patterns/fe/gates/check-skeleton-prop.mjs` fails a presentational component
+under the same name. `scripts/gates/check-skeleton-prop.mjs` fails a presentational component
 that re-labels the shimmer flag, because a subtree that receives `isLoading` and forwards it as
 `isSkeleton` has quietly created a second vocabulary for one concept.
 
@@ -61,7 +61,7 @@ The loading state is demonstrated through the real wrapper, at the presentationa
 one instance per state rather than four near-copies. The story conventions, including the
 comparison-table shape a skeleton reference story takes, are
 `canon/fe/enforce/authoring/storybook-stories.md`; the coverage is gated by
-`patterns/fe/gates/check-story-coverage.mjs` and `patterns/fe/gates/check-doc-parity.mjs`.
+`scripts/gates/check-story-coverage.mjs` and `scripts/gates/check-doc-parity.mjs`.
 
 ## The loop
 
@@ -87,7 +87,7 @@ comparison-table shape a skeleton reference story takes, are
    - *Rhythm*: the same seams and insets, declared with the **same** named concept as the node it
      stands in for. A skeleton that declares a different concept from its loaded twin is a jump that
      is already written down — `canon/fe/enforce/spacing/overview.md` states this directly, and
-     `patterns/fe/patterns.mjs` holds the values.
+     `canon/fe/explore/registry.mjs` holds the values.
    - *Shape*: approximate height, width and radius per node, matched by picking the piece that
      corresponds to the real node rather than sizing a bare box by eye.
 
@@ -104,7 +104,7 @@ comparison-table shape a skeleton reference story takes, are
    with the loaded edge, and any movement at the moment of resolve.
 
 5. **Prove it.** Type-check and lint the app, then run the contract: the source gates in
-   `patterns/fe/gates/` and the rendered-tree runner in `patterns/fe/runner/test-runner.ts`. That
+   `scripts/gates/` and the rendered-tree runner in `scripts/runner/test-runner.ts`. That
    run, and how to read a red one, is `skills/starci-fe-contract`.
 
 ## What a jump is telling you
@@ -142,7 +142,7 @@ has no structure to mirror, that is a layout finding: record it rather than abso
 | `canon/fe/enforce/authoring/storybook-stories.md` | how the loading state is demonstrated in a story |
 | `canon/fe/enforce/spacing/overview.md` | the named seams and insets a mirror must repeat |
 | `canon/fe/enforce/tiers/architecture.md` | the presentational and connected halves, and what each may know |
-| `patterns/fe/gates/check-skeleton-prop.mjs` | the shimmer prop is `isSkeleton`, everywhere |
-| `patterns/fe/gates/check-story-coverage.mjs` | nothing ships without a story |
+| `scripts/gates/check-skeleton-prop.mjs` | the shimmer prop is `isSkeleton`, everywhere |
+| `scripts/gates/check-story-coverage.mjs` | nothing ships without a story |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-skeleton-apply/test.mjs` |

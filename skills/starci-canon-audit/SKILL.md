@@ -1,6 +1,6 @@
 ---
 name: starci-canon-audit
-description: Audits the whole canon under `canon/` — front end and back end together — for the six ways a rule set decays, and reports what it finds: cross-references pointing at files that moved, a rule filed on the wrong shelf, prose that no longer describes the source it claims to describe, two files stating the same rule, an area of the source no rule covers, and an index whose tables no longer match the folder beside it. Use this skill when the rules themselves are the subject rather than the code: "audit the canon", "check the rules are still true", "is anything in canon stale", "we just merged a big refactor, re-ground the docs", "why do two files disagree about tiers", "soi lại canon", "dọn tài liệu", "kiểm tra rules còn đúng không", "the docs sent me to a file that isn't there". Reach for it after any large move in the source — a tier renamed, a folder split, stories relocated — because that is when a correct rule quietly stops being findable. Not for writing or changing a rule (that is `canon/HOW-TO-WRITE.md`), not for changing application code, and not a substitute for `patterns/verify.mjs`, which this skill runs as its first step rather than replaces.
+description: Audits the whole canon under `canon/` — front end and back end together — for the six ways a rule set decays, and reports what it finds: cross-references pointing at files that moved, a rule filed on the wrong shelf, prose that no longer describes the source it claims to describe, two files stating the same rule, an area of the source no rule covers, and an index whose tables no longer match the folder beside it. Use this skill when the rules themselves are the subject rather than the code: "audit the canon", "check the rules are still true", "is anything in canon stale", "we just merged a big refactor, re-ground the docs", "why do two files disagree about tiers", "soi lại canon", "dọn tài liệu", "kiểm tra rules còn đúng không", "the docs sent me to a file that isn't there". Reach for it after any large move in the source — a tier renamed, a folder split, stories relocated — because that is when a correct rule quietly stops being findable. Not for writing or changing a rule (that is `canon/HOW-TO-WRITE.md`), not for changing application code, and not a substitute for `scripts/verify.mjs`, which this skill runs as its first step rather than replaces.
 ---
 
 # Auditing the canon
@@ -25,9 +25,9 @@ it reads the real source those files describe, to check them against it. The sou
 never written down:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour that exit code. An
@@ -52,10 +52,10 @@ Two of these carry a trap worth stating outright.
 **Duplication between `canon/` and `patterns/` is not duplication.** It is the design: a rule that
 lives only in prose decays quietly, and one that lives only in a script gets routed around by
 people who do not understand it, so each rule lives in both places once and
-`patterns/fe/gates/check-canon-sync.mjs` holds the two halves to the same numbers. Reporting that
+`scripts/gates/check-canon-sync.mjs` holds the two halves to the same numbers. Reporting that
 as a merge candidate is a finding that would break the set if acted on.
 
-**Staleness has a layer no machine sees.** `patterns/verify.mjs` catches an anchor pointing at a
+**Staleness has a layer no machine sees.** `scripts/verify.mjs` catches an anchor pointing at a
 path that no longer exists, and recounts a claim of the form "N files mention `X`". It cannot
 catch a rule whose named path still exists but now holds something else, or a rule about a concept
 that was renamed everywhere except in the prose. That layer is why a human-grade reading pass
@@ -72,7 +72,7 @@ machines could not decide rather than rediscovering what they already found.
 stop and say so — `starci-setup-workspace-fe` and `starci-setup-workspace-be` fix it in one
 command. A partial audit presented as a whole one is worse than no audit.
 
-1b. `node .claude/patterns/verify.mjs` — anchors and counts, per role. A missing anchor is a
+1b. `node .claude/scripts/verify.mjs` — anchors and counts, per role. A missing anchor is a
 failure: the rule points at nothing. A drifted count is a warning: the rule is probably still true
 and only its evidence is stale. Keep that distinction in the report; collapsing them makes the
 whole list feel like noise.
@@ -82,8 +82,8 @@ and `design/…` path named inside the canon must resolve, and the tables in `ca
 match what `canon/fe/`, `canon/fe/enforce/authoring/` and `canon/be/*/` actually hold.
 
 1d. Where a coverage question is already machine-decidable, let the machine decide it rather than
-arguing it in prose: `patterns/fe/gates/check-story-coverage.mjs` for the Storybook-first law,
-`patterns/fe/gates/check-pattern-coverage.mjs` and `patterns/fe/gates/check-doc-parity.mjs` for
+arguing it in prose: `scripts/gates/check-story-coverage.mjs` for the Storybook-first law,
+`scripts/gates/check-pattern-coverage.mjs` and `scripts/gates/check-doc-parity.mjs` for
 rules that are supposed to have a written counterpart.
 
 **2. Read one shelf at a time, grounded.** Take the shelves separately — `canon/fe/` top level,
@@ -120,7 +120,7 @@ When the person who asked approves a fix, work in order of how much judgement it
   with a reference left where the deleted one stood.
 - **Rewriting and splitting last, one file at a time.** This is where a well-meant paraphrase
   invents a rule nobody agreed to. Change the rule, its anchor, and its date together, as
-  `canon/HOW-TO-WRITE.md` requires, and re-run `node .claude/patterns/verify.mjs` after each one
+  `canon/HOW-TO-WRITE.md` requires, and re-run `node .claude/scripts/verify.mjs` after each one
   rather than at the end.
 
 Debt that is found and consciously not paid belongs in the ledger, not in the report only —
@@ -130,19 +130,19 @@ Debt that is found and consciously not paid belongs in the ledger, not in the re
 
 No component reaches the app that was never a component and a story in the design-system folder
 first. The reasoning is in `canon/fe/enforce/tiers/architecture.md`; the enforcement is
-`patterns/fe/gates/check-story-coverage.mjs`. On the coverage axis this cuts both ways, and both
+`scripts/gates/check-story-coverage.mjs`. On the coverage axis this cuts both ways, and both
 are findings: a component in the app with no story behind it, and a tier or a pattern that the
 design-system folder now carries with no rule in `canon/fe/` describing when to reach for it.
 
 ## Common mistakes
 
 - **Reading before running.** The reading pass then spends its attention rediscovering the dead
-  links `patterns/verify.mjs` would have listed in two seconds, and misses the semantic staleness
+  links `scripts/verify.mjs` would have listed in two seconds, and misses the semantic staleness
   only a reader can catch.
 - **Declaring staleness from memory.** The rule is measured against the tree in front of you, not
   against what the tree looked like in an earlier conversation.
 - **Reporting a canon rule and its gate as duplicates.** See above; that pair is deliberate, and
-  `patterns/fe/gates/check-canon-sync.mjs` is what keeps them equal.
+  `scripts/gates/check-canon-sync.mjs` is what keeps them equal.
 - **Treating a failing gate as a verdict.** A failing check is a question. More than once the check
   has been the thing that was wrong — it matched an ellipsis as a path, and it read an inner
   `src/…` out of a longer path. Read its output before editing the rule it accuses.
@@ -158,9 +158,9 @@ design-system folder now carries with no rule in `canon/fe/` describing when to 
 |---|---|
 | `canon/INDEX.md` | the map being audited, and the stated division between prose and machinery |
 | `canon/HOW-TO-WRITE.md` | the rules this audit enforces: grounding, anchors with dates, two sources before a general rule |
-| `patterns/verify.mjs` | the mechanical half — anchors and counts, per role |
-| `patterns/fe/patterns.mjs` · `patterns/fe/runner/test-runner.ts` | the registry and the rendered-tree runner a canon number must agree with |
-| `patterns/fe/gates/check-canon-sync.mjs` | holds the prose and the registry to the same values |
+| `scripts/verify.mjs` | the mechanical half — anchors and counts, per role |
+| `canon/fe/explore/registry.mjs` · `scripts/runner/test-runner.ts` | the registry and the rendered-tree runner a canon number must agree with |
+| `scripts/gates/check-canon-sync.mjs` | holds the prose and the registry to the same values |
 | `canon/fe/` · `canon/fe/explore/component/` | the longer material the canon was consolidated from, and the right place to argue a boundary rather than apply one |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-canon-audit/test.mjs` |

@@ -42,7 +42,7 @@ t.group("every path it cites still resolves");
  * not matched: they live on a machine this suite knows nothing about, which is why they are
  * written as `<fe.path>/...` rather than as a path at all.
  */
-const cited = [...text.matchAll(/(?:canon|patterns|design|skills)\/[A-Za-z0-9_.*\/-]+/g)]
+const cited = [...text.matchAll(/(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9_.*\/-]+/g)]
     .map((m) => m[0].replace(/[.,;:)]+$/, ""))
     .filter((p, i, all) => all.indexOf(p) === i);
 
@@ -74,10 +74,10 @@ t.expect(
 t.expect(
     "the three gates that guard storybook-first are each named, not summarised",
     check("gates", [
-        "patterns/fe/gates/check-story-coverage.mjs",
-        "patterns/fe/gates/check-doc-parity.mjs",
-        "patterns/fe/gates/check-src-sb-import.mjs",
-        "patterns/fe/runner/test-runner.ts",
+        "scripts/gates/check-story-coverage.mjs",
+        "scripts/gates/check-doc-parity.mjs",
+        "scripts/gates/check-src-sb-import.mjs",
+        "scripts/runner/test-runner.ts",
     ].every((g) => text.includes(g))),
     { exit: 0 },
 );

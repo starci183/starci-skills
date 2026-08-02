@@ -9,11 +9,11 @@ import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Minimal CSV reader: handles quoted cells containing commas. */
 function read(name) {
-    const file = join(ROOT, "patterns", "fe", "data", `${name}.csv`);
+    const file = join(ROOT, "scripts", "search", "data", `${name}.csv`);
     if (!existsSync(file)) { console.error(`no such table: ${name}`); process.exit(1); }
     const lines = readFileSync(file, "utf8").trim().split("\n");
     const split = (line) => {

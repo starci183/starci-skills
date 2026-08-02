@@ -37,7 +37,7 @@ t.group("what it points at is still there");
 // prose around them. Trailing sentence punctuation is stripped so `…/architecture.md.` at the
 // end of a sentence is not read as a filename nobody has.
 const cited = [...new Set(
-    (SKILL.match(/\b(?:canon|patterns|design|skills)\/[A-Za-z0-9._/-]+/g) ?? [])
+    (SKILL.match(/\b(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._/-]+/g) ?? [])
         .map((p) => p.replace(/[.,;:)\]]+$/, "")),
 )].sort();
 
@@ -56,7 +56,7 @@ t.expect(
         has: [
             "canon/fe/enforce/tiers/architecture.md",
             "canon/fe/enforce/tiers/split.md",
-            "patterns/fe/gates/check-src-sb-import.mjs",
+            "scripts/gates/check-src-sb-import.mjs",
         ],
     },
 );

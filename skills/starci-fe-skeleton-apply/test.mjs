@@ -28,7 +28,7 @@ const SKILL = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "SKILL.
  * A glob is skipped: `check-*.mjs` names a family, not a file.
  */
 const cited = [...new Set(
-    (SKILL.match(/(?:canon|patterns|design|skills)\/[A-Za-z0-9._/-]+/g) ?? [])
+    (SKILL.match(/(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._/-]+/g) ?? [])
         .map((p) => p.replace(/[.,;:)]+$/, ""))
         .filter((p) => !p.includes("*")),
 )];

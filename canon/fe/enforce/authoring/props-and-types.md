@@ -1,7 +1,7 @@
 # Props and types — STRICT
 
 Scope: how to DECLARE props and types for an FE component (`<fe>/src/components` — `<fe>` =
-`node .claude/scripts/read-workspace-context.mjs fe.path`) — not design. Grounded entirely in real source.
+`node .claude/scripts/workspace/read-workspace-context.mjs fe.path`) — not design. Grounded entirely in real source.
 
 ## 1. `WithClassNames<T>` — the ONLY way to accept a className
 

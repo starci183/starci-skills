@@ -11,7 +11,7 @@
  * that reader none of its references can be trusted.
  *
  * What it cannot test: whether every call site in a real tree was actually replaced. That is
- * what the type checker and `patterns/fe/gates/check-deps-coverage.mjs` are for, and they run
+ * what the type checker and `scripts/gates/check-deps-coverage.mjs` are for, and they run
  * against the app rather than against this folder — see README.md.
  *
  *   node .claude/skills/starci-fe-consolidate-apply/test.mjs [--verbose]
@@ -34,7 +34,7 @@ t.group("it points outward, and every pointer still lands");
 
 // Any reference into the canon, the gates, the design material or a sibling skill — written
 // bare or with the `.claude/` prefix, in prose or inside a table cell.
-const CITATION = /(?:\.claude\/)?((?:canon|patterns|design|skills)\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(?:md|mjs|ts|tsx|csv|json))/g;
+const CITATION = /(?:\.claude\/)?((?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.(?:md|mjs|ts|tsx|csv|json))/g;
 const cited = [...new Set([...skill.matchAll(CITATION)].map((m) => m[1]))].sort();
 
 t.expect("the skill cites the canon and the gates instead of restating them",

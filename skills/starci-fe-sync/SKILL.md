@@ -21,8 +21,8 @@ in a story.
 Never write either of them down. Ask:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
 ```
 
 `fe.design_system` is `.storybook/` inside the app repo. When the ecosystem's book lives in another
@@ -53,8 +53,8 @@ authored, and syncing it makes the app the place where its states are first disc
 no story, stop here: the work belongs upstream, in the design system, before anything is mirrored.
 
 ```bash
-cd "$(node .claude/scripts/read-workspace-context.mjs fe.path)"
-node .claude/patterns/fe/gates/check-story-coverage.mjs
+cd "$(node .claude/scripts/workspace/read-workspace-context.mjs fe.path)"
+node .claude/scripts/gates/check-story-coverage.mjs
 ```
 
 **2. Read it before copying it.**
@@ -111,7 +111,7 @@ App code imports `@/components/*`. It never imports `@sb-components/*`.
 The alias is not cosmetic: `@sb-components/` resolves into the design-system tree, which is dev-only.
 An app that imports it ships a catalog, and — worse — makes the catalog's file the thing that runs, so
 the twin silently stops being exercised. The line is held by
-`patterns/fe/gates/check-src-sb-import.mjs`, which fails on any `src` file that reaches across, and
+`scripts/gates/check-src-sb-import.mjs`, which fails on any `src` file that reaches across, and
 names the twin to create when one is missing.
 
 ## Storybook-first, checked afterwards rather than trusted
@@ -122,12 +122,12 @@ only moment it can be proved:
 
 | Gate | Refuses |
 |---|---|
-| `patterns/fe/gates/check-src-sb-import.mjs` | an `src` file importing the design-system tree |
-| `patterns/fe/gates/check-story-coverage.mjs` | a canonical component with no story at the mirror path |
-| `patterns/fe/gates/check-doc-parity.mjs` | a component whose leading spec block drifted from its story's |
-| `scripts/check-presentational-purity.mjs` | a `component.tsx` that fetches, reads a store, or resolves text |
-| `patterns/fe/gates/check-orphan-parts.mjs` | the retired anatomy props surviving in a mirrored file |
-| `patterns/fe/gates/check-passthrough-block.mjs` | a block that forwards instead of earning its layer |
+| `scripts/gates/check-src-sb-import.mjs` | an `src` file importing the design-system tree |
+| `scripts/gates/check-story-coverage.mjs` | a canonical component with no story at the mirror path |
+| `scripts/gates/check-doc-parity.mjs` | a component whose leading spec block drifted from its story's |
+| `scripts/gates/check-presentational-purity.mjs` | a `component.tsx` that fetches, reads a store, or resolves text |
+| `scripts/gates/check-orphan-parts.mjs` | the retired anatomy props surviving in a mirrored file |
+| `scripts/gates/check-passthrough-block.mjs` | a block that forwards instead of earning its layer |
 
 Finding a component in `src` that has no counterpart upstream is not a sync problem. It is a
 component that skipped the design system, and the repair runs the other way: take it up, story it,
@@ -136,7 +136,7 @@ then sync it back down.
 ## Verifying
 
 ```bash
-cd "$(node .claude/scripts/read-workspace-context.mjs fe.path)"
+cd "$(node .claude/scripts/workspace/read-workspace-context.mjs fe.path)"
 npx tsc --noEmit
 npx eslint . --max-warnings=0
 ```
@@ -145,8 +145,8 @@ Lint is not advisory here — formatting is decided by ESLint and the pre-commit
 `--max-warnings=0` (`canon/fe/enforce/authoring/imports-and-format.md`).
 
 Then the gates above, and — when the sync touched spacing, seams or truncation — the rendered-tree
-run, which measures computed style rather than reading source: `patterns/fe/runner/test-runner.ts`,
-against the vocabulary in `patterns/fe/patterns.mjs`, with the contract explained in
+run, which measures computed style rather than reading source: `scripts/runner/test-runner.ts`,
+against the vocabulary in `canon/fe/explore/registry.mjs`, with the contract explained in
 `canon/fe/enforce/testing.md`. Last, open the routes whose call sites moved. A twin can type-check, pass every
 gate, and still be the wrong shell; `canon/fe/enforce/spacing/overview.md` is what a screen is read against.
 
@@ -154,7 +154,7 @@ gate, and still be the wrong shell; `canon/fe/enforce/spacing/overview.md` is wh
 
 Sometimes the twin is blocked on a field that does not exist yet. That is a backend change, not a
 reason to fetch twice or to derive the value in the component: `canon/be/contracts/api-surface.md` for
-the shape of the surface, and `node .claude/scripts/read-workspace-context.mjs be.path` for where it
+the shape of the surface, and `node .claude/scripts/workspace/read-workspace-context.mjs be.path` for where it
 lives. Until the field exists, the honest move is to record the gap rather than fake it.
 
 ## Common mistakes
@@ -179,8 +179,8 @@ lives. Until the field exists, the honest move is to record the gap rather than 
 | `canon/fe/enforce/tiers/architecture.md` | the tiers, the import direction, the split |
 | `canon/fe/enforce/tiers/split.md` | the two files, worked out in full |
 | `canon/fe/enforce/tiers/story.md` | what the story upstream has to be |
-| `patterns/fe/gates/` | the gates that hold each line |
-| `.claude/scripts/read-workspace-context.mjs` | where the two roots actually are |
+| `scripts/gates/` | the gates that hold each line |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | where the two roots actually are |
 | `test.mjs` | `node .claude/skills/starci-fe-sync/test.mjs` |
 
 Authoring the component upstream comes first; fetching the book onto a machine that has none is

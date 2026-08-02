@@ -18,9 +18,9 @@ new and small gets recorded too; small is not the same as approved.
 ## Where the source is
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Resolve them at the start of the session rather than trusting a path the proposal or the earlier
@@ -68,7 +68,7 @@ state of one that was never storied, it does not start in the app. **No componen
 that was never a component and a story in the design-system folder first** —
 [`canon/fe/enforce/tiers/architecture.md`](../../canon/fe/enforce/tiers/architecture.md), with the story's obligations in
 [`canon/fe/enforce/tiers/story.md`](../../canon/fe/enforce/tiers/story.md) and coverage
-held by [`patterns/fe/gates/check-story-coverage.mjs`](../../patterns/fe/gates/check-story-coverage.mjs).
+held by [`scripts/gates/check-story-coverage.mjs`](../../scripts/gates/check-story-coverage.mjs).
 Author it under `fe.design_system`, story it with its full state matrix, then bring it across as a
 twin with `starci-fe-sync`. A reference link component invented directly in `src` because it was
 "only needed here" is the exact shape that gate exists to stop.

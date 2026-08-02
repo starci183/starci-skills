@@ -50,7 +50,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, resolve, basename } from "node:path";
 
 /** Root of this skill set — the folder holding `scripts/`, `design/`, `context/`. */
-const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const CONTEXT_DIR = join(REPO, "context");
 const CONTEXT_FILE = join(CONTEXT_DIR, "workspace.json");

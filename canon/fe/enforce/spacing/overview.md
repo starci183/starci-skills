@@ -21,7 +21,7 @@ usually makes several layout decisions at once, so it declares each of them.
 **The token is the concept, never the pixel.** Writing `data-principles="p-4"` would restate the
 class beside the class and check nothing.
 
-This file is the prose side of the registry. The executable side is `patterns/fe/patterns.mjs`, which
+This file is the prose side of the registry. The executable side is `canon/fe/explore/registry.mjs`, which
 holds every token, the property it governs, and the value it must compute to; the reasoning behind
 each scale is `canon/fe/enforce/spacing/`. Where a number here and a number there
 ever disagree, the registry is the one the test reads, and this file is the one that is stale.
@@ -251,7 +251,7 @@ contract and names its width; one that does not matter should not have been a br
 ## What all of this forbids
 
 - **A gap or padding class written by hand above the atom tier.** It bypasses the scale wherever it
-  was written. `patterns/fe/gates/check-seams.mjs` and `patterns/fe/gates/check-padding.mjs` read the
+  was written. `scripts/gates/check-seams.mjs` and `scripts/gates/check-padding.mjs` read the
   source for it; the rendered-tree runner catches the ones no source regex can see.
 - **A value between steps** — a fifth rung on the gap ladder, an arbitrary pixel value. Off the
   ladder is a screen that will never match another.
@@ -266,5 +266,5 @@ contract and names its width; one that does not matter should not have been a br
   a claim nothing checks, and the runner treats it as a hard failure on its own.
 
 A frame that realises a seam and does not name it is caught by
-`patterns/fe/gates/check-pattern-coverage.mjs` — the concept layer only works if declaring it is not
+`scripts/gates/check-pattern-coverage.mjs` — the concept layer only works if declaring it is not
 optional.

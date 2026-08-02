@@ -131,7 +131,7 @@ question comes up whenever one of these becomes a skill.
 
 1. Read the source first. The rule may already be describing something that moved.
 2. Change the rule, the anchor, and the date together. An anchor left behind is worse than none.
-3. `node .claude/patterns/verify.mjs`
+3. `node .claude/scripts/verify.mjs`
 4. If the check disagrees with you, **read its output before editing the rule**. Three times while
    building this set the check was the thing that was wrong: it matched an ellipsis as a path, it
    read a substring `src/…` out of `apps/core/src/…`, and it demanded lowercase where the real

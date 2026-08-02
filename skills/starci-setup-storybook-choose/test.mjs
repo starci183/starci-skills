@@ -60,9 +60,12 @@ function makeRepo(dir, shape = {}) {
  */
 function sandbox(root, projects) {
     const skillset = join(root, "skillset");
-    mkdirSync(join(skillset, "scripts"), { recursive: true });
-    for (const f of ["choose-design-system.mjs", "read-workspace-context.mjs", "register-workspace-source.mjs", "test-harness.mjs"]) {
+    mkdirSync(join(skillset, "scripts", "workspace"), { recursive: true });
+    for (const f of ["choose-design-system.mjs", "test-harness.mjs"]) {
         cpSync(join(REPO, "scripts", f), join(skillset, "scripts", f));
+    }
+    for (const f of ["read-workspace-context.mjs", "register-workspace-source.mjs"]) {
+        cpSync(join(REPO, "scripts", "workspace", f), join(skillset, "scripts", "workspace", f));
     }
     mkdirSync(join(skillset, "context"), { recursive: true });
     writeFileSync(join(skillset, "context", "workspace.json"), JSON.stringify({
@@ -127,12 +130,12 @@ try {
         t.expect("the recorded commit is kept, so drift can be reported later",
             { code: 0, out: JSON.stringify(ws.ledger().design_system) }, { has: ["commit"] });
         t.expect("workspace.mjs answers design_system.path for the current project",
-            ws("scripts/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["design-app"] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["design-app"] });
 
         // This is the whole point of holding it at ledger level rather than per project.
-        execFileSync(process.execPath, [join(root, "skillset", "scripts", "register-workspace-source.mjs"), "--use", "beta"], { cwd: root, stdio: "ignore" });
+        execFileSync(process.execPath, [join(root, "skillset", "scripts", "workspace", "register-workspace-source.mjs"), "--use", "beta"], { cwd: root, stdio: "ignore" });
         t.expect("a project with no storybook of its own still reads the ecosystem's",
-            ws("scripts/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["design-app"] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["design-app"] });
     }
 
     // ---------------------------------------------------------------------
@@ -203,7 +206,9 @@ try {
         const root = join(SANDBOX, "noledger");
         const skillset = join(root, "skillset");
         mkdirSync(join(skillset, "scripts"), { recursive: true });
-        for (const f of ["choose-design-system.mjs", "read-workspace-context.mjs"]) cpSync(join(REPO, "scripts", f), join(skillset, "scripts", f));
+        cpSync(join(REPO, "scripts", "choose-design-system.mjs"), join(skillset, "scripts", "choose-design-system.mjs"));
+        mkdirSync(join(skillset, "scripts", "workspace"), { recursive: true });
+        cpSync(join(REPO, "scripts", "workspace", "read-workspace-context.mjs"), join(skillset, "scripts", "workspace", "read-workspace-context.mjs"));
         t.expect("without a workspace context it names the command that creates one",
             t.run(join(skillset, "scripts/choose-design-system.mjs"), [], root),
             { exit: 1, has: ["register-workspace-source.mjs"] });

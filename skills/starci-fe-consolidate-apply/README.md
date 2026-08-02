@@ -75,7 +75,7 @@ replacing call sites hides it from both.
 ## What the tests cannot cover
 
 Whether the call sites were actually all replaced in a real tree — that is what
-`patterns/fe/gates/check-deps-coverage.mjs` and the type checker are for, and they run against the app,
+`scripts/gates/check-deps-coverage.mjs` and the type checker are for, and they run against the app,
 not against this skill.
 
 The suite here checks that the skill's own claims still stand up: every path it sends a reader to

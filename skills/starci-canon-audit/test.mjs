@@ -38,7 +38,7 @@ t.group("the pointers still point somewhere");
  * `.claude/` is optional because a runnable command is written the way it is typed, while a
  * reference in prose is written relative to the skill-set root. Both mean the same file.
  */
-const CITED = /(?<![\w.-])(?:\.claude\/)?(?:canon|patterns|design|skills)\/[\w./*-]+/g;
+const CITED = /(?<![\w.-])(?:\.claude\/)?(?:canon|patterns|design|skills|scripts)\/[\w./*-]+/g;
 
 const cited = [...new Set(
     [...SKILL.matchAll(CITED)]
@@ -47,7 +47,7 @@ const cited = [...new Set(
 
 /**
  * Does this citation resolve under the skill-set root?
- * A citation containing `*` names a family rather than a file — `patterns/fe/gates/check-*.mjs`
+ * A citation containing `*` names a family rather than a file — `scripts/gates/check-*.mjs`
  * is a true statement about a folder, so the folder is what gets checked.
  */
 const resolves = (rel) => {

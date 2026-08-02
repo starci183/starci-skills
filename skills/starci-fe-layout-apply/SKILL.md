@@ -25,9 +25,9 @@ invisible until somebody walks the flow.
 ## Where the source is
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Ask every time rather than remembering an answer from earlier in the session. A missing context
@@ -58,7 +58,7 @@ Then read the canon the build will be graded against, before writing code rather
 | tier, import direction, the presentational and connected split | `canon/fe/enforce/tiers/architecture.md`, `canon/fe/enforce/tiers/split.md` |
 | what a page, a layout shell and an overlay each own | `canon/fe/enforce/tiers/page.md`, `canon/fe/enforce/tiers/layout.md`, `canon/fe/enforce/tiers/overlay.md` |
 | what a story must render, and how the file is spelled | `canon/fe/enforce/tiers/story.md`, `canon/fe/enforce/authoring/storybook-stories.md` |
-| seams, insets, and the named container widths | `canon/fe/enforce/spacing/overview.md`, with `patterns/fe/patterns.mjs` as the authority on values |
+| seams, insets, and the named container widths | `canon/fe/enforce/spacing/overview.md`, with `canon/fe/explore/registry.mjs` as the authority on values |
 | fetching, and what the loading state owes the reader | `canon/fe/enforce/authoring/async-data.md`, `canon/fe/enforce/authoring/loading-and-skeleton.md` |
 | modal, drawer and toast as code | `canon/fe/enforce/authoring/overlay-and-feedback.md` |
 | file placement, prop declaration, class writing, translated strings | `canon/fe/enforce/authoring/INDEX.md` and the file it points at |
@@ -110,12 +110,12 @@ invisible to anyone reading only the page.
 A green build is not a working surface, and the two failures look nothing alike.
 
 1. The type checker and the linter, clean.
-2. The source gates under `patterns/fe/gates/check-*.mjs` — in particular
-   `patterns/fe/gates/check-story-coverage.mjs` for a component that reached the app without a
-   story, `patterns/fe/gates/check-doc-parity.mjs` for a component whose spec block and story's
-   have drifted apart, and `patterns/fe/gates/check-src-sb-import.mjs` for app code reaching into
+2. The source gates under `scripts/gates/check-*.mjs` — in particular
+   `scripts/gates/check-story-coverage.mjs` for a component that reached the app without a
+   story, `scripts/gates/check-doc-parity.mjs` for a component whose spec block and story's
+   have drifted apart, and `scripts/gates/check-src-sb-import.mjs` for app code reaching into
    the design-system tree instead of its own twin.
-3. The rendered-tree runner, `patterns/fe/runner/test-runner.ts`, which measures computed style
+3. The rendered-tree runner, `scripts/runner/test-runner.ts`, which measures computed style
    against the registry after every story. What it checks and how to read a failure is
    `canon/fe/enforce/testing.md`.
 4. The app itself, walked along the proposal's verify plan — the whole flow, and every state in the

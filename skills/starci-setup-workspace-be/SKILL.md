@@ -16,11 +16,11 @@ The port is the same problem in miniature. `3000` is a habit, not a fact.
 
 ```bash
 # register the back end (folder, or a git URL to clone)
-node .claude/scripts/register-workspace-source.mjs --be <dir-or-git-url> [--project <name>]
+node .claude/scripts/workspace/register-workspace-source.mjs --be <dir-or-git-url> [--project <name>]
 
 # use it
-node .claude/scripts/read-workspace-context.mjs be.path
-node .claude/scripts/read-workspace-context.mjs be.url
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs be.url
 ```
 
 ## What you can ask for
@@ -34,9 +34,9 @@ node .claude/scripts/read-workspace-context.mjs be.url
 | `be.ports_found_by` | which file the port came from |
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs              # everything, for a human
-node .claude/scripts/read-workspace-context.mjs be.url       # one value, bare — safe in $(...)
-node .claude/scripts/read-workspace-context.mjs --json       # the whole record
+node .claude/scripts/workspace/read-workspace-context.mjs              # everything, for a human
+node .claude/scripts/workspace/read-workspace-context.mjs be.url       # one value, bare — safe in $(...)
+node .claude/scripts/workspace/read-workspace-context.mjs --json       # the whole record
 ```
 
 A missing context exits 1 and prints the command that fixes it. Honour that exit code — a caller
@@ -61,9 +61,9 @@ Nothing found means `be.url` is `null`, and null is the honest answer. Fill it i
 ## Registering
 
 ```bash
-node .claude/scripts/register-workspace-source.mjs --be ../shop-api --project shop
-node .claude/scripts/register-workspace-source.mjs --be git@github.com:acme/shop-api.git --into ~/Repositories
-node .claude/scripts/register-workspace-source.mjs <fe-dir> <be-dir>     # positional: back end second
+node .claude/scripts/workspace/register-workspace-source.mjs --be ../shop-api --project shop
+node .claude/scripts/workspace/register-workspace-source.mjs --be git@github.com:acme/shop-api.git --into ~/Repositories
+node .claude/scripts/workspace/register-workspace-source.mjs <fe-dir> <be-dir>     # positional: back end second
 ```
 
 A git URL is cloned — into the current directory, or into `--into <dir>`. Running it again reuses
@@ -91,7 +91,7 @@ end too, and every front-end lookup then pointed at the API.
 ## Before trusting a recorded path
 
 ```bash
-node .claude/scripts/register-workspace-source.mjs --check
+node .claude/scripts/workspace/register-workspace-source.mjs --check
 ```
 
 Paths rot. `--check` costs nothing and turns a confusing failure later into a clear one now. A
@@ -112,8 +112,8 @@ migrations and entities differ across branches and a wrong answer there is expen
 
 | Path | What it is |
 |---|---|
-| `.claude/scripts/register-workspace-source.mjs` | writes the record |
-| `.claude/scripts/read-workspace-context.mjs` | reads it |
+| `.claude/scripts/workspace/register-workspace-source.mjs` | writes the record |
+| `.claude/scripts/workspace/read-workspace-context.mjs` | reads it |
 | `.claude/context/workspace.json` | the record, gitignored, per machine |
 | `README.md` | why this is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-setup-workspace-be/test.mjs` |

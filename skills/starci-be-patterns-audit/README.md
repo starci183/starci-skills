@@ -4,7 +4,7 @@ Notes for whoever changes it. `SKILL.md` is the interface; this is the reasoning
 
 ## Why a skill at all, when there is already a script
 
-`patterns/verify.mjs` answers the two questions a machine can answer: does this path exist, and does
+`scripts/verify.mjs` answers the two questions a machine can answer: does this path exist, and does
 this count still recount. Those are worth automating precisely because they are mechanical, and the
 day they were first run they found an anchor pointing at a folder that had been renamed and a count
 that was off by nearly three hundred.

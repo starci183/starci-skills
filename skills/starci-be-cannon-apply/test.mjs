@@ -36,7 +36,7 @@ const INVARIANT = "approval comes before the diff, never after it";
 /** Every canon/patterns/design/skills path the document points a reader at. */
 function citedPaths(source) {
     const found = new Set();
-    for (const raw of source.match(/\b(?:canon|patterns|design|skills)\/[A-Za-z0-9._/-]+/g) ?? []) {
+    for (const raw of source.match(/\b(?:canon|patterns|design|skills|scripts)\/[A-Za-z0-9._/-]+/g) ?? []) {
         let p = raw;
         // Trailing punctuation belongs to the sentence, not to the path — but only strip it while
         // what is left does not already end in a real file extension.

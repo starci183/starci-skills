@@ -26,7 +26,7 @@ system with a domain already in it. Your app joins at its own namespace; the exi
 where it is.
 
 Sizes are deliberately not written down here. Ask the checkout:
-`node .claude/scripts/scan-storybook-architecture.mjs <path>`.
+`node .claude/scripts/audit/scan-storybook-architecture.mjs <path>`.
 
 ## Clone, never copy
 

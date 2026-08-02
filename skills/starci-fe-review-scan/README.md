@@ -19,7 +19,7 @@ copy note, a layout note and a shrug. Read as one surface it is one finding with
 
 ## The territory is what the machine cannot see
 
-The gates under `patterns/fe/gates/` and the rendered-tree runner already own the mechanical part of
+The gates under `scripts/gates/` and the rendered-tree runner already own the mechanical part of
 two of these axes, and they own it better than a reader does. That is the reason the skill opens by
 running them rather than by grading anything: whatever they catch is not worth a human's attention,
 and a review that re-reports it looks productive while adding nothing.

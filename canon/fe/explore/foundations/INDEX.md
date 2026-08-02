@@ -6,7 +6,7 @@ z-index step. The reason they are closed is the whole point — a reader who kno
 any component in the app without opening it, and one arbitrary value spends that knowledge everywhere
 to buy a slightly better fit in one place.
 
-Where a number here also exists in `patterns/fe/patterns.mjs`, the registry is authoritative and this
+Where a number here also exists in `canon/fe/explore/registry.mjs`, the registry is authoritative and this
 prose is the side that goes stale. What prose owns is the reason a value was chosen, which no registry
 can hold.
 

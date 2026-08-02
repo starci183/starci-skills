@@ -42,9 +42,9 @@ Missing one? Go and get it. Never guess the volume: count it from the query, not
 No path is written down in this set, because a path is true on exactly one machine. Ask:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Registering a source is `skills/starci-setup-workspace-fe/SKILL.md` and its back-end twin. A missing
@@ -70,7 +70,7 @@ context exits non-zero and prints the command that fixes it.
    in decides what it is allowed to own, and that is a lookup rather than an opinion:
 
    ```bash
-   node .claude/scripts/search-tier-rules.mjs tier layout
+   node .claude/scripts/search/search-tier-rules.mjs tier layout
    ```
 
    The routing for the rest of the tier questions is `canon/fe/storybook.md`. Two rules ride
@@ -158,7 +158,7 @@ first**, and an arrangement is a component. A layout with no story has no state 
 read, which means the empty region and the narrow width you drew in step 4 exist only in the widget.
 The reasoning is `canon/fe/enforce/tiers/architecture.md`, what a story has to render is
 `canon/fe/enforce/tiers/story.md`, and the line is held by
-`patterns/fe/gates/check-story-coverage.mjs` rather than by discipline.
+`scripts/gates/check-story-coverage.mjs` rather than by discipline.
 
 ## Measure, do not look
 
@@ -166,10 +166,10 @@ Volume comes from the data layer, never from a screenshot. Cite the query, the p
 record count.
 
 Spacing comes from a measurement, not from a look. The rendered-tree runner
-`patterns/fe/runner/test-runner.ts` measures the computed box against the registry in
-`patterns/fe/patterns.mjs`, and the contract it reads off the DOM is `canon/fe/enforce/testing.md`; the
-source-reading half is `patterns/fe/gates/check-seams.mjs` and
-`patterns/fe/gates/check-pattern-coverage.mjs`. Check the viewport before trusting any measurement:
+`scripts/runner/test-runner.ts` measures the computed box against the registry in
+`canon/fe/explore/registry.mjs`, and the contract it reads off the DOM is `canon/fe/enforce/testing.md`; the
+source-reading half is `scripts/gates/check-seams.mjs` and
+`scripts/gates/check-pattern-coverage.mjs`. Check the viewport before trusting any measurement:
 with the document hidden or the width at zero, every rectangle comes back zero and healthy code looks
 exactly like broken code.
 
@@ -188,7 +188,7 @@ have answered.
 | the material taught the opposite of what you measured | fix it, with a dated anchor and the before and after |
 
 A rule no machine can catch belongs in prose under `canon/fe/`; a rule a script can decide belongs in
-`patterns/fe/gates/`, because a prose copy of a checkable fact is a second source of truth that goes
+`scripts/gates/`, because a prose copy of a checkable fact is a second source of truth that goes
 wrong the day the first one changes. A fix you are deliberately postponing belongs in the ledger with
 its reason, `skills/starci-record-debt/SKILL.md`, rather than in a comment nobody will check.
 

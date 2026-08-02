@@ -59,9 +59,10 @@ function publish(seed, bareDir) {
 /** A sandbox with its own scripts and its own ledger. */
 function sandbox(root, projects = {}) {
     const skillset = join(root, "skillset");
-    mkdirSync(join(skillset, "scripts"), { recursive: true });
-    for (const f of ["choose-design-system.mjs", "read-workspace-context.mjs", "register-workspace-source.mjs"]) {
-        cpSync(join(REPO, "scripts", f), join(skillset, "scripts", f));
+    mkdirSync(join(skillset, "scripts", "workspace"), { recursive: true });
+    cpSync(join(REPO, "scripts", "choose-design-system.mjs"), join(skillset, "scripts", "choose-design-system.mjs"));
+    for (const f of ["read-workspace-context.mjs", "register-workspace-source.mjs"]) {
+        cpSync(join(REPO, "scripts", "workspace", f), join(skillset, "scripts", "workspace", f));
     }
     mkdirSync(join(skillset, "context"), { recursive: true });
     writeFileSync(join(skillset, "context", "workspace.json"), JSON.stringify({
@@ -107,7 +108,7 @@ try {
         t.expect("nothing was written to the clone target",
             { code: existsSync(join(root, "checkouts")) ? 1 : 0, out: "" }, { exit: 0 });
         t.expect("the reused checkout becomes the ledger's design system",
-            ws("scripts/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["already-here"] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["already-here"] });
     }
 
     // ---------------------------------------------------------------------
@@ -123,7 +124,7 @@ try {
 
         t.expect("it clones, and says where before writing", r, { exit: 0, has: ["cloning", into] });
         t.expect("the clone becomes the ledger's design system",
-            ws("scripts/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["starci-academy"] });
+            ws("scripts/workspace/read-workspace-context.mjs", ["design_system.path"]), { exit: 0, has: ["starci-academy"] });
         t.expect("the clone is registered as a source, so nobody later wonders what the folder is",
             { code: ws.ledger().projects["starci-academy"] ? 0 : 1, out: JSON.stringify(ws.ledger().projects ?? {}) },
             { exit: 0, has: ["starci-academy"] });

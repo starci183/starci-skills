@@ -10,7 +10,7 @@
  * points at a file which has moved; a version of it whose own references have rotted would be
  * reporting a failure it is itself committing.
  *
- * What it cannot test: whether an agent holding this skill actually runs `patterns/verify.mjs`
+ * What it cannot test: whether an agent holding this skill actually runs `scripts/verify.mjs`
  * first, keeps the state file, and stops at reporting instead of editing. Those need an eval —
  * see README.md.
  *
@@ -36,7 +36,7 @@ const SKILL = readFileSync(join(HERE, "SKILL.md"), "utf8");
  */
 function citations(text) {
     const out = new Set();
-    for (const m of text.matchAll(/(?<![\w/.-])(?:\.claude\/)?((?:canon|patterns|design|skills)\/[\w.@/-]+)/g)) {
+    for (const m of text.matchAll(/(?<![\w/.-])(?:\.claude\/)?((?:canon|patterns|design|skills|scripts)\/[\w.@/-]+)/g)) {
         const p = m[1].replace(/[:#].*$/, "").replace(/[.,;)]+$/, "");
         if (/[*<>{}]/.test(p)) continue;
         if (/\.{3}|…/.test(p)) continue;
@@ -66,7 +66,7 @@ t.expect(
 t.expect(
     "the skill points outward rather than restating — it names the canon files it audits",
     { code: 0, out: `${cited.length} cited: ${cited.join(" ")}` },
-    { has: ["canon/be/INDEX.md", "canon/HOW-TO-WRITE.md", "patterns/verify.mjs"] },
+    { has: ["canon/be/INDEX.md", "canon/HOW-TO-WRITE.md", "scripts/verify.mjs"] },
 );
 
 // ---- what it must never contain ----------------------------------------------

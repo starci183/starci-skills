@@ -33,9 +33,9 @@ Nothing here remembers a path. The front end, its design-system folder, and the 
 for, every time:
 
 ```bash
-node .claude/scripts/read-workspace-context.mjs fe.path
-node .claude/scripts/read-workspace-context.mjs fe.design_system
-node .claude/scripts/read-workspace-context.mjs be.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.path
+node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
+node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A missing context exits non-zero and prints the command that fixes it; `starci-setup-workspace-fe`
@@ -53,7 +53,7 @@ is drawn means rewriting the blueprint.
 | what a page owns | `canon/fe/enforce/tiers/page.md` |
 | what a layout shell owns, and what an overlay owns | `canon/fe/enforce/tiers/layout.md`, `canon/fe/enforce/tiers/overlay.md` |
 | which component a shape of data becomes | `canon/fe/explore/component/`, and the "Which component a data shape becomes" section of `canon/fe/enforce/tiers/architecture.md` |
-| what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/enforce/spacing/overview.md`, with `patterns/fe/patterns.mjs` as the authority on the values |
+| what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/enforce/spacing/overview.md`, with `canon/fe/explore/registry.mjs` as the authority on the values |
 | how an async surface is written, and what its loading state owes the reader | `canon/fe/enforce/authoring/async-data.md`, `canon/fe/enforce/authoring/loading-and-skeleton.md` |
 | how a modal, drawer or toast behaves as code | `canon/fe/enforce/authoring/overlay-and-feedback.md` |
 | what already exists to compose with | the design-system folder at `fe.design_system`, read directly |
@@ -97,7 +97,7 @@ zones, because a state is a different arrangement, not a different sentence. The
 nothing yet, exactly one, the ordinary many, more than fits, mixed or partially complete, still
 loading, and failed. Each one changes which region matters, and at least one of them usually reveals
 that the chosen shell was wrong. These are not optional later: the build is graded on them by
-`patterns/fe/gates/check-one-instance-per-state.mjs` and by the rendered-tree runner described in
+`scripts/gates/check-one-instance-per-state.mjs` and by the rendered-tree runner described in
 `canon/fe/enforce/testing.md`, so a state left out of the proposal is a state somebody has to design during
 a build.
 
