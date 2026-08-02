@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 /**
- * verify.mjs — check that the patterns still describe the source they claim to describe.
+ * verify.mjs — check that the canon still describes the source it claims to describe.
+ *
+ * WHAT IT READS
+ * `canon/<role>/**\/*.md` — the prose, recursively, wherever it sits in the canon's folders. It
+ * used to read `patterns/<role>/*.md`; the prose moved to `canon/` and `patterns/` became
+ * executable-only, so this follows it. Nothing else about the check changed.
  *
  * WHY THIS EXISTS
- * A pattern file earns its authority by being grounded: it names a real file and quotes a real
+ * A canon file earns its authority by being grounded: it names a real file and quotes a real
  * count. That is also what makes it rot. The source moves, the document does not, and nothing
  * says so — a reader then trusts a path that was deleted a fortnight ago.
  *
@@ -99,6 +104,27 @@ function resolves(root, rel) {
 }
 
 /**
+ * Every `.md` under a canon role folder, recursively, as paths relative to that folder.
+ * The canon groups its prose into subfolders (`authoring/`, `contracts/`, `modules/`), so a flat
+ * listing would silently check nothing.
+ * @param {string} dir
+ * @param {string} [prefix]
+ * @returns {string[]}
+ */
+function mdFiles(dir, prefix = "") {
+    const out = [];
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+    for (const e of entries) {
+        if (e.name.startsWith(".")) continue;
+        const rel = prefix ? `${prefix}/${e.name}` : e.name;
+        if (e.isDirectory()) out.push(...mdFiles(join(dir, e.name), rel));
+        else if (e.name.endsWith(".md")) out.push(rel);
+    }
+    return out.sort();
+}
+
+/**
  * Claims of the form "N file" or "N files" where the same line also names a symbol.
  * Only these can be rechecked mechanically; a count with no symbol beside it is left alone
  * rather than guessed at.
@@ -155,7 +181,7 @@ let warns = 0;
 let checked = 0;
 
 for (const role of roles) {
-    const dir = join(HERE, role);
+    const dir = join(CLAUDE, "canon", role);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) continue;
 
     const root = sourceOf(role);
@@ -166,9 +192,9 @@ for (const role of roles) {
         continue;
     }
 
-    console.log(`\n# ${role}/  against  ${root}`);
+    console.log(`\n# canon/${role}/  against  ${root}`);
 
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
+    for (const file of mdFiles(dir)) {
         const text = readFileSync(join(dir, file), "utf8");
 
         const missing = [];
