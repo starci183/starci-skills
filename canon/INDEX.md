@@ -52,10 +52,28 @@ One law spans all of them: **no component reaches the app that was never a compo
 the design-system folder first.** The reasoning is in `canon/fe/architecture.md`; the enforcement is
 `patterns/fe/gates/check-story-coverage.mjs`.
 
+Four further shelves sit beside those, holding the material that decides what a screen may look like
+and do — a layer above spelling and below architecture. Each carries its own index, because each is
+long enough that a copy of its table here would drift from the folder within a month.
+
+| Shelf | Answers |
+|---|---|
+| [`canon/fe/foundations/`](fe/foundations/INDEX.md) | which value out of a deliberately closed scale an element gets: gap, colour token, radius, elevation, breakpoint, z-index, motion, type, sticky offset, scrollbar gutter, and how wide content overflows |
+| [`canon/fe/design-principles/`](fe/design-principles/INDEX.md) | what the interface is allowed to say and do: accent as signal, one primary action, honest persuasion, hover affordance, design restraint, content voice, accessibility, and building for the data that exists |
+| [`canon/fe/layouts/`](fe/layouts/INDEX.md) | which shell a surface gets and how its regions behave — the job-to-shell rule, the shell decision tree, the region vocabulary, responsive and adaptive behaviour, and one file per archetype grounded in a real route |
+| [`canon/fe/patterns/`](fe/patterns/INDEX.md) | the recurring behaviours inside a shell: list anatomy, form flow, the three tiers of loading feedback, empty states, drawers, where a surface lands, and how a progress block is composed |
+
 ## Back end
 
 Grouped by what the rule constrains rather than by which folder the code sits in, because the same
 question tends to arrive from several modules at once.
+
+One shelf sits ahead of the rest. [`canon/be/concepts/`](be/concepts/INDEX.md) holds one file per
+subsystem this backend is actually built out of — the exception layer, the GraphQL resolver leaf, CQRS
+events and CDC projection, BullMQ processors, Elasticsearch sync, the seeders, auth, payments, RAG,
+media encoding and the rest — each naming the `src/` folder it was read from. The files below say how
+a line is spelled; that shelf says what the thing being spelled is, and it is usually the cheaper file
+to open first. Its table is [`canon/be/concepts/INDEX.md`](be/concepts/INDEX.md).
 
 | Area | File | Decides |
 |---|---|---|

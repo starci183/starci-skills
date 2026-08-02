@@ -5,7 +5,17 @@ module written today reads like the module next to it. Every rule in them names 
 it was read from; if a rule and the source disagree, the source wins and the rule is stale — fix it
 the way [`HOW-TO-WRITE.md`](../HOW-TO-WRITE.md) describes.
 
-The set is split into three shelves by the question each one answers.
+The set is split into four shelves by the question each one answers.
+
+## `concepts/` — what the pieces of this backend are
+
+One file per subsystem, each naming the `src/` folder it was read from: the exception layer, the
+resolver leaf, the projection listener, the queue processor, the seeders, the five payment gateways,
+and the rest. The other three shelves say how a line is spelled; this one says what the thing being
+spelled is, which is why it is usually the cheaper file to open first.
+
+The whole table is [`concepts/INDEX.md`](concepts/INDEX.md) — twenty-five concepts, too many to
+restate here without the two copies drifting apart.
 
 ## `modules/` — how a module is put together
 
@@ -35,6 +45,7 @@ The set is split into three shelves by the question each one answers.
 ## Reading order
 
 Open the one file the task touches. These are not a curriculum, and a rule read out of context is a
-rule applied where it does not belong. A new feature typically crosses all three shelves —
-`modules/` for the folder it lives in, `contracts/` for the surface it exposes, `conventions/` for
-how the resulting lines are typed — so reach for the shelf, not the whole set.
+rule applied where it does not belong. A new feature typically crosses all four shelves —
+`concepts/` for what it is being built out of, `modules/` for the folder it lives in, `contracts/`
+for the surface it exposes, `conventions/` for how the resulting lines are typed — so reach for the
+shelf, not the whole set.
