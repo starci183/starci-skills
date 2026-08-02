@@ -1,7 +1,3 @@
----
-description: Names the concrete technology this front-end canon is written against — Next.js App Router, React, TypeScript, HeroUI, Tailwind, SWR, Apollo/GraphQL, Zustand, Storybook — and, for each, which enforce/authoring file grounds it. Use this when a rule elsewhere in canon/fe says "the request layer" or "the store" and the concrete library behind that phrase needs naming; when onboarding to this codebase and the question is "what is this actually built out of"; when writing a new canon rule and the choice is between naming a library and staying portable; or when a dependency is about to change and every file it grounds needs finding first. Not for how to write the idiom — each enforce/authoring file linked below does that. Not for which component or tier a shape of data becomes (explore/component/) or which shell a surface gets (explore/layouts/) — those are design questions, not stack questions.
----
-
 # FE tech stack — the one place a concrete name is said out loud
 
 Everywhere else in this canon, a rule is written to survive the stack changing under it: "the

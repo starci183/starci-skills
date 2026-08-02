@@ -1,7 +1,3 @@
----
-description: Names the concrete technology this back-end canon is written against — NestJS, TypeORM, PostgreSQL, GraphQL, REST, NATS, Kafka, Debezium, BullMQ, Keycloak, MinIO, Elasticsearch — and, for each, which system-design or authoring file grounds it. Use this when a rule elsewhere in canon/be says "the message broker" or "the read model" and the concrete system behind that phrase needs naming; when onboarding to this backend and the question is "what does this actually run on"; when writing a new canon rule and the choice is between naming a product and staying portable; or when a piece of infrastructure is about to be swapped and every file it grounds needs finding first. Not for how to write the idiom — each system-design or authoring file linked below does that. Not for what a module is built out of conceptually (that is the reasoning inside the linked files themselves, not this map).
----
-
 # BE tech stack — the one place a concrete name is said out loud
 
 `canon/be/explore/system-design/` is written portable on purpose: "the message broker," "the read
