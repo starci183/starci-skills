@@ -1,9 +1,11 @@
 # `authoring/` — how a line of back-end code is spelled
 
-Two files, both about the text of the code rather than the design behind it. One says where a thing
-lives and what it is called; the other says how a failure is represented on its way out. Together
-they cover the two decisions a stranger is most likely to get wrong in the first hour: which folder
-this belongs in, and what to do with the error they just caught.
+Seven files, all about the text of the code rather than the design behind it: where a thing lives
+and what it is called, how a failure is represented on its way out, what may accept input and how it
+is guarded, which types are allowed to survive, how configuration and secrets are read, and how
+imports and comments are written. Together they cover the decisions a stranger is most likely to get
+wrong in the first hour — which folder this belongs in, what to do with the error they just caught,
+and how the line itself is spelled.
 
 This is the **enforce** lane, so each rule states plainly whether a machine can settle it — a
 filename case rule an eslint plugin holds, a thrown literal the compiler's own rule catches, a

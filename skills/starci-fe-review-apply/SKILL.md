@@ -26,6 +26,8 @@ before any code is written, and offer three or four real choices rather than one
 to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
 reasoning behind each.
 
+This skill also honours `canon/fe/business-parity.md`: the back end owns each business rule, so it reads the value from the API and obeys the rule exactly, never inventing one beside it — where the server is silent or ambiguous it surfaces the gap rather than guessing.
+
 ## Before anything: resolve the source
 
 ```bash

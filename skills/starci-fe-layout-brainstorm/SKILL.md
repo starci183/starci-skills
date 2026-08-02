@@ -35,6 +35,8 @@ before any code is written, and offer three or four real choices rather than one
 to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
 reasoning behind each.
 
+This skill also honours `canon/fe/business-parity.md`: the back end owns each business rule, so it reads the value from the API and obeys the rule exactly, never inventing one beside it — where the server is silent or ambiguous it surfaces the gap rather than guessing.
+
 ## Where the source is
 
 Nothing here remembers a path. The front end, its design-system folder, and the back end are asked
