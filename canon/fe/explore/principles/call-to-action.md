@@ -1,48 +1,54 @@
 # Call to action
 
-Drawn from the button canon §2, the region model's CTA anchor, and `CTA.md` — a real file inside the
-source at `src/components/features/learn/CTA.md`. StarCi already keeps a CTA notebook next to the
-code; this file is the framework half of it written as a rule. The psychological detail stays in
-`persuasion-psychology.md`.
+A call to action is not a button style. It is the point where a surface asks for the one thing it
+wants, and everything about it — how many there are, where it sits, when it fires, what it says —
+follows from that. The psychology behind the ask is in `persuasion-psychology.md`; this file is the
+structural half.
 
 ## The test
 
-**Each surface has exactly ONE primary action, fired at the moment the learner has both enough
+**Each surface has exactly ONE primary action, fired at the moment the person has both enough
 motivation and enough ease — and the copy names the OUTCOME, not the mechanism.**
 
 ## The rules
 
-- **One primary CTA per surface**: `variant="primary" size="lg"` with a trailing `ArrowRightIcon`.
-  Every other action drops to `secondary` or `tertiary`. Two buttons of the same primary size side
-  by side produce decision paralysis — Hick's Law, recorded in `CTA.md` as B4.
-- **The CTA lives in the CTA-anchor region** — the hero, or the sticky bar. It does not wander into
-  a secondary slot: the `actions` slot of `PageHeader` is for the primary action, not for a refresh
-  button or a toolbar.
-- **Trigger where motivation multiplies ability** (Fogg's B=MAP). Do not fire a CTA when motivation
-  is low (the value has not been seen yet, first open of the app) or when ability is low (the
-  destination is vague, the path is many steps). The two levers available: fire at a **completion
-  moment**, where motivation peaks — the Zeigarnik effect, see `persuasion-psychology.md` — and
-  make the action one click with a clear destination.
-- **The north-star CTA is "enter the course / keep learning".** Everything else — buying an AI
-  pack, buying a streak freeze — is secondary, and every layout must contain at least one path back
-  to a course or to content.
-- **Copy is outcome, not feature.** "Mở khóa để dựng bằng chứng đi làm", not "phỏng vấn tốn AI
-  credit". Outcome framing persuades where mechanism framing does not; settled in `CTA.md` as
-  lever #8.
-- **Sub-CTAs stay quiet.** A secondary action — retry, view details — is `tertiary`, not `lg`, and
-  carries no arrow, so it reads as subordinate at a glance.
+- **One primary call to action per surface**: the primary button at its largest size, with a
+  trailing forward arrow. Every other action drops to secondary or tertiary. Two buttons of equal
+  weight side by side do not double the conversion, they split it — Hick's Law: choice time rises
+  with the number of equally-weighted options, and two equal primaries are exactly that.
+- **The call to action lives in the surface's action anchor** — the hero, or the sticky bar at the
+  bottom of a long page. It does not wander into a secondary slot. The action slot beside a page
+  header is for the surface's primary action; a refresh control or a toolbar button placed there
+  quietly claims a weight it has not earned.
+- **Fire where motivation multiplies ability** (Fogg's B=MAP: behaviour happens when motivation,
+  ability and a prompt coincide). Do not fire when motivation is low — the value has not been seen
+  yet, the person just arrived — or when ability is low, because the destination is vague or the
+  path is many steps. Two levers are available: fire at a **completion moment**, where motivation
+  peaks and an unfinished thing is still holding attention (the Zeigarnik effect), and make the
+  action one click with a destination the reader can already picture.
+- **The product's core loop owns the primary call to action.** Whatever the product exists to let
+  people do — check out, publish, run the report, get back to the task in progress — is the primary
+  everywhere. Ancillary purchases and add-ons are secondary, and every layout offers at least one
+  path back into that loop.
+- **Copy names the outcome, not the mechanism.** "Get the report" rather than "Run query";
+  "Ship your first change" rather than "Consume one build credit". Outcome framing tells the reader
+  what they will have; mechanism framing tells them what they will spend, which is the argument
+  against acting.
+- **Sub-actions stay quiet.** A secondary action — retry, view details — is tertiary, not large, and
+  carries no arrow, so it reads as subordinate at a glance rather than competing for the same click.
 
-## Where it is applied
+## One worked example
 
-`UpNextCard` (`blocks/learn/UpNextCard`) — one accent primary, `lg` with an arrow ("Làm N thử thách
-của bài này"), plus one quiet tertiary, fired at the completion moment at the end of a lesson or a
-flashcard session.
+A summary card at the end of a multi-step task — the moment where motivation is highest and the work
+is fresh — carries one large primary with an arrow naming the concrete next thing, and one quiet
+tertiary beside it for the person who wants to go back over what just happened. Earlier drafts of
+that card tend to carry a generic primary ("Try again") pointing at the surface the reader has just
+left; the version that works points at the specific weakest part the run just measured, so the
+destination is one the reader has a reason to want.
 
-`MockInterviewScorecard` — the primary CTA moved from the generic "làm lại" to a specific
-destination, "ôn {weak phase} →", inside the course; retry dropped to tertiary.
+The same card is where a second primary usually creeps in: an upsell that arrives at the completion
+moment because that is when it converts. It converts by borrowing the attention of the real primary.
+One of the two has to drop a tier.
 
-`CourseCtaButtons`, `PremiumPaywall`, `PremiumGateModal` and `CourseMobileEnrollBar` — the CTA icon
-was unified to `ArrowRightIcon`, replacing the cart and rocket icons.
-
-Related: `content-linking.md` (a CTA is one form of onward path — every surface has one),
-`persuasion-psychology.md`, and the layout rule requiring a funnel to courses.
+Related: `content-linking.md` (a call to action is one form of onward path — every surface has one),
+`persuasion-psychology.md`.

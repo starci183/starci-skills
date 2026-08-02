@@ -1,33 +1,36 @@
 # Heavy technology proves capability; it is not decoration
 
-StarCi **teaches** hardcore engineering, so its own interface has to demonstrate command of that
-engineering. Three-dimensional scenes with `three.js`, node diagrams with React Flow (`@xyflow`),
-real-time surfaces, interactive canvases — these carry weight in the product because they are
-congruent with the claim "we can teach it because we can build it". That congruence is what buys
-authority; see the persuasion rules. It is not what buys prettiness.
+Some products make a claim about their own technical competence. When they do, their interface is
+part of the evidence: a three-dimensional scene, a node graph, a live canvas, a real-time surface
+all carry weight, because they are congruent with the claim. Congruence is what buys authority — the
+demonstration and the claim have to be about the same thing. Prettiness buys nothing.
 
 ## The rule
 
-- Heavy technology must **serve a real purpose** — describing an architecture, letting someone draw
-  a system, illustrating a concept, walking a data flow — **and** demonstrate capability at the
-  same time. Beautiful with no substance is showing off, and gets cut.
-- **The one-sentence test:** *does this 3D scene or React Flow canvas prove a capability tied to
-  what we teach, or is it eye candy?* If the first half cannot be answered, remove it.
-- **Where it is right, in the shipped app:** the `architecture` page and the landing (showing the
-  real architecture), MindMap (walking the tree of a course), the MockInterview whiteboard (drawing
-  a system design), the microservices diagram. **Where it is wrong:** sparkle effects with no
-  meaning, 3D added for swagger, animation nobody needed.
-- **It still has to be honest.** Flex a capability that is real; do not manufacture gloss. And do
-  not trade away performance or accessibility for it — honour `prefers-reduced-motion` and provide
-  a fallback.
+- **Heavy technology must serve a real job** — describing a system, letting someone draw one,
+  walking a data flow, showing a signal as it arrives — **and** demonstrate capability at the same
+  time. Beautiful with no substance is showing off, and gets cut.
+- **The one-sentence test:** *does this scene, graph or canvas prove a capability the product
+  actually claims, or is it eye candy?* If the first half cannot be answered, remove it.
+- **Where it is right:** an infrastructure product drawing the real topology of a running deployment
+  as a pannable node graph, so the reader can trace one request through it; a design tool whose
+  canvas is the product; an analytics surface streaming values as they land instead of on a refresh
+  button. **Where it is wrong:** particle effects behind a pricing table, a rotating model on a
+  settings page, an animation nobody needed and nobody can turn off.
+- **It still has to be honest.** Demonstrate a capability that is real. A staged animation of a
+  system the product does not actually run is a claim, not a demonstration, and it is the kind of
+  claim a technical audience checks.
+- **The cost is paid by everyone, so cap it.** Honour `prefers-reduced-motion` (WCAG 2.2, 2.3.3
+  Animation from Interactions), give the canvas a static fallback and a keyboard path to the same
+  information, and do not let a decorative scene sit on the critical rendering path of the page it
+  decorates.
 - Heavy **with a purpose** is not a violation of `design-restraint.md`. Restraint forbids the
-  superfluous; it does not forbid serious technology that has a reason.
+  superfluous; it does not forbid serious engineering that has a reason.
 
-## Where it lives in the source
+The aesthetic-usability effect is real — Nielsen Norman's write-up of it is the standard reference —
+but it cuts both ways here. A beautiful surface buys tolerance for small friction; it does not buy
+credibility for a claim it has nothing to do with, and a reader who notices the mismatch discounts
+the claim rather than the decoration.
 
-`features/architecture` (`ArchitectureFlow`, `ArchitectureScene`, the `three.js` `RainEffect`,
-`MicroservicesDiagram` and `MicroservicesScene`); `features/learn/MindMap` (`@xyflow` React Flow);
-`MockInterview/MockInterviewDiagram` (a React Flow whiteboard); `blocks/marketing/ShowcaseMockup`.
-
-Related: `persuasion-psychology.md` (authority is capability shown, not claimed),
-`design-restraint.md` (heavy but not superfluous), `accessibility.md`, and the motion foundations.
+Related: `persuasion-psychology.md` (authority is capability shown, not asserted),
+`design-restraint.md` (heavy but not superfluous), `accessibility.md`.

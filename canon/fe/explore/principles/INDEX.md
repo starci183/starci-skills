@@ -13,20 +13,20 @@ the ruling that produced it.
 |---|---|
 | [`accent-system.md`](accent-system.md) | that accent is a signal rather than a surface — the four roles that may carry it, one channel per element, and that it never encodes status |
 | [`accessibility.md`](accessibility.md) | the single baseline a new component is checked against: works without colour, works from the keyboard, and is not silent to a screen reader |
-| [`advanced-tech-flexes-capability-not-decoration.md`](advanced-tech-flexes-capability-not-decoration.md) | that heavy technology — 3D scenes, node graphs, live canvases — earns its place by serving a real purpose and demonstrating capability at once, and is cut when it is only beautiful |
+| [`advanced-tech-flexes-capability-not-decoration.md`](advanced-tech-flexes-capability-not-decoration.md) | that heavy technology — three-dimensional scenes, node graphs, live canvases — earns its place by serving a real job and demonstrating capability at once, and is cut when it is only beautiful |
 | [`affordance-and-feedback.md`](affordance-and-feedback.md) | the umbrella over hover affordance and waiting states: the interface never goes silent, and every region handles loading, empty and error explicitly |
 | [`call-to-action.md`](call-to-action.md) | that each surface has exactly one primary action, fired when motivation and ease are both present, with copy naming the outcome rather than the mechanism |
-| [`card.md`](card.md) | when to build a card at all, and the ban on two bordered surfaces stacked directly against each other with the three correct shapes when the second thing is secondary |
+| [`card.md`](card.md) | when to build a card at all, and the ban on two bordered surfaces stacked directly against each other, with the three correct shapes when the second thing is secondary |
 | [`content-linking.md`](content-linking.md) | that no screen is a dead end — every surface offers a way onward, and every reference to another entity is clickable and carries the right intent |
-| [`content-voice.md`](content-voice.md) | how a UI string reads: Vietnamese translated by meaning rather than word for word, both locales complete, no emoji, no uppercase |
+| [`content-voice.md`](content-voice.md) | how a UI string reads: translated by meaning rather than word for word, every locale complete, no emoji, no uppercase |
 | [`design-restraint.md`](design-restraint.md) | that a screen carries exactly the visual weight it needs, and everything decorative, repeated or vanity gets cut |
+| [`flat-render-is-a-token-bug-not-a-redesign.md`](flat-render-is-a-token-bug-not-a-redesign.md) | that a flat or washed-out element is an undeclared custom property until proven otherwise — inspect the computed style before proposing a redesign |
 | [`grounded-in-data.md`](grounded-in-data.md) | that the interface is built for the data that actually exists, nulls and blanks included, rather than for the ideal schema nobody has filled in |
-| [`heatmap-trong-la-bug-token-khong-redesign.md`](heatmap-trong-la-bug-token-khong-redesign.md) | that a flat or washed-out element is an undefined CSS token until proven otherwise — inspect the computed style before proposing a redesign |
 | [`hover-style-matches-clickable-nature.md`](hover-style-matches-clickable-nature.md) | which kind of hover a target gets, decided by whether the action goes there or stays here: underline for navigation, fill for selection in place |
 | [`interactive-needs-hover.md`](interactive-needs-hover.md) | that anything clickable, openable or navigable has a hover response and a hand cursor, because an element that does something and shows nothing is indistinguishable from text |
 | [`landing-marketing.md`](landing-marketing.md) | the rules shared by every public selling surface — what the design may assume about data, how it is positioned, which visualisation it may reach for, and how the copy reads |
-| [`no-emoji.md`](no-emoji.md) | that emoji are banned in product text, and that a genuinely needed symbol is a phosphor icon which takes the system's colour and size tokens |
-| [`no-uppercase-text.md`](no-uppercase-text.md) | that hand-typed caps and `uppercase` are banned outside spots individually approved, and that text stays as the i18n source wrote it |
+| [`no-emoji.md`](no-emoji.md) | that emoji are banned in product text, and that a genuinely needed symbol is an icon which takes the system's colour and size tokens |
+| [`no-uppercase-text.md`](no-uppercase-text.md) | that hand-typed caps and `uppercase` are banned outside spots individually approved, and that text stays as the translation source wrote it |
 | [`persuasion-psychology.md`](persuasion-psychology.md) | which persuasion techniques are legal — only those whose claim is true and checkable against a real back-end field — and the ethical boundary on each |
 | [`progressive-disclosure.md`](progressive-disclosure.md) | when something is hidden behind a summary row and opened on demand, across drawer, accordion, modal and see-more alike |
 | [`resume-cta-only-when-away.md`](resume-cta-only-when-away.md) | that a resume CTA renders only when the reader is not already on the task it would link to |

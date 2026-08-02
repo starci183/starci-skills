@@ -1,62 +1,56 @@
 # Persuasion psychology — honest only
 
-Taken from `src/components/features/learn/CTA.md`, a real file in the tree in which StarCi wrote its
-own handbook of persuasion techniques, each one grounded in an actual back-end field and each with an
-explicit ethical boundary. This file is that handbook stated as rules and widened from the
-course-purchase CTA to the whole app.
+Persuasion is a real part of interface design, and it has a literature: Cialdini's influence
+principles, Fogg's behaviour model, Kivetz's goal-gradient work, the Zeigarnik effect, and Eyal's
+habit loop. This file states them as rules for building surfaces, and draws the line each one has to
+stay behind.
 
 ## The rule of thumb
 
 **A persuasion technique is legal only when what it says is TRUE and checkable against the back
 end.** There is no exception for "it converts better if we make it up".
 
-## The frameworks, and what they are already built as here
+## The frameworks, and what an honest implementation looks like
 
-| Framework | Mechanism | What StarCi built |
+| Framework | Mechanism | Honest form |
 |---|---|---|
-| Cialdini — scarcity | A scarce thing is priced and valued higher | `PhaseScarcityNote` — a real seat cap and a real price increase (`coursePricePreview`), HIDDEN when there is no cap (`seatsRemaining == null`) |
-| Cialdini — social proof | A crowd lowers perceived risk | `StatStrip` / `CourseTrustStats` on the landing page (real learner, lesson and course counts); `TopLearners` / `LeaderboardPodium` (the real leaderboard) |
-| Cialdini — authority | Expertise and exclusivity raise perceived value | `SelfHostGpuMark` (self-hosted GPU, stated rather than buried in a technical prompt); `FounderCard` (build-in-public, a real founder) |
-| Cialdini — consistency | Consistent behaviour pulls further commitment | `StreakStrip` / `StreakFreezeCard` (keeping the daily streak alive) |
-| Cialdini — reciprocity | Receiving first creates an obligation to return | The premium preview cuts off at "Kiểm thử" — real learning is given away before the lock |
-| Cialdini — liking | Liking opens the reader up | The mascot and rank persona system, and the teacher-to-student voice in content-voice |
-| Fogg B = M·A·P | Action needs motivation, ability and a prompt at once | `UpNextCard` fires its CTA at the completion moment (high motivation) with a one-click, unambiguous target (high ability) — see [[call-to-action]] |
-| Goal-gradient (Kivetz) | Motivation rises non-linearly near the goal | `WeeklyGoals` plus `ProgressMeter` / `SegmentBar`; framed as "còn N bài" (near the goal) instead of "đã đọc N" (far from it) |
-| Zeigarnik / peak-end | Unfinished work creates tension that pulls the reader back; memory keeps the peak and the end | `UpNextCard` sits at the END of each surface (end of lesson, end of session), riding a positive ending rather than interrupting mid-flow |
-| Hook (Eyal): trigger → action → reward → investment | The habit loop | `DailyQuest` (daily trigger) → completion (action) → XP (reward) → accumulated streak (investment) |
+| Cialdini — scarcity | A scarce thing is priced and valued higher | A real remaining-stock or seat count, and a real scheduled price change; the whole element is HIDDEN when supply is unlimited |
+| Cialdini — social proof | A crowd lowers perceived risk | Real counts and real reviews on the pricing page; the number is gated below a minimum rather than padded |
+| Cialdini — authority | Expertise and provenance raise perceived value | A named author with checkable credentials, a published audit, a public repository |
+| Cialdini — consistency | Consistent behaviour pulls further commitment | A progress indicator over work the person genuinely did — steps completed, days used |
+| Cialdini — reciprocity | Receiving first creates an obligation to return | A free tier or preview that gives real value before the paywall, cut at a natural boundary rather than mid-sentence |
+| Cialdini — liking | Liking opens the reader up | A consistent voice and persona — [[content-voice]] |
+| Fogg B = M·A·P | Action needs motivation, ability and a prompt at once | The next-step card fires at the completion moment (high motivation) with one unambiguous, one-click target (high ability) — see [[call-to-action]] |
+| Goal-gradient (Kivetz) | Motivation rises non-linearly near the goal | A progress meter framed as "two steps left" (near the goal) rather than "three done" (far from it) |
+| Zeigarnik and peak-end | Unfinished work creates tension that pulls the reader back; memory keeps the peak and the end | The next-step prompt sits at the END of a task, riding a positive ending, rather than interrupting mid-flow |
+| Hook (Eyal): trigger → action → reward → investment | The habit loop | A daily prompt, a completing action, an immediate reward, and something accumulated that would be lost by leaving |
 
 ## How it is executed
 
-**Every field used to persuade points at a real back-end source** — seat count, enrollment count, XP
-and streak are all genuinely queried. No hardcoded or decorative number in the UI: `PhaseScarcityNote`
-renders only when `seatsRemaining` actually exists, and it never simulates a countdown.
+**Every field used to persuade points at a real back-end source.** A count, a remaining quantity, a
+quota and a completion total are all genuinely queried. No hardcoded or decorative number reaches the UI: a
+scarcity note renders only when the remaining quantity actually exists, and it never simulates a
+countdown that resets on reload.
 
-**One focal point per screen** (Von Restorff). The primary CTA is the single solid accent; making
-everything stand out means nothing does — [[accent-system]].
+**One focal point per screen** (Von Restorff). The primary call to action is the single solid accent;
+making everything stand out means nothing does — [[accent-system]].
 
 **Ambient pressure at the right dose** — one thin strip, in the same place, without blinking and
-without repeating across several overlays. Over-applied mere exposure becomes banner blindness and
+without repeating across several overlays. Mere exposure over-applied becomes banner blindness and
 works against you.
 
 ## The boundary — absolutely forbidden
 
-Fake scarcity or fake social proof (a fake countdown, an invented learner count); a fake
-progress-loss threat (free progress is NOT deleted when a trial ends — only the extended part locks,
-so the copy says "mở tiếp", not "giữ lại"); confirmshaming; and a nag loop that cannot be dismissed.
-All are forbidden even where they measure as more effective. These are tied hard to the fair
-monetization axiom.
+Fake scarcity and fake social proof (a countdown with no deadline behind it, an invented user count);
+a fake loss threat, where the copy implies work will be destroyed when in truth only a feature locks,
+so the message is "unlock the rest", not "save what you have"; confirmshaming, where the decline
+option is worded to make the reader feel small; and a nag loop that cannot be dismissed. These are
+the deceptive patterns catalogued by Brignull and increasingly named directly in consumer-protection
+law, and they are forbidden here even where they measure as more effective — a technique that only
+works while the reader is mistaken stops working the moment they are not.
 
-**North star:** persuasion here always points the learner toward REAL learning — capstones,
-challenges, code, evidence someone can check — and never toward "pay to raise a number". That is the
-asymmetric-fairness rule: no scalar inflates just because more was purchased.
-
-## Already applied
-
-`PhaseScarcityNote` (`blocks/commerce/PhaseScarcityNote`) — real scarcity, hidden when supply is
-unlimited. `TrialConversionStrip` (`features/learn/CourseContents`) — loss aversion, goal gradient
-and scarcity combined into one thin strip, shown only to trial users. `UpNextCard` — the Fogg trigger
-plus Zeigarnik/peak-end at the completion moment. `AiQuotaCard` — the real quota (remaining5h/Week)
-rendered through `ProgressBar`, with no invented numbers.
+**North star:** persuasion points the person toward the REAL value the product delivers — the work
+they came to do, the outcome they can verify — and never toward inflating a number that money bought.
 
 ## Related
 

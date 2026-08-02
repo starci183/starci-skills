@@ -1,8 +1,10 @@
 # Design restraint
 
-The shared kernel of three rules that turned out to be one: `whitespace-over-dividers.md`, the
-anti-pattern section of `accent-system.md`, and the rule that a progress block leads with a growing
-quantity rather than a vanity strip. All three say **minimum visual weight**.
+Three rules that look separate — whitespace before dividers, accent as a seasoning, one meaningful
+quantity instead of a strip of figures — share a kernel: **minimum visual weight**. Every mark on a
+screen costs the reader something, so each one has to be doing work. Tufte's data-ink argument is
+the oldest form of it, and it survives the move from a printed chart to an application surface
+almost unchanged.
 
 ## The test
 
@@ -13,23 +15,26 @@ repeated or vanity gets cut.**
 
 - **Accent follows 60-30-10.** Accent is a seasoning at a few small points — an icon, a chip, a
   value, a border — and never a fill across a whole block or section. Accent flood is an
-  anti-pattern, not "making it stand out more".
-- **Separate with whitespace before reaching for a divider.** The `gap` between two sections already
-  separates them; add a `border-t` or a `Separator` only when two regions cannot be separated by gap
-  — inside one bounded block, or where two joined regions must share a container.
-- **Cut vanity numbers.** A count that repeats what the eye already sees (a list showing its items
-  does not also need "N items" underneath), or a number that means nothing because the sample is too
-  small (100% retention from exactly one attempt) — hide it rather than display it to fill the
-  dashboard.
-- **One meaningful quantity — a single meter or headline — beats N numbers of equal rank.** A stat
-  strip of same-size figures is a dashboard for the look of it, with no way to tell which figure
-  matters.
+  anti-pattern, not "making it stand out more": emphasis is relative, so spreading it removes it.
+- **Separate with whitespace before reaching for a divider.** The gap between two sections already
+  separates them; proximity is the strongest grouping signal available and it is free. Add a rule or
+  a separator only where a gap cannot do the job — inside one bounded block, or where two joined
+  regions must share a container.
+- **Cut vanity numbers.** A count that repeats what the eye already sees — a list of six items does
+  not also need "6 items" underneath — or a number that means nothing because the sample is too
+  small, such as a hundred-percent success rate drawn from a single run. Hide it rather than print
+  it to fill space.
+- **One meaningful quantity beats N numbers of equal rank.** A strip of same-size figures is a
+  dashboard for the look of a dashboard: nothing in it says which figure matters, so the reader
+  either reads all of them or none. One headline value or one meter, with the rest demoted or on
+  demand, is the version that gets read.
 - **Icons and colour are not applied to static, non-interactive elements to make them pretty.** Every
-  visual emphasis must mean something: it is interactive, or it is a state signal.
+  visual emphasis must mean something: either the element is interactive, or the emphasis is a state
+  signal. Decoration that looks like signal trains the reader to ignore signal.
 
-Already applied in: `whitespace-over-dividers.md` (section rails separated by `gap-6`, with the
-`Separator` and the redundant count removed); `accent-system.md` §5 (accent flood and decorative
-accent as anti-patterns); the progress-block rule (one mastery meter replacing a strip of three
-loose numbers).
+The failure this guards against is cumulative rather than local. No single divider, count or tint is
+wrong on its own, which is why they accumulate; the screen only becomes unreadable after the
+twentieth one, and by then nobody can name the change that did it.
 
-Related: `card.md` — never stacking two bordered cards, the same restraint applied to surfaces.
+Related: `card.md` — never stacking two bordered cards is the same restraint applied to surfaces;
+`accent-system.md` §5 for the accent half in detail.

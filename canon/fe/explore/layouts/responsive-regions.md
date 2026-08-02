@@ -1,61 +1,60 @@
 # Regions that CHANGE with the screen — responsive and adaptive
 
-> A region changes how it is arranged with the viewport. The distinction
+> A region changes how it is arranged with the viewport, and there are two different mechanisms
+> behind that sentence
 > ([supercharge.design](https://supercharge.design/articles/adaptive-layout-vs-responsive-layout)):
-> **responsive** is fluid within ONE shape (max-width, flex-wrap); **adaptive** CHANGES the shape or
-> shell at a breakpoint (rail becomes chips, two panes become a stack). This codebase uses both,
-> plus adaptive-by-task ([`surface-job-drives-layout.md`](surface-job-drives-layout.md)).
+> **responsive** is fluid within ONE shape (a capped width, wrapping); **adaptive** CHANGES the shape
+> or the shell at a breakpoint (a rail becomes chips, two panes become a stack). Material's window
+> size classes and Fluent 2's layout guidance both assume the second, not only the first. A third
+> mechanism sits alongside them: adaptive-by-task, where the layout follows the JOB rather than the
+> width ([`surface-job-drives-layout.md`](surface-job-drives-layout.md)).
 
 ## Adaptive rules — STRICT
 
-- **A vertical rail exists only at `lg+`.** On a narrow screen it FOLDS into a horizontally
-  scrolling CHIP row at the top of the pane, reading the same URL state: `hidden lg:flex` on the
-  rail, `flex lg:hidden overflow-x-auto` on the chip row. Grounded in `LearnMobileTabBar`,
-  `LearnMobileBar` and `useSmViewpoint`.
-- **The mobile nav bar of `/learn/**` is ALWAYS at the FOOTER (`fixed bottom-0`), never at the top —
-  settled 2026-07-09.** `LearnShell` picks one of two components depending on whether the page has a
-  suitable `leftRail`: `LearnMobileTabBar` for a reader page, where the content map and the
-  on-this-page rail fold into three tabs (contents / lesson / on this page), and `LearnMobileBar`
-  for every page without such a rail — mock interview, flashcards, mind map, leaderboard,
-  foundations — which is a single button opening the course-menu drawer.
+- **A vertical rail exists only at the large breakpoint.** On a narrow screen it FOLDS into a
+  horizontally scrolling CHIP row at the top of the pane, reading the same URL state: the rail is
+  hidden below the breakpoint, the chip row hidden above it. A rail hidden with nothing in its place
+  means the navigation is simply gone.
+- **Sibling mobile bars must share POSITION, and may differ only in CONTENT.** A shell that picks
+  one of two bars depending on the page — a three-tab bar for a reader, a single drawer button for
+  everything else — is picking correctly: a reader needs three views, other pages need one drawer.
+  It is not free to also move them. Put one bar at the bottom and its sibling below the navbar, and
+  every page carrying the second one reads as though it has LOST its navigation entirely: all that
+  is left is a faint line of links at the top where a solid bar sits on the neighbouring page.
+  Consistency of position is what lets a reader stop looking for the control (Nielsen's consistency
+  and standards).
 
-  The two components differ in CONTENT, which is correct: a reader needs three views, other pages
-  need one drawer. They must NOT differ in POSITION. `LearnMobileBar` used to be `sticky top-16`,
-  below the navbar, while `LearnMobileTabBar` was `fixed bottom-0`, so every rail-less page (Mock
-  Interview, Flashcards) looked as though it had LOST its mobile nav entirely next to a Content
-  page — all that remained was a faint line of links at the top.
-
-  The fix: `LearnMobileBar` moved from `sticky top-16 border-b` to
-  `fixed inset-x-0 bottom-0 h-16 border-t`, matching `LearnMobileTabBar`'s position and height
-  exactly; and `LearnShell`'s `max-lg:pb-16`, which reserves the space so content is not covered,
-  changed from applying only when `useTabBar` to applying ALWAYS, since both bars are now
-  fixed-bottom.
-- **Two panes STACK on mobile** (`flex-col lg:grid`): context on top, workspace or detail below as a
-  tab strip or collapsible ([`full-bleed-work-surface.md`](full-bleed-work-surface.md)).
-- **Reposition and reflow** (Material, Fluent): a vertical card becomes horizontal, a FAB becomes a
-  nav rail as width allows. Use it when there is room; do not cram.
-- **Swap the overlay by modality:** on desktop a Drawer or Modal beside the content, on mobile a
-  bottom sheet (`placement="bottom"` with `useSmViewpoint`) — `when-drawer`.
+  Two consequences follow. Both bars take the same position and the same height, so the swap is
+  invisible. And the shell's bottom padding — the space reserved so content is not covered by a
+  fixed bar — is applied ALWAYS rather than only for the variant that happened to be fixed first;
+  reserving space conditionally is how the last line of a page ends up under a bar.
+- **Two panes STACK on mobile**: context on top, workspace or detail below as a tab strip or a
+  collapsible ([`full-bleed-work-surface.md`](full-bleed-work-surface.md)).
+- **Reposition and reflow** (Material, Fluent 2): a vertical card becomes horizontal, a floating
+  action button becomes a nav rail as width allows. Use it when there is room; do not cram.
+- **Swap the overlay by modality:** on desktop a drawer or a modal beside the content, on mobile a
+  bottom sheet.
 
 ## Responsive — fluid, same shape
 
-- Container `max-w-*` with `mx-auto`; flex-wrap for chips and buttons; `min-w-0` along a flex chain
-  so it can actually shrink.
-- **A block WIDER than the column SCROLLS (`overflow-x-auto`) instead of breaking the layout** —
-  mermaid, tables, code: `foundations/wide-content-scrolls-not-blocks-ui`.
-- Against scrollbar jitter: `foundations/scrollbar-gutter`.
+- A capped container width, centered; wrapping for chips and buttons; and permission to shrink along
+  the whole flex chain, since one child that refuses to shrink defeats every ancestor's max-width.
+- **A block WIDER than the column SCROLLS instead of breaking the layout** — diagrams, tables, wide
+  code. The overflow belongs to that block, never to the page: a page that scrolls horizontally has
+  lost its left margin for every element on it.
+- Reserve the scrollbar gutter so content does not jump sideways when a scrollbar appears.
 
 ## Gotchas
 
-- A left vertical rail does not suit mobile, so there must ALWAYS be a chip-row branch. A rail left
-  `hidden` with nothing in its place means the nav is simply gone.
-- Changing shape at a breakpoint must keep ONE source of state, the URL. Never two states, one for
-  desktop and one for mobile.
+- Changing shape at a breakpoint must keep ONE source of state, and the URL is the right one. Never
+  two states, one for desktop and one for mobile: they will disagree the first time a reader rotates
+  a tablet.
+- A layout that changes shape must be checked in the SHAPE IT CHANGES TO. Most breakpoint bugs are
+  not wrong values; they are branches nobody looked at.
 
 ## Related
 
 [`region-model.md`](region-model.md) ·
 [`surface-job-drives-layout.md`](surface-job-drives-layout.md) ·
-[`full-bleed-work-surface.md`](full-bleed-work-surface.md) · `when-drawer` ·
-`foundations/breakpoints` · `foundations/wide-content-scrolls-not-blocks-ui` ·
-`foundations/scrollbar-gutter` · `components/sidebar` (the mobile fold).
+[`full-bleed-work-surface.md`](full-bleed-work-surface.md) ·
+[`master-detail-rail.md`](master-detail-rail.md) · when-drawer.

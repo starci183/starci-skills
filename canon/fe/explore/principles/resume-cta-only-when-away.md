@@ -1,29 +1,31 @@
 # A "Resume" CTA appears only when the reader has LEFT the unfinished task — STRICT
 
-Read from the content-map rail, where "Tiếp tục học" stayed on screen even while the reader was
-already on that exact lesson (2026-06-24).
-
 ## The rules
 
-**A resume CTA — the button that jumps back to the unfinished task — renders only when the user is
-NOT on that task.** While the current view IS `currentTask`, hide it, because it would link to the
-page it is sitting on. The gate:
+**A resume CTA — the control that jumps back to the unfinished task — renders only when the user is
+NOT on that task.** While the current view IS the saved position, hide it, because it would link to
+the page it is sitting on. The gate compares position against position, never presence against
+absence:
 
 ```ts
-// OutlineRail header
-continue: continueHref && currentTask?.id !== activeContentId ? … : undefined
+// Sidebar header of a document reader
+resume: resumeHref && lastVisited?.id !== currentDocumentId ? resumeHref : undefined
+
+// Wrong: gated on the link existing, so it never goes away
+resume: resumeHref
 ```
 
 **Why:** resume means "take me back to where I stopped". If I am already there, there is nothing to
-resume, so the button is dead weight and it is noise — especially as a large CTA stuck to the bottom
-of the rail. An affordance shows up only when it can do something.
+resume, so the control is dead weight — and worse than dead weight when it is a large button pinned
+to the bottom of a rail, because it occupies the position the reader has learned to trust for the
+next real action. Nielsen Norman's minimalist-design heuristic is the general statement: every unit
+of interface competes with the useful units around it.
 
-**The general form:** any "take me to X" CTA hides while the reader is on X. Do not render a no-op
-action just because the data behind it (`currentTask`) exists; gate on whether it differs from the
-current position.
+**The general form:** any "take me to X" affordance hides while the reader is on X. Do not render a
+no-op action just because the data behind it exists; gate on whether that data differs from the
+current position. The same test retires a "back to top" button at the top of the page, a "go to
+checkout" button inside the checkout, and a breadcrumb whose last node links to itself.
 
-## First applied 2026-06-24
-
-`ContentMap` (the lesson reader's content-map rail): the `OutlineRail` header's `continue` becomes
-`undefined` when `currentTask?.id === activeContentId`. It had previously been gated on
-`continueHref` alone, so it never went away.
+An affordance shows up only when it can do something. A control that is present, styled as active,
+and does nothing teaches the reader that controls here may be decorative — and that conclusion is
+applied to the controls that do work.

@@ -1,99 +1,94 @@
 # Gap and vertical rhythm
 
-One scale covers all spacing — gap and padding alike. Settled 2026-06-24; it supersedes the earlier
-`0 / 2 / 3 / 4 / 6` scale, which had a step at 4 that no longer exists.
+One scale covers all spacing — gap and padding alike. Refactoring UI puts it first among its layout
+chapters for a reason: the difficulty in spacing is never picking a good value, it is picking the
+same good value twice, and a scale is the only mechanism that makes that automatic.
 
-## 1. The scale is `0 · 2 · 3 · 6 · 8`
+## 1. A five-step scale, not a continuum
 
-- **`gap-0`** — glued together: a number and its unit, an eyebrow sitting tight against its title.
-- **`gap-2`** (8px) — a sub-cluster: title and description, price and its discount chip, icon and
-  label, chip and chip. Also **item to item inside a dense list** — the short muted rows of a
-  `LabeledList` in a rail ([[list]] §3) sit at `gap-2`. Also **a `<Label>` above a single text
-  input** ([[label]] §1b), which is a tight pair by HeroUI's own convention.
-- **`gap-3`** (12px) — within one block: label to content (in `LabeledList`, label to list to
-  action), rows inside a card, sibling sub-blocks at the same level. Also **a `<Label>` above a
-  card, a radio group, or a cluster of controls** — `FlexWrapCardRadio`, `FlexWrapButtonRadio`,
-  `SelectableCardGroup` — which need air, and so differ from label-to-single-input at `gap-2`
-  ([[label]] §1b).
-- **`gap-6`** (24px) — between two regions with different jobs: section to section, the left and
-  right halves of a grid. **Only for genuinely large clusters.** Several small components stacked
-  vertically — inside a modal, say: a summary, a list of gateways, a link, a trust line — stay at
-  `gap-3`. Settled 2026-06-24: three small components read as `gap-3`. The step is chosen by the
-  SIZE of the blocks, not merely by "these do different things".
-- **`gap-8`** (32px) — a wider separation when a cluster genuinely needs a larger beat.
+Written in a system where one unit is 4px, the steps are `0 · 2 · 3 · 6 · 8`:
 
-Anything off the scale — 1, 1.5, 5, 7, 9, 10 — is out, except the two named exceptions below. The
-point of a five-step scale is that a reader can tell the relationship between two elements from the
-gap alone; a sixth value nobody can name destroys that.
+- **`0`** — glued together: a number and its unit, an eyebrow sitting tight against the title it
+  belongs to.
+- **`2`** (8px) — a sub-cluster, two things that are really one thing: title and description, price
+  and its discount badge, icon and label, chip and chip. Also item-to-item inside a dense list of
+  short muted rows, and a label sitting directly above a single text input.
+- **`3`** (12px) — within one block: label to content, rows inside a card, sibling sub-blocks at the
+  same level. Also a label above a card, a radio group, or a cluster of controls, which need more
+  air than a label above one input and therefore step up from `2`.
+- **`6`** (24px) — between two regions with different jobs: section to section, the two halves of a
+  split. **Only for genuinely large clusters.** Several small components stacked inside a dialog — a
+  summary, a list of payment methods, a link, a reassurance line — stay at `3`. The step is chosen
+  by the SIZE of the blocks, not merely by the fact that they do different things.
+- **`8`** (32px) — a wider separation when a cluster genuinely needs a larger beat.
 
-## 2. Two named exceptions
+Anything off the scale — 1, 1.5, 5, 7, 9 — is out, except the named exceptions below. The point of a
+five-step scale is that a reader can infer the relationship between two elements from the gap alone,
+which is the Gestalt law of proximity doing the work the markup cannot. A sixth value nobody can
+name destroys that inference for every element on the page, not just the one it was added for.
 
-**`PageHeader` to the content below it is `gap-10`** (40px), in the app only. The header cluster
-(breadcrumb, title, description, chips) gets a large breath before the page content starts. This is
-the only place in the app that uses it.
+## 2. Two named exceptions, and why they are named
 
-**On landing and marketing pages, a `SectionHeading` to the content below it is `gap-16`** (64px).
-Settled 2026-06-26, correcting a first draft that said `gap-24` — that was too far. Every landing
-section has a `SectionHeading` (eyebrow, title, intro) and sits `gap-16` above its content block,
-which is the landing breathing rhythm as opposed to the app's `gap-10`. A section with several
-content blocks wraps them in `<div className="flex flex-col gap-6">` so that header-to-content stays
-`gap-16` while the content's own rhythm stays `gap-6`. Applied on: courses, treasure, founder, faq,
-and LearnLoop (both the pinned and static variants).
+**A page header to the content below it takes a step above the top of the scale** — 40px is a
+reasonable value. The header cluster (breadcrumb, title, description, status chips) earns one large
+breath before the page's content starts, and this is the only place in an application that uses it.
 
-Note this is header-to-content WITHIN a section; section-to-section on landing uses a larger gap
-still ([[landing-marketing-section-spacing-and-editorial-stats]]).
+**On a marketing page, a section heading to its content takes more still** — around 64px. Marketing
+pages breathe differently from applications: the reader is scrolling, not working, and the rhythm
+that reads as generous on a landing page reads as broken on a settings screen. Where a section has
+several content blocks, wrap them so that heading-to-content keeps the large value while the
+content's own internal rhythm stays on the ordinary scale.
 
-## 3. A divider inside a card or stack takes `gap-3` on both sides
+An exception that is written down, named, and given a reason is a scale with two tiers. An exception
+that is merely used is a scale with a hole in it.
 
-Settled 2026-06-30. When two blocks are separated by a divider (`border-t`) inside one card or
-stack, the space above and below the divider is `gap-3` (12px), not `gap-6`. The divider is already
-doing the separating; adding 24px on each side reads as a gulf.
+## 3. A divider inside a card or a stack takes the small gap on both sides
 
-The implementation is symmetric: the upper block and the lower block (`border-t pt-3`) are two
-children of a `flex flex-col gap-3` container, so the space above the divider comes from the
-container and the space below from `pt-3` — 12px on each side. Each block keeps its own internal
-rhythm (a control cluster inside one of them may still be `gap-6`); only the band around the divider
-is `gap-3`.
+When two blocks are separated by a rule inside one card, the space above and below that rule is the
+`3` step, not the `6`. The divider is already doing the separating; paying 24px on each side as well
+reads as a gulf, and the reader starts to wonder what is missing between them.
 
-Same spirit as [[whitespace-over-dividers]]: prefer whitespace, and if you do use a divider, do not
-also pay for a large gap.
+Implement it symmetrically — the container's own gap supplies the space above, the lower block's
+padding-top supplies the space below — so that both sides are provably equal rather than
+coincidentally equal. Each block keeps its own internal rhythm; only the band around the divider is
+pinned.
 
-## 4. In a vertical stack, `gap-6` DIVIDES and `gap-3` groups
+Same spirit as preferring whitespace to dividers in the first place: if whitespace can do the
+separating, do not draw a line, and if you do draw one, do not also pay for the whitespace.
 
-`gap-6` marks the boundary between two regions with different jobs; everything inside one region is
-`gap-3`. Spreading `gap-6` evenly over every stacked block leaves the page thin and shapeless;
-forcing everything to `gap-3` erases the region boundaries. Group into `gap-3` clusters, then spend
-`gap-6` on the one line that actually divides them.
+## 4. In a vertical stack, the large gap DIVIDES and the small gap GROUPS
 
-Course home is the worked example. Region A is identity and action — breadcrumb, title, continue
-button with progress — internally `gap-3`. Region B is browsing — search, index tree — internally
-`gap-3`. Between A and B, `gap-6`.
+The large step marks the boundary between two regions with different jobs; everything inside one
+region uses the small step. Spreading the large gap evenly over every stacked block leaves a page
+that is thin and shapeless — a list of things with no structure. Forcing everything to the small gap
+erases the region boundaries entirely. Group into small-gap clusters first, then spend the large gap
+on the one line that actually divides them.
 
-The "continue learning plus progress" block stays **flat, not wrapped in a `Card`**. It is the
-primary action with a meter sitting directly on the page background; wrapping it produces a box
-inside a box ([[card]], a card is for a bounded object; and [[design-restraint]]).
+A documentation reader is the worked example. Region A is identity and action: breadcrumb, title,
+and the resume control with its progress meter, internally at `3`. Region B is browsing: the search
+field and the index tree, internally at `3`. Between A and B, `6`. One large gap on the whole page,
+and the page has a shape.
 
-The skeleton mirrors the same structure and the same rhythm — `gap-6` dividing, `gap-3` inside — so
-nothing shifts when the data lands.
+The resume control and its meter stay **flat on the page background, not wrapped in a card**. It is
+the primary action with a meter attached; wrapping it produces a box inside a box, and a card is for
+a bounded object rather than for anything the author wants to emphasise.
 
-When the page uses the `PageHeader` block, the header separates out on its own terms
-(header to content is the named `gap-10` exception) and the continue/progress block is CONTENT,
-living inside the `gap-6` cluster. See [[header]] §2.
+The loading skeleton mirrors the same structure and the same rhythm — large dividing, small
+grouping — so that nothing shifts position when the data lands.
 
 ## 5. Scrolling does not compress the header
 
-While the page scrolls, the header cluster at the top — breadcrumb, title, description, chips —
-keeps its gaps unchanged. The content below scrolls; the header's rhythm does not shrink. See
-[[sticky]].
+While the page scrolls, the header cluster keeps its gaps unchanged. The content below scrolls; the
+header's rhythm does not shrink into a denser version of itself. A header that collapses as you
+scroll is a separate design decision with its own cost, not a free improvement, and it should never
+happen by accident. See [[sticky]].
 
 ## 6. Reading the scale back
 
-Each pair of elements picks one step from the relationship between them: glued (0), sub-cluster (2),
-within a block (3), between blocks (6), between wide regions (8), header to content (10).
+Each pair of elements picks its step from the relationship between them: glued (0), sub-cluster (2),
+within a block (3), between blocks (6), between wide regions (8), header to content (the named
+exception).
 
-Card padding is a separate decision, owned by the block rather than by this scale. This file
-recorded it as `px-4 py-3`; `globals.css` now bakes `.card { padding: calc(var(--spacing) * 3)
-!important }`, so read the card padding rule from its own file before quoting a number here.
-
-Known debt: a few places still use `gap-4` — the pricing card interior among them — which is off the
-current scale. Candidates to pull back to 3 or 6; see the debt ledger.
+Card padding is a separate decision, owned by the card rather than by this scale. Read it from the
+card's own rule rather than quoting a number from here, because the two scales are allowed to move
+independently and the day they do, a number copied across is silently wrong.

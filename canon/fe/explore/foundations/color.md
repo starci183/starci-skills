@@ -1,88 +1,98 @@
-# Color and tokens
+# Colour and tokens
 
-Every colour in this app is a semantic token. The accent is a seasoning, not a surface — see
-[[accent-system]] — and the two components that carry most of the colour decisions are
-[[button]] and [[chip]].
+Every colour in a product is a semantic token — a name that says what the colour is for, not what
+the colour is. Material 3 calls these colour roles, Fluent 2 calls them global and alias tokens, and
+both exist for the same reason: a value written as `#0F62FE` can only be found by searching for that
+string, while a value written as `--accent` can be re-themed, contrast-checked and reasoned about.
 
-## 1. Semantic tokens only — no hex, no `slate-*`, no `cyan-500`
+## 1. Semantic tokens only — no hex, no raw palette class
 
-- **Backgrounds** — `bg-background` is the table, `bg-surface` (and `-secondary` / `-tertiary`) is
-  the paper laid on it; form fields use the `--field-*` family.
-- **Text** — `text-foreground`, `text-muted`, `text-accent`, and the semantic
-  `text-{success,warning,danger}`.
-- **Borders** — `border-separator` or `border-default`.
-- **Third-party brand colour** (Facebook, GitHub) gets a `--brand-*` token rather than a literal.
-- Anything categorical maps back onto success / warning / danger / accent instead of inventing a
-  hue.
+- **Backgrounds** — one token for the page itself and a small family for the surfaces laid on it
+  (primary, secondary, tertiary). Form fields get their own family, because fields move
+  independently of cards.
+- **Text** — a foreground, a muted foreground, an accent, and the semantic trio of success, warning
+  and danger.
+- **Borders** — a separator token for hairlines between things, a default border token for the
+  outline of a thing.
+- **Third-party brand colour** — a sign-in provider's blue, a repository host's black — gets its own
+  brand token rather than a literal, so it is visibly not part of the palette.
+- Anything categorical maps back onto success, warning, danger or accent rather than inventing a
+  hue. A seventh colour invented for one badge is a colour with no meaning anywhere else.
 
-The one legitimate exception is **data-driven colour** — a per-language swatch for TS or Go, a
-per-category colour. That belongs in a domain util and is applied through `style`, because it is
-data, not design. It never becomes a token in `globals.css`.
+The one legitimate exception is **data-driven colour**: a per-language swatch in a repository list, a
+per-category colour in a chart legend, a user-chosen label colour. That belongs in a data utility and
+is applied through an inline style, because it is data rather than design. It never becomes a token
+in the theme.
 
-## 2. Active, selected, or highlighted — tint plus matching text
+## 2. Active, selected or highlighted — a tint plus matching text
 
-A component in its active or selected state (a nav row, a chip, a tab, a segment) gets a tinted
-background `bg-<Color>/10` with icon and text in the same `<Color>` at full strength. That is the
-standard tonal pattern — the same one shadcn, Material and Linear use — and it reads as "on"
-without needing a border or a shadow.
+A component in its active or selected state — a navigation row, a chip, a tab, a segment — takes a
+tinted background at roughly ten percent alpha with its icon and text in the same hue at full
+strength. This is the standard tonal pattern, the one Material's secondary container, Fluent's
+subtle-selected fill and most shadcn-derived systems all land on, and it reads as "on" without
+needing a border or a shadow.
 
-`<Color>` is `accent` for the primary active state, `success` / `warning` / `danger` when the state
-is semantic, and `default` for a neutral selection (`bg-default text-foreground`).
+The hue is the accent for an ordinary active state, success, warning or danger when the state is
+genuinely semantic, and a neutral fill for a selection that carries no judgement.
 
-**Only for a small bounded block.** Do not flood `bg-<Color>/10` across a whole section: the accent
-earns its meaning by being rare ([[accent-system]]). To highlight "mine" or "currently selected" in
-a list, put the accent on a detail — a ring, a chip, a value — rather than tinting the entire row.
+**Only for a small bounded element.** Do not flood a ten-percent accent across a whole section: the
+accent earns its meaning by being rare, which is the entire argument of Refactoring UI's chapter on
+using colour sparingly. To mark "mine" or "currently selected" in a list, put the accent on one
+detail — a ring, a chip, a value — rather than tinting the whole row.
 
-A semantic chip in its raised form is `bg-<token>/10 text-<token>`, soft and borderless; that is
-already settled in [[chip]].
+## 3. The primary action is a solid fill, never a tint
 
-## 3. Primary is SOLID, never tinted
+The main action on a surface is solid: the accent as background, the accent-foreground as text. Not
+the ten-percent tint. The tint belongs to active, selected and secondary states, and spending it on
+the primary action leaves the screen with no visual centre — every element is equally quiet and the
+eye has nowhere to land.
 
-The main action is a solid fill: `bg-accent` with `--accent-foreground`. Not `bg-accent/10`. The
-`/10` tint belongs to active, selected and secondary states, and using it for the primary action
-leaves a screen with no visual centre. See [[button]] §2.
+Whatever colour the accent-foreground is, it must be verified rather than assumed. An accent that
+sits high on the lightness axis — a pink, a lime, a cyan near 70% — is close to the line where white
+text stops passing 4.5:1, and the honest fix is to darken the accent for the button rather than to
+ship the pair and hope.
 
-`--accent-foreground` is **white** — `oklch(100% 0 0)`, settled 2026-06-26 — so text, icons and
-arrows sitting on a solid accent are white. The accent is a pink near 70% lightness, which is close
-to the line: verify 4.5:1 rather than assuming it, and darken the accent for the button if it fails.
+## 4. A large toned area on a dark background uses an opaque mix, not alpha
 
-## 4. A large toned node on a dark background uses opaque `color-mix`, not alpha
+To tone a large box on a dark background — a diagram node, an emphasised card — mix the tone into
+the surface colour opaquely rather than laying alpha over it:
 
-To tone a large box or node on a dark background — a diagram node, an emphasised card — the
-background is an opaque mix:
-
+```css
+background: color-mix(in oklch, var(--tone) 22%, var(--surface));
 ```
-color-mix(in oklch, var(--<tone>) 20-26%, var(--surface))
-```
 
-rendered through an inline `style`, since `color-mix` does not compress into a class.
+Alpha smears as soon as anything sits behind the box. A gradient, a glow, an ambient background
+reads straight through the fill, and the box looks like frosted glass laid over the page instead of
+a solid object on it. An opaque fill with a border in the same tone reads as one object; a coloured
+border over a translucent centre fights itself.
 
-Why not `bg-<Color>/10`: alpha smears when a glow or gradient sits behind the box — the glow reads
-through and the node looks like frosted glass. An opaque fill with a border in the same tone sits
-together; a coloured border over pure black fights.
+**This is not the chip rule.** A chip stays on alpha, because it is small and sits on a flat surface
+with nothing behind it. Large area over anything textured: opaque mix.
 
-**This is not the chip rule.** A chip stays on alpha (`bg-<token>/10`, §2 and [[chip]]) because it
-is small and sits on a flat surface with no glow behind it. Large box on a glow, opaque mix.
+**Tone only the areas that mean something.** The focal node in the accent, the failing node in
+danger, and everything else neutral. Eight coloured nodes is a rainbow, and a rainbow carries no
+information.
 
-**Tone only the nodes that mean something** — the focal node in `accent`, the problem node in
-`danger` — and leave the rest neutral (`bg-surface` with `border-default`). Eight coloured nodes is
-a rainbow and carries no information.
+**Text stays the ordinary foreground** on a toned fill. The tone is already carried by the border
+and the background; tinting the text as well only spends contrast to say the same thing twice.
 
-**Text stays `text-foreground`** on a toned fill. The tone is already carried by the border and the
-background; tinting the text as well only lowers contrast.
-
-**Neutral node over a glow is the exception**: give it
-`color-mix(in oklch, var(--surface) 80%, transparent)` plus `backdrop-blur`. Translucent, it catches
-the glow and stays alive instead of reading as a dead black hole. The division of labour is: toned
-nodes are opaque and pop, neutral nodes are glass and catch the light.
+**A neutral area over a glow is the exception**: mix the surface with transparency and add a
+backdrop blur. Translucent, it catches the light behind it and stays alive instead of reading as a
+hole cut in the page. The division of labour is that toned areas are opaque and come forward, and
+neutral areas are glass and catch what is behind them.
 
 ## 5. Accessibility
 
-Contrast at least 4.5:1 for text, at least 3:1 for icons and secondary marks. `text-<Color>` on
-`bg-<Color>/10` behaves like coloured text on white — the dark tokens pass comfortably, but accent
-and any bright token must be verified. Colour is never the only channel: pair it with an icon or a
-label.
+WCAG 2.2 sets the floor: 4.5:1 for body text, 3:1 for large text and for the non-text parts that
+carry meaning — icons, focus rings, the boundary of a control. Coloured text on its own
+ten-percent tint behaves like coloured text on white; the dark tokens clear it comfortably, and any
+bright token has to be measured.
+
+Colour is never the only channel. WCAG 1.4.1 states it plainly, and the practical form of it is that
+every status colour is paired with an icon or a word, so that the difference between "passed" and
+"failed" survives both a monochrome print and the eight percent of men with red-green colour vision
+deficiency.
 
 ## Related
 
-[[accent-system]] · [[button]] · [[chip]] · [[no-emoji]] (icons in place of emoji).
+[[accent-system]] · [[button]] · [[chip]].

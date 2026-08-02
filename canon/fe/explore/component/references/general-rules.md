@@ -1,69 +1,89 @@
 # Rules over the whole table
 
-Read when a row has been picked and you want to know why the table is shaped this way, or when
-proposing a new row. Not needed for an ordinary lookup.
+A component matrix answers one question — given this shape of data, which component renders it — and
+it only works while the answers stay decidable. Read this when a row has been picked and you want to
+know why the table is shaped the way it is, or when proposing a new row. Not needed for an ordinary
+lookup.
 
 ## The five
 
-1. **Look the table up BEFORE building**, not after building and then auditing. No row matches ⇒
-   only then consider extending the component set, and that is **the teacher's decision**. Draw the
-   proposed entry as a widget and let the teacher rule on it.
+1. **Look the table up BEFORE building**, not after building and then auditing. Auditing afterwards
+   finds the mismatch at the point where changing it costs a rewrite, and the rewrite is what gets
+   deferred. If no row matches, only then consider extending the component set — and that is an
+   OWNER decision, not an author's. Draw the proposed entry, show it beside the rows it sits between,
+   and let the owner rule on it.
 
-2. **DATA SHAPE decides the component, not the specific content.** "A paragraph" and "a 200-line
-   markdown article" both pick `SurfaceCard`; "one line" and "eight lines" both pick
-   `SurfaceCardList`. Choose by **the test**, not by eye — `SurfaceCardList` and
-   `SurfaceCardAccordion` share the same skin (same `surfaceFrame`, full-bleed dividers, outer
-   label and description), so a screenshot cannot tell them apart. A hidden `body` means Accordion.
+2. **DATA SHAPE decides the component, not the specific content.** A one-sentence paragraph and a
+   two-hundred-line article are the same shape and take the same component; a list of one line and a
+   list of eight lines are the same shape and take the same one. Choose by the deciding test written
+   into the section, not by eye, because two components in a family routinely share a skin — the
+   same frame, the same dividers, the same outer label — and a screenshot cannot tell them apart.
+   What separates them is a structural fact: whether a body is hidden until a click, whether the
+   rows repeat, whether the length can ever be greater than one.
 
-3. **The component name must match the concept being rendered.** An always-one-element `items` ·
-   `List` for a single paragraph · `Accordion` for something that never opens · `Chip` for a free
-   number · a name with "Card" in it and no card in sight — every one of these is wrong **right at
-   the data-shape level**, even though the render still looks fine and every gate stays green.
+3. **The component's name must match the concept being rendered.** An items array that is always
+   length one. A list component holding a single paragraph. A disclosure that never opens. A
+   classification chip around a free-running number. A name with "Card" in it and no card in sight.
+   Every one of these is wrong at the DATA-SHAPE level, even though the render looks fine and every
+   automated check stays green — and that is exactly why the name is worth arguing about, because it
+   is the only signal left once the gates are satisfied.
 
-4. **The type is an invitation.** A prop named `title` declared `ReactNode` invites the caller to
-   stuff markdown into it; `items` opening up `content: ReactNode` invites a loss of control.
-   Tightening the type is the cheapest way to block it — and tightening requires checking the real
-   cases in use (3 of 3 cases stuffing an icon into `title` ⇒ add `titleStart`, do not keep
-   `ReactNode`).
+4. **The type is an invitation.** A prop named `title` declared as `ReactNode` invites the caller to
+   stuff a markdown renderer into it, and eventually somebody will. A generic content slot on a list
+   item invites the loss of every constraint the list was built to hold. Tightening the type is the
+   cheapest way to close that door — and tightening honestly requires checking the real cases first:
+   if every current caller is pushing an icon into `title`, the answer is a dedicated slot for the
+   icon, not leaving the type wide open because three call sites need it.
 
-5. **Every new row carries an anchor** — a date, a file, and the teacher's own words if there were
-   any. One example is not a rule. Promoting it to a general rule takes **two independent sources**;
-   otherwise say plainly that it is anchored to that one case.
+5. **Every new row carries an anchor** — a date, the case it was read from, and the reviewer's own
+   words if there were any. One example is not a rule. Promoting an observation to a general rule
+   takes two independent sources; with one, say plainly that it is anchored to that single case, so
+   the next reader knows what they are allowed to generalise from.
 
 ## Reading a zero correctly
 
-Import count in `components/starci/{blocks,pages,overlays,layouts}` at the last measurement:
+A component with no call sites is not thereby the wrong component. Some rows exist because a family
+must be complete: the nested variant that is reached through a prop rather than by name, the rare
+selectable form, the placeholder nobody has needed yet. Some cover a region no screen has required
+so far.
 
-`Typography` 93 · `SurfaceCard` 54 · `MarkdownContent` 19 · `SurfaceCardList` 17 · `AsyncContent` 13
-· `EnumChip` 11 · `AsyncContentEmpty` 7 · `ListRow` 6 · `SurfaceCardAccordion` 4–6 · `Disclosure` 4
-· `SurfaceCardPressableGroup` 3 · `SurfaceCardCrossList` 1 · `ListMeta` 1 · `RichText` 1.
+But a zero also does not license picking that component without re-checking the deciding test of its
+section. Zero call sites means zero people have ever discovered that it does not fit — the usual way
+a component earns its place is by surviving a case that nearly broke it, and an unused component has
+survived nothing.
 
-**Zero real call sites:** `SurfaceCardNested` · `SurfaceCardSelectableGroup` ·
-`SurfaceCardPlaceholder` · `ListLabeled` · `ListToggleRow`.
-
-The first three have a reason — nested goes through the `variant` prop, and Selectable and
-Placeholder are rare cases. `ListLabeled` and `ListToggleRow` cover a region no screen has needed
-yet. **A zero does not mean the wrong component** — but it also does not license picking one
-without re-checking the deciding test of its section.
+Keep the counts somewhere they can be recounted rather than in prose. A number written into a
+sentence is correct on the day it is written and quietly wrong a fortnight later, and a reader
+quoting it is quoting something nobody can reproduce.
 
 ## Drifts flagged on purpose, left unfixed
 
-Written down so nobody "clears the debt" without asking, and so nobody copies them as a template.
+Record the known deviations in the open, with the reason they were left. Two things go wrong when
+they are not written down: somebody "clears the debt" without knowing why it was accepted, and
+somebody else reads the deviation as the house pattern and copies it.
 
-1. **`SurfaceCardSelectableGroup`** calls the vendor's `Radio`/`RadioGroup` directly instead of
-   going through the `ChoiceRadio`/`ChoiceRadioGroup` atoms — the only member of the family that
-   reaches straight down into the vendor. The teacher said to leave it this pass.
-2. **`ListToggleRow`** — the real branch uses a bare vendor `Switch` while the `isSkeleton` branch
-   goes through the `ChoiceSwitch` atom. Two branches of **the same row** through two different
-   doors. Nothing flags this in the source yet.
+The recurring shapes are worth naming, because they repeat across every component set:
 
-Same category: `HighlightChip` calls the vendor `Chip` directly with `size="sm"` and hand-draws its
-own `h-6 w-20` skeleton instead of going through the `Chip` atom the way `EnumChip` does.
-`MetricCard` holds an internal copy named `SectionCard` at the top of its file, with a TODO to
-switch to the real local version once the cards batch finishes porting.
+- One member of a family that reaches straight down to the vendor component while its siblings go
+  through the shared wrapper. The render is identical, so nothing reports it, and it becomes the
+  file that does not get the next fix.
+- Two branches of the SAME component going through two different doors — the loaded branch on a bare
+  vendor control, the skeleton branch on the house wrapper. Neither branch is wrong on its own; the
+  pair is.
+- A component holding a private copy of another component at the top of its own file, with a note to
+  switch to the real one later.
+
+Each of these is a deliberate deferral or it is rot, and the only difference between the two is
+whether somebody wrote down which.
 
 ## Names that are not doors
 
-`data/not-a-door.csv` — exports that exist but are only touched when editing that exact layer.
-Reaching for one at the block or page layer means routing around a constraint.
-`node scripts/search.mjs used-by <Name>` says so when you ask about one.
+Some exports exist only so that the layer that owns them can compose itself, and are not entry
+points for anyone above. Keep that list beside the table — the parser glue for a markdown renderer,
+the internal row of a list, the unconstrained layout primitive that the constrained ones are built
+from.
+
+Reaching for one of these from a higher layer is almost always a way of routing around a constraint
+rather than a discovery of a better path. If the constrained component genuinely cannot express what
+is needed, that is an argument to make about the component, in review, where the answer can become a
+new row.

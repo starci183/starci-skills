@@ -1,77 +1,84 @@
 # Motion
 
-There is no named duration scale in this app. What follows is the convention read back out of real
-usage, plus two guards that are mandatory for every decorative animation.
+Motion in an interface is either information or decoration. Information — a spinner, a progress bar,
+the shift that shows a row was removed — must survive every accessibility setting the user has.
+Decoration must not survive `prefers-reduced-motion`. Almost everything below follows from that one
+division.
 
-Source: `globals.css` (the `@keyframes` book, the `@media (prefers-reduced-motion)` block, the
-`--tooltip-delay` / `--tooltip-close-delay` overrides), `@heroui/styles` (tooltip defaults of
-1500ms / 500ms, `--skeleton-animation`), and a grep of `duration-*` / `transition-*` across `src/`.
+## 1. Transition the property, not everything
 
-## 1. `transition-colors` is the default
+Hover and focus change colour, so a colour-only transition dominates real usage in any product; a
+fade transitions opacity; a caret rotating or an arrow sliding transitions transform. Naming the
+property is not pedantry — the browser can composite opacity and transform on the compositor thread
+without touching layout, and a transition that names them stays smooth under load.
 
-Hover and focus change colour, so `transition-colors` dominates real usage — roughly 92 places in
-`src/`. `transition-opacity` is for fades; `transition-transform` is for movement and scale (a caret
-icon, a CTA arrow).
+`transition: all` is only for the case where two properties from different groups genuinely need to
+animate together, and that case has been confirmed rather than assumed. As a default it animates
+everything the browser can, including properties nobody intended, and it costs more to composite
+than the two it was meant to cover.
 
-`transition-all` is only for a case where two properties from different groups genuinely need to
-animate, and that has been confirmed. It is not a lazy default: it animates everything the browser
-can, including properties you did not intend, and it costs more to composite.
+## 2. Durations sit in a narrow band
 
-## 2. Durations run 150 / 200 / 300 / 500ms
+Material's motion durations are a good public reference point: short in the 50-200ms region, medium
+250-400ms, long 450-600ms, with anything longer reserved for something entering or leaving the whole
+screen. Read back out of real usage, most products end up using four values — 150, 200, 300 and 500
+milliseconds — and nothing else.
 
-Those are the values observable in the source. There is no token and no named scale. 150-300ms
-covers micro-interaction (hover, focus); 500ms is for a larger fade (the splash, a page-level
-transition). Stay inside that band rather than inventing an unfamiliar number.
+150-300ms covers micro-interaction: hover, focus, a state change on a control. 500ms is for a larger
+fade, a page-level transition, an entry animation. Below roughly 100ms the motion is not perceived as
+motion, and above roughly 500ms the user is waiting for the interface rather than using it.
 
 ## 3. `prefers-reduced-motion` is MANDATORY for every decorative animation
 
-It does not apply to essential feedback such as a loading spinner, where removing the motion removes
-the information. Two mechanisms, chosen by where the animation lives:
+It does not apply to essential feedback such as a loading indicator, where removing the motion
+removes the information. Everything else — ambient backgrounds, parallax, scroll-driven scenes,
+entrance animations, a bounce on a reaction — must have a reduced branch. WCAG 2.3.3 makes this a
+requirement for motion triggered by interaction, and vestibular disorders make it a requirement in
+practice for the rest.
 
-- **CSS `@keyframes`** (ambient, splash) — guard it inside
-  `@media (prefers-reduced-motion: reduce)` right there in `globals.css`. Blocks already exist for
-  `.ambient-*` and `.app-splash-bar`.
-- **Framer-motion components** (diagrams, scroll-driven scenes) — call the `useReducedMotion()` hook
-  and switch the lerp or motion off, falling back to a hard cut. Already done in
-  `CollapsibleSidebar`, `ArchitectureScene`, `KnowledgeGraph`, `LearnLoopScroll`, `StatStrip` and
-  `AIProcessingText`.
+Two mechanisms, chosen by where the animation lives:
 
-## 4. `@keyframes` live in ONE book, in `globals.css`
+- **CSS keyframes** — guard them inside `@media (prefers-reduced-motion: reduce)` in the same file
+  as the animation itself, so the guard cannot be separated from the thing it guards.
+- **JavaScript-driven motion** — read the same query through the animation library's reduced-motion
+  hook and switch the interpolation off, falling back to a hard cut. A hard cut is a correct
+  reduced-motion answer; a slower version of the same animation is not.
 
-No loose keyframes in a CSS module or an inline `<style>`. What is already there:
+## 4. Keyframes live in ONE book
 
-- `wireFlow` — the packet running along a wire in the hero diagram.
-- `emberRise`, `snowFall`, `rainFall`, `bubbleRise`, `fireflyDrift`, `starTwinkle`, `auroraDrift`,
-  `waveDrift`, `circuitPulse` — the nine `AmbientBackground` effects.
-- `reactionPop` — the Facebook-style bounce-in on a reaction.
-- `appSplashTrickle` — the entry splash bar.
+No loose keyframes in a component-scoped stylesheet or an inline style block. One place for the
+whole product means a duplicate is visible before it ships, and the reduced-motion guard in the
+previous section has a single surface to cover rather than a search to perform.
 
-A new decorative animation is added here. One book means a duplicate is visible before it ships, and
-the reduced-motion guard in §3 has a single place to cover.
-
-See [[reimplement-dead-lib-natively-fb-reactions]] for the convention that keeps a transform pop-in
-(on the button) separate from a hover-scale (on a child span), so the two do not overwrite each
-other on the same element.
+Keep a transform used for entrance separate from a transform used for hover by putting them on
+different elements — the entrance on the wrapper, the hover scale on the inner span. Two animations
+writing `transform` on the same element overwrite each other, and the loser is decided by whichever
+rule the cascade happens to resolve last.
 
 ## 5. Skeletons share one animation
 
-`--skeleton-animation: shimmer` is the HeroUI default and the app does not override it. Every
-`Skeleton` uses it. Do not build a second loading animation — two shimmer styles on one page reads
-as two different kinds of loading, which is a claim the UI is not making.
+Every skeleton in the product uses the same shimmer, at the same speed, in the same direction. Two
+shimmer styles on one page reads as two different kinds of loading, and that is a claim the
+interface is not actually making. It is also the cheapest possible thing to get wrong, because each
+one looks fine in isolation.
 
-## 6. Tooltips are instant
+## 6. Decide the tooltip delay deliberately
 
-The app forces `--tooltip-delay` and `--tooltip-close-delay` to `0ms`, against HeroUI's defaults of
-1500ms and 500ms. Hover shows the tooltip immediately; the library's built-in hesitation is gone
-deliberately.
+Component libraries commonly ship a long hover delay before a tooltip opens — a second and a half is
+typical — and a shorter one before it closes. Whether that hesitation is right depends on how
+information-dense the surface is: on a toolbar of icon-only buttons it is an obstacle, and setting
+both delays to zero makes the labels feel like part of the interface rather than a reward for
+waiting. On text peppered with definitions it is what stops the page flickering as the pointer
+crosses it.
 
-## 7. The three loading tiers are their own concept
+The rule is not a number. It is that the number is chosen once, at the theme level, rather than
+inherited by default and then patched at three call sites.
 
-Cold-load splash, navigation top-bar, region skeleton — that is a larger idea than motion alone. See
-[[loading-feedback-three-tiers-splash-toploader-skeleton]].
+## 7. The loading tiers are their own concept
+
+A cold-load splash, a navigation progress bar, and a region skeleton answer three different
+questions about three different waits. That is a larger idea than motion alone.
 
 ## Related
 
-[[loading-feedback-three-tiers-splash-toploader-skeleton]] ·
-[[reimplement-dead-lib-natively-fb-reactions]] · [[z-index]] (splash and top-bar layering belong to
-the same system).
+[[z-index]] (a splash and a top progress bar belong to the same layering system).

@@ -6,55 +6,60 @@
 > [`catalog-grid.md`](catalog-grid.md) · [`centered-form-setup.md`](centered-form-setup.md) ·
 > [`marketing-landing.md`](marketing-landing.md)).
 >
-> It gathers three separate rules — [`when-rail.md`](when-rail.md),
-> [`solving-surface-fullbleed-no-course-rails.md`](solving-surface-fullbleed-no-course-rails.md) and
+> It gathers the scattered shell rules — [`when-rail.md`](when-rail.md),
+> [`full-bleed-work-surface.md`](full-bleed-work-surface.md) and
 > [`fullbleed-canvas-no-chrome-and-orient-zoom.md`](fullbleed-canvas-no-chrome-and-orient-zoom.md) —
-> into ONE decision tree. Those three files are KEPT as the case-by-case detail and are not replaced
-> by this one.
+> into ONE decision tree. Those files are KEPT as the case-by-case detail and are not replaced by
+> this one. Material calls the same idea canonical layouts: a small closed set of arrangements, so
+> that choosing one is a decision with a name rather than an improvisation.
 
 ## The decision tree — ask in order, stop at the FIRST question that matches
 
-1. **Does a canvas or tool occupy the WHOLE viewport for one focused job** (mind map, solving a
-   single challenge)? → **full-bleed**, dropping every rail, all chrome and the breadcrumb. See
+1. **Does a canvas or a tool occupy the WHOLE viewport for one focused job?** Full-bleed, dropping
+   the content rails, the page chrome and the breadcrumb. See
    [`fullbleed-canvas-no-chrome-and-orient-zoom.md`](fullbleed-canvas-no-chrome-and-orient-zoom.md)
-   for the canvas and
-   [`solving-surface-fullbleed-no-course-rails.md`](solving-surface-fullbleed-no-course-rails.md)
-   for the solve surface, which keeps one back-link.
-2. **Is there ONE nav axis plus a list long enough (roughly 5 items or more) to browse alongside the
-   content?** → a two-pane rail. Then split: a third TOC or outline pane on the right, for
-   multi-level documentation inside `LearnShell`, means
-   [`docs-three-pane-reader.md`](docs-three-pane-reader.md); two panes only — a rail and a work
-   pane on a standalone route — means [`master-detail-rail.md`](master-detail-rail.md). The "earn
-   the rail" test is in [`when-rail.md`](when-rail.md): fewer than 5 items, or no real sub-list, and
+   for a pannable canvas and [`full-bleed-work-surface.md`](full-bleed-work-surface.md) for a work
+   surface, which keeps one back-link and possibly a second pane.
+2. **Is there ONE nav axis plus a list long enough — roughly five items or more — to browse
+   alongside the content?** A two-pane rail. Then split: a third orientation pane on the right, for
+   multi-level documentation inside a reading shell, means
+   [`docs-three-pane-reader.md`](docs-three-pane-reader.md); two panes only, a rail and a work pane
+   on a standalone route, means [`master-detail-rail.md`](master-detail-rail.md). The "earn the
+   rail" test is in [`when-rail.md`](when-rail.md): fewer than five items, or no real sub-list, and
    there is NO rail.
 3. **Several PEER areas of content under one identity or scope, switched by TAB rather than by
-   hierarchical nav?** → [`dashboard-hub.md`](dashboard-hub.md), a tab strip on the navbar bottom
-   layer over a two-column bare-identity and panel body.
-4. **Browsing N items of the SAME kind** (course, job, deck)? → [`catalog-grid.md`](catalog-grid.md)
-   — search, count, grid/line toggle, pager. When the item does not need tiling, use the minimal
-   anatomy in `search-filter-list-surface` instead.
-5. **One focused task or form with no secondary nav** (checkout, cart, post form, session setup)? →
-   [`centered-form-setup.md`](centered-form-setup.md), one column and no rail.
-6. **Public selling or storytelling, no login?** → [`marketing-landing.md`](marketing-landing.md).
+   hierarchical nav?** [`dashboard-hub.md`](dashboard-hub.md), a tab strip below the navbar over a
+   two-column bare-identity and panel body.
+4. **Browsing N items of the SAME kind?** [`catalog-grid.md`](catalog-grid.md) — search, count, view
+   toggle, pager. When the item does not need tiling, use the minimal search-filter-list anatomy
+   instead.
+5. **One focused task or form with no secondary nav** (a cart, a checkout, a post form, a session
+   setup)? [`centered-form-setup.md`](centered-form-setup.md), one column and no rail.
+6. **Public selling or storytelling, no login?** [`marketing-landing.md`](marketing-landing.md).
 
-Nothing matches → default to a **centered single column, `max-w-3xl mx-auto`**. It is the safest
-choice; see [`when-rail.md`](when-rail.md), section "DEFAULT is NO rail".
+Nothing matches: default to a **centered single column at a narrow measure**. It is the safest
+choice, because it is the only one that cannot be wrong for the wrong reason — see
+[`when-rail.md`](when-rail.md), section "DEFAULT is NO rail".
 
-## Anti-patterns already caught in the real app
+## Anti-patterns
 
-- A rail left EMPTY because the mode has only two or three options rather than a list. Drop the
-  rail; see [`when-rail.md`](when-rail.md), section "Traps".
+- A rail left EMPTY because the nav has only two or three options rather than a list. Drop the rail;
+  see [`when-rail.md`](when-rail.md), section "Common traps".
 - A full-bleed surface still carrying a breadcrumb or page chrome, which erases the definition of
-  full-bleed.
-- A dashboard hub rebuilding a nav rail instead of a tab strip for the job of "switch content
-  area". That is question 3, not question 2.
+  full-bleed and leaves a surface that is neither.
+- A hub rebuilding a nav rail instead of a tab strip for the job of "switch content area". That is
+  question 3, not question 2, and the difference is whether the areas are peers or a hierarchy.
+- Asking the questions out of order. The tree is ordered by how much the answer constrains
+  everything downstream; answering question 4 first produces a catalog page that then has to be
+  argued into a shell it does not fit.
 
 ## Related
 
-[`when-rail.md`](when-rail.md) · `when-drawer` ·
-[`solving-surface-fullbleed-no-course-rails.md`](solving-surface-fullbleed-no-course-rails.md) ·
+[`when-rail.md`](when-rail.md) · when-drawer ·
+[`full-bleed-work-surface.md`](full-bleed-work-surface.md) ·
 [`fullbleed-canvas-no-chrome-and-orient-zoom.md`](fullbleed-canvas-no-chrome-and-orient-zoom.md) ·
 [`docs-three-pane-reader.md`](docs-three-pane-reader.md) ·
 [`master-detail-rail.md`](master-detail-rail.md) · [`dashboard-hub.md`](dashboard-hub.md) ·
 [`catalog-grid.md`](catalog-grid.md) · [`centered-form-setup.md`](centered-form-setup.md) ·
-[`marketing-landing.md`](marketing-landing.md) · `search-filter-list-surface`.
+[`marketing-landing.md`](marketing-landing.md) ·
+[`surface-job-drives-layout.md`](surface-job-drives-layout.md).

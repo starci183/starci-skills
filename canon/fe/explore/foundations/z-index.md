@@ -1,51 +1,56 @@
 # Z-index
 
-There is no CSS variable for layering. The scale below is LITERAL, cast from actual usage across the
-app — a grep of `z-\d+` and `z-\[N\]` over `src/`. Do not climb to an arbitrary number; anchor to the
-nearest step here.
+Layering is a scale like any other, and the reason to publish it is that a stacking order nobody
+wrote down becomes a race between authors, each raising a number until their layer wins. Bootstrap
+publishes its map — dropdown 1000, sticky 1020, fixed 1030, modal backdrop 1040, modal 1050, popover
+1070, tooltip 1080 — and the numbers themselves matter far less than the fact that they are listed
+in one place with a role beside each one.
 
-## 1. The scale, low to high
+## 1. A scale of seven steps, low to high
 
-- **`z-10`** — chrome floating LOCALLY inside one component: the mini reaction-bar popover, an
-  overlay button on article text. `-z-10` is for decoration behind content (the ambient background).
-- **`z-20`** — a control floating above a region that is itself already sticky: the rail's resize
-  handle, video controls overlay.
-- **`z-30`** — a sticky sub-header, or an in-page overlay on mobile: the filter bar at
-  `sticky top-16`, the mobile settings tab strip, the search-result dropdown.
-- **`z-40`** — chrome floating at PAGE level: the FAB, a sticky bottom bar, the mobile bottom tab
-  bar, the socket-connection-status pill, the learn mobile top bar.
-- **`z-50`** — the **navbar** (`sticky top-0 z-50`). This is the marker for "top of app chrome in the
-  ordinary page flow".
-- **`z-[60]`** — TopLoader, the SPA navigation loading bar, which MUST sit above the navbar. See
-  [[loading-feedback-three-tiers-splash-toploader-skeleton]].
-- **`z-[70]`** — AppSplash (the cold-load overlay), and any secondary overlay that has to clear all
-  chrome — the settings modal opened from inside a FAB popover at `z-40`, for instance. This is the
-  highest step currently in the app.
+- **10** — chrome floating LOCALLY inside one component: a small popover attached to a control, an
+  overlay button on an image. The negative step, `-10`, is for decoration sitting behind content.
+- **20** — a control floating above a region that is itself already sticky: a rail's resize handle,
+  a video's controls overlay.
+- **30** — a sticky sub-header, or an in-page overlay on mobile: a filter bar pinned below the main
+  header, a search-results dropdown.
+- **40** — chrome floating at PAGE level: a floating action button, a sticky bottom bar, a mobile
+  tab bar, a connection-status pill.
+- **50** — the main navigation header. This step is the marker for "top of the application chrome in
+  the ordinary page flow", and it is the one every other number is read against.
+- **60** — the navigation progress bar, which must sit above the header because it reports on the
+  navigation the header initiated.
+- **70** — a cold-load splash, and any secondary overlay that has to clear all chrome. This is the
+  ceiling.
 
-Anchors: Navbar `z-50`, TopLoader `z-[60]`, AppSplash and the `ContentAiSettingsModal` backdrop
-`z-[70]`, FAB / StickyBottomBar / mobile bars `z-40`, rail resize handle and video controls `z-20`,
-sticky filter and search dropdown `z-30`.
+Write the anchors down beside the scale — which real element occupies each step — because a step
+with no occupant is a step nobody can calibrate against.
 
-## 2. Every new z-index anchors to the nearest existing step
+## 2. Every new layer anchors to the nearest existing step
 
-No inventing a value in between (`z-[45]`), and no jumping straight to `z-[100]` to be safe. A scale
-only tells you what a layer MEANS while the steps stay countable; one number nobody can place turns
-it back into guesswork.
+No inventing a value in between, and no jumping to 100 to be safe. A scale only tells the reader
+what a layer MEANS while its steps stay countable; one number nobody can place turns the whole thing
+back into guesswork, and the next author will jump to 200.
 
-When two overlays fight, fix the ARCHITECTURE before raising a number — see the gotcha below.
+When two overlays fight, fix the ARCHITECTURE before raising a number.
 
-## 3. The unlayered gotcha: numbers do not decide the fight
+## 3. The unlayered gotcha: the number does not decide the fight
 
-HeroUI bakes `z-50` into `.modal__backdrop` and `.drawer__backdrop`. That baked style sits in the
-SAME layer as a `z-[N]` added through className, so the winner is decided by SOURCE ORDER in the
-bundle, not by the numeric value — a hand-added `z-[70]` can still LOSE if the HeroUI CSS loads
-after it.
+Component libraries bake a z-index into their modal and drawer backdrops. That baked rule sits in
+the SAME stacking context as a value added through a class, so the winner is decided by SOURCE ORDER
+in the bundle rather than by the number — a hand-added 70 can still lose if the library's stylesheet
+loads after it.
 
-So an overlay opened from inside another popover is not a z-fight you can win by counting. Render it
-IN-PANEL instead of as a body-level `Modal` or `Drawer`. See
-[[overlay-from-popover-render-in-panel]].
+There is a second mechanism underneath, and it is the one that actually matters: z-index only
+compares siblings within a stacking context. A parent with a transform, a filter, an opacity below
+1, or a `will-change` creates a new stacking context, and every descendant is trapped inside it no
+matter what number it carries. A child at 9999 inside a transformed ancestor still renders beneath
+that ancestor's sibling at 1.
+
+So an overlay opened from inside another floating panel is not a fight you can win by counting.
+Render it in place, inside the panel, rather than as a document-level dialog — or move it out of the
+trapped subtree entirely with a portal. Both are architecture; raising the number is not.
 
 ## Related
 
-[[overlay-from-popover-render-in-panel]] ·
-[[loading-feedback-three-tiers-splash-toploader-skeleton]] · [[when-drawer]].
+[[when-drawer]].

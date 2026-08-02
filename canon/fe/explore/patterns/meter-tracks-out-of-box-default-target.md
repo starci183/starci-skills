@@ -1,47 +1,60 @@
 # A progress meter runs out of the box, on a default target — STRICT
 
-> Read from the "Mục tiêu tuần" block sitting at zero on 2026-06-25 for a learner who had in fact
-> been studying, because no target had been configured.
+> The endowed progress effect, from Nunes and Drèze's loyalty-card work: people given a goal that is
+> already visibly under way persist toward it far more than people handed an identical goal starting
+> at zero. The goal-gradient effect is the second half — effort rises as the target gets closer. Both
+> require a target to exist. A meter with no target has neither.
 
 ## The rule
 
-A meter measuring **progress toward a goal** — a weekly goal, a KPI, a quota — must not sit empty
-just because the user has never set a target. Give it a sensible **default target** so that any
-activity moves the bar immediately; the user can still override it through the Edit button. A meter
-waiting on configuration reads as broken: *"if I studied, the progress should move, shouldn't it?"*
+A meter measuring **progress toward a goal** — a weekly target, a quota, a usage allowance — must not
+sit empty because the user has never configured a target. Give it a sensible **default** so that any
+activity moves the bar from the first session, and let the user override it afterwards.
+
+A meter waiting on configuration reads as broken rather than as unconfigured, because the reader's
+question is not "have I set a target" but "I did the work, why did nothing move?" The failure looks
+identical to a bug, which is why nobody reports it as a design problem.
 
 ## Three parts, one effective target
 
-`current` is real activity and rises as the feature is used. `target` is the custom value or the
-default. `percent` is `current / target`. Use one **`effectiveTarget = custom ?? default`** for the
-bar, for the `current/target` display and for the summary, so the three can never disagree.
+`current` is real activity and rises as the feature is used. `target` is the user's custom value or
+the default. `percent` is one divided by the other. Derive a single **effective target** —
+`custom ?? default` — and feed the bar, the `current / target` label and any summary line from that
+one value, so the three can never disagree. Two independent fallbacks in two components is how a bar
+at sixty percent ends up next to the text "3 of 10".
 
 ## Where the default belongs
 
-The back end is the right place, because the editor then shows the same number the meter used. A
-front-end-only default is acceptable as a stopgap, but the editor will read blank until the user
-sets a value — record that as a debt to reconcile.
+Server-side, because the editor then offers the same number the meter is already using. A front-end
+default is an acceptable stopgap, but the editor will read blank until the user saves something, and
+that gap should be recorded as debt rather than left to be rediscovered.
 
-## Render the bar as a plain div
+## Render the bar plainly
 
-`bg-default` for the track, `bg-accent` for the fill with `width` as a percentage. It always
-renders. A compound component can lose its styling depending on the context it is dropped into, and
-a progress bar is the wrong place to find that out.
+A track element and a fill element, the fill's width set as a percentage, on the neutral track token
+and the accent token. It always renders. A compound component from a library can lose its styling
+depending on the context it is dropped into, and a progress bar that silently renders at zero height
+is the wrong place to discover that.
 
 ## Two kinds of meter, one shared obligation
 
-This one has a **target** and needs a number to aim at. The other kind measures a **quantity that
-grows** — mastery, where the denominator is natural (total cards). Either way, no meter is left
-meaningless or blank; there is always a denominator to fill against.
+This kind has a **target** and needs a number to aim at. The other kind measures a **quantity that
+grows** toward a natural denominator — items completed out of items that exist — and needs no
+configuration at all. Either way, no meter is left meaningless or blank. There is always a
+denominator to fill against, and if there genuinely is not, the thing being drawn is not a meter.
 
-## First applied 2026-06-25
+## A worked example
 
-`WeeklyGoals` gained `DEFAULT_KPI_TARGETS` — lessons 5, studyDays 5, challenges 3, coding 3,
-flashcards 20 — with the effective target feeding the bar, the display and the summary, so studying
-moves the bar. The heatmap losing its colour in the same block was a token bug, not a reason to
-redesign the block.
+A weekly activity block on a productivity dashboard ships with defaults for each of its rows —
+sessions five, active days five, items cleared twenty — and the effective target feeds the bar, the
+label and the week summary alike. On day one of a new account the bar moves the first time the user
+does anything, which is the only day the movement matters.
+
+Note the failure mode this example also caught: when a neighbouring visualisation in the same block
+loses its colour, that is a token or theme bug in one component, not evidence that the block needs
+redesigning. Fix the token.
 
 ## Related
 
-`progress-block-growing-quantity-headline-not-vanity-strip.md` — the growing-quantity meter and why
-a stat strip is not progress.
+`progress-block-growing-quantity-headline-not-vanity-strip.md` — the growing-quantity meter, and why
+a strip of numbers is not progress.

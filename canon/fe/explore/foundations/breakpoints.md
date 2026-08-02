@@ -1,42 +1,51 @@
 # Breakpoints
 
-The app runs on Tailwind v4's default breakpoints, unmodified. There is no `tailwind.config.*` in
-the repo, and `globals.css` / `@theme` declares no `--breakpoint-*` of its own, so the five stops in
-`node_modules/tailwindcss/theme.css` are the whole scale.
+A responsive interface changes shape at a small, fixed set of widths, and every component in the
+product uses the same set. The numbers matter far less than the fact that they are shared: a reader
+opening any component already knows the only widths at which it can change.
 
 ## 1. Five stops, and no sixth
 
-`sm` 640px, `md` 768px, `lg` 1024px, `xl` 1280px, `2xl` 1536px.
+Almost every mainstream scale lands on five, and they land close to each other — the common utility
+framework default is 640, 768, 1024, 1280 and 1536 pixels; Material 3's window size classes cut at
+600, 840, 1200 and 1600. Pick one set, publish it, and treat it as closed.
 
-Do not open an arbitrary breakpoint — `min-[900px]` and its family — when one of the five will do.
-The value of a shared scale is that a reader of any component already knows where it changes; a
-one-off stop buys a slightly better fit for one block and costs that knowledge everywhere else.
+Do not open an arbitrary stop — `min-[900px]` and its family — when one of the five will do. A
+one-off stop buys a slightly better fit for one block and spends, everywhere else, the reader's
+ability to predict a component without opening it. If a component genuinely cannot live on the
+scale, that is an argument to make about the scale in review, not a value to bury in one file.
 
-## 2. `sm` is the mobile/desktop line, not `md`
+## 2. The first stop is the mobile/desktop line
 
-The rules in this set that hide or swap something for small screens hang off `sm`: tab labels
-appear and disappear there ([[tabs]] §2), the input variant follows the background there, and the
-various "hidden on mobile" cases resolve there. Reach for `md` only when a rule genuinely needs the
-768px stop, which is rare.
+Everything that appears, disappears or swaps between phone and laptop should hang off one stop, and
+in practice that is the lowest one. Tab strips drop their labels there, a field's variant follows
+its background there, the various "hidden on mobile" cases resolve there.
 
-## 3. `lg` is where a rail or a two-pane opens
+Reach for the second stop only when a rule genuinely needs it. A layout with decisions scattered
+across three stops has no legible break; it has three, and no reader can hold all of them.
 
-A rail is always `hidden lg:flex` ([[when-rail]], [[sidebar]]). Below `lg` it folds into a
-horizontally scrolling chip row, or disappears entirely. There is no intermediate "at `md` the rail
-narrows" step, and adding one would put a layout in the tree that no other page has.
+## 3. The third stop is where a rail or a two-pane opens
 
-The `md` band is therefore "not yet `lg`, no longer as cramped as mobile" — real, but it anchors
-almost no primary layout decision.
+Material's window size classes make the same call: a navigation rail belongs to the expanded class,
+not to the medium one. Below that width a rail folds into a horizontally scrolling row of chips, or
+disappears into a drawer.
 
-## 4. The JS mirror is `useSmViewpoint()`
+Resist an intermediate "and at the middle stop the rail narrows" step. It puts a layout in the tree
+that no other surface has, and it is the arrangement nobody remembers to update. The middle band is
+real — no longer as cramped as a phone, not yet a desktop — but it should anchor almost no primary
+layout decision.
 
-`src/hooks/reuseables/useSmViewpoint.ts` exposes `isMobile` (`max-width: 640px`), `isTablet`
-(`max-width: 768px`) and `isDesktop` (`min-width: 1024px`).
+## 4. A JavaScript mirror is a last resort
 
-Use it only when JS logic must actually branch on viewport — a different component rendered, a
-different handler bound. A difference that is purely visual belongs in a `sm:` or `lg:` class, where
-it costs no render and no hydration mismatch.
+A `matchMedia` hook that exposes the same stops to JavaScript is worth having, and worth using
+rarely: only when logic must actually branch — a different component mounted, a different handler
+bound, a virtualised list given a different row count.
+
+A difference that is purely visual belongs in a media query, where it costs no render, no
+measurement, and no hydration mismatch on a server-rendered page. The mirror is also the thing that
+drifts: two definitions of "mobile", one in CSS and one in JavaScript, will disagree the first time
+someone edits only one of them.
 
 ## Related
 
-[[when-rail]] · [[sidebar]] · [[tabs]] §2 · [[wide-content-scrolls-not-blocks-ui]].
+[[sidebar]] · [[tabs]] · [[wide-content-scrolls-not-blocks-ui]].

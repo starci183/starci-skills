@@ -22,7 +22,7 @@ can hold.
 | [`sticky.md`](sticky.md) | that a sticky element pins at its own resting position rather than flush to the navbar, and the offset that makes it look like it simply stopped |
 | [`typography.md`](typography.md) | that type is selected through the `Typography` component's `type=` scale, not through loose `text-*` classes that put a size in the tree no other component shares |
 | [`wide-content-scrolls-not-blocks-ui.md`](wide-content-scrolls-not-blocks-ui.md) | that a block wider than its column scrolls on its own axis, and the `min-w-0` on the flex chain that lets the column shrink instead of overflowing the page |
-| [`z-index.md`](z-index.md) | the literal layering scale cast from real usage, and that a new layer anchors to the nearest existing step rather than climbing to an arbitrary number |
+| [`z-index.md`](z-index.md) | the seven-step layering scale with a role written beside each step, and that a new layer anchors to the nearest existing step rather than climbing to an arbitrary number |
 
 ## Reading order
 

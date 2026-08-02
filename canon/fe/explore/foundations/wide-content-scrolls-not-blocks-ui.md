@@ -1,74 +1,67 @@
 # Wide content SCROLLS, it does not block the UI
 
-A block that can be wider than the column containing it gets `overflow-x-auto`; a flex chain that
-contains one gets `min-w-0`. The heuristic belongs to the `responsives/*` family — how things shrink
-and overflow with the viewport.
+A block that can be wider than the column containing it gets its own horizontal scroll; a flex chain
+that contains one gets `min-width: 0`. Content is never allowed to break the layout — scrolling is
+the lesser cost, and it is the only cost the reader can recover from.
 
-Read out of the mermaid case in the lesson reader and the hero, 2026-06-27: a wide mermaid SVG kept
-the reading column from shrinking as the browser narrowed, and overflowed the whole page
-horizontally. The ruling was that content which cannot shrink should scroll on its right, rather
-than block the UI.
+The case that establishes it: a wide diagram inside a reading column keeps the column from shrinking
+as the browser narrows, and eventually overflows the whole page sideways. Every symptom points at
+the page layout; the cause is one child that was never told it may scroll.
 
 ## 1. The rule (STRICT)
 
-**Any block that can exceed its containing column is wrapped in `overflow-x-auto`** — scrolling
-horizontally INSIDE its frame — instead of widening the column or the page. That covers mermaid
-SVGs, tables, code and `<pre>` with long lines, iframes and embeds, fixed-size images and diagrams,
-and sandboxes.
-
-Content is never allowed to break the layout. Scrolling is the lesser cost.
+**Any block that can exceed its containing column is wrapped in a horizontal scroll container**, so
+it scrolls inside its own frame rather than widening the column or the document. That covers
+generated SVG diagrams, data tables, preformatted code with long lines, embedded frames, fixed-size
+images, and anything rendered by a third party.
 
 ## 2. The flexbox min-content trap
 
-A flex item does NOT shrink below its content width unless it has `min-width: 0` (`min-w-0`); the
-default is `min-width: auto`. So one wide child — an SVG, a `<pre>`, a table — forces the entire
-column to stay wide. The fix has two layers:
+A flex item does NOT shrink below its content width unless it is given `min-width: 0`; the initial
+value is `auto`, and `auto` means "no smaller than my content". This is specified behaviour, not a
+browser quirk, and it is the single most common cause of a layout that will not get smaller.
 
-1. **`min-w-0` on the CHAIN of flex items** (shell content column, then reader, then wrapper) so
-   they are allowed to shrink.
-2. **`overflow-x-auto` on the wide block itself.** This is the part that actually fixes "the page
-   will not get smaller": a scroll container has `min-content = 0`, so its flex ancestors become
-   free to shrink — and the wide content scrolls in its box instead of spilling out of `body`.
+So one wide child — an SVG, a `<pre>`, a table — forces the entire column to stay wide, and the
+column forces its parent, and so on up to the document. The fix has two layers:
+
+1. **`min-width: 0` on the CHAIN of flex items** — shell, content column, reader, wrapper — so they
+   are permitted to shrink at all.
+2. **The horizontal scroll on the wide block itself.** This is the part that actually resolves it: a
+   scroll container has a min-content contribution of zero, so its flex ancestors become free to
+   shrink, and the wide content scrolls in its box instead of spilling out of the document.
+
+Either layer alone leaves the bug in place. That is why it is usually diagnosed twice.
 
 ## 3. A utility class does not beat a third-party library's INLINE style
 
-Mermaid v11 stamps `style="max-width: Npx"` inline on the `<svg>`. That BEATS a class such as
-`[&_svg]:max-w-full` (`max-width: 100%`), because inline style outranks any class — so the class is
-dead code and the SVG stays N wide.
+Libraries that generate SVG commonly stamp `style="max-width: Npx"` on the element they produce.
+An inline style beats any class, whatever its specificity, so a `max-width: 100%` utility written
+against it is dead code that looks alive.
 
 The right handling, in order:
 
-- **Prefer wrapping in `overflow-x-auto`.** Safest: whatever width the SVG claims, it cannot break
-  the layout, and it still scales to fit when there is room.
-- Or force it with `!important` (`[&_svg]:!max-w-full`) when you genuinely want fit-without-scroll.
-  For diagrams the settled choice is scrolling, which keeps the diagram legible instead of squeezing
-  it to nothing.
+- **Prefer the scroll wrapper.** Whatever width the generated element claims, it cannot break the
+  layout, and it still scales down to fit when there is room.
+- Force it with `!important` only when you genuinely want fit-without-scroll, and accept what that
+  means: at narrow widths a complex diagram squeezed to fit is legible to nobody.
 
-## 4. Diagnosing "the page will not shrink / it overflows sideways"
+## 4. Diagnosing "the page will not shrink"
 
-It is usually not the parent component — those normally already have `min-w-0`. Look at the WIDEST
-CHILD (mermaid, table, `pre`) and check two things: does it have `overflow-x-auto`, and does the
-flex chain above it have `min-w-0`. One block missing its overflow is enough to hold the whole page
-open.
+It is rarely the parent component — those usually already carry `min-width: 0`, because somebody hit
+this before. Find the WIDEST CHILD and check two things: does it have its own overflow, and does the
+flex chain above it permit shrinking. One block missing its overflow is enough to hold the entire
+page open, and the block will look completely innocent.
 
 ## 5. Neighbouring cases, deliberately different
 
-- **Wide content that must keep its size to stay readable** (diagram, table, code) —
-  `overflow-x-auto`.
-- **A rail or panel too long VERTICALLY** — `ScrollShadow`, with a faded edge
-  ([[sticky-rail-overflow-wrap-scrollshadow]]). Different axis, same family: contain the overflow
-  rather than letting it spill.
-- **Jitter from the vertical scrollbar appearing and disappearing** —
-  `html { overflow-y: scroll; scrollbar-gutter: stable }` ([[scrollbar-gutter]]).
-
-## First applied 2026-06-27
-
-`MarkdownContent/MermaidDiagram`: the div wrapping the SVG had `[&_svg]:h-auto [&_svg]:max-w-full`
-and gained `overflow-x-auto`. A wide diagram now scrolls inside its figure, the reading column
-shrinks normally, and `body` no longer overflows. Code blocks and tables in `MarkdownContent`
-already scrolled on their own — mermaid was the one block missing its overflow.
+- **Wide content that must keep its size to stay readable** — a diagram, a data table, a code block:
+  horizontal scroll.
+- **A rail or panel too long VERTICALLY** — a bounded max height with a faded edge, so the cut is
+  visibly a cut rather than an accident. Different axis, same family: contain the overflow rather
+  than letting it spill.
+- **Jitter from the vertical scrollbar appearing and disappearing** — see [[scrollbar-gutter]].
 
 ## Related
 
-[[scrollbar-gutter]] · [[sticky-rail-overflow-wrap-scrollshadow]] (vertical overflow of a rail) ·
-[[gap]] · [[three-tier-page-layout]] (the reading column at `max-w-3xl` with `min-w-0`).
+[[scrollbar-gutter]] · [[gap]] · [[region-model]] (the reading column, and why its measure belongs to
+the column rather than to the renderer).

@@ -1,57 +1,57 @@
 # Elevation (shadow)
 
-There are three real shadow tiers, and none of them is an app token — all three are baked in
-`@heroui/styles/dist/themes/default/variables.css`. The app adds exactly one inversion on top, for
-`Card`.
+A shadow language is readable only while the number of shadows stays countable. Three tiers is
+enough for almost every product, and the tier is chosen by what the element is doing rather than by
+how much lift the author wants.
 
 ## 1. Three tiers, chosen by ROLE
 
-- `--surface-shadow` / `shadow-surface` — a card or surface at rest.
-- `--field-shadow` / `shadow-field` — an input or field at rest. Practically the same weight as
-  `shadow-surface` (blur around 4px).
-- `--overlay-shadow` — a popover, dropdown, tooltip or modal content: three layers, blur up to 28px,
-  plus one negative "throw" layer. This is the highest tier.
+- **Surface at rest** — a card or panel sitting on the page. A short, soft shadow, blur in the
+  region of 4px.
+- **Field at rest** — an input, a select, a combo box. Practically the same weight as a surface;
+  it is a separate token because the field family moves independently of the card family.
+- **Overlay** — a popover, dropdown, tooltip, or modal content. Several layers, blur up to roughly
+  30px, usually with one negative-offset layer that throws the shadow slightly upward as well. This
+  is the top tier and nothing sits above it.
 
-Choose by what the element is doing, not by how much lift you want: standing at rest on the page
-takes surface or field, floating above everything else takes overlay. That is what keeps two
-unrelated popovers reading as the same kind of thing.
+Choose by the job, not by taste: resting on the page takes surface or field, floating above
+everything else takes overlay. That is the whole reason two unrelated popovers in different corners
+of a product read as the same kind of thing. Material's elevation levels make the same argument from
+the other direction — the level is a property of the component's role, and every component of that
+role shares it.
 
-## 2. In dark mode the resting shadows are invisible — nested surfaces need a BORDER
+## 2. In dark mode the resting shadows disappear, so nested surfaces need a BORDER
 
-In `.dark`, both `--surface-shadow` and `--field-shadow` are `0 0 0 0 transparent inset`. A card
-nested inside a card, or a field inside a card, therefore cannot be separated by shadow at all in
-dark mode.
+A shadow is a dark thing drawn on a darker thing. On a dark theme the resting tiers are close to
+invisible, and most systems set them to nothing rather than ship a shadow nobody can see. Material 3
+accepts the same fact and answers it with surface tint instead of shadow.
 
-This is the origin of the "surface inside surface uses a border, never a second fill" rule recorded
-in [[card]] §0/§4 and [[input]] §8b. It is not a stylistic preference — the shadow is literally not
-rendered.
+The consequence is mechanical rather than stylistic: a card nested inside a card, or a field inside
+a card, cannot be separated by shadow at all in dark mode. It has to be separated by a border. This
+is the origin of the rule that a surface inside a surface takes a border and never a second fill.
 
-`--overlay-shadow` changes strategy in dark rather than disappearing: a faint white inset highlight
-replaces the drop shadow, so a floating layer in dark mode is lit at its edge instead of casting.
+The overlay tier changes strategy rather than disappearing: a faint light inset along the top edge
+replaces the drop shadow, so a floating layer in dark mode is lit at its edge instead of casting a
+shadow onto a black background.
 
 ## 3. Top-level takes shadow, nested takes border
 
-App override, 2026-06-30 ([[card]] §0): `globals.css` declares `.card { border: none !important }`.
-A top-level `Card` uses `shadow-surface` as its only elevation and carries no border.
-
-Nested surfaces still need the border, for the reason in §2. So the choice is mechanical:
+Two stacked fills is never the answer in either theme — it produces a step in lightness that reads
+as a rendering artifact rather than as a boundary. So the choice is mechanical:
 
 - top-level surface: shadow, no border
 - nested surface: border, no second fill
 
-Two stacked fills is never the answer in either mode.
+Deciding this once, at the theme level, is what stops every author from re-litigating it per card.
 
 ## 4. Do not invent a shadow
 
-A block that wants to "lift" reaches for one of the three utilities above by role. A hand-rolled
-`shadow-[...]` adds a fourth tier that no other component shares, and the shadow language stops
-being readable as soon as there are two of them.
-
-Source: `@heroui/styles/dist/themes/default/variables.css` (`--surface-shadow`, `--field-shadow`,
-`--overlay-shadow`, light versus `.dark`) and `globals.css` (`.card { border: none !important }`,
-`.card--transparent`).
+A block that wants to lift reaches for one of the three by role. A hand-rolled shadow adds a fourth
+tier that no other component shares, and a shadow language stops being readable the moment there are
+two dialects of it. The reader can no longer tell whether a slightly heavier shadow means "this is a
+different kind of thing" or "somebody eyeballed it".
 
 ## Related
 
-[[card]] §0 (the border-to-shadow inversion) · [[input]] §8b (a field nested in a card drops its
-shadow) · [[radius]] (concentric radius, the same "nested surface" family).
+[[card]] (the border-to-shadow inversion) · [[input]] (a field nested in a card drops its shadow) ·
+[[radius]] (concentric radius, the same nested-surface family).
