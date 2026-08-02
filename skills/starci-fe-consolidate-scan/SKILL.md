@@ -19,6 +19,14 @@ the same thing* — and hands the mechanical part to the apply.
 proposal rests on: the call-site count in a cluster was measured against a tree that no longer exists,
 and nobody reviewing the proposal can check it.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## Where the code is
 
 Never write a path down. Ask, every session:
@@ -31,7 +39,7 @@ node .claude/scripts/workspace/read-workspace-context.mjs fe.artifacts
 
 A missing context exits non-zero and prints the command that fixes it; `starci-setup-workspace-fe`
 owns that record. When the project borrows the ecosystem's book rather than carrying its own,
-`design_system.path` is the answer instead — see `.claude/skills/starci-setup-storybook-choose/SKILL.md`.
+`design_system.path` is the answer instead — see `.claude/skills/starci-setup-storybook/SKILL.md`.
 
 These are **two trees and two different findings**. A shape duplicated inside the design system is a
 vocabulary that split in half; a shape duplicated across app code is a missing import of a word that

@@ -1,6 +1,6 @@
 ---
 name: starci-canon-audit
-description: Audits the whole canon under `canon/` — front end and back end together — for the six ways a rule set decays, and reports what it finds: cross-references pointing at files that moved, a rule filed on the wrong shelf, prose that no longer describes the source it claims to describe, two files stating the same rule, an area of the source no rule covers, and an index whose tables no longer match the folder beside it. Use this skill when the rules themselves are the subject rather than the code: "audit the canon", "check the rules are still true", "is anything in canon stale", "we just merged a big refactor, re-ground the docs", "why do two files disagree about tiers", "soi lại canon", "dọn tài liệu", "kiểm tra rules còn đúng không", "the docs sent me to a file that isn't there". Reach for it after any large move in the source — a tier renamed, a folder split, stories relocated — because that is when a correct rule quietly stops being findable. Not for writing or changing a rule (that is `canon/HOW-TO-WRITE.md`), not for changing application code, and not a substitute for `scripts/verify.mjs`, which this skill runs as its first step rather than replaces.
+description: Audits the whole canon under `canon/` — front end and back end together — for the six ways a rule set decays, and reports what it finds: cross-references pointing at files that moved, a rule filed on the wrong shelf, prose that no longer describes the source it claims to describe — a back-end rule included, whose anchor has gone dead, whose count no longer recounts, or whose idiom the code has quietly stopped following — two files stating the same rule, an area of the source no rule covers, and an index whose tables no longer match the folder beside it. Use this skill when the rules themselves are the subject rather than the code: "audit the canon", "check the rules are still true", "is anything in canon stale", "we just merged a big refactor, re-ground the docs", "why do two files disagree about tiers", "is canon/be still true", "check the be rules against the source", "does this rule still describe the code", "re-ground the exceptions doc", "soi lại canon", "soi patterns be", "dọn tài liệu", "kiểm tra rules còn đúng không", "dong bo canon backend voi code", "canon be con dung khong", "the docs sent me to a file that isn't there". Reach for it after any large move in the source — a tier renamed, a folder split, stories relocated, a back-end module renamed — because that is when a correct rule quietly stops being findable. Not for writing or changing a rule (that is `canon/HOW-TO-WRITE.md`), not for changing application code, and not a substitute for `scripts/verify.mjs`, which this skill runs as its first step rather than replaces.
 ---
 
 # Auditing the canon
@@ -62,6 +62,19 @@ that was renamed everywhere except in the prose. That layer is why a human-grade
 exists at all, and why every finding on this axis has to name the source line that contradicts the
 canon line.
 
+## Re-grounding `canon/be/` is inside this, not a separate job
+
+A rule under `canon/be/` rots the same three ways as any other rule here, and none of the three need
+a back-end-only pass to catch: a dead anchor — a rule naming a `src/` file, a module, or a thrown
+built-in that has since moved or been renamed; a count that no longer recounts — a `N files` claim,
+or one written in words, such as `exceptions.md` claiming zero `throw new Error` survives in running
+code; and an idiom the code has quietly stopped following — the anchor still resolves, the file is
+still there, and it no longer does what the rule says. The first two are `node .claude/scripts/verify.mjs be`,
+already step 1b below. The third is the reading pass in step 2, run against `canon/be/enforce/authoring/`
+and `canon/be/explore/system-design/` the same as `canon/fe/` gets read against its own shelves. There
+is no separate back-end audit to reach for first — asking whether `canon/be/` still describes the
+backend is this same procedure, framed on one role instead of both.
+
 ## Procedure
 
 **1. Set the frame and run the machines first.** The mechanical pass is cheap and certain, so it
@@ -87,7 +100,7 @@ arguing it in prose: `scripts/gates/check-story-coverage.mjs` for the Storybook-
 rules that are supposed to have a written counterpart.
 
 **2. Read one shelf at a time, grounded.** Take the shelves separately — `canon/fe/` top level,
-`canon/fe/enforce/authoring/`, `canon/be/contracts/`, `canon/be/modules/`, `canon/be/conventions/` — and
+`canon/fe/enforce/authoring/`, `canon/be/enforce/authoring/`, `canon/be/explore/system-design/` — and
 for each, read the files against the real tree. Wrong-shelf, semantic staleness, duplication and
 coverage gaps are decided here.
 
@@ -151,6 +164,9 @@ design-system folder now carries with no rule in `canon/fe/` describing when to 
 - **Deleting a rule because it is unenforced.** Deleting is fine and `canon/HOW-TO-WRITE.md`
   encourages it — but the rules worth keeping are precisely the ones no gate can catch, so
   "no gate covers this" is an argument for keeping it, not against.
+- **Counting `*.spec.ts` as running code when re-grounding `canon/be/`.** A spec deliberately holds
+  the shape a rule forbids elsewhere — a bare `Error`, an `as unknown as` — and counting it reports
+  a clean module as broken.
 
 ## Files
 

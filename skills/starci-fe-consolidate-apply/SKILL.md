@@ -17,6 +17,14 @@ That is the whole shape of this half.
 The unit of work is the cluster, not the file, and a cluster is done when the code it duplicated has
 been deleted.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## Where the code is
 
 ```bash
@@ -133,7 +141,7 @@ thing on one of five call sites is the exact failure no machine in this list cat
 
 Occasionally two duplicated blocks fetched two near-identical shapes, and one canonical block wants
 one query instead of two. That is a real API change and it is not a side effect of a front-end
-cleanup: it follows `canon/be/contracts/api-surface.md`, and it is worth saying out loud before doing
+cleanup: it follows `canon/be/explore/system-design/api-design.md`, and it is worth saying out loud before doing
 it, because the proposal did not ask for it.
 
 ## 7. Record what landed

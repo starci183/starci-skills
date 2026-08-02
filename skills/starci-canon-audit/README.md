@@ -16,6 +16,17 @@ half and never the seam between them, which is where the contradictions live.
 So there is one skill over `canon/`, and the roles are shelves inside its pass rather than separate
 passes.
 
+## Why the back-end-only pass moved in here instead of staying its own skill
+
+A second skill once audited `canon/be/` alone, incrementally, against the backend's own git history:
+same three failures — a dead anchor, a count that no longer recounts, an idiom the tenth module
+quietly stopped following — read only against the back-end shelves. It answered a real question, but
+it was a second place a reader had to remember to reach for, and the seam argument above applies to
+it exactly: a convention `canon/be/` and `canon/fe/` both state, or a table in `canon/INDEX.md` that
+drifted on one role only, was invisible to a pass that opened just one tree. Its procedure was never
+a different one — it was steps 1b and 2 here, run with the back end as the question instead of both —
+so it is now that: a framing of this same audit, not a separate program to keep in sync with this one.
+
 ## Why the mechanical half runs first, and why it is a separate program
 
 `scripts/verify.mjs` is not part of this skill. It is a standalone check that anyone can run

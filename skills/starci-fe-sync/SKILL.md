@@ -16,6 +16,14 @@ mirrored, plus a connected file that only the app can write. The sync runs one w
 is the source, the twin is the copy, and a change made in the copy is a change nobody will ever see
 in a story.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## The two roots
 
 Never write either of them down. Ask:
@@ -153,7 +161,7 @@ gate, and still be the wrong shell; `canon/fe/enforce/spacing/overview.md` is wh
 ## When the connected half needs something the API does not have
 
 Sometimes the twin is blocked on a field that does not exist yet. That is a backend change, not a
-reason to fetch twice or to derive the value in the component: `canon/be/contracts/api-surface.md` for
+reason to fetch twice or to derive the value in the component: `canon/be/explore/system-design/api-design.md` for
 the shape of the surface, and `node .claude/scripts/workspace/read-workspace-context.mjs be.path` for where it
 lives. Until the field exists, the honest move is to record the gap rather than fake it.
 

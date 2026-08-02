@@ -17,6 +17,14 @@ This is the loading-state counterpart to a layout or block task, and deliberatel
 not restructure what a region contains. It makes the region's *pending* rendering match the region
 that is already there.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## Before anything: resolve the source
 
 ```bash

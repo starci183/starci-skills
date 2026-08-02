@@ -19,6 +19,14 @@ The sentence to hold while reading one: **a red result is a seam that declares a
 computes to the wrong pixel.** It is rarely a broken build. It is almost always a claim and a
 measurement that disagree, and the interesting question is which of the two is wrong.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## 1. Resolve the roots
 
 ```bash

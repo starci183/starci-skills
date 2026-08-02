@@ -1,6 +1,6 @@
 ---
 name: starci-fe-layout-brainstorm
-description: Designs the layout of a whole flow — every surface a feature touches: the route's page, the shell it sits inside, and each modal and drawer it opens — by deciding each surface's shell from the job it exists to do, mapping its zones, walking the data-state matrix and a conversion lens through every one of those states, briefing each block against a component that actually exists, and then rendering a clickable HTML prototype of the flow so the design can be walked and argued with before anything is built; on approval it writes the design as a proposal into the front-end app's proposals queue. Reach for it when a feature's surfaces are being planned rather than adjusted: "dựng trang X", "làm luồng đăng ký", "sửa layout", "plan the layout for the checkout flow", "design the whole enrolment flow", "what should this page look like", "I want to click through it before you build it", "queue this design for later". It designs and then stops — it writes no application code; building an approved proposal is starci-fe-layout-apply, and adjusting one block or one component's internals after the surfaces exist is starci-fe-review.
+description: Designs the layout of a whole flow — every surface a feature touches: the route's page, the shell it sits inside, and each modal and drawer it opens — by deciding each surface's shell from the job it exists to do, counting the record volume the back end actually returns to decide how many regions each surface needs and which of them shrink, drawing three or four workable arrangements as widgets for a person to choose between, mapping the zones of the arrangement chosen, walking the data-state matrix and a conversion lens through every one of those states, briefing each block against a component looked up in the component matrix rather than invented, and then rendering a clickable HTML prototype of the flow so the design can be walked and argued with before anything is built; on approval it writes the design as a proposal into the front-end app's proposals queue. Reach for it when a feature's surfaces are being planned rather than adjusted, or when the question is really how much a page can hold and what gives when it does not fit: "dựng trang X", "làm luồng đăng ký", "sửa layout", "plan the layout for the checkout flow", "design the whole enrolment flow", "what should this page look like", "I want to click through it before you build it", "queue this design for later", "how should this page be arranged", "this screen feels crowded", "should this be a drawer or a modal", "màn hình này chật quá". It designs and then stops — it writes no application code; building an approved proposal is starci-fe-layout-apply, and adjusting one block or one component's internals after the surfaces exist is starci-fe-review.
 ---
 
 # Designing a flow's surfaces
@@ -27,6 +27,14 @@ a workspace nobody can read.
 This skill decides shape. What goes inside a block stops at one line of brief; the internals are
 another skill's job.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## Where the source is
 
 Nothing here remembers a path. The front end, its design-system folder, and the back end are asked
@@ -52,7 +60,8 @@ is drawn means rewriting the blueprint.
 | which tier a surface or a piece of it belongs to, and what it may import | `canon/fe/enforce/tiers/architecture.md` |
 | what a page owns | `canon/fe/enforce/tiers/page.md` |
 | what a layout shell owns, and what an overlay owns | `canon/fe/enforce/tiers/layout.md`, `canon/fe/enforce/tiers/overlay.md` |
-| which component a shape of data becomes | `canon/fe/explore/component/`, and the "Which component a data shape becomes" section of `canon/fe/enforce/tiers/architecture.md` |
+| how much data a surface actually carries, and how a collection is paged | `canon/be/explore/system-design/api-design.md`, with the entity relations that decide one record versus many in `canon/be/explore/system-design/data-access.md` |
+| which component a shape of data becomes | the lookup in `canon/fe/explore/component/`, queried through `scripts/search/search-component-matrix.mjs` rather than opened whole, and the "Which component a data shape becomes" section of `canon/fe/enforce/tiers/architecture.md` |
 | what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/enforce/spacing/overview.md`, with `canon/fe/explore/registry.mjs` as the authority on the values |
 | how an async surface is written, and what its loading state owes the reader | `canon/fe/enforce/authoring/async-data.md`, `canon/fe/enforce/authoring/loading-and-skeleton.md` |
 | how a modal, drawer or toast behaves as code | `canon/fe/enforce/authoring/overlay-and-feedback.md` |
@@ -87,10 +96,27 @@ one with the awkward state.
   want the same frame, and forcing one shell across a flow is the commonest way a working surface
   ends up cramped.
 
-**3. Map the zones.** For each surface, name its regions and what each holds — the shell's own
-chrome, the primary region, any secondary rail, the action area. Then say what each region does when
-its container narrows: which rail collapses into what, which split stacks, and at which named width.
-A rail that would hold fewer than a handful of items is not a rail; fold it before it gets drawn.
+**3. Measure the volume, then derive the regions it forces.** A region count chosen by eye is
+chosen by whichever mockup happened to be open, and the mockup never holds the volume production
+will. So before naming a single zone, count what the back end actually returns.
+
+- **3a.** For each surface, count from the data layer: the page size, the worst case, how many
+  records arrive at typical load, and how many regions are simply empty for a new account —
+  `canon/be/explore/system-design/api-design.md` governs how a list is paged and bounded,
+  `canon/be/explore/system-design/data-access.md` governs the relations that decide whether a
+  region holds one record or many. An async region is a region too; see
+  `canon/fe/enforce/authoring/async-data.md`.
+- **3b.** That count decides how many regions there are and which of them shrinks: a lot of data
+  splits into two workspaces because one column cannot carry it, a little data centres into one
+  because spreading it thin only dilutes it. Draw three or four workable arrangements at that
+  volume as widgets — never as a choice offered in prose — at the real record count and at more
+  than one width, and let a person pick between them. Where the volume forces exactly one
+  arrangement, draw that one with the sentence that there is no second, rather than manufacturing
+  options nobody needs.
+- **3c.** Once an arrangement is picked, name its zones — the shell's own chrome, the primary
+  region, any secondary rail, the action area — and say what each one does when its container
+  narrows: which rail collapses into what, which split stacks, and at which named width. A rail
+  that would hold fewer than a handful of items is not a rail; fold it before it gets drawn.
 
 **4. Walk the data-state matrix, per surface.** Not as a list beside the design — placed *into* the
 zones, because a state is a different arrangement, not a different sentence. The set to cover:
@@ -116,9 +142,13 @@ lives here, and it is three questions asked of every state of every surface:
 
 **6. Brief every block against a component that exists.** One line per block, and that line names
 the real component from the design system, resolved from `fe.design_system` and grepped, not
-recalled. Where nothing suitable exists, say so plainly and name the tier the new component would
-sit at. That sentence is not a footnote — it is the storybook-first work the apply phase will do
-first, and a proposal that hides it produces a build that hand-rolls.
+recalled. Which component a shape of data becomes is a lookup, not a decision invented here: query
+`canon/fe/explore/component/`'s `matrix.csv` through `scripts/search/search-component-matrix.mjs`,
+describing the shape in your own words rather than entering by a component name already in mind —
+reading the table backwards is how the wrong shell survives review. Where nothing suitable exists,
+say so plainly and name the tier the new component would sit at. That sentence is not a footnote —
+it is the storybook-first work the apply phase will do first, and a proposal that hides it produces
+a build that hand-rolls.
 
 **7. Verify your own blueprint before showing it.** The self-check below. A miss found here costs a
 sentence; the same miss found in review costs the whole review.
@@ -174,12 +204,15 @@ Ask these of the blueprint before showing it, and answer them in words:
 2. Does each surface's shell follow from the job sentence written in step 2a, or from the data?
 3. Is there exactly one primary action per surface, and is it reachable in every state that permits
    it?
-4. Does every rail earn being a rail, and does every shape that changes name the container width it
+4. Was each surface's region count derived from a real record count in the back end, and were three
+   or four arrangements drawn before one was picked — or the sentence written that the volume forces
+   exactly one?
+5. Does every rail earn being a rail, and does every shape that changes name the container width it
    changes at?
-5. Is every number shown one that can be reproduced from real data?
-6. Does every block brief name a component that exists, or say clearly that it does not exist yet
+6. Is every number shown one that can be reproduced from real data?
+7. Does every block brief name a component that exists, or say clearly that it does not exist yet
    and at which tier it would sit?
-7. Was every surface in the flow covered — every phase, every mode, every modal and drawer, and the
+8. Was every surface in the flow covered — every phase, every mode, every modal and drawer, and the
    siblings that share the shell?
 
 ## The proposal
@@ -189,6 +222,8 @@ the prototype, and everything not written into it is lost. Resolve `fe.path`, th
 `.claude/fe/proposals/<feature>.proposal.md` under it, holding:
 
 - the flow, surface by surface, each with its job sentence and the shell that job chose
+- the volume each surface was measured against and the arrangement that count forced — the
+  alternatives drawn and the one picked, or the sentence that only one arrangement existed
 - the zones per surface, and what each does as its container narrows, with the named width
 - the state matrix placed into zones, with the conversion lens answered per state
 - the block briefs, naming real components, and a separate list of the components that do not exist

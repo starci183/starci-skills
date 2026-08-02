@@ -90,7 +90,33 @@ t.expect(
 t.expect(
     "and the Storybook-first law is still the thing that bounds what may be fixed here",
     { code: 0, out: text },
-    { has: ["Storybook first, without exception"] },
+    { has: ["No component reaches the app that was never a component and a story in the design-system folder first"] },
+);
+
+// ---- the conversion axis is folded in, not bolted on ---------------------
+// This skill absorbed starci-fe-cta-and-link-apply's territory: the three routes a finding can
+// take, and the conversion-specific fixes (outcome copy, a demoted primary, a wired-up reference
+// link, a deleted fallback number). If those quietly disappear, this half silently drops back to
+// three axes without anyone deciding that.
+
+t.group("the conversion axis is really in here, not just in the name");
+
+t.expect(
+    "the three routes a finding can take are all still named",
+    { code: 0, out: text },
+    { has: ["Routed to the layout lane", "Built in the design system first"] },
+);
+
+t.expect(
+    "a conversion fix is spelled out on its own terms, same as the other three axes",
+    { code: 0, out: text },
+    { has: ["*Conversion*"] },
+);
+
+t.expect(
+    "and it resolves the back end too, since a routed-or-dropped conversion finding is checked against the schema",
+    { code: 0, out: text },
+    { has: ["read-workspace-context.mjs be.path"] },
 );
 
 t.finish();

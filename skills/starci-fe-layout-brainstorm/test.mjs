@@ -117,4 +117,45 @@ t.expect(
     { exit: 0 },
 );
 
+// ---- the composition audit's method is folded in, not a separate pass ---
+
+t.group("the volume-to-arrangement fold is stated");
+
+// This is what step 3 absorbed: a region count is derived from a real record count, never chosen
+// by eye, and the candidates are drawn rather than argued about in prose.
+const VOLUME_INVARIANT = "That count decides how many regions there are and which of them shrinks";
+
+t.expect(
+    "a region count is derived from the data layer, not chosen by eye — stated in these words",
+    check(flat.includes(VOLUME_INVARIANT) ? "present" : `missing: ${VOLUME_INVARIANT}`, flat.includes(VOLUME_INVARIANT)),
+    { exit: 0, lacks: ["missing:"] },
+);
+
+t.expect(
+    "three or four candidate arrangements are drawn as widgets before one is picked",
+    check("widgets", /three or four workable arrangements/i.test(text) && /as widgets/.test(text)),
+    { exit: 0 },
+);
+
+// ---- the block-matrix lookup is folded in here, not deferred to a separate lane ----
+
+t.group("which component a shape becomes is a lookup here, not a separate skill");
+
+t.expect(
+    "the component matrix and its search script are both named",
+    check("lookup", text.includes("matrix.csv") && text.includes("search-component-matrix.mjs")),
+    { exit: 0 },
+);
+
+// The two audit skills this document absorbed are meant to be deleted once the fold lands. A
+// reference surviving here would dangle the moment they are gone, which is exactly the silent
+// failure this whole set is built to catch.
+const danglingRefs = ["story-audit-composition", "story-audit-block"].filter((name) => text.includes(name));
+
+t.expect(
+    "no reference remains to the two audit skills this document absorbed",
+    check(danglingRefs.length ? `found: ${danglingRefs.join(", ")}` : "clean", danglingRefs.length === 0),
+    { exit: 0, lacks: ["found:"] },
+);
+
 t.finish();

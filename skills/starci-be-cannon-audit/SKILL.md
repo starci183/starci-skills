@@ -49,16 +49,16 @@ read out of its shelf gets applied where it does not belong.
 
 | Shelf | Grade the scope against it when the code… |
 |---|---|
-| `canon/be/modules/modules-and-di.md` | declares a module, a provider, a resolver, a service or a CQRS handler |
-| `canon/be/modules/database-and-entities.md` | declares an entity or writes a query |
-| `canon/be/contracts/api-surface.md` | exposes a GraphQL leaf or a REST controller |
-| `canon/be/contracts/validation.md` | accepts input at the boundary |
-| `canon/be/contracts/exceptions.md` | throws anything at all |
-| `canon/be/contracts/async-and-messaging.md` | enqueues work, consumes it, emits events, or schedules |
-| `canon/be/conventions/type-safety.md` | types anything loosely, or types nothing |
-| `canon/be/conventions/imports-and-format.md` | imports, formats, or barrels |
-| `canon/be/conventions/comments.md` | comments |
-| `canon/be/conventions/config-and-env.md` | reads configuration or a secret |
+| `canon/be/explore/system-design/module-layering.md` | declares a module, a provider, a resolver, a service or a CQRS handler |
+| `canon/be/explore/system-design/data-access.md` | declares an entity or writes a query |
+| `canon/be/explore/system-design/api-design.md` | exposes a GraphQL leaf or a REST controller |
+| `canon/be/enforce/authoring/validation.md` | accepts input at the boundary |
+| `canon/be/enforce/authoring/error-handling.md` | throws anything at all |
+| `canon/be/explore/system-design/messaging-and-events.md` | enqueues work, consumes it, emits events, or schedules |
+| `canon/be/enforce/authoring/type-safety.md` | types anything loosely, or types nothing |
+| `canon/be/enforce/authoring/imports-and-format.md` | imports, formats, or barrels |
+| `canon/be/enforce/authoring/comments.md` | comments |
+| `canon/be/enforce/authoring/config-and-env.md` | reads configuration or a secret |
 
 Most scopes cross all three shelves at once: `modules/` for the folder the code lives in,
 `contracts/` for the surface it exposes, `conventions/` for how the resulting lines are typed.
@@ -68,7 +68,7 @@ Most scopes cross all three shelves at once: `modules/` for the folder the code 
 A finding carries four parts, and one missing part makes it unusable:
 
 1. **the rule** — canon file and the numbered heading inside it, e.g.
-   `canon/be/contracts/exceptions.md` rule 2
+   `canon/be/enforce/authoring/error-handling.md` rule 2
 2. **the anchor** — a real path under `be.path` and a real line number, plus the offending line
    quoted as it stands
 3. **the severity** — see below

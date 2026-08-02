@@ -8,7 +8,7 @@
  * defends, so a failing run reads as a promise broken rather than as "test 2 failed".
  *
  * What it cannot test: whether an agent holding this skill actually reads a surface once and
- * grades all three axes, instead of reporting the first thing it noticed. That is a behaviour
+ * grades all four axes, instead of reporting the first thing it noticed. That is a behaviour
  * question and needs an eval — see README.md.
  *
  *   node .claude/skills/starci-fe-review-scan/test.mjs [--verbose]
@@ -76,21 +76,46 @@ t.expect(
 );
 
 // ---- the founding invariant ----------------------------------------------
-// Three axes in one pass is not a convenience, it is the reason this skill exists rather than
-// three. Lose the sentence and the next editor splits it back into three skills.
+// Four axes in one pass is not a convenience, it is the reason this skill exists rather than
+// four. Lose the sentence and the next editor splits it back into separate skills.
 
 t.group("the sentence the skill is built on");
 
 t.expect(
-    "one surface, one reading, all three axes — stated in the body, not implied",
+    "one surface, one reading, all four axes — stated in the body, not implied",
     { code: 0, out: text },
-    { has: ["one surface is read once and graded on all three axes in that pass"] },
+    { has: ["one surface is read once and graded on all four axes in that pass"] },
 );
 
 t.expect(
     "and the scan half still refuses to change code",
     { code: 0, out: text },
     { has: ["Nothing here changes code"] },
+);
+
+// ---- the conversion axis is folded in, not bolted on ---------------------
+// This skill absorbed starci-fe-cta-and-link-scan's territory. If the fourth axis, its trigger
+// phrases, or the back-end lookup it depends on quietly disappear, review has silently shrunk
+// back to three axes without anyone deciding that.
+
+t.group("the conversion axis is really in here, not just in the name");
+
+t.expect(
+    "the conversion axis has its own section, grounded in the same rubric the retired skill used",
+    { code: 0, out: text },
+    { has: ["### Conversion and links"] },
+);
+
+t.expect(
+    "the description still fires on a funnel question, not only on copy and width",
+    { code: 0, out: text },
+    { has: ["does this page go anywhere"] },
+);
+
+t.expect(
+    "and it resolves the back end too, since a conversion claim is a claim about the schema",
+    { code: 0, out: text },
+    { has: ["read-workspace-context.mjs be.path"] },
 );
 
 t.finish();

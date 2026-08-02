@@ -116,4 +116,23 @@ t.expect(
     { has: ["An audit that edits while it reads loses the only baseline it had."] },
 );
 
+// ---- the retired BE-only pass is folded in, not merely adjacent ----------
+
+t.group("re-grounding canon/be/ reads as this skill's own job, not a separate one");
+
+// This skill absorbed a back-end-only skill that used to audit `canon/be/` alone. If the
+// description loses its BE-focused phrasing, or the body's claim that canon/be/ decays the same
+// three ways gets edited away, a reader has no way to find out this job lives here now.
+t.expect(
+    "the description carries BE-focused trigger phrases, not only the FE ones",
+    { code: 0, out: SKILL },
+    { has: ["is canon/be still true", "check the be rules against the source", "canon be con dung khong"] },
+);
+
+t.expect(
+    "the body states plainly that canon/be/ needs no separate audit, not just that be.path is read",
+    { code: 0, out: SKILL },
+    { has: ["Re-grounding `canon/be/` is inside this, not a separate job"] },
+);
+
 t.finish();

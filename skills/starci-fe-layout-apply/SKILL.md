@@ -22,6 +22,14 @@ that reuses the list from the page behind it, the empty state that points at the
 along. Landing half of that produces a set that disagrees with itself, and the disagreement is
 invisible until somebody walks the flow.
 
+## House manner
+
+This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
+instead of describing them, render a large layout as a clickable prototype served on `:8080`
+before any code is written, and offer three or four real choices rather than one finished answer
+to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
+reasoning behind each.
+
 ## Where the source is
 
 ```bash
@@ -76,8 +84,8 @@ this reliably discovers on the fourth surface that the second one made an assump
 
 **4a. The back end, when the proposal needs it.** This skill is not confined to the front end. A
 surface that needs a field, a resolver, a gate or a new relation gets it, in the tree at `be.path`,
-under `canon/be/contracts/api-surface.md`, `canon/be/contracts/validation.md`,
-`canon/be/contracts/exceptions.md` and `canon/be/modules/database-and-entities.md`. It goes first
+under `canon/be/explore/system-design/api-design.md`, `canon/be/enforce/authoring/validation.md`,
+`canon/be/enforce/authoring/error-handling.md` and `canon/be/explore/system-design/data-access.md`. It goes first
 because the front end is about to be written against its shape, and a shape that changes underneath
 half-built surfaces is the most expensive ordering mistake available here.
 

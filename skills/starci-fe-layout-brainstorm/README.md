@@ -88,6 +88,28 @@ feature's name.
 Note that this is not a rule about sessions. Applying immediately in the same session is fine and
 the skill offers it; what must not happen is building *while* deciding.
 
+## Why the region count is measured here, before a zone is named
+
+An arrangement chosen before anyone counts the records is chosen against whichever mockup happened
+to be open, and the mockup never carries the volume production actually has. Two surfaces can hold
+the same records and still need different arrangements, for no reason except that one carries five
+items and the other carries five hundred — volume, not taste, is what decides, and the only way to
+know it is to count from the data layer before drawing a single zone.
+
+This used to be asked for in a lane of its own, reached separately once a page's shape needed
+deciding. Splitting it out bought nothing that a single flow-level decision does not already need,
+and it cost a handoff: the region count belongs beside the shell decision it constrains, checked by
+the same self-check, before the same proposal is written — not reconstructed in a second document
+by whoever picks the flow up next.
+
+## Why the component lookup stays a lookup, done in step 6, not a separate pass
+
+Which component a briefed block becomes does not change by being asked in a different session; it
+is the same lookup either way — describe the shape in your own words, query the matrix, never enter
+by a component name already in mind. Routing it through a second lane only added a file a later
+reader has to chase. Keeping it in step 6 keeps the whole brief, shell to block, in the one document
+that already carries everything else about the surface.
+
 ## Why panel mode is opt-in
 
 Rival directions plus an adversarial pass is expensive, and on an ordinary flow it manufactures a

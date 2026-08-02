@@ -35,14 +35,14 @@ worktree and passes every check in a tree nobody ships.
 
 | Writing… | Read |
 |---|---|
-| a module, provider, resolver, service, CQRS handler | `canon/be/modules/modules-and-di.md` |
-| an entity, a column, a query | `canon/be/modules/database-and-entities.md` |
-| a GraphQL leaf or a REST controller | `canon/be/contracts/api-surface.md` |
-| anything that accepts input | `canon/be/contracts/validation.md` |
-| anything that throws | `canon/be/contracts/exceptions.md` |
-| a queue, worker, event, cron or lock | `canon/be/contracts/async-and-messaging.md` |
-| any file at all | `canon/be/conventions/type-safety.md`, `canon/be/conventions/imports-and-format.md`, `canon/be/conventions/comments.md` |
-| anything reading configuration or a secret | `canon/be/conventions/config-and-env.md` |
+| a module, provider, resolver, service, CQRS handler | `canon/be/explore/system-design/module-layering.md` |
+| an entity, a column, a query | `canon/be/explore/system-design/data-access.md` |
+| a GraphQL leaf or a REST controller | `canon/be/explore/system-design/api-design.md` |
+| anything that accepts input | `canon/be/enforce/authoring/validation.md` |
+| anything that throws | `canon/be/enforce/authoring/error-handling.md` |
+| a queue, worker, event, cron or lock | `canon/be/explore/system-design/messaging-and-events.md` |
+| any file at all | `canon/be/enforce/authoring/type-safety.md`, `canon/be/enforce/authoring/imports-and-format.md`, `canon/be/enforce/authoring/comments.md` |
+| anything reading configuration or a secret | `canon/be/enforce/authoring/config-and-env.md` |
 
 A new feature normally crosses all three shelves: the folder it lives in, the surface it exposes,
 and how the resulting lines are typed.
