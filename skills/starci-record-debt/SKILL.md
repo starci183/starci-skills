@@ -60,7 +60,7 @@ than the code says.
 ## Paths are relative, by role
 
 An entry says `--role fe` and a path inside that tree. Which folder `fe` means is a per-machine
-answer that `starci-setup-workspace-fe` already owns, so an entry written on one machine still
+answer that `starci-setup-workspace` already owns, so an entry written on one machine still
 resolves on the next. An absolute path is refused — it would be a second, competing, quietly wrong
 copy of the workspace registry.
 

@@ -117,7 +117,7 @@ node .claude/scripts/workspace/read-workspace-context.mjs fe.design_system
 node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
-Registering a source is `starci-setup-workspace-fe` and `starci-setup-workspace-be`. A missing context
+Registering a source is `starci-setup-workspace` (`--fe`/`--be`, either or both). A missing context
 exits non-zero and prints the command that fixes it.
 
 ## Reading order

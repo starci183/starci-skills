@@ -1,30 +1,30 @@
 #!/usr/bin/env node
 /**
- * Tests for starci-fe-layout-apply.
+ * Tests for starci-fe-layout-plan.
  *
  * Each case is named as the CLAIM the skill makes, so a failing run reads as a promise broken
  * rather than as "test 3 failed".
  *
  * This skill ships no script. What it ships is a document that points outward — at canon, at the
- * gates, at the rendered-tree runner — and the whole value of pointing outward is lost the moment
- * a reference points at nothing. So the suite reads SKILL.md and checks three things about it:
+ * gates, at the design material — and the whole value of pointing outward is lost the moment a
+ * reference points at nothing. So the suite reads SKILL.md and checks three things about it:
  * that every path it cites still resolves, that it names no machine, and that the sentence the
- * whole build order rests on is still in it.
+ * rest of the document leans on is still in it.
  *
- * What it cannot test: whether an agent holding this skill actually authors a missing component in
- * the design system before composing the page, instead of inlining it. That is the behaviour the
- * skill exists to produce and it needs an eval — see README.md.
+ * What it cannot test: whether an agent holding this skill actually enumerates a flow's surfaces
+ * before designing one of them. That is a property of the frontmatter description and needs an
+ * eval — see README.md.
  *
- *   node .claude/skills/starci-fe-layout-apply/test.mjs [--verbose]
+ *   node .claude/skills/starci-fe-layout-plan/test.mjs [--verbose]
  */
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { harness, REPO } from "../../scripts/test-harness.mjs";
 
-const t = harness("starci-fe-layout-apply");
+const t = harness("starci-fe-layout-plan");
 
-const SKILL = join(REPO, "skills", "starci-fe-layout-apply", "SKILL.md");
+const SKILL = join(REPO, "skills", "starci-fe-layout-plan", "SKILL.md");
 const text = readFileSync(SKILL, "utf8");
 
 /** Markdown wraps prose at will, so a quoted sentence is compared with its whitespace flattened. */
@@ -58,28 +58,17 @@ const resolves = (p) => {
 const missing = cited.filter((p) => !resolves(p));
 
 t.expect(
-    "the skill cites canon, the gates and the runner rather than restating them",
-    check(`cited ${cited.length} paths`, cited.length >= 12),
+    "the skill cites canon, patterns and design rather than restating them",
+    check(`cited ${cited.length} paths`, cited.length >= 8),
     { exit: 0 },
 );
 
-// A rule that moves has to fail here. A document that keeps sending a builder to a gate that was
-// renamed is worse than one that says nothing, because the builder trusts it first.
+// A rule that moves has to fail here. A document that keeps sending a reader to a file that was
+// renamed is worse than one that says nothing, because the reader trusts it first.
 t.expect(
     "no reference points at a file that has moved or been deleted",
     check(missing.length ? `unresolved:\n  ${missing.join("\n  ")}` : "all resolve", !missing.length),
     { exit: 0, lacks: ["unresolved"] },
-);
-
-t.expect(
-    "the three gates that guard storybook-first are each named, not summarised",
-    check("gates", [
-        "scripts/gates/check-story-coverage.mjs",
-        "scripts/gates/check-doc-parity.mjs",
-        "scripts/gates/check-src-sb-import.mjs",
-        "scripts/runner/test-runner.ts",
-    ].every((g) => text.includes(g))),
-    { exit: 0 },
 );
 
 // ---- no machine is named -------------------------------------------------
@@ -111,33 +100,62 @@ t.expect(
 
 t.group("the founding invariant is still stated");
 
-// The whole build order — back end, then components in the design system, then the surfaces —
-// exists to keep this one sentence true under time pressure. Remove it and step 4b is just a
-// preference about where files go.
-const INVARIANT =
-    "No component reaches the app that was never a component and a story in the design-system folder first.";
+// Everything downstream rests on this sentence: the job sentence in step 2a, the shell choice,
+// the self-check, and the proposal's "job -> shell" column. Delete it and the procedure becomes
+// a list of steps with no reason under them.
+const INVARIANT = "A surface's shell follows the job it exists to do, not the data it happens to carry.";
 
 t.expect(
-    "storybook-first is stated in canon's own words, so the two cannot drift apart",
+    "the shell follows the job, not the data — stated in the words the rest of the skill leans on",
     check(flat.includes(INVARIANT) ? "present" : `missing: ${INVARIANT}`, flat.includes(INVARIANT)),
     { exit: 0, lacks: ["missing:"] },
 );
 
-// The quote above is only worth anything while canon still says it. If canon rewords the rule,
-// this fails and forces the skill to be re-read against it rather than quietly quoting history.
-const canon = readFileSync(join(REPO, "canon", "fe", "enforce", "tiers", "architecture.md"), "utf8").replace(/\s+/g, " ");
+t.expect(
+    "the boundary holds: this skill designs and stops, and names the skill that builds",
+    check("boundary", text.includes("starci-fe-layout-apply") && /does not build/i.test(text)),
+    { exit: 0 },
+);
+
+// ---- the composition audit's method is folded in, not a separate pass ---
+
+t.group("the volume-to-arrangement fold is stated");
+
+// This is what step 3 absorbed: a region count is derived from a real record count, never chosen
+// by eye, and the candidates are drawn rather than argued about in prose.
+const VOLUME_INVARIANT = "That count decides how many regions there are and which of them shrinks";
 
 t.expect(
-    "canon still states the invariant this skill quotes it from",
-    check(canon.includes(INVARIANT) ? "present" : "canon/fe/enforce/tiers/architecture.md no longer says it",
-        canon.includes(INVARIANT)),
-    { exit: 0, lacks: ["no longer"] },
+    "a region count is derived from the data layer, not chosen by eye — stated in these words",
+    check(flat.includes(VOLUME_INVARIANT) ? "present" : `missing: ${VOLUME_INVARIANT}`, flat.includes(VOLUME_INVARIANT)),
+    { exit: 0, lacks: ["missing:"] },
 );
 
 t.expect(
-    "the boundary holds: a design that turns out wrong goes back to the plan phase",
-    check("boundary", text.includes("starci-fe-layout-plan") && /does not redesign/i.test(text)),
+    "three or four candidate arrangements are drawn as widgets before one is picked",
+    check("widgets", /three or four workable arrangements/i.test(text) && /as widgets/.test(text)),
     { exit: 0 },
+);
+
+// ---- the block-matrix lookup is folded in here, not deferred to a separate lane ----
+
+t.group("which component a shape becomes is a lookup here, not a separate skill");
+
+t.expect(
+    "the component matrix and its search script are both named",
+    check("lookup", text.includes("matrix.csv") && text.includes("search-component-matrix.mjs")),
+    { exit: 0 },
+);
+
+// The two audit skills this document absorbed are meant to be deleted once the fold lands. A
+// reference surviving here would dangle the moment they are gone, which is exactly the silent
+// failure this whole set is built to catch.
+const danglingRefs = ["story-audit-composition", "story-audit-block"].filter((name) => text.includes(name));
+
+t.expect(
+    "no reference remains to the two audit skills this document absorbed",
+    check(danglingRefs.length ? `found: ${danglingRefs.join(", ")}` : "clean", danglingRefs.length === 0),
+    { exit: 0, lacks: ["found:"] },
 );
 
 t.finish();

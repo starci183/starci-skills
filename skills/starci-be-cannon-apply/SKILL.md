@@ -1,6 +1,6 @@
 ---
 name: starci-be-cannon-apply
-description: Builds backend code that already obeys the BE canon — a new module, resolver, service, entity, handler or queue consumer written to the house spelling from the first line, or the approved findings of an audit turned into a real diff in the real tree — and self-checks the result against the same rules before it reports done. Reach for it whenever backend source is about to be written or repaired: "add a module for X", "write the resolver for this query", "make this service follow our patterns", "fix the blocking findings from the audit", "viết module BE chuẩn cannon", "sửa theo báo cáo audit", "apply code pattern backend", "chuẩn hoá module này". Not for judging code that already exists — that report comes from starci-be-cannon-audit and is what supplies the approved list. Not for front-end work, where a component reaches the app only after it has been a component and a story in the design system first (starci-setup-workspace-fe). Not for deciding what to build, only how the lines are written.
+description: Builds backend code that already obeys the BE canon — a new module, resolver, service, entity, handler or queue consumer written to the house spelling from the first line, or the approved findings of an audit turned into a real diff in the real tree — and self-checks the result against the same rules before it reports done. Reach for it whenever backend source is about to be written or repaired: "add a module for X", "write the resolver for this query", "make this service follow our patterns", "fix the blocking findings from the audit", "viết module BE chuẩn cannon", "sửa theo báo cáo audit", "apply code pattern backend", "chuẩn hoá module này". Not for judging code that already exists — that report comes from starci-be-cannon-plan and is what supplies the approved list. Not for front-end work, where a component reaches the app only after it has been a component and a story in the design system first (starci-setup-workspace). Not for deciding what to build, only how the lines are written.
 ---
 
 # Writing backend code that is already on canon
@@ -25,7 +25,7 @@ node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A non-zero exit means this machine has never stated where its backend is, and it prints the
-command that fixes that; `skills/starci-setup-workspace-be` is the registration lane. Every path
+command that fixes that; `skills/starci-setup-workspace` is the registration lane. Every path
 below is relative to that answer. Writing into a remembered path is how a fix lands in a stale
 worktree and passes every check in a tree nobody ships.
 
@@ -73,7 +73,7 @@ that happened to need it first.
 
 Run the audit's own checklist over your own change before reporting done — same shelves, same
 severities, and treat a blocking finding of your own making as unfinished work rather than as a
-note. `skills/starci-be-cannon-audit` describes what counts as a finding and how it is anchored.
+note. `skills/starci-be-cannon-plan` describes what counts as a finding and how it is anchored.
 
 The questions that catch the most: is there a layer violation; does any error path throw something
 that is not a canon exception; did an inline object type slip into a generic; is any new `any`
@@ -128,5 +128,13 @@ summary — it spends the reviewer's trust on nothing.
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-be-cannon-apply/test.mjs` |
 
-The grading lane is `skills/starci-be-cannon-audit`. They read the same canon; only this one
+The grading lane is `skills/starci-be-cannon-plan`. They read the same canon; only this one
 writes.
+
+## When it is corrected
+
+This is the [`post/record-correction.md`](../hooks/post/record-correction.md) hook. When the person
+corrects what this skill just applied — rejects it, says "not like that", restates a rule it missed —
+record it before you finish: one file under `corrections/pending/`, in the shape that hook and
+[`corrections/README.md`](../corrections.md) set out. Do not fix it silently; the miss returns next
+session unless it is written down.

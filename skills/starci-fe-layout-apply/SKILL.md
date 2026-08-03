@@ -1,6 +1,6 @@
 ---
 name: starci-fe-layout-apply
-description: Builds an approved layout proposal into real code — the whole surface set at once: every component the proposal needs is authored first as a component and a story in the design-system folder, at its tier, and only then composed into the route's page, the layout shell and each modal and drawer, with routing, data wiring and, when the feature genuinely needs it, the back-end fields and resolvers behind it; it then verifies the result against the type checker, the source gates and the rendered-tree runner, walks the proposal's own verify plan in the running app, and closes the proposal out in the queue. Reach for it when a design has already been settled and the work is to land it: "apply the proposal", "build the enrolment flow we agreed", "dựng layout đã chốt", "build what's queued for the checkout page", "làm tiếp cái proposal hôm qua", "ship the design from the prototype", "sửa layout theo proposal". It builds only what a proposal says — designing or redesigning a flow is starci-fe-layout-brainstorm, and changing one block or one component's internals on a surface that already exists is starci-fe-review.
+description: Builds an approved layout proposal into real code — the whole surface set at once: every component the proposal needs is authored first as a component and a story in the design-system folder, at its tier, and only then composed into the route's page, the layout shell and each modal and drawer, with routing, data wiring and, when the feature genuinely needs it, the back-end fields and resolvers behind it; it then verifies the result against the type checker, the source gates and the rendered-tree runner, walks the proposal's own verify plan in the running app, and closes the proposal out in the queue. Reach for it when a design has already been settled and the work is to land it: "apply the proposal", "build the enrolment flow we agreed", "dựng layout đã chốt", "build what's queued for the checkout page", "làm tiếp cái proposal hôm qua", "ship the design from the prototype", "sửa layout theo proposal". It builds only what a proposal says — designing or redesigning a flow is starci-fe-layout-plan, and changing one block or one component's internals on a surface that already exists is starci-fe-review.
 ---
 
 # Building an approved surface set
@@ -24,11 +24,10 @@ invisible until somebody walks the flow.
 
 ## House manner
 
-This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
-instead of describing them, render a large layout as a clickable prototype served on `:8080`
-before any code is written, and offer three or four real choices rather than one finished answer
-to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
-reasoning behind each.
+This skill follows the house manner recorded in `skills/hooks/README.md`: an apply skill presents
+nothing and draws nothing — it lands a decided change, and records the correction when the change it
+made was not the change that was wanted. That manner is not restated here — read
+`skills/hooks/README.md` for the rule and the reasoning behind it.
 
 This skill also honours `canon/fe/business-parity.md`: the back end owns each business rule, so it reads the value from the API and obeys the rule exactly, never inventing one beside it — where the server is silent or ambiguous it surfaces the gap rather than guessing.
 
@@ -41,8 +40,8 @@ node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 Ask every time rather than remembering an answer from earlier in the session. A missing context
-exits non-zero and prints the command that fixes it; `starci-setup-workspace-fe` and
-`starci-setup-workspace-be` register the sources.
+exits non-zero and prints the command that fixes it; `starci-setup-workspace` and
+`starci-setup-workspace` register the sources.
 
 ## 1. Take one proposal off the queue
 
@@ -153,7 +152,7 @@ the reason survives; a shortcut with no note is read as the house pattern by the
 ## What this skill does not do
 
 It does not redesign. A proposal that turns out to be wrong mid-build is a signal to stop and go
-back to `starci-fe-layout-brainstorm`, not to quietly choose a different shell — the value of
+back to `starci-fe-layout-plan`, not to quietly choose a different shell — the value of
 separating the phases is entirely that the design was settled while it was still cheap to change,
 and a design changed during a build is invisible because it looks like progress.
 
@@ -166,6 +165,14 @@ primitive. Dead code that the change genuinely orphans can go, once nothing impo
 |---|---|
 | `<fe.path>/.claude/fe/proposals/BACKLOG.md` | the queue this reads from and writes back to |
 | `<fe.path>/.claude/fe/proposals/<feature>.proposal.md` | the spec being built |
-| `skills/starci-fe-layout-brainstorm/SKILL.md` | the phase that produced it |
+| `skills/starci-fe-layout-plan/SKILL.md` | the phase that produced it |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-layout-apply/test.mjs` |
+
+## When it is corrected
+
+This is the [`post/record-correction.md`](../hooks/post/record-correction.md) hook. When the person
+corrects what this skill just applied — rejects it, says "not like that", restates a rule it missed —
+record it before you finish: one file under `corrections/pending/`, in the shape that hook and
+[`corrections/README.md`](../corrections.md) set out. Do not fix it silently; the miss returns next
+session unless it is written down.

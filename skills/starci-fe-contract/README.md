@@ -50,7 +50,7 @@ clean report, which is why the roots are resolved before anything else runs.
 ## What it refuses
 
 It does not fix anything. A confirmed finding is handed to the apply skill that owns the surface —
-`skills/starci-fe-skeleton-apply` for a pending state, the layout and block skills for structure —
+the layout or review apply lane, which owns both the structure and the pending state (per `canon/fe/enforce/authoring/loading-and-skeleton.md`) —
 and anything left unfixed is recorded through `skills/starci-record-debt` rather than remembered.
 
 It also has no opinion about whether a component is the right component for the data. That is a

@@ -1,6 +1,6 @@
 ---
 name: starci-fe-sync
-description: Mirrors a component out of the design-system folder — where it was authored, storied and gated — into the app's own `src` tree as a twin, and writes the connected half on the app side: the wrapper that holds the request, the store slice and the translation, and renders the presentational file through `@/components/*` rather than `@sb-components/*`. Reach for it when a design-system component has to start doing real work in the app, when the app is reaching into the design system to get one, or when a component changed shape upstream and the app copy stayed behind: "wire this card to real data", "bring the storybook block into the app", "connect this block to SWR", "the twin is missing", "why is src importing @sb-components", "dựng trang X", "sửa layout", "component này có story rồi mà app chưa dùng", "tạo twin cho block này". Not for authoring the component or its story in the first place — that happens in the design system, before anything is synced — and not for deciding which component a shape of data becomes, which is the lookup in `canon/fe/explore/component/`. Registering the two roots is `starci-setup-workspace-fe`.
+description: Mirrors a component out of the design-system folder — where it was authored, storied and gated — into the app's own `src` tree as a twin, and writes the connected half on the app side: the wrapper that holds the request, the store slice and the translation, and renders the presentational file through `@/components/*` rather than `@sb-components/*`. Reach for it when a design-system component has to start doing real work in the app, when the app is reaching into the design system to get one, or when a component changed shape upstream and the app copy stayed behind: "wire this card to real data", "bring the storybook block into the app", "connect this block to SWR", "the twin is missing", "why is src importing @sb-components", "dựng trang X", "sửa layout", "component này có story rồi mà app chưa dùng", "tạo twin cho block này". Not for authoring the component or its story in the first place — that happens in the design system, before anything is synced — and not for deciding which component a shape of data becomes, which is the lookup in `canon/fe/explore/component/`. Registering the two roots is `starci-setup-workspace`.
 ---
 
 # Syncing a design-system component into the app
@@ -18,11 +18,10 @@ in a story.
 
 ## House manner
 
-This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
-instead of describing them, render a large layout as a clickable prototype served on `:8080`
-before any code is written, and offer three or four real choices rather than one finished answer
-to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
-reasoning behind each.
+This skill follows the house manner recorded in `skills/hooks/README.md`: an apply skill presents
+nothing and draws nothing — it lands a decided change, and records the correction when the change it
+made was not the change that was wanted. That manner is not restated here — read
+`skills/hooks/README.md` for the rule and the reasoning behind it.
 
 ## The two roots
 

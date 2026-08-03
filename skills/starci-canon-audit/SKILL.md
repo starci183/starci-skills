@@ -82,7 +82,7 @@ goes first and its output becomes the spine of the report; the reading pass then
 machines could not decide rather than rediscovering what they already found.
 
 1a. Resolve `fe.path`, `fe.design_system` and `be.path` as above. If either role is unregistered,
-stop and say so — `starci-setup-workspace-fe` and `starci-setup-workspace-be` fix it in one
+stop and say so — `starci-setup-workspace` and `starci-setup-workspace` fix it in one
 command. A partial audit presented as a whole one is worse than no audit.
 
 1b. `node .claude/scripts/verify.mjs` — anchors and counts, per role. A missing anchor is a

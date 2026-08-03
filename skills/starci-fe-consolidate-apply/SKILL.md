@@ -1,6 +1,6 @@
 ---
 name: starci-fe-consolidate-apply
-description: Consolidates one batch of duplicated components into a single canonical component and rewires the call sites, working from a proposal written by starci-fe-consolidate-scan — it reuses or extracts the target as a component and a story in the design system first, replaces every call site the cluster names, deletes the code that was duplicated, verifies with the type checker, the source gates under `scripts/gates/` and the rendered-tree runner, then records what landed. Use it when the finding already exists and the work is to land it: "apply the consolidation", "do the first batch in the proposal", "merge these three cards into one component", "gom component đã chốt", "chốt gom theo proposal", "replace the copies with the block we extracted". Use it also when a scan and an apply happen in different sessions, because the proposal is the whole handover. Not for finding duplication or for changing what a proposal says — that is starci-fe-consolidate-scan, and a consolidation you would rather do differently goes back there first. Not for authoring a component nobody has asked for yet.
+description: Consolidates one batch of duplicated components into a single canonical component and rewires the call sites, working from a proposal written by starci-fe-consolidate-plan — it reuses or extracts the target as a component and a story in the design system first, replaces every call site the cluster names, deletes the code that was duplicated, verifies with the type checker, the source gates under `scripts/gates/` and the rendered-tree runner, then records what landed. Use it when the finding already exists and the work is to land it: "apply the consolidation", "do the first batch in the proposal", "merge these three cards into one component", "gom component đã chốt", "chốt gom theo proposal", "replace the copies with the block we extracted". Use it also when a scan and an apply happen in different sessions, because the proposal is the whole handover. Not for finding duplication or for changing what a proposal says — that is starci-fe-consolidate-plan, and a consolidation you would rather do differently goes back there first. Not for authoring a component nobody has asked for yet.
 ---
 
 # Consolidating duplicates
@@ -19,11 +19,10 @@ been deleted.
 
 ## House manner
 
-This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
-instead of describing them, render a large layout as a clickable prototype served on `:8080`
-before any code is written, and offer three or four real choices rather than one finished answer
-to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
-reasoning behind each.
+This skill follows the house manner recorded in `skills/hooks/README.md`: an apply skill presents
+nothing and draws nothing — it lands a decided change, and records the correction when the change it
+made was not the change that was wanted. That manner is not restated here — read
+`skills/hooks/README.md` for the rule and the reasoning behind it.
 
 ## Where the code is
 
@@ -160,7 +159,7 @@ it, because the proposal did not ask for it.
 
 Follow the cluster's specification. A consolidation you would rather do differently — a different
 target, a different tier, a fourth copy nobody had counted — goes back to
-`.claude/skills/starci-fe-consolidate-scan/SKILL.md`, which is cheap, rather than being decided
+`.claude/skills/starci-fe-consolidate-plan/SKILL.md`, which is cheap, rather than being decided
 silently inside a diff that claims to be applying an approved plan.
 
 ## Common mistakes
@@ -184,6 +183,14 @@ silently inside a diff that claims to be applying an approved plan.
 |---|---|
 | `.claude/scripts/workspace/read-workspace-context.mjs` | resolves both trees, per machine |
 | `<fe.artifacts>/consolidate/<scope>.md` | the proposal being applied, and where the result is recorded |
-| `.claude/skills/starci-fe-consolidate-scan/SKILL.md` | the half that finds and proposes |
+| `.claude/skills/starci-fe-consolidate-plan/SKILL.md` | the half that finds and proposes |
 | `README.md` | why this is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-consolidate-apply/test.mjs` |
+
+## When it is corrected
+
+This is the [`post/record-correction.md`](../hooks/post/record-correction.md) hook. When the person
+corrects what this skill just applied — rejects it, says "not like that", restates a rule it missed —
+record it before you finish: one file under `corrections/pending/`, in the shape that hook and
+[`corrections/README.md`](../corrections.md) set out. Do not fix it silently; the miss returns next
+session unless it is written down.

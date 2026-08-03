@@ -33,7 +33,7 @@ That distinction is the tool's entire filter, and it is worth being blunt about.
 
 ## Why roles instead of paths
 
-The same reasoning as `starci-setup-workspace-fe`, and the same failure it avoids: a path written
+The same reasoning as `starci-setup-workspace`, and the same failure it avoids: a path written
 into a file is true on one machine. Debt entries outlive the machine that wrote them more often
 than most notes do — they are read months later, frequently on a different checkout.
 

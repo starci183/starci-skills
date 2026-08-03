@@ -1,6 +1,6 @@
 ---
 name: starci-fe-review-apply
-description: Turns approved review findings into real changes in the front-end app, across all four axes — a missing or unnatural translation, a control the keyboard cannot see, a colour pair that fails contrast, a region that breaks at a width, mechanism copy rewritten as an outcome, a second primary demoted, a plain-text entity mention wired to a real reference link, a deep link given the intent the surface already knows, an invented fallback number deleted — and is also the lane for a small, single-piece adjustment to a surface that is already built, each change verified in the story before the app and left with its ledger updated and its leftovers recorded. Reach for it when the decision is already made and the change is bounded: "apply the review findings", "sửa layout", "chỉnh lại chỗ này một chút", "áp các finding đã duyệt", "fix the contrast on that chip", "add the missing aria-label", "this label wraps in Vietnamese, shorten it", "nudge the spacing on that card", "make the empty state say something useful", "apply the CTA proposal", "fix the dead-end empty states from the audit", "chốt sửa CTA/link", "sửa phễu đã chốt". Not for deciding what is wrong — that is starci-fe-review-scan, and a finding that is not in the proposal goes back there rather than being fixed on the way past. Not for building a new component, a new state or a new shell either: that work starts in the design system as a component and a story, and belongs to the build lane that owns the surface.
+description: Applies a decided, bounded front-end change to whatever surface, component or region it targets — approved review findings across all four axes (a missing or unnatural translation, a control the keyboard cannot see, a colour pair that fails contrast, a region that breaks at a width, mechanism copy rewritten as an outcome, a second primary demoted, a plain-text entity mention wired to a real reference link, a deep link given the intent the surface already knows, an invented fallback number deleted); a small single-piece adjustment to a surface that is already built; and building or repairing an existing surface's loading, empty and error states — a skeleton drawn or redrawn to mirror the loaded shape, an empty state given something useful to say, an error state given a retry, all routed through `AsyncContent` behind the one `isSkeleton` prop the connected file computes once, the how held in `canon/fe/enforce/authoring/loading-and-skeleton.md` and `canon/fe/enforce/authoring/async-data.md`. Each change is verified in the story before the app and left with its ledger updated and its leftovers recorded. Reach for it when the decision is already made and the change is bounded: "apply the review findings", "áp các finding đã duyệt", "sửa layout", "chỉnh lại chỗ này", "fix contrast/aria-label", "this label wraps in Vietnamese, shorten it", "nudge the spacing on that card", "make the empty state say something useful", "làm skeleton cho trang X", "sửa loading state", "thêm empty/error state cho list này", "the page jumps when it loads", "skeleton flashes on refetch", "fix the dead-end empty states from the audit". Not for deciding what is wrong — that is starci-fe-review-plan, and a finding that is not in the proposal goes back there rather than being fixed on the way past. Not for designing or building a whole new flow, surface or shell — that is starci-fe-layout-apply.
 ---
 
 # Front-end review, applied
@@ -13,18 +13,21 @@ It carries a second lane deliberately. A small adjustment to a surface that is a
 that, shorten this label, the ring is invisible on the dark surface — arrives constantly and has no
 natural home, and every place it gets absorbed does damage: a build skill that also takes
 adjustments slowly becomes a general-purpose editor, and an adjustment made with no lane at all is
-made with no verification. Both lanes are the same shape of work, so they share one procedure:
+made with no verification. The same lane carries a close cousin: an existing region given the
+loading, empty or error state it never had, or one that already exists and jumps, flashes or dead-ends
+— bounded to a surface that is already built, using the primitives that already exist for it
+(`AsyncContent`, `Skeleton.<Component>`), never a new shell or a new surface. Both lanes, and this
+cousin, are the same shape of work, so they share one procedure:
 **the unit of work is one named piece, with one stated reason, verified where it was built.** The
 only thing that differs is where the reason comes from — a proposal, or the sentence the person just
 said. Either way it is written down before the edit, not after.
 
 ## House manner
 
-This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
-instead of describing them, render a large layout as a clickable prototype served on `:8080`
-before any code is written, and offer three or four real choices rather than one finished answer
-to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
-reasoning behind each.
+This skill follows the house manner recorded in `skills/hooks/README.md`: an apply skill presents
+nothing and draws nothing — it lands a decided change, and records the correction when the change it
+made was not the change that was wanted. That manner is not restated here — read
+`skills/hooks/README.md` for the rule and the reasoning behind it.
 
 This skill also honours `canon/fe/business-parity.md`: the back end owns each business rule, so it reads the value from the API and obeys the rule exactly, never inventing one beside it — where the server is silent or ambiguous it surfaces the gap rather than guessing.
 
@@ -38,13 +41,13 @@ node .claude/scripts/workspace/read-workspace-context.mjs be.path
 ```
 
 A missing context exits non-zero and prints the command that fixes it. Honour the exit code — see
-`skills/starci-setup-workspace-fe`. `be.path` is what settles a conversion finding that turns out to
+`skills/starci-setup-workspace`. `be.path` is what settles a conversion finding that turns out to
 be wrong: re-checking whether the relationship the scan assumed in the data actually exists needs the
 real entities, not the proposal's word for it.
 
 ## The two ways in
 
-**From a proposal.** Read the ledger and the batch written by `skills/starci-fe-review-scan`, take
+**From a proposal.** Read the ledger and the batch written by `skills/starci-fe-review-plan`, take
 the findings that were approved, and take nothing else. A finding you would rather fix differently
 goes back to the scan and comes out as a changed finding; rewriting it here leaves the ledger
 describing a change that never happened.
@@ -58,7 +61,7 @@ Both lanes converge on the loop below.
 
 ## The three routes
 
-Every finding, on any of the four axes, resolves to one of three routes. Confirm the route still
+Every finding — on any of the four review axes, or on async state — resolves to one of three routes. Confirm the route still
 holds against the source in front of you — the classification the scan made can go stale exactly
 like the finding it attaches to — then follow it.
 
@@ -67,8 +70,11 @@ label added, a focus ring restored, a colour pair swapped for the paired token, 
 named as a prop, mechanism copy rewritten as an outcome, a second primary demoted, a plain-text
 entity mention wired to the app's real reference link with an honest fallback when it cannot resolve,
 a deep link pointed at the module the surface already identified rather than at a generic page, a
-fabricated fallback number removed so the component shows nothing rather than something untrue. These
-are edits inside one component, and two rules decide where inside it:
+fabricated fallback number removed so the component shows nothing rather than something untrue, a
+region given the loading, empty and error state it never had, a skeleton rebuilt so it mirrors the
+loaded shape instead of jumping, a bare `isLoading` corrected to the first-load formula so a
+background revalidation stops flashing the skeleton over content the reader is reading. These
+are edits inside one component, and three rules decide where inside it:
 
 - **`className` stops at the vocabulary.** An atom, a frame and a composite take a class from their
   caller; a block does not, and a page composes none — `canon/fe/enforce/tiers/architecture.md`. An
@@ -80,6 +86,14 @@ are edits inside one component, and two rules decide where inside it:
   A copy fix, a rewritten call to action included, lands in the catalogs and, where the key itself is
   wrong, in the connected file — never as a literal in a presentational component, however small the
   word is.
+- **Async state is one boundary, not a set of local branches.** Every region rendered from data
+  goes through `AsyncContent`, holding the fixed order error, loading, empty, content in one place
+  rather than a hand-rolled `if (error) … if (isLoading) …` re-invented inside a feature —
+  `canon/fe/enforce/authoring/loading-and-skeleton.md`. The connected file computes the loading
+  condition once and hands it down as a single `isSkeleton`, per
+  `canon/fe/enforce/authoring/async-data.md`; the skeleton mirrors the real layout tree node for
+  node so nothing shrinks or jumps on resolve, and `emptyContent`/`errorContent` are configured by
+  props, never hand-rolled JSX.
 
 Spell every fix the way the rest of the tree is spelled — `canon/fe/enforce/authoring/INDEX.md`
 decides that, and nothing about being a review fix exempts a line from it. Do not hand-roll a new
@@ -91,7 +105,7 @@ not exist anywhere in the flow, a primary action sitting in the wrong zone rathe
 wrong rank, a resume that lands outside the scope of its own surface, a region that would need
 reordering for the responsive collapse to make sense. Do not force these in from here. Mark the
 finding as routed, leave it open in the ledger, and take it up through
-`skills/starci-fe-layout-brainstorm` and the apply half that follows it — or, if there is appetite to
+`skills/starci-fe-layout-plan` and the apply half that follows it — or, if there is appetite to
 widen the session, say so and open that lane deliberately.
 
 **3. Built in the design system first.**
@@ -149,6 +163,14 @@ needed here" is the exact shape that gate exists to stop.
      rather than replaced with a different invented one
      (`canon/fe/explore/principles/grounded-in-data.md`,
      `canon/fe/explore/principles/persuasion-psychology.md`).
+   - *Async state* — the region goes through `AsyncContent` with the fixed order error, loading,
+     empty, content; `isLoading` reads as the first-load formula (`isLoading && !data`, or
+     `!swr.data && !swr.error` when settled means data or error) so a background revalidation never
+     flashes the skeleton over content already on screen; the skeleton matches each real node to its
+     `Skeleton.<Component>` counterpart, or gets its own co-located `<X>Skeleton` folder when the
+     tree is large; `emptyContent` and `errorContent` are configured by props, never hand-rolled
+     JSX. All of this is `canon/fe/enforce/authoring/loading-and-skeleton.md` and
+     `canon/fe/enforce/authoring/async-data.md`.
 
 5. **Prove it, on the axis you touched.** Type-check and lint, then run the contract: the source
    gates in `scripts/gates/` and the rendered-tree runner `scripts/runner/test-runner.ts`,
@@ -157,7 +179,9 @@ needed here" is the exact shape that gate exists to stop.
    its contrast measured; a width fix is resized through the four steps with real strings in both
    languages, not fixture text; a conversion fix is clicked through in every state the finding
    named — the primary fires where the proposal said, the secondary reads as subordinate, the link
-   and the deep link arrive where they claimed, the empty state offers a way out. A fix nobody
+   and the deep link arrive where they claimed, the empty state offers a way out; an async-state fix
+   is watched through first load, an empty result and a forced error, and through a background
+   revalidation to confirm the skeleton no longer flashes over content already on screen. A fix nobody
    watched work is a fix nobody knows works.
 
 6. **Close the finding where it was written.** Mark it in the ledger the scan produced, so a
@@ -186,18 +210,24 @@ indistinguishable, next month, from code nobody ever looked at.
 It will not invent a finding on the way past. "While I was in there" is how a two-line fix becomes
 an unreviewable diff, and how a change nobody asked for arrives with no reason attached to it. It
 will not force a funnel through two surfaces that have no real relationship in the data — that is a
-dropped finding, not a fix. It will not restructure a shell, will not author a component or a state,
-and will not reach for a class on a block to avoid dropping a tier. It will not silently widen an
-approved fix: a finding that turns out to be bigger than the proposal said goes back to
-`skills/starci-fe-review-scan` and comes back as a finding that matches the work.
+dropped finding, not a fix. It will not restructure a shell, will not author a component that has
+never existed anywhere in the design system, and will not reach for a class on a block to avoid
+dropping a tier. Giving an existing region the loading, empty or error state it never had is exactly
+this lane's work when the pieces it needs — `AsyncContent`, `Skeleton.<Component>` — already exist;
+the moment the skeleton needs a piece with no counterpart anywhere in the design system, that piece
+is Route 3, not this one. It will not silently widen an approved fix: a finding that turns out to be
+bigger than the proposal said goes back to `skills/starci-fe-review-plan` and comes back as a finding
+that matches the work.
 
 ## Files
 
 | Path | Holds |
 |---|---|
-| `skills/starci-fe-review-scan` | the half that decides, and writes the ledger this one reads |
+| `skills/starci-fe-review-plan` | the half that decides, and writes the ledger this one reads |
 | `canon/fe/enforce/tiers/architecture.md` | Storybook first, the tiers, and where `className` stops |
 | `canon/fe/enforce/authoring/i18n.md` | how a copy fix is spelled, and where it lands |
+| `canon/fe/enforce/authoring/loading-and-skeleton.md` | how a skeleton is built or repaired to mirror the loaded shape, and how empty/error are configured |
+| `canon/fe/enforce/authoring/async-data.md` | the `isLoading`/`isEmpty` formula behind the single `isSkeleton` prop |
 | `canon/fe/enforce/authoring/styling-tailwind.md` | the paired colour tokens a contrast fix uses |
 | `canon/fe/explore/principles/accessibility.md` | the accessibility baseline a fix is checked against |
 | `canon/fe/enforce/spacing/overview.md` | the named seams, insets and container widths |
@@ -210,8 +240,16 @@ approved fix: a finding that turns out to be bigger than the proposal said goes 
 | `canon/fe/enforce/authoring/storybook-stories.md` | how the change is demonstrated before it ships |
 | `scripts/gates/` | the source gates, run before this is called done |
 | `scripts/runner/test-runner.ts` | the rendered-tree runner, including the width sweep |
-| `skills/starci-fe-layout-brainstorm` | where a shell- or funnel-level finding is routed |
+| `skills/starci-fe-layout-plan` | where a shell- or funnel-level finding is routed |
 | `skills/starci-fe-sync` | how an authored component becomes a working twin in the app |
 | `skills/starci-record-debt` | where a deliberate deferral goes |
 | `README.md` | why this skill is shaped the way it is |
 | `test.mjs` | run after any change: `node .claude/skills/starci-fe-review-apply/test.mjs` |
+
+## When it is corrected
+
+This is the [`post/record-correction.md`](../hooks/post/record-correction.md) hook. When the person
+corrects what this skill just applied — rejects it, says "not like that", restates a rule it missed —
+record it before you finish: one file under `corrections/pending/`, in the shape that hook and
+[`corrections/README.md`](../../corrections/README.md) set out. Do not fix it silently; the miss returns
+next session unless it is written down.

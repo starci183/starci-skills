@@ -1,6 +1,6 @@
 ---
 name: starci-fe-contract
-description: Runs the front end's DOM contract — the rendered-tree runner that measures computed style after every story, plus the source-reading gates — against the app the workspace context names, and reads the result back as a diagnosis rather than a list of failures. Reach for it whenever a change needs proving or a red run needs explaining: "run the contract", "chạy gate frontend", "kiểm tra lại storybook trước khi merge", "why is this story failing the audit", "check-seams says my gap is off-scale but it looks fine", "unregistered token", "the responsive sweep found a breakpoint I did not write", "is this branch clean". Also worth running before touching an unfamiliar component, so the drift you are about to inherit is visible first. Not for writing or repairing the component — a confirmed finding is handed to the apply skill that owns that surface; not for registering where the front end lives (use starci-setup-workspace-fe); and not for judging whether a component is the right component at all, which is a design question the runner has no opinion about.
+description: Runs the front end's DOM contract — the rendered-tree runner that measures computed style after every story, plus the source-reading gates — against the app the workspace context names, and reads the result back as a diagnosis rather than a list of failures. Reach for it whenever a change needs proving or a red run needs explaining: "run the contract", "chạy gate frontend", "kiểm tra lại storybook trước khi merge", "why is this story failing the audit", "check-seams says my gap is off-scale but it looks fine", "unregistered token", "the responsive sweep found a breakpoint I did not write", "is this branch clean". Also worth running before touching an unfamiliar component, so the drift you are about to inherit is visible first. Not for writing or repairing the component — a confirmed finding is handed to the apply skill that owns that surface; not for registering where the front end lives (use starci-setup-workspace); and not for judging whether a component is the right component at all, which is a design question the runner has no opinion about.
 ---
 
 # The DOM contract
@@ -21,11 +21,10 @@ measurement that disagree, and the interesting question is which of the two is w
 
 ## House manner
 
-This skill follows the house manner recorded in `skills/prompt.md`: draw options as widgets
-instead of describing them, render a large layout as a clickable prototype served on `:8080`
-before any code is written, and offer three or four real choices rather than one finished answer
-to approve. That manner is not restated here — read `skills/prompt.md` for the three rules and the
-reasoning behind each.
+This skill follows the house manner recorded in `skills/hooks/README.md`: it presents nothing and
+draws nothing — it measures a rendered tree and reports what it found, and records the correction when
+the result was not what was wanted. That manner is not restated here — read `skills/hooks/README.md`
+for the rule and the reasoning behind it.
 
 ## 1. Resolve the roots
 
@@ -37,7 +36,7 @@ node .claude/scripts/workspace/read-workspace-context.mjs fe.storybook_url
 
 A missing context exits non-zero and prints the command that fixes it. Honour that exit code:
 continuing with an empty string builds a path that fails somewhere far from the cause. Registering a
-source is `skills/starci-setup-workspace-fe`.
+source is `skills/starci-setup-workspace`.
 
 Everything below runs with the front-end root as the working directory. The gates read
 `process.cwd()` and walk the design-system and application component trees from there, so a gate run
@@ -124,7 +123,7 @@ prop the story passed, and the runner holds only the DOM half.
 A clean run means no audit observed a violation. It does not mean the component is right. Nothing
 here judges whether the component is the correct component for the data, whether the copy is
 sensible, or whether the pending state mirrors the loaded one in any way an audit can measure — that
-last one is `skills/starci-fe-skeleton-apply`.
+last one belongs to the surface's own apply lane, built per `canon/fe/enforce/authoring/loading-and-skeleton.md`.
 
 The runner also asserts nothing about a frame's slot contents, on purpose, because a rendered tree
 cannot distinguish content a frame imported from content a caller handed it. Reading that silence as
