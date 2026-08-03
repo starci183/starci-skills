@@ -95,4 +95,7 @@ deficiency.
 
 ## Related
 
+Where the token VALUES and the light/dark theme are configured — one file, `globals.css`, and never a
+component — is `canon/fe/enforce/authoring/styling-tailwind.md` §1.
+
 [[accent-system]] · [[button]] · [[chip]].

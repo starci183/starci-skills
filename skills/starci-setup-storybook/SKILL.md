@@ -12,6 +12,10 @@ and the day one app's tokens stop matching another's, nothing announces it. An a
 own components adds them **under its own namespace inside the one book**, never in a book of its own.
 `check-single-source-of-truth.mjs` fails while a second book exists.
 
+A dev-only *kitchen-sink* route inside an app is NOT a second book and does not trip that rule: it
+renders the raw vendor primitives to check the theme in the running app, never the app's own
+components — see [`canon/fe/explore/patterns/kitchen-sink-theme-check-not-component-source.md`](../../canon/fe/explore/patterns/kitchen-sink-theme-check-not-component-source.md).
+
 Recording the choice once, at the ledger level rather than per project, is what holds that line.
 Sometimes there is nothing yet to point at — a fresh machine, a fresh clone, nobody's fetched one
 here before. That is not a different problem, just the other branch of the same one: fetch StarCi's

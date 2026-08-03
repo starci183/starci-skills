@@ -12,6 +12,12 @@ Colour is a CSS-variable token declared in `src/app/globals.css` — `--accent`,
 `-soft` / `-soft-foreground` family — consumed through Tailwind utilities: `text-muted` (399
 occurrences), `bg-default` (121), `text-foreground` (179), `bg-accent-soft`.
 
+The token VALUES — and the light/dark theme that swaps them — live in `globals.css` and only there.
+Re-theming a product (a new brand hue, a different accent, the dark palette) edits `globals.css`
+alone; a component is never edited to change a colour, it consumes the token. An atom that hardcodes
+or overrides a colour to force a theme change is a token bug spelled in the wrong file — the fix moves
+the value to `globals.css` and the component back to the token ([[flat-render-is-a-token-bug-not-a-redesign]]).
+
 Raw hex or rgb in a class or style is not allowed in an ordinary component. Hex is legitimate in
 exactly three places, where THREE.js, WebGL, or an `<svg fill>` cannot read a CSS variable:
 `blocks/marketing/ArchitectureScene`, `svg/LogoMark`, and
