@@ -66,6 +66,7 @@ is drawn means rewriting the blueprint.
 | which component a shape of data becomes | the lookup in `canon/fe/explore/component/`, queried through `scripts/search/search-component-matrix.mjs` rather than opened whole, and the "Which component a data shape becomes" section of `canon/fe/enforce/tiers/architecture.md` |
 | what a seam or an inset means, and the four container widths a shape may change at | `canon/fe/enforce/spacing/overview.md`, with `canon/fe/explore/registry.mjs` as the authority on the values |
 | how an async surface is written, and what its loading state owes the reader | `canon/fe/enforce/authoring/async-data.md`, `canon/fe/enforce/authoring/loading-and-skeleton.md` |
+| how a landing or marketing surface is generated — letting a design-intelligence database brief the plan while the real-data marketing rules and the build gates stay in force | `canon/fe/explore/patterns/landing-generation-with-design-intelligence.md`, with the query commands and the pattern→shell mapping in its `references/pro-max-bridge.md` |
 | how a modal, drawer or toast behaves as code | `canon/fe/enforce/authoring/overlay-and-feedback.md` |
 | what already exists to compose with | the design-system folder at `fe.design_system`, read directly |
 
