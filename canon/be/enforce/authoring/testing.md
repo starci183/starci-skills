@@ -98,6 +98,14 @@ e2e that cannot even boot (a provider missing from the test module, so `Test.cre
 never compiles) counts as absent, however green its assertions would have been: the lane is measured
 by what runs, not by what was written.
 
+**The lane runs SEQUENTIALLY — `--runInBand`, `maxWorkers: 1` — and that is not a tuning knob.**
+Each jest worker's `globalSetup` boots its own Testcontainers Postgres; run the specs in parallel and
+N workers spin up N containers at once, which exhausts the host and takes the machine down (a boot
+that then fails its 120s health check under the load, not a real test failure). So `test:e2e:docker`
+is `--runInBand` by design, and a fan-out that WRITES e2e specs must never also RUN them — ten agents
+each booting a container is the same crash. The specs are written and type-checked in parallel; they
+are validated in one sequential run afterwards.
+
 (`npm run test:e2e` — `jest-e2e.json` / `setup-e2e.ts` — is the same idea wired the older way, its
 own inline container boot rather than the shared `E2eStackService`. `test:e2e:docker` is the current
 lane, built around the stack instance the harness lane below also shares.)
