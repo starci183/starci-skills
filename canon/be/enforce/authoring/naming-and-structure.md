@@ -88,6 +88,16 @@ export type { OrderSummary, OrderStatus } from "./types"
 // pricing.service.ts is deliberately absent: it is how ordering computes, not what it offers.
 ```
 
+The barrel re-exports the module class, its service(s) and the types the surface promises — and it
+never `export *`s the `.module-definition.ts`. `ConfigurableModuleBuilder` generates
+`ConfigurableModuleClass`, `MODULE_OPTIONS_TOKEN` and `OPTIONS_TYPE` under those exact generic names in
+*every* module, so a barrel that blanket-exports two of them re-exports the same three names twice and
+the compiler refuses it — `TS2308`, "already exported a member". Those tokens are wired inside the
+module; no importer binds against them, so they stay internal. This is live drift, not a hypothetical:
+`src/modules/ai/index.ts` and `src/modules/bussiness/index.ts` each carry exactly this collision
+(2026-08-04). Gated — a `.module-definition` reached by an `export *`, or any `TS2308` on a module's
+`index.ts`, is a folder-shape check away.
+
 ```ts
 // Wrong: reaching past the entry into another capability's internals.
 import { PricingService } from "@modules/ordering/pricing.service"
