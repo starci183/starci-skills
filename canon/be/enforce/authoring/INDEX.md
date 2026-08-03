@@ -1,10 +1,10 @@
 # `authoring/` — how a line of back-end code is spelled
 
-Eight files. Seven are about the text of the code rather than the design behind it: where a thing
+Nine files. Eight are about the text of the code rather than the design behind it: where a thing
 lives and what it is called, how a failure is represented on its way out, what may accept input and
-how it is guarded, which types are allowed to survive, how configuration and secrets are read, and
-how imports and comments are written. The eighth, `testing.md`, is how that code is checked — the
-three kinds of test this backend runs. Together they cover the decisions a stranger is most likely to get
+how it is validated, who may call a mutation and how ownership is enforced, which types are allowed
+to survive, how configuration and secrets are read, and how imports and comments are written. The
+ninth, `testing.md`, is how that code is checked — the three kinds of test this backend runs. Together they cover the decisions a stranger is most likely to get
 wrong in the first hour — which folder this belongs in, what to do with the error they just caught,
 and how the line itself is spelled.
 
@@ -25,6 +25,7 @@ each example is what travels.
 | [`naming-and-structure.md`](naming-and-structure.md) | that a top-level folder is a capability rather than a layer, the split between what is reusable and what wires it to a transport, one public entry per module with a deep import from another capability treated as a bug, colocation by default with promotion on the second consumer, one operation per folder behind an entry-point method with a fixed name, the suffix that names a file's role, and the expand-and-contract rule for renaming something that has already spread |
 | [`error-handling.md`](error-handling.md) | that every thrown value is a typed exception carrying a stable code, that expected and unexpected failures are different species and the thrower decides which, that a driver's error is translated at its adapter and never travels past it, one error shape built in exactly one place at the API boundary, no stack or query or internal identifier crossing that boundary, one log line per error at the boundary carrying a correlation id, and retryability declared on the error rather than guessed by the retrier |
 | [`validation.md`](validation.md) | that every HTTP and GraphQL input passes through a DTO class carrying `class-validator` decorators at the field, so a malformed or out-of-range value dies before it reaches business logic, that the globally registered `ValidationPipe` is used plainly — no `whitelist` or `forbidNonWhitelisted` invented on top of it without the teacher's call — and that a `string → number` coercion is attached with `@Type(() => Number)` at the field rather than leaned on a global `transform` |
+| [`authorization.md`](authorization.md) | that every mutation resolver method carries an authz guard with `@UseGuards`, the identity gate `KeycloakAuthGraphQLGuard` first and a deliberately-open read the commented exception, that the domain check ("may THIS caller") is a second stacked guard from `bussiness/guards/` rather than an `if` in the handler, and that ownership rides in the query `where` — never re-checked after the fetch — so a by-id path that forgets the owner is caught as the IDOR it is |
 | [`type-safety.md`](type-safety.md) | that `any` is refused in favour of `unknown`-then-narrow even though `tsconfig` and eslint both allow it, that `as` casts stay rare, that the two remaining `any` sites are named old debt no new site may join, and that input of unknown type — a caught error, an external payload — is narrowed with `typeof`, `instanceof`, or duck typing before use |
 | [`config-and-env.md`](config-and-env.md) | that `process.env` is read in exactly one place — the `parseEnv*` helpers in `src/modules/env/utils/parse-env.ts` — so no service or provider touches the environment directly and loses its typing and defaults, and that secrets live behind that same boundary rather than being scattered across the codebase |
 | [`imports-and-format.md`](imports-and-format.md) | that a `.ts` file under `src/**` is formatted the way `eslint.config.mjs` dictates — four-space indent, double quotes, no semicolons, one array element and one argument per line — that imports go through the `@modules` / `@features` aliases in a fixed order, and that eslint, not the root `.prettierrc` (which governs only `apps/**` and `libs/**`), is the single authority `npm run lint` must pass clean |

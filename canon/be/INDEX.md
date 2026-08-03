@@ -29,10 +29,11 @@ The full table, one row per file, is
 
 ## enforce/authoring/ — how a line of back-end code is spelled
 
-Seven files about the text of the code rather than the design behind it: where a thing lives and what
+Eight files about the text of the code rather than the design behind it: where a thing lives and what
 it is called, what to do with a caught error, when a comment earns its place, how config and env are
-read, how imports are ordered and formatted, what may not be typed loosely, and how input is
-validated at the boundary. Most are grounded in this codebase's own `src/`, with a count and a date
+read, how imports are ordered and formatted, what may not be typed loosely, how input is validated at
+the boundary, and who may call a mutation and how ownership is enforced. Most are grounded in this
+codebase's own `src/`, with a count and a date
 that `scripts/verify.mjs` re-checks; a few are grounded in named public sources (Parnas, Evans,
 Richardson, the RFCs) because the constraint comes from the platform rather than a house habit.
 
