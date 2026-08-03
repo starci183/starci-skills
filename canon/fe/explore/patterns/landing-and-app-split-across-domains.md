@@ -42,3 +42,18 @@ subdomain with a rewrite. Splitting adds a second build-and-deploy surface, so i
 when the marketing and product cadences — or teams — genuinely diverge. Until then, one app with the
 landing at the root is the smaller, honest setup; the domain rule above is what the split resolves to
 when it comes, not a thing to build on day one.
+
+## Exception — one domain, middleware decides by situation
+
+The apex-vs-`app.` split is the default, not the only shape. A product may keep a SINGLE app on a
+SINGLE domain and let MIDDLEWARE choose which surface renders from the request — the visitor's
+situation (auth state, path, entitlement) picks landing versus app, instead of a subdomain doing it.
+StarCi Academy runs this way: one host, and middleware routes a logged-out visitor to the marketing
+surface and a signed-in one into the app.
+
+The trade is explicit: one deploy and one domain, at the cost of the app's weight and auth sitting
+behind the same host as the landing (so the SEO and caching benefits of a dedicated apex host are
+given up). Which topology a product uses — the subdomain split above, or middleware on one domain —
+is the product's decision, and the one it chose is recorded either way so a reader knows where the
+landing actually lives. Graduate from the middleware form to the `app.` split when the marketing and
+product cadences diverge enough to want separate hosts and pipelines.
