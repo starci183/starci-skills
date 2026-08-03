@@ -210,20 +210,27 @@ export const Advanced: Story = ...
 export const Insane: Story = ...
 ```
 
-## 7. Skeleton stories — MIRROR the shape, demonstrated through `AsyncContent` / `isLoading`
+## 7. Skeleton stories — MIRROR the shape, through the block's own co-located `isSkeleton`
 
-Following `Skeleton.stories.tsx` and `AsyncContent/components.tsx`:
+The PRIMARY way a data-owning block shows its skeleton is its OWN `isSkeleton?: boolean` prop: the
+story sets `isSkeleton: true` (§10) and the block renders its normal tree with `isSkeleton` threaded
+down to every leaf, so each atom/frame/composite draws its own co-located shimmer. Because it is the
+SAME tree, the skeleton mirrors the loaded shape automatically — you build no separate skeleton at all.
 
-- **The skeleton MIRRORS the real layout tree** — keep the structural nodes (separator, wrapper,
-  gaps, the same `p-3` as a real row) and replace ONLY the content nodes with `Skeleton.<Component>`.
-  Do not scatter shimmer. The goal is a box that neither jumps nor collapses on resolve.
-- **Demonstrate the loading state through the real wrapper** — `AsyncContent` with `isLoading` and
-  `skeleton={...}` — rather than building a loose skeleton inside the main story.
+- **The skeleton MIRRORS the real layout tree** — this is automatic under co-located `isSkeleton`,
+  because the skeleton IS the loaded tree with the shimmer switched on. When you do build a stand-alone
+  skeleton (the legacy `AsyncContent` path below), keep the structural nodes (separator, wrapper, gaps,
+  the same `p-3` as a real row) and replace ONLY the content nodes with `Skeleton.<Component>`. Do not
+  scatter shimmer. The goal is a box that neither jumps nor collapses on resolve.
+- **`AsyncContent` is the LEGACY path** — a minority of blocks still demonstrate loading through the
+  `AsyncContent` wrapper with `isLoading` and a hand-built `skeleton={...}`. Reach for it only for a
+  self-contained async region with no leaf tree of its own to shimmer; it is being phased out in favour
+  of co-located `isSkeleton`.
 - **The Skeleton reference story is a table**: the skeleton on the left, the REAL node of the same
   `type` on the right, so the heights can be compared.
 
 ```tsx
-// .storybook/stories/blocks/async/AsyncContent/components.tsx
+// .storybook/stories/blocks/async/AsyncContent/components.tsx — LEGACY AsyncContent path
 // the skeleton mirrors the real row: same SurfaceListCard, same p-3, same separator
 export const skeleton = (
     <SurfaceListCard>
@@ -290,10 +297,10 @@ render: () => {
 }
 ```
 
-## 10. A presentational block plus `AsyncContent` — the `variant / scenario / state` taxonomy
+## 10. A presentational block — the `variant / scenario / state` taxonomy
 
 Block stories are built on the tree **`variant / scenario / state`**. The three levels map onto CODE
-without forcing the block to grow three props:
+without forcing the block to grow three separate branches:
 
 - **variant** is a shape **prop** — `variant="item" | "hero"`.
 - **scenario is the SHAPE**, a **discriminating prop** that decides the COMPOSITION — which parts
@@ -307,14 +314,15 @@ without forcing the block to grow three props:
   // in the component: {scenario === "progress" && <ProgressMeter value={value} max={max} />}
   ```
 
-- **state — loading, error, empty — is NOT a prop of the block.** The block renders only the LOADED
-  case. State belongs to the **`AsyncContent`** wrapper and its priority switch
-  (`error → loading → empty → content`). The real API (`blocks/async/AsyncContent`):
-  - `isLoading` with `skeleton`, a `Skeleton.*` tree MIRRORING the shape — per scenario, so a
-    no-progress skeleton has no bar.
-  - `error` with `errorContent={{ title, onRetry, retryLabel }}` — props, not nodes.
-  - `isEmpty` with `emptyContent={{…}}` — only when the consumer has an empty branch.
-  - `children` — the loaded block.
+- **The skeleton state IS a prop of the block — `isSkeleton?: boolean`.** When set, the block renders
+  its OWN normal tree with `isSkeleton` threaded down to every leaf, so each atom/frame/composite draws
+  its co-located shimmer and the skeleton mirrors the loaded shape automatically. `error` is NOT a
+  per-block prop and `isEmpty` is derived from the resolved data.
+- **`AsyncContent` is the LEGACY state wrapper**, still used by a minority of blocks for a stand-alone
+  async region with no leaf tree of its own to shimmer. Its priority switch
+  (`error → loading → empty → content`) takes `isLoading` with a hand-built `skeleton`, `error` with
+  `errorContent={{ title, onRetry, retryLabel }}`, `isEmpty` with `emptyContent={{…}}`, and `children`
+  — the loaded block. It is being phased out in favour of co-located `isSkeleton`.
 
 Rendering the kinds out as stories:
 
@@ -327,14 +335,12 @@ export const Urgent: Story = { name: "Gấp",
 export const NotStarted: Story = { name: "Chưa có tiến độ",
     render: () => <ContinueCard variant="hero" scenario="no-progress" /> }
 
-// state leaves — through the REAL AsyncContent, never a hand-rolled <SectionCard><Skeleton/>
+// skeleton leaf — the block's OWN isSkeleton, rendering its real tree with the shimmer co-located
 export const Loading: Story = { name: "Đang tải",
-    render: () => (
-        <AsyncContent isLoading skeleton={<HeroProgressSkeleton />}>
-            <ContinueCard variant="hero" scenario="progress" value={2} max={8} />
-        </AsyncContent>
-    ) }
-export const LoadError: Story = { name: "Lỗi tải (mạng rớt)",
+    render: () => <ContinueCard variant="hero" scenario="progress" isSkeleton /> }
+
+// LEGACY — a stand-alone async region wrapped in AsyncContent, for a block with no leaf tree to shimmer
+export const LoadErrorLegacy: Story = { name: "Lỗi tải (mạng rớt)",
     render: () => (
         <AsyncContent isLoading={false} error={new Error("network")}
             errorContent={{ title: "Mất kết nối", retryLabel: "Thử lại", onRetry: () => {} }}>
@@ -343,12 +349,18 @@ export const LoadError: Story = { name: "Lỗi tải (mạng rớt)",
     ) }
 ```
 
-Because the skeleton mirrors the shape (§7), there is **one skeleton per SCENARIO** — progress has a
-bar, no-progress does not — and it is never multiplied by tone.
+Because the shimmer is co-located per leaf (§7), the skeleton follows the SCENARIO for free — a
+progress skeleton has a bar, a no-progress one does not — and it is never multiplied by tone.
 
-`ContinueCard` is the template being straightened toward this standard: an explicit `scenario` prop
-plus loading and error through `AsyncContent`, replacing the implicit `value === undefined` and a
-hand-rolled `<SectionCard><Skeleton/>`.
+**A data-owning tier's story MUST include the `skeleton` leaf — which means the presentational `_Name`
+MUST expose `isSkeleton?: boolean` and propagate it to its leaves.** A block that models only content
+and empty is unfinished: when its connected half is wired up ([[split]]), there is no `isSkeleton` to
+pass, so the first-load shimmer is silently dropped at sync. Enumerating "every value of each prop" is
+not enough on its own — a block that simply lacks the prop would pass the story gate while shipping no
+skeleton state at all. Anchor: across every nivo mirror-tree sync slice — invoices, wallet, domains,
+support, leads (four-plus independent cases, 2026-08-03) — the sync surfaced book blocks that shipped
+with no skeleton state because they exposed no `isSkeleton`, modelling only empty and content. See
+[[loading-and-skeleton]] for the co-located `isSkeleton` pattern these leaves render through.
 
 ## 10b. Anatomy is the REAL DOM tree, PER LEAF (`BlockAnatomy`)
 
@@ -416,8 +428,8 @@ plus smoke; behaviour is `play` where it is genuinely needed. Do not breed a cro
 
 - [[imports-and-format]] — 4-space, double-quote, no semicolons, import order; all of it applies to
   stories too.
-- [[loading-and-skeleton]] and [[async-data]] — mirror-shape skeletons and the async wrapper, the
-  source of §7 and §10.
+- [[loading-and-skeleton]] and [[async-data]] — the co-located `isSkeleton` pattern (mirror-shape
+  skeletons threaded to the leaves) and the legacy `AsyncContent` wrapper, the source of §7 and §10.
 - [[props-and-types]] and [[type-safety]] — `WithClassNames` and the no-`any` rule for the component
   a story demonstrates.
-- `src/components/blocks/async/AsyncContent` — the real state switch that §10 renders through.
+- `src/components/blocks/async/AsyncContent` — the legacy stand-alone async region §10 notes.

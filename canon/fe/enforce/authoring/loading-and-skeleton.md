@@ -1,25 +1,62 @@
 # Loading and skeleton — how to WRITE an async state — STRICT
 
-> The code convention for EVERY region rendered from data (SWR or a query): async state goes through
-> `AsyncContent`, and the skeleton must MIRROR the loaded shape. Every example below is quoted from
-> real code on branch `mtp` in `src/`. This is code style, not a design rule.
+> The code convention for EVERY region rendered from data (SWR or a query): the block takes a single
+> `isSkeleton` prop and threads it down to its leaves, so the shimmer stays CO-LOCATED and mirrors the
+> loaded shape. Every example below is quoted from real code on branch `mtp`. This is code style, not
+> a design rule.
 
-## 1. A data region is ALWAYS wrapped in `AsyncContent` — never a hand-rolled four-branch if
+## 1. A data-owning block takes `isSkeleton` and threads it to its leaves — the shimmer is co-located
 
-Every region rendered from data goes through `AsyncContent` (from
-`src/components/blocks/async/AsyncContent`). It is the ONE place that holds the priority order
-**error → loading → empty → content**; do not rewrite that chain of `if (error) … if (isLoading) …`
-inside a feature.
+Every region rendered from data takes a single **`isSkeleton?: boolean`** prop and, when set, renders
+its OWN normal tree with `isSkeleton` threaded down to each leaf it draws. Every atom, frame, and
+composite exposes its own `isSkeleton` and switches to a shimmer sized to the exact box its value will
+occupy (atom `ATOM-4`, composite `COMPOSITE-10`). Because the skeleton is the SAME tree as the loaded
+state, it mirrors the loaded shape automatically — nothing collapses, nothing jumps, and it cannot
+drift. Keep the shimmer co-located: a centrally-gathered, hand-built skeleton is a second copy of the
+layout that drifts the day someone edits one and not the other.
 
-Pass `skeleton` (required), and as needed `isEmpty` with `emptyContent`, and `error` with
-`errorContent`. Omitting `emptyContent` makes the section hide itself by rendering `null`; omitting
-`errorContent` lets an error fall through into the loading branch and be swallowed. Each pair
-travels together.
+`error` is NOT a per-block prop — there is no hand-rolled `if (error) … if (isLoading) …` switch inside
+the presentational block. `isEmpty` is derived from the resolved data (§2). The connected half computes
+`isSkeleton` from the first-load formula (§2) and passes it, with the resolved data and `isEmpty`, to
+the presentational `_Name`.
 
 ```tsx
-// src/components/features/dashboard/WhoToFollow/index.tsx
+// ConsultantCard (condensed) — the block renders ONE tree; isSkeleton flows straight down to every leaf.
+const ConsultantCard = ({ consultant, onOpen, isSkeleton = false }: ConsultantCardProps) => (
+    <SurfaceCard isDisabled={isSkeleton} onPress={() => onOpen(consultant.id)}
+        body={() => (
+            <StackV gap={4} isSkeleton={isSkeleton} items={[
+                () => <Image src={consultant.avatarUrl} ratio="square" isSkeleton={isSkeleton} />,
+                () => <Typography size="sm" weight="medium" text={consultant.fullName} isSkeleton={isSkeleton} />,
+            ]} />
+        )}
+    />
+)
+```
+
+```tsx
+// Wrong: building a branch chain inside the feature — wrong order, missing branches,
+// and a separate skeleton tree that drifts from the loaded one.
+if (isLoading) return <Spinner />
+if (!data) return null
+return <SectionCard>…</SectionCard>
+```
+
+### `AsyncContent` — the LEGACY stand-alone async region (being phased out)
+
+A minority of blocks still wrap a self-contained async region in `AsyncContent` (from
+`src/components/blocks/async/AsyncContent`) — the composite that holds the priority order
+**error → loading → empty → content** and renders a hand-built `skeleton` mirror. This is the OLDER
+pattern; it is not the default and is being phased out in favour of the co-located `isSkeleton` above.
+Reach for it only for a region that has no leaf tree of its own to shimmer. When you do, pass
+`skeleton` (required), and as needed `isEmpty` with `emptyContent`, and `error` with `errorContent` —
+each pair travels together (omitting `errorContent` lets an error fall through into the loading branch
+and be swallowed).
+
+```tsx
+// src/components/features/dashboard/WhoToFollow/index.tsx — LEGACY AsyncContent path
 <AsyncContent
-    isLoading={isLoading}
+    isLoading={isLoading && !data}
     skeleton={<WhoToFollowSkeleton className={className} />}
     isEmpty={!data || data.length === 0}
 >
@@ -27,18 +64,12 @@ travels together.
 </AsyncContent>
 ```
 
-```tsx
-// Wrong: building the branch chain inside the feature — wrong order, missing branches,
-// and nothing reusable.
-if (isLoading) return <Spinner />
-if (!data) return null
-return <SectionCard>…</SectionCard>
-```
+## 2. The skeleton flag is a FORMULA meaning "first load, nothing in hand" — not a bare `swr.isLoading`
 
-## 2. `isLoading` is a FORMULA meaning "first load, nothing in hand" — not a bare `swr.isLoading`
-
-Show the skeleton only on the FIRST load, when there is nothing to show yet. Passing a bare
-`isLoading` makes a background SWR revalidation flash the skeleton over content the user is reading.
+The connected half computes the value it passes as `isSkeleton` (or, on the legacy `AsyncContent` path,
+as `isLoading`) from this same formula. Show the skeleton only on the FIRST load, when there is nothing
+to show yet. Passing a bare `swr.isLoading` makes a background SWR revalidation flash the skeleton over
+content the user is reading.
 
 The dominant idiom is `isLoading && <nothing yet>` — either `&& !data` or `&& items.length === 0`:
 
@@ -63,6 +94,10 @@ isLoading={isLoading}
 `isEmpty={!data || data.length === 0}`. Do not fold the empty condition into `isLoading`.
 
 ## 3. The skeleton MIRRORS the loaded shape — nothing collapses, nothing jumps
+
+Under the co-located `isSkeleton` (§1) this is automatic — the skeleton IS the loaded tree with the
+shimmer switched on. Sections 3–6 detail how to build a stand-alone skeleton by hand for the LEGACY
+`AsyncContent` path; the mirror principle is the same either way.
 
 The skeleton is the SAME layout tree as the real content: keep the structural nodes — wrapper,
 `SectionCard`, separators, gaps, spacing — and replace only the CONTENT nodes with

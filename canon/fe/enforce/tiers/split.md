@@ -33,17 +33,29 @@ is no separate blueprint to keep in sync, because the story renders the real pre
 `_Name` renders whatever it is handed. That is the whole discipline: the same function, fed live data in
 the app and fixture data in a story, cannot render two different shapes.
 
-## The async switch spans the two files
+In the design-system book, a data-owning component is authored as **one presentational file exporting
+`Name`** — there is no fetch there, so it needs no connected half. The two-file split above is the
+**end state after sync**: the mirror-tree sync maps the book's single `Name` onto the app's
+`component.tsx` (renamed `_Name`, presentational, unchanged) plus a new `index.tsx` (`Name`, connected)
+that wires the app's data and renders `<_Name {...resolved} />`. So the book side is single-file until
+the app adopts it; the split is what sync introduces (2026-08-03).
 
-`block.md` BLOCK-8 puts the switch — error, then loading, then empty, then content — in the block. The split
-does not move it out of the block; it divides the block:
+## The async state spans the two files
 
-- The connected `index.tsx` owns the **decision**: it holds the request and derives the status.
-- The presentational `_Name` owns the **switch**: it takes `isLoading` / `error` / the data as props and
-  renders the four branches in the fixed order.
+`block.md` BLOCK-8 gives the block its async decisions. The split does not move them out of the block; it
+divides WHERE each lives:
 
-BLOCK-10 still holds — nothing below the block knows a request exists — because `_Name` is handed a status,
-not a request.
+- The connected `index.tsx` owns the **decision**: it holds the request, computes `isSkeleton` from the
+  first-load formula ("first load, nothing in hand", see
+  [`loading-and-skeleton.md`](../authoring/loading-and-skeleton.md)), and derives `isEmpty` from the
+  resolved data.
+- The presentational `_Name` owns the **render**: it takes `isSkeleton` (co-located shimmer), the
+  resolved data, and `isEmpty` as props, and renders its ONE normal tree — threading `isSkeleton` down
+  to every leaf so the skeleton mirrors the loaded shape. There is no separate four-branch switch and no
+  per-block `error` prop.
+
+BLOCK-10 still holds — nothing below the block knows a request exists — because `_Name` is handed resolved
+props (`isSkeleton`, the data, `isEmpty`), not a request.
 
 ## i18n is data, so it lives in the connected file
 
@@ -97,6 +109,19 @@ padding is what it is; it is not identity and has no bearing on how the componen
 
 `check-presentational-purity.mjs` enforces the removal: a `component.tsx` that names `showAnatomy`,
 `anatPart`, or `data-anat-part` fails, the same way one that fetches or resolves i18n does.
+
+## Sync precondition: the app must share the book's styling stack
+
+A mirror-tree twin does not arrive alone — `_Name` renders through the vocabulary below it (atoms that
+wrap HeroUI, Tailwind classes, design tokens), so adopting one twin pulls in that whole subtree. An app
+can mirror the book's components ONLY if it shares the book's styling stack — HeroUI + Tailwind + the
+same tokens. An app with its own theming does not get the vendor-wrapping atoms for free.
+
+Anchor (2026-08-03): nivo shares the stack (HeroUI + Tailwind) and its slices synced cleanly.
+nivo-expert-app is deliberately plain-CSS with runtime-injected `--nivo-*` tokens — each expert
+re-themes at runtime, touching zero code — so mirroring the book's HeroUI/Tailwind atoms would break
+that per-expert theming. Such an app needs plain-CSS twins that read its OWN tokens, not the
+vendor-wrapping atoms.
 
 ## Convergence
 
