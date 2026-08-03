@@ -1,18 +1,21 @@
 ---
 name: starci-setup-storybook
-description: Decides which storybook the whole ecosystem uses as its design system — reading the answer from the shared ledger of registered sources, never from a disk sweep — and records the choice once so every registered project reads the same blueprint; when nothing usable is registered yet, the same job fetches StarCi's canonical storybook (which ships inside the front-end app repo, not as a separate package) and records that instead. Use this skill whenever a task needs the design system and the ledger has none recorded, or the recorded one might be wrong: "set up storybook", "which storybook are we using", "point the design system at X", "I built my own storybook, use that one", "where do the atoms live", "open the design system", "the skill is reading the wrong storybook". Use it just as much when there is nothing on the machine yet to choose between: "I don't have the storybook", "get me the design system", "pull starci's storybook", "clone the design system", "set up storybook on a new machine", "generate the storybook for my project". Use it before writing any component, story, or token — a project with no `.storybook/` of its own is not missing a design system, it borrows the ecosystem's, and guessing which one is how two apps quietly drift apart. Not for registering where the front-end or back-end source itself lives, its branch, or its dev port (starci-setup-workspace-fe / starci-setup-workspace-be), and not for deciding which component or tier a piece of UI belongs in once the book is chosen — that is the component matrix and the tier-boundaries material under canon/fe/.
+description: Decides which storybook the whole ecosystem uses as its design system — reading the answer from the shared ledger of registered sources, never from a disk sweep — and records the choice once so every registered project reads the same blueprint; when nothing usable is registered yet, the same job fetches StarCi's canonical storybook (which ships inside the front-end app repo, not as a separate package) and records that instead. Use this skill whenever a task needs the design system and the ledger has none recorded, or the recorded one might be wrong: "set up storybook", "which storybook are we using", "point the design system at X", "I built my own storybook, use that one", "where do the atoms live", "open the design system", "the skill is reading the wrong storybook". Use it just as much when there is nothing on the machine yet to choose between: "I don't have the storybook", "get me the design system", "pull starci's storybook", "clone the design system", "set up storybook on a new machine", "generate the storybook for my project". Use it before writing any component, story, or token — there is exactly one book (starci-academy's `.storybook/`) and a registered source must not carry its own; an app adds its components under its own namespace inside that one book, and guessing which storybook to read is how two apps quietly drift apart. Not for registering where the front-end or back-end source itself lives, its branch, or its dev port (starci-setup-workspace-fe / starci-setup-workspace-be), and not for deciding which component or tier a piece of UI belongs in once the book is chosen — that is the component matrix and the tier-boundaries material under canon/fe/.
 ---
 
 # Setting up the ecosystem's storybook
 
-A design system is **one** thing shared by every source in the ledger. An app with no
-`.storybook/` of its own is not missing anything — it borrows. Recording the choice once, at the
-ledger level rather than per project, is what stops each app growing its own copy and drifting.
+There is exactly **one** design system, and it is `starci-academy/.storybook` — the book that
+ships inside the StarCi front-end app repo. Every registered source reads its blueprint from there.
+A registered source **must not carry a `.storybook/` of its own**: a second book is a second truth,
+and the day one app's tokens stop matching another's, nothing announces it. An app that needs its
+own components adds them **under its own namespace inside the one book**, never in a book of its own.
+`check-single-source-of-truth.mjs` fails while a second book exists.
 
-Sometimes there is nothing yet to choose between — a fresh machine, a fresh clone, nobody's built
-one here before. That is not a different problem, just the other branch of the same one: fetch
-StarCi's canonical book instead of pointing at one that already exists, and record it exactly the
-same way.
+Recording the choice once, at the ledger level rather than per project, is what holds that line.
+Sometimes there is nothing yet to point at — a fresh machine, a fresh clone, nobody's fetched one
+here before. That is not a different problem, just the other branch of the same one: fetch StarCi's
+canonical book (it comes with the front-end app repo) and record it exactly the same way.
 
 ## Quick start
 
@@ -40,15 +43,17 @@ Both write into the same `design_system` entry, so a skill reading it back never
 which branch put it there. `choose` itself names `generate` the moment it finds nothing to pick
 from, rather than failing blankly — the two branches hand off to each other automatically.
 
-## Adopting your own
+## Pointing at the one book explicitly
 
 ```bash
-node .claude/scripts/choose-design-system.mjs choose <path-to-repo-or-.storybook>
+node .claude/scripts/choose-design-system.mjs choose <path-to-starci-academy-or-its-.storybook>
 ```
 
-Building your own design system is a deliberate act, so claiming it is one too. Nothing here
-notices a storybook you made and adopts it on your behalf — the bias runs to the canonical book,
-and anything else is adopted only because you named it.
+Naming a path is for pointing at the one canonical book when nothing is recorded yet — a fresh
+clone of `starci-academy`, say. It is not a door to a second book: the bias runs to the canonical
+one, and a stray storybook is never noticed and adopted on your behalf. If you have a `.storybook/`
+of your own, fold its stories into a namespace inside the one book and delete the copy —
+`check-single-source-of-truth.mjs` fails while a second book exists.
 
 ## What counts as usable
 
@@ -168,10 +173,10 @@ folder is what brings a clone forward; a copied folder would not have that line 
 
 ## Common mistakes
 
-- **Treating a missing `fe.design_system` as breakage.** It only means this project has no
-  `.storybook/` folder of its own. It borrows; ask `design_system.path`.
+- **Treating a missing `fe.design_system` as breakage.** A registered source is *supposed* to have
+  no `.storybook/` of its own — there is one book, and it is asked for with `design_system.path`.
 - **Reading from one storybook and writing into another.** The blueprint has one home. Editing a
-  borrowed copy splits the ecosystem in two, and nothing will tell you it happened.
+  second copy splits the ecosystem in two, and nothing will tell you it happened.
 - **Adopting a folder because it exists.** Check the config; a shell renders nothing.
 - **Scanning the disk for `.storybook`.** It finds stale clones that look perfect.
 - **Cloning when a copy is already registered.** Run the plain command first; reuse fires before

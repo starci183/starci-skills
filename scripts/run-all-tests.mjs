@@ -77,6 +77,22 @@ for (const dir of skills) {
     if (r.status !== 0) failed.push(rel);
 }
 
+// Standalone checks that are not skills but still ship a suite. findSkills skips `scripts/` on
+// purpose, so an enforcement script under it is named here by hand rather than auto-discovered —
+// one explicit line is cheaper to trust than widening the walk to every `*.test.mjs` on disk.
+const EXTRA = ["scripts/workspace/check-single-source-of-truth.test.mjs"];
+for (const rel of EXTRA) {
+    const suite = join(REPO, rel);
+    if (!existsSync(suite)) { untested.push(rel); continue; }
+    if (filter && !rel.includes(filter)) continue;
+
+    ran++;
+    const r = spawnSync(process.execPath, [suite, ...(verbose ? ["--verbose"] : [])], {
+        stdio: "inherit", cwd: REPO,
+    });
+    if (r.status !== 0) failed.push(rel);
+}
+
 console.log(`\n${"=".repeat(60)}`);
 console.log(`${ran} suite(s) run, ${failed.length} failed`);
 for (const f of failed) console.log(`  FAILED  ${f}`);

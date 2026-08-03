@@ -32,7 +32,7 @@ Then work against `$(node .claude/scripts/workspace/read-workspace-context.mjs f
 | `fe.branch` · `fe.head` | branch, and the last commit with its date |
 | `fe.url` | dev server, from the repo's own `dev` script or its framework's default |
 | `fe.storybook_url` | from the repo's own `storybook` script |
-| `fe.design_system` | `.storybook/`, when the project has one |
+| `fe.design_system` | this project's own `.storybook/`, if any — normally null; the one shared book is `design_system.path` |
 | `fe.artifacts` | `.artifacts/`, when the project has one |
 | `fe.remote` · `fe.name` | origin URL, package name |
 
@@ -99,8 +99,9 @@ while another is checked out will mislead you, so read the warning.
   name. The date on `fe.head` is what separates them. Register the one you mean.
 - **Assuming port 3000.** That is `next dev`'s default, not a fact about this project. `fe.url`
   says what will actually serve.
-- **Treating a missing `fe.design_system` as breakage.** A project without `.storybook/` simply has
-  no design-system lane. `null` is the honest answer, not an error.
+- **Treating a missing `fe.design_system` as breakage.** A registered source should not carry its
+  own `.storybook/` — there is one shared book. `null` here is the expected answer; ask
+  `design_system.path` (see starci-setup-storybook) for the book everyone reads.
 - **Committing `context/`.** It is the one file guaranteed wrong on the next machine.
 
 ## Files

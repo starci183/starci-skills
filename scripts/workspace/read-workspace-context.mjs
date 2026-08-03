@@ -61,11 +61,12 @@ if (!project) {
 /**
  * What a caller sees: the current project's roles, plus which project answered.
  *
- * `design_system` is deliberately NOT per project. One storybook serves every source in the
- * ledger — a new app does not lack a design system, it borrows the ecosystem's. Keeping it at
+ * `design_system` is deliberately NOT per project. There is exactly one book — starci-academy's
+ * `.storybook/` — and every source in the ledger reads it; a registered source must not carry a
+ * `.storybook/` of its own (check-single-source-of-truth.mjs enforces that). Keeping the book at
  * the registry level is what stops each project growing its own copy and drifting apart.
- * `fe.design_system` still means something different and narrower: does THIS project happen to
- * carry a `.storybook/` folder of its own.
+ * `fe.design_system` is the narrower, diagnostic fact: whether THIS project happens to carry a
+ * `.storybook/` folder — normally null, and a non-null here is what the gate flags.
  */
 const ctx = {
     ...project,
