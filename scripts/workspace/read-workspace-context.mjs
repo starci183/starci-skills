@@ -68,6 +68,9 @@ if (!project) {
  * `fe.design_system` is the narrower, diagnostic fact: whether THIS project happens to carry a
  * `.storybook/` folder — normally null, and a non-null here is what the gate flags.
  */
+/** Env-var prefix for this project's secrets: values live at `<PROJECT>_<NAME>`. */
+const SECRET_PREFIX = String(registry.current).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+
 const ctx = {
     ...project,
     design_system: registry.design_system ?? null,
@@ -82,10 +85,45 @@ if (argv.includes("--json")) {
     process.exit(0);
 }
 
+// ---- the project's secret env-var names, one per line ---------------------
+// For a setter script to iterate: prints `<PROJECT>_<NAME>` for each declared secret. Names only,
+// never values.
+if (argv.includes("--secrets")) {
+    for (const name of project.secrets ?? []) console.log(`${SECRET_PREFIX}_${name}`);
+    process.exit(0);
+}
+
 // ---- one value, for a shell ----------------------------------------------
 
 /** The first non-flag argument is a dotted key such as `fe.path` or `be.url`. */
 const key = argv.find((a) => !a.startsWith("--"));
+
+// ---- a secret, resolved from the environment (never stored on disk) -------
+// Secrets never live in workspace.json — only their NAMES do, in the project's `secrets` manifest.
+// The value lives in an environment variable `<PROJECT>_<KEY>`, and `secret.VPS_PASS` reads
+// `process.env.<PROJECT>_VPS_PASS`. A missing one exits non-zero and names the env var to set,
+// WITHOUT ever printing a value — so a secret cannot leak into a log through this path, and a
+// public checkout of this skill set never carries a credential.
+if (key && key.startsWith("secret.")) {
+    const name = key.slice("secret.".length);
+    const envVar = `${SECRET_PREFIX}_${name}`;
+    // Project-scoped first, then the bare global name. A per-project secret (a VPS password that
+    // differs per app) lives at `<PROJECT>_<NAME>`; a per-user token that is the same everywhere
+    // (a Claude Code OAuth token, a personal GitHub PAT) lives at the bare `<NAME>` the tool itself
+    // reads — so `CLAUDE_CODE_OAUTH_TOKEN` set once, globally, resolves for every project.
+    const value = process.env[envVar] || process.env[name];
+    if (value === undefined || value === "") {
+        console.error(`secret "${name}" is not set for project "${registry.current}".`);
+        console.error(`Set it in your environment as:  ${envVar}   (or globally as ${name})`);
+        const manifest = project.secrets ?? [];
+        if (manifest.length) console.error(`this project declares: ${manifest.join(" ")}`);
+        process.exit(1);
+    }
+    // Bare value, no newline — meant to be captured by $(...) or piped straight into
+    // `gh secret set`. Never echo it into a log.
+    process.stdout.write(value);
+    process.exit(0);
+}
 
 if (key) {
     // Walk the dotted path, stopping at the first missing level instead of throwing.
@@ -121,6 +159,18 @@ for (const tree of ["fe", "be"]) {
     if (t.storybook_url) console.log(`  storybook  ${t.storybook_url}`);
     if (t.design_system) console.log(`  blueprint  ${t.design_system}`);
     if (t.artifacts) console.log(`  artifacts  ${t.artifacts}`);
+}
+
+// Secrets are names only in the record; the values live in the environment. Show which of the
+// project's declared secrets are actually present, so a missing one is visible before a deploy
+// needs it — and never the value itself.
+const declared = project.secrets ?? [];
+if (declared.length) {
+    console.log("\nSECRETS  (values live in env as <PROJECT>_<KEY>, never on disk)");
+    for (const name of declared) {
+        const set = Boolean(process.env[`${SECRET_PREFIX}_${name}`] || process.env[name]);
+        console.log(`  ${set ? "ok  " : "MISS"} ${SECRET_PREFIX}_${name}`);
+    }
 }
 
 // Which project answered, and when it was measured — a stale record is then visible without

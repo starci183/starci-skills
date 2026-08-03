@@ -1,6 +1,6 @@
 ---
 name: starci-setup-workspace
-description: Registers and resolves BOTH sources this machine works against — the front end's folder, branch, dev URL, Storybook URL, design-system folder, and the back end's folder, branch, and the HTTP port it actually serves on (read from CORE_PORT/PORT/APP_PORT/HTTP_PORT/SERVER_PORT in its .env/.env.override/.env.local/.env.development before falling back to the default in its own config code, `be.url` null and `be.ports_found_by` naming the file when nothing is found) — through one `--fe`/`--be` pair of flags, sharing a single gitignored per-machine context file and one pair of scripts. Use this skill whenever a task needs to know where either side's code actually lives, before opening, editing, grepping, or running anything in it: "set up the workspace", "point this at my app/api", "which repo is the FE", "which repo is the BE", "what port does the api run on", "what's the storybook url", "máy này FE/BE là repo nào", "api chạy port mấy", "the skill is reading the wrong frontend", "switch to project X". Use it even when the request never says "workspace" or "setup" — any FE or BE task on a fresh machine, a fresh clone, or a machine holding several checkouts needs this first, because a remembered path is right on one machine and silently wrong on the next. Not for choosing which storybook is the design system (use starci-setup-storybook).
+description: Registers and resolves BOTH sources this machine works against — the front end's folder, branch, dev URL, Storybook URL, design-system folder, and the back end's folder, branch, and the HTTP port it actually serves on (read from CORE_PORT/PORT/APP_PORT/HTTP_PORT/SERVER_PORT in its .env/.env.override/.env.local/.env.development before falling back to the default in its own config code, `be.url` null and `be.ports_found_by` naming the file when nothing is found) — through one `--fe`/`--be` pair of flags, sharing a single gitignored per-machine context file and one pair of scripts. Use this skill whenever a task needs to know where either side's code actually lives, before opening, editing, grepping, or running anything in it: "set up the workspace", "point this at my app/api", "which repo is the FE", "which repo is the BE", "what port does the api run on", "what's the storybook url", "máy này FE/BE là repo nào", "api chạy port mấy", "the skill is reading the wrong frontend", "switch to project X". Use it even when the request never says "workspace" or "setup" — any FE or BE task on a fresh machine, a fresh clone, or a machine holding several checkouts needs this first, because a remembered path is right on one machine and silently wrong on the next. The same skill also declares and resolves per-project secrets — names only, in the workspace record; the values live in env vars and never touch this public repo: "set the vps password", "add cloudflare token", "khai secret cho project", "set github credentials", "which env var holds the token". Not for choosing which storybook is the design system (use starci-setup-storybook).
 ---
 
 # Front-end + back-end workspace
@@ -80,6 +80,41 @@ that merely shares a name is refused, because adopting it is how the wrong tree 
 Several projects live side by side. `--list` shows them with `*` on the current one, `--use <name>`
 switches, and everything read through `read-workspace-context.mjs` follows that switch — no other skill needs to
 know it happened.
+
+## Secrets (env-only)
+
+A secret's *value* never lives in this repo — only its *name* does. `.claude` is public, so
+anything written into `workspace.json` is written for anyone to read; a manifest of names is safe
+there, a manifest of values is not. So the name goes into a per-project `secrets` manifest and the
+value stays in an environment variable named `<PROJECT>_<NAME>` (the project uppercased) — set
+once per machine, never written to disk by anything in this skill.
+
+```bash
+# declare which secrets a project needs (names only). Works on the current project without
+# re-stating --fe/--be.
+node .claude/scripts/workspace/register-workspace-source.mjs --secrets VPS_PASS,CLOUDFLARE_TOKEN,DO_TOKEN,GITHUB_TOKEN
+
+# read one value back out of the environment
+node .claude/scripts/workspace/read-workspace-context.mjs secret.VPS_PASS
+```
+
+For a project registered as `starci`, `secret.VPS_PASS` reads `process.env.STARCI_VPS_PASS`. The
+command prints the bare value — safe in `$(...)`, safe to pipe straight into `gh secret set` — or,
+when the env var isn't set, exits non-zero and names exactly which var to set. It never prints a
+value speculatively, and never on failure.
+
+The human view — `read-workspace-context.mjs` with no key — lists every secret the current project
+declares as present or missing, by name only:
+
+```
+SECRETS  (values live in env as <PROJECT>_<KEY>, never on disk)
+  ok   STARCI_VPS_PASS
+  MISS STARCI_CLOUDFLARE_TOKEN
+```
+
+These are the names `starci-deploy-vps` and `starci-deploy-k8s` read at deploy time. Declaring them
+here first means a missing credential shows up as `MISS` before a deploy goes looking for it, not
+partway through one.
 
 ## It does not search for your repo
 

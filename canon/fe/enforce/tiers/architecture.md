@@ -184,6 +184,26 @@ badge attributes on children. That scaffolding is removed, and its removal is ga
 remembered: `scripts/gates/check-orphan-parts.mjs` and the purity gate reject a presentational
 file that names the retired props.
 
+### The outermost frame of a higher tier wears that tier — by override, not by a wrapper
+
+A component emits its own identity, as above — **until it is the outermost element of a higher tier
+being built, and then it wears that tier instead.** An overlay, a block, a page has no identity node of
+its own: its root is the frame or composite it is built from, standing at the outer edge and overriding
+its own `data-tier`/`data-component` to the surface's. A drawer is a `DrawerShell` whose own `<Drawer>`
+root, at the outer edge, emits `data-tier="overlay" data-component="SubmissionAttemptsDrawer"` — the
+shell promoted, not a bare `<div data-tier="drawer">` wrapped around it. Nested anywhere inside, the same
+shell keeps its own `composite` identity; the override is spent at exactly one node, the container.
+
+So every structural frame and composite accepts an overridable `data-tier`/`data-component`, defaulting
+to its own value — the default is the rule, the override the exception taken only at the outer edge.
+
+What this forbids is the **identity-only wrapper**: a component whose whole body is
+`<div data-tier="…" data-component={caller}>{children}</div>`, added solely to stamp a tier that a real
+element could have carried. It adds a node the contract cannot measure — it owns no spacing, so it
+declares no `principles` and exposes no seam — while doubling the identity of one logical surface. A
+`*Root` frame and a `principles`-free "grouping" frame are the same mistake; both were removed, and
+their absence is the rule. When a surface needs an identity, the element already there wears it.
+
 ## Which component a data shape becomes
 
 Placing a component in a tier and choosing *which* component a cluster of data demands are two

@@ -96,6 +96,16 @@ const DRY = argv.includes("--dry");
 const LIST = argv.includes("--list");
 
 /**
+ * Secret NAMES this run declares for the project. Values NEVER touch this file — they live in the
+ * environment as `<PROJECT>_<NAME>`, and only the name is recorded here so `--check` and the reader
+ * can see which ones a deploy will need. `--secrets A,B,C` or a single `--secret A`.
+ */
+const secretList = [
+    ...(typeof flag("secrets") === "string" ? flag("secrets").split(",") : []),
+    ...(typeof flag("secret") === "string" ? [flag("secret")] : []),
+].map((s) => s.trim().toUpperCase()).filter(Boolean);
+
+/**
  * Flags that stand alone. Everything else takes the next token as its value.
  * Getting this list wrong is not a small bug: without it, `--dry --project shop --be <dir>`
  * treated "shop" as a bare word and tried to open it as the front-end folder.
@@ -478,6 +488,34 @@ if (CHECK) {
     process.exit(0);
 }
 
+// ---- declare secrets on an existing project (names only) ------------------
+
+// Secrets are env-only. This records WHICH env vars a project needs (`<PROJECT>_<NAME>`), never
+// their values, and runs on its own — no need to re-state fe/be just to add a secret name.
+if (secretList.length && !stated("fe") && !stated("be")) {
+    const ctx = load();
+    const name = typeof flag("project") === "string" ? flag("project") : ctx.current;
+    if (!name || !ctx.projects?.[name]) {
+        console.error("No project to attach secrets to — pass --project <name> or set a current one first.");
+        console.error(`known: ${Object.keys(ctx.projects ?? {}).join(" ") || "(none)"}`);
+        process.exit(1);
+    }
+    const merged = [...new Set([...(ctx.projects[name].secrets ?? []), ...secretList])];
+    const prefix = String(name).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+    if (DRY) {
+        console.log(`--dry: would set ${name}.secrets = ${merged.join(" ")}`);
+        process.exit(0);
+    }
+    ctx.projects[name].secrets = merged;
+    ctx.written_at = new Date().toISOString();
+    mkdirSync(CONTEXT_DIR, { recursive: true });
+    writeFileSync(CONTEXT_FILE, JSON.stringify(ctx, null, 2) + "\n");
+    console.log(`secrets for "${name}": ${merged.join(" ")}`);
+    console.log(`values live in env as ${prefix}_<NAME> — never written here. Set them, then check with:`);
+    console.log(`  node scripts/workspace/read-workspace-context.mjs`);
+    process.exit(0);
+}
+
 // ---- register ------------------------------------------------------------
 
 if (!stated("fe") && !stated("be")) {
@@ -542,6 +580,12 @@ if (unresolved.length === Object.values(project).filter(Boolean).length) {
 const ctx = load();
 ctx.note = "Written per machine by scripts/register-workspace-source.mjs. Never commit this file.";
 ctx.written_at = new Date().toISOString();
+// Carry over (and add to) the secret manifest — names only, never values. A re-register of
+// fe/be must not silently drop the secrets a project already declared.
+const priorSecrets = ctx.projects?.[name]?.secrets ?? [];
+if (priorSecrets.length || secretList.length) {
+    project.secrets = [...new Set([...priorSecrets, ...secretList])];
+}
 ctx.projects[name] = project;
 ctx.current = name;
 
