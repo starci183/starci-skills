@@ -85,6 +85,19 @@ prove the mock was called correctly. A disposable per-run container, not a share
 the point: every run starts from an empty schema, so one run's leftover rows can never leak into the
 next, and CI never needs a hand-maintained test database to go stale.
 
+**Coverage is the whole business, not a sample.** Every business flow that commits state end to end
+earns an e2e — every mutation that writes a row a user later sees (an enrolment, a challenge or
+personal-project submission, a reward redemption, a payment settlement, a streak or XP grant, a
+community post or reaction, a flashcard review), and every query whose correctness rests on the real
+schema (a join, a projection read, a cursor page). A domain whose write flows carry no
+`*.e2e-spec.ts` is a coverage gap, not a judgement call: money flows tested while enrol, submission,
+progress, and community are not is exactly the hole this rule names. A flow whose only
+non-deterministic step is an LLM call is still e2e-covered up to that call — the model is stubbed for
+the e2e — and covered *at* the call by the harness (§3); it is never left untested in both. And an
+e2e that cannot even boot (a provider missing from the test module, so `Test.createTestingModule`
+never compiles) counts as absent, however green its assertions would have been: the lane is measured
+by what runs, not by what was written.
+
 (`npm run test:e2e` — `jest-e2e.json` / `setup-e2e.ts` — is the same idea wired the older way, its
 own inline container boot rather than the shared `E2eStackService`. `test:e2e:docker` is the current
 lane, built around the stack instance the harness lane below also shares.)
