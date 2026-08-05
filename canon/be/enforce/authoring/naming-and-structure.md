@@ -68,6 +68,10 @@ whether something is live: a folder existing under the capability root proves on
 wrote it. 12-Factor's build/release/run separation (V) is the same instinct — what runs is a
 declared thing, not an emergent property of the file system.
 
+A `@Module` under `src/modules/` or `src/features/` therefore wires only its own providers. Foreign
+in-repo modules are registered globally, once, at the app composition root. The rule, the cost, and
+the `.register()` decision are §8.
+
 ---
 
 ## 3. Name the declaring file; a barrel is a bug
@@ -80,8 +84,13 @@ Every import names the file that declares the symbol. There is no module `index.
 This is still Parnas, stated as tooling — just the other way around from a curated facade. The
 capability boundary in §1 is the folder and the `@Module` that wires it, not a re-export list that
 drifts, collides on `ConfigurableModuleClass`, and hides the file a reader actually needs to open.
-When a symbol moves, the import path moves with it; grep finds every caller; `isolatedModules` does
-not have to chase `export *`.
+
+The barrel was retired because it had become the product: **1412** `index.ts` files under `src/`
+(1306 pure `export *`, 106 mixed) carrying **9407** lines of forwarding, plus the
+one-symbol-two-folders collisions (`TS2308`) those chains caused. What was accepted in exchange,
+said plainly: **file paths are now public API**. Moving a file breaks its importers. That is the
+real cost of this decision, not an accident of the migration. When a symbol moves, the import path
+moves with it; grep finds every caller; `isolatedModules` does not have to chase `export *`.
 
 ```ts
 // Wrong: a folder, a barrel, a promise nobody can keep.
@@ -247,3 +256,64 @@ export const OrderService = OrderingService
 The same discipline applies to moving a folder. A move and an edit in one commit produce a diff that
 review cannot read, so the history stops being able to answer why anything changed — which is the
 one thing history is for.
+
+---
+
+## 8. A module does not import another in-repo module
+
+Modules are registered globally, once, at the app composition root (`apps/*/src/**` -- this repo has
+eight Nest projects in `nest-cli.json`). A `@Module` under `src/modules/**` or `src/features/**`
+wires only its own providers. Third-party per-feature registrations stay: they are resource wiring
+(`TypeOrmModule.forFeature`, `CqrsModule`, `JwtModule.register`, ...) rather than app composition.
+
+```ts
+// Wrong: CryptoModule is registered globally at the app root that loads this module.
+@Module({
+    imports: [
+        TypeOrmModule.forFeature([PodCredentialEntity], POSTGRESQL_PRIMARY),
+        CryptoModule,
+    ],
+    providers: [PodCredentialService],
+    exports: [PodCredentialService],
+})
+export class PodCredentialModule {}
+
+// Right: own providers only. EncryptionService resolves because CryptoModule is global.
+@Module({
+    imports: [
+        TypeOrmModule.forFeature([PodCredentialEntity], POSTGRESQL_PRIMARY),
+    ],
+    providers: [PodCredentialService],
+    exports: [PodCredentialService],
+})
+export class PodCredentialModule {}
+```
+
+**Same-capability nesting is not this rule.** A large module may still nest a sub-module (canon §3)
+and an aggregator still registers its leaves (canon §5). `AiPingModule.register`,
+`EventBusModule.register`, and `CdnSynchronizerModule.register` are that shape -- relative, same
+capability, often carrying options the parent forwards. Bare `ChildModule` inside the same
+capability is the same nesting.
+
+**Cross-capability `SomeModule.register({...})` is banned outright**, same as a bare identifier.
+Per-instance configuration of a foreign module belongs at the app root next to `isGlobal: true`.
+Allowing any `.register()` would let `CryptoModule.register({})` silence the linter without moving
+composition. That is the fake-fix this choice exists to prevent.
+
+**The cost, stated because a list of upsides is how the next person gets surprised.** Removing
+module-to-module imports makes the dependency graph implicit. Today, moving or deleting a module
+breaks compilation at every importer. After this change nothing points at it, so the same mistake
+surfaces at runtime as an unresolved provider, in whichever app happened to load it. `nest build`
+will not catch that -- it fails when the process boots. The migration is not "delete the import":
+for each import removed, the provider must still resolve in every app that composes that module, and
+if it does not, the global registration is added at that app's root first. This repo can be global
+in `apps/core` and absent from `apps/cli`.
+
+What is bought in exchange: a module no longer has to know which other modules it needs wired, and
+app composition lives in one place.
+
+**Machine-checked by `no-non-global-module-import`.** AST-based: it reads `imports` on `@Module({...})`
+and on every static method's returned `DynamicModule` object (the `register` / `forRoot` / `forFeature`
+family, including private helpers). Regex cannot do this -- a static `@Module({})` with
+`imports: [...modules]` built inside `register()` is the shape that a decorator-only scan misses.
+The rule is scoped off `apps/*/src/**`. Severity follows the burn-down playbook in `CLAUDE.md`.
