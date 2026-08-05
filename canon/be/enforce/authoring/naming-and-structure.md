@@ -84,9 +84,36 @@ grown through it.
 // ordering/index.ts — the entire public surface, in one file
 export * from "./ordering.module"
 export * from "./ordering.service"
-export type { OrderSummary, OrderStatus } from "./types"
-// pricing.service.ts is deliberately absent: it is how ordering computes, not what it offers.
+export * from "./types"
 ```
+
+**A barrel contains `export *` lines and nothing else.** No `export { A, B }`, no
+`export type { X } from`. A named re-export is always a symptom: it means two folders are trying to
+emit the same symbol and someone hand-picked their way around the resulting `TS2308` instead of
+fixing the ownership. The cure is ownership, not curation — see below.
+
+**One symbol, one home; a symbol two folders share moves to `shared/`.** When folder `b` needs a type
+that folder `a` defined, the answer is never `export type { T } from "../a"` in `b`'s barrel — that
+makes `T` reachable by two paths, and the parent barrel that `export *`s both is then illegal. Move
+`T` into the capability's `shared/` folder, which becomes its single owner, and let every consumer —
+`a`, `b`, and the parent barrel — reach it through that one path.
+
+```ts
+// Wrong — real drift, seeders/ (2026-08-05): three paths emit one type
+// shared/path/types/index.ts      defines ResolvedFilePath
+// courses/path/index.ts           export type { ResolvedFilePath } from "../../shared"
+// cv/path/types/…                 export type { ResolvedFilePath } from "../../../courses/path/…"
+// → seeders/index.ts cannot `export *` both ./courses and ./shared, so it hand-listed ./shared's
+//   surface behind a five-line apology. The apology is the bug report.
+
+// Right: ResolvedFilePath lives in shared/ only. courses/ and cv/ import it; neither re-exports it.
+```
+
+The cost of `export *` is that a folder's whole surface is public, so the barrel no longer hides an
+internal the way a curated list did. That hiding is bought back a level up: §3's own
+`no-deep-module-import` rule means no consumer can name anything inside the module regardless, so the
+information hiding lives at the module boundary, where it is machine-checked, instead of in a
+hand-maintained list that drifts and collides.
 
 The barrel re-exports the module class, its service(s) and the types the surface promises — and it
 never `export *`s the `.module-definition.ts`. `ConfigurableModuleBuilder` generates
