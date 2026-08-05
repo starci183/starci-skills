@@ -1,7 +1,8 @@
 # Naming and structure (BE)
 
 > Scope: where a module or a file LIVES and what it is CALLED — the folder tree, the boundary
-> between what is reusable and what is wiring, the one public entry, and the file-name suffixes.
+> between what is reusable and what is wiring, which specifier an import may name, and the
+> file-name suffixes.
 > Not error handling, not data access, not API design beyond where their files sit.
 >
 > Anchors here are public sources, not files in this tree — there is nothing to re-count. The
@@ -32,8 +33,7 @@ src/modules/
     ordering.service.ts          the capability's rules; nothing HTTP-shaped in here
     pricing.service.ts
     entities/order.entity.ts
-    types/index.ts
-    index.ts                     the only file anything outside ordering may import
+    types.ts                     colocated types; import the file, not a folder barrel
 
   catalog/
   notification/
@@ -70,91 +70,67 @@ declared thing, not an emergent property of the file system.
 
 ---
 
-## 3. One public entry per module; a deep import from another capability is a bug
+## 3. Name the declaring file; a barrel is a bug
 
-A module's folder has exactly one file the outside world may name, and it re-exports the module's
-public surface. Everything else — services, entities, helpers, types not in the surface — is
-internal, and internal means the compiler and the linter say so, not that a comment asks nicely.
+Every import names the file that declares the symbol. There is no module `index.ts`, no
+`export *` public surface, and no "go through the entry". A specifier that stops at a folder
+(`@modules/ai`, `@modules/platform/exceptions`, `@features/video-encoder`, `./types` meaning
+`types/index.ts`) is a barrel, and a barrel is the bug.
 
-This is Parnas again, stated as tooling. Without it, a refactor inside a capability breaks files in
-three other capabilities, and the module boundary you drew in §1 is decorative: the code has already
-grown through it.
-
-```ts
-// ordering/index.ts — the entire public surface, in one file
-export * from "./ordering.module"
-export * from "./ordering.service"
-export * from "./types"
-```
-
-**A barrel contains `export *` lines and nothing else.** No `export { A, B }`, no
-`export type { X } from`. A named re-export is always a symptom: it means two folders are trying to
-emit the same symbol and someone hand-picked their way around the resulting `TS2308` instead of
-fixing the ownership. The cure is ownership, not curation — see below.
-
-**One symbol, one home; a symbol two folders share moves to `shared/`.** When folder `b` needs a type
-that folder `a` defined, the answer is never `export type { T } from "../a"` in `b`'s barrel — that
-makes `T` reachable by two paths, and the parent barrel that `export *`s both is then illegal. Move
-`T` into the capability's `shared/` folder, which becomes its single owner, and let every consumer —
-`a`, `b`, and the parent barrel — reach it through that one path.
+This is still Parnas, stated as tooling — just the other way around from a curated facade. The
+capability boundary in §1 is the folder and the `@Module` that wires it, not a re-export list that
+drifts, collides on `ConfigurableModuleClass`, and hides the file a reader actually needs to open.
+When a symbol moves, the import path moves with it; grep finds every caller; `isolatedModules` does
+not have to chase `export *`.
 
 ```ts
-// Wrong — real drift, seeders/ (2026-08-05): three paths emit one type
-// shared/path/types/index.ts      defines ResolvedFilePath
-// courses/path/index.ts           export type { ResolvedFilePath } from "../../shared"
-// cv/path/types/…                 export type { ResolvedFilePath } from "../../../courses/path/…"
-// → seeders/index.ts cannot `export *` both ./courses and ./shared, so it hand-listed ./shared's
-//   surface behind a five-line apology. The apology is the bug report.
-
-// Right: ResolvedFilePath lives in shared/ only. courses/ and cv/ import it; neither re-exports it.
-```
-
-The cost of `export *` is that a folder's whole surface is public, so the barrel no longer hides an
-internal the way a curated list did. That hiding is bought back a level up: §3's own
-`no-deep-module-import` rule means no consumer can name anything inside the module regardless, so the
-information hiding lives at the module boundary, where it is machine-checked, instead of in a
-hand-maintained list that drifts and collides.
-
-The barrel re-exports the module class, its service(s) and the types the surface promises — and it
-never `export *`s the `.module-definition.ts`. `ConfigurableModuleBuilder` generates
-`ConfigurableModuleClass`, `MODULE_OPTIONS_TOKEN` and `OPTIONS_TYPE` under those exact generic names in
-*every* module, so a barrel that blanket-exports two of them re-exports the same three names twice and
-the compiler refuses it — `TS2308`, "already exported a member". Those tokens are wired inside the
-module; no importer binds against them, so they stay internal. This is live drift, not a hypothetical:
-`src/modules/ai/index.ts` and `src/modules/bussiness/index.ts` each carry exactly this collision
-(2026-08-04). Gated — a `.module-definition` reached by an `export *`, or any `TS2308` on a module's
-`index.ts`, is a folder-shape check away.
-
-```ts
-// Wrong: reaching past the entry into another capability's internals.
-import { PricingService } from "@modules/ordering/pricing.service"
-
-// Right: through the entry, which is the file that made a promise.
+// Wrong: a folder, a barrel, a promise nobody can keep.
 import { OrderingService } from "@modules/ordering"
+import { PricingService } from "./pricing"
+
+// Right: the file that declares the symbol.
+import { OrderingService } from "@modules/ordering/ordering.service"
+import { PricingService } from "./pricing.service"
 ```
 
-Machine-checkable, and it should be checked, because review will not catch it reliably. Point
-`eslint-plugin-import` at the boundary:
+**Cross-capability imports use the alias and the path under that root.** `@modules/<path from
+src/modules>`, `@features/<path from src/features>`, `@tests/<path from src/tests>`. Meta-category
+modules keep the category segment (`@modules/platform/winston/winston.service`, never the collapsed
+`@modules/winston/...` short form).
 
-```js
-// eslint.config.js
-"import/no-internal-modules": ["error", {
-    // a capability may be imported at its root only; anything inside it is private
-    forbid: ["@modules/*/*"],
-}],
+**Same-capability imports are relative.** A file under `src/modules/ai/` that writes `@modules/ai/...`
+is talking to itself through the public alias — a cycle magnet and a lie about the boundary. Gated
+by `no-self-module-alias`. The same cut applies to `@features/<name>` and `@tests/<name>`.
+
+**Machine-checked by two rules, both `error` with zero debt:**
+
+- `must-deep-module-import` — a module/feature/tests root specifier is illegal; name a file.
+- `no-self-module-alias` — inside a capability, do not use that capability's own alias.
+
+**One symbol, one home; a symbol two folders share moves to `shared/`.** Without barrels the old
+`TS2308` "already exported a member" failure mode is gone, but the ownership rule is not: when
+folder `b` needs a type folder `a` defined, `b` imports the declaring file. It does not copy the
+type, and it does not re-export it. If a third folder needs it too, the type moves to the
+capability's `shared/` in the same commit and every caller points at that one file.
+
+```ts
+// Wrong — three paths emit one type (seeders/, 2026-08-05 drift, now retired).
+// shared/path/types.ts            defines ResolvedFilePath
+// courses/path.ts                 export type { ResolvedFilePath } from "../shared/path/types"
+// cv/...                          export type { ResolvedFilePath } from "../../courses/path"
+
+// Right: ResolvedFilePath lives in shared/ only. courses/ and cv/ import that file.
 ```
 
-Path aliases carry the same rule: map `@modules/*` at folder granularity, never
-`@modules/ordering/services/*`. An alias that resolves into a module's interior is an invitation
-that will be accepted.
+`.module-definition.ts` stays internal for the same reason it never belonged in a barrel:
+`ConfigurableModuleBuilder` emits `ConfigurableModuleClass`, `MODULE_OPTIONS_TOKEN` and
+`OPTIONS_TYPE` under those exact generic names in every module. Importers bind against the concrete
+module class and its services, not those tokens.
 
-Two exceptions that are real, not loopholes. A large module may nest a sub-module and re-export it
-from its own `exports: [...]`, so consumers still go through the parent and the parent stays in
-control of how the child is configured. And a genuinely cross-cutting utility used by many
-capabilities belongs in a shared `common` module — not deep-imported from whichever capability
-happened to write it first.
-
----
+A large module may still nest a sub-module and list it in `exports: [...]` so Nest's injector stays
+in the parent's control. That is wiring, not an import facade. A genuinely cross-cutting utility
+used by many capabilities belongs in its own shared module — imported by declaring file, not
+deep-copied out of whichever capability wrote it first.
 
 ## 4. Colocate by default; promote on the second consumer
 
@@ -172,7 +148,7 @@ by taste, and the shared module stays small enough to read.
 
 Companion folders are created when they have something in them and not before. An empty `utils/`
 with a barrel exporting nothing is a folder a reader has to open to discover it was a false lead.
-Under about three items, a flat `types.ts` beside the service beats a `types/` folder with a barrel;
+Under about three items, a flat `types.ts` beside the service beats a `types/` folder of one-file-each;
 past that, the folder earns itself.
 
 Tests colocate too — the spec sits beside the file it covers, so that moving the unit moves its
@@ -196,7 +172,6 @@ features/api/graphql/queries/order-summary/
   order-summary.resolver.ts           one method, named execute
   order-summary.service.ts            reads; calls into the capability layer for anything rule-bearing
   graphql-types/response.ts
-  index.ts
 ```
 
 Two conventions in there are load-bearing and neither is obvious.
@@ -262,7 +237,7 @@ old as a deprecated re-export so nothing breaks, migrate call sites over time, t
 in a commit that does nothing else.
 
 ```ts
-// ordering/index.ts
+// ordering/ordering.service.ts
 export class OrderingService { /* ... */ }
 
 /** @deprecated Renamed to {@link OrderingService}; this alias is removed after the call sites move. */
