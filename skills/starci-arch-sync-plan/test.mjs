@@ -122,6 +122,22 @@ t.expect("it separates the pile that is blocked on a decision from the pile that
 t.expect("it says a rule punishing correct code is the rule's defect",
     said(/the rule is the defect/i.test(prose), "rule-is-the-defect stated"), { exit: 0 });
 
+
+t.expect("it makes the source sweep a step, not an afterthought",
+    said(/Sweep the SOURCE first/i.test(prose), "source sweep stated"), { exit: 0 });
+
+t.expect("it says an unwritten convention cannot be synced",
+    said(/An unwritten convention cannot be synced/i.test(prose), "folklore-not-exportable stated"), { exit: 0 });
+
+t.expect("it warns that a rule reporting zero may simply never have run",
+    said(/the code conforms, or the rule never ran/i.test(prose), "zero-is-ambiguous stated"), { exit: 0 });
+
+t.expect("it warns that a rule guards only the construct it names",
+    said(/says nothing about how an exception class is DECLARED/i.test(prose), "one-construct warning stated"), { exit: 0 });
+
+t.expect("it rejects inventing a rule for a pattern that is only half-followed",
+    said(/it is coincidence/i.test(prose), "coincidence-not-convention stated"), { exit: 0 });
+
 // ---------------------------------------------------------------------
 t.group("the house voice holds");
 

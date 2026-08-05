@@ -113,6 +113,10 @@ t.expect("it requires the comments describing removed wiring to be fixed in the 
 t.expect("it names the conditions under which it stops rather than improvises",
     said(/When to stop and hand back/.test(prose), "stop conditions named"), { exit: 0 });
 
+
+t.expect("it requires the ported rules to be proved firing before any count is trusted",
+    said(/the code conforms or that the rule never ran/i.test(prose), "probe-before-trust stated"), { exit: 0 });
+
 // ---------------------------------------------------------------------
 t.group("the house voice holds");
 

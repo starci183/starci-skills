@@ -38,6 +38,12 @@ untouched history never blocks a commit while the file being touched must be cle
 Nothing is at `error` yet. A rule at `error` with debt blocks every commit that so much as opens an
 offending file, including the commits that were going to fix it.
 
+**Then prove the instrument works before trusting a single number it produces.** A rule reporting
+zero means either that the code conforms or that the rule never ran, and the output does not say
+which. Write a probe file that violates every ported rule at once and confirm each one reports.
+Put it where the configuration actually looks: a probe outside the config's `files` glob comes back
+silent and reads exactly like a set of broken rules. Delete the probe once it has done its job.
+
 ## Then, one rule at a time
 
 For each rule, in the sequence the proposal set:

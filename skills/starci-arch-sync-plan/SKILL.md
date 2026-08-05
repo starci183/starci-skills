@@ -33,6 +33,33 @@ So: **write the rule first, land it at `warn`, and let the rule count.** An esti
 decide whether a rule is worth writing at all, and any number it produces is labelled as a floor in the
 proposal, never as the debt.
 
+## 0. Sweep the SOURCE first, because half the rules are not written down yet
+
+Before measuring the target, measure the repository the canon comes from. A codebase that has been
+written to a standard for years obeys more rules than anyone has recorded, and those unrecorded ones
+are invisible until somebody tries to export them.
+
+Sweep for **invariants**: patterns the source follows with no exception. For each candidate, count
+the conforming sites and the violating ones, and read the percentage as a verdict:
+
+- **at or near 100 percent** -- this is a real convention. It can become a rule and land at `error`
+  immediately, because the debt is already zero.
+- **around half** -- this is not a convention, it is coincidence. Writing a rule for it means
+  inventing policy and then making a machine enforce it. Record the number and reject it by name, so
+  the next sweep does not re-propose it.
+- **in between** -- a convention with real debt. It becomes a rule at `warn` with a burn-down, not an
+  `error`.
+
+**An unwritten convention cannot be synced.** This is the reason the sweep comes first. One sweep
+found a repository where persistence went through one handle at 1341 sites against zero alternatives,
+and where a caching wrapper was used everywhere while the raw client appeared only inside the wrapper
+itself. Both were absolute. Neither was in the canon: every mention was an example in a code snippet,
+never a clause. The universal-principles shelf stated the idea in general terms, deliberately naming
+no house spelling. So the practice was folklore -- true, total, and unexportable.
+
+The order is therefore: sweep, then write the clause into the enforcing shelf, then write the rule.
+A rule shipped ahead of its clause is a machine enforcing something no document says.
+
 ## 1. Read the canon that governs, and the target as it is
 
 Open `canon/be/INDEX.md` and the shelf index `canon/be/enforce/authoring/INDEX.md` for a back end, or
@@ -89,7 +116,26 @@ burned down before it is known which application composes which feature - the sa
 delete in a repository with one application and fatal in one with eight. State the dependencies between
 rules explicitly, and say what must be true before each phase starts.
 
-## 5. Say which checks prove it, and which cannot
+## 5. Prove each rule fires before believing its count
+
+A rule that reports zero has two possible meanings and they are opposite: the code conforms, or the
+rule never ran. Nothing in the output tells them apart, and the wrong reading ships a lint layer that
+enforces nothing while every report says clean.
+
+So before recording any rule's debt, write a probe file that violates every rule at once and confirm
+each one reports. **Put the probe where the configuration actually looks.** One probe came back
+silent on all eight rules under test and looked like eight broken rules; the file was sitting in a
+directory outside the configuration's `files` glob, so nothing had scanned it. Moved inside, all
+eight fired.
+
+The same caution applies to a rule that already exists and reads as settled. A rule guards the
+construct it names and nothing else: one that checks how an exception is THROWN says nothing about
+how an exception class is DECLARED, so a class extending the framework's base is thrown by its own
+name and the throw looks correct. That hole was live, and thrown from four call sites, while the gate
+stayed green. When the sweep finds a rule that "already covers" something, check which construct it
+actually visits.
+
+## 6. Say which checks prove it, and which cannot
 
 Name the commands, and be honest about what each one can see.
 
@@ -105,8 +151,10 @@ zero, and "no regressions" is not a claim that can be made against a number nobo
 
 Written to the target repository, not to this one, so it travels with the work:
 
+- the sweep of the SOURCE: invariants found, their conformance percentage, which became rules, and
+  which were rejected by name with their number
 - what the target already satisfies, with counts
-- the debt table, one row per rule, measured by the rule
+- the debt table, one row per rule, measured by the rule, each rule proved to fire first
 - the three piles, with every blocked rule's decision stated as a question
 - the sequence, with the dependency between phases named
 - the checks, with their baselines
