@@ -50,6 +50,13 @@ exception: it says, once, what this backend actually runs those portable words o
 TypeORM, PostgreSQL, GraphQL, NATS, Kafka, Debezium, BullMQ, Keycloak, MinIO, Elasticsearch — and
 which `system-design/` or `authoring/` file each one grounds.
 
+## sourcetree.md — the physical map
+
+[`sourcetree.md`](sourcetree.md) is the orientation map: where every kind of file sits in `src/`
+(`modules/` the tiered library vs `features/` the runnable side), pointing to
+`enforce/authoring/naming-and-structure.md` and `.artifacts/states/_modules/structure.md` for the rules.
+Start there to place a file; it restates no rule.
+
 ## Reading order
 
 Open the shelf the task touches, not the set. A new feature typically crosses both: `system-design/`

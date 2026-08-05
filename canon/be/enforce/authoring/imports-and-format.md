@@ -46,19 +46,25 @@ still takes three lines — this is the repo's DOMINANT idiom.
 // src/features/.../purchase-ai-subscription.handler.ts
 import {
     ICQRSHandler,
-} from "@modules/cqrs"
+} from "@modules/platform/cqrs/icqrs-handler"
 import {
     ActionType,
-    InjectPrimaryPostgreSQLEntityManager,
+} from "@modules/databases/postgresql/primary/enums/action-type"
+import {
     PaymentType,
+} from "@modules/databases/postgresql/primary/enums/payment-type"
+import {
     TransactionEntity,
-} from "@modules/databases"
+} from "@modules/databases/postgresql/primary/entities/transaction.entity"
+import {
+    InjectPrimaryPostgreSQLEntityManager,
+} from "@modules/databases/postgresql/primary/primary.decorators"
 ```
 
 ```ts
 // Wrong: collapsed onto one line — eslint's object-curly-newline flags it.
-import { ICQRSHandler } from "@modules/cqrs"
-import { ActionType, PaymentType, TransactionEntity } from "@modules/databases"
+import { ICQRSHandler } from "@modules/platform/cqrs/icqrs-handler"
+import { ActionType, PaymentType, TransactionEntity } from "@modules/databases/postgresql/primary/entities/transaction.entity"
 ```
 
 The only exception is a **default import**, which has no braces and stays on one line:
@@ -90,32 +96,35 @@ import type {
 
 ---
 
-## 4. Crossing modules uses the `@modules/*` alias, never a relative path across a module boundary
+## 4. Crossing modules uses the `@modules/*` alias and names the declaring file
 
-The path aliases in `tsconfig.json` are `@modules/*` → `src/modules/*` and `@features/*` →
-`src/features/*`. Importing from another module ALWAYS goes through the **barrel alias**
-`@modules/<name>` — `@modules/databases`, `@modules/exceptions`, `@modules/mixin` — never deep into a
-file inside that module, and never `../../../modules/...`.
+The path aliases in `tsconfig.json` are a single root each: `@modules/*` → `src/modules/*` and
+`@features/*` → `src/features/*`. Importing from another capability ALWAYS goes through the alias
+**and the file that declares the symbol** — never a folder barrel, never the collapsed short form
+(`@modules/winston/...`), and never `../../../modules/...`. Same-capability imports stay relative
+(naming-and-structure §3). Grounded 2026-08-05 against
+`src/features/api/core/graphql/mutations/ai/purchase-ai-subscription/purchase-ai-subscription.handler.ts`.
 
 ```ts
 import {
     UserNotFoundException,
-} from "@modules/exceptions"
+} from "@modules/platform/exceptions/errors/users/user"
 import {
     DayjsService,
+} from "@modules/lib/mixin/dayjs.service"
+import {
     RetryService,
-} from "@modules/mixin"
+} from "@modules/lib/mixin/retry.service"
 ```
 
 ```ts
-// Wrong: climbing out to another module, and reaching past its barrel.
-import { UserNotFoundException } from "../../../../modules/exceptions"
-import { DayjsService } from "@modules/mixin/dayjs/dayjs.service"
+// Wrong: climbing out to another module, or stopping at a folder barrel.
+import { UserNotFoundException } from "../../../../modules/platform/exceptions"
+import { DayjsService } from "@modules/mixin"
 ```
 
-For a type shared WITHIN the same feature, either `@features/<path>` (for instance
-`@features/api/core/types`) or a relative `./` or `../` is idiomatic here — choose by distance
-(see §5).
+For a type shared WITHIN the same feature, either `@features/<path-to-file>` or a relative `./` or
+`../` is idiomatic here — choose by distance (see §5).
 
 ---
 
@@ -154,19 +163,9 @@ import {
 
 ---
 
-## 6. A barrel `index.ts` is `export * from "./x"`, one line per file
+## 6. There is no barrel
 
-A barrel only re-exports with a star, one source per line, renaming nothing, with no stray blank
-lines.
-
-```ts
-// src/features/.../graphql-types/index.ts
-export * from "./request"
-export * from "./response"
-```
-
-```ts
-// Wrong: selective named re-exports — not the barrel idiom here.
-export { PurchaseAiSubscriptionRequest } from "./request"
-export { PurchaseAiSubscriptionResponseData } from "./response"
-```
+`index.ts` is not a public surface. Importers name `./graphql-types/request` and
+`./graphql-types/response` (or the `@modules` / `@features` file path) directly. A new
+`export * from "./x"` folder is the bug `must-deep-module-import` exists to catch. See
+naming-and-structure §3 for why the barrel was retired and what that made public API.
