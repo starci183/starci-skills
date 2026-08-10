@@ -58,18 +58,13 @@ const DOCUMENTED_KINDS = new Set([
   "FunctionDeclaration",
 ])
 
-/**
- * Index of the first non-ASCII character in a line, or -1.
- *
- * A codepoint scan rather than a regex. What this replaces was three separate character classes -
- * Vietnamese, emoji, decorative symbols - which between them still let a fourth alphabet through,
- * and every escaping mistake inside them failed silently rather than loudly.
- */
-const firstNonAscii = (line) => {
-  for (let index = 0; index < line.length; index += 1) {
-    if (line.charCodeAt(index) > ASCII_MAX) return index
-  }
-  return -1
+/** What a line offends with, or null. */
+const offenceIn = (line) => {
+  const withoutEndonym = line.replace(ENDONYM, "")
+  if (VIETNAMESE_LETTER.test(withoutEndonym)) return "a Vietnamese letter"
+  if (EMOJI.test(withoutEndonym)) return "an emoji"
+  if (ORNAMENT.test(withoutEndonym)) return "an ornamental symbol"
+  return null
 }
 
 /** Whether a JSDoc block sits immediately before a node. */
@@ -166,7 +161,7 @@ export const noNonAsciiSource = {
     schema: [],
     messages: {
       nonAscii:
-        "Non-ASCII character in source. The bar is a reader who does not share the author's first language: a codebase with two languages in it has somebody for whom half the reasoning is unavailable, and it is the half explaining the surprising parts. If this is text the program MATCHES on or EMITS, it is data rather than prose - keep it and mark the line `vn-ok: <reason>` so the next sweep does not turn it into a bug.",
+        "This line carries {{offence}}. The bar is a reader who does not share the author's first language: a codebase with two languages in it has somebody for whom half the reasoning is unavailable, and it is the half explaining the surprising parts - and an emoji or an ornament carries tone rather than information, which reads differently to everybody. If this is text the program MATCHES on or EMITS, it is data rather than prose: keep it and mark the line `vn-ok: <reason>` so the next sweep does not turn it into a bug.",
     },
   },
   create(context) {
@@ -180,15 +175,18 @@ export const noNonAsciiSource = {
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index]
           if (KEEP_MARKER.test(line)) continue
-          const column = firstNonAscii(line)
-          if (column < 0) continue
+          const offence = offenceIn(line)
+          if (offence === null) continue
           context.report({
             node,
             loc: {
               line: index + 1,
-              column,
+              column: 0,
             },
             messageId: "nonAscii",
+            data: {
+              offence,
+            },
           })
         }
       },

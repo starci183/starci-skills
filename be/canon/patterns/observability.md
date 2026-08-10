@@ -49,6 +49,16 @@ and on what evidence — is the thing nobody can reconstruct afterwards.
 The code and the metadata, so the alert groups by what actually broke. A stringified message groups
 by wording, which means one failure becomes several the day somebody improves the English.
 
+**OBSERVABILITY-6 · A standalone program is the one sanctioned exit, and it is scoped by path.**
+
+An agent or CLI that runs outside the request lifecycle has no request to correlate and no transport
+configured — the house service would give it nothing but a dependency. Those programs may use a
+plain logger, and the exit is declared once in the lint config against their folder rather than as a
+suppression on each line.
+
+The distinction is not "it is a small program". It is whether a request exists to attach the line
+to: everything served over HTTP or a queue has one, and everything with one uses the house service.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |

@@ -111,12 +111,31 @@ export const rules = {
 /**
  * The level this law asks for, as the plugin's own opinion.
  *
- * Both measured at zero debt in the reference repository. `no-console` is the standard rule rather
- * than a house one, listed here so a consuming repository switches all three on together - it is
- * the third way out of the pipeline and leaving it off makes the other two decorative.
+ * Both measured at zero debt in the reference repository ONCE the sanctioned exit is scoped:
+ * `no-framework-logger` reports four sites under the standalone-agent folder, and those are the
+ * exit rather than the debt. An agent running outside the request lifecycle has no request to
+ * correlate and no transport configured, so the house service would give it a dependency and
+ * nothing else. Scope that folder off in the consuming config -- once, by path -- rather than
+ * letting per-line suppressions accumulate until nobody can see how wide the exception has grown.
+ *
+ * `no-console` is the standard rule rather than a house one, listed here so a repository switches
+ * all three on together: it is the third way out of the pipeline, and leaving it off makes the
+ * other two decorative.
  */
 export const recommended = {
   "starci-be/no-framework-logger": "error",
   "starci-be/no-interpolated-log-message": "error",
   "no-console": "error",
 }
+
+/**
+ * Paths where a plain logger is sanctioned -- programs with no request to correlate.
+ *
+ * Exported so a consuming config and a measuring gate use the SAME list. Two copies of an exemption
+ * is how one of them silently grows.
+ */
+export const standaloneProgramGlobs = [
+  "src/modules/playground-agent-core/**",
+  "apps/playground-*-agent/**",
+  "apps/cli/**",
+]
