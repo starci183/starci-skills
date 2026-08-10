@@ -1,19 +1,19 @@
 # Config and env — code style
 
 Scope: how the backend reads configuration and environment variables — who may touch `process.env`,
-how a consumer reads config, and where secrets live. Grounded entirely in `src/modules/env/**` and
+how a consumer reads config, and where secrets live. Grounded entirely in `src/modules/platform/env/**` and
 its real consumers.
 
 ---
 
-## 1. `process.env[...]` may be touched ONLY in `src/modules/env/utils/parse-env.ts`
+## 1. `process.env[...]` may be touched ONLY in `src/modules/platform/env/utils/parse-env.ts`
 
 All reading of `process.env` is gathered into the `parseEnv*` helpers. No service, handler, or
 provider reads `process.env` directly — scattered reads lose typing, lose defaults, and cannot be
 found in one grep.
 
 ```ts
-// src/modules/env/utils/parse-env.ts — the ONLY place that touches process.env
+// src/modules/platform/env/utils/parse-env.ts — the ONLY place that touches process.env
 export const parseEnvInt = ({ key, defaultValue }: ParseEnvIntParams): number => {
     return parseInt(process.env[key] ?? defaultValue.toString(), 10)
 }
@@ -27,7 +27,7 @@ const maxDevices = parseInt(process.env.SESSION_MAX_DEVICES ?? "2", 10)
 There are exactly three LEGITIMATE exceptions, all at system boundaries rather than in business
 logic:
 
-- `src/modules/sentry/instrument.ts` — Sentry initialises BEFORE the Nest boot, so no config exists
+- `src/modules/integrations/sentry/instrument.ts` — Sentry initialises BEFORE the Nest boot, so no config exists
   yet: `environment: process.env.NODE_ENV`.
 - `src/modules/filesystem/mount.service.ts` and `src/features/backup/pg/pg.service.ts` — these pass
   `...process.env` down into a child process via `spawn`; they are not reading a value to use it.
@@ -42,7 +42,7 @@ Every configuration value is obtained by CALLING `envConfig()` and then walking 
 Import from the `@modules/env` barrel, never deep into `config.ts`.
 
 ```ts
-// src/modules/session/session.service.ts and src/modules/csrf/csrf.service.ts
+// src/modules/platform/session/session.service.ts and src/modules/platform/csrf/csrf.service.ts
 import { envConfig } from "@modules/env"
 // ...
 const max = envConfig().session.maxDevices
@@ -63,13 +63,13 @@ import { envConfig } from "@modules/env/config"
 
 ## 3. Every config node is one `parseEnv*({ key, defaultValue })` inside `envConfig()`
 
-`envConfig` (`src/modules/env/config.ts`) is an object tree, and every leaf goes through exactly one
+`envConfig` (`src/modules/platform/env/config.ts`) is an object tree, and every leaf goes through exactly one
 helper chosen by its data type, ALWAYS with a `defaultValue`. The helpers are `parseEnvString`,
 `parseEnvInt`, `parseEnvFloat`, `parseEnvBoolean`, `parseEnvMs` (a duration in milliseconds),
-`parseEnvSecond`, and `parseEnvJson<T>`.
+`parseEnvSecond`, `parseEnvJson<T>`, and — for credentials only — `parseEnvSecret` (§5).
 
 ```ts
-// src/modules/env/config.ts
+// src/modules/platform/env/config.ts
 maxDevices: parseEnvInt({ key: "SESSION_MAX_DEVICES", defaultValue: 2 }),
 ttlMs: parseEnvMs({ key: "SESSION_TTL", defaultValue: "30d" }),
 teamSlugsByCourseSlug: parseEnvJson<Record<string, string>>({
@@ -94,7 +94,7 @@ Splitting, filtering, comparing, or building a list is done at the config leaf, 
 receives an already-clean value of the right type.
 
 ```ts
-// src/modules/env/config.ts
+// src/modules/platform/env/config.ts
 isProduction: parseEnvString({ key: "NODE_ENV", defaultValue: "development" }) === "production",
 
 contactPoints: parseEnvString({ key: "SCYLLADB_CONTACT_POINTS", defaultValue: "localhost" })
@@ -110,30 +110,52 @@ The shape to avoid is returning a raw string and making every consumer `.split("
 
 ---
 
-## 5. A secret is NOT an env var — it is read on demand from a mounted file
+## 5. A secret goes through `parseEnvSecret` and the `<KEY>_FILE` pointer convention
 
-Keys and API secrets do not live in `process.env`. `envConfig().mountPath.*` holds only the file
-PATH, which may itself be overridden by env; the secret VALUE is read with `readFileSync` in
-`src/modules/filesystem/utils/mount-secrets.ts`. The goal is to keep secrets out of logs and APM —
-see the note in `src/modules/filesystem/mount.service.ts`: *"Avoid using process.env for sensitive
-secrets"*.
-
-```ts
-// src/modules/filesystem/utils/mount-secrets.ts
-export const getS3SecretAccessKey = (): string =>
-    readFileSync(envConfig().mountPath.terraform.s3SecretAccessKey, "utf8")
-```
+Every credential — an infra password as much as a third-party API key — is declared under
+`envConfig().secrets.*` with `parseEnvSecret`, never `parseEnvString`. The KEY names the VALUE
+(`STRIPE_SECRET_KEY`, not a path); the pointer twin `<KEY>_FILE` names a file, and
+`parseEnvSecret` opens it while the config tree is being built. The leaf therefore holds the
+RESOLVED value, and nothing downstream opens a file for it.
 
 ```ts
-// src/modules/env/config.ts — config declares the path and says plainly that the secret is not env
-stripe: {
-    // Secrets (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) are NOT env vars —
-    // they live in mount-terraform files read via MountFilesystemService.
-    currency: parseEnvString({ key: "STRIPE_CURRENCY", defaultValue: "usd" }),
+// src/modules/platform/env/config.ts — the key names the value, not a path
+secrets: {
+    stripeSecretKey: parseEnvSecret({ key: "STRIPE_SECRET_KEY", defaultValue: "" }),
 },
 ```
 
 ```ts
-// Wrong: putting the secret in env and reading it directly — it must come from the mounted file
-const key = process.env.STRIPE_SECRET_KEY
+// src/modules/filesystem/utils/mount-secrets.ts — a lookup, not a file read
+export const getStripeSecretKey = (): string => envConfig().secrets.stripeSecretKey
 ```
+
+The three rules `parseEnvSecret` enforces, and why:
+
+- **Pointer unset** → falls through to the ordinary string parser (env var, else default). The
+  optional case stays free.
+- **Both `<KEY>` and `<KEY>_FILE` set** → `EnvFileConflictException`. Either precedence rule is
+  defensible and neither is discoverable, so a silent winner is a stack running on a credential
+  nobody chose.
+- **Pointer set but the file is missing or empty** → `EnvFileUnreadableException`, at boot. The
+  pointer is generated by `scripts/sync.mjs`, not hand-written, so a pointer present means somebody
+  put a file behind it; falling back to the default there produces a green deploy quietly running
+  without a credential it was given.
+
+Calling `parseEnvSecret` IS the statement that a key is a secret — which is why it is a separate
+function rather than a `_FILE` branch inside all the parsers. A shared branch would make every key
+file-backable for free, and then nothing in the source would say which keys are credentials.
+
+```ts
+// Wrong: a credential read as an ordinary string — no pointer, no conflict check
+password: parseEnvString({ key: "POSTGRESQL_PRIMARY_PASSWORD", defaultValue: "postgres" }),
+```
+
+```ts
+// Wrong: an env key that names a PATH instead of the value it points at
+key: "TERRAFORM_STRIPE_SECRET_KEY_MOUNT_PATH",
+```
+
+`envConfig().mountPath.*` survives, but only for what it honestly describes: CONTENT and CONFIG
+file paths (`DATA_*_MOUNT_PATH`, `CONFIG_*_MOUNT_PATH`) plus the AI key-pool DIRECTORY. Those are
+locations, not credentials, and the loaders still open them themselves.
