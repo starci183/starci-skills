@@ -19,7 +19,12 @@ import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
 import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as propsRecommended, rules as propsRules } from "./props-and-slots.mjs"
+import { recommended as splitRecommended, rules as splitRules } from "./the-split.mjs"
 import { recommended as tokensRecommended, rules as tokensRules } from "./tokens.mjs"
+import { recommended as translationRecommended, rules as translationRules } from "./translation.mjs"
+import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
+import { recommended as typographyRecommended, rules as typographyRules } from "./typography.mjs"
+import { recommended as vendorRecommended, rules as vendorRules } from "./vendor-boundary.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
@@ -30,7 +35,12 @@ const CONTRIBUTIONS = [
   { law: "loading", rules: loadingRules, recommended: loadingRecommended },
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
+  { law: "the-split", rules: splitRules, recommended: splitRecommended },
   { law: "tokens", rules: tokensRules, recommended: tokensRecommended },
+  { law: "translation", rules: translationRules, recommended: translationRecommended },
+  { law: "type-safety", rules: typeSafetyRules, recommended: typeSafetyRecommended },
+  { law: "typography", rules: typographyRules, recommended: typographyRecommended },
+  { law: "vendor-boundary", rules: vendorRules, recommended: vendorRecommended },
 ]
 
 /**
