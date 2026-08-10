@@ -1,8 +1,0 @@
-tier,owns,never,may_import,signal_it_belongs_here,signal_it_is_misplaced
-atom,"one indivisible unit: a value it renders and the states of that value","knows nothing about data; arranges nothing",nothing,"takes a value and renders it; no child of its own to place","it arranges children — it is a composite with the wrong name"
-frame,"direction, seam, alignment, and its own chrome between children","asks what its children are","atoms, and only to place its own chrome","every prop is about arrangement, none about content","a prop makes the caller describe its own content"
-composite,"a reusable shape assembled from atoms inside frames","knows any domain entity","atoms, frames","props are shapes: items, title, onPress","a prop names a domain entity — it is a block"
-block,"domain data and its async decisions","draws a shape of its own","atoms, frames, composites","takes an entity and owns empty/loading/error","it takes no data — it is a composite in the wrong folder"
-layout,"the shell a whole route sits in","owns content","composites, frames","every route of a section renders inside it","it is used by one screen only — it is a composite"
-overlay,"a surface that covers the page: modal, drawer, popover shell","owns domain data","composites, frames","it traps focus and dims what is behind","it does not cover anything — it is a composite"
-page,"a list of functions: which blocks, in which frames, fed which data","draws a shape of its own","blocks, composites, frames","it names blocks and passes typed data, nothing more","it builds a shape inline — a block is missing"

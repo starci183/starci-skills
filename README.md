@@ -1,1 +1,0 @@
-﻿# starci-claude-skills
