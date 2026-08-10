@@ -44,9 +44,9 @@ const fixtureRoot = () => {
     join(root, "src/components/contracts/index.ts"),
     [
       "export const CONTRACTS = buildContracts({",
-      '    "title-with-baseline-fact": {',
-      '        classes: ["flex", "items-baseline", "gap-3"],',
-      '        why: "the fact sits on the title baseline so a long title pushes it down rather than misaligning",',
+      "    \"title-with-baseline-fact\": {",
+      "        classes: [\"flex\", \"items-baseline\", \"gap-3\"],",
+      "        why: \"the fact sits on the title baseline so a long title pushes it down rather than misaligning\",",
       "    },",
       "})",
       "",
@@ -78,21 +78,21 @@ test("every rule this law declares is exported under its published name", () => 
 test("CONTRACT-1: a structural class written as a literal goes back to a key", () => {
   tester.run("no-literal-structural-class", noLiteralStructuralClass, {
     valid: [
-      { filename: BLOCK, code: 'export const E = () => <Tree contract="title-with-baseline-fact" />' },
-      { filename: BLOCK, code: 'export const E = () => <Text className="text-sm" />' },
-      { filename: LEAF, code: 'export const T = () => <p className="inline-flex items-center gap-2" />' },
+      { filename: BLOCK, code: "export const E = () => <Tree contract=\"title-with-baseline-fact\" />" },
+      { filename: BLOCK, code: "export const E = () => <Text className=\"text-sm\" />" },
+      { filename: LEAF, code: "export const T = () => <p className=\"inline-flex items-center gap-2\" />" },
     ],
     invalid: [
       {
         filename: BLOCK,
-        code: 'export const E = () => <Tree className="flex gap-4" />',
+        code: "export const E = () => <Tree className=\"flex gap-4\" />",
         errors: [{ messageId: "structural" }],
       },
       {
         // a composite is NOT exempt: the leaf folder is the only exemption, and widening it is
         // exactly how the leaf tier filled up with arrangements
         filename: COMPOSITE,
-        code: 'export const C = () => <div className="flex flex-col gap-2" />',
+        code: "export const C = () => <div className=\"flex flex-col gap-2\" />",
         errors: [{ messageId: "structural" }],
       },
     ],
@@ -103,16 +103,16 @@ test("CONTRACT-1: hoisting the string into a constant hides it rather than licen
   tester.run("no-literal-structural-class", noLiteralStructuralClass, {
     valid: [
       // not structural - a leaf's own look is none of this rule's business
-      { filename: COMPOSITE, code: 'const TONE = "text-sm text-muted"' },
+      { filename: COMPOSITE, code: "const TONE = \"text-sm text-muted\"" },
       // the leaf folder is the one exemption, and it applies to the constant too
-      { filename: LEAF, code: 'const ROW = "inline-flex items-center gap-2"' },
+      { filename: LEAF, code: "const ROW = \"inline-flex items-center gap-2\"" },
       { filename: COMPOSITE, code: "const LABEL = `already resolved`" },
     ],
     invalid: [
       {
         // the exact shape that survived every rule in the source this was ported from
         filename: COMPOSITE,
-        code: 'const ROW_CLASSES = "flex flex-row items-center gap-3 rounded-xl px-3 py-2"',
+        code: "const ROW_CLASSES = \"flex flex-row items-center gap-3 rounded-xl px-3 py-2\"",
         errors: [{ messageId: "hoisted" }],
       },
       {
@@ -127,13 +127,13 @@ test("CONTRACT-1: hoisting the string into a constant hides it rather than licen
 test("CONTRACT-2: a class string is never assembled at runtime", () => {
   tester.run("no-class-composition-outside-contract", noClassCompositionOutsideContract, {
     valid: [
-      { filename: BLOCK, code: 'export const E = () => <Tree contract={t ? "rows-tight" : "rows"} />' },
-      { filename: LEAF, code: 'export const T = () => <p className={cn("a", "b")} />' },
+      { filename: BLOCK, code: "export const E = () => <Tree contract={t ? \"rows-tight\" : \"rows\"} />" },
+      { filename: LEAF, code: "export const T = () => <p className={cn(\"a\", \"b\")} />" },
     ],
     invalid: [
       {
         filename: BLOCK,
-        code: 'export const E = () => <Tree className={cn("flex", on && "gap-4")} />',
+        code: "export const E = () => <Tree className={cn(\"flex\", on && \"gap-4\")} />",
         errors: [{ messageId: "composer" }],
       },
       {
@@ -150,19 +150,19 @@ test("CONTRACT-6: a reason that restates the key is not a reason", () => {
     valid: [
       {
         filename: TABLE,
-        code: 'const C = { "title-with-baseline-fact": { why: "the fact sits on the title baseline so a long title pushes it down rather than misaligning it" } }',
+        code: "const C = { \"title-with-baseline-fact\": { why: \"the fact sits on the title baseline so a long title pushes it down rather than misaligning it\" } }",
       },
-      { filename: BLOCK, code: 'const C = { "x": { why: "row of chips" } }' },
+      { filename: BLOCK, code: "const C = { \"x\": { why: \"row of chips\" } }" },
     ],
     invalid: [
       {
         filename: TABLE,
-        code: 'const C = { "content-row": { why: "row of chips" } }',
+        code: "const C = { \"content-row\": { why: \"row of chips\" } }",
         errors: [{ messageId: "tooShort" }],
       },
       {
         filename: TABLE,
-        code: 'const C = { "title-with-baseline-fact": { why: "title with baseline fact title with baseline fact title with baseline fact" } }',
+        code: "const C = { \"title-with-baseline-fact\": { why: \"title with baseline fact title with baseline fact title with baseline fact\" } }",
         errors: [{ messageId: "restates" }],
       },
     ],
@@ -172,20 +172,30 @@ test("CONTRACT-6: a reason that restates the key is not a reason", () => {
 test("CONTRACT-7: a structural host outside the frame is a node with no key", () => {
   tester.run("no-structural-host-outside-contract-frame", noStructuralHostOutsideContractFrame, {
     valid: [
-      { filename: BLOCK, code: 'export const E = () => <Tree contract="title-with-baseline-fact" />' },
+      { filename: BLOCK, code: "export const E = () => <Tree contract=\"title-with-baseline-fact\" />" },
       { filename: FRAME, code: "export const Tree = () => <div />" },
       { filename: FRAME, code: "export const Tree = () => <ul />" },
       { filename: LEAF, code: "export const T = () => <div />" },
       { filename: BLOCK, code: "export const E = () => <span />" },
+      // a semantic element carrying MEANING and no shape: it decides nothing, and swapping it for
+      // a neutral box would change what assistive technology reports
+      { filename: BLOCK, code: "export const E = () => <form onSubmit={submit}><Tree contract=\"form-column\" /></form>" },
+      { filename: COMPOSITE, code: "export const C = () => <ul><li /></ul>" },
     ],
     invalid: [
       { filename: BLOCK, code: "export const E = () => <div />", errors: [{ messageId: "host" }] },
       { filename: BLOCK, code: "export const E = () => <section />", errors: [{ messageId: "host" }] },
-      // the semantic elements: an entry names its own host now, so writing one by hand is a node
-      // with no key exactly like a div is
-      { filename: COMPOSITE, code: "export const C = () => <ul />", errors: [{ messageId: "host" }] },
-      { filename: COMPOSITE, code: "export const C = () => <li />", errors: [{ messageId: "host" }] },
-      { filename: BLOCK, code: "export const E = () => <form />", errors: [{ messageId: "host" }] },
+      // a semantic element the moment it carries a shape
+      {
+        filename: COMPOSITE,
+        code: "export const C = () => <ul className=\"flex gap-2\" />",
+        errors: [{ messageId: "styledSemantic" }],
+      },
+      {
+        filename: BLOCK,
+        code: "export const E = () => <form className=\"flex flex-col\" />",
+        errors: [{ messageId: "styledSemantic" }],
+      },
     ],
   })
 })
@@ -193,13 +203,13 @@ test("CONTRACT-7: a structural host outside the frame is a node with no key", ()
 test("CONTRACT-8: a marker written by hand claims a contract nothing holds", () => {
   tester.run("no-hand-written-contract-attrs", noHandWrittenContractAttrs, {
     valid: [
-      { filename: FRAME, code: 'export const Tree = () => <div data-node="x" />' },
-      { filename: BLOCK, code: 'export const E = () => <Tree contract="title-with-baseline-fact" />' },
+      { filename: FRAME, code: "export const Tree = () => <div data-node=\"x\" />" },
+      { filename: BLOCK, code: "export const E = () => <Tree contract=\"title-with-baseline-fact\" />" },
     ],
     invalid: [
       {
         filename: BLOCK,
-        code: 'export const E = () => <Tree data-node="title-with-baseline-fact" />',
+        code: "export const E = () => <Tree data-node=\"title-with-baseline-fact\" />",
         errors: [{ messageId: "marker" }],
       },
     ],
@@ -208,10 +218,10 @@ test("CONTRACT-8: a marker written by hand claims a contract nothing holds", () 
 
 test("CONTRACT-9: an unknown key describes nothing, and the message lists the real ones", () => {
   tester.run("no-unknown-contract-key", noUnknownContractKey, {
-    valid: [{ filename: BLOCK, code: 'export const E = () => <Tree contract="title-with-baseline-fact" />' }],
+    valid: [{ filename: BLOCK, code: "export const E = () => <Tree contract=\"title-with-baseline-fact\" />" }],
     invalid: [
-      { filename: BLOCK, code: 'export const E = () => <Tree contract="card" />', errors: [{ messageId: "unknown" }] },
-      { filename: BLOCK, code: 'const spec = contractSpec("card")', errors: [{ messageId: "unknown" }] },
+      { filename: BLOCK, code: "export const E = () => <Tree contract=\"card\" />", errors: [{ messageId: "unknown" }] },
+      { filename: BLOCK, code: "const spec = contractSpec(\"card\")", errors: [{ messageId: "unknown" }] },
     ],
   })
 })
@@ -221,7 +231,7 @@ test("a table that cannot be read silences the rule instead of failing every cal
   assert.equal(readContracts(`${orphan}/src/components/blocks/x/Y/index.tsx`), null)
   tester.run("no-unknown-contract-key", noUnknownContractKey, {
     valid: [
-      { filename: `${orphan}/src/components/blocks/x/Y/index.tsx`, code: 'const E = () => <Tree contract="anything" />' },
+      { filename: `${orphan}/src/components/blocks/x/Y/index.tsx`, code: "const E = () => <Tree contract=\"anything\" />" },
     ],
     invalid: [],
   })

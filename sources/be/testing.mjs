@@ -187,7 +187,7 @@ export const rules = {
  * Both land at `warn` with the count, get burned down, and flip to `error` at zero.
  */
 export const recommended = {
-  "starci-be/no-call-only-spec": "warn", // no=1 of 181
-  "starci-be/e2e-asserts-persisted-state": "warn", // no=1 of 48
-  "starci-be/no-model-call-in-e2e": "error", // no=0 of 48
+  "starci-be/no-call-only-spec": "error", // no=0 of 182 - burned down from 1
+  "starci-be/e2e-asserts-persisted-state": "error", // no=0 of 47 - burned down from 1
+  "starci-be/no-model-call-in-e2e": "error", // no=0 of 47
 }

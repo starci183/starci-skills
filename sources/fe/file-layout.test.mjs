@@ -107,7 +107,7 @@ test("LAYOUT-4: a family is exported as members, not as one object", () => {
     valid: [
       "export const CardRoot = () => null",
       // data, not a component family - the members are not component-shaped names
-      'export const TONE = { muted: "a", accent: "b" }',
+      "export const TONE = { muted: \"a\", accent: \"b\" }",
       // one member is not a namespace
       "export const Card = { Root: CardRoot }",
     ],

@@ -80,10 +80,17 @@ fact that made the node exist.
 
 **CONTRACT-7 · One frame turns a key into an element.**
 
-An entry becomes real markup in exactly one file. Everywhere else, a structural host written by hand
-is a node with no key: nothing records what classes it should carry, which children belong inside it,
-or why it is there. If no key fits the shape being built, that is the finding — not a reason to open
-a `div`.
+An entry becomes real markup in exactly one file. Everywhere else, a NEUTRAL box written by hand — a
+`div`, a `section`, a `nav` — is a node with no key: nothing records what classes it should carry,
+which children belong inside it, or why it is there. If no key fits the shape being built, that is
+the finding — not a reason to open a `div`.
+
+**A semantic element is different, and the difference is not a loophole.** A `form` exists to
+submit; a `ul` exists because its contents are a list. Assistive technology reports the element, so
+it cannot be swapped for a neutral box, and opening one around a contract node decides no shape at
+all. What must still come from an entry is the SHAPE: the moment a semantic element carries a class,
+it has stopped being a wrapper and become a node with no key, and the entry that replaces it names
+the element as its host.
 
 **CONTRACT-8 · The markers are painted from the entry, never written by hand.**
 

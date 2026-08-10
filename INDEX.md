@@ -41,24 +41,38 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
   an overlay is summoned and dismissed.
 - **`patterns/`** — how code is written. One file per concept, each naming the artifact that holds
   it: [`contract`](fe/canon/patterns/contract.md) · [`file-layout`](fe/canon/patterns/file-layout.md)
-  · [`naming`](fe/canon/patterns/naming.md). Still owed: props-and-slots, css-doors, tokens,
-  loading, the-split, translation, type-safety, comments, accessibility.
+  · [`icon`](fe/canon/patterns/icon.md) · [`naming`](fe/canon/patterns/naming.md). Still owed:
+  props-and-slots, css-doors, tokens, loading, the-split, translation, type-safety, comments,
+  accessibility.
 
-`fe/design/` has begun with the three that define each other:
-[`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) · [`padding`](fe/design/padding.md).
-Still owed: position, responsive, hierarchy, restraint, colour, typography.
+`be/canon/patterns/` holds [`cqrs`](be/canon/patterns/cqrs.md) ·
+[`data-access`](be/canon/patterns/data-access.md) · [`testing`](be/canon/patterns/testing.md).
 
-**Where a spacing decision is settled, and where it is merely explained.** These three say WHY a
-seam is the seam it is; none of them can be checked by a machine, because none of them names a
-number. What a machine holds is the vocabulary itself — the closed set of values a node may wear —
-and that lives in `fe/canon/patterns/`. Reading design without canon leaves a reader with taste and
-no spelling; reading canon without design leaves them able to type a legal value for the wrong
-reason.
+`fe/design/` carries the laws no machine can hold — no file there names a number of its own, which
+is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) ·
+[`padding`](fe/design/padding.md) · [`surface-in-surface`](fe/design/surface-in-surface.md) ·
+[`call-to-action`](fe/design/call-to-action.md). Still owed: position, responsive, hierarchy,
+restraint, colour, typography.
+
+**Which shelf a concept goes on is decided by whether anything can hold it.** A law with an
+enforceable half belongs in `canon/patterns/` beside its artifact — `icon` began in `design/` and
+moved, because it turned out to have measurable steps and a rule that can see them. A law that
+states only a reason stays in `design/`.
+
+Reading design without canon leaves a reader with taste and no spelling; reading canon without
+design leaves them able to type a legal value for the wrong reason.
 
 ## What holds a law
 
 A law a machine can hold ships WITH the thing that holds it, under [`sources/`](sources/), named for
-the law file that governs it — `naming.md` is held by `sources/naming.mjs` and its twin test.
+the law file that governs it: `<axis>/canon/patterns/<name>.md` is held by
+`sources/<axis>/<name>.mjs` and its twin `sources/<axis>/<name>.test.mjs`.
+
+**That correspondence is checked, not trusted.** [`sources/parity.test.mjs`](sources/parity.test.mjs)
+fails when a rule module has no law, when a rule module has no twin, or when a law names an artifact
+that is absent. It exists because all three drifted within an hour of each other while a promise to
+write this gate went unkept — a convention nobody checks is a preference. Adding an axis to its list
+is what puts that shelf under the gate.
 
 The artifact is not always a lint rule, and the strongest ones are not. A closed union makes a wrong
 value UNREPRESENTABLE rather than forbidden, and there is nothing left to police once the bad value

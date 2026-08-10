@@ -178,24 +178,27 @@ const CLASS_COMPOSERS = new Set(["cn", "clsx", "classnames", "classNames", "twMe
 const CONTRACT_ATTRS = new Set(["data-node", "data-why"])
 
 /**
- * Elements whose whole job is to hold other elements.
+ * Neutral boxes: elements with no meaning of their own, whose only job is to hold other elements.
  *
- * The list matches what an entry may name as its host: if the table can express it, writing it by
- * hand is a node with no key. See the module header for why the semantic elements are here.
+ * Opening one is always a shape decision, because there is no other reason to open one. These are
+ * refused unconditionally outside the frame.
  */
-const STRUCTURAL_HOSTS = new Set([
-  "div",
-  "section",
-  "main",
-  "header",
-  "footer",
-  "aside",
-  "nav",
-  "ul",
-  "ol",
-  "li",
-  "form",
-])
+const NEUTRAL_HOSTS = new Set(["div", "section", "main", "header", "footer", "aside", "nav"])
+
+/**
+ * Elements chosen for MEANING, which an entry may also name as its host.
+ *
+ * These are refused only when they carry classes, and the distinction is load-bearing. A `<form>`
+ * exists to submit, a `<ul>` exists because its contents are a list - assistive technology reports
+ * the element, so it cannot be swapped for a neutral one, and wrapping a contract node in one
+ * decides no shape at all. What must still come from an entry is the SHAPE: the moment one of these
+ * carries a class, it has stopped being a semantic wrapper and become a node with no key.
+ *
+ * An earlier version refused these outright, on the reasoning that an entry can name them. That
+ * confused "the table CAN express this element" with "every use of this element is a node", and it
+ * flagged three honest wrappers that carried a submit handler and not one class.
+ */
+const SEMANTIC_HOSTS = new Set(["ul", "ol", "li", "form"])
 
 /** Strip responsive/state variants and the important marker: `lg:hover:!flex` becomes `flex`. */
 const bareToken = (token) => {
@@ -402,6 +405,8 @@ export const noStructuralHostOutsideContractFrame = {
     messages: {
       host:
         "`<{{tag}}>` written here is a node with no key: nothing records what classes it should carry, which children belong inside it, or why it exists. Name the shape in `{{table}}` and render it with `<Tree contract=\"...\" />` - and if the ELEMENT is the problem rather than the classes, the entry names its own host, so `<ul>`, `<form>` and `<nav>` are keys too. If no key fits, that is the finding, not a reason to open a div.",
+      styledSemantic:
+        "`<{{tag}}>` carries classes, so it has stopped being a semantic wrapper and become a node with no key. Opening one for its MEANING is fine - a form submits, a list is a list, and assistive technology reports the element - but the shape it wears belongs to an entry. Move the classes into a key in `{{table}}` and give that entry `host: \"{{tag}}\"`.",
     },
   },
   create(context) {
@@ -410,8 +415,15 @@ export const noStructuralHostOutsideContractFrame = {
     return {
       JSXOpeningElement(node) {
         const tag = hostName(node)
-        if (!tag || !STRUCTURAL_HOSTS.has(tag)) return
-        context.report({ node, messageId: "host", data: { tag, table: CONTRACT_TABLE_RELATIVE } })
+        if (!tag) return
+        if (NEUTRAL_HOSTS.has(tag)) {
+          context.report({ node, messageId: "host", data: { tag, table: CONTRACT_TABLE_RELATIVE } })
+          return
+        }
+        if (!SEMANTIC_HOSTS.has(tag)) return
+        // A semantic element decides no shape until it carries one.
+        const styled = (node.attributes || []).some((attr) => isClassAttribute(attr))
+        if (styled) context.report({ node, messageId: "styledSemantic", data: { tag, table: CONTRACT_TABLE_RELATIVE } })
       },
     }
   },

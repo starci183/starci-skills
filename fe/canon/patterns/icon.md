@@ -12,6 +12,11 @@ Reading past it means marker: the small step, the outline cut, no colour of its 
 Reading it means subject: the large step, the solid cut, on a plate. There is nothing between the
 two, and a case that seems to need something between is a case where the role has not been decided.
 
+What holds this law is [`sources/fe/icon.mjs`](../../../sources/fe/icon.mjs) and the closed size
+union in the icon leaf itself. The union is the stronger of the two: a step that is not a member
+cannot be typed. The rules cover the two things a union cannot see — a glyph imported straight from
+a library, and a size written as a class string rather than passed as a step.
+
 ## The two steps, and what they actually are
 
 | Step | Glyph | Plate it sits on | Where |
@@ -24,6 +29,18 @@ ratio that holds everywhere: **the glyph is half its plate.** 16-in-32, 20-in-40
 glyph are therefore one decision, not two.
 
 A glyph carries a no-shrink instruction at every step, in every row, without exception.
+
+**Two steps is a narrowing, and it was deliberate.** The surface this replaces ran three: 16, 20 and
+24. The third was not rare — it carried a fifth of that codebase's glyphs, on the upload prompt, the
+avatar camera, the notification bell, the mobile navigation rows and the status marker of every
+toast. Each of those was a defensible local choice, and together they were a scale nobody could
+apply from memory: the third step is the one an author reaches for when the second looks slightly
+small, which is a judgement that lands differently on every screen.
+
+Dropping it costs something real, and the cost is worth naming. A glyph that used to lead a
+notification row at 24 now leads it at 20, and there is no way to make it 24 without changing the
+scale for everybody — which is the point. A port of those surfaces resolves each one to a step
+rather than preserving its measurement.
 
 ## Rules
 

@@ -201,7 +201,7 @@ export const rules = {
  * option; a repository that wires it supplies the listing from its own gate.
  */
 export const recommended = {
-  "starci-be/handler-overrides-process": "warn", // no=3 of 141
-  "starci-be/message-carries-params-only": "warn", // no=2 of 138
+  "starci-be/handler-overrides-process": "error", // no=0 of 141 - burned down from 3
+  "starci-be/message-carries-params-only": "error", // no=0 of 138 - burned down from 2
   "starci-be/handler-has-twin-spec": "off",
 }
