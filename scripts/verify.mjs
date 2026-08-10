@@ -37,7 +37,7 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLAUDE = join(HERE, "..");
-const WORKSPACE = join(CLAUDE, "scripts", "read-workspace-context.mjs");
+const WORKSPACE = join(CLAUDE, "scripts", "workspace", "read-workspace-context.mjs");
 
 /**
  * Ask the workspace context where a source lives.
