@@ -99,6 +99,21 @@ recorded, the quota was spent, the entitlement was checked, the answer was persi
 Those are the parts that break. Whether the sentence the model produced was any good is a different
 question, asked in a different lane.
 
+**THE STUB RETURNS REALISTIC JSON, IN THE SHAPE THE PARSER EXPECTS.** This is the part that is easy
+to get wrong and expensive to get wrong. A stub answering `"stubbed"` skips the strict-JSON parser
+entirely — and the parser is the piece most likely to break, because it is where a model's output
+meets a schema. A flow whose stub returns a marker proves the plumbing and hides the one seam that
+actually fails in production.
+
+So the canned payload carries the real fields, with values a real answer could have: the scores in
+range, the arrays non-empty, the enum members ones the schema declares. It is a fixture of the
+model's OUTPUT, not a placeholder standing in for one.
+
+**The override is the default, never something a flow author remembers.** The world boots with the
+model stubbed; reaching a provider takes a deliberate opt-out. A rule that depends on being
+remembered is a rule that is one distracted afternoon from being broken, and the breakage shows up
+as a slow, expensive, intermittently-red suite that nobody can explain.
+
 The override is the boundary between the two lanes, and it runs the other way in the harness: there,
 a call that is faked proves nothing, so **if it calls, it really calls**.
 
@@ -130,6 +145,8 @@ because its last green result is still on the board.
 | Splitting one flow into a test per endpoint | The promise disappears; five endpoint descriptions do not add up to one working flow | One file, one flow, start to finish |
 | A configured lane with no specs in it | It reports green forever, and green is what gets read | Fill it or delete it |
 | Calling a model from an e2e | It costs money, takes seconds and answers differently every time - so the suite becomes expensive, slow and flaky all at once | Stub the model; assert the quota, the persistence and the response around it |
+| A stub returning a marker string (`"stubbed"`, `"ok"`) | It skips the strict-JSON parser, which is the seam most likely to break, so the flow proves the plumbing and hides the failure | Return realistic JSON in the shape the parser expects |
+| Relying on each flow author to remember the stub | A rule that must be remembered is one distracted afternoon from being broken | Stub by default in the world; make reaching a provider a deliberate opt-out |
 | A harness reaching the provider through a tier or routing layer | The thing under test is then not the thing that ships, and the harness can pass while production fails | Call the provider's own client directly |
 | A harness that grows a case per edge | It is billed per call, so it becomes something people stop running - and a stale green is worse than no green | One or two cases per capability, chosen to expose a regression |
 
@@ -235,21 +252,36 @@ They differ in one thing: whether a wrong number would be caught.
 ### The lane trap — a flow through a model
 
 ```ts
-// e2e: the model is stubbed, and the test asserts everything that can actually break -
-// the entitlement check, the quota spend, the persisted answer.
-askContentAi.mockResolvedValue({ answer: "stubbed", tokensUsed: 120 })
+// e2e: the model is stubbed with realistic JSON, so the flow still runs the strict parser -- and
+// the test asserts what can actually break: the entitlement check, the quota spend, the persistence.
+aiInvoke.run.mockResolvedValue({
+    text: JSON.stringify({
+        answer: "A closure keeps access to its enclosing scope after that scope returns.",
+        citations: [{ contentId: CONTENT, quote: "lexical scope" }],
+        confidence: 0.82,
+    }),
+})
 
-await ask(contentId, "what is a closure?")
+await ask(CONTENT, "what is a closure?")
 
-const session = await entityManager.findOneOrFail(ContentAiSessionEntity, { where: { contentId } })
+const session = await entityManager.findOneOrFail(ContentAiSessionEntity, { where: { contentId: CONTENT } })
 expect(session.turns).toHaveLength(1)
-expect(await remainingQuota(userId)).toBe(startingQuota - 1)
+expect(session.turns[0].citations).toHaveLength(1)
+expect(await remainingQuota(learner.id)).toBe(startingQuota - 1)
 ```
 
 ```ts
-// Wrong lane: a real model call inside a flow test. It costs money, adds seconds, and the
+// Wrong: a marker. The parser never runs, so the seam where a model's output meets a schema --
+// the piece most likely to break -- is the one piece this flow does not touch.
+aiInvoke.run.mockResolvedValue({ text: "stubbed" })
+```
+
+They differ in one thing: whether the parser is exercised.
+
+```ts
+// Wrong lane entirely: a real model call inside a flow test. It costs money, adds seconds, and the
 // assertion has to be loose enough to survive a different wording - so it stops catching anything.
-const response = await ask(contentId, "what is a closure?")
+const response = await ask(CONTENT, "what is a closure?")
 expect(response.answer.toLowerCase()).toContain("closure")
 ```
 

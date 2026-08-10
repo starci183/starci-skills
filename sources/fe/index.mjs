@@ -16,6 +16,7 @@ import { recommended as commentsRecommended, rules as commentsRules } from "./co
 import { recommended as contractRecommended, rules as contractRules } from "./contract.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
 import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
+import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as propsRecommended, rules as propsRules } from "./props-and-slots.mjs"
 import { recommended as tokensRecommended, rules as tokensRules } from "./tokens.mjs"
@@ -26,6 +27,7 @@ const CONTRIBUTIONS = [
   { law: "contract", rules: contractRules, recommended: contractRecommended },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
   { law: "icon", rules: iconRules, recommended: iconRecommended },
+  { law: "loading", rules: loadingRules, recommended: loadingRecommended },
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
   { law: "tokens", rules: tokensRules, recommended: tokensRecommended },
