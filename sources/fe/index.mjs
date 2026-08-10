@@ -18,6 +18,7 @@ import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "
 import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as propsRecommended, rules as propsRules } from "./props-and-slots.mjs"
+import { recommended as tokensRecommended, rules as tokensRules } from "./tokens.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
@@ -27,6 +28,7 @@ const CONTRIBUTIONS = [
   { law: "icon", rules: iconRules, recommended: iconRecommended },
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
+  { law: "tokens", rules: tokensRules, recommended: tokensRecommended },
 ]
 
 /**
