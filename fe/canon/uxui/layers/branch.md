@@ -33,13 +33,21 @@ searched, named or reused. The next author extends whichever they found first, a
 `Tree` is not an exception to this. It APPLIES contract classes; it does not author any. The classes
 it renders are the entry's, and the entry is what a reader argues with.
 
-**BRANCH-3 · It does not import the component library.**
+**BRANCH-3 · It does not import the component library, and `shells/` is the one exemption.**
 
-This is where the leaf's vendor monopoly is usually lost, and losing it costs the most. A modal needs
-a focus trap, an escape key, a scroll lock, a backdrop and a returned focus — none of that is
-arrangement, and none of it can be written here. It gets wrapped as a LEAF, and the branch composes
-that leaf with the caller's children. Without this rule, every container quietly reaches for the
-library and no tier is the boundary any more.
+This is where the vendor monopoly is usually lost, and losing it costs the most: without the rule,
+every container quietly reaches for the library and no tier is the boundary any more.
+
+A covering surface is the case that forces the exemption. A dialog owes a focus trap, an escape key,
+a scroll lock, an inert page behind it, a returned focus, a backdrop and a placement — none of that
+is arrangement, all of it is browser behaviour that changes underneath whoever reimplements it, and
+the vendor primitive that provides it REQUIRES children. So it cannot be a leaf, which takes none,
+and it cannot be an ordinary branch, which may not reach for the library.
+
+It is a [`shell`](shell.md): a branch, in its own folder, allowed the import. The folder is the
+exemption, which makes it countable and checkable in both directions — a branch outside it that
+imports the library is misfiled, and a file inside it that imports nothing is an ordinary branch
+that has wandered in.
 
 **BRANCH-4 · Its name fixes what may go inside it.**
 
@@ -79,7 +87,7 @@ now edits the branch, and the branch's own props stop describing the branch.
 | Never | Why it is refused | Instead |
 |---|---|---|
 | Writing a class — once, one utility, or via a helper | The arrangement then exists outside the contract table, unfindable and unarguable | Add or name a contract entry and render it through `Tree` |
-| Importing `@heroui/react` | It moves the library boundary above the leaves, so a swap no longer ends there | Wrap the vendor behaviour as a leaf, then hold that leaf |
+| Importing the component library from `branches/` | It moves the boundary above the two folders that own it, so a swap no longer ends there | Wrap the primitive as a leaf, or as a shell when its API needs children, then hold it |
 | A name that admits anything (`Card`, `Box`, `Wrapper`, `Row`) | The generic member drains the call sites from its specific siblings, and then constrains nothing | Name what it holds — `SurfaceListCard`, `SurfaceAccordionCard` |
 | Calling the family's generic base directly | Same drain, one level down | Call the variant that says what is inside |
 | Importing `@/hooks` or translating | Both are knowing the domain; the tier is defined by not knowing it | It is a `layout` or an `overlay` |
@@ -119,10 +127,10 @@ They differ in one thing: whether the arrangement has a name somebody else can f
 ### The vendor trap — behaviour is not arrangement
 
 ```tsx
-// branch: the focus trap, the escape key and the aria wiring live in a leaf. This file only
-// arranges what the caller sent.
+// branch: the focus trap, the escape key and the aria wiring live in a SHELL. This file only
+// arranges what the caller sent, and the arrangement comes from a key.
 export const Modal = ({ props, on, children }: ModalProps) => (
-    <ModalShell props={{ isOpen: props.isOpen, label: props.label }} on={{ dismiss: on?.dismiss }}>
+    <ModalShell props={{ isOpen: props.isOpen }} on={{ dismiss: on?.dismiss }}>
         <Tree contract="title-over-body-over-actions">{children}</Tree>
     </ModalShell>
 )

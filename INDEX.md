@@ -21,10 +21,10 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 `fe/canon/` divides again by what is being decided:
 
 - **`uxui/`** — what a thing IS and where it may sit. `layers/` holds one file per layer:
-  [`leaf`](fe/canon/uxui/layers/leaf.md) · [`composite`](fe/canon/uxui/layers/composite.md) ·
-  [`branch`](fe/canon/uxui/layers/branch.md) · [`block`](fe/canon/uxui/layers/block.md) ·
-  [`layout`](fe/canon/uxui/layers/layout.md) · [`overlay`](fe/canon/uxui/layers/overlay.md) ·
-  [`page`](fe/canon/uxui/layers/page.md).
+  [`leaf`](fe/canon/uxui/layers/leaf.md) · [`shell`](fe/canon/uxui/layers/shell.md) ·
+  [`composite`](fe/canon/uxui/layers/composite.md) · [`branch`](fe/canon/uxui/layers/branch.md) ·
+  [`block`](fe/canon/uxui/layers/block.md) · [`layout`](fe/canon/uxui/layers/layout.md) ·
+  [`overlay`](fe/canon/uxui/layers/overlay.md) · [`page`](fe/canon/uxui/layers/page.md).
 
   Two questions place anything, and both are answered by a type signature rather than by taste:
 
@@ -33,9 +33,16 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
   | **knows no domain** | composite | branch |
   | **knows the domain** | block | layout · overlay |
 
-  A **leaf** sits below the table: it wraps ONE vendor primitive, arranges nothing, and is the only
-  layer permitted to import the component library. A **page** sits above it: one screen, composed of
-  blocks, in a folder holding exactly two files.
+  A **leaf** sits below the table: it wraps ONE vendor primitive, takes no children, and arranges
+  nothing. A **page** sits above it: one screen, composed of blocks, in a folder holding exactly two
+  files.
+
+  A **shell** is the one named exemption in the whole system. It is a branch by the table — children,
+  no domain — and it alone may import the component library alongside the leaves, because the vendor
+  primitives it wraps (a dialog, a drawer, a popover) REQUIRE children and so fit in neither tier as
+  written. The exemption is a folder rather than a list inside a rule, which makes it countable and
+  checkable both ways: a branch elsewhere that imports the library is misfiled, and a file in
+  `shells/` that imports nothing is an ordinary branch that wandered in.
 
   Layout and overlay share the same cell and differ in one thing — a layout SURVIVES navigation,
   an overlay is summoned and dismissed.

@@ -46,8 +46,15 @@ arranging.
 **LEAF-3 · It takes `props`, `on`, `isLoading`, and nothing else.**
 
 No `className`: a caller who can restyle a node has become its second owner, and the component now
-has two authors who never speak. No `children`: accepting one is how a leaf starts arranging, and it
-is also how it stops being usable without knowing what will be passed.
+has two authors who never speak. No `children`: a component that accepts arbitrary markup cannot be
+reasoned about without knowing what will be passed — it cannot be rendered from a fixture, and its
+output is no longer decided by its own props. That is also the door the data fence exists to close,
+so leaving `children` open makes the fence decorative.
+
+**A leaf is a leaf, and this rule has no exception.** When the vendor primitive being wrapped turns
+out to require children — a dialog, a drawer, a popover — the file does not gain a slot; it becomes
+a [`shell`](shell.md) and changes folder. Keeping it here would cost the word its meaning, and a
+tier whose name has to be explained is one that will be misread by everybody who was not told.
 
 **LEAF-4 · It owns its own resting, disabled and focused shapes.**
 
