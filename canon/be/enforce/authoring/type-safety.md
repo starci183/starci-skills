@@ -8,9 +8,9 @@ suggestion.
 ## 1. No `any` — use `unknown` and narrow
 
 Production `src/` is almost free of `any`. What remains is `argsExtractor`
-(`src/modules/cache/types/graphql-cache.ts`, `(request: any, user: any) => Array<any>`) and an
+(`src/modules/integrations/cache/types/graphql-cache.ts`, `(request: any, user: any) => Array<any>`) and an
 `any[]` inside a raw-SQL tuple in `process-video`
-(`src/modules/bullmq/types/payloads/process-video.ts`). That is old debt; do not add new sites.
+(`src/modules/integrations/bullmq/types/payloads/process-video.ts`). That is old debt; do not add new sites.
 
 Input of unknown type — a caught error, an external payload — is `unknown`, then narrowed with
 `typeof`, `instanceof`, or duck typing:
@@ -168,7 +168,7 @@ if (host.getType<string>() === "graphql") ...
 
 ## 8. Typed config — never read `process.env` in scattered places
 
-`process.env` may be touched ONLY in `src/modules/env/utils/parse-env.ts`. Every consumer reads the
+`process.env` may be touched ONLY in `src/modules/platform/env/utils/parse-env.ts`. Every consumer reads the
 typed tree `envConfig().<domain>.<key>`, where each field has JSDoc and a default (see
 `env/config.ts`):
 

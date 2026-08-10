@@ -2,7 +2,7 @@
 
 Scope: the three kinds of test this backend actually runs, what each proves, when to reach for
 which, and the command that runs it. Grounded in `jest.config.ts`, the `package.json` scripts, and
-`apps/core/test/{e2e,harness,stack}/**`.
+`src/tests/{e2e,harness,stack}/**`.
 
 ---
 
@@ -47,19 +47,19 @@ it is where a branch, a thrown exception, or an edge case belongs by default.
 Boots the real Nest application against a real, disposable Postgres and drives real HTTP requests
 at it — proving the wiring, not a mock of it.
 
-`jest-e2e-docker.json`'s `globalSetup` (`apps/core/test/e2e/setup.ts`) constructs an
+`jest-e2e-docker.json`'s `globalSetup` (`src/tests/helpers/e2e-setup.ts`) constructs an
 `E2eStackService` and calls `.up()`, which starts an actual `postgres:16-alpine` container via
-`@testcontainers/postgresql` (`apps/core/test/stack/e2e-stack.service.ts`) and points the
+`@testcontainers/postgresql` (`src/tests/helpers/e2e-stack.service.ts`) and points the
 `POSTGRESQL_PRIMARY_*` env vars at it before any spec runs; `TypeORM synchronize: true` then builds
 the schema fresh. `globalTeardown` (`teardown.ts`) stops the container after the suite. Each spec
-then calls a helper like `createE2eApp` (`apps/core/test/helpers/create-e2e-app.ts`) to compile a
+then calls a helper like `createE2eApp` (`src/tests/helpers/create-e2e-app.ts`) to compile a
 focused `Test.createTestingModule` around the real `PrimaryPostgreSQLModule`, the real `CqrsModule`,
 and the real controllers under test — only the SDK clients for outbound payment gateways (SePay,
 PayOS, Stripe) and the enroll-job queue are stubbed, because those are genuinely external to the
 process.
 
 ```ts
-// apps/core/test/app/sepay-webhook.e2e-spec.ts — a real HTTP request against the booted app,
+// src/tests/e2e/sepay-webhook.e2e-spec.ts — a real HTTP request against the booted app,
 // asserting a real row in the real (containerized) Postgres
 await request(e2e.app.getHttpServer())
     .post(WEBHOOK_URL)
@@ -77,7 +77,7 @@ const settled = await entityManager.findOne(TransactionEntity,
 expect(settled?.status).toBe(TransactionStatus.Succeeded)
 ```
 
-Files are named `*.e2e-spec.ts`, under `apps/core/test/app/`. Reach for this when the thing under
+Files are named `*.e2e-spec.ts`, under `src/tests/e2e/`. Reach for this when the thing under
 test IS the wiring — a webhook handler that has to commit a transaction row, an idempotency guard
 against a re-delivered event, a query that is syntactically valid but wrong against the real
 schema — because a unit test with a mocked `EntityManager` cannot catch any of those; it can only
@@ -119,20 +119,20 @@ answer identically twice. `jest-harness.json` (`testRegex: "\\.harness-spec\\.ts
 `testTimeout: 300000` — five minutes, because a real model call is not a mocked promise) exists to
 make that testable anyway, by combining two things.
 
-First, `apps/core/test/harness/models.ts` holds one shared client, `client = new Anthropic()`, whose
+First, `src/tests/helpers/models.ts` holds one shared client, `client = new Anthropic()`, whose
 own comment states its credentials are "resolved once, not per call" from "an env var or an
 `ant auth login` profile" — Claude Code's own OAuth session, never a production `OPENAI_API_KEY` or
 `OPENROUTER_API_KEY`. A harness spec overrides the app's real LLM entry point —
 `AiInvokeService` (`src/modules/ai/ai-invoke.service.ts`, the single façade the app calls to reach
 `ChatOpenAI`, `ChatGoogleGenerativeAI`, or `ChatAnthropic`) — with an adapter over this client, using
 the same provider-swap `Test.createTestingModule({ providers: [{ provide: AiInvokeService, useValue: ... }] })`
-already used to stub that same service in `apps/core/test/app/ai-lab-eval-runner.e2e-spec.ts`, except
+already used to stub that same service in `src/tests/e2e/ai-lab-eval-runner.e2e-spec.ts`, except
 here the stand-in is a real Claude call through Claude Code's own session rather than a canned
 string. That override is why the lane is safe to run at all: no paid production provider key has to
 exist on a test runner or in CI, and a suite that ran on every push cannot quietly rack up an OpenAI
 bill nobody signed off on.
 
-Second, once a real, non-deterministic generation exists, `apps/core/test/harness/judge.ts` grades
+Second, once a real, non-deterministic generation exists, `src/tests/helpers/judge.ts` grades
 it, because "did this satisfy the rubric" is exactly the kind of question a fixed-string assertion
 cannot answer. `judge(rubric, output)` sends both to Opus 4.8 pinned at `effort: "high"` —
 "regardless of which tier produced the output under test" per its own comment, so grading rigor
@@ -141,7 +141,7 @@ Sonnet 5 at low/high effort) generated the thing being judged — and gets back 
 via the SDK's JSON-schema-constrained output rather than free text to parse:
 
 ```ts
-// apps/core/test/harness/judge.ts
+// src/tests/helpers/judge.ts
 const res = await client.messages.parse({
     model: "claude-opus-4-8",
     max_tokens: 2048,

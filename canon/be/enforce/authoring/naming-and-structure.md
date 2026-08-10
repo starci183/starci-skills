@@ -147,8 +147,8 @@ Everything one unit of work needs sits beside it: its types, its constants, its 
 Next.js made this idea mainstream in a form worth borrowing — `layout`, `page`, `loading` and
 `error` are first-class files colocated in the route folder they serve, so the route is one place
 rather than four registries to keep in sync. The server-side version is identical: a service's
-enums live in the capability's `enums/`, not in a global `src/enums/` that every module imports and
-nobody owns.
+enums live in the capability's own `enums/`, not in a global root-level enums folder that every
+module imports and nobody owns.
 
 Promotion is triggered by the SECOND consumer, not by a prediction of one. A type used by one module
 stays in that module. When a second module genuinely needs it, it moves to the shared module in the

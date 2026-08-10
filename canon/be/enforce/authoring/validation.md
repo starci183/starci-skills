@@ -12,8 +12,9 @@ boundaries).
 
 - **core** (`apps/core/src/app.module.ts`): `{ provide: APP_PIPE, useClass: ValidationPipe }` —
   plain, no options.
-- **mock and tools** (`apps/mock/src/main.ts`, `apps/tools/src/main.ts`):
-  `new ValidationPipe({ transform: true })`.
+- **mock** (`apps/mock/src/main.ts`): `new ValidationPipe({ transform: true })`. It is the only
+  app that bootstraps its own pipe; `apps/tools` used to be the second and is now a static
+  dashboard with no Nest entrypoint.
 
 Nowhere in the repo uses `whitelist` or `forbidNonWhitelisted` — do not introduce them without the
 teacher's decision. When an HTTP body needs a `string → number` coercion, attach `@Type(() => Number)`
