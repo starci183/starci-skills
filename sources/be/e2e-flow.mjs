@@ -1,8 +1,8 @@
 /**
  * The rules that hold `e2e-flow.md`.
  *
- * ONLY TWO OF THE TEN RULES ARE HERE, and that is the honest number rather than a gap somebody
- * should close. A rule earns its place by being exact: it must fire on a syntactic shape, not on a
+ * FIVE OF THE TWELVE RULES HAVE A MACHINE-CHECKABLE HALF HERE. That is the honest number rather
+ * than a gap somebody should close. A rule earns its place by being exact: it must fire on a syntactic shape, not on a
  * judgement, or it becomes something authors learn to disable and the law is worse off than when
  * nothing enforced it.
  *
@@ -14,16 +14,15 @@
  *   - FLOW-2 (named steps, not one long case). Counting `it` blocks would refuse a flow that is
  *     genuinely one step, and a rule whose first false positive is legitimate teaches authors that
  *     the rule is wrong rather than that they are.
- *   - FLOW-4, FLOW-5, FLOW-6, FLOW-9 all turn on WHAT is asserted or WHO is acting, which is meaning.
+ *   - FLOW-5, FLOW-6 and FLOW-9 turn on WHAT is asserted or WHO is acting, which is meaning.
  *   - FLOW-8 (one place stands the world up) is a fact about a repository's fixtures, not about a
  *     file, so it belongs to a gate that can see the tree rather than to a rule that sees one file.
  *   - FLOW-10 (a flow logs nothing) is already held: `no-console` and `no-framework-logger` in the
  *     observability law cover every call site, and a second rule saying the same thing in this lane
  *     would double every report.
  *
- * The two below are left because they are exact, and because both fail in a way that costs hours:
- * a sleep makes a suite slow and flaky at once, and a branch in a test makes a green run mean
- * nothing at all.
+ * The rules below enforce only exact syntax: transport bypass, absence of any persisted-state read,
+ * direct provider imports, sleeps and branches. They do not pretend to judge business meaning.
  */
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -31,6 +30,87 @@ const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(String(filename || "").re
 
 /** Names a repository sleeps by. Awaiting any of them is waiting for a duration instead of a state. */
 const SLEEPERS = new Set(["sleep", "delay", "wait", "pause", "setTimeout"])
+
+/** E2E enters through production transport and never invokes an internal actor directly. */
+export const e2eUsesProductionTransport = {
+  meta: {
+    type: "problem",
+    docs: { description: "Operational E2E keeps the production transport boundary in the proof." },
+    schema: [],
+    messages: {
+      busImport: "`{{name}}` is an internal dispatcher. Enter through GraphQL, HTTP, socket, broker or scheduler.",
+      direct: "Direct `.{{method}}()` skips production routing and delivery semantics.",
+      actor: "Calling `{{name}}` directly bypasses the broker/CQRS boundary that owns it.",
+    },
+  },
+  create(context) {
+    if (!isE2eSpec(context.filename || context.getFilename())) return {}
+    const buses = new Set(["CommandBus", "QueryBus", "EventBus"])
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "@nestjs/cqrs") return
+        for (const specifier of node.specifiers) {
+          if (specifier.type !== "ImportSpecifier") continue
+          const imported = specifier.imported.name || specifier.imported.value
+          if (buses.has(imported)) context.report({ node: specifier, messageId: "busImport", data: { name: imported } })
+        }
+      },
+      CallExpression(node) {
+        const callee = node.callee
+        if (callee.type !== "MemberExpression" || callee.computed) return
+        const method = callee.property.name
+        if (method === "execute" || method === "process") {
+          context.report({ node: callee.property, messageId: "direct", data: { method } })
+          return
+        }
+        let receiver = callee.object
+        while (receiver && ["TSAsExpression", "TSTypeAssertion", "ChainExpression"].includes(receiver.type)) receiver = receiver.expression
+        if (receiver && receiver.type === "Identifier" && /(?:Worker|Handler)$/.test(receiver.name)) {
+          context.report({ node: callee.property, messageId: "actor", data: { name: receiver.name } })
+        }
+      },
+    }
+  },
+}
+
+/** E2E reads the consequence from persistent state rather than only its response envelope. */
+export const e2eAssertsPersistedState = {
+  meta: {
+    type: "problem",
+    docs: { description: "E2E reads a persisted business consequence." },
+    schema: [],
+    messages: { state: "This E2E never reads persisted state back; an envelope alone is not a business consequence." },
+  },
+  create(context) {
+    if (!isE2eSpec(context.filename || context.getFilename())) return {}
+    let readsState = false
+    const readers = /^(?:entityManager|dataSource|EntityManager|DataSource|getRepository|queryRunner)$/
+    return {
+      Identifier(node) { if (readers.test(node.name)) readsState = true },
+      "Program:exit"(node) { if (!readsState) context.report({ node, messageId: "state" }) },
+    }
+  },
+}
+
+/** Model quality belongs in harness; E2E scripts only the provider boundary. */
+export const noModelCallInE2e = {
+  meta: {
+    type: "problem",
+    docs: { description: "E2E never reaches a paid or nondeterministic model provider." },
+    schema: [],
+    messages: { provider: "`{{source}}` reaches a model provider from E2E. Script the external result and keep internal policy real." },
+  },
+  create(context) {
+    if (!isE2eSpec(context.filename || context.getFilename())) return {}
+    const providers = /^(?:@anthropic-ai\/|openai$|openai\/|ollama$|@google\/generative-ai|@mistralai\/|cohere-ai)/
+    return {
+      ImportDeclaration(node) {
+        const source = node.source.value
+        if (typeof source === "string" && providers.test(source)) context.report({ node, messageId: "provider", data: { source } })
+      },
+    }
+  },
+}
 
 // -- FLOW-3 ----------------------------------------------------------------------------------------
 
@@ -117,6 +197,9 @@ export const noBranchInFlowStep = {
 
 /** The rules this law contributes to the plugin. */
 export const rules = {
+  "e2e-uses-production-transport": e2eUsesProductionTransport,
+  "e2e-asserts-persisted-state": e2eAssertsPersistedState,
+  "no-model-call-in-e2e": noModelCallInE2e,
   "no-sleep-in-flow": noSleepInFlow,
   "no-branch-in-flow-step": noBranchInFlowStep,
 }

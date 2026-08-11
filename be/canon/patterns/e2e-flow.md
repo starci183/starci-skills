@@ -14,8 +14,9 @@ broke and why?** A flow that answers "no" is a flow that gets re-run rather than
 that gets re-run rather than read has stopped being a test.
 
 What holds the machine-checkable part is [`sources/be/e2e-flow.mjs`](../../../sources/be/e2e-flow.mjs),
-and it is **three of the twelve rules below** — FLOW-3, FLOW-7 and the direct-internal-actor
-half of FLOW-11. That is the honest number, not a gap.
+and it is **five of the twelve rules below** — FLOW-3, the persisted-state half of FLOW-4,
+FLOW-7, the direct-internal-actor half of FLOW-11, and the provider-import half of FLOW-12.
+That is the honest number, not a gap.
 The rest turn on what a name means, what is being asserted, or who is acting, and a rule that fires
 on a judgement is one authors learn to disable — which leaves the law worse off than when nothing
 enforced it. The module records what was measured and left alone, so the next reader does not
