@@ -36,15 +36,15 @@ Not one literal, not one composed string, not one conditional. A branch that wri
 become a second contract table: the same arrangement now exists in two places, only one of which can be
 searched, named or reused. The next author extends whichever they found first, and the two drift.
 
-`Tree` applies contract classes; it does not author any. `SurfaceCard`, `SurfaceAccordionCard` and
-`SurfaceListCard` are peers of `Tree` as contract hosts: they may author the fixed outer seam and
+`Tree` applies contract classes; it does not author any. `SurfaceCard`, `SurfaceAccordionCard`,
+`SurfaceListCard` and `SurfaceFormCard` are peers of `Tree` as contract hosts: they may author the fixed outer seam and
 vendor wrapper they exist to own, while `contractNodeProps(contract)` is applied only to the content
 body. They may not create extra contracts for their label, wrapper or caption merely to avoid
 writing that fixed assembly, and callers may not tune it through class props.
 
 **BRANCH-3 · A branch imports no vendor except the named surface family that owns its wrapper.**
 
-`SurfaceCard`, `SurfaceAccordionCard`, and `SurfaceListCard` may import the vendor primitive whose
+`SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` may import the vendor primitive whose
 wrapper they own. Their visible content still arrives as `contract + render`; only the physical
 projection differs. A two-line `Card > Card.Content` does not earn `CardShell`, because no independent
 mechanics policy exists to own.

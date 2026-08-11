@@ -128,7 +128,7 @@ one host into three contracts.
 
 This is why there is no `CardShell` and no compound table. Repeating `Card > Card.Content` is only
 two lines; extracting it would add indirection without owning a policy. `SurfaceCard`,
-`SurfaceAccordionCard`, and `SurfaceListCard` are named branches because each owns a distinct wrapper
+`SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` are named branches because each owns a distinct wrapper
 and still accepts `contract + render` for the content node.
 
 **CONTRACT-11 · An entry declares every slot inside it, and each slot has a name.**

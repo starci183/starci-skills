@@ -52,6 +52,7 @@ test("VENDOR-1: the library belongs to closed primitives, covering shells and na
       // outside the component tree: standing the library up is not reaching past a tier
       { filename: PROVIDER, code: "import { HeroUIProvider } from \"@heroui/react\"" },
       { filename: BRANCH, code: "import { Card } from \"@heroui/react\"" },
+      { filename: "D:/repo/src/components/branches/SurfaceFormCard/index.tsx", code: "import { Card } from \"@heroui/react\"" },
     ],
     invalid: [
       { filename: "D:/repo/src/components/branches/GenericPanel/index.tsx", code: "import { Modal } from \"@heroui/react\"", errors: [{ messageId: "outside" }] },
@@ -132,11 +133,18 @@ test("VENDOR-8: an overlay does not draw a surface inside itself", () => {
   const overlay = "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx"
   tester.run("no-surface-branch-in-overlay", noSurfaceBranchInOverlay, {
     valid: [{ filename: overlay, code: "import { ModalShell } from '@/components/shells/ModalShell'" }],
-    invalid: [{
-      filename: overlay,
-      code: "import { SurfaceCard } from '@/components/branches/SurfaceCard'",
-      errors: [{ messageId: "nested" }],
-    }],
+    invalid: [
+      {
+        filename: overlay,
+        code: "import { SurfaceCard } from '@/components/branches/SurfaceCard'",
+        errors: [{ messageId: "nested" }],
+      },
+      {
+        filename: overlay,
+        code: "import { SurfaceFormCard } from '@/components/branches/SurfaceFormCard'",
+        errors: [{ messageId: "nested" }],
+      },
+    ],
   })
 })
 

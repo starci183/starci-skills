@@ -68,7 +68,7 @@ export const isContractFrameFile = (filename) => normalizePath(filename).include
 
 /** Named surface branches own fixed vendor-wrapper mechanics around one checked content node. */
 export const isSurfaceContractHostFile = (filename) =>
-  /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard)\//.test(normalizePath(filename))
+  /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)\//.test(normalizePath(filename))
 
 /**
  * True when this file is a leaf.

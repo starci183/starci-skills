@@ -74,6 +74,7 @@ const COMPOSITE = `${ROOT}/src/components/composites/LabelledProgressRow/index.t
 const LEAF = `${ROOT}/src/components/leaves/Text/index.tsx`
 const FRAME = `${ROOT}/src/components/branches/Tree/index.tsx`
 const SURFACE = `${ROOT}/src/components/branches/SurfaceListCard/index.tsx`
+const FORM_SURFACE = `${ROOT}/src/components/branches/SurfaceFormCard/index.tsx`
 const TABLE = `${ROOT}/src/components/contracts/index.ts`
 
 test("the path constant still finds a real entry table", () => {
@@ -189,6 +190,7 @@ test("CONTRACT-7: a structural host outside the frame is a node with no key", ()
       { filename: FRAME, code: "export const Tree = () => <div />" },
       { filename: FRAME, code: "export const Tree = () => <ul />" },
       { filename: SURFACE, code: "export const SurfaceListCard = () => <div className=\"flex flex-col gap-3\" />" },
+      { filename: FORM_SURFACE, code: "export const SurfaceFormCard = () => <Card />" },
       { filename: LEAF, code: "export const T = () => <div />" },
       { filename: BLOCK, code: "export const E = () => <span />" },
       // a semantic element carrying MEANING and no shape: it decides nothing, and swapping it for

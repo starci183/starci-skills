@@ -6,7 +6,7 @@ Vendor ownership is a closed list:
 
 - `leaves/` own closed primitives;
 - `ModalShell` and `DrawerShell` own covering mechanics and the only uninterpreted `children` slots;
-- `SurfaceCard`, `SurfaceAccordionCard`, and `SurfaceListCard` own vendor wrappers that project a
+- `SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` own vendor wrappers that project a
   typed content contract into the vendor body.
 
 Everything else composes those owners. A provider outside the component tree may stand the library
@@ -40,7 +40,7 @@ second inset.
 inside a dialog or card.
 
 **VENDOR-8 · An overlay cannot directly mount a named surface branch.** The overlay is already the
-bounded object. `SurfaceCard`, `SurfaceAccordionCard`, and `SurfaceListCard` belong on page ground,
+bounded object. `SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` belong on page ground,
 not inside `overlays/**`.
 
 **VENDOR-9 · Field labels are text-only.** Input kind does not license a decorative email, lock, or

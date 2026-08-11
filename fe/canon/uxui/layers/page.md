@@ -76,15 +76,17 @@ is drawing anything, the page it should be mounting does not exist yet.
 ### The ordinary case — the page settles one question
 
 ```tsx
-// page: it answers the one thing no block can — whether there is a session — and then composes.
+// page: it answers the one thing no block can — whether there is a session — before composing.
 export const DashboardPage = () => {
-    const t = useTranslations("dashboard")
     const token = useSessionToken()
+    const router = useRouter()
 
-    if (token === undefined) {
-        return <_DashboardPage state="signedOut" props={{ title: t("title"), message: t("signedOut") }} />
-    }
-    return <_DashboardPage state="signedIn" props={{ title: t("title") }} />
+    useEffect(() => {
+        if (token === undefined) router.replace("/authentication")
+    }, [router, token])
+
+    if (token === undefined) return null
+    return <_DashboardPage />
 }
 ```
 

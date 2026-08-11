@@ -25,7 +25,7 @@ const SHELL_DIR = "/src/components/shells/"
 const SHELL_FILE = /\/src\/components\/shells\/(?:ModalShell|DrawerShell)\//
 
 /** Named surface branches may own the vendor wrapper they project a content contract into. */
-const SURFACE_BRANCH = /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard)\//
+const SURFACE_BRANCH = /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)\//
 
 const isAllowedVendorOwner = (file) =>
   file.includes("/src/components/leaves/") || SHELL_FILE.test(file) || SURFACE_BRANCH.test(file)
@@ -203,7 +203,7 @@ export const noSurfaceBranchInOverlay = {
     return {
       ImportDeclaration(node) {
         const source = normalizePath(node.source?.value)
-        const match = source.match(/\/components\/branches\/(SurfaceCard|SurfaceAccordionCard|SurfaceListCard)$/)
+        const match = source.match(/\/components\/branches\/(SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)$/)
         if (match) context.report({ node, messageId: "nested", data: { surface: match[1] } })
       },
     }
