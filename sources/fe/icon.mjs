@@ -15,8 +15,8 @@
 /** Forward-slash form of a filename, so Windows paths compare like every other path. */
 const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 
-/** The one folder allowed to name a glyph from a library. */
-const ICON_LEAF_RELATIVE = "src/components/leaves/Icon"
+/** The one module allowed to name a glyph from a library. */
+const ICON_MODULE_RELATIVE = "src/components/leaves/Icon/index.tsx"
 
 /**
  * Package roots that ship glyphs.
@@ -31,7 +31,14 @@ const GLYPH_PACKAGES = [
   "@heroicons/",
   "@tabler/icons",
   "@fortawesome/",
+  "@mui/icons-material",
+  "@fluentui/react-icons",
+  "iconsax-react",
+  "react-feather",
 ]
+
+/** Package-name signal for a glyph catalogue not yet listed explicitly. */
+const GLYPH_PACKAGE_NAME = /(?:icon|glyph|lucide|feather|tabler|fortawesome)/i
 
 /** The two Heroicon families selected by the product roles. */
 const HEROICON_PACKAGES = new Set([
@@ -40,7 +47,7 @@ const HEROICON_PACKAGES = new Set([
 ])
 
 /** True when this file is the icon leaf, which owns the meaning-to-glyph map. */
-const isIconLeafFile = (filename) => normalizePath(filename).includes(`/${ICON_LEAF_RELATIVE}/`)
+const isIconLeafFile = (filename) => normalizePath(filename).endsWith(`/${ICON_MODULE_RELATIVE}`)
 
 /** Product source under `src/`; tooling and config are out of scope. */
 const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
@@ -48,7 +55,9 @@ const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
 /** True when an import source resolves into a glyph library, subpaths included. */
 const isGlyphImport = (source) => {
   const value = typeof source === "string" ? source : ""
-  return GLYPH_PACKAGES.some((pkg) => value === pkg || value.startsWith(pkg))
+  const isExternalPackage = value !== "" && !value.startsWith(".") && !value.startsWith("@/")
+  return GLYPH_PACKAGES.some((pkg) => value === pkg || value.startsWith(pkg)) ||
+    (isExternalPackage && GLYPH_PACKAGE_NAME.test(value))
 }
 
 /** A glyph size written as a fraction of a step, or as an arbitrary value. */
@@ -89,7 +98,7 @@ export const noVendorIconOutsideIconLeaf = {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
         if (!isGlyphImport(source)) return
-        context.report({ node, messageId: "vendor", data: { source, leaf: ICON_LEAF_RELATIVE } })
+        context.report({ node, messageId: "vendor", data: { source, leaf: ICON_MODULE_RELATIVE } })
       },
     }
   },

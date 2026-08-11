@@ -66,6 +66,21 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
       },
       { filename: BLOCK, code: "import { Star } from \"lucide-react\"", errors: [{ messageId: "vendor" }] },
       { filename: BLOCK, code: "import { FaBeer } from \"react-icons/fa\"", errors: [{ messageId: "vendor" }] },
+      {
+        filename: ICON_LEAF_BRANDS,
+        code: "import { GoogleIcon } from \"@heroicons/react/24/outline\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: OTHER_LEAF,
+        code: "import Home from \"@mui/icons-material/Home\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: OTHER_LEAF,
+        code: "import { Home } from \"some-glyph-catalogue\"",
+        errors: [{ messageId: "vendor" }],
+      },
     ],
   })
 })

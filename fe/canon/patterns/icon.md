@@ -48,7 +48,8 @@ recolouring them changes their identity.
 
 **ICON-6 · Callers name meanings, never vendor components.**
 
-Only `src/components/leaves/Icon/` may import a glyph library. A caller importing an SVG component
+Only `src/components/leaves/Icon/index.tsx` may import a glyph library. A sibling such as
+`brands.tsx` owns exact local SVG paths, not another route into Heroicons. A caller importing an SVG component
 chooses vendor, picture, family and size locally, creating a second icon vocabulary outside the
 closed map.
 
