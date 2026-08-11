@@ -8,6 +8,7 @@
  * first and must never be deleted to make an import tidier.
  */
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
@@ -27,6 +28,12 @@ const ICON_LEAF = `${R}/leaves/Icon/index.tsx`
 const ICON_LEAF_BRANDS = `${R}/leaves/Icon/brands.tsx`
 const OTHER_LEAF = `${R}/leaves/SeeMoreLink/index.tsx`
 const BLOCK = `${R}/blocks/dashboard/DailyQuest/component.tsx`
+const ICON_LAW = readFileSync(new URL("../../fe/canon/patterns/icon.md", import.meta.url), "utf8")
+const MAPPING_TABLE = ICON_LAW.match(/\| Meaning \(`IconName`\)[\s\S]*?(?=\n## Forbidden)/)?.[0] ?? ""
+const MAPPING_ROWS = Array.from(
+  MAPPING_TABLE.matchAll(/^\| `(\w+)` \| [^|]+ \| `(\w+)` \|$/gm),
+  (match) => ({ meaning: match[1], glyph: match[2] }),
+)
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -61,6 +68,12 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
       { filename: BLOCK, code: "import { FaBeer } from \"react-icons/fa\"", errors: [{ messageId: "vendor" }] },
     ],
   })
+})
+
+test("ICON-9: the canon feature map gives every meaning unique glyph ownership", () => {
+  assert.ok(MAPPING_ROWS.length > 0, "icon.md has no readable feature mapping rows")
+  assert.equal(new Set(MAPPING_ROWS.map(({ meaning }) => meaning)).size, MAPPING_ROWS.length)
+  assert.equal(new Set(MAPPING_ROWS.map(({ glyph }) => glyph)).size, MAPPING_ROWS.length)
 })
 
 test("ICON-7: only the Heroicons outline and micro families may supply glyphs", () => {

@@ -71,6 +71,46 @@ a glyph merely because it is nearby or visually plausible. `IconName`, `GLYPHS` 
 together, and source parity tests reject a missing row, a stale component name or duplicate glyph
 ownership.
 
+The canon mirrors that operational table below so an AI reading `.claude` has the selection answer
+before it opens the product source. A mapping change updates this table and the source table in the
+same logical change.
+
+| Meaning (`IconName`) | Product feature | Heroicon |
+|---|---|---|
+| `brand` | Academy/learning identity | `AcademicCapIcon` |
+| `streak` | Learning streak | `FireIcon` |
+| `credit` | AI credit/quota | `BoltIcon` |
+| `reward` | Rewards and gift points | `GiftIcon` |
+| `course` | Courses and lessons | `BookOpenIcon` |
+| `email` | Email identity | `EnvelopeIcon` |
+| `password` | Password field | `LockClosedIcon` |
+| `code` | Verification/security code | `ShieldCheckIcon` |
+| `signedIn` | Successful authentication | `CheckCircleIcon` |
+| `signIn` | Enter account/session | `ArrowRightOnRectangleIcon` |
+| `close` | Dismiss/close | `XMarkIcon` |
+| `next` | Continue/go forward | `ArrowRightIcon` |
+| `retry` | Retry/refresh failed work | `ArrowPathIcon` |
+| `send` | Send/submit message | `PaperAirplaneIcon` |
+| `home` | Dashboard overview | `HomeIcon` |
+| `explore` | Explore/discover catalogue | `GlobeAltIcon` |
+| `community` | Learner community | `UserGroupIcon` |
+| `league` | Leaderboard and competition | `TrophyIcon` |
+| `review` | Review assigned work | `ClipboardDocumentCheckIcon` |
+| `light` | Light theme | `SunIcon` |
+| `dark` | Dark theme | `MoonIcon` |
+| `locale` | Language/locale switch | `LanguageIcon` |
+| `google` | Google provider | `GoogleMark` |
+| `github` | GitHub provider | `GithubMark` |
+| `search` | Global search | `MagnifyingGlassIcon` |
+| `cart` | Shopping cart | `ShoppingCartIcon` |
+| `notification` | Notifications | `BellIcon` |
+| `account` | Current user account | `UserCircleIcon` |
+| `saved` | Saved/bookmarked content | `BookmarkIcon` |
+| `blog` | Blog/editorial content | `NewspaperIcon` |
+| `talents` | Talent discovery | `UserPlusIcon` |
+| `jobs` | IT jobs | `BriefcaseIcon` |
+| `practice` | Programming/code practice | `CodeBracketIcon` |
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
