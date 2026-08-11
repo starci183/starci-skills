@@ -83,17 +83,17 @@ export type CompositeProps<D extends ComponentData, A extends ComponentActions =
  * THIS IS THE SLOT THAT USED TO BE `children`, AND THE CHANGE IS NOT COSMETIC. `children` is markup
  * that has already been built: it can be a `.map`, a ternary, a fragment, or a subtree nobody named,
  * so nothing above it can say what is inside a node and no rule can check. `render` is a contract
- * descriptor: either typed named slots or an explicit branch projection. A slot descriptor is not
- * callable and a projection exposes `project`, so neither can pretend to be the other. That is what
- * lets the table state what belongs in each position and have the claim be worth something.
+ * value in one of two lanes. This alias is the bound lane: Tree and ordinary branches receive
+ * named slots or an explicit projection. A data-driven surface uses {@link ContractRenderBranchProps}
+ * to receive a stable component type and pass changing runtime `props` into it.
  *
  * `contract` and `render` are one decision written twice, and `ContractComponent<K>` ties them together:
  * the key fixes which slots exist and what may fill each, so a card cannot say one thing and hold
  * another. A wrong leaf, wrong leaf props, a node where a leaf was asked for, a missing slot and a
  * slot nobody declared are five compile errors rather than five things a reviewer has to spot.
  *
- * Runtime data may be closed over by the typed builder at the call site. What may not arrive is a
- * bare callback or JSX value with no contract/leaf metadata, because that erases the slot identity.
+ * A bare callback or JSX value may not arrive: neither carries the exact key metadata that makes
+ * `contract` and `render` one checked decision.
  *
  * THERE IS NO LIST VARIANT, and there does not need to be. A slot that holds many says so in the
  * table with `repeats: true`; that slot becomes an array. `restingCount` separately fixes how many
@@ -108,6 +108,23 @@ export type BranchProps<
     readonly on?: A
     readonly contract: K
     readonly render: ContractComponent<NoInfer<K>>
+    readonly isLoading?: boolean
+}
+
+/**
+ * A data-driven contract host's props. Runtime data stays in `props`; `render` is a stable real
+ * component type branded for the exact key. `SurfaceListCard` uses this lane because a repeated
+ * domain collection must not be closed into a new callback descriptor at every host call site.
+ */
+export type ContractRenderBranchProps<
+    D extends ComponentData,
+    K extends ContractKey,
+    A extends ComponentActions = ComponentActions,
+> = {
+    readonly props: D
+    readonly on?: A
+    readonly contract: K
+    readonly render: ContractComponent<NoInfer<K>, LeafProps<D, A>>
     readonly isLoading?: boolean
 }
 

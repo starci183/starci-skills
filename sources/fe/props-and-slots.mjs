@@ -105,10 +105,51 @@ export const noChildrenSlot = {
   },
 }
 
+// -- SLOTS-7 ---------------------------------------------------------------------------------------
+
+/** A joined-list surface receives domain collections through named props, never a generic items lane. */
+export const noSurfaceListItemsSlot = {
+  meta: {
+    type: "problem",
+    docs: { description: "SurfaceListCard receives collection data through named props, never items." },
+    schema: [],
+    messages: {
+      items:
+        "`items` creates a second runtime-data lane beside `props` and makes SurfaceListCard know every domain collection. Put the collection in the render component's named props type (for example `tasks`) and pass it through `props`.",
+    },
+  },
+  create(context) {
+    const filename = String(context.filename || context.getFilename()).replace(/\\/g, "/")
+    if (!filename.includes("/src/")) return {}
+    const bindings = new Set()
+    return {
+      ImportDeclaration(node) {
+        const source = String(node.source?.value || "").replace(/\\/g, "/")
+        if (!/(?:^|\/)components\/branches\/SurfaceListCard$/.test(source)) return
+        for (const specifier of node.specifiers || []) {
+          const imported = specifier.imported?.name
+          if (imported === "SurfaceListCard" && specifier.local?.name) bindings.add(specifier.local.name)
+        }
+      },
+      JSXOpeningElement(node) {
+        const component = node.name?.type === "JSXIdentifier" ? node.name.name : null
+        if (!component || !bindings.has(component)) return
+        for (const attribute of node.attributes || []) {
+          if (attribute.type !== "JSXAttribute") continue
+          if (attribute.name?.type === "JSXIdentifier" && attribute.name.name === "items") {
+            context.report({ node: attribute, messageId: "items" })
+          }
+        }
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-inline-parameter-type": noInlineParameterType,
   "no-children-slot": noChildrenSlot,
+  "no-surface-list-items-slot": noSurfaceListItemsSlot,
 }
 
 /**

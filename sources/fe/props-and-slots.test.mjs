@@ -11,7 +11,12 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noChildrenSlot, noInlineParameterType, rules } from "./props-and-slots.mjs"
+import {
+  noChildrenSlot,
+  noInlineParameterType,
+  noSurfaceListItemsSlot,
+  rules,
+} from "./props-and-slots.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -108,6 +113,24 @@ test("SLOTS-4: containers take contract and render; only ModalShell/DrawerShell 
         filename: "/repo/src/components/leaves/Icon/index.tsx",
         code: "export const Icon = ({ children }: IconProps) => null",
         errors: [{ messageId: "slot" }],
+      },
+    ],
+  })
+})
+
+test("SLOTS-7: list collections travel through named props, never an items lane", () => {
+  tester.run("no-surface-list-items-slot", noSurfaceListItemsSlot, {
+    valid: [
+      {
+        filename: "/repo/src/components/blocks/dashboard/DailyQuest/component.tsx",
+        code: "import { SurfaceListCard } from '@/components/branches/SurfaceListCard'; export const C = () => <SurfaceListCard contract='daily-quest-list' render={Content} props={{ label, tasks }} />",
+      },
+    ],
+    invalid: [
+      {
+        filename: "/repo/src/components/blocks/dashboard/DailyQuest/component.tsx",
+        code: "import { SurfaceListCard as List } from '@/components/branches/SurfaceListCard'; export const C = () => <List contract='daily-quest-list' render={Content} props={{ label }} items={tasks} />",
+        errors: [{ messageId: "items" }],
       },
     ],
   })

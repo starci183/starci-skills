@@ -121,8 +121,10 @@ another wrapper. Those wrappers are branch mechanics, not a second contract voca
 The named surface branch owns its fixed outer seam as ordinary branch code. That seam is not a
 second content grammar: it cannot vary by caller, it cannot admit children, and it never receives
 contract markers. Only the content host (`Card.Content`, accordion body, list body) receives
-`contractNodeProps(contract)` and `ContractContent`. Creating keys for the heading line, outer
-wrapper and caption merely to avoid writing the branch would turn one host into three contracts.
+`contractNodeProps(contract)`. A bound host places `ContractContent` there; a data-driven surface
+places the branded component there and passes its ordinary `props`, `on`, and `isLoading`. Creating
+keys for the heading line, outer wrapper and caption merely to avoid writing the branch would turn
+one host into three contracts.
 
 This is why there is no `CardShell` and no compound table. Repeating `Card > Card.Content` is only
 two lines; extracting it would add indirection without owning a policy. `SurfaceCard`,
@@ -154,14 +156,22 @@ unspecified resting shape.
 
 The values in `props` are literal constraints, never values injected at runtime. A slot declaring
 `props: { size: "sm" }` accepts a leaf component branded with that exact constraint; copy such as a
-query-provided label stays closed over by the render component and never enters the table.
+query-provided label travels through the render component's runtime `props` and never enters the
+table.
+
+For a joined list, the relation between peer rows belongs to the root contract. `divide-y` sits on
+the content host; a row leaf does not draw an `after` rule or inspect `last-child`. The collection's
+domain name (`tasks`, `courses`, `alerts`) remains a field of the content component's named props
+type. A generic `items` slot would teach the surface the caller's data model and is not part of the
+branch vocabulary.
 
 None of this is `children` in the React sense, and that is what makes it checkable. Markup arrives
-already built and erases its shape; a slot value is a branded descriptor. `ContractSlots<K>` carries
-the checked record and is not callable. `ContractProjection<K>` carries an explicit `project`
-function for a branch that already drew its wrapper. Their union is `ContractComponent<K>`; keeping
-the two variants distinct prevents a slot record from pretending to be a component that renders
-`null`. Wrong identity, props, cardinality, missing slots and extra slots are compile errors.
+already built and erases its shape. `ContractSlots<K>` carries a checked bound record and is not
+callable. `ContractProjection<K>` carries an explicit `project` function for a branch that already
+drew its wrapper. `ContractComponent<K,P>` is the third lane: a real `ComponentType<P>` branded with
+the exact key, used when runtime data must remain in `props` instead of being closed into a new
+descriptor on every render. Wrong key, props, identity, cardinality, missing slots and extra slots
+are compile errors.
 
 ## Forbidden
 
@@ -179,7 +189,7 @@ the two variants distinct prevents a slot record from pretending to be a compone
 | Hand-writing a contract marker attribute | The node claims a contract nothing enforces, and every test that reads those attributes believes it | Render the key and let the frame paint them |
 | A new key because the existing one is the wrong size | The vocabulary grows one call site at a time until it describes call sites, not shapes | Use the key that exists, or change the entry for everyone |
 | `children` on a structural node | Markup arrives already built, so nothing above can say what is inside and no rule can check | Declare the slots on the entry and pass one component per slot in `render` |
-| A bare arrow or literal JSX in a `render` slot | It carries no contract/leaf metadata | Use the typed builder; its callback may close runtime data, while the returned slot value remains branded |
+| A bare arrow or literal JSX in a `render` slot | It carries no contract/leaf metadata | Brand the stable component type with `defineContractComponent`; pass runtime data through `props` |
 | A positional list of children instead of named slots | Insert one in the middle and every slot after it silently means something else | Name each slot; a name survives the insertion |
 | A leaf without a `name` on its metadata | Two leaves taking the same props become interchangeable, and a slot asking for a glyph will accept a label | Give every leaf its name beside its tier marker |
 | A hand-written skeleton tree beside a list | Loading cardinality drifts away from the live shape | Put `repeats: true` and `restingCount` on the slot |
@@ -191,21 +201,25 @@ the two variants distinct prevents a slot record from pretending to be a compone
 ### The ordinary case — a node is a key
 
 ```tsx
-// The shape has a name, every slot has a name, and the compiler holds both.
-export const SurfaceListCard = ({ props, contract, render }: SurfaceListCardProps) => (
+// The wrapper and the contract component receive the same named runtime props.
+export const SurfaceListCard = ({ props, on, contract, render: Content, isLoading }: SurfaceListCardProps) => (
     <div className="flex flex-col gap-3">
         <Heading props={{ content: props.label, level: 3 }} />
         <Card>
             <Card.Content {...contractNodeProps(contract)}>
-                <ContractContent contract={contract} render={render} />
+                <Content props={props} on={on} isLoading={isLoading} />
             </Card.Content>
         </Card>
         {caption}
     </div>
 )
 
-const content = defineContractComponent("stacked-peer-controls", { control: courseRows })
-<SurfaceListCard contract="stacked-peer-controls" render={content} />
+const DailyQuestContent = defineContractComponent("daily-quest-list", DailyQuestContentView)
+<SurfaceListCard
+    contract="daily-quest-list"
+    render={DailyQuestContent}
+    props={{ label, description, tasks }}
+/>
 ```
 
 ```tsx

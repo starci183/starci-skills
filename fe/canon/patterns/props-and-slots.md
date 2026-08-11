@@ -17,12 +17,11 @@ Five slots exist across the whole system, and no component has all five. `props`
 that key declares — having those two is what makes a container a container. `isLoading` is handed
 down, never decided locally.
 
-`render` is a branded `ContractComponent<K>`, never markup or an arbitrary React component.
-`ContractSlots<K>` carries one named value per slot the key declares; `ContractProjection<K>`
-carries an explicit branch projection that already owns its host. The exact key survives the
-branch boundary, and the slot descriptor is not callable. That is the difference between content
-the contract table can state and whatever subtree a call site happened to build — see
-[`contract`](contract.md), CONTRACT-11.
+`render` is branded contract content, never markup or an arbitrary React component. Tree may take
+bound `ContractSlots<K>` or `ContractProjection<K>`. A surface host takes
+`ContractComponent<K, LeafProps<D,A>>`: a real component type carrying the exact key while changing
+runtime data continues through the ordinary `props`, `on`, and `isLoading` slots. The call site does
+not rebuild a descriptor or close data into callbacks. See [`contract`](contract.md), CONTRACT-11.
 
 What holds this law is [`sources/fe/props.ts`](../../../sources/fe/props.ts), which is the fence
 itself, and [`sources/fe/props-and-slots.mjs`](../../../sources/fe/props-and-slots.mjs) for the one
@@ -81,6 +80,13 @@ No class name, no style, no gap, no per-part styling hook. A caller who can rest
 become its second owner, and the component now has two authors who never speak. Whatever the caller
 was trying to say is a VARIANT with a name, decided inside.
 
+**SLOTS-7 · A list surface receives domain collections through named `props`, never `items`.**
+
+`SurfaceListCard` is a contract host, not a data model. Its stable branded `render` component owns
+the domain props shape, so `tasks`, `courses`, or any later collection travels under its real name
+inside `props`. A generic top-level `items` slot would create a second data lane and teach the shared
+surface every caller's model. The strict rule rejects that lane at the JSX call site.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -90,6 +96,7 @@ was trying to say is a VARIANT with a name, decided inside.
 | An inline object type on a parameter | The shape has no name, so nothing can import it, test it or find it | Name it in the module |
 | A slot the alias does not have | The alias IS the shape; wanting one more means the layer was chosen wrongly | Decide which layer this is |
 | `children` in a component except ModalShell/DrawerShell | Markup arrives already built, so what a container holds can never be stated or checked | `contract` plus a branded `ContractComponent<K>` |
+| `items` on `SurfaceListCard` | It creates a second data lane and makes the shared surface know a caller's collection model | Put the collection under its domain name in the render component's named `props` type |
 | `render` on a closed shape | It has become a container, whatever its folder says | Move it to the container layer |
 | A component that decides its own `isLoading` | It asks a question the layer above already answered | Take the flag |
 | A class name, style or spacing prop | The component gains a second author who is invisible from inside | A named variant |

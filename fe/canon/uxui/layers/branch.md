@@ -26,8 +26,9 @@ sits in. Both directions are visible in the props alias, which is why this bound
 here that never needs arguing about.
 
 The slots come from the KEY, not from this file: the entry declares which slots exist and what may
-fill each, and `render` carries one component per slot. So a branch cannot invent a position, and what it
-holds is stated in the contract table rather than in whatever the call site happened to build.
+fill each. A bound Tree receives the checked slot record. A data-driven surface receives a stable
+component type branded for that key and passes its ordinary `props` into it. So a branch cannot
+invent a position, and runtime data does not have to be closed into call-site callbacks.
 
 **BRANCH-2 · Ordinary branches own no class; named surface hosts own only their fixed wrapper.**
 
@@ -85,6 +86,14 @@ that knows the domain — and belongs in that file instead.
 A branch republishing what its slot components accept has become a funnel: every future change to
 any of them now edits the branch, and the branch's own props stop describing the branch.
 
+**BRANCH-9 · A list surface receives props, never an `items` lane.**
+
+`SurfaceListCard` owns the shared Card, clipping, the contract-bearing content body, and placement
+of the whole-list caption. It does not decide whether the domain calls its collection tasks,
+courses, rows or alerts. The branded content component receives the same named `props` value and
+turns that domain data into the repeated slot. Separators remain on the root contract as `divide-y`,
+never as an `after` rule owned by each row leaf.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -98,28 +107,34 @@ any of them now edits the branch, and the branch's own props stop describing the
 | Reading or counting what fills the slots | The choice then depends on meaning, which this tier does not have — and the count is the key's to state | Take the choice as a prop from whoever knows |
 | Republishing a slot component's props | It makes the branch a funnel that every child change edits | Let the caller pass to the child directly |
 | A `children` slot | Markup arrives already built, so what this container holds could never be stated in the table | `contract` plus one component per named slot |
+| An `items` slot invented by `SurfaceListCard` | The branch has learned one caller's data model and cannot host a list derived from any other props shape | Keep the collection under its domain name in the content component's named `props` type |
+| A row leaf drawing its own separator | The leaf has learned that it has peers and whether it is last | Put `divide-y` on the joined-list contract root |
 
 ## Examples
 
 ### The ordinary case — a named section
 
 ```tsx
-// branch: one key, and one component per slot. It never looks at what it holds.
-export const SurfaceListCard = ({ props, contract, render }: SurfaceListCardProps) => (
+// branch: the component identity is stable; only its named props change.
+export const SurfaceListCard = ({ props, on, contract, render: Content, isLoading }: SurfaceListCardProps) => (
     <div className="flex flex-col gap-3">
         <Heading props={{ content: props.label, level: 3 }} />
         <Card>
             <Card.Content {...contractNodeProps(contract)}>
-                <ContractContent contract={contract} render={render} />
+                <Content props={props} on={on} isLoading={isLoading} />
             </Card.Content>
         </Card>
         {caption}
     </div>
 )
 
-// the call site binds the key to the named slot record before it crosses the branch boundary
-const content = defineContractComponent("stacked-peer-controls", { control: courseRows })
-<SurfaceListCard contract="stacked-peer-controls" render={content} />
+// Runtime collections remain fields of a named props type, never a special `items` slot.
+const DailyQuestContent = defineContractComponent("daily-quest-list", DailyQuestContentView)
+<SurfaceListCard
+    contract="daily-quest-list"
+    render={DailyQuestContent}
+    props={{ label, description, tasks }}
+/>
 ```
 
 ```tsx
@@ -163,8 +178,16 @@ They differ in one thing: whether the tier below is still the boundary with the 
 
 ```tsx
 // branch: the name fixes the inside, and the key fixes the slots. A wrong child does not compile.
-export const SurfaceListCard = ({ props, render }: SurfaceListCardProps) => (
-    <SurfaceCard props={{ label: props.label }} contract="label-over-stacked-rows" render={render} />
+export const SurfaceListCard = ({ props, on, contract, render: Content, isLoading }: SurfaceListCardProps) => (
+    <div className="flex flex-col gap-3">
+        <Heading props={{ content: props.label, level: 3 }} />
+        <Card>
+            <Card.Content {...contractNodeProps(contract)}>
+                <Content props={props} on={on} isLoading={isLoading} />
+            </Card.Content>
+        </Card>
+        {caption}
+    </div>
 )
 ```
 

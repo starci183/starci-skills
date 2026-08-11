@@ -13,7 +13,7 @@
  * whole family of patrol rules unnecessary: there is nothing to police when the bad value cannot be
  * typed, and nothing to argue about when the compiler has already refused.
  */
-import type { ReactNode } from "react"
+import type { ComponentType, ReactNode } from "react"
 
 /**
  * What a component drawn inside a node receives. It never receives the key that placed it: the node
@@ -223,8 +223,19 @@ export type ContractProjection<K extends ContractKey> = {
     readonly project: () => ReactNode
 }
 
-/** Checked contract content, either as named slots or one explicit branch projection. */
-export type ContractComponent<K extends ContractKey> = ContractSlots<K> | ContractProjection<K>
+/** A real component type whose runtime props stay separate from its exact contract identity. */
+export type ContractRenderComponent<K extends ContractKey, P> = ComponentType<P> & {
+    readonly kind: "component"
+    readonly meta: { readonly shape: "contract"; readonly contract: K }
+}
+
+/** Checked bound content used when a caller has already supplied every slot value. */
+export type BoundContractComponent<K extends ContractKey> = ContractSlots<K> | ContractProjection<K>
+
+/** Bound content by default; supplying `P` selects the stable component-type lane. */
+export type ContractComponent<K extends ContractKey, P = undefined> = [P] extends [undefined]
+    ? BoundContractComponent<K>
+    : ContractRenderComponent<K, P>
 
 /**
  * A leaf, typed by its NAME and the props it takes. It has no key, because it is not a node.
