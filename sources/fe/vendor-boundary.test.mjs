@@ -11,7 +11,13 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { rules, vendorBoundary } from "./vendor-boundary.mjs"
+import {
+  fieldInputUsesSecondaryVariant,
+  modalShellPassesContentDirectly,
+  noSurfaceBranchInOverlay,
+  rules,
+  vendorBoundary,
+} from "./vendor-boundary.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -67,5 +73,46 @@ test("VENDOR-2: a shell that wraps nothing is an ordinary component in the wrong
         errors: [{ messageId: "unknownShell" }],
       },
     ],
+  })
+})
+
+test("VENDOR-6: ModalShell leaves its interior uninterpreted", () => {
+  tester.run("modal-shell-passes-content-directly", modalShellPassesContentDirectly, {
+    valid: [{
+      filename: SHELL,
+      code: "export const S = ({ children }) => <Modal.Dialog><Modal.CloseTrigger />{children}</Modal.Dialog>",
+    }],
+    invalid: [{
+      filename: SHELL,
+      code: "export const S = ({ children }) => <Modal.Dialog><Modal.Body>{children}</Modal.Body></Modal.Dialog>",
+      errors: [{ messageId: "body" }],
+    }],
+  })
+})
+
+test("VENDOR-7: Field uses the secondary input variant on its bounded surface", () => {
+  const field = "D:/repo/src/components/leaves/Field/index.tsx"
+  tester.run("field-input-uses-secondary-variant", fieldInputUsesSecondaryVariant, {
+    valid: [{
+      filename: field,
+      code: "import { Input as HeroInput } from '@heroui/react'; export const Field = () => <HeroInput variant='secondary' />",
+    }],
+    invalid: [{
+      filename: field,
+      code: "import { Input } from '@heroui/react'; export const Field = () => <Input />",
+      errors: [{ messageId: "variant" }],
+    }],
+  })
+})
+
+test("VENDOR-8: an overlay does not draw a surface inside itself", () => {
+  const overlay = "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx"
+  tester.run("no-surface-branch-in-overlay", noSurfaceBranchInOverlay, {
+    valid: [{ filename: overlay, code: "import { ModalShell } from '@/components/shells/ModalShell'" }],
+    invalid: [{
+      filename: overlay,
+      code: "import { SurfaceCard } from '@/components/branches/SurfaceCard'",
+      errors: [{ messageId: "nested" }],
+    }],
   })
 })

@@ -15,6 +15,12 @@ The question that settles every case: **does this region deserve to be a bounded
 one content section, one list of choices: yes. A single action, one navigation link, one line of
 metadata: no. Reach for space before an edge, and for an edge before a box.
 
+The mechanical overlay subset is held by
+[`sources/fe/vendor-boundary.mjs`](../../sources/fe/vendor-boundary.mjs): an overlay file cannot
+import a named surface branch, and ModalShell cannot force uninterpreted content through a vendor
+body wrapper. The wider visual judgement remains a design review because a transitive child can
+draw an edge without its overlay importer naming that child as a surface.
+
 ## Rules
 
 **SURFACE-1 · Never stack two bordered surfaces directly against each other.**

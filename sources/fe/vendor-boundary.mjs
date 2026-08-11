@@ -36,6 +36,13 @@ const isComponentFile = (filename) => normalizePath(filename).includes("/src/com
 /** True when an import names the component library, subpaths included. */
 const isVendorImport = (source) => typeof source === "string" && source.startsWith(VENDOR_PACKAGE_PREFIX)
 
+/** Read a two-part JSX member such as `Modal.Body`. */
+const jsxMemberName = (node) => {
+  if (node?.type !== "JSXMemberExpression") return null
+  if (node.object?.type !== "JSXIdentifier" || node.property?.type !== "JSXIdentifier") return null
+  return `${node.object.name}.${node.property.name}`
+}
+
 // -- VENDOR-1 · VENDOR-2 ---------------------------------------------------------------------------
 
 /** The library belongs to two folders, and a wrapper folder that wraps nothing is misfiled. */
@@ -77,9 +84,100 @@ export const vendorBoundary = {
   },
 }
 
+// -- VENDOR-6 --------------------------------------------------------------------------------------
+
+/** A content-agnostic modal shell passes children directly instead of forcing one body shape. */
+export const modalShellPassesContentDirectly = {
+  meta: {
+    type: "problem",
+    docs: { description: "ModalShell passes its uninterpreted interior directly to Modal.Dialog." },
+    schema: [],
+    messages: {
+      body:
+        "ModalShell is content-agnostic, so wrapping every child in `Modal.Body` is an interior-shape decision. Pass `children` directly to `Modal.Dialog`; the mounted content owns its arrangement.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!/\/src\/components\/shells\/ModalShell\/index\.tsx$/.test(file)) return {}
+    return {
+      JSXOpeningElement(node) {
+        if (jsxMemberName(node.name) === "Modal.Body") context.report({ node, messageId: "body" })
+      },
+    }
+  },
+}
+
+// -- VENDOR-7 --------------------------------------------------------------------------------------
+
+/** The house Field fixes the vendor input variant used on bounded form surfaces. */
+export const fieldInputUsesSecondaryVariant = {
+  meta: {
+    type: "problem",
+    docs: { description: "The Field leaf uses HeroUI Input's secondary surface variant." },
+    schema: [],
+    messages: {
+      variant:
+        "The house Field sits inside a bounded form surface. Its HeroUI Input must use `variant=\"secondary\"`; the default variant draws a competing field surface.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!/\/src\/components\/leaves\/Field\/index\.tsx$/.test(file)) return {}
+    const inputBindings = new Set()
+    return {
+      ImportDeclaration(node) {
+        if (node.source?.value !== "@heroui/react") return
+        for (const specifier of node.specifiers || []) {
+          if (specifier.imported?.name === "Input" && specifier.local?.name) inputBindings.add(specifier.local.name)
+        }
+      },
+      JSXOpeningElement(node) {
+        const name = node.name?.type === "JSXIdentifier" ? node.name.name : null
+        if (!name || !inputBindings.has(name)) return
+        const variant = (node.attributes || []).find((attribute) =>
+          attribute.type === "JSXAttribute"
+          && attribute.name?.type === "JSXIdentifier"
+          && attribute.name.name === "variant")
+        if (variant?.value?.type === "Literal" && variant.value.value === "secondary") return
+        context.report({ node, messageId: "variant" })
+      },
+    }
+  },
+}
+
+// -- VENDOR-8 --------------------------------------------------------------------------------------
+
+/** An overlay is already bounded and cannot directly mount a second named surface branch. */
+export const noSurfaceBranchInOverlay = {
+  meta: {
+    type: "problem",
+    docs: { description: "An overlay does not directly mount a named surface branch." },
+    schema: [],
+    messages: {
+      nested:
+        "This overlay is already the bounded surface. Do not mount `{{surface}}` inside it; use headings, spacing, rows and controls directly.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!file.includes("/src/components/overlays/")) return {}
+    return {
+      ImportDeclaration(node) {
+        const source = normalizePath(node.source?.value)
+        const match = source.match(/\/components\/branches\/(SurfaceCard|SurfaceAccordionCard|SurfaceListCard)$/)
+        if (match) context.report({ node, messageId: "nested", data: { surface: match[1] } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "vendor-boundary": vendorBoundary,
+  "modal-shell-passes-content-directly": modalShellPassesContentDirectly,
+  "field-input-uses-secondary-variant": fieldInputUsesSecondaryVariant,
+  "no-surface-branch-in-overlay": noSurfaceBranchInOverlay,
 }
 
 /**

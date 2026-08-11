@@ -6,7 +6,7 @@ A shell owns covering mechanics while deliberately ignoring the shape inside. Th
 exactly two: `ModalShell` and `DrawerShell`.
 
 They earn the only public React `children` hole because their job is to pass an uninterpreted
-interior straight into the vendor body. They arrange none of it. Focus trapping, Escape, backdrop,
+interior straight into the vendor dialog root. They arrange none of it. Focus trapping, Escape, backdrop,
 scroll lock, inertness, placement and focus return are the shell's concern; copy and content shape
 are not.
 
@@ -19,8 +19,8 @@ a named branch using `contract + render`.
 **SHELL-1 · Only `ModalShell` and `DrawerShell` are shells.** The list is closed; `shells/` is not a
 folder-wide escape hatch.
 
-**SHELL-2 · A shell passes `children` directly to the vendor body.** It never wraps them in layout,
-counts them, reads them, or chooses their contract.
+**SHELL-2 · A shell passes `children` directly to the vendor dialog root.** It never forces them
+through `Modal.Body`, wraps them in layout, counts them, reads them, or chooses their contract.
 
 **SHELL-3 · It owns mechanics only.** No title, copy, domain hook, fetch or decision about why it is
 open.
@@ -46,7 +46,7 @@ export const ModalShell = ({ isOpen, onDismiss, children }: ModalShellProps) => 
             <Modal.Container>
                 <Modal.Dialog>
                     <Modal.CloseTrigger />
-                    <Modal.Body>{children}</Modal.Body>
+                    {children}
                 </Modal.Dialog>
             </Modal.Container>
         </Modal.Backdrop>
