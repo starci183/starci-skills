@@ -47,6 +47,20 @@ not inside `overlays/**`.
 code icon before the label. A glyph appears only when it owns a separate action, such as password
 visibility, and then the action—not the label—owns it.
 
+**VENDOR-10 · TextLink is HeroUI Link.** Navigation semantics, keyboard handling, focus and hover
+belong to the vendor primitive. A raw button with a handwritten `hover:underline` class is not a
+link and must not imitate one.
+
+**VENDOR-11 · The signed-out account control owns a HeroUI Dropdown.** Pressing the account icon
+reveals the guest summary plus Sign in and Sign up choices. It does not jump directly into one auth
+mode. `AccountMenu` owns Dropdown semantics as a closed compound leaf; this does not create a
+`DropdownShell` or an uninterpreted children slot.
+
+**VENDOR-12 · Auth projection has one zero-inset host.** `ModalShell` supplies the zero-inset scroll
+body, `AuthenticationPanel` owns `centred-page-column`, and `SignInOverlay` projects it with
+`ContractContent`. Re-wrapping the projection in `Tree` duplicates the contract host; adding
+`py-*`, `pt-*`, or `pb-*` to `centred-page-column` recreates the second padding band.
+
 ## Examples
 
 ```tsx

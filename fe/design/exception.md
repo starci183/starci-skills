@@ -31,6 +31,14 @@ The repository contract pair should be named for these relationships, for exampl
 `auth-entry-stack` and `auth-shortcuts-over-divider`. `stacked-peer-controls` must not admit Divider
 to accommodate them.
 
+**EXCEPTION-3 · Auth content meets the modal scroll body without an outer inset.**
+
+The modal body already defines the covering and scrolling boundary. The projected authentication
+panel owns its sole `centred-page-column` host, so the overlay must mount that projection through
+`ContractContent`, not another `Tree`. `centred-page-column` carries no vertical padding; its named
+child contracts own every visible seam. This prevents both a second contract host and the two empty
+padding bands above and below the form.
+
 ## Forbidden
 
 | Never | Why | Instead |
@@ -38,3 +46,5 @@ to accommodate them.
 | Add Divider to the generic peer-control contract for auth | Every ordinary control stack gains an unrelated child | Auth-specific contract |
 | Let OAuth and the form be page-column siblings | The outer rhythm adds a second gap after OR | Wrap both in `auth-entry-stack`; it alone owns `gap-3` |
 | Copy the auth exception into another screen | An exception is evidence about one relationship, not a new default | Re-evaluate and name a separate contract if warranted |
+| Wrap the auth projection in another `Tree` | The same contract and spacing are mounted twice | Project it with `ContractContent` |
+| Add vertical padding to `centred-page-column` | The modal gains empty bands outside its named content rhythm | Let its child contracts own the seams |

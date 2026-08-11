@@ -88,6 +88,7 @@ same logical change.
 | `code` | Verification/security code | `ShieldCheckIcon` |
 | `signedIn` | Successful authentication | `CheckCircleIcon` |
 | `signIn` | Enter account/session | `ArrowRightOnRectangleIcon` |
+| `signUp` | Create account/session | `UserPlusIcon` |
 | `close` | Dismiss/close | `XMarkIcon` |
 | `next` | Continue/go forward | `ArrowRightIcon` |
 | `retry` | Retry/refresh failed work | `ArrowPathIcon` |
@@ -108,7 +109,7 @@ same logical change.
 | `account` | Current user account | `UserCircleIcon` |
 | `saved` | Saved/bookmarked content | `BookmarkIcon` |
 | `blog` | Blog/editorial content | `NewspaperIcon` |
-| `talents` | Talent discovery | `UserPlusIcon` |
+| `talents` | Talent discovery | `SparklesIcon` |
 | `jobs` | IT jobs | `BriefcaseIcon` |
 | `practice` | Programming/code practice | `CodeBracketIcon` |
 

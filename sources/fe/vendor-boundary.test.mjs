@@ -12,11 +12,14 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
+  accountControlOwnsDropdown,
+  authOverlayOwnsSingleContentHost,
   fieldInputUsesSecondaryVariant,
   fieldLabelIsTextOnly,
   modalShellOwnsScrollBody,
   noSurfaceBranchInOverlay,
   rules,
+  textLinkUsesHeroLink,
   vendorBoundary,
 } from "./vendor-boundary.mjs"
 
@@ -134,5 +137,73 @@ test("VENDOR-8: an overlay does not draw a surface inside itself", () => {
       code: "import { SurfaceCard } from '@/components/branches/SurfaceCard'",
       errors: [{ messageId: "nested" }],
     }],
+  })
+})
+
+test("VENDOR-10: TextLink delegates hover and press behavior to HeroUI Link", () => {
+  tester.run("text-link-uses-hero-link", textLinkUsesHeroLink, {
+    valid: [{
+      filename: "D:/repo/src/components/leaves/TextLink/index.tsx",
+      code: "import { Link as HeroLink } from '@heroui/react'; export const TextLink = ({ label, press }) => <HeroLink onPress={press}>{label}</HeroLink>",
+    }],
+    invalid: [{
+      filename: "D:/repo/src/components/leaves/TextLink/index.tsx",
+      code: "export const TextLink = ({ label }) => <button className='hover:underline'>{label}</button>",
+      errors: [{ messageId: "missing" }, { messageId: "handmade" }, { messageId: "handmade" }],
+    }],
+  })
+})
+
+test("VENDOR-11: the navbar account control opens a HeroUI dropdown before auth", () => {
+  tester.run("account-control-owns-dropdown", accountControlOwnsDropdown, {
+    valid: [
+      {
+        filename: "D:/repo/src/components/leaves/AccountMenu/index.tsx",
+        code: "import { Dropdown } from '@heroui/react'; export const AccountMenu = () => <Dropdown />",
+      },
+      {
+        filename: "D:/repo/src/components/layouts/ShellNav/component.tsx",
+        code: "import { AccountMenu } from '@/components/leaves/AccountMenu'; export const ShellNav = () => <AccountMenu />",
+      },
+    ],
+    invalid: [
+      {
+        filename: "D:/repo/src/components/leaves/AccountMenu/index.tsx",
+        code: "export const AccountMenu = () => <div />",
+        errors: [{ messageId: "dropdown" }],
+      },
+      {
+        filename: "D:/repo/src/components/layouts/ShellNav/component.tsx",
+        code: "export const ShellNav = ({ openSignIn }) => <IconButton props={{ icon: 'account' }} on={{ press: openSignIn }} />",
+        errors: [{ messageId: "menu" }, { messageId: "direct" }],
+      },
+    ],
+  })
+})
+
+test("VENDOR-12: the auth overlay has one zero-inset content host", () => {
+  tester.run("auth-overlay-owns-single-content-host", authOverlayOwnsSingleContentHost, {
+    valid: [
+      {
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { ContractContent } from '@/components/branches/Tree'; export const Overlay = ({ render }) => <ContractContent contract={render.meta.contract} render={render} />",
+      },
+      {
+        filename: "D:/repo/src/components/contracts/index.ts",
+        code: "const C = { 'centred-page-column': { classes: ['flex', 'gap-6'] } }",
+      },
+    ],
+    invalid: [
+      {
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { Tree } from '@/components/branches/Tree'; export const Overlay = ({ render }) => <Tree contract={render.meta.contract} render={render} />",
+        errors: [{ messageId: "missing" }, { messageId: "duplicate" }],
+      },
+      {
+        filename: "D:/repo/src/components/contracts/index.ts",
+        code: "const C = { 'centred-page-column': { classes: ['flex', 'py-6'] } }",
+        errors: [{ messageId: "inset" }],
+      },
+    ],
   })
 })

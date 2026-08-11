@@ -210,6 +210,127 @@ export const noSurfaceBranchInOverlay = {
   },
 }
 
+// -- VENDOR-10 -------------------------------------------------------------------------------------
+
+/** TextLink delegates link interaction and hover treatment to HeroUI Link. */
+export const textLinkUsesHeroLink = {
+  meta: {
+    type: "problem",
+    docs: { description: "TextLink wraps HeroUI Link instead of hand-drawing link behavior." },
+    schema: [],
+    messages: {
+      missing: "TextLink must import HeroUI `Link`. The vendor owns link hover, focus and interaction states.",
+      handmade: "Do not rebuild a HeroUI Link with a raw button or local className. Wrap HeroUI `Link` and pass `onPress`.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!/\/src\/components\/leaves\/TextLink\/index\.tsx$/.test(file)) return {}
+    let hasHeroLink = false
+    return {
+      ImportDeclaration(node) {
+        if (node.source?.value !== "@heroui/react") return
+        hasHeroLink ||= (node.specifiers || []).some((specifier) => specifier.imported?.name === "Link")
+      },
+      JSXOpeningElement(node) {
+        if (node.name?.type === "JSXIdentifier" && node.name.name === "button") context.report({ node, messageId: "handmade" })
+        if ((node.attributes || []).some((attribute) => attribute.type === "JSXAttribute" && attribute.name?.name === "className")) {
+          context.report({ node, messageId: "handmade" })
+        }
+      },
+      "Program:exit"(node) {
+        if (!hasHeroLink) context.report({ node, messageId: "missing" })
+      },
+    }
+  },
+}
+
+// -- VENDOR-11 -------------------------------------------------------------------------------------
+
+/** The navbar account control opens one HeroUI dropdown before choosing an auth journey. */
+export const accountControlOwnsDropdown = {
+  meta: {
+    type: "problem",
+    docs: { description: "AccountMenu owns HeroUI Dropdown and ShellNav does not open auth directly." },
+    schema: [],
+    messages: {
+      dropdown: "AccountMenu must import HeroUI `Dropdown`; the account trigger opens the guest menu before any authentication surface.",
+      menu: "ShellNav must render AccountMenu for a guest account control.",
+      direct: "The account IconButton may not carry an action in ShellNav. Guests open AccountMenu; its Sign in or Sign up choice opens the modal.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    const isMenu = /\/src\/components\/leaves\/AccountMenu\/index\.tsx$/.test(file)
+    const isShell = /\/src\/components\/layouts\/ShellNav\/component\.tsx$/.test(file)
+    if (!isMenu && !isShell) return {}
+    let hasOwner = false
+    return {
+      ImportDeclaration(node) {
+        if (isMenu && node.source?.value === "@heroui/react") {
+          hasOwner ||= (node.specifiers || []).some((specifier) => specifier.imported?.name === "Dropdown")
+        }
+        if (isShell && /\/components\/leaves\/AccountMenu$/.test(normalizePath(node.source?.value))) hasOwner = true
+      },
+      JSXOpeningElement(node) {
+        if (!isShell || node.name?.type !== "JSXIdentifier" || node.name.name !== "IconButton") return
+        const props = (node.attributes || []).find((attribute) => attribute.type === "JSXAttribute" && attribute.name?.name === "props")
+        const expression = props?.value?.type === "JSXExpressionContainer" ? props.value.expression : null
+        const isAccount = expression?.type === "ObjectExpression" && expression.properties.some((property) =>
+          property.type === "Property" && property.key?.name === "icon" && property.value?.value === "account")
+        const hasAction = (node.attributes || []).some((attribute) => attribute.type === "JSXAttribute" && attribute.name?.name === "on")
+        if (isAccount && hasAction) context.report({ node, messageId: "direct" })
+      },
+      "Program:exit"(node) {
+        if (hasOwner) return
+        context.report({ node, messageId: isMenu ? "dropdown" : "menu" })
+      },
+    }
+  },
+}
+
+// -- VENDOR-12 -------------------------------------------------------------------------------------
+
+/** The auth overlay projects one already-owned column and adds no vertical inset of its own. */
+export const authOverlayOwnsSingleContentHost = {
+  meta: {
+    type: "problem",
+    docs: { description: "Authentication has one zero-inset content host inside ModalShell." },
+    schema: [],
+    messages: {
+      duplicate: "SignInOverlay must project with `ContractContent`, not open another `Tree` around a panel that already owns the same host.",
+      missing: "SignInOverlay must import `ContractContent` for its already-hosted projection.",
+      inset: "`centred-page-column` must not add py/pt/pb. ModalShell is zero-inset and the auth content touches that scroll region without a second vertical padding band.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    const isOverlay = /\/src\/components\/overlays\/auth\/SignInOverlay\/component\.tsx$/.test(file)
+    const isContracts = /\/src\/components\/contracts\/index\.ts$/.test(file)
+    if (!isOverlay && !isContracts) return {}
+    let hasContent = false
+    return {
+      ImportDeclaration(node) {
+        if (!isOverlay || !/\/components\/branches\/Tree$/.test(normalizePath(node.source?.value))) return
+        for (const specifier of node.specifiers || []) {
+          if (specifier.imported?.name === "ContractContent") hasContent = true
+          if (specifier.imported?.name === "Tree") context.report({ node: specifier, messageId: "duplicate" })
+        }
+      },
+      Property(node) {
+        if (!isContracts) return
+        const key = node.key?.type === "Literal" ? node.key.value : node.key?.name
+        if (key !== "centred-page-column") return
+        const source = context.sourceCode || context.getSourceCode()
+        if (/["'`](?:py|pt|pb)-/.test(source.getText(node))) context.report({ node, messageId: "inset" })
+      },
+      "Program:exit"(node) {
+        if (isOverlay && !hasContent) context.report({ node, messageId: "missing" })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "vendor-boundary": vendorBoundary,
@@ -217,6 +338,9 @@ export const rules = {
   "field-input-uses-secondary-variant": fieldInputUsesSecondaryVariant,
   "field-label-is-text-only": fieldLabelIsTextOnly,
   "no-surface-branch-in-overlay": noSurfaceBranchInOverlay,
+  "text-link-uses-hero-link": textLinkUsesHeroLink,
+  "account-control-owns-dropdown": accountControlOwnsDropdown,
+  "auth-overlay-owns-single-content-host": authOverlayOwnsSingleContentHost,
 }
 
 /**
