@@ -86,23 +86,36 @@ export const vendorBoundary = {
 
 // -- VENDOR-6 --------------------------------------------------------------------------------------
 
-/** A content-agnostic modal shell passes children directly instead of forcing one body shape. */
-export const modalShellPassesContentDirectly = {
+/** A content-agnostic modal shell owns one zero-inset vendor body as the scroll region. */
+export const modalShellOwnsScrollBody = {
   meta: {
     type: "problem",
-    docs: { description: "ModalShell passes its uninterpreted interior directly to Modal.Dialog." },
+    docs: { description: "ModalShell keeps one zero-inset Modal.Body as its scroll region." },
     schema: [],
     messages: {
-      body:
-        "ModalShell is content-agnostic, so wrapping every child in `Modal.Body` is an interior-shape decision. Pass `children` directly to `Modal.Dialog`; the mounted content owns its arrangement.",
+      missing:
+        "ModalShell must keep one `Modal.Body` around its uninterpreted children: that vendor body is the dialog's scroll region, not a second content surface.",
+      inset:
+        "ModalShell's body must be `className=\"p-0\"`. The mounted contract owns layout; vendor body padding plus contract padding creates a doubled inset.",
     },
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
     if (!/\/src\/components\/shells\/ModalShell\/index\.tsx$/.test(file)) return {}
+    let hasBody = false
     return {
       JSXOpeningElement(node) {
-        if (jsxMemberName(node.name) === "Modal.Body") context.report({ node, messageId: "body" })
+        if (jsxMemberName(node.name) !== "Modal.Body") return
+        hasBody = true
+        const className = (node.attributes || []).find((attribute) =>
+          attribute.type === "JSXAttribute"
+          && attribute.name?.type === "JSXIdentifier"
+          && attribute.name.name === "className")
+        if (className?.value?.type === "Literal" && className.value.value === "p-0") return
+        context.report({ node, messageId: "inset" })
+      },
+      "Program:exit"(node) {
+        if (!hasBody) context.report({ node, messageId: "missing" })
       },
     }
   },
@@ -146,6 +159,31 @@ export const fieldInputUsesSecondaryVariant = {
   },
 }
 
+// -- VENDOR-9 --------------------------------------------------------------------------------------
+
+/** Field labels stay textual instead of inferring decorative glyphs from the input kind. */
+export const fieldLabelIsTextOnly = {
+  meta: {
+    type: "problem",
+    docs: { description: "The house Field label contains no inferred kind icon." },
+    schema: [],
+    messages: {
+      icon:
+        "Field labels are text-only in the source design. Do not infer a decorative icon from the input kind; an icon belongs only to a control with its own action, such as password visibility.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!/\/src\/components\/leaves\/Field\/index\.tsx$/.test(file)) return {}
+    return {
+      ImportDeclaration(node) {
+        const source = normalizePath(node.source?.value)
+        if (/\/components\/leaves\/Icon$/.test(source)) context.report({ node, messageId: "icon" })
+      },
+    }
+  },
+}
+
 // -- VENDOR-8 --------------------------------------------------------------------------------------
 
 /** An overlay is already bounded and cannot directly mount a second named surface branch. */
@@ -175,8 +213,9 @@ export const noSurfaceBranchInOverlay = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "vendor-boundary": vendorBoundary,
-  "modal-shell-passes-content-directly": modalShellPassesContentDirectly,
+  "modal-shell-owns-scroll-body": modalShellOwnsScrollBody,
   "field-input-uses-secondary-variant": fieldInputUsesSecondaryVariant,
+  "field-label-is-text-only": fieldLabelIsTextOnly,
   "no-surface-branch-in-overlay": noSurfaceBranchInOverlay,
 }
 

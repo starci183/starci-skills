@@ -30,9 +30,10 @@ policy. The named surface branch owns it directly.
 
 **VENDOR-5 · Glyph libraries keep their own boundary.**
 
-**VENDOR-6 · ModalShell does not choose an interior shape.** Its `children` pass directly to
-`Modal.Dialog`; wrapping every child in `Modal.Body` would make the content-agnostic shell decide
-padding, scrolling, and body semantics for content it promises not to inspect.
+**VENDOR-6 · ModalShell owns one zero-inset scroll body.** `Modal.Body` is the vendor's scroll
+mechanics for the same dialog, not a second content surface. It wraps the uninterpreted `children`
+with `p-0`: the mounted contract owns layout, while the shell preserves scrolling without adding a
+second inset.
 
 **VENDOR-7 · The house Field fixes the bounded-surface input variant.** Its HeroUI `Input` uses
 `secondary`; callers do not receive an appearance slot and the default field surface cannot return
@@ -41,6 +42,10 @@ inside a dialog or card.
 **VENDOR-8 · An overlay cannot directly mount a named surface branch.** The overlay is already the
 bounded object. `SurfaceCard`, `SurfaceAccordionCard`, and `SurfaceListCard` belong on page ground,
 not inside `overlays/**`.
+
+**VENDOR-9 · Field labels are text-only.** Input kind does not license a decorative email, lock, or
+code icon before the label. A glyph appears only when it owns a separate action, such as password
+visibility, and then the action—not the label—owns it.
 
 ## Examples
 

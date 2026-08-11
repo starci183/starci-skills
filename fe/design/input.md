@@ -18,6 +18,13 @@ claiming a second container.
 Callers receive no `variant` slot. `Field` maps the house relationship to the vendor once, and a new
 ground relationship requires a named semantic leaf or variant rather than a raw HeroUI value.
 
+**INPUT-3 · Input kind does not add a label icon.**
+
+Email, password, and code labels remain text-only. Their kind already changes keyboard,
+autocomplete, and secrecy semantics; inferring a decorative envelope or lock adds visual language
+the source does not contain. A password-visibility action may own an eye glyph because it is a
+separate control with a separate outcome.
+
 The mechanical fence is `field-input-uses-secondary-variant` in
 [`sources/fe/vendor-boundary.mjs`](../../sources/fe/vendor-boundary.mjs).
 
@@ -27,3 +34,4 @@ The mechanical fence is `field-input-uses-secondary-variant` in
 |---|---|---|
 | Default HeroUI Input inside a bounded surface | It draws a second surface inside the first | House `Field`, fixed to `secondary` |
 | Public `variant` prop carrying HeroUI names | It makes every caller a second visual owner | A named semantic distinction inside the leaf |
+| Envelope, lock, or code glyph inferred from input kind | It decorates a label and changes the source layout | Text-only label |

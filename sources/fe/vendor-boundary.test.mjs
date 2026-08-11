@@ -13,7 +13,8 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
   fieldInputUsesSecondaryVariant,
-  modalShellPassesContentDirectly,
+  fieldLabelIsTextOnly,
+  modalShellOwnsScrollBody,
   noSurfaceBranchInOverlay,
   rules,
   vendorBoundary,
@@ -76,17 +77,24 @@ test("VENDOR-2: a shell that wraps nothing is an ordinary component in the wrong
   })
 })
 
-test("VENDOR-6: ModalShell leaves its interior uninterpreted", () => {
-  tester.run("modal-shell-passes-content-directly", modalShellPassesContentDirectly, {
+test("VENDOR-6: ModalShell owns one zero-inset scroll body", () => {
+  tester.run("modal-shell-owns-scroll-body", modalShellOwnsScrollBody, {
     valid: [{
       filename: SHELL,
-      code: "export const S = ({ children }) => <Modal.Dialog><Modal.CloseTrigger />{children}</Modal.Dialog>",
+      code: "export const S = ({ children }) => <Modal.Dialog><Modal.Body className='p-0'>{children}</Modal.Body></Modal.Dialog>",
     }],
-    invalid: [{
-      filename: SHELL,
-      code: "export const S = ({ children }) => <Modal.Dialog><Modal.Body>{children}</Modal.Body></Modal.Dialog>",
-      errors: [{ messageId: "body" }],
-    }],
+    invalid: [
+      {
+        filename: SHELL,
+        code: "export const S = ({ children }) => <Modal.Dialog>{children}</Modal.Dialog>",
+        errors: [{ messageId: "missing" }],
+      },
+      {
+        filename: SHELL,
+        code: "export const S = ({ children }) => <Modal.Dialog><Modal.Body>{children}</Modal.Body></Modal.Dialog>",
+        errors: [{ messageId: "inset" }],
+      },
+    ],
   })
 })
 
@@ -101,6 +109,18 @@ test("VENDOR-7: Field uses the secondary input variant on its bounded surface", 
       filename: field,
       code: "import { Input } from '@heroui/react'; export const Field = () => <Input />",
       errors: [{ messageId: "variant" }],
+    }],
+  })
+})
+
+test("VENDOR-9: Field labels do not infer decorative kind icons", () => {
+  const field = "D:/repo/src/components/leaves/Field/index.tsx"
+  tester.run("field-label-is-text-only", fieldLabelIsTextOnly, {
+    valid: [{ filename: field, code: "export const Field = ({ label }) => <label>{label}</label>" }],
+    invalid: [{
+      filename: field,
+      code: "import { Icon } from '@/components/leaves/Icon'; export const Field = () => <Icon />",
+      errors: [{ messageId: "icon" }],
     }],
   })
 })

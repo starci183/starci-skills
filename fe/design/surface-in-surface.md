@@ -17,8 +17,8 @@ metadata: no. Reach for space before an edge, and for an edge before a box.
 
 The mechanical overlay subset is held by
 [`sources/fe/vendor-boundary.mjs`](../../sources/fe/vendor-boundary.mjs): an overlay file cannot
-import a named surface branch, and ModalShell cannot force uninterpreted content through a vendor
-body wrapper. The wider visual judgement remains a design review because a transitive child can
+import a named surface branch, and ModalShell keeps its vendor body at zero inset so scroll mechanics
+do not become a second visual surface. The wider visual judgement remains a design review because a transitive child can
 draw an edge without its overlay importer naming that child as a surface.
 
 ## Rules
