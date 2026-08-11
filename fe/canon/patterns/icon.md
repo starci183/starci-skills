@@ -63,6 +63,14 @@ remain local assets rather than approximations selected from another general-pur
 Every role carries `shrink-0`. When a row becomes tight, words wrap or clip first; deforming the
 glyph makes the row hardest to recognise at the exact point it is hardest to read.
 
+**ICON-9 · The source feature map owns meaning-to-glyph selection.**
+
+`src/components/leaves/Icon/icon.md` maps every `IconName` to one product feature and one concrete
+Heroicon. The same feature reuses its meaning in every placement; different meanings do not share
+a glyph merely because it is nearby or visually plausible. `IconName`, `GLYPHS` and the table move
+together, and source parity tests reject a missing row, a stale component name or duplicate glyph
+ownership.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -75,6 +83,8 @@ glyph makes the row hardest to recognise at the exact point it is hardest to rea
 | Pass a raw size, class or weight | The caller silently creates another role | Choose `heading`, `leading` or `chip` |
 | Give a product glyph its own colour | It contradicts the state carried by its container | Inherit `currentColor` |
 | Let a glyph shrink in a flex row | Its geometry collapses under pressure | Keep `shrink-0`; let words give way |
+| Reuse one glyph for unrelated features | Readers cannot distinguish the destinations and later authors copy the ambiguity | Add a unique feature row to the source map |
+| Change `GLYPHS` without changing the source table | Code and AI guidance immediately disagree | Update `icon.md`, `IconName` and `GLYPHS` together |
 
 ## Examples
 
