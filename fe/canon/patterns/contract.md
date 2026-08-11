@@ -68,8 +68,14 @@ it holds, so a wrong child is visible on sight.
 The name is also what keeps the reason honest. One key drawing twenty regions cannot say why any one
 of them is there; the reason a title and a fact share a baseline is the SAME reason at all twenty.
 
-Since the child map was retired, the name is the ONLY thing holding the child contract. A rule can
-no longer check what goes inside a node; a reader can, and only if the name tells them.
+For a plain node the name is the only thing holding the child contract, because the contents come
+from a caller and could be anything. **It is no longer the ONLY thing everywhere** — a compound key
+declares every slot inside it and the compiler checks each one, see CONTRACT-11.
+
+That reversal is recorded rather than quiet. The child map was retired because nothing could be
+checked once contents arrived as markup: a `.map`, a ternary and an unnamed subtree all look the
+same to a rule. Contents arrive as COMPONENTS now, one per named slot, so the check is not a rule at
+all — it is the type. The old decision was right for the shape it was made in and wrong for this one.
 
 **CONTRACT-6 · Every entry states why its node exists, and the reason is not the key again.**
 
@@ -105,6 +111,51 @@ A shape none of the existing keys can express earns a key. Wanting the same shap
 does not: that is the vocabulary being widened one call site at a time, until the keys describe call
 sites instead of shapes and the list is longer than the code that reads it.
 
+**CONTRACT-10 · The contract fixes content; the branch owns wrapper mechanics.**
+
+A contract describes the node that arranges validated content. It does not describe vendor
+composition. `Tree` may place that node on a `div`; `SurfaceCard` may place the same node props on
+`Card.Content` inside `div > Card > Card.Content`; an accordion or list surface may project it into
+another wrapper. Those wrappers are branch mechanics, not a second contract vocabulary.
+
+This is why there is no `CardShell` and no compound table. Repeating `Card > Card.Content` is only
+two lines; extracting it would add indirection without owning a policy. `SurfaceCard`,
+`SurfaceAccordionCard`, and `SurfaceListCard` are named branches because each owns a distinct wrapper
+and still accepts `contract + render` for the content node.
+
+**CONTRACT-11 · An entry declares every slot inside it, and each slot has a name.**
+
+`children` is a record. Each key is a slot name; each value names one or more closed identities:
+
+| the child is | the slot says | the component declares |
+|---|---|---|
+| another node | `{ contract: "key" }` | `ContractComponent<"key">` |
+| a leaf | `{ leaf: "icon", props: { size: "sm" } }` | `LeafComponent<"icon", { size: "sm" }>` |
+
+A node child names a key and the key is checked against the table. A leaf cannot — a leaf is not a
+node and has no key — so the slot names the leaf and the props it must take, and the leaf declares
+the same pair on its own metadata. The table never imports a component and the compiler still holds
+the pairing.
+
+**Slots are named, never counted.** Insert a child into a positional list and every position after
+it silently means something else; a name survives the insertion, reads at the call site without
+counting, and gives the reason something to refer to.
+
+**`repeats: true` says the live slot is an array; `restingCount: 6` says how many placeholders draw
+while waiting.** Live length is dynamic, so it must not be confused with the skeleton count. The
+pair is required together: no `restingCount` on a scalar slot, and no repeated slot with an
+unspecified resting shape.
+
+The values in `props` are literal constraints, never values injected at runtime. A slot declaring
+`props: { size: "sm" }` accepts a leaf component branded with that exact constraint; copy such as a
+query-provided label stays closed over by the render component and never enters the table.
+
+None of this is `children` in the React sense, and that is what makes it checkable. Markup arrives
+already built and erases its shape; a slot value is a branded component. A helper may close runtime
+data over an inline callback, but it must return `ContractComponent<K>` or `LeafComponent<N,P>` with
+the identity and literal constraints intact. Wrong identity, props, cardinality, missing slots and
+extra slots are compile errors.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -120,21 +171,38 @@ sites instead of shapes and the list is longer than the code that reads it.
 | A structural host written outside the frame | It is a node with no key, no child contract and no recorded reason | Compose the key; if none fits, that is the finding |
 | Hand-writing a contract marker attribute | The node claims a contract nothing enforces, and every test that reads those attributes believes it | Render the key and let the frame paint them |
 | A new key because the existing one is the wrong size | The vocabulary grows one call site at a time until it describes call sites, not shapes | Use the key that exists, or change the entry for everyone |
+| `children` on a structural node | Markup arrives already built, so nothing above can say what is inside and no rule can check | Declare the slots on the entry and pass one component per slot in `render` |
+| A bare arrow or literal JSX in a `render` slot | It carries no contract/leaf metadata | Use the typed builder; its callback may close runtime data, while the returned slot value remains branded |
+| A positional list of children instead of named slots | Insert one in the middle and every slot after it silently means something else | Name each slot; a name survives the insertion |
+| A leaf without a `name` on its metadata | Two leaves taking the same props become interchangeable, and a slot asking for a glyph will accept a label | Give every leaf its name beside its tier marker |
+| A hand-written skeleton tree beside a list | Loading cardinality drifts away from the live shape | Put `repeats: true` and `restingCount` on the slot |
+| A boolean prop choosing between two arrangements | One of the two ends up with no key, no reason and no name — it exists on screen and nowhere in the table | Two shapes are two keys, and both get named |
+| A compound/CardShell table for `Card > Card.Content` | It models wrapper mechanics as a second vocabulary and adds indirection without a policy | Let the named surface branch own the wrapper and apply the content contract to its body |
 
 ## Examples
 
 ### The ordinary case — a node is a key
 
 ```tsx
-// The shape has a name, the name says what it holds, and the reason lives with it.
-export const SurfaceCard = ({ props, children }: SurfaceCardProps) => (
-    <Tree contract="label-row-over-card">{children}</Tree>
+// The shape has a name, every slot has a name, and the compiler holds both.
+export const SurfaceCard = ({ props, contract, render }: SurfaceCardProps) => (
+    <div {...contractNodeProps("label-row-over-card")}>
+        <Card>
+            <Card.Content {...contractNodeProps(contract)}>
+                <ContractContent contract={contract} render={render} />
+            </Card.Content>
+        </Card>
+    </div>
 )
+
+const content = defineContractComponent("stacked-peer-controls", { control: courseRows })
+<SurfaceCard contract="stacked-peer-controls" render={content} />
 ```
 
 ```tsx
 // Wrong: the same output, decided here. Whoever needs this surface tomorrow cannot find it,
-// and nothing records why the label sits outside the card it names.
+// nothing records why the label sits outside the card it names, and what goes inside is markup
+// nobody can check.
 export const SurfaceCard = ({ props, children }: SurfaceCardProps) => (
     <div className="flex flex-col gap-3">{children}</div>
 )
@@ -145,9 +213,11 @@ They differ in one thing: whether the arrangement has a name somebody else can f
 ### The host trap — the hole the vocabulary drained into
 
 ```ts
-// The entry names its element, so a run of days is a list and still comes from a key.
+// The entry names its element, so a run of days is a list and still comes from a key - and
+// `repeats` says both that the slot holds many and how many rest while they load.
 "weekday-run": {
-    classes: ["flex", "flex-row", "flex-wrap", "items-center", "gap-2"],
+    classNames: ["flex", "flex-row", "flex-wrap", "items-center", "gap-2"],
+    children: { day: { leaf: "day-cell", props: { size: "sm" }, repeats: true, restingCount: 6 } },
     host: "ul",
     why: "a run of equal columns only reads as one span of time while the columns stay on one line",
 }
@@ -166,7 +236,7 @@ They differ in one thing: whether the element was expressible in an entry.
 
 ```tsx
 // Two shapes are two keys. The distinction was real, so it got a name.
-<Tree contract={props.isCompact ? "stacked-peer-controls" : "stacked-sections"}>{children}</Tree>
+<Tree contract={props.isCompact ? "stacked-peer-controls" : "stacked-sections"} render={render} />
 ```
 
 ```tsx

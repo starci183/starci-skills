@@ -15,7 +15,9 @@
  * is a rule: correct today, and one `extends` away from carrying a `className` next month.
  * `type XProps = LeafProps<XData>` is a fence.
  */
-import type { ReactNode } from "react"
+import type { ContractComponent, ContractKey } from "./index"
+
+export type { InnerProps } from "./index"
 
 /**
  * What DATA is: anything a JSON document could hold.
@@ -47,7 +49,7 @@ export type ComponentActions = { readonly [key: string]: ((...args: Array<never>
  * A LEAF's props. Three slots, no fourth.
  *
  * `props` - what it draws. `on` - what it does. `isLoading` - handed down, never decided here.
- * No `children`: only a branch assembles. No `className`: a caller who can restyle a node has
+ * No `render`: only a branch assembles. No `className`: a caller who can restyle a node has
  * become its second owner, and the component now has two authors who never speak.
  */
 export type LeafProps<D extends ComponentData, A extends ComponentActions = ComponentActions> = {
@@ -61,7 +63,7 @@ export type LeafProps<D extends ComponentData, A extends ComponentActions = Comp
  *
  * A composite is a CLOSED shape: it assembles leaves into an arrangement a caller can use but
  * cannot rearrange. That boundary with `branch` is held by this type rather than by a convention -
- * there is no `children` here, so an author who wanted a slot cannot express one and has to decide
+ * there is no `render` here, so an author who wanted a slot cannot express one and has to decide
  * which tier they are actually writing. A boundary the compiler holds does not drift.
  *
  * It is structurally identical to {@link LeafProps} and deliberately NOT an alias of it: the two
@@ -75,13 +77,36 @@ export type CompositeProps<D extends ComponentData, A extends ComponentActions =
 }
 
 /**
- * A BRANCH's props. Same three, plus the one thing that makes it a branch: it assembles, so it
- * takes what goes inside.
+ * A BRANCH's props. The same three a leaf has, plus the key it draws and the components that fill
+ * the slots that key declares.
+ *
+ * THIS IS THE SLOT THAT USED TO BE `children`, AND THE CHANGE IS NOT COSMETIC. `children` is markup
+ * that has already been built: it can be a `.map`, a ternary, a fragment, or a subtree nobody named,
+ * so nothing above it can say what is inside a node and no rule can check. `render` is a contract
+ * component carrying a typed RECORD OF COMPONENTS, one per slot the entry declares. That is
+ * what lets the table state what belongs in each position and have the claim be worth something.
+ *
+ * `contract` and `render` are one decision written twice, and `ContractComponent<K>` ties them together:
+ * the key fixes which slots exist and what may fill each, so a card cannot say one thing and hold
+ * another. A wrong leaf, wrong leaf props, a node where a leaf was asked for, a missing slot and a
+ * slot nobody declared are five compile errors rather than five things a reviewer has to spot.
+ *
+ * Runtime data may be closed over by the typed builder at the call site. What may not arrive is a
+ * bare callback or JSX value with no contract/leaf metadata, because that erases the slot identity.
+ *
+ * THERE IS NO LIST VARIANT, and there does not need to be. A slot that holds many says so in the
+ * table with `repeats: true`; that slot becomes an array. `restingCount` separately fixes how many
+ * placeholders draw while loading, because live length is dynamic and is not the skeleton count.
  */
-export type BranchProps<D extends ComponentData, A extends ComponentActions = ComponentActions> = {
+export type BranchProps<
+    D extends ComponentData,
+    K extends ContractKey,
+    A extends ComponentActions = ComponentActions,
+> = {
     readonly props: D
     readonly on?: A
-    readonly children?: ReactNode
+    readonly contract: K
+    readonly render: ContractComponent<NoInfer<K>>
     readonly isLoading?: boolean
 }
 

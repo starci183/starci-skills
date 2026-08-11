@@ -4,7 +4,8 @@
 
 A leaf wraps ONE vendor primitive and renders it straight through. It is the boundary between this
 design system and the component library underneath it, and that boundary is the whole reason the
-tier exists: a library swap reaches the leaves and stops there.
+tier exists for closed primitives; covering shells and the named surface branch family are the two
+explicit vendor owners beside it.
 
 **How complicated the vendor's own component is does not matter.** A date picker that draws a month
 grid, a weekday header and two paging controls is still a leaf when we render it, because none of
@@ -20,10 +21,9 @@ vendor's output looks.
 
 **LEAF-1 · One vendor primitive, rendered through.**
 
-A leaf names exactly one thing from the component library and hands it props. It is the only tier
-permitted to import the library at all, and that monopoly is load-bearing: it is what lets somebody
-answer "what would changing component libraries cost" by listing one folder. Every tier above asks a
-leaf for vendor behaviour instead of reaching for it.
+A leaf names exactly one closed thing from the component library and hands it props. Modal/drawer
+mechanics belong to shells; Card/Accordion/List wrappers belong to their named surface branches.
+Every other tier asks one of those owners instead of reaching for the vendor.
 
 **LEAF-2 · It may keep the classes that hold ONE line together.**
 
@@ -46,15 +46,18 @@ arranging.
 **LEAF-3 · It takes `props`, `on`, `isLoading`, and nothing else.**
 
 No `className`: a caller who can restyle a node has become its second owner, and the component now
-has two authors who never speak. No `children`: a component that accepts arbitrary markup cannot be
-reasoned about without knowing what will be passed — it cannot be rendered from a fixture, and its
-output is no longer decided by its own props. That is also the door the data fence exists to close,
-so leaving `children` open makes the fence decorative.
+has two authors who never speak. No `contract` and no `render`: a leaf FILLS a slot, it does not
+open one. A component whose output depends on what a caller puts inside it cannot be rendered from a
+fixture, and is no longer decided by its own props. That is the door the data fence exists to close,
+so leaving any inward slot open makes the fence decorative.
 
-**A leaf is a leaf, and this rule has no exception.** When the vendor primitive being wrapped turns
-out to require children — a dialog, a drawer, a popover — the file does not gain a slot; it becomes
-a [`shell`](shell.md) and changes folder. Keeping it here would cost the word its meaning, and a
-tier whose name has to be explained is one that will be misread by everybody who was not told.
+**It carries one thing more, and it is not a slot: its NAME**, on its own metadata beside the tier
+marker. A slot in the contract table asks for a named leaf taking named props, so without the name
+two leaves accepting the same props are interchangeable and a slot wanting a glyph will take a label.
+
+**A leaf is a leaf, and this rule has no exception.** A modal or drawer becomes one of the two
+[`shells`](shell.md). Other vendor containers do not automatically earn a `children` hole: a closed
+primitive remains a leaf and a visible open shape becomes a branch with `contract + render`.
 
 **LEAF-4 · It owns its own resting, disabled and focused shapes.**
 
@@ -84,7 +87,8 @@ Name the thing, and the second caller costs nothing.
 | Importing a leaf that carries its own content — words, a value, a control | A file holding two things that can each be read on their own is assembling the vocabulary rather than being a word in it, and the seam between them has no name anybody can find | It is a composite; move it |
 | Importing the glyph leaf and then giving it a second content to sit beside | The permission in LEAF-2 covers a glyph and the words it belongs to, and stops at the first thing that could be read without them | Same: name the arrangement and move it up |
 | A `className` prop, even "for position only" | It is the escape hatch by another name, and every use looks locally reasonable | Add a prop naming the VARIANT you actually need |
-| A `children` slot | A caller who supplies the inside decides the arrangement, which is a branch's job | Move it to `branch` |
+| A `render` slot, or `children` under any name | A caller who supplies the inside decides the arrangement, which is a branch's job | Move it to `branch` |
+| No `name` on its metadata | A slot asking for a glyph will accept a label, because nothing tells two leaves with the same props apart | Declare it beside the tier marker |
 
 ## Examples
 

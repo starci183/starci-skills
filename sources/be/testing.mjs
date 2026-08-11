@@ -165,11 +165,56 @@ export const noModelCallInE2e = {
   },
 }
 
+// -- TESTING-3 -------------------------------------------------------------------------------------
+
+/** CQRS application buses are internal dispatchers, never production entry points. */
+const APPLICATION_BUSES = new Set(["CommandBus", "QueryBus", "EventBus"])
+
+/** Methods whose direct invocation skips the transport owned by production. */
+const INTERNAL_ENTRY_METHODS = new Set(["execute", "process"])
+
+/** An e2e enters through a production transport rather than an application object. */
+export const e2eUsesProductionTransport = {
+  meta: {
+    type: "problem",
+    docs: { description: "An e2e enters through GraphQL, HTTP, socket, broker or scheduler transport." },
+    schema: [],
+    messages: {
+      busImport:
+        "`{{name}}` is an application dispatcher, not a production transport. An e2e must enter through GraphQL, HTTP, a real socket, a broker message or the scheduler boundary so routing, guards, validation and serialization are part of the proof.",
+      direct:
+        "Direct `.{{method}}()` invocation skips the production transport and starts inside the application. Move this decision/wiring test to the integration lane, or drive the flow through GraphQL, HTTP, a real socket, broker or scheduler boundary.",
+    },
+  },
+  create(context) {
+    if (!isE2eSpec(context.filename || context.getFilename())) return {}
+    return {
+      ImportDeclaration(node) {
+        if (!node.source || node.source.value !== "@nestjs/cqrs") return
+        for (const specifier of node.specifiers) {
+          if (specifier.type !== "ImportSpecifier") continue
+          const imported = specifier.imported && (specifier.imported.name || specifier.imported.value)
+          if (!APPLICATION_BUSES.has(imported)) continue
+          context.report({ node: specifier, messageId: "busImport", data: { name: imported } })
+        }
+      },
+      CallExpression(node) {
+        const callee = node.callee
+        if (!callee || callee.type !== "MemberExpression" || callee.computed) return
+        const method = callee.property && callee.property.name
+        if (!INTERNAL_ENTRY_METHODS.has(method)) return
+        context.report({ node: callee.property, messageId: "direct", data: { method } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-call-only-spec": noCallOnlySpec,
   "e2e-asserts-persisted-state": e2eAssertsPersistedState,
   "no-model-call-in-e2e": noModelCallInE2e,
+  "e2e-uses-production-transport": e2eUsesProductionTransport,
 }
 
 /**
@@ -190,4 +235,5 @@ export const recommended = {
   "starci-be/no-call-only-spec": "error", // no=0 of 182 - burned down from 1
   "starci-be/e2e-asserts-persisted-state": "error", // no=0 of 47 - burned down from 1
   "starci-be/no-model-call-in-e2e": "error", // no=0 of 47
+  "starci-be/e2e-uses-production-transport": "error",
 }

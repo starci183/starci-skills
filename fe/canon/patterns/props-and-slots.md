@@ -12,9 +12,16 @@ from carrying a caller's own styling. An alias that IS the whole shape is a fenc
 to put a fourth slot, so an author who wanted one has to decide which layer they are actually
 writing.
 
-Four slots exist across the whole system, and no component has all four. `props` is what it draws.
-`on` is what it does. `children` is what a caller puts inside — and having it is what makes a
-container a container. `isLoading` is handed down, never decided locally.
+Five slots exist across the whole system, and no component has all five. `props` is what it draws.
+`on` is what it does. `contract` is the key it renders, and `render` is one named component per slot
+that key declares — having those two is what makes a container a container. `isLoading` is handed
+down, never decided locally.
+
+`render` is a branded `ContractComponent<K>` carrying a record of COMPONENTS, never markup. The
+record has one named value per slot the key declares; the brand preserves the exact key across the
+branch boundary. That is the difference between a container whose contents can be stated in the
+contract table and one whose contents are whatever the call site happened to build — see
+[`contract`](contract.md), CONTRACT-11.
 
 What holds this law is [`sources/fe/props.ts`](../../../sources/fe/props.ts), which is the fence
 itself, and [`sources/fe/props-and-slots.mjs`](../../../sources/fe/props-and-slots.mjs) for the one
@@ -44,13 +51,22 @@ imported, cannot be referenced by the twin that tests it, and cannot be found by
 what this component accepts. Naming it costs one line and is the difference between a contract and a
 signature.
 
-**SLOTS-4 · The presence of `children` is the layer boundary, and it is the only one that never
-needs arguing about.**
+The name is `XProps` for component `X`, and it names the complete input before the function. An
+intersection such as `Frame & { signOutLabel: string }` written inline at the parameter is still an
+anonymous shape and is refused for the same reason as an inline object.
 
-A closed shape takes no children; an open container does. Both directions are visible in the props
+**SLOTS-4 · The presence of `contract` and `render` is the layer boundary, and it is the only one
+that never needs arguing about.**
+
+A closed shape has neither; an open container has both. Both directions are visible in the props
 alias, so a file that has drifted across the boundary is visible from its type rather than from a
 review. A container the caller cannot fill belongs one layer down whatever it is called, and a
-closed shape given a slot has become a container whatever folder it sits in.
+closed shape given slots has become a container whatever folder it sits in.
+
+The slot is not called `children` and the name is not cosmetic. `children` accepts markup that has
+already been built — a `.map`, a ternary, a subtree nobody named — so what is inside a container
+could never be stated anywhere. `render` accepts one component per named slot, which is what lets
+the boundary be a fact the compiler holds rather than a habit reviewers keep.
 
 **SLOTS-5 · `isLoading` is received, never decided.**
 
@@ -71,8 +87,9 @@ was trying to say is a VARIANT with a name, decided inside.
 | A function in the data slot | It smuggles a component through data, and the shape becomes unfindable from outside | Put it in the handler slot |
 | An interface for a component's data | It silently fails the fence that keeps functions out | A type alias |
 | An inline object type on a parameter | The shape has no name, so nothing can import it, test it or find it | Name it in the module |
-| A fifth slot | The alias IS the shape; a fifth means the layer was chosen wrongly | Decide which layer this is |
-| `children` on a closed shape | It has become a container, whatever its folder says | Move it to the container layer |
+| A slot the alias does not have | The alias IS the shape; wanting one more means the layer was chosen wrongly | Decide which layer this is |
+| `children` in a component except ModalShell/DrawerShell | Markup arrives already built, so what a container holds can never be stated or checked | `contract` plus a branded `ContractComponent<K>` |
+| `render` on a closed shape | It has become a container, whatever its folder says | Move it to the container layer |
 | A component that decides its own `isLoading` | It asks a question the layer above already answered | Take the flag |
 | A class name, style or spacing prop | The component gains a second author who is invisible from inside | A named variant |
 | A per-part styling hook | Every internal element becomes public surface, and the component can never change | A named variant, decided inside |
@@ -122,6 +139,21 @@ export const Row = ({ props }: { props: { label: string; value: string } }) => /
 ```
 
 They differ in one thing: whether anything else can refer to the shape.
+
+### The intersection trap
+
+```tsx
+export type DashboardPageProps = DashboardFrame & DashboardCopy
+export const _DashboardPage = (input: DashboardPageProps) => /* ... */
+```
+
+```tsx
+export const _DashboardPage = (
+    input: DashboardFrame & { readonly signOutLabel: string; readonly unavailableMessage: string },
+) => /* ... */
+```
+
+They differ in one thing: whether the complete public input has the component's name.
 
 ### The escape-hatch trap
 

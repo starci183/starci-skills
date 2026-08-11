@@ -20,11 +20,15 @@ const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 /** The component library this boundary owns. Its glyph counterpart belongs to `icon.mjs`. */
 const VENDOR_PACKAGE_PREFIX = "@heroui/"
 
-/** The two folders that may name the library, and what each wraps. */
-const WRAPPER_DIRS = ["/src/components/leaves/", "/src/components/shells/"]
-
-/** The folder whose entry condition is "it imports the library"; the other tier is not exclusive. */
+/** The shell folder is closed to the two covering mechanics that intentionally ignore their interior. */
 const SHELL_DIR = "/src/components/shells/"
+const SHELL_FILE = /\/src\/components\/shells\/(?:ModalShell|DrawerShell)\//
+
+/** Named surface branches may own the vendor wrapper they project a content contract into. */
+const SURFACE_BRANCH = /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard)\//
+
+const isAllowedVendorOwner = (file) =>
+  file.includes("/src/components/leaves/") || SHELL_FILE.test(file) || SURFACE_BRANCH.test(file)
 
 /** True for a file inside the component tree, where the boundary applies. */
 const isComponentFile = (filename) => normalizePath(filename).includes("/src/components/")
@@ -38,13 +42,15 @@ const isVendorImport = (source) => typeof source === "string" && source.startsWi
 export const vendorBoundary = {
   meta: {
     type: "problem",
-    docs: { description: "The component library is imported by `leaves/` and `shells/`, and every shell imports it." },
+    docs: { description: "Vendor imports belong to leaves, the two covering shells, and named surface branches." },
     schema: [],
     messages: {
       outside:
-        "Importing the component library outside `leaves/` and `shells/`. The vendor is wrapped ONCE, and that monopoly is what lets somebody answer \"what would changing component libraries cost\" by listing two folders instead of reading the tree. Use the wrapper for this primitive, and if none exists, add one - a leaf when it takes only values, a shell when its API needs children. Reaching past it for pure BEHAVIOUR is where this boundary is usually lost, because behaviour does not look like styling.",
+        "This component does not own a vendor primitive. Vendor imports belong to leaves, ModalShell/DrawerShell, and the named SurfaceCard family branches that project contracts into vendor bodies.",
       emptyShell:
-        "This file is in `shells/` and imports no component library, so it is an ordinary component holding an exemption it does not need. Move it to the tier it belongs to. The folder means one thing - a vendor container wrapped once - and a folder anybody can opt into stops meaning anything; the first thing to opt in is always something that was hard to place.",
+        "ModalShell/DrawerShell must wrap their vendor covering primitive; otherwise this is an ordinary branch in the wrong tier.",
+      unknownShell:
+        "Only ModalShell and DrawerShell are shells. This component must use contract + render as a branch; needing an arbitrary vendor children slot does not create a third shell.",
     },
   },
   create(context) {
@@ -52,18 +58,20 @@ export const vendorBoundary = {
     // Outside the component tree, a provider standing the library up for the whole application is a
     // different thing from a component pulling in a widget.
     if (!isComponentFile(file)) return {}
-    const isWrapper = WRAPPER_DIRS.some((dir) => file.includes(dir))
-    const isShell = file.includes(SHELL_DIR)
+    const isShellDirectory = file.includes(SHELL_DIR)
+    const isShell = SHELL_FILE.test(file)
+    const isAllowed = isAllowedVendorOwner(file)
     let importsVendor = false
     return {
       ImportDeclaration(node) {
         if (!isVendorImport(node.source && node.source.value)) return
         importsVendor = true
-        if (isWrapper) return
+        if (isAllowed) return
         context.report({ node, messageId: "outside" })
       },
       "Program:exit"(node) {
-        if (isShell && !importsVendor) context.report({ node, messageId: "emptyShell" })
+        if (isShellDirectory && !isShell) context.report({ node, messageId: "unknownShell" })
+        else if (isShell && !importsVendor) context.report({ node, messageId: "emptyShell" })
       },
     }
   },

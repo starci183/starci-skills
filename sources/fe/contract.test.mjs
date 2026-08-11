@@ -45,8 +45,20 @@ const fixtureRoot = () => {
     [
       "export const CONTRACTS = buildContracts({",
       "    \"title-with-baseline-fact\": {",
-      "        classes: [\"flex\", \"items-baseline\", \"gap-3\"],",
+      "        classNames: [\"flex\", \"items-baseline\", \"gap-3\"],",
+      "        children: { title: { leaf: \"text\", props: { size: \"md\" } } },",
       "        why: \"the fact sits on the title baseline so a long title pushes it down rather than misaligning\",",
+      "    },",
+      "})",
+      "",
+      // A SECOND table in the same file. It is here so the reader cannot go back to slicing to EOF:
+      // do that and this key is collected as a node key, and the rule accepts it where it must not.
+      "export const UNRELATED = buildSomethingElse({",
+      "    \"label-over-tile-grid\": {",
+      "        classNames: [\"flex\", \"flex-col\", \"gap-4\"],",
+      "        hidden: \"none\",",
+      "        body: \"title-with-baseline-fact\",",
+      "        why: \"the tiles are already surfaces, so another one around them nests two insets\",",
       "    },",
       "})",
       "",
@@ -222,6 +234,7 @@ test("CONTRACT-9: an unknown key describes nothing, and the message lists the re
     invalid: [
       { filename: BLOCK, code: "export const E = () => <Tree contract=\"card\" />", errors: [{ messageId: "unknown" }] },
       { filename: BLOCK, code: "const spec = contractSpec(\"card\")", errors: [{ messageId: "unknown" }] },
+      { filename: BLOCK, code: "export const E = () => <Tree contract=\"label-over-tile-grid\" />", errors: [{ messageId: "unknown" }] },
     ],
   })
 })

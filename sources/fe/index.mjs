@@ -17,6 +17,11 @@ import { recommended as contractRecommended, rules as contractRules } from "./co
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
 import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
 import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
+import {
+  linterOptions as strictLinterOptions,
+  recommended as lintEscapeRecommended,
+  rules as lintEscapeRules,
+} from "./lint-escape-hatch.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as propsRecommended, rules as propsRules } from "./props-and-slots.mjs"
 import { recommended as splitRecommended, rules as splitRules } from "./the-split.mjs"
@@ -33,6 +38,7 @@ const CONTRIBUTIONS = [
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
   { law: "icon", rules: iconRules, recommended: iconRecommended },
   { law: "loading", rules: loadingRules, recommended: loadingRecommended },
+  { law: "lint-escape-hatch", rules: lintEscapeRules, recommended: lintEscapeRecommended },
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
   { law: "the-split", rules: splitRules, recommended: splitRecommended },
@@ -62,13 +68,15 @@ export const rules = Object.fromEntries(
 /**
  * The levels this canon asks for, as the plugin's own opinion.
  *
- * A repository adopting these with existing debt turns a rule down to `warn` while it burns the
- * count down, and back to `error` at zero. What never changes is that a rule at `error` is a broken
- * build rather than a warning to triage.
+ * Every FE canon rule is an error. Existing debt is fixed before adoption; lowering architecture
+ * to warn teaches every later author that the boundary is optional and is not a supported rollout.
  */
 export const recommended = Object.fromEntries(
   CONTRIBUTIONS.flatMap((entry) => Object.entries(entry.recommended)),
 )
+
+/** Flat-config options that make inline directives ineffective rather than merely forbidden. */
+export const linterOptions = strictLinterOptions
 
 /** The plugin object, shaped the way a flat config expects it. */
 export default {

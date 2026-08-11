@@ -11,7 +11,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noInlineParameterType, rules } from "./props-and-slots.mjs"
+import { noChildrenSlot, noInlineParameterType, rules } from "./props-and-slots.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -28,7 +28,7 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("SLOTS-3: a destructured parameter's shape is named in the module", () => {
+test("SLOTS-3: a parameter's complete shape is named in the module", () => {
   tester.run("no-inline-parameter-type", noInlineParameterType, {
     valid: [
       "export const Row = ({ props }: RowProps) => null",
@@ -37,8 +37,7 @@ test("SLOTS-3: a destructured parameter's shape is named in the module", () => {
       "const f = ({ a }) => a",
       // a named scalar parameter is not a shape with nowhere to be read from
       "const f = (value: string) => value",
-      // an inline type on a NON-destructured parameter still has a binding to read it by
-      "const f = (input: { a: string }) => input.a",
+      "const f = (input: RowProps) => input.props",
     ],
     invalid: [
       {
@@ -53,6 +52,62 @@ test("SLOTS-3: a destructured parameter's shape is named in the module", () => {
         // parentheses do not hide it
         code: "const f = ({ a }: ({ a: string })) => a",
         errors: [{ messageId: "inline" }],
+      },
+      {
+        code: "const C = (input: DashboardFrame & { readonly signOutLabel: string }) => input",
+        errors: [{ messageId: "inline" }],
+      },
+      {
+        code: "const C = ({ props }: DashboardFrame & { readonly props: Copy }) => props",
+        errors: [{ messageId: "inline" }],
+      },
+      {
+        code: "const f = (input: { a: string }) => input.a",
+        errors: [{ messageId: "inline" }],
+      },
+    ],
+  })
+})
+
+const BRANCH = "/repo/src/components/branches/SurfaceCard/index.tsx"
+const SHELL = "/repo/src/components/shells/ModalShell/index.tsx"
+const FAKE_SHELL = "/repo/src/components/shells/PopoverShell/index.tsx"
+
+test("SLOTS-4: containers take contract and render; only ModalShell/DrawerShell take children", () => {
+  tester.run("no-children-slot", noChildrenSlot, {
+    valid: [
+      // the shape this rule exists to push people towards
+      { filename: BRANCH, code: "export interface P { contract: ContractKey; render: ChildrenOf<K> }" },
+      { filename: BRANCH, code: "export const S = ({ props, render }: SProps) => null" },
+      // the one lawful home for the slot: the vendor declares it, the wrapper cannot refuse it
+      { filename: SHELL, code: "export interface P { children?: ReactNode }" },
+      { filename: SHELL, code: "export const M = ({ children }: MProps) => null" },
+      // outside the component tree entirely - a page or a test may say what it likes
+      { filename: "/repo/src/app/page.tsx", code: "export const P = ({ children }: PProps) => null" },
+      // an ordinary object property that happens to be called children is not a slot
+      { filename: BRANCH, code: "const spec = { children: [] }" },
+    ],
+    invalid: [
+      {
+        filename: FAKE_SHELL,
+        code: "type PopoverShellProps = { readonly children?: ReactNode }",
+        errors: [{ messageId: "slot" }],
+      },
+      {
+        filename: BRANCH,
+        code: "export interface SProps { children?: ReactNode }",
+        errors: [{ messageId: "slot" }],
+      },
+      {
+        filename: BRANCH,
+        code: "export const S = ({ props, children }: SProps) => null",
+        errors: [{ messageId: "slot" }],
+      },
+      {
+        // a leaf is below the container tier, so it may not grow one either
+        filename: "/repo/src/components/leaves/Icon/index.tsx",
+        code: "export const Icon = ({ children }: IconProps) => null",
+        errors: [{ messageId: "slot" }],
       },
     ],
   })

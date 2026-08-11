@@ -137,7 +137,7 @@ They differ in one thing: whether the tier knows a feature at all.
 ### The namespace trap
 
 ```tsx
-export const CardRoot = ({ children }: CardRootProps) => /* ... */
+export const CardRoot = ({ contract, render }: CardRootProps) => /* ... */
 export const CardHeader = ({ props }: CardHeaderProps) => /* ... */
 ```
 

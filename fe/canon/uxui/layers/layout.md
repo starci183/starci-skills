@@ -2,7 +2,7 @@
 
 ## Definition
 
-A layout is **route-stable chrome**. It takes `children` — the routed body — and it knows the domain:
+A layout is **route-stable chrome**. It holds the routed body — and it knows the domain:
 who is signed in, which section is current, what the cart holds. Open and domain-aware at once, which
 is exactly the pair no other tier is allowed.
 
@@ -12,15 +12,17 @@ sections must not see the chrome flicker, because chrome that repaints on every 
 whole application reloading.
 
 The question that settles it: **does it stay while the body changes?** If yes, it is a layout. If it
-appears in response to an action and goes away again, it is an overlay. If it takes no children at
-all, it is a block.
+appears in response to an action and goes away again, it is an overlay. If nothing can be put
+inside it at all, it is a block.
 
 ## Rules
 
-**LAYOUT-1 · It takes `children` and never inspects them.**
+**LAYOUT-1 · The framework boundary brands the routed body before composition.**
 
-The routed body arrives as an opaque node. A layout that reads what it was given to decide how to
-draw itself has coupled the chrome to the page, and now every new page edits the layout.
+Next's root `app/layout.tsx` is the framework boundary and therefore receives `children`; no
+component layout does. The boundary closes that node into the contract's `page` leaf immediately.
+A layout that accepts or reads arbitrary body markup has coupled the chrome to the page, and now
+every new page edits the layout.
 
 **LAYOUT-2 · It is a SIBLING of the body, not a parent of its state.**
 
@@ -34,7 +36,7 @@ Session, navigation, notification count, cart count: it fetches these itself. Th
 chrome, not to whichever page happens to be mounted, and passing them down from a page would make
 every page responsible for the bar.
 
-**LAYOUT-4 · It never aggregates its children's APIs into its own.**
+**LAYOUT-4 · It never aggregates the API of what it holds into its own.**
 
 A layout republishing what pages accept becomes a funnel: every page change edits the layout, and
 the layout's props stop describing the layout. This is the single most common way an app shell turns
@@ -61,37 +63,33 @@ a change to the rule.
 
 | Never | Why it is refused | Instead |
 |---|---|---|
-| Reading `children` to decide anything | The chrome is then coupled to the page, and every new page edits it | Take the decision as its own domain (current route, session) |
+| Reading what it holds to decide anything | The chrome is then coupled to the page, and every new page edits it | Take the decision as its own domain (current route, session) |
 | Holding what the body is working on | A layout is global; state put there is global state with a nicer name | Leave it in the page or the block that owns it |
 | Republishing page props | Every page change now edits the layout, and its props stop describing it | Let the page own its own props |
 | Writing a class | The pin/fill/scroll relationship is a node with a reason, not a string | Name a contract entry for the shell topology |
 | Writing domain markup inline (a notification list, an account menu) | Those are domain sentences, and the layout stops being topology | Compose the block that says it |
 | Taking a fetched payload as a prop | The page becomes responsible for the chrome | Fetch it here |
 | Remounting on navigation | The application appears to reload on every link | Keep the layout a sibling of the routed body |
+| `children` on a component layout | Arbitrary page markup crosses into a domain-aware component and cannot be checked | Brand framework children at `app/layout.tsx`, then compose the layout as a sibling |
 
 ## Examples
 
 ### The ordinary case — chrome that survives the body
 
 ```tsx
-// layout: it resolves its own domain, composes blocks for the parts that mean something, and
-// holds the routed body without looking at it.
-export const AppShell = ({ children }: AppShellProps) => {
-    const t = useTranslations("shell")
-    const session = useSessionToken()
-    return (
-        <Tree contract="nav-over-body-page">
-            <ShellNav />
-            {children}
-            <ShellFooter />
-        </Tree>
-    )
-}
+// framework boundary: it brands the opaque routed body immediately; the layout is its sibling.
+<Tree
+    contract="nav-over-body-page"
+    render={defineContractComponent("nav-over-body-page", {
+        navigation: defineContractProjection("double-navbar", () => <ShellNav />),
+        body: defineLeafComponent("page", {}, () => children),
+    })}
+/>
 ```
 
 ```tsx
 // Wrong: the shell now reads the body to decide its own shape, so every new page is a shell edit.
-export const AppShell = ({ children, pageKind }: { children: ReactNode; pageKind: "wide" | "narrow" }) => (
+export const AppShell = ({ children, pageKind }: AppShellProps) => (
     <div className={pageKind === "wide" ? "max-w-full" : "max-w-app-lg"}>{children}</div>
 )
 ```
@@ -101,15 +99,15 @@ They differ in one thing: whether the chrome knows anything about the page insid
 ### The funnel trap
 
 ```tsx
-// layout: it takes the body and nothing about the body.
-export const AppShell = ({ children }: { children: ReactNode }) => ( /* ... */ )
+// layout: it resolves only the chrome domain and receives no page API.
+export const ShellNav = () => ( /* ... */ )
 ```
 
 ```tsx
 // Wrong: a funnel. Every page's needs now surface in the shell's props, and the shell grows a
 // field per page forever.
-export const AppShell = ({
-    children, showSearch, hideFooter, breadcrumbs, pageTitle, ctaLabel,
+export const ShellNav = ({
+    showSearch, hideFooter, breadcrumbs, pageTitle, ctaLabel,
 }: AppShellProps) => ( /* ... */ )
 ```
 
@@ -119,10 +117,13 @@ They differ in one thing: whether the shell's props describe the shell.
 
 ```tsx
 // layout: a sibling of the routed body. The route changes, the body is replaced, the bar is not.
-<Tree contract="nav-over-body-page">
-    <ShellNav />
-    {children}
-</Tree>
+<Tree
+    contract="nav-over-body-page"
+    render={defineContractComponent("nav-over-body-page", {
+        navigation: defineContractProjection("double-navbar", () => <ShellNav />),
+        body: defineLeafComponent("page", {}, () => children),
+    })}
+/>
 ```
 
 ```tsx

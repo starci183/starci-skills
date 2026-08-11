@@ -34,17 +34,17 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("VENDOR-1: the library belongs to the two wrapper folders", () => {
+test("VENDOR-1: the library belongs to closed primitives, covering shells and named surface branches", () => {
   tester.run("vendor-boundary", vendorBoundary, {
     valid: [
       { filename: LEAF, code: "import { Button } from \"@heroui/react\"" },
       { filename: SHELL, code: "import { Modal } from \"@heroui/react\"" },
       // outside the component tree: standing the library up is not reaching past a tier
       { filename: PROVIDER, code: "import { HeroUIProvider } from \"@heroui/react\"" },
-      { filename: BRANCH, code: "import { Tree } from \"@/components/branches/Tree\"" },
+      { filename: BRANCH, code: "import { Card } from \"@heroui/react\"" },
     ],
     invalid: [
-      { filename: BRANCH, code: "import { Modal } from \"@heroui/react\"", errors: [{ messageId: "outside" }] },
+      { filename: "D:/repo/src/components/branches/GenericPanel/index.tsx", code: "import { Modal } from \"@heroui/react\"", errors: [{ messageId: "outside" }] },
       { filename: BLOCK, code: "import { Button } from \"@heroui/react\"", errors: [{ messageId: "outside" }] },
       // a subpath does not walk around the boundary
       { filename: BLOCK, code: "import { X } from \"@heroui/theme\"", errors: [{ messageId: "outside" }] },
@@ -57,9 +57,14 @@ test("VENDOR-2: a shell that wraps nothing is an ordinary component in the wrong
     valid: [{ filename: SHELL, code: "import { Modal } from \"@heroui/react\"" }],
     invalid: [
       {
-        filename: "D:/repo/src/components/shells/SurfaceCard/index.tsx",
+        filename: SHELL,
         code: "import { Tree } from \"@/components/branches/Tree\"",
         errors: [{ messageId: "emptyShell" }],
+      },
+      {
+        filename: "D:/repo/src/components/shells/SurfaceCard/index.tsx",
+        code: "import { Tree } from \"@/components/branches/Tree\"",
+        errors: [{ messageId: "unknownShell" }],
       },
     ],
   })

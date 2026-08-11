@@ -45,6 +45,13 @@ webhook, an encode — is polled until the state settles rather than asserted on
 call, because asserting immediately tests the scheduler's speed and nothing else. A realtime step
 opens a REAL client and waits for the message. A write is read back out of the database.
 
+The CQRS bus, a handler, a resolver and a worker method are application internals, not transports.
+Calling `commandBus.execute(...)`, `handler.execute(...)`, `resolver.execute(...)` or
+`worker.process(...)` starts after routing, authentication, validation and serialization have
+already succeeded, so the flow can stay green while its production door is broken. They belong in
+the integration or unit lane. An e2e enters through GraphQL, HTTP, a real socket, a broker message
+or the scheduler boundary that production enters through.
+
 There is no prize for a test that only speaks one protocol. A flow that is half HTTP and half
 socket, tested over HTTP alone, is half tested — and the untested half is the half that is hard.
 
@@ -140,6 +147,7 @@ because its last green result is still on the board.
 | Asserting only `status` / `__typename` in an e2e | It proves the server is alive and nothing else; the flow can stop persisting silently | Read the state back and assert the consequence |
 | Asserting an async result on the line after the call | It tests how fast the scheduler happened to be, and is flaky by construction | Poll until the state settles, with a bounded wait |
 | Testing a realtime flow over HTTP only | The untested half is the half that is hard | Open a real client and wait for the message |
+| Calling `CommandBus`, `QueryBus`, a handler, resolver or worker method from an e2e | It enters after production routing, guards, validation and serialization, so those seams can break while the flow stays green | Enter through GraphQL, HTTP, a real socket, broker or scheduler boundary |
 | An e2e for a plain validation error | It costs a database to prove a branch | Put it in a unit spec |
 | A unit spec whose every assertion is `toHaveBeenCalled*` | It restates the source: correct rewrites go red, broken rules stay green | Assert the returned value or the changed state |
 | Splitting one flow into a test per endpoint | The promise disappears; five endpoint descriptions do not add up to one working flow | One file, one flow, start to finish |

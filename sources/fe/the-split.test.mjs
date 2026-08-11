@@ -11,7 +11,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { presentationalPurity, rules } from "./the-split.mjs"
+import { connectedBlockHasPresentationalTwin, presentationalPurity, rules } from "./the-split.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -51,6 +51,62 @@ test("SPLIT-1: the drawing half receives everything and asks for nothing", () =>
       { filename: DRAWING, code: "const t = useTranslations(\"quest\")", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const r = queryResolveRoute({ request })", errors: [{ messageId: "reaches" }] },
+    ],
+  })
+})
+
+test("SPLIT-5: a connected block renders only its exact pure twin", () => {
+  tester.run("connected-block-has-presentational-twin", connectedBlockHasPresentationalTwin, {
+    valid: [
+      {
+        filename: CONNECTED,
+        code: `
+          import { useTranslations } from "next-intl"
+          import { _DailyQuest } from "./component"
+          export const DailyQuest = () => {
+            const t = useTranslations("quest")
+            return <_DailyQuest state="pending" props={{ label: t("label") }} />
+          }
+        `,
+      },
+      {
+        filename: CONNECTED,
+        code: "export const DailyQuest = ({ props }) => <QuestRows props={props} />",
+      },
+    ],
+    invalid: [
+      {
+        filename: CONNECTED,
+        code: `
+          import { useTranslations } from "next-intl"
+          export const DailyQuest = () => <StatRow props={{ label: useTranslations("quest")("label") }} />
+        `,
+        errors: [{ messageId: "missing" }],
+      },
+      {
+        filename: CONNECTED,
+        code: `
+          import { useTranslations } from "next-intl"
+          import { _DailyQuest } from "./component"
+          export const DailyQuest = () => {
+            const t = useTranslations("quest")
+            return t("empty") ? <EmptyNotice /> : <_DailyQuest state="ready" props={{ label: t("label") }} />
+          }
+        `,
+        errors: [{ messageId: "bypass" }],
+      },
+      {
+        filename: CONNECTED,
+        code: `
+          import { useTranslations } from "next-intl"
+          import { _DailyQuest } from "./component"
+          export const DailyQuest = () => {
+            const t = useTranslations("quest")
+            return t("empty")
+          }
+        `,
+        errors: [{ messageId: "unused" }],
+      },
     ],
   })
 })

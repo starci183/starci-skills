@@ -14,11 +14,16 @@
  * TWO DELIBERATE DEPARTURES from the source this was ported from, both recorded so the next reader
  * does not "restore" them:
  *
- *   - `noUnknownSlotRole` is absent. It policed a `slots` object against roles a key declared, and
- *     stopped being able to when contracts collapsed to classes-plus-a-reason. What remained was an
- *     exported rule nothing registered, reading fields off an object that no longer carries them -
- *     it would have thrown on the first node it saw. A rule nothing runs is not a safety net, it is
- *     a claim that one exists. The child contract is held by the KEY'S NAME now.
+ *   - NO RULE PATROLS WHAT FILLS A SLOT, and that was measured rather than assumed. A slot resolves
+ *     to `LeafComponent<name, props>`, so the compiler was handed an inline arrow, a named function
+ *     with no metadata, and metadata carrying the WRONG name: it refused all three. A rule here
+ *     would re-check a door the type already holds shut, and cost a rule to keep it doing so.
+ *   - `noUnknownSlotRole` is absent, and it is NOT coming back even though the child contract has.
+ *     It policed a `slots` object against roles a key declared, and stopped being able to when
+ *     contracts collapsed to classes-plus-a-reason. Entries declare their slots again now - but as
+ *     a record the COMPILER reads, so a wrong leaf, wrong leaf props, a missing slot or a slot
+ *     nobody declared are type errors before any rule runs. Re-adding a rule here would patrol a
+ *     door the type already holds shut, which is the weaker of the two and costs a rule to keep.
  *   - The list of banned elements includes `ul`, `ol`, `li` and `form`. The original stopped at the
  *     neutral boxes, from an era when an entry could only open a `div`. An entry names its own host
  *     now, so a hand-written `<ul>` is a node with no key exactly like a hand-written `<div>` - and
@@ -110,11 +115,34 @@ export const findContractTable = (filename) => {
   return null
 }
 
-/** Every key, read off the entry table. */
-const parseKeys = (source) => {
-  const start = source.indexOf("buildContracts({")
-  if (start < 0) return []
-  return [...source.slice(start).matchAll(/^\s{4}"([a-z][a-z-]*)":\s*\{/gm)].map((hit) => hit[1])
+/**
+ * The text of one `buildX({ ... })` call, brace-balanced.
+ *
+ * READING TO THE END OF THE FILE IS NOT GOOD ENOUGH, and that is not a hypothetical. The moment a
+ * second table joined the first in this file, a reader that sliced to EOF collected unrelated keys
+ * as node keys. The balanced reader stops at the actual end of the selected table.
+ */
+const balancedCall = (source, builder) => {
+  const at = source.indexOf(`${builder}({`)
+  if (at < 0) return null
+  const open = source.indexOf("{", at)
+  let depth = 0
+  for (let i = open; i < source.length; i += 1) {
+    const ch = source[i]
+    if (ch === "{") depth += 1
+    else if (ch === "}") {
+      depth -= 1
+      if (depth === 0) return source.slice(open, i + 1)
+    }
+  }
+  return null
+}
+
+/** Every key of one table, read off its own call and no other. */
+const parseKeys = (source, builder) => {
+  const body = balancedCall(source, builder)
+  if (!body) return []
+  return [...body.matchAll(/^\s{4}"([a-z][a-z-]*)":\s*\{/gm)].map((hit) => hit[1])
 }
 
 /**
@@ -146,7 +174,7 @@ export const readContracts = (filename) => {
   } catch {
     return null
   }
-  const keys = parseKeys(source)
+  const keys = parseKeys(source, "buildContracts")
   const value = keys.length > 0 ? { path, keys } : null
   cache.set(path, { stamp, value })
   return value

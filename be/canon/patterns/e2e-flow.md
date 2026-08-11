@@ -13,6 +13,14 @@ The question it answers: **when this goes red at 3am, will the person reading it
 broke and why?** A flow that answers "no" is a flow that gets re-run rather than read, and a test
 that gets re-run rather than read has stopped being a test.
 
+What holds the machine-checkable part is [`sources/be/e2e-flow.mjs`](../../../sources/be/e2e-flow.mjs),
+and it is **three of the twelve rules below** — FLOW-3, FLOW-7 and the direct-internal-actor
+half of FLOW-11. That is the honest number, not a gap.
+The rest turn on what a name means, what is being asserted, or who is acting, and a rule that fires
+on a judgement is one authors learn to disable — which leaves the law worse off than when nothing
+enforced it. The module records what was measured and left alone, so the next reader does not
+"finish the job".
+
 ## Rules
 
 **FLOW-1 · One file, one flow, and the file is named for the sentence.**
@@ -85,6 +93,24 @@ flow, so flows never share state and can run in any order.
 assertion on a red one. What a reader needs when it fails is the step name and the assertion, both
 of which the runner already prints.
 
+**FLOW-11 · Operational chains enter at their production boundary and keep every internal hop real.**
+
+A fallback, retry, queue, scheduler, projection, cache-invalidation or realtime-delivery flow is
+an E2E only when the test enters through GraphQL/HTTP/socket, publishes to the real broker, or lets
+the real scheduler fire. Importing a worker so Nest can register it is correct; resolving that
+worker and calling `process`, `finalize` or another internal method is not. The direct call erases
+serialization, locking, retry, acknowledgement and competing-consumer behaviour — exactly the
+behaviour the operational flow exists to prove.
+
+**FLOW-12 · Override the external result, never the internal policy that chooses it.**
+
+AI E2E keeps `AiInvokeService`, the balancer, key rotation, health cache, entitlement and billing
+real; Jest scripts only the concrete provider client's `invoke`/`stream` result or error. Payment
+E2E keeps reconciliation, action routing and grants real; Jest scripts only Stripe/PayOS/PayPal/
+NOWPayments. The same boundary applies to Keycloak, SMTP, GitHub, Judge0 and FFmpeg. Mocking an
+internal orchestrator makes fallback, attribution, rollback and idempotency disappear while the
+test remains green.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -97,6 +123,8 @@ of which the runner already prints.
 | A magic actor ordinal (`accountNumber: 8`) | It says nothing, and two flows silently collide on it | A named actor minted per flow |
 | `console.log` in a test | Unread when green, noise when red | The step name and the assertion |
 | Asserting only the response status | It proves the server replied and nothing else | Read the state back |
+| Calling a resolved `*Worker` / `*Handler` | It skips the broker/CQRS boundary and all delivery semantics | Register it, then trigger the real queue/transport |
+| Mocking an internal fallback/orchestration service | It removes the policy the operational E2E is meant to prove | Mock only the external SDK result/error |
 
 ## Examples
 

@@ -15,7 +15,7 @@ is a leaf.
 
 ## Rules
 
-**COMPOSITE-1 · Closed. `props`, `on`, `isLoading` — and no `children`.**
+**COMPOSITE-1 · Closed. `props`, `on`, `isLoading` — and no way in.**
 
 This is the entire boundary with branch, and it is a TYPE rather than a convention: the props alias
 carries no slot, so an author who wanted one cannot express it and has to decide which tier they are
@@ -62,7 +62,7 @@ than by taste, and the tier stays small enough to read.
 
 | Never | Why it is refused | Instead |
 |---|---|---|
-| A `children` slot, however it is named (`body`, `content`, `slot`) | The moment a caller supplies the inside, the shape is not closed, and every rule below stops being checkable | Move it to `branch` |
+| Any slot a caller fills — `render`, or `children` under any name | The moment a caller supplies the inside, the shape is not closed, and every rule below stops being checkable | Move it to `branch` |
 | A domain word in the name (`Course…`, `Streak…`, `Quota…`) | The name will be false for the second caller, and false names get copied rather than corrected | Name the shape; if the shape has no name without the domain, it is a block |
 | Writing a class | The arrangement then exists in two places and only one is findable | Name a contract node and hold it with a branch |
 | Importing `@heroui/react` | It moves the library boundary above the leaves, so a swap no longer ends there | Wrap the vendor behaviour as a leaf first |
@@ -78,13 +78,22 @@ than by taste, and the tier stays small enough to read.
 ```tsx
 // composite: closed. Three values in, one arrangement out, no idea what is progressing.
 export const LabelledProgressRow = ({ props, isLoading = false }: LabelledProgressRowProps) => (
-    <Tree contract="label-figure-over-bar">
-        <Tree contract="label-value-row">
-            <Text props={{ content: props.title, size: "sm", weight: "medium" }} isLoading={isLoading} />
-            <Text props={{ content: props.percentText, size: "sm", tone: "muted" }} isLoading={isLoading} />
-        </Tree>
-        <Progress props={{ value: props.percent, label: props.title ?? "" }} isLoading={isLoading} />
-    </Tree>
+    <Tree
+        contract="label-figure-over-bar"
+        render={defineContractComponent("label-figure-over-bar", {
+            heading: defineContractComponent("label-value-row", {
+                label: defineLeafComponent("text", { size: "sm", weight: "medium" }, () => (
+                    <Text props={{ content: props.title, size: "sm", weight: "medium" }} isLoading={isLoading} />
+                )),
+                value: defineLeafComponent("text", { size: "sm", tone: "muted" }, () => (
+                    <Text props={{ content: props.percentText, size: "sm", tone: "muted" }} isLoading={isLoading} />
+                )),
+            }),
+            bar: defineLeafComponent("progress", {}, () => (
+                <Progress props={{ value: props.percent, label: props.title ?? "" }} isLoading={isLoading} />
+            )),
+        })}
+    />
 )
 ```
 
@@ -122,11 +131,18 @@ They differ in one thing: whether a second caller can use it without the name be
 ```tsx
 // composite: the resize behaviour lives in a leaf; this file only arranges what surrounds it.
 export const SearchBox = ({ props, on }: SearchBoxProps) => (
-    <Tree contract="glyph-input-hint-row">
-        <Icon props={{ name: "search", size: "sm" }} />
-        <Input props={{ value: props.value, placeholder: props.placeholder }} on={{ change: on?.change }} />
-        <Kbd props={{ keys: props.shortcut }} />
-    </Tree>
+    <Tree
+        contract="glyph-input-hint-row"
+        render={defineContractComponent("glyph-input-hint-row", {
+            glyph: defineLeafComponent("icon", { size: "sm" }, () => (
+                <Icon props={{ name: "search", size: "sm" }} />
+            )),
+            input: defineLeafComponent("input", {}, () => (
+                <Input props={{ value: props.value, placeholder: props.placeholder }} on={{ change: on?.change }} />
+            )),
+            hint: defineLeafComponent("kbd", {}, () => <Kbd props={{ keys: props.shortcut }} />),
+        })}
+    />
 )
 ```
 
@@ -150,11 +166,11 @@ They differ in one thing: whether the library boundary is still at the leaves.
 ```tsx
 // block internals: this arrangement has exactly one caller today, so it stays where it is used.
 export const _DailyQuest = ({ props }: DailyQuestProps) => (
-    <SurfaceCard props={{ label: props.label }}>
-        <Tree contract="stacked-rows">
-            {props.tasks.map((task) => <LabelledProgressRow key={task.id} props={task} />)}
-        </Tree>
-    </SurfaceCard>
+    <SurfaceCard
+        props={{ label: props.label }}
+        contract="stacked-rows"
+        render={taskRows(props.tasks)}
+    />
 )
 ```
 

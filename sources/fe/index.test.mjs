@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname } from "node:path"
 import test from "node:test"
-import plugin, { recommended, ruleOwners, rules } from "./index.mjs"
+import plugin, { linterOptions, recommended, ruleOwners, rules } from "./index.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -48,6 +48,15 @@ test("every published rule is in the recommended set", () => {
     [],
     `these rules exist but ask for no level: ${missing.join(", ")} - they would reach a repository switched off while looking adopted`,
   )
+})
+
+test("every FE canon rule is strict - no warn or off rollout", () => {
+  const loose = Object.entries(recommended).filter(([, level]) => level !== "error")
+  assert.deepEqual(loose, [], "FE canon contains a rule that is not an error")
+})
+
+test("the gathered config refuses inline lint directives", () => {
+  assert.deepEqual(linterOptions, { noInlineConfig: true })
 })
 
 test("every rule is a rule, and the plugin exposes them all", () => {

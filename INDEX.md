@@ -28,29 +28,35 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 
   Two questions place anything, and both are answered by a type signature rather than by taste:
 
-  | | takes only `props` | takes `children` |
+  | | takes only `props` | takes `contract` + `render` |
   |---|---|---|
   | **knows no domain** | composite | branch |
   | **knows the domain** | block | layout · overlay |
 
-  A **leaf** sits below the table: it wraps ONE vendor primitive, takes no children, and arranges
-  nothing. A **page** sits above it: one screen, composed of blocks, in a folder holding exactly two
-  files.
+  `render` is a branded `ContractComponent<K>` carrying a record of COMPONENTS — one per slot the
+  key declares — never markup. That is what lets an entry state what belongs at every position,
+  preserve the exact key across a branch boundary, and have the compiler hold it.
 
-  A **shell** is the one named exemption in the whole system. It is a branch by the table — children,
-  no domain — and it alone may import the component library alongside the leaves, because the vendor
-  primitives it wraps (a dialog, a drawer, a popover) REQUIRE children and so fit in neither tier as
-  written. The exemption is a folder rather than a list inside a rule, which makes it countable and
+  A **leaf** sits below the table: it wraps ONE vendor primitive, fills a slot rather than opening
+  one, and arranges nothing. It carries its own name on its metadata, which is how a slot asking for
+  a glyph refuses a label. A **page** sits above it: one screen, composed of blocks, in a folder
+  holding exactly two files.
+
+  A **shell** is the one named exemption in the whole system. It is a branch by the table — it opens
+  slots, it knows no domain — and it alone may import the component library alongside the leaves,
+  because ModalShell and DrawerShell intentionally pass a real `children` hole through
+  of their own and so fit in neither tier as written. The exemption is a folder rather than a list inside a rule, which makes it countable and
   checkable both ways: a branch elsewhere that imports the library is misfiled, and a file in
-  `shells/` that imports nothing is an ordinary branch that wandered in.
+  `shells/` is closed to those two names; surface cards remain typed branches.
 
   Layout and overlay share the same cell and differ in one thing — a layout SURVIVES navigation,
   an overlay is summoned and dismissed.
 - **`patterns/`** — how code is written. One file per concept, each naming the artifact that holds
   it: [`contract`](fe/canon/patterns/contract.md) · [`file-layout`](fe/canon/patterns/file-layout.md)
-  · [`icon`](fe/canon/patterns/icon.md) · [`naming`](fe/canon/patterns/naming.md). Still owed:
-  props-and-slots, css-doors, tokens, loading, the-split, translation, type-safety, comments,
-  accessibility.
+  · [`icon`](fe/canon/patterns/icon.md) · [`naming`](fe/canon/patterns/naming.md) ·
+  [`props-and-slots`](fe/canon/patterns/props-and-slots.md) ·
+  [`the-split`](fe/canon/patterns/the-split.md) ·
+  [`lint-escape-hatch`](fe/canon/patterns/lint-escape-hatch.md).
 
 `be/canon/patterns/` holds [`cqrs`](be/canon/patterns/cqrs.md) ·
 [`data-access`](be/canon/patterns/data-access.md) · [`testing`](be/canon/patterns/testing.md).
@@ -58,7 +64,8 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 `fe/design/` carries the laws no machine can hold — no file there names a number of its own, which
 is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) ·
 [`padding`](fe/design/padding.md) · [`surface-in-surface`](fe/design/surface-in-surface.md) ·
-[`call-to-action`](fe/design/call-to-action.md). Still owed: position, responsive, hierarchy,
+[`call-to-action`](fe/design/call-to-action.md) · [`refactor-parity`](fe/design/refactor-parity.md).
+Still owed: position, responsive, hierarchy,
 restraint, colour, typography.
 
 **Which shelf a concept goes on is decided by whether anything can hold it.** A law with an

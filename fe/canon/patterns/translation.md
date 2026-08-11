@@ -77,7 +77,7 @@ return <_DailyQuest state="failed" props={{ label: t("label"), message: t("faile
 ```tsx
 // component.tsx: it would have to know the situation AND the dictionary
 const t = useTranslations("quest")
-return <SurfaceCard props={{ label: t("label") }} />
+return <SurfaceCard props={{ label: t("label") }} contract="quest-rows" render={questRows} />
 ```
 
 They differ in one thing: whether the drawing half can be rendered without the runtime.

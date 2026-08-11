@@ -13,9 +13,9 @@ The question that settles which half a line belongs to: **could this be wrong wh
 fine?** A wrong tree, a wrong seam, a missing state: drawing. A wrong request, a wrong situation,
 the wrong word chosen: data.
 
-What holds this law is [`sources/fe/the-split.mjs`](../../../sources/fe/the-split.mjs). It reaches
-only the drawing half, because that is the half whose purity is checkable: a file that fetches is
-visible in its imports, while a file that draws badly is not visible to anything.
+What holds this law is [`sources/fe/the-split.mjs`](../../../sources/fe/the-split.mjs). It checks both
+directions a syntax tree can prove: the drawing half cannot reach for the world, and a connected
+block must import and render only its exact `_X` twin.
 
 ## Rules
 
@@ -47,8 +47,13 @@ that was already done one file away.
 
 **SPLIT-5 · The connected half draws nothing of its own.**
 
-It renders one thing: the drawing half, with a situation and its props. A connected file that grows
-markup has become both halves, and the line stops meaning anything the moment it is crossed once.
+It imports exact `_${FolderName}` from `./component` and renders that one component on every JSX
+path. A connected file that renders a leaf, branch or alternate tree has become both halves, and the
+line stops meaning anything the moment it is crossed once.
+
+There is no thin-block exception. One leaf, one tree in every state, no local domain state, or a
+presentational twin that only forwards props are the cases most likely to grow a second situation
+later; they still cross the same exact twin.
 
 **SPLIT-6 · A surface with no request does not split.**
 
@@ -65,6 +70,7 @@ file holds nothing that the first could get wrong. The split exists because a re
 | Flags instead of a named situation | Four booleans admit sixteen combinations, and most have never existed | A discriminated union |
 | Styling decided in the connected half | It takes a decision whose consequence it cannot see | Let the drawing half decide how a situation looks |
 | Markup in the connected half | It has become both halves, and the line stops meaning anything | Render the drawing half and nothing else |
+| Rendering a leaf directly because the block is thin | The request and presentation can no longer be tested independently, and the first added state crosses the line | Create exact `_X` and render only it |
 | Splitting a component that fetches nothing | There is no data half to separate, so the second file is ceremony | One file |
 
 ## Examples
@@ -110,3 +116,21 @@ They differ in one thing: whether a situation nobody has seen can be expressed.
 ```
 
 They differ in one thing: whether the drawing half needs the translation runtime to be tested.
+
+### The thin-block trap
+
+```tsx
+export const CreditStatRow = () => {
+    const quota = useQueryMyAiQuotaSwr()
+    return <_CreditStatRow state="settled" props={{ label: t("credit"), value: formatQuota(quota.data) }} />
+}
+```
+
+```tsx
+export const CreditStatRow = () => {
+    const quota = useQueryMyAiQuotaSwr()
+    return <StatRow props={{ label: t("credit"), value: formatQuota(quota.data) }} />
+}
+```
+
+They differ in one thing: whether every connected render crosses the exact presentational twin.

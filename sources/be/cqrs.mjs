@@ -203,5 +203,5 @@ export const rules = {
 export const recommended = {
   "starci-be/handler-overrides-process": "error", // no=0 of 141 - burned down from 3
   "starci-be/message-carries-params-only": "error", // no=0 of 138 - burned down from 2
-  "starci-be/handler-has-twin-spec": "off",
+  "starci-be/handler-has-twin-spec": "off", // needs the folder listing as an option; a repo that wires it turns this on
 }

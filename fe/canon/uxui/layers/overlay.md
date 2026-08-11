@@ -2,7 +2,7 @@
 
 ## Definition
 
-An overlay is **interaction topology that knows the domain**. It takes `children` and it arrives in
+An overlay is **interaction topology that knows the domain**. It opens slots and it arrives in
 response to something the reader did: a dialog asking them to confirm, a drawer holding a filter, a
 command surface. Open and domain-aware — the same pair as a layout, differing in one thing: a layout
 survives navigation, an overlay is summoned and dismissed.
@@ -20,8 +20,8 @@ about what it holds, it is a branch.
 **OVERLAY-1 · The container is a branch; the overlay composes it.**
 
 Focus trap, escape key, scroll lock, backdrop, returned focus, `role="dialog"` — none of that is the
-overlay's work. It belongs to a leaf that wraps the vendor, held by a branch that arranges the parts.
-The overlay supplies the domain and the children.
+overlay's work. It belongs to ModalShell or DrawerShell; the overlay chooses the typed content.
+The overlay supplies the domain and fills the slots.
 
 **OVERLAY-2 · It owns whether it is open, and it owns why.**
 
@@ -60,7 +60,7 @@ them is settled in the pattern shelf rather than reargued per feature.
 
 | Never | Why it is refused | Instead |
 |---|---|---|
-| Importing `@heroui/react` for dialog behaviour | The vendor boundary belongs to the leaves, and a dialog is where it is most often lost | Use the leaf that wraps it, held by the branch that arranges it |
+| Importing `@heroui/react` for dialog behaviour | The covering mechanics boundary is lost | Use ModalShell or DrawerShell |
 | Accepting an arbitrary `ReactNode` as its whole body | An overlay that accepts anything owns nothing, and its rules stop being checkable | Expose typed slots and a finite set of sizes |
 | Taking `isOpen` from a caller as a plain boolean | The caller then owns a state it cannot reason about, and success has nowhere to go | Own the state; take a named intent to open |
 | Making escape, backdrop and close behave differently | A reader dismisses by accident and loses what they typed | One dismissal path, three ways to reach it |

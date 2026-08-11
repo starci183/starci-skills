@@ -17,6 +17,14 @@ const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 /** The drawing half, named by the convention every split surface follows. */
 const isDrawingHalf = (filename) => /(?:^|\/)component\.tsx$/.test(normalizePath(filename))
 
+/** A connected block entrypoint and the public name its folder fixes. */
+const connectedBlock = (filename) => {
+  const match = normalizePath(filename).match(
+    /\/src\/components\/blocks\/(?:[^/]+\/)*([A-Z][A-Za-z0-9]*)\/index\.tsx$/,
+  )
+  return match ? match[1] : null
+}
+
 /**
  * Calls that reach for the world instead of receiving it.
  *
@@ -52,9 +60,80 @@ export const presentationalPurity = {
   },
 }
 
+// -- SPLIT-5 ---------------------------------------------------------------------------------------
+
+/** A connected block delegates every render path to its exact pure twin. */
+export const connectedBlockHasPresentationalTwin = {
+  meta: {
+    type: "problem",
+    docs: { description: "A connected block index renders only its exact `_X` twin from component.tsx." },
+    schema: [],
+    messages: {
+      missing:
+        "`{{block}}` reads the world, so it must import exact `{{twin}}` from `./component`. A single leaf, one tree, or no local state is not an exception.",
+      bypass:
+        "Connected `{{block}}` renders `<{{rendered}}>` directly. Resolve the world here, then render only `<{{twin}}>`; component.tsx owns the complete presentation.",
+      unused:
+        "Connected `{{block}}` imports `{{twin}}` but never renders it. Every connected render path must cross the pure twin.",
+    },
+  },
+  create(context) {
+    const block = connectedBlock(context.filename || context.getFilename())
+    if (!block) return {}
+
+    const twin = `_${block}`
+    const worldBindings = new Set()
+    const rendered = []
+    let importsTwin = false
+    let readsWorld = false
+    let rendersTwin = false
+
+    return {
+      ImportDeclaration(node) {
+        const source = typeof node.source?.value === "string" ? node.source.value : ""
+        for (const specifier of node.specifiers || []) {
+          const imported = specifier.imported?.name
+          const local = specifier.local?.name
+          if (source === "./component" && imported === twin && local === twin) importsTwin = true
+          if (imported && local && REACHES_FOR_THE_WORLD.test(imported)) worldBindings.add(local)
+        }
+      },
+      CallExpression(node) {
+        if (node.callee?.type !== "Identifier") return
+        if (worldBindings.has(node.callee.name) || REACHES_FOR_THE_WORLD.test(node.callee.name)) {
+          readsWorld = true
+        }
+      },
+      JSXOpeningElement(node) {
+        if (node.name?.type !== "JSXIdentifier") return
+        rendered.push({ name: node.name.name, node })
+        if (node.name.name === twin) rendersTwin = true
+      },
+      "Program:exit"(node) {
+        if (!readsWorld) return
+        if (!importsTwin) {
+          context.report({ node, messageId: "missing", data: { block, twin } })
+          return
+        }
+        for (const entry of rendered) {
+          if (entry.name !== twin) {
+            context.report({
+              node: entry.node,
+              messageId: "bypass",
+              data: { block, rendered: entry.name, twin },
+            })
+          }
+        }
+        if (!rendersTwin) context.report({ node, messageId: "unused", data: { block, twin } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "presentational-purity": presentationalPurity,
+  "connected-block-has-presentational-twin": connectedBlockHasPresentationalTwin,
 }
 
 /**

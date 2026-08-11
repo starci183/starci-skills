@@ -42,10 +42,11 @@ A block takes no already-translated string from its page and no fetched payload 
 handing each other data through a page turn that page into a data layer, and the page then becomes
 the file that breaks whenever anything below it changes.
 
-**BLOCK-5 · It may be terminal without arranging.**
+**BLOCK-5 · It may be terminal without arranging, and it still crosses its pure twin.**
 
 Wrapping one leaf to give it the domain's words and the domain's request is a legitimate block. It
-assembles nothing and needs to: what makes it a block is that it knows what the value MEANS.
+assembles nothing and needs to: what makes it a block is that it knows what the value MEANS. The
+connected half still renders exact `_X`; being thin changes no boundary and earns no exception.
 
 **BLOCK-6 · It may use basic vocabulary leaves directly, and so may a page.**
 
@@ -54,11 +55,11 @@ each in a composite that does nothing would be ritual. What may not be reached f
 ARRANGEMENT: the moment two of them need to sit in a relationship, that relationship is a branch or
 a composite with a name.
 
-**BLOCK-7 · It takes no `children`.**
+**BLOCK-7 · It opens no slots.**
 
-Something that takes children AND knows the domain is a layout or an overlay — route-stable chrome
-or interaction topology, not a domain sentence. Filing one as a block is how a container quietly
-acquires a request.
+Something that takes `contract` and `render` AND knows the domain is a layout or an overlay —
+route-stable chrome or interaction topology, not a domain sentence. Filing one as a block is how a
+container quietly acquires a request.
 
 **BLOCK-8 · Its landing states are its own.**
 
@@ -76,11 +77,12 @@ own question onto something that cannot answer it.
 |---|---|---|
 | Fabricating a figure — an invented count, a placeholder percent, an averaged guess | A wrong number is believed; a missing one is asked about | Report the gap in words, and say which field the back end does not send |
 | Taking `className`, `gap`, or any appearance prop | The block then has two owners, and the second one is invisible from inside | Add a semantic variant, or let the holding node decide |
-| Taking a `children` slot | Open plus domain is a different tier, and mixing them is how a container acquires a request | Move it to `layout` or `overlay` |
+| Opening a slot — `render`, or `children` under any name | Open plus domain is a different tier, and mixing them is how a container acquires a request | Move it to `layout` or `overlay` |
 | Taking fetched data as a prop | Whoever passes it becomes a data layer, and breaks whenever the payload changes | Fetch it here, in the connected half |
 | Taking an already-translated string as a prop | Same: the caller becomes responsible for this block's words | Translate here |
 | Importing another block | Two blocks needing each other are one unnamed block, or two a page should compose | Merge them, or compose both from the page |
 | One `isLoading` shared across independent requests | It makes the fastest wait on the slowest and blurs four honest situations into one | Let each block own its own request and land when it lands |
+| A connected block rendering a leaf or branch directly | The connected half now owns drawing, so the split exists only in filenames | Render exact `_${FolderName}` from `./component` on every path |
 | A boolean that could be a state | Booleans multiply into combinations nobody has seen | Use a discriminated union of the situations that exist |
 | Naming it after its current surface | The name dies at the second caller | Name what it says |
 
@@ -107,7 +109,7 @@ export const DailyQuest = () => {
 // and the page breaks whenever the quest payload changes.
 export const DailyQuest = ({ tasks, label, isLoading }: {
     tasks: Task[]; label: string; isLoading: boolean
-}) => <SurfaceCard props={{ label }} isLoading={isLoading}>{/* ... */}</SurfaceCard>
+}) => <SurfaceCard props={{ label }} contract="labelled-row-stack" render={rows} isLoading={isLoading} />
 ```
 
 They differ in one thing: which file has to change when the domain does.
@@ -158,16 +160,17 @@ They differ in one thing: whether the screen claims something the back end never
 export const CreditStatRow = () => {
     const t = useTranslations("identity")
     const quota = useQueryMyAiQuotaSwr()
-    return <StatRow props={{ icon: "credit", label: t("credit"), value: formatQuota(quota.data) }} />
+    return <_CreditStatRow state="settled" props={{ label: t("credit"), value: formatQuota(quota.data) }} />
 }
 ```
 
 ```tsx
-// Wrong at this tier: same file, no domain left in it — no request, no words of its own. That is
-// a composite that has been given a block's folder.
-export const CreditStatRow = ({ props }: { props: { label: string; value: string } }) => (
-    <StatRow props={{ icon: "credit", label: props.label, value: props.value }} />
-)
+// Wrong: the domain is here, but the drawing is here too because the exact twin is bypassed.
+export const CreditStatRow = () => {
+    const t = useTranslations("identity")
+    const quota = useQueryMyAiQuotaSwr()
+    return <StatRow props={{ icon: "credit", label: t("credit"), value: formatQuota(quota.data) }} />
+}
 ```
 
-They differ in one thing: whether the file knows what the number means.
+They differ in one thing: whether the connected half crosses the pure twin.
