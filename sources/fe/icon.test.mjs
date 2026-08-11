@@ -3,15 +3,15 @@
  *
  *   node --test icon.test.mjs
  *
- * The case that matters most is the SUBPATH one. The escape these rules were written for imported
- * `@phosphor-icons/react/dist/ssr`, and a check comparing the package name for equality does not
- * see it - so that case is asserted first and must never be deleted to make an import tidier.
+ * The case that matters most is the SUBPATH one. The original escape imported a vendor subpath,
+ * and a check comparing a package name for equality does not see it - so that case is asserted
+ * first and must never be deleted to make an import tidier.
  */
 import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noOffScaleGlyphSize, noVendorIconOutsideIconLeaf, rules } from "./icon.mjs"
+import { heroiconsIsTheGlyphVendor, noOffScaleGlyphSize, noVendorIconOutsideIconLeaf, rules } from "./icon.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -37,9 +37,9 @@ test("every rule this law declares is exported under its published name", () => 
 test("ICON-6: the icon leaf owns the library, and a subpath does not walk around it", () => {
   tester.run("no-vendor-icon-outside-icon-leaf", noVendorIconOutsideIconLeaf, {
     valid: [
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@phosphor-icons/react\"" },
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
       // a second file INSIDE the leaf folder is still the leaf
-      { filename: ICON_LEAF_BRANDS, code: "import { X } from \"@phosphor-icons/react/dist/ssr\"" },
+      { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
       { filename: OTHER_LEAF, code: "import { Icon } from \"@/components/leaves/Icon\"" },
       { filename: BLOCK, code: "import { Link as HeroLink } from \"@heroui/react\"" },
       // tooling is out of scope
@@ -59,6 +59,39 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
       },
       { filename: BLOCK, code: "import { Star } from \"lucide-react\"", errors: [{ messageId: "vendor" }] },
       { filename: BLOCK, code: "import { FaBeer } from \"react-icons/fa\"", errors: [{ messageId: "vendor" }] },
+    ],
+  })
+})
+
+test("ICON-7: only the Heroicons outline and micro families may supply glyphs", () => {
+  tester.run("heroicons-is-the-glyph-vendor", heroiconsIsTheGlyphVendor, {
+    valid: [
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/16/solid\"" },
+      { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
+      { filename: "D:/repo/scripts/build.ts", code: "import { X } from \"lucide-react\"" },
+    ],
+    invalid: [
+      {
+        filename: ICON_LEAF,
+        code: "import { FireIcon } from \"@phosphor-icons/react\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: ICON_LEAF,
+        code: "import { Flame } from \"lucide-react\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: ICON_LEAF,
+        code: "import { FireIcon } from \"@heroicons/react/20/solid\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: ICON_LEAF,
+        code: "import { FireIcon } from \"@heroicons/react/24/solid\"",
+        errors: [{ messageId: "vendor" }],
+      },
     ],
   })
 })

@@ -33,6 +33,12 @@ const GLYPH_PACKAGES = [
   "@fortawesome/",
 ]
 
+/** The two Heroicon families selected by the product roles. */
+const HEROICON_PACKAGES = new Set([
+  "@heroicons/react/24/outline",
+  "@heroicons/react/16/solid",
+])
+
 /** True when this file is the icon leaf, which owns the meaning-to-glyph map. */
 const isIconLeafFile = (filename) => normalizePath(filename).includes(`/${ICON_LEAF_RELATIVE}/`)
 
@@ -89,6 +95,32 @@ export const noVendorIconOutsideIconLeaf = {
   },
 }
 
+// -- ICON-7 ----------------------------------------------------------------------------------------
+
+/** The icon leaf owns the map, but that ownership does not license a second glyph vocabulary. */
+export const heroiconsIsTheGlyphVendor = {
+  meta: {
+    type: "problem",
+    docs: { description: "Only the Heroicons heading and micro families may supply product glyphs." },
+    schema: [],
+    messages: {
+      vendor:
+        "`{{source}}` is not one of StarCi's two glyph families. Heading and leading roles use `@heroicons/react/24/outline`; chip roles use `@heroicons/react/16/solid`. Map the meaning there instead. Brand marks are exact house SVGs, not substitutes from another icon package.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!isSourceFile(file)) return {}
+    return {
+      ImportDeclaration(node) {
+        const source = node.source && node.source.value
+        if (!isGlyphImport(source) || HEROICON_PACKAGES.has(String(source))) return
+        context.report({ node, messageId: "vendor", data: { source } })
+      },
+    }
+  },
+}
+
 // -- ICON-1 ----------------------------------------------------------------------------------------
 
 /** A glyph takes one of the two steps; a fraction or an arbitrary value is a third. */
@@ -125,6 +157,7 @@ export const noOffScaleGlyphSize = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-vendor-icon-outside-icon-leaf": noVendorIconOutsideIconLeaf,
+  "heroicons-is-the-glyph-vendor": heroiconsIsTheGlyphVendor,
   "no-off-scale-glyph-size": noOffScaleGlyphSize,
 }
 

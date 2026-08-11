@@ -2,175 +2,130 @@
 
 ## Definition
 
-An icon is the picture a word needs when the word alone is slower to find. It is either a MARKER on a
-line of text, or the SUBJECT of a region — and every question about an icon is answered by deciding
-which of the two it is.
+An icon is a closed product meaning drawn through the Heroicons vocabulary. The caller names what
+the glyph MEANS and the role it performs; the icon leaf alone selects the concrete SVG.
 
-The question that settles it: **is the reader reading this glyph, or reading past it?**
+The question that classifies its role is: **is it introducing content, leading an ordinary control
+or row, or sitting inside a compact chip?** A heading icon is not a leading icon made larger, and a
+chip icon is not either one made smaller. Heroicons authored separate drawings for those jobs.
 
-Reading past it means marker: the small step, the outline cut, no colour of its own, no plate.
-Reading it means subject: the large step, the solid cut, on a plate. There is nothing between the
-two, and a case that seems to need something between is a case where the role has not been decided.
-
-What holds this law is [`sources/fe/icon.mjs`](../../../sources/fe/icon.mjs) and the closed size
-union in the icon leaf itself. The union is the stronger of the two: a step that is not a member
-cannot be typed. The rules cover the two things a union cannot see — a glyph imported straight from
-a library, and a size written as a class string rather than passed as a step.
-
-## The two steps, and what they actually are
-
-| Step | Glyph | Plate it sits on | Where |
-|---|---|---|---|
-| small | 16px, outline cut | none | on a line with words |
-| large | 20px, solid cut | 40px | leading a region, no words on its line |
-
-The plate has a second step of its own at 32px, which carries the SMALL glyph at 16px. That gives the
-ratio that holds everywhere: **the glyph is half its plate.** 16-in-32, 20-in-40. The plate and the
-glyph are therefore one decision, not two.
-
-A glyph carries a no-shrink instruction at every step, in every row, without exception.
-
-**Two steps is a narrowing, and it was deliberate.** The surface this replaces ran three: 16, 20 and
-24. The third was not rare — it carried a fifth of that codebase's glyphs, on the upload prompt, the
-avatar camera, the notification bell, the mobile navigation rows and the status marker of every
-toast. Each of those was a defensible local choice, and together they were a scale nobody could
-apply from memory: the third step is the one an author reaches for when the second looks slightly
-small, which is a judgement that lands differently on every screen.
-
-Dropping it costs something real, and the cost is worth naming. A glyph that used to lead a
-notification row at 24 now leads it at 20, and there is no way to make it 24 without changing the
-scale for everybody — which is the point. A port of those surfaces resolves each one to a step
-rather than preserving its measurement.
+What holds this law is [`sources/fe/icon.mjs`](../../../sources/fe/icon.mjs). TypeScript closes the
+meaning and role unions; lint closes the two escapes types cannot see: importing a glyph package at
+a call site, and changing the vendor from inside the icon leaf.
 
 ## Rules
 
-**ICON-1 · Two steps, and the small one is the default.**
+**ICON-1 · An icon has exactly three semantic roles.**
 
-A third step is a decision nobody makes consistently: the first author picks it for a reason true on
-their screen, and every later author copies the nearest of three without knowing which reason
-applied. The default is the small step, because the overwhelmingly common case is a marker beside
-words — of the icon call sites that sit on a line of text, every single one takes the small step.
+`heading` is a Heroicons 24 outline glyph at `size-6`. `leading` is the same outline vocabulary at
+`size-5`, for navigation, list rows, fields and ordinary icon controls. `chip` is the native
+Heroicons 16 solid micro glyph at `size-4`. These are role names, not styling choices; a caller does
+not pass pixels, Tailwind size classes or an arbitrary weight.
 
-**ICON-2 · A glyph beside words takes the small step, WHATEVER size the words are.**
+**ICON-2 · A heading icon is 24 outline at size six.**
 
-This is the rule most often got wrong, because the intuition is that the icon should scale with the
-text. It must not, and the numbers say why. Body text has two steps, 14px and 16px. The glyph's small
-step is 16px at both.
+A heading needs the open 24-pixel drawing because it introduces a region without becoming a badge.
+Using mini or micro artwork there changes both its geometry and visual weight, even when CSS grows
+the final box to the same measurement.
 
-A glyph FILLS its box; a letter does not. A 16px glyph therefore reads as optically level with 14px
-text, and a glyph matched to the text's own measurement reads as larger than the text it accompanies.
-Tying the two would make the glyph correct at one text size and wrong at the other — so it is tied to
-neither.
+**ICON-3 · A leading icon is outline at size five.**
 
-**ICON-3 · The large step is only for a glyph with no words on its line.**
+Navigation tabs, list rows, fields, switches and icon controls use the outline vocabulary at 20px.
+They lead words or an ordinary interaction; they do not claim the weight of a heading and are not
+compressed into a chip.
 
-Leading an empty region, standing as the mark of a tile. If any word shares the line, the role is
-marker and the step is small, whatever the region is. In practice the large step is never reached for
-directly at all: it arrives through the tile, which is the only construct where a glyph is the
-subject.
+**ICON-4 · A chip icon is the native 16 solid micro drawing.**
 
-**ICON-4 · The solid cut is for a subject, never for emphasis.**
+A chip is compact and already supplies its own enclosing shape. Its icon therefore comes from
+`@heroicons/react/16/solid` at `size-4`; scaling a 24 outline glyph down is not equivalent because
+the paths were drawn for a different optical size.
 
-Filling a glyph does not make it more important; it changes what it IS. An outline glyph reads as a
-label, naming the thing beside it. A solid glyph reads as an object in its own right. Using the fill
-to make a marker stand out gives it a subject's weight while it is still doing a marker's job, and
-the surface then has two things claiming to be what is being looked at.
+**ICON-5 · A glyph inherits colour.**
 
-The solid cut and the large step travel together — the tile is the only place either appears. A case
-wanting one without the other is a case where the role is being decided twice, differently.
+The glyph draws in `currentColor`, so disabled, muted, selected and themed states remain one state
+with the words around it. Exact provider and house marks may keep their authored colours because
+recolouring them changes their identity.
 
-**ICON-5 · A glyph has no colour of its own.**
+**ICON-6 · Callers name meanings, never vendor components.**
 
-It draws in the inherited colour, so it can never disagree with the label beside it. A glyph given
-its own colour is the one still bright after its row has been dimmed — and dimming a row is how a
-surface says "not this one", which the glyph then contradicts.
+Only `src/components/leaves/Icon/` may import a glyph library. A caller importing an SVG component
+chooses vendor, picture, family and size locally, creating a second icon vocabulary outside the
+closed map.
 
-One exception, and it is narrow: a third party's own mark, in its own colours, where recognition
-happens before reading and a recoloured version stops performing.
+**ICON-7 · Heroicons is the only glyph vendor.**
 
-**ICON-6 · The set of meanings is closed, and a caller names the MEANING.**
-
-An icon library ships thousands of glyphs, and a product that can reach all of them has no
-iconography — it has a search box. A caller asks for what the mark SAYS; one file owns which picture
-draws it. A caller reaching into the library decides three things at the call site — which library,
-which glyph, how big — and the next screen answers all three differently.
-
-**ICON-7 · A glyph that repeats the words beside it is removed.**
-
-A caret already says "this goes somewhere"; a globe beside it says it again in a second alphabet.
-Decoration that reads as signal teaches a reader to stop reading signal.
+The icon leaf may import `@heroicons/react/24/outline` and `@heroicons/react/16/solid`. Phosphor,
+Lucide, React Icons, Tabler and Font Awesome are refused even inside that folder. Exact brand SVGs
+remain local assets rather than approximations selected from another general-purpose package.
 
 **ICON-8 · A glyph never shrinks.**
 
-When a row runs out of room the words wrap or clip and the glyph does not. A squeezed glyph is
-unrecognisable at exactly the moment the row is hardest to read, and a glyph that has become an
-ellipse is worse than no glyph at all.
+Every role carries `shrink-0`. When a row becomes tight, words wrap or clip first; deforming the
+glyph makes the row hardest to recognise at the exact point it is hardest to read.
 
 ## Forbidden
 
 | Never | Why it is refused | Instead |
 |---|---|---|
-| A third size step | Nobody applies it consistently; later authors copy the nearest of three | Decide marker or subject; there is no middle |
-| A fractional or arbitrary glyph size | It is off both steps, and the spacing rules do not scan size utilities, so nothing catches it | One of the two steps |
-| An icon sized to match its text | A glyph fills its box and a letter does not, so it reads larger than its label | The small step, at both text sizes |
-| The large step beside words | The role is marker whatever the region is | The small step |
-| The solid cut used for emphasis | A marker then claims to be a subject, and two things claim the same attention | Quieten the neighbours instead |
-| The solid cut without the large step, or the reverse | The role is being decided twice, differently | Both, or neither |
-| A colour on the glyph | It stays bright after its row is dimmed, contradicting the dimming | Inherit the line's colour |
-| A glyph filling its plate, or lost in it | The plate and the glyph were chosen separately | Half the plate, at every step |
-| A glyph that shrinks in a tight row | Unrecognisable exactly when the row is hardest to read | Words give way; the glyph never does |
-| A glyph imported straight from the library at a call site | Three decisions land there, and the next screen answers them differently | Name the meaning |
+| Import Phosphor or another glyph package | It opens a second visual language | Map the meaning to Heroicons in the icon leaf |
+| Import Heroicons outside the icon leaf | Vendor, glyph, family and size escape to the call site | Pass an `IconName` and semantic role |
+| Grow micro artwork into a heading | CSS size cannot restore geometry authored for another optical size | Use 24 outline at `size-6` |
+| Shrink 24 outline artwork into a chip | It is not the native micro drawing | Use 16 solid at `size-4` |
+| Use `mini` for a chip | Mini is 20px; the product chip role is micro | Use `@heroicons/react/16/solid` |
+| Pass a raw size, class or weight | The caller silently creates another role | Choose `heading`, `leading` or `chip` |
+| Give a product glyph its own colour | It contradicts the state carried by its container | Inherit `currentColor` |
+| Let a glyph shrink in a flex row | Its geometry collapses under pressure | Keep `shrink-0`; let words give way |
 
 ## Examples
 
-### The scale trap
+### Heading family
 
-```
-a marker beside body text: 16px, at both 14px and 16px text
-```
-
-```
-the same marker sized to its words: 14px beside small text, 16px beside large - it grows on one
-surface and reads heavier than its own label on the other
+```tsx
+<Icon props={{ name: "course", role: "heading" }} />
 ```
 
-They differ in one thing: whether a glyph's box was confused with a letter's height.
-
-### The role trap
-
-```
-an empty region led by a 20px solid glyph on a 40px plate, nothing else on its line
+```tsx
+<BookOpenIcon className="size-6" />
 ```
 
-```
-the same 20px solid glyph placed beside a label in a row
+They differ in one thing: the first selects the 24 outline drawing through the closed meaning map;
+the second leaks the vendor component to the caller.
+
+### Chip family
+
+```tsx
+<Icon props={{ name: "close", role: "chip" }} />
 ```
 
-They differ in one thing: whether anything on the line competes to be looked at.
-
-### The emphasis trap
-
-```
-the row that matters is made to matter by dimming the rows around it
+```tsx
+<XMarkIcon className="size-4" />
 ```
 
-```
-the row that matters is made to matter by filling its glyph
+They differ in one thing: the first selects the native 16 solid micro drawing; the second leaves
+the family ambiguous even though its final CSS box happens to be 16px.
+
+### Leading versus heading
+
+```tsx
+<Icon props={{ name: "home", role: "leading" }} />
 ```
 
-They differ in one thing: whether a marker was asked to do a subject's job.
-
-### The escape trap — the one that no rule catches
-
-```
-a caret drawn through the named set, at the small step, in the inherited colour
+```tsx
+<Icon props={{ name: "home", role: "heading" }} />
 ```
 
-```
-a caret imported straight from the library at 14px with a third weight, because the small step
-looked slightly too big on that one line
+They differ in one thing: whether the icon leads an ordinary navigation row or introduces a
+heading region.
+
+### Brand boundary
+
+```tsx
+<Icon props={{ name: "google", role: "chip" }} />
 ```
 
-They differ in one thing: whether the exception is visible to anybody who did not write it. The
-second is off both steps and outside the meaning set, and the spacing rules scan gaps and insets
-rather than glyph sizes — so nothing reports it and the third step now exists.
+```tsx
+<SomeGenericGoogleIcon className="size-4" />
+```
+
+They differ in one thing: the first preserves the exact provider SVG; the second substitutes a
+general-purpose glyph for an identity mark.
