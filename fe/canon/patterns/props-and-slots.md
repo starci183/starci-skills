@@ -17,10 +17,11 @@ Five slots exist across the whole system, and no component has all five. `props`
 that key declares — having those two is what makes a container a container. `isLoading` is handed
 down, never decided locally.
 
-`render` is a branded `ContractComponent<K>` carrying a record of COMPONENTS, never markup. The
-record has one named value per slot the key declares; the brand preserves the exact key across the
-branch boundary. That is the difference between a container whose contents can be stated in the
-contract table and one whose contents are whatever the call site happened to build — see
+`render` is a branded `ContractComponent<K>`, never markup or an arbitrary React component.
+`ContractSlots<K>` carries one named value per slot the key declares; `ContractProjection<K>`
+carries an explicit branch projection that already owns its host. The exact key survives the
+branch boundary, and the slot descriptor is not callable. That is the difference between content
+the contract table can state and whatever subtree a call site happened to build — see
 [`contract`](contract.md), CONTRACT-11.
 
 What holds this law is [`sources/fe/props.ts`](../../../sources/fe/props.ts), which is the fence

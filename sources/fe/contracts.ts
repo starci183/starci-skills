@@ -209,15 +209,22 @@ export const contractSpec = (name: ContractKey): ContractSpec => CONTRACTS[name]
 /** Every key, in declaration order, so gates and tests can walk the vocabulary. */
 export const CONTRACT_KEYS: ReadonlyArray<ContractKey> = Object.keys(CONTRACTS) as Array<ContractKey>
 
-/**
- * A component that draws the node for one key. It CARRIES the key, so the pairing is the compiler's
- * problem rather than a reviewer's.
- */
-export type ContractComponent<K extends ContractKey> = {
-    (): ReactNode
+/** Checked named slots for one key. Content records are values, not pretend React components. */
+export type ContractSlots<K extends ContractKey> = {
+    readonly kind: "slots"
     readonly meta: { readonly shape: "contract"; readonly contract: K }
-    readonly slots?: ChildrenOf<K>
+    readonly slots: ChildrenOf<K>
 }
+
+/** A branch-owned node that has already drawn wrapper mechanics a content contract cannot express. */
+export type ContractProjection<K extends ContractKey> = {
+    readonly kind: "projection"
+    readonly meta: { readonly shape: "contract"; readonly contract: K }
+    readonly project: () => ReactNode
+}
+
+/** Checked contract content, either as named slots or one explicit branch projection. */
+export type ContractComponent<K extends ContractKey> = ContractSlots<K> | ContractProjection<K>
 
 /**
  * A leaf, typed by its NAME and the props it takes. It has no key, because it is not a node.

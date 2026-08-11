@@ -83,8 +83,9 @@ export type CompositeProps<D extends ComponentData, A extends ComponentActions =
  * THIS IS THE SLOT THAT USED TO BE `children`, AND THE CHANGE IS NOT COSMETIC. `children` is markup
  * that has already been built: it can be a `.map`, a ternary, a fragment, or a subtree nobody named,
  * so nothing above it can say what is inside a node and no rule can check. `render` is a contract
- * component carrying a typed RECORD OF COMPONENTS, one per slot the entry declares. That is
- * what lets the table state what belongs in each position and have the claim be worth something.
+ * descriptor: either typed named slots or an explicit branch projection. A slot descriptor is not
+ * callable and a projection exposes `project`, so neither can pretend to be the other. That is what
+ * lets the table state what belongs in each position and have the claim be worth something.
  *
  * `contract` and `render` are one decision written twice, and `ContractComponent<K>` ties them together:
  * the key fixes which slots exist and what may fill each, so a card cannot say one thing and hold

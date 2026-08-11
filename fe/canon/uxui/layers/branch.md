@@ -29,14 +29,17 @@ The slots come from the KEY, not from this file: the entry declares which slots 
 fill each, and `render` carries one component per slot. So a branch cannot invent a position, and what it
 holds is stated in the contract table rather than in whatever the call site happened to build.
 
-**BRANCH-2 · It owns no class of its own.**
+**BRANCH-2 · Ordinary branches own no class; named surface hosts own only their fixed wrapper.**
 
 Not one literal, not one composed string, not one conditional. A branch that writes a class has
 become a second contract table: the same arrangement now exists in two places, only one of which can be
 searched, named or reused. The next author extends whichever they found first, and the two drift.
 
-`Tree` is not an exception to this. It APPLIES contract classes; it does not author any. The classes
-it renders are the entry's, and the entry is what a reader argues with.
+`Tree` applies contract classes; it does not author any. `SurfaceCard`, `SurfaceAccordionCard` and
+`SurfaceListCard` are peers of `Tree` as contract hosts: they may author the fixed outer seam and
+vendor wrapper they exist to own, while `contractNodeProps(contract)` is applied only to the content
+body. They may not create extra contracts for their label, wrapper or caption merely to avoid
+writing that fixed assembly, and callers may not tune it through class props.
 
 **BRANCH-3 · A branch imports no vendor except the named surface family that owns its wrapper.**
 
@@ -86,7 +89,7 @@ any of them now edits the branch, and the branch's own props stop describing the
 
 | Never | Why it is refused | Instead |
 |---|---|---|
-| Writing a class — once, one utility, or via a helper | The arrangement then exists outside the contract table, unfindable and unarguable | Add or name a contract entry and render it through `Tree` |
+| Writing a class in an ordinary branch, or composing a surface host's classes dynamically | The arrangement becomes caller-dependent or creates an unnamed second vocabulary | Add a contract entry; a named surface host may own only its fixed wrapper seam |
 | Importing the component library from an ordinary branch | It creates an unnamed vendor owner | Use a leaf, ModalShell/DrawerShell, or one of the named surface family branches |
 | A name that admits anything (`Card`, `Box`, `Wrapper`, `Row`) | The generic member drains the call sites from its specific siblings, and then constrains nothing | Name what it holds — `SurfaceListCard`, `SurfaceAccordionCard` |
 | Calling the family's generic base directly | Same drain, one level down | Call the variant that says what is inside |
@@ -102,24 +105,25 @@ any of them now edits the branch, and the branch's own props stop describing the
 
 ```tsx
 // branch: one key, and one component per slot. It never looks at what it holds.
-export const SurfaceCard = ({ props, contract, render }: SurfaceCardProps) => (
-    <div {...contractNodeProps("label-row-over-card")}>
+export const SurfaceListCard = ({ props, contract, render }: SurfaceListCardProps) => (
+    <div className="flex flex-col gap-3">
+        <Heading props={{ content: props.label, level: 3 }} />
         <Card>
             <Card.Content {...contractNodeProps(contract)}>
                 <ContractContent contract={contract} render={render} />
             </Card.Content>
         </Card>
+        {caption}
     </div>
 )
 
 // the call site binds the key to the named slot record before it crosses the branch boundary
 const content = defineContractComponent("stacked-peer-controls", { control: courseRows })
-<SurfaceCard contract="stacked-peer-controls" render={content} />
+<SurfaceListCard contract="stacked-peer-controls" render={content} />
 ```
 
 ```tsx
-// Wrong: identical output, arrangement stated here instead of named. Whoever needs the same
-// surface tomorrow cannot find this one.
+// Wrong: the vendor surface is rebuilt by hand and its interior is untyped markup.
 export const SurfaceCard = ({ props, children }: SurfaceCardProps) => (
     <div className="flex flex-col gap-3">
         <Heading props={{ content: props.label, level: 3 }} />
@@ -128,7 +132,7 @@ export const SurfaceCard = ({ props, children }: SurfaceCardProps) => (
 )
 ```
 
-They differ in one thing: whether the arrangement has a name somebody else can find.
+They differ in one thing: whether the named surface owns a contract-checked content body.
 
 ### The vendor trap — behaviour is not arrangement
 

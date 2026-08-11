@@ -66,6 +66,10 @@ export const isContractTableFile = (filename) => normalizePath(filename).endsWit
 /** True when this file is the frame that renders an entry, and therefore paints its markers. */
 export const isContractFrameFile = (filename) => normalizePath(filename).includes(`/${CONTRACT_FRAME_RELATIVE}/`)
 
+/** Named surface branches own fixed vendor-wrapper mechanics around one checked content node. */
+export const isSurfaceContractHostFile = (filename) =>
+  /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard)\//.test(normalizePath(filename))
+
 /**
  * True when this file is a leaf.
  *
@@ -313,7 +317,7 @@ export const noLiteralStructuralClass = {
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
-    if (!isGovernedFile(file) || isContractTableFile(file)) return {}
+    if (!isGovernedFile(file) || isContractTableFile(file) || isSurfaceContractHostFile(file)) return {}
     return {
       JSXAttribute(node) {
         if (!isClassAttribute(node)) return
@@ -439,7 +443,7 @@ export const noStructuralHostOutsideContractFrame = {
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
-    if (!isGovernedFile(file)) return {}
+    if (!isGovernedFile(file) || isSurfaceContractHostFile(file)) return {}
     return {
       JSXOpeningElement(node) {
         const tag = hostName(node)

@@ -118,6 +118,12 @@ composition. `Tree` may place that node on a `div`; `SurfaceCard` may place the 
 `Card.Content` inside `div > Card > Card.Content`; an accordion or list surface may project it into
 another wrapper. Those wrappers are branch mechanics, not a second contract vocabulary.
 
+The named surface branch owns its fixed outer seam as ordinary branch code. That seam is not a
+second content grammar: it cannot vary by caller, it cannot admit children, and it never receives
+contract markers. Only the content host (`Card.Content`, accordion body, list body) receives
+`contractNodeProps(contract)` and `ContractContent`. Creating keys for the heading line, outer
+wrapper and caption merely to avoid writing the branch would turn one host into three contracts.
+
 This is why there is no `CardShell` and no compound table. Repeating `Card > Card.Content` is only
 two lines; extracting it would add indirection without owning a policy. `SurfaceCard`,
 `SurfaceAccordionCard`, and `SurfaceListCard` are named branches because each owns a distinct wrapper
@@ -151,16 +157,17 @@ The values in `props` are literal constraints, never values injected at runtime.
 query-provided label stays closed over by the render component and never enters the table.
 
 None of this is `children` in the React sense, and that is what makes it checkable. Markup arrives
-already built and erases its shape; a slot value is a branded component. A helper may close runtime
-data over an inline callback, but it must return `ContractComponent<K>` or `LeafComponent<N,P>` with
-the identity and literal constraints intact. Wrong identity, props, cardinality, missing slots and
-extra slots are compile errors.
+already built and erases its shape; a slot value is a branded descriptor. `ContractSlots<K>` carries
+the checked record and is not callable. `ContractProjection<K>` carries an explicit `project`
+function for a branch that already drew its wrapper. Their union is `ContractComponent<K>`; keeping
+the two variants distinct prevents a slot record from pretending to be a component that renders
+`null`. Wrong identity, props, cardinality, missing slots and extra slots are compile errors.
 
 ## Forbidden
 
 | Never | Why it is refused | Instead |
 |---|---|---|
-| A literal structural class (`flex`, `gap-4`, `items-center`) outside the table | The node's shape is decided at the call site, where nothing above it can find or predict it | Add or reuse a key and render it through the frame |
+| A literal structural class (`flex`, `gap-4`, `items-center`) outside the table or a named surface host | The node's shape is decided at a call site, where nothing above it can find or predict it | Add or reuse a key; fixed vendor-wrapper mechanics belong only to their named surface branch |
 | `cn`, `clsx`, `twMerge`, `cva` or any runtime class composition | A second table with no keys, no reasons and nothing readable from outside | Give the distinction a key, or a named prop on the component that owns the node |
 | An interpolated `className` | The string exists only while the component runs, so nothing can read it back | Move the whole string into an entry and pass the key |
 | A class not in the union | It escapes the vocabulary the whole system is defined by | Add the member deliberately, or use the nearest one that exists |
@@ -168,7 +175,7 @@ extra slots are compile errors.
 | Opening `<ul>`, `<form>` or `<nav>` by hand because the frame "only draws divs" | It no longer does. This is the exact hole that filled the leaf tier with arrangements | Give the entry a host |
 | A key named `card`, `box`, `wrapper`, `row` | It admits anything, so it constrains nothing and drains the call sites from its specific siblings | Name what it holds |
 | A reason that restates the key | It costs a line and teaches nothing, and the next author cannot tell whether the node is load-bearing | State what breaks, wraps or overflows without the node |
-| A structural host written outside the frame | It is a node with no key, no child contract and no recorded reason | Compose the key; if none fits, that is the finding |
+| A structural host written outside the frame or a named surface host branch | It is a node with no key, no child contract and no recorded reason | Compose the key; surface branches alone may open the fixed wrapper around their checked content host |
 | Hand-writing a contract marker attribute | The node claims a contract nothing enforces, and every test that reads those attributes believes it | Render the key and let the frame paint them |
 | A new key because the existing one is the wrong size | The vocabulary grows one call site at a time until it describes call sites, not shapes | Use the key that exists, or change the entry for everyone |
 | `children` on a structural node | Markup arrives already built, so nothing above can say what is inside and no rule can check | Declare the slots on the entry and pass one component per slot in `render` |
@@ -185,30 +192,30 @@ extra slots are compile errors.
 
 ```tsx
 // The shape has a name, every slot has a name, and the compiler holds both.
-export const SurfaceCard = ({ props, contract, render }: SurfaceCardProps) => (
-    <div {...contractNodeProps("label-row-over-card")}>
+export const SurfaceListCard = ({ props, contract, render }: SurfaceListCardProps) => (
+    <div className="flex flex-col gap-3">
+        <Heading props={{ content: props.label, level: 3 }} />
         <Card>
             <Card.Content {...contractNodeProps(contract)}>
                 <ContractContent contract={contract} render={render} />
             </Card.Content>
         </Card>
+        {caption}
     </div>
 )
 
 const content = defineContractComponent("stacked-peer-controls", { control: courseRows })
-<SurfaceCard contract="stacked-peer-controls" render={content} />
+<SurfaceListCard contract="stacked-peer-controls" render={content} />
 ```
 
 ```tsx
-// Wrong: the same output, decided here. Whoever needs this surface tomorrow cannot find it,
-// nothing records why the label sits outside the card it names, and what goes inside is markup
-// nobody can check.
+// Wrong: the wrapper accepts untyped markup, so the contract cannot prove what the card contains.
 export const SurfaceCard = ({ props, children }: SurfaceCardProps) => (
     <div className="flex flex-col gap-3">{children}</div>
 )
 ```
 
-They differ in one thing: whether the arrangement has a name somebody else can find.
+They differ in one thing: whether the content body is checked by the contract it claims.
 
 ### The host trap — the hole the vocabulary drained into
 
