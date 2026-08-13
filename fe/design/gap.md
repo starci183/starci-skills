@@ -15,7 +15,8 @@ The one idea that makes an unfamiliar case decidable: **the ladder climbs by gro
 level of grouping the seam separates, then read off the rung. `gap-2` requires BOTH conditions:
 the peers are horizontal, and they must be read or operated as one functional cluster. An owner
 and what it names, or two units
-that remain independently readable, use `gap-3`. Wider page and layout seams continue above them.
+that remain independently readable, use `gap-3`. Two participants that are each ALREADY a cluster
+use `gap-4`, wherever they happen to stand. Wider page and layout seams continue above them.
 
 ## Rules
 
@@ -67,7 +68,7 @@ input directly. Both tests matter: the parts share a row AND one function. Two u
 not become close peers merely because responsive layout happens to place them on one row.
 
 Fail either test and the seam is `gap-3`. A horizontal row that is not one functional cluster uses
-`gap-3`; a vertical stack still uses `gap-3`, except for the feed chronology in GAP-11.
+`gap-3`; a vertical stack still uses `gap-3`, except for the feed chronology in GAP-12.
 
 `gap-2` is not the default vertical seam. A label above its card or input names a separate owned
 unit and therefore uses `gap-3`; so do consecutive field blocks and a card followed by its muted
@@ -86,20 +87,41 @@ In a `SurfaceListCard`, the label, joined surface and whole-list caption/action 
 of one named section and use `gap-3` outside the surface. Inside the surface rows use `gap-0`; row
 padding owns their vertical rhythm while every divider remains full width.
 
-**GAP-9 · Two large page blocks use `gap-6`.**
+**GAP-9 · Two participants that are each already a cluster use `gap-4`.**
+
+The rung above the unit seam is reached by what the two participants ARE, never by what encloses
+them. `gap-3` separates a unit from a unit: a label from the card it names, a field from the next
+field. `gap-4` separates a group from a group — each side is itself composed, each side already
+carries its own inner seam, and the seam BETWEEN them must therefore out-rank the seams INSIDE
+them. Left at the unit rung, the two groups flatten into one longer run of parts and nothing on the
+screen says where the first one ended.
+
+That test is deliberately not written as "inside a card", because the relationship is the same
+wherever the pair stands. A portrait stack over the identity stack beneath it, an identity cluster
+against the trailing fact it is compared by at the far end of one row, a week run against the
+outcome beside it, a prompt against the action that answers it, and peer cards repeating across a
+responsive grid are all one rung — a column, a row and a grid do not make three different answers.
+Naming the container instead of the participants is exactly how one rung comes to mean one thing
+in a card and another thing in a rail, which is the drift this ladder exists to prevent.
+
+It does not climb further on its own. Two groups inside one bounded thing still belong to each
+other, which is what separates this rung from the one above it.
+
+**GAP-10 · Two large page blocks use `gap-6`.**
 
 Blocks that each read as a substantial page object — for example two major dashboard sections —
-keep the existing 24px seam. `gap-3` does not replace this rung; it separates smaller independent
-blocks that still belong to one local section.
+keep the existing 24px seam. Neither `gap-3` nor `gap-4` replaces this rung: those separate units
+and groups that still belong to one local section, while these two would each survive on a page of
+their own.
 
-**GAP-10 · Consecutive rows of one list use `gap-0`.**
+**GAP-11 · Consecutive rows of one list use `gap-0`.**
 
 Rows that already state their own vertical hit area and are read as one uninterrupted list do not
 add a second seam between row boxes. Dashboard standing figures are the canonical example: streak,
 AI credit and reward are one identity list, so their parent is `gap-0`. This is not the sticky
 cluster rule: the row padding owns each row's breathing room, while the list owns zero extra space.
 
-**GAP-11 · A toolbar and its result use `gap-3`; a subtle result chronology may use `gap-2`.**
+**GAP-12 · A toolbar and its result use `gap-3`; a subtle result chronology may use `gap-2`.**
 
 A tab or filter toolbar and the result region it governs are separate operated units, so their
 container owns `gap-3`. Inside a feed, temporal labels and their adjacent result cards form one
@@ -118,6 +140,8 @@ and chronology need different seams, they are two named containers.
 | A resting shape with its own spacing | The layout jumps when real content arrives | Give it the same seam as what it replaces |
 | Two different seams inside one container | It is two containers wearing one element | Split it, and name both |
 | Choosing a seam from component names or direction alone | Two horizontal things may be one direct control or two independent groups | Use `gap-2` only for horizontal peers in one functional cluster; otherwise use `gap-3` |
+| Two composed groups left at the unit rung | Both sides already carry `gap-3` inside them, so nothing on the screen says where the first group ended | Use `gap-4` once each participant is itself a cluster |
+| A rung chosen from what encloses the seam — "it is inside a card, so…" | The same relationship then gets one answer in a card, another in a rail and a third in a grid | Choose from what the two participants are, not from what holds them |
 | Adding child margin on top of a parent gap | One relationship is counted twice | Let the parent own the one seam |
 
 ## Examples
@@ -129,6 +153,7 @@ horizontal peers in one unit gap-2: one compact functional cluster
 consecutive rows of one list gap-0: row padding already owns the rhythm
 owner and owned unit         gap-3: label-to-card, label-to-input, card-to-caption
 two blocks in one section    gap-3: independent but locally related
+two composed groups          gap-4: each side already carries its own inner seam
 two large blocks on a page   gap-6: two substantial page objects
 two columns of a layout      gap-8: two regions
 ```
@@ -143,6 +168,34 @@ Today, card, Yesterday, card gap-2 as one subtle feed chronology
 ```
 
 They differ in one thing: whether an unfamiliar case has an answer before anybody looks at it.
+
+### The group rung
+
+```
+the week run and the outcome beside it, at gap-4 - the run's own cells sit tighter than the
+seam that separates the run from the outcome, so two groups are visibly two
+```
+
+```
+the same pair at gap-3 - the seam between the groups now matches the seam inside them, and the
+cells and the outcome read as one run-on row
+```
+
+They differ in one thing: whether the seam between the groups out-ranks the seams inside them.
+
+### The container trap
+
+```
+two composed groups take gap-4 whether they stand in a column, at the two ends of one row, or
+repeating across a grid
+```
+
+```
+the same two groups take one seam in a card and a different one in a rail, because the rung was
+read off the thing holding them
+```
+
+They differ in one thing: whether the rung describes the participants or their container.
 
 ### The ownership trap
 

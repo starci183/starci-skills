@@ -47,6 +47,16 @@ Each direction records:
 6. bounded backend-enabler proposals, if any;
 7. strongest benefit, trade-off and adversarial rejection risk.
 
+Inventory before invention. Before a direction proposes a new contract entry, composite or row, list
+the existing keys and composites whose shape already expresses the same relationship and record one
+verdict per candidate: REUSE, EXTEND, or NEW because <the relationship no existing key can express>.
+An entry whose class list and child identities repeat an existing entry is not a new concept, it is
+the same concept under a second name, and `starci-fe/no-duplicate-entry-shape` refuses it. A row
+assembled inline from a leaf plus a glyph is the same failure where no lint can see it, because it
+never became an entry at all. This repository has already paid for it: a value-proposition list was
+written with the exact class list of the day's-quest list, and its ticked row was rebuilt from a text
+leaf and an icon while the composite that draws that row already shipped.
+
 An existing component may gain a prop only when it already owns that semantic relationship and
 visual slot. Record exact `props`/`on` delta, absence/default, precedence, callers and tests. Do not
 rename a domain fact into a generic-looking but false prop to avoid creating the correct owner.
@@ -63,6 +73,10 @@ instrument, not an implementation promise. Never call it production parity, appr
 Apply-ready render. A direction is selectable only when its proposed anatomy is demonstrably
 expressible by current StarCi owners/contracts or by exact API/new-owner proposals recorded beside
 it. An attractive shape with no feasible component path is not a valid direction.
+
+After any edit to a contract table, run the target repository's typecheck before rendering anything:
+the class vocabulary is a closed union, so one unadmitted token makes the whole table fail to type
+and reports as errors in unrelated files.
 
 Host on the first free port from `8080`:
 

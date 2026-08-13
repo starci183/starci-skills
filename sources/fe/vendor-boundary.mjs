@@ -454,7 +454,17 @@ export const authOverlayOwnsSingleContentHost = {
     let hasContent = false
     return {
       ImportDeclaration(node) {
-        if (!isOverlay || !/\/components\/branches\/Tree$/.test(normalizePath(node.source?.value))) return
+        if (!isOverlay) return
+        /*
+         * Matched by the NAME imported, not by where it came from.
+         *
+         * The path test this replaced only recognised `components/branches/Tree`,
+         * which is the single-app layout. A workspace that publishes the same
+         * branches from a package satisfied the law and failed the rule, with
+         * the only available remedy being an import of a module that does not
+         * exist there. `ContractContent` and `Tree` are canon vocabulary: a file
+         * importing either means the same thing wherever it resolves from.
+         */
         for (const specifier of node.specifiers || []) {
           if (specifier.imported?.name === "ContractContent") hasContent = true
           if (specifier.imported?.name === "Tree") context.report({ node: specifier, messageId: "duplicate" })

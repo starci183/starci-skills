@@ -124,9 +124,29 @@ export const noSecondLanguageInSource = {
   },
   create(context) {
     if (isContentFile(context.filename || context.getFilename())) return {}
+    const source = context.sourceCode || context.getSourceCode()
+    /*
+     * Lines carrying the pragma, gathered once.
+     *
+     * The message tells the author to "mark the LINE", and until this existed
+     * that was not true of a literal: the exemption tested the node's OWN text,
+     * which for a string is its value, so `"Học viện Mộc" // vn-ok: ...` still
+     * reported and no phrasing could satisfy it. The rule's own valid fixture
+     * only passed because its string carried no diacritics at all.
+     *
+     * A marked line exempts the node ON it and the statement BELOW it, which are
+     * the two placements the message's wording admits.
+     */
+    const marked = new Set()
+    for (const comment of source.getAllComments()) {
+      if (!OK_PRAGMA.test(comment.value)) continue
+      marked.add(comment.loc.start.line)
+      marked.add(comment.loc.end.line + 1)
+    }
     return proseVisitors(context, (node, text) => {
       if (!text || !SECOND_LANGUAGE_LETTER.test(text)) return
       if (ENDONYM.test(text) || OK_PRAGMA.test(text)) return
+      if (marked.has(node.loc.start.line)) return
       context.report({ node, messageId: "second" })
     })
   },

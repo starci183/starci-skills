@@ -60,13 +60,16 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
   an overlay is summoned and dismissed.
 - **`patterns/`** — how code is written. One file per concept, each explaining the concept and its
   `why`, naming concrete `starci-academy-fe` implementation anchors, and linking the artifact or
-  repository audit that holds it: [`comments`](fe/canon/patterns/comments.md) ·
+  repository audit that holds it: [`cache-key`](fe/canon/patterns/cache-key.md) ·
+  [`comments`](fe/canon/patterns/comments.md) ·
   [`contract`](fe/canon/patterns/contract.md) ·
   [`file-layout`](fe/canon/patterns/file-layout.md) · [`icon`](fe/canon/patterns/icon.md) ·
+  [`landmark`](fe/canon/patterns/landmark.md) ·
   [`lint-adoption`](fe/canon/patterns/lint-adoption.md) ·
   [`lint-escape-hatch`](fe/canon/patterns/lint-escape-hatch.md) ·
   [`loading`](fe/canon/patterns/loading.md) · [`naming`](fe/canon/patterns/naming.md) ·
   [`props-and-slots`](fe/canon/patterns/props-and-slots.md) ·
+  [`served-locale`](fe/canon/patterns/served-locale.md) ·
   [`the-split`](fe/canon/patterns/the-split.md) · [`tokens`](fe/canon/patterns/tokens.md) ·
   [`translation`](fe/canon/patterns/translation.md) ·
   [`type-safety`](fe/canon/patterns/type-safety.md) ·
@@ -81,6 +84,7 @@ is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](f
 [`padding`](fe/design/padding.md) · [`surface-in-surface`](fe/design/surface-in-surface.md) ·
 [`hierarchy`](fe/design/hierarchy.md) · [`call-to-action`](fe/design/call-to-action.md) ·
 [`input`](fe/design/input.md) · [`exception`](fe/design/exception.md) ·
+[`press-affordance`](fe/design/press-affordance.md) ·
 [`refactor-parity`](fe/design/refactor-parity.md).
 Still owed: position, responsive, restraint, colour, typography.
 

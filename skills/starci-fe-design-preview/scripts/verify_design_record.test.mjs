@@ -72,6 +72,32 @@ const createRecord = () => {
             props: [],
             tokens: [],
         }],
+        relationships: [
+            {
+                kind: "seam",
+                subject: "profile-identity-stack",
+                decision: "gap-3",
+                reason: "the name and the handle beneath it are one identity, and the card below is a second unit",
+            },
+        ],
+        openQuestions: [
+            {
+                question: "does the empty state offer a recovery action",
+                default: "it does",
+                cost: "one control on a screen with nothing to recover",
+                resolution: "answered",
+                answeredBy: "keep the action",
+            },
+        ],
+        newOwners: ["page-profile"],
+        consolidation: [
+            {
+                ownerId: "page-profile",
+                kin: ["page-account"],
+                verdict: "keep-apart",
+                distinguishingFact: "a different domain entity - one renders a viewer, the other an account",
+            },
+        ],
         seal: { algorithm: "sha256", manifestSha256: "" },
     }, null, 2))
     return { root, recordPath }
@@ -114,6 +140,38 @@ const refuses = (patch, pattern) => {
     assert.notEqual(result.status, 0, `sealed a record it should refuse: ${pattern}`)
     assert.match(result.stderr, pattern)
 }
+
+test("rejects a record that states no relationship", () => {
+    refuses((record) => { record.relationships = [] }, /at least one seam, rank or variant/)
+})
+
+test("rejects a relationship stated without its reason", () => {
+    refuses((record) => { record.relationships[0].reason = "" }, /states no reason/)
+})
+
+test("rejects an open question left neither answered nor waived", () => {
+    refuses((record) => { record.openQuestions[0].resolution = "pending" }, /must end answered or waived/)
+})
+
+test("rejects an answered question with nobody behind the answer", () => {
+    refuses((record) => { record.openQuestions[0].answeredBy = "" }, /no evidence of who said so/)
+})
+
+test("rejects an absent open-question list, which is not the same claim as an empty one", () => {
+    refuses((record) => { delete record.openQuestions }, /openQuestions must be present/)
+})
+
+test("rejects a new owner carrying no consolidation verdict", () => {
+    refuses((record) => { record.newOwners.push("leaf-invented") }, /carries no consolidation verdict/)
+})
+
+test("rejects a pair kept apart with no distinguishing fact", () => {
+    refuses((record) => { record.consolidation[0].distinguishingFact = "" }, /names no distinguishing fact/)
+})
+
+test("rejects a verdict outside the four the consolidate skill owns", () => {
+    refuses((record) => { record.consolidation[0].verdict = "looks-different" }, /merge, prop-variant, extract-composite or keep-apart/)
+})
 
 test("rejects a candidate whose build did not pass", () => {
     refuses((record) => { record.candidate.build.exitCode = 1 }, /build did not pass/)

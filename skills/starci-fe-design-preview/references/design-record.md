@@ -58,6 +58,16 @@ Write matching `design-record.md/json` beside the executable candidate. Version 
     { "targetPath": "src/components/.../component.tsx", "reason": "wire the app env import" }
   ],
   "stateCoverage": [],
+  "relationships": [
+    { "kind": "seam | rank | variant", "subject": "catalog-card-body", "decision": "gap-3", "reason": "name, price group and promises are three parts of one decision" }
+  ],
+  "openQuestions": [
+    { "question": "does the pager stay at one page", "default": "stays", "cost": "one control shown with nothing to page", "resolution": "answered | waived", "answeredBy": "user words" }
+  ],
+  "newOwners": ["leaf-pagination", "contract-price-note-row"],
+  "consolidation": [
+    { "ownerId": "leaf-pagination", "kin": ["leaf-choice-tabs"], "verdict": "keep-apart", "distinguishingFact": "different vendor primitive and slot identity" }
+  ],
   "blockTrees": [],
   "contracts": [],
   "vocabularyProposals": [],
@@ -108,6 +118,15 @@ named scope is not evidence, which is why every rendered state carries its own r
 locale, theme, persona, fixture hash and screenshot, and why states that were reasoned about rather
 than observed stay in `stateCoverage` as `covered-by` or `not-applicable`. A reviewer must be able
 to separate proof from expectation without asking.
+
+**Three records carry what a screenshot cannot.** `relationships` states, per seam, what level of
+grouping it separates, per line of copy its rank, and per control its variant with the reason -
+because a relationship written in a line can be refused in a line, while the same disagreement drawn
+as a picture has to be redrawn before it can be argued with. `openQuestions` holds every product
+decision the candidate had to settle that no rule decides, each with the default taken and what it
+costs, so a reader approves those choices instead of discovering them after implementation.
+`consolidation` gives every new owner one verdict against its nearest kin. All three are approved
+with the pixels and sealed with them.
 
 ## Three claims the verifier will not take on trust
 

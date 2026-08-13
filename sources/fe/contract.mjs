@@ -1,7 +1,7 @@
 /**
  * The rules that hold `contract.md`.
  *
- * One idea, stated six ways: a structural node is described ONCE, by a key that owns the node's
+ * One idea, stated several ways: a structural node is described ONCE, by a key that owns the node's
  * classes, the element it opens, and the reason its children sit that way. An author types the key
  * and nothing else. Everything here exists to make the alternatives - a literal class string, a
  * hand-composed class, a hand-painted marker, an invented key, a bare `div` - stop compiling in
@@ -32,7 +32,7 @@
  * This module also exports the path helpers and the table reader, because both describe the
  * contract table rather than any one rule. Other law modules import them from here.
  */
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { dirname, join } from "node:path"
 
 // -- where things are ---------------------------------------------------------------------------
@@ -264,6 +264,170 @@ export const readContracts = (filename) => {
   const value = keys.length > 0 ? { path, keys } : null
   cache.set(path, { stamp, value })
   return value
+}
+
+// -- reading who uses the table -------------------------------------------------------------------
+
+/**
+ * The repository root the table hangs from, or null when the path is not a table path.
+ *
+ * The longest matching layout wins, because `src/contracts/index.ts` is a suffix of nothing here but
+ * would happily claim a monorepo path if the shortest candidate were tried first, and the root it
+ * returned would be a directory that does not exist.
+ */
+const repositoryRootOf = (tablePath) => {
+  const path = normalizePath(tablePath)
+  const candidates = [...componentCandidates("contracts/index.ts")].sort((a, b) => b.length - a.length)
+  for (const candidate of candidates) {
+    if (path.endsWith(`/${candidate}`)) return path.slice(0, path.length - candidate.length - 1)
+  }
+  return null
+}
+
+/**
+ * Every directory a call site of a contract key can be written in, for the repository holding one
+ * table.
+ *
+ * THE WORKSPACE SIBLINGS ARE THE WHOLE POINT, and leaving them out is not a smaller answer, it is
+ * the wrong one. A monorepo keeps the table in the shared package and renders it from the apps: in
+ * `nivo-fe` a handful of references sit beside the table under `packages/ui/src` and the rest live
+ * in the `src` tree of each workspace under `apps`. A reader that walked only `COMPONENT_ROOTS`
+ * would see those few, call every other
+ * key dead, and hand back a list of deletions that would take working screens off the air - the same
+ * shape of failure `COMPONENT_ROOTS` itself was written to end.
+ *
+ * Roots nested inside another root are dropped, so a tree is walked once rather than once per prefix
+ * that happens to name it.
+ *
+ * @param tablePath - the contract table's own path.
+ * @returns existing search roots, or an empty list when the repository root cannot be resolved.
+ */
+export const contractSearchRoots = (tablePath) => {
+  const root = repositoryRootOf(tablePath)
+  if (!root) return []
+  const candidates = new Set(COMPONENT_ROOTS.map((relative) => `${root}/${relative}`))
+  for (const group of ["apps", "packages"]) {
+    let entries = []
+    try {
+      entries = readdirSync(`${root}/${group}`, { withFileTypes: true })
+    } catch {
+      entries = []
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) candidates.add(`${root}/${group}/${entry.name}/src`)
+    }
+  }
+  const present = [...candidates].filter((dir) => {
+    try {
+      return statSync(dir).isDirectory()
+    } catch {
+      return false
+    }
+  })
+  return present.filter((dir) => !present.some((other) => other !== dir && dir.startsWith(`${other}/`)))
+}
+
+/** Directories that hold copies of source rather than source, and are never a call site. */
+const UNWALKED_DIRS = new Set(["node_modules", ".next", "dist", ".artifacts"])
+
+/** Files a reference can be written in. */
+const WALKED_FILES = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/
+
+/**
+ * Every way a key is named outside the table.
+ *
+ * All five are textual on purpose. The walk reads hundreds of files that are not the file being
+ * linted, under whatever parser that file would need, and a reference is a quoted key in every one
+ * of these forms - so a regex reads exactly as much as an AST would and reads it once.
+ *
+ * A story and a test count. They render the key, which is what the question asks: a shape proven in
+ * Storybook and nowhere else is documented rather than dead, and deleting it deletes the proof.
+ */
+const REFERENCE_PATTERNS = [
+  /\bcontract\s*=\s*\{?\s*"([a-z][a-z0-9-]*)"/g,
+  /\bcontract\s*:\s*"([a-z][a-z0-9-]*)"/g,
+  /\bdefineContractComponent\(\s*"([a-z][a-z0-9-]*)"/g,
+  /\bdefineContractProjection\(\s*"([a-z][a-z0-9-]*)"/g,
+  /\bCONTRACTS\[\s*"([a-z][a-z0-9-]*)"\s*\]/g,
+]
+
+/**
+ * A key does not always reach the frame written next to it, and the difference is not stylistic.
+ *
+ * A component that picks between sibling entries names them somewhere else entirely: in
+ * `starci-academy-fe`, `RankedUserRow` resolves its verdict through a helper typed `ContractKey` that
+ * RETURNS the key, and hands the frame a variable. The five forms above see nothing there, and three
+ * keys that draw the leaderboard on every load were reported as drawn by nobody.
+ *
+ * So a file that speaks the `ContractKey` type is read differently: every quoted key-shaped literal
+ * in it counts. That is deliberately generous, and generous is the correct direction - the cost of
+ * over-reading is a dead key surviving one more release, and the cost of under-reading is a rule
+ * whose finding is "delete the row that renders".
+ *
+ * The table itself is not read this way, or rather is not read at all: it is the one file skipped,
+ * so its own key list cannot vouch for anything.
+ */
+const TYPED_KEY_FILE = /\bContractKey\b/
+const QUOTED_KEY = /"([a-z][a-z0-9]*(?:-[a-z0-9]+)+)"/g
+
+/** Reference sets, keyed by table path. One eslint run is one process, so this is one walk per run. */
+const referenceCache = new Map()
+
+/**
+ * Every contract key named anywhere in the repository outside the table itself.
+ *
+ * Returns null when the tree cannot be seen - no resolvable root, no directory to walk. A reader
+ * that cannot see the tree must stay quiet: the alternative is a rule that answers "nothing renders
+ * this" when the truth is "I looked nowhere", and that answer arrives as a list of deletions.
+ *
+ * The walk happens once per table per process and is cached, because the question is asked once for
+ * every key in the table and the answer is one traversal.
+ *
+ * @param tablePath - the contract table being linted.
+ * @returns the set of referenced keys, or null when the tree could not be walked.
+ */
+export const readContractReferences = (tablePath) => {
+  const table = normalizePath(tablePath)
+  const hit = referenceCache.get(table)
+  if (hit !== undefined) return hit
+  const roots = contractSearchRoots(table)
+  if (roots.length === 0) {
+    referenceCache.set(table, null)
+    return null
+  }
+  const found = new Set()
+  const pending = [...roots]
+  while (pending.length > 0) {
+    const dir = pending.pop()
+    let entries = []
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const path = `${dir}/${entry.name}`
+      if (entry.isDirectory()) {
+        if (!UNWALKED_DIRS.has(entry.name)) pending.push(path)
+        continue
+      }
+      if (!WALKED_FILES.test(entry.name) || path === table) continue
+      let source = null
+      try {
+        source = readFileSync(path, "utf8")
+      } catch {
+        continue
+      }
+      for (const pattern of REFERENCE_PATTERNS) {
+        for (const match of source.matchAll(pattern)) found.add(match[1])
+      }
+      if (TYPED_KEY_FILE.test(source)) {
+        for (const match of source.matchAll(QUOTED_KEY)) found.add(match[1])
+      }
+    }
+  }
+  referenceCache.set(table, found)
+  return found
 }
 
 // -- shared AST helpers -------------------------------------------------------------------------
@@ -608,14 +772,411 @@ export const noUnknownContractKey = {
   },
 }
 
+// -- CONTRACT-4 ------------------------------------------------------------------------------------
+
+/** The element an entry names is worn by the frame alone; every other wearer erases it. */
+export const onlyTheFrameWearsANode = {
+  meta: {
+    type: "problem",
+    docs: { description: "An entry's node is rendered by the frame, never worn by a component's own element." },
+    schema: [],
+    messages: {
+      worn:
+        "`contractNodeProps` hands back an entry's classes and its markers and NOT its element, so calling it outside the frame puts one key's contract on an element THIS file chose. The entry says `ol` and the document gets whatever the props were spread onto: the list leaves the accessibility tree, nothing announces how many items there are - and the key still resolves, the markers still read correct and every gate stays green, which is why this is the failure with no red anywhere. Render the entry's own node through the frame inside your wrapper - `<Tree contract=\"...\" render={...} />` in the vendor body - the way the surface branches now do.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    /*
+     * The frame is the only exemption, and a test is not a second one. What a twin test wants to
+     * know is what reaches the document, which it reads off the rendered frame; a test that spreads
+     * the props itself proves its own fixture and nothing about the product.
+     */
+    if (!isSourceFile(file) || isContractFrameFile(file)) return {}
+    return {
+      CallExpression(node) {
+        const callee = node.callee
+        if (!callee) return
+        const named =
+          callee.type === "Identifier"
+            ? callee.name
+            : callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier"
+              ? callee.property.name
+              : null
+        if (named !== "contractNodeProps") return
+        context.report({ node, messageId: "worn" })
+      },
+    }
+  },
+}
+
+/** Static string carried by a node, or null when it is anything else. */
+const literalString = (node) =>
+  node && node.type === "Literal" && typeof node.value === "string" ? node.value : null
+
+/** Every string in an array literal, or null when one element is not a static string. */
+const literalStringList = (node) => {
+  if (!node || node.type !== "ArrayExpression") return null
+  const out = []
+  for (const element of node.elements) {
+    const text = literalString(element)
+    if (text === null) return null
+    out.push(text)
+  }
+  return out
+}
+
+/** The three ways a slot names what fills it. */
+const SLOT_IDENTITY_KEYS = new Set(["contract", "composite", "leaf"])
+
+/**
+ * One slot as a comparable string: its declared identity, whether it is optional, whether it repeats.
+ *
+ * Alternatives are a SET - a slot accepting `["a", "b"]` accepts exactly what `["b", "a"]` accepts.
+ * The identity carries which of `contract`, `composite` and `leaf` named it, because those are
+ * three different vocabularies and the same word in two of them is not the same child.
+ */
+const slotShape = (node) => {
+  if (!node || node.type !== "ObjectExpression") return null
+  let identity = null
+  let optional = false
+  let repeats = false
+  for (const property of node.properties) {
+    const name = propertyName(property)
+    if (name === null) return null
+    if (SLOT_IDENTITY_KEYS.has(name)) {
+      if (identity !== null) return null
+      const one = literalString(property.value)
+      const many = one === null ? literalStringList(property.value) : null
+      if (one === null && many === null) return null
+      identity = `${name}:${(many ? [...new Set(many)].sort() : [one]).join("|")}`
+      continue
+    }
+    if (name === "optional" || name === "repeats") {
+      const flag = property.value
+      if (!flag || flag.type !== "Literal" || typeof flag.value !== "boolean") return null
+      if (name === "optional") optional = flag.value
+      else repeats = flag.value
+    }
+    // `props` and `restingCount` are read past on purpose: a literal constraint and a placeholder
+    // count are not the shape the slot holds.
+  }
+  if (identity === null) return null
+  return `${identity}/optional:${optional}/repeats:${repeats}`
+}
+
+/** The slot record as a comparable string, with the names sorted so declaration order says nothing. */
+const childrenShape = (node) => {
+  if (!node) return ""
+  if (node.type !== "ObjectExpression") return null
+  const slots = []
+  for (const property of node.properties) {
+    const name = propertyName(property)
+    if (name === null) return null
+    const shape = slotShape(property.value)
+    if (shape === null) return null
+    slots.push(`${name}=${shape}`)
+  }
+  return slots.sort().join(",")
+}
+
+/**
+ * The shape one entry spells, as a string two entries can be compared by.
+ *
+ * WHAT IS IN IT IS THE WHOLE RULE. Classes as a MULTISET, because the order they are typed in is
+ * not a decision the node takes; the host, because the element is part of what the key fixes; and
+ * the slots by name, declared identity, `optional` and `repeats`, because that is what the entry
+ * promises is inside.
+ *
+ * WHAT IS LEFT OUT IS THE WHOLE POINT. The key's name, its reason, its `restingCount` and the
+ * literal `props` on a slot are all absent, so an entry differing only in one of them lands on the
+ * same string as its twin. A different resting count IS the same shape: CONTRACT-9 refuses a key
+ * for a different gap, and a key for a different placeholder count is that same widening.
+ *
+ * A `host` that is absent is not folded into `div`. The frame defaults there, but naming the
+ * element is a decision the entry took and leaving it unnamed is not the same statement, so a pair
+ * disagreeing about it is never called a copy.
+ *
+ * @param node - the entry's object expression.
+ * @returns the shape string, or null when any part of the entry cannot be read statically.
+ */
+const entryShape = (node) => {
+  if (!node || node.type !== "ObjectExpression") return null
+  let classes = []
+  let host = ""
+  let children = ""
+  for (const property of node.properties) {
+    const name = propertyName(property)
+    if (name === null) return null
+    // Both spellings, because the table and the type that checks it have carried both.
+    if (name === "classes" || name === "classNames") {
+      classes = literalStringList(property.value)
+      if (classes === null) return null
+    } else if (name === "host") {
+      host = literalString(property.value)
+      if (host === null) return null
+    } else if (name === "children") {
+      children = childrenShape(property.value)
+      if (children === null) return null
+    }
+  }
+  return `classes[${[...classes].sort().join(" ")}] host[${host}] children{${children}}`
+}
+
+/** An entry whose shape another entry already spells is that entry under a second name. */
+export const noDuplicateEntryShape = {
+  meta: {
+    type: "problem",
+    docs: { description: "Two entries may not spell one shape under two names." },
+    schema: [],
+    messages: {
+      duplicate:
+        "`{{key}}` spells the shape `{{other}}` already spells: the same classes in any order, the same host, and the same slots holding the same things. A different reason, a different `restingCount` or a different name is not a different shape. Reuse `{{other}}`, or state in `why` the relationship this entry expresses that `{{other}}` cannot - and if neither is true, `{{key}}` and `{{other}}` are one entry under a name that fits both.",
+    },
+  },
+  create(context) {
+    if (!isContractTableFile(context.filename || context.getFilename())) return {}
+    return {
+      /*
+       * The entries are read off the `buildContracts` call rather than off every object in the
+       * file, for the reason the textual reader records: a second table in the same file would
+       * otherwise be compared against the first, and two vocabularies would report each other.
+       *
+       * An entry that cannot be read statically is skipped rather than reported. A table nobody can
+       * read is a reason to stay quiet, never a reason to call an entry a copy.
+       */
+      CallExpression(node) {
+        if (!node.callee || node.callee.type !== "Identifier" || node.callee.name !== "buildContracts") return
+        const table = node.arguments[0]
+        if (!table || table.type !== "ObjectExpression") return
+        const firstByShape = new Map()
+        for (const property of table.properties) {
+          const key = propertyName(property)
+          if (key === null) continue
+          const shape = entryShape(property.value)
+          if (shape === null) continue
+          const other = firstByShape.get(shape)
+          // The pair is reported once, on the later entry, because the earlier one is the key the
+          // author is being sent back to.
+          if (other === undefined) firstByShape.set(shape, key)
+          else context.report({ node: property, messageId: "duplicate", data: { key, other } })
+        }
+      },
+    }
+  },
+}
+
+/**
+ * The class families an entry may not hold, and what each of them is really claiming.
+ *
+ * A cursor and a hover state claim the node reacts to a pointer. A focus state claims it takes the
+ * keyboard. `group` claims something inside it answers this node's hover. A text colour and an
+ * alignment are the paint of one value rather than the relationship between several. None of them
+ * is an arrangement, and the table cannot be told when the claim stops being true: an entry cannot
+ * know that this call site passed no handler, so it goes on drawing a pointer over a dead node.
+ */
+const INTERACTION_CLASS = /^(?:cursor-|group$|group\/|hover:|active:|focus:|focus-visible:|disabled:|aria-[a-z-]+:|data-\[)/
+
+/**
+ * ALIGNMENT IS NOT PAINT, and the line is drawn here rather than by taste.
+ *
+ * `text-center` says how the content of every child sits inside this node, which is the same kind
+ * of statement as `items-center` and is inherited by children that never asked - so it belongs to
+ * the node that arranges them. A text COLOUR says what one value looks like, and the leaf that
+ * draws that value already owns it; an entry that names one is a second author for something it
+ * cannot see. So `text-left` and `text-center` stay legal here, and `text-foreground` does not.
+ */
+const PAINT_CLASS = /^(?:text-(?:foreground|muted|accent|success|warning|danger)$|decoration-|underline$)/
+
+/**
+ * A GROUND AND AN ELEVATION MAKE A RAISED OBJECT, and a raised object is a component.
+ *
+ * `bg-surface` lifts the node off the page and `shadow-*` says how far - and either alone already
+ * says it, which is why either alone is refused. Neither is a statement about how children stand
+ * together; both are statements about what the node IS. What it becomes is a card, and a card
+ * already has an owner: a named surface branch draws it, owns its inset, its edge and the vendor
+ * wrapper underneath. An entry that draws it too puts a second card inside the first, and nothing
+ * can see the doubling because the entry and the branch never read each other.
+ *
+ * THE NEIGHBOURS ARE DELIBERATELY LEFT OUT, each for its own reason.
+ *
+ *   - `bg-background` is the app frame's ground - the page a navbar or a mobile action bar sits on,
+ *     drawn by chrome no card branch owns. It raises nothing, so refusing it would take away the
+ *     only ground those nodes have.
+ *   - `rounded-*` and `border*` stay legal because an edge also CLIPS and DIVIDES: entries use it to
+ *     round the ends of a joined list and to rule one band off from the next. A machine cannot tell
+ *     those apart from the corner of a card, so the separation is left to the migration.
+ *   - `divide-y`, `divide-separator` and `overflow-hidden` describe relationships BETWEEN children,
+ *     which is the one thing an entry is for.
+ */
+const RAISED_OBJECT_CLASS = /^(?:bg-surface(?:-|$)|shadow(?:-|$))/
+
+/**
+ * A ground alone is not a raised object, and this is the one shape that tells them apart.
+ *
+ * `shadow-*` is elevation and needs no companion: nothing casts a shadow without standing above
+ * something. A ground does not settle it - a landing page whose sections alternate their ground so a
+ * reader can count them carries the same token and is not a card.
+ *
+ * The difference is not the corner. Plenty of cards have no radius, and a band can be rounded. The
+ * difference is that a BAND RUNS EDGE TO EDGE AND RULES ITSELF OFF: it takes the full measure and
+ * separates itself from the next band with one border, because it has no boundary of its own to do
+ * it with. An object stops before the edge and is bounded by being an object.
+ *
+ * So a ground is refused unless the entry is written as a band, and a machine can read that: the
+ * full measure, plus a rule along one edge.
+ */
+const BAND_WIDTH_CLASS = /^w-full$/
+const BAND_RULE_CLASS = /^border-[bt]$/
+
+/** Whether this entry is written as a full-bleed band, which is the one ground an entry may own. */
+const isBand = (classes) =>
+  classes.some((value) => BAND_WIDTH_CLASS.test(value)) && classes.some((value) => BAND_RULE_CLASS.test(value))
+
+/** An entry describes how children stand together; how the node reacts, paints or rises is a branch's. */
+export const noInteractionClassInEntry = {
+  meta: {
+    type: "problem",
+    docs: { description: "Entry classes are the arrangement, never the behaviour, the paint or the object." },
+    schema: [],
+    messages: {
+      interaction:
+        "`{{key}}` carries `{{value}}`, which is how the node REACTS rather than how its children stand together. The thing that presses owns the handler, the disabled state and therefore the cursor - so the entry cannot know when that promise is off, and goes on drawing it over a dead node. Draw the control in a named branch and put this key's node inside it.",
+      paint:
+        "`{{key}}` carries `{{value}}`, which is the paint of one value rather than a relationship between children. A leaf owns how its own words are set, and a branch owns the surface it draws; an entry that paints is a second author for something it cannot see.",
+      raised:
+        "`{{key}}` carries `{{value}}`, which gives the node a ground or an elevation of its own. A ground and an elevation make the node a raised OBJECT rather than an arrangement of children, and a raised object is a component with an owner - so the entry is claiming a thing the surface branch around it already draws, drawn twice and read back nowhere. Put this key's node inside that branch. The app frame's own ground is a different thing and stays legal: `bg-background` is the page chrome sits on, not a raised object. So does an edge - `rounded-*` and `border*` also clip and divide - and so do `divide-y` and `overflow-hidden`, which describe the children.",
+    },
+  },
+  create(context) {
+    if (!isContractTableFile(context.filename || context.getFilename())) return {}
+    return {
+      CallExpression(node) {
+        if (!node.callee || node.callee.type !== "Identifier" || node.callee.name !== "buildContracts") return
+        const table = node.arguments[0]
+        if (!table || table.type !== "ObjectExpression") return
+        for (const property of table.properties) {
+          const key = propertyName(property)
+          if (key === null || !property.value || property.value.type !== "ObjectExpression") continue
+          for (const field of property.value.properties) {
+            const name = propertyName(field)
+            if (name !== "classes" && name !== "classNames") continue
+            if (!field.value || field.value.type !== "ArrayExpression") continue
+            const written = field.value.elements
+              .map((element) => literalString(element))
+              .filter((value) => value !== null && value !== "")
+            const band = isBand(written)
+            for (const element of field.value.elements) {
+              const value = literalString(element)
+              if (value === null || value === "") continue
+              // A ground with nothing bounding it is a band, and a band is the only ground an entry
+              // may still own. An elevation is refused wherever it appears.
+              const raises = RAISED_OBJECT_CLASS.test(value)
+                && (!band || /^shadow(?:-|$)/.test(value))
+              const messageId = INTERACTION_CLASS.test(value)
+                ? "interaction"
+                : PAINT_CLASS.test(value)
+                  ? "paint"
+                  : raises ? "raised" : null
+              if (messageId !== null) context.report({ node: element, messageId, data: { key, value } })
+            }
+          }
+        }
+      },
+    }
+  },
+}
+
+// -- CONTRACT-13 -----------------------------------------------------------------------------------
+
+/** Every contract key one entry declares as a child of its own, including alternatives. */
+const childContractKeys = (entry) => {
+  const out = []
+  if (!entry || entry.type !== "ObjectExpression") return out
+  for (const property of entry.properties) {
+    if (propertyName(property) !== "children") continue
+    const slots = property.value
+    if (!slots || slots.type !== "ObjectExpression") continue
+    for (const slot of slots.properties) {
+      const shape = slot.value
+      if (!shape || shape.type !== "ObjectExpression") continue
+      for (const field of shape.properties) {
+        if (propertyName(field) !== "contract") continue
+        const one = literalString(field.value)
+        // A slot accepting `["a", "b"]` renders whichever it is handed, so both are drawn.
+        const many = one === null ? literalStringList(field.value) : null
+        if (one !== null) out.push(one)
+        else if (many !== null) out.push(...many)
+      }
+    }
+  }
+  return out
+}
+
+/** A key nobody renders is a promise about a node that does not exist. */
+export const noDeadContractKey = {
+  meta: {
+    type: "problem",
+    docs: { description: "Every key in the table is rendered somewhere, or it is not vocabulary." },
+    schema: [],
+    messages: {
+      dead:
+        "`{{key}}` is in the table and nothing draws it: no `contract=\"{{key}}\"`, no `defineContractComponent(\"{{key}}\")`, no `defineContractProjection(\"{{key}}\")`, no `CONTRACTS[\"{{key}}\"]`, and no slot of another entry - searched under {{roots}}. An entry is a promise about a node standing in the document, so a key with no user is a promise about nothing: it survives every rename because renaming follows call sites and it has none, it travels whole into the next repository, and it makes the table longer than the code that reads it until telling a described screen from an intended one means searching the source. Delete it. A shape wanted for work that has not started belongs in the plan record, where an unbuilt node is exactly what a reader expects to find.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!isContractTableFile(file)) return {}
+    /*
+     * A table inside a plan record is a record. A design candidate carries a COPY of the vocabulary
+     * and renders the one page it was built to answer, so most of that copy is drawn by nobody -
+     * which is not a finding, it is what a plan record is: the place this rule sends an unbuilt
+     * shape to. Measured on `starci-academy-fe`, two candidates would have opened a hundred and
+     * thirty deletions against a tree nothing ships.
+     */
+    if (file.includes("/.artifacts/")) return {}
+    /*
+     * No tree, no finding. `readContractReferences` returns null when the repository root cannot be
+     * resolved from this path or nothing can be walked, and the only honest report from a reader
+     * that looked nowhere is silence - the alternative is every key in the vocabulary reported dead
+     * at once, which reads as a table to empty rather than as a rule that is blind.
+     */
+    const referenced = readContractReferences(file)
+    if (referenced === null) return {}
+    const roots = contractSearchRoots(file).join(", ")
+    return {
+      CallExpression(node) {
+        if (!node.callee || node.callee.type !== "Identifier" || node.callee.name !== "buildContracts") return
+        const table = node.arguments[0]
+        if (!table || table.type !== "ObjectExpression") return
+        // A child slot is a call site the walk cannot see, because the only file naming that key is
+        // the one file the walk skips. Collected first, so declaration order says nothing.
+        const asChild = new Set()
+        for (const property of table.properties) {
+          for (const key of childContractKeys(property.value)) asChild.add(key)
+        }
+        for (const property of table.properties) {
+          const key = propertyName(property)
+          if (key === null || referenced.has(key) || asChild.has(key)) continue
+          context.report({ node: property, messageId: "dead", data: { key, roots } })
+        }
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-literal-structural-class": noLiteralStructuralClass,
+  "no-interaction-class-in-entry": noInteractionClassInEntry,
   "no-class-composition-outside-contract": noClassCompositionOutsideContract,
   "contract-why-is-a-reason": contractWhyIsAReason,
   "no-structural-host-outside-contract-frame": noStructuralHostOutsideContractFrame,
   "no-hand-written-contract-attrs": noHandWrittenContractAttrs,
   "no-unknown-contract-key": noUnknownContractKey,
+  "no-duplicate-entry-shape": noDuplicateEntryShape,
+  "only-the-frame-wears-a-node": onlyTheFrameWearsANode,
+  "no-dead-contract-key": noDeadContractKey,
 }
 
 /**

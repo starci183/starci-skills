@@ -275,6 +275,12 @@ test("VENDOR-12: the auth overlay has one zero-inset content host", () => {
         code: "import { ContractContent } from '@/components/branches/Tree'; export const Overlay = ({ render }) => <ContractContent contract={render.meta.contract} render={render} />",
       },
       {
+        // the same projection in a workspace that publishes its branches from a
+        // package: the law is satisfied, so the rule must be too
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { ContractContent } from '@acme/ui'; export const Overlay = ({ render }) => <ContractContent contract={render.meta.contract} render={render} />",
+      },
+      {
         filename: "D:/repo/src/components/contracts/index.ts",
         code: "const C = { 'centred-page-column': { classes: ['flex', 'gap-6'] } }",
       },
@@ -283,6 +289,12 @@ test("VENDOR-12: the auth overlay has one zero-inset content host", () => {
       {
         filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
         code: "import { Tree } from '@/components/branches/Tree'; export const Overlay = ({ render }) => <Tree contract={render.meta.contract} render={render} />",
+        errors: [{ messageId: "missing" }, { messageId: "duplicate" }],
+      },
+      {
+        // and a second host opened from a package is still a second host
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { Tree } from '@acme/ui'; export const Overlay = ({ render }) => <Tree contract={render.meta.contract} render={render} />",
         errors: [{ messageId: "missing" }, { messageId: "duplicate" }],
       },
       {

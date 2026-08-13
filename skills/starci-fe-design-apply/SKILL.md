@@ -24,6 +24,11 @@ and a valid seal. Validate it before lint or production work:
 node <trust-root>/skills/starci-fe-design-preview/scripts/verify_design_record.mjs <design-record.json>
 ```
 
+A record whose new owners carry no consolidation verdict, or whose open questions were never
+answered, is not admissible either. Both are decisions the record is supposed to have settled, and
+Apply is the phase with the least standing to settle them: it is holding a write boundary, so the
+cheapest thing it can do with an open question is answer it silently in code.
+
 Any missing candidate source, fixture, screenshot, runtime fingerprint or hash blocks Apply.
 Missing Plan routes to `$starci-fe-design-plan`; selected but unapproved work routes to
 `$starci-fe-design-preview`.
@@ -50,6 +55,16 @@ Read [`references/steps-table.md`](references/steps-table.md) and
 anchors, contracts/callers/tests, backend behavior and named legacy evidence. Revalidate drift and
 ownership. Pages orchestrate; blocks own product sentences; branches arrange contract content;
 shells own vendor mechanics; connected blocks resolve world data and render pure `_X` halves.
+
+Inventory before invention. Before writing a new contract entry, composite or row into the target,
+list the existing keys and composites whose shape already expresses the same relationship and record
+one verdict per candidate: REUSE, EXTEND, or NEW because <the relationship no existing key can
+express>. An entry whose class list and child identities repeat an existing entry is not a new
+concept, it is the same concept under a second name, and `starci-fe/no-duplicate-entry-shape` refuses
+it. A row assembled inline from a leaf plus a glyph is the same failure where no lint can see it,
+because it never became an entry at all. This repository has already paid for it: a value-proposition
+list was written with the exact class list of the day's-quest list, and its ticked row was rebuilt
+from a text leaf and an icon while the composite that draws that row already shipped.
 
 Map each sealed candidate file to its recorded target path. Reuse imports as recorded; copy or port
 candidate source mechanically; make only environment integration edits that the record explicitly
@@ -79,6 +94,10 @@ silently patch. The coordinator alone accepts completion.
 For a small single owner, keep all roles with the coordinator; do not manufacture parallelism.
 
 ## Verification and handoff
+
+After editing the contract table, run the target repository's typecheck before rendering anything:
+the class vocabulary is a closed union, so one unadmitted token makes the whole table fail to type
+and reports as errors in unrelated files.
 
 Verify every approved owner state in browser using the exact recorded route, viewport, locale,
 theme, auth persona and fixture hash. Capture production beside its approved screenshot and compare

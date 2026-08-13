@@ -51,11 +51,25 @@ canon and concrete `starci-academy-fe` source anchors. Do not add a prop, contra
 backend capability unless the expected result requires it and ownership is already settled; any
 new product decision returns to Plan.
 
+Inventory before invention. When the correction does require a new contract entry, composite or row,
+list first the existing keys and composites whose shape already expresses the same relationship and
+record one verdict per candidate: REUSE, EXTEND, or NEW because <the relationship no existing key can
+express>. An entry whose class list and child identities repeat an existing entry is not a new
+concept, it is the same concept under a second name, and `starci-fe/no-duplicate-entry-shape` refuses
+it. A row assembled inline from a leaf plus a glyph is the same failure where no lint can see it,
+because it never became an entry at all. This repository has already paid for it: a value-proposition
+list was written with the exact class list of the day's-quest list, and its ticked row was rebuilt
+from a text leaf and an icon while the composite that draws that row already shipped.
+
 Canon may be proposed for update when the defect exposes a reusable law. Modify trust only when the
 user explicitly authorizes that separate write boundary and the source evidence supports a general
 rule; one visual preference is not canon.
 
 ## Verify
+
+After editing the contract table, run the target repository's typecheck before rendering anything:
+the class vocabulary is a closed union, so one unadmitted token makes the whole table fail to type
+and reports as errors in unrelated files.
 
 Render before/after evidence for every touched state, run focused tests, typecheck, strict lint,
 build as proportional, and rerun lint adoption. Report exact drift fixed and untouched unknowns.

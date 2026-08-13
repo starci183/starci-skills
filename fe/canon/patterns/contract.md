@@ -61,6 +61,16 @@ This rule is load-bearing for a reason that is not obvious. Before it existed th
 instead, where it could write its own classes. That is how an entire tier filled up with
 arrangements. A missing host was not a small gap; it was the hole the vocabulary drained into.
 
+The way it is actually broken is not a `host` prop; nobody adds one. It is a branch that wears an
+entry's node on a vendor element of its own. `contractNodeProps(contract)` hands back the classes
+and the markers and NOT the element, so spreading them onto `Card.Content`, an accordion body or a
+hand-written box erases the host the entry named while every visible sign of the contract stays
+exactly where a reader expects it. The entry says `ol` and the document gets `div`: the list leaves
+the accessibility tree, nothing announces how many items there are, and the key still resolves, the
+markers still read correct, and every gate stays green. It is the failure with no red anywhere. So
+a surface branch renders the entry's own node INSIDE its vendor body rather than on it, and the
+frame remains the only thing that ever wears one.
+
 **CONTRACT-5 · A key's NAME fixes what goes inside it.**
 
 `card` is not a name here. It says nothing about what it holds, so anything may go in, and the entry
@@ -117,14 +127,15 @@ sites instead of shapes and the list is longer than the code that reads it.
 **CONTRACT-10 · The contract fixes content; the branch owns wrapper mechanics.**
 
 A contract describes the node that arranges validated content. It does not describe vendor
-composition. `Tree` may place that node on a `div`; `SurfaceCard` may place the same node props on
-`Card.Content` inside `div > Card > Card.Content`; an accordion or list surface may project it into
+composition. `Tree` may open the host the entry names; `SurfaceCard` may stand that same node inside
+`Card.Content` within `div > Card > Card.Content`; an accordion or list surface may project it into
 another wrapper. Those wrappers are branch mechanics, not a second contract vocabulary.
 
 The named surface branch owns its fixed outer seam as ordinary branch code. That seam is not a
 second content grammar: it cannot vary by caller, it cannot admit children, and it never receives
-contract markers. Only the content host (`Card.Content`, accordion body, list body) receives
-`contractNodeProps(contract)`. A bound host places `ContractContent` there; a data-driven surface
+contract markers. The contract node stands INSIDE the content host (`Card.Content`, accordion body,
+list body) and never on it, because the node props carry no element and wearing them would hand the
+entry's host to the vendor. A bound host places `ContractContent` there; a data-driven surface
 places the branded component there and passes its ordinary `props`, `on`, and `isLoading`. Creating
 keys for the heading line, outer wrapper and caption merely to avoid writing the branch would turn
 one host into three contracts.
@@ -186,10 +197,54 @@ the exact key, used when runtime data must remain in `props` instead of being cl
 descriptor on every render. Wrong key, props, identity, cardinality, missing slots and extra slots
 are compile errors.
 
+**CONTRACT-12 · An entry's classes are the ARRANGEMENT, never the behaviour or the paint.**
+
+`flex`, `grid`, `gap-*`, `items-*`, `justify-*`, the width and inset family: these say how the
+children of one node stand together, which is what an entry is for. A cursor, a hover or active
+state, a text colour, a text alignment, `group`: these say how one thing REACTS and what it looks
+like, and neither is a relationship between children.
+
+The difference is not stylistic tidiness. A node whose entry carries `cursor-pointer` and
+`hover:opacity-80` is claiming to be pressable, while the thing that actually presses — the button,
+the link, the control that owns the handler and the disabled state — is somewhere else entirely. Two
+owners for one promise, and the table is the one that cannot be told the promise is off: an entry
+cannot know that this call site passed no handler, so it goes on drawing a pointer over something
+that does nothing.
+
+So behaviour belongs to the component that owns the behaviour. A press target is a named branch that
+draws its own control and puts the arranged node inside it; the entry inside stays a pure
+arrangement and can be reused by a row that presses and a row that does not.
+
+The paint follows the same verdict, and it has a consequence worth stating outright: **a surface is a
+COMPONENT, not a class list.** The named surface branches draw the ground, the radius and the
+elevation, so an entry that paints `bg-surface`, `rounded-2xl` or `shadow-surface` is a second way to
+make a thing that already has an owner. What that costs is paid by every later reader of the table:
+it then holds two kinds of card — one a branch draws, one a key draws — and no key tells anybody
+which kind they are looking at. The next author reaches for whichever is nearer, and the day the
+house surface changes its radius or its elevation, only one of the two kinds moves.
+
+**CONTRACT-13 · A key nobody renders is not vocabulary.**
+
+An entry is a promise about a node that exists — these classes, this element, this reason, standing
+in the document — so a key with no user is a promise about nothing, and a promise about nothing does
+not sit quietly. It survives every rename, because renaming follows call sites and it has none. It
+is copied into the next repository, because the table travels whole and nothing in it says which
+members were ever drawn. And it makes the table longer than the code that reads it, which is how a
+reader stops trusting the table as a description of the product: once some keys describe screens and
+others describe intentions, telling them apart means searching the source, and a vocabulary that has
+to be searched before it can be believed is not one anybody types from.
+
+So delete it. A key kept for work that has not started belongs in the plan record, where an unbuilt
+shape is exactly what a reader expects to find, and not in the vocabulary, where everything present
+is taken to be on screen.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
 |---|---|---|
+| An interaction or paint class in an entry (`cursor-*`, `hover:*`, `active:*`, `focus:*`, `group`, `text-left`, a text colour) | The node claims a behaviour it does not own, and the table cannot be told when that behaviour is absent | Give the behaviour to the branch that owns the control, and leave the entry its arrangement |
+| A branch that renders somebody else's key on a host of its own choosing | Two call sites of one key then disagree about the element, which is CONTRACT-4 wearing a helper's name | Draw your own control and put the key's own node inside it |
+| `contractNodeProps(contract)` spread onto a vendor element | The props carry the classes and the markers and not the element, so an entry that says `ol` reaches the document as a `div` and the list leaves the accessibility tree with every gate still green | Render the entry's own node inside the vendor body; only the frame wears a host |
 | A literal structural class (`flex`, `gap-4`, `items-center`) outside the table or a named surface host | The node's shape is decided at a call site, where nothing above it can find or predict it | Add or reuse a key; fixed vendor-wrapper mechanics belong only to their named surface branch |
 | `cn`, `clsx`, `twMerge`, `cva` or any runtime class composition | A second table with no keys, no reasons and nothing readable from outside | Give the distinction a key, or a named prop on the component that owns the node |
 | An interpolated `className` | The string exists only while the component runs, so nothing can read it back | Move the whole string into an entry and pass the key |
@@ -201,6 +256,7 @@ are compile errors.
 | A structural host written outside the frame or a named surface host branch | It is a node with no key, no child contract and no recorded reason | Compose the key; surface branches alone may open the fixed wrapper around their checked content host |
 | Hand-writing a contract marker attribute | The node claims a contract nothing enforces, and every test that reads those attributes believes it | Render the key and let the frame paint them |
 | A new key because the existing one is the wrong size | The vocabulary grows one call site at a time until it describes call sites, not shapes | Use the key that exists, or change the entry for everyone |
+| A key in the table that nothing renders | It promises a node that does not exist, survives every rename because it has no call sites, and lengthens the table past the code that reads it until the table stops describing the product | Delete it; a shape wanted for work that has not started belongs in the plan record |
 | `children` on a structural node | Markup arrives already built, so nothing above can say what is inside and no rule can check | Declare the slots on the entry and pass one component per slot in `render` |
 | A bare arrow or literal JSX in a `render` slot | It carries no contract/leaf metadata | Brand the stable component type with `defineContractComponent`; pass runtime data through `props` |
 | A positional list of children instead of named slots | Insert one in the middle and every slot after it silently means something else | Name each slot; a name survives the insertion |

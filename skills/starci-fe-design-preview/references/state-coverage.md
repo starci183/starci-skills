@@ -21,6 +21,29 @@ Only classify states that the product and owner can enter. For each candidate us
 }
 ```
 
+## Volume and arrival
+
+The table above classifies what an owner can BE. These cells classify what it is given, and they are
+not optional additions to it: a candidate approved without them is approved at the one volume its
+fixture happened to hold.
+
+| Cell | What only this cell can show |
+|---|---|
+| nothing | whether the region collapses, or titles an emptiness |
+| one item | whether a grid of one reads as a mistake |
+| several items of uneven length | whether peers still align — a row of cards whose actions land at three heights reads as three different kinds of offer |
+| exactly one page of items | whether page furniture that depends on a count disappears at the boundary |
+| more than one page | whether the pager, its window and the page-to-request conversion are real |
+| an answer that lands AFTER first paint | whether anything measured at mount is now stale |
+
+The last cell is the one people skip and the one that hurts. A control that measures itself once —
+an animated tab indicator, a sticky offset, a virtualised row height — is measured against the layout
+that existed before the data arrived. Render the state where the answer lands late, and look at the
+control that moved, not at the content that arrived.
+
+The uneven-length cell is the same argument horizontally: equal fixtures make every card the same
+height, and a row of equal cards proves nothing about the row a reader will actually get.
+
 ## Integrated scenarios
 
 Avoid Cartesian explosion. Prefer a small scenario set whose entries name every owner state they

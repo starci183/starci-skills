@@ -25,7 +25,7 @@ Five rungs for the seam between things, and they are not evenly spaced:
 |---|---|
 | 8px | `gap-2`: compact horizontal peers in one functional cluster — icon and label, peer tabs, grouped cards, or an input and its direct inline action |
 | 12px | `gap-3`: owner-to-owned or independently readable local units — label to card/input, field to field, card to caption, toolbar to governed content, or unrelated groups sharing a row |
-| 16px | two groups inside one surface |
+| 16px | `gap-4`: two participants that are each already a cluster — a stack over the stack beneath it, an identity cluster against the trailing fact at the far end of its row, a prompt against the action answering it, or peer cards repeating across a grid |
 | 24px | two blocks on a page |
 | 32px | the layout seam — a rail against the column beside it |
 
@@ -35,7 +35,9 @@ never by component name or direction:
 an input and its direct action may use `gap-2` when they share one horizontal control, while a label
 above that input uses `gap-3`. Horizontal parts that are separate semantic groups also use `gap-3`.
 A subtle feed chronology may use `gap-2` between date labels and result cards, but the toolbar above
-that chronology uses `gap-3`. There is **no zero rung and no 4px rung**, and their absence is deliberate. The surface this
+that chronology uses `gap-3`. `gap-4` is selected the same way and by the participants alone: once
+each side is itself composed, the seam between them out-ranks the seams inside them, in a column, a
+row and a grid alike. There is **no zero rung and no 4px rung**, and their absence is deliberate. The surface this
 replaces ran eight rungs including both; the two tightest were the ones nobody applied consistently,
 because "touching" and "almost touching" are not a distinction a second author reproduces from
 memory. Two things that are one thing do not need a seam at all — they are one element.
@@ -155,18 +157,21 @@ to have an opinion about it.
 ### The matching inset
 
 ```ts
-// the house surface: a 16px edge around a 16px interior seam, so the edge breathes at the
-// rhythm of what it holds
-classes: ["flex", "flex-col", "gap-4", "rounded-2xl", "bg-surface", "p-4", "shadow-surface"]
+// the content node the house surface holds: a 16px edge around a 16px interior seam, so the
+// edge breathes at the rhythm of what it holds
+classes: ["flex", "flex-col", "gap-4", "p-4"]
 ```
 
 ```ts
-// the same surface with a tighter edge than its contents: every individual value is on the
+// the same node with a tighter edge than its contents: every individual value is on the
 // scale, and it still reads as crowded
-classes: ["flex", "flex-col", "gap-4", "rounded-2xl", "bg-surface", "px-3", "py-2", "shadow-surface"]
+classes: ["flex", "flex-col", "gap-4", "px-3", "py-2"]
 ```
 
-They differ in one thing: whether the edge and the interior agree. No single value is wrong.
+They differ in one thing: whether the edge and the interior agree. No single value is wrong. The
+ground, the radius and the elevation appear in neither, because the surface branch draws them and an
+entry only arranges what stands inside — see CONTRACT-12 in
+[`contract.md`](contract.md).
 
 ### The leaf, where the rules earn their place
 

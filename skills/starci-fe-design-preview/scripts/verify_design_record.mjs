@@ -194,6 +194,67 @@ for (const state of record.states) {
 }
 
 /**
+ * Why three more collections are checked as hard as the screenshots.
+ *
+ * Approval happens by looking, and looking cannot see three whole classes of defect: a seam that
+ * separates the wrong level of grouping, a product decision the reader never knew was taken, and a
+ * component rebuilt beside the one that already draws it. All three survive any number of
+ * revisions, because every revision is judged on a picture and none of the three is IN the picture.
+ *
+ * So each gets a field, and a field left empty is a claim the record is making rather than a
+ * formality: `relationships` says what the seams and ranks mean, `openQuestions` says which choices
+ * were the reader's to make, and `consolidation` says what each new owner was compared against.
+ * `keep-apart` carries the distinguishing fact because a pair kept apart without one is a pair
+ * nobody compared - two components that render identically can still be two components, and only
+ * the fact says which case this is.
+ */
+if (!Array.isArray(record.relationships) || record.relationships.length === 0) {
+    fail("relationships must state at least one seam, rank or variant decision")
+}
+for (const entry of record.relationships) {
+    const label = entry?.subject ?? "<no subject>"
+    if (!["seam", "rank", "variant"].includes(entry?.kind)) {
+        fail(`relationship ${label} must be kind seam, rank or variant`)
+    }
+    requireValue(entry.subject, "every relationship needs a subject")
+    requireValue(entry.decision, `relationship ${label} needs the decision taken`)
+    requireValue(entry.reason, `relationship ${label} states no reason, which is the only part a reader can refuse`)
+}
+
+if (!Array.isArray(record.openQuestions)) {
+    fail("openQuestions must be present, as an array - an absent list is not the same claim as an empty one")
+}
+for (const entry of record.openQuestions) {
+    const label = entry?.question ?? "<no question>"
+    requireValue(entry.question, "every open question needs its question")
+    requireValue(entry.default, `open question ${label} needs the default that was taken`)
+    requireValue(entry.cost, `open question ${label} needs what that default costs`)
+    if (!["answered", "waived"].includes(entry.resolution)) {
+        fail(`open question ${label} must end answered or waived before the seal`)
+    }
+    requireValue(entry.answeredBy, `open question ${label} claims ${entry.resolution} with no evidence of who said so`)
+}
+
+if (!Array.isArray(record.newOwners)) fail("newOwners must be present, as an array")
+if (!Array.isArray(record.consolidation)) fail("consolidation must be present, as an array")
+const settled = new Set()
+for (const entry of record.consolidation) {
+    const label = entry?.ownerId ?? "<no owner>"
+    requireValue(entry.ownerId, "every consolidation verdict needs its ownerId")
+    if (!Array.isArray(entry.kin)) fail(`consolidation ${label} needs kin, as an array`)
+    if (!["merge", "prop-variant", "extract-composite", "keep-apart"].includes(entry.verdict)) {
+        fail(`consolidation ${label} must end at merge, prop-variant, extract-composite or keep-apart`)
+    }
+    if (entry.verdict === "keep-apart") {
+        requireValue(entry.distinguishingFact, `consolidation ${label} keeps a pair apart and names no distinguishing fact`)
+    }
+    settled.add(entry.ownerId)
+}
+for (const owner of record.newOwners) {
+    if (!settled.has(owner)) fail(`New owner ${owner} carries no consolidation verdict`)
+}
+
+/**
  * Why approval must name the revision, and how a bare "ok" is recorded honestly.
  *
  * Approval is what turns an artifact into something Apply may write into production, so the record

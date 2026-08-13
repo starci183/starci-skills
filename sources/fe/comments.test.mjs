@@ -65,6 +65,11 @@ test("COMMENTS-2: the source is English, wherever the prose hides", () => {
       { filename: SRC, code: "const LABEL = \"Tiếng Việt\"" },
       // a functional literal, marked with why it stays
       { filename: SRC, code: "// vn-ok: the server sends this verbatim\nconst S = \"Da huy\"" },
+      // the same, with the diacritics the previous fixture happens to lack --
+      // without them it passes for the wrong reason and proves nothing
+      { filename: SRC, code: "// vn-ok: the server sends this verbatim\nconst S = \"Đã huỷ\"" },
+      // and marked where an author actually writes it: at the end of the line
+      { filename: SRC, code: "const NAME = \"Học viện Mộc\" // vn-ok: one academy's own name" },
       // locale content IS the other language
       { filename: LOCALE, code: "const t = \"Tiếp tục học\"" },
       // a fixture reproduces a real string, or it tests something else
