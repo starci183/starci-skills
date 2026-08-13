@@ -17,6 +17,10 @@ What holds this law is [`sources/fe/the-split.mjs`](../../../sources/fe/the-spli
 directions a syntax tree can prove: the drawing half cannot reach for the world, and a connected
 block must import and render only its exact `_X` twin.
 
+Implementation anchors in `starci-academy-fe`:
+`src/components/blocks/dashboard/CreditStatRow/index.tsx` and
+`src/components/blocks/dashboard/CreditStatRow/component.tsx`.
+
 ## Rules
 
 **SPLIT-1 · The drawing half receives everything and asks for nothing.**

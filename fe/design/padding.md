@@ -60,6 +60,28 @@ A padded surface inside a padded surface produces a distance neither author chos
 see. When contents sit further in than expected, the question is which of the two surfaces should
 have been plain — not what number to subtract.
 
+**PADDING-7 · A card uses `p-4`; a joined-list card distributes that inset across its rows.**
+
+An ordinary Card holds its content with `p-4`. A `SurfaceListCard` sets both the vendor Card root
+and its content host to `p-0`; it cannot put that padding around
+the list root because doing so would inset the dividers. Its surface and contract root therefore
+use `p-0`, and the rows recreate the card edge while keeping the interior seam tight:
+
+If the global vendor override owns Card padding with `!important`, a plain `p-0` class is not proof
+that the inset is gone. The branch marks the root as
+`data-component="SurfaceListCardSurface"`, and the theme carries the equally strong semantic
+override `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important; }`. UI
+verification reads computed padding from the rendered test-account page; a class assertion alone
+does not close this rule.
+
+- one row: `p-4`;
+- first row: `px-4 pt-4 pb-3`;
+- middle rows: `px-4 py-3`;
+- last row: `px-4 pt-3 pb-4`.
+
+The divider remains full-width between direct row children. The top and bottom edges still breathe
+at the Card's 16px inset; each row carries the 12px reading rhythm beside an interior divider.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -70,6 +92,8 @@ have been plain — not what number to subtract.
 | An inset added to push a neighbour away | The fix lands in a surface unrelated to the problem | Give the seam to whatever holds both |
 | A single padded edge with no stated reason | It is usually compensation, and the real cause stays hidden | Fix the cause, or write the reason beside it |
 | A padded surface inside a padded surface | The distance is one neither author chose | Decide which of the two draws the surface |
+| `p-4` on the content wrapper of a joined list | It pulls every divider 16px away from the surface edge | Put `p-0` on the list root and distribute the edge inset through first/middle/last row padding |
+| One padding value on every joined-list row | Either the outer edge is too tight or the interior rhythm is too loose | Use the first/middle/last matrix from PADDING-7 |
 
 ## Examples
 
@@ -109,6 +133,40 @@ as either author intended
 ```
 
 They differ in one thing: how many elements think they are drawing the surface.
+
+### The joined-list exception
+
+```
+surface p-0
+first row   px-4 pt-4 pb-3
+divider     full width
+middle row  px-4 py-3
+divider     full width
+last row    px-4 pt-3 pb-4
+```
+
+```
+surface p-4
+all rows p-2
+divider inset with the list
+```
+
+They differ in one thing: whether the 16px card edge is preserved without pulling the peer
+divider away from the surface edge.
+
+### The select-like row rule
+
+A compact group of peer rows that visually behaves like a select or navigation list gives `p-2`
+to every row, not to the group container. The parent owns only grouping (`p-0`, usually `gap-0`);
+each row owns its complete icon-label-value hit area and therefore its own inset.
+
+```text
+group       p-0 gap-0
+each row    p-2
+```
+
+Putting one `p-2` on the group is not equivalent: it creates an outer frame while leaving each
+element without the select-like geometry shared by neighbouring list items.
 
 ### The neighbour trap
 

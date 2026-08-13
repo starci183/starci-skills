@@ -169,12 +169,39 @@ export const noNonAsciiSource = {
     const file = normalizePath(context.filename || context.getFilename())
     // locale files are wholly product copy; policing them would be policing the product
     if (/\/(?:messages|locales|i18n)\//.test(file)) return {}
+
+    /*
+     * IN A TEST LANE, A STRING IS A FIXTURE AND A COMMENT IS STILL PROSE.
+     *
+     * The rule's own reason draws this line already: prose in a second language leaves half the
+     * reasoning unavailable to a reader, while "text the program MATCHES on or EMITS is data rather
+     * than prose". A spec that feeds an agent the sentence a real customer would type - "khach vua
+     * chuyen khoan" - is feeding it data, and translating it would test a system nobody uses.
+     *
+     * Measured before it was written: of 92 findings in one back end, 89 were fixture strings and 3
+     * were comments. Demanding `vn-ok` on all 92 would have put a marker on every line of every
+     * conversation fixture, which is noise that teaches a reader to stop seeing the marker.
+     *
+     * The exemption is for STRINGS ONLY. A Vietnamese comment in a spec is the same problem it is
+     * anywhere else - the next reader still cannot follow the reasoning - so it is still refused.
+     */
+    const fixtureLane = /\.spec\.ts$|-spec\.ts$|\/src\/tests\//.test(file)
+    const commentLines = fixtureLane
+      ? new Set(sourceCode.getAllComments().flatMap((comment) => {
+        const span = []
+        for (let line = comment.loc.start.line; line <= comment.loc.end.line; line += 1) span.push(line)
+        return span
+      }))
+      : null
+
     return {
       "Program:exit"(node) {
         const lines = sourceCode.getLines()
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index]
           if (KEEP_MARKER.test(line)) continue
+          // in a fixture lane only prose is policed; the data the fixture feeds is the point of it
+          if (commentLines && !commentLines.has(index + 1)) continue
           const offence = offenceIn(line)
           if (offence === null) continue
           context.report({

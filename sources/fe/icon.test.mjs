@@ -12,7 +12,14 @@ import { readFileSync } from "node:fs"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { heroiconsIsTheGlyphVendor, noOffScaleGlyphSize, noVendorIconOutsideIconLeaf, rules } from "./icon.mjs"
+import {
+  heroiconsIsTheGlyphVendor,
+  noDecorativeIconInMetricCell,
+  noOffScaleGlyphSize,
+  noVendorIconOutsideIconLeaf,
+  rankArtworkIsAClosedSet,
+  rules,
+} from "./icon.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -28,6 +35,7 @@ const ICON_LEAF = `${R}/leaves/Icon/index.tsx`
 const ICON_LEAF_BRANDS = `${R}/leaves/Icon/brands.tsx`
 const OTHER_LEAF = `${R}/leaves/SeeMoreLink/index.tsx`
 const BLOCK = `${R}/blocks/dashboard/DailyQuest/component.tsx`
+const METRIC_CELL = `${R}/composites/LabelledProgressRow/index.tsx`
 const ICON_LAW = readFileSync(new URL("../../fe/canon/patterns/icon.md", import.meta.url), "utf8")
 const MAPPING_TABLE = ICON_LAW.match(/\| Meaning \(`IconName`\)[\s\S]*?(?=\n## Forbidden)/)?.[0] ?? ""
 const MAPPING_ROWS = Array.from(
@@ -144,6 +152,93 @@ test("ICON-1: a glyph size off both steps is a third step", () => {
         filename: BLOCK,
         code: "const E = () => <Glyph className=\"size-[13px]\" />",
         errors: [{ messageId: "offScale" }],
+      },
+    ],
+  })
+})
+
+test("ICON-10: a repeated metric cell does not invent a decorative feature glyph", () => {
+  tester.run("no-decorative-icon-in-metric-cell", noDecorativeIconInMetricCell, {
+    valid: [
+      {
+        filename: METRIC_CELL,
+        code: "const Row = () => <div><Text props={{ content: 'Content' }} /></div>",
+      },
+      {
+        filename: BLOCK,
+        code: "const Entry = () => <Icon props={{ name: 'course' }} />",
+      },
+    ],
+    invalid: [
+      {
+        filename: METRIC_CELL,
+        code: "const Row = () => <div><Icon props={{ name: 'course' }} /><Text /></div>",
+        errors: [{ messageId: "decorative" }],
+      },
+    ],
+  })
+})
+
+const RANK_LEAF = `${R}/leaves/RankMark/index.tsx`
+
+test("ICON-11: the rank leaf may import its award artwork, and no other file may", () => {
+  tester.run("no-vendor-icon-outside-icon-leaf", noVendorIconOutsideIconLeaf, {
+    valid: [{ filename: RANK_LEAF, code: "import { Icon } from '@iconify/react'" }],
+    invalid: [
+      {
+        filename: BLOCK,
+        code: "import { Icon } from '@iconify/react'",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        // The exemption is one PACKAGE, not one folder: the rank leaf reaching for a
+        // second catalogue is the same escape wearing an approved filename.
+        filename: RANK_LEAF,
+        code: "import { Trophy } from '@phosphor-icons/react'",
+        errors: [{ messageId: "vendor" }],
+      },
+    ],
+  })
+  tester.run("heroicons-is-the-glyph-vendor", heroiconsIsTheGlyphVendor, {
+    valid: [{ filename: RANK_LEAF, code: "import { Icon } from '@iconify/react'" }],
+    invalid: [
+      {
+        filename: OTHER_LEAF,
+        code: "import { Icon } from '@iconify/react'",
+        errors: [{ messageId: "vendor" }],
+      },
+    ],
+  })
+})
+
+test("ICON-11: the award vocabulary is four artworks, closed", () => {
+  tester.run("rank-artwork-is-a-closed-set", rankArtworkIsAClosedSet, {
+    valid: [
+      {
+        filename: RANK_LEAF,
+        code: "const PLACES = { 1: 'fluent-emoji-flat:1st-place-medal', 2: 'fluent-emoji-flat:2nd-place-medal', 3: 'fluent-emoji-flat:3rd-place-medal' }",
+      },
+      { filename: RANK_LEAF, code: "const FALLBACK = 'fluent-emoji-flat:trophy'" },
+      // A file naming no award artwork at all is simply not this rule's business.
+      { filename: BLOCK, code: "const label = 'first place'" },
+      // The twin test of the rank leaf has to name the whole map to prove it is closed.
+      {
+        filename: `${R}/leaves/RankMark/index.test.tsx`,
+        code: "const cases = ['fluent-emoji-flat:1st-place-medal', 'fluent-emoji-flat:4th-place-medal']",
+      },
+    ],
+    invalid: [
+      {
+        // A fifth medal is a decision about what a PLACE means, and it is made in the law.
+        filename: RANK_LEAF,
+        code: "const FOURTH = 'fluent-emoji-flat:4th-place-medal'",
+        errors: [{ messageId: "unknown" }],
+      },
+      {
+        // An approved id in an unapproved file still splits the map in two.
+        filename: BLOCK,
+        code: "const mine = 'fluent-emoji-flat:trophy'",
+        errors: [{ messageId: "outside" }],
       },
     ],
   })

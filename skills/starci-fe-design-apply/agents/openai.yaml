@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Design Apply"
+  short_description: "Implement approved StarCi UI and enablers"
+  default_prompt: "Use $starci-fe-design-apply. Inherit Context Lock, reconfirm every production write boundary, verify the sealed executable Preview record, and prove effective StarCi FE lint adoption before editing or dispatching workers. Materialize the candidate-to-target map without screenshot reinterpretation or component substitution, then prove same-state structural and visual parity."

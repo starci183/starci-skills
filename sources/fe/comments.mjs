@@ -134,7 +134,7 @@ export const noSecondLanguageInSource = {
 
 // -- COMMENTS-4 ------------------------------------------------------------------------------------
 
-/** No emoji in source: it renders differently everywhere and means different things in different places. */
+/** No Unicode emoji in source: stable product reactions use attributed checked-in SVG artwork. */
 export const noEmojiInSource = {
   meta: {
     type: "problem",
@@ -142,7 +142,7 @@ export const noEmojiInSource = {
     schema: [],
     messages: {
       emoji:
-        "Emoji in source authoring. It renders differently on every platform, sorts unpredictably, breaks a terminal that is not expecting it, and does not mean the same thing in two countries. If a mark is wanted on screen, that is an icon, and the icon vocabulary already owns the decision.",
+        "Unicode emoji in source authoring. It renders differently on every platform, sorts unpredictably, breaks a terminal that is not expecting it, and does not mean the same thing in two countries. Generic marks belong to the icon vocabulary; product reactions use the attributed checked-in SVG artwork through the reaction leaf.",
     },
   },
   create(context) {

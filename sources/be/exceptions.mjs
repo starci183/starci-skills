@@ -43,10 +43,54 @@ const FRAMEWORK_EXCEPTIONS = new Set([
 ])
 
 /** Where every exception is declared. */
-const ERRORS_FOLDER = "/platform/exceptions/errors/"
+const ERRORS_FOLDER = /\/exceptions\/errors\//
+
+/**
+ * True when a file sits in an exceptions folder - ANY of them.
+ *
+ * THE PATH USED TO BE `/platform/exceptions/errors/`, WHICH WAS ONE REPOSITORY'S LAYOUT WRITTEN
+ * INTO A LAW. EXCEPTION-4 asks for one place per APPLICATION to look, not for one literal path: a
+ * repository with several apps has `apps/<name>/src/exceptions/errors/` per app and still satisfies
+ * it, because "what can this application throw" still has a single answer.
+ *
+ * Measured before changing: the narrow path reported 83 findings in a second back end, and the top
+ * offenders were files already sitting in an `exceptions/errors/` folder - just not that one. A rule
+ * that fires on correct code is worse than no rule, because the next author learns to scroll past it.
+ */
+const isInErrorsFolder = (filename) => ERRORS_FOLDER.test(normalizePath(filename))
 
 /** The base class's own file, which is the one class allowed to extend something else. */
 const isExceptionBaseFile = (filename) => /exceptions\/errors\/abstract\.ts$/.test(normalizePath(filename))
+
+/**
+ * The test lanes, where `throw new Error` is a test-runner assertion rather than a domain failure.
+ *
+ * THE CARVE-OUT WAS ALREADY GRANTED IN PROSE AND MISSING FROM THE RULE, which is the worst of the
+ * two places for them to disagree: canon said the lanes may throw, the artifact said they may not,
+ * and a repository adopting the rule inherited 69 findings its own canon had already excused.
+ *
+ * A flow that could not fail its own setup would have to invent a domain exception for "the fixture
+ * is missing", which is a failure of the test rather than of the business - and naming it as a
+ * domain failure would put it in the same vocabulary the product uses to describe real ones.
+ */
+const isTestLane = (filename) => {
+  const path = normalizePath(filename)
+  return /\.spec\.ts$/.test(path) || /-spec\.ts$/.test(path) || path.includes("/src/tests/")
+}
+
+/**
+ * A liveness or readiness probe, where the HTTP STATUS is the whole contract.
+ *
+ * THE RULE'S OWN REASON IS WHAT GRANTS THIS. A framework exception is refused because it "carries an
+ * HTTP status and no identity" - the status is not enough to tell two failures apart. A probe is the
+ * one endpoint where that sentence inverts: kubernetes reads the status code and NOTHING else, never
+ * the body, so the status is the entire identity and a domain exception carrying a rich code would
+ * arrive as a 500 and be read as "down" for the wrong reason.
+ *
+ * Narrow on purpose. Only a health controller qualifies, so this cannot become the place a service
+ * goes to avoid naming its failures.
+ */
+const isHealthProbe = (filename) => /\/health(?:z)?\.controller\.ts$|\/health\//.test(normalizePath(filename))
 
 // -- EXCEPTION-1 -----------------------------------------------------------------------------------
 
@@ -64,6 +108,10 @@ export const throwAbstractException = {
     },
   },
   create(context) {
+    const filename = context.filename || context.getFilename()
+    // the lanes canon already excuses - see `isTestLane`
+    if (isTestLane(filename)) return {}
+    const probe = isHealthProbe(filename)
     return {
       ThrowStatement(node) {
         const thrown = node.argument
@@ -73,6 +121,9 @@ export const throwAbstractException = {
           context.report({ node: thrown, messageId: "bareError" })
           return
         }
+        // a probe answers with a status code and nothing else - see `isHealthProbe`. `Error` above
+        // is still refused here: a probe's status is its contract, an unnamed crash is not.
+        if (probe) return
         if (FRAMEWORK_EXCEPTIONS.has(name)) {
           context.report({ node: thrown, messageId: "framework", data: { name } })
         }
@@ -105,6 +156,18 @@ export const requireExceptionObjectArg = {
         if (!thrown || thrown.type !== "NewExpression" || thrown.callee.type !== "Identifier") return
         const name = thrown.callee.name
         if (name === EXCEPTION_BASE || !EXCEPTION_NAME.test(name)) return
+        /*
+         * A FRAMEWORK EXCEPTION IS NOT A HOUSE ONE, AND ITS SHAPE IS NOT OURS TO DICTATE.
+         *
+         * This rule says a house exception takes exactly one metadata object. `EXCEPTION_NAME`
+         * matches anything ending in `Exception`, so it was also demanding that shape from Nest's
+         * own classes - `new ServiceUnavailableException(body)` is the constructor Nest published,
+         * and rewriting it to satisfy a house convention would change what the framework sends.
+         *
+         * Whether a framework exception may be thrown at all is EXCEPTION-1's question, and it
+         * answers it. This rule only governs the ones we declare.
+         */
+        if (FRAMEWORK_EXCEPTIONS.has(name)) return
 
         if (thrown.arguments.length === 0) {
           context.report({ node: thrown, messageId: "zero", data: { name } })
@@ -165,7 +228,7 @@ export const exceptionInErrorsFolder = {
     },
   },
   create(context) {
-    if (normalizePath(context.filename || context.getFilename()).includes(ERRORS_FOLDER)) return {}
+    if (isInErrorsFolder(context.filename || context.getFilename())) return {}
     return {
       ClassDeclaration(node) {
         if (!node.id || !EXCEPTION_NAME.test(node.id.name)) return

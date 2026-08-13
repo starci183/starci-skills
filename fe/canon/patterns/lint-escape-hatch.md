@@ -11,6 +11,9 @@ What holds this law is
 config also applies the exported `linterOptions.noInlineConfig`, because a rule that could be
 disabled by the comment it reports would not be a fence.
 
+Implementation anchors in `starci-academy-fe`: `eslint.config.mjs` and
+`plugins/eslint/index.mjs`.
+
 ## Rules
 
 **LINT-ESCAPE-1 · Product source cannot contain an inline ESLint directive.**

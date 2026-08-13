@@ -78,7 +78,7 @@ const BRANCH = "/repo/src/components/branches/SurfaceCard/index.tsx"
 const SHELL = "/repo/src/components/shells/ModalShell/index.tsx"
 const FAKE_SHELL = "/repo/src/components/shells/PopoverShell/index.tsx"
 
-test("SLOTS-4: containers take contract and render; only ModalShell/DrawerShell take children", () => {
+test("SLOTS-4: containers take contract and render; only the three closed shells take children", () => {
   tester.run("no-children-slot", noChildrenSlot, {
     valid: [
       // the shape this rule exists to push people towards
@@ -87,6 +87,7 @@ test("SLOTS-4: containers take contract and render; only ModalShell/DrawerShell 
       // the one lawful home for the slot: the vendor declares it, the wrapper cannot refuse it
       { filename: SHELL, code: "export interface P { children?: ReactNode }" },
       { filename: SHELL, code: "export const M = ({ children }: MProps) => null" },
+      { filename: "/repo/src/components/shells/DropdownShell/index.tsx", code: "type DropdownShellProps = { children?: ReactNode }" },
       // outside the component tree entirely - a page or a test may say what it likes
       { filename: "/repo/src/app/page.tsx", code: "export const P = ({ children }: PProps) => null" },
       // an ordinary object property that happens to be called children is not a slot

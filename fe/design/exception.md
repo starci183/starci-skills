@@ -39,6 +39,18 @@ panel owns its sole `centred-page-column` host, so the overlay must mount that p
 child contracts own every visible seam. This prevents both a second contract host and the two empty
 padding bands above and below the form.
 
+**EXCEPTION-4 · StarCi Academy says `content`, never `lesson`.**
+
+In StarCi Academy, `content` is the reader-facing product term for a unit of learning. `lesson` may
+remain in an upstream API field, GraphQL type, database name or integration boundary, but it must be
+translated to `content` in the connected block before copy reaches a pure component. Therefore:
+
+- English visible copy says `Content`, never `Lesson`;
+- Vietnamese visible copy says `Nội dung`, never `Bài học` when naming this product concept;
+- translation keys and resolved UI discriminants use `content`;
+- API and persistence names may stay `lesson` only when changing them would alter an external or
+  stored contract.
+
 ## Forbidden
 
 | Never | Why | Instead |
@@ -48,3 +60,4 @@ padding bands above and below the form.
 | Copy the auth exception into another screen | An exception is evidence about one relationship, not a new default | Re-evaluate and name a separate contract if warranted |
 | Wrap the auth projection in another `Tree` | The same contract and spacing are mounted twice | Project it with `ContractContent` |
 | Add vertical padding to `centred-page-column` | The modal gains empty bands outside its named content rhythm | Let its child contracts own the seams |
+| Let an API `lesson` name reach StarCi Academy copy | Infrastructure vocabulary replaces the product's chosen concept | Map it to `content` at the connected boundary |

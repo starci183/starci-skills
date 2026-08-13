@@ -16,7 +16,13 @@ import { recommended as commentsRecommended, rules as commentsRules } from "./co
 import { recommended as contractRecommended, rules as contractRules } from "./contract.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
 import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
+import { recommended as landmarkRecommended, rules as landmarkRules } from "./landmark.mjs"
 import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
+import {
+  audits as lintAdoptionAudits,
+  recommended as lintAdoptionRecommended,
+  rules as lintAdoptionRules,
+} from "./lint-adoption.mjs"
 import {
   linterOptions as strictLinterOptions,
   recommended as lintEscapeRecommended,
@@ -37,7 +43,14 @@ const CONTRIBUTIONS = [
   { law: "contract", rules: contractRules, recommended: contractRecommended },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
   { law: "icon", rules: iconRules, recommended: iconRecommended },
+  { law: "landmark", rules: landmarkRules, recommended: landmarkRecommended },
   { law: "loading", rules: loadingRules, recommended: loadingRecommended },
+  {
+    law: "lint-adoption",
+    rules: lintAdoptionRules,
+    recommended: lintAdoptionRecommended,
+    audits: lintAdoptionAudits,
+  },
   { law: "lint-escape-hatch", rules: lintEscapeRules, recommended: lintEscapeRecommended },
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
@@ -48,6 +61,21 @@ const CONTRIBUTIONS = [
   { law: "typography", rules: typographyRules, recommended: typographyRecommended },
   { law: "vendor-boundary", rules: vendorRules, recommended: vendorRecommended },
 ]
+
+/** Every gathered law, including repository audits that publish no AST rule. */
+export const lawOwners = CONTRIBUTIONS.map((entry) => entry.law)
+
+/** Which law declares each repository-level audit. */
+export const auditOwners = Object.fromEntries(
+  CONTRIBUTIONS.flatMap((entry) =>
+    Object.keys(entry.audits ?? {}).map((name) => [name, entry.law]),
+  ),
+)
+
+/** Repository-level audits gathered beside the plugin. */
+export const audits = Object.fromEntries(
+  CONTRIBUTIONS.flatMap((entry) => Object.entries(entry.audits ?? {})),
+)
 
 /**
  * Which law declares each rule.
@@ -83,3 +111,6 @@ export default {
   meta: { name: "eslint-plugin-starci-fe" },
   rules,
 }
+
+/** Attach this canon to a repository: one block, one branch for its layout. */
+export { starciFeConfig, LAYOUTS } from "./lint-adoption.mjs"

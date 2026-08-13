@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Fidelity Fix"
+  short_description: "Repair bounded StarCi UI fidelity defects"
+  default_prompt: "Use $starci-fe-fidelity-fix. Lock and confirm the exact target and write boundary, freeze one same-state comparison identity, require binding expected-result evidence, prove effective StarCi FE lint adoption, and repair only the named owner and touched states. Route any unresolved product choice to Plan."

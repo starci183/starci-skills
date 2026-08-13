@@ -41,6 +41,27 @@ Signed out, signed in, loading, empty, populated, light, dark and responsive sta
 different branches of the same component. Preserving only the easiest state leaves the migration
 untested where it differs most.
 
+**REFACTOR-PARITY-6 · Architecture translation does not license visual invention.**
+
+The legacy source decides the initial render, content grouping and state branches. The new layer
+model decides where that same behavior belongs and how its types are enforced. New icons, cards,
+copy, states or interactions wait for an explicit redesign request; they are not improvements made
+while porting.
+
+**REFACTOR-PARITY-7 · Selection changes state, not peer geometry.**
+
+Selected and unselected options in one selector use the same primitive, font size, line height and
+target geometry; only state tokens and state attributes change. The available option list is owned
+independently of the current selection. Deriving recent years from the selected year makes an old
+choice erase the route back to the present, which is a behavior change rather than a styling bug.
+
+**REFACTOR-PARITY-8 · Port the reference's overflow interaction, not a browser substitute.**
+
+When the reference uses a constrained draggable track inside an `overflow-hidden` viewport, port
+that interaction as-is. A visible native scrollbar is not an equivalent rendering: it changes both
+the geometry and the interaction the reader was given. Any accessibility improvement is a separate,
+explicit product change; do not silently mix it into a parity refactor.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -51,6 +72,9 @@ untested where it differs most.
 | Splitting a compound navigation landmark | Hierarchy, sticky ownership and separators change | Preserve the complete landmark structure |
 | Choosing a nearby spacing, size, shadow or divider token | The refactor silently becomes a redesign one token at a time | Read and copy the exact source value |
 | Approving one state screenshot | Other branches can be structurally different and remain unseen | Verify the complete state matrix |
+| Adding helpful-looking UI absent from the reference | The migration silently changes product behavior or visual hierarchy | Port the reference first; propose redesigns separately |
+| Rendering the selected option with a different text primitive or size | State changes the selector's geometry and reading rhythm | Use one peer primitive and vary only semantic state tokens |
+| Deriving the option list from the selected option | Choosing an old value can remove the way back | Derive stable choices from their domain anchor, such as the current year |
 
 ## Examples
 

@@ -2,22 +2,23 @@
 
 ## Definition
 
-A shell owns covering mechanics while deliberately ignoring the shape inside. This system has
-exactly two: `ModalShell` and `DrawerShell`.
+A shell owns vendor interaction mechanics while deliberately ignoring the product shape inside.
+This system has exactly three: `ModalShell`, `DrawerShell`, and `DropdownShell`.
 
-They earn the only public React `children` hole because their job is to pass an uninterpreted
-interior through the vendor's covering mechanics. They arrange none of it. Focus trapping, Escape, backdrop,
-scroll lock, inertness, placement and focus return are the shell's concern; copy and content shape
-are not.
+They earn the only public React `children` holes because their job is to pass uninterpreted content
+through vendor mechanics. Modal and drawer own focus trapping, Escape, backdrop, scroll lock,
+inertness and focus return. Dropdown owns trigger/popover/menu focus, placement and keyboard
+navigation. Copy, account state and the meaning of menu choices are never shell concerns.
 
 A vendor primitive requiring children does not automatically create a shell. Card, accordion,
-list, popover and tooltip composition still has a visible shape and therefore belongs to a leaf or
-a named branch using `contract + render`.
+list and tooltip composition still has a visible product shape and therefore belongs to a leaf or
+a named branch using `contract + render`. Dropdown is admitted because its trigger and menu items
+must share one vendor focus/selection machine while the owning block decides what those items mean.
 
 ## Rules
 
-**SHELL-1 · Only `ModalShell` and `DrawerShell` are shells.** The list is closed; `shells/` is not a
-folder-wide escape hatch.
+**SHELL-1 · Only `ModalShell`, `DrawerShell`, and `DropdownShell` are shells.** The list is closed;
+`shells/` is not a folder-wide escape hatch.
 
 **SHELL-2 · A shell may own the vendor body only as scroll mechanics.** ModalShell wraps `children`
 once in `Modal.Body className="p-0"`: the body preserves scrolling, while zero inset leaves all
@@ -26,6 +27,10 @@ arrangement to the mounted contract. It never counts children, reads them, or ch
 **SHELL-3 · It owns mechanics only.** No title, copy, domain hook, fetch or decision about why it is
 open.
 
+**SHELL-5 · Dropdown content belongs to the block that names the function.** `DropdownShell` exposes
+trigger, section and item mechanics without importing domain copy. A menu such as `AccountMenu`
+is a block: it decides which choices exist and what actions they report, then composes the shell.
+
 **SHELL-4 · It imports the vendor covering primitive.** Without that mechanics ownership it is an
 ordinary branch in the wrong folder.
 
@@ -33,7 +38,8 @@ ordinary branch in the wrong folder.
 
 | Never | Instead |
 |---|---|
-| `PopoverShell`, `TooltipShell`, `CardShell` | A leaf for a closed primitive, or a named branch with `contract + render` |
+| `PopoverShell`, `TooltipShell`, `CardShell` | Use the closed DropdownShell only for a real menu machine; otherwise use a leaf or named branch |
+| Domain `AccountMenu` filed as a leaf | A block over `DropdownShell` |
 | Layout around `children` | Put layout in a contract rendered by the caller |
 | Domain copy or state | Keep intent in the overlay/block that mounts the shell |
 | A shell with no vendor import | Move it to `branches/` |

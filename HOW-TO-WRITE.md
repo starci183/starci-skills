@@ -52,6 +52,20 @@ five ways teach nothing; five pairs each differing in one way teach five rules. 
 case first, then the ones people actually get wrong: the borderline, the tempting shortcut, the case
 that looks like a different tier.
 
+## Frontend pattern evidence
+
+Every file under `fe/canon/patterns/` also contains this exact sentence in its Definition:
+
+```markdown
+Implementation anchors in `starci-academy-fe`: `<path>` and `<path>`.
+```
+
+The paths point to concrete source, caller or test files verified at the reference HEAD recorded by
+Context Lock. The anchors are implementation evidence, not a substitute for Definition or WHY, and
+not permission to copy a stale snapshot blindly. A pattern is complete only when it explains the
+concept, points to the code that spells it, and links the artifact that holds its enforceable half.
+If source and law disagree, record that disagreement as a finding instead of inventing an example.
+
 ## What a file must NOT carry
 
 **Counts and measurements.** Not "669 files do this", not "31 rules", not "9 components violate

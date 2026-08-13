@@ -16,6 +16,9 @@ change with it?** If it does not, it is a second description and it will drift.
 
 What holds this law is [`sources/fe/loading.mjs`](../../../sources/fe/loading.mjs).
 
+Implementation anchors in `starci-academy-fe`: `src/components/leaves/Text/index.tsx` and
+`src/components/blocks/dashboard/pending-gate.test.tsx`.
+
 ## How the two halves meet
 
 This is the seam most often got wrong, so it is written down rather than inferred. A block and a leaf

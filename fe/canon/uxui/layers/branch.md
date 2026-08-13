@@ -89,10 +89,36 @@ any of them now edits the branch, and the branch's own props stop describing the
 **BRANCH-9 · A list surface receives props, never an `items` lane.**
 
 `SurfaceListCard` owns the shared Card, clipping, the contract-bearing content body, and placement
-of the whole-list caption. It does not decide whether the domain calls its collection tasks,
+of the list label, its optional trailing fact, and the whole-list caption. The fact shares the
+label line because it qualifies that list as one bounded object: the label is `sm semibold`, while
+the supporting fact is `xs muted`. It is not a description. A description explains the whole list
+after the surface and therefore remains the caption below it. It does not decide whether the domain calls its collection tasks,
 courses, rows or alerts. The branded content component receives the same named `props` value and
 turns that domain data into the repeated slot. Separators remain on the root contract as `divide-y`,
 never as an `after` rule owned by each row leaf.
+
+Its fixed outer assembly uses `gap-3`: label, joined surface and whole-list caption/action are
+owner-to-owned units inside one named section. The Card and list root use `p-0` so every divider
+reaches both surface edges. Rows
+restore the ordinary Card inset without widening the interior seam: one row `p-4`; first row
+`px-4 pt-4 pb-3`; middle rows `px-4 py-3`; last row `px-4 pt-3 pb-4`. The repeated row slot must be
+a direct child of the dividing contract root; an extra projection wrapper would make `divide-y`
+and the first/last matrix target the wrong elements.
+
+The Card root is marked `data-component="SurfaceListCardSurface"`. If the theme's ordinary Card
+inset is `!important`, the theme must also define the semantic zero-inset override at equal cascade
+strength. A test that sees only `className="p-0"` has not verified the rendered branch.
+
+When the joined list belongs inside a larger story surface, `isNested` changes only the wrapper's
+surface treatment: the Card keeps the ordinary SurfaceListCard radius and zero inset, replaces its
+shadow with one token border, and the contract remains a borderless row recipe. This is branch-owned
+vendor projection, not a caller styling hook. A whole-list description below the surface is a
+supporting caption and uses the reserved `xs` text step, one rank below a `sm` row label.
+
+The list label stays visible by default. A nested list may suppress that duplicate heading only when
+the enclosing surface already names the exact list. The resolved label still remains required data;
+`isLabelHidden` changes projection, not meaning. A page-level list, or a nested list whose outer
+heading names a broader story rather than the list itself, must draw its own label.
 
 ## Forbidden
 
@@ -109,6 +135,10 @@ never as an `after` rule owned by each row leaf.
 | A `children` slot | Markup arrives already built, so what this container holds could never be stated in the table | `contract` plus one component per named slot |
 | An `items` slot invented by `SurfaceListCard` | The branch has learned one caller's data model and cannot host a list derived from any other props shape | Keep the collection under its domain name in the content component's named `props` type |
 | A row leaf drawing its own separator | The leaf has learned that it has peers and whether it is last | Put `divide-y` on the joined-list contract root |
+| `p-4` around the joined-list root | The divider becomes inset even though the Card edge is correct | Keep the root `p-0`; distribute `p-4`/`p-2` through the first/middle/last rows |
+| Border/radius/shadow classes on a nested list contract or call site | The same SurfaceListCard acquires a second visual implementation | Set `isNested`; the branch owns one border, no shadow, and the ordinary list radius |
+| Hiding a page-list label, or hiding a nested label without an enclosing name for that exact list | The bounded object becomes anonymous and its data label stops matching what readers see | Keep the label visible; use `isLabelHidden` only for the exact duplicate nested heading |
+| An extra wrapper between the dividing root and rows | `divide-y` and first/last selectors no longer target the rows | Make repeated rows direct children of the contract root |
 
 ## Examples
 
@@ -118,9 +148,13 @@ never as an `after` rule owned by each row leaf.
 // branch: the component identity is stable; only its named props change.
 export const SurfaceListCard = ({ props, on, contract, render: Content, isLoading }: SurfaceListCardProps) => (
     <div className="flex flex-col gap-3">
-        <Heading props={{ content: props.label, level: 3 }} />
-        <Card>
-            <Card.Content {...contractNodeProps(contract)}>
+        {props.fact === undefined ? (
+            <Heading props={{ content: props.label, level: 3 }} />
+        ) : (
+            <Tree contract="label-with-muted-fact-row" render={labelAndFactFrom(props)} />
+        )}
+        <Card className="p-0" data-component="SurfaceListCardSurface">
+            <Card.Content className="p-0">
                 <Content props={props} on={on} isLoading={isLoading} />
             </Card.Content>
         </Card>
@@ -129,11 +163,14 @@ export const SurfaceListCard = ({ props, on, contract, render: Content, isLoadin
 )
 
 // Runtime collections remain fields of a named props type, never a special `items` slot.
+const DailyQuestContentView = ({ props }) => (
+    <Tree contract="daily-quest-list" render={rowsFrom(props.tasks)} />
+)
 const DailyQuestContent = defineContractComponent("daily-quest-list", DailyQuestContentView)
 <SurfaceListCard
     contract="daily-quest-list"
     render={DailyQuestContent}
-    props={{ label, description, tasks }}
+    props={{ label, fact, description, tasks }}
 />
 ```
 
@@ -181,8 +218,8 @@ They differ in one thing: whether the tier below is still the boundary with the 
 export const SurfaceListCard = ({ props, on, contract, render: Content, isLoading }: SurfaceListCardProps) => (
     <div className="flex flex-col gap-3">
         <Heading props={{ content: props.label, level: 3 }} />
-        <Card>
-            <Card.Content {...contractNodeProps(contract)}>
+        <Card className="p-0" data-component="SurfaceListCardSurface">
+            <Card.Content className="p-0">
                 <Content props={props} on={on} isLoading={isLoading} />
             </Card.Content>
         </Card>

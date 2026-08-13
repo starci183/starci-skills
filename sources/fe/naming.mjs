@@ -73,9 +73,71 @@ export const handlerOnPrefix = {
 }
 
 /** The rules this law contributes to the plugin. */
+// -- NAMING-3 --------------------------------------------------------------------------------------
+
+/** Letters that exist in Vietnamese and not in English, in the forms a path can carry. */
+const SECOND_LANGUAGE_PATH = /[àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i
+
+/**
+ * Second-language words spelled in ASCII, as a route or folder segment writes them.
+ *
+ * A path cannot carry diacritics, so `cấp phát` reaches the filesystem as `cap-phat` and every
+ * accent-based check passes it. The segments below are the ones this product actually produced.
+ * A list is the honest instrument here: guessing at Vietnamese-shaped ASCII would refuse `dang`
+ * in `dangerous` and `cap` in `capacity`, and a rule that fires on English words is one a
+ * repository turns off.
+ */
+const ROMANISED = [
+  "dang-nhap", "dang-ky", "dang-xuat", "cap-phat", "khoa-hoc", "hoc-vien", "gioi-thieu",
+  "lien-he", "tai-khoan", "thanh-toan", "gio-hang", "tin-tuc", "san-pham", "bang-gia",
+  "dieu-khoan", "chinh-sach", "trang-chu", "quan-ly", "cai-dat", "ho-so",
+]
+
+/** A route segment or folder name, lowercased, from a normalized path. */
+const segmentsOf = (filename) =>
+  String(filename || "").replace(/\\/g, "/").toLowerCase().split("/").filter(Boolean)
+
+/**
+ * A path names things in one language: the one every reader of this repository shares.
+ *
+ * WHY A PATH AND NOT ONLY THE SOURCE. `no-second-language-in-source` reads identifiers, comments
+ * and strings, and cannot see the file it is reading. So a route could be `app/cap-phat/page.tsx`
+ * with every identifier inside it in English, and nothing said a word - while the URL, the import
+ * specifier, the folder in every editor sidebar and the path in every stack trace stayed in a
+ * language half the readers do not have.
+ *
+ * A ROUTE SEGMENT IS ALSO A PUBLIC NAME. It is the address a customer sees and a support ticket
+ * quotes, so this is not only an authoring question: the product's own URLs stop being readable to
+ * anybody outside one language.
+ */
+export const noSecondLanguageInPath = {
+  meta: {
+    type: "problem",
+    docs: { description: "File and route names are written in the repository's one shared language." },
+    schema: [],
+    messages: {
+      path:
+        "`{{segment}}` names this file in a second language. A path is read by more people than the code inside it - it is the URL a customer quotes, the folder every editor shows, and the specifier every import repeats - and unlike a comment it cannot be skimmed past. Rename the segment; the words a person READS belong in the locale catalogue, never in the address.",
+    },
+  },
+  create(context) {
+    const filename = context.filename || context.getFilename()
+    const offending = segmentsOf(filename).find(
+      (segment) => SECOND_LANGUAGE_PATH.test(segment) || ROMANISED.includes(segment.replace(/[()[\]]/g, "")),
+    )
+    if (!offending) return {}
+    return {
+      Program(node) {
+        context.report({ node, messageId: "path", data: { segment: offending } })
+      },
+    }
+  },
+}
+
 export const rules = {
   "prefer-arrow-export": preferArrowExport,
   "handler-on-prefix": handlerOnPrefix,
+  "no-second-language-in-path": noSecondLanguageInPath,
 }
 
 /**

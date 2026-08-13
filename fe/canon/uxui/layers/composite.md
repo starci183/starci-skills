@@ -28,11 +28,33 @@ composite named after its first caller is a lie waiting for the second one — a
 either copied, which doubles the maintenance, or kept, which makes the name false for everybody who
 reads it afterwards.
 
+Direction and incidental chrome are not the shape either. Two peer tab groups sharing one toolbar
+are `DualTabsToolbar`: `StackedChoiceTabs` becomes false when the groups sit on one row, while
+`DualFilterTabsCard` invents both a domain role and a card the arrangement does not own. The name
+must survive a layout-preserving reuse without describing an obsolete implementation accident.
+
+StarCi's feed toolbar renders both the audience axis (`For you / Following`) and the content-category
+axis (`All / Courses / Achievements / People`) as HeroUI `primary`. "Category is secondary to scope"
+describes product meaning, not the vendor `variant`; translating that sentence into `secondary`
+silently changes the legacy control. The toolbar fixes the two resolved variants, while the generic
+`ChoiceTabs` leaf accepts a variant because other arrangements can legitimately choose differently.
+
 **COMPOSITE-3 · It owns no class of its own.**
 
 Its arrangement comes from branches and the contract table, exactly as a branch's does. A composite that
 writes a class has put the same layout in two places, and only one of them can be searched, named or
 reused — so the next author extends whichever they happen to find, and the two drift apart quietly.
+
+Closed does not mean exempt from branches. It means the composite itself closes the named slots passed
+to `Tree`: callers cannot rearrange them, while every seam remains visible in the contract table. A raw
+`div` inside `composites/` is therefore not a harmless implementation detail; it is an unnamed branch
+and a second registry.
+
+The same applies to semantic containers such as `article`, `ul` and `ol`. Semantics do not make a
+container cease to be structure. A composite closes typed slots with `defineContractComponent` and
+hands them to `Tree` or another named branch; it never opens the host itself. The strict structural-host
+gate covers `composites/` and these semantic containers, so moving a raw host into a composite is not
+an escape hatch.
 
 **COMPOSITE-4 · It does not import the component library.**
 
@@ -65,6 +87,7 @@ than by taste, and the tier stays small enough to read.
 | Any slot a caller fills — `render`, or `children` under any name | The moment a caller supplies the inside, the shape is not closed, and every rule below stops being checkable | Move it to `branch` |
 | A domain word in the name (`Course…`, `Streak…`, `Quota…`) | The name will be false for the second caller, and false names get copied rather than corrected | Name the shape; if the shape has no name without the domain, it is a block |
 | Writing a class | The arrangement then exists in two places and only one is findable | Name a contract node and hold it with a branch |
+| Opening `div`, `article`, `ul` or `ol` directly | A semantic tag is still an unnamed structural node, and the composite becomes a second registry | Close the contract's named leaves and render them through `Tree` or a named branch |
 | Importing `@heroui/react` | It moves the library boundary above the leaves, so a swap no longer ends there | Wrap the vendor behaviour as a leaf first |
 | Importing `@/hooks` | Fetching is knowing the domain, whatever the folder says | Move it to `block`, or take the value through `props` |
 | Calling a translation function | Same: choosing words for a domain is a block's job | Take the resolved string through `props` |

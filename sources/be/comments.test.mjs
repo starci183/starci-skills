@@ -66,6 +66,38 @@ test("COMMENT-2: every member of an exported enum carries its own doc", () => {
   })
 })
 
+test("COMMENT-4: a fixture lane keeps its data and still gives up its prose", () => {
+  const FIXTURE = "/repo/src/tests/e2e/support-ticket.e2e-spec.ts"
+  tester.run("no-non-ascii-source", noNonAsciiSource, {
+    valid: [
+      // the sentence a real customer types IS the thing under test - translating it would test a
+      // system nobody uses
+      {
+        filename: FIXTURE,
+        code: "const message = \"Anh chuyen roi nhe, em nhan duoc chua?\".replace(\"a\", \"ă\")",
+      },
+      {
+        filename: FIXTURE,
+        code: "const reply = { from: \"khách vừa chuyển khoản\" }",
+      },
+    ],
+    invalid: [
+      // a comment in a spec is prose like anywhere else: the next reader still cannot follow it
+      {
+        filename: FIXTURE,
+        code: "// kiểm tra luồng thanh toán\nconst x = 1",
+        errors: [{ messageId: "nonAscii" }],
+      },
+      // and outside a fixture lane, a string is prose again
+      {
+        filename: "/repo/src/modules/billing/charge.service.ts",
+        code: "const reply = \"khách vừa chuyển khoản\"",
+        errors: [{ messageId: "nonAscii" }],
+      },
+    ],
+  })
+})
+
 test("COMMENT-4: source stays ASCII unless the line is marked as depended-upon data", () => {
   tester.run("no-non-ascii-source", noNonAsciiSource, {
     valid: [

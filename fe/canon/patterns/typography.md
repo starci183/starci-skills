@@ -12,6 +12,9 @@ weight chosen together; it is a LEVEL, and the level decides both.
 What holds this law is [`sources/fe/typography.mjs`](../../../sources/fe/typography.mjs), plus the
 closed unions on the two components that own type.
 
+Implementation anchors in `starci-academy-fe`: `src/components/leaves/Text/index.tsx` and
+`src/components/leaves/Heading/index.tsx`.
+
 ## The scale, as it actually is
 
 Headings are four levels, and each fixes a size and a weight at once:
@@ -23,9 +26,11 @@ Headings are four levels, and each fixes a size and a weight at once:
 | 3 | 14px | medium |
 | 4 | 12px | medium |
 
-Body text is two sizes — 14px and 16px — three weights, and two tones. That is the whole vocabulary,
-and it is deliberately smaller than the surface it replaces: a scale a second author cannot hold in
-their head is one they read off the nearest neighbour instead.
+Body text uses 14px and 16px. A third, restricted 12px caption step exists only for supporting copy
+beneath or beside a primary line or joined surface; it is not another general-purpose body size.
+Because that step already means "supporting", every `text-xs` is muted. Size and tone are one rank
+here: there is no default-tone or foreground-coloured 12px exception. The scale has three weights
+and two tones, and callers do not invent further steps from nearby pixels.
 
 Notice what the heading table does NOT do: it never pairs a large size with the heaviest weight. Rank
 comes from the STEP, not from shouting one line as loudly as the type system allows.
@@ -61,10 +66,27 @@ An eyebrow, a count, a category, a piece of meta: smaller and dimmer, never larg
 card whose loudest element is its category tag is a card whose name nobody read, and that is a
 defect rather than a successful emphasis.
 
+A muted caption below a primary `text-sm` label therefore uses the reserved `text-xs` step. Tone
+alone is not enough: two lines at the same size still claim the same rank even when one is grey.
+
 **TYPE-6 · Weight is a body-text axis. A heading does not take one.**
 
 Headings already carry weight as part of their level. Pushing another onto one is asking two systems
 to decide the same thing, and the loser is whichever the reader sees second.
+
+**TYPE-7 · `text-xs` always means muted supporting copy.**
+
+The smaller step is not a compact version of primary copy. It is the right-hand fact beside a
+`text-sm` label, a relative time such as "55 minutes ago", or a caption under the thing it explains.
+If the words must keep the foreground tone, they are primary enough to remain `text-sm` or larger.
+The `Text` leaf encodes this pairing: selecting `size: "xs"` resolves and types the tone as muted.
+
+**TYPE-8 · A temporal result marker is a muted subtitle, not a heading.**
+
+Today, Yesterday and equivalent local-time partitions qualify the joined results immediately below
+them. They render outside that surface as `text-sm` with muted tone. They remain `text-sm` because
+they name a scan partition; they are not explanatory caption copy. Giving them a heading level or
+the label treatment of `SurfaceListCard` falsely promotes each time bucket into a page section.
 
 ## Forbidden
 
@@ -75,8 +97,9 @@ to decide the same thing, and the loser is whichever the reader sees second.
 | A fifth heading level | The section has nested further than a reader can hold | Flatten the section |
 | A box drawn to emphasise | Jewellery that does not match rank teaches the reader to ignore boxes | Size, weight, tone |
 | Making the important thing louder | Emphasis is relative, so raising it raises the floor for everything | Quieten its neighbours |
-| A secondary line larger or heavier than its title | The card's name goes unread, which is a defect and not emphasis | Smaller and dimmer |
+| A secondary line the same size as, larger than, or heavier than its title | The two lines claim equal rank, or the card's name goes unread | The restricted 12px caption step plus muted tone |
 | A weight pushed onto a heading | Two systems decide one thing, and the reader sees the loser | Let the level decide |
+| `text-xs` without muted tone | A supporting-size line claims primary colour and sends two contradictory rank signals | Pair `text-xs` with `text-muted`, or keep primary copy at `text-sm` |
 
 ## Examples
 

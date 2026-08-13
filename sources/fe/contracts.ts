@@ -38,10 +38,12 @@ export type LayoutClassName =
     | "gap-2" | "gap-3" | "gap-4" | "gap-6" | "gap-8"
     | "grid-cols-1" | "sm:grid-cols-2"
     | "mx-auto" | "w-full" | "text-center"
-    | "px-3" | "px-4" | "py-2" | "py-3" | "py-6" | "p-4" | "p-6"
+    | "px-3" | "px-4" | "py-2" | "py-3" | "py-6" | "p-0" | "p-4" | "p-6"
     | "rounded-xl" | "rounded-2xl" | "rounded-full"
     | "bg-surface" | "bg-default" | "shadow-surface"
     // Positional selectors are accepted HERE and only here - see the note on the table below.
+    | "[&>*]:px-4" | "[&>*]:py-3"
+    | "[&>*:first-child]:pt-4" | "[&>*:last-child]:pb-4"
     | "[&>*:first-child]:grow" | "[&>*:last-child]:grow"
     | "[&>*:nth-child(2)]:min-w-0" | "[&>*:nth-child(2)]:grow"
 
@@ -56,8 +58,22 @@ export type LayoutClassName =
  * `div`, so any shape needing `<ul>` has nowhere lawful to live and gets filed among the leaves
  * instead - where it may write its own classes. That is how an entire tier fills up with
  * arrangements, and the duplication is invisible afterwards because no rule reads both places.
+ *
+ * `main` AND `ol` WERE ADDED FROM A CONSUMING REPOSITORY, which is the part worth recording. A
+ * repository had grown its own copy of this union under a different NAME - `ContractHostTag` - with
+ * `main` and `ol` present and `li`, `header` and `footer` missing. Neither list contained the other,
+ * so both were wrong and neither could tell: the scaffolding above the table is supposed to be
+ * identical everywhere, and a renamed type is a divergence no import ever reports. The members are
+ * merged here, at the source, and the repository takes this name.
+ *
+ * `main` is the document's one landmark. `ol` is `ul` where the sequence is the meaning - module
+ * three follows module two - and it is useless without the `li` beside it, which is the trap the
+ * other repository hit: it admitted both list containers and not the item, so a list row had to be
+ * a `div`, which is invalid HTML and silent. A `<ul>` whose children are not `<li>` stops being
+ * announced as a list at all, and nothing turns red, because a `div` is never wrong on its own.
  */
-export type ContractHost = "div" | "ul" | "li" | "form" | "nav" | "section" | "header" | "footer" | "aside"
+export type ContractHost =
+    | "div" | "ul" | "ol" | "li" | "form" | "nav" | "main" | "section" | "header" | "footer" | "aside"
 
 /**
  * ONE CHILD SLOT. Either the child is another node, or it is a leaf.
@@ -170,7 +186,7 @@ const buildContracts = <
  */
 export const CONTRACTS = buildContracts({
     "glyph-title-fact-row": {
-        classNames: ["flex", "flex-row", "items-center", "gap-3", "[&>*:nth-child(2)]:min-w-0", "[&>*:nth-child(2)]:grow"],
+        classNames: ["flex", "flex-row", "items-center", "gap-2", "[&>*:nth-child(2)]:min-w-0", "[&>*:nth-child(2)]:grow"],
         children: {
             glyph: { leaf: "icon", props: { size: "sm" } },
             title: { leaf: "text", props: { size: "md", tone: "default" } },
@@ -179,7 +195,7 @@ export const CONTRACTS = buildContracts({
         why: "The glyph identifies the row faster than its name does, so it leads the line and the fact trails it - and the name between them takes the slack, because a long one must clip rather than push the figure off the end of the row.",
     },
     "heading-over-body": {
-        classNames: ["flex", "flex-col", "gap-4"],
+        classNames: ["flex", "flex-col", "gap-3"],
         children: {
             heading: { leaf: "heading", props: { level: 3 } },
             body: { contract: "glyph-title-fact-row" },

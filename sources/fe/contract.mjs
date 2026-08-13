@@ -37,6 +37,25 @@ import { dirname, join } from "node:path"
 
 // -- where things are ---------------------------------------------------------------------------
 
+/**
+ * Every prefix a component tree can sit under.
+ *
+ * ONE TIER, TWO LAYOUTS. A single-app repository keeps the tree at `src/components/*`; a monorepo
+ * keeps the same tree, with the same tier names, in a shared package at `packages/ui/src/*`. Only
+ * the prefix differs, so a rule that writes the prefix out by hand works in one repository and is
+ * BLIND in the other - and blind here does not mean noisy, it means silently wrong in both
+ * directions at once. A leaf it cannot recognise is reported for writing the classes a leaf is
+ * supposed to write, while every rule that guards the leaf tier stops guarding anything.
+ *
+ * That is not hypothetical. Pointed at a monorepo, this file produced 46 errors across 28 correct
+ * files - every one of them a leaf declaring `meta = { shape: "leaf" }` in `packages/ui/src/leaves`
+ * - and the obvious reading was that the repository owed 46 fixes. It owed none.
+ *
+ * A layout added to this list is added to every rule at once, which is the only reason there is one
+ * list rather than a literal per predicate.
+ */
+export const COMPONENT_ROOTS = ["src/components", "packages/ui/src", "src"]
+
 /** The contract folder, relative to the repository root. */
 export const CONTRACT_DIR_RELATIVE = "src/components/contracts"
 
@@ -60,15 +79,36 @@ export const LEAF_DIR_RELATIVE = "src/components/leaves"
 /** Forward-slash form of a filename, so Windows paths compare like every other path. */
 export const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 
+/**
+ * Whether a file sits in one named tier, under any supported layout.
+ *
+ * @param filename - the file being linted.
+ * @param segment - the tier path below the component root, e.g. `leaves` or `branches/Tree`.
+ * @returns true when the file is inside that tier in any layout.
+ */
+export const isInComponentTier = (filename, segment) =>
+    COMPONENT_ROOTS.some((root) => normalizePath(filename).includes(`/${root}/${segment}/`))
+
+/**
+ * Candidate paths for one component-tree file, one per supported layout.
+ *
+ * @param relative - path below the component root, e.g. `contracts/index.ts`.
+ * @returns one candidate per known root, most specific first.
+ */
+export const componentCandidates = (relative) => COMPONENT_ROOTS.map((root) => `${root}/${relative}`)
+
 /** True when this file holds the entry table - the one place a class string or a reason is written. */
-export const isContractTableFile = (filename) => normalizePath(filename).endsWith(`/${CONTRACT_TABLE_RELATIVE}`)
+export const isContractTableFile = (filename) =>
+    componentCandidates("contracts/index.ts")
+        .some((candidate) => normalizePath(filename).endsWith(`/${candidate}`))
 
 /** True when this file is the frame that renders an entry, and therefore paints its markers. */
-export const isContractFrameFile = (filename) => normalizePath(filename).includes(`/${CONTRACT_FRAME_RELATIVE}/`)
+export const isContractFrameFile = (filename) => isInComponentTier(filename, "branches/Tree")
 
 /** Named surface branches own fixed vendor-wrapper mechanics around one checked content node. */
 export const isSurfaceContractHostFile = (filename) =>
-  /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)\//.test(normalizePath(filename))
+  ["SurfaceCard", "SurfaceAccordionCard", "SurfaceListCard", "SurfaceFormCard"]
+      .some((surface) => isInComponentTier(filename, `branches/${surface}`))
 
 /**
  * True when this file is a leaf.
@@ -86,7 +126,7 @@ export const isSurfaceContractHostFile = (filename) =>
  * these rules by filing a component here. What keeps a region out is a question a person asks -
  * does this file arrange two contents? If yes it is a composite. No gate asks that question.
  */
-export const isLeafFile = (filename) => normalizePath(filename).includes(`/${LEAF_DIR_RELATIVE}/`)
+export const isLeafFile = (filename) => isInComponentTier(filename, "leaves")
 
 /** A twin test may build fixture markup by hand; product source may not. */
 export const isTestFile = (filename) => /\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(normalizePath(filename))
@@ -108,10 +148,19 @@ const cache = new Map()
 
 /** Walk up from a linted file to the contract table; null when none sits above it. */
 export const findContractTable = (filename) => {
+  /*
+   * Every layout's table path is tried at each level, not just the single-app one. Walking up
+   * looking only for `src/components/contracts/index.ts` finds nothing in a monorepo, and the
+   * reader's own header records what that silence costs: it returns null, every rule that reads it
+   * does nothing, and eslint reports a clean tree while an invented key walks through.
+   */
+  const candidates = componentCandidates("contracts/index.ts")
   let dir = dirname(normalizePath(filename))
   for (let depth = 0; depth < 40; depth += 1) {
-    const candidate = normalizePath(join(dir, CONTRACT_TABLE_RELATIVE))
-    if (existsSync(candidate)) return candidate
+    for (const relative of candidates) {
+      const candidate = normalizePath(join(dir, relative))
+      if (existsSync(candidate)) return candidate
+    }
     const parent = dirname(dir)
     if (!parent || parent === dir) return null
     dir = parent
@@ -161,6 +210,39 @@ const parseKeys = (source, builder) => {
  *
  * @param filename - The file being linted.
  */
+/**
+ * The element one contract key opens, read from the table.
+ *
+ * WHY A RULE NEEDS THIS. The document's main landmark used to be drawn by a branch called `Main`,
+ * so a rule could look for that name. The element now belongs to the entry - `host: "main"` beside
+ * the classes and the children - because a `<main>` is a MEANING and meaning lives with the rest of
+ * what the key fixes. A rule that still looks for the branch reports a correct landmark as missing.
+ *
+ * Textual, for the same reason `readContracts` is: a rule runs under one parser on one file and
+ * cannot import a TypeScript module. Absent `host` means `div`, which is what the frame defaults to.
+ *
+ * @param filename - The file being linted, used to locate the table above it.
+ * @param key - The contract key to read.
+ * @returns The host element name, or null when the table or the key cannot be read.
+ */
+export const contractHostOf = (filename, key) => {
+  const path = findContractTable(filename)
+  if (!path) return null
+  let source = null
+  try {
+    source = readFileSync(path, "utf8")
+  } catch {
+    return null
+  }
+  const opening = source.indexOf(`"${key}": {`)
+  if (opening === -1) return null
+  // The entry ends at the next key at the same indentation; a bounded window is enough and avoids
+  // brace-matching a file this rule only needs one field from.
+  const window = source.slice(opening, opening + 2000)
+  const host = window.match(/\bhost:\s*"([a-z]+)"/)
+  return host ? host[1] : "div"
+}
+
 export const readContracts = (filename) => {
   const path = findContractTable(filename)
   if (!path) return null

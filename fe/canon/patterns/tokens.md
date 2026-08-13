@@ -14,19 +14,28 @@ What holds this law is the closed union in
 [`sources/fe/contracts.ts`](../../../sources/fe/contracts.ts) and, for what a union cannot see,
 [`sources/fe/tokens.mjs`](../../../sources/fe/tokens.mjs).
 
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.ts` and
+`src/components/branches/Tree/index.tsx`.
+
 ## The scale, as it actually is
 
 Five rungs for the seam between things, and they are not evenly spaced:
 
 | Rung | Reads as |
 |---|---|
-| 8px | things that belong to one unit but stay separate — a row of controls, a run of rows |
-| 12px | a label and the thing it names |
+| 8px | `gap-2`: compact horizontal peers in one functional cluster — icon and label, peer tabs, grouped cards, or an input and its direct inline action |
+| 12px | `gap-3`: owner-to-owned or independently readable local units — label to card/input, field to field, card to caption, toolbar to governed content, or unrelated groups sharing a row |
 | 16px | two groups inside one surface |
 | 24px | two blocks on a page |
 | 32px | the layout seam — a rail against the column beside it |
 
-There is **no zero rung and no 4px rung**, and their absence is deliberate. The surface this
+`gap-2` requires two facts at once: the peers are horizontal AND they form one functional cluster.
+Fail either test and the seam is `gap-3`. The tokens are selected by relationship and grouping,
+never by component name or direction:
+an input and its direct action may use `gap-2` when they share one horizontal control, while a label
+above that input uses `gap-3`. Horizontal parts that are separate semantic groups also use `gap-3`.
+A subtle feed chronology may use `gap-2` between date labels and result cards, but the toolbar above
+that chronology uses `gap-3`. There is **no zero rung and no 4px rung**, and their absence is deliberate. The surface this
 replaces ran eight rungs including both; the two tightest were the ones nobody applied consistently,
 because "touching" and "almost touching" are not a distinction a second author reproduces from
 memory. Two things that are one thing do not need a seam at all — they are one element.
@@ -35,6 +44,25 @@ Insets take 16px and 24px symmetric, or 12/8 and 16/12 asymmetric. And the relat
 an unfamiliar surface decidable is visible in the table rather than asserted over it: **the house
 surface carries a 16px inset around a 16px interior seam.** The edge breathes at the rhythm of the
 contents, so the two are one decision and not two.
+
+An ordinary Card therefore uses `p-4`. A joined-list Card preserves that same 16px outer edge
+without insetting its dividers: both vendor Card and content host are `p-0`, the list root is `p-0`;
+a single row is `p-4`; first/middle/last
+rows are respectively `px-4 pt-4 pb-3`, `px-4 py-3`, and `px-4 pt-3 pb-4`.
+When the generic Card token is enforced with `!important`, the joined-list root uses a semantic
+`data-component` selector at equal strength. Utility presence is insufficient; computed padding
+on the rendered test-account page must be `0px`.
+
+Buttons have two height tokens, selected by placement rather than importance:
+
+| Token | Placement |
+|---|---|
+| `sm` | Embedded action inside a row, list item, compact toolbar, card cluster or another control's local seam; reactions in an activity row belong here |
+| `md` | Standalone action that owns a line or anchors a form or surface |
+
+The `variant` axis remains independent: it says whether an action is primary, secondary, outline,
+or tertiary; it does not select height. A primary action may be `sm` in a compact cluster, and a
+tertiary action may be `md` when it stands alone. Label length never changes the size token.
 
 ## Rules
 
@@ -79,6 +107,21 @@ patrol, and it is why they read class strings in source rather than only entries
 They also read a class string hoisted into a module constant, because hoisting is where the last
 off-scale value in this codebase survived every rule that existed.
 
+**TOKEN-7 · Semantic colour is paired by the surface that carries it.**
+
+A bare success word or glyph uses `text-success`. A soft success plate pairs
+`bg-success-soft` with `text-success-soft-foreground`; a solid success plate pairs `bg-success`
+with `text-success-foreground`. Warning and danger follow the same three roles. A background token
+is not a foreground token: using `text-success-soft` on a bare check confuses the plate colour with
+the ink intended to sit on it and breaks contrast across themes.
+
+**TOKEN-8 · Button size follows placement, while variant follows priority.**
+
+An embedded action uses `sm`; a standalone action that owns a line uses `md`. These are the only
+button sizes because each names a reproducible relationship. Inferring height from primary versus
+tertiary, from the number of words, or from how visually loud the control feels mixes independent
+axes and makes the same role change geometry between screens.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -90,6 +133,9 @@ off-scale value in this codebase survived every rule that existed.
 | Large text plus heavy weight assembled by hand | It is a heading the outline does not contain, and it stays behind when the scale moves | The component that owns both facts |
 | A sixth rung because a screen looked slightly wrong | The scale then describes screens instead of relationships | Ask which level of grouping the seam separates |
 | An off-scale value hoisted into a constant | Lifting it out of the markup hides it; it does not license it | The nearest rung |
+| A `*-soft` background token used as text colour | Plate and foreground roles are different and have different contrast duties | Bare `text-*`, or pair `bg-*-soft` with `text-*-soft-foreground` |
+| Button size inferred from variant | Visual priority does not say whether the action is embedded or standalone | Select variant from priority and size from placement |
+| Custom padding used to shrink a button | It creates a third, local control height outside the closed set | Use `sm` for an embedded action |
 
 ## Examples
 
@@ -147,3 +193,28 @@ They differ in one thing: whether the value exists anywhere else in the product.
 ```
 
 They differ in one thing: whether a screen reader's outline contains the title.
+
+### The embedded action
+
+```tsx
+<Button props={{ label: reactionLabel, variant: "ghost", size: "sm" }} />
+```
+
+```tsx
+<Button props={{ label: reactionLabel, variant: "ghost", size: "md" }} />
+```
+
+They differ in one thing: whether an action embedded in a feed row uses the compact placement token.
+
+### Priority is not size
+
+```tsx
+<Button props={{ label: submitLabel, variant: "primary", size: "md" }} />
+```
+
+```tsx
+<Button props={{ label: submitLabel, variant: "primary", size: "sm" }} />
+```
+
+They differ in one thing: whether a standalone form anchor uses the resting placement token; both
+remain primary.

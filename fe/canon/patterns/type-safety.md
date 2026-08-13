@@ -17,6 +17,9 @@ anything else, the cast is hiding it.
 
 What holds this law is [`sources/fe/type-safety.mjs`](../../../sources/fe/type-safety.mjs).
 
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/props.ts` and
+`src/components/pages/ProfileSkillsPage/component.test.tsx`.
+
 ## Rules
 
 **TYPE-SAFETY-1 · A double cast turns checking off, and it is the loudest form of doing so.**

@@ -45,6 +45,13 @@ The commonest legitimate case is a section whose contents are THEMSELVES surface
 region keeps its name and drops its edge, so the run of inner surfaces reads as the section's body
 rather than as boxes inside a box.
 
+One narrow exception is a joined list inside a larger story surface. Its boundary communicates
+membership and clipping for peer rows, so it may remain bounded, but it uses a single token border
+and **no shadow**. Only the named `SurfaceListCard` nested mode owns that exception; a call site may
+not recreate it with a rounded wrapper, and the list contract itself owns neither border nor radius.
+When the outer surface already names that exact list, nested mode may suppress the duplicate inner
+heading; it does not erase the required resolved label or permit an anonymous page-level list.
+
 **SURFACE-3 · A section's name sits OUTSIDE the surface it names.**
 
 Holding the name inside the edge forces every section whose contents are already bounded to draw a
@@ -82,7 +89,7 @@ below that scale is separated by space and by names.
 | Never | Why it is refused | Instead |
 |---|---|---|
 | Two bordered surfaces stacked directly | They read as one heavy block with a seam, and the boundary they claim is not real | A flat link, a merge into the surface above, or a full section apart |
-| A bounded region inside a bounded region | The inner edge claims a level of grouping the reader already has | Drop the inner edge, or drop the outer one |
+| A bounded region inside a bounded region | The inner edge claims a level of grouping the reader already has | Drop one edge; for a genuine nested joined list only, use SurfaceListCard's border/no-shadow mode |
 | A section name held inside the surface it names | Every section whose body is already bounded must then draw a box around boxes | Hold the name outside the surface |
 | A surface drawn inside a dialog, drawer or popover | The overlay is already the boundary; a second one competes with it | Space and a heading |
 | A surface around one action | An action is not a group, and the edge grants weight it did not earn | Let it sit flat |

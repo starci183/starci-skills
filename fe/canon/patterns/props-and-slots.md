@@ -28,6 +28,9 @@ itself, and [`sources/fe/props-and-slots.mjs`](../../../sources/fe/props-and-slo
 thing a fence cannot see: a shape written inline at the parameter, where it has no name to be read
 by.
 
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/props.ts` and
+`src/components/branches/SurfaceListCard/index.tsx`.
+
 ## Rules
 
 **SLOTS-1 · The data slot carries DATA, and a function does not satisfy it.**
@@ -95,7 +98,7 @@ surface every caller's model. The strict rule rejects that lane at the JSX call 
 | An interface for a component's data | It silently fails the fence that keeps functions out | A type alias |
 | An inline object type on a parameter | The shape has no name, so nothing can import it, test it or find it | Name it in the module |
 | A slot the alias does not have | The alias IS the shape; wanting one more means the layer was chosen wrongly | Decide which layer this is |
-| `children` in a component except ModalShell/DrawerShell | Markup arrives already built, so what a container holds can never be stated or checked | `contract` plus a branded `ContractComponent<K>` |
+| `children` outside ModalShell/DrawerShell/DropdownShell | Markup arrives already built, so what a container holds can never be stated or checked | `contract` plus a branded `ContractComponent<K>` |
 | `items` on `SurfaceListCard` | It creates a second data lane and makes the shared surface know a caller's collection model | Put the collection under its domain name in the render component's named `props` type |
 | `render` on a closed shape | It has become a container, whatever its folder says | Move it to the container layer |
 | A component that decides its own `isLoading` | It asks a question the layer above already answered | Take the flag |

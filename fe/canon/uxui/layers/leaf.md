@@ -175,8 +175,8 @@ They differ in one thing: who decided the arrangement. Not size.
 
 ```tsx
 // leaf: the vendor's own link carries the press, and the glue keeps the glyph on the line.
-export const NavLink = ({ props }: NavLinkProps) => (
-    <HeroLink href={props.href} className="inline-flex items-center gap-2">
+export const NavLink = ({ props, on }: NavLinkProps) => (
+    <HeroLink onPress={on?.press} className="inline-flex items-center gap-2">
         <Icon props={{ name: props.icon, size: "sm" }} />
         {props.label}
     </HeroLink>
@@ -185,8 +185,8 @@ export const NavLink = ({ props }: NavLinkProps) => (
 
 ```tsx
 // NOT a leaf: the padding is there to make the whole row the target, which turns it into a box.
-export const QuickActionRow = ({ props }: QuickActionRowProps) => (
-    <HeroLink href={props.href} className="flex flex-row items-center gap-3 rounded-xl px-3 py-2">
+export const QuickActionRow = ({ props, on }: QuickActionRowProps) => (
+    <HeroLink onPress={on?.press} className="flex flex-row items-center gap-3 rounded-xl px-3 py-2">
         <Icon props={{ name: props.icon, size: "sm" }} />
         {props.label}
     </HeroLink>

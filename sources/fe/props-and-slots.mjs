@@ -12,6 +12,8 @@
  * a shape is findable.
  */
 
+import { COMPONENT_ROOTS, isContractTableFile, isInComponentTier } from "./contract.mjs"
+
 /** True when a parameter type contains an anonymous object shape, including inside intersections. */
 const isInlineObjectType = (node) => {
   if (!node) return false
@@ -56,13 +58,38 @@ export const noInlineParameterType = {
 
 // -- SLOTS-4 ---------------------------------------------------------------------------------------
 
-/** The only two files where a React `children` hole is lawful. */
-const CHILDREN_SHELL = /\/src\/components\/shells\/(?:ModalShell|DrawerShell)\//
+/** The only three components where a React `children` hole is lawful. */
+const CHILDREN_SHELLS = ["ModalShell", "DrawerShell", "DropdownShell"]
 
-/** True for a component file the slot fence governs. Pages and non-source files are outside it. */
+/**
+ * True for a component file the slot fence governs.
+ *
+ * TWO EXEMPTIONS AND ONE LAYOUT FIX, all of which this predicate got wrong at once.
+ *
+ * It read `/src/components/` as a literal, so in a monorepo - where the same tier sits at
+ * `packages/ui/src/*` - the rule applied to NOTHING. That repository reported no violations, which
+ * looked like compliance and was silence: the fence was not holding anywhere in it.
+ *
+ * The registry table is exempt because `ContractSpec.children` is not a children hole; it is the
+ * NAMED CHILD GRAMMAR that replaces one. Reporting it asks the file that abolished the anonymous
+ * slot to stop describing what it admits instead.
+ *
+ * The three shells stay exempt for the reason canon already gives them: they pass real children
+ * through and arrange nothing.
+ *
+ * @param filename - the file being linted.
+ */
 const isGoverned = (filename) => {
   const path = String(filename || "").replace(/\\/g, "/")
-  return path.includes("/src/components/") && !CHILDREN_SHELL.test(path)
+  if (isContractTableFile(path)) return false
+  if (CHILDREN_SHELLS.some((shell) => isInComponentTier(path, `shells/${shell}`))) return false
+  /*
+   * The bare `src` root is dropped here, and only here. `COMPONENT_ROOTS` carries it as a
+   * catch-all so a reader that walks up from any file still finds the table; used as a FENCE it
+   * matches every file under `src/`, which pulls routed pages into a rule about component slots and
+   * reports a page for taking children - the one thing a page legitimately does.
+   */
+  return COMPONENT_ROOTS.filter((root) => root !== "src").some((root) => path.includes(`/${root}/`))
 }
 
 /**
@@ -72,17 +99,17 @@ const isGoverned = (filename) => {
  * aliases it defines, but nothing stops a file declaring its own props shape by hand and putting
  * `children` in it. What the alias makes unrepresentable, a hand-written interface makes ordinary.
  *
- * ModalShell and DrawerShell are exempt because their purpose is to ignore the interior shape and
+ * ModalShell, DrawerShell and DropdownShell are exempt because they ignore the interior shape and
  * pass it directly to the vendor body. No folder-wide exemption exists.
  */
 export const noChildrenSlot = {
   meta: {
     type: "problem",
-    docs: { description: "A container takes contract and render; only ModalShell/DrawerShell may take children." },
+    docs: { description: "A container takes contract and render; only the three closed shells may take children." },
     schema: [],
     messages: {
       slot:
-        "`children` accepts markup that has already been built, so its shape cannot be checked. Take contract + render instead. Only ModalShell and DrawerShell may pass an uninterpreted interior straight to a vendor body.",
+        "`children` accepts markup that has already been built, so its shape cannot be checked. Take contract + render instead. Only ModalShell, DrawerShell and DropdownShell may pass an uninterpreted interior straight to vendor mechanics.",
     },
   },
   create(context) {

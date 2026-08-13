@@ -20,6 +20,9 @@ importantly, the two closed unions in [`sources/contracts.ts`](../../../sources/
 unions matter more than the rules: a class or an element that is not a member is not forbidden, it
 is unrepresentable, and there is nothing to police when the wrong value cannot be typed.
 
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.ts` and
+`src/components/branches/Tree/index.tsx`.
+
 ## Rules
 
 **CONTRACT-1 · A structural node takes its classes from a key, never from a literal.**
@@ -165,6 +168,16 @@ domain name (`tasks`, `courses`, `alerts`) remains a field of the content compon
 type. A generic `items` slot would teach the surface the caller's data model and is not part of the
 branch vocabulary.
 
+That joined-list root is `p-0`, with repeated rows as direct children, so every divider reaches both
+surface edges. The row contract restores the Card's ordinary `p-4` edge asymmetrically: one row
+`p-4`; first `px-4 pt-4 pb-3`; middle `px-4 py-3`; last `px-4 pt-3 pb-4`. The fixed
+label/surface/caption assembly contains owner-to-owned units and uses `gap-3`.
+
+The list host also owns the optional fact at the end of its label line. That fact is `xs muted`
+beside an `sm semibold` label and qualifies the joined list itself. It must not be projected as a
+separate sibling by the caller, and it must not be put in `description`: description is reserved
+for the whole-list caption below the surface.
+
 None of this is `children` in the React sense, and that is what makes it checkable. Markup arrives
 already built and erases its shape. `ContractSlots<K>` carries a checked bound record and is not
 callable. `ContractProjection<K>` carries an explicit `project` function for a branch that already
@@ -201,12 +214,16 @@ are compile errors.
 ### The ordinary case — a node is a key
 
 ```tsx
-// The wrapper and the contract component receive the same named runtime props.
+// The wrapper passes named runtime props; the branded content draws the one contract root.
 export const SurfaceListCard = ({ props, on, contract, render: Content, isLoading }: SurfaceListCardProps) => (
     <div className="flex flex-col gap-3">
-        <Heading props={{ content: props.label, level: 3 }} />
-        <Card>
-            <Card.Content {...contractNodeProps(contract)}>
+        {props.fact === undefined ? (
+            <Heading props={{ content: props.label, level: 3 }} />
+        ) : (
+            <Tree contract="label-with-muted-fact-row" render={labelAndFactFrom(props)} />
+        )}
+        <Card className="p-0" data-component="SurfaceListCardSurface">
+            <Card.Content className="p-0">
                 <Content props={props} on={on} isLoading={isLoading} />
             </Card.Content>
         </Card>
@@ -214,11 +231,14 @@ export const SurfaceListCard = ({ props, on, contract, render: Content, isLoadin
     </div>
 )
 
+const DailyQuestContentView = ({ props }) => (
+    <Tree contract="daily-quest-list" render={rowsFrom(props.tasks)} />
+)
 const DailyQuestContent = defineContractComponent("daily-quest-list", DailyQuestContentView)
 <SurfaceListCard
     contract="daily-quest-list"
     render={DailyQuestContent}
-    props={{ label, description, tasks }}
+    props={{ label, fact, description, tasks }}
 />
 ```
 

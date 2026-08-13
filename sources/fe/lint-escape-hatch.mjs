@@ -6,8 +6,17 @@ const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 /** Product source is governed; canon tests deliberately construct forbidden directives. */
 const isProductSource = (filename) => normalizePath(filename).includes("/src/")
 
-/** Any directive that changes ESLint's active rule set inside a source file. */
-const INLINE_DIRECTIVE = /\beslint-(?:disable(?:-next-line|-line)?|enable)\b/
+/**
+ * Any directive that changes ESLint's active rule set inside a source file.
+ *
+ * ANCHORED AT THE START OF THE COMMENT, because that is the only place ESLint itself honours one:
+ * a directive is recognised from the first non-space character of the comment body and nowhere else.
+ * An unanchored pattern matched the WORD instead of the directive, so a comment explaining why a
+ * file carries no `eslint-disable` was reported as carrying one - and the only way to silence that
+ * was to stop writing the explanation, which is the opposite of what this law wants. Under-catching
+ * is not the trade: a directive ESLint would obey always sits at the start.
+ */
+const INLINE_DIRECTIVE = /^\s*eslint-(?:disable(?:-next-line|-line)?|enable)\b/
 
 /** Inline lint configuration is repository policy, never a file-local choice. */
 export const noInlineLintConfig = {

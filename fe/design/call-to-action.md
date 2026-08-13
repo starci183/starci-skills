@@ -72,6 +72,14 @@ A surface with no next step is a dead end, and a reader who reaches one leaves t
 than the screen. The path onward is not always a primary action — it can be a link back into the
 core loop — but its absence is never correct.
 
+**CTA-9 · Priority and physical size are separate decisions.**
+
+The appearance answers how strongly the product recommends an action; the physical size answers
+where that action lives. An action embedded among the content of a row or compact control cluster
+uses the compact control size because it is a peer of that content. An action that owns a line or
+anchors a form or surface uses the resting control size. Label length does not choose either, and a
+subordinate appearance does not grant permission to compress a control below the house geometry.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -84,6 +92,8 @@ core loop — but its absence is never correct.
 | A primary pointing back where the reader just came from | The destination is one they have already rejected | Point at what the last step gave them a reason to want |
 | A subordinate action carrying the forward marker | It competes for the click the primary needs | Tertiary, small, no marker |
 | A surface with no path onward | The reader leaves the product rather than the screen | Give it one, even if it is only a way back into the loop |
+| Choosing size from variant or label length | Priority, wording and placement are different decisions, so coupling them makes identical roles render differently | Choose appearance from priority and size from placement |
+| Hand-shrinking an embedded action | It creates a one-off hit target and visual rhythm outside the component system | Use the compact size owned by the button component |
 
 ## Examples
 
@@ -134,3 +144,15 @@ the slot beside the heading holds a refresh control, and the primary sits furthe
 ```
 
 They differ in one thing: which action the position claims is the important one.
+
+### The size trap
+
+```
+a tertiary reaction inside an activity row, using the house compact button size
+```
+
+```
+the same reaction with custom padding added until it looks smaller
+```
+
+They differ in one thing: whether placement selects a system size or invents a local one.

@@ -20,6 +20,9 @@ identifiers, comments, JSDoc, diagnostics and string literals — everywhere pro
 a rule that checked only comments would leave the same sentence legal one line lower as a variable
 name.
 
+Implementation anchors in `starci-academy-fe`: `src/components/branches/SurfaceCard/index.tsx` and
+`plugins/eslint/index.mjs`.
+
 ## Rules
 
 **COMMENTS-1 · Every export opens with a documentation block.**
@@ -49,12 +52,13 @@ The mark is the point of the third exception. An unmarked literal is indistingui
 comment somebody forgot to translate, so a reader has to decide, and the next one decides
 differently.
 
-**COMMENTS-4 · No emoji in source.**
+**COMMENTS-4 · No Unicode emoji in source.**
 
 Not in identifiers, comments, diagnostics or non-content strings. A pictograph renders differently
 on every platform, sorts unpredictably, breaks a terminal that is not expecting it, and carries a
-meaning that is not the same in two countries. Where a mark is genuinely wanted on screen, it is an
-icon, which is a decision the icon vocabulary already owns.
+meaning that is not the same in two countries. Generic interface marks belong to the icon vocabulary.
+Product reactions are the one narrower artwork case: they use attributed, checked-in SVG assets
+through the reaction leaf, never a Unicode pictograph in source or locale data.
 
 **COMMENTS-5 · A comment that restates the line is deleted, not improved.**
 
@@ -76,7 +80,7 @@ obvious shape is wrong here. Those are exactly the ones a reader would otherwise
 | A comment in a second language | The codebase gains a population of readers who skip parts of it | English, to a stranger's standard |
 | An identifier in a second language | Same, one line lower, where a comment rule would not look | Same |
 | A diagnostic message in a second language | The person reading it is whoever is on call, not whoever wrote it | Same |
-| Emoji anywhere in source | It renders differently everywhere and means different things in different places | An icon, if a mark is wanted on screen |
+| Unicode emoji anywhere in source | It renders differently everywhere and means different things in different places | A semantic icon, or the checked-in reaction artwork when the product meaning is a reaction |
 | A functional literal in another language, unmarked | It is indistinguishable from prose somebody forgot to translate | Keep it, and mark the line with its reason |
 | A comment restating the line below it | It teaches nothing and trains the reader to skip the next one | Delete it |
 

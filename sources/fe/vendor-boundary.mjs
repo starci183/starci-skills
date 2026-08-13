@@ -17,12 +17,19 @@
 /** Forward-slash form of a filename, so Windows paths compare like every other path. */
 const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
 
+/** Dot form of a two-part JSX member name such as `Checkbox.Content`. */
+const memberName = (node) => {
+  if (node?.type !== "JSXMemberExpression") return null
+  if (node.object?.type !== "JSXIdentifier" || node.property?.type !== "JSXIdentifier") return null
+  return `${node.object.name}.${node.property.name}`
+}
+
 /** The component library this boundary owns. Its glyph counterpart belongs to `icon.mjs`. */
 const VENDOR_PACKAGE_PREFIX = "@heroui/"
 
-/** The shell folder is closed to the two covering mechanics that intentionally ignore their interior. */
+/** The shell folder is closed to the three vendor mechanics that intentionally ignore their interior. */
 const SHELL_DIR = "/src/components/shells/"
-const SHELL_FILE = /\/src\/components\/shells\/(?:ModalShell|DrawerShell)\//
+const SHELL_FILE = /\/src\/components\/shells\/(?:ModalShell|DrawerShell|DropdownShell)\//
 
 /** Named surface branches may own the vendor wrapper they project a content contract into. */
 const SURFACE_BRANCH = /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)\//
@@ -175,10 +182,30 @@ export const fieldLabelIsTextOnly = {
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
     if (!/\/src\/components\/leaves\/Field\/index\.tsx$/.test(file)) return {}
+    const iconBindings = new Set()
     return {
       ImportDeclaration(node) {
         const source = normalizePath(node.source?.value)
-        if (/\/components\/leaves\/Icon$/.test(source)) context.report({ node, messageId: "icon" })
+        if (!/\/components\/leaves\/Icon$/.test(source)) return
+        for (const specifier of node.specifiers || []) {
+          if (specifier.imported?.name === "Icon" && specifier.local?.name) iconBindings.add(specifier.local.name)
+        }
+      },
+      JSXOpeningElement(node) {
+        const name = node.name?.type === "JSXIdentifier" ? node.name.name : null
+        if (!name || !iconBindings.has(name)) return
+        let ancestor = node.parent
+        while (ancestor) {
+          if (
+            ancestor.type === "JSXElement"
+            && ancestor.openingElement?.name?.type === "JSXIdentifier"
+            && ancestor.openingElement.name.name === "label"
+          ) {
+            context.report({ node, messageId: "icon" })
+            return
+          }
+          ancestor = ancestor.parent
+        }
       },
     }
   },
@@ -234,8 +261,12 @@ export const textLinkUsesHeroLink = {
       },
       JSXOpeningElement(node) {
         if (node.name?.type === "JSXIdentifier" && node.name.name === "button") context.report({ node, messageId: "handmade" })
-        if ((node.attributes || []).some((attribute) => attribute.type === "JSXAttribute" && attribute.name?.name === "className")) {
-          context.report({ node, messageId: "handmade" })
+        const className = (node.attributes || []).find(
+          (attribute) => attribute.type === "JSXAttribute" && attribute.name?.name === "className",
+        )
+        const classText = className?.value?.type === "Literal" ? String(className.value.value || "") : ""
+        if (/(?:hover:|underline)/.test(classText)) {
+          context.report({ node: className, messageId: "handmade" })
         }
       },
       "Program:exit"(node) {
@@ -247,33 +278,52 @@ export const textLinkUsesHeroLink = {
 
 // -- VENDOR-11 -------------------------------------------------------------------------------------
 
-/** The navbar account control opens one HeroUI dropdown before choosing an auth journey. */
+/** The account block owns the product choices; DropdownShell alone owns HeroUI mechanics. */
 export const accountControlOwnsDropdown = {
   meta: {
     type: "problem",
-    docs: { description: "AccountMenu owns HeroUI Dropdown and ShellNav does not open auth directly." },
+    docs: { description: "AccountMenu is a block over DropdownShell; only the shell imports HeroUI Dropdown." },
     schema: [],
     messages: {
-      dropdown: "AccountMenu must import HeroUI `Dropdown`; the account trigger opens the guest menu before any authentication surface.",
-      menu: "ShellNav must render AccountMenu for a guest account control.",
+      dropdown: "DropdownShell must import HeroUI `Dropdown`; vendor mechanics belong to the shell.",
+      shell: "AccountMenu's pure block half must compose DropdownShell instead of importing HeroUI directly.",
+      vendor: "AccountMenu is a product block. Import DropdownShell; do not own HeroUI Dropdown here.",
+      menu: "ShellNav must render the AccountMenu block from `components/blocks/auth/AccountMenu`.",
       direct: "The account IconButton may not carry an action in ShellNav. Guests open AccountMenu; its Sign in or Sign up choice opens the modal.",
+      pieces: "AccountMenu passes typed section data to DropdownShell; it must not import shell Section or Item pieces and rebuild vendor anatomy itself.",
     },
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
-    const isMenu = /\/src\/components\/leaves\/AccountMenu\/index\.tsx$/.test(file)
-    const isShell = /\/src\/components\/layouts\/ShellNav\/component\.tsx$/.test(file)
-    if (!isMenu && !isShell) return {}
+    const isDropdown = /\/src\/components\/shells\/DropdownShell\/index\.tsx$/.test(file)
+    const isMenu = /\/src\/components\/blocks\/auth\/AccountMenu\/component\.tsx$/.test(file)
+    const isNav = /\/src\/components\/layouts\/ShellNav\/component\.tsx$/.test(file)
+    if (!isDropdown && !isMenu && !isNav) return {}
     let hasOwner = false
     return {
+      ExportNamedDeclaration(node) {
+        if (!isDropdown) return
+        const source = context.sourceCode || context.getSourceCode()
+        if (/\bDropdownShell(?:Item|Section)\b/.test(source.getText(node))) {
+          context.report({ node, messageId: "pieces" })
+        }
+      },
       ImportDeclaration(node) {
-        if (isMenu && node.source?.value === "@heroui/react") {
+        if (isDropdown && node.source?.value === "@heroui/react") {
           hasOwner ||= (node.specifiers || []).some((specifier) => specifier.imported?.name === "Dropdown")
         }
-        if (isShell && /\/components\/leaves\/AccountMenu$/.test(normalizePath(node.source?.value))) hasOwner = true
+        if (isMenu && node.source?.value === "@heroui/react") context.report({ node, messageId: "vendor" })
+        if (isMenu && /\/components\/shells\/DropdownShell$/.test(normalizePath(node.source?.value))) {
+          hasOwner = true
+          if ((node.specifiers || []).some((specifier) =>
+            /^(?:DropdownShellSection|DropdownShellItem)/.test(specifier.imported?.name || ""))) {
+            context.report({ node, messageId: "pieces" })
+          }
+        }
+        if (isNav && /\/components\/blocks\/auth\/AccountMenu$/.test(normalizePath(node.source?.value))) hasOwner = true
       },
       JSXOpeningElement(node) {
-        if (!isShell || node.name?.type !== "JSXIdentifier" || node.name.name !== "IconButton") return
+        if (!isNav || node.name?.type !== "JSXIdentifier" || node.name.name !== "IconButton") return
         const props = (node.attributes || []).find((attribute) => attribute.type === "JSXAttribute" && attribute.name?.name === "props")
         const expression = props?.value?.type === "JSXExpressionContainer" ? props.value.expression : null
         const isAccount = expression?.type === "ObjectExpression" && expression.properties.some((property) =>
@@ -283,7 +333,100 @@ export const accountControlOwnsDropdown = {
       },
       "Program:exit"(node) {
         if (hasOwner) return
-        context.report({ node, messageId: isMenu ? "dropdown" : "menu" })
+        context.report({ node, messageId: isDropdown ? "dropdown" : isMenu ? "shell" : "menu" })
+      },
+    }
+  },
+}
+
+// -- VENDOR-13 -------------------------------------------------------------------------------------
+
+/** Checkbox.Content owns the control, indicator and label so every visible word toggles it. */
+export const checkboxKeepsCompoundAnatomy = {
+  meta: {
+    type: "problem",
+    docs: { description: "Keep the required HeroUI Checkbox nesting inside the house leaf." },
+    schema: [],
+    messages: {
+      anatomy:
+        "Checkbox must nest `HeroCheckbox.Control` (and its Indicator) inside `HeroCheckbox.Content`. Sibling Control and Content leave the visible label outside the checkbox's press target.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!/\/src\/components\/leaves\/Checkbox\/index\.tsx$/.test(file)) return {}
+    let hasContent = false
+    let controlInsideContent = false
+    let indicatorInsideControl = false
+    const hasAncestor = (node, expected) => {
+      let ancestor = node.parent
+      while (ancestor) {
+        if (ancestor.type === "JSXElement" && memberName(ancestor.openingElement?.name) === expected) return true
+        ancestor = ancestor.parent
+      }
+      return false
+    }
+    return {
+      JSXOpeningElement(node) {
+        const name = memberName(node.name)
+        if (name === "HeroCheckbox.Content") hasContent = true
+        if (name === "HeroCheckbox.Control" && hasAncestor(node, "HeroCheckbox.Content")) controlInsideContent = true
+        if (name === "HeroCheckbox.Indicator" && hasAncestor(node, "HeroCheckbox.Control")) indicatorInsideControl = true
+      },
+      "Program:exit"(node) {
+        if (!hasContent || !controlInsideContent || !indicatorInsideControl) {
+          context.report({ node, messageId: "anatomy" })
+        }
+      },
+    }
+  },
+}
+
+// -- VENDOR-14 -------------------------------------------------------------------------------------
+
+/** Internal StarCi navigation is an action resolved by connected code, never an href. */
+export const noInternalStarciHref = {
+  meta: {
+    type: "problem",
+    docs: { description: "Route internal StarCi destinations through connected router.push actions." },
+    schema: [],
+    messages: {
+      internal:
+        "Internal StarCi navigation must not use `href`. Keep the destination in connected code, report an id/press from the pure component, and call `router.push` there.",
+      leaf:
+        "This internal-navigation leaf must not declare or render `href`; it reports `on.press` and leaves routing to its connected owner.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!file.includes("/src/") || /\.(?:test|spec)\.[jt]sx?$/.test(file)) return {}
+    const internalOnlyLeaf = /\/src\/components\/leaves\/(?:Checkbox|NavLink|QuickActionRow|SeeMoreLink)\/index\.tsx$/.test(file)
+    const literalText = (node) => {
+      if (node?.type === "Literal" && typeof node.value === "string") return node.value
+      if (node?.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0]?.value?.cooked || ""
+      return null
+    }
+    const isInternal = (value) => value.startsWith("/") || /^https?:\/\/(?:www\.)?academy\.starci\.org(?:\/|$)/i.test(value)
+    return {
+      JSXAttribute(node) {
+        if (node.name?.name !== "href") return
+        if (internalOnlyLeaf) {
+          context.report({ node, messageId: "leaf" })
+          return
+        }
+        const value = node.value?.type === "JSXExpressionContainer" ? literalText(node.value.expression) : literalText(node.value)
+        if (value !== null && isInternal(value)) context.report({ node, messageId: "internal" })
+      },
+      Property(node) {
+        const key = node.key?.type === "Literal" ? node.key.value : node.key?.name
+        const value = literalText(node.value)
+        if ((key === "href" || key === "externalHref") && value !== null && isInternal(value)) {
+          context.report({ node, messageId: "internal" })
+        }
+      },
+      TSPropertySignature(node) {
+        if (!internalOnlyLeaf || node.key?.name !== "href") return
+        context.report({ node, messageId: "leaf" })
       },
     }
   },
@@ -341,6 +484,8 @@ export const rules = {
   "text-link-uses-hero-link": textLinkUsesHeroLink,
   "account-control-owns-dropdown": accountControlOwnsDropdown,
   "auth-overlay-owns-single-content-host": authOverlayOwnsSingleContentHost,
+  "checkbox-keeps-compound-anatomy": checkboxKeepsCompoundAnatomy,
+  "no-internal-starci-href": noInternalStarciHref,
 }
 
 /**

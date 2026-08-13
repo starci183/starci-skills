@@ -65,6 +65,9 @@ export type LeafProps<D extends ComponentData, A extends ComponentActions = Comp
  * cannot rearrange. That boundary with `branch` is held by this type rather than by a convention -
  * there is no `render` here, so an author who wanted a slot cannot express one and has to decide
  * which tier they are actually writing. A boundary the compiler holds does not drift.
+ * CLOSED DOES NOT MEAN FREEHAND. A composite still assembles through a typed `Tree` contract;
+ * raw structural markup would create an unnamed layout outside the registry. If a caller may
+ * supply the content or recipe, the component is a branch rather than a composite.
  *
  * It is structurally identical to {@link LeafProps} and deliberately NOT an alias of it: the two
  * tiers answer different questions, and a shared name would let a reader conclude they are the same

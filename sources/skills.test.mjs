@@ -1,0 +1,117 @@
+/**
+ * The skill gate: a procedure may not point at something that is not there.
+ *
+ *   node --test skills.test.mjs
+ *
+ * WHY THIS EXISTS. `parity.test.mjs` holds canon to its artifacts, and nothing held the skills to
+ * anything. A skill is mostly references — to the trust files it must read first, to the reference
+ * pages carrying its steps table, and to the scripts that are its actual gates — and every one of
+ * those is a path typed by hand into prose, where nothing recompiles when the target moves.
+ *
+ * It was written after a sweep found three of these at once, all silent: two skills invoking
+ * `<trust-root>/.claude/scripts/...` when the lock defines the trust root AS the `.claude`
+ * directory, so the path doubled the folder and could never resolve; and the same server started
+ * three different ways across four skills — once repo-relative, once skill-relative, once by
+ * placeholder — of which only the placeholder form survives being run from another repository,
+ * which is the normal case, because the target is rarely the repository holding trust.
+ *
+ * A broken link in a skill fails at the worst moment: mid-run, after the context lock is printed
+ * and the user is waiting, when the honest recovery is to stop and ask.
+ */
+import assert from "node:assert/strict"
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import { dirname, join, resolve } from "node:path"
+import test from "node:test"
+
+/** The trust root, resolved from this file so the gate travels with the tree. */
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
+const SKILLS = join(ROOT, "skills")
+
+/** Every markdown file under `skills/`, as absolute paths. */
+const markdownFiles = (directory) =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = join(directory, entry.name)
+    if (entry.isDirectory()) return markdownFiles(entryPath)
+    return entry.isFile() && entry.name.endsWith(".md") ? [entryPath] : []
+  })
+
+const skillMarkdown = existsSync(SKILLS) ? markdownFiles(SKILLS) : []
+const shown = (absolute) => absolute.slice(ROOT.length + 1).replace(/\\/g, "/")
+
+// Whether a skill's markdown LINKS resolve is not asked here: `links.test.mjs` asks it of every
+// file in the tree, and a second copy scoped to skills would be the same law in two places.
+
+test("every trust-tree command a skill prints names a script that exists", () => {
+  const broken = []
+  for (const file of skillMarkdown) {
+    const text = readFileSync(file, "utf8")
+    for (const [, path] of text.matchAll(/<trust-root>\/(\S+\.(?:mjs|py))/g)) {
+      if (!existsSync(join(ROOT, path))) broken.push(`${shown(file)} -> <trust-root>/${path}`)
+    }
+  }
+  assert.deepEqual(
+    broken,
+    [],
+    `skills print commands for scripts that do not exist: ${broken.join("; ")}. The command is the gate; a gate that cannot start is one a run reports as unavailable rather than failed.`,
+  )
+})
+
+/** Every executable this tree owns, by basename, so a target repository's own script is not judged. */
+const trustScripts = (directory) =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === ".git" || entry.name === "worktrees" || entry.name === "node_modules") return []
+    const entryPath = join(directory, entry.name)
+    if (entry.isDirectory()) return trustScripts(entryPath)
+    return /\.(?:mjs|py)$/.test(entry.name) ? [entry.name] : []
+  })
+
+test("a skill invokes a trust-tree script only through <trust-root>", () => {
+  // The target repository is rarely the one holding trust, so a path relative to the working
+  // directory resolves to nothing there. The lock already carries the one absolute value that
+  // works, and `<trust-root>` is how a skill spends it.
+  //
+  // Only scripts this tree OWNS are judged. A skill may legitimately print a command that runs the
+  // target repository's own script, and that one is anchored by the target, not by trust.
+  const owned = new Set(trustScripts(ROOT))
+  const offenders = []
+  for (const file of skillMarkdown) {
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      if (!/\b(?:node|python|python3)\s/.test(line)) continue
+      const invoked = [...line.matchAll(/([\w.-]+\.(?:mjs|py))\b/g)].map(([, name]) => name)
+      if (!invoked.some((name) => owned.has(name))) continue
+      if (line.includes("<trust-root>/.claude/")) {
+        offenders.push(`${shown(file)}: doubles the trust folder — ${line.trim()}`)
+        continue
+      }
+      if (!line.includes("<trust-root>/")) {
+        offenders.push(`${shown(file)}: not anchored to <trust-root> — ${line.trim()}`)
+      }
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `skills start trust scripts by a path that depends on where the run happens: ${offenders.join("; ")}. Trust root is the .claude directory itself, so \`<trust-root>/.claude/...\` names it twice and a bare relative path names it never.`,
+  )
+})
+
+test("every skill carries a frontmatter name matching its folder", () => {
+  const wrong = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const skillFile = join(SKILLS, entry.name, "SKILL.md")
+    if (!existsSync(skillFile) || !statSync(skillFile).isFile()) {
+      wrong.push(`${entry.name}: has no SKILL.md`)
+      continue
+    }
+    const declared = readFileSync(skillFile, "utf8").match(/^---\r?\n(?:.*\r?\n)*?name:\s*(\S+)/)
+    if (declared === null) wrong.push(`${entry.name}: declares no frontmatter name`)
+    else if (declared[1] !== entry.name) wrong.push(`${entry.name}: declares ${declared[1]}`)
+  }
+  assert.deepEqual(
+    wrong,
+    [],
+    `skill folders and their declared names disagree: ${wrong.join("; ")}. The folder is what a router links and the name is what an invocation types, so a difference makes one of the two unreachable.`,
+  )
+})

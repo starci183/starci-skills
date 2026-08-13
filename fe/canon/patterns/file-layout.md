@@ -14,6 +14,10 @@ one screen's folder into a second codebase.
 What holds this law is [`sources/file-layout.mjs`](../../../sources/fe/file-layout.mjs), plus the tree
 below, which is the map the rules send things back to.
 
+Implementation anchors in `starci-academy-fe`:
+`src/components/blocks/dashboard/CreditStatRow/index.tsx` and
+`src/components/blocks/dashboard/CreditStatRow/component.tsx`.
+
 ## The tree
 
 ```
@@ -44,6 +48,41 @@ src/
 know the domain, and a feature is the only grouping that stays true as the product grows.
 `leaves/`, `branches/`, `layouts/` and `pages/` are flat because they know no feature — a category
 there would be somebody's guess about which screen owns a thing that belongs to all of them.
+
+## The same tree in a monorepo
+
+A workspace with several apps splits the tree in exactly one place, and the split is not a packaging
+preference — it is the feature line drawn above.
+
+```
+packages/ui/src/            THE VOCABULARY - knows no feature
+    contracts/                  the entry table and the slot types
+    leaves/<Name>/
+    composites/<Name>/
+    branches/<Name>/
+    shells/<Name>/
+
+apps/<app>/src/             THE SENTENCES - each knows its own domain
+    app/                        routes only
+    components/
+        blocks/<category>/<Name>/
+        overlays/<category>/<Name>/
+        layouts/<Name>/
+        pages/<Name>/
+```
+
+**Everything below a block is shared; a block and everything above it is not.** A leaf, a composite,
+a branch and the contract table describe SHAPE, and a shape is the same shape in every app — that is
+why one copy can exist and why it must. A block is a domain sentence: it knows what a course, an
+invoice or a fleet resource is. Put one in the shared package and the package now knows a feature it
+has no business knowing, and the next app inherits vocabulary it will never use.
+
+The test is the same question the tier answers, asked about the workspace: **would a second app want
+this without wanting the feature it was written for?** A `Badge` yes. A `FleetRow` no.
+
+Nothing else moves. The tiers keep their names, their flat-or-categorised rule and their two-file
+shape; a monorepo only decides which side of the feature line each tier lives on. A candidate under
+`.artifacts/**/candidate/` may mirror either layout, and lint reads whichever it finds.
 
 Destinations the rules name are created on first use rather than kept empty: a pure helper goes to
 `modules/utils/`, a shared shape to `modules/types/`, a config map or non-translated copy to
@@ -81,11 +120,33 @@ have reused it, so the second author writes it again and the two drift.
 drags the whole family in, and nothing can be tree-shaken away. Export the members. A dotted call
 site is a convenience the bundler pays for.
 
-**LAYOUT-5 · The route file mounts and nothing else.**
+**LAYOUT-5 · In a monorepo, the shared package stops below the block.**
+
+`packages/ui/src/` holds `contracts/`, `leaves/`, `composites/`, `branches/` and `shells/` — the
+tiers that know no feature. `blocks/`, `overlays/`, `layouts/` and `pages/` belong to the app that
+owns the feature they speak for.
+
+A block in the shared package is the whole failure in one file: the package now knows a domain, the
+apps that never wanted that domain still ship it, and the next author reasonably concludes the line
+is somewhere else and puts a page there too.
+
+**LAYOUT-6 · The route file mounts and nothing else, and `app/` holds nothing but route files.**
 
 A file under `app/` names which page renders at which URL. No fetching, no arrangement, no contract
 key. If a route file is drawing, the page it should be mounting does not exist yet — and the drawing
 is now in the one place nobody looks for it.
+
+The routing tree holds the framework's own slots — `page`, `layout`, `template`, `loading`, `error`,
+`not-found`, `default`, `route` and their siblings — plus `providers` and `globals.css`, which the
+root layout mounts and which have nowhere else to be. `app/api/**` is server code and `_folders`
+are Next's own opt-out; neither is a screen. **Any other file there is a component in the one
+directory nobody greps.** A screen goes to `components/pages/<Name>/`, a domain sentence to
+`components/blocks/<category>/<Name>/`.
+
+That second sentence was not always written down, and the cost of leaving it implicit is on record:
+a page owner was written to `app/<segment>/fleet-page.tsx` and carried a build, a lint run, a
+typecheck, four sealed screenshots and an approval to the edge of a production write with every gate
+green — because every gate was reading rules, and this one was only prose.
 
 ## Forbidden
 
@@ -95,9 +156,12 @@ is now in the one place nobody looks for it.
 | `constants/`, `utils/`, `types/`, `hooks/` under `components/` | It is not component code, so the folder is mislabelled and the contents are invisible | Move it to the tree that names what it is |
 | A category folder under `leaves/` or `branches/` | Those tiers know no feature, so any category is a guess about which screen owns them | Keep them flat |
 | A flat `blocks/<Name>/` with no category | A domain component with no feature has nowhere to be found by the next person working on that feature | Put it under the feature it speaks for |
+| `blocks/`, `overlays/`, `layouts/` or `pages/` inside a shared package | The package learns a feature, and every app that never wanted it ships it anyway | Move it to `apps/<app>/src/components/` |
+| A leaf, composite, branch or contract inside one app of a monorepo | The second app writes it again, and the two drift with nothing to notice | Move it to `packages/ui/src/` |
 | A folder whose export does not match its name | The path stops predicting the name, and a grep finds nothing | Rename one of them so the two agree |
 | `export const X = { A, B }` as a namespace | It bundles as one unit, so importing one member drags in all of them | Export the members directly |
 | Fetching or drawing in a route file | The route becomes a second page, in the file nobody looks in | Mount the page; move the work into it |
+| A named component file under `app/` | The routing tree is addressed by URL, not browsed by tier, so the component is invisible to everyone looking for its siblings | `components/pages/<Name>/` for a screen, `components/blocks/<category>/<Name>/` for a domain sentence |
 
 ## Examples
 

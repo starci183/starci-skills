@@ -5,6 +5,11 @@ The rules this codebase is written by, one file per concept, filed on an axis.
 Read [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md) before adding or changing anything here. It states the
 shape every file takes and, more importantly, what a file must never carry.
 
+Before any skill or task action, read [`CONTEXT-LOCK.md`](CONTEXT-LOCK.md). It resolves and shows
+the trust root, skill path, target/reference repositories, git identity, artifact root, runtime and
+write boundary. Plan and Preview are artifact-only; Apply pauses for explicit confirmation before
+production writes; inherited drift always stops the phase.
+
 ## The axes
 
 An axis answers a different KIND of question, which is why they are separate trees rather than
@@ -16,6 +21,8 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 |---|---|---|
 | **canon** | How is this spelled here? The law the code already follows, and the machine enforces. | `fe/canon/` |
 | **design** | Why is it shaped this way? The thinking a rule came out of — hierarchy, restraint, what earns attention. Written in a universal voice: a file here should read as true of any front end, and name no product. | `fe/design/` |
+| **creativity** | How are researched alternatives generated, challenged and selected without escaping canon? | `fe/creativity/` |
+| **baselines** | What does ONE screen already promise its users? Named product behaviour a parity request must preserve. Names its product, unlike every shelf above. | `fe/baselines/` |
 | **references** | What does the outside world say? Vendor docs, platform behaviour, prior art. Cited, never paraphrased into law. | `fe/references/` |
 
 `fe/canon/` divides again by what is being decided:
@@ -44,19 +51,27 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 
   A **shell** is the one named exemption in the whole system. It is a branch by the table — it opens
   slots, it knows no domain — and it alone may import the component library alongside the leaves,
-  because ModalShell and DrawerShell intentionally pass a real `children` hole through
+  because ModalShell, DrawerShell and DropdownShell intentionally pass real `children` holes through
   of their own and so fit in neither tier as written. The exemption is a folder rather than a list inside a rule, which makes it countable and
   checkable both ways: a branch elsewhere that imports the library is misfiled, and a file in
-  `shells/` is closed to those two names; surface cards remain typed branches.
+  `shells/` is closed to those three names; surface cards remain typed branches.
 
   Layout and overlay share the same cell and differ in one thing — a layout SURVIVES navigation,
   an overlay is summoned and dismissed.
-- **`patterns/`** — how code is written. One file per concept, each naming the artifact that holds
-  it: [`contract`](fe/canon/patterns/contract.md) · [`file-layout`](fe/canon/patterns/file-layout.md)
-  · [`icon`](fe/canon/patterns/icon.md) · [`naming`](fe/canon/patterns/naming.md) ·
+- **`patterns/`** — how code is written. One file per concept, each explaining the concept and its
+  `why`, naming concrete `starci-academy-fe` implementation anchors, and linking the artifact or
+  repository audit that holds it: [`comments`](fe/canon/patterns/comments.md) ·
+  [`contract`](fe/canon/patterns/contract.md) ·
+  [`file-layout`](fe/canon/patterns/file-layout.md) · [`icon`](fe/canon/patterns/icon.md) ·
+  [`lint-adoption`](fe/canon/patterns/lint-adoption.md) ·
+  [`lint-escape-hatch`](fe/canon/patterns/lint-escape-hatch.md) ·
+  [`loading`](fe/canon/patterns/loading.md) · [`naming`](fe/canon/patterns/naming.md) ·
   [`props-and-slots`](fe/canon/patterns/props-and-slots.md) ·
-  [`the-split`](fe/canon/patterns/the-split.md) ·
-  [`lint-escape-hatch`](fe/canon/patterns/lint-escape-hatch.md).
+  [`the-split`](fe/canon/patterns/the-split.md) · [`tokens`](fe/canon/patterns/tokens.md) ·
+  [`translation`](fe/canon/patterns/translation.md) ·
+  [`type-safety`](fe/canon/patterns/type-safety.md) ·
+  [`typography`](fe/canon/patterns/typography.md) ·
+  [`vendor-boundary`](fe/canon/patterns/vendor-boundary.md).
 
 `be/canon/patterns/` holds [`cqrs`](be/canon/patterns/cqrs.md) ·
 [`data-access`](be/canon/patterns/data-access.md) · [`testing`](be/canon/patterns/testing.md).
@@ -64,9 +79,14 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 `fe/design/` carries the laws no machine can hold — no file there names a number of its own, which
 is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) ·
 [`padding`](fe/design/padding.md) · [`surface-in-surface`](fe/design/surface-in-surface.md) ·
-[`call-to-action`](fe/design/call-to-action.md) · [`refactor-parity`](fe/design/refactor-parity.md).
-Still owed: position, responsive, hierarchy,
-restraint, colour, typography.
+[`hierarchy`](fe/design/hierarchy.md) · [`call-to-action`](fe/design/call-to-action.md) ·
+[`input`](fe/design/input.md) · [`exception`](fe/design/exception.md) ·
+[`refactor-parity`](fe/design/refactor-parity.md).
+Still owed: position, responsive, restraint, colour, typography.
+
+Two of them answer the questions a reader meets first, and in this order: `hierarchy` settles what
+is read and in what sequence, then `call-to-action` settles what the surface asks for once it has
+been understood. A primary action nobody reaches was never a call-to-action failure.
 
 **Which shelf a concept goes on is decided by whether anything can hold it.** A law with an
 enforceable half belongs in `canon/patterns/` beside its artifact — `icon` began in `design/` and
@@ -75,6 +95,50 @@ states only a reason stays in `design/`.
 
 Reading design without canon leaves a reader with taste and no spelling; reading canon without
 design leaves them able to type a legal value for the wrong reason.
+
+`fe/creativity/` is the operating workflow for page and flow invention. Start at
+[`creativity/INDEX.md`](fe/creativity/INDEX.md). It uses canon as fixed grammar, design as judgement,
+backend behavior as business truth and the contract `why` plus existing components as reuse
+evidence. It is not another canon shelf. Net-new UI and work that still needs a product or
+composition choice follow **Plan -> Preview revisions -> Apply**. Three task procedures execute it
+across four explicit scopes (`page`, `layout`, `block`, `overlay`) without blurring their owners:
+
+- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) researches evidence, inventories
+  owner states, shows two to four selectable directions inside one cohesive case, renders matching
+  representative directional HTML concepts in one direction lab from port 8080 and stops for an
+  explicit direction choice. Every canvas says it is not an Apply baseline, and every selectable
+  anatomy maps to existing StarCi grammar or an exact proposal.
+- [`starci-fe-design-preview`](skills/starci-fe-design-preview/SKILL.md) optimizes the one selected
+  direction into an executable candidate built from the same framework, owners, contracts, tokens
+  and fixtures production will use. Candidate files, state identity and screenshots are hashed into
+  a sealed explicit approval record.
+- [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) materializes only that sealed
+  candidate after effective StarCi FE lint adoption passes. It may not reinterpret screenshots or
+  substitute components, and it closes only on same-state structural and visual parity.
+
+Duplication is the other thing a build leaves behind, and it is not a defect list: two files holding
+one shape say the vocabulary had no word for it. It is a second pair, split for the same reason as
+the first — surveying and editing want different write boundaries.
+
+- [`starci-fe-consolidate-plan`](skills/starci-fe-consolidate-plan/SKILL.md) states a scope, freezes
+  members and call sites while the tree it measured still exists, and settles each cluster with the
+  question a diff cannot re-derive — the same thing, or the same picture. Each ends at `merge`,
+  `prop-variant`, `extract-composite` or `keep-apart`, and it stops for approval of that set. It
+  writes a proposal and changes no code, because editing while surveying destroys the measurement
+  the proposal rests on.
+- [`starci-fe-consolidate-apply`](skills/starci-fe-consolidate-apply/SKILL.md) carries out the
+  approved verdicts one cluster per diff, may neither widen nor narrow the measured call sites, and
+  proves each one still renders what it rendered.
+
+Merging two shapes that merely look alike is worse than the duplication: it produces one owner with
+a flag per call site. Two blocks over different domain entities that render identically are not one
+block — the shape is a composite and the meaning stays where it is.
+
+A bounded parity, interaction or runtime defect whose expected result is already proven has no
+choice to Plan. [`starci-fe-fidelity-fix`](skills/starci-fe-fidelity-fix/SKILL.md) locks the named
+evidence, reconfirms its production write boundary, proves lint adoption and makes the smallest
+owner-scoped correction. If ownership, CTA, behavior or reusable vocabulary becomes undecided, it
+returns to Plan.
 
 ## What holds a law
 
@@ -88,11 +152,35 @@ that is absent. It exists because all three drifted within an hour of each other
 write this gate went unkept — a convention nobody checks is a preference. Adding an axis to its list
 is what puts that shelf under the gate.
 
+**Three gates hold the tree itself rather than any one law.**
+[`sources/parity.test.mjs`](sources/parity.test.mjs) holds law to artifact.
+[`sources/links.test.mjs`](sources/links.test.mjs) fails when anything here points at a file that is
+not there, which is the drift that consolidating two statements of one concept leaves behind.
+[`sources/skills.test.mjs`](sources/skills.test.mjs) fails when a skill prints a command for a
+script that does not exist, starts a trust script by a path that depends on where the run happens,
+or declares a name its folder does not match.
+
+Run them:
+
+```powershell
+npm test          # from the trust root
+npm run gate:canon # from a repository that vendors it
+```
+
+This tree has no build, so those gates are the only moment anything here is executed. They were
+wired after a sweep found them all passing and none of them reachable: the trust root carried no
+manifest, so `node --test` had no entry point and the gates had never been run by anybody. A gate
+that cannot be invoked is indistinguishable from a gate that does not exist.
+
 The artifact is not always a lint rule, and the strongest ones are not. A closed union makes a wrong
 value UNREPRESENTABLE rather than forbidden, and there is nothing left to police once the bad value
 cannot be typed; a rule covers only what a type cannot see, such as which file wrote a string. A
-repository adopting a law copies the artifact rather than reimplementing it, and its own lint config
-stays the authority on what is switched on and at what level.
+repository adopting FE canon attaches the gathered StarCi FE plugin, recommendation and linter
+options as one unit rather than maintaining a handwritten parallel subset. The effective config is
+then proved against a real production file by
+[`scripts/audit-fe-lint-adoption.mjs`](scripts/audit-fe-lint-adoption.mjs); an import, plugin folder
+or copied name is not adoption. See
+[`fe/canon/patterns/lint-adoption.md`](fe/canon/patterns/lint-adoption.md).
 
 ### Back end
 
@@ -111,9 +199,8 @@ yet — it is a proposal, and proposals do not belong in this tree.
 When canon and the source disagree, one of them is wrong and the disagreement is the finding. Say
 which, and why, rather than quietly obeying whichever was read most recently.
 
-## Status
+## Trust boundary
 
-This tree is being built beside the previous one rather than converted in place, so that no rule is
-half-migrated at any moment. Where a concept exists in both, **this tree wins for the front-end
-rebuild**, and the older shelf still governs the legacy front end, which has a different layer
-system and different rules.
+This `.claude/` tree is the only StarCi trust tree for the backend and frontend repositories. Root
+`CLAUDE.md` files route into it. Parallel trees, versioned Claude folders and frontend-local canon
+copies are legacy drift and must not be recreated.

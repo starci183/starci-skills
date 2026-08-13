@@ -4,7 +4,7 @@ role: be
 state: open
 cost: small
 opened: 2026-08-10
-paths: [.claude/canon/be/enforce/authoring/testing.md]
+paths: [.claude/be/canon/patterns/testing.md]
 ---
 
 ## What is wrong

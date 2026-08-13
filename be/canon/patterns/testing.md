@@ -139,6 +139,18 @@ expose a regression — not a matrix. A harness billed per call that grows a cas
 harness somebody eventually stops running, and an eval nobody runs is worth less than no eval,
 because its last green result is still on the board.
 
+**TESTING-11 · A demo seed represents a living product world, not one empty account.**
+
+A local seed exists so a reader can inspect real product states through production read paths. It
+therefore seeds a deterministic cohort with varied progress: resumed work, consecutive activity,
+earned currency, populated aggregates and social outcomes involving several actors. Empty states
+still deserve fixtures, but an all-empty world cannot reveal whether lists, counts, rankings,
+progress or cross-user joins are correct.
+
+The seed writes source records and invalidates derived projections so normal handlers rebuild them.
+It is idempotent and accepts the account being inspected; it never pins screenshot-only JSON or
+assumes one hard-coded identity is the person currently signed in.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -157,6 +169,7 @@ because its last green result is still on the board.
 | Relying on each flow author to remember the stub | A rule that must be remembered is one distracted afternoon from being broken | Stub by default in the world; make reaching a provider a deliberate opt-out |
 | A harness reaching the provider through a tier or routing layer | The thing under test is then not the thing that ships, and the harness can pass while production fails | Call the provider's own client directly |
 | A harness that grows a case per edge | It is billed per call, so it becomes something people stop running - and a stale green is worse than no green | One or two cases per capability, chosen to expose a regression |
+| A demo seed containing one all-zero learner | It hides populated branches and every relationship involving another actor | Seed an idempotent cohort with varied source data, then let production read models derive the screen |
 
 ## Examples
 
@@ -338,3 +351,21 @@ it("resolves the attempt state", async () => {
 ```
 
 They differ in one thing: whether the boundary was taken.
+
+### The seed trap — painting a screenshot instead of building its world
+
+```ts
+await seedDemoWorld({
+    currentLearner: { resumedLessons, activeDays, earnedCurrency, gradedWork },
+    learners: variedLearners,
+    challengePassers,
+})
+await invalidateDerivedProjections(currentLearner.id)
+```
+
+```ts
+// Wrong: the screen looks populated, but no production join or projection can prove it.
+await writeDashboardProjection(currentLearner.id, screenshotShapedJson)
+```
+
+They differ in one thing: whether the UI is reading a real world or a painted result.

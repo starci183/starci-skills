@@ -17,6 +17,10 @@ If yes, it is copy, and copy is resolved one file away.
 What holds this law is [`sources/fe/translation.mjs`](../../../sources/fe/translation.mjs), plus the
 split rule that keeps the drawing half from reaching for the runtime at all.
 
+Implementation anchors in `starci-academy-fe`:
+`src/components/blocks/dashboard/CreditStatRow/index.tsx` and
+`src/components/blocks/dashboard/CreditStatRow/component.tsx`.
+
 ## Rules
 
 **COPY-1 · The connected half resolves every word.**

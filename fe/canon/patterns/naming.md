@@ -15,6 +15,10 @@ question is answered per layer, because the failure it prevents is different at 
 
 What holds this law is [`sources/naming.mjs`](../../../sources/fe/naming.mjs).
 
+Implementation anchors in `starci-academy-fe`:
+`src/components/blocks/dashboard/CreditStatRow/index.tsx` and
+`src/components/blocks/dashboard/CreditStatRow/component.tsx`.
+
 ## Rules
 
 **NAMING-1 · A module-level function is an arrow const.**
@@ -40,11 +44,33 @@ this file is in.
 Naming it `onPress` at birth means the name is the same at the declaration, at the call site and in
 the props type.
 
+**NAMING-3 · A file and route name is written in the one language every reader shares.**
+
+Held by
+[`sources/fe/naming.mjs`](../../../sources/fe/naming.mjs)'s `no-second-language-in-path`.
+
+The rule that reads source can see identifiers, comments and strings, and cannot see the name of the
+file it is reading. So a route may be `app/cap-phat/page.tsx` with every identifier inside it in
+English and nothing says a word — while the URL, the import specifier, the folder in every editor
+sidebar and the path in every stack trace stay in a language half the readers do not have.
+
+A route segment is also a PUBLIC name. It is the address a customer quotes in a support ticket, so
+this is not only an authoring question: the product's own URLs stop being readable outside one
+language. The words a person READS belong in the locale catalogue, where a second language is
+content and switching it is the point. A path is not content; it is an address, and it is read by
+more people than the code inside it.
+
+The check is two-part because a path cannot carry diacritics: `cấp phát` reaches the filesystem as
+`cap-phat`. Accents catch the first form, and a named list catches the romanised one. The list is
+deliberate rather than clever — guessing at Vietnamese-shaped ASCII would refuse `capacity` and
+`dangerous`, and a rule that fires on English words is one a repository turns off.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
 |---|---|---|
 | `function X() {}` at module level | It is hoisted, so the file's order stops carrying any guarantee about what exists when | `export const X = () => {}` |
+| A route or folder named in a second language | The address is read by more people than the code, and unlike a comment it cannot be skimmed past | Rename the segment; put the words a reader sees in the locale catalogue |
 | `export default function` | The same, plus the export has no name to grep for at its call sites | A named arrow const, exported by name |
 | `handleX` as a local | It is renamed at the boundary every time it is passed, and a rename is a chance to be wrong | `onX`, the same word the slot uses |
 | `handleX` as a prop | Two vocabularies for one idea, and every author must decide which one this file speaks | `onX` |

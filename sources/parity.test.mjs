@@ -107,4 +107,18 @@ for (const axis of AXES) {
       `laws in ${axis}/canon/patterns/ are lying about their enforcement: ${broken.join("; ")}. A law that reads as enforced while nothing holds it is worse than one that admits it is only a document.`,
     )
   })
+
+  if (axis === "fe") {
+    test("fe: every canon pattern names concrete starci-academy-fe implementation anchors", () => {
+      const missing = laws(axis).filter((name) => {
+        const text = readFileSync(join(ROOT, axis, "canon", "patterns", `${name}.md`), "utf8")
+        return !text.includes("Implementation anchors in `starci-academy-fe`:")
+      })
+      assert.deepEqual(
+        missing,
+        [],
+        `FE laws without source evidence: ${missing.join(", ")}. A concept with no locked source anchor invites invented examples instead of checked StarCi patterns.`,
+      )
+    })
+  }
 }

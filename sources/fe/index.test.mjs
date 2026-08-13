@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname } from "node:path"
 import test from "node:test"
-import plugin, { linterOptions, recommended, ruleOwners, rules } from "./index.mjs"
+import plugin, { audits, lawOwners, linterOptions, recommended, ruleOwners, rules } from "./index.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -24,12 +24,16 @@ const lawModules = () =>
     .sort()
 
 test("every law in the folder is gathered - a new module cannot be forgotten here", async () => {
-  const gathered = [...new Set(Object.values(ruleOwners))].sort()
+  const gathered = [...new Set(lawOwners)].sort()
   assert.deepEqual(
     gathered,
     lawModules(),
     "a rule module exists that this file does not import, so its rules ship as a document",
   )
+})
+
+test("repository audits are gathered with the plugin laws", () => {
+  assert.equal(typeof audits["effective-config"], "function")
 })
 
 test("no two laws publish the same rule name", () => {
