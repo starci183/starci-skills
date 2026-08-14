@@ -1,6 +1,6 @@
 ---
 name: starci-workflow-drift
-description: Read the task files under <backend-repo>/.workflows/<app>/ and ask the source whether it still matches — every file a task recorded writing, anything new inside a boundary the task never named, every state it recorded rendering. Use to check one task or sweep them all: "cái này còn đúng không", "check drift", before trusting an old workflow record.
+description: Read the task files under <backend-repo>/.workflows/<kind>/<app>/ and ask the source whether it still matches — every file a task recorded writing, anything new inside a boundary the task never named, every state it recorded rendering. Use to check one task or sweep them all: "cái này còn đúng không", "check drift", before trusting an old workflow record.
 ---
 
 # StarCi workflow drift
@@ -17,7 +17,7 @@ hash per file and a phase that refused to finish, and detection costs one run ov
 ## SCOPE
 
 Print the table. `Touching` is nothing — this skill reads and reports. Say which task files are in
-scope: one app, one id inside it, or every file under `<backend-repo>/.workflows/*/`.
+scope: one kind, one app inside it, one id inside that, or every file under `<backend-repo>/.workflows/*/*/`.
 
 ## PROCESS
 
@@ -49,7 +49,7 @@ The four tables — this skill invites nobody, it reports. For each task: matche
 the file and the line of the record it contradicts.
 
 Then say which lane clears each one, so the report is actionable rather than a list of complaints: a
-render that moved is `$starci-fe-fidelity-fix` when the old state was right, and
+render that moved is `$starci-fe-fidelity-plan` when the old state was right, and
 `$starci-fe-design-plan` when nobody has decided which of the two is right. A file present that no
 task named is neither until somebody reads it.
 

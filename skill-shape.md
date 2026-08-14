@@ -18,7 +18,7 @@ and a backend monorepo builds several apps from one tree — name the app and th
 when either is in play. An entity written against the wrong connection compiles and writes to a
 table nobody reads.
 
-`App` is not a label on the work, it is where the task file is filed: `<backend-repo>/.workflows/<app>/`.
+`App` is not a label on the work, it is where the task file is filed: `<backend-repo>/.workflows/<kind>/<app>/`.
 A phase that cannot name the app cannot write its record, which is the point — a product is usually
 several repositories, so `Repo / branch` alone never says which product this belongs to, and the
 frontend and backend halves of one feature would file themselves in two different places.
@@ -272,7 +272,7 @@ A later phase reads this file instead of rediscovering anything.
 
 **This is also what replaces the seal**, and it replaces it with something stronger. A seal guards one
 run while that run is happening and knows nothing afterwards. This file stays, so the comparison stays
-available: `starci-workflow-drift` reads every `<backend-repo>/.workflows/*/*.md` and asks the source whether it
+available: `starci-workflow-drift` reads every `<backend-repo>/.workflows/*/*/*.md` and asks the source whether it
 still matches — each file under `WROTE` still there, nothing new inside `Touching` that `WROTE` never
 named, each state under `STATES` still rendering what it rendered.
 

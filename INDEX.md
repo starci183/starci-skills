@@ -9,7 +9,7 @@ Before running any skill, read [`skill-shape.md`](skill-shape.md). Every skill h
 parts — a SCOPE table printed before anything happens, a PROCESS that runs until genuinely stuck, and
 an OUTPUT in one of exactly three shapes, each a table: what needs the user, what is done and what
 comes next, or what is done and what is owed. One
-task is one file at `<backend-repo>/.workflows/<app>/<id>.md`, appended to by each phase. It lives with
+task is one file at `<backend-repo>/.workflows/<kind>/<app>/<id>.md`, appended to by each phase. It lives with
 the product rather than in this tree, and the backend repository holds it even for frontend work.
 
 There is no seal and no lock record. The production write boundary is confirmed once, out loud,
@@ -165,7 +165,7 @@ a flag per call site. Two blocks over different domain entities that render iden
 block — the shape is a composite and the meaning stays where it is.
 
 A bounded parity, interaction or runtime defect whose expected result is already proven has no
-choice to Plan. [`starci-fe-fidelity-fix`](skills/starci-fe-fidelity-fix/SKILL.md) locks the named
+choice to Plan. [`starci-fe-fidelity-plan`](skills/starci-fe-fidelity-plan/SKILL.md) locks the named
 evidence, reconfirms its production write boundary, proves lint adoption and makes the smallest
 owner-scoped correction. If ownership, CTA, behavior or reusable vocabulary becomes undecided, it
 returns to Plan.

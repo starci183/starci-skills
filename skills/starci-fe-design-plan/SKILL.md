@@ -1,15 +1,15 @@
 ---
 name: starci-fe-design-plan
-description: Draw two to four real screens for net-new or undecided StarCi frontend work and stop for the user to pick one. Use when hierarchy, CTA, interaction or disclosure still needs a product choice. Renders real HTML from port 8080 and writes no production code. Not for a bounded fix with a known reference — that is starci-fe-fidelity-fix.
+description: Draw two to four real screens for net-new or undecided StarCi frontend work and stop for the user to pick one. Use when hierarchy, CTA, interaction or disclosure still needs a product choice. Renders real HTML from port 8080 and writes no production code. Not for a bounded fix with a known reference — that is starci-fe-fidelity-plan.
 ---
 
 # StarCi FE Design Plan
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first: SCOPE, PROCESS, OUTPUT, and the task file
-at `<backend-repo>/.workflows/<app>/<id>.md`.
+at `<backend-repo>/.workflows/designs/<app>/<id>.md`.
 
 Plan exists for one reason — a choice the user has to make. If the answer is already proven by a
-named reference, a contract or a test, this is `$starci-fe-fidelity-fix` and there is nothing to
+named reference, a contract or a test, this is `$starci-fe-fidelity-plan` and there is nothing to
 choose.
 
 ## SCOPE
