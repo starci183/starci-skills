@@ -96,6 +96,36 @@ test("a skill invokes a trust-tree script only through <trust-root>", () => {
   )
 })
 
+test("a skill that names another skill also carries the law of naming one", () => {
+  // A `$other-skill` token is a handoff: the run is being told where the work goes next, or which
+  // procedure it has to detour through and return from. `handoff.md` is what decides which of the
+  // two it is, and what the phase owes before it may say either.
+  //
+  // The failure this was written after: the token appeared in three skills, at exactly the three
+  // phase boundaries, and NO file in the tree defined it. So the honest reading of "Route to
+  // $starci-fe-design-preview" was a note to the reader, and the runs stopped there — the selection
+  // was made, the record was written and validated, and the phase that had every prerequisite in
+  // hand ended its turn. Six cases sat at `direction-selected` with no successor.
+  //
+  // The token is cheap to type and the law behind it is not, which is exactly the pair that drifts.
+  const naked = []
+  for (const file of skillMarkdown) {
+    if (!file.endsWith("SKILL.md")) continue
+    const text = readFileSync(file, "utf8")
+    const named = [...text.matchAll(/\$(starci-[a-z-]+)/g)].map(([, name]) => name)
+    const others = new Set(named.filter((name) => !file.includes(`${name}/SKILL.md`)))
+    if (others.size === 0) continue
+    if (!text.includes("handoff.md")) {
+      naked.push(`${shown(file)} names ${[...others].join(", ")} but never reaches handoff.md`)
+    }
+  }
+  assert.deepEqual(
+    naked,
+    [],
+    `skills hand work to another skill without the law that says how: ${naked.join("; ")}. A skill name in prose is a note to the reader; handoff.md is what makes it a transition, a detour that returns, or a finding carried back.`,
+  )
+})
+
 test("every skill carries a frontmatter name matching its folder", () => {
   const wrong = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {

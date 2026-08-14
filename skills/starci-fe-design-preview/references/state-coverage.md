@@ -61,6 +61,29 @@ same owner's behavior.
 - If independent queries resolve independently, preview partial availability rather than a fake
   all-page loader.
 
+## When the browser refuses to produce the image
+
+The seal requires a screenshot per rendered state, and the in-app Browser pane composites frames only
+while it is displayed — which is the user's window state, not something the run controls. A hidden
+pane answers `read_page`, `get_page_text` and `javascript_tool` normally and refuses only
+`screenshot`. That refusal is not a state that cannot be captured; it is a capture path that is
+closed, and HANDOFF-4 requires the other one to be taken before the evidence is called unobtainable.
+
+Capture with headless Chrome instead, one invocation per state:
+
+```powershell
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --disable-gpu `
+  --hide-scrollbars --window-size=1280,900 --user-data-dir=<a fresh temp dir per invocation> `
+  --screenshot=<absolute path with forward slashes> <state url>
+```
+
+The `--screenshot` path must be absolute, or Chrome answers "Access is denied", and it must use
+forward slashes, or a Windows path expanded inside a shell loop writes one file named after the
+variable. Each invocation needs its own `--user-data-dir` or the loop produces only its first image.
+
+Only when this path also fails is the evidence a finding, recorded with both attempts and carried to
+the phase's item list rather than ending the phase.
+
 ## Responsive and theme truth
 
 Render desktop/mobile and light/dark only where the target supports them, but never mark them N/A

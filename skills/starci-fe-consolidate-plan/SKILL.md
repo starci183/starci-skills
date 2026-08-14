@@ -78,7 +78,15 @@ answer.
 
 Show a compact table in conversation: cluster, members, call-site count, verdict, and what the
 verdict costs. Rank by call sites reached, never by lines saved. Then **stop for approval of the
-verdict set**. Do not begin editing, and do not treat a ranking as an instruction.
+verdict set** — once, for the whole set, as one form the reader answers in a single pass. Do not
+begin editing, and do not treat a ranking as an instruction.
+
+A cluster the survey could not settle on its own is a row in that form, not a halt where it was
+found. So is a SUB-RUN the sweep uncovers — a repository whose lint adoption is failing cannot be
+measured honestly, and that names `$starci-fe-lint-sync`, which runs and returns here rather than
+replacing the survey. It arrives with the verdict the evidence leans to, what makes it uncertain, and what changes
+if the reader picks the other one. Surveying produces these one at a time and asking them that way
+makes the reader pay a round trip per cluster, which is how a survey stops being run to the end.
 
 When the answer is ambiguous — "gộp hết đi", "cái nào cũng được", silence — ask once more about the
 specific clusters in doubt. If it stays ambiguous, default those clusters to `keep-apart`, because
@@ -91,4 +99,11 @@ Write `consolidation-plan.md/json` and validate before routing:
 node <trust-root>/skills/starci-fe-consolidate-plan/scripts/verify_consolidation_plan.mjs <consolidation-plan.json>
 ```
 
-It must report `ok: true`. Route approved clusters to `$starci-fe-consolidate-apply`.
+It must report `ok: true`. Then INVITE `$starci-fe-consolidate-apply` by name with the approved
+clusters, per [`../../handoff.md`](../../handoff.md): say how many clusters and call sites it will
+touch, and that it opens by confirming the write boundary. The reader starts it — but say plainly
+that the measurement ages from here, because a plan applied against a tree that has moved on is a
+plan nobody can check.
+
+Clusters the reader left at `keep-apart` or `default-after-ambiguity` do not travel. Only the
+approved set does, and it travels whole.

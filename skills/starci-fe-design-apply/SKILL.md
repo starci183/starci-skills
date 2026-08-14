@@ -29,9 +29,12 @@ answered, is not admissible either. Both are decisions the record is supposed to
 Apply is the phase with the least standing to settle them: it is holding a write boundary, so the
 cheapest thing it can do with an open question is answer it silently in code.
 
-Any missing candidate source, fixture, screenshot, runtime fingerprint or hash blocks Apply.
-Missing Plan routes to `$starci-fe-design-plan`; selected but unapproved work routes to
-`$starci-fe-design-preview`.
+Any missing candidate source, fixture, screenshot, runtime fingerprint or hash blocks Apply. Missing
+Plan names `$starci-fe-design-plan`; selected but unapproved work names `$starci-fe-design-preview` —
+in each case carrying the finding and the ONE recorded decision it invalidates, per
+[`../../handoff.md`](../../handoff.md), so the earlier phase resumes on evidence rather than
+rediscovering it. Apply holds the evidence for its own refusal; a refusal announced as a bare route
+leaves that evidence in the phase least able to act on it.
 
 ## Mandatory lint-adoption gate
 
@@ -71,8 +74,16 @@ candidate source mechanically; make only environment integration edits that the 
 permits in `integrationEdits`. An edit nobody declared before the seal is not an integration edit —
 it is a change to an approved artifact made by the phase the approval was meant to bind, so it
 returns to Preview for a minor revision rather than being written and explained afterwards. Do not substitute components, contracts, props, token classes, DOM anatomy or fixtures
-because another implementation is easier. If target drift prevents exact materialization, stop and
-return to Preview with evidence instead of adapting the design silently.
+because another implementation is easier. If target drift prevents exact materialization, do not
+adapt the design silently and do not stop at the gate's message either. Resolve what actually drifted
+and say which of the three it is: a shared file rewritten under the run is MECHANICAL — resync the
+candidate mirror from the clean tree, re-apply the recorded additions and carry on; a component that
+no longer exposes the approved slot is a DECISION and joins the form; an asset or endpoint the target
+never had is a RESOURCE and ships with the command that supplies it; a capability the target does not
+have at all is a SUB-RUN that names its owning skill and returns here. Only drift that invalidates a
+recorded decision goes back to Preview, and it goes back carrying the finding rather than announcing
+it. Everything in this scope that does not touch the drifted seam is materialized and verified first,
+per [`../../handoff.md`](../../handoff.md); one broken seam refuses its own packet, never the phase.
 
 Implement one vertical representative slice first and render the exact approved `stateId`. For API
 extensions, preserve owner, semantic slot, default/absence, precedence and existing callers.
@@ -115,7 +126,11 @@ node <trust-root>/skills/starci-fe-design-apply/scripts/verify_apply_materializa
 
 Every recorded target must be present and either identical to its approved hash or listed in
 `integrationEdits` with a reason. A missing file, an undeclared difference or a target outside the
-confirmed boundary blocks handoff. This checks bytes, never appearance: it cannot see a wrong
+confirmed boundary blocks handoff — for the file it names. Report each as its cause rather than as
+the mismatch: which file, what rewrote it, and whether clearing it is the run's own work, a decision
+or a resource. A hash that moved because another session rewrote a shared import is not the same
+finding as a hash that moved because this phase edited an approved artifact, and only the second one
+returns to Preview. This checks bytes, never appearance: it cannot see a wrong
 hierarchy, so it stands beside the same-state parity matrix and does not replace it.
 
 Run focused tests, typecheck, strict lint, canonical rule tests, production build, design-record
@@ -125,3 +140,12 @@ undocumented exception.
 Report spec hash, approved revision, candidate-to-target map, same-state browser evidence, parity
 result, command ledger, remaining drift and unknowns. Worker completion, green unit tests or a
 production screenshot from another state are insufficient.
+
+Apply invites nothing after it, so its close is the item form itself, per
+[`../../handoff.md`](../../handoff.md). Sort every remaining line by who can clear it and hand the set
+over as ONE pass: what the run already repaired inside its boundary, reported and not asked; each
+DECISION with the default in force and the one file that changes if the answer differs; each RESOURCE
+with the exact command that supplies it and the check that proves it landed; each SUB-RUN with the
+skill that owns it and what it returns here to finish. Name what each line blocks precisely — one
+state, one href, one packet — because a line that says only "incomplete" is the same fact with the
+act removed, and it is what turns a finished Apply into a case nobody can close.

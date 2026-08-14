@@ -149,8 +149,22 @@ Show the file list, the decisions and the assumptions, and stop. Do not write pr
 create the folders, and do not start "just the entity" — an entity is where the shape lives, so it
 is the file most worth arguing about and the last one to write unreviewed.
 
-Record the approval and route to `$starci-be-feature-apply`. An architecture nobody approved is a
-plan; Apply builds records, not plans.
+Stop ONCE, and carry everything into that one stop, per [`../../handoff.md`](../../handoff.md). The
+assumptions from item 6 are not asked one at a time as they surface during reading; each is recorded
+with the default the evidence supports and handed over beside the approval request as a single form
+the owner answers in one pass. Classify each: an assumption the owner settles by choosing is a
+DECISION and arrives with its options; anything the run cannot obtain at all — a credential, a
+seeded row, a running API to dump the schema from — is a RESOURCE and arrives with the exact command
+that supplies it, not with a description of what is needed.
+
+An assumption that turns out to need another procedure first — a migration, an e2e harness that does
+not exist, a service that has to be running to dump the schema — is a SUB-RUN, not a blocker. Name
+the skill that owns it and what it will produce; when the owner starts it, it runs and RETURNS here,
+and this record finishes. It does not replace this half.
+
+Record the approval, then INVITE `$starci-be-feature-apply` by name once nothing is left open: say
+which files it will write and that it opens by confirming the write boundary. The owner starts it. An
+architecture nobody approved is a plan; Apply builds records, not plans.
 
 ## Forbidden
 
@@ -161,7 +175,9 @@ plan; Apply builds records, not plans.
 | Design around a missing capability without asking | "The API cannot" becomes "the product should not", which is backwards | Name the gap; let the owner decide whether to fill it |
 | Trust a copied catalogue, contract or type as evidence | It describes the repository it came from | Ask the schema and the resolver folder |
 | Describe a folder as a shape rather than as files | The missing file is invisible, and the missing one is usually the spec | List every path |
-| Write product code in this half | The architecture stops being reviewable the moment it is also implemented | Write the record; route to Apply |
+| Write product code in this half | The architecture stops being reviewable the moment it is also implemented | Write the record; enter Apply |
+| Ask each assumption as it surfaces | Reading produces them one at a time, so the owner pays a round trip per question and the run stalls between each | Record each with its default and hand the set over as one form |
+| Invite Apply with assumptions still unanswered | The invitation moves this half's unfinished work onto the owner without saying so | Clear or hand over every item, then invite |
 | Bury a product question inside a default | A guess in a handler is a decision nobody made and nobody can find | State it as an assumption and get it answered |
 | Settle a family divergence inside one new feature | One operation becomes the odd one out, and the disagreement stays unrecorded | Mirror the family, record the divergence as a finding |
 

@@ -105,11 +105,22 @@ Report path, URL, PID and stop command. After each feedback pass, update the rev
 same review URL. Ask for explicit approval of a named revision; silence and agent completion are not
 approval.
 
-When approval arrives as "ok", "looks good" or a nod at the screen, do not seal it as though the
-revision had been named. Name the revision back once — "approve revision 1.3 as shown?" — and record
-the answer as `confirmed-restated`, with the restatement and the user's own words kept in separate
-fields. A bare confirmation approves a specific thing only if that thing was stated first, and the
-record has to show which of the two happened.
+Name the revision INSIDE the question — "revision 1.3 as shown, approve and seal?" — so a one-word
+answer already carries what it approves and the run seals on it. That is HANDOFF-3: a bare
+confirmation is only bare when the thing confirmed was left unstated. Should an approval still
+arrive against an unnamed revision, restate it once and record `confirmed-restated`, keeping the
+restatement and the user's own words in separate fields, because the record has to show which of the
+two happened.
+
+Everything else this phase cannot decide is an ITEM, not a question. Carry it with what it blocks,
+build through everything it does not block, and hand the whole set over beside the approval request
+as ONE form the user answers in a single pass. Classify each item first: a DECISION arrives with its
+options and the default taken, a RESOURCE arrives with the exact command that places the file and the
+path it writes to, and a SUB-RUN names the skill that owns it. A field the candidate needs and the
+schema does not expose is the common one here — that is `$starci-be-feature-plan`, and it RETURNS to
+this phase rather than replacing it, because the candidate is still Preview's to finish. When the form comes back, resolve the items and carry on into the seal — an
+answered form that produces a status report has spent the user's pass and moved nothing. See
+[`../../handoff.md`](../../handoff.md).
 
 ## Settle the candidate before sealing
 
@@ -129,6 +140,14 @@ whether page furniture stays when the data would hide it, whether an action is w
 what a control is called. State each in one line with the default taken and what it costs, at most a
 handful. Silence on the list is not agreement with it; approval names them or waives them out loud.
 A decision the reader finds AFTER implementation was never theirs to make.
+
+These are TAKEN and recorded, not asked. HANDOFF-6 puts every choice inside the selected direction —
+phrasing, glyph, ordering, density — with this phase, because the direction was already chosen and
+the revision is about to be approved, and a micro-choice raised on its own spends a round trip the
+approval covers. The list is where the reader meets them all at once and overturns any of them in a
+sentence. What does NOT belong here is anything the candidate could be WRONG about rather than
+merely unpreferred — a fact derived instead of read, a promise, a permission, a price. Those are
+items on the form, because approval cannot undo them after they ship.
 
 **The consolidation verdicts.** List every new owner the candidate introduces — leaf, entry,
 composite, block — with its nearest existing kin found by vendor primitive, class signature, slot
@@ -167,5 +186,10 @@ node <trust-root>/skills/starci-fe-design-preview/scripts/verify_design_record.m
 ```
 
 Any candidate, fixture, screenshot or semantic manifest change after approval invalidates the seal
-and requires a new minor revision plus approval. Route only a valid sealed record to
-`$starci-fe-design-apply`.
+and requires a new minor revision plus approval. Only a valid sealed record may go on. With the seal
+verified and nothing left open, INVITE `$starci-fe-design-apply` by name, per
+[`../../handoff.md`](../../handoff.md): say what it will materialize and that it opens by confirming
+the write boundary with the user. They start it. Run Apply's admission gates HERE, before the
+invitation — the lint-adoption audit against a real production probe, and every recorded target path
+checked to be inside a plausible boundary. A gate that fails after the user has confirmed a boundary
+has cost them a round trip Preview could have spent itself.

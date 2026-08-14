@@ -10,6 +10,14 @@ the trust root, skill path, target/reference repositories, git identity, artifac
 write boundary. Plan and Preview are artifact-only; Apply pauses for explicit confirmation before
 production writes; inherited drift always stops the phase.
 
+[`handoff.md`](handoff.md) governs the seams between those phases, and it governs every Plan/Apply
+pair here rather than one of them: a phase runs to the end of its own work, hands over what only the
+user can clear as one answerable form — decisions with defaults, resources with the command that
+supplies them, sub-runs with the skill that owns them and a return to here — and only then invites
+the next phase by name. What the run cannot decide is an item to carry, never a question to halt on;
+what a tool refuses is work until every named fallback has failed; and a refusal names what broke
+rather than where the gate noticed it.
+
 ## The axes
 
 An axis answers a different KIND of question, which is why they are separate trees rather than

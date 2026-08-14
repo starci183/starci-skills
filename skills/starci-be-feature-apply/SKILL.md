@@ -24,10 +24,16 @@ Read the inherited `context-lock.plan.json` and the architecture record. Redetec
 git state, app and database, and print the lock.
 
 Compare inherited against detected: trust root, target root, branch, worktree, HEAD, remote, app,
-database connection, artifact root. Any difference is drift. Print a drift table, stop, and ask
-whether to relock or return to Plan. Never switch app, connection, branch or boundary
-automatically, even when the new value looks equivalent — an entity written against the wrong
-connection compiles and writes to a table nobody reads.
+database connection, artifact root. Any difference is drift. Never switch app, connection, branch or
+boundary automatically, even when the new value looks equivalent — an entity written against the
+wrong connection compiles and writes to a table nobody reads.
+
+Print the drift table, and with it what actually moved rather than the field that differs, per
+[`../../handoff.md`](../../handoff.md). A HEAD that advanced on commits touching nothing in the
+architecture record is a different finding from a HEAD that rewrote a file the record names, and only
+the second one is a reason to go back. Say which, then fold the question into the write-boundary
+confirmation in step 2 — relocking and confirming the boundary are the same decision asked twice
+when they are asked apart.
 
 ## 2 · Confirm the write boundary explicitly
 
@@ -44,9 +50,15 @@ service dispatches; the resolver is a door. A failure is a domain exception that
 a `null` and never an `{ ok: false }` shape.
 
 **A file not in the record does not get written.** If the work turns out to need one, that is the
-architecture being wrong, which is worth knowing: say so, and return to Plan for that one
-addition. The cost is a paragraph. The cost of the other path is a shape nobody reviewed, discovered
-by whoever needs it next.
+architecture being wrong, which is worth knowing: say so, name the ONE file and why the work needs it,
+and put returning to Plan for that single addition to the owner. It comes back named. The cost is a
+paragraph. The cost of the other path is a shape
+nobody reviewed, discovered by whoever needs it next.
+
+Scope that return to the operation folder that needs it. Every other folder in the record is
+independent by construction — one operation, one folder — so it is built, specced and proved while
+the missing file is being named. A single unnamed file that sends the whole record back charges one
+paragraph as a whole feature redone, and that is the shape that makes going back feel like losing.
 
 When the sibling family does something canon's prose forbids — auth operations doing their work in
 the service rather than a handler, for example — **mirror the family the record named**, rather than
@@ -105,6 +117,27 @@ frontend still cannot use, the assumption that was taken rather than answered.
 A summary that reads as finished when it is not is the one artifact that makes the next session
 slower rather than faster — it spends the next reader's time proving that something is missing,
 which the person who left it out already knew.
+
+This half invites nothing after it, so its close is the item form itself. Hand that list over the way
+[`../../handoff.md`](../../handoff.md) requires — ONE pass, sorted by who can clear each line, never
+one undifferentiated pile of caveats.
+
+- **The run's own** — already done by the time the list is printed, reported so the owner can see it
+  and not so they can act on it. A proof the environment refused is only here after every fallback
+  the skill names has failed, with both attempts stated.
+- **DECISION** — an assumption taken rather than answered, each with the default in force and the one
+  predicate that changes if the owner decides otherwise.
+- **RESOURCE** — something the run cannot obtain: a credential, an API key, a seeded row, a service
+  that has to be up. Ship the exact command that supplies it and the check that proves it landed,
+  because the owner is the only one who can provide it and the run is the one that knows where it
+  goes.
+- **SUB-RUN** — work owned by another procedure: a migration, an e2e harness that does not exist, a
+  frontend that has to consume the enabler before it is proved end to end. Name the skill, say what
+  it produces, and say that it returns here — the capability stays this record's to close.
+
+Name what each item blocks, precisely. "The live call is owed because the schema will not build
+while an entity the response exposes carries no `@ObjectType`" is one file and an answerable
+sentence; "verification incomplete" is the same fact with the act removed.
 
 ## Forbidden
 

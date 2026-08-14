@@ -106,8 +106,15 @@ After selection, write `plan-record.md/json` using
 node <trust-root>/skills/starci-fe-design-plan/scripts/verify_plan_record.mjs <plan-record.json>
 ```
 
-It must report `ok: true`. Route to `$starci-fe-design-preview`. Plan never
-claims visual approval, executable parity or edits production code. Preview must rebuild the
+It must report `ok: true`. Then close the way [`../../handoff.md`](../../handoff.md) requires: settle
+everything Plan can settle — and by HANDOFF-6 that includes every UX and UI choice inside a direction,
+which is taken and recorded rather than asked, because asking them is how a phase hands back the
+judgement it was engaged for. Then hand over what only the user can clear as ONE form — decisions with
+their defaults, resources with the command that supplies them, sub-runs named with the skill that owns
+them — and only when nothing is left open, INVITE `$starci-fe-design-preview` by name, saying what it will
+build and that it will ask for approval of a named revision. The user starts it. A bare "route to
+Preview" with items still open is the refused shape: it moves Plan's unfinished work onto the user
+inside an invitation. Plan never claims visual approval, executable parity or edits production code. Preview must rebuild the
 selected direction as an executable candidate; it must not bless the Plan mockup by copying it.
 
 When agents are available, they may inventory independent evidence or critique bounded directions.

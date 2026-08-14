@@ -45,11 +45,17 @@ one folder layout reports the other layout's correct files, and at volume that r
 debt: fifty reports, fifty apparently owed fixes, and every one of them a file that was right. Fix
 the rule in this tree, redistribute, and re-measure before touching product source.
 
-**LINT-SYNC-5 — Repairs that change a silhouette stop for the owner.** Rounding a spacing value to
-its nearest rung, choosing an element for a landmark, or naming a token that did not exist are
-visible decisions even when the rule leaves no alternative. Measure the difference, state it in the
-units a reader will see, and let the owner choose. Silence here spends somebody else's design
-judgement.
+**LINT-SYNC-5 — Repairs that change a silhouette stop for the owner, together and once.** Rounding a
+spacing value to its nearest rung, choosing an element for a landmark, or naming a token that did not
+exist are visible decisions even when the rule leaves no alternative. Measure the difference, state
+it in the units a reader will see, and let the owner choose. Silence here spends somebody else's
+design judgement.
+
+Collect them; do not ask them as the sweep meets them. Every unambiguous repair is made first, then
+the visible ones are handed over as ONE form — each with the measured delta, the rung or element in
+force as the default, and what changes if the owner picks the other. A sweep that halts at each
+silhouette makes the owner pay a round trip per value, which is how a sync stops being finished.
+[`../../handoff.md`](../../handoff.md) governs the shape.
 
 **LINT-SYNC-6 — A rule that cannot pass anywhere is escalated, not disabled quietly.** Where a
 canonical rule cannot hold in a repository — because it decides something the product has not
@@ -135,5 +141,11 @@ node <trust-root>/scripts/audit-fe-lint-adoption.mjs --target <repo> --probe <pr
 ```
 
 Between those two, work the reported errors under LINT-SYNC-4 and LINT-SYNC-5: establish that each
-is real, fix the rule here when it is not, and stop for the owner on anything a reader would see.
-Report the before and after counts together — a repair is only legible beside the number it moved.
+is real, fix the rule here when it is not, and collect anything a reader would see into the one form
+the owner answers in a single pass. Report the before and after counts together — a repair is only
+legible beside the number it moved.
+
+This procedure is often a SUB-RUN: Apply or Fidelity Fix reached a failing lint-adoption audit and
+named it. When that is how it started, it RETURNS to the phase that requested it — closing with
+`ok: true` and the phase's own name, not with a fresh invitation to something else. A sub-run that
+ends by starting a different lane abandons the work that asked for it, half done and unrecorded.

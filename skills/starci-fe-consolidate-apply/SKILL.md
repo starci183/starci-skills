@@ -26,9 +26,10 @@ Proceed only from an approved survey. Validate it before touching anything:
 node <trust-root>/skills/starci-fe-consolidate-plan/scripts/verify_consolidation_plan.mjs <consolidation-plan.json>
 ```
 
-A missing survey routes to `$starci-fe-consolidate-plan`. A cluster the survey recorded as
-`keep-apart` is a finding, not a backlog item: it cannot be applied here, and changing that verdict
-means returning to the survey with new evidence.
+A missing survey is not a bare absence to report: name `$starci-fe-consolidate-plan` as the thing
+that produces it and what it will measure, per [`../../handoff.md`](../../handoff.md). A cluster the
+survey recorded as `keep-apart` is a finding, not a backlog item: it cannot be applied here, and
+changing that verdict means going back to the survey with the new evidence named.
 
 Read [`references/steps-table.md`](references/steps-table.md),
 [`references/consolidation-record.md`](references/consolidation-record.md),
@@ -42,8 +43,13 @@ cluster that caused it, and the whole batch then has to be unpicked to find out.
 
 Work only inside the inherited cluster and its measured call sites. Widening the set mid-edit is
 scope creep discovered too late to review; narrowing it is a caller left behind. If the work reveals
-a call site the survey missed, that is a survey that was wrong — return to it rather than quietly
-extending the diff.
+a call site the survey missed, that is a survey that was wrong — name that call site and put the
+correction back to the survey rather than quietly extending the diff.
+
+That return is scoped to the cluster whose measurement was wrong. Clusters are applied one per diff
+precisely so they are independent, so every other approved cluster is applied and proved while the
+mismeasured one goes back. Sending the whole approved set back for one missed call site charges a
+single correction as the entire survey redone.
 
 An added prop preserves owner, semantic slot, absence and default, precedence and every existing
 caller, and it is the ONE prop the survey approved. It is never `className`, `style` or another
@@ -70,3 +76,12 @@ superseded owner left in place.
 Green tests are not the proof here, and saying so is the point of the phase: no unit test knows what
 a screen looked like yesterday, so a merge that quietly restyles one caller passes all of them.
 Report clusters applied, call sites touched, parity per call site, and anything the survey got wrong.
+
+This half invites nothing after it, so its close is the item form itself. Hand it over as ONE pass,
+sorted by who can clear each line, per [`../../handoff.md`](../../handoff.md): what the run already
+handled, each DECISION with the default in force, each RESOURCE with the command that supplies it,
+and each SUB-RUN with the skill that owns it. A render the browser refused is not a
+finding until the fallback in
+[`../starci-fe-design-preview/references/state-coverage.md`](../starci-fe-design-preview/references/state-coverage.md)
+has also failed — parity here is proved by images, so the phase that cannot take one has to try the
+other camera before it reports a call site as unproven.
