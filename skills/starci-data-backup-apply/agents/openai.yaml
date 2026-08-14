@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Data Backup Apply"
+  short_description: "Create an approved encrypted snapshot"
+  default_prompt: "Use $starci-data-backup-apply to create and verify the approved encrypted snapshot."

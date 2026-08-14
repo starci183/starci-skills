@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Workflow Drift Apply"
+  short_description: "Finalize drift verdicts and routing"
+  default_prompt: "Use $starci-workflow-drift-apply to finalize approved drift verdicts and repair routing."

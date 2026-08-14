@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Upgrade Review"
+  short_description: "Review trust upgrade proposals"
+  default_prompt: "Use $starci-fe-upgrade-review to revise and approve trust upgrade proposals."

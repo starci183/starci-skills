@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Consolidate Plan"
+  short_description: "Brief component consolidation groups"
+  default_prompt: "Use $starci-fe-consolidate-plan to survey and brief frontend consolidation groups."

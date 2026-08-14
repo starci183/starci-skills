@@ -5,18 +5,32 @@ The rules this codebase is written by, one file per concept, filed on an axis.
 Read [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md) before adding or changing anything here. It states the
 shape every file takes and, more importantly, what a file must never carry.
 
-Before running any skill, read [`skill-shape.md`](skill-shape.md). Every skill here has the same three
-parts — a SCOPE table printed before anything happens, a PROCESS that runs until genuinely stuck, and
-an OUTPUT in one of exactly three shapes, each a table: what needs the user, what is done and what
-comes next, or what is done and what is owed. One
-task is one file at `<backend-repo>/.workflows/<kind>/<app>/<id>.md`, appended to by each phase. It lives with
-the product rather than in this tree, and the backend repository holds it even for frontend work.
+Before running any skill, read [`skill-shape.md`](skill-shape.md). Every capability follows
+**Plan -> Review -> Apply** and every phase prints `CONTEXT` first, then closes with `OUTPUTS`,
+`CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED`. `OUTPUTS` carries concepts;
+`CHANGES` carries the detailed code tree. One task is one append-only file at
+`<backend-repo>/.workflows/<kind>/<app>/<id>.md`, held by the product's backend repository even for
+frontend work.
 
 There is no seal and no lock record. The production write boundary is confirmed once, out loud,
 before the first write; whether an old task still matches the source is asked afterwards by
-[`starci-workflow-drift`](skills/starci-workflow-drift/SKILL.md), over one task or all of them. That
+[`starci-workflow-drift-plan`](skills/starci-workflow-drift-plan/SKILL.md), over one task or all of them. That
 is a deliberate trade: preventing drift cost a hash per file and phases that refused to finish, and
 finding it costs one skill run.
+
+## The capability trios
+
+| Capability | Plan | Review | Apply |
+|---|---|---|---|
+| Backend feature | [`starci-be-feature-plan`](skills/starci-be-feature-plan/SKILL.md) | [`starci-be-feature-review`](skills/starci-be-feature-review/SKILL.md) | [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md) |
+| Data backup | [`starci-data-backup-plan`](skills/starci-data-backup-plan/SKILL.md) | [`starci-data-backup-review`](skills/starci-data-backup-review/SKILL.md) | [`starci-data-backup-apply`](skills/starci-data-backup-apply/SKILL.md) |
+| Data restore | [`starci-data-restore-plan`](skills/starci-data-restore-plan/SKILL.md) | [`starci-data-restore-review`](skills/starci-data-restore-review/SKILL.md) | [`starci-data-restore-apply`](skills/starci-data-restore-apply/SKILL.md) |
+| FE consolidation | [`starci-fe-consolidate-plan`](skills/starci-fe-consolidate-plan/SKILL.md) | [`starci-fe-consolidate-review`](skills/starci-fe-consolidate-review/SKILL.md) | [`starci-fe-consolidate-apply`](skills/starci-fe-consolidate-apply/SKILL.md) |
+| FE design | [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) | [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) | [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) |
+| FE fidelity | [`starci-fe-fidelity-plan`](skills/starci-fe-fidelity-plan/SKILL.md) | [`starci-fe-fidelity-review`](skills/starci-fe-fidelity-review/SKILL.md) | [`starci-fe-fidelity-apply`](skills/starci-fe-fidelity-apply/SKILL.md) |
+| FE lint sync | [`starci-fe-lint-sync-plan`](skills/starci-fe-lint-sync-plan/SKILL.md) | [`starci-fe-lint-sync-review`](skills/starci-fe-lint-sync-review/SKILL.md) | [`starci-fe-lint-sync-apply`](skills/starci-fe-lint-sync-apply/SKILL.md) |
+| Trust upgrade | [`starci-fe-upgrade-plan`](skills/starci-fe-upgrade-plan/SKILL.md) | [`starci-fe-upgrade-review`](skills/starci-fe-upgrade-review/SKILL.md) | [`starci-fe-upgrade-apply`](skills/starci-fe-upgrade-apply/SKILL.md) |
+| Workflow drift | [`starci-workflow-drift-plan`](skills/starci-workflow-drift-plan/SKILL.md) | [`starci-workflow-drift-review`](skills/starci-workflow-drift-review/SKILL.md) | [`starci-workflow-drift-apply`](skills/starci-workflow-drift-apply/SKILL.md) |
 
 ## The axes
 
@@ -99,13 +113,14 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 Still owed, each with the evidence that says so: `migrations`, `pagination`, `concurrency`,
 `throttling`.
 
-Backend capability work follows **Plan -> Apply**, for the same reason the frontend does: a
+Backend capability work follows **Plan -> Review -> Apply**, for the same reason the frontend does: a
 folder architecture is arguable in a sentence and the same decisions embedded in thirty written
 files are arguable only by whoever reads all thirty.
 [`starci-be-feature-plan`](skills/starci-be-feature-plan/SKILL.md) reads the law, dumps the
 schema unfiltered, mirrors the sibling family and stops with every file named and every test case
-enumerated. [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md) writes those files
-and no others, and a file the record does not name sends the work back rather than arriving quietly.
+enumerated. [`starci-be-feature-review`](skills/starci-be-feature-review/SKILL.md) challenges and
+revises that brief until one exact tree is approved. [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md)
+writes those files and no others.
 
 `fe/design/` carries the laws no machine can hold — no file there names a number of its own, which
 is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) ·
@@ -132,19 +147,18 @@ design leaves them able to type a legal value for the wrong reason.
 [`creativity/INDEX.md`](fe/creativity/INDEX.md). It uses canon as fixed grammar, design as judgement,
 backend behavior as business truth and the contract `why` plus existing components as reuse
 evidence. It is not another canon shelf. Net-new UI and work that still needs a product or
-composition choice follow **Plan -> Preview revisions -> Apply**. Three task procedures execute it
+composition choice follow **Plan -> Review revisions -> Apply**. Three task procedures execute it
 across four explicit scopes (`page`, `layout`, `block`, `overlay`) without blurring their owners:
 
-- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) reads the live schema and the
-  components already shipped, draws two to four screens differing in product decisions as real HTML
-  from port 8080, and stops for the user to pick one. Every canvas says it is not an implementation
-  baseline, and a screen no existing component can express is not an option.
-- [`starci-fe-design-preview`](skills/starci-fe-design-preview/SKILL.md) builds the chosen screen from
-  the framework, owners, contracts and tokens production uses, renders every owner state, proposes
-  any backend update the screen needs, and ends when the user approves what they can see.
-- [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) confirms the write boundary once,
-  lands the backend update first if there was one, writes the frontend where the review named it, and
-  closes on the real page rendering rather than on green tests.
+- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) reads live contracts, shipped
+  components and named references, then records two to four conceptual directions and a brief. It
+  creates no parallel design code.
+- [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) challenges the selected brief,
+  source boundary, owner states and acceptance evidence until one exact revision is approved. It
+  writes no production source.
+- [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) commits the current target state
+  as the before-state, writes the approved frontend directly in final source paths, and closes by
+  matching the baseline diff, rendered states and tests.
 
 Duplication is the other thing a build leaves behind, and it is not a defect list: two files holding
 one shape say the vocabulary had no word for it. It is a second pair, split for the same reason as
@@ -156,6 +170,8 @@ the first — surveying and editing want different write boundaries.
   `prop-variant`, `extract-composite` or `keep-apart`, and it stops for approval of that set. It
   writes a proposal and changes no code, because editing while surveying destroys the measurement
   the proposal rests on.
+- [`starci-fe-consolidate-review`](skills/starci-fe-consolidate-review/SKILL.md) revises and approves
+  one verdict and measured call-site boundary per group.
 - [`starci-fe-consolidate-apply`](skills/starci-fe-consolidate-apply/SKILL.md) carries out the
   approved verdicts one cluster per diff, may neither widen nor narrow the measured call sites, and
   proves each one still renders what it rendered.
@@ -164,11 +180,12 @@ Merging two shapes that merely look alike is worse than the duplication: it prod
 a flag per call site. Two blocks over different domain entities that render identically are not one
 block — the shape is a composite and the meaning stays where it is.
 
-A bounded parity, interaction or runtime defect whose expected result is already proven has no
-choice to Plan. [`starci-fe-fidelity-plan`](skills/starci-fe-fidelity-plan/SKILL.md) locks the named
-evidence, reconfirms its production write boundary, proves lint adoption and makes the smallest
-owner-scoped correction. If ownership, CTA, behavior or reusable vocabulary becomes undecided, it
-returns to Plan.
+A bounded parity, interaction or runtime defect still follows the trio.
+[`starci-fe-fidelity-plan`](skills/starci-fe-fidelity-plan/SKILL.md) locks binding evidence and the
+comparison identity. [`starci-fe-fidelity-review`](skills/starci-fe-fidelity-review/SKILL.md) renders
+and revises the smallest correction. [`starci-fe-fidelity-apply`](skills/starci-fe-fidelity-apply/SKILL.md)
+writes only the approved correction. If ownership, CTA, behavior or reusable vocabulary becomes
+undecided, it returns to Design Plan.
 
 ## What holds a law
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Consolidate Review"
+  short_description: "Review consolidation verdicts"
+  default_prompt: "Use $starci-fe-consolidate-review to revise and approve consolidation verdicts."

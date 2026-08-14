@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Upgrade Plan"
+  short_description: "Brief evidence-backed trust upgrades"
+  default_prompt: "Use $starci-fe-upgrade-plan to group workflow evidence into trust upgrade proposals."

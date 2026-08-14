@@ -1,6 +1,6 @@
 ---
 name: starci-fe-consolidate-apply
-description: Carry out approved consolidation verdicts — merge the duplicate owners, add the one variant prop, or extract the shared shape — updating every measured call site and proving each still renders what it rendered. Use after starci-fe-consolidate-plan records verdicts in the task file: "gộp lại đi", "apply the consolidation plan".
+description: Carry out consolidation verdicts approved by starci-fe-consolidate-review, updating exactly the measured call sites and proving each still renders what it rendered. Use after Review approves merge, prop-variant or extract-composite groups and their production boundary.
 ---
 
 # StarCi FE Consolidate Apply
@@ -15,11 +15,14 @@ The promise is narrow and total: **ownership changes, the render does not.** Tha
 [`refactor-parity`](../../fe/design/refactor-parity.md), and it is the only thing this half is judged
 on.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table, then **confirm `Repo / branch` and `Touching` with the user before the first edit.**
 
-Read `## plan` in the task file. No verdicts means `$starci-fe-consolidate-plan` has not run. A group
+Read the approved `## review` in the task file. No approved verdicts means
+`$starci-fe-consolidate-review` has not finished. A group
 recorded `keep-apart` cannot be applied here; changing that verdict means going back with new
 evidence.
 
@@ -43,7 +46,7 @@ for the thing that now has one word, and the next survey will find it and rank i
 **Prove nothing moved.** Render every measured call site before and after in the same state — same
 route, viewport, locale, theme, persona and fixture. Then typecheck, lint, focused tests and build.
 When the browser refuses to composite, take the fallback in
-[`../starci-fe-design-preview/references/state-coverage.md`](../starci-fe-design-preview/references/state-coverage.md)
+[`../starci-fe-design-review/references/state-coverage.md`](../starci-fe-design-review/references/state-coverage.md)
 before recording a call site as unproven: parity here is proved by images, so the camera failing is
 the one failure this half must not accept on the first try.
 
@@ -52,8 +55,9 @@ screen looked like yesterday, so a merge that quietly restyles one caller passes
 
 ## OUTPUT
 
-The four tables. Append `## apply` to the task file: the SCOPE table, groups applied,
-**every file written**, parity per call site, the green commands, and anything the survey got wrong.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
 
-Compare that file list against `## plan` above it — a file the verdicts never named is visible
-immediately.
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+Print the six canonical tables. `OUTPUTS` names the consolidated concepts; `CHANGES` details every
+written path and measured call site. Append `## apply` with parity evidence and owed proof.

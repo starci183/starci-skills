@@ -1,55 +1,62 @@
 ---
 name: starci-fe-design-apply
-description: Write the reviewed StarCi screen into production — backend updates first if the review proposed any, then the frontend — and open the real page to prove it renders. Use after starci-fe-design-preview records an approved review in the task file. Confirms the write boundary once, then runs to a working page.
+description: Commit the current target source as a clean baseline, then implement the approved StarCi frontend design directly in final source paths and track the resulting diff. Use after starci-fe-design-review approves the exact revision, production boundary, states and evidence. Creates no parallel design code; renders, tests and records the baseline-to-worktree diff.
 ---
 
 # StarCi FE Design Apply
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
-Apply writes what the review named. It does not finish design work in JSX, substitute a component
-that was easier, or improve something on the way past.
+Apply creates the before-state commit, writes the approved design directly in source, and uses that
+commit to expose the exact final diff.
 
-## SCOPE
+## CONTEXT
 
-Print the table, then **confirm `Repo / branch` and `Touching` with the user before the first
-production write.** Once. Detection is not permission, and this is the only place in the chain where
-the work becomes expensive to unwind.
+Present the phase table under the exact heading `### CONTEXT`.
 
-Read `## review` in the task file. No review means `$starci-fe-design-preview` has not run; say so
-rather than inventing what it would have decided.
+Read the approved `## review`. Confirm `Repo / branch` and `Touching` before the first production
+write. `Touching` contains the workflow and exact approved source boundary.
 
 ## PROCESS
 
-**Backend first when the review proposed one.** A frontend built against a field nobody serves fails
-at the only moment that counts. Hand it to `$starci-be-feature-plan`, which returns here.
+**Commit before editing.** On entry to Apply, commit the current target source state and record
+`Baseline commit: <sha>`. This is the before-state for the design diff. Do not make any approved
+design edit before this commit. Exclude generated artifacts, secrets and paths outside the target
+repository; surface an uncommittable state in `WARNINGS` or `NEED APPROVALS` instead of inventing a
+baseline.
 
-**Write what the review named, where it named it.** Pages orchestrate, blocks own product sentences,
-branches arrange contract content, shells own vendor mechanics, connected blocks resolve data and
-render pure `_X` halves. Read the tier's file in
-[`../../fe/canon/uxui/layers/`](../../fe/canon/uxui/layers/) BEFORE authoring that tier — a page
-taking one situation prop for the whole screen, a branch opening `children`, a component writing its
-own layout class: each compiles, renders and reviews cleanly, and each is refused.
+When the approved screen needs a backend enabler, complete its approved backend capability before
+the frontend consumes it and include its repository baseline separately.
 
-**Inventory before invention** — the same rule Plan and Preview ran. A new entry whose class list and
-child identities repeat an existing one is the same concept under a second name.
+Write the approved revision directly at final source paths. Pages orchestrate, blocks own product
+sentences, branches arrange contract content, shells own vendor mechanics, and connected blocks
+resolve data before rendering pure halves. Create no detached HTML, design-code directory or copied
+component implementation.
 
-If the target has moved and the reviewed shape no longer fits, that is a confirm row. Do not adapt it
-quietly. Report what actually moved rather than the error you saw: a shared import renamed under you
-is yours to resync and carry on from; a component that no longer exposes the slot the review used is
-the user's call. One broken seam refuses its own file, never the whole run — everything clear of it
-lands and is proved.
+Track `git diff <baseline>` while working. Every path must remain inside Review's boundary. If a new
+path is required, append the finding and return that boundary decision to Review before writing it.
 
-**Prove it renders.** Typecheck, lint and build must be green with nothing suppressed. Then open the
-real page and look at each state the review listed, in the same route, viewport, locale, theme,
-persona and fixture the review used. A screenshot from another state cannot prove or disprove
-anything, and green tests know nothing about what a screen looks like.
+Run typecheck, lint and build without suppression. Open the real page and verify every approved state
+at the recorded route, viewport, locale, theme, persona and fixture. Feedback on the implementation
+is handled by revising the same source inside Apply and appending `REJECTED` evidence. Feedback that
+changes the approved product thesis returns to Plan/Review.
+
+Before closing, record:
+
+```text
+Applied revision: <approved identity>
+Baseline commit: <sha>
+Tracked diff: <baseline>..worktree
+```
+
+The name-status diff, `CHANGES` tree and approved boundary must agree.
 
 ## OUTPUT
 
-The four tables. Append `## apply` to the task
-file: the SCOPE table, **every file written**, the green commands, and what is still owed.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED`
+and `### OWED`.
 
-That file list is the check. Compare it against `## review` directly above it — a file the review
-never mentions is visible immediately, with no hash and no script. `$starci-workflow-drift` makes the
-same comparison later, across every task at once.
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+`OUTPUTS` names the implemented concept and proof. `CHANGES` details every source and workflow path
+in `git diff <baseline>`. Append `## apply` with commands, rendered states and remaining proof.

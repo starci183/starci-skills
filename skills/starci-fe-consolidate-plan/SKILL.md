@@ -1,6 +1,6 @@
 ---
 name: starci-fe-consolidate-plan
-description: Survey a stated scope of the StarCi frontend for near-duplicate components, group them by real call sites, and settle each group with one verdict — merge, one variant prop, extract the shared shape, or keep apart. Writes a proposal and changes no code. Use when the job is to FIND duplication: "tìm component trùng", "is there already a component for this", "what should we consolidate next".
+description: Survey a stated StarCi frontend scope for near-duplicate components and brief each group as merge, prop-variant, extract-composite or keep-apart. Use when finding duplicate components or deciding what to consolidate. Writes no production code and hands the frozen groups to starci-fe-consolidate-review.
 ---
 
 # StarCi FE Consolidate Plan
@@ -15,7 +15,9 @@ merely LOOK alike produces one owner carrying a flag per call site, which nobody
 and no story renders honestly. So this half spends its effort on the question a later diff cannot
 re-derive — **are these the same thing** — and hands the mechanical part on.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table. `Touching` is the artifact directory: editing while surveying destroys the evidence
 the proposal rests on, because a call-site count measured against a tree that no longer exists cannot
@@ -55,11 +57,14 @@ identity or domain entity. "They feel different" is a pair nobody compared.
 
 ## OUTPUT
 
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
+
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
 A confirm row for a group you cannot settle alone: the verdict the evidence leans to, what makes it
 uncertain, and what changes if the other one is picked. A repository whose lint adoption is failing
-cannot be measured honestly either — that is `$starci-fe-lint-sync`, which returns here.
+cannot be measured honestly either — that is `$starci-fe-lint-sync-plan`, which returns here.
 
-Once the verdict set is approved: append `## plan` to the task file with the SCOPE table,
-each group, its members, its call sites and its verdict. Groups left at `keep-apart` do not travel.
-Then invite `$starci-fe-consolidate-apply` — it edits one group per diff, updates every measured call
-site and proves each still renders what it rendered. Say plainly that the measurement ages from here.
+Append `## plan` to `.workflows/consolidation/<app>/<name>.md` with each proposed group, member,
+call site and candidate verdict. Print the six canonical tables: `OUTPUTS` holds the consolidation
+brief and `CHANGES` the workflow path only. Then invite `$starci-fe-consolidate-review`.

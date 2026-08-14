@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Lint Sync Plan"
+  short_description: "Brief canonical FE lint adoption"
+  default_prompt: "Use $starci-fe-lint-sync-plan to audit and brief canonical FE lint adoption."

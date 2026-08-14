@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Lint Sync Apply"
+  short_description: "Apply and prove canonical FE lint"
+  default_prompt: "Use $starci-fe-lint-sync-apply to apply and prove canonical FE lint adoption."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Workflow Drift Review"
+  short_description: "Review workflow drift verdicts"
+  default_prompt: "Use $starci-workflow-drift-review to compare source and approve workflow drift verdicts."

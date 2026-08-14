@@ -1,20 +1,22 @@
 ---
 name: starci-fe-fidelity-apply
-description: Make the repair a fidelity plan named, in the files it named, and prove it with a before-and-after pair in the frozen comparison state. Use after starci-fe-fidelity-plan records the binding evidence and the file list. Never widens the fix or redesigns on the way past.
+description: Apply the bounded StarCi frontend correction approved by starci-fe-fidelity-review and prove it with a before-and-after pair in the frozen comparison state. Use only after Review approves the exact correction and file boundary.
 ---
 
 # StarCi FE Fidelity Apply
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table, then **confirm `Repo / branch` and `Touching` with the user before the first
 production write.** Once. A small fix changes the amount of code, not the authority required to
 change it.
 
-Read `## plan` in `<backend-repo>/.workflows/fidel/<app>/<id>.md`. No plan means the binding evidence
-was never named — say so rather than deciding for yourself what "correct" meant.
+Read the approved `## review` in `<backend-repo>/.workflows/fidel/<app>/<id>.md`. No approved
+revision means `$starci-fe-fidelity-review` has not finished.
 
 ## PROCESS
 
@@ -32,7 +34,7 @@ comparison chosen after seeing the defect is a comparison chosen to pass.
 **Render before and after for every touched state.** This lane is judged on a pair of images, and
 green tests know nothing about what a screen looks like. When the browser refuses to composite, take
 the fallback in
-[`../starci-fe-design-preview/references/state-coverage.md`](../starci-fe-design-preview/references/state-coverage.md)
+[`../starci-fe-design-review/references/state-coverage.md`](../starci-fe-design-review/references/state-coverage.md)
 before recording any state as uncaptured — and when a capture tool lays the page out at a width it
 was never given, say so and carry the measurement instead. An image that lies is worse than no image.
 
@@ -43,9 +45,10 @@ One blocked packet does not hold the others.
 
 ## OUTPUT
 
-The four tables. Append `## apply` to the same task file: the SCOPE table, the frozen comparison
-identity, every file written, before-and-after per touched state, the green commands, what the
-founder rejected during the write, and what is still owed.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
 
-That file list is the check. Compare it against `## plan` directly above it — a file the plan never
-named is visible immediately, with no hash and no script.
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+Print the six canonical tables. `OUTPUTS` names the restored fidelity concept; `CHANGES` details
+every written path. Append `## apply` with the CONTEXT, frozen comparison, before/after proof, green
+commands, warnings, rejections and owed work.

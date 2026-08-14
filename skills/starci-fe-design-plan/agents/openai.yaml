@@ -1,4 +1,4 @@
 interface:
   display_name: "StarCi FE Design Plan"
-  short_description: "Compare evidence-backed StarCi UI choices"
-  default_prompt: "Use $starci-fe-design-plan. Lock context and write artifacts only. Build one cohesive case with 2-4 selectable, implementation-feasible directions. Render representative HTML from port 8080+, visibly label it DIRECTIONAL - NOT AN APPLY BASELINE, and stop for explicit selection. Route a settled bounded repair to Fidelity Fix."
+  short_description: "Brief evidence-backed UI directions"
+  default_prompt: "Use $starci-fe-design-plan to research and present evidence-backed UI directions."

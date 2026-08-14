@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Design Review"
+  short_description: "Review and approve a frontend brief"
+  default_prompt: "Use $starci-fe-design-review to challenge and approve the selected frontend design brief before source changes."

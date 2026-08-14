@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi BE Feature Apply"
+  short_description: "Implement an approved backend feature"
+  default_prompt: "Use $starci-be-feature-apply to implement and prove the approved backend feature."

@@ -1,19 +1,21 @@
 ---
 name: starci-fe-upgrade-apply
-description: Write the rule changes an upgrade plan proposed and the founder approved — into canon, a skill, skill-shape or a lint rule with its twin test — then mirror and prove the gate is still green. Use after starci-fe-upgrade-plan records approved groups. Never invents a rule the plan did not trace to refusals.
+description: Apply trust-tree changes approved by starci-fe-upgrade-review to canon, skills, skill shape or lint rules, then prove the gates remain green. Use only after Review approves each wording, home, test obligation and write boundary.
 ---
 
 # StarCi FE Upgrade Apply
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table, then **confirm `Touching` with the user before the first write.** This is the one
 lane whose writes change every future run, so the boundary is worth naming out loud even when the
 change is three lines.
 
-Read the approved groups in `<backend-repo>/.workflows/upgrade/<window>.md`. A group the founder did
+Read the approved groups in `<backend-repo>/.workflows/upgrade/<app>/<name>.md`. A group Review did
 not approve is not written, however good the evidence looked — and a group the plan never traced to
 at least two refusals is not written at all.
 
@@ -48,8 +50,12 @@ in a place nobody will look.
 
 ## OUTPUT
 
-The four tables. Append `## apply` to the same upgrade file: the SCOPE table, every file written,
-the twin tests added, the gate and mirror commands with their results, what the founder rejected
-during the write, and what is still owed.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
+
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+Print the six canonical tables. `OUTPUTS` names upgraded rule concepts; `CHANGES` details every
+trust, mirror and target path. Append `## apply` with the CONTEXT, twin tests, gate and mirror
+results, warnings, rejections and owed work.
 
 Nothing invites anything after this. The next run reads the new rules without being told to.

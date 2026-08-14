@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Fidelity Plan"
+  short_description: "Brief a bounded fidelity correction"
+  default_prompt: "Use $starci-fe-fidelity-plan to lock evidence and brief a fidelity correction."

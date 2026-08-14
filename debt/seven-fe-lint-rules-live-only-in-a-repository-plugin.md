@@ -4,7 +4,7 @@ role: fe
 state: open
 cost: medium
 opened: 2026-08-13
-paths: [.claude/sources/fe/index.mjs, .claude/skills/starci-fe-lint-sync/SKILL.md]
+paths: [.claude/sources/fe/index.mjs, .claude/skills/starci-fe-lint-sync-plan/SKILL.md]
 ---
 
 ## What is wrong
@@ -26,7 +26,7 @@ this tree agrees with; none of them is a local preference.
 
 ## Why it was left
 
-`starci-fe-lint-sync` removes a repository's own plugin folder, because a second copy of the rules is
+`starci-fe-lint-sync-plan` audits a repository's own plugin folder, because a second copy of the rules is
 a second answer to the same question. That removal drops these seven with it. They were recorded here
 and dropped rather than carried, which is the branch the skill's own Forbidden table permits when the
 alternative is a large port made in the same breath as the wiring change.

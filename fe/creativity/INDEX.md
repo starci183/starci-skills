@@ -42,15 +42,15 @@ scopes rather than separate, competing workflows.
 
 | Phase | Skill | Ends when |
 |---|---|---|
-| Plan | [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | Two to four screens differing in product decisions are rendered as real HTML, and the user picks one |
-| Preview | [`starci-fe-design-preview`](../../skills/starci-fe-design-preview/SKILL.md) | The chosen screen is built from the real components and contracts, every owner state renders, any backend gap is proposed, and the user approves what they can see |
-| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | The backend update lands first if there was one, the frontend is written where the review named, and the real page renders |
+| Plan | [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | Evidence, two to four conceptual directions and one selected brief are recorded without design code |
+| Review | [`starci-fe-design-review`](../../skills/starci-fe-design-review/SKILL.md) | The selected brief, exact source boundary, owner states and acceptance evidence are explicitly approved |
+| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | Current source is committed as the baseline, approved code is written directly in source, and the final diff plus real page are proved |
 
 Every phase runs to the end of its own work before it speaks. What it cannot settle alone comes back
 as one batched ask and the run continues on the answer; what only looks like a choice — a label, a
 glyph, an ordering inside the chosen direction — is decided and recorded in a line. Whether an old
 task still matches the source is asked later by
-[`starci-workflow-drift`](../../skills/starci-workflow-drift/SKILL.md), not prevented by a seal.
+[`starci-workflow-drift-plan`](../../skills/starci-workflow-drift-plan/SKILL.md), not prevented by a seal.
 
 A bounded defect with a binding expected result uses
 [`starci-fe-fidelity-plan`](../../skills/starci-fe-fidelity-plan/SKILL.md), because manufacturing
@@ -91,19 +91,19 @@ change and the stronger its proof must be.
 
 **CREATIVITY-6 · Choice-bearing work has three gates and no shortcut.**
 
-Plan freezes evidence and makes preliminary directions comparable through visibly directional HTML
-that is never an Apply baseline. Preview rebuilds the selected direction as an executable candidate
-using the same StarCi framework, owners, contracts, tokens and fixtures production will use, then
-seals its files and state evidence. Apply materializes that exact candidate and may not translate a
-screenshot into a different tree. A settled bounded defect is not choice-bearing work and uses
-Fidelity Fix; discovering a choice moves it back to this pipeline.
+Plan freezes evidence and makes preliminary directions comparable in one conceptual brief. Review
+challenges the selected direction, source boundary, owner states and acceptance evidence without
+creating design code. Apply commits the current target source as its before-state, then implements
+the approved direction directly in final source paths and tracks that baseline diff. A settled
+bounded defect is not choice-bearing work and uses Fidelity Fix; discovering a choice moves it back
+to this pipeline.
 
-**CREATIVITY-8 · Approval binds executable identity, not resemblance.**
+**CREATIVITY-8 · Approval binds the brief and source boundary, not a parallel implementation.**
 
-A Preview approval names the candidate file hashes and state identity: route, viewport, locale,
-theme, auth persona, fixture hash, owner tree, contracts, props and tokens. Apply is correct only
-when the same identity produces the same structure and rendering. Comparing different states is
-invalid evidence; silently changing the candidate after approval invalidates the seal.
+Review approval names the revision, final source boundary and state identity: route, viewport,
+locale, theme, auth persona, fixture identity, owner tree, contracts, props and tokens. Apply is
+correct only when its baseline diff stays inside that boundary and the same state identity produces
+the approved behavior. Comparing different states is invalid evidence.
 
 **CREATIVITY-7 · State completeness follows ownership.**
 

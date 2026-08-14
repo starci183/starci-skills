@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Data Backup Plan"
+  short_description: "Brief an encrypted stack snapshot"
+  default_prompt: "Use $starci-data-backup-plan to inventory and brief an encrypted stack snapshot."

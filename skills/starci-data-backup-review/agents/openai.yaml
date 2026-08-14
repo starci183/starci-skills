@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Data Backup Review"
+  short_description: "Review snapshot safety and coverage"
+  default_prompt: "Use $starci-data-backup-review to review and approve snapshot safety and coverage."

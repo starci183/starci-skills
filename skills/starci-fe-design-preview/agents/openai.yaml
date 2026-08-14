@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi FE Design Preview"
-  short_description: "Revise and approve selected StarCi UI"
-  default_prompt: "Use $starci-fe-design-preview. Inherit Context Lock and write artifacts only. Rebuild the selected direction as an executable candidate using the same StarCi framework, owners, contracts, tokens and fixtures production will use. Feed canvas and source from that candidate, lock every rendered state identity, and hash-seal only an explicitly approved revision."

@@ -4,6 +4,7 @@
   "private": true,
   "description": "The StarCi trust tree. This manifest exists so the gates that hold canon can be RUN, not merely written: parity between every law and its artifact, the rule twins, the design-record seal, and the review-lab phase separation. A gate nobody can invoke is a preference.",
   "scripts": {
-    "test": "node --test \"sources/**/*.test.mjs\" \"skills/**/*.test.mjs\""
+    "test": "node --test \"sources/**/*.test.mjs\" \"skills/**/*.test.mjs\"",
+    "validate:workflows": "node scripts/validate-workflows.mjs --root ../.workflows"
   }
 }

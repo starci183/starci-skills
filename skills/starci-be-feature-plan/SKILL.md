@@ -14,7 +14,9 @@ So this half produces the file list, before there are any files.
 Not for changing a value or fixing a typo. That is a bounded repair and needs evidence, not a
 procedure.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table, and name two rows that are invisible when wrong: **which app** (a monorepo builds
 several from one tree — `nest-cli.json` names them, and two apps are two products with two auth
@@ -63,12 +65,16 @@ nobody considered, and the suite ends up green where the risk is.
 
 ## OUTPUT
 
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
+
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
 A confirm row for anything only the owner can settle — a product question the code surfaced (does a trial
 count as an enrollment? is there an edit window?) with the default the evidence supports, a credential
 or a running service you need, or another procedure that has to go first. Never bury one of these in
 a handler default: a guess in a handler is a decision nobody made and nobody can find.
 
-Once it is approved: append `## plan` to the task file with the SCOPE table, every file
-named, the decisions the evidence forced, the assumptions still standing and what this will NOT do.
-Then invite `$starci-be-feature-apply` — it confirms the write boundary, writes those files and no
-others, and proves them with the specs, the e2e and a live call.
+Print the six canonical tables. `OUTPUTS` names the capability brief and architecture concept;
+`CHANGES` details the workflow path only. Put every product rule that can be wrong in
+`NEED APPROVALS`, never in a handler default. Append `## plan` with the CONTEXT, proposed file tree,
+test matrix, assumptions and exclusions. Then invite `$starci-be-feature-review`.

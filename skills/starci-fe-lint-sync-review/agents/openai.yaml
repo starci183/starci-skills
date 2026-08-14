@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Lint Sync Review"
+  short_description: "Review lint adoption and repairs"
+  default_prompt: "Use $starci-fe-lint-sync-review to review and approve lint adoption and repairs."

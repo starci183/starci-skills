@@ -103,7 +103,7 @@ test("a skill that names another skill also carries the law of naming one", () =
   //
   // The failure this was written after: the token appeared in three skills, at exactly the three
   // phase boundaries, and NO file in the tree defined it. So the honest reading of "Route to
-  // $starci-fe-design-preview" was a note to the reader, and the runs stopped there — the selection
+  // $starci-fe-design-review" was a note to the reader, and the runs stopped there — the selection
   // was made, the record was written and validated, and the phase that had every prerequisite in
   // hand ended its turn. Six cases sat at `direction-selected` with no successor.
   //
@@ -144,4 +144,105 @@ test("every skill carries a frontmatter name matching its folder", () => {
     [],
     `skill folders and their declared names disagree: ${wrong.join("; ")}. The folder is what a router links and the name is what an invocation types, so a difference makes one of the two unreachable.`,
   )
+})
+
+test("every capability has exactly Plan, Review and Apply", () => {
+  const phasesByCapability = new Map()
+  const invalid = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const match = entry.name.match(/^(.*)-(plan|review|apply)$/)
+    if (match === null) {
+      invalid.push(entry.name)
+      continue
+    }
+    const [, capability, phase] = match
+    const phases = phasesByCapability.get(capability) ?? []
+    phases.push(phase)
+    phasesByCapability.set(capability, phases)
+  }
+
+  const incomplete = [...phasesByCapability.entries()]
+    .map(([capability, phases]) => [capability, [...phases].sort()])
+    .filter(([, phases]) => phases.join(",") !== "apply,plan,review")
+    .map(([capability, phases]) => `${capability}: ${phases.join(", ")}`)
+
+  assert.deepEqual(invalid, [], `skills outside Plan -> Review -> Apply: ${invalid.join(", ")}`)
+  assert.deepEqual(incomplete, [], `incomplete capability trios: ${incomplete.join("; ")}`)
+})
+
+test("every phase carries the workflow contract", () => {
+  const required = [
+    "## CONTEXT",
+    "## PROCESS",
+    "## OUTPUT",
+    "### CONTEXT",
+    "### OUTPUTS",
+    "### CHANGES",
+    "### NEED APPROVALS",
+    "### WARNINGS",
+    "### REJECTED",
+    "### OWED",
+  ]
+  const broken = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const skillFile = join(SKILLS, entry.name, "SKILL.md")
+    const text = readFileSync(skillFile, "utf8")
+    const missing = required.filter((token) => !text.includes(token))
+    if (!text.includes("skill-shape.md")) missing.push("skill-shape.md")
+    if (missing.length > 0) broken.push(`${entry.name}: ${missing.join(", ")}`)
+  }
+  assert.deepEqual(broken, [], `skills missing the workflow contract: ${broken.join("; ")}`)
+})
+
+test("Plan routes to Review and Review routes to Apply", () => {
+  const broken = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const match = entry.name.match(/^(.*)-(plan|review|apply)$/)
+    if (match === null || match[2] === "apply") continue
+    const next = match[2] === "plan" ? `${match[1]}-review` : `${match[1]}-apply`
+    const text = readFileSync(join(SKILLS, entry.name, "SKILL.md"), "utf8")
+    if (!text.includes(`$${next}`)) broken.push(`${entry.name}: does not route to $${next}`)
+  }
+  assert.deepEqual(broken, [], `phase routing is incomplete: ${broken.join("; ")}`)
+})
+
+test("FE Design commits its baseline at Apply, then writes only target source", () => {
+  const plan = readFileSync(join(SKILLS, "starci-fe-design-plan", "SKILL.md"), "utf8")
+  const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
+  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
+
+  assert.match(plan, /Plan writes no production source/)
+  assert.match(review, /Review writes no target source/)
+  assert.match(apply, /Commit before editing/)
+  assert.match(apply, /Baseline commit: <sha>/)
+  assert.match(apply, /git diff <baseline>/)
+  assert.match(apply, /directly at final source paths/)
+})
+
+test("every skill has current UI metadata", () => {
+  const broken = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const metadata = join(SKILLS, entry.name, "agents", "openai.yaml")
+    if (!existsSync(metadata)) {
+      broken.push(`${entry.name}: missing agents/openai.yaml`)
+      continue
+    }
+    const text = readFileSync(metadata, "utf8")
+    if (!text.includes(`$${entry.name}`)) broken.push(`${entry.name}: default prompt misses $${entry.name}`)
+  }
+  assert.deepEqual(broken, [], `skill UI metadata is stale: ${broken.join("; ")}`)
+})
+
+test("skill folders contain no auxiliary README", () => {
+  const readmes = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const file = join(SKILLS, entry.name, "README.md")
+    if (existsSync(file)) readmes.push(shown(file))
+  }
+  assert.deepEqual(readmes, [], `skill README files duplicate loaded guidance: ${readmes.join(", ")}`)
 })

@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Workflow Drift Plan"
+  short_description: "Brief a workflow drift audit"
+  default_prompt: "Use $starci-workflow-drift-plan to select records and lock a workflow drift audit."

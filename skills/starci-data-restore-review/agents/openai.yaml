@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Data Restore Review"
+  short_description: "Review a destructive restore boundary"
+  default_prompt: "Use $starci-data-restore-review to review and approve the destructive restore boundary."

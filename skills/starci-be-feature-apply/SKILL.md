@@ -1,6 +1,6 @@
 ---
 name: starci-be-feature-apply
-description: Write exactly the StarCi/nivo backend files an approved plan names, and prove them with the twin specs, the flow e2e and a live call. Use after starci-be-feature-plan records a file list in the task file. Never reopens a shape decision inside a handler.
+description: Write exactly the StarCi or nivo backend files an approved feature review names, then prove them with twin specs, flow e2e and a live call. Use after starci-be-feature-review approves one revision and production boundary. Never reopens a shape decision inside a handler.
 ---
 
 # StarCi BE Feature Apply
@@ -12,14 +12,16 @@ author while typing. The failure it prevents arrives quietly: a second entity no
 moved into the service because the handler was getting long, an operation that grew a fourth door.
 Each is defensible alone and none was ever approved.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table — app and database included — then **confirm `Repo / branch` and `Touching` with the
 owner before the first write.** A correct plan and a correct detection still do not say that now is
 the moment to write into a repository somebody else may be working in.
 
-Read `## plan` in the task file. No file list means `$starci-be-feature-plan` has not run; the list
-IS the review, so building without one ships the shape unreviewed.
+Read the approved `## review` in the task file. No approved revision means
+`$starci-be-feature-review` has not finished.
 
 ## PROCESS
 
@@ -60,10 +62,10 @@ broken: writing the source table changes nothing visible until the listener has 
 
 ## OUTPUT
 
-The four tables. Append `## apply` to the task file: the SCOPE
-table, **every file written**, the commands and their output, and what is still owed — the state
-nothing covers, the migration not written, the assumption taken rather than answered.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
 
-That file list is the check: compare it against `## plan` directly above it. A summary that reads as
-finished when it is not is the one artifact that makes the next session slower, because it spends the
-next reader's time proving something is missing that the author already knew.
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+Print the six canonical tables. `OUTPUTS` names the implemented backend capability; `CHANGES`
+details every written path and must match the approved Review boundary. Append `## apply` with the
+CONTEXT, commands, results, warnings, rejections and owed proof.

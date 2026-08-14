@@ -10,7 +10,9 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first.
 This lane exists when there is nothing to CHOOSE — only something to restore. It is not a shortcut
 for net-new UI, and it is not a licence to redesign on the way past.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table. `Touching` is nothing: this half writes only the task file.
 
@@ -46,10 +48,11 @@ proposal, never written. One visual preference is not canon.
 
 ## OUTPUT
 
-The four tables. Append `## plan` to
-`<backend-repo>/.workflows/fidel/<app>/<id>.md`: the SCOPE table, the binding evidence, the frozen
-comparison identity, the measured difference, every file the fix will touch, and what the founder
-rejected on the way. Then invite `$starci-fe-fidelity-apply`.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
 
-**The file list is the contract between the two halves.** Apply writes what this named and nothing
-else; a file that shows up there and not here is the finding, not a detail.
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+Print the six canonical tables. Append `## plan` to
+`<backend-repo>/.workflows/fidel/<app>/<id>.md` with binding evidence, frozen comparison, measured
+difference and proposed file boundary. `OUTPUTS` names the correction brief; `CHANGES` details the
+workflow path only. Then invite `$starci-fe-fidelity-review`.

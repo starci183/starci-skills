@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Data Restore Apply"
+  short_description: "Execute an approved datastore restore"
+  default_prompt: "Use $starci-data-restore-apply to execute and verify the approved datastore restore."

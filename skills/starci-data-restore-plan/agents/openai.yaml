@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Data Restore Plan"
+  short_description: "Brief a bounded datastore restore"
+  default_prompt: "Use $starci-data-restore-plan to inspect a snapshot and brief its restore impact."

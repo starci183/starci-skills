@@ -12,7 +12,9 @@ truth: the `Rejected` tables in `<backend-repo>/.workflows/*/*/*.md`. A rule inv
 what usually goes wrong is a rule nobody can check; a rule traced to three refusals is a rule with
 three witnesses.
 
-## SCOPE
+## CONTEXT
+
+Present the phase table under the exact heading `### CONTEXT`.
 
 Print the table. `Touching` is the proposal file and nothing else — this half writes no rule, no
 skill and no canon page.
@@ -54,9 +56,11 @@ correction becomes a law, because a law nobody can recite is a law nobody follow
 
 ## OUTPUT
 
-The four tables. Write the proposal to `<backend-repo>/.workflows/upgrade/<window>.md`: the SCOPE
-table, one section per group with its four rows, the WATCHED list, and what the founder rejected
-about the proposal itself. Then invite `$starci-fe-upgrade-apply`.
+Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.
 
-The confirm table carries one row per proposed change, because a rule the founder did not agree to is
-a rule that will be argued with on every run that meets it.
+Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
+
+Print the six canonical tables. Write the proposal to
+`<backend-repo>/.workflows/upgrade/<app>/<name>.md` with deduplicated witnesses, one section per group
+and the WATCHED list. `OUTPUTS` names proposed rule concepts; `CHANGES` details the workflow path
+only. Then invite `$starci-fe-upgrade-review`.
