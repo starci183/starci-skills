@@ -13,6 +13,8 @@ Review settles what Apply will build. It does not build a second implementation 
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 `Touching` is the workflow and declared review evidence only. Read `## plan`; if it has no selected
 direction, return to `$starci-fe-design-plan`. Review writes no target source.
 

@@ -16,7 +16,23 @@ const KINDS = new Set([
   "lint",
   "upgrade",
 ])
-const CONTEXT_ROWS = ["Workdir", "Trust", "App", "Repo / branch", "Purpose", "Workflow", "Phase", "Touching"]
+const CONTEXT_ROWS = [
+  "Workdir",
+  "Source",
+  "Project",
+  "Frontend",
+  "Backend",
+  "Trust",
+  "Skills",
+  "App",
+  "Repo / branch",
+  "Purpose",
+  "Workflow root",
+  "Workflow",
+  "Language",
+  "Phase",
+  "Touching",
+]
 const OUTPUT_HEADINGS = ["OUTPUTS", "CHANGES", "NEED APPROVALS", "WARNINGS", "REJECTED", "OWED"]
 const OUTPUT_HEADERS = [
   "| Concept | Result |",
@@ -26,6 +42,8 @@ const OUTPUT_HEADERS = [
   "| Rejected | Instead | Why |",
   "| Owed | Cleared by |",
 ]
+const DESIGN_PREVIEW_HEADER = "| Preview | URL | HTML | SHA-256 | Status |"
+const DESIGN_DIRECTION_HEADER = "| Direction | Tab | Status |"
 
 const markdownFiles = (directory) =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -41,6 +59,25 @@ const phaseSections = (text) => {
     text: text.slice(match.index, matches[index + 1]?.index ?? text.length),
   }))
 }
+
+const tableRows = (text, header) => {
+  const lines = text.split(/\r?\n/)
+  const headerIndex = lines.indexOf(header)
+  if (headerIndex < 0) return []
+  const rows = []
+  for (const line of lines.slice(headerIndex + 2)) {
+    if (!line.startsWith("|")) break
+    rows.push(line)
+  }
+  return rows
+}
+
+const contextValue = (text, field) => {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return text.match(new RegExp(`^\\|\\s*${escaped}\\s*\\|\\s*(.*?)\\s*\\|$`, "im"))?.[1]?.trim() ?? ""
+}
+
+const normalizedPath = (value) => value.replace(/\\/g, "/").replace(/\/$/, "").toLowerCase()
 
 export const validateWorkflow = (relativePath, text) => {
   if (!text.includes(MARKER)) return { legacy: true, errors: [] }
@@ -64,11 +101,64 @@ export const validateWorkflow = (relativePath, text) => {
     if (!section.text.includes(`| Phase | ${section.phase} |`)) {
       errors.push(`${section.phase}[${index}]: CONTEXT phase value does not match heading`)
     }
+    if (contextValue(section.text, "Language") && !section.text.includes("| Language | vi |")) {
+      errors.push(`${section.phase}[${index}]: workflow language must be vi`)
+    }
+    const source = normalizedPath(contextValue(section.text, "Source"))
+    const trust = normalizedPath(contextValue(section.text, "Trust"))
+    const skills = normalizedPath(contextValue(section.text, "Skills"))
+    const workflowRoot = normalizedPath(contextValue(section.text, "Workflow root"))
+    const workflow = normalizedPath(contextValue(section.text, "Workflow"))
+    if (source && trust !== `${source}/.claude`) {
+      errors.push(`${section.phase}[${index}]: Trust must resolve from Source/.claude`)
+    }
+    if (trust && skills !== `${trust}/skills`) {
+      errors.push(`${section.phase}[${index}]: Skills must resolve from Trust/skills`)
+    }
+    if (source && workflowRoot !== `${source}/.workflows`) {
+      errors.push(`${section.phase}[${index}]: Workflow root must resolve from Source/.workflows`)
+    }
+    if (workflowRoot && !workflow.startsWith(`${workflowRoot}/`)) {
+      errors.push(`${section.phase}[${index}]: Workflow must live under Workflow root`)
+    }
+    if (segments[0] === "designs") {
+      for (const field of ["Project", "Frontend", "Backend"]) {
+        if (section.text.includes(`| ${field} |`) && !contextValue(section.text, field)) {
+          errors.push(`${section.phase}[${index}]: unresolved ${field}`)
+        }
+      }
+    }
     for (const heading of OUTPUT_HEADINGS) {
       if (!section.text.includes(`### ${heading}`)) errors.push(`${section.phase}[${index}]: missing ${heading}`)
     }
     for (const header of OUTPUT_HEADERS) {
       if (!section.text.includes(header)) errors.push(`${section.phase}[${index}]: missing table ${header}`)
+    }
+    if (segments[0] === "designs" && section.phase === "plan") {
+      if (!section.text.includes(DESIGN_PREVIEW_HEADER)) {
+        errors.push(`plan[${index}]: missing tracked tabbed HTML preview`)
+      } else {
+        const previewRows = tableRows(section.text, DESIGN_PREVIEW_HEADER)
+        if (previewRows.length !== 1) errors.push(`plan[${index}]: design requires exactly one preview URL`)
+        for (const row of previewRows) {
+          const port = Number(row.match(/https?:\/\/(?:127\.0\.0\.1|localhost):(\d+)/i)?.[1])
+          if (!Number.isInteger(port) || port < 8080 || port > 65535) {
+            errors.push(`plan[${index}]: preview URL port must be at least 8080`)
+          }
+          if (!/\b[a-f0-9]{64}\b/i.test(row)) {
+            errors.push(`plan[${index}]: preview row must carry a SHA-256 digest`)
+          }
+          if (!/index\.html/i.test(row)) errors.push(`plan[${index}]: preview must track one index.html`)
+        }
+      }
+      if (!section.text.includes(DESIGN_DIRECTION_HEADER)) {
+        errors.push(`plan[${index}]: missing direction tabs`)
+      } else {
+        const directionRows = tableRows(section.text, DESIGN_DIRECTION_HEADER)
+        if (directionRows.length < 2 || directionRows.length > 4) {
+          errors.push(`plan[${index}]: design requires two to four direction tabs`)
+        }
+      }
     }
   }
 

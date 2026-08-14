@@ -14,6 +14,8 @@ for net-new UI, and it is not a licence to redesign on the way past.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print the table. `Touching` is nothing: this half writes only the task file.
 
 **Require one binding source for the expected result**, named in the record: an explicit instruction,
@@ -53,6 +55,6 @@ Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARN
 Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
 
 Print the six canonical tables. Append `## plan` to
-`<backend-repo>/.workflows/fidel/<app>/<id>.md` with binding evidence, frozen comparison, measured
+`<Source>/.workflows/fidel/<app>/<id>.md` with binding evidence, frozen comparison, measured
 difference and proposed file boundary. `OUTPUTS` names the correction brief; `CHANGES` details the
 workflow path only. Then invite `$starci-fe-fidelity-review`.

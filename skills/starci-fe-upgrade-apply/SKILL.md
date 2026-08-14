@@ -11,11 +11,13 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print the table, then **confirm `Touching` with the user before the first write.** This is the one
 lane whose writes change every future run, so the boundary is worth naming out loud even when the
 change is three lines.
 
-Read the approved groups in `<backend-repo>/.workflows/upgrade/<app>/<name>.md`. A group Review did
+Read the approved groups in `<Source>/.workflows/upgrade/<app>/<name>.md`. A group Review did
 not approve is not written, however good the evidence looked — and a group the plan never traced to
 at least two refusals is not written at all.
 

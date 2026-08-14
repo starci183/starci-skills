@@ -19,6 +19,8 @@ on.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print the table, then **confirm `Repo / branch` and `Touching` with the user before the first edit.**
 
 Read the approved `## review` in the task file. No approved verdicts means

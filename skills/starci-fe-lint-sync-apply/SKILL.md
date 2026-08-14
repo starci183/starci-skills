@@ -11,6 +11,8 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print `CONTEXT`, read the approved Review and confirm `Repo / branch` plus `Touching` once.
 
 ## PROCESS

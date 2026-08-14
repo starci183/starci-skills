@@ -19,17 +19,28 @@ is invalid because the workflow validator cannot identify its section.
 | Field | Value |
 |---|---|
 | Workdir | absolute working directory |
-| Trust | absolute path to the `.claude` trust tree |
+| Source | absolute repository containing the active `AGENTS.md` and `.claude` trust tree |
+| Project | user-declared project identity, or `Explicit targets` when FE/BE were supplied directly |
+| Frontend | exact user-declared or project-resolved frontend repository |
+| Backend | exact user-declared or project-resolved backend repository |
+| Trust | absolute `<Source>/.claude` trust tree |
+| Skills | absolute `<trust>/skills` root discovered by ChatGPT/Codex |
 | App | product name, for example `starci-academy`, `nivo` or `nivo-expert-academy` |
 | Repo / branch | absolute repository path and current branch, read from git |
 | Purpose | one sentence saying what this phase must settle |
-| Workflow | `<backend-repo>/.workflows/<kind>/<app>/<name>.md` |
+| Workflow root | absolute `<Source>/.workflows` |
+| Workflow | `<workflow-root>/<kind>/<app>/<name>.md` |
+| Language | `vi` |
 | Phase | `plan`, `review` or `apply` |
 | Touching | exact paths this phase may write |
 
-`App` names the product, not the repository. The workflow lives in the product's backend repository
-even when the work is frontend-only. A phase that cannot resolve Workdir, Trust, App or Workflow is
-stuck before it writes.
+`Source` is the current Codex project context that owns `AGENTS.md`, `.claude` and `.workflows`; it is
+not automatically a target repository. Resolve `Trust`, `Skills` and `Workflow root` from `Source`;
+never hardcode a drive, machine path or repository name. The user must provide either `Project`, or
+explicit `Frontend` and `Backend` targets. Resolve the targets from that declaration and never infer
+them from Source or App. `App` names the product used in the workflow path. A phase that cannot
+resolve Workdir, Source, Project/explicit targets, Frontend, Backend, Trust, Skills, App, Workflow
+root or Workflow is stuck before target-specific work.
 
 Before the first production write in Apply, confirm `Repo / branch` and `Touching` with the user.
 Detection is not permission. Plan and Review write only the workflow and declared review evidence.
@@ -52,12 +63,16 @@ Read the governing canon, contracts, live source and named references before pro
 Produce a brief: objective, evidence, boundaries, decisions, alternatives and acceptance evidence.
 Do not write production code.
 
-For visual work with an undecided product choice, describe two to four implementation-feasible
-directions in the brief. A parity request includes a parity-first option. Work with no real choice
-does not manufacture alternatives. Plan creates no HTML, JSX, CSS or parallel design tree.
+For FE Design with an undecided product choice, build one implementation-feasible `index.html` with
+two to four proposal tabs. Put it under
+`<Source>/.workflows/.previews/designs/<app>/<name>/<revision>/` and serve that directory on the first
+free localhost port starting at `8080`. A parity request includes a parity-first tab. Work with no
+real choice does not manufacture alternatives. This preview is inspectable Plan evidence, not
+production source or an Apply baseline.
 
-Plan completes only after the brief is written to the workflow and Review has enough evidence to
-challenge every decision before Apply.
+Track the single preview by URL, HTML path and SHA-256, then track each tab by direction ID and status.
+Plan completes only after the user can open the preview and switch every tab, the brief is written to
+the workflow, and Review has enough evidence to challenge every decision before Apply.
 
 ### Review
 
@@ -157,15 +172,19 @@ Keep the three claims separate.
 Use one append-only record:
 
 ```text
-<backend-repo>/.workflows/<kind>/<app>/<name>.md
+<Source>/.workflows/<kind>/<app>/<name>.md
 ```
 
 Begin every new record with `<!-- starci-workflow: v2 -->`. Historical files without the marker
 remain valid evidence and are not rewritten. After appending a phase, run:
 
 ```powershell
-node <trust-root>/scripts/validate-workflows.mjs --root <backend-repo>/.workflows
+node <trust-root>/scripts/validate-workflows.mjs --root <Source>/.workflows
 ```
+
+Write workflow narrative, evidence, decisions, questions, warnings, rejections and table values in
+Vietnamese. Keep canonical headings, schema labels, paths, commands, code identifiers and exact source
+quotes unchanged where translation would break validation or evidence.
 
 | kind | capability |
 |---|---|

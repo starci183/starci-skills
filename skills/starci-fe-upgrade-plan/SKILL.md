@@ -8,13 +8,15 @@ description: Read every task record for what the founder REFUSED, find the patte
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
 Every other skill improves the product. This one improves the RULES, and it has exactly one source of
-truth: the `Rejected` tables in `<backend-repo>/.workflows/*/*/*.md`. A rule invented from memory of
+truth: the `Rejected` tables in `<Source>/.workflows/*/*/*.md`. A rule invented from memory of
 what usually goes wrong is a rule nobody can check; a rule traced to three refusals is a rule with
 three witnesses.
 
 ## CONTEXT
 
 Present the phase table under the exact heading `### CONTEXT`.
+
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
 
 Print the table. `Touching` is the proposal file and nothing else — this half writes no rule, no
 skill and no canon page.
@@ -61,6 +63,6 @@ Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARN
 Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
 
 Print the six canonical tables. Write the proposal to
-`<backend-repo>/.workflows/upgrade/<app>/<name>.md` with deduplicated witnesses, one section per group
+`<Source>/.workflows/upgrade/<app>/<name>.md` with deduplicated witnesses, one section per group
 and the WATCHED list. `OUTPUTS` names proposed rule concepts; `CHANGES` details the workflow path
 only. Then invite `$starci-fe-upgrade-review`.

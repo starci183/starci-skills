@@ -9,8 +9,8 @@ Before running any skill, read [`skill-shape.md`](skill-shape.md). Every capabil
 **Plan -> Review -> Apply** and every phase prints `CONTEXT` first, then closes with `OUTPUTS`,
 `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED`. `OUTPUTS` carries concepts;
 `CHANGES` carries the detailed code tree. One task is one append-only file at
-`<backend-repo>/.workflows/<kind>/<app>/<id>.md`, held by the product's backend repository even for
-frontend work.
+`<Source>/.workflows/<kind>/<app>/<id>.md`. `Source` is the current backend AGENTS/project context;
+its one workflow root holds every app's records, including frontend-only work.
 
 There is no seal and no lock record. The production write boundary is confirmed once, out loud,
 before the first write; whether an old task still matches the source is asked afterwards by
@@ -151,8 +151,8 @@ composition choice follow **Plan -> Review revisions -> Apply**. Three task proc
 across four explicit scopes (`page`, `layout`, `block`, `overlay`) without blurring their owners:
 
 - [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) reads live contracts, shipped
-  components and named references, then records two to four conceptual directions and a brief. It
-  creates no parallel design code.
+  components and named references, then renders one disposable `index.html` with two to four
+  direction tabs, serves one URL on the first free port from 8080 and tracks its path/hash.
 - [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) challenges the selected brief,
   source boundary, owner states and acceptance evidence until one exact revision is approved. It
   writes no production source.

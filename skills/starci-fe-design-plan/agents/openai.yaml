@@ -1,4 +1,4 @@
 interface:
   display_name: "StarCi FE Design Plan"
-  short_description: "Brief evidence-backed UI directions"
-  default_prompt: "Use $starci-fe-design-plan to research and present evidence-backed UI directions."
+  short_description: "Render one tabbed FE preview"
+  default_prompt: "Use $starci-fe-design-plan to research and serve one trackable HTML preview with direction tabs for user selection."

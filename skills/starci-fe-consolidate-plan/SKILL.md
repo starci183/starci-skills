@@ -19,6 +19,8 @@ re-derive — **are these the same thing** — and hands the mechanical part on.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print the table. `Touching` is the artifact directory: editing while surveying destroys the evidence
 the proposal rests on, because a call-site count measured against a tree that no longer exists cannot
 be checked by anybody reviewing it.

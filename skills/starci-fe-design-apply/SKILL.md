@@ -14,6 +14,8 @@ commit to expose the exact final diff.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Read the approved `## review`. Confirm `Repo / branch` and `Touching` before the first production
 write. `Touching` contains the workflow and exact approved source boundary.
 

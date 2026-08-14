@@ -222,6 +222,18 @@ test("FE Design commits its baseline at Apply, then writes only target source", 
   assert.match(apply, /directly at final source paths/)
 })
 
+test("every FE skill requires declared project or target repositories", () => {
+  const broken = []
+  for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith("starci-fe-")) continue
+    const text = readFileSync(join(SKILLS, entry.name, "SKILL.md"), "utf8")
+    if (!text.includes("Require a user-declared `Project` or explicit `Frontend` and `Backend`")) {
+      broken.push(entry.name)
+    }
+  }
+  assert.deepEqual(broken, [], `FE skills inheriting or guessing target context: ${broken.join(", ")}`)
+})
+
 test("every skill has current UI metadata", () => {
   const broken = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {

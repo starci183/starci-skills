@@ -11,6 +11,8 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print `CONTEXT`. Read the consolidation Plan. `Touching` is the workflow and parity artifacts only;
 the measured source tree remains unchanged while its verdicts are reviewed.
 

@@ -11,6 +11,8 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print `CONTEXT` and read the lint Plan. `Touching` is the workflow and review artifacts only.
 
 ## PROCESS

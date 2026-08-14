@@ -11,11 +11,13 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
 Present the phase table under the exact heading `### CONTEXT`.
 
+Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
+
 Print the table, then **confirm `Repo / branch` and `Touching` with the user before the first
 production write.** Once. A small fix changes the amount of code, not the authority required to
 change it.
 
-Read the approved `## review` in `<backend-repo>/.workflows/fidel/<app>/<id>.md`. No approved
+Read the approved `## review` in `<Source>/.workflows/fidel/<app>/<id>.md`. No approved
 revision means `$starci-fe-fidelity-review` has not finished.
 
 ## PROCESS
