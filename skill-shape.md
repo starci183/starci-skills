@@ -18,7 +18,7 @@ and a backend monorepo builds several apps from one tree — name the app and th
 when either is in play. An entity written against the wrong connection compiles and writes to a
 table nobody reads.
 
-`App` is not a label on the work, it is where the task file is filed: `.claude/workflows/<app>/`.
+`App` is not a label on the work, it is where the task file is filed: `<backend-repo>/.workflows/<app>/`.
 A phase that cannot name the app cannot write its record, which is the point — a product is usually
 several repositories, so `Repo / branch` alone never says which product this belongs to, and the
 frontend and backend halves of one feature would file themselves in two different places.
@@ -86,17 +86,41 @@ No third shape. No "waiting on", no "needs clarification", no progress report.
 
 ## The task file
 
-One task is one file: `.claude/workflows/<app>/<id>.md`. Every phase appends to it; none creates
-another.
+One task is one file, and it lives with the PRODUCT rather than with these rules:
 
-`<app>` is the PRODUCT the task changes, not the repository holding it: `starci-academy`, `nivo`,
-`nivo-expert-academy`. One tree serves several products and a product is often several repositories
-— a frontend, a backend, a legacy reference — so a flat folder of task ids answers "what work has
-been done" and cannot answer "what work has been done to THIS product", which is the question
-anybody arriving at one of them actually has. It is also what keeps two products from colliding on
-an obvious id: `cart` means one thing in a course marketplace and another in an expert console, and
-under a flat folder the second one to be written would have had to invent a longer name to avoid
-the first.
+```
+<backend-repo>/.workflows/<app>/<id>.md
+```
+
+| app | file |
+|---|---|
+| `starci-academy` | `starci-academy-backend/.workflows/starci-academy/<id>.md` |
+| `nivo` | `nivo-backend/.workflows/nivo/<id>.md` |
+| `nivo-expert-academy` | `nivo-backend/.workflows/nivo-expert-academy/<id>.md` |
+
+Every phase appends to it; none creates another.
+
+**The backend repository is the home even for frontend work.** A product is several repositories —
+a frontend, a backend, a legacy reference — and one feature crosses them: the cart is a page, a
+drawer, a query and a pricing rule. Filed in the frontend it would be invisible to whoever changes
+the schema underneath it; split across both it would be two records disagreeing by the second
+commit. The backend is the one repository every part of a product has to pass through, so it holds
+the record for all of them.
+
+**Not in this tree, and that is the change.** These rules are shared and mirrored; the record is
+neither. A task file here would travel to repositories the work never touched and would be missing
+from the clone of the repository it did. It also outlives this tree's own reorganisations, which is
+what a record is for.
+
+**The app folder survives even inside one repository**, because `nivo-backend` builds both `nivo`
+and `nivo-expert-academy` from `apps/core` and `apps/expert-academy-api`. Without the app level the
+two products share one folder and collide on any obvious id — `cart` means one thing in a course
+marketplace and another in an expert console, and the second one written would have to invent a
+longer name to dodge the first.
+
+It is not filed under `apps/<app>/` either. A task that changes two apps, or changes only the
+frontend, would have nowhere to go — and the record would then be describing the repository's
+current layout rather than the product, so a monorepo fold would move every record in it.
 
 ```markdown
 # refactor-authentication
@@ -123,7 +147,7 @@ A later phase reads this file instead of rediscovering anything.
 
 **This is also what replaces the seal**, and it replaces it with something stronger. A seal guards one
 run while that run is happening and knows nothing afterwards. This file stays, so the comparison stays
-available: `starci-workflow-drift` reads every `.claude/workflows/*/*.md` and asks the source whether it
+available: `starci-workflow-drift` reads every `<backend-repo>/.workflows/*/*.md` and asks the source whether it
 still matches — each file under `WROTE` still there, nothing new inside `Touching` that `WROTE` never
 named, each state under `STATES` still rendering what it rendered.
 
