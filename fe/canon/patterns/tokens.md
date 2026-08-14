@@ -19,10 +19,11 @@ Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.t
 
 ## The scale, as it actually is
 
-Five rungs for the seam between things, and they are not evenly spaced:
+Six rungs for the seam between things, and they are not evenly spaced:
 
 | Rung | Reads as |
 |---|---|
+| 4px | `gap-1`: two lines of ONE identity — a name over its handle, a figure over the word labelling it, a title over its muted subtitle, a price over the caption qualifying it |
 | 8px | `gap-2`: compact horizontal peers in one functional cluster — icon and label, peer tabs, grouped cards, or an input and its direct inline action |
 | 12px | `gap-3`: owner-to-owned or independently readable local units — label to card/input, field to field, card to caption, toolbar to governed content, or unrelated groups sharing a row |
 | 16px | `gap-4`: two participants that are each already a cluster — a stack over the stack beneath it, an identity cluster against the trailing fact at the far end of its row, a prompt against the action answering it, or peer cards repeating across a grid |
@@ -37,10 +38,12 @@ above that input uses `gap-3`. Horizontal parts that are separate semantic group
 A subtle feed chronology may use `gap-2` between date labels and result cards, but the toolbar above
 that chronology uses `gap-3`. `gap-4` is selected the same way and by the participants alone: once
 each side is itself composed, the seam between them out-ranks the seams inside them, in a column, a
-row and a grid alike. There is **no zero rung and no 4px rung**, and their absence is deliberate. The surface this
-replaces ran eight rungs including both; the two tightest were the ones nobody applied consistently,
-because "touching" and "almost touching" are not a distinction a second author reproduces from
-memory. Two things that are one thing do not need a seam at all — they are one element.
+row and a grid alike. There is **no zero rung**, and its absence is deliberate: "touching" and
+"almost touching" are not a distinction a second author reproduces from memory, so the surface this
+replaces ended up spelling one identity stack both ways. Only the 4px rung survived that, and it
+survived because it names a relationship rather than an amount — the second line qualifies the
+first. A container that wants no seam at all declares no gap class, which is a different statement
+from naming a rung that measures nothing.
 
 Insets take 16px and 24px symmetric, or 12/8 and 16/12 asymmetric. And the relationship that makes
 an unfamiliar surface decidable is visible in the table rather than asserted over it: **the house
@@ -131,7 +134,8 @@ axes and makes the same role change geometry between screens.
 | A class outside the union | It is not a member; the type is the scale | Add the member deliberately, or use the nearest rung |
 | A fractional step | Not between rungs — off the ladder, matching nothing on any screen | The nearest rung |
 | A bracketed length or raw colour | Chosen once for one screen, findable by nobody, and it does not move when the scale does | A member, or a semantic token |
-| A zero or near-zero seam | Two things that need no seam are one element | Make it one element |
+| A written zero rung | Zero is a step off the ladder, not its bottom step, and naming it implies a rung below | Declare no gap class at all |
+| The compact rung between two lines of one identity | `gap-2` separates two facts; a qualifying line is not a second fact | `gap-1` |
 | Large text plus heavy weight assembled by hand | It is a heading the outline does not contain, and it stays behind when the scale moves | The component that owns both facts |
 | A sixth rung because a screen looked slightly wrong | The scale then describes screens instead of relationships | Ask which level of grouping the seam separates |
 | An off-scale value hoisted into a constant | Lifting it out of the markup hides it; it does not license it | The nearest rung |

@@ -16,16 +16,20 @@ level of grouping the seam separates, then read off the rung. `gap-2` requires B
 the peers are horizontal, and they must be read or operated as one functional cluster. An owner
 and what it names, or two units
 that remain independently readable, use `gap-3`. Two participants that are each ALREADY a cluster
-use `gap-4`, wherever they happen to stand. Wider page and layout seams continue above them.
+use `gap-4`, wherever they happen to stand. Wider page and layout seams continue above them, and
+beneath them all sits `gap-1` for the two lines of a single identity. The ladder has no zero rung:
+a container that wants no seam declares none.
 
 ## Rules
 
 **GAP-1 · The measurement is a step on a ladder, not a size.**
 
-The rungs are an ordered list, not a unit, and they are not evenly spaced. That has one immediate
-consequence worth stating: **there is no arithmetic on a step.** Two steps of the smallest seam do
-not make the next one up, and a value computed by adding to a step lands between rungs — where it
-matches nothing else on the screen and nobody chose it.
+The rungs are an ordered list, not a unit, and they are not evenly spaced — the lower steps advance
+by four and the upper ones by eight. That has one immediate consequence worth stating: **a rung is
+read off, never computed.** Adding to a step usually lands between rungs, and where the arithmetic
+happens to land on one it landed there by coincidence, not because anybody asked what the seam
+separates. A value nobody chose by relationship matches nothing else on the screen even when it
+measures the same.
 
 A ladder with few rungs is the point. Every additional rung is another decision a reader has to make
 and another way two screens that should match can differ.
@@ -42,11 +46,23 @@ number was never the problem; the direction of the decision was.
 which level of grouping is being separated, and the answer is the same in every screen that
 separates that level. This is what makes two surfaces built by two people look like one product.
 
-**GAP-4 · Zero is a decision, not the absence of one.**
+**GAP-4 · There is no zero rung; the smallest declared seam is `gap-1`.**
 
-Two lines of one identity — a name over the handle beneath it — are one thing. A seam between them
-would claim they are two, and a reader would believe it. Choosing zero deliberately is different
-from never having asked, and the difference shows up the moment somebody "fixes" the missing space.
+Zero is not the bottom of the ladder — it is standing off the ladder, and a container that wants no
+seam says so by declaring none at all rather than by naming a rung that measures nothing. A joined
+list whose rows already own their vertical hit area is the case: the rows touch, every divider runs
+full width, and the container carries no gap class.
+
+The rung that does exist beneath the compact seam is four pixels, and it holds exactly one
+relationship: **two lines of ONE identity.** A name over the handle beneath it, a figure over the
+word that labels it, a title over its muted subtitle, a price over the caption qualifying it. The
+second line does not state a second fact; it qualifies the first, and four pixels is what says so
+without letting the pair drift into two rows.
+
+A written zero and a written `gap-1` are the same distinction as "touching" and "almost touching",
+and that is not a distinction a second author reproduces from memory — one identity stack ends up at
+each value and the product stops looking like one product. Naming only one of them is what closes
+that.
 
 **GAP-5 · A resting shape declares the same seam as the thing it stands in for.**
 
@@ -84,17 +100,37 @@ horizontal `gap-2`; the parent owns the single `gap-3` between units. Neither ch
 alter that seam.
 
 In a `SurfaceListCard`, the label, joined surface and whole-list caption/action are separate units
-of one named section and use `gap-3` outside the surface. Inside the surface rows use `gap-0`; row
-padding owns their vertical rhythm while every divider remains full width.
+of one named section and use `gap-3` outside the surface. Inside the surface the rows declare no
+seam at all; row padding owns their vertical rhythm while every divider remains full width.
 
-**GAP-9 · Two participants that are each already a cluster use `gap-4`.**
+**GAP-9 · A container holding composed participants uses `gap-4`.**
 
-The rung above the unit seam is reached by what the two participants ARE, never by what encloses
-them. `gap-3` separates a unit from a unit: a label from the card it names, a field from the next
-field. `gap-4` separates a group from a group — each side is itself composed, each side already
-carries its own inner seam, and the seam BETWEEN them must therefore out-rank the seams INSIDE
-them. Left at the unit rung, the two groups flatten into one longer run of parts and nothing on the
-screen says where the first one ended.
+The rung above the unit seam is reached by what the participants ARE, never by what encloses them.
+`gap-3` separates a unit from a unit: a label from the card it names, a field from the next field.
+`gap-4` is what a container owns once its children are read as SECTIONS rather than as parts —
+once at least one participant is itself composed and carries its own inner seam, the container's
+seam must out-rank that inner seam. Left at the unit rung, the section and its own contents are
+separated by the same measurement and nothing on the screen says where the section ended.
+
+The test is the container's level of grouping, not a tally of its children. A section list that
+closes with one standalone action — a rail ending in its buy button, a standing card ending in the
+action that changes the standing — is still a container of sections; a single trailing leaf does not
+pull it down a rung, because the seam is one decision about the whole container rather than a
+different answer per pair. This follows from GAP-6: a container has one seam, so it is chosen at the
+level the container reads at.
+
+The commonest case is a run of small blocks doing ONE job inside one block: the fields of a form,
+each holding a label over its control. The field owns `gap-3` between its own two parts, so the form
+owns `gap-4` between fields — otherwise a label belongs to the control above it as readily as to the
+one below, and the reader has to work out which.
+
+**A boundary that is DRAWN does not also need to be spaced.** Where a rule, divider or separator
+already closes one group before the next begins, the seam is carrying no information the reader
+lacks, and it stays at the unit rung — a sign-in surface separating its OAuth shortcuts from its
+credential form by an OR divider keeps `gap-3` across that divider while the credential form spaces
+its own fields at `gap-4`. This is the one place a container may sit below the rung of something
+inside it, and it is not the ladder inverted: the boundary was stated twice and one statement was
+removed, not weakened.
 
 That test is deliberately not written as "inside a card", because the relationship is the same
 wherever the pair stands. A portrait stack over the identity stack beneath it, an identity cluster
@@ -114,12 +150,16 @@ keep the existing 24px seam. Neither `gap-3` nor `gap-4` replaces this rung: tho
 and groups that still belong to one local section, while these two would each survive on a page of
 their own.
 
-**GAP-11 · Consecutive rows of one list use `gap-0`.**
+**GAP-11 · Consecutive rows of one list declare no seam at all.**
 
 Rows that already state their own vertical hit area and are read as one uninterrupted list do not
 add a second seam between row boxes. Dashboard standing figures are the canonical example: streak,
-AI credit and reward are one identity list, so their parent is `gap-0`. This is not the sticky
-cluster rule: the row padding owns each row's breathing room, while the list owns zero extra space.
+AI credit and reward are one identity list, so their parent names no gap class. This is not the
+sticky cluster rule: the row padding owns each row's breathing room, while the list owns nothing.
+
+Writing a zero rung here instead is what GAP-4 refuses. It looks like the same result and is not the
+same statement: a named zero invites the next reader to read it as the tightest rung and to reach for
+the one below it when a list feels cramped, and there is no rung below it.
 
 **GAP-12 · A toolbar and its result use `gap-3`; a subtle result chronology may use `gap-2`.**
 
@@ -142,6 +182,8 @@ and chronology need different seams, they are two named containers.
 | Choosing a seam from component names or direction alone | Two horizontal things may be one direct control or two independent groups | Use `gap-2` only for horizontal peers in one functional cluster; otherwise use `gap-3` |
 | Two composed groups left at the unit rung | Both sides already carry `gap-3` inside them, so nothing on the screen says where the first group ended | Use `gap-4` once each participant is itself a cluster |
 | A rung chosen from what encloses the seam — "it is inside a card, so…" | The same relationship then gets one answer in a card, another in a rail and a third in a grid | Choose from what the two participants are, not from what holds them |
+| A written zero rung | Zero is not the bottom of the ladder but a step off it, and naming it invites the next reader to look for the rung below | Declare no gap class at all |
+| Two lines of one identity given the compact rung | `gap-2` separates two facts; the qualifying line is not a second fact | `gap-1`, the one rung that means a single identity |
 | Adding child margin on top of a parent gap | One relationship is counted twice | Let the parent own the one seam |
 
 ## Examples
@@ -149,8 +191,9 @@ and chronology need different seams, they are two named containers.
 ### The ordinary case — the ladder decides
 
 ```
+consecutive rows of one list (none): row padding already owns the rhythm
+two lines of one identity    gap-1: a name over its handle, a figure over its label
 horizontal peers in one unit gap-2: one compact functional cluster
-consecutive rows of one list gap-0: row padding already owns the rhythm
 owner and owned unit         gap-3: label-to-card, label-to-input, card-to-caption
 two blocks in one section    gap-3: independent but locally related
 two composed groups          gap-4: each side already carries its own inner seam
@@ -209,17 +252,31 @@ child: the second one carries space above itself, so it pushes the first away.
 
 They differ in one thing: whether the decision survives moving the child somewhere else.
 
+### The identity rung
+
+```
+a name over the handle beneath it at gap-1 - the handle qualifies the name, and one rung says so
+```
+
+```
+the same pair at gap-3, the seam between owned units - now they read as two separate facts
+```
+
+They differ in one thing: whether the pair is one identity or two.
+
 ### The zero trap
 
 ```
-a name directly over the handle beneath it - one identity, so the two lines touch
+a joined list whose rows own their own hit area declares no gap class, so the rows touch and
+every divider runs full width
 ```
 
 ```
-a name over its handle with the default seam between them - now they read as two facts
+the same list declares gap-0 - it renders identically and tells the next reader there is a
+tightest rung, so the next cramped list reaches for one below it
 ```
 
-They differ in one thing: whether the pair is one thing or two.
+They differ in one thing: whether the ladder appears to have a bottom step that does not exist.
 
 ### The resting-shape trap
 
