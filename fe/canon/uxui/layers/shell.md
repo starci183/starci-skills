@@ -2,8 +2,15 @@
 
 ## Definition
 
-A shell owns vendor interaction mechanics while deliberately ignoring the product shape inside.
-This system has exactly three: `ModalShell`, `DrawerShell`, and `DropdownShell`.
+A shell owns MECHANICS while deliberately ignoring the product shape inside. This system has exactly
+four: `ModalShell`, `DrawerShell`, `DropdownShell` and `RouteShell`.
+
+The first three own a vendor's interaction machine. The fourth owns a framework's, and it was added
+because the framework leaves no choice: a Next segment layout is HANDED its routed page as
+`children`, and no tier below a shell may take one. A server component cannot convert it either -
+passing a client component a function is not serialisable, and the page fails as a server exception
+with a digest and no line number. `RouteShell` is the single component where that node becomes the
+component every tier below expects.
 
 They earn the only public React `children` holes because their job is to pass uninterpreted content
 through vendor mechanics. Modal and drawer own focus trapping, Escape, backdrop, scroll lock,
@@ -17,8 +24,18 @@ must share one vendor focus/selection machine while the owning block decides wha
 
 ## Rules
 
-**SHELL-1 · Only `ModalShell`, `DrawerShell`, and `DropdownShell` are shells.** The list is closed;
-`shells/` is not a folder-wide escape hatch.
+**SHELL-1 · Only `ModalShell`, `DrawerShell`, `DropdownShell` and `RouteShell` are shells.** The list
+is closed; `shells/` is not a folder-wide escape hatch.
+
+The fourth was admitted against the alternative, not in the abstract: the other way to mount a frame
+was to exempt every connected layout, and an exemption that follows a FOLDER is inherited by the next
+file written in it. One named component is a decision somebody made; a folder rule is a hole nobody
+remembers opening.
+
+**SHELL-6 · `RouteShell` converts and does nothing else.** It takes the framework's `children`, makes
+a component of it, and hands that to the frame it was given. It reads no route, resolves no data,
+draws no element of its own and decides nothing about what is inside — a shell that arranged its
+interior would be a layout with a children hole, which is the thing this list exists to prevent.
 
 **SHELL-2 · A shell may own the vendor body only as scroll mechanics.** ModalShell wraps `children`
 once in `Modal.Body className="p-0"`: the body preserves scrolling, while zero inset leaves all

@@ -59,7 +59,7 @@ export const noInlineParameterType = {
 // -- SLOTS-4 ---------------------------------------------------------------------------------------
 
 /** The only three components where a React `children` hole is lawful. */
-const CHILDREN_SHELLS = ["ModalShell", "DrawerShell", "DropdownShell"]
+const CHILDREN_SHELLS = ["ModalShell", "DrawerShell", "DropdownShell", "RouteShell"]
 
 /**
  * True for a component file the slot fence governs.
@@ -109,7 +109,7 @@ export const noChildrenSlot = {
     schema: [],
     messages: {
       slot:
-        "`children` accepts markup that has already been built, so its shape cannot be checked. Take contract + render instead. Only ModalShell, DrawerShell and DropdownShell may pass an uninterpreted interior straight to vendor mechanics.",
+        "`children` accepts markup that has already been built, so its shape cannot be checked. Take contract + render instead. Only ModalShell, DrawerShell, DropdownShell and RouteShell may take one - the first three pass an interior straight to vendor mechanics, and RouteShell converts the children a framework layout is handed.",
     },
   },
   create(context) {

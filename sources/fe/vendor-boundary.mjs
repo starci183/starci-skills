@@ -27,9 +27,18 @@ const memberName = (node) => {
 /** The component library this boundary owns. Its glyph counterpart belongs to `icon.mjs`. */
 const VENDOR_PACKAGE_PREFIX = "@heroui/"
 
-/** The shell folder is closed to the three vendor mechanics that intentionally ignore their interior. */
+/**
+ * The shell folder is closed, and it is closed to FOUR now.
+ *
+ * Three own a vendor interaction machine and ignore their interior. `RouteShell` owns a framework
+ * one: a Next segment layout is handed its page as `children`, no tier below a shell may take one,
+ * and a server component cannot convert it because a function does not serialise across that
+ * boundary. It imports no vendor at all, which is why this rule can admit it without widening what
+ * a vendor import means.
+ */
 const SHELL_DIR = "/src/components/shells/"
-const SHELL_FILE = /\/src\/components\/shells\/(?:ModalShell|DrawerShell|DropdownShell)\//
+const FRAMEWORK_SHELL = /\/src\/components\/shells\/RouteShell\//
+const SHELL_FILE = /\/src\/components\/shells\/(?:ModalShell|DrawerShell|DropdownShell|RouteShell)\//
 
 /** Named surface branches may own the vendor wrapper they project a content contract into. */
 const SURFACE_BRANCH = /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)\//
@@ -64,7 +73,7 @@ export const vendorBoundary = {
       emptyShell:
         "ModalShell/DrawerShell must wrap their vendor covering primitive; otherwise this is an ordinary branch in the wrong tier.",
       unknownShell:
-        "Only ModalShell and DrawerShell are shells. This component must use contract + render as a branch; needing an arbitrary vendor children slot does not create a third shell.",
+        "Only ModalShell, DrawerShell, DropdownShell and RouteShell are shells. This component must use contract + render as a branch; needing an arbitrary vendor children slot does not create another one - and the list disagreeing with canon is a gate bug, which is how this message came to name two when the tree said three.",
     },
   },
   create(context) {
@@ -85,7 +94,13 @@ export const vendorBoundary = {
       },
       "Program:exit"(node) {
         if (isShellDirectory && !isShell) context.report({ node, messageId: "unknownShell" })
-        else if (isShell && !importsVendor) context.report({ node, messageId: "emptyShell" })
+        /*
+         * A shell with no vendor import is empty - except the one whose mechanic is the FRAMEWORK's.
+         * `RouteShell` converts the children a Next layout is handed into the component every tier
+         * below expects, and it imports nothing to do it. Demanding a vendor primitive there would
+         * force an import that means nothing, which is how a rule teaches somebody to add noise.
+         */
+        else if (isShell && !importsVendor && !FRAMEWORK_SHELL.test(file)) context.report({ node, messageId: "emptyShell" })
       },
     }
   },

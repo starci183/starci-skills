@@ -136,3 +136,23 @@ test("SLOTS-7: list collections travel through named props, never an items lane"
     ],
   })
 })
+
+test("SLOTS-4: RouteShell may take the children the framework hands a layout", () => {
+  tester.run("no-children-slot", rules["no-children-slot"], {
+    valid: [
+      {
+        // The one seam between Next's contract and this house's: it converts and arranges nothing.
+        filename: "/repo/src/components/shells/RouteShell/index.tsx",
+        code: "export const RouteShell = ({ children, frame: Frame }) => <Frame surface={() => children} />",
+      },
+    ],
+    invalid: [
+      {
+        // A connected layout is NOT the seam, however close it sits to one.
+        filename: "/repo/src/components/layouts/LearnShellLayout/index.tsx",
+        code: "export const L = ({ children }) => <div>{children}</div>",
+        errors: 1,
+      },
+    ],
+  })
+})
