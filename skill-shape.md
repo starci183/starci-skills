@@ -129,15 +129,30 @@ will ask. One sentence, not a fifth table.
 
 ## The task file
 
-One task is one file, and it lives with the PRODUCT rather than with these rules:
+One task is one file, and it lives with the PRODUCT rather than with these rules. The kind of work
+comes first, then the app, then the task:
 
-| app | file |
-|---|---|
-| `starci-academy` | `starci-academy-backend/.workflows/starci-academy/<id>.md` |
-| `nivo` | `nivo-backend/.workflows/nivo/<id>.md` |
-| `nivo-expert-academy` | `nivo-backend/.workflows/nivo-expert-academy/<id>.md` |
+| kind | what goes there | example |
+|---|---|---|
+| `designs` | a screen, a flow, an overlay — anything Plan → Preview → Apply | `.workflows/designs/starci-academy/learn-content-page.md` |
+| `feature` | a backend capability — Plan → Apply | `.workflows/feature/starci-academy/course-reviews.md` |
+| `fidel` | a bounded repair against binding evidence — Plan → Apply | `.workflows/fidel/starci-academy/spine-locked-glyph.md` |
+
+The repository is the product's backend: `starci-academy-backend/.workflows/...` for
+`starci-academy`, `nivo-backend/.workflows/...` for both `nivo` and `nivo-expert-academy`.
 
 Every phase appends to it; none creates another.
+
+**The kind is a folder rather than a field**, because the three are read by different questions. "What
+did we decide about this screen" reaches for one design record; "what has been repaired lately" wants
+every fidelity record and none of the designs; and `$starci-fe-upgrade-plan` reads across all of them
+for one thing only — where the founder said no. A field would make each of those a search; a folder
+makes them a listing.
+
+**The task keeps its own file inside the app**, and one file per app was considered and refused. Four
+tasks were open in `starci-academy` at once during the week this was written, two of them by different
+sessions in parallel, and a shared file is a shared place to collide. It also breaks drift: a task
+whose files all moved should go red on its own, not take three healthy records with it.
 
 **The backend repository is the home even for frontend work.** A product is several repositories —
 a frontend, a backend, a legacy reference — and one feature crosses them: the cart is a page, a
@@ -161,13 +176,36 @@ It is not filed under `apps/<app>/` either. A task that changes two apps, or cha
 frontend, would have nowhere to go — and the record would then be describing the repository's
 current layout rather than the product, so a monorepo fold would move every record in it.
 
+## What the founder rejected
+
+Every phase records what was REFUSED, not only what was agreed, in a table of its own:
+
+| Rejected | Instead | Why |
+|---|---|---|
+| what was put in front of them, in one line | what they asked for instead | their reason, in their words where possible |
+
+**This is the row the whole upgrade loop runs on.** A record holding only approvals says a run went
+well; the same run's refusals say what the rules let it get wrong in the first place. Revision 1.1 of
+one reader was refused with "read the legacy exactly, stop inventing" — and the rule that would have
+prevented it did not exist until that sentence was written down. Nobody can improve a skill from a
+list of things that worked.
+
+Record the refusal at the phase it happened in, however small: a direction rejected, a label sent
+back, a shape called wrong, a gate the founder said not to bend. `$starci-fe-upgrade-plan` reads
+exactly these rows across every task and proposes what the rules should have said.
+
+Approvals go in the same table's absence — a phase whose refusal table says "nothing refused" is a
+phase that went in clean, and that is worth as much as the refusals when a pattern is being counted.
+
 Each phase appends a heading, the SCOPE table it printed, and its own tables. Nothing in a task file
 is aligned with spaces — see [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md): a padded block only lines up in a
 monospace box, and a list of files under a `WROTE` label collapses into one paragraph everywhere
 else.
 
 ```markdown
-# refactor-authentication
+# learn-content-page
+
+One line: what this task is, and what it is not.
 
 ## plan
 
@@ -175,9 +213,17 @@ else.
 
 **Chose** direction B — the user's reason, in their words where they gave one.
 
+| Evidence | What it settled |
+|---|---|
+| the file read at a named commit | the fact it decided, so the next phase does not re-read it |
+
 | Took | Because |
 |---|---|
-| each UX call | the one line that justifies it |
+| each UX call made alone | the one line that justifies it |
+
+| Rejected | Instead | Why |
+|---|---|---|
+| what was put in front of them | what they asked for | their words |
 
 ## review
 
@@ -185,13 +231,17 @@ else.
 
 | Owner | State | Rendered |
 |---|---|---|
-| the thing that can change | the situation it is in | yes, or what stopped it |
+| the thing that can change | the situation it is in | yes, at <url> — or what stopped it |
 
 | Backend | Covered by |
 |---|---|
-| the field the screen needs | `$the-skill` that designs it |
+| the field the screen needs | the skill that designs it — or the table says nothing |
 
-**Approved** what the user approved, named.
+| Rejected | Instead | Why |
+|---|---|---|
+| the revision sent back | what replaced it | their words |
+
+**Approved** what the user approved, named, and how they said it.
 
 ## apply
 
@@ -205,9 +255,17 @@ else.
 |---|---|
 | the command | its outcome |
 
+| Extended | What it means |
+|---|---|
+| what grew beyond the ask | the decision it forced, and who owns it |
+
+| Rejected | Instead | Why |
+|---|---|---|
+| what was refused during the write | what replaced it | their words |
+
 | Owed | Cleared by |
 |---|---|
-| what is missing | the command, the `$skill`, or the decision — or the whole table is absent |
+| what is missing | the command, the skill, or the decision — or the table is absent |
 ```
 
 A later phase reads this file instead of rediscovering anything.
