@@ -24,7 +24,7 @@ Read in this order:
 9. [`implementation.md`](implementation.md) — build one evidence-backed vertical slice at a time.
 10. [`verification.md`](verification.md) — prove the rendered states and interactions.
 
-The record that carries all of this is one file per task at `.claude/workflows/<id>.md`, appended to
+The record that carries all of this is one file per task at `.claude/workflows/<app>/<id>.md`, appended to
 by each phase and owned by none of them. Its shape is in
 [`skill-shape.md`](../../skill-shape.md).
 

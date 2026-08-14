@@ -1,6 +1,6 @@
 ---
 name: starci-workflow-drift
-description: Read the task files under .claude/workflows/ and ask the source whether it still matches — every file a task recorded writing, anything new inside a boundary the task never named, every state it recorded rendering. Use to check one task or sweep them all: "cái này còn đúng không", "check drift", before trusting an old workflow record.
+description: Read the task files under .claude/workflows/<app>/ and ask the source whether it still matches — every file a task recorded writing, anything new inside a boundary the task never named, every state it recorded rendering. Use to check one task or sweep them all: "cái này còn đúng không", "check drift", before trusting an old workflow record.
 ---
 
 # StarCi workflow drift
@@ -17,7 +17,7 @@ hash per file and a phase that refused to finish, and detection costs one run ov
 ## SCOPE
 
 Print the table. `Touching` is nothing — this skill reads and reports. Say which task files are in
-scope: one id, or every file under `.claude/workflows/`.
+scope: one app, one id inside it, or every file under `.claude/workflows/*/`.
 
 ## PROCESS
 

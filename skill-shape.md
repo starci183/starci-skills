@@ -7,15 +7,21 @@ Every skill here has three parts, in this order. Read this before running one.
 | | |
 |---|---|
 | Doing | one sentence |
+| App | `starci-academy`, `nivo` or `nivo-expert-academy` — the product, not the repository |
 | Repo / branch | real path, from `git rev-parse` and `git branch --show-current` |
 | Touching | the paths that may be written |
 | Not touching | everything else |
 | Produces | something you can open |
 
-Two rows carry the whole old lock: the repo being changed is rarely the repo holding these rules, and
-a backend monorepo builds several apps from one tree — name the app and the database connection when
-either is in play. An entity written against the wrong connection compiles and writes to a table
-nobody reads.
+Three rows carry the whole old lock. The repo being changed is rarely the repo holding these rules,
+and a backend monorepo builds several apps from one tree — name the app and the database connection
+when either is in play. An entity written against the wrong connection compiles and writes to a
+table nobody reads.
+
+`App` is not a label on the work, it is where the task file is filed: `.claude/workflows/<app>/`.
+A phase that cannot name the app cannot write its record, which is the point — a product is usually
+several repositories, so `Repo / branch` alone never says which product this belongs to, and the
+frontend and backend halves of one feature would file themselves in two different places.
 
 Before the first write into production source, confirm `Repo / branch` and `Touching` with the user.
 Once. Detection is not permission.
@@ -80,7 +86,17 @@ No third shape. No "waiting on", no "needs clarification", no progress report.
 
 ## The task file
 
-One task is one file: `.claude/workflows/<id>.md`. Every phase appends to it; none creates another.
+One task is one file: `.claude/workflows/<app>/<id>.md`. Every phase appends to it; none creates
+another.
+
+`<app>` is the PRODUCT the task changes, not the repository holding it: `starci-academy`, `nivo`,
+`nivo-expert-academy`. One tree serves several products and a product is often several repositories
+— a frontend, a backend, a legacy reference — so a flat folder of task ids answers "what work has
+been done" and cannot answer "what work has been done to THIS product", which is the question
+anybody arriving at one of them actually has. It is also what keeps two products from colliding on
+an obvious id: `cart` means one thing in a course marketplace and another in an expert console, and
+under a flat folder the second one to be written would have had to invent a longer name to avoid
+the first.
 
 ```markdown
 # refactor-authentication
@@ -107,7 +123,7 @@ A later phase reads this file instead of rediscovering anything.
 
 **This is also what replaces the seal**, and it replaces it with something stronger. A seal guards one
 run while that run is happening and knows nothing afterwards. This file stays, so the comparison stays
-available: `starci-workflow-drift` reads every `.claude/workflows/*.md` and asks the source whether it
+available: `starci-workflow-drift` reads every `.claude/workflows/*/*.md` and asks the source whether it
 still matches — each file under `WROTE` still there, nothing new inside `Touching` that `WROTE` never
 named, each state under `STATES` still rendering what it rendered.
 

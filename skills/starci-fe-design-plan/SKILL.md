@@ -6,7 +6,7 @@ description: Draw two to four real screens for net-new or undecided StarCi front
 # StarCi FE Design Plan
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first: SCOPE, PROCESS, OUTPUT, and the task file
-at `.claude/workflows/<id>.md`.
+at `.claude/workflows/<app>/<id>.md`.
 
 Plan exists for one reason — a choice the user has to make. If the answer is already proven by a
 named reference, a contract or a test, this is `$starci-fe-fidelity-fix` and there is nothing to

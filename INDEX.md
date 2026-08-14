@@ -8,7 +8,8 @@ shape every file takes and, more importantly, what a file must never carry.
 Before running any skill, read [`skill-shape.md`](skill-shape.md). Every skill here has the same three
 parts — a SCOPE table printed before anything happens, a PROCESS that runs until genuinely stuck, and
 an OUTPUT in one of exactly two shapes: what needs the user, or what is done and what comes next. One
-task is one file at `.claude/workflows/<id>.md`, appended to by each phase.
+task is one file at `.claude/workflows/<app>/<id>.md`, appended to by each phase — `<app>` being the
+product the work changes rather than the repository holding it.
 
 There is no seal and no lock record. The production write boundary is confirmed once, out loud,
 before the first write; whether an old task still matches the source is asked afterwards by
