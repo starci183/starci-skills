@@ -7,7 +7,8 @@ shape every file takes and, more importantly, what a file must never carry.
 
 Before running any skill, read [`skill-shape.md`](skill-shape.md). Every skill here has the same three
 parts — a SCOPE table printed before anything happens, a PROCESS that runs until genuinely stuck, and
-an OUTPUT in one of exactly two shapes: what needs the user, or what is done and what comes next. One
+an OUTPUT in one of exactly three shapes, each a table: what needs the user, what is done and what
+comes next, or what is done and what is owed. One
 task is one file at `<backend-repo>/.workflows/<app>/<id>.md`, appended to by each phase. It lives with
 the product rather than in this tree, and the backend repository holds it even for frontend work.
 

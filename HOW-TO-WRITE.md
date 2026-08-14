@@ -92,3 +92,30 @@ that fits two axes is usually two files, one per axis, each answering its own qu
 
 Prose, in judgements. No tick and cross marks: a rule that needs a ✅ beside it to be understood is
 a rule that has not been written yet. Write the verdict in words and let the words carry it.
+
+## A fence is for running. A table is for reading.
+
+One question decides every block on the page: **would somebody copy this and run it?** If yes it is
+a fence. If they would only read it, it is a table.
+
+A fence does not wrap. Whatever is inside it keeps its own line whatever the width of the window, so
+a long line runs off the edge or breaks mid-word, and the reader gets a wall where a list was meant.
+A table wraps inside its cell, which is why the label column stays readable however long the thing
+it labels turns out to be.
+
+The failure this replaces was not ugly, it was UNREADABLE, and it came from the same instinct every
+time: reach for a fence, align the labels with spaces, and let the alignment carry the structure.
+That alignment exists only in a monospace box. Rendered anywhere else it collapses, and a list of
+files under a `WROTE` label becomes one paragraph of paths.
+
+So a set of labelled facts is a two-column table, not a padded block:
+
+| Wrote | Note |
+|---|---|
+| `leaves/NavLink/index.tsx` | gains `kind: "section"` and `depth` |
+
+The note in that second column is the tell. In a padded block it had to be squeezed into trailing
+whitespace, which is how a fact ends up positioned rather than stated.
+
+Shell commands stay fenced. They are the thing somebody copies, one per fence, with no prompt marker
+in front of them.

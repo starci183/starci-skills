@@ -28,13 +28,11 @@ Once. Detection is not permission.
 
 ## 2 · PROCESS — run until genuinely stuck, then return
 
-```
-work ──► stuck? ──yes──► OUTPUT A ──user confirms──┐
-         │                                          │
-         └──no──► finished ──► OUTPUT B             │
-                                                    │
-         ◄──────────── keep working ◄───────────────┘
-```
+| state | output | what happens next |
+|---|---|---|
+| stuck | **A** | the user answers, and the run continues **inside the same skill** |
+| finished, something follows | **B** | the next skill is named and invited |
+| finished, nothing follows | **C** | what runs, and what is owed |
 
 Stuck means no further progress is possible, not that something is unclear. Anything that does not
 block gets decided, written down in one line, and passed. A tool that refuses — a browser that will
@@ -53,44 +51,63 @@ one ordering over another — take it, record one line with the reason, let the 
 what can be WRONG goes to A: a fact you derived rather than read, a promise, a permission, a price.
 Being overruled later does not undo one of those once it ships.
 
-## 3 · OUTPUT — two shapes, and there is no third
+## 3 · OUTPUT — three shapes, and there is no fourth
+
+**Every one of them is a TABLE, and that is not decoration.** These outputs were fixed-width blocks
+aligned with spaces, which only line up inside a monospace box — so the moment a `RESOURCE` line
+carried a real command it ran past the edge or broke mid-word, and the reader got a wall instead of
+a list. A table wraps inside its cell, so the column that says what KIND of thing this is stays
+readable however long the thing itself gets. Prose beside the table is welcome; the table is what
+carries the asks.
 
 **A — something needs the user:**
 
-```
-CHOOSE    <what> — a) <the default in force>  b) <the other>
-RESOURCE  <what is missing> — run: <the exact command>   → I read it back and continue
-SUB-RUN   <skill name> — it produces <what>, then RETURNS here
-```
+| | what | the ask |
+|---|---|---|
+| CHOOSE | the decision | a) the default in force · b) the other |
+| RESOURCE | what is missing | run: `the exact command` — then it is read back and the run continues |
+| SUB-RUN | `$skill-name` | what it produces, then RETURNS here |
 
-A sub-run is a detour. The skill that asked for it owns the result and finishes; it is never a
-handover.
+Only the rows that apply. A sub-run is a detour: the skill that asked for it owns the result and
+finishes, and it is never a handover.
 
-**B — nothing is stuck:**
+**B — nothing is stuck, and something comes next:**
 
-```
-Done. <what exists now>.
+Done. What exists now, in one line.
 
-Next — <skill name>:
-  does        <one sentence>
-  touches     <paths>
-  will ask    <the one question, or "nothing">
-  produces    <something you can open>
+| Next | `$skill-name` |
+|---|---|
+| does | one sentence |
+| touches | the paths |
+| will ask | the one question, or nothing |
+| produces | something you can open |
 
 Say the word.
-```
 
-The last skill in a chain closes with B minus the invitation: what runs, and what is still owed.
+**C — nothing is stuck and nothing comes next.** The last skill in a chain closes here.
 
-No third shape. No "waiting on", no "needs clarification", no progress report.
+Done. What runs now, in one line.
+
+| Owed | Cleared by |
+|---|---|
+| the thing that is missing, named precisely | the exact command, the `$skill`, or the decision and who makes it |
+
+**C is its own shape rather than "B without the invitation", and it is written out because the gap
+was filled wrongly the first time.** Told only to close with "what is owed" and given no shape for
+it, a run reached for A's keywords and printed `SUB-RUN` and `RESOURCE` inside a close — which reads
+as a run that is stuck, in the one shape that exists to say it is not. An owed line and a blocking
+ask are different claims: an owed line says the work stopped somewhere honest and names who can
+carry it further, while an ask says nothing more can happen until somebody answers.
+
+`Owed` names what is missing and what it blocks — one state, one route, one packet. A line saying
+only "incomplete" is the same fact with the act removed, and it is what turns a finished run into a
+case nobody can close.
+
+No fourth shape. No "waiting on", no "needs clarification", no progress report.
 
 ## The task file
 
 One task is one file, and it lives with the PRODUCT rather than with these rules:
-
-```
-<backend-repo>/.workflows/<app>/<id>.md
-```
 
 | app | file |
 |---|---|
@@ -122,25 +139,53 @@ It is not filed under `apps/<app>/` either. A task that changes two apps, or cha
 frontend, would have nowhere to go — and the record would then be describing the repository's
 current layout rather than the product, so a monorepo fold would move every record in it.
 
+Each phase appends a heading, the SCOPE table it printed, and its own tables. Nothing in a task file
+is aligned with spaces — see [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md): a padded block only lines up in a
+monospace box, and a list of files under a `WROTE` label collapses into one paragraph everywhere
+else.
+
 ```markdown
 # refactor-authentication
 
 ## plan
-SCOPE   <the table>
-CHOSE   direction B — <the user's reason>
-TOOK    <each UX call, one line each>
+
+<the SCOPE table>
+
+**Chose** direction B — the user's reason, in their words where they gave one.
+
+| Took | Because |
+|---|---|
+| each UX call | the one line that justifies it |
 
 ## review
-SCOPE   <the table>
-STATES  <owner → state → rendered?>
-BACKEND <missing field → which skill covers it>
-APPROVED <what the user approved>
+
+<the SCOPE table>
+
+| Owner | State | Rendered |
+|---|---|---|
+| the thing that can change | the situation it is in | yes, or what stopped it |
+
+| Backend | Covered by |
+|---|---|
+| the field the screen needs | `$the-skill` that designs it |
+
+**Approved** what the user approved, named.
 
 ## apply
-SCOPE   <the table>
-WROTE   <every file>
-GREEN   tsc / lint / build
-OWED    <or "nothing">
+
+<the SCOPE table>
+
+| Wrote | Note |
+|---|---|
+| every file, one per row | what changed in it, when that is not obvious |
+
+| Green | Result |
+|---|---|
+| the command | its outcome |
+
+| Owed | Cleared by |
+|---|---|
+| what is missing | the command, the `$skill`, or the decision — or the whole table is absent |
 ```
 
 A later phase reads this file instead of rediscovering anything.

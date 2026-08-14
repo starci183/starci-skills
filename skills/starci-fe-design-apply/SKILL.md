@@ -47,7 +47,7 @@ anything, and green tests know nothing about what a screen looks like.
 
 ## OUTPUT
 
-Shape B, and it is the last one in the chain, so it invites nobody. Append `## apply` to the task
+Shape C, and it is the last one in the chain, so it invites nobody. Append `## apply` to the task
 file: the SCOPE table, **every file written**, the green commands, and what is still owed.
 
 That file list is the check. Compare it against `## review` directly above it — a file the review

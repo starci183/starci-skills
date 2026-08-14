@@ -52,10 +52,10 @@ for the seconds between decrypting and unpacking — that is long enough for an 
 
 Decryption needs the shared age identity:
 
-```
-Windows  %USERPROFILE%\.starci\master.identity
-POSIX    ~/.starci/master.identity
-```
+| Platform | Identity file |
+|---|---|
+| Windows | `%USERPROFILE%\.starci\master.identity` |
+| POSIX | `~/.starci/master.identity` |
 
 If decryption fails, the honest diagnosis is usually one of two things, and the message should name
 both: the archive was encrypted for a different identity, or it was corrupted in transit — commonly

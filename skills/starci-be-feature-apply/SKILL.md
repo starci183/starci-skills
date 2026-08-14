@@ -60,7 +60,7 @@ broken: writing the source table changes nothing visible until the listener has 
 
 ## OUTPUT
 
-Shape B, last in the chain, so it invites nobody. Append `## apply` to the task file: the SCOPE
+Shape C, last in the chain, so it invites nobody. Append `## apply` to the task file: the SCOPE
 table, **every file written**, the commands and their output, and what is still owed — the state
 nothing covers, the migration not written, the assumption taken rather than answered.
 

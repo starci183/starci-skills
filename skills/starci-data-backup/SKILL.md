@@ -57,10 +57,10 @@ a `finally`. The repo only ever sees ciphertext.
 
 Encryption uses the machine's shared age identity — one key covering every project of this owner:
 
-```
-Windows  %USERPROFILE%\.starci\master.identity
-POSIX    ~/.starci/master.identity
-```
+| Platform | Identity file |
+|---|---|
+| Windows | `%USERPROFILE%\.starci\master.identity` |
+| POSIX | `~/.starci/master.identity` |
 
 If it is missing, stop and say so. Never fall back to writing an unencrypted archive; a backup that
 quietly downgraded its own protection is worse than none, because it is trusted.

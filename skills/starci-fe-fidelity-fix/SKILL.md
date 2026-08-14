@@ -58,6 +58,6 @@ the boundary, that is not a dead end: name the missing rules, name `$starci-fe-l
 fixes them, and offer extending the boundary as a choice — one line for the user, and it unblocks
 the lane.
 
-Shape B, last in the chain. Append `## fix` to the task file: the SCOPE table, the frozen comparison
+Shape C, last in the chain. Append `## fix` to the task file: the SCOPE table, the frozen comparison
 identity, **every file written**, before-and-after per touched state, the green commands, and what is
 still unknown.

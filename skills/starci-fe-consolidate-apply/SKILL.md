@@ -52,7 +52,7 @@ screen looked like yesterday, so a merge that quietly restyles one caller passes
 
 ## OUTPUT
 
-Shape B, last in the chain. Append `## apply` to the task file: the SCOPE table, groups applied,
+Shape C, last in the chain. Append `## apply` to the task file: the SCOPE table, groups applied,
 **every file written**, parity per call site, the green commands, and anything the survey got wrong.
 
 Compare that file list against `## plan` above it — a file the verdicts never named is visible
