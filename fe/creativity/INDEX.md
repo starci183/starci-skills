@@ -24,10 +24,9 @@ Read in this order:
 9. [`implementation.md`](implementation.md) — build one evidence-backed vertical slice at a time.
 10. [`verification.md`](verification.md) — prove the rendered states and interactions.
 
-The record that carries all of this is owned by the phase that writes it, not by this shelf:
-[`plan-record`](../../skills/starci-fe-design-plan/references/plan-record.md) and
-[`design-record`](../../skills/starci-fe-design-preview/references/design-record.md) state both the
-schema and the judgement behind each field.
+The record that carries all of this is one file per task at `.claude/workflows/<id>.md`, appended to
+by each phase and owned by none of them. Its shape is in
+[`skill-shape.md`](../../skill-shape.md).
 
 Approved product baselines are not filed here. A baseline states what ONE screen already promises
 its users, which is a different kind of claim from the reasoning above and ages on a different
@@ -41,18 +40,17 @@ The documents above hold the reasoning model. Net-new UI and UI with an unresolv
 mandatory approval pipeline. All phases keep `page`, `layout`, `block` and `overlay` as explicit
 scopes rather than separate, competing workflows.
 
-| Phase | Skill | Stops when |
+| Phase | Skill | Ends when |
 |---|---|---|
-| Plan | [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | Two to four evidence-backed directions are shown inside one cohesive case as visibly directional HTML, every key anatomy has an implementation-feasibility map, and work stops for explicit selection |
-| Preview revisions | [`starci-fe-design-preview`](../../skills/starci-fe-design-preview/SKILL.md) | The winner is rebuilt as one executable StarCi candidate, the same candidate feeds canvas and source, every rendered state has a locked identity, and candidate/state evidence is hash-sealed after explicit approval |
-| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | Effective StarCi FE lint adoption passes, the sealed candidate is mapped mechanically into target paths without reinterpretation, and same-state structural plus visual parity passes |
+| Plan | [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | Two to four screens differing in product decisions are rendered as real HTML, and the user picks one |
+| Preview | [`starci-fe-design-preview`](../../skills/starci-fe-design-preview/SKILL.md) | The chosen screen is built from the real components and contracts, every owner state renders, any backend gap is proposed, and the user approves what they can see |
+| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | The backend update lands first if there was one, the frontend is written where the review named, and the real page renders |
 
-The plan [steps table](../../skills/starci-fe-design-plan/references/steps-table.md) prevents
-brainstorming from filling evidence gaps or hiding choices inside an artifact. The preview
-[steps table](../../skills/starci-fe-design-preview/references/steps-table.md) prevents approval from
-silently omitting block, page, layout or overlay states. The apply
-[steps table](../../skills/starci-fe-design-apply/references/steps-table.md) prevents implementation
-from reopening a design decision in JSX or CSS.
+Every phase runs to the end of its own work before it speaks. What it cannot settle alone comes back
+as one batched ask and the run continues on the answer; what only looks like a choice — a label, a
+glyph, an ordering inside the chosen direction — is decided and recorded in a line. Whether an old
+task still matches the source is asked later by
+[`starci-workflow-drift`](../../skills/starci-workflow-drift/SKILL.md), not prevented by a seal.
 
 A bounded defect with a binding expected result uses
 [`starci-fe-fidelity-fix`](../../skills/starci-fe-fidelity-fix/SKILL.md), because manufacturing

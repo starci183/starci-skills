@@ -98,7 +98,7 @@ test("a skill invokes a trust-tree script only through <trust-root>", () => {
 
 test("a skill that names another skill also carries the law of naming one", () => {
   // A `$other-skill` token is a handoff: the run is being told where the work goes next, or which
-  // procedure it has to detour through and return from. `handoff.md` is what decides which of the
+  // procedure it has to detour through and return from. `skill-shape.md` is what decides which of the
   // two it is, and what the phase owes before it may say either.
   //
   // The failure this was written after: the token appeared in three skills, at exactly the three
@@ -115,14 +115,14 @@ test("a skill that names another skill also carries the law of naming one", () =
     const named = [...text.matchAll(/\$(starci-[a-z-]+)/g)].map(([, name]) => name)
     const others = new Set(named.filter((name) => !file.includes(`${name}/SKILL.md`)))
     if (others.size === 0) continue
-    if (!text.includes("handoff.md")) {
-      naked.push(`${shown(file)} names ${[...others].join(", ")} but never reaches handoff.md`)
+    if (!text.includes("skill-shape.md")) {
+      naked.push(`${shown(file)} names ${[...others].join(", ")} but never reaches skill-shape.md`)
     }
   }
   assert.deepEqual(
     naked,
     [],
-    `skills hand work to another skill without the law that says how: ${naked.join("; ")}. A skill name in prose is a note to the reader; handoff.md is what makes it a transition, a detour that returns, or a finding carried back.`,
+    `skills hand work to another skill without the law that says how: ${naked.join("; ")}. A skill name in prose is a note to the reader; skill-shape.md is what makes it a transition, a detour that returns, or a finding carried back.`,
   )
 })
 

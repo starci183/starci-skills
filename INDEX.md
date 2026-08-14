@@ -5,18 +5,16 @@ The rules this codebase is written by, one file per concept, filed on an axis.
 Read [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md) before adding or changing anything here. It states the
 shape every file takes and, more importantly, what a file must never carry.
 
-Before any skill or task action, read [`CONTEXT-LOCK.md`](CONTEXT-LOCK.md). It resolves and shows
-the trust root, skill path, target/reference repositories, git identity, artifact root, runtime and
-write boundary. Plan and Preview are artifact-only; Apply pauses for explicit confirmation before
-production writes; inherited drift always stops the phase.
+Before running any skill, read [`skill-shape.md`](skill-shape.md). Every skill here has the same three
+parts — a SCOPE table printed before anything happens, a PROCESS that runs until genuinely stuck, and
+an OUTPUT in one of exactly two shapes: what needs the user, or what is done and what comes next. One
+task is one file at `.claude/workflows/<id>.md`, appended to by each phase.
 
-[`handoff.md`](handoff.md) governs the seams between those phases, and it governs every Plan/Apply
-pair here rather than one of them: a phase runs to the end of its own work, hands over what only the
-user can clear as one answerable form — decisions with defaults, resources with the command that
-supplies them, sub-runs with the skill that owns them and a return to here — and only then invites
-the next phase by name. What the run cannot decide is an item to carry, never a question to halt on;
-what a tool refuses is work until every named fallback has failed; and a refusal names what broke
-rather than where the gate noticed it.
+There is no seal and no lock record. The production write boundary is confirmed once, out loud,
+before the first write; whether an old task still matches the source is asked afterwards by
+[`starci-workflow-drift`](skills/starci-workflow-drift/SKILL.md), over one task or all of them. That
+is a deliberate trade: preventing drift cost a hash per file and phases that refused to finish, and
+finding it costs one skill run.
 
 ## The axes
 
@@ -135,18 +133,16 @@ evidence. It is not another canon shelf. Net-new UI and work that still needs a 
 composition choice follow **Plan -> Preview revisions -> Apply**. Three task procedures execute it
 across four explicit scopes (`page`, `layout`, `block`, `overlay`) without blurring their owners:
 
-- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) researches evidence, inventories
-  owner states, shows two to four selectable directions inside one cohesive case, renders matching
-  representative directional HTML concepts in one direction lab from port 8080 and stops for an
-  explicit direction choice. Every canvas says it is not an Apply baseline, and every selectable
-  anatomy maps to existing StarCi grammar or an exact proposal.
-- [`starci-fe-design-preview`](skills/starci-fe-design-preview/SKILL.md) optimizes the one selected
-  direction into an executable candidate built from the same framework, owners, contracts, tokens
-  and fixtures production will use. Candidate files, state identity and screenshots are hashed into
-  a sealed explicit approval record.
-- [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) materializes only that sealed
-  candidate after effective StarCi FE lint adoption passes. It may not reinterpret screenshots or
-  substitute components, and it closes only on same-state structural and visual parity.
+- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) reads the live schema and the
+  components already shipped, draws two to four screens differing in product decisions as real HTML
+  from port 8080, and stops for the user to pick one. Every canvas says it is not an implementation
+  baseline, and a screen no existing component can express is not an option.
+- [`starci-fe-design-preview`](skills/starci-fe-design-preview/SKILL.md) builds the chosen screen from
+  the framework, owners, contracts and tokens production uses, renders every owner state, proposes
+  any backend update the screen needs, and ends when the user approves what they can see.
+- [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) confirms the write boundary once,
+  lands the backend update first if there was one, writes the frontend where the review named it, and
+  closes on the real page rendering rather than on green tests.
 
 Duplication is the other thing a build leaves behind, and it is not a defect list: two files holding
 one shape say the vocabulary had no word for it. It is a second pair, split for the same reason as

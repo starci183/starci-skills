@@ -1,195 +1,63 @@
 ---
 name: starci-fe-design-preview
-description: Build and refine an executable, production-faithful StarCi UI candidate for one selected direction before implementation. Use after starci-fe-design-plan records one selected direction for a single or batch scope. Inherits Context Lock, writes artifacts only, renders the exact candidate component tree against locked fixtures and runtime states, revises it in place, seals hashes, and records explicit approval of one revision. Never approves a standalone HTML imitation or edits production code.
+description: Build the chosen StarCi screen from the real components, contracts and tokens production uses, render every owner state, and propose any backend update it needs. Use after starci-fe-design-plan records a chosen direction in the task file. Writes no production source and ends with the user approving what they can see.
 ---
 
 # StarCi FE Design Preview
 
-Preview is the executable revision and approval phase: `1.0 -> 1.1 -> 1.2 -> approved`. It optimizes
-one selected direction rather than generating new directions. Its approved output is a frozen
-implementation candidate, not an image that Apply later interprets.
+Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
-## Input and Context Lock
+Preview turns a chosen picture into something that runs. Its output is a screen built the way
+production will build it, not an image Apply has to interpret afterwards.
 
-Read [`../../CONTEXT-LOCK.md`](../../CONTEXT-LOCK.md), the Plan context record and the complete
-`plan-record.md/json`. Redetect context, print inherited lock plus drift, and stop on any difference
-or ambiguity. Persist `context-lock.preview.md/json` in the same artifact root. Preview writes no
-production or trust source.
+## SCOPE
 
-Proceed only when Plan records one `caseId`, one selected direction, explicit selection evidence,
-owner boundaries, state inventory, contracts/proposals and business evidence. Return to
-`$starci-fe-design-plan` when feedback changes product thesis, ownership, business behavior or
-reopens alternatives. A visual refinement or compatible approved prop refinement remains Preview
-work and is recorded explicitly.
+Print the table. `Touching` is the artifact directory. Read `## plan` in the task file; if there is
+no chosen direction, `$starci-fe-design-plan` has not finished.
 
-Read [`references/steps-table.md`](references/steps-table.md),
-[`references/state-coverage.md`](references/state-coverage.md),
-[`references/executable-spec.md`](references/executable-spec.md), governing canon/design, locked
-`starci-academy-fe` source anchors, selected Plan HTML, callers and tests.
+Feedback that changes the product thesis, ownership or business behavior goes back to Plan. Feedback
+about how it looks stays here.
 
-## Build the executable candidate
+## PROCESS
 
-Treat selected Plan HTML as directional evidence only. Build an artifact-local candidate with the
-same framework, StarCi leaves/composites/branches/shells, contracts, vendor wrappers and tokens that
-production will use. Prefer importing locked target components read-only. When an approved API or
-new owner does not exist yet, place its exact proposed source in the candidate and record its future
-target path. Do not replace unavailable StarCi components with hand-written HTML/CSS merely to match
-the Plan picture.
+**Build it with the real vocabulary.** Same framework, same leaves, composites, branches, shells,
+contracts, vendor wrappers and tokens production uses. Import the target's components read-only where
+they exist. Where an approved new owner does not exist yet, write its exact source here and record
+the path it will take. Never substitute hand-written HTML for a StarCi component to match the Plan
+picture faster — that is the one shortcut that makes Apply a rewrite.
 
-Inventory before invention. Before writing a new contract entry, composite or row into the candidate,
-list the existing keys and composites whose shape already expresses the same relationship and record
-one verdict per candidate: REUSE, EXTEND, or NEW because <the relationship no existing key can
-express>. An entry whose class list and child identities repeat an existing entry is not a new
-concept, it is the same concept under a second name, and `starci-fe/no-duplicate-entry-shape` refuses
-it. A row assembled inline from a leaf plus a glyph is the same failure where no lint can see it,
-because it never became an entry at all. This repository has already paid for it: a value-proposition
-list was written with the exact class list of the day's-quest list, and its ticked row was rebuilt
-from a text leaf and an icon while the composite that draws that row already shipped.
+Read the tier's file in [`../../fe/canon/uxui/layers/`](../../fe/canon/uxui/layers/) BEFORE authoring
+that tier, and [`contract`](../../fe/canon/patterns/contract.md) before touching the contract table:
+the class vocabulary is a closed union, so one unadmitted token makes the whole table fail to type
+and reports as errors in unrelated files.
 
-Read the canon for every tier you are about to author BEFORE authoring it — `leaf`, `composite`,
-`branch`, `block`, `page` — not after. A page that takes one situation prop for the whole screen, a
-branch that opens `children`, a component that writes its own layout class: each compiles, renders
-and reviews cleanly, and each is refused by canon. Reading the tier afterwards turns the whole
-candidate into rework.
+**Inventory before invention.** Before writing a new entry, composite or row, list the existing keys
+whose shape already expresses the same relationship and say REUSE, EXTEND, or NEW because <the
+relationship nothing existing can express>. An entry repeating another's class list and child
+identities is the same concept under a second name, and `starci-fe/no-duplicate-entry-shape` refuses
+it. A row built inline from a leaf plus a glyph is the same failure where no rule can see it.
 
-The candidate must run, typecheck, PASS THE TARGET'S CANON LINT and expose a manifest of exact
-source files and target paths. Capture both runs: `candidate.build` and `candidate.lint` each record
-the command, its exit code and a log file that is hashed and sealed with everything else, because a
-command named in a field is not a command anybody ran. Lint the candidate as you write it rather
-than once at the end — the rules state their own remedy in the message, so they are the cheapest
-design review available and the only one that cannot be talked out of a finding. After editing the
-contract table, run the target repository's typecheck before rendering anything: the class vocabulary
-is a closed union, so one unadmitted token makes the whole table fail to type and reports as errors
-in unrelated files.
+**Render every owner state**, classified by the owner that can change rather than one flat page
+checklist — see [`references/state-coverage.md`](references/state-coverage.md), which also carries
+what to do when the browser refuses to screenshot. Skeleton only genuinely pending values; known
+labels and totals stay truthful. Never compare a visitor state against an owner state, or loading
+against populated.
 
-If the target's ESLint configuration does not reach the candidate path, that is the first defect to
-report: the candidate is the source Apply ports into `src/`, so rules scoped to `src/**` alone leave
-this phase ungoverned exactly where it decides production.
-The render and source panel must consume this candidate; a separately maintained HTML facsimile is
-forbidden. If selected anatomy cannot be expressed without a new product or ownership choice,
-return to Plan. If it needs only an already-approved compatible API proposal, implement that
-proposal inside the artifact candidate and keep it visible for approval.
+**Lint as you write, not once at the end.** The rules state their own remedy in the message, so they
+are the cheapest design review available and the only one that cannot be talked out of a finding.
+Typecheck, lint and build must be green before you ask for anything.
 
-## Revision model
+**A field the screen needs and the schema does not serve is a SUB-RUN**, not a blocker:
+`$starci-be-feature-plan` designs it and returns here. The screen is still yours to finish.
 
-Create revision `1.0` from the selected direction. Every feedback pass increments only the minor
-revision (`1.1`, `1.2`, ...) and records affected elements, retained traits, rejected traits and exact
-reason. Do not reset the design or rewrite unrelated regions when the user points at one element.
-The current revision remains inspectable beside its feedback ledger.
+## OUTPUT
 
-One case covers the whole single/batch scope. Render one cohesive review scene by default. Complete
-state coverage does not require one case per state: expose state controls or integrated scenarios in
-that scene and keep a machine-readable state manifest. For every owner state record `rendered`,
-`covered-by`, or evidence-backed `not-applicable`. Do not create a Cartesian product.
+Shape A while anything is stuck. Batch what you know; keep building everything it does not block.
 
-For every rendered state freeze `stateId`, route, viewport, locale, theme, auth persona, fixture file
-and hash, owner/component tree, contract keys, props/actions, token decisions and screenshot. Never
-compare visitor Preview with owner production or loading Preview with populated production. Show
-owner/block trees, contract keys and `why`, reuse/API/new-owner widgets, and bounded backend
-proposals. Skeleton only genuinely pending values; known labels, totals and unaffected owners remain
-truthful.
+Shape B when the user approves what they are looking at. Name the thing in the question — "approve
+this and move on?" — so their one word already carries what it approves. Then append `## review` to
+the task file: the SCOPE table, every owner state and whether it rendered, the backend update you are
+proposing, the UX calls you took on your own, and what they approved.
 
-## Host and revise
-
-Use [`assets/review-lab/`](assets/review-lab/) only as review chrome around the executable candidate;
-set its manifest `phase` to `preview` and point each rendered state at the candidate runtime through
-`candidateUrl`. The chrome loads that runtime in an iframe and lists its exact candidate file map.
-It must not receive `state.html` or a second CSS implementation. Host the candidate on the first
-free port from `8080`:
-
-```powershell
-python <trust-root>/skills/starci-fe-design-preview/scripts/serve_preview.py <preview-directory> --start-port 8080
-```
-
-Report path, URL, PID and stop command. After each feedback pass, update the revision and return the
-same review URL. Ask for explicit approval of a named revision; silence and agent completion are not
-approval.
-
-Name the revision INSIDE the question — "revision 1.3 as shown, approve and seal?" — so a one-word
-answer already carries what it approves and the run seals on it. That is HANDOFF-3: a bare
-confirmation is only bare when the thing confirmed was left unstated. Should an approval still
-arrive against an unnamed revision, restate it once and record `confirmed-restated`, keeping the
-restatement and the user's own words in separate fields, because the record has to show which of the
-two happened.
-
-Everything else this phase cannot decide is an ITEM, not a question. Carry it with what it blocks,
-build through everything it does not block, and hand the whole set over beside the approval request
-as ONE form the user answers in a single pass. Classify each item first: a DECISION arrives with its
-options and the default taken, a RESOURCE arrives with the exact command that places the file and the
-path it writes to, and a SUB-RUN names the skill that owns it. A field the candidate needs and the
-schema does not expose is the common one here — that is `$starci-be-feature-plan`, and it RETURNS to
-this phase rather than replacing it, because the candidate is still Preview's to finish. When the form comes back, resolve the items and carry on into the seal — an
-answered form that produces a status report has spent the user's pass and moved nothing. See
-[`../../handoff.md`](../../handoff.md).
-
-## Settle the candidate before sealing
-
-A revision is approved by looking at it, and looking is blind to three whole classes of defect: a
-seam that separates the wrong level of grouping, a decision the user never knew was made, and a
-component rebuilt beside the one that already draws it. None of the three is visible in a rendered
-state, and all three survive any number of revisions. So the candidate carries three short records
-into approval, and the seal refuses a candidate missing any of them.
-
-**The relationship sheet.** For each candidate: every seam and the level of grouping it separates,
-every text node and its rank, every control and its variant with the reason. The reader approves
-these WITH the pixels, because a relationship stated in a line can be refused in a line, while the
-same disagreement expressed as a picture has to be redrawn before it can even be argued with.
-
-**The open questions.** Every product decision the candidate had to settle that no rule decides —
-whether page furniture stays when the data would hide it, whether an action is words or a glyph,
-what a control is called. State each in one line with the default taken and what it costs, at most a
-handful. Silence on the list is not agreement with it; approval names them or waives them out loud.
-A decision the reader finds AFTER implementation was never theirs to make.
-
-These are TAKEN and recorded, not asked. HANDOFF-6 puts every choice inside the selected direction —
-phrasing, glyph, ordering, density — with this phase, because the direction was already chosen and
-the revision is about to be approved, and a micro-choice raised on its own spends a round trip the
-approval covers. The list is where the reader meets them all at once and overturns any of them in a
-sentence. What does NOT belong here is anything the candidate could be WRONG about rather than
-merely unpreferred — a fact derived instead of read, a promise, a permission, a price. Those are
-items on the form, because approval cannot undo them after they ship.
-
-**The consolidation verdicts.** List every new owner the candidate introduces — leaf, entry,
-composite, block — with its nearest existing kin found by vendor primitive, class signature, slot
-identity and domain entity. Settle each with the three tests and the four verdicts already owned by
-[`starci-fe-consolidate-plan`](../starci-fe-consolidate-plan/SKILL.md): `merge`, `prop-variant`,
-`extract-composite` or `keep-apart`. Do not restate those tests here; a second copy of a rule is the
-duplication this section exists to catch.
-
-`keep-apart` must NAME the fact that distinguishes the pair — a different vendor primitive, a
-different slot identity, a different domain entity. A pair kept apart on the grounds that they feel
-different is a pair nobody compared. Two things that render identically may still be two things:
-words that press are a link primitive with focus, keyboard and press semantics, and words that do
-not are a line of copy — which is why "renders the same" is the weakest signal on this list and
-never the verdict on its own.
-
-The scope is the candidate's own new surface and each new owner's nearest kin. A survey of the whole
-tree is [`starci-fe-consolidate-plan`](../starci-fe-consolidate-plan/SKILL.md)'s job, and running it
-on every revision is how a phase stops being run at all.
-
-**Named references only.** When — and only when — the request names a legacy or production screen,
-read that screen's SOURCE and list the divergences with their reasons before approval. An unnamed
-reference is not consulted and not guessed at.
-
-## Freeze approval
-
-Write version-3 `design-record.md/json` using
-[`references/design-record.md`](references/design-record.md). Record `approvedRevision`, revision
-history, complete owner-state classification, exact candidate files/target paths, state runtime
-fingerprints, fixtures, screenshots, trees, contracts, props, tokens, API proposals and approved
-additive backend enablers, plus the relationship sheet, the answered open questions and one
-consolidation verdict per new owner. After explicit approval, seal hashes:
-
-```powershell
-node <trust-root>/skills/starci-fe-design-preview/scripts/verify_design_record.mjs <design-record.json> --seal
-node <trust-root>/skills/starci-fe-design-preview/scripts/verify_design_record.mjs <design-record.json>
-```
-
-Any candidate, fixture, screenshot or semantic manifest change after approval invalidates the seal
-and requires a new minor revision plus approval. Only a valid sealed record may go on. With the seal
-verified and nothing left open, INVITE `$starci-fe-design-apply` by name, per
-[`../../handoff.md`](../../handoff.md): say what it will materialize and that it opens by confirming
-the write boundary with the user. They start it. Run Apply's admission gates HERE, before the
-invitation — the lint-adoption audit against a real production probe, and every recorded target path
-checked to be inside a plausible boundary. A gate that fails after the user has confirmed a boundary
-has cost them a round trip Preview could have spent itself.
+Then invite `$starci-fe-design-apply` — it confirms the write boundary with them, applies the backend
+update first if there is one, writes the frontend, and opens the real page.

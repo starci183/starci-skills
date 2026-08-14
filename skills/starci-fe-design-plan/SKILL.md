@@ -1,123 +1,60 @@
 ---
 name: starci-fe-design-plan
-description: Present evidence-backed StarCi UI choices for net-new or genuinely undecided frontend work across one or many pages, layouts, blocks or overlays. Use when product hierarchy, CTA, interaction, disclosure or reusable vocabulary still needs a user choice. Locks context, writes artifacts only, renders one cohesive comparison case as real HTML from port 8080+, and stops for explicit direction selection. Do not use for a bounded fidelity fix with a known reference and no product choice.
+description: Draw two to four real screens for net-new or undecided StarCi frontend work and stop for the user to pick one. Use when hierarchy, CTA, interaction or disclosure still needs a product choice. Renders real HTML from port 8080 and writes no production code. Not for a bounded fix with a known reference — that is starci-fe-fidelity-fix.
 ---
 
 # StarCi FE Design Plan
 
-Turn uncertain product intent into visible choices without inventing business truth. Canon is fixed
-grammar. Backend behavior is business evidence. Contract `why` and concrete
-`starci-academy-fe` source anchors are reuse evidence. A named legacy render is the parity baseline.
+Read [`../../skill-shape.md`](../../skill-shape.md) first: SCOPE, PROCESS, OUTPUT, and the task file
+at `.claude/workflows/<id>.md`.
 
-## Admission and Context Lock
+Plan exists for one reason — a choice the user has to make. If the answer is already proven by a
+named reference, a contract or a test, this is `$starci-fe-fidelity-fix` and there is nothing to
+choose.
 
-Read [`../../CONTEXT-LOCK.md`](../../CONTEXT-LOCK.md), detect workspace/repository roles and print the
-Context Lock table. Stop on any ambiguity. Persist `context-lock.plan.md/json` in the locked artifact
-root. Plan may write only artifacts; target source, reference repositories and trust remain read-only.
+## SCOPE
 
-Use Plan only when at least one real choice remains. Route an exact, bounded parity or runtime repair
-with a known target to `$starci-fe-fidelity-fix`. Do not manufacture options around a settled fix.
+Print the table. `Touching` is the artifact directory and nothing else — Plan writes no production
+source. Name the app and database when the screens depend on backend behavior.
 
-Read [`references/steps-table.md`](references/steps-table.md),
-[`../../fe/creativity/INDEX.md`](../../fe/creativity/INDEX.md), governing canon/design, relevant
-contracts and their `why`, concrete source anchors at the locked reference HEAD, callers, tests,
-rendered evidence, and backend truth. Read
-[`references/backend-enablers.md`](references/backend-enablers.md) only when a UI need may require a
-small additive backend enabler.
+## PROCESS
 
-## One scope case, several selectable directions
+**Read the evidence before drawing.** The live GraphQL schema decides what the product can actually
+say; a screen promising a field nobody serves is a screen that cannot ship. The existing components
+under `src/components` decide what can be built cheaply. A named legacy screen, when the request
+names one, decides parity. Read
+[`../../fe/canon/uxui/layers/`](../../fe/canon/uxui/layers/) for the tiers you will draw with, and
+[`../../fe/design/hierarchy.md`](../../fe/design/hierarchy.md) and
+[`call-to-action`](../../fe/design/call-to-action.md) for what earns attention.
 
-One run creates exactly one cohesive case for the requested scope. The case may contain one block,
-several pages, a persistent layout and overlays; `batch` describes delivery, never ownership. Freeze
-one work-item matrix and dependency graph, with one primary scope (`page`, `layout`, `block`, or
-`overlay`) per item.
-
-Inside that case, produce two to four genuinely distinct directions. Directions vary product
-decisions—CTA priority, reading order, disclosure, density, interaction or composition—not colour
-swaps. Migration and mixed work include a parity-first direction and label every divergence. A
-multi-page batch still receives one direction system, not unrelated options per page.
-
-Each direction records:
-
-1. thesis, primary CTA, success condition and reading order;
-2. evidence, assumptions, unknowns and legacy divergence;
-3. owner/block tree and contract graph;
-4. required owner-state inventory;
-5. reuse, public API extension and new-owner proposals;
-6. bounded backend-enabler proposals, if any;
-7. strongest benefit, trade-off and adversarial rejection risk.
-
-Inventory before invention. Before a direction proposes a new contract entry, composite or row, list
-the existing keys and composites whose shape already expresses the same relationship and record one
-verdict per candidate: REUSE, EXTEND, or NEW because <the relationship no existing key can express>.
-An entry whose class list and child identities repeat an existing entry is not a new concept, it is
-the same concept under a second name, and `starci-fe/no-duplicate-entry-shape` refuses it. A row
-assembled inline from a leaf plus a glyph is the same failure where no lint can see it, because it
-never became an entry at all. This repository has already paid for it: a value-proposition list was
-written with the exact class list of the day's-quest list, and its ticked row was rebuilt from a text
-leaf and an icon while the composite that draws that row already shipped.
-
-An existing component may gain a prop only when it already owns that semantic relationship and
-visual slot. Record exact `props`/`on` delta, absence/default, precedence, callers and tests. Do not
-rename a domain fact into a generic-looking but false prop to avoid creating the correct owner.
-
-## Direction lab
-
-Read [`references/direction-lab.md`](references/direction-lab.md). Build one real-HTML comparison
-lab for the case, with one representative scene per direction. The scene is sufficient to judge
-hierarchy, CTA, reading order, density, owner tree, contracts and proposals; Plan does not expand
-every state into a separate page. Keep the complete state manifest explicit for Preview.
-
-Every Plan canvas must visibly say `DIRECTIONAL - NOT AN APPLY BASELINE`. Plan HTML is a choice
-instrument, not an implementation promise. Never call it production parity, approved fidelity or an
-Apply-ready render. A direction is selectable only when its proposed anatomy is demonstrably
-expressible by current StarCi owners/contracts or by exact API/new-owner proposals recorded beside
-it. An attractive shape with no feasible component path is not a valid direction.
-
-After any edit to a contract table, run the target repository's typecheck before rendering anything:
-the class vocabulary is a closed union, so one unadmitted token makes the whole table fail to type
-and reports as errors in unrelated files.
-
-Host on the first free port from `8080`:
+**Draw two to four screens that differ in PRODUCT decisions** — reading order, CTA priority, what is
+disclosed and what is folded away, density, composition. Not colour, not spacing. A migration or
+parity request always includes a parity-first option. Real HTML, hosted from the first free port:
 
 ```powershell
-python <trust-root>/skills/starci-fe-design-preview/scripts/serve_preview.py <direction-lab-directory> --start-port 8080
+python <trust-root>/skills/starci-fe-design-preview/scripts/serve_preview.py <directory> --start-port 8080
 ```
 
-Report absolute path, URL, PID and stop command. Show a compact comparison table in conversation,
-give the URL, then stop for an explicit direction choice. Do not select for the user. A requested
-hybrid becomes one updated direction with retained and rejected traits named and its HTML refreshed.
+Every canvas says `DIRECTIONAL - NOT AN IMPLEMENTATION BASELINE`. Plan HTML is how a choice is made
+visible; Preview rebuilds the winner from real components and never copies this.
 
-When the answer is not one of the directions — "either is fine", "whichever is fastest", silence —
-ask once more as a binary question. If it stays ambiguous, do not keep waiting and do not choose on
-merit: fall to the direction that risks least, `parity-first` where a baseline exists and
-`conservative` otherwise, record `selectionKind: default-after-ambiguity` with what was asked and
-what came back, and say plainly in conversation that this was a default rather than a selection. A
-default is reversible in Preview; a decision the user never made, recorded as though they made it,
-is not.
+**Inventory before invention.** Before a screen proposes a new contract entry, composite or row, list
+the existing keys whose shape already expresses the same relationship and say REUSE, EXTEND, or NEW
+because <the relationship nothing existing can express>. An entry repeating another entry's class
+list and child identities is the same concept under a second name, and
+`starci-fe/no-duplicate-entry-shape` refuses it. A screen whose anatomy no existing component can
+express, and that proposes no exact new owner, is not a real option.
 
-## Record and handoff
+## OUTPUT
 
-After selection, write `plan-record.md/json` using
-[`references/plan-record.md`](references/plan-record.md), status `direction-selected`, exactly one
-`caseId`, and exactly one `selectedDirectionId`. Validate it before routing:
+Shape A when something blocks: a fact the screens need and the schema does not serve, an asset that
+does not exist, a backend capability that has to be designed first.
 
-```powershell
-node <trust-root>/skills/starci-fe-design-plan/scripts/verify_plan_record.mjs <plan-record.json>
-```
+Shape B when the user has picked: append `## plan` to the task file with the SCOPE table, the chosen
+direction and their reason, and every UX call you took on your own. Then invite
+`$starci-fe-design-preview` — it builds the chosen screen from real components and contracts, renders
+every owner state, and asks you to approve it.
 
-It must report `ok: true`. Then close the way [`../../handoff.md`](../../handoff.md) requires: settle
-everything Plan can settle — and by HANDOFF-6 that includes every UX and UI choice inside a direction,
-which is taken and recorded rather than asked, because asking them is how a phase hands back the
-judgement it was engaged for. Then hand over what only the user can clear as ONE form — decisions with
-their defaults, resources with the command that supplies them, sub-runs named with the skill that owns
-them — and only when nothing is left open, INVITE `$starci-fe-design-preview` by name, saying what it will
-build and that it will ask for approval of a named revision. The user starts it. A bare "route to
-Preview" with items still open is the refused shape: it moves Plan's unfinished work onto the user
-inside an invitation. Plan never claims visual approval, executable parity or edits production code. Preview must rebuild the
-selected direction as an executable candidate; it must not bless the Plan mockup by copying it.
-
-When agents are available, they may inventory independent evidence or critique bounded directions.
-The coordinator owns Context Lock, business thesis, CTA, shared layout, contracts, vocabulary,
-backend-enabler classification, synthesis and the stop for selection. Agent agreement is not user
-selection.
+Do not pick for the user. If the answer stays ambiguous after one more direct question, take the
+parity-first option where a baseline exists and the most conservative one otherwise, and say plainly
+that it was a default rather than a choice.

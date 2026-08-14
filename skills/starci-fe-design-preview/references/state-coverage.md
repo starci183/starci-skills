@@ -63,11 +63,12 @@ same owner's behavior.
 
 ## When the browser refuses to produce the image
 
-The seal requires a screenshot per rendered state, and the in-app Browser pane composites frames only
+A rendered state is proved by an image, and the in-app Browser pane composites frames only
 while it is displayed — which is the user's window state, not something the run controls. A hidden
 pane answers `read_page`, `get_page_text` and `javascript_tool` normally and refuses only
 `screenshot`. That refusal is not a state that cannot be captured; it is a capture path that is
-closed, and HANDOFF-4 requires the other one to be taken before the evidence is called unobtainable.
+closed, and a closed path is work rather than a stop: take the other one before calling the evidence
+unobtainable.
 
 Capture with headless Chrome instead, one invocation per state:
 
