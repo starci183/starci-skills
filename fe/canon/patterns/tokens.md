@@ -127,6 +127,23 @@ button sizes because each names a reproducible relationship. Inferring height fr
 tertiary, from the number of words, or from how visually loud the control feels mixes independent
 axes and makes the same role change geometry between screens.
 
+**TOKEN-9 · A class that names a token means nothing until the theme defines it.**
+
+`max-w-app-lg` is not a width. It is a REQUEST for `--container-app-lg`, and when that variable does
+not exist the class is still emitted, the element still renders, and nothing anywhere goes red — the
+union admits the name, the compiler is satisfied by the union, and the page silently loses its
+measure.
+
+This is the one dead value a closed union cannot catch, and it is worse than an off-scale value for
+exactly that reason: an off-scale value fails to compile, while this one passes every gate and ships.
+A repository already carried such a member for long enough to write a comment about it beside another
+entry rather than delete it.
+
+So the two halves are checked together: the name is a member of the union, AND the variable it asks
+for is defined in the stylesheet. Names Tailwind resolves itself — `screen`, `full`, `fit`, the
+viewport units — promise nothing about the theme and are not this rule's business; a rule that
+reported them would send an author to define a variable nothing reads.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |

@@ -12,7 +12,10 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noArbitraryValue, noFractionalStep, noHandRolledHeading, rules } from "./tokens.mjs"
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { noArbitraryValue, noFractionalStep, noHandRolledHeading, noUnresolvedTokenClass, rules } from "./tokens.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -91,6 +94,46 @@ test("TOKEN-5: large text plus a heavy weight is a heading", () => {
         filename: LEAF,
         code: "const E = () => <span className=\"text-xl font-extrabold\">{t}</span>",
         errors: [{ messageId: "heading" }],
+      },
+    ],
+  })
+})
+
+/** A repository whose stylesheet defines ONE container token, built fresh for this run. */
+const themedRoot = () => {
+  const root = mkdtempSync(join(tmpdir(), "starci-tokens-")).replace(/\\/g, "/")
+  mkdirSync(join(root, "src/app"), { recursive: true })
+  writeFileSync(
+    join(root, "src/app/globals.css"),
+    "@theme {\n    --container-app-sm: 40rem;\n    --max-height-rail: calc(100dvh - 7rem);\n}\n",
+    "utf8",
+  )
+  return root
+}
+
+const THEMED = themedRoot()
+
+test("TOKEN-9: a class naming a theme token is dead unless the theme defines it", () => {
+  tester.run("no-unresolved-token-class", noUnresolvedTokenClass, {
+    valid: [
+      // The token exists, so the class means what it says.
+      { filename: `${THEMED}/src/components/pages/Reader/component.tsx`, code: 'const M = "mx-auto max-w-app-sm"' },
+      { filename: `${THEMED}/src/components/layouts/Rail/component.tsx`, code: 'const R = "max-h-rail overflow-y-auto"' },
+      // Tailwind's own scale, not a theme promise: nothing here is derivable from a variable name.
+      { filename: `${THEMED}/src/components/pages/Reader/component.tsx`, code: 'const S = "max-w-sm gap-4 text-muted"' },
+      // Outside src, this is somebody else\'s rule to enforce.
+      { filename: `${THEMED}/scripts/report.mjs`, code: 'const M = "max-w-app-xl"' },
+    ],
+    invalid: [
+      {
+        filename: `${THEMED}/src/components/pages/Reader/component.tsx`,
+        code: 'const M = "mx-auto max-w-app-xl"',
+        errors: [{ messageId: "unresolved", data: { value: "max-w-app-xl", variable: "--container-app-xl" } }],
+      },
+      {
+        filename: `${THEMED}/src/components/layouts/Rail/component.tsx`,
+        code: 'const R = "max-h-drawer"',
+        errors: [{ messageId: "unresolved" }],
       },
     ],
   })

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+
 /**
  * The rules that hold `tokens.md`.
  *
@@ -151,11 +154,108 @@ export const noHandRolledHeading = {
   },
 }
 
+/**
+ * The class families whose names are PROMISES about a theme token, and the variable each needs.
+ *
+ * Tailwind resolves `max-w-app-lg` by looking for `--container-app-lg`. Nothing warns when that
+ * variable does not exist: the class is emitted, the element gets no width, and the type system
+ * is satisfied because the name IS in the union. That is the failure this rule exists for - a
+ * class can be typesafe and mean nothing at the same time, and the union is exactly what makes
+ * it look settled.
+ *
+ * Only families whose token name is DERIVABLE from the class name are listed. A colour or a
+ * spacing step resolves through Tailwind's own scale as well as the theme, so a rule guessing at
+ * those would report classes that work.
+ */
+/**
+ * Names Tailwind resolves ITSELF, which therefore promise nothing about this theme.
+ *
+ * `min-h-screen` is the viewport, not a variable; so are `full`, `fit`, `auto` and the viewport
+ * units. Reported as unresolved tokens they would send an author to define `--min-height-screen`,
+ * which is a variable nothing reads - the rule would have invented work and broken a working class.
+ * Measured on both repositories the first time this ran: two findings, both wrong, both this list.
+ */
+const TAILWIND_OWN_NAMES = new Set([
+  "screen", "full", "fit", "auto", "none", "min", "max", "prose",
+  "dvh", "svh", "lvh", "dvw", "svw", "lvw", "px",
+])
+const TOKEN_CLASS_FAMILIES = [
+  { pattern: /^max-w-app-([a-z0-9]+)$/, variable: (name) => `--container-app-${name}` },
+  { pattern: /^max-h-([a-z][a-z0-9-]*)$/, variable: (name) => `--max-height-${name}` },
+  { pattern: /^min-h-([a-z][a-z0-9-]*)$/, variable: (name) => `--min-height-${name}` },
+]
+
+/** Stylesheets a repository may declare its theme in, relative to the repository root. */
+const STYLESHEET_CANDIDATES = [
+  "src/app/globals.css",
+  "apps/app/src/app/globals.css",
+  "apps/expert/src/app/globals.css",
+  "apps/landing/src/app/globals.css",
+  "packages/ui/src/styles/globals.css",
+]
+
+/** Every stylesheet found above the linted file, read once and cached for the run. */
+const themeCache = new Map()
+const themeTextFor = (filename) => {
+  let directory = dirname(normalizePath(filename))
+  for (let depth = 0; depth < 12 && directory !== "/" && directory !== ""; depth += 1) {
+    if (themeCache.has(directory)) return themeCache.get(directory)
+    const found = STYLESHEET_CANDIDATES
+      .map((relative) => join(directory, relative))
+      .filter((candidate) => existsSync(candidate))
+      .map((candidate) => readFileSync(candidate, "utf8"))
+    if (found.length > 0) {
+      const text = found.join("\n")
+      themeCache.set(directory, text)
+      return text
+    }
+    directory = dirname(directory)
+  }
+  return null
+}
+
+/** A class naming a token the theme never defines is a class that draws nothing. */
+export const noUnresolvedTokenClass = {
+  meta: {
+    type: "problem",
+    docs: { description: "A class naming a theme token resolves only when the theme defines it." },
+    schema: [],
+    messages: {
+      unresolved:
+        "`{{value}}` reads as a token this theme defines, and `{{variable}}` is defined nowhere in it. Tailwind emits the class, the element gets nothing, and both the union and the compiler stay happy - which is why this is the one dead class no type can catch. Define `{{variable}}` in the stylesheet, or name a token that exists.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!isSourceFile(file)) return {}
+    const theme = themeTextFor(file)
+    // A reader that cannot find the stylesheet stays quiet rather than calling every token dead.
+    if (theme === null) return {}
+    // The visitor hands (node, text) in that order; reversing them here is how a rule reports the
+    // node as its message and the message as its node, and neither complains.
+    const check = (node, value) => {
+      for (const raw of String(value).split(/\s+/)) {
+        const bare = raw.replace(/^[a-z-]+:/, "").replace(/^!/, "")
+        for (const family of TOKEN_CLASS_FAMILIES) {
+          const match = family.pattern.exec(bare)
+          if (match === null) continue
+          if (TAILWIND_OWN_NAMES.has(match[1])) continue
+          const variable = family.variable(match[1])
+          if (theme.includes(variable)) continue
+          context.report({ node, messageId: "unresolved", data: { value: bare, variable } })
+        }
+      }
+    }
+    return classTextVisitors(context, check)
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-fractional-step": noFractionalStep,
   "no-arbitrary-value": noArbitraryValue,
   "no-hand-rolled-heading": noHandRolledHeading,
+  "no-unresolved-token-class": noUnresolvedTokenClass,
 }
 
 /**
