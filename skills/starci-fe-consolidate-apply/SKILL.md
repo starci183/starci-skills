@@ -55,6 +55,13 @@ the one failure this half must not accept on the first try.
 Green tests are not the proof, and saying so is the point of the half: no unit test knows what a
 screen looked like yesterday, so a merge that quietly restyles one caller passes all of them.
 
+When a measured call site is authenticated or runtime-backed, follow
+[`../starci-fe-design-review/references/live-flow-proof.md`](../starci-fe-design-review/references/live-flow-proof.md).
+Use the declared app's authorized test account, run the real affected flow, inspect UI, Network,
+Console and frontend/backend terminal output, and append `### LIVE FLOW PROOF`. Never record a
+credential or token. An unexplained failed request, console error or terminal error breaks parity
+even when before/after screenshots look equal.
+
 ## OUTPUT
 
 Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED` and `### OWED`.

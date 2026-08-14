@@ -52,9 +52,16 @@ Before completion, reconcile every component and props row against `git diff <ba
 the row-to-diff proof in the workflow; an unimplemented row or an unexplained diff returns to Review.
 
 Run typecheck, lint and build without suppression. Open the real page and verify every approved state
-at the recorded route, viewport, locale, theme, persona and fixture. Feedback on the implementation
-is handled by revising the same source inside Apply and appending `REJECTED` evidence. Feedback that
-changes the approved product thesis returns to Plan/Review.
+at the recorded route, viewport, locale, theme, persona and fixture. For every authenticated or
+runtime-backed flow, follow
+[`../starci-fe-design-review/references/live-flow-proof.md`](../starci-fe-design-review/references/live-flow-proof.md): use the declared app's authorized
+test account, log in through the real UI, execute the approved flow, and inspect UI, Network, Console
+and frontend/backend terminal output in the same time window. Append `### LIVE FLOW PROOF`; never
+record credentials or tokens. A screenshot with an unexplained failed request or terminal error is
+failed proof, and Apply cannot close while an approved flow is failed or blocked.
+
+Feedback on the implementation is handled by revising the same source inside Apply and appending
+`REJECTED` evidence. Feedback that changes the approved product thesis returns to Plan/Review.
 
 Before closing, record:
 

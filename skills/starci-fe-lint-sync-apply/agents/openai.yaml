@@ -1,4 +1,4 @@
 interface:
   display_name: "StarCi FE Lint Sync Apply"
-  short_description: "Apply and prove canonical FE lint"
-  default_prompt: "Use $starci-fe-lint-sync-apply to apply and prove canonical FE lint adoption."
+  short_description: "Apply lint and live-proof FE repairs"
+  default_prompt: "Use $starci-fe-lint-sync-apply to apply canonical FE lint adoption and live-test affected product flows with UI, Network, Console and terminal evidence."
