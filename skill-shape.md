@@ -80,6 +80,12 @@ Challenge the brief against the real contracts, components, fixtures and runtime
 every decision that can make Apply diverge. FE Design Review creates no HTML, JSX, CSS, parallel
 design tree or production edit.
 
+FE Design Review must freeze two source-backed tables before approval: `COMPONENT DELTA` names every
+route, page, layout, overlay, block, composite, branch, leaf and shell as `REUSE`, `ADD`, `MODIFY`,
+`MOVE` or `REMOVE`; `PROPS DELTA` names every public prop/API action and all producers or call sites.
+No row may defer discovery to Apply. `REUSE` predicts no edit, while every other row predicts an
+exact baseline-to-worktree change.
+
 Run the feedback loop until the user explicitly approves:
 
 ```text
@@ -100,6 +106,9 @@ Then implement the approved revision directly in target source. For FE Design, s
 implementation: no design-code directory, detached HTML proposal or disposable component copy.
 Track `git diff <baseline>` throughout Apply. A required path outside `Touching` returns to Review as
 a finding; it never arrives quietly in the diff.
+
+For FE Design, reconcile that diff with every approved `COMPONENT DELTA` and `PROPS DELTA` row.
+Discovering a new owner, tier, path, prop or action returns to Review; Apply does not invent it.
 
 Prove the result at the production boundary. Tests, renders and live calls prove different claims;
 run the ones the approved acceptance evidence names. Append the exact results to the workflow.

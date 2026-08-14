@@ -154,11 +154,11 @@ across four explicit scopes (`page`, `layout`, `block`, `overlay`) without blurr
   components and named references, then renders one disposable `index.html` with two to four
   direction tabs, serves one URL on the first free port from 8080 and tracks its path/hash.
 - [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) challenges the selected brief,
-  source boundary, owner states and acceptance evidence until one exact revision is approved. It
-  writes no production source.
+  then freezes every component-tree action and public-prop migration with source/call-site evidence
+  before one exact revision is approved. It writes no production source.
 - [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) commits the current target state
-  as the before-state, writes the approved frontend directly in final source paths, and closes by
-  matching the baseline diff, rendered states and tests.
+  as the before-state, writes only the approved component/props delta directly in final source paths,
+  and closes by matching every row to the baseline diff, rendered states and tests.
 
 Duplication is the other thing a build leaves behind, and it is not a defect list: two files holding
 one shape say the vocabulary had no word for it. It is a second pair, split for the same reason as

@@ -65,6 +65,19 @@ const proposals = `| Preview | URL | HTML | SHA-256 | Status |
 | B | Theo lộ trình | đang chờ |
 `
 
+const designDeltas = `### COMPONENT DELTA
+
+| Layer | Owner | Action | Current path | Final path | Parent / call sites | Contract | Reason |
+|---|---|---|---|---|---|---|---|
+| page | LearnPage | MODIFY | src/pages/LearnPage | src/pages/LearnPage | route learn | learn-page | approved composition change |
+
+### PROPS DELTA
+
+| Owner | Prop / API | Action | Before | After | Producers / call sites | Migration proof |
+|---|---|---|---|---|---|---|
+| LearnPage | public props | KEEP | LearnPageProps | LearnPageProps | route learn | typecheck and call-site search |
+`
+
 test("a v2 Plan with context and six outputs is valid", () => {
   const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}`
   assert.deepEqual(validateWorkflow("designs/starci-academy/page.md", text), { legacy: false, errors: [] })
@@ -92,7 +105,7 @@ test("Apply cannot exist without an approved Review revision", () => {
 test("Design Apply requires the baseline commit and tracked worktree diff", () => {
   const reviewContext = context.replace("| Phase | plan |", "| Phase | review |")
   const applyContext = context.replace("| Phase | plan |", "| Phase | apply |")
-  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${outputs}\n## apply\n\n${applyContext}\nApplied revision: r1\n\n${outputs}`
+  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${designDeltas}\n${outputs}\n## apply\n\n${applyContext}\nApplied revision: r1\n\n${outputs}`
   const errors = validateWorkflow("designs/starci-academy/page.md", text).errors
   assert.ok(errors.includes("design Apply must cite Baseline commit"))
   assert.ok(errors.includes("design Apply must cite Tracked diff"))
@@ -101,8 +114,41 @@ test("Design Apply requires the baseline commit and tracked worktree diff", () =
 test("Design Apply accepts a baseline-to-worktree diff", () => {
   const reviewContext = context.replace("| Phase | plan |", "| Phase | review |")
   const applyContext = context.replace("| Phase | plan |", "| Phase | apply |")
-  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${outputs}\n## apply\n\n${applyContext}\nApplied revision: r1\nBaseline commit: abc123\nTracked diff: abc123..worktree\n\n${outputs}`
+  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${designDeltas}\n${outputs}\n## apply\n\n${applyContext}\nApplied revision: r1\nBaseline commit: abc123\nTracked diff: abc123..worktree\n\n${outputs}`
   assert.deepEqual(validateWorkflow("designs/starci-academy/page.md", text), { legacy: false, errors: [] })
+})
+
+test("approved Design Review requires component and props deltas", () => {
+  const reviewContext = context.replace("| Phase | plan |", "| Phase | review |")
+  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${outputs}`
+  const errors = validateWorkflow("designs/starci-academy/page.md", text).errors
+  assert.ok(errors.includes("review[1]: missing COMPONENT DELTA heading"))
+  assert.ok(errors.includes("review[1]: missing component delta table"))
+  assert.ok(errors.includes("review[1]: missing PROPS DELTA heading"))
+  assert.ok(errors.includes("review[1]: missing props delta table"))
+})
+
+test("approved Design Review rejects deferred owners and missing prop verdicts", () => {
+  const reviewContext = context.replace("| Phase | plan |", "| Phase | review |")
+  const deferredDeltas = designDeltas
+    .replace("| LearnPage | public props | KEEP |", "| ApplyWillDecide | public props | KEEP |")
+    .replace("route learn | learn-page", "** | learn-page")
+  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${deferredDeltas}\n${outputs}`
+  const errors = validateWorkflow("designs/starci-academy/page.md", text).errors
+  assert.ok(errors.includes("review[1]: component delta contains deferred inventory"))
+  assert.ok(errors.includes("review[1]: missing props verdict for LearnPage"))
+})
+
+test("approved Design Review rejects unknown component and prop actions", () => {
+  const reviewContext = context.replace("| Phase | plan |", "| Phase | review |")
+  const invalidDeltas = designDeltas
+    .replace("| page | LearnPage | MODIFY |", "| widget | LearnPage | EXTEND |")
+    .replace("| LearnPage | public props | KEEP |", "| LearnPage | public props | CHANGE |")
+  const text = `<!-- starci-workflow: v2 -->\n\n# page\n\n## plan\n\n${context}\n${proposals}\n${outputs}\n## review\n\n${reviewContext}\nApproved revision: r1\n\n${invalidDeltas}\n${outputs}`
+  const errors = validateWorkflow("designs/starci-academy/page.md", text).errors
+  assert.ok(errors.includes("review[1]: unknown component layer widget"))
+  assert.ok(errors.includes("review[1]: unknown component action EXTEND"))
+  assert.ok(errors.includes("review[1]: unknown props action CHANGE"))
 })
 
 test("legacy workflow history remains evidence and is not rewritten", () => {

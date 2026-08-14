@@ -222,6 +222,19 @@ test("FE Design commits its baseline at Apply, then writes only target source", 
   assert.match(apply, /directly at final source paths/)
 })
 
+test("FE Design Review freezes component and props deltas before Apply", () => {
+  const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
+  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
+
+  assert.match(review, /### COMPONENT DELTA/)
+  assert.match(review, /### PROPS DELTA/)
+  assert.match(review, /page`, `layout`, `overlay`, `block`, `composite`, `branch`, `leaf` or `shell`/)
+  assert.match(review, /`REUSE`, `ADD`, `MODIFY`, `MOVE` or `REMOVE`/)
+  assert.match(review, /`KEEP`, `ADD`, `REMOVE`, `RENAME`, `RETYPE`, `MAKE_REQUIRED`, `MAKE_OPTIONAL` or/)
+  assert.match(apply, /Treat the approved delta rows as an executable boundary/)
+  assert.match(apply, /return to Review when implementation discovers a new owner, tier, path, prop or action/)
+})
+
 test("every FE skill requires declared project or target repositories", () => {
   const broken = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {

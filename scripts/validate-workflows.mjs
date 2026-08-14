@@ -44,6 +44,22 @@ const OUTPUT_HEADERS = [
 ]
 const DESIGN_PREVIEW_HEADER = "| Preview | URL | HTML | SHA-256 | Status |"
 const DESIGN_DIRECTION_HEADER = "| Direction | Tab | Status |"
+const DESIGN_COMPONENT_DELTA_HEADER =
+  "| Layer | Owner | Action | Current path | Final path | Parent / call sites | Contract | Reason |"
+const DESIGN_PROPS_DELTA_HEADER =
+  "| Owner | Prop / API | Action | Before | After | Producers / call sites | Migration proof |"
+const DESIGN_LAYERS = new Set(["route", "page", "layout", "overlay", "block", "composite", "branch", "leaf", "shell"])
+const DESIGN_COMPONENT_ACTIONS = new Set(["REUSE", "ADD", "MODIFY", "MOVE", "REMOVE"])
+const DESIGN_PROP_ACTIONS = new Set([
+  "KEEP",
+  "ADD",
+  "REMOVE",
+  "RENAME",
+  "RETYPE",
+  "MAKE_REQUIRED",
+  "MAKE_OPTIONAL",
+  "CHANGE_DEFAULT",
+])
 
 const markdownFiles = (directory) =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -71,6 +87,9 @@ const tableRows = (text, header) => {
   }
   return rows
 }
+
+const tableCells = (row) => row.split("|").slice(1, -1).map((cell) => cell.trim().replace(/^`|`$/g, ""))
+const isDeferred = (value) => /(?:\*|<[^>]+>|\b(?:tbd|todo|later|apply will|apply decides)\b)/i.test(value)
 
 const contextValue = (text, field) => {
   const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -157,6 +176,49 @@ export const validateWorkflow = (relativePath, text) => {
         const directionRows = tableRows(section.text, DESIGN_DIRECTION_HEADER)
         if (directionRows.length < 2 || directionRows.length > 4) {
           errors.push(`plan[${index}]: design requires two to four direction tabs`)
+        }
+      }
+    }
+    if (segments[0] === "designs" && section.phase === "review" && /Approved revision\s*:/i.test(section.text)) {
+      if (!section.text.includes("### COMPONENT DELTA")) {
+        errors.push(`review[${index}]: missing COMPONENT DELTA heading`)
+      }
+      if (!section.text.includes(DESIGN_COMPONENT_DELTA_HEADER)) {
+        errors.push(`review[${index}]: missing component delta table`)
+      } else {
+        const rows = tableRows(section.text, DESIGN_COMPONENT_DELTA_HEADER)
+        if (rows.length === 0) errors.push(`review[${index}]: component delta table is empty`)
+        for (const row of rows) {
+          const [layer, owner, action, currentPath, finalPath, callSites, contract, reason] = tableCells(row)
+          if (!DESIGN_LAYERS.has(layer)) errors.push(`review[${index}]: unknown component layer ${layer}`)
+          if (!DESIGN_COMPONENT_ACTIONS.has(action)) errors.push(`review[${index}]: unknown component action ${action}`)
+          if ([owner, currentPath, finalPath, callSites, contract, reason].some(isDeferred)) {
+            errors.push(`review[${index}]: component delta contains deferred inventory`)
+          }
+        }
+      }
+      if (!section.text.includes("### PROPS DELTA")) {
+        errors.push(`review[${index}]: missing PROPS DELTA heading`)
+      }
+      if (!section.text.includes(DESIGN_PROPS_DELTA_HEADER)) {
+        errors.push(`review[${index}]: missing props delta table`)
+      } else {
+        const rows = tableRows(section.text, DESIGN_PROPS_DELTA_HEADER)
+        if (rows.length === 0) errors.push(`review[${index}]: props delta table is empty`)
+        const propOwners = new Set()
+        for (const row of rows) {
+          const [owner, prop, action, before, after, callSites, proof] = tableCells(row)
+          propOwners.add(owner)
+          if (!DESIGN_PROP_ACTIONS.has(action)) errors.push(`review[${index}]: unknown props action ${action}`)
+          if ([owner, prop, before, after, callSites, proof].some(isDeferred)) {
+            errors.push(`review[${index}]: props delta contains deferred inventory`)
+          }
+        }
+        for (const row of tableRows(section.text, DESIGN_COMPONENT_DELTA_HEADER)) {
+          const [, owner, action] = tableCells(row)
+          if (action !== "REUSE" && !propOwners.has(owner)) {
+            errors.push(`review[${index}]: missing props verdict for ${owner}`)
+          }
         }
       }
     }

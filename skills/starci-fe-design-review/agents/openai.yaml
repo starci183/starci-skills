@@ -1,4 +1,4 @@
 interface:
   display_name: "StarCi FE Design Review"
-  short_description: "Review and approve a frontend brief"
-  default_prompt: "Use $starci-fe-design-review to challenge and approve the selected frontend design brief before source changes."
+  short_description: "Freeze the FE component and props delta"
+  default_prompt: "Use $starci-fe-design-review to challenge the selected frontend brief and approve the exact component tree, prop migrations, states and source boundary before Apply."

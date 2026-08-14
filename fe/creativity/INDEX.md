@@ -43,8 +43,8 @@ scopes rather than separate, competing workflows.
 | Phase | Skill | Ends when |
 |---|---|---|
 | Plan | [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | One HTML preview with two to four direction tabs is served at one URL on the first free port at 8080+, tracked by path/hash, and one tab is selected |
-| Review | [`starci-fe-design-review`](../../skills/starci-fe-design-review/SKILL.md) | The selected brief, exact source boundary, owner states and acceptance evidence are explicitly approved |
-| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | Current source is committed as the baseline, approved code is written directly in source, and the final diff plus real page are proved |
+| Review | [`starci-fe-design-review`](../../skills/starci-fe-design-review/SKILL.md) | The selected brief, exact component tree, every public-prop migration, owner states and supporting source boundary are explicitly approved |
+| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | Current source is committed as the baseline, only approved delta rows are written directly in source, and every row matches the final diff plus real page proof |
 
 Every phase runs to the end of its own work before it speaks. What it cannot settle alone comes back
 as one batched ask and the run continues on the answer; what only looks like a choice — a label, a

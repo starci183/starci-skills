@@ -1,4 +1,4 @@
 interface:
   display_name: "StarCi FE Design Apply"
-  short_description: "Baseline, implement and track FE diff"
-  default_prompt: "Use $starci-fe-design-apply to commit the current baseline, implement the approved UI in source and prove its diff."
+  short_description: "Apply the approved FE architecture delta"
+  default_prompt: "Use $starci-fe-design-apply to commit the current baseline, implement only the approved component and props delta in source, and reconcile every row with the resulting diff."
