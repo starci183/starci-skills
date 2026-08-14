@@ -76,8 +76,28 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
   [`typography`](fe/canon/patterns/typography.md) ·
   [`vendor-boundary`](fe/canon/patterns/vendor-boundary.md).
 
-`be/canon/patterns/` holds [`cqrs`](be/canon/patterns/cqrs.md) ·
-[`data-access`](be/canon/patterns/data-access.md) · [`testing`](be/canon/patterns/testing.md).
+`be/canon/patterns/` holds [`authorization`](be/canon/patterns/authorization.md) ·
+[`cdc`](be/canon/patterns/cdc.md) · [`comments`](be/canon/patterns/comments.md) ·
+[`cqrs`](be/canon/patterns/cqrs.md) · [`data-access`](be/canon/patterns/data-access.md) ·
+[`e2e-flow`](be/canon/patterns/e2e-flow.md) ·
+[`event-delivery`](be/canon/patterns/event-delivery.md) ·
+[`exception-identity`](be/canon/patterns/exception-identity.md) ·
+[`exceptions`](be/canon/patterns/exceptions.md) ·
+[`module-layering`](be/canon/patterns/module-layering.md) ·
+[`naming`](be/canon/patterns/naming.md) ·
+[`observability`](be/canon/patterns/observability.md) ·
+[`testing`](be/canon/patterns/testing.md) · [`transport`](be/canon/patterns/transport.md) ·
+[`type-safety`](be/canon/patterns/type-safety.md).
+Still owed, each with the evidence that says so: `migrations`, `pagination`, `concurrency`,
+`throttling`.
+
+Backend capability work follows **Plan -> Apply**, for the same reason the frontend does: a
+folder architecture is arguable in a sentence and the same decisions embedded in thirty written
+files are arguable only by whoever reads all thirty.
+[`starci-be-feature-plan`](skills/starci-be-feature-plan/SKILL.md) reads the law, dumps the
+schema unfiltered, mirrors the sibling family and stops with every file named and every test case
+enumerated. [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md) writes those files
+and no others, and a file the record does not name sends the work back rather than arriving quietly.
 
 `fe/design/` carries the laws no machine can hold — no file there names a number of its own, which
 is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) ·
@@ -193,6 +213,19 @@ or copied name is not adoption. See
 | **canon** | How is this spelled here? Modules, exceptions, types, logging, tests. | `be/canon/` |
 | **stacks** | What is it running on, and what does that thing demand? Postgres, Kafka, Redis, NATS, Elasticsearch. | `be/stacks/` |
 | **references** | Vendor and protocol documentation, cited. | `be/references/` |
+
+The back end reaches its rules the same way the front end does, through a generated mirror written by
+[`scripts/sync-be-lint.mjs`](scripts/sync-be-lint.mjs) — and on this axis the import that "obviously"
+replaces it is not merely fragile but impossible: `.claude/` is gitignored by the back end, so a
+config importing `sources/be/` resolves on one machine and in no clone, no CI job and no image.
+[`sources/be/index.mjs`](sources/be/index.mjs) gathers every law's rules once, and the target's
+config keeps deciding which globs and which levels.
+
+The script differs from its front-end twin in one deliberate way: it will not delete a repository's
+hand-written plugin while that plugin still publishes a rule canon does not. Removing the front end's
+cost seven live rules that are still owed back, and an adoption that quietly subtracts enforcement is
+the failure `LINT-ADOPTION-1` describes wearing the word adoption. So the names at risk are printed
+every run, and the folder goes only when the list is empty and `--retire-local-plugin` says so.
 
 ## The one rule that outranks the others
 
