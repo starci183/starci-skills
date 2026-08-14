@@ -34,7 +34,7 @@ own layout class: each compiles, renders and reviews cleanly, and each is refuse
 **Inventory before invention** — the same rule Plan and Preview ran. A new entry whose class list and
 child identities repeat an existing one is the same concept under a second name.
 
-If the target has moved and the reviewed shape no longer fits, that is shape A. Do not adapt it
+If the target has moved and the reviewed shape no longer fits, that is a confirm row. Do not adapt it
 quietly. Report what actually moved rather than the error you saw: a shared import renamed under you
 is yours to resync and carry on from; a component that no longer exposes the slot the review used is
 the user's call. One broken seam refuses its own file, never the whole run — everything clear of it
@@ -47,7 +47,7 @@ anything, and green tests know nothing about what a screen looks like.
 
 ## OUTPUT
 
-Shape C, and it is the last one in the chain, so it invites nobody. Append `## apply` to the task
+The four tables. Append `## apply` to the task
 file: the SCOPE table, **every file written**, the green commands, and what is still owed.
 
 That file list is the check. Compare it against `## review` directly above it — a file the review

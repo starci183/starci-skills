@@ -29,7 +29,7 @@ never `{ ok: false }`, because the caller then guesses with less information tha
 
 **A file the plan does not name does not get written.** If the work turns out to need one, that is
 the architecture being wrong and worth knowing: name the file, say why, and put it back to the owner
-as shape A. Scope that to the one operation folder — the others are independent by construction, so
+as a confirm row. Scope that to the one operation folder — the others are independent by construction, so
 they are built and proved meanwhile.
 
 When the sibling family does something canon's prose forbids, mirror the family the plan named
@@ -60,7 +60,7 @@ broken: writing the source table changes nothing visible until the listener has 
 
 ## OUTPUT
 
-Shape C, last in the chain, so it invites nobody. Append `## apply` to the task file: the SCOPE
+The four tables. Append `## apply` to the task file: the SCOPE
 table, **every file written**, the commands and their output, and what is still owed — the state
 nothing covers, the migration not written, the assumption taken rather than answered.
 

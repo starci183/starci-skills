@@ -52,9 +52,18 @@ Typecheck, lint and build must be green before you ask for anything.
 
 ## OUTPUT
 
-Shape A while anything is stuck. Batch what you know; keep building everything it does not block.
+**The first table carries the ONE settled page, at its URL, with a row per rendered state.** Plan's
+output was two to four addresses because the user was choosing between them; Preview's is one,
+because the choosing is over — and it is the address of the thing that RUNS, built from the real
+components, not a picture of it. A Preview that closes without it has asked for approval of
+something nobody can open, which is the one thing this phase exists to prevent. When the browser
+refuses to screenshot a state, the row says so and carries the measurement instead: an image that
+lays out at a width it was never given is not evidence.
 
-Shape B when the user approves what they are looking at. Name the thing in the question — "approve
+Confirm rows while anything is stuck. Batch what you know; keep building everything it does not
+block.
+
+Ask for approval when the user can see what they are approving. Name the thing in the question — "approve
 this and move on?" — so their one word already carries what it approves. Then append `## review` to
 the task file: the SCOPE table, every owner state and whether it rendered, the backend update you are
 proposing, the UX calls you took on your own, and what they approved.

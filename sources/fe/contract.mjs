@@ -238,7 +238,16 @@ export const contractHostOf = (filename, key) => {
   if (opening === -1) return null
   // The entry ends at the next key at the same indentation; a bounded window is enough and avoids
   // brace-matching a file this rule only needs one field from.
-  const window = source.slice(opening, opening + 2000)
+  /*
+   * The window ENDS at the next key at the same indentation, which is what the comment above has
+   * always said and what the code did not do. A fixed 2000-character slice runs straight into the
+   * entries below it, so an entry declaring no host inherited the first one it could see - and any
+   * key written a few lines above `routed-page-main` was reported as drawing the document's main
+   * landmark. The rule was right about the law and wrong about where one entry stops.
+   */
+  const rest = source.slice(opening + 1)
+  const nextKey = rest.search(/\n    "[a-z0-9-]+": \{/)
+  const window = nextKey === -1 ? source.slice(opening) : source.slice(opening, opening + 1 + nextKey)
   const host = window.match(/\bhost:\s*"([a-z]+)"/)
   return host ? host[1] : "div"
 }

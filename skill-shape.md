@@ -51,59 +51,81 @@ one ordering over another — take it, record one line with the reason, let the 
 what can be WRONG goes to A: a fact you derived rather than read, a promise, a permission, a price.
 Being overruled later does not undo one of those once it ships.
 
-## 3 · OUTPUT — three shapes, and there is no fourth
+## 3 · OUTPUT — four tables, and they are the same four every time
 
-**Every one of them is a TABLE, and that is not decoration.** These outputs were fixed-width blocks
-aligned with spaces, which only line up inside a monospace box — so the moment a `RESOURCE` line
-carried a real command it ran past the edge or broke mid-word, and the reader got a wall instead of
-a list. A table wraps inside its cell, so the column that says what KIND of thing this is stays
-readable however long the thing itself gets. Prose beside the table is welcome; the table is what
-carries the asks.
+**Context goes at the START, the middle is nobody's business, and the end is four tables.** That is
+the whole rhythm: SCOPE says what this run is allowed to touch before it touches anything, the work
+itself is not narrated, and the close answers four questions a reader always has — what exists
+now, what needs me, what grew, and what is still missing.
 
-**A — something needs the user:**
+**They are TABLES rather than aligned blocks, and that is not decoration.** These outputs were
+fixed-width text aligned with spaces, which only lines up inside a monospace box — so the moment a
+line carried a real command it ran past the edge or broke mid-word, and the reader got a wall
+instead of a list. A table wraps inside its cell, so the column saying what KIND of thing this is
+stays readable however long the thing itself gets.
 
-| | what | the ask |
-|---|---|---|
-| CHOOSE | the decision | a) the default in force · b) the other |
-| RESOURCE | what is missing | run: `the exact command` — then it is read back and the run continues |
-| SUB-RUN | `$skill-name` | what it produces, then RETURNS here |
+Print all four, in this order, at the end of every run. A table with nothing in it still prints,
+carrying one row that says so — an absent table and an empty one are different claims, and only one
+of them says the question was asked.
 
-Only the rows that apply. A sub-run is a detour: the skill that asked for it owns the result and
-finishes, and it is never a handover.
+**1 · Đã làm — what exists now**
 
-**B — nothing is stuck, and something comes next:**
-
-Done. What exists now, in one line.
-
-| Next | `$skill-name` |
+| Thing | Where |
 |---|---|
-| does | one sentence |
-| touches | the paths |
-| will ask | the one question, or nothing |
-| produces | something you can open |
+| what was produced, one row each | the path, the port, the state id |
 
-Say the word.
+Files, entries, states, gates. Not steps: nobody needs the order they happened in, and a run that
+lists its own middle is a progress report wearing a table.
 
-**C — nothing is stuck and nothing comes next.** The last skill in a chain closes here.
+**2 · Cần xác nhận — what cannot move without the user**
 
-Done. What runs now, in one line.
+| Question | Options |
+|---|---|
+| the decision, stated so one word answers it | a) the default in force · b) the other |
+| what is missing | run: `the exact command` — then it is read back and the run continues |
+
+Only what can be WRONG belongs here: a fact derived rather than read, a promise, a permission, a
+price, a write boundary. **UX and UI choices inside an approved direction are yours** — a label's
+wording, words versus a glyph, one ordering over another. Take them, put one line in the first table
+with the reason, and let the review overturn it. Being overruled later does not undo a permission
+once it shipped.
+
+Nothing to ask is the good case: one row saying so, and the run reads as finished rather than
+stalled.
+
+**3 · Mở rộng — what grew beyond what was asked**
+
+| Found | What it means |
+|---|---|
+| the thing nobody named at the start | the decision it forces, or the work it adds, and who owns it |
+
+This is the table that keeps a widened run honest. A run almost never ends inside the sentence that
+started it: a rule turns out to be wrong, a component the review named does not exist, the data is
+markdown when the design assumed sections, a target moved under the work. Each of those changes what
+the user is agreeing to, and each used to arrive buried in prose — or not at all, which is how a
+five-file task quietly becomes an eighteen-file one.
+
+
+**4 · Nợ — what is not done, and who clears it**
 
 | Owed | Cleared by |
 |---|---|
-| the thing that is missing, named precisely | the exact command, the `$skill`, or the decision and who makes it |
+| the state nobody rendered, the owner that belongs to another leaf, the screenshot the tool refused | the exact command, the skill to run, or the decision and who makes it |
 
-**C is its own shape rather than "B without the invitation", and it is written out because the gap
-was filled wrongly the first time.** Told only to close with "what is owed" and given no shape for
-it, a run reached for A's keywords and printed `SUB-RUN` and `RESOURCE` inside a close — which reads
-as a run that is stuck, in the one shape that exists to say it is not. An owed line and a blocking
-ask are different claims: an owed line says the work stopped somewhere honest and names who can
-carry it further, while an ask says nothing more can happen until somebody answers.
+OWED IS NOT THE SAME CLAIM AS EXTENDS, and folding them was the first draft's mistake. Extends says
+the work grew and names what that cost; owed says a piece of it did NOT happen. A run can extend
+enormously and owe nothing, and it can owe three things without having grown at all. Kept in one
+table the reader cannot tell which rows still need somebody.
 
-`Owed` names what is missing and what it blocks — one state, one route, one packet. A line saying
-only "incomplete" is the same fact with the act removed, and it is what turns a finished run into a
-case nobody can close.
+It is also not the confirm table. An owed line says the run stopped somewhere honest and names who
+can carry it; an ask says nothing more can happen until somebody answers. A run that prints its debts
+as questions reads as stuck in the one shape that exists to say it is not.
 
-No fourth shape. No "waiting on", no "needs clarification", no progress report.
+A line saying only "incomplete" is the same fact with the act removed, and it is what turns a
+finished run into a case nobody can close.
+
+After the tables, one sentence may invite the next skill — what it does, what it touches, what it
+will ask. One sentence, not a fifth table.
 
 ## The task file
 

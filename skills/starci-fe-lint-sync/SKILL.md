@@ -56,13 +56,13 @@ that fails again.
 
 ## OUTPUT
 
-Shape A for repairs a reader would SEE — rounding a spacing value to its nearest rung, choosing an
+A confirm row for repairs a reader would SEE — rounding a spacing value to its nearest rung, choosing an
 element for a landmark, naming a token that did not exist. These are visible decisions even when the
 rule leaves one legal shape. Measure the difference in the units a person sees, give the rung in
 force as the default, and hand them over TOGETHER. Halting at each one makes the user pay a round
 trip per value, which is how a sync stops being finished.
 
-Shape B when the audit is green. Report the before and after counts together — a repair is only
+Close when the audit is green. Report the before and after counts together — a repair is only
 legible beside the number it moved.
 
 **When another lane called this one**, it is a detour: close by returning to the skill that asked,

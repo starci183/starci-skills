@@ -45,7 +45,7 @@ is the finding; do not quietly prefer whichever was read most recently.
 
 ## OUTPUT
 
-Shape B — this skill invites nobody, it reports. For each task: matches, or the exact divergence with
+The four tables — this skill invites nobody, it reports. For each task: matches, or the exact divergence with
 the file and the line of the record it contradicts.
 
 Then say which lane clears each one, so the report is actionable rather than a list of complaints: a

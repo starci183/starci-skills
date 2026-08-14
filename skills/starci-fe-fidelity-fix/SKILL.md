@@ -53,11 +53,11 @@ One blocked packet does not hold the others.
 
 ## OUTPUT
 
-Shape A while anything is stuck, batched. If the lint-adoption audit fails and the config is outside
+Confirm rows while anything is stuck, batched. If the lint-adoption audit fails and the config is outside
 the boundary, that is not a dead end: name the missing rules, name `$starci-fe-lint-sync` as what
 fixes them, and offer extending the boundary as a choice — one line for the user, and it unblocks
 the lane.
 
-Shape C, last in the chain. Append `## fix` to the task file: the SCOPE table, the frozen comparison
+The four tables. Append `## fix` to the task file: the SCOPE table, the frozen comparison
 identity, **every file written**, before-and-after per touched state, the green commands, and what is
 still unknown.

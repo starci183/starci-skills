@@ -47,10 +47,17 @@ express, and that proposes no exact new owner, is not a real option.
 
 ## OUTPUT
 
-Shape A when something blocks: a fact the screens need and the schema does not serve, an asset that
-does not exist, a backend capability that has to be designed first.
+**The first table carries the HTML, and the run is not finished without it.** Every direction — two
+to four of them — is a real page at a real URL, and that link is the first row of `Đã làm`. A Plan
+whose output describes three directions in prose has produced nothing: the whole point of this phase
+is a choice made by LOOKING, and a reader cannot look at a paragraph. One row per direction, with
+its own address, plus the screenshot when the pane will not open.
 
-Shape B when the user has picked: append `## plan` to the task file with the SCOPE table, the chosen
+The confirm table then carries exactly one question — which direction — with the directions as its
+options. A fact the screens need and the schema does not serve, an asset that does not exist, or a
+backend capability that has to be designed first is a second row, not a reason to skip the first.
+
+Once the user has picked: append `## plan` to the task file with the SCOPE table, the chosen
 direction and their reason, and every UX call you took on your own. Then invite
 `$starci-fe-design-preview` — it builds the chosen screen from real components and contracts, renders
 every owner state, and asks you to approve it.

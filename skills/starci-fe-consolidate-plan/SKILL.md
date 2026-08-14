@@ -55,11 +55,11 @@ identity or domain entity. "They feel different" is a pair nobody compared.
 
 ## OUTPUT
 
-Shape A for a group you cannot settle alone: the verdict the evidence leans to, what makes it
+A confirm row for a group you cannot settle alone: the verdict the evidence leans to, what makes it
 uncertain, and what changes if the other one is picked. A repository whose lint adoption is failing
 cannot be measured honestly either — that is `$starci-fe-lint-sync`, which returns here.
 
-Shape B when the verdict set is approved: append `## plan` to the task file with the SCOPE table,
+Once the verdict set is approved: append `## plan` to the task file with the SCOPE table,
 each group, its members, its call sites and its verdict. Groups left at `keep-apart` do not travel.
 Then invite `$starci-fe-consolidate-apply` — it edits one group per diff, updates every measured call
 site and proves each still renders what it rendered. Say plainly that the measurement ages from here.

@@ -63,12 +63,12 @@ nobody considered, and the suite ends up green where the risk is.
 
 ## OUTPUT
 
-Shape A for anything only the owner can settle — a product question the code surfaced (does a trial
+A confirm row for anything only the owner can settle — a product question the code surfaced (does a trial
 count as an enrollment? is there an edit window?) with the default the evidence supports, a credential
 or a running service you need, or another procedure that has to go first. Never bury one of these in
 a handler default: a guess in a handler is a decision nobody made and nobody can find.
 
-Shape B when it is approved: append `## plan` to the task file with the SCOPE table, every file
+Once it is approved: append `## plan` to the task file with the SCOPE table, every file
 named, the decisions the evidence forced, the assumptions still standing and what this will NOT do.
 Then invite `$starci-be-feature-apply` — it confirms the write boundary, writes those files and no
 others, and proves them with the specs, the e2e and a live call.
