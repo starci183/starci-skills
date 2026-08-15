@@ -146,12 +146,12 @@ test("every skill carries a frontmatter name matching its folder", () => {
   )
 })
 
-test("every capability has exactly Plan, Review and Apply", () => {
+test("every capability has its canonical lifecycle", () => {
   const phasesByCapability = new Map()
   const invalid = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    const match = entry.name.match(/^(.*)-(plan|review|apply)$/)
+    const match = entry.name.match(/^(.*)-(plan|review|apply|start|end|finality)$/)
     if (match === null) {
       invalid.push(entry.name)
       continue
@@ -164,11 +164,13 @@ test("every capability has exactly Plan, Review and Apply", () => {
 
   const incomplete = [...phasesByCapability.entries()]
     .map(([capability, phases]) => [capability, [...phases].sort()])
-    .filter(([, phases]) => phases.join(",") !== "apply,plan,review")
+    .filter(([capability, phases]) => phases.join(",") !== (
+      capability === "starci-fe-fidelity" ? "end,finality,start" : "apply,plan,review"
+    ))
     .map(([capability, phases]) => `${capability}: ${phases.join(", ")}`)
 
-  assert.deepEqual(invalid, [], `skills outside Plan -> Review -> Apply: ${invalid.join(", ")}`)
-  assert.deepEqual(incomplete, [], `incomplete capability trios: ${incomplete.join("; ")}`)
+  assert.deepEqual(invalid, [], `skills outside a canonical lifecycle: ${invalid.join(", ")}`)
+  assert.deepEqual(incomplete, [], `incomplete capability lifecycles: ${incomplete.join("; ")}`)
 })
 
 test("every phase carries the workflow contract", () => {
@@ -222,6 +224,18 @@ test("FE Design commits its baseline at Apply, then writes only target source", 
   assert.match(apply, /directly at final source paths/)
 })
 
+test("FE Design Apply proves non-mutating lint in both resolved target repositories", () => {
+  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
+
+  assert.match(apply, /### CROSS-REPOSITORY LINT PROOF/)
+  assert.match(apply, /each resolved target repository:\s*Frontend and Backend/)
+  assert.match(apply, /repository-owned non-mutating lint command/)
+  assert.match(apply, /never use `--fix` as a proof command/)
+  assert.match(apply, /Both rows must be present and pass/)
+  assert.match(apply, /cannot close while either lint verdict is missing or\s+failed/)
+  assert.match(apply, /lint\s+failure does not expand the approved production boundary/i)
+})
+
 test("FE Design Review freezes component and props deltas before Apply", () => {
   const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
   const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
@@ -233,6 +247,20 @@ test("FE Design Review freezes component and props deltas before Apply", () => {
   assert.match(review, /`KEEP`, `ADD`, `REMOVE`, `RENAME`, `RETYPE`, `MAKE_REQUIRED`, `MAKE_OPTIONAL` or/)
   assert.match(apply, /Treat the approved delta rows as an executable boundary/)
   assert.match(apply, /return to Review when implementation discovers a new owner, tier, path, prop or action/)
+})
+
+test("Fidelity Start fixes small patches and routes only creative items to previews", () => {
+  const start = readFileSync(join(SKILLS, "starci-fe-fidelity-start", "SKILL.md"), "utf8")
+
+  assert.match(start, /Split a mixed feedback message into independent items/)
+  assert.match(start, /A creative item never\s+delays an independent authorized small patch/)
+  assert.match(start, /edit production immediately/)
+  assert.match(start, /do not wait for Design Plan, Review or Apply/)
+  assert.match(start, /\$starci-fe-design-plan` for three to four HTML cases/)
+  assert.match(start, /Passing proof is not user acceptance/)
+  assert.match(start, /resolve the Project's canonical app origin/)
+  assert.match(start, /Never\s+treat `localhost` and `127\.0\.0\.1` as interchangeable/)
+  assert.match(start, /A static proposal URL is not evidence for the live app origin/)
 })
 
 test("every FE skill requires declared project or target repositories", () => {

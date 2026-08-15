@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Fidelity Start"
+  short_description: "Fix small patches; route creative choices"
+  default_prompt: "Use $starci-fe-fidelity-start to fix settled small patches immediately, split mixed feedback item by item, and route explicit creative requests to a three-to-four-case design preview."

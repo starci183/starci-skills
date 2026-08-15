@@ -51,9 +51,19 @@ path is required, append the finding and return that boundary decision to Review
 Before completion, reconcile every component and props row against `git diff <baseline>`. Record
 the row-to-diff proof in the workflow; an unimplemented row or an unexplained diff returns to Review.
 
-Run typecheck, lint and build without suppression. Open the real page and verify every approved state
-at the recorded route, viewport, locale, theme, persona and fixture. For every authenticated or
-runtime-backed flow, follow
+Run the approved Frontend typecheck, lint and build gates without suppression. In addition, before
+closing Apply, run a repository-owned non-mutating lint command in each resolved target repository:
+Frontend and Backend. Resolve the package manager and check-only script from that repository; prefer
+`lint:check` when available and never use `--fix` as a proof command.
+
+Append a `### CROSS-REPOSITORY LINT PROOF` table with one row per target containing repository,
+working directory, exact command, exit code and verdict. Both rows must be present and pass. A lint
+failure does not expand the approved production boundary: record it in `OWED` and return the repair
+to its owning Review or audit capability. Apply cannot close while either lint verdict is missing or
+failed.
+
+Open the real page and verify every approved state at the recorded route, viewport, locale, theme,
+persona and fixture. For every authenticated or runtime-backed flow, follow
 [`../starci-fe-design-review/references/live-flow-proof.md`](../starci-fe-design-review/references/live-flow-proof.md): use the declared app's authorized
 test account, log in through the real UI, execute the approved flow, and inspect UI, Network, Console
 and frontend/backend terminal output in the same time window. Append `### LIVE FLOW PROOF`; never

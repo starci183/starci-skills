@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi FE Fidelity Apply"
-  short_description: "Apply an approved fidelity correction"
-  default_prompt: "Use $starci-fe-fidelity-apply to apply and prove the approved fidelity correction."

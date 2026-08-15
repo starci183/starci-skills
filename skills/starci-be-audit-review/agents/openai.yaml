@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi BE Audit Review"
+  short_description: "Approve exact backend audit repairs"
+  default_prompt: "Use $starci-be-audit-review to classify backend gate failures and approve one exact repair boundary."

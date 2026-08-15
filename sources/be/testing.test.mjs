@@ -12,7 +12,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { e2eAssertsPersistedState, e2eUsesProductionTransport, noCallOnlySpec, noModelCallInE2e, rules } from "./testing.mjs"
+import {
+  e2eAssertsPersistedState,
+  e2eUsesProductionTransport,
+  harnessCallsProviderDirectly,
+  noCallOnlySpec,
+  noModelCallInE2e,
+  rules,
+} from "./testing.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -26,6 +33,7 @@ const UNIT = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-car
 const E2E = "D:/repo/src/tests/e2e/course-enroll.e2e-spec.ts"
 const SRC = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts"
 const HARNESS = "D:/repo/src/tests/harness/challenge-grading.harness-spec.ts"
+const HARNESS_HELPER = "D:/repo/src/tests/helpers/harness-credentials.ts"
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -153,6 +161,102 @@ test("TESTING-3: an e2e enters through production transport", () => {
         filename: E2E,
         code: "await worker.process(job)",
         errors: [{ messageId: "direct" }],
+      },
+    ],
+  })
+})
+
+test("TESTING-10: a model-quality harness calls the declared provider directly", () => {
+  tester.run("harness-calls-provider-directly", harnessCallsProviderDirectly, {
+    valid: [
+      {
+        filename: HARNESS,
+        code: `
+          import OpenAI from "openai"
+          import { gradingPrompt } from "../../features/grading/grading-prompt.service"
+          import { parseGrade } from "../../features/grading/grading-parse.service"
+          const client = new OpenAI({ apiKey: process.env.HARNESS_MODEL_API_KEY })
+          const result = await client.chat.completions.create({ model: "deepseek-chat", messages: gradingPrompt(input) })
+          expect(parseGrade(result.choices[0].message.content)).toBeDefined()
+        `,
+      },
+      {
+        filename: HARNESS,
+        code: `
+          import Anthropic from "@anthropic-ai/sdk"
+          const client = new Anthropic({ apiKey: process.env.HARNESS_ANTHROPIC_API_KEY })
+          await client.messages.create({ model: "claude", max_tokens: 10, messages: [] })
+        `,
+      },
+      {
+        filename: E2E,
+        code: `
+          import { AiInvokeService } from "../../modules/ai/ai-invoke.service"
+          const providers = [{ provide: AiInvokeService, useValue: { run: jest.fn() } }]
+        `,
+      },
+      {
+        filename: UNIT,
+        code: `import OpenAI from "openai"; import { AiInvokeService } from "../../modules/ai/ai-invoke.service"`,
+      },
+      {
+        filename: HARNESS_HELPER,
+        code: `export const apiKey = process.env.HARNESS_MODEL_API_KEY`,
+      },
+    ],
+    invalid: [
+      {
+        filename: HARNESS,
+        code: `import { HarnessInvokeService } from "../helpers/harness-invoke.service"`,
+        errors: [{ messageId: "helper" }, { messageId: "missingProvider" }, { messageId: "gateway" }],
+      },
+      {
+        filename: HARNESS,
+        code: `import { createHarnessInvoke } from "../helpers/harness-invoke"`,
+        errors: [{ messageId: "helper" }, { messageId: "missingProvider" }, { messageId: "gateway" }],
+      },
+      {
+        filename: HARNESS,
+        code: `
+          import OpenAI from "openai"
+          import { AiInvokeService } from "../../modules/ai/ai-invoke.service"
+          const providers = [{ provide: AiInvokeService, useValue: fake }]
+        `,
+        errors: [{ messageId: "gateway" }, { messageId: "gateway" }],
+      },
+      {
+        filename: HARNESS,
+        code: `
+          import OpenAI from "openai"
+          import { AiInvokeService } from "../../modules/ai/ai-invoke.service"
+          builder.overrideProvider(AiInvokeService).useValue(fake)
+        `,
+        errors: [{ messageId: "gateway" }, { messageId: "gateway" }],
+      },
+      {
+        filename: HARNESS,
+        code: `import { askModel } from "../helpers/models"; await askModel("hello")`,
+        errors: [{ messageId: "helper" }, { messageId: "missingProvider" }],
+      },
+      {
+        filename: HARNESS,
+        code: `import OpenAI from "openai"; const token = process.env["CLAUDE_CODE_OAUTH_TOKEN"]`,
+        errors: [{ messageId: "consumerAuth" }],
+      },
+      {
+        filename: HARNESS_HELPER,
+        code: `export const tokenFile = ".secrets/claude-code-token.txt"`,
+        errors: [{ messageId: "consumerAuth" }],
+      },
+      {
+        filename: HARNESS,
+        code: `type Fake = Pick<AiInvokeService, "run">`,
+        errors: [{ messageId: "missingProvider" }, { messageId: "gateway" }],
+      },
+      {
+        filename: HARNESS,
+        code: `const quality = await grade(prompt)`,
+        errors: [{ messageId: "missingProvider" }],
       },
     ],
   })

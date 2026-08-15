@@ -48,6 +48,8 @@ const DESIGN_COMPONENT_DELTA_HEADER =
   "| Layer | Owner | Action | Current path | Final path | Parent / call sites | Contract | Reason |"
 const DESIGN_PROPS_DELTA_HEADER =
   "| Owner | Prop / API | Action | Before | After | Producers / call sites | Migration proof |"
+const FIDELITY_EVENTS = new Set(["start", "feedback", "end", "finality"])
+const RELATED_BUGS_HEADER = "| Finding | Evidence | Classification | Route |"
 const DESIGN_LAYERS = new Set(["route", "page", "layout", "overlay", "block", "composite", "branch", "leaf", "shell"])
 const DESIGN_COMPONENT_ACTIONS = new Set(["REUSE", "ADD", "MODIFY", "MOVE", "REMOVE"])
 const DESIGN_PROP_ACTIONS = new Set([
@@ -69,7 +71,7 @@ const markdownFiles = (directory) =>
   })
 
 const phaseSections = (text) => {
-  const matches = [...text.matchAll(/^## (plan|review|apply)(?:\s+.*)?$/gim)]
+  const matches = [...text.matchAll(/^## (plan|review|apply|start|feedback|end|finality)(?:\s+.*)?$/gim)]
   return matches.map((match, index) => ({
     phase: match[1].toLowerCase(),
     text: text.slice(match.index, matches[index + 1]?.index ?? text.length),
@@ -96,6 +98,11 @@ const contextValue = (text, field) => {
   return text.match(new RegExp(`^\\|\\s*${escaped}\\s*\\|\\s*(.*?)\\s*\\|$`, "im"))?.[1]?.trim() ?? ""
 }
 
+const recordValue = (text, field) => {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return text.match(new RegExp(`^${escaped}:\\s*(.*?)\\s*$`, "im"))?.[1]?.trim() ?? ""
+}
+
 const normalizedPath = (value) => value.replace(/\\/g, "/").replace(/\/$/, "").toLowerCase()
 
 export const validateWorkflow = (relativePath, text) => {
@@ -110,7 +117,10 @@ export const validateWorkflow = (relativePath, text) => {
   }
 
   const sections = phaseSections(text)
-  if (sections.length === 0 || sections[0].phase !== "plan") errors.push("first phase must be plan")
+  const startsWithFidelitySession = segments[0] === "fidel" && sections[0]?.phase === "start"
+  if (sections.length === 0 || (!startsWithFidelitySession && sections[0].phase !== "plan")) {
+    errors.push(segments[0] === "fidel" ? "first fidelity event must be start or legacy plan" : "first phase must be plan")
+  }
 
   for (const [index, section] of sections.entries()) {
     if (!section.text.includes("### CONTEXT")) errors.push(`${section.phase}[${index}]: missing CONTEXT`)
@@ -239,6 +249,59 @@ export const validateWorkflow = (relativePath, text) => {
       }
       if (!/Tracked diff\s*:/i.test(sections[applyIndex].text)) {
         errors.push("design Apply must cite Tracked diff")
+      }
+    }
+  }
+
+  if (segments[0] === "fidel" && sections.some(({ phase }) => FIDELITY_EVENTS.has(phase))) {
+    let activeSessionId = ""
+    let lastEvent = ""
+    let sawEnd = false
+    let finalized = false
+    for (const [index, section] of sections.entries()) {
+      if (!FIDELITY_EVENTS.has(section.phase)) continue
+      const sessionId = recordValue(section.text, "Session id")
+      const status = recordValue(section.text, "Session status")
+      if (section.phase === "start") {
+        if (activeSessionId && !finalized) errors.push(`start[${index}]: previous fidelity session is still open`)
+        if (activeSessionId && !/Continuation of\s*:/i.test(section.text)) {
+          errors.push(`start[${index}]: continuation must cite the finalized session`)
+        }
+        activeSessionId = sessionId
+        lastEvent = "start"
+        sawEnd = false
+        finalized = false
+        if (!sessionId) errors.push(`start[${index}]: missing Session id`)
+        if (status !== "open") errors.push(`start[${index}]: Session status must be open`)
+        continue
+      }
+      if (!activeSessionId) {
+        errors.push(`${section.phase}[${index}]: fidelity event requires an earlier start`)
+        continue
+      }
+      if (sessionId !== activeSessionId) errors.push(`${section.phase}[${index}]: Session id must match start`)
+      if (finalized) errors.push(`${section.phase}[${index}]: finalized fidelity session cannot receive more events`)
+      if (section.phase === "feedback") {
+        if (status !== "open") errors.push(`feedback[${index}]: Session status must be open`)
+        lastEvent = "feedback"
+        continue
+      }
+      if (section.phase === "end") {
+        if (status !== "open") errors.push(`end[${index}]: Session status must be open`)
+        if (!section.text.includes("### RELATED BUGS")) errors.push(`end[${index}]: missing RELATED BUGS heading`)
+        if (!section.text.includes(RELATED_BUGS_HEADER)) errors.push(`end[${index}]: missing related bugs table`)
+        sawEnd = true
+        lastEvent = "end"
+        continue
+      }
+      if (section.phase === "finality") {
+        if (!sawEnd || lastEvent !== "end") errors.push(`finality[${index}]: finality requires the latest event to be end`)
+        if (status !== "finalized") errors.push(`finality[${index}]: Session status must be finalized`)
+        if (recordValue(section.text, "Session finalized") !== activeSessionId) {
+          errors.push(`finality[${index}]: Session finalized must match Session id`)
+        }
+        finalized = true
+        lastEvent = "finality"
       }
     }
   }

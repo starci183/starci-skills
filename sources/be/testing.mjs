@@ -25,6 +25,12 @@ const isUnitSpec = (filename) => {
 /** The flow lane. */
 const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(normalizePath(filename))
 
+/** The paid model-quality lane. */
+const isHarnessSpec = (filename) => /\.harness-spec\.ts$/.test(normalizePath(filename))
+
+/** Test-only helpers whose only authority is the harness lane. */
+const isHarnessHelper = (filename) => /\/src\/tests\/helpers\//.test(normalizePath(filename))
+
 /**
  * Matchers that assert a CALL happened rather than what came out of it.
  *
@@ -209,12 +215,119 @@ export const e2eUsesProductionTransport = {
   },
 }
 
+// -- TESTING-10 ------------------------------------------------------------------------------------
+
+/** Official provider clients that a harness may call without a house routing layer. */
+const DIRECT_PROVIDER_PACKAGES = /^(?:@anthropic-ai\/sdk(?:\/|$)|openai(?:\/|$)|@google\/genai(?:\/|$)|@google\/generative-ai(?:\/|$)|@mistralai\/(?:mistralai|mistralai-ts)(?:\/|$)|cohere-ai(?:\/|$)|ollama(?:\/|$))/
+
+/** Helpers that hide a model call or impersonate the production gateway. */
+const FORBIDDEN_HARNESS_HELPERS = /(?:^|\/)(?:models(?:\.service)?|harness-invoke(?:\.service)?)$/
+
+/** Consumer/CLI credential authorities that are never provider API credentials. */
+const FORBIDDEN_HARNESS_AUTH = /(?:CLAUDE_CODE_OAUTH_TOKEN|claude-code-token|sk-ant-oat|OAUTH_BETA|CHATGPT_(?:SESSION|AUTH)_TOKEN|CODEX_(?:SESSION|AUTH)_TOKEN|auth-profile)/i
+
+/** Imported symbols that reveal a fake production gateway in the harness lane. */
+const FORBIDDEN_HARNESS_SYMBOLS = new Set([
+  "AiInvokeService",
+  "HarnessInvokeService",
+  "createHarnessInvoke",
+])
+
+/** Return the static property name of an object/member property when one exists. */
+const propertyName = (property) => {
+  if (!property) return null
+  if (property.type === "Identifier") return property.name
+  if (property.type === "Literal") return property.value
+  return null
+}
+
+/** Find the `AiInvokeService` token in a `Pick<AiInvokeService, ...>` type. */
+const aiInvokePickToken = (sourceCode) => {
+  const tokens = sourceCode.getTokens(sourceCode.ast)
+  for (let index = 0; index < tokens.length - 2; index += 1) {
+    if (tokens[index].value !== "Pick" || tokens[index + 1].value !== "<") continue
+    if (tokens[index + 2].value === "AiInvokeService") return tokens[index + 2]
+  }
+  return null
+}
+
+/** A harness calls one explicit provider SDK and never disguises it as `AiInvokeService`. */
+export const harnessCallsProviderDirectly = {
+  meta: {
+    type: "problem",
+    docs: { description: "A model-quality harness calls an approved provider SDK directly with provider API credentials." },
+    schema: [],
+    messages: {
+      missingProvider:
+        "This harness imports no approved provider SDK. A model-quality harness calls the declared provider client directly; a house helper, tier or gateway override can make it green about a model production does not use.",
+      gateway:
+        "`{{name}}` impersonates or replaces the production AI gateway from a harness. Reuse the production prompt builder and parser around a direct provider SDK call instead.",
+      helper:
+        "`{{source}}` hides the provider call behind a house harness helper. Import and call the approved provider SDK in this harness; only credential loading may be shared.",
+      consumerAuth:
+        "`{{authority}}` is a consumer or CLI credential authority, not a provider-issued server API key. Read an explicit harness API-key environment variable instead.",
+    },
+  },
+  create(context) {
+    const filename = context.filename || context.getFilename()
+    const harness = isHarnessSpec(filename)
+    const authScope = harness || isHarnessHelper(filename)
+    if (!authScope) return {}
+
+    let hasProviderImport = false
+    return {
+      ImportDeclaration(node) {
+        const source = node.source && node.source.value
+        if (typeof source !== "string") return
+        if (harness && DIRECT_PROVIDER_PACKAGES.test(source)) hasProviderImport = true
+        if (harness && FORBIDDEN_HARNESS_HELPERS.test(source.replace(/\.(?:ts|js)$/, ""))) {
+          context.report({ node, messageId: "helper", data: { source } })
+        }
+        if (!harness) return
+        for (const specifier of node.specifiers) {
+          const imported = specifier.imported && (specifier.imported.name || specifier.imported.value)
+          const local = specifier.local && specifier.local.name
+          const name = imported || local
+          if (!FORBIDDEN_HARNESS_SYMBOLS.has(name)) continue
+          context.report({ node: specifier, messageId: "gateway", data: { name } })
+        }
+      },
+      Literal(node) {
+        if (typeof node.value !== "string" || !FORBIDDEN_HARNESS_AUTH.test(node.value)) return
+        context.report({ node, messageId: "consumerAuth", data: { authority: node.value } })
+      },
+      Property(node) {
+        if (!harness || propertyName(node.key) !== "provide") return
+        if (!node.value || node.value.type !== "Identifier" || node.value.name !== "AiInvokeService") return
+        context.report({ node, messageId: "gateway", data: { name: "provide: AiInvokeService" } })
+      },
+      CallExpression(node) {
+        if (!harness || !node.callee || node.callee.type !== "MemberExpression") return
+        if (propertyName(node.callee.property) !== "overrideProvider") return
+        const argument = node.arguments && node.arguments[0]
+        if (!argument || argument.type !== "Identifier" || argument.name !== "AiInvokeService") return
+        context.report({ node, messageId: "gateway", data: { name: "overrideProvider(AiInvokeService)" } })
+      },
+      "Program:exit"(node) {
+        if (!harness) return
+        const sourceCode = context.sourceCode || context.getSourceCode()
+        const pickToken = aiInvokePickToken(sourceCode)
+        if (pickToken) {
+          context.report({ node: pickToken, messageId: "gateway", data: { name: 'Pick<AiInvokeService, "run">' } })
+        }
+        if (!hasProviderImport) context.report({ node, messageId: "missingProvider" })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-call-only-spec": noCallOnlySpec,
   "e2e-asserts-persisted-state": e2eAssertsPersistedState,
   "no-model-call-in-e2e": noModelCallInE2e,
   "e2e-uses-production-transport": e2eUsesProductionTransport,
+  "harness-calls-provider-directly": harnessCallsProviderDirectly,
 }
 
 /**
@@ -236,4 +349,5 @@ export const recommended = {
   "starci-be/e2e-asserts-persisted-state": "error", // no=0 of 47 - burned down from 1
   "starci-be/no-model-call-in-e2e": "error", // no=0 of 47
   "starci-be/e2e-uses-production-transport": "error",
+  "starci-be/harness-calls-provider-directly": "error",
 }

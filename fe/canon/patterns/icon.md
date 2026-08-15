@@ -148,6 +148,10 @@ same logical change.
 | `cart` | Shopping cart | `ShoppingCartIcon` |
 | `notification` | Notifications | `BellIcon` |
 | `account` | Current user account | `UserCircleIcon` |
+| `profile` | Current learner profile | `UserIcon` |
+| `cv` | Learner CV | `DocumentTextIcon` |
+| `settings` | Account/profile settings | `Cog6ToothIcon` |
+| `signOut` | End the current session | `ArrowLeftStartOnRectangleIcon` |
 | `saved` | Saved/bookmarked content | `BookmarkIcon` |
 | `blog` | Blog/editorial content | `NewspaperIcon` |
 | `talents` | Talent discovery | `SparklesIcon` |

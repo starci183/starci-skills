@@ -53,7 +53,7 @@ task still matches the source is asked later by
 [`starci-workflow-drift-plan`](../../skills/starci-workflow-drift-plan/SKILL.md), not prevented by a seal.
 
 A bounded defect with a binding expected result uses
-[`starci-fe-fidelity-plan`](../../skills/starci-fe-fidelity-plan/SKILL.md), because manufacturing
+[`starci-fe-fidelity-start`](../../skills/starci-fe-fidelity-start/SKILL.md), because manufacturing
 alternatives around a settled parity fix wastes review and weakens the reference. Fidelity Fix
 still locks context, reconfirms writes, proves full lint adoption and renders touched states. It
 returns to Plan when hierarchy, CTA, behavior, ownership or reusable vocabulary needs a choice.

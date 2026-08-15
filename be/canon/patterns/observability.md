@@ -59,6 +59,29 @@ suppression on each line.
 The distinction is not "it is a small program". It is whether a request exists to attach the line
 to: everything served over HTTP or a queue has one, and everything with one uses the house service.
 
+**OBSERVABILITY-7 · Observability grows in two phases: Minimal, then Full.**
+
+`Phase 1 — Minimal` is the default production change boundary. It carries the smallest complete
+path that can collect the named core signals, retain or forward them through an approved backend,
+show their health and fire the named critical alerts. It must declare what already exists, what it
+adds and what it deliberately defers.
+
+`Phase 2 — Full` is not unfinished work owed by Minimal. It begins in a later Review only when a
+measured SLO or debugging gap, scale/cardinality limit, compliance or data-residency constraint,
+reliability requirement or demonstrated cost justifies an exact addition. A tool being available,
+managed or cloud-hosted is not such evidence by itself.
+
+**OBSERVABILITY-8 · Every local telemetry process pays for its own lifecycle.**
+
+Before a new agent, collector, exporter, store or dashboard service becomes part of the runtime,
+its brief names the signal the existing path cannot carry, its owner, resource and port budget,
+credentials, persistence, health check, backup obligation and removal condition. If an existing
+process or approved managed backend can carry the same signal without violating security,
+residency or reliability requirements, the additional local process is refused.
+
+Managed backends reduce local runtime ownership; they do not remove the need to control PII,
+cardinality, egress, retention and spend before telemetry crosses the boundary.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -70,6 +93,9 @@ to: everything served over HTTP or a queue has one, and everything with one uses
 | A bare string as the event name | It is one reword away from being a different event to every dashboard | Add the member to the enum |
 | Logging method entry and exit | It says the code ran, which the source already said | Log the decision and its evidence |
 | Logging a stringified exception message | Alerts then group by wording, so improving the English splits one failure into several | Log the code and the metadata |
+| Treating Full as part of the Minimal Apply because the tools integrate cleanly | Availability is not evidence of need and silently expands runtime and operating cost | Record the Full addition as deferred and name the measured trigger that can reopen Review |
+| Adding a local telemetry service without a lifecycle budget | The new process creates ports, secrets, storage, health, backup and failure ownership even when its feature looks small | Reuse the existing path or declare every lifecycle field before approval |
+| Calling cloud-first cloud-only | Security, residency, reliability or cost can make a managed backend the wrong owner | Prefer the smallest approved managed path, but record the constraint when local ownership is necessary |
 
 ## Examples
 

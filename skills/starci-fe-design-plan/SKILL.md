@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-plan
-description: Research, render and serve one tabbed HTML preview containing two to four implementation-feasible directions for net-new or undecided StarCi frontend work, then record the user's choice. Use when hierarchy, CTA, interaction or disclosure still needs a product choice. Writes workflow evidence and one disposable index.html only; never production source. Not for a bounded fix with a known reference; use starci-fe-fidelity-plan instead.
+description: Research, render and serve one tabbed HTML preview containing two to four implementation-feasible directions for net-new or undecided StarCi frontend work, then record the user's choice. Use when hierarchy, CTA, interaction or disclosure still needs a product choice. Writes workflow evidence and one disposable index.html only; never production source. Not for a bounded fix with a known reference; use starci-fe-fidelity-start instead.
 ---
 
 # StarCi FE Design Plan
@@ -9,7 +9,7 @@ Read [`../../skill-shape.md`](../../skill-shape.md) first and use
 `<Source>/.workflows/designs/<app>/<id>.md`.
 
 Plan exists for a product choice. If a named reference, contract or test already settles the answer,
-route the bounded correction to `$starci-fe-fidelity-plan`.
+route the bounded correction to `$starci-fe-fidelity-start`.
 
 ## CONTEXT
 

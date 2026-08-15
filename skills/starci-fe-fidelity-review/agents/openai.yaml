@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi FE Fidelity Review"
-  short_description: "Review a fidelity correction"
-  default_prompt: "Use $starci-fe-fidelity-review to render, revise and approve a fidelity correction."

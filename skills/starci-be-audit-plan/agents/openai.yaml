@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi BE Audit Plan"
+  short_description: "Measure backend quality gates and defects"
+  default_prompt: "Use $starci-be-audit-plan to measure backend lint, build, and test failures and write an exact cleanup brief."

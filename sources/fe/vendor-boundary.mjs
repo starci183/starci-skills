@@ -83,6 +83,7 @@ export const vendorBoundary = {
     if (!isComponentFile(file)) return {}
     const isShellDirectory = file.includes(SHELL_DIR)
     const isShell = SHELL_FILE.test(file)
+    const isTestFile = /\.(?:test|spec)\.[jt]sx?$/.test(file)
     const isAllowed = isAllowedVendorOwner(file)
     let importsVendor = false
     return {
@@ -93,6 +94,7 @@ export const vendorBoundary = {
         context.report({ node, messageId: "outside" })
       },
       "Program:exit"(node) {
+        if (isTestFile) return
         if (isShellDirectory && !isShell) context.report({ node, messageId: "unknownShell" })
         /*
          * A shell with no vendor import is empty - except the one whose mechanic is the FRAMEWORK's.

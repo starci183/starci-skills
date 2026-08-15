@@ -157,3 +157,70 @@ test("legacy workflow history remains evidence and is not rewritten", () => {
     errors: [],
   })
 })
+
+const fidelityContext = (phase) => context
+  .replace("| Phase | plan |", `| Phase | ${phase} |`)
+  .replace("/designs/starci-academy/page.md", "/fidel/starci-academy/icon.md")
+
+const fidelityEvent = (phase, extra = "") => `## ${phase}
+
+${fidelityContext(phase)}
+Session id: fidel-1
+Session status: ${phase === "finality" ? "finalized" : "open"}
+${extra}
+${outputs}`
+
+test("fidelity accepts one continuous start feedback end finality session", () => {
+  const related = `### RELATED BUGS
+
+| Finding | Evidence | Classification | Route |
+|---|---|---|---|
+| None | focused owner scan | not-a-bug | None |
+`
+  const text = `<!-- starci-workflow: v2 -->
+
+${fidelityEvent("start")}
+${fidelityEvent("feedback")}
+${fidelityEvent("end", related)}
+${fidelityEvent("finality", "Session finalized: fidel-1")}`
+  assert.deepEqual(validateWorkflow("fidel/starci-academy/icon.md", text), { legacy: false, errors: [] })
+})
+
+test("fidelity End requires a related-bug scan", () => {
+  const text = `<!-- starci-workflow: v2 -->
+
+${fidelityEvent("start")}
+${fidelityEvent("end")}`
+  const errors = validateWorkflow("fidel/starci-academy/icon.md", text).errors
+  assert.ok(errors.includes("end[1]: missing RELATED BUGS heading"))
+  assert.ok(errors.includes("end[1]: missing related bugs table"))
+})
+
+test("fidelity Finality requires the latest event to be End", () => {
+  const text = `<!-- starci-workflow: v2 -->
+
+${fidelityEvent("start")}
+${fidelityEvent("feedback")}
+${fidelityEvent("finality", "Session finalized: fidel-1")}`
+  assert.ok(validateWorkflow("fidel/starci-academy/icon.md", text).errors.includes(
+    "finality[2]: finality requires the latest event to be end",
+  ))
+})
+
+test("fidelity rejects feedback appended after Finality", () => {
+  const related = `### RELATED BUGS
+
+| Finding | Evidence | Classification | Route |
+|---|---|---|---|
+| None | focused owner scan | not-a-bug | None |
+`
+  const text = `<!-- starci-workflow: v2 -->
+
+${fidelityEvent("start")}
+${fidelityEvent("end", related)}
+${fidelityEvent("finality", "Session finalized: fidel-1")}
+${fidelityEvent("feedback")}`
+  assert.ok(validateWorkflow("fidel/starci-academy/icon.md", text).errors.includes(
+    "feedback[3]: finalized fidelity session cannot receive more events",
+  ))
+})

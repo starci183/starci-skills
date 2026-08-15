@@ -35,6 +35,17 @@ and two tones, and callers do not invent further steps from nearby pixels.
 Notice what the heading table does NOT do: it never pairs a large size with the heaviest weight. Rank
 comes from the STEP, not from shouting one line as loudly as the type system allows.
 
+### Body title decision table
+
+| Content role | Component | Size | Weight | Conditions |
+|---|---|---|---|---|
+| Page or section title | `Heading` | Level-owned | Level-owned | Has outline rank; do not fake a heading with body `Text` |
+| Dominant title of a large or important object/card | `Text` | `text-base` | medium | Short, dominant and representative of the important object; hover is optional and is not the criterion |
+| Compact, repeated or long title | `Text` | `text-sm` | medium | DailyStats, rows, accordions, dense lists and long or repeated titles |
+| Body, description, metadata or ordinary value | `Text` | `text-sm` | normal | Continuous content; a numeric value does not promote itself |
+| Compact peer label needing distinction | `Text` | `text-sm` | medium | Weight creates the hierarchy; the peer value stays `text-sm` normal or muted |
+| Supporting caption | `Text` | `text-xs` | normal + muted | Explains only the primary line or surface |
+
 ## Rules
 
 **TYPE-1 · A heading is a level, and the level decides the tag as well as the look.**
@@ -88,6 +99,14 @@ them. They render outside that surface as `text-sm` with muted tone. They remain
 they name a scan partition; they are not explanatory caption copy. Giving them a heading level or
 the label treatment of `SurfaceListCard` falsely promotes each time bucket into a page section.
 
+**TYPE-9 · Body title rank follows content ownership, not hover, numeric value or available space.**
+
+`text-base font-medium` belongs to a short dominant title representing one important object or large
+card. Compact, repeated or long titles use `text-sm font-medium`; their descriptions, metadata and
+ordinary values use `text-sm` at normal weight. A hover effect can confirm that a surface is
+interactive, but it cannot promote its text. A number can be an ordinary value, and spare room is
+not a semantic rank.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -100,6 +119,7 @@ the label treatment of `SurfaceListCard` falsely promotes each time bucket into 
 | A secondary line the same size as, larger than, or heavier than its title | The two lines claim equal rank, or the card's name goes unread | The restricted 12px caption step plus muted tone |
 | A weight pushed onto a heading | Two systems decide one thing, and the reader sees the loser | Let the level decide |
 | `text-xs` without muted tone | A supporting-size line claims primary colour and sends two contradictory rank signals | Pair `text-xs` with `text-muted`, or keep primary copy at `text-sm` |
+| Choosing `text-base` because a card hovers, a value is numeric or room is available | Interaction, data type and spare space do not establish content rank | Use the body title decision table and classify the content owner |
 
 ## Examples
 
@@ -143,3 +163,21 @@ They differ in one thing: which line the eye reaches first — and in the second
 ```
 
 They differ in one thing: whether the scale still has room above it.
+
+### Dominant title versus repeated title
+
+```tsx
+// One large card represents one important course object.
+<Text props={{ content: courseName, size: "base", weight: "medium" }} />
+
+// Repeated rows and long accordion labels remain compact.
+<Text props={{ content: moduleName, size: "sm", weight: "medium" }} />
+<Text props={{ content: moduleSummary, size: "sm" }} />
+```
+
+```tsx
+// Wrong: hover and available room promote every repeated title.
+<Text props={{ content: moduleName, size: "base", weight: "medium" }} />
+```
+
+They differ in one thing: whether size follows the content owner's rank or incidental presentation.

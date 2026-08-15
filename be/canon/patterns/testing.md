@@ -100,11 +100,11 @@ A model call costs money, takes seconds, and answers differently every time. All
 are fatal in a flow test: the suite becomes expensive to run, slow enough that people stop running
 it, and flaky in a way that trains everybody to re-run rather than read.
 
-So a flow that passes through a model **overrides it with Jest** — a mocked provider, or a testing
-module that supplies a stub in its place — and asserts everything around it: that the request was
-recorded, the quota was spent, the entitlement was checked, the answer was persisted and returned.
-Those are the parts that break. Whether the sentence the model produced was any good is a different
-question, asked in a different lane.
+So a flow that passes through a model keeps production transport and internal orchestration real,
+then replaces only the external provider SDK result with a deterministic fixture. It asserts that
+the request was recorded, the quota was spent, the entitlement was checked, the answer was persisted
+and returned. Those are the parts that break. Whether the sentence the model produced was any good
+is a different question, asked in a different lane.
 
 **THE STUB RETURNS REALISTIC JSON, IN THE SHAPE THE PARSER EXPECTS.** This is the part that is easy
 to get wrong and expensive to get wrong. A stub answering `"stubbed"` skips the strict-JSON parser
@@ -116,10 +116,11 @@ So the canned payload carries the real fields, with values a real answer could h
 range, the arrays non-empty, the enum members ones the schema declares. It is a fixture of the
 model's OUTPUT, not a placeholder standing in for one.
 
-**The override is the default, never something a flow author remembers.** The world boots with the
-model stubbed; reaching a provider takes a deliberate opt-out. A rule that depends on being
-remembered is a rule that is one distracted afternoon from being broken, and the breakage shows up
-as a slow, expensive, intermittently-red suite that nobody can explain.
+**The external provider stub is the default, never something a flow author remembers.** The world
+boots with the SDK result stubbed while `AiInvokeService`, routing, quota and persistence remain real;
+reaching a provider takes a deliberate opt-out. A rule that depends on being remembered is a rule
+that is one distracted afternoon from being broken, and the breakage shows up as a slow, expensive,
+intermittently-red suite that nobody can explain.
 
 The override is the boundary between the two lanes, and it runs the other way in the harness: there,
 a call that is faked proves nothing, so **if it calls, it really calls**.
@@ -133,6 +134,22 @@ the whole subject of the lane is what the model actually said.
 Every layer between the harness and the provider is a layer that can make the harness pass while
 production fails: a tier indirection, a routing override, a house wrapper choosing the model. Each
 one means the thing under test is not the thing that ships.
+
+A model-quality harness owns one explicit provider target. It imports the approved provider SDK,
+supplies a provider-issued server API key from an explicit harness environment variable, names the
+exact model and endpoint, and calls that SDK directly. It may reuse the production prompt builder
+and production parser; it must not provide, override, wrap or impersonate `AiInvokeService`, and it
+must not route through a tier, catalog, fallback chain, key pool or house model-call helper.
+
+A consumer or CLI credential is not a provider API credential. Claude Code OAuth tokens,
+ChatGPT/Codex session tokens, CLI profiles and token files are forbidden harness authorities. A
+separate LLM judge, when used, declares its own explicit provider/model/endpoint/key tuple. Neither
+SUT nor judge silently inherits or falls back to another tuple.
+
+Lane ownership remains asymmetric: an e2e keeps production transport and internal orchestration real
+while replacing only the external provider result; a model-quality harness calls the live provider
+but proves only prompt/model/parser quality. It does not replace flow coverage. Keep one or two live
+quality cases per capability and bound retries to transient provider failures.
 
 And it stays small. One or two cases per capability, chosen because they are the ones that would
 expose a regression — not a matrix. A harness billed per call that grows a case per edge is a
@@ -164,10 +181,12 @@ assumes one hard-coded identity is the person currently signed in.
 | A unit spec whose every assertion is `toHaveBeenCalled*` | It restates the source: correct rewrites go red, broken rules stay green | Assert the returned value or the changed state |
 | Splitting one flow into a test per endpoint | The promise disappears; five endpoint descriptions do not add up to one working flow | One file, one flow, start to finish |
 | A configured lane with no specs in it | It reports green forever, and green is what gets read | Fill it or delete it |
-| Calling a model from an e2e | It costs money, takes seconds and answers differently every time - so the suite becomes expensive, slow and flaky all at once | Stub the model; assert the quota, the persistence and the response around it |
+| Calling a model from an e2e | It costs money, takes seconds and answers differently every time - so the suite becomes expensive, slow and flaky all at once | Keep internal orchestration real, stub the external provider result, then assert quota, persistence and response |
 | A stub returning a marker string (`"stubbed"`, `"ok"`) | It skips the strict-JSON parser, which is the seam most likely to break, so the flow proves the plumbing and hides the failure | Return realistic JSON in the shape the parser expects |
 | Relying on each flow author to remember the stub | A rule that must be remembered is one distracted afternoon from being broken | Stub by default in the world; make reaching a provider a deliberate opt-out |
 | A harness reaching the provider through a tier or routing layer | The thing under test is then not the thing that ships, and the harness can pass while production fails | Call the provider's own client directly |
+| A harness providing or overriding `AiInvokeService` with a live provider adapter | It disguises a provider call as the production gateway and can invent provider, token and cost metadata | Reuse the production prompt/parser around a direct provider SDK call |
+| A harness authenticated by Claude Code OAuth, a ChatGPT/Codex session, CLI profile or token file | Consumer credentials are not provider-issued server API credentials and do not prove the deployed authority | Read one explicit provider API key from the harness runtime environment |
 | A harness that grows a case per edge | It is billed per call, so it becomes something people stop running - and a stale green is worse than no green | One or two cases per capability, chosen to expose a regression |
 | A demo seed containing one all-zero learner | It hides populated branches and every relationship involving another actor | Seed an idempotent cohort with varied source data, then let production read models derive the screen |
 
@@ -311,7 +330,9 @@ They differ in one thing: whether the test can fail for a reason that is not a d
 ### The harness trap — testing the wrapper instead of the model
 
 ```ts
-// harness: the provider's own client, one case, chosen because a regression would show here.
+// harness: the provider's own client and an explicit provider-issued API key, one case chosen
+// because a regression would show here. gradingPrompt and scoreFrom are production seams.
+const anthropic = new Anthropic({ apiKey: requiredEnv("HARNESS_ANTHROPIC_API_KEY") })
 const message = await anthropic.messages.create({
     model: HARNESS_MODEL,
     max_tokens: 1024,
@@ -321,13 +342,15 @@ expect(scoreFrom(message)).toBeGreaterThanOrEqual(PASSING)
 ```
 
 ```ts
-// Wrong: routed through the house tier resolver. If that layer picks a different model in
-// production than it picks here, the harness is green about a model nobody ships.
-const text = await models.generate("cheap", { prompt: gradingPrompt(submission) })
+// Wrong: a live provider hidden behind a fake production gateway. The adapter can invent provider,
+// token and cost metadata, and the harness is green without proving the production contract.
+const aiInvoke = createHarnessInvoke(() => ({ model: "claude-sonnet-5" }))
+const text = await aiInvoke.run({ messages: gradingPrompt(submission) })
 expect(scoreFrom(text)).toBeGreaterThanOrEqual(PASSING)
 ```
 
-They differ in one thing: whether the model under test is the model that ships.
+They differ in one thing: whether the harness calls the declared provider target or impersonates the
+production gateway.
 
 ### Covering the decision, not the line
 

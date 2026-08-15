@@ -5,8 +5,9 @@ The rules this codebase is written by, one file per concept, filed on an axis.
 Read [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md) before adding or changing anything here. It states the
 shape every file takes and, more importantly, what a file must never carry.
 
-Before running any skill, read [`skill-shape.md`](skill-shape.md). Every capability follows
-**Plan -> Review -> Apply** and every phase prints `CONTEXT` first, then closes with `OUTPUTS`,
+Before running any skill, read [`skill-shape.md`](skill-shape.md). Capabilities follow
+**Plan -> Review -> Apply**, except fidelity's continuous **Start -> Feedback* -> End -> Finality**
+session. Every phase or fidelity event prints `CONTEXT` first, then closes with `OUTPUTS`,
 `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED`. `OUTPUTS` carries concepts;
 `CHANGES` carries the detailed code tree. One task is one append-only file at
 `<Source>/.workflows/<kind>/<app>/<id>.md`. `Source` is the current backend AGENTS/project context;
@@ -27,7 +28,7 @@ finding it costs one skill run.
 | Data restore | [`starci-data-restore-plan`](skills/starci-data-restore-plan/SKILL.md) | [`starci-data-restore-review`](skills/starci-data-restore-review/SKILL.md) | [`starci-data-restore-apply`](skills/starci-data-restore-apply/SKILL.md) |
 | FE consolidation | [`starci-fe-consolidate-plan`](skills/starci-fe-consolidate-plan/SKILL.md) | [`starci-fe-consolidate-review`](skills/starci-fe-consolidate-review/SKILL.md) | [`starci-fe-consolidate-apply`](skills/starci-fe-consolidate-apply/SKILL.md) |
 | FE design | [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) | [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) | [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) |
-| FE fidelity | [`starci-fe-fidelity-plan`](skills/starci-fe-fidelity-plan/SKILL.md) | [`starci-fe-fidelity-review`](skills/starci-fe-fidelity-review/SKILL.md) | [`starci-fe-fidelity-apply`](skills/starci-fe-fidelity-apply/SKILL.md) |
+| FE fidelity | [`starci-fe-fidelity-start`](skills/starci-fe-fidelity-start/SKILL.md) | [`starci-fe-fidelity-end`](skills/starci-fe-fidelity-end/SKILL.md) | [`starci-fe-fidelity-finality`](skills/starci-fe-fidelity-finality/SKILL.md) |
 | FE lint sync | [`starci-fe-lint-sync-plan`](skills/starci-fe-lint-sync-plan/SKILL.md) | [`starci-fe-lint-sync-review`](skills/starci-fe-lint-sync-review/SKILL.md) | [`starci-fe-lint-sync-apply`](skills/starci-fe-lint-sync-apply/SKILL.md) |
 | Trust upgrade | [`starci-fe-upgrade-plan`](skills/starci-fe-upgrade-plan/SKILL.md) | [`starci-fe-upgrade-review`](skills/starci-fe-upgrade-review/SKILL.md) | [`starci-fe-upgrade-apply`](skills/starci-fe-upgrade-apply/SKILL.md) |
 | Workflow drift | [`starci-workflow-drift-plan`](skills/starci-workflow-drift-plan/SKILL.md) | [`starci-workflow-drift-review`](skills/starci-workflow-drift-review/SKILL.md) | [`starci-workflow-drift-apply`](skills/starci-workflow-drift-apply/SKILL.md) |
@@ -180,12 +181,14 @@ Merging two shapes that merely look alike is worse than the duplication: it prod
 a flag per call site. Two blocks over different domain entities that render identically are not one
 block — the shape is a composite and the meaning stays where it is.
 
-A bounded parity, interaction or runtime defect still follows the trio.
-[`starci-fe-fidelity-plan`](skills/starci-fe-fidelity-plan/SKILL.md) locks binding evidence and the
-comparison identity. [`starci-fe-fidelity-review`](skills/starci-fe-fidelity-review/SKILL.md) renders
-and revises the smallest correction. [`starci-fe-fidelity-apply`](skills/starci-fe-fidelity-apply/SKILL.md)
-writes only the approved correction. If ownership, CTA, behavior or reusable vocabulary becomes
-undecided, it returns to Design Plan.
+A bounded parity, interaction or runtime defect uses one continuous session.
+[`starci-fe-fidelity-start`](skills/starci-fe-fidelity-start/SKILL.md) records binding evidence and
+comparison identity immediately, then corrects in-boundary feedback as it arrives.
+[`starci-fe-fidelity-end`](skills/starci-fe-fidelity-end/SKILL.md) reruns proof, writes the session
+summary and scans related bugs without closing the session.
+[`starci-fe-fidelity-finality`](skills/starci-fe-fidelity-finality/SKILL.md) verifies the End record
+and closes it. If ownership, CTA, behavior or reusable vocabulary becomes undecided, the open
+session routes that finding to Design Plan without losing its context.
 
 ## What holds a law
 

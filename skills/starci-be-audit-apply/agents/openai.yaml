@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi BE Audit Apply"
+  short_description: "Repair backend gates until errors are zero"
+  default_prompt: "Use $starci-be-audit-apply to repair the approved backend audit until lint has zero errors and build and tests pass."

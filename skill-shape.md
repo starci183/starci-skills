@@ -11,6 +11,17 @@ commits the current target state as its baseline, then writes the approved chang
 resulting diff. Every phase reads and appends the same workflow file; no phase creates a second record
 for the same task.
 
+Fidelity is the named exception. A bounded frontend repair uses one continuous session:
+
+```text
+Start -> Feedback* -> End -> Finality
+```
+
+Start opens the record and performs authorized in-boundary corrections as feedback arrives. End
+summarizes proof and scans related bugs but leaves the session open. Finality alone closes it. The
+three fidelity skills are `starci-fe-fidelity-start`, `starci-fe-fidelity-end` and
+`starci-fe-fidelity-finality`; old Plan/Review/Apply fidelity records remain historical evidence.
+
 ## CONTEXT — print before doing anything
 
 Present and append the table under the exact Markdown heading `### CONTEXT`. A plain `CONTEXT` label
@@ -33,6 +44,10 @@ is invalid because the workflow validator cannot identify its section.
 | Language | `vi` |
 | Phase | `plan`, `review` or `apply` |
 | Touching | exact paths this phase may write |
+
+For fidelity session records, `Phase` is `start`, `feedback`, `end` or `finality`. Every event keeps
+the same `Session id`; `start`, `feedback` and `end` use `Session status: open`, while `finality`
+uses `Session status: finalized`.
 
 `Source` is the current Codex project context that owns `AGENTS.md`, `.claude` and `.workflows`; it is
 not automatically a target repository. Resolve `Trust`, `Skills` and `Workflow root` from `Source`;
@@ -217,6 +232,10 @@ Each phase appends, in order:
 3. Evidence and phase-specific artifact/state tables.
 4. The six output tables in their canonical order.
 
+Fidelity session records instead append `## start`, zero or more `## feedback`, one or more
+`## end`, then `## finality`. Feedback after End resumes the same open session and requires End to
+run again. Feedback after Finality opens a new Start with `Continuation of: <session-id>`.
+
 An approved Review writes `Approved revision: <identity>`. Apply writes
 `Applied revision: <same identity>`, `Baseline commit: <sha>` and `Tracked diff: <baseline>..worktree`
 so the validator can prove what changed after Apply began.
@@ -231,6 +250,8 @@ real `REJECTED` rows, deduplicates identical witnesses by workflow and phase, an
 - Review loops until explicit approval, then invites its sibling Apply.
 - Apply closes the capability or routes a newly discovered concern to that concern's Plan.
 - Fidelity repairs deviation from approved evidence; it does not redesign.
+- Fidelity Start fixes authorized feedback immediately inside the open session; End records proof
+  and scans related bugs; Finality closes the session.
 - Upgrade changes future rules only after repeated workflow evidence passes Upgrade Review.
 
 No phase skips its sibling because the requested change looks small.

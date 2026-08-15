@@ -67,7 +67,13 @@ test("VENDOR-1: the library belongs to closed primitives, covering shells and na
 
 test("VENDOR-2: a shell that wraps nothing is an ordinary component in the wrong folder", () => {
   tester.run("vendor-boundary", vendorBoundary, {
-    valid: [{ filename: SHELL, code: "import { Modal } from \"@heroui/react\"" }],
+    valid: [
+      { filename: SHELL, code: "import { Modal } from \"@heroui/react\"" },
+      {
+        filename: "D:/repo/src/components/shells/DropdownShell/index.test.tsx",
+        code: "export const Fixture = () => <span>Static identity</span>",
+      },
+    ],
     invalid: [
       {
         filename: SHELL,

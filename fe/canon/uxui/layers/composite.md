@@ -13,6 +13,14 @@ The question that settles it: **can the caller put something inside it?** If yes
 no, and it still assembles more than one thing, it is a composite. If it assembles nothing at all, it
 is a leaf.
 
+### ChoiceTabs ownership table
+
+| Situation | Variant | Geometry | Example |
+|---|---|---|---|
+| Local parameter or choice inside one bounded owner | `primary` | Intrinsic segmented/pill control in the owner row | Contribution years 2026 / 2025 / 2024 |
+| Route or major-region navigation owning an independent line | `secondary` | Full navigation run/underline; sticky when the shell requires it | ShellNav course sections |
+| Product prose calls an axis “secondary” but it remains a peer local choice | `primary` | Preserve the vendor primary treatment | Feed category tabs |
+
 ## Rules
 
 **COMPOSITE-1 · Closed. `props`, `on`, `isLoading` — and no way in.**
@@ -80,6 +88,13 @@ An arrangement used once lives inside the block that uses it. It becomes a compo
 caller genuinely needs the same shape — at which point the extraction is justified by evidence rather
 than by taste, and the tier stays small enough to read.
 
+**COMPOSITE-8 · ChoiceTabs variant follows navigation ownership scope, not data volume, option count or the word secondary in product prose.**
+
+A local parameter remains an intrinsic `primary` segmented control inside the surface or row that
+owns it. A route or major-region navigation gets the full-line `secondary` underline treatment and
+may inherit shell stickiness. Neither the number of choices, the amount of data behind them nor a
+product sentence calling one axis secondary changes that ownership.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -93,8 +108,26 @@ than by taste, and the tier stays small enough to read.
 | Calling a translation function | Same: choosing words for a domain is a block's job | Take the resolved string through `props` |
 | Holding state about its content (selection, submission, validity) | That state means something to somebody else, and this component cannot know who | Lift it to the block that knows what it means |
 | Extracting it for one caller | An arrangement with one consumer is a block's internals, and moving it out only adds a hop | Leave it inside the block until a second caller appears |
+| Choosing a ChoiceTabs variant from option count, data volume or the prose word “secondary” | Those facts do not say whether the control owns a route/region or only a local parameter | Classify it with the ChoiceTabs ownership table |
 
 ## Examples
+
+### ChoiceTabs — local choice versus region navigation
+
+```tsx
+// Local year parameter inside the contribution surface.
+<ChoiceTabs props={{ items: years, variant: "primary" }} />
+
+// Major course regions own a navigation line in the shell.
+<ChoiceTabs props={{ items: courseRegions, variant: "secondary" }} />
+```
+
+```tsx
+// Wrong: three years become secondary because each reveals a large dataset.
+<ChoiceTabs props={{ items: years, variant: "secondary" }} />
+```
+
+They differ in one thing: ownership scope, not how much data each option reveals.
 
 ### The ordinary case — a name, a figure and a bar
 
