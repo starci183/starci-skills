@@ -261,6 +261,12 @@ test("Fidelity Start fixes small patches and routes only creative items to previ
   assert.match(start, /resolve the Project's canonical app origin/)
   assert.match(start, /Never\s+treat `localhost` and `127\.0\.0\.1` as interchangeable/)
   assert.match(start, /A static proposal URL is not evidence for the live app origin/)
+  assert.match(start, /REFERENCE OWNER CLOSURE/)
+  assert.match(start, /trace the rendered\s+reference to its concrete component and contract/)
+  assert.match(start, /including owners whose current name is\s+domain-specific/)
+  assert.match(start, /`reuse`, `alter-generic` or `keep-apart`/)
+  assert.match(start, /A\s+different interaction host does not by itself justify duplicating the visual content/)
+  assert.match(start, /Reference \| Concrete owner \/ contract \| Same-purpose candidates \| Verdict \| Interaction-host difference/)
 })
 
 test("every FE skill requires declared project or target repositories", () => {

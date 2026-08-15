@@ -40,6 +40,20 @@ storage. A static proposal URL is not evidence for the live app origin.
 Measure the defect as a difference, inventory existing owners before inventing a new one, and name
 the smallest file boundary. Record the baseline commit or worktree identity before the first write.
 
+**REFERENCE OWNER CLOSURE.** Before drawing or copying a referenced shape, trace the rendered
+reference to its concrete component and contract. Compare its named slots and design purpose with
+existing leaf, composite and contract owners, including owners whose current name is
+domain-specific. Record each plausible owner as `reuse`, `alter-generic` or `keep-apart`. A
+different interaction host does not by itself justify duplicating the visual content. When purpose
+matches, prefer reusing or altering/renaming the existing owner and its contract; if that requires a
+boundary not already authorized, route that exact consolidation boundary before writing the
+duplicate.
+
+Record the closure in this table:
+
+| Reference | Concrete owner / contract | Same-purpose candidates | Verdict | Interaction-host difference |
+|---|---|---|---|---|
+
 Then make the smallest in-boundary correction and prove it in the frozen state. A fidelity session
 does not pause merely to hand work from planning to review to application; those responsibilities
 are performed inside this skill as soon as their evidence exists.
