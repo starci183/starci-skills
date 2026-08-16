@@ -1,85 +1,82 @@
-# the split
+# sự chia rẽ
 
-## Definition
+## Định nghĩa
 
-A surface that owns a request is two files. `index.tsx` fetches, settles which situation the reader
-is in, and resolves the words. `component.tsx` takes an already-settled situation and draws it.
+Một bề mặt sở hữu một yêu cầu là hai tệp.`index.tsx`tìm nạp, giải quyết tình huống nào người đọc
+là trong, và giải quyết các từ.`component.tsx`lấy một tình huống đã được giải quyết sẵn và rút ra nó.
 
-The split is not organisational tidiness. It is a line drawn so that **everything that can be wrong
-about DATA lives in one file and everything that can be wrong about DRAWING lives in the other** —
-and neither review has to read the other file.
+Sự chia rẽ không phải là sự ngăn nắp về mặt tổ chức. Đó là một đường được vẽ sao cho **mọi thứ có thể sai
+về DỮ LIỆU tồn tại trong một tệp và mọi thứ có thể sai về BẢN VẼ tồn tại trong tệp kia** —
+và không xem xét nào phải đọc tệp khác.
 
-The question that settles which half a line belongs to: **could this be wrong when the network is
-fine?** A wrong tree, a wrong seam, a missing state: drawing. A wrong request, a wrong situation,
-the wrong word chosen: data.
+Câu hỏi xác định nửa dòng thuộc về: **điều này có thể sai khi mạng không hoạt động
+được không?** Sai cây, sai đường may, thiếu trạng thái: vẽ. Một yêu cầu sai, một tình huống sai,
+chọn sai từ: dữ liệu.
 
-What holds this law is [`sources/fe/the-split.mjs`](../../../sources/fe/the-split.mjs). It checks both
-directions a syntax tree can prove: the drawing half cannot reach for the world, and a connected
-block must import and render only its exact `_X` twin.
+Điều giữ luật này là[`sources/fe/the-split.mjs`](../../../sources/fe/the-split.mjs). Nó kiểm tra cả hai
+hướng mà cây cú pháp có thể chứng minh: nửa bản vẽ không thể vươn tới thế giới và phần được kết nối
+khối phải nhập và chỉ hiển thị chính xác`_X`sinh đôi.
 
 Implementation anchors in `starci-academy-fe`:
-`src/components/blocks/dashboard/CreditStatRow/index.tsx` and
-`src/components/blocks/dashboard/CreditStatRow/component.tsx`.
+`src/components/blocks/dashboard/CreditStatRow/index.tsx` and `src/components/blocks/dashboard/CreditStatRow/component.tsx`.
 
-## Rules
+## Quy tắc
 
-**SPLIT-1 · The drawing half receives everything and asks for nothing.**
+**SPLIT-1 · Drawing half nhận mọi thứ và không yêu cầu gì.**
 
-No request, no store, no translation call, no reading of the current locale. Every value it renders
-arrives already decided, which is what makes it renderable from a fixture — and a component that
-cannot be rendered from a fixture cannot be tested, because the test would have to stand up the
-world first.
+Không yêu cầu, không lưu trữ, không gọi dịch thuật, không đọc ngôn ngữ hiện tại. Mọi giá trị nó biểu hiện
+đã được quyết định, đó là điều khiến nó có thể kết xuất được từ một thiết bị cố định — và một thành phần
+không thể được kết xuất từ thiết bị cố định không thể được kiểm tra vì thử nghiệm sẽ phải đứng vững
+đầu tiên trên thế giới.
 
-**SPLIT-2 · The connected half settles the SITUATION, not the styling.**
+**SPLIT-2 · Connected half quyết định TÌNH HUỐNG, không quyết định styling.**
 
-It decides which of the named states this is and hands it down. It does not decide how a state
-looks, how far apart anything sits, or which element draws what. Those are the drawing half's, and
-a connected file that reaches for them has taken a decision it cannot see the consequence of.
+Nó quyết định trạng thái được đặt tên này là gì và chuyển nó xuống. Nó không quyết định làm thế nào một nhà nước
+trông như thế nào, mọi thứ nằm cách nhau bao xa, hoặc yếu tố nào vẽ nên cái gì. Đó là một nửa bản vẽ, và
+một tập tin được kết nối với họ đã đưa ra quyết định mà nó không thể thấy được hậu quả của nó.
 
-**SPLIT-3 · The situation crosses the line as a NAME, never as a bag of flags.**
+**SPLIT-3 · Tình huống đi qua ranh giới dưới dạng TÊN, không bao giờ là một túi flag.** `state="pending"` thay vì `isLoading`, `hasError`, `isEmpty`. Tên là một value từ closed set;
+thiết lập; bốn lá cờ thừa nhận mười sáu sự kết hợp, trong đó hầu hết chưa từng được nhìn thấy. Công đoàn là cái gì
+làm cho bức vẽ trở nên đầy đủ một nửa: mọi tình huống tồn tại đều được vẽ ra và không có tình huống nào làm được điều đó.
+không tồn tại có thể được thể hiện.
 
-`state="pending"` rather than `isLoading`, `hasError`, `isEmpty`. A name is one value from a closed
-set; four flags admit sixteen combinations, of which most have never been seen. The union is what
-makes the drawing half exhaustive: every situation that exists is drawn, and no situation that does
-not exist can be expressed.
+**SPLIT-4 · Copy được resolve trước khi đi qua ranh giới.**
 
-**SPLIT-4 · Copy is resolved before it crosses.**
+Nửa bản vẽ nhận được chữ chứ không phải chìa khóa. Một chuỗi được dịch là một giá trị giống như bất kỳ chuỗi nào khác và một chuỗi
+thành phần tra cứu đã có được sự phụ thuộc vào toàn bộ thời gian chạy dịch cho một công việc
+việc đó đã được thực hiện cách đây một tập tin.
 
-The drawing half receives words, not keys. A translated string is a value like any other, and a
-component that looks one up has acquired a dependency on the whole translation runtime for a job
-that was already done one file away.
+**SPLIT-5 · Connected half không tự vẽ gì.**
 
-**SPLIT-5 · The connected half draws nothing of its own.**
+Nó nhập chính xác`_${FolderName}`từ`./component`và hiển thị một thành phần đó trên mọi JSX
+con đường. Một tệp được kết nối hiển thị một lá, nhánh hoặc cây thay thế đã trở thành cả hai nửa và
+dòng dừng lại có nghĩa là bất cứ điều gì thời điểm nó được vượt qua một lần.
 
-It imports exact `_${FolderName}` from `./component` and renders that one component on every JSX
-path. A connected file that renders a leaf, branch or alternate tree has become both halves, and the
-line stops meaning anything the moment it is crossed once.
+Không có ngoại lệ khối mỏng. Một lá, một cây ở mọi trạng thái, không có trạng thái miền cục bộ hoặc một
+cặp song sinh trình bày chỉ chuyển tiếp đạo cụ là những trường hợp có nhiều khả năng phát triển tình huống thứ hai nhất
+sau này; họ vẫn lai cùng một cặp song sinh.
 
-There is no thin-block exception. One leaf, one tree in every state, no local domain state, or a
-presentational twin that only forwards props are the cases most likely to grow a second situation
-later; they still cross the same exact twin.
+**SPLIT-6 · Surface không có request thì không split.**
 
-**SPLIT-6 · A surface with no request does not split.**
-
-Two files for a component that fetches nothing is ceremony: there is no data half, so the second
-file holds nothing that the first could get wrong. The split exists because a request exists.
+Hai tệp dành cho một thành phần không tìm nạp gì là nghi lễ: không có một nửa dữ liệu, vì vậy tệp thứ hai
+tập tin không chứa gì mà tập tin đầu tiên có thể sai. Sự phân chia tồn tại vì có một yêu cầu tồn tại.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A request, store read or translation call in the drawing half | It stops being renderable from a fixture, so it stops being testable without the world | Put it in the connected half and pass the result |
-| Reading the current locale while drawing | Same dependency, wearing a smaller name | Resolve the words one file away |
-| A translation key crossing the line | The drawing half acquires the translation runtime for a job already done | Send the resolved string |
-| Flags instead of a named situation | Four booleans admit sixteen combinations, and most have never existed | A discriminated union |
-| Styling decided in the connected half | It takes a decision whose consequence it cannot see | Let the drawing half decide how a situation looks |
-| Markup in the connected half | It has become both halves, and the line stops meaning anything | Render the drawing half and nothing else |
-| Rendering a leaf directly because the block is thin | The request and presentation can no longer be tested independently, and the first added state crosses the line | Create exact `_X` and render only it |
-| Splitting a component that fetches nothing | There is no data half to separate, so the second file is ceremony | One file |
+| Một yêu cầu, lệnh gọi đọc hoặc dịch lưu trữ trong nửa bản vẽ | Nó ngừng hiển thị từ một vật cố định, vì vậy nó không thể kiểm tra được nếu không có thế giới | Đặt nó vào nửa được kết nối và chuyển kết quả |
+| Đọc ngôn ngữ hiện tại trong khi vẽ | Sự phụ thuộc tương tự, mang tên nhỏ hơn | Giải quyết các từ một tập tin |
+| Một phím dịch qua dòng | Nửa bản vẽ lấy thời gian dịch cho một công việc đã được thực hiện | Gửi chuỗi đã giải quyết |
+| Cờ thay vì một tình huống được đặt tên | Bốn boolean thừa nhận mười sáu kết hợp và hầu hết chưa từng tồn tại | Một công đoàn bị phân biệt đối xử |
+| Kiểu dáng quyết định ở nửa kết nối | Nó đưa ra một quyết định mà nó không thể thấy được hậu quả | Hãy để một nửa bản vẽ quyết định tình huống sẽ như thế nào |
+| Đánh dấu ở nửa được kết nối | Nó đã trở thành cả hai nửa và dòng này không còn ý nghĩa gì nữa | Render một nửa bản vẽ và không có gì khác |
+| Hiển thị trực tiếp một chiếc lá vì khối mỏng | Yêu cầu và bản trình bày không còn có thể được kiểm tra độc lập nữa và trạng thái được thêm đầu tiên vượt qua dòng | Tạo chính xác`_X`và chỉ hiển thị nó |
+| Tách một thành phần không tìm nạp gì | Không có dữ liệu nào phân nửa nên file thứ 2 là lễ | Một tập tin |
 
-## Examples
+## Ví dụ
 
-### The line
+### Ranh giới
 
 ```tsx
 // index.tsx - it settles the situation and resolves the words
@@ -91,10 +88,9 @@ if (quest.error !== undefined) return <_DailyQuest state="failed" props={{ label
 // component.tsx - it draws a situation that has already been decided
 const isLoading = input.state === "pending"
 ```
+Chúng khác nhau ở một điều: cái nào trong số chúng có thể sai trong khi mạng vẫn ổn.
 
-They differ in one thing: which of them could be wrong while the network is fine.
-
-### The situation, not the flags
+### Tình huống, không phải các flag
 
 ```tsx
 type Props =
@@ -106,10 +102,9 @@ type Props =
 ```tsx
 type Props = { isLoading: boolean; hasError: boolean; isEmpty: boolean; rows: ReadonlyArray<Row> }
 ```
+Chúng khác nhau ở một điều: liệu một tình huống mà không ai từng thấy có thể được diễn đạt hay không.
 
-They differ in one thing: whether a situation nobody has seen can be expressed.
-
-### The words
+### Các chuỗi chữ
 
 ```tsx
 <_DailyQuest state="failed" props={{ label: t("label"), message: t("failed") }} />
@@ -118,10 +113,9 @@ They differ in one thing: whether a situation nobody has seen can be expressed.
 ```tsx
 <_DailyQuest state="failed" props={{ labelKey: "quest.label", messageKey: "quest.failed" }} />
 ```
+Chúng khác nhau ở một điểm: liệu nửa bản vẽ có cần kiểm tra thời gian chạy dịch hay không.
 
-They differ in one thing: whether the drawing half needs the translation runtime to be tested.
-
-### The thin-block trap
+### Bẫy block mỏng
 
 ```tsx
 export const CreditStatRow = () => {
@@ -136,5 +130,4 @@ export const CreditStatRow = () => {
     return <StatRow props={{ label: t("credit"), value: formatQuota(quota.data) }} />
 }
 ```
-
-They differ in one thing: whether every connected render crosses the exact presentational twin.
+Chúng khác nhau ở một điểm: liệu mọi kết xuất được kết nối có vượt qua cặp song sinh trình bày chính xác hay không.

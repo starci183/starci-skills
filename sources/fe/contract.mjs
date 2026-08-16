@@ -246,7 +246,7 @@ export const contractHostOf = (filename, key) => {
    * landmark. The rule was right about the law and wrong about where one entry stops.
    */
   const rest = source.slice(opening + 1)
-  const nextKey = rest.search(/\n    "[a-z0-9-]+": \{/)
+  const nextKey = rest.search(/\n[ ]{4}"[a-z0-9-]+": \{/)
   const window = nextKey === -1 ? source.slice(opening) : source.slice(opening, opening + 1 + nextKey)
   const host = window.match(/\bhost:\s*"([a-z]+)"/)
   return host ? host[1] : "div"
@@ -716,6 +716,101 @@ export const noStructuralHostOutsideContractFrame = {
   },
 }
 
+// -- CONTRACT-7B -----------------------------------------------------------------------------------
+
+/**
+ * A leaf may own one atomic host. It may not arrange structural hosts into a second component tree.
+ *
+ * This complements CONTRACT-7: leaves are exempt there because their job is to reach one primitive
+ * host. The exemption ends the moment that primitive contains another structural host, or one
+ * parent owns several structural host siblings.
+ */
+export const noStructuralArrangementInLeaf = {
+  meta: {
+    type: "problem",
+    docs: { description: "A leaf owns one atomic host, never a structural arrangement." },
+    schema: [],
+    messages: {
+      arrangement:
+        "This leaf {{kind}} structural hosts, so it is a composite/contract tree rather than one atomic primitive. Move this ownership to a branch rendered through `<Tree contract=\"...\" />`. `meta.shape`, `data-tier`, aliases, constants, helper callbacks and `defineLeafComponent` do not exempt source JSX structure.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (!isLeafFile(file) || isTestFile(file) || isContractFrameFile(file)) return {}
+
+    const aliases = new Map()
+    const structuralHosts = new Set([...NEUTRAL_HOSTS, ...SEMANTIC_HOSTS])
+
+    const staticHostValue = (node) => {
+      if (!node) return null
+      if (node.type === "Literal" && typeof node.value === "string") return node.value
+      if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
+        return node.quasis.map((quasi) => quasi.value.cooked).join("")
+      }
+      return null
+    }
+
+    const structuralHostName = (opening) => {
+      const intrinsic = hostName(opening)
+      if (intrinsic && structuralHosts.has(intrinsic)) return intrinsic
+      const name = jsxElementName(opening)
+      const alias = name && aliases.get(name)
+      return alias && structuralHosts.has(alias) ? alias : null
+    }
+
+    const directStructuralOpening = (child) =>
+      child && child.type === "JSXElement" && structuralHostName(child.openingElement)
+        ? child.openingElement
+        : null
+
+    const hasStructuralAncestor = (opening) => {
+      let current = opening.parent
+      while (current) {
+        if (
+          current.type === "JSXElement" &&
+          current.openingElement !== opening &&
+          structuralHostName(current.openingElement)
+        ) {
+          return true
+        }
+        current = current.parent
+      }
+      return false
+    }
+
+    const reportSiblingArrangement = (parent) => {
+      const openings = (parent.children || []).map(directStructuralOpening).filter(Boolean)
+      if (openings.length < 2) return
+      context.report({ node: openings[1], messageId: "arrangement", data: { kind: "owns sibling" } })
+    }
+
+    return {
+      Program(node) {
+        for (const statement of node.body || []) {
+          if (statement.type !== "VariableDeclaration") continue
+          for (const declaration of statement.declarations || []) {
+            if (!declaration.id || declaration.id.type !== "Identifier") continue
+            const value = staticHostValue(declaration.init)
+            if (value && structuralHosts.has(value)) aliases.set(declaration.id.name, value)
+          }
+        }
+      },
+      JSXOpeningElement(node) {
+        if (!structuralHostName(node) || !hasStructuralAncestor(node)) return
+        context.report({ node, messageId: "arrangement", data: { kind: "nests" } })
+      },
+      JSXElement(node) {
+        // A structural parent is already handled as nested ownership for each structural child.
+        // Sibling ownership is needed for an atomic/custom parent that opens several host roots.
+        if (structuralHostName(node.openingElement)) return
+        reportSiblingArrangement(node)
+      },
+      JSXFragment: reportSiblingArrangement,
+    }
+  },
+}
+
 // -- CONTRACT-8 ------------------------------------------------------------------------------------
 
 /** Contract markers are painted by the frame, never hand-written on a host element. */
@@ -1181,6 +1276,7 @@ export const rules = {
   "no-class-composition-outside-contract": noClassCompositionOutsideContract,
   "contract-why-is-a-reason": contractWhyIsAReason,
   "no-structural-host-outside-contract-frame": noStructuralHostOutsideContractFrame,
+  "no-structural-arrangement-in-leaf": noStructuralArrangementInLeaf,
   "no-hand-written-contract-attrs": noHandWrittenContractAttrs,
   "no-unknown-contract-key": noUnknownContractKey,
   "no-duplicate-entry-shape": noDuplicateEntryShape,

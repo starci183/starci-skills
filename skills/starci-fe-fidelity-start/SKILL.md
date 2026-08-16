@@ -7,6 +7,12 @@ description: Start or continue one bounded StarCi frontend fidelity session. Fre
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
+Then read the Fidelity decision owners:
+[`mode.md`](../../fe/creativity/mode.md),
+[`best-belief-source.md`](../../fe/creativity/best-belief-source.md),
+[`contract-graph.md`](../../fe/creativity/contract-graph.md) and
+[`verification.md`](../../fe/creativity/verification.md).
+
 This lane restores an expected result. It does not redesign hierarchy, CTA, behavior, ownership or
 reusable vocabulary. Route an explicit request for “sáng tạo”, a new concept or several layout
 directions to `$starci-fe-design-plan`, which must render three to four implementation-feasible HTML
@@ -43,16 +49,37 @@ the smallest file boundary. Record the baseline commit or worktree identity befo
 **REFERENCE OWNER CLOSURE.** Before drawing or copying a referenced shape, trace the rendered
 reference to its concrete component and contract. Compare its named slots and design purpose with
 existing leaf, composite and contract owners, including owners whose current name is
-domain-specific. Record each plausible owner as `reuse`, `alter-generic` or `keep-apart`. A
+domain-specific. Record each plausible owner as `REUSE`, `ALTER` or `KEEP_APART`. A
 different interaction host does not by itself justify duplicating the visual content. When purpose
 matches, prefer reusing or altering/renaming the existing owner and its contract; if that requires a
 boundary not already authorized, route that exact consolidation boundary before writing the
 duplicate.
 
-Record the closure in this table:
+When the correction touches reusable ownership, record the canonical graph rows under
+`### OWNER CHALLENGE`. `REUSE` or `ALTER` may proceed only inside the authorized boundary. An
+unapproved `ADD` is a `new-finding` routed to Design; Fidelity does not invent reusable vocabulary.
 
-| Reference | Concrete owner / contract | Same-purpose candidates | Verdict | Interaction-host difference |
-|---|---|---|---|---|
+Before adding or changing any wrapper, list, region or spacing, append `### GROUPING / TREE`:
+
+| Owner tier | Contract key | Host | Direct children | Semantic relationship | Inner seam | Outer seam | Verdict |
+|---|---|---|---|---|---|---|---|
+| `leaf` / `composite` / `branch` / `block` | Existing or proposed key | Intrinsic/vendor host | Named direct children | What makes them one group | Gap inside this owner | Gap to its parent peer | `REUSE` / `ALTER` / `new-finding` |
+
+Choose owner and group boundaries before choosing a gap. One container owns one direct-child seam;
+different relationships require nested named owners. A proposed leaf may own one atomic primitive,
+but if it contains more than one content or any structural relationship, classify it as
+`new-finding`/`ALTER` and do not patch the arrangement inside the leaf. No `meta.shape`, `data-tier`,
+renamed wrapper, constant, helper callback or `defineLeafComponent` render callback substitutes for
+the source tree. Run canonical `starci-fe/no-structural-arrangement-in-leaf` plus a connected render
+assertion proving the expected `Tree`/contract ancestry reaches the DOM; role, text and class-only
+assertions do not prove ownership.
+
+For each touched interaction, record the canonical `### INTERACTION CONSEQUENCE` row from
+[`research.md`](../../fe/creativity/research.md) and prove only that bounded journey. For every added
+or changed icon, badge, chip, border, surface, wrapper or selected paint, record the canonical
+`### VISUAL JOB` row from [`critique.md`](../../fe/creativity/critique.md). Compare the complete
+applicable state family at the same frozen identity, including adjacent detail or content panels;
+record non-applicable states instead of silently omitting them.
 
 Then make the smallest in-boundary correction and prove it in the frozen state. A fidelity session
 does not pause merely to hand work from planning to review to application; those responsibilities

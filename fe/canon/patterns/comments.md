@@ -1,92 +1,89 @@
-# comments
+# comment
 
-## Definition
+## Định nghĩa
 
-A comment is what the code cannot say about itself. The code already states what happens; a comment
-states why it happens that way, what breaks without it, and which alternative was refused. Anything
-that merely renames the line below it is noise, and noise trains a reader to skip the comment that
-mattered.
+Comment nói điều mà code không thể tự nói. Code đã cho biết chuyện gì xảy ra; comment giải thích vì
+sao nó phải xảy ra như vậy, điều gì sẽ hỏng nếu bỏ nó và phương án nào đã bị từ chối. Comment chỉ
+đổi tên cho dòng ngay bên dưới là nhiễu, và nhiễu khiến người đọc bỏ qua đúng comment đáng lẽ phải
+đọc.
 
-Two questions settle everything here. **Would a stranger reach the same conclusion from the code
-alone?** If yes, the comment is not needed. **Can a reader who does not share your first language
-read it?** If no, it is not written yet.
+Hai câu hỏi quyết định mọi trường hợp. **Một người lạ chỉ đọc code có tự đi đến cùng kết luận không?**
+Nếu có, comment không cần thiết. **Người đọc không dùng chung tiếng mẹ đẻ với tác giả có đọc được
+không?** Nếu không, comment vẫn chưa được viết đúng.
 
-That second question is the one this file is strictest about, and the bar is deliberately not
-"English where convenient": the source is English-only, to a stranger's standard, and the exceptions
-are three, narrow, and named below.
+Câu hỏi thứ hai là nơi file này nghiêm khắc nhất. Chuẩn không phải là "dùng English khi tiện": source
+phải là English, đủ rõ với người lạ; các ngoại lệ chỉ có ba loại, hẹp và được nêu tên bên dưới.
 
-What holds this law is [`sources/fe/comments.mjs`](../../../sources/fe/comments.mjs). It reaches
-identifiers, comments, JSDoc, diagnostics and string literals — everywhere prose can hide — because
-a rule that checked only comments would leave the same sentence legal one line lower as a variable
-name.
+Luật này được bảo đảm bởi [`sources/fe/comments.mjs`](../../../sources/fe/comments.mjs). Rule chạm
+đến identifier, comment, JSDoc, diagnostic và string literal — mọi nơi prose có thể ẩn — vì nếu chỉ
+kiểm comment, cùng một câu vẫn có thể hợp lệ khi được chuyển xuống một dòng dưới thành tên biến.
 
 Implementation anchors in `starci-academy-fe`: `src/components/branches/SurfaceCard/index.tsx` and
 `plugins/eslint/index.mjs`.
 
-## Rules
+## Luật
 
-**COMMENTS-1 · Every export opens with a documentation block.**
+**COMMENTS-1 · Mọi export đều mở đầu bằng documentation block.**
 
-An export is something another file depends on, so its contract is read far more often than it is
-written, and by people who will never open the body. The block names the ROLE — what this is, what
-it is for — rather than restating the signature, which the signature already states.
+Export là thứ file khác phụ thuộc vào, nên contract của nó được đọc thường xuyên hơn được viết và
+thường bởi người sẽ không mở body. Block phải nêu ROLE — đây là gì và dùng để làm gì — thay vì lặp
+lại signature mà chính signature đã nói rõ.
 
-The scope is deliberate: exports only. Requiring one on every internal helper produces a file where
-half the lines are ceremony and no block is read.
+Phạm vi được giới hạn có chủ ý: chỉ export. Bắt mọi helper nội bộ phải có block sẽ tạo ra file mà
+một nửa số dòng là nghi thức và chẳng block nào còn được đọc.
 
-**COMMENTS-2 · The source is English, to a stranger's standard.**
+**COMMENTS-2 · Source phải là English, đủ rõ với người lạ.**
 
-Comments, JSDoc, identifiers and diagnostic messages. The bar is not the team — it is somebody who
-joins in a year and does not share the first language of whoever wrote the line. A codebase with two
-languages in it has two populations of readers, and the smaller one silently stops reading the parts
-it cannot.
+Quy tắc áp dụng cho comment, JSDoc, identifier và diagnostic message. Chuẩn không dựa trên team hiện
+tại mà dựa trên người sẽ tham gia sau một năm và không dùng chung tiếng mẹ đẻ với tác giả. Codebase
+có hai ngôn ngữ sẽ tạo ra hai nhóm người đọc, rồi nhóm nhỏ hơn âm thầm bỏ qua những phần họ không đọc
+được.
 
-**COMMENTS-3 · Three exceptions, and each is stated where it applies.**
+**COMMENTS-3 · Có ba ngoại lệ, và mỗi ngoại lệ phải được nêu đúng nơi áp dụng.**
 
-Locale content is not authoring: a translation dictionary IS the other language, and holding it to
-this rule would empty the product. A test fixture that reproduces a real string has to reproduce it
-exactly, or it is testing something else. And a literal the running program matches on or emits —
-a value, not prose — stays, marked on its own line with the reason.
+Locale content không phải authoring: translation dictionary LÀ ngôn ngữ còn lại, áp rule này vào đó
+sẽ làm rỗng product. Test fixture tái hiện một string thật phải giữ nguyên string đó, nếu không nó
+đang test thứ khác. Literal mà chương trình dùng để match hoặc emit — một value, không phải prose —
+được giữ lại và phải có lý do trên chính dòng đó.
 
-The mark is the point of the third exception. An unmarked literal is indistinguishable from a
-comment somebody forgot to translate, so a reader has to decide, and the next one decides
-differently.
+Việc đánh dấu là điểm cốt lõi của ngoại lệ thứ ba. Literal không được đánh dấu trông không khác một
+comment bị quên dịch, khiến mỗi người đọc phải tự quyết định và mỗi người có thể quyết định khác nhau.
 
-**COMMENTS-4 · No Unicode emoji in source.**
+**COMMENTS-4 · Không dùng Unicode emoji trong source.**
 
-Not in identifiers, comments, diagnostics or non-content strings. A pictograph renders differently
-on every platform, sorts unpredictably, breaks a terminal that is not expecting it, and carries a
-meaning that is not the same in two countries. Generic interface marks belong to the icon vocabulary.
-Product reactions are the one narrower artwork case: they use attributed, checked-in SVG assets
-through the reaction leaf, never a Unicode pictograph in source or locale data.
+Không dùng trong identifier, comment, diagnostic hay string không phải content. Pictograph hiển thị
+khác nhau trên từng platform, sắp xếp khó đoán, có thể phá terminal và mang ý nghĩa khác nhau giữa
+các quốc gia. Mark giao diện chung thuộc về icon vocabulary. Product reaction là trường hợp artwork
+hẹp duy nhất: dùng SVG asset đã kiểm tra và commit qua reaction leaf, không dùng pictograph Unicode
+trong source hay locale data.
 
-**COMMENTS-5 · A comment that restates the line is deleted, not improved.**
+**COMMENTS-5 · Comment lặp lại dòng code thì bị xóa, không được cải thiện.**
 
-`// increment the counter` above an increment costs a line and teaches nothing, and it is worse than
-neutral: a reader who finds three of them stops reading the fourth, which is the one that said why
-the counter resets on a Sunday.
+`// increment the counter` đặt trên một lệnh increment tốn một dòng mà không dạy điều gì. Tệ hơn,
+người đọc gặp ba comment như vậy sẽ bỏ qua comment thứ tư — dù đó có thể là comment giải thích vì
+sao counter reset vào Chủ nhật.
 
-**COMMENTS-6 · A comment that has to argue is arguing with a decision, and names it.**
+**COMMENTS-6 · Comment phải tranh luận là comment đang ghi lại một quyết định, và phải gọi tên quyết định đó.**
 
-The comments worth keeping are the ones recording a refusal: what was tried, what it cost, why the
-obvious shape is wrong here. Those are exactly the ones a reader would otherwise undo.
+Comment đáng giữ là comment ghi lại một điều đã bị từ chối: đã thử gì, cái giá là gì, vì sao shape
+hiển nhiên lại sai ở đây. Đó chính là những quyết định mà người đọc sau nếu không biết sẽ dễ hoàn tác.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| An export with no documentation block | Its contract is read by people who never open the body | Name the role, not the signature |
-| A block that restates the signature | The signature already says it, in a form that cannot go stale | Say why it exists, or delete the block |
-| A comment in a second language | The codebase gains a population of readers who skip parts of it | English, to a stranger's standard |
-| An identifier in a second language | Same, one line lower, where a comment rule would not look | Same |
-| A diagnostic message in a second language | The person reading it is whoever is on call, not whoever wrote it | Same |
-| Unicode emoji anywhere in source | It renders differently everywhere and means different things in different places | A semantic icon, or the checked-in reaction artwork when the product meaning is a reaction |
-| A functional literal in another language, unmarked | It is indistinguishable from prose somebody forgot to translate | Keep it, and mark the line with its reason |
-| A comment restating the line below it | It teaches nothing and trains the reader to skip the next one | Delete it |
+| Export không có documentation block | Contract của nó được đọc bởi người không mở body | Nêu role, không lặp signature |
+| Block lặp lại signature | Signature đã nói điều đó theo cách không thể stale | Nói vì sao nó tồn tại, hoặc xóa block |
+| Comment bằng ngôn ngữ thứ hai | Codebase tạo ra nhóm người đọc bỏ qua một phần source | English, đủ rõ với người lạ |
+| Identifier bằng ngôn ngữ thứ hai | Cùng lỗi đó nhưng nằm thấp hơn một dòng, nơi rule comment không nhìn tới | Làm như trên |
+| Diagnostic message bằng ngôn ngữ thứ hai | Người đọc nó là người on-call, không nhất thiết là người viết | Làm như trên |
+| Unicode emoji ở bất cứ đâu trong source | Hiển thị khác nhau và mang ý nghĩa khác nhau ở các nơi khác nhau | Semantic icon, hoặc reaction artwork đã commit khi product meaning là reaction |
+| Functional literal bằng ngôn ngữ khác nhưng không đánh dấu | Không thể phân biệt với prose bị quên dịch | Giữ lại và ghi lý do trên dòng |
+| Comment lặp lại dòng ngay bên dưới | Không dạy gì và khiến người đọc bỏ qua comment kế tiếp | Xóa comment |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — a block that says what the signature cannot
+### Trường hợp thông thường — block nói điều signature không thể nói
 
 ```ts
 /**
@@ -106,9 +103,9 @@ obvious shape is wrong here. Those are exactly the ones a reader would otherwise
  */
 ```
 
-They differ in one thing: whether a reader learns what to do with the answer.
+Chúng chỉ khác nhau ở một điểm: người đọc biết phải làm gì với kết quả hay không.
 
-### The language trap — one line lower
+### Bẫy ngôn ngữ — lệch một dòng
 
 ```ts
 const isOverdue = (dueAt: Date) => dueAt < now
@@ -119,10 +116,10 @@ const isOverdue = (dueAt: Date) => dueAt < now
 const isOverdue = (dueAt: Date) => dueAt < now
 ```
 
-They differ in one thing: whether the next reader can read the reason. The rule reaches identifiers
-for the same reason — moving the sentence into a name does not translate it.
+Chúng chỉ khác nhau ở một điểm: người đọc sau có hiểu lý do hay không. Rule cũng chạm identifier vì
+đưa câu đó vào tên không khiến nó được dịch.
 
-### The functional-literal exception
+### Ngoại lệ literal chức năng
 
 ```ts
 // vn-ok: the server sends this status verbatim and the screen matches on it
@@ -133,9 +130,9 @@ const CANCELLED = "Da huy"
 const CANCELLED = "Da huy"
 ```
 
-They differ in one thing: whether a reader can tell a value from an untranslated comment.
+Chúng chỉ khác nhau ở một điểm: người đọc có phân biệt được value với comment chưa dịch hay không.
 
-### The restatement trap
+### Bẫy lặp lại nguyên văn
 
 ```ts
 // The rungs are not evenly spaced, so adding one lands between them.
@@ -147,4 +144,4 @@ const next = STEPS[index + 1]
 const next = STEPS[index + 1]
 ```
 
-They differ in one thing: whether the comment says something the line does not.
+Chúng chỉ khác nhau ở một điểm: comment có nói điều mà dòng code chưa nói hay không.

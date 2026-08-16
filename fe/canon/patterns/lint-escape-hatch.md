@@ -1,50 +1,52 @@
-# lint escape hatch
+# lối thoát của lint
 
-## Definition
+## Định nghĩa
 
-A lint escape hatch is source text that changes which laws apply to the file containing it:
-`eslint-disable`, its line variants, or `eslint-enable`. It turns a repository law into a local
-choice, so the author of the violation also becomes the author of whether it is a violation.
+Lối thoát của lint là đoạn source làm thay đổi những luật áp dụng cho file chứa nó:
+`eslint-disable`, các biến thể theo dòng của nó hoặc `eslint-enable`. Nó biến luật của repository
+thành lựa chọn cục bộ, để chính tác giả của vi phạm cũng quyết định việc đó có bị xem là vi phạm hay
+không.
 
-What holds this law is
-[`sources/fe/lint-escape-hatch.mjs`](../../../sources/fe/lint-escape-hatch.mjs). The consuming flat
-config also applies the exported `linterOptions.noInlineConfig`, because a rule that could be
-disabled by the comment it reports would not be a fence.
+Luật này được bảo đảm bởi
+[`sources/fe/lint-escape-hatch.mjs`](../../../sources/fe/lint-escape-hatch.mjs). Flat config của
+project sử dụng cũng áp dụng `linterOptions.noInlineConfig` đã export, vì một rule có thể bị vô hiệu
+hóa bởi chính comment mà nó báo cáo thì không thể là hàng rào bảo vệ.
 
 Implementation anchors in `starci-academy-fe`: `eslint.config.mjs` and
 `plugins/eslint/index.mjs`.
 
-## Rules
+## Luật
 
-**LINT-ESCAPE-1 · Product source cannot contain an inline ESLint directive.**
+**LINT-ESCAPE-1 · Product source không được chứa chỉ thị ESLint inline.**
 
-Every rule is repository policy at `error`. A file cannot lower, suspend or restore that policy for
-itself; if a rule is wrong, its matcher or the architecture is corrected for everyone.
+Mọi rule đều là policy của repository ở mức `error`. Một file không thể tự hạ mức, tạm dừng hay
+khôi phục policy đó; nếu rule sai, matcher của rule hoặc kiến trúc phải được sửa cho tất cả mọi
+người.
 
-**LINT-ESCAPE-2 · The flat config disables inline configuration.**
+**LINT-ESCAPE-2 · Flat config vô hiệu hóa inline configuration.**
 
-The rule reports the attempted bypass, while `noInlineConfig` makes the attempt ineffective. Both
-are required: one explains the failure and the other guarantees the directive cannot silence its
-own guard.
+Rule báo cáo nỗ lực bypass, còn `noInlineConfig` khiến nỗ lực đó không có hiệu lực. Cả hai đều cần
+thiết: một thứ giải thích lỗi, thứ kia bảo đảm chỉ thị không thể tự làm im lặng hàng rào của mình.
 
-**LINT-ESCAPE-3 · There is no allowlist.**
+**LINT-ESCAPE-3 · Không có allowlist.**
 
-Thin components, vendor boundaries, declarations, generated-looking files and temporary migration
-work do not earn local exemptions. A legitimate syntax is represented in shared configuration or a
-closed type; debt is fixed before merge rather than hidden beside it.
+Component mỏng, ranh giới vendor, declaration, file trông như được sinh tự động và công việc
+migration tạm thời đều không được hưởng miễn trừ cục bộ. Cú pháp hợp lệ phải được biểu diễn trong
+shared configuration hoặc closed type; debt phải được sửa trước khi merge thay vì che giấu bên cạnh
+nó.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| `eslint-disable` in product source | The violating file decides whether repository law applies | Fix the code or the shared rule |
-| `eslint-disable-next-line` with a reason | A reason documents the bypass; it does not stop the bypass | Encode the legitimate case in the rule or type |
-| A path allowlist for one component | The exception becomes permanent and invisible at the call site | State the semantic case in the shared matcher |
-| A warning-level architectural rule | New violations merge while appearing governed | Error, with a twin test |
+| `eslint-disable` trong product source | Chính file vi phạm quyết định luật của repository có áp dụng hay không | Sửa code hoặc shared rule |
+| `eslint-disable-next-line` kèm lý do | Lý do chỉ ghi lại bypass, không ngăn bypass | Mã hóa trường hợp hợp lệ trong rule hoặc type |
+| Path allowlist cho một component | Ngoại lệ trở thành vĩnh viễn và vô hình tại call site | Nêu trường hợp ngữ nghĩa trong shared matcher |
+| Rule kiến trúc ở mức warning | Vi phạm mới vẫn được merge dù trông như đang được kiểm soát | Dùng mức Error, kèm twin test |
 
-## Examples
+## Ví dụ
 
-### The local bypass
+### Bypass cục bộ
 
 ```ts
 declare module "vendor" {
@@ -57,10 +59,10 @@ declare module "vendor" {
 namespace VendorTypes {}
 ```
 
-They differ in one thing: whether the repository configuration owns the legitimate declaration
-syntax or one file suspends the law for itself.
+Chúng chỉ khác nhau ở một điểm: cú pháp declaration hợp lệ do cấu hình repository làm chủ, hay một
+file tự đình chỉ luật cho chính nó.
 
-### The architectural finding
+### Phát hiện kiến trúc
 
 ```tsx
 return <_CreditStatRow state="pending" props={{ label }} />
@@ -71,4 +73,4 @@ return <_CreditStatRow state="pending" props={{ label }} />
 return <StatRow props={{ label }} isLoading />
 ```
 
-They differ in one thing: whether the connected/presentational boundary still exists.
+Chúng chỉ khác nhau ở một điểm: ranh giới connected/presentational còn tồn tại hay không.

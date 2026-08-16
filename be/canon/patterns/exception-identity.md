@@ -1,120 +1,70 @@
-# exception identity
+# danh tính ngoại lệ
 
-## Definition
+## Định nghĩa
 
-A failure's identity is the word that tells it apart from every other failure this application can
-produce. [`exceptions.md`](exceptions.md) settles that a failure IS a named thing with data attached.
-This file settles the name: **one word, written in three alphabets, and all three say the same
-thing.**
+Exception identity là từ dùng để phân biệt một lỗi với mọi lỗi khác mà backend có thể tạo ra. [`exceptions.md`](exceptions.md) quy định rằng lỗi là một thứ được đặt tên và mang theo dữ liệu. File này quy định cách đặt tên: **một từ, được viết qua ba alphabet, và cả ba phải nói cùng một điều.**
 
-The class is `CourseReviewNotOwnedException`. The code is `COURSE_REVIEW_NOT_OWNED_EXCEPTION`. The
-payload type is `CourseReviewNotOwnedExceptionMetadata`. Nothing here is decoration — each alphabet
-is read by a different consumer, and none of them can read the others:
+Class là `CourseReviewNotOwnedException`. Code là `COURSE_REVIEW_NOT_OWNED_EXCEPTION`. Payload type là `CourseReviewNotOwnedExceptionMetadata`. Không phần nào là trang trí: mỗi alphabet được một consumer khác đọc, và không consumer nào có thể đọc thay phần còn lại:
 
-- The **class name** is what the gates see. Every rule guarding exceptions matches a name ending in
-  `Exception`, so a failure that spells its name differently is not enforced by any of them.
-- The **code** is what the client sees. Apollo's `formatError` stamps it onto every GraphQL error and
-  the REST filter puts it in the body, and the front end matches on it rather than on the status,
-  because one GraphQL response can carry several errors of different severities.
-- The **metadata type** is what the throw site sees. It is the contract the caller has to satisfy,
-  and the place the failure's second field will land.
+- **class name** là thứ các rule nhìn thấy. Mọi exception rule đều match tên kết thúc bằng `Exception`, nên một lỗi viết khác đi sẽ không được rule nào thực thi.
+- **code** là thứ client nhìn thấy. Apollo `formatError` đóng dấu code vào mọi GraphQL error, còn REST filter đưa nó vào response body; UI match code thay vì status, vì một GraphQL response có thể chứa nhiều lỗi với mức độ khác nhau.
+- **metadata type** là thứ call site nhìn thấy. Nó là contract mà caller phải đáp ứng và là nơi field thứ hai của failure sẽ được thêm vào.
 
-The question that settles whether a declaration has an identity: **if this failure and the one
-declared above it both arrived at a client, could anything tell them apart without reading English?**
-If the answer is the message, it has no identity — it has a sentence.
+Câu hỏi quyết định một declaration có identity hay không là: **nếu lỗi này và lỗi kia cùng được gửi tới client, client có phân biệt được chúng mà không cần đọc tiếng Anh không?** Nếu câu trả lời là message, lỗi đó không có identity — nó chỉ có một câu.
 
-What holds this law is
-[`sources/be/exception-identity.mjs`](../../../sources/be/exception-identity.mjs). Two of its rulings
-are held there; the ones about renaming and about the HTTP status are stated here and enforced by
-review, because neither is visible in one file.
+Rule này được giữ bởi [`sources/be/exception-identity.mjs`](../../../sources/be/exception-identity.mjs). Hai phán quyết của module được tổ chức ở đó; các vấn đề đổi tên và HTTP status được nêu ở đây và do review thực thi, vì cả hai đều không hiện rõ trong một file đơn lẻ.
 
-## Rules
+## Quy tắc
 
-**IDENTITY-1 · A class extending `AbstractException` is named `*Exception`.**
+**IDENTITY-1 · Class mở rộng `AbstractException` phải được đặt tên `*Exception`.**
 
-Not `*Error`, not a bare noun. This is not a style preference — the suffix is the only thing every
-other exception rule can see. `require-exception-object-arg`, `exception-extends-abstract` and
-`exception-in-errors-folder` all key on it, and `throw-abstract-exception` recognises only `Error`
-and the framework names — so a failure named `SomethingError` sits in the errors folder, extends the
-house base, is thrown from real call sites, and is checked by NONE of them. The gate reports nothing
-and that reads as agreement.
+Không `*Error`, không danh từ trần. Đây không phải sở thích về style — suffix là thứ duy nhất mà các exception rule khác có thể nhìn thấy. `require-exception-object-arg`, `exception-extends-abstract` và `exception-in-errors-folder` đều dựa vào suffix đó, còn `throw-abstract-exception` chỉ nhận diện `Error` và các framework name. Vì vậy, một `SomethingError` nằm trong errors folder, kế thừa framework base và được throw từ call site thật có thể không bị BẤT KỲ rule nào kiểm tra. Cổng không báo lỗi và điều đó bị tưởng là thỏa thuận.
 
-The same trap `EXCEPTION-3` describes, from the other end. There, a class extending a framework base
-looks house-shaped at the throw site; here, a class named for no convention looks house-shaped in the
-folder. Both are failures that pass every check by being invisible to it.
+Đây cũng là cái bẫy mà `EXCEPTION-3` mô tả từ đầu bên kia. Ở đó, class kế thừa framework base trông hợp lệ tại nơi throw; ở đây, class có tên sai trông hợp lệ trong folder. Cả hai đều lọt qua bằng cách vô hình trước các phép kiểm tra.
 
-**IDENTITY-2 · The code is the class name, spelled in SCREAMING_SNAKE.**
+**IDENTITY-2 · Code là class name, viết theo SCREAMING_SNAKE.**
 
-`CourseNotFoundException` reports `COURSE_NOT_FOUND_EXCEPTION`, and it is written as a literal in the
-`super()` call, never assembled. Two things follow from deriving it rather than choosing it, and both
-are the point.
+`CourseNotFoundException` báo cáo `COURSE_NOT_FOUND_EXCEPTION`, được viết dưới dạng literal trong lời gọi `super()`, không ghép khi chạy. Khi code được suy ra thay vì chọn thủ công, hai điều trở nên đúng.
 
-The first is that nobody has to look it up. A reader with the class name knows the code; a reader
-with the code can find the class by searching for it. A code chosen by hand is a second name for the
-same failure, and the second name is the one that ends up in the client, in the alert rule and in the
-support ticket, while the first is the only one in the source.
+Thứ nhất, không ai phải tra cứu code. Người đọc class name biết code; người đọc code có thể tìm class bằng search. Code chọn bằng tay trở thành tên thứ hai cho cùng một failure, rồi tên thứ hai xuất hiện trong client, alert rule và support ticket trong khi source chỉ có tên thứ nhất.
 
-The second is uniqueness for free. A code copied from the exception above it is the ordinary way two
-unrelated failures come to share one identity — and it has happened here: an OTP challenge and a
-course challenge reported the same code, so a client matching on it could not tell a missing course
-lesson from a missing login step. That is precisely the defect `EXCEPTION-1` refuses framework
-exceptions for, arriving inside the house vocabulary instead.
+Thứ hai, uniqueness đến tự nhiên. Code sao chép từ exception phía trên là cách thường gặp khiến hai failure không liên quan có cùng identity — ví dụ challenge OTP và course challenge cùng báo một code, khiến client không biết thiếu course challenge hay thiếu login challenge. Đó chính là lỗi mà `EXCEPTION-1` từ chối khi framework exception lấy vocabulary của framework làm tên.
 
-Underscore placement inside an acronym is not part of the ruling. `GRAPHQL_DATA_NOT_FOUND_EXCEPTION`
-and `GRAPH_QL_DATA_NOT_FOUND_EXCEPTION` name the same class, there is no correct split, and a rule
-insisting on one would fire on code that is right.
+Vị trí underscore bên trong acronym không thuộc phán quyết này. `GRAPHQL_DATA_NOT_FOUND_EXCEPTION` và `GRAPH_QL_DATA_NOT_FOUND_EXCEPTION` vẫn cùng tên theo rule này; không có một cách tách chính xác duy nhất, và rule nhấn mạnh một bên sẽ kích hoạt đúng code đó.
 
-**IDENTITY-3 · Renaming the class renames the wire, so rename on purpose.**
+**IDENTITY-3 · Đổi tên class sẽ đổi tên wire, nên rename phải có chủ đích.**
 
-Because the code is derived, a rename is a client-visible change rather than a refactor. That is the
-honest consequence and the reason to keep it: the alternative is a class whose code preserves a name
-it no longer has, which has also happened here — a path lookup still reports the directory lookup it
-used to be, and no reader of either name can guess the other.
+Vì code được suy ra từ class name, rename là thay đổi client có thể nhìn thấy chứ không chỉ là refactor. Đây là hệ quả cần chấp nhận và cũng là lý do phải giữ quy tắc: phương án ngược lại — giữ code cũ trong class đã đổi tên — tạo ra một class mà không người đọc nào có thể suy ra code từ tên.
 
-So a rename is a decision with a migration, not a tidy-up performed on the way past. If the old code
-must stay on the wire for a released client, the class keeps its old name until the client is
-retired; what is refused is the silent half-rename that leaves the two disagreeing forever.
+Vì vậy, rename là quyết định migration, không phải dọn dẹp tiện tay. Nếu code cũ phải tiếp tục tương thích với client đã phát hành, hãy giữ class name cũ cho tới khi client đó được retire; điều bị cấm là đổi một nửa trong im lặng khiến class name và code bất đồng mãi mãi.
 
-**IDENTITY-4 · The metadata type is named for its exception, even when it adds nothing.**
+**IDENTITY-4 · Metadata type được đặt tên theo exception, kể cả khi không thêm field.**
 
-`CourseNotFoundExceptionMetadata`, extending `AbstractExceptionMetadata`, is what the constructor's
-destructured parameter is typed as — and an exception with nothing of its own to say still declares
-`export type XExceptionMetadata = AbstractExceptionMetadata` rather than typing the parameter as the
-base directly.
+`CourseNotFoundExceptionMetadata`, mở rộng `AbstractExceptionMetadata`, là type của constructor destructuring. Exception không có gì để nói vẫn khai báo `export type XExceptionMetadata = AbstractExceptionMetadata`, thay vì type trực tiếp là base.
 
-The empty alias is not ceremony, for the same reason `EXCEPTION-2`'s empty object is not: it is the
-place the first field lands. A parameter typed as the base says "this failure carries nothing", which
-stops being true the moment somebody has an id to attach — and at that moment the base type is shared
-by every other exception, so the field cannot be added there and the declaration has to be reshaped
-before it can be extended. Naming the type after the exception also means a reader holding the
-failure's name can find its payload without opening the file.
+Alias rỗng không phải nghi thức. Nó giữ chỗ cho field đầu tiên, cũng như object rỗng trong `EXCEPTION-2` giữ một cách viết thống nhất. Type base trực tiếp nói rằng lỗi này không mang gì thêm; điều đó sẽ sai ngay khi cần gắn id, và type base dùng chung không phải nơi để thêm field riêng. Đặt tên type theo exception cũng giúp người cầm error name tìm được payload mà không phải mở file.
 
-**IDENTITY-5 · The HTTP status is not the identity.**
+**IDENTITY-5 · HTTP status không phải identity.**
 
-`AbstractException` takes an optional `httpStatus`, and most failures omit it and default to 500. It
-is a transport concession for the cases where the status IS the contract — a guard answering 401, an
-upload refused as 413 — and it is never how two failures are told apart, because a status is a
-category shared by hundreds of them.
+`AbstractException` nhận một tùy chọn `httpStatus`; phần lớn exception bỏ qua và mặc định là 500. Đây là nhượng bộ cho transport trong những trường hợp status LÀ contract — guard trả 401, upload bị từ chối trả 413 — chứ không phải cách phân biệt lỗi, vì một status được hàng trăm lỗi dùng chung.
 
-This is why an exception that sets a status still needs everything above, and why a reviewer asking
-"what does the client match on?" is asking about the code. A declaration reaching for a status in
-order to be distinguishable has answered the wrong question.
+Đó là lý do exception có status vẫn cần mọi phần ở trên và reviewer vẫn hỏi “client match vào đâu?” Câu trả lời là code. Một declaration cố tình dùng status để phân biệt đã trả lời sai câu hỏi.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A failure class named `*Error` or a bare noun | Every exception rule keys on the `Exception` suffix, so the class is enforced by nothing while the gate stays green | Name it `*Exception` |
-| A code chosen by hand rather than derived from the class | It is a second name for one failure, and the second name is the one that reaches the client while the first is the only one in the source | Spell the class name in SCREAMING_SNAKE |
-| A code copied from the exception declared above it | Two unrelated failures then arrive at the client identical, which is the defect framework exceptions are refused for | Derive it, so the copy is visible in the same file |
-| A code assembled at runtime | Nothing can find it by searching, which is what every consumer of a code does | Pass a literal |
-| A class renamed while the code stays | The two names disagree forever and neither can be guessed from the other | Rename both, or keep the old class name until the released client is retired |
-| A constructor parameter typed `AbstractExceptionMetadata` | It says the failure carries nothing, and the shared base is not where its first field can be added | `export type XExceptionMetadata = AbstractExceptionMetadata` |
-| An `httpStatus` set so the failure can be told apart | A status is a category shared by hundreds of failures, so it distinguishes nothing | Set the status only where the status is the contract; the code carries the identity |
+| Class failure tên `*Error` hoặc danh từ trần | Các exception rule dựa vào suffix `Exception`, nên class không bị kiểm tra dù cổng vẫn xanh | Đặt tên là `*Exception` |
+| Code chọn thủ công thay vì suy ra từ class | Nó tạo tên thứ hai cho cùng failure, và client sẽ tiếp cận tên thứ hai trong khi source chỉ có tên thứ nhất | Viết class name theo SCREAMING_SNAKE |
+| Code sao chép từ exception được khai báo phía trên | Hai lỗi không liên quan trở thành giống hệt nhau với client; đây là chính lỗi mà framework-vocabulary exception bị từ chối | Để code được suy ra từ declaration trong cùng file |
+| Code được ghép khi chạy | Không thể tìm bằng search, trong khi mọi consumer đều dựa vào search | Truyền một literal |
+| Đổi tên class nhưng giữ nguyên code | Hai tên không còn đồng nhất và không thể suy ra lẫn nhau | Đổi tên cả hai hoặc giữ class name cũ đến khi client retire |
+| Constructor parameter được type là `AbstractExceptionMetadata` | Nó nói lỗi không mang thêm gì, và shared base không phải nơi thêm field riêng | `export type XExceptionMetadata = AbstractExceptionMetadata` |
+| Dùng `httpStatus` để phân biệt lỗi | Status là category dùng chung cho hàng trăm failure, nên không tạo identity | Chỉ đặt status khi status là contract; code mang identity |
 
-## Examples
+## Ví dụ
 
-### The ordinary declaration — three alphabets, one word
+### Declaration thông thường — ba alphabet, một từ
 
 ```ts
 /** Metadata when a caller reaches for a review that belongs to somebody else. */
@@ -145,9 +95,9 @@ export class CourseReviewNotOwnedException extends AbstractException {
 }
 ```
 
-They differ in one thing: whether the three consumers are reading the same word.
+Chúng khác nhau ở việc ba consumer có đọc cùng một từ hay không.
 
-### The suffix trap — the declaration no rule can see
+### Bẫy suffix — declaration mà rule không thể nhìn thấy
 
 ```ts
 export class CourseAlreadyEnrolledException extends AbstractException { /* ... */ }
@@ -159,9 +109,9 @@ export class CourseAlreadyEnrolledException extends AbstractException { /* ... *
 export class CourseAlreadyEnrolledError extends AbstractException { /* ... */ }
 ```
 
-They differ in one thing: whether the gate can see the class at all.
+Chúng khác nhau ở việc cổng có nhìn thấy class hay không.
 
-### The copied code
+### Code bị sao chép
 
 ```ts
 export class ChallengeOtpNotFoundException extends AbstractException {
@@ -181,9 +131,9 @@ export class ChallengeOtpNotFoundException extends AbstractException {
 }
 ```
 
-They differ in one thing: whether the code was derived or inherited from a neighbour.
+Chúng khác nhau ở việc code có có nguồn gốc hay chỉ được sao chép từ hàng xóm.
 
-### The empty metadata type
+### Type metadata rỗng
 
 ```ts
 /** Metadata for a request missing the `x-admin-api-key` header. */
@@ -210,9 +160,9 @@ export class AdminApiKeyRequiredException extends AbstractException {
 }
 ```
 
-They differ in one thing: whether the failure owns the type describing it.
+Chúng khác nhau ở việc error có thuộc type mô tả chính nó hay không.
 
-### The status is not the name
+### Status không có tên
 
 ```ts
 // Two refusals, distinguishable by code; the status says only how the transport should answer.
@@ -228,4 +178,4 @@ super("Premium content requires an active plan", "PREMIUM_CONTENT_AI_ACCESS_DENI
 super("Not allowed", "FORBIDDEN_EXCEPTION", { userId }, HttpStatus.FORBIDDEN)
 ```
 
-They differ in one thing: whether the failure is told apart by its code or by its transport.
+Chúng khác nhau ở việc error được phân biệt bằng code hay chỉ bằng transport status.

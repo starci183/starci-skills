@@ -7,6 +7,12 @@ description: Challenge and revise an evidence-backed StarCi frontend design brie
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
+Then read the Review decision owners:
+[`critique.md`](../../fe/creativity/critique.md),
+[`selection.md`](../../fe/creativity/selection.md),
+[`contract-graph.md`](../../fe/creativity/contract-graph.md) and
+[`verification.md`](../../fe/creativity/verification.md).
+
 Review settles what Apply will build. It does not build a second implementation for Apply to copy.
 
 ## CONTEXT
@@ -26,7 +32,24 @@ Challenge the selected direction against live contracts, existing source ownersh
 paths, owner states, fixture identities and acceptance commands.
 
 Read the live target imports, exports, prop types and call sites. Freeze every owner in the approved
-tree under the exact heading `### COMPONENT DELTA`:
+tree only after the following decision artifacts are settled.
+
+Print the selected direction's canonical research rows from
+[`research.md`](../../fe/creativity/research.md) under `### INTERACTION CONSEQUENCE`. Reject a visible
+interaction with a missing or wildcard trigger, product owner, visual state, pending, success,
+failure, persistence/shared effect or evidence claim. `N/A` requires evidence.
+
+For every proposed `ADD composite` or `ADD block`, print the canonical graph rows under
+`### OWNER CHALLENGE`. Search live contracts, components, imports and call sites; try `REUSE` and
+`ALTER` before `KEEP_APART` or `ADD`. Every such ADD must match one challenge row and its
+layer-specific proof. Print this heading before `### COMPONENT DELTA`.
+
+For every added or changed icon, badge, chip, border, surface, wrapper or selected paint, print the
+canonical critique rows under `### VISUAL JOB`. Reject chrome without an observable recognition,
+grouping or interaction-state job. Bind its complete applicable state family in acceptance
+evidence.
+
+Then freeze every owner in the approved tree under the exact heading `### COMPONENT DELTA`:
 
 | Layer | Owner | Action | Current path | Final path | Parent / call sites | Contract | Reason |
 |---|---|---|---|---|---|---|---|
@@ -49,10 +72,11 @@ verdict. For a removed or renamed prop, name every producer and how source prove
 the connected/pure twin boundary, state union, contract key or slot API when that is the interface
 that changes.
 
-Reject approval if either table is absent, has unresolved wildcards, defers inventory to Apply, or
-names an owner without inspecting its live definition and consumers. The production boundary may
-also name contracts, fixtures, messages, hooks and transport files, but it cannot substitute for the
-two component-interface tables.
+Reject approval if a required decision artifact or either delta table is absent, has unresolved
+wildcards, defers inventory to Apply, or names an owner without inspecting its live definition and
+consumers. An empty `VISUAL JOB` table is valid only when no listed visual element is added or
+changed. The production boundary may also name contracts, fixtures, messages, hooks and transport
+files, but it cannot substitute for the decision artifacts or two component-interface tables.
 
 Review two to four conceptual directions only when the Plan still carries a real unresolved product
 choice. Create no HTML, JSX, CSS, design-code directory, copied component tree or production edit.

@@ -34,29 +34,20 @@ clock: this shelf changes when the way we decide changes, a baseline changes whe
 changes. They live in [`fe/baselines/`](../baselines/) — currently
 [`explore.md`](../baselines/explore.md) for Dashboard Explore.
 
-## Operating procedures
+## Phase consumers
 
-The documents above hold the reasoning model. Net-new UI and UI with an unresolved choice use one
-mandatory approval pipeline. All phases keep `page`, `layout`, `block` and `overlay` as explicit
-scopes rather than separate, competing workflows.
+Every retained creativity decision owner has one or more named consuming phases. A phase reads its
+named owners before producing the corresponding evidence. When a repeated failure is already
+forbidden by a consumed owner, repair the phase artifact or regression gate; do not add synonymous
+canon. Lifecycle mechanics remain owned by [`skill-shape.md`](../../skill-shape.md) and the phase
+skills rather than being restated here.
 
-| Phase | Skill | Ends when |
+| Phase | Must read | Evidence it owns |
 |---|---|---|
-| Plan | [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | One HTML preview with two to four direction tabs is served at one URL on the first free port at 8080+, tracked by path/hash, and one tab is selected |
-| Review | [`starci-fe-design-review`](../../skills/starci-fe-design-review/SKILL.md) | The selected brief, exact component tree, every public-prop migration, owner states and supporting source boundary are explicitly approved |
-| Apply | [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | Current source is committed as the baseline, only approved delta rows are written directly in source, and every row matches the final diff plus real page proof |
-
-Every phase runs to the end of its own work before it speaks. What it cannot settle alone comes back
-as one batched ask and the run continues on the answer; what only looks like a choice — a label, a
-glyph, an ordering inside the chosen direction — is decided and recorded in a line. Whether an old
-task still matches the source is asked later by
-[`starci-workflow-drift-plan`](../../skills/starci-workflow-drift-plan/SKILL.md), not prevented by a seal.
-
-A bounded defect with a binding expected result uses
-[`starci-fe-fidelity-start`](../../skills/starci-fe-fidelity-start/SKILL.md), because manufacturing
-alternatives around a settled parity fix wastes review and weakens the reference. Fidelity Fix
-still locks context, reconfirms writes, proves full lint adoption and renders touched states. It
-returns to Plan when hierarchy, CTA, behavior, ownership or reusable vocabulary needs a choice.
+| [`starci-fe-design-plan`](../../skills/starci-fe-design-plan/SKILL.md) | `mode.md`, `best-belief-source.md`, `research.md`, `brief.md`, `divergence.md` | Mode, claim authority, evidence packet, brief/anti-goals and materially different directions |
+| [`starci-fe-design-review`](../../skills/starci-fe-design-review/SKILL.md) | `critique.md`, `selection.md`, `contract-graph.md`, `verification.md` | Counterargument and verdict, selected trade-off, owner graph, interaction consequence, visual job and acceptance states |
+| [`starci-fe-design-apply`](../../skills/starci-fe-design-apply/SKILL.md) | `implementation.md`, `verification.md` | Approved vertical slice, graph-disproof routing and rendered/code proof |
+| [`starci-fe-fidelity-start`](../../skills/starci-fe-fidelity-start/SKILL.md) | `mode.md`, `best-belief-source.md`, `contract-graph.md`, `verification.md` | Binding authority, reference owner closure and touched interaction/visual proof |
 
 ## Rules
 

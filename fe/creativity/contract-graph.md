@@ -29,6 +29,19 @@ For each new contract, leaf, composite, branch, block or shell, state what it ow
 inventory cannot own it honestly, where else it can recur, how it rests and which tests will bind
 it. A proposal that exists only to obtain another gap or wrapper is refused.
 
+Before `ADD`, search live contracts, component owners, imports and call sites, then try `REUSE` and
+`ALTER` before `KEEP_APART` or `ADD`. `None` is valid only with exact searched roots and call-site
+evidence. `ADD composite` requires at least two real consumers of the same closed named-slot shape;
+one consumer remains block-internal. `ADD block` requires a distinct domain sentence plus request,
+copy, state and connected/pure ownership; visual novelty is not block proof.
+
+Record the decision under `### OWNER CHALLENGE`:
+
+| Proposed owner | Layer | Purpose | Closest existing owners / contracts | REUSE verdict | ALTER verdict | Layer proof | Decision | Evidence |
+|---|---|---|---|---|---|---|---|---|
+
+`Decision` is `REUSE`, `ALTER`, `KEEP_APART` or `ADD`.
+
 **GRAPH-4 · Lists carry one recipe and inert item data.**
 
 A list surface receives a contract-bound render component and the data it repeats. Cardinality and
@@ -58,6 +71,7 @@ Contracts and component identities describe structure, `props` carries inert res
 | Put product menu choices inside a dropdown shell | The mechanical boundary becomes domain behavior | Let the block supply resolved menu content and actions |
 | Pass rendered children or functions through data | Structure and behavior bypass their typed fences | Use contract-bound render identity and `on` |
 | Add a leaf for a reusable multi-leaf arrangement | A primitive tier would hide composition | Use a composite when the fixed arrangement is the reusable thing |
+| Approve `ADD composite` or `ADD block` without an owner challenge | The nearest owner and its consumers were never disproved | Search live ownership, try REUSE and ALTER, then record the layer-specific verdict |
 
 ## Examples
 

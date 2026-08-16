@@ -1,100 +1,65 @@
-# authorization
+# ủy quyền
 
-## Definition
+## Định nghĩa
 
-Authentication asks **who is this**. Authorization asks **whether they may do this, to this**. They
-are different questions, they are answered in different places, and the reason they are separate is
-that one of them can be answered without reading any data and the other cannot.
+Xác thực hỏi **đây là ai**. Ủy quyền hỏi **người đó có được phép làm việc này trên đối tượng này hay không**. Đây là hai câu hỏi khác nhau, được trả lời ở hai nơi khác nhau: một câu có thể trả lời mà không cần đọc dữ liệu, còn câu kia thì không.
 
-A guard sees the request. It can prove a token, resolve a user, and refuse an anonymous caller —
-and that is the whole of what it can do, because the row the caller is reaching for has not been
-loaded yet. Whether this user owns this review, has an enrollment on this course, or belongs to the
-tenant that owns this record are questions about a row, and only the handler holds both the row and
-the identity at the same moment.
+Guard nhìn thấy request. Nó có thể xác minh token, phân giải người dùng và từ chối caller ẩn danh — đó là toàn bộ phạm vi của nó, vì row mà caller muốn truy cập vẫn chưa được tải. Người dùng này có sở hữu review này, có enrollment trong course này, hay có thuộc tenant sở hữu record này không đều là câu hỏi về một row; chỉ handler mới đồng thời giữ row và identity.
 
-The question that settles where a check belongs: **does the answer depend on the request's data?**
-"Is anyone signed in" does not, and belongs to the door. "May this person edit *that*" does, and
-belongs to the handler.
+Câu hỏi quyết định vị trí của phép kiểm tra là: **câu trả lời có phụ thuộc vào dữ liệu của request không?** “Có ai đăng nhập không?” không phụ thuộc, nên thuộc về cánh cửa. “Người này có được sửa *đối tượng đó* không?” có phụ thuộc, nên thuộc về handler.
 
-What holds the machine-checkable half is
-[`sources/be/authorization.mjs`](../../../sources/be/authorization.mjs). That half is AUTHZ-2 and
-only AUTHZ-2 — the rest turn on which row is being reached and what it means to own it, and no parser
-knows that. The module records what was measured and deliberately left alone, so the next reader does
-not "finish the job" by writing a rule that fires on every correct handler in the tree.
+Phần có thể kiểm tra bằng máy nằm trong [`sources/be/authorization.mjs`](../../../sources/be/authorization.mjs). Phần đó chỉ là AUTHZ-2 — không hơn — vì các phần còn lại phụ thuộc vào row đang được truy cập và ý nghĩa của quyền sở hữu; parser không biết những điều đó. Module ghi lại những gì đã đo và cố ý không chạm vào phần còn lại, để người đọc sau không “làm nốt” bằng cách viết một rule kích hoạt trên mọi handler đúng trong cây.
 
-## Rules
+## Quy tắc
 
-**AUTHZ-1 · A handler owns its own preconditions, and an identity is one of them.**
+**AUTHZ-1 · Handler sở hữu các điều kiện tiên quyết của chính nó, và identity là một trong số đó.**
 
-A handler checking that it has a user is not duplicating the guard. The guard belongs to ONE door,
-and the handler belongs to every door — the CLI, the job, the harness and the next transport are all
-callers with no resolver in front of them. That is the same argument CQRS makes for putting the work
-in the handler, applied to the work's preconditions.
+Handler kiểm tra rằng nó có user không phải là lặp lại guard. Guard thuộc về MỘT cánh cửa, còn handler thuộc về mọi cánh cửa — CLI, job, harness và transport tiếp theo đều có thể gọi nó mà không có resolver đứng trước. Đây cũng là lập luận của CQRS khi đặt công việc trong handler, nay áp dụng cho điều kiện tiên quyết của công việc.
 
-So the check reads as defensive and is not: remove it, and the operation is safe exactly as long as
-nobody invokes it from anywhere new.
+Vì vậy, phép kiểm tra này chỉ mang tính phòng thủ. Xóa nó đi thì operation chỉ an toàn chừng nào chưa có ai gọi từ một nơi mới.
 
-**AUTHZ-2 · A door that READS an identity carries the guard that establishes it.**
+**AUHZ-2 · Cánh cửa ĐỌC identity phải mang guard thiết lập identity đó.**
 
-A resolver method taking the authenticated-user parameter without a guard on that method or its
-class is reading a user off a request nothing authenticated. It compiles, it is quiet, and what it
-hands the handler is whatever the pipeline happened to leave there.
+Resolver method nhận tham số authenticated user nhưng không có guard trên method hoặc class đang đọc một user từ request mà chưa có gì xác thực. Mã vẫn biên dịch, vẫn im lặng, và thứ được chuyển cho handler chỉ là giá trị pipeline tình cờ để lại.
 
-This is the half worth a rule, because it is the failure that looks like nothing: the door still
-mentions a user, the handler still receives one, and the only missing piece is the line that proved
-it belonged to the caller.
+Đây là nửa đáng để thành rule, vì lỗi này trông như không có lỗi: cánh cửa vẫn nhắc đến user, handler vẫn nhận được user, chỉ thiếu dòng chứng minh user đó thuộc về caller.
 
-**AUTHZ-3 · Ownership is decided against the loaded row, never against the request.**
+**AUHZ-3 · Quyền sở hữu được quyết định dựa trên row đã tải, không bao giờ dựa trên request.**
 
-`request.reviewId` says which row the caller NAMES, not which row they own. Load it, compare the
-owner to the authenticated identity, and refuse on the comparison. A check written against ids the
-caller supplied is a check the caller passes by choosing different ids.
+`request.reviewId` cho biết caller ĐẶT TÊN row nào, không cho biết caller sở hữu row nào. Hãy tải row, so sánh owner với authenticated identity rồi từ chối theo kết quả so sánh. Phép kiểm tra dựa trên id do caller cung cấp là phép kiểm tra mà caller có thể vượt qua bằng cách cung cấp id khác.
 
-**AUTHZ-4 · A refusal that would reveal a private row's existence is a not-found.**
+**AUTHZ-4 · Từ chối mà làm lộ sự tồn tại của private row phải là not-found.**
 
-"You may not edit this" and "this does not exist" are different facts, and a client shows different
-things for them — so ordinarily each earns its own exception. The exception to that is a row the
-caller could not otherwise know about: there, answering "forbidden" confirms the row exists, and the
-existence was the secret. Answer not-found, and let the log carry the real reason.
+“Bạn không được sửa đối tượng này” và “đối tượng này không tồn tại” là hai sự thật khác nhau, nên thông thường mỗi trường hợp cần exception riêng. Ngoại lệ là row mà caller không thể biết trước: trả lời “forbidden” ở đó sẽ xác nhận row tồn tại, trong khi chính sự tồn tại là bí mật. Hãy trả lời not-found và để log mang lý do thật.
 
-Say which of the two a refusal is when you write it, because the wrong one is invisible in both
-directions: a not-found where forbidden was correct sends a legitimate caller hunting for a bug, and
-a forbidden where not-found was correct is an enumeration oracle.
+Khi viết phép từ chối, hãy nói rõ nó thuộc loại nào trong hai loại trên. Chọn sai sẽ gây lỗi theo cả hai hướng: not-found ở nơi cần forbidden khiến caller hợp lệ đi tìm một bug không tồn tại; forbidden ở nơi cần not-found tạo ra một oracle cho phép enumeration.
 
-**AUTHZ-5 · An entitlement is a STATE, and having the row is not having the state.**
+**AUTHZ-5 · Entitlement là một STATE; có row không đồng nghĩa với có state đó.**
 
-Enrollment, membership, subscription, trial. A row saying somebody has a relationship to a course
-does not say which relationship: a trial row and a paid row are both enrollments and grant different
-things. A check that treats the row's EXISTENCE as the entitlement grants the trial everything the
-purchase grants.
+Enrollment, membership, subscription, trial. Một row cho biết ai đó có quan hệ với course, nhưng không cho biết quan hệ nào: trial và paid đều là enrollment nhưng cấp các quyền khác nhau. Phép kiểm tra coi sự TỒN TẠI của row là entitlement sẽ cấp cho trial mọi thứ vốn chỉ được mở sau khi mua.
 
-Read the field that carries the distinction, and name it in the query rather than in a comment. This
-is the check most likely to be written once, correctly, and then copied to a place where the
-distinction matters and the field is dropped.
+Hãy đọc field mang sự phân biệt đó và nêu field ngay trong query, thay vì mô tả trong comment. Đây là loại phép kiểm tra thường được viết đúng một lần rồi sao chép sang nơi mà sự phân biệt vẫn quan trọng nhưng field đã bị bỏ đi.
 
-**AUTHZ-6 · An operator is a different subject from a viewer.**
+**AUHZ-6 · Operator là một subject khác với viewer.**
 
-A platform operator, a service token and a product user are three identities, and hanging them off
-one guard means one academy's administrator can operate the platform. The subject decides the guard,
-and a door serving a non-viewer subject says so — see `transport.md`, which places such a door and
-gives it the one reason it is allowed not to be GraphQL.
+Platform operator, service token và product user là ba identity khác nhau. Gắn cả ba vào một guard có thể khiến administrator của một academy vận hành toàn bộ platform. Subject quyết định guard; cánh cửa phục vụ subject không phải viewer phải nói rõ điều đó — xem `transport.md`, nơi đặt một cánh cửa như vậy và nêu lý do duy nhất cho phép nó không phải GraphQL.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A resolver reading the authenticated user with no guard on the method or class | It reads an identity off a request nothing authenticated, and hands the handler whatever was left there | Put the guard on the door that reads the identity |
-| Deciding ownership from ids in the request | The caller chose those ids, so the check is one they pass by choosing others | Load the row and compare its owner to the authenticated identity |
-| Answering "forbidden" for a row the caller could not know exists | The refusal confirms the row, and its existence was the secret | Answer not-found; put the real reason in the log |
-| Answering "not found" where the caller legitimately knows the row | It sends a legitimate caller hunting for a bug that is not there | Name the refusal |
-| Treating an entitlement row's existence as the entitlement | A trial row and a paid row are both rows, and they grant different things | Read the field that distinguishes them |
-| One guard for operators, service tokens and product users | One tenant's administrator ends up able to operate the platform | One guard per subject |
-| Removing a handler's identity precondition because the resolver has a guard | The guard covers one door; the handler has as many doors as the bus has callers | Leave it; it is the handler's precondition, not the door's |
-| An authorization rule written in the service beside the handler | It has no message, so no second door reaches it and the next door grows its own copy | Put it in the handler |
+| Resolver đọc authenticated user mà không có guard trên method hoặc class | Nó đọc identity từ một request chưa được xác thực và chuyển cho handler bất cứ thứ gì pipeline để lại | Đặt guard trên cánh cửa đọc identity |
+| Quyết định ownership từ các id trong request | Caller đã chọn các id đó, nên có thể vượt qua phép kiểm tra bằng cách chọn id khác | Tải row và so sánh owner của nó với authenticated identity |
+| Trả lời “forbidden” cho row mà caller không thể biết tồn tại | Từ chối sẽ xác nhận row tồn tại, trong khi sự tồn tại là bí mật | Trả lời not-found; ghi lý do thật vào log |
+| Trả lời “not found” ở nơi caller biết rõ row | Nó khiến caller hợp lệ đi tìm một bug không tồn tại | Đặt tên cho kiểu từ chối |
+| Coi sự tồn tại của entitlement row là entitlement | Trial và paid đều là row nhưng cấp các quyền khác nhau | Đọc field phân biệt chúng |
+| Dùng một guard cho operator, service token và product user | Administrator của một tenant có thể vận hành toàn bộ platform | Một guard cho mỗi subject |
+| Xóa điều kiện identity của handler vì resolver đã có guard | Guard chỉ che một cánh cửa; handler có nhiều caller như bus có người gọi | Giữ lại; đó là điều kiện của handler, không phải của cánh cửa |
+| Viết rule authorization trong service cạnh handler | Nó không có message, nên cánh cửa thứ hai không thể dùng lại và sẽ tạo bản sao riêng | Đặt rule trong handler |
 
-## Examples
+## Ví dụ
 
-### The door that reads what nothing proved
+### Cánh cửa đọc một identity chưa được chứng minh
 
 ```ts
 @UseGuards(KeycloakAuthGraphQLGuard)
@@ -115,9 +80,9 @@ async execute(
 ): Promise<CourseReviewEntity> { /* ... */ }
 ```
 
-They differ in one thing: whether anything proved the identity the door reads.
+Chúng chỉ khác nhau ở một điểm: cánh cửa có chứng minh identity mà nó đọc hay không.
 
-### The ownership trap
+### Bẫy ownership
 
 ```ts
 // the row decides, and the row was loaded
@@ -137,9 +102,9 @@ if (request.userId !== user.id) {
 await this.entityManager.delete(CourseReviewEntity, { id: request.reviewId })
 ```
 
-They differ in one thing: whether the check reads anything the caller did not choose.
+Chúng chỉ khác nhau ở một điểm: phép kiểm tra có đọc dữ liệu mà caller không tự chọn hay không.
 
-### The entitlement trap
+### Bẫy entitlement
 
 ```ts
 // the field that distinguishes a purchase from a trial is named in the query
@@ -155,9 +120,9 @@ const isEntitled = await this.entityManager.exists(EnrollmentEntity, {
 })
 ```
 
-They differ in one thing: whether a trial passes the gate a purchase was meant to open.
+Chúng chỉ khác nhau ở một điểm: trial có vượt qua được cổng vốn chỉ purchase mới mở hay không.
 
-### The refusal that leaks
+### Từ chối làm lộ thông tin
 
 ```ts
 // a draft nobody may read: the refusal does not confirm it exists
@@ -172,4 +137,4 @@ if (!draft) throw new DraftNotFoundException({ id: draftId })
 if (draft.author.id !== user.id) throw new DraftNotOwnedException({ id: draftId })
 ```
 
-They differ in one thing: whether the refusal is an enumeration oracle.
+Chúng chỉ khác nhau ở một điểm: lời từ chối có trở thành enumeration oracle hay không.

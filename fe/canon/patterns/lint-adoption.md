@@ -1,57 +1,59 @@
-# lint adoption
+# áp dụng lint
 
-## Definition
+## Định nghĩa
 
-Lint adoption is the effective ESLint configuration applied to a real production file, not the
-presence of a plugin folder, an import, or a similarly named local rule set. The deciding question
-is: does `eslint --print-config` show every StarCi FE canon rule at `error` and refuse inline config?
+Áp dụng lint là cấu hình ESLint thực sự được áp dụng lên một file production có thật; không phải là
+việc có một thư mục plugin, một lệnh import hay một bộ rule cục bộ có tên tương tự. Câu hỏi quyết
+định là: `eslint --print-config` có hiển thị mọi rule FE canon của StarCi ở mức `error` và từ chối
+inline config hay không?
 
-What holds this law is
-[`sources/fe/lint-adoption.mjs`](../../../sources/fe/lint-adoption.mjs). It audits the resolved
-configuration after ESLint has merged every config layer. The repository gate is
+Luật này được bảo đảm bởi
+[`sources/fe/lint-adoption.mjs`](../../../sources/fe/lint-adoption.mjs). Module này audit cấu hình
+đã resolve sau khi ESLint gộp mọi lớp cấu hình. Gate của repository là
 [`scripts/audit-fe-lint-adoption.mjs`](../../../scripts/audit-fe-lint-adoption.mjs).
 
 Implementation anchors in `starci-academy-fe`: `eslint.config.mjs` and
-`plugins/eslint/index.mjs`. They are evidence to inspect at the Context Lock commit, not substitutes
-for the effective-config audit.
+`plugins/eslint/index.mjs`. Đây là bằng chứng cần kiểm tra tại commit Context Lock, không phải thứ
+có thể thay thế cho effective-config audit.
 
-## Rules
+## Luật
 
-**LINT-ADOPTION-1.** A consuming project attaches the gathered StarCi FE plugin, recommendation and
-linter options as one versioned unit, because a handwritten project-local subset becomes a second
-canon the moment either list changes.
+**LINT-ADOPTION-1.** Project sử dụng phải gắn plugin FE StarCi, recommendation và các tùy chọn
+linter đã tập hợp thành một đơn vị có version, vì một subset tự viết trong project sẽ trở thành canon
+thứ hai ngay khi một trong hai danh sách thay đổi.
 
-**LINT-ADOPTION-2.** The project runs the canonical effective-config audit against at least one real
-production source file, because loading a plugin proves only that rules exist, not that ESLint
-enables them.
+**LINT-ADOPTION-2.** Project phải chạy canonical effective-config audit trên ít nhất một file source
+production có thật, vì việc load plugin chỉ chứng minh rằng các rule tồn tại, không chứng minh ESLint
+đã bật chúng.
 
-**LINT-ADOPTION-3.** Every rule in the canonical recommendation resolves to `error`, because a
-parallel handwritten plugin or a warning-level rollout creates a second, weaker architecture.
+**LINT-ADOPTION-3.** Mọi rule trong canonical recommendation phải resolve thành `error`, vì một
+plugin tự viết chạy song song hoặc rollout ở mức warning sẽ tạo ra một kiến trúc thứ hai, yếu hơn.
 
-**LINT-ADOPTION-4.** The resolved config sets `linterOptions.noInlineConfig` to `true`, because an
-inline disable turns repository trust into a caller-local preference.
+**LINT-ADOPTION-4.** Cấu hình đã resolve phải đặt `linterOptions.noInlineConfig` thành `true`, vì
+inline disable biến trust của repository thành lựa chọn riêng của caller.
 
-**LINT-ADOPTION-5.** Apply and fidelity work stop before production edits when this audit fails,
-because code written under incomplete enforcement can be legal locally while violating canon.
+**LINT-ADOPTION-5.** Apply và công việc fidelity phải dừng trước khi sửa production nếu audit này
+thất bại, vì code được viết dưới cơ chế thực thi chưa đầy đủ có thể hợp lệ cục bộ nhưng vẫn vi phạm
+canon.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| Claim adoption because a `starci-fe` plugin is imported | The imported plugin may omit rules or never enable them | Audit `eslint --print-config` for a real production file |
-| Keep a handwritten parallel subset as the project authority | Canon and the subset drift independently | Attach the gathered StarCi FE plugin, recommendation and linter options, then prove effective parity |
-| Lower missing debt to warning | Warning makes an architecture boundary optional | Fix existing debt, then enable the full strict set |
-| Begin Apply while adoption fails | New code is being judged by incomplete trust | Repair lint wiring within an approved boundary or stop |
+| Khẳng định đã áp dụng chỉ vì đã import plugin `starci-fe` | Plugin được import có thể thiếu rule hoặc không bật chúng | Audit `eslint --print-config` trên một file production có thật |
+| Giữ một subset tự viết chạy song song làm nguồn có thẩm quyền của project | Canon và subset sẽ tự lệch nhau | Gắn plugin FE StarCi, recommendation và tùy chọn linter đã tập hợp, rồi chứng minh parity thực tế |
+| Hạ debt còn thiếu xuống warning | Warning biến ranh giới kiến trúc thành tùy chọn | Sửa debt hiện có, sau đó bật toàn bộ strict set |
+| Bắt đầu Apply khi việc áp dụng chưa đạt | Code mới đang được đánh giá bằng trust chưa đầy đủ | Sửa wiring của lint trong boundary đã được duyệt hoặc dừng lại |
 
-## Examples
+## Ví dụ
 
-Right: run the audit against `src/components/pages/DashboardPage/component.tsx` and proceed only
-after it returns `ok: true`.
+Đúng: chạy audit trên `src/components/pages/DashboardPage/component.tsx` và chỉ tiếp tục sau khi
+audit trả về `ok: true`.
 
-Wrong: point to `plugins/eslint/index.mjs` and call the project adopted without inspecting the
-resolved config. The difference is effective enforcement rather than file presence.
+Sai: chỉ vào `plugins/eslint/index.mjs` rồi gọi project là đã áp dụng mà không kiểm tra cấu hình đã
+resolve. Khác biệt nằm ở việc thực thi có hiệu lực, không phải sự hiện diện của file.
 
-Right: keep every canonical rule at `error` and `noInlineConfig: true`.
+Đúng: giữ mọi rule canonical ở mức `error` và `noInlineConfig: true`.
 
-Wrong: enable most rules at `error` while leaving newly added canon rules absent. The difference is
-complete canon parity rather than a familiar plugin name.
+Sai: bật phần lớn rule ở mức `error` nhưng bỏ sót các rule canon mới thêm. Khác biệt nằm ở parity
+đầy đủ với canon, không phải tên plugin quen thuộc.

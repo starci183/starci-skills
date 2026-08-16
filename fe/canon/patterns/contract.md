@@ -1,273 +1,253 @@
-# contract
+# hợp đồng
 
-## Definition
+## Định nghĩa
 
-A contract is the description of ONE node. It is a key, and the key owns three things that are
-worthless apart: the classes the node wears, the element it opens, and the reason what it holds sits
-that way. An author who needs a shape types the key. That is the whole layout decision there is.
+Hợp đồng là mô tả của MỘT nút. Nó là một chiếc chìa khóa, và chiếc chìa khóa đó sở hữu ba thứ
+ngoài giá trị vô giá trị: các lớp mà nút mặc, phần tử nó mở và lý do nó giữ vị trí
+theo cách đó. Một tác giả cần một hình dạng sẽ gõ phím. Đó là toàn bộ quyết định bố trí có.
 
-Everything above the leaves composes keys. A branch renders one, a composite arranges several, a
-block asks for one, a page orders them — and not one of them writes a class string, because the
-moment a caller can type `flex gap-3`, the tree is decided in as many places as there are call sites
-and nothing above can be predicted from the key any more.
+Mọi thứ phía trên những chiếc lá đều tạo nên các phím. Một nhánh biểu hiện một, một tập hợp sắp xếp nhiều, một
+khối yêu cầu một cái, một trang sẽ yêu cầu chúng - và không ai trong số chúng viết một chuỗi lớp, bởi vì
+thời điểm người gọi có thể gõ`flex gap-3`, cây được quyết định ở bao nhiêu nơi cũng có gọi là site
+và không có gì ở trên có thể được dự đoán từ chìa khóa nữa.
 
-The question that settles it: **does this element hold other elements?** If it does, it is a node,
-and a node comes from a key. A file that opens a `div` has answered a question the contract table
-was supposed to answer.
+Câu hỏi giải quyết vấn đề đó: **phần tử này có chứa các phần tử khác không?** Nếu có, nó là một nút,
+và một nút đến từ một khóa. Một tập tin mở một`div`đã trả lời một câu hỏi bảng hợp đồng
+lẽ ra phải trả lời.
 
-What holds this law is [`sources/contract.mjs`](../../../sources/fe/contract.mjs) and, more
-importantly, the two closed unions in [`sources/contracts.ts`](../../../sources/fe/contracts.ts). The
-unions matter more than the rules: a class or an element that is not a member is not forbidden, it
-is unrepresentable, and there is nothing to police when the wrong value cannot be typed.
+Điều giữ luật này là[`sources/contract.mjs`](../../../sources/fe/contract.mjs)và hơn thế nữa
+quan trọng là hai công đoàn khép kín ở[`sources/contracts.ts`](../../../sources/fe/contracts.ts). các
+các công đoàn quan trọng hơn các quy tắc: một lớp hoặc một thành phần không phải là thành viên không bị cấm, nó
+là không thể trình bày được và không có gì cần cảnh sát xử lý khi không thể nhập sai giá trị.
 
-Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.ts` and
-`src/components/branches/Tree/index.tsx`.
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.ts` and `src/components/branches/Tree/index.tsx`.
 
-## Rules
+## Quy tắc
 
-**CONTRACT-1 · A structural node takes its classes from a key, never from a literal.**
+**CONTRACT-1 · Node cấu trúc lấy class từ key, không bao giờ từ literal.** `flex`, `grid`, `gap-*`, `items-*`, `justify-*`, `col-*`, họ position — những thứ này quyết định
+hình dạng của một cái cây chứ không phải là hình thức của một giá trị và hình dạng được quyết định tại vị trí cuộc gọi là hình dạng
+không ai có thể tìm thấy từ bất cứ nơi nào khác. Điều quan trọng là cách viết duy nhất. Đây là quy tắc những quy tắc khác tồn tại
+để bảo vệ, và mỗi người trong số họ đóng một cánh cửa mà lẽ ra ai đó sẽ bước qua trong khi tin tưởng
+họ đã tuân theo nó.
 
-`flex`, `grid`, `gap-*`, `items-*`, `justify-*`, `col-*`, the position family — these decide the
-shape of a tree rather than the look of one value, and a shape decided at a call site is a shape
-nobody can find from anywhere else. The key is the only spelling. This is the rule the others exist
-to protect, and each of them closes a door somebody would otherwise walk through while believing
-they had obeyed it.
+**CONTRACT-2 · Chuỗi lớp không bao giờ được tập hợp trong thời gian chạy.**`cn(base, isActive && "gap-4")`là cùng một cửa thoát hiểm mang lệnh gọi hàm: bảng thứ hai
+không có chìa khóa, không có lý do và không có gì mà bất cứ ai cũng có thể đọc lại được. Nội suy lại là điều tương tự -
+một chuỗi chỉ tồn tại trong khi thành phần chạy không thể được kiểm tra, tìm kiếm hoặc tranh luận.
+Bất cứ điều gì chi nhánh đang thử nghiệm đều là một sự khác biệt thực sự và một sự khác biệt thực sự sẽ mang lại một chìa khóa hoặc một danh hiệu được đặt tên.
+chống đỡ.
 
-**CONTRACT-2 · A class string is never assembled at runtime.**
+**CONTRACT-3 · Vocabulary của class là một closed union.**
 
-`cn(base, isActive && "gap-4")` is the same escape hatch wearing a function call: a second table
-with no keys, no reasons and nothing anybody can read back. Interpolation is the same thing again —
-a string that exists only while the component runs cannot be inspected, searched, or argued with.
-Whatever the branch was testing is a real distinction, and a real distinction earns a key or a named
-prop.
+Các lớp mà một nút có thể sắp xếp cho các con của nó là loại kết hợp, không phải là quy ước.`gap-[13px]`không thất bại trong việc xem xét; nó không biên dịch được. Đây là điều tạo nên cả một hệ thống các quy tắc tuần tra
+không cần thiết và đó là lý do tại sao giá trị khoảng cách mới là sự chỉnh sửa có chủ ý đối với danh sách được đặt tên thay vì
+một cái gì đó đến bên trong một khác biệt không ai đọc kỹ.
 
-**CONTRACT-3 · The class vocabulary is a closed union.**
+**CONTRACT-4 · Element thuộc về entry, không bao giờ thuộc về caller.**
 
-The classes a node may lay its children out with are a union type, not a convention. `gap-[13px]`
-does not fail review; it fails to compile. This is what makes a whole family of patrol rules
-unnecessary, and it is why a new spacing value is a deliberate edit to a named list rather than
-something that arrives inside a diff nobody read closely.
+Một nút không phải lúc nào cũng là một`div`. Một chuỗi ngày LÀ một danh sách; một trường có biểu mẫu gửi IS; một phần tử
+được chọn vì ý nghĩa không thể đổi lấy ý nghĩa trung lập mà không thay đổi công nghệ hỗ trợ nào
+báo cáo. Vì vậy, mục này đặt tên cho máy chủ của chính nó, từ một liên minh đóng và không có chỗ dựa máy chủ nào cho một
+người gọi chuyển - hai trang gọi của một khóa không đồng ý về phần tử sẽ là hai trang khác nhau
+các nút mang một tên.
 
-**CONTRACT-4 · The element belongs to the entry, never to a caller.**
+Quy tắc này mang tính chịu tải vì một lý do không rõ ràng. Trước khi nó tồn tại, khung chỉ được vẽ`div`, vì vậy bất kỳ hình dạng nào cần thiết`<ul>`**không có nơi nào hợp pháp để sống** và nằm giữa những chiếc lá
+thay vào đó, nơi nó có thể viết các lớp riêng của mình. Đó là cách toàn bộ tầng được lấp đầy
+sắp xếp. Một vật chủ bị thiếu không phải là một khoảng cách nhỏ; đó là cái lỗ mà từ vựng chảy vào.
 
-A node is not always a `div`. A run of days IS a list; a field with a submit IS a form; an element
-chosen for meaning cannot be swapped for a neutral one without changing what assistive technology
-reports. So the entry names its own host, from a closed union, and there is no host prop for a
-caller to pass — two call sites of one key that disagreed about the element would be two different
-nodes wearing one name.
+Cách nó thực sự bị hỏng không phải là một`host`chống đỡ; không ai thêm một. Đó là một cành cây mang một
+nút của mục nhập trên phần tử nhà cung cấp của chính nó.`contractNodeProps(contract)`trao lại lớp học
+và các điểm đánh dấu chứ KHÔNG phải phần tử, vì vậy hãy trải chúng lên`Card.Content`, một thân đàn accordion hoặc một
+hộp viết tay xóa máy chủ mục nhập được đặt tên trong khi mọi dấu hiệu có thể nhìn thấy của hợp đồng vẫn còn
+chính xác nơi người đọc mong đợi nó. Mục nhập nói`ol`và tài liệu được`div`: danh sách rời đi
+cây khả năng truy cập, không có gì thông báo có bao nhiêu mục và khóa vẫn được phân giải,
+các điểm đánh dấu vẫn đọc chính xác và mọi cổng vẫn có màu xanh. Đó là sự thất bại không có màu đỏ ở bất cứ đâu. Vì vậy
+một nhánh bề mặt hiển thị nút riêng của mục nhập BÊN TRONG phần thân nhà cung cấp của nó chứ không phải trên đó và
+khung vẫn là thứ duy nhất từng được đeo.
 
-This rule is load-bearing for a reason that is not obvious. Before it existed the frame drew only
-`div`, so any shape that needed `<ul>` had **nowhere lawful to live** and was filed among the leaves
-instead, where it could write its own classes. That is how an entire tier filled up with
-arrangements. A missing host was not a small gap; it was the hole the vocabulary drained into.
+**CONTRACT-5 · NAME của key quyết định nội dung bên trong nó.** `card` không phải là một tên có ý nghĩa. Nó không nói key chứa gì, nên bất kỳ thứ gì cũng có thể được truyền vào, và entry đó
+ngừng ràng buộc bất cứ điều gì - và thành viên chung của một gia đình luôn giành được các địa điểm cuộc gọi từ chính nó
+anh chị em cụ thể, vì đó là người không ai phải nghĩ tới.`label-figure-over-bar`nói gì
+nó giữ nguyên, vì vậy có thể nhìn thấy một đứa trẻ sai trái.
 
-The way it is actually broken is not a `host` prop; nobody adds one. It is a branch that wears an
-entry's node on a vendor element of its own. `contractNodeProps(contract)` hands back the classes
-and the markers and NOT the element, so spreading them onto `Card.Content`, an accordion body or a
-hand-written box erases the host the entry named while every visible sign of the contract stays
-exactly where a reader expects it. The entry says `ol` and the document gets `div`: the list leaves
-the accessibility tree, nothing announces how many items there are, and the key still resolves, the
-markers still read correct, and every gate stays green. It is the failure with no red anywhere. So
-a surface branch renders the entry's own node INSIDE its vendor body rather than on it, and the
-frame remains the only thing that ever wears one.
+Cái tên cũng là thứ giữ cho lý do trở nên trung thực. Một phím vẽ hai mươi vùng không thể nói tại sao một vùng nào đó
+trong số họ ở đó; lý do một tiêu đề và một sự kiện có chung một đường cơ sở là CÙNG một lý do ở cả hai mươi.
 
-**CONTRACT-5 · A key's NAME fixes what goes inside it.**
+Đối với một nút đơn giản, tên là thứ duy nhất chứa hợp đồng con, bởi vì nội dung
+từ một người gọi và có thể là bất cứ điều gì. **Nó không còn là thứ DUY NHẤT ở mọi nơi** — một phím ghép
+khai báo mọi vị trí bên trong nó và trình biên dịch sẽ kiểm tra từng vị trí, xem CONTRACT-11.
 
-`card` is not a name here. It says nothing about what it holds, so anything may go in, and the entry
-stops constraining anything — and the generic member of a family always wins the call sites from its
-specific siblings, because it is the one nobody has to think about. `label-figure-over-bar` says what
-it holds, so a wrong child is visible on sight.
+Sự đảo ngược đó được ghi lại chứ không phải im lặng. Bản đồ con đã bị loại bỏ vì không thể
+được kiểm tra khi nội dung đến dưới dạng đánh dấu: a`.map`, một cây ba ngôi và một cây con không tên đều trông giống như
+giống nhau theo một quy luật. Nội dung bây giờ đến dưới dạng THÀNH PHẦN, một nội dung cho mỗi vị trí được đặt tên, vì vậy việc kiểm tra không phải là quy tắc tại
+tất cả - đó là loại. Quyết định cũ đúng với hình dạng nó được tạo ra và sai đối với hình dạng này.
 
-The name is also what keeps the reason honest. One key drawing twenty regions cannot say why any one
-of them is there; the reason a title and a fact share a baseline is the SAME reason at all twenty.
+**CONTRACT-6 · Mỗi entry nêu vì sao node tồn tại, và lý do đó không lặp lại key.**
 
-For a plain node the name is the only thing holding the child contract, because the contents come
-from a caller and could be anything. **It is no longer the ONLY thing everywhere** — a compound key
-declares every slot inside it and the compiler checks each one, see CONTRACT-11.
+Lý do là điều mà không ai có thể xây dựng lại từ đánh dấu sau này. Nó đặt tên cho những gì bị phá vỡ,
+quấn, tràn hoặc không thể nhấn được khi nút bị loại bỏ. "Một hàng chip" bật`content-row`tốn một dòng và không dạy gì cả; "các thẻ nằm trên dòng riêng của chúng trước khi tiêu đề" là
+thực tế đã làm cho nút tồn tại.
 
-That reversal is recorded rather than quiet. The child map was retired because nothing could be
-checked once contents arrived as markup: a `.map`, a ternary and an unnamed subtree all look the
-same to a rule. Contents arrive as COMPONENTS now, one per named slot, so the check is not a rule at
-all — it is the type. The old decision was right for the shape it was made in and wrong for this one.
+**CONTRACT-7 · Một khung biến một khóa thành một phần tử.**
 
-**CONTRACT-6 · Every entry states why its node exists, and the reason is not the key again.**
+Một mục trở thành đánh dấu thực sự trong chính xác một tệp. Ở mọi nơi khác, một ô TRUNG LẬP được viết bằng tay - một`div`, Một`section`, Một`nav`— là một nút không có khóa: không có gì ghi lại những lớp mà nó phải mang,
+đứa trẻ nào thuộc về bên trong nó, hoặc tại sao nó lại ở đó. Nếu không có phím nào phù hợp với hình dạng đang được xây dựng, đó là
+phát hiện - không phải là lý do để mở một`div`.
 
-The reason is the one thing nobody can reconstruct from the markup later. It names what breaks,
-wraps, overflows or stops being pressable when the node is removed. "A row of chips" on `content-row`
-costs a line and teaches nothing; "the tags wrap onto their own line before the title does" is the
-fact that made the node exist.
+**Yếu tố ngữ nghĩa là khác nhau và sự khác biệt không phải là kẽ hở.** A`form`tồn tại để
+nộp; Một`ul`tồn tại vì nội dung của nó là một danh sách. Công nghệ hỗ trợ báo cáo phần tử, vì vậy
+nó không thể được hoán đổi cho một hộp trung tính và việc mở một hộp xung quanh nút hợp đồng sẽ quyết định không có hình dạng nào tại
+tất cả. Thứ vẫn phải đến từ một mục là HÌNH DẠNG: thời điểm một phần tử ngữ nghĩa mang một lớp,
+nó đã ngừng đóng vai trò là một trình bao bọc và trở thành một nút không có khóa và mục nhập thay thế nó có tên
+phần tử làm máy chủ của nó.
 
-**CONTRACT-7 · One frame turns a key into an element.**
+**CONTRACT-8 · Marker được vẽ từ entry, không bao giờ viết bằng tay.**
 
-An entry becomes real markup in exactly one file. Everywhere else, a NEUTRAL box written by hand — a
-`div`, a `section`, a `nav` — is a node with no key: nothing records what classes it should carry,
-which children belong inside it, or why it is there. If no key fits the shape being built, that is
-the finding — not a reason to open a `div`.
+Khung phát ra các thuộc tính xác định một nút từ mục mà nó đang hiển thị. Viết bằng tay
+họ tuyên bố rằng một hợp đồng không có gì thực thi, và mọi người đọc cũng như mọi bài kiểm tra thực hiện các thuộc tính đó
+sau đó tin tưởng một yêu cầu không có quy tắc nào được giữ. Điều đó còn tệ hơn một nút không được đánh dấu, bởi vì một nút không được đánh dấu
+nút ít nhất là trung thực.
 
-**A semantic element is different, and the difference is not a loophole.** A `form` exists to
-submit; a `ul` exists because its contents are a list. Assistive technology reports the element, so
-it cannot be swapped for a neutral box, and opening one around a contract node decides no shape at
-all. What must still come from an entry is the SHAPE: the moment a semantic element carries a class,
-it has stopped being a wrapper and become a node with no key, and the entry that replaces it names
-the element as its host.
+**CONTRACT-9 · Key mới phải được biện minh bằng shape, không phải bằng một khoảng cách khác.**
 
-**CONTRACT-8 · The markers are painted from the entry, never written by hand.**
+Một hình dạng mà không có khóa nào hiện có có thể biểu thị sẽ kiếm được khóa. Muốn hình dạng tương tự chặt chẽ hơn một chút
+không: đó là từ vựng được mở rộng từng trang gọi một, cho đến khi các phím mô tả cuộc gọi
+trang web thay vì hình dạng và danh sách dài hơn mã đọc nó.
 
-The frame emits the attributes that identify a node from the entry it is rendering. Written by hand
-they claim a contract nothing enforces, and every reader and every test that walks those attributes
-then trusts a claim no rule is holding. That is worse than an unmarked node, because an unmarked
-node is at least honest.
+**CONTRACT-10 · Contract cố định content; branch sở hữu wrapper mechanics.**
 
-**CONTRACT-9 · A new key is justified by a shape, never by a different gap.**
+Hợp đồng mô tả nút sắp xếp nội dung được xác thực. Nó không mô tả nhà cung cấp
+thành phần.`Tree`có thể mở máy chủ tên mục;`SurfaceCard`có thể đứng cùng một nút bên trong`Card.Content`ở trong`div > Card > Card.Content`; một bề mặt xếp hoặc danh sách có thể chiếu nó vào
+một cái bọc khác. Những trình bao bọc đó là cơ chế chi nhánh, không phải là từ vựng hợp đồng thứ hai.
 
-A shape none of the existing keys can express earns a key. Wanting the same shape slightly tighter
-does not: that is the vocabulary being widened one call site at a time, until the keys describe call
-sites instead of shapes and the list is longer than the code that reads it.
+Nhánh bề mặt được đặt tên sở hữu đường nối bên ngoài cố định như mã nhánh thông thường. Đường may đó không phải là
+ngữ pháp nội dung thứ hai: nó không thể thay đổi tùy theo người gọi, nó không thể thừa nhận trẻ em và nó không bao giờ nhận được
+dấu hợp đồng. Nút hợp đồng đứng BÊN TRONG máy chủ nội dung (`Card.Content`, thân đàn accordion,
+thân danh sách) và không bao giờ có trên đó, bởi vì các đạo cụ nút không mang phần tử nào và việc đeo chúng sẽ dẫn đến
+máy chủ của mục nhập cho nhà cung cấp. Một nơi lưu trữ bị ràng buộc`ContractContent`ở đó; bề mặt điều khiển dữ liệu
+đặt thành phần có thương hiệu ở đó và chuyển thông thường của nó`props`, `on`, Và`isLoading`. Tạo
+phím cho dòng tiêu đề, phần bao bọc bên ngoài và chú thích đơn thuần để tránh viết nhánh sẽ biến
+một máy chủ thành ba hợp đồng.
 
-**CONTRACT-10 · The contract fixes content; the branch owns wrapper mechanics.**
+Đây là lý do tại sao không có`CardShell`và không có bảng ghép. Lặp đi lặp lại`Card > Card.Content`chỉ là
+hai dòng; việc giải nén nó sẽ thêm tính gián tiếp mà không cần sở hữu chính sách.`SurfaceCard`,
+`SurfaceAccordionCard`, `SurfaceListCard`, Và`SurfaceFormCard`được đặt tên là các nhánh vì mỗi nhánh sở hữu một trình bao bọc riêng biệt
+và vẫn chấp nhận`contract + render`cho nút nội dung.
 
-A contract describes the node that arranges validated content. It does not describe vendor
-composition. `Tree` may open the host the entry names; `SurfaceCard` may stand that same node inside
-`Card.Content` within `div > Card > Card.Content`; an accordion or list surface may project it into
-another wrapper. Those wrappers are branch mechanics, not a second contract vocabulary.
+**CONTRACT-11 · Entry khai báo mọi slot bên trong nó, và mỗi slot có một tên.** `children` là một record. Mỗi key là tên slot; mỗi value nêu một hoặc nhiều identity đóng:
 
-The named surface branch owns its fixed outer seam as ordinary branch code. That seam is not a
-second content grammar: it cannot vary by caller, it cannot admit children, and it never receives
-contract markers. The contract node stands INSIDE the content host (`Card.Content`, accordion body,
-list body) and never on it, because the node props carry no element and wearing them would hand the
-entry's host to the vendor. A bound host places `ContractContent` there; a data-driven surface
-places the branded component there and passes its ordinary `props`, `on`, and `isLoading`. Creating
-keys for the heading line, outer wrapper and caption merely to avoid writing the branch would turn
-one host into three contracts.
-
-This is why there is no `CardShell` and no compound table. Repeating `Card > Card.Content` is only
-two lines; extracting it would add indirection without owning a policy. `SurfaceCard`,
-`SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` are named branches because each owns a distinct wrapper
-and still accepts `contract + render` for the content node.
-
-**CONTRACT-11 · An entry declares every slot inside it, and each slot has a name.**
-
-`children` is a record. Each key is a slot name; each value names one or more closed identities:
-
-| the child is | the slot says | the component declares |
+| đứa trẻ là | khe nói | thành phần khai báo |
 |---|---|---|
-| another node | `{ contract: "key" }` | `ContractComponent<"key">` |
-| a leaf | `{ leaf: "icon", props: { size: "sm" } }` | `LeafComponent<"icon", { size: "sm" }>` |
+| nút khác |`{ contract: "key" }` | `ContractComponent<"key">`|
+| một chiếc lá |`{ leaf: "icon", props: { size: "sm" } }` | `LeafComponent<"icon", { size: "sm" }>`|
 
-A node child names a key and the key is checked against the table. A leaf cannot — a leaf is not a
-node and has no key — so the slot names the leaf and the props it must take, and the leaf declares
-the same pair on its own metadata. The table never imports a component and the compiler still holds
-the pairing.
+Một nút con đặt tên cho một khóa và khóa đó được kiểm tra trên bảng. Một chiếc lá không thể - một chiếc lá không phải là một
+nút và không có khóa - do đó, slot đặt tên cho lá và các đạo cụ mà nó phải lấy và lá đó khai báo
+cùng một cặp trên siêu dữ liệu của chính nó. Bảng không bao giờ nhập một thành phần và trình biên dịch vẫn giữ
+sự ghép đôi.
 
-**Slots are named, never counted.** Insert a child into a positional list and every position after
-it silently means something else; a name survives the insertion, reads at the call site without
-counting, and gives the reason something to refer to.
+**Các vị trí được đặt tên, không bao giờ được tính.** Chèn trẻ vào danh sách vị trí và mọi vị trí sau đó
+nó âm thầm có nghĩa là cái gì đó khác; một tên vẫn tồn tại sau khi chèn, đọc tại trang cuộc gọi mà không cần
+đếm và đưa ra lý do để tham khảo.
 
-**`repeats: true` says the live slot is an array; `restingCount: 6` says how many placeholders draw
-while waiting.** Live length is dynamic, so it must not be confused with the skeleton count. The
-pair is required together: no `restingCount` on a scalar slot, and no repeated slot with an
-unspecified resting shape.
+**`repeats: true`cho biết vị trí trực tiếp là một mảng;`restingCount: 6`cho biết có bao nhiêu phần giữ chỗ vẽ
+trong khi chờ đợi.** Độ dài trực tiếp là động nên không được nhầm lẫn với số lượng bộ xương. các
+cặp được yêu cầu cùng nhau: không`restingCount`trên một khe vô hướng và không có khe lặp lại nào có
+hình dạng nghỉ ngơi không xác định.
 
-The values in `props` are literal constraints, never values injected at runtime. A slot declaring
-`props: { size: "sm" }` accepts a leaf component branded with that exact constraint; copy such as a
-query-provided label travels through the render component's runtime `props` and never enters the
-table.
+Các giá trị trong`props`là những ràng buộc theo nghĩa đen, không bao giờ có giá trị được đưa vào khi chạy. Một khai báo vị trí`props: { size: "sm" }`chấp nhận một thành phần lá được gắn nhãn hiệu với ràng buộc chính xác đó; sao chép chẳng hạn như một
+nhãn do truy vấn cung cấp di chuyển trong thời gian chạy của thành phần kết xuất`props`và không bao giờ đi vào
+cái bàn.
 
-For a joined list, the relation between peer rows belongs to the root contract. `divide-y` sits on
-the content host; a row leaf does not draw an `after` rule or inspect `last-child`. The collection's
-domain name (`tasks`, `courses`, `alerts`) remains a field of the content component's named props
-type. A generic `items` slot would teach the surface the caller's data model and is not part of the
-branch vocabulary.
+Đối với danh sách đã nối, mối quan hệ giữa các hàng ngang hàng thuộc về hợp đồng gốc.`divide-y`ngồi trên
+máy chủ nội dung; một lá hàng không vẽ được một`after`cai trị hoặc kiểm tra`last-child`. Bộ sưu tập của
+tên miền (`tasks`, `courses`, `alerts`) vẫn là một trường có tên props của thành phần nội dung
+loại. Một cái chung`items`khe sẽ dạy bề mặt mô hình dữ liệu của người gọi và không phải là một phần của
+từ vựng nhánh.
 
-That joined-list root is `p-0`, with repeated rows as direct children, so every divider reaches both
-surface edges. The row contract restores the Card's ordinary `p-4` edge asymmetrically: one row
-`p-4`; first `px-4 pt-4 pb-3`; middle `px-4 py-3`; last `px-4 pt-3 pb-4`. The fixed
-label/surface/caption assembly contains owner-to-owned units and uses `gap-3`.
+Danh sách gốc đã tham gia đó là`p-0`, với các hàng lặp lại là con trực tiếp, do đó mọi dấu chia đều đạt đến cả hai
+các cạnh bề mặt. Hợp đồng hàng khôi phục thông thường của Thẻ`p-4`cạnh không đối xứng: một hàng`p-4`; Đầu tiên`px-4 pt-4 pb-3`; ở giữa`px-4 py-3`; cuối cùng`px-4 pt-3 pb-4`. cố định
+Tập hợp nhãn/bề mặt/chú thích chứa các đơn vị và mục đích sử dụng của chủ sở hữu`gap-3`.
 
-The list host also owns the optional fact at the end of its label line. That fact is `xs muted`
-beside an `sm semibold` label and qualifies the joined list itself. It must not be projected as a
-separate sibling by the caller, and it must not be put in `description`: description is reserved
-for the whole-list caption below the surface.
+Máy chủ danh sách cũng sở hữu thông tin tùy chọn ở cuối dòng nhãn của nó. Sự thật đó là`xs muted`bên cạnh một`sm semibold`nhãn và đủ điều kiện cho danh sách đã tham gia. Nó không được chiếu như một
+tách biệt anh chị em bởi người gọi và không được đưa vào`description`: mô tả được bảo lưu
+cho chú thích toàn bộ danh sách bên dưới bề mặt.
 
-None of this is `children` in the React sense, and that is what makes it checkable. Markup arrives
-already built and erases its shape. `ContractSlots<K>` carries a checked bound record and is not
-callable. `ContractProjection<K>` carries an explicit `project` function for a branch that already
-drew its wrapper. `ContractComponent<K,P>` is the third lane: a real `ComponentType<P>` branded with
-the exact key, used when runtime data must remain in `props` instead of being closed into a new
-descriptor on every render. Wrong key, props, identity, cardinality, missing slots and extra slots
-are compile errors.
+Không ai trong số này là`children`theo nghĩa React, và đó là điều khiến nó có thể kiểm tra được. Đánh dấu đến
+đã được xây dựng và xóa hình dạng của nó.`ContractSlots<K>`mang một bản ghi ràng buộc được kiểm tra và không
+có thể gọi được.`ContractProjection<K>`mang một sự rõ ràng`project`hoạt động cho một chi nhánh đã
+đã vẽ cái bọc của nó.`ContractComponent<K,P>`là làn đường thứ ba: một làn đường thực sự`ComponentType<P>`mang nhãn hiệu với
+khóa chính xác, được sử dụng khi dữ liệu thời gian chạy phải được giữ nguyên`props`thay vì bị đóng cửa vào một cái mới
+mô tả trên mỗi kết xuất. Sai key, props, Identity, cardinality, thiếu slot và thừa slot
+là các lỗi biên dịch.
 
-**CONTRACT-12 · An entry's classes are the ARRANGEMENT, never the behaviour or the paint.**
+**CONTRACT-12 · Class của entry là ARRANGEMENT, không bao giờ là behavior hay paint.** `flex`, `grid`, `gap-*`, `items-*`, `justify-*`, nhóm width và inset: những thứ này nói cách
+các nút con của một nút đứng cùng nhau, đó là mục đích của một mục nhập. Một con trỏ, di chuột hoặc hoạt động
+trạng thái, màu văn bản, căn chỉnh văn bản,`group`: những điều này cho biết một vật sẽ PHẢN ỨNG như thế nào và nó trông như thế nào
+thích, và cũng không phải là mối quan hệ giữa trẻ em.
 
-`flex`, `grid`, `gap-*`, `items-*`, `justify-*`, the width and inset family: these say how the
-children of one node stand together, which is what an entry is for. A cursor, a hover or active
-state, a text colour, a text alignment, `group`: these say how one thing REACTS and what it looks
-like, and neither is a relationship between children.
+Sự khác biệt không phải là sự ngăn nắp về mặt phong cách. Một nút có mục nhập mang`cursor-pointer`Và`hover:opacity-80`đang tuyên bố là có thể nhấn được, trong khi thứ thực sự được nhấn - nút,
+liên kết, điều khiển sở hữu trình xử lý và trạng thái bị vô hiệu hóa - hoàn toàn ở một nơi khác. Hai
+chủ sở hữu cho một lời hứa, và cái bàn là cái không thể nói được lời hứa đã tắt: một mục
+không thể biết rằng trang cuộc gọi này đã không được xử lý, vì vậy nó tiếp tục vẽ con trỏ lên thứ gì đó
+điều đó không có tác dụng gì
 
-The difference is not stylistic tidiness. A node whose entry carries `cursor-pointer` and
-`hover:opacity-80` is claiming to be pressable, while the thing that actually presses — the button,
-the link, the control that owns the handler and the disabled state — is somewhere else entirely. Two
-owners for one promise, and the table is the one that cannot be told the promise is off: an entry
-cannot know that this call site passed no handler, so it goes on drawing a pointer over something
-that does nothing.
+Vì vậy hành vi thuộc về thành phần sở hữu hành vi đó. Mục tiêu báo chí là một nhánh được đặt tên
+rút ra điều khiển của riêng nó và đặt nút được sắp xếp bên trong nó; lối vào bên trong vẫn trong sáng
+sắp xếp và có thể được sử dụng lại bởi một hàng được nhấn và một hàng không được nhấn.
 
-So behaviour belongs to the component that owns the behaviour. A press target is a named branch that
-draws its own control and puts the arranged node inside it; the entry inside stays a pure
-arrangement and can be reused by a row that presses and a row that does not.
+Lớp sơn cũng tuân theo phán quyết tương tự, và nó có một hệ quả đáng nói thẳng: **một bề mặt là một
+THÀNH PHẦN, không phải là danh sách lớp.** Các nhánh bề mặt được đặt tên sẽ vẽ mặt đất, bán kính và
+độ cao, vì vậy một mục sơn`bg-surface`, `rounded-2xl`hoặc`shadow-surface`là cách thứ hai để
+làm một vật đã có chủ. Những chi phí đó được trả bởi mỗi người đọc bảng sau này:
+sau đó nó chứa hai loại thẻ - một loại rút nhánh, một loại rút chìa khóa - và không có chìa khóa nào cho ai biết
+họ đang xem loại nào. Tác giả tiếp theo sẽ tìm đến nơi nào gần hơn và ngày đó
+bề mặt ngôi nhà thay đổi bán kính hoặc độ cao, chỉ một trong hai loại di chuyển.
 
-The paint follows the same verdict, and it has a consequence worth stating outright: **a surface is a
-COMPONENT, not a class list.** The named surface branches draw the ground, the radius and the
-elevation, so an entry that paints `bg-surface`, `rounded-2xl` or `shadow-surface` is a second way to
-make a thing that already has an owner. What that costs is paid by every later reader of the table:
-it then holds two kinds of card — one a branch draws, one a key draws — and no key tells anybody
-which kind they are looking at. The next author reaches for whichever is nearer, and the day the
-house surface changes its radius or its elevation, only one of the two kinds moves.
+**CONTRACT-13 · Key không được render không phải vocabulary.**
 
-**CONTRACT-13 · A key nobody renders is not vocabulary.**
+Một mục nhập là một lời hứa về một nút tồn tại - những lớp này, phần tử này, lý do này, trạng thái
+trong tài liệu - vì vậy, một khóa không có người dùng là một lời hứa không có gì và một lời hứa không có gì
+không ngồi yên. Nó tồn tại sau mỗi lần đổi tên, bởi vì việc đổi tên tuân theo các trang gọi và nó không có. Nó
+được sao chép vào kho lưu trữ tiếp theo, vì bảng sẽ di chuyển toàn bộ và không có gì trong đó cho biết bảng nào
+các thành viên đã từng được rút ra. Và nó làm cho bảng dài hơn đoạn mã đọc nó, đó là cách một
+Người đọc không còn tin tưởng vào bảng mô tả sản phẩm nữa: một khi một số phím mô tả màn hình và
+những người khác mô tả ý định, phân biệt chúng có nghĩa là tìm kiếm nguồn và từ vựng có
+được tìm kiếm trước khi có thể tin được không phải là một trong những loại từ ai.
 
-An entry is a promise about a node that exists — these classes, this element, this reason, standing
-in the document — so a key with no user is a promise about nothing, and a promise about nothing does
-not sit quietly. It survives every rename, because renaming follows call sites and it has none. It
-is copied into the next repository, because the table travels whole and nothing in it says which
-members were ever drawn. And it makes the table longer than the code that reads it, which is how a
-reader stops trusting the table as a description of the product: once some keys describe screens and
-others describe intentions, telling them apart means searching the source, and a vocabulary that has
-to be searched before it can be believed is not one anybody types from.
-
-So delete it. A key kept for work that has not started belongs in the plan record, where an unbuilt
-shape is exactly what a reader expects to find, and not in the vocabulary, where everything present
-is taken to be on screen.
+Vì vậy hãy xóa nó đi. Chìa khóa được lưu giữ cho công việc chưa bắt đầu thuộc về bản ghi kế hoạch, trong đó một bản ghi chưa được xây dựng
+hình dạng chính xác là những gì người đọc mong đợi tìm thấy chứ không phải trong từ vựng, nơi mọi thứ đều hiện diện.
+được đưa lên màn hình.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| An interaction or paint class in an entry (`cursor-*`, `hover:*`, `active:*`, `focus:*`, `group`, `text-left`, a text colour) | The node claims a behaviour it does not own, and the table cannot be told when that behaviour is absent | Give the behaviour to the branch that owns the control, and leave the entry its arrangement |
-| A branch that renders somebody else's key on a host of its own choosing | Two call sites of one key then disagree about the element, which is CONTRACT-4 wearing a helper's name | Draw your own control and put the key's own node inside it |
-| `contractNodeProps(contract)` spread onto a vendor element | The props carry the classes and the markers and not the element, so an entry that says `ol` reaches the document as a `div` and the list leaves the accessibility tree with every gate still green | Render the entry's own node inside the vendor body; only the frame wears a host |
-| A literal structural class (`flex`, `gap-4`, `items-center`) outside the table or a named surface host | The node's shape is decided at a call site, where nothing above it can find or predict it | Add or reuse a key; fixed vendor-wrapper mechanics belong only to their named surface branch |
-| `cn`, `clsx`, `twMerge`, `cva` or any runtime class composition | A second table with no keys, no reasons and nothing readable from outside | Give the distinction a key, or a named prop on the component that owns the node |
-| An interpolated `className` | The string exists only while the component runs, so nothing can read it back | Move the whole string into an entry and pass the key |
-| A class not in the union | It escapes the vocabulary the whole system is defined by | Add the member deliberately, or use the nearest one that exists |
-| A `host` or `as` prop on the frame | Two call sites of one key could then disagree about the element, which is two nodes wearing one name | Name the host on the entry |
-| Opening `<ul>`, `<form>` or `<nav>` by hand because the frame "only draws divs" | It no longer does. This is the exact hole that filled the leaf tier with arrangements | Give the entry a host |
-| A key named `card`, `box`, `wrapper`, `row` | It admits anything, so it constrains nothing and drains the call sites from its specific siblings | Name what it holds |
-| A reason that restates the key | It costs a line and teaches nothing, and the next author cannot tell whether the node is load-bearing | State what breaks, wraps or overflows without the node |
-| A structural host written outside the frame or a named surface host branch | It is a node with no key, no child contract and no recorded reason | Compose the key; surface branches alone may open the fixed wrapper around their checked content host |
-| Hand-writing a contract marker attribute | The node claims a contract nothing enforces, and every test that reads those attributes believes it | Render the key and let the frame paint them |
-| A new key because the existing one is the wrong size | The vocabulary grows one call site at a time until it describes call sites, not shapes | Use the key that exists, or change the entry for everyone |
-| A key in the table that nothing renders | It promises a node that does not exist, survives every rename because it has no call sites, and lengthens the table past the code that reads it until the table stops describing the product | Delete it; a shape wanted for work that has not started belongs in the plan record |
-| `children` on a structural node | Markup arrives already built, so nothing above can say what is inside and no rule can check | Declare the slots on the entry and pass one component per slot in `render` |
-| A bare arrow or literal JSX in a `render` slot | It carries no contract/leaf metadata | Brand the stable component type with `defineContractComponent`; pass runtime data through `props` |
-| A positional list of children instead of named slots | Insert one in the middle and every slot after it silently means something else | Name each slot; a name survives the insertion |
-| A leaf without a `name` on its metadata | Two leaves taking the same props become interchangeable, and a slot asking for a glyph will accept a label | Give every leaf its name beside its tier marker |
-| A hand-written skeleton tree beside a list | Loading cardinality drifts away from the live shape | Put `repeats: true` and `restingCount` on the slot |
-| A boolean prop choosing between two arrangements | One of the two ends up with no key, no reason and no name — it exists on screen and nowhere in the table | Two shapes are two keys, and both get named |
-| A compound/CardShell table for `Card > Card.Content` | It models wrapper mechanics as a second vocabulary and adds indirection without a policy | Let the named surface branch own the wrapper and apply the content contract to its body |
+| Một lớp tương tác hoặc sơn trong một mục (`cursor-*`, `hover:*`, `active:*`, `focus:*`, `group`, `text-left`, màu văn bản) | Nút xác nhận một hành vi mà nó không sở hữu và không thể thông báo cho bảng khi hành vi đó không có | Cung cấp hành vi cho nhánh sở hữu quyền kiểm soát và để lại mục sắp xếp |
+| Một nhánh hiển thị khóa của người khác trên máy chủ do chính nó chọn | Hai site gọi một key thì bất đồng về phần tử là CONTRACT-4 mang tên người giúp việc | Vẽ điều khiển của riêng bạn và đặt nút riêng của khóa bên trong nó |
+|`contractNodeProps(contract)`lây lan sang một yếu tố nhà cung cấp | Các đạo cụ mang các lớp và các điểm đánh dấu chứ không phải phần tử, vì vậy một mục có nội dung`ol`tiếp cận tài liệu dưới dạng`div`và danh sách để lại cây tiếp cận với mọi cổng vẫn còn xanh | Hiển thị nút riêng của mục nhập bên trong phần thân nhà cung cấp; chỉ có khung đeo máy chủ |
+| Một lớp cấu trúc theo nghĩa đen (`flex`, `gap-4`, `items-center`) bên ngoài bảng hoặc máy chủ bề mặt có tên | Hình dạng của nút được quyết định tại một trang web cuộc gọi, nơi không có gì ở trên nó có thể tìm thấy hoặc dự đoán nó | Thêm hoặc sử dụng lại khóa; cơ chế bao bọc nhà cung cấp cố định chỉ thuộc về nhánh bề mặt được đặt tên của họ |
+|`cn`, `clsx`, `twMerge`, `cva`hoặc bất kỳ thành phần lớp thời gian chạy nào | Bảng thứ hai không có chìa khóa, không có lý do và không có gì có thể đọc được từ bên ngoài | Cung cấp cho sự phân biệt một khóa hoặc một chỗ dựa có tên trên thành phần sở hữu nút |
+| Một nội suy`className`| Chuỗi chỉ tồn tại trong khi thành phần chạy, vì vậy không có gì có thể đọc lại được | Di chuyển toàn bộ chuỗi vào một mục và truyền khóa |
+| Một lớp không thuộc đoàn thể | Nó thoát khỏi từ vựng mà toàn bộ hệ thống được xác định bởi | Thêm thành viên một cách có chủ ý hoặc sử dụng thành viên gần nhất tồn tại |
+| MỘT`host`hoặc`as`chống đỡ trên khung | Khi đó, hai trang web gọi của một khóa có thể không đồng ý về phần tử, đó là hai nút mang một tên | Đặt tên máy chủ vào mục |
+| Khai mạc`<ul>`, `<form>`hoặc`<nav>`bằng tay vì khung "chỉ vẽ div" | Nó không còn nữa. Đây chính xác là lỗ đã lấp đầy tầng lá bằng các cách sắp xếp | Cung cấp cho mục nhập một máy chủ |
+| Một khóa có tên`card`, `box`, `wrapper`, `row`| Nó thừa nhận bất cứ điều gì, vì vậy nó không hạn chế gì và loại bỏ các trang web cuộc gọi khỏi các anh chị em cụ thể của nó | Đặt tên cho những gì nó nắm giữ |
+| Một lý do trình bày lại chìa khóa | Nó tốn một dòng và không dạy gì, và tác giả tiếp theo không thể biết liệu nút có chịu tải hay không | Nêu rõ những gì bị đứt, bị bao bọc hoặc bị tràn khi không có nút |
+| Máy chủ cấu trúc được viết bên ngoài khung hoặc nhánh máy chủ bề mặt được đặt tên | Đó là một nút không có khóa, không có hợp đồng con và không có lý do được ghi lại | Soạn chìa khóa; riêng các nhánh bề mặt có thể mở trình bao bọc cố định xung quanh máy chủ nội dung đã được kiểm tra của chúng |
+| Viết tay một thuộc tính đánh dấu hợp đồng | Nút xác nhận một hợp đồng không có gì thực thi và mọi thử nghiệm đọc các thuộc tính đó đều tin vào điều đó | Kết xuất khóa và để khung vẽ chúng |
+| Một khóa mới vì khóa hiện có sai kích thước | Từ vựng phát triển từng trang cuộc gọi cho đến khi nó mô tả các trang cuộc gọi chứ không phải hình dạng | Sử dụng khóa tồn tại hoặc thay đổi mục nhập cho mọi người |
+| Một khóa trong bảng không có gì hiển thị | Nó hứa hẹn một nút không tồn tại, tồn tại sau mỗi lần đổi tên vì nó không có trang gọi và kéo dài bảng qua mã đọc nó cho đến khi bảng ngừng mô tả sản phẩm | Xóa nó; một hình dạng mong muốn cho công việc chưa bắt đầu thuộc về bản ghi kế hoạch |
+|`children`trên một nút cấu trúc | Đánh dấu đã được tạo sẵn nên không có gì ở trên có thể nói những gì bên trong và không có quy tắc nào có thể kiểm tra | Khai báo các vị trí trên mục nhập và chuyển một thành phần cho mỗi vị trí trong`render`|
+| Một mũi tên trần hoặc JSX theo nghĩa đen trong một`render`khe | Nó không mang siêu dữ liệu hợp đồng/lá | Gắn nhãn hiệu cho loại thành phần ổn định với`defineContractComponent`; truyền dữ liệu thời gian chạy qua`props`|
+| Danh sách vị trí của trẻ em thay vì vị trí được đặt tên | Chèn một cái vào giữa và mỗi khe sau nó âm thầm có ý nghĩa khác | Đặt tên cho từng vị trí; một tên vẫn tồn tại sau khi chèn |
+| Một chiếc lá không có`name`trên siêu dữ liệu của nó | Hai chiếc lá lấy cùng một đạo cụ có thể hoán đổi cho nhau và một ô yêu cầu hình tượng sẽ chấp nhận nhãn | Đặt tên cho mỗi chiếc lá bên cạnh điểm đánh dấu cấp của nó |
+| Cây xương viết tay bên cạnh danh sách | Đang tải số lượng thẻ trôi ra khỏi hình dạng trực tiếp | Đặt`repeats: true`Và`restingCount`trên khe |
+| Một giá trị boolean lựa chọn giữa hai cách sắp xếp | Một trong hai kết thúc không có chìa khóa, không có lý do và không có tên - nó tồn tại trên màn hình và không có trong bảng | Hai hình dạng là hai khóa và cả hai đều được đặt tên |
+| Bảng ghép/CardShell dành cho`Card > Card.Content`| Nó mô hình hóa cơ chế bao bọc như một từ vựng thứ hai và thêm hướng dẫn mà không cần chính sách | Hãy để nhánh bề mặt được đặt tên sở hữu trình bao bọc và áp dụng hợp đồng nội dung cho phần thân của nó |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — a node is a key
+### Trường hợp thông thường — node là key
 
 ```tsx
 // The wrapper passes named runtime props; the branded content draws the one contract root.
@@ -304,10 +284,9 @@ export const SurfaceCard = ({ props, children }: SurfaceCardProps) => (
     <div className="flex flex-col gap-3">{children}</div>
 )
 ```
+Chúng khác nhau ở một điều: liệu nội dung có được kiểm tra theo hợp đồng mà nó yêu cầu hay không.
 
-They differ in one thing: whether the content body is checked by the contract it claims.
-
-### The host trap — the hole the vocabulary drained into
+### Bẫy host — lỗ hổng làm thất thoát vocabulary
 
 ```ts
 // The entry names its element, so a run of days is a list and still comes from a key - and
@@ -326,10 +305,9 @@ They differ in one thing: whether the content body is checked by the contract it
 const RUN_CLASSES = "flex flex-row flex-wrap items-center gap-2"
 export const StreakWeekRun = ({ props }: StreakWeekRunProps) => <ul className={RUN_CLASSES}>{/* ... */}</ul>
 ```
+Chúng khác nhau ở một điều: liệu phần tử đó có thể biểu thị được trong một mục hay không.
 
-They differ in one thing: whether the element was expressible in an entry.
-
-### The composition trap — a helper is not an exemption
+### Bẫy composition — helper không phải ngoại lệ
 
 ```tsx
 // Two shapes are two keys. The distinction was real, so it got a name.
@@ -341,10 +319,9 @@ They differ in one thing: whether the element was expressible in an entry.
 // rule and every reader that looks at the entry table.
 <div className={cn("flex flex-col", props.isCompact ? "gap-2" : "gap-4")}>{children}</div>
 ```
+Chúng khác nhau ở một điều: liệu sự khác biệt đó có được đặt tên hay được sử dụng nội tuyến.
 
-They differ in one thing: whether the distinction earned a name or was spent inline.
-
-### The naming trap — a key that admits anything
+### Bẫy naming — key chấp nhận mọi thứ
 
 ```ts
 // The name fixes the inside, so a wrong child is visible on sight, and one reason is true for
@@ -363,10 +340,9 @@ They differ in one thing: whether the distinction earned a name or was spent inl
     why: "a card",
 }
 ```
+Chúng khác nhau ở một điều: liệu tên có hạn chế những gì có thể được thông qua hay không.
 
-They differ in one thing: whether the name constrains what may be passed.
-
-### The reason trap — a label is not a why
+### Bẫy reason — label không phải là `why`
 
 ```ts
 why: "the tags wrap onto their own line before the title does, so a long title never breaks mid-word"
@@ -375,5 +351,4 @@ why: "the tags wrap onto their own line before the title does, so a long title n
 ```ts
 why: "row of chips"
 ```
-
-They differ in one thing: whether the sentence says what breaks when the node is removed.
+Chúng khác nhau ở một điều: liệu câu có nói điều gì bị ngắt khi nút bị loại bỏ hay không.

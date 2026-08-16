@@ -1,79 +1,59 @@
-# comments
+# bình luận
 
-## Definition
+## Định nghĩa
 
-A comment here answers the one question the code cannot: **why**. What the code does is already
-written in the code, in a language designed for saying it precisely; restating that in English adds
-a second description that drifts the first time the code changes and nobody edits the sentence
-beside it.
+Comment ở đây trả lời câu hỏi mà code không thể trả lời: **tại sao**. Code đã mô tả nó làm gì bằng một ngôn ngữ được thiết kế để chính xác; lặp lại điều đó bằng tiếng Anh chỉ tạo thêm một bản mô tả, rồi bản mô tả ấy sẽ lỗi thời ngay lần đầu code thay đổi mà không ai sửa comment bên cạnh.
 
-So every export opens with a doc block naming what it is FOR, every enum member states the
-consequence of choosing it, and the whole file is written in English ASCII so that the next reader
-— who may not share a language with the author — can read it.
+Vì vậy, mọi export đều mở đầu bằng một documentation block mô tả nó là gì, mọi member của exported enum đều nêu hậu quả của việc chọn member đó, và toàn bộ source được viết bằng English ASCII để người đọc tiếp theo — kể cả người không dùng chung ngôn ngữ với tác giả — vẫn đọc được.
 
-The question that settles whether a comment earns its place: **could a reader work this out from
-the code in front of them?** If yes, delete it. If no — a constraint from elsewhere, a decision that
-looks arbitrary, a bug this shape prevents — write it down, because it is about to be lost.
+Câu hỏi quyết định comment có xứng đáng với vị trí của nó không là: **người đọc có thể tự giải quyết vấn đề từ code phía trước không?** Nếu có, hãy xóa comment. Nếu không — chẳng hạn một hạn chế từ nơi khác, một quyết định trông tùy ý, hoặc một bug mà hình dạng hiện tại ngăn chặn — hãy ghi lại, vì lý do đó sắp bị mất.
 
-What holds this law is [`sources/be/comments.mjs`](../../../sources/be/comments.mjs).
+Rule này được giữ bởi [`sources/be/comments.mjs`](../../../sources/be/comments.mjs).
 
-## Rules
+## Quy tắc
 
-**COMMENT-1 · Every export opens with a doc block.**
+**BÌNH LUẬN-1 · Mọi export đều mở đầu bằng một documentation block.**
 
-A class, an interface, a type, an enum, an exported function. These are the surface other files
-depend on, so they are what somebody reads when deciding whether to use them — and a name plus a
-signature says what it takes, never what it is for or when to reach for it.
+Class, interface, type, enum và function được export là những bề mặt mà file khác phụ thuộc vào. Vì vậy, đó là thứ người đọc cần thấy khi quyết định có nên sử dụng hay không: tên và signature cho biết nó cần gì, nhưng không cho biết nó dùng để làm gì hoặc khi nào nên dùng.
 
-Data constants are out of scope: `export const MAX_ATTEMPTS = 3` is already fully described, and
-requiring a sentence beside it would produce sentences that restate the name.
+Data constant nằm ngoài phạm vi: `export const MAX_ATTEMPTS = 3` đã tự mô tả đầy đủ; thêm một câu cạnh nó chỉ lặp lại tên.
 
-**COMMENT-2 · Every member of an exported enum states its CONSEQUENCE.**
+**BÌNH LUẬN-2 · Mọi member của exported enum đều nêu rõ HẬU QUẢ của nó.**
 
-Not what it is called — what choosing it does. `Pending` restated as "the pending state" is a line
-that teaches nothing; "no payment has settled, so nothing is granted and the cart is still editable"
-is the fact the next author needs and cannot derive.
+Không chỉ ghi member được gọi là gì, mà phải nói việc chọn nó làm gì. `Pending` được mô tả là “trạng thái chờ xử lý” thì không mang lại thông tin; “chưa thanh toán xong nên chưa cấp quyền và cart vẫn có thể chỉnh sửa” mới là sự thật mà tác giả sau cần biết nhưng không thể suy ra.
 
-An enum is where this matters most, because a member is chosen at a call site far from the switch
-that gives it meaning.
+Enum đặc biệt cần điều này, vì member thường được chọn ở một call site xa switch nơi nó nhận được ý nghĩa.
 
-**COMMENT-3 · The comment says why, and the code says what.**
+**BÌNH LUẬN-3 · Comment nói lý do, code nói điều gì xảy ra.**
 
-A comment restating the line beneath it is worse than no comment: it doubles the maintenance and it
-is the half that goes stale silently, because nothing fails when a sentence stops being true.
+Comment viết lại dòng ngay bên dưới còn tệ hơn không có comment: nó nhân đôi chi phí bảo trì, rồi một nửa sẽ âm thầm cũ đi vì không có gì báo lỗi khi câu chữ không còn đúng.
 
-Reach for a comment when the reason lives OUTSIDE the file — a provider's quirk, a constraint from
-the schema, an ordering that looks arbitrary and is not, a bug this shape prevents.
+Hãy viết comment khi lý do nằm BÊN NGOÀI file — hành vi khó hiểu của provider, một ràng buộc từ schema, thứ tự trông tùy ý nhưng thực ra bắt buộc, hoặc một bug mà hình dạng này ngăn chặn.
 
-**COMMENT-4 · Source is English ASCII.**
+**BÌNH LUẬN-4 · Source là English ASCII.**
 
-Not because English is better, but because a codebase with two languages in it has a reader for whom
-half the reasoning is unavailable — and the half they cannot read is exactly the half that explains
-the surprising parts. The bar is a stranger who does not share the author's first language.
+Không phải vì tiếng Anh tốt hơn, mà vì một codebase hai ngôn ngữ sẽ có người đọc không tiếp cận được một nửa lý do. Đáng tiếc là nửa không đọc được thường chính là nửa giải thích cho phần bất ngờ. Comment nên là thứ mà người không dùng chung ngôn ngữ với tác giả vẫn đọc được.
 
-ASCII, likewise: no emoji, no decorative symbols. An emoji carries tone rather than information,
-and tone is the thing that reads differently to everybody.
+ASCII cũng là một phần của quy tắc: không emoji, không ký hiệu trang trí. Emoji truyền sắc thái hơn là thông tin, còn sắc thái được mỗi người đọc khác nhau.
 
-**COMMENT-5 · Text a program matches on or emits is not a comment.**
+**BÌNH LUẬN-5 · Text mà chương trình match hoặc emit không phải là comment.**
 
-A locale string, a provider's own message, a value compared against — these are DATA that happens
-to be prose, and translating them breaks the program. They stay, marked with a short note saying
-why, so the next sweep does not "fix" them.
+Language string, provider message và giá trị được so sánh là DATA được viết dưới dạng prose; dịch chúng sẽ phá vỡ chương trình. Hãy giữ nguyên, đồng thời thêm một dòng ngắn giải thích lý do để lần quét sau không “sửa” nhầm.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| An undocumented export | The surface others depend on says what it takes and never what it is for | Open it with a doc block |
-| An enum member with no doc, or one restating its name | The member is chosen far from the switch that gives it meaning | State what choosing it causes |
-| A comment restating the code beneath it | It doubles the maintenance, and it is the half that goes stale in silence | Delete it, or replace it with the reason |
-| A comment in a language other than English | Half the reasoning becomes unavailable to some reader, and it is the surprising half | English |
-| An emoji or a decorative symbol | It carries tone, not information, and tone reads differently to everybody | Words |
-| Translating a string the program matches on | It is data wearing prose, and translating it breaks the behaviour | Leave it, and mark why in one short note |
+| Export không có documentation | Bề mặt mà code khác dựa vào chỉ nói nó cần gì, không nói nó dùng để làm gì | Mở đầu bằng documentation block |
+| Enum member không có tài liệu hoặc chỉ nhắc lại tên | Member được chọn ở xa switch nơi nó nhận ý nghĩa | Nêu hậu quả của việc chọn member |
+| Comment diễn giải lại code ngay bên dưới | Nó nhân đôi chi phí bảo trì và một nửa sẽ âm thầm lỗi thời | Xóa hoặc thay bằng lý do |
+| Comment bằng ngôn ngữ khác tiếng Anh | Một số độc giả không tiếp cận được nửa lý do đáng ngạc nhiên | Tiếng Anh |
+| Emoji hoặc ký hiệu trang trí | Nó truyền sắc thái chứ không truyền thông tin, và sắc thái được đọc khác nhau | Từ ngữ |
+| Dịch một string mà chương trình match | Đó là data chứa prose; dịch nó sẽ phá vỡ hành vi | Giữ nguyên và đánh dấu lý do bằng một comment ngắn |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — the doc says what the code cannot
+### Trường hợp thông thường — tài liệu nói điều code không thể nói
 
 ```ts
 /**
@@ -90,9 +70,9 @@ export const InjectPrimaryPostgreSQLEntityManager = () => InjectEntityManager(PO
 export const InjectPrimaryPostgreSQLEntityManager = () => InjectEntityManager(POSTGRESQL_PRIMARY)
 ```
 
-They differ in one thing: whether a reader learns what goes wrong without it.
+Chúng khác nhau ở việc người đọc có biết điều gì sẽ sai nếu bỏ documentation hay không.
 
-### The enum trap
+### Bẫy enum
 
 ```ts
 export enum PaymentState {
@@ -112,9 +92,9 @@ export enum PaymentState {
 }
 ```
 
-They differ in one thing: whether the member tells a caller what choosing it does.
+Chúng khác nhau ở việc member có cho caller biết hậu quả của lựa chọn hay không.
 
-### The restatement trap
+### Bẫy diễn giải lại code
 
 ```ts
 // the provider sends this webhook twice for a single capture, so the second one must be a no-op
@@ -126,9 +106,9 @@ const existing = await this.entityManager.findOne(PaymentEntity, { where: { prov
 const existing = await this.entityManager.findOne(PaymentEntity, { where: { providerRef } })
 ```
 
-They differ in one thing: whether the sentence says something the line does not.
+Chúng khác nhau ở việc comment có nói thêm điều gì mà dòng code không thể nói hay không.
 
-### The data-wearing-prose trap
+### Bẫy prose chứa data
 
 ```ts
 // vn-ok: the provider returns this exact Vietnamese string and the comparison is against it
@@ -141,4 +121,4 @@ if (response.message === "Giao dich thanh cong") {
 if (response.message === "Transaction successful") {
 ```
 
-They differ in one thing: whether the string is ours to change.
+Chúng khác nhau ở việc string đó có phải là dữ liệu thuộc về chúng ta để thay đổi hay không.

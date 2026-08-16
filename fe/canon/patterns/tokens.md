@@ -1,168 +1,156 @@
-# tokens
+# mã thông báo
 
-## Definition
+## Định nghĩa
 
-A token is a member of a closed set. Not a value somebody agreed to prefer — a value that is the
-only thing which can be typed, so a screen off the scale is not a screen that failed review, it is a
-screen that failed to compile.
+Mã thông báo là thành viên của một tập hợp đóng. Không phải là một giá trị mà ai đó đồng ý ưa thích - một giá trị là
+thứ duy nhất có thể gõ được, vì vậy màn hình ngoài thang đo không phải là màn hình không được đánh giá, mà là một màn hình
+màn hình không biên dịch được.
 
-Most of this law is therefore held by a type, and the rest of it exists to cover the one place the
-type does not reach. That division is the whole shape of this file: **the union protects the table,
-and the rules protect the folder the union cannot see.**
+Do đó, hầu hết luật này được nắm giữ bởi một loại và phần còn lại của nó tồn tại để bao trùm một nơi mà
+loại không đạt được. Sự phân chia đó là toàn bộ hình dạng của tập tin này: **công đoàn bảo vệ bảng,
+và các quy tắc bảo vệ thư mục mà liên minh không thể nhìn thấy.**
 
-What holds this law is the closed union in
-[`sources/fe/contracts.ts`](../../../sources/fe/contracts.ts) and, for what a union cannot see,
-[`sources/fe/tokens.mjs`](../../../sources/fe/tokens.mjs).
+Điều giữ nguyên luật này là liên minh khép kín trong[`sources/fe/contracts.ts`](../../../sources/fe/contracts.ts)và, vì điều mà một công đoàn không thể nhìn thấy,[`sources/fe/tokens.mjs`](../../../sources/fe/tokens.mjs).
 
-Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.ts` and
-`src/components/branches/Tree/index.tsx`.
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/index.ts` and `src/components/branches/Tree/index.tsx`.
 
-## The scale, as it actually is
+## Quy mô, như thực tế
 
-Six rungs for the seam between things, and they are not evenly spaced:
+Sáu bậc cho đường nối giữa các vật và chúng không cách đều nhau:
 
-| Rung | Reads as |
+| Rừng | Đọc dưới dạng |
 |---|---|
-| 4px | `gap-1`: two lines of ONE identity — a name over its handle, a figure over the word labelling it, a title over its muted subtitle, a price over the caption qualifying it |
-| 8px | `gap-2`: compact horizontal peers in one functional cluster — icon and label, peer tabs, grouped cards, or an input and its direct inline action |
-| 12px | `gap-3`: owner-to-owned or independently readable local units — label to card/input, field to field, card to caption, toolbar to governed content, or unrelated groups sharing a row |
-| 16px | `gap-4`: two participants that are each already a cluster — a stack over the stack beneath it, an identity cluster against the trailing fact at the far end of its row, a prompt against the action answering it, or peer cards repeating across a grid |
-| 24px | two blocks on a page |
-| 32px | the layout seam — a rail against the column beside it |
+| 4px |`gap-1`: hai dòng của MỘT danh tính — một cái tên trên tay cầm của nó, một con số trên từ gắn nhãn nó, một tiêu đề trên phụ đề bị tắt tiếng, một mức giá trên chú thích đủ tiêu chuẩn cho nó |
+| 8px |`gap-2`: các thiết bị ngang hàng nhỏ gọn trong một cụm chức năng — biểu tượng và nhãn, tab ngang hàng, thẻ được nhóm hoặc đầu vào và hành động nội tuyến trực tiếp của nó |
+| 12px |`gap-3`: các đơn vị cục bộ thuộc sở hữu của chủ sở hữu hoặc có thể đọc độc lập — nhãn vào thẻ/đầu vào, trường này sang trường khác, thẻ này đến chú thích, thanh công cụ cho nội dung được quản lý hoặc các nhóm không liên quan chia sẻ một hàng |
+| 16px |`gap-4`: hai người tham gia, mỗi người đã là một cụm — một ngăn xếp trên ngăn xếp bên dưới nó, một cụm nhận dạng dựa trên dữ kiện theo sau ở cuối hàng của nó, một lời nhắc chống lại hành động trả lời nó hoặc các thẻ ngang hàng lặp lại trên một lưới |
+| 24px | hai khối trên một trang |
+| 32px | đường nối bố trí — một đường ray dựa vào cột bên cạnh nó |`gap-2`yêu cầu hai sự kiện cùng một lúc: các đồng nghiệp nằm ngang VÀ chúng tạo thành một cụm chức năng.
+Không đạt một trong hai lần kiểm tra và đường may không bị hỏng`gap-3`. Các mã thông báo được chọn theo mối quan hệ và nhóm,
+không bao giờ theo tên thành phần hoặc hướng:
+một đầu vào và hành động trực tiếp của nó có thể sử dụng`gap-2`khi họ chia sẻ một điều khiển ngang, trong khi nhãn
+ở trên đầu vào đó sử dụng`gap-3`. Các phần ngang là các nhóm ngữ nghĩa riêng biệt cũng sử dụng`gap-3`.
+Trình tự thời gian cấp dữ liệu tinh tế có thể sử dụng`gap-2`giữa nhãn ngày và thẻ kết quả, nhưng thanh công cụ phía trên
+niên đại đó sử dụng`gap-3`. `gap-4`được lựa chọn theo cùng một cách và bởi riêng những người tham gia: một lần
+mỗi bên được cấu tạo riêng, đường nối giữa chúng xếp hạng cao hơn các đường nối bên trong chúng, theo một cột, một
+hàng và lưới giống nhau. **không có bậc 0**, và sự vắng mặt của nó là có chủ ý: "chạm vào" và
+"gần như chạm vào" không phải là sự khác biệt mà tác giả thứ hai tái tạo từ trí nhớ, vì vậy bề nổi của điều này
+thay thế đã kết thúc việc đánh vần một ngăn xếp danh tính theo cả hai cách. Chỉ có bậc thang 4px còn sót lại và nó
+tồn tại vì nó đặt tên cho mối quan hệ chứ không phải số tiền - dòng thứ hai mô tả
+đầu tiên. Một vùng chứa không có đường nối nào sẽ tuyên bố không có lớp khoảng trống, đây là một tuyên bố khác
+từ việc đặt tên cho một bậc thang không đo lường được gì.
 
-`gap-2` requires two facts at once: the peers are horizontal AND they form one functional cluster.
-Fail either test and the seam is `gap-3`. The tokens are selected by relationship and grouping,
-never by component name or direction:
-an input and its direct action may use `gap-2` when they share one horizontal control, while a label
-above that input uses `gap-3`. Horizontal parts that are separate semantic groups also use `gap-3`.
-A subtle feed chronology may use `gap-2` between date labels and result cards, but the toolbar above
-that chronology uses `gap-3`. `gap-4` is selected the same way and by the participants alone: once
-each side is itself composed, the seam between them out-ranks the seams inside them, in a column, a
-row and a grid alike. There is **no zero rung**, and its absence is deliberate: "touching" and
-"almost touching" are not a distinction a second author reproduces from memory, so the surface this
-replaces ended up spelling one identity stack both ways. Only the 4px rung survived that, and it
-survived because it names a relationship rather than an amount — the second line qualifies the
-first. A container that wants no seam at all declares no gap class, which is a different statement
-from naming a rung that measures nothing.
+Các hình nhỏ có kích thước đối xứng 16px và 24px hoặc không đối xứng 12/8 và 16/12. Và mối quan hệ đó tạo nên
+một bề mặt xa lạ có thể quyết định được hiển thị trong bảng thay vì được khẳng định trên nó: **ngôi nhà
+bề mặt mang một hình nhỏ 16px xung quanh đường nối bên trong 16px.** Cạnh thở theo nhịp điệu của
+nội dung, nên hai là một quyết định chứ không phải hai.
 
-Insets take 16px and 24px symmetric, or 12/8 and 16/12 asymmetric. And the relationship that makes
-an unfamiliar surface decidable is visible in the table rather than asserted over it: **the house
-surface carries a 16px inset around a 16px interior seam.** The edge breathes at the rhythm of the
-contents, so the two are one decision and not two.
+Do đó, Thẻ thông thường sẽ sử dụng`p-4`. Thẻ danh sách đã tham gia giữ nguyên cạnh ngoài 16px đó
+mà không cần chèn các dải phân cách: cả Thẻ nhà cung cấp và máy chủ nội dung đều`p-0`, danh sách gốc là`p-0`;
+một hàng duy nhất là`p-4`; đầu tiên/giữa/cuối cùng
+các hàng tương ứng`px-4 pt-4 pb-3`, `px-4 py-3`, Và`px-4 pt-3 pb-4`.
+Khi mã thông báo Thẻ chung được thực thi bằng`!important`, danh sách gốc đã tham gia sử dụng một ngữ nghĩa`data-component`bộ chọn ở cường độ bằng nhau. Sự hiện diện của tiện ích là không đủ; phần đệm được tính toán
+trên trang tài khoản thử nghiệm được hiển thị phải`0px`.
 
-An ordinary Card therefore uses `p-4`. A joined-list Card preserves that same 16px outer edge
-without insetting its dividers: both vendor Card and content host are `p-0`, the list root is `p-0`;
-a single row is `p-4`; first/middle/last
-rows are respectively `px-4 pt-4 pb-3`, `px-4 py-3`, and `px-4 pt-3 pb-4`.
-When the generic Card token is enforced with `!important`, the joined-list root uses a semantic
-`data-component` selector at equal strength. Utility presence is insufficient; computed padding
-on the rendered test-account page must be `0px`.
+Các nút có hai mã thông báo chiều cao, được chọn theo vị trí thay vì tầm quan trọng:
 
-Buttons have two height tokens, selected by placement rather than importance:
-
-| Token | Placement |
+| Mã thông báo | Vị trí |
 |---|---|
-| `sm` | Embedded action inside a row, list item, compact toolbar, card cluster or another control's local seam; reactions in an activity row belong here |
-| `md` | Standalone action that owns a line or anchors a form or surface |
+|`sm`| Hành động được nhúng bên trong một hàng, mục danh sách, thanh công cụ thu gọn, cụm thẻ hoặc đường nối cục bộ của điều khiển khác; phản ứng trong một hàng hoạt động thuộc về đây |
+|`md`| Hành động độc lập sở hữu một đường hoặc neo một biểu mẫu hoặc bề mặt |
 
-The `variant` axis remains independent: it says whether an action is primary, secondary, outline,
-or tertiary; it does not select height. A primary action may be `sm` in a compact cluster, and a
-tertiary action may be `md` when it stands alone. Label length never changes the size token.
+các`variant`trục vẫn độc lập: nó cho biết một hành động là chính, phụ, phác thảo,
+hoặc đại học; nó không chọn chiều cao. Hành động chính có thể là`sm`trong một cụm nhỏ gọn và một
+hành động cấp ba có thể là`md`khi nó đứng một mình. Độ dài nhãn không bao giờ thay đổi mã thông báo kích thước.
 
-## Rules
+## Quy tắc
 
-**TOKEN-1 · The vocabulary is a union, so an off-scale value is unrepresentable.**
+**TOKEN-1 · Từ vựng là một sự kết hợp, vì vậy giá trị ngoài thang đo là không thể biểu thị được.**`gap-[13px]`không bị cấm - nó không phải là thành viên. Tài sản duy nhất đó loại bỏ cả một gia đình
+quy tắc tuần tra: cảnh sát không có quyền gì một khi không thể gõ giá trị sai và không có gì để tranh cãi
+khoảng một lần trình biên dịch đã từ chối.
 
-`gap-[13px]` is not forbidden — it is not a member. That single property removes a whole family of
-patrol rules: there is nothing to police once the wrong value cannot be typed, and nothing to argue
-about once the compiler has already refused.
+**TOKEN-2 · Thành viên mới là một bản chỉnh sửa theo thang đo và được đọc là một.**
 
-**TOKEN-2 · A new member is an edit to the scale, and reads as one.**
+Phát triển công đoàn là một quyết định về nhịp điệu ngôi nhà, được thực hiện một cách có chủ ý, trong một danh sách được đặt tên trong đó
+sự khác biệt cho thấy nó. Điều đó trái ngược với giá trị đến bên trong một thành phần chưa được ai xem xét
+chặt chẽ hơn, đó là cách thang đo đạt được bậc thứ sáu mà chỉ một màn hình sử dụng.
 
-Growing the union is a decision about the house rhythm, taken deliberately, in a named list where
-the diff shows it. That is the opposite of a value arriving inside a component nobody reviewed
-closely, which is how a scale acquires a sixth rung that only one screen uses.
+**TOKEN-3 · Bước phân số không bao giờ có trên thang đo.**
 
-**TOKEN-3 · A fractional step is never on the scale.**
+Các bậc là toàn bộ bậc và cách đều nhau, nên nửa cung không phải là "giữa hai bậc" — nó bị tắt
+thang hoàn toàn và nó sẽ không khớp với bất kỳ thứ gì khác trên bất kỳ màn hình nào. Điều này chính xác hơn là một
+vấn đề sở thích: không có trường hợp nào câu trả lời đúng là nửa bậc.
 
-The rungs are whole steps and unevenly spaced, so a half-step is not "between two rungs" — it is off
-the ladder entirely, and it will match nothing else on any screen. This is exact rather than a
-matter of taste: there is no case where the correct answer is half of a rung.
+**TOKEN-4 · Một giá trị tùy ý thoát khỏi hệ thống, bất kể nó ước tính là gì.**
 
-**TOKEN-4 · An arbitrary value escapes the system, whatever it evaluates to.**
+Độ dài trong ngoặc hoặc màu thô là giá trị được một người chọn một lần cho một màn hình. Ngay cả khi
+nó tình cờ là một bậc thang, bất kỳ ai tìm kiếm trên cân đều không thể tìm thấy nó và nó không di chuyển
+khi cân di chuyển.
 
-A bracketed length or a raw colour is a value chosen once, by one person, for one screen. Even when
-it happens to equal a rung, it cannot be found by anybody searching the scale, and it does not move
-when the scale moves.
+**TOKEN-5 · Xếp hạng đến từ thang loại, không bao giờ đến từ sự kết hợp được cuộn bằng tay.**
 
-**TOKEN-5 · Rank comes from the type scale, never from a hand-rolled combination.**
+Văn bản lớn cộng với trọng lượng nặng LÀ một tiêu đề, bất kể yếu tố nào mang nó. Được lắp ráp từ các lớp thô
+đó là một tiêu đề mà không ai khác biết đến: bản phác thảo mà trình đọc màn hình xây dựng không bao gồm nó và
+ngày quy mô loại thay đổi nó vẫn ở phía sau. Các tiêu đề đến từ một thành phần sở hữu cả hai
+sự thật cùng một lúc.
 
-Large text plus heavy weight IS a heading, whatever element carries it. Assembled out of raw classes
-it is a heading nothing else knows about: the outline a screen reader builds does not include it, and
-the day the type scale changes it stays behind. Headings come from the one component that owns both
-facts at once.
+**TOKEN-6 · Các quy tắc tồn tại đối với thư mục mà liên minh không thể xem.**
 
-**TOKEN-6 · The rules exist for the folder the union cannot see.**
+Mỗi tầng phía trên các lá lấy các lớp của nó từ một mục nhập và mục nhập đó được nhập - vì vậy liên kết
+đã nắm giữ chúng rồi. Thư mục lá viết các lớp riêng của nó và được miễn các quy tắc đầu vào bởi
+chính sách, điều này làm cho nó trở thành nơi duy nhất mà giá trị ngoài quy mô vẫn có thể được nhập. Đó là những gì các quy tắc này
+tuần tra và đó là lý do tại sao họ đọc các chuỗi lớp trong nguồn thay vì chỉ các mục nhập.
 
-Every tier above the leaves takes its classes from an entry, and the entry is typed — so the union
-already holds them. The leaf folder writes its own classes and is exempt from the entry rules by
-policy, which makes it the one place an off-scale value can still be typed. That is what these rules
-patrol, and it is why they read class strings in source rather than only entries.
+Họ cũng đọc một chuỗi lớp được đưa vào một hằng số mô-đun, bởi vì hoisting là nơi cuối cùng
+giá trị ngoài quy mô trong cơ sở mã này tồn tại trong mọi quy tắc tồn tại.
 
-They also read a class string hoisted into a module constant, because hoisting is where the last
-off-scale value in this codebase survived every rule that existed.
+**TOKEN-7 · Màu ngữ nghĩa được ghép nối bởi bề mặt mang nó.**
 
-**TOKEN-7 · Semantic colour is paired by the surface that carries it.**
+Một từ thành công đơn giản hoặc sử dụng glyph`text-success`. Một cặp đĩa thành công mềm mại`bg-success-soft`với`text-success-soft-foreground`; một cặp đĩa thành công vững chắc`bg-success`với`text-success-foreground`. Cảnh báo và nguy hiểm có ba vai trò giống nhau. Mã thông báo nền
+không phải là mã thông báo tiền cảnh: sử dụng`text-success-soft`trên séc trần nhầm lẫn màu tấm với
+mực được thiết kế để đặt trên đó và phá vỡ sự tương phản giữa các chủ đề.
 
-A bare success word or glyph uses `text-success`. A soft success plate pairs
-`bg-success-soft` with `text-success-soft-foreground`; a solid success plate pairs `bg-success`
-with `text-success-foreground`. Warning and danger follow the same three roles. A background token
-is not a foreground token: using `text-success-soft` on a bare check confuses the plate colour with
-the ink intended to sit on it and breaks contrast across themes.
+**TOKEN-8 · Kích thước nút tùy theo vị trí, trong khi biến thể theo mức độ ưu tiên.**
 
-**TOKEN-8 · Button size follows placement, while variant follows priority.**
+Một hành động được nhúng sử dụng`sm`; một hành động độc lập sở hữu một dòng sử dụng`md`. Đây là những thứ duy nhất
+kích thước nút vì mỗi tên đặt tên cho một mối quan hệ có thể lặp lại. Suy ra chiều cao từ sơ cấp so với
+cấp ba, từ số lượng từ hoặc từ mức độ trực quan của điều khiển, kết hợp độc lập
+các trục và thực hiện cùng một vai trò thay đổi hình học giữa các màn hình.
 
-An embedded action uses `sm`; a standalone action that owns a line uses `md`. These are the only
-button sizes because each names a reproducible relationship. Inferring height from primary versus
-tertiary, from the number of words, or from how visually loud the control feels mixes independent
-axes and makes the same role change geometry between screens.
+**TOKEN-9 · Lớp đặt tên cho mã thông báo không có ý nghĩa gì cho đến khi chủ đề xác định nó.**`max-w-app-lg`không phải là chiều rộng. Đó là một YÊU CẦU cho`--container-app-lg`và khi biến đó thực hiện
+không tồn tại, lớp vẫn được phát ra, phần tử vẫn hiển thị và không có gì chuyển sang màu đỏ -
+liên kết thừa nhận tên, trình biên dịch hài lòng với liên kết và trang âm thầm mất đi
+đo lường.
 
-**TOKEN-9 · A class that names a token means nothing until the theme defines it.**
+Đây là một giá trị chết mà một liên minh đóng không thể nắm bắt được và nó còn tệ hơn một giá trị ngoài quy mô cho
+chính xác đó là lý do: một giá trị ngoài quy mô không thể biên dịch được, trong khi giá trị này vượt qua mọi cổng và tàu.
+Một kho lưu trữ đã có thành viên như vậy đủ lâu để viết bình luận về nó bên cạnh thành viên khác
+nhập thay vì xóa nó.
 
-`max-w-app-lg` is not a width. It is a REQUEST for `--container-app-lg`, and when that variable does
-not exist the class is still emitted, the element still renders, and nothing anywhere goes red — the
-union admits the name, the compiler is satisfied by the union, and the page silently loses its
-measure.
-
-This is the one dead value a closed union cannot catch, and it is worse than an off-scale value for
-exactly that reason: an off-scale value fails to compile, while this one passes every gate and ships.
-A repository already carried such a member for long enough to write a comment about it beside another
-entry rather than delete it.
-
-So the two halves are checked together: the name is a member of the union, AND the variable it asks
-for is defined in the stylesheet. Names Tailwind resolves itself — `screen`, `full`, `fit`, the
-viewport units — promise nothing about the theme and are not this rule's business; a rule that
-reported them would send an author to define a variable nothing reads.
+Vì vậy, hai nửa được kiểm tra cùng nhau: tên là thành viên của liên minh VÀ biến mà nó yêu cầu
+for được xác định trong biểu định kiểu. Tên Tailwind tự giải quyết —`screen`, `full`, `fit`, cái
+đơn vị khung nhìn - không hứa hẹn gì về chủ đề và không phải là vấn đề của quy tắc này; một quy tắc đó
+báo cáo rằng họ sẽ gửi một tác giả để xác định một biến không có gì đọc được.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A class outside the union | It is not a member; the type is the scale | Add the member deliberately, or use the nearest rung |
-| A fractional step | Not between rungs — off the ladder, matching nothing on any screen | The nearest rung |
-| A bracketed length or raw colour | Chosen once for one screen, findable by nobody, and it does not move when the scale does | A member, or a semantic token |
-| A written zero rung | Zero is a step off the ladder, not its bottom step, and naming it implies a rung below | Declare no gap class at all |
-| The compact rung between two lines of one identity | `gap-2` separates two facts; a qualifying line is not a second fact | `gap-1` |
-| Large text plus heavy weight assembled by hand | It is a heading the outline does not contain, and it stays behind when the scale moves | The component that owns both facts |
-| A sixth rung because a screen looked slightly wrong | The scale then describes screens instead of relationships | Ask which level of grouping the seam separates |
-| An off-scale value hoisted into a constant | Lifting it out of the markup hides it; it does not license it | The nearest rung |
-| A `*-soft` background token used as text colour | Plate and foreground roles are different and have different contrast duties | Bare `text-*`, or pair `bg-*-soft` with `text-*-soft-foreground` |
-| Button size inferred from variant | Visual priority does not say whether the action is embedded or standalone | Select variant from priority and size from placement |
-| Custom padding used to shrink a button | It creates a third, local control height outside the closed set | Use `sm` for an embedded action |
+| Một lớp học ngoài đoàn | Nó không phải là thành viên; loại là thang đo | Thêm thành viên một cách có chủ ý hoặc sử dụng bậc thang gần nhất |
+| Một bước phân đoạn | Không phải giữa các bậc thang — ngoài thang, không khớp với bất kỳ màn hình nào | Bậc thang gần nhất |
+| Chiều dài trong ngoặc hoặc màu thô | Được chọn một lần cho một màn hình, không ai có thể tìm thấy và nó không di chuyển khi tỷ lệ | Một thành viên hoặc mã thông báo ngữ nghĩa |
+| Một chữ số 0 được viết | Số 0 là một bước khỏi thang chứ không phải là bước cuối cùng và việc đặt tên cho nó ngụ ý một bậc thang bên dưới | Tuyên bố không có lớp khoảng cách nào cả |
+| Nấc thang nhỏ gọn giữa hai dòng của một bản sắc |`gap-2`tách biệt hai sự thật; một dòng đủ điều kiện không phải là sự thật thứ hai |`gap-1`|
+| Văn bản lớn cộng với trọng lượng nặng được lắp ráp bằng tay | Đó là một tiêu đề mà đường viền không chứa và nó vẫn ở phía sau khi thang đo di chuyển | Thành phần sở hữu cả hai sự kiện |
+| Bậc thứ sáu vì màn hình nhìn hơi sai | Thang đo sau đó mô tả các màn hình thay vì các mối quan hệ | Hỏi mức độ phân nhóm của đường may |
+| Một giá trị ngoài quy mô được nâng lên thành hằng số | Nhấc nó ra khỏi đánh dấu sẽ ẩn nó đi; nó không cấp phép cho nó | Bậc thang gần nhất |
+| MỘT`*-soft`mã thông báo nền được sử dụng làm màu văn bản | Vai trò của mảng và tiền cảnh là khác nhau và có nhiệm vụ tương phản khác nhau | trần`text-*`, hoặc cặp`bg-*-soft`với`text-*-soft-foreground`|
+| Kích thước nút được suy ra từ biến thể | Mức độ ưu tiên trực quan không cho biết hành động được nhúng hay độc lập | Chọn biến thể theo mức độ ưu tiên và kích thước từ vị trí |
+| Phần đệm tùy chỉnh được sử dụng để thu nhỏ nút | Nó tạo ra chiều cao điều khiển cục bộ thứ ba bên ngoài tập đóng | Sử dụng`sm`cho một hành động được nhúng |
 
-## Examples
+## Ví dụ
 
-### The type doing the work
+### Type làm phần việc của nó
 
 ```ts
 classes: ["flex", "flex-col", "gap-4"]
@@ -171,11 +159,10 @@ classes: ["flex", "flex-col", "gap-4"]
 ```ts
 classes: ["flex", "flex-col", "gap-[15px]"]
 ```
+Chúng khác nhau ở một điều: liệu cái thứ hai có biên dịch hay không. Không phải vậy - đó là lý do tại sao không cần có quy tắc nào
+để có ý kiến về nó.
 
-They differ in one thing: whether the second one compiles. It does not — which is why no rule needs
-to have an opinion about it.
-
-### The matching inset
+### Inset tương ứng
 
 ```ts
 // the content node the house surface holds: a 16px edge around a 16px interior seam, so the
@@ -188,13 +175,11 @@ classes: ["flex", "flex-col", "gap-4", "p-4"]
 // scale, and it still reads as crowded
 classes: ["flex", "flex-col", "gap-4", "px-3", "py-2"]
 ```
+Chúng khác nhau ở một điều: cạnh và bên trong có thống nhất hay không. Không có giá trị duy nhất là sai. các
+mặt đất, bán kính và độ cao đều không xuất hiện, bởi vì nhánh bề mặt thu hút chúng và một
+mục nhập chỉ sắp xếp những gì đứng bên trong — xem CONTRACT-12 trong [`contract.md`](contract.md).
 
-They differ in one thing: whether the edge and the interior agree. No single value is wrong. The
-ground, the radius and the elevation appear in neither, because the surface branch draws them and an
-entry only arranges what stands inside — see CONTRACT-12 in
-[`contract.md`](contract.md).
-
-### The leaf, where the rules earn their place
+### Leaf, nơi rule phát huy tác dụng
 
 ```tsx
 // inside the one folder that writes its own classes: on the scale
@@ -205,10 +190,9 @@ const GLUE = "inline-flex items-center gap-2"
 // the same folder, half a rung: off the ladder, and the entry rules do not look here
 const GLUE = "inline-flex items-center gap-1.5"
 ```
+Chúng khác nhau ở một điều: liệu giá trị có tồn tại ở bất kỳ nơi nào khác trong sản phẩm hay không.
 
-They differ in one thing: whether the value exists anywhere else in the product.
-
-### The hand-rolled heading
+### Heading tự lắp ghép
 
 ```tsx
 <Heading props={{ content: title, level: 2 }} />
@@ -217,10 +201,9 @@ They differ in one thing: whether the value exists anywhere else in the product.
 ```tsx
 <span className="text-2xl font-bold">{title}</span>
 ```
+Chúng khác nhau ở một điểm: dàn bài của trình đọc màn hình có chứa tiêu đề hay không.
 
-They differ in one thing: whether a screen reader's outline contains the title.
-
-### The embedded action
+### Action được nhúng
 
 ```tsx
 <Button props={{ label: reactionLabel, variant: "ghost", size: "sm" }} />
@@ -229,10 +212,9 @@ They differ in one thing: whether a screen reader's outline contains the title.
 ```tsx
 <Button props={{ label: reactionLabel, variant: "ghost", size: "md" }} />
 ```
+Chúng khác nhau ở một điểm: liệu một hành động được nhúng trong hàng nguồn cấp dữ liệu có sử dụng mã thông báo vị trí thu gọn hay không.
 
-They differ in one thing: whether an action embedded in a feed row uses the compact placement token.
-
-### Priority is not size
+### Priority không phải size
 
 ```tsx
 <Button props={{ label: submitLabel, variant: "primary", size: "md" }} />
@@ -241,6 +223,5 @@ They differ in one thing: whether an action embedded in a feed row uses the comp
 ```tsx
 <Button props={{ label: submitLabel, variant: "primary", size: "sm" }} />
 ```
-
-They differ in one thing: whether a standalone form anchor uses the resting placement token; both
-remain primary.
+Chúng khác nhau ở một điểm: liệu neo biểu mẫu độc lập có sử dụng mã thông báo vị trí nghỉ hay không; cả hai
+vẫn là chính.

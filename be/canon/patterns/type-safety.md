@@ -1,76 +1,68 @@
-# type safety
+#loại an toàn
 
-## Definition
+## Định nghĩa
 
-The type system is the cheapest reviewer this codebase has: it reads every line, never gets tired,
-and objects before the code runs. Every rule here is about **not switching it off** — because each
-of the ways to do that looks locally reasonable and is invisible afterwards.
+Hệ thống loại là công cụ đánh giá rẻ nhất mà cơ sở mã này có: nó đọc từng dòng, không bao giờ mệt mỏi,
+và các đối tượng trước khi mã chạy. Mọi quy tắc ở đây đều là **không tắt** — bởi vì mỗi quy tắc
+trong số những cách để làm điều đó có vẻ hợp lý cục bộ và sau đó vô hình.`any`là điều hiển nhiên. Những cái khác yên tĩnh hơn: một diễn viên kép rửa sai loại thông qua`unknown`, một kiểu đối tượng nội tuyến mà không gì khác có thể tham chiếu, một enum bị xóa khi biên dịch
+thời gian và không thể đọc lại khi chạy.
 
-`any` is the obvious one. The others are quieter: a double cast that launders a wrong type through
-`unknown`, an inline object type that nothing else can reference, an enum that is erased at compile
-time and cannot be read back at runtime.
+Câu hỏi giải quyết một trường hợp: **sau dòng này, trình biên dịch có còn biết nó có gì không?** Nếu
+Câu trả lời là không, dòng đó đã có sự đảm bảo rồi, và nó cần một lý do tốt hơn là sự thuận tiện.
 
-The question that settles a case: **after this line, does the compiler still know what it had?** If
-the answer is no, the line has spent a guarantee, and it needs a reason better than convenience.
+Điều giữ luật này là[`sources/be/type-safety.mjs`](../../../sources/be/type-safety.mjs).
 
-What holds this law is [`sources/be/type-safety.mjs`](../../../sources/be/type-safety.mjs).
+## Quy tắc
 
-## Rules
+**LOẠI-1 · Không`any`. Thu hẹp từ`unknown`thay vì.**`any`không có nghĩa là "Tôi không biết loại này" — nó có nghĩa là "ngưng kiểm tra" và mức chênh lệch dừng:
+mọi thuộc tính đều đọc nó, mọi giá trị bắt nguồn từ nó và mọi lệnh gọi nó được chuyển đến đều
+cũng không được chọn.`unknown`cũng nói điều trung thực tương tự và buộc việc thu hẹp xảy ra một lần, trong
+mở, nơi người đọc có thể thấy những gì đã được giả định.
 
-**TYPE-1 · No `any`. Narrow from `unknown` instead.**
+**TYPE-2 · Không dùng chiêu kép`unknown`.**
 
-`any` does not mean "I do not know this type" — it means "stop checking", and the stopping spreads:
-every property read off it, every value derived from it, and every call it is passed to are
-unchecked too. `unknown` says the same honest thing and forces the narrowing to happen once, in the
-open, where a reader can see what was assumed.
+`x as unknown as T`là trình biên dịch cho bạn biết dàn diễn viên sai và bị ghi đè hai lần. Đó là
+tệ hơn`any`theo một cách cụ thể: nó tạo ra một giá trị YÊU CẦU được`T`, vậy là mọi thứ
+hạ lưu hoàn toàn tin tưởng vào nó và sự cố xảy ra cách xa đường gây ra nó.
 
-**TYPE-2 · No double cast through `unknown`.**
+**TYPE-3 · Kiểu của tham số bị hủy cấu trúc là loại được đặt tên, không phải là kiểu chữ trong dòng.**`({ userId, courseId }: { userId: string, courseId: string })`không thể được tham chiếu, tái sử dụng,
+được mở rộng hoặc được nhập - vì vậy người gọi thứ hai viết lại và hai bản sao lặng lẽ trôi đi
+bởi vì không có gì kết nối họ. Một loại được đặt tên trong thư mục loại của mô-đun có cùng thông tin
+với một tay cầm trên đó.
 
-`x as unknown as T` is the compiler telling you the cast is wrong and being overruled twice. It is
-worse than `any` in one specific way: it produces a value that CLAIMS to be `T`, so everything
-downstream trusts it completely and the failure surfaces far from the line that caused it.
+**TYPE-4 · Một enum là một enum đơn giản, không bao giờ`const enum`.**
 
-**TYPE-3 · A destructured parameter's type is a named type, not an inline literal.**
+MỘT`const enum`được nội tuyến tại thời điểm biên dịch và không có đối tượng thời gian chạy, vì vậy nó không thể lặp lại,
+không thể được ánh xạ ngược và không thể vượt qua ranh giới các mô-đun biệt lập mà kho lưu trữ này biên dịch
+dưới. Chi phí mà nó tiết kiệm được là một vài byte; chi phí mà nó áp đặt là một tập hợp những việc đơn giản chỉ cần làm
+không làm việc.
 
-`({ userId, courseId }: { userId: string, courseId: string })` cannot be referenced, reused,
-extended or imported — so the second caller writes it again, and the two copies drift silently
-because nothing connects them. A named type in the module's types folder is the same information
-with a handle on it.
+**TYPE-5 · Một liên minh bị phân biệt đối xử đánh bại một túi boolean.**
 
-**TYPE-4 · An enum is a plain enum, never `const enum`.**
+Bốn boolean thừa nhận mười sáu kết hợp, trong đó có lẽ tồn tại ba kết hợp. Mười ba người còn lại
+kiểm tra loại và một trong số đó là nội dung người gọi chuyển vào lúc bốn giờ sáng. Một liên minh của các bang
+tồn tại không thể diễn đạt một trạng thái không tồn tại.
 
-A `const enum` is inlined at compile time and has no runtime object, so it cannot be iterated,
-cannot be reverse-mapped, and cannot cross the isolated-modules boundary this repository compiles
-under. The cost it saves is a few bytes; the cost it imposes is a family of things that simply do
-not work.
+**TYPE-6 · Các lối thoát bị xử phạt được nêu rõ khi áp dụng.**
 
-**TYPE-5 · A discriminated union beats a bag of booleans.**
+Họ thông số kỹ thuật và cây thử nghiệm có thể sử dụng kiểu kép: việc xây dựng một giá trị sai có chủ ý là cách
+bạn chứng minh rằng API đã đóng từ chối nó. Lối ra đó dành cho các bài kiểm tra chứ không phải nơi nào khác, và nó được ghi vào
+cấu hình thay vì rải dưới dạng ngăn chặn trên mỗi dòng.
 
-Four booleans admit sixteen combinations, of which perhaps three exist. The other thirteen
-type-check, and one of them is what a caller passes at four in the morning. A union of the states
-that exist cannot express a state that does not.
+## Bị cấm
 
-**TYPE-6 · The sanctioned exits are stated where they apply.**
-
-The spec family and the test tree may use a double cast: building a deliberately wrong value is how
-you prove a closed API refuses it. That exit is for tests and nowhere else, and it is written into
-the config rather than sprinkled as per-line suppressions.
-
-## Forbidden
-
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| `any` | It does not say "unknown type", it says "stop checking" - and the stopping spreads to everything derived from it | `unknown`, narrowed once in the open |
-| `x as unknown as T` | The compiler refused the cast and was overruled twice; the result CLAIMS to be `T`, so the failure surfaces far from here | Fix the type, or narrow with a guard that checks |
-| An inline object type on a destructured parameter | It cannot be referenced or imported, so the second caller writes it again and the copies drift | A named type in the module's `types/` |
-| `const enum` | It has no runtime object: not iterable, not reverse-mappable, and it cannot cross the isolated-modules boundary | A plain `enum` |
-| A set of booleans describing one situation | They multiply into combinations nobody has ever seen, and all of them compile | A discriminated union of the states that exist |
-| A per-line suppression for a test-only need | The exit stops being visible and starts being a habit | State the exit in the config, scoped to the test globs |
+|`any`| Nó không nói "loại không xác định", nó nói "dừng kiểm tra" - và việc dừng lại lan sang mọi thứ bắt nguồn từ nó |`unknown`, thu hẹp một lần khi mở |
+|`x as unknown as T`| Trình biên dịch đã từ chối tuyển chọn và bị ghi đè hai lần; kết quả YÊU CẦU được`T`, vậy là sự thất bại lại xuất hiện cách xa đây | Sửa loại hoặc thu hẹp bằng bộ bảo vệ kiểm tra |
+| Loại đối tượng nội tuyến trên tham số bị hủy cấu trúc | Nó không thể được tham chiếu hoặc nhập, vì vậy người gọi thứ hai viết lại và các bản sao trôi | Một loại được đặt tên trong mô-đun`types/` |
+| `const enum`| Nó không có đối tượng thời gian chạy: không thể lặp lại, không thể ánh xạ ngược và không thể vượt qua ranh giới mô-đun biệt lập | Một đồng bằng`enum`|
+| Một tập hợp các boolean mô tả một tình huống | Chúng nhân lên thành các tổ hợp chưa ai từng thấy và tất cả chúng đều được biên dịch | Một liên minh phân biệt đối xử của các bang tồn tại |
+| Ngăn chặn trên mỗi dòng chỉ dành cho nhu cầu kiểm tra | Lối ra không còn hiển thị và bắt đầu trở thành thói quen | Nêu rõ lối ra trong cấu hình, nằm trong phạm vi kiểm tra toàn cầu |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — unknown, narrowed once
-
+### Trường hợp thông thường — chưa biết, đã thu hẹp một lần
 ```ts
 const parsePayload = (raw: unknown): WebhookPayload => {
     if (typeof raw !== "object" || raw === null || !("event" in raw)) {
@@ -84,11 +76,9 @@ const parsePayload = (raw: unknown): WebhookPayload => {
 // Wrong: nothing below this line is checked, including the things built out of it.
 const parsePayload = (raw: any): WebhookPayload => raw
 ```
+Chúng khác nhau ở một điều: giả định đó có được nêu ở bất kỳ nơi nào mà người đọc có thể tìm thấy hay không.
 
-They differ in one thing: whether the assumption is stated anywhere a reader can find it.
-
-### The laundering trap
-
+### Bẫy rửa tiền
 ```ts
 // the guard checks the thing the type claims
 if (isEnrollment(row)) {
@@ -101,11 +91,9 @@ if (isEnrollment(row)) {
 // now trusts `row` completely, and the failure appears wherever it is finally used.
 return (row as unknown as EnrollmentEntity).courseId
 ```
+Chúng khác nhau ở một điều: liệu có điều gì thực sự được kiểm tra hay không.
 
-They differ in one thing: whether anything actually checked.
-
-### The inline-type trap
-
+### Bẫy kiểu nội tuyến
 ```ts
 /** What granting XP needs. */
 export interface GrantXpParams {
@@ -121,11 +109,9 @@ export const grantXp = ({ userId, amount }: GrantXpParams) => { /* ... */ }
 // arrives, one of the two copies gets it.
 export const grantXp = ({ userId, amount }: { userId: string, amount: number }) => { /* ... */ }
 ```
+Chúng khác nhau ở một điều: hình dạng đó có tay cầm hay không.
 
-They differ in one thing: whether the shape has a handle.
-
-### The state trap
-
+### Bẫy nhà nước
 ```ts
 type GradeState =
     | { kind: "pending" }
@@ -142,5 +128,4 @@ interface GradeState {
     score?: number
 }
 ```
-
-They differ in one thing: whether an impossible state can be written down.
+Chúng khác nhau ở một điều: liệu một trạng thái không thể có có thể được viết ra hay không.

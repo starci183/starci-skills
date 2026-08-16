@@ -7,6 +7,10 @@ description: Commit the current target source as a clean baseline, then implemen
 
 Read [`../../skill-shape.md`](../../skill-shape.md) first.
 
+Then read the Apply decision owners:
+[`implementation.md`](../../fe/creativity/implementation.md) and
+[`verification.md`](../../fe/creativity/verification.md).
+
 Apply creates the before-state commit, writes the approved design directly in source, and uses that
 commit to expose the exact final diff.
 
@@ -50,6 +54,11 @@ path is required, append the finding and return that boundary decision to Review
 
 Before completion, reconcile every component and props row against `git diff <baseline>`. Record
 the row-to-diff proof in the workflow; an unimplemented row or an unexplained diff returns to Review.
+
+Reconcile and prove every approved `INTERACTION CONSEQUENCE`, `OWNER CHALLENGE` and `VISUAL JOB`
+row at the frozen identity. Exercise the complete applicable interaction state family rather than
+one screenshot. If real implementation disproves the approved graph, action consequence or visual
+job, return to Review instead of patching a local exception.
 
 Run the approved Frontend typecheck, lint and build gates without suppression. In addition, before
 closing Apply, run a repository-owned non-mutating lint command in each resolved target repository:

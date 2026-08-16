@@ -43,6 +43,13 @@ A one-off implementation defect is fixed in code. A repeated design judgement ma
 document. A stable, already-followed and enforceable convention may become canon. Do not turn every
 review comment directly into law.
 
+**VERIFICATION-7 · Verify interactions as state families.**
+
+Verify an interaction as a state family, not one screenshot: resting, hover/focus,
+selected/expanded, selected-hover/focus and applicable pending/failed states. Record non-applicable
+members. Confirm what changes and what must remain invariant, including adjacent detail or content
+panels.
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -52,6 +59,7 @@ review comment directly into law.
 | Accept “close enough” in migration | Nearby tokens accumulate into a redesign | Compare exact reference evidence |
 | Change canon to excuse a failing implementation | The rule becomes a record of convenience | Fix code or raise a separate evidence-backed proposal |
 | Add a rule from one isolated mistake | The instruction tree becomes a defect diary | Promote only stable repeated judgement |
+| Approve one interaction state in isolation | Hover, selection or detail can regress when another state takes precedence | Compare the complete applicable state family at one frozen identity |
 
 ## Examples
 
@@ -66,4 +74,3 @@ contract tests pass, therefore the joined list is visually correct
 ```
 
 They differ in one thing: whether the rendered claim is actually observed.
-

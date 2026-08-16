@@ -1,84 +1,81 @@
-# naming
+# đặt tên
 
-## Definition
+## Định nghĩa
 
-Naming here is the mechanical half: the spellings that are the same in every file regardless of what
-the file is for. How a module-level function is declared, and what a thing that responds to a reader
-is called.
+Naming ở đây là phần cơ học: cách viết phải giống nhau trong mọi file, bất kể file dùng để làm gì —
+cách khai báo một function ở cấp module và cách đặt tên cho thứ phản hồi hành động của người đọc.
 
-These are not preferences. Both forms of each pair work, and that is exactly why they are rules —
-nothing corrects the second spelling, so a file written on a Tuesday reads differently from its
-neighbour, and every diff afterwards carries noise that has nothing to do with the change.
+Đây không phải vấn đề sở thích. Cả hai cách viết trong mỗi cặp đều hoạt động, và chính vì vậy chúng
+phải trở thành rule: không có gì tự sửa cách viết thứ hai, nên một file viết hôm nay sẽ đọc khác file
+bên cạnh, còn mọi diff về sau đều mang theo nhiễu không liên quan đến thay đổi.
 
-What a component is called for — the thing rather than its first caller — is not settled here. That
-question is answered per layer, because the failure it prevents is different at each one.
+Tên của một component phải nói component đó là gì, không phải nó được caller đầu tiên gọi ở đâu. Câu
+hỏi này được quyết định theo từng layer, vì lỗi cần ngăn chặn khác nhau ở mỗi layer.
 
-What holds this law is [`sources/naming.mjs`](../../../sources/fe/naming.mjs).
+Luật này được bảo đảm bởi [`sources/naming.mjs`](../../../sources/fe/naming.mjs).
 
 Implementation anchors in `starci-academy-fe`:
 `src/components/blocks/dashboard/CreditStatRow/index.tsx` and
 `src/components/blocks/dashboard/CreditStatRow/component.tsx`.
 
-## Rules
+## Luật
 
-**NAMING-1 · A module-level function is an arrow const.**
+**NAMING-1 · Function cấp module là arrow const.**
 
-`export const X = () => {}`, never `function X() {}` and never `export default function`. One
-spelling means a reader scanning a file sees the same silhouette for every declaration in it, and a
-grep for the name finds the definition rather than a hoisted surprise.
+`export const X = () => {}`, không dùng `function X() {}` và không dùng `export default function`.
+Một cách viết duy nhất giúp người đọc quét file thấy cùng một hình dạng cho mọi khai báo, còn grep
+theo tên sẽ tìm đúng định nghĩa thay vì gặp một bất ngờ do hoisting.
 
-The deeper reason is hoisting. A `function` declaration exists before the line that declares it, so
-a file can call downward and stay green — and the order of a file then stops meaning anything,
-because nothing enforces that a thing is defined before it is used. A const cannot be used before it
-exists, so the file reads top to bottom in the order it actually runs.
+Lý do sâu hơn là hoisting. Function declaration tồn tại trước dòng khai báo, nên file có thể gọi
+một thứ được viết bên dưới mà vẫn xanh. Khi đó thứ tự trong file không còn mang ý nghĩa, vì không có
+gì buộc một thứ phải được định nghĩa trước khi dùng. Const không thể được dùng trước khi tồn tại,
+nên file được đọc từ trên xuống theo đúng thứ tự nó thực sự chạy.
 
-**NAMING-2 · Something that responds to a reader is named `onX`, never `handleX`.**
+**NAMING-2 · Thứ phản hồi hành động của người đọc phải có tên `onX`, không bao giờ `handleX`.**
 
-Both the prop and the local. `handleSubmit` and `onSubmit` describe the same function, but a
-codebase that uses both has two vocabularies for one idea, and every author has to decide which one
-this file is in.
+Quy tắc này áp dụng cho cả prop lẫn local. `handleSubmit` và `onSubmit` mô tả cùng một function,
+nhưng codebase dùng cả hai sẽ có hai vocabulary cho một ý, buộc mỗi tác giả phải quyết định file này
+đang nói theo vocabulary nào.
 
-`on` is the one that survives the trip. The prop is already `on.press`, the DOM attribute is already
-`onClick`, and the slot the function is passed into is already `on` — so a local called
-`handlePress` is renamed at the boundary, every time, and the rename is a chance to get it wrong.
-Naming it `onPress` at birth means the name is the same at the declaration, at the call site and in
-the props type.
+`on` là tên đi xuyên suốt được. Prop vốn đã là `on.press`, DOM attribute vốn đã là `onClick`, và
+slot nhận function vốn đã dùng `on`; vì vậy local tên `handlePress` sẽ bị đổi tên ở boundary mỗi lần
+được truyền đi, và mỗi lần đổi tên là một cơ hội mắc lỗi. Đặt tên `onPress` ngay từ đầu giúp tên giữ
+nguyên ở declaration, call site và props type.
 
-**NAMING-3 · A file and route name is written in the one language every reader shares.**
+**NAMING-3 · Tên file và tên route dùng ngôn ngữ mà mọi người đọc đều chia sẻ.**
 
-Held by
+Rule này được giữ bởi
 [`sources/fe/naming.mjs`](../../../sources/fe/naming.mjs)'s `no-second-language-in-path`.
 
-The rule that reads source can see identifiers, comments and strings, and cannot see the name of the
-file it is reading. So a route may be `app/cap-phat/page.tsx` with every identifier inside it in
-English and nothing says a word — while the URL, the import specifier, the folder in every editor
-sidebar and the path in every stack trace stay in a language half the readers do not have.
+Rule đọc source nhìn thấy identifier, comment và string nhưng không nhìn thấy tên file đang đọc. Vì
+thế route có thể là `app/cap-phat/page.tsx`, bên trong toàn identifier tiếng Anh mà không có gì cảnh
+báo — trong khi URL, import specifier, folder trong sidebar của editor và path trong stack trace
+đều dùng ngôn ngữ mà một nửa người đọc không biết.
 
-A route segment is also a PUBLIC name. It is the address a customer quotes in a support ticket, so
-this is not only an authoring question: the product's own URLs stop being readable outside one
-language. The words a person READS belong in the locale catalogue, where a second language is
-content and switching it is the point. A path is not content; it is an address, and it is read by
-more people than the code inside it.
+Route segment cũng là một tên PUBLIC: đó là địa chỉ khách hàng trích dẫn trong ticket hỗ trợ. Đây
+không chỉ là chuyện authoring; URL của sản phẩm cũng phải đọc được. Những từ người dùng nhìn thấy
+thuộc về locale catalogue, nơi ngôn ngữ thứ hai là content và việc chuyển ngôn ngữ là mục đích. Path
+không phải content; nó là địa chỉ và được nhiều người đọc hơn code bên trong.
 
-The check is two-part because a path cannot carry diacritics: `cấp phát` reaches the filesystem as
-`cap-phat`. Accents catch the first form, and a named list catches the romanised one. The list is
-deliberate rather than clever — guessing at Vietnamese-shaped ASCII would refuse `capacity` and
-`dangerous`, and a rule that fires on English words is one a repository turns off.
+Việc kiểm tra có hai phần vì path không thể giữ dấu: `cấp phát` đi vào filesystem thành `cap-phat`.
+Dấu bắt được dạng đầu tiên, còn một danh sách tên rõ ràng bắt được dạng Latin hóa. Danh sách này có
+chủ ý thay vì đoán mò — đoán các chuỗi ASCII có hình dạng tiếng Việt sẽ từ chối `capacity` và
+`dangerous`, khiến rule bắt cả từ tiếng Anh và rồi bị repository tắt đi.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| `function X() {}` at module level | It is hoisted, so the file's order stops carrying any guarantee about what exists when | `export const X = () => {}` |
-| A route or folder named in a second language | The address is read by more people than the code, and unlike a comment it cannot be skimmed past | Rename the segment; put the words a reader sees in the locale catalogue |
-| `export default function` | The same, plus the export has no name to grep for at its call sites | A named arrow const, exported by name |
-| `handleX` as a local | It is renamed at the boundary every time it is passed, and a rename is a chance to be wrong | `onX`, the same word the slot uses |
-| `handleX` as a prop | Two vocabularies for one idea, and every author must decide which one this file speaks | `onX` |
-| A name that says where it is used | It dies at the second caller, and is either copied or left lying | Name what it is — the rule for this is stated per layer |
+| `function X() {}` ở cấp module | Nó được hoist, nên thứ tự file không còn bảo đảm điều gì tồn tại tại mỗi dòng | `export const X = () => {}` |
+| Route hoặc folder có tên bằng ngôn ngữ thứ hai | Địa chỉ được nhiều người đọc hơn code và không thể lướt qua như comment | Đổi tên segment; đưa từ người dùng thấy vào locale catalogue |
+| `export default function` | Tương tự, đồng thời export không có tên để grep ở call site | Arrow const có tên và export theo tên |
+| `handleX` làm local | Nó bị đổi tên ở boundary mỗi lần truyền đi, và việc đổi tên có thể sai | `onX`, cùng từ mà slot dùng |
+| `handleX` làm prop | Hai vocabulary cho một ý, buộc mỗi tác giả tự chọn cách nói | `onX` |
+| Tên chỉ nói nơi nó được dùng | Nó mất ý nghĩa ở caller thứ hai, rồi bị sao chép hoặc bỏ lại | Đặt tên theo bản chất; rule cho việc này được nêu theo từng layer |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — one silhouette per declaration
+### Trường hợp thông thường — một hình dạng cho mỗi khai báo
 
 ```tsx
 // Every declaration in the file has the same shape, and nothing exists before its own line.
@@ -101,9 +98,9 @@ function formatQuota(value: number) {
 }
 ```
 
-They differ in one thing: whether a name can be used before the line that creates it.
+Chúng chỉ khác nhau ở một điểm: một tên có thể được dùng trước dòng tạo ra nó hay không.
 
-### The handler trap — the rename at the boundary
+### Bẫy handler — đổi tên ở boundary
 
 ```tsx
 // The name is the same at the declaration, at the slot, and in the props type.
@@ -120,9 +117,9 @@ const handleClaim = () => claim.trigger()
 return <_DailyQuest state="claimable" props={frame} on={{ claim: handleClaim }} />
 ```
 
-They differ in one thing: whether the name survives being passed.
+Chúng chỉ khác nhau ở một điểm: tên có giữ nguyên khi function được truyền đi hay không.
 
-### The borderline — a handler that is not a handler
+### Trường hợp ranh giới — một handler không phải là handler
 
 ```tsx
 // Not a handler: it computes a value. `on` would be a lie, and this rule does not ask for it.
@@ -134,4 +131,4 @@ const claimLabel = buildClaimLabel(quest.data)
 const onClaimLabel = buildClaimLabel(quest.data)
 ```
 
-They differ in one thing: whether a reader's action is what runs it.
+Chúng chỉ khác nhau ở một điểm: action của người đọc có phải là thứ làm nó chạy hay không.

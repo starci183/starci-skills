@@ -27,6 +27,7 @@ import test from "node:test"
 /** The trust root, resolved from this file so the gate travels with the tree. */
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const SKILLS = join(ROOT, "skills")
+const CREATIVITY = join(ROOT, "fe", "creativity")
 
 /** Every markdown file under `skills/`, as absolute paths. */
 const markdownFiles = (directory) =>
@@ -249,6 +250,68 @@ test("FE Design Review freezes component and props deltas before Apply", () => {
   assert.match(apply, /return to Review when implementation discovers a new owner, tier, path, prop or action/)
 })
 
+test("FE creativity decisions have canonical owners and explicit phase consumers", () => {
+  const index = readFileSync(join(CREATIVITY, "INDEX.md"), "utf8")
+  const plan = readFileSync(join(SKILLS, "starci-fe-design-plan", "SKILL.md"), "utf8")
+  const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
+  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
+  const fidelity = readFileSync(join(SKILLS, "starci-fe-fidelity-start", "SKILL.md"), "utf8")
+  const research = readFileSync(join(CREATIVITY, "research.md"), "utf8")
+  const critique = readFileSync(join(CREATIVITY, "critique.md"), "utf8")
+  const graph = readFileSync(join(CREATIVITY, "contract-graph.md"), "utf8")
+  const verification = readFileSync(join(CREATIVITY, "verification.md"), "utf8")
+
+  const ordered = index.slice(0, index.indexOf("## Phase consumers"))
+  for (const name of [
+    "mode.md",
+    "best-belief-source.md",
+    "research.md",
+    "brief.md",
+    "divergence.md",
+    "critique.md",
+    "selection.md",
+    "contract-graph.md",
+    "implementation.md",
+    "verification.md",
+  ]) {
+    assert.ok(ordered.includes(`\`${name}\``), `${name} is missing from the read order`)
+  }
+
+  for (const name of ["mode.md", "best-belief-source.md", "research.md", "brief.md", "divergence.md"]) {
+    assert.match(plan, new RegExp(name.replace(".", "\\.")), `Design Plan does not consume ${name}`)
+  }
+  for (const name of ["critique.md", "selection.md", "contract-graph.md", "verification.md"]) {
+    assert.match(review, new RegExp(name.replace(".", "\\.")), `Design Review does not consume ${name}`)
+  }
+  for (const name of ["implementation.md", "verification.md"]) {
+    assert.match(apply, new RegExp(name.replace(".", "\\.")), `Design Apply does not consume ${name}`)
+  }
+  for (const name of ["mode.md", "best-belief-source.md", "contract-graph.md", "verification.md"]) {
+    assert.match(fidelity, new RegExp(name.replace(".", "\\.")), `Fidelity Start does not consume ${name}`)
+  }
+
+  const interactionSchema = "| Interaction | Trigger | Product owner | Request / route | Visual states | Pending | Success | Failure | Persistence / shared effect | Evidence |"
+  const ownerSchema = "| Proposed owner | Layer | Purpose | Closest existing owners / contracts | REUSE verdict | ALTER verdict | Layer proof | Decision | Evidence |"
+  const visualSchema = "| Visual element | Owner / state | Recognition, grouping or interaction job | Existing reference | Verdict | Evidence |"
+  assert.match(research, new RegExp(interactionSchema.replace(/[|/]/g, "\\$&")))
+  assert.match(graph, new RegExp(ownerSchema.replace(/[|/]/g, "\\$&")))
+  assert.match(critique, new RegExp(visualSchema.replace(/[|/]/g, "\\$&")))
+  for (const skill of [plan, review, apply, fidelity]) {
+    assert.doesNotMatch(skill, new RegExp(interactionSchema.replace(/[|/]/g, "\\$&")))
+    assert.doesNotMatch(skill, new RegExp(ownerSchema.replace(/[|/]/g, "\\$&")))
+    assert.doesNotMatch(skill, new RegExp(visualSchema.replace(/[|/]/g, "\\$&")))
+  }
+
+  assert.match(plan, /### INTERACTION CONSEQUENCE/)
+  assert.match(review, /### INTERACTION CONSEQUENCE/)
+  assert.match(review, /### OWNER CHALLENGE/)
+  assert.match(review, /### VISUAL JOB/)
+  assert.ok(review.indexOf("### OWNER CHALLENGE") < review.indexOf("### COMPONENT DELTA"))
+  assert.match(apply, /INTERACTION CONSEQUENCE.*, `OWNER CHALLENGE` and `VISUAL JOB`/s)
+  assert.match(fidelity, /An\s+unapproved `ADD` is a `new-finding` routed to Design/)
+  assert.match(verification, /resting, hover\/focus,\s+selected\/expanded, selected-hover\/focus/)
+})
+
 test("Fidelity Start fixes small patches and routes only creative items to previews", () => {
   const start = readFileSync(join(SKILLS, "starci-fe-fidelity-start", "SKILL.md"), "utf8")
 
@@ -264,9 +327,10 @@ test("Fidelity Start fixes small patches and routes only creative items to previ
   assert.match(start, /REFERENCE OWNER CLOSURE/)
   assert.match(start, /trace the rendered\s+reference to its concrete component and contract/)
   assert.match(start, /including owners whose current name is\s+domain-specific/)
-  assert.match(start, /`reuse`, `alter-generic` or `keep-apart`/)
+  assert.match(start, /`REUSE`, `ALTER` or `KEEP_APART`/)
   assert.match(start, /A\s+different interaction host does not by itself justify duplicating the visual content/)
-  assert.match(start, /Reference \| Concrete owner \/ contract \| Same-purpose candidates \| Verdict \| Interaction-host difference/)
+  assert.match(start, /### OWNER CHALLENGE/)
+  assert.match(start, /unapproved `ADD` is a `new-finding` routed to Design/)
 })
 
 test("every FE skill requires declared project or target repositories", () => {

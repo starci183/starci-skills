@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.academy/schema/fe/patterns/gate.schema.json",
+  "title": "Gate 4 - patterns",
+  "description": "Cổng thứ tư: nhận HTML của gate principles và trả về mã front end thật - từng file, từng khoá hợp đồng, từng lát cắt pure và connected, kèm lý do của mỗi chỗ.",
+  "$comment": "input là $ref thẳng vào MarkupPlan của .claude/fe/principles/gate.schema.json. output là $ref của gate lints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "description": "HTML và cây node đã chốt ở gate principles, đưa nguyên vào chứ không tóm tắt lại.",
+      "$ref": "https://starci.academy/schema/fe/principles/gate.schema.json#/$defs/MarkupPlan"
+    },
+    "output": {
+      "description": "Mã front end đã dựng theo đúng HTML đó, và đúng bằng input của gate lints.",
+      "$ref": "#/$defs/SourcePlan"
+    }
+  },
+  "$defs": {
+    "Reason": {
+      "description": "Lý do có neo, kéo theo chuỗi từ gate principles nên cả năm gate dùng đúng một định nghĩa.",
+      "$ref": "https://starci.academy/schema/fe/principles/gate.schema.json#/$defs/Reason"
+    },
+
+    "PatternModule": {
+      "description": "Module luật sở hữu quyết định mã này, lấy từ đúng các module đang có trên shelf patterns.",
+      "$comment": "Nguồn: các thư mục module trong .claude/fe/patterns, khớp một-một với 17 law của .claude/sources/fe/index.mjs cộng cache-key.",
+      "enum": [
+        "cache-key",
+        "comments",
+        "contract",
+        "file-layout",
+        "icon",
+        "landmark",
+        "lint-adoption",
+        "lint-escape-hatch",
+        "loading",
+        "naming",
+        "props-and-slots",
+        "served-locale",
+        "the-split",
+        "tokens",
+        "translation",
+        "type-safety",
+        "typography",
+        "vendor-boundary"
+      ]
+    },
+
+    "Tier": {
+      "description": "Tầng component mà một file thuộc về, lấy từ các thư mục tầng đang có thật trong repo sống.",
+      "$comment": "Nguồn đo: src/components có contracts, pages, layouts, overlays, blocks, branches, composites, leaves, shells.",
+      "enum": [
+        "contracts",
+        "pages",
+        "layouts",
+        "overlays",
+        "blocks",
+        "branches",
+        "composites",
+        "leaves",
+        "shells",
+        "modules",
+        "app"
+      ]
+    },
+
+    "PatternDecision": {
+      "type": "object",
+      "title": "Một quyết định mã",
+      "description": "Một tình huống mà một module luật sở hữu ở tầng mã, kèm mã tình huống và vì sao file rơi vào đúng mã đó.",
+      "additionalProperties": false,
+      "required": ["module", "code", "reason"],
+      "properties": {
+        "module": {
+          "description": "Module luật sở hữu tình huống này.",
+          "$ref": "#/$defs/PatternModule"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z-]*-[0-9]+$",
+          "description": "Mã tình huống của module, viết hoa và có số, ví dụ CONTRACT-6."
+        },
+        "reason": {
+          "description": "Vì sao mã này áp đúng vào chỗ này, chứ không phải mã hàng xóm của nó.",
+          "$ref": "#/$defs/Reason"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "module": { "const": "contract" } }, "required": ["module"] },
+          "then": {
+            "properties": {
+              "code": {
+                "description": "Mã tình huống của luật hợp đồng; đánh số CỐ ĐỊNH vì đã bị trích dẫn từ các record đã viết, kết thúc ở mười ba.",
+                "enum": [
+                  "CONTRACT-1",
+                  "CONTRACT-2",
+                  "CONTRACT-3",
+                  "CONTRACT-4",
+                  "CONTRACT-5",
+                  "CONTRACT-6",
+                  "CONTRACT-7",
+                  "CONTRACT-8",
+                  "CONTRACT-9",
+                  "CONTRACT-10",
+                  "CONTRACT-11",
+                  "CONTRACT-12",
+                  "CONTRACT-13"
+                ]
+              }
+            },
+            "$comment": "Nguồn: bảng Situation Codes trong .claude/fe/patterns/contract/INDEX.md."
+          }
+        }
+      ]
+    },
+
+    "SourceFile": {
+      "type": "object",
+      "title": "Một file mã",
+      "description": "Một file sẽ được ghi hoặc sửa, kèm tầng của nó và vai trò của nó trong cặp file.",
+      "additionalProperties": false,
+      "required": ["path", "tier", "role", "reason"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[Dd]:[\\\\/]Repositories[\\\\/]starci-academy-fe[\\\\/].+\\.(ts|tsx|css|json|mjs)$",
+          "description": "Đường dẫn tuyệt đối của file trong repo sống; repo cũ starci-academy bị chặn ngay ở pattern."
+        },
+        "tier": {
+          "description": "Tầng component mà file thuộc về.",
+          "$ref": "#/$defs/Tier"
+        },
+        "role": {
+          "description": "Vai trò của file trong cặp file của tầng đó.",
+          "$comment": "Nguồn đo: thứ tự cố định của component.tsx và index.tsx trong tầng block; regex TWO_FILE_TIERS chỉ khớp pages và layouts, nên tầng block không bị luật file-layout phủ.",
+          "enum": ["component", "index", "test", "story", "contract-entry", "hook", "route-file", "global-css"]
+        },
+        "exportName": {
+          "type": "string",
+          "pattern": "^_?[A-Za-z][A-Za-z0-9]*$",
+          "description": "Tên export chính của file; nửa thuần mang tiền tố gạch dưới, nửa nối mang tên trần."
+        },
+        "hasMeta": {
+          "type": "boolean",
+          "description": "File có export meta hay không; meta là chú thích thuần vì không gate nào đọc nó."
+        },
+        "reason": {
+          "description": "Vì sao file này tồn tại ở đúng tầng đó với đúng vai trò đó.",
+          "$ref": "#/$defs/Reason"
+        }
+      }
+    },
+
+    "ContractEntry": {
+      "type": "object",
+      "title": "Một khoá hợp đồng",
+      "description": "Mô tả một node đúng một lần: khoá sở hữu class, thẻ nó mở và lý do các con ngồi như thế.",
+      "additionalProperties": false,
+      "required": ["key", "host", "classNames", "children", "why"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Khoá hợp đồng theo kebab-case, và tên khoá phải nói được cái gì nằm bên trong nó."
+        },
+        "isNew": {
+          "type": "boolean",
+          "description": "Đây là khoá mới thêm vào bảng hay khoá đã có sẵn được dùng lại."
+        },
+        "host": {
+          "description": "Thẻ mà entry mở, lấy từ union đóng ContractHost.",
+          "$ref": "https://starci.academy/schema/fe/layouts/gate.schema.json#/$defs/ContractHost"
+        },
+        "classNames": {
+          "type": "array",
+          "description": "Các class sắp xếp của entry, chỉ mô tả các con đứng cạnh nhau ra sao.",
+          "$comment": "CONTRACT-12: hành vi, sơn, nền và độ nổi không được nằm trong entry. Giá trị tuỳ ý có số kèm đơn vị bị chặn ngay tại đây.",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Một class sắp xếp thuộc union đóng LayoutClassName của registry sống.",
+            "not": { "pattern": "\\[[^\\]]*[0-9]+(px|rem|em|%|vh|vw|ch|dvh)" }
+          }
+        },
+        "children": {
+          "type": "array",
+          "description": "Mọi slot bên trong entry, khai bằng TÊN chứ không bằng children hay danh sách vị trí.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slot"],
+            "properties": {
+              "slot": {
+                "type": "string",
+                "pattern": "^[a-z][a-zA-Z0-9]*$",
+                "description": "Tên slot, và tên này là danh tính của vùng con."
+              },
+              "contract": {
+                "type": "string",
+                "description": "Khoá hợp đồng của node con khi con lại là một node."
+              },
+              "leaf": {
+                "type": "string",
+                "description": "Tên leaf khi con không phải node nữa."
+              },
+              "repeats": {
+                "type": "boolean",
+                "description": "Slot này là một mảng ở đời thật hay đứng đúng một lần."
+              },
+              "restingCount": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Số hàng lúc nghỉ, bắt buộc khi slot lặp, và là cardinality của lúc tải chứ không phải độ dài thật."
+              },
+              "optional": {
+                "type": "boolean",
+                "description": "Slot có thể vắng mặt hay luôn có mặt."
+              }
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "repeats": { "const": true } }, "required": ["repeats"] },
+                "then": { "required": ["restingCount"] }
+              }
+            ]
+          }
+        },
+        "why": {
+          "type": "string",
+          "minLength": 60,
+          "description": "Cái gì hỏng khi xoá node này, viết ít nhất mười hai từ và không được ghép lại từ chính các từ trong khoá."
+        },
+        "reason": {
+          "description": "Vì sao cần đúng khoá này chứ không phải một khoá đã có sẵn diễn tả cùng hình dạng.",
+          "$ref": "#/$defs/Reason"
+        }
+      }
+    },
+
+    "SourcePlan": {
+      "type": "object",
+      "title": "Đầu ra của gate patterns",
+      "description": "HTML cũ kèm mã đã dựng: file, khoá hợp đồng, lát cắt pure và connected, chủ landmark main; đây đúng bằng input của gate lints.",
+      "additionalProperties": false,
+      "required": ["markup", "files", "contractEntries", "split", "mainLandmarkOwner", "decisions"],
+      "properties": {
+        "markup": {
+          "description": "Nguyên HTML và cây node đến từ gate principles, mang theo để gate lints không phải đoán lại nó.",
+          "$ref": "https://starci.academy/schema/fe/principles/gate.schema.json#/$defs/MarkupPlan"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Mọi file sẽ được ghi hoặc sửa, không file nào nằm ngoài danh sách này.",
+          "items": { "$ref": "#/$defs/SourceFile" }
+        },
+        "contractEntries": {
+          "type": "array",
+          "description": "Các khoá hợp đồng được dùng lại hoặc thêm mới cho cây node ở trên.",
+          "items": { "$ref": "#/$defs/ContractEntry" }
+        },
+        "split": {
+          "type": "object",
+          "title": "Lát cắt pure và connected",
+          "description": "Ai giữ request, dịch, router và mutation, và ai giữ cây.",
+          "$comment": "Nguồn đo: rule the-split khoá bằng ĐƯỜNG DẪN FILE và bằng tên twin gạch dưới, không bao giờ đọc meta.",
+          "additionalProperties": false,
+          "required": ["pureExport", "connectedExport", "worldReachedFrom", "reason"],
+          "properties": {
+            "pureExport": {
+              "type": "string",
+              "pattern": "^_[A-Z][A-Za-z0-9]*$",
+              "description": "Tên export của nửa thuần, luôn mang tiền tố gạch dưới."
+            },
+            "connectedExport": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9]*$",
+              "description": "Tên export của nửa nối, đúng bằng tên thư mục."
+            },
+            "worldReachedFrom": {
+              "description": "Nửa nào được phép chạm thế giới.",
+              "$comment": "Nguồn đo: regex REACHES_FOR_THE_WORLD liệt kê bốn họ bị cấm ở nửa thuần - request, store, runtime dịch, query trực tiếp.",
+              "enum": ["chi-nua-connected", "ca-hai-nua"]
+            },
+            "reExportsComponent": {
+              "type": "boolean",
+              "description": "index.tsx có chạy export * từ ./component hay không; repo sống làm việc này ở 8 trên 31 chỗ nên nơi nhập kiểu công khai không nhất quán."
+            },
+            "reason": {
+              "description": "Vì sao lát cắt rơi đúng vào chỗ đó, và vì sao nửa thuần không cần chạm thế giới.",
+              "$ref": "#/$defs/Reason"
+            }
+          }
+        },
+        "meta": {
+          "type": "object",
+          "title": "Nhãn meta",
+          "description": "Chú thích khai báo của khối; không gate nào đọc nó nên nó là lời khai chứ không phải bằng chứng.",
+          "additionalProperties": false,
+          "required": ["world", "domain"],
+          "properties": {
+            "world": {
+              "description": "Nửa thuần hay nửa nối, theo lời khai.",
+              "enum": ["pure", "connected"]
+            },
+            "domain": {
+              "description": "Miền nghiệp vụ, lấy đúng mười miền đo được ở tầng block.",
+              "$ref": "https://starci.academy/schema/fe/blocks/gate.schema.json#/$defs/Block/properties/domain"
+            },
+            "shape": {
+              "description": "Hình dạng của đơn vị khi nó không phải một khối thường.",
+              "$comment": "Nguồn đo: marker shape layout chỉ có ở 3 trên 6 layout sống; ba lược đồ meta khác nhau cùng tồn tại.",
+              "enum": ["layout", "block", "page", "overlay"]
+            }
+          }
+        },
+        "mainLandmarkOwner": {
+          "description": "Ai mở landmark main cho route này.",
+          "$comment": "Nguồn đo: luật landmark có hai rule - routed-page-is-a-main-landmark và main-landmark-belongs-to-a-route-file. Repo sống đang lồng main trong main trên 30 route learn vì 23 contract page cùng khai host main dưới một routed-page-main đã mở sẵn.",
+          "enum": ["route-file", "contract-page", "khong-mo-main"]
+        },
+        "translationKeys": {
+          "type": "array",
+          "description": "Các khoá dịch mà mã này thêm, giải ở tầng khối chứ không thấp hơn.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "resolvedAt"],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Khoá next-intl đầy đủ."
+              },
+              "resolvedAt": {
+                "description": "Tầng giải khoá này thành chữ.",
+                "$comment": "Nguồn: rule no-copy-resolution-below-block của luật translation.",
+                "enum": ["block", "page", "layout", "overlay"]
+              }
+            }
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Mọi quyết định mã, mỗi cái gắn với một module luật và một mã tình huống.",
+          "items": { "$ref": "#/$defs/PatternDecision" }
+        },
+        "owed": {
+          "type": "array",
+          "description": "Những chỗ mã này chưa chứng minh được, ví dụ một luật không có rule nào bắt.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["claim", "reason"],
+            "properties": {
+              "claim": {
+                "type": "string",
+                "description": "Điều chưa có gate nào giữ, hoặc điều còn nợ từ một record cũ."
+              },
+              "reason": {
+                "description": "Vì sao chỗ này còn nợ thay vì được vá tạm.",
+                "$ref": "#/$defs/Reason"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,77 +1,77 @@
-# translation
+# bản dịch
 
-## Definition
+## Định nghĩa
 
-Copy is data. It arrives from a dictionary, it changes without a deploy, it differs per reader — and
-like every other piece of data in this system, it is resolved by the half that owns the request and
-handed down already decided.
+Copy là dữ liệu. Nó đến từ dictionary, có thể thay đổi mà không cần deploy, khác nhau theo từng
+người đọc — và cũng như mọi dữ liệu khác trong hệ thống, nó được resolve bởi nửa sở hữu request rồi
+truyền xuống dưới ở trạng thái đã được quyết định.
 
-That has one consequence worth stating plainly, because it is the rule people reach past: **no
-component below a block ever says a word of its own.** A leaf renders the string it was given. A
-composite arranges strings it was given. Neither knows which language it is in, and neither can be
-made wrong by a translation landing late.
+Hệ quả cần nói rõ, vì đây là rule mà người viết thường tìm cách bỏ qua: **không component nào bên
+dưới một block tự nói ra một từ.** Leaf render string được truyền vào. Composite sắp xếp các string
+được truyền vào. Cả hai không biết string đang ở ngôn ngữ nào và không thể bị ảnh hưởng bởi việc bản
+dịch đến muộn.
 
-The question that settles it: **would a reader in another language see something different here?**
-If yes, it is copy, and copy is resolved one file away.
+Câu hỏi quyết định là: **người đọc bằng ngôn ngữ khác có thấy điều gì khác ở đây không?** Nếu có, đó
+là copy, và copy phải được resolve ở file bên trên một tầng.
 
-What holds this law is [`sources/fe/translation.mjs`](../../../sources/fe/translation.mjs), plus the
-split rule that keeps the drawing half from reaching for the runtime at all.
+Luật này được bảo đảm bởi [`sources/fe/translation.mjs`](../../../sources/fe/translation.mjs), cùng
+với rule split giữ cho nửa drawing không truy cập runtime dịch.
 
 Implementation anchors in `starci-academy-fe`:
 `src/components/blocks/dashboard/CreditStatRow/index.tsx` and
 `src/components/blocks/dashboard/CreditStatRow/component.tsx`.
 
-## Rules
+## Luật
 
-**COPY-1 · The connected half resolves every word.**
+**COPY-1 · Connected half resolve mọi từ.**
 
-The block that owns the request owns the words that describe its answer, because only it knows which
-situation the reader is in and therefore which sentence is true. Everything below receives strings.
+Block sở hữu request cũng sở hữu các từ mô tả câu trả lời, vì chỉ block biết người đọc đang ở tình
+huống nào và câu nào là đúng. Mọi component bên dưới chỉ nhận string.
 
-**COPY-2 · A component below a block holds no literal a reader can see.**
+**COPY-2 · Component bên dưới block không giữ literal nào mà người đọc có thể thấy.**
 
-Not in a label, not in a placeholder, not in an aria-label, not in a title attribute. Those four are
-where copy hides most often, because none of them looks like a sentence in the markup — and a reader
-using a screen reader hears the aria-label as the primary text, so an English one in a Vietnamese
-surface is not a small defect.
+Không phải trong label, placeholder, aria-label hay title attribute. Đây là những nơi copy thường
+ẩn nhất vì trong markup chúng không trông như câu văn — nhưng người dùng screen reader nghe
+aria-label như văn bản chính, nên một label tiếng Anh trên surface tiếng Việt không phải lỗi nhỏ.
 
-**COPY-3 · A key never crosses the line.**
+**COPY-3 · Key không bao giờ đi qua ranh giới.**
 
-Passing `labelKey="quest.title"` moves the lookup rather than the decision, and now the drawing half
-needs the whole translation runtime to be rendered from a fixture. The string crosses, not the key.
+Truyền `labelKey="quest.title"` chỉ chuyển việc lookup thay vì chuyển quyết định; lúc đó nửa drawing
+cần toàn bộ translation runtime mới render được từ fixture. Thứ đi qua ranh giới là string, không
+phải key.
 
-**COPY-4 · A resolved string is a value, so it obeys the data fence.**
+**COPY-4 · String đã resolve là một value, nên tuân theo data fence.**
 
-It travels in `props` like any other value. That is what lets a component be rendered from a fixture
-with the word `"anything"` and still be correct.
+Nó đi trong `props` như mọi value khác. Nhờ vậy component có thể được render từ fixture với từ
+`"anything"` mà vẫn đúng.
 
-**COPY-5 · The dictionary is the other language, so it is not source.**
+**COPY-5 · Dictionary là ngôn ngữ còn lại, nên không phải source.**
 
-A file under the locale folders is content, not authoring, and the English-only rule does not reach
-it. That is the one exemption, and it is a path rather than a judgement, because a judgement-based
-one would be argued per file forever.
+File trong thư mục locale là content, không phải authoring, nên rule English-only không áp dụng cho
+nó. Đây là ngoại lệ duy nhất, và được xác định bằng path thay vì phán đoán, vì ngoại lệ theo phán
+đoán sẽ bị tranh luận mãi ở từng file.
 
-**COPY-6 · A word the program MATCHES on is not copy.**
+**COPY-6 · Từ mà chương trình MATCH trên đó không phải copy.**
 
-A status the server sends and the screen compares against is a value, and translating it breaks the
-comparison. It stays as it is, marked on its line with the reason — the mark is what tells the next
-reader it was a decision rather than something somebody forgot.
+Status server gửi và screen dùng để so sánh là một value; dịch nó sẽ làm hỏng phép so sánh. Value đó
+giữ nguyên và được đánh dấu ngay trên dòng kèm lý do — dấu đánh dấu cho người đọc sau biết đây là
+quyết định có chủ ý, không phải câu bị quên dịch.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| A translation call below a block | The component needs the runtime to be rendered, so it cannot be tested from a fixture | Resolve it in the connected half |
-| Reading the current locale to pick a word | Same dependency, one level quieter | Same |
-| A visible literal in a leaf or composite | It is copy, and one reader in another language sees English | Take the resolved string through `props` |
-| A literal in `aria-label`, `placeholder`, `title` or `alt` | It does not look like a sentence, and a screen reader treats it as the primary text | Same |
-| A translation KEY passed down | It moves the lookup, not the decision, and drags the runtime with it | Pass the resolved string |
-| Translating a value the program matches on | The comparison breaks, and the failure is silent | Keep it, and mark the line with why |
-| Applying the English-only rule to a dictionary | The dictionary IS the other language | Leave locale content alone |
+| Gọi translation bên dưới một block | Component cần runtime mới render được nên không thể test từ fixture | Resolve ở connected half |
+| Đọc locale hiện tại để chọn từ | Cùng một dependency, chỉ được che dưới tên khác | Làm như trên |
+| Literal hiển thị trong leaf hoặc composite | Đó là copy, nên người đọc dùng ngôn ngữ khác sẽ thấy tiếng Anh | Truyền string đã resolve qua `props` |
+| Literal trong `aria-label`, `placeholder`, `title` hoặc `alt` | Nó không trông như câu văn nhưng screen reader coi là văn bản chính | Làm như trên |
+| Truyền translation KEY xuống dưới | Nó chuyển lookup chứ không chuyển quyết định, đồng thời kéo runtime theo | Truyền string đã resolve |
+| Dịch value mà chương trình dùng để so sánh | Phép so sánh hỏng và lỗi diễn ra im lặng | Giữ nguyên và ghi rõ lý do trên dòng |
+| Áp dụng rule English-only cho dictionary | Dictionary LÀ ngôn ngữ còn lại | Để nguyên locale content |
 
-## Examples
+## Ví dụ
 
-### Where the word is chosen
+### Nơi chọn từ
 
 ```tsx
 // index.tsx: the half that knows which situation this is knows which sentence is true
@@ -84,9 +84,9 @@ const t = useTranslations("quest")
 return <SurfaceCard props={{ label: t("label") }} contract="quest-rows" render={questRows} />
 ```
 
-They differ in one thing: whether the drawing half can be rendered without the runtime.
+Chúng chỉ khác nhau ở một điểm: nửa drawing có thể render mà không cần translation runtime hay không.
 
-### The literal that does not look like one
+### Literal không trông giống literal
 
 ```tsx
 <Icon props={{ name: "search" }} />
@@ -97,10 +97,10 @@ They differ in one thing: whether the drawing half can be rendered without the r
 <Input props={{ placeholder: "Search courses" }} />
 ```
 
-They differ in one thing: what a reader in another language sees — and with an `aria-label`, what a
-screen reader says.
+Chúng chỉ khác nhau ở một điểm: người đọc bằng ngôn ngữ khác nhìn thấy gì — và với `aria-label`,
+screen reader sẽ nói gì.
 
-### The value that is not copy
+### Giá trị không phải copy
 
 ```ts
 // vn-ok: the server sends this status verbatim and the screen matches on it
@@ -111,4 +111,4 @@ const CANCELLED = "Da huy"
 const CANCELLED = t("status.cancelled")
 ```
 
-They differ in one thing: whether the comparison still works after the dictionary changes.
+Chúng chỉ khác nhau ở một điểm: phép so sánh có còn hoạt động sau khi dictionary thay đổi hay không.

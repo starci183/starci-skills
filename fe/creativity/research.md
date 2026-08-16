@@ -45,6 +45,18 @@ Ready, first-load, empty, failed, pending action, partial data, signed-out and r
 states can change the tree or its content. Researching only the populated desktop view designs only
 the easiest branch.
 
+**RESEARCH-6 · Prove the consequence of every visible interaction.**
+
+A visible interaction is not proved by its control or selected paint. For every interaction in the
+selected journey, trace the trigger to its product owner, request or route, visual states, pending
+behavior, success consequence, failure consequence and persistence or shared-surface effect. `N/A`
+is a claim and requires evidence.
+
+Record the result under `### INTERACTION CONSEQUENCE`:
+
+| Interaction | Trigger | Product owner | Request / route | Visual states | Pending | Success | Failure | Persistence / shared effect | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -54,6 +66,7 @@ the easiest branch.
 | Invent a statistic to make a mockup convincing | It turns visual confidence into a product lie | Use a labelled fixture or honest empty state |
 | Record a source without the fact learned from it | The evidence cannot constrain a decision | Write claim, source and consequence together |
 | Research only the happy path | Loading and failure will later force unplanned trees | Build the state matrix before concepts |
+| Treat a painted control as completed behavior | Selection chrome can exist while request, navigation, failure or persistence is absent | Trace and prove the complete interaction consequence |
 
 ## Examples
 

@@ -1,98 +1,98 @@
-# loading
+# trạng thái tải
 
-## Definition
+## Định nghĩa
 
-A surface waiting for data draws **the same shape it will draw when the data arrives**, with the
-values taken out. Not a different tree, not a stack of grey bars that happens to look similar — the
-same components, in the same arrangement, resting.
+Một surface đang chờ dữ liệu phải vẽ **đúng hình dạng sẽ vẽ khi dữ liệu đến**, chỉ bỏ các giá trị đi.
+Không phải một tree khác, cũng không phải vài thanh xám trông có vẻ tương tự — mà là chính các
+component đó, theo đúng cách sắp xếp đó, ở trạng thái nghỉ.
 
-The reason is drift, and it is not hypothetical. A second tree describing the first is a description
-that nobody updates: it is correct on the day it is written, and wrong the first time the real shape
-changes. Nothing turns red, because a resting shape has no assertion to fail — it is simply wrong on
-screen, and only for the second somebody happens to be watching.
+Lý do là nguy cơ lệch, và đó không phải giả thuyết. Tree thứ hai mô tả tree thứ nhất là bản mô tả
+không ai cập nhật: đúng vào ngày được viết, rồi sai ngay lần đầu hình dạng thật thay đổi. Không có gì
+chuyển sang đỏ, vì hình dạng nghỉ không có assertion nào để fail — nó chỉ đơn giản là sai trên màn
+hình, và thường chỉ bị nhận ra đúng lúc có người đang nhìn.
 
-The question that settles it: **if this component changes shape tomorrow, does the waiting version
-change with it?** If it does not, it is a second description and it will drift.
+Câu hỏi quyết định là: **nếu component này đổi hình dạng vào ngày mai, phiên bản chờ có đổi theo
+không?** Nếu không, đó là một bản mô tả thứ hai và nó sẽ lệch dần.
 
-What holds this law is [`sources/fe/loading.mjs`](../../../sources/fe/loading.mjs).
+Luật này được bảo đảm bởi [`sources/fe/loading.mjs`](../../../sources/fe/loading.mjs).
 
 Implementation anchors in `starci-academy-fe`: `src/components/leaves/Text/index.tsx` and
 `src/components/blocks/dashboard/pending-gate.test.tsx`.
 
-## How the two halves meet
+## Hai nửa gặp nhau như thế nào
 
-This is the seam most often got wrong, so it is written down rather than inferred. A block and a leaf
-express waiting differently, and the translation between them is one line:
+Đây là seam thường bị hiểu sai nhất, nên phải được ghi rõ thay vì để người đọc tự suy ra. Block và
+leaf biểu đạt trạng thái chờ khác nhau, và phép chuyển giữa hai bên chỉ là một dòng:
 
-| Tier | How waiting is expressed |
+| Tầng | Trạng thái chờ được biểu đạt như thế nào |
 |---|---|
-| block | `pending` is a member of the state union — a real situation, beside `ready`, `empty`, `failed` |
-| leaf, composite | `isLoading`, a flag received and never decided |
-| the seam | `const isLoading = input.state === "pending"` in the presentational half |
+| block | `pending` là một thành viên của state union — một tình huống thực, đứng cạnh `ready`, `empty`, `failed` |
+| leaf, composite | `isLoading`, một flag được nhận vào và không được tự quyết định |
+| seam | `const isLoading = input.state === "pending"` ở nửa presentational |
 
-The block owns the SITUATION because only it knows whether the answer has arrived. The leaf owns the
-LOOK of resting because only it knows its own anatomy. Neither can do the other's half, and the one
-line between them is where they meet.
+Block sở hữu TÌNH HUỐNG vì chỉ nó biết câu trả lời đã đến hay chưa. Leaf sở hữu DIỆN MẠO của trạng
+thái nghỉ vì chỉ nó biết anatomy của mình. Không bên nào có thể làm phần của bên kia; dòng duy nhất
+ở giữa là nơi hai bên gặp nhau.
 
-## Rules
+## Luật
 
-**LOADING-1 · One shape, two states. Never two trees.**
+**LOADING-1 · Một hình dạng, hai trạng thái. Không bao giờ có hai tree.**
 
-The component that draws the data draws the waiting. It does not delegate to a twin, and nothing
-hands it a ready-made placeholder to render instead of itself.
+Component vẽ dữ liệu cũng phải vẽ trạng thái chờ. Nó không ủy quyền cho twin, và không nhận một
+placeholder dựng sẵn để render thay cho chính nó.
 
-**LOADING-2 · A resting element is the SAME element, emptied.**
+**LOADING-2 · Phần tử ở trạng thái nghỉ vẫn là CHÍNH phần tử đó, chỉ được làm rỗng.**
 
-Same tag, same arrangement, same measure — the values gone and a resting surface in their place. That
-is what makes the layout hold still at the moment data lands, and holding still is the entire point:
-a reader who has begun reading loses their place when the page moves under them.
+Cùng tag, cùng cách sắp xếp, cùng kích thước — chỉ bỏ các giá trị và đặt surface nghỉ vào chỗ đó.
+Nhờ vậy layout đứng yên khi dữ liệu đến, và đó chính là mục tiêu: người đọc đã bắt đầu đọc sẽ mất
+vị trí khi trang dịch chuyển bên dưới họ.
 
-**LOADING-3 · The resting shape keeps the section's height.**
+**LOADING-3 · Hình dạng nghỉ phải giữ chiều cao của section.**
 
-A region that draws nothing while waiting collapses, and the whole column below it jumps when the
-answer arrives. A run of rows rests as a run of rows — the count is a decision, made so the resting
-region is the size of a real one.
+Region không vẽ gì trong lúc chờ sẽ co lại, rồi cả cột bên dưới nhảy lên khi câu trả lời đến. Một
+dãy row phải nghỉ như một dãy row — số lượng là một quyết định có chủ đích để region nghỉ có kích
+thước như region thật.
 
-**LOADING-4 · A resting element is hidden from assistive technology.**
+**LOADING-4 · Phần tử ở trạng thái nghỉ phải được ẩn khỏi assistive technology.**
 
-There is nothing to read yet. A shimmer announced to a screen reader is noise at the exact moment a
-reader is waiting to be told something, and the emptied values would be read as blanks.
+Chưa có gì để đọc. Shimmer được thông báo cho screen reader là nhiễu đúng lúc người đọc đang chờ
+được thông tin, còn các giá trị đã làm rỗng sẽ bị đọc như những khoảng trống.
 
-**LOADING-5 · A control is not drawn before it has somewhere to go.**
+**LOADING-5 · Không được vẽ control trước khi nó có nơi để đi tới.**
 
-A resting card leaves the place where its action will be empty rather than shimmering a button. A
-target that arrives before its destination is one a reader presses and learns nothing from — and
-pressing it is the fastest way to teach them the surface is not to be trusted.
+Card ở trạng thái nghỉ phải để trống vị trí dành cho action thay vì làm shimmer một button. Target
+đến trước destination là thứ người đọc bấm vào nhưng không nhận được gì — và đó là cách nhanh nhất để
+họ học rằng surface này không đáng tin.
 
-**LOADING-6 · Each region owns its own waiting.**
+**LOADING-6 · Mỗi region tự sở hữu trạng thái chờ của mình.**
 
-One flag shared across independent requests makes the fastest region wait for the slowest, and blurs
-several honest situations into one. A screen that fills in over a second reads faster than one that
-appears all at once after three.
+Một flag dùng chung cho các request độc lập khiến region nhanh nhất phải chờ region chậm nhất, đồng
+thời trộn nhiều tình huống thực thành một. Màn hình hoàn thiện dần trong một giây được cảm nhận là
+nhanh hơn màn hình hiện ra cùng lúc sau ba giây.
 
-**LOADING-7 · The waiting state is a real situation, not the absence of one.**
+**LOADING-7 · Trạng thái chờ là một tình huống thực, không phải sự vắng mặt của tình huống.**
 
-`pending` sits in the union beside `ready`, `empty` and `failed`, and it carries what it needs to
-draw the frame — the region's own name does not disappear while its contents are on their way. A
-component that treats waiting as "no data yet" cannot tell it from "there is none", and those two
-need different words.
+`pending` nằm trong union cạnh `ready`, `empty` và `failed`, đồng thời mang đủ thông tin cần thiết để
+vẽ frame — tên của chính region không biến mất trong lúc nội dung đang đến. Component coi trạng thái
+chờ là "chưa có data" sẽ không phân biệt được với "không có gì", trong khi hai tình huống này cần
+hai cách diễn đạt khác nhau.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| A twin component whose job is to mirror another's shape | It cannot be kept in step; it can only be noticed after it has already drifted | Give the component a resting state |
-| A `skeleton={<...>}` prop | Same second tree, handed in from outside, where it is even further from the shape it copies | Pass the flag down |
-| A ternary choosing between two DIFFERENT components | It is a resting shape written at the call site, and it drifts from the real one | One component, two states |
-| A region that draws nothing while waiting | The column jumps when the answer lands, and the reader loses their place | Rest at the height of a real one |
-| A shimmer announced to assistive technology | Noise at the moment a reader is waiting to be told something | Hide it while it rests |
-| A control drawn before its destination exists | A reader presses it and learns the surface cannot be trusted | Leave the place empty until there is somewhere to go |
-| One flag across independent requests | The fastest region waits for the slowest, and four situations become one | Let each land when it lands |
-| Treating waiting as missing data | "Not arrived" and "there is none" need different words | Make `pending` a member of the union |
+| Một twin component có nhiệm vụ mô phỏng hình dạng component khác | Không thể giữ chúng đồng bộ; chỉ nhận ra khi chúng đã lệch | Cho component một trạng thái nghỉ |
+| Prop `skeleton={<...>}` | Vẫn là tree thứ hai, được truyền từ bên ngoài và càng xa hình dạng mà nó sao chép | Truyền flag xuống |
+| Ternary chọn giữa hai component KHÁC NHAU | Hình dạng nghỉ được viết ở call site và sẽ lệch khỏi component thật | Một component, hai trạng thái |
+| Region không vẽ gì trong lúc chờ | Cột nhảy khi câu trả lời đến và người đọc mất vị trí | Nghỉ ở chiều cao của region thật |
+| Shimmer được thông báo cho assistive technology | Gây nhiễu đúng lúc người đọc đang chờ được thông tin | Ẩn nó khi đang nghỉ |
+| Control được vẽ trước khi destination tồn tại | Người đọc bấm vào và biết rằng surface không đáng tin | Để trống vị trí cho tới khi có nơi để đi tới |
+| Một flag dùng chung cho các request độc lập | Region nhanh nhất phải chờ region chậm nhất, biến bốn tình huống thành một | Để mỗi region hoàn thiện khi nó hoàn thiện |
+| Coi trạng thái chờ là dữ liệu thiếu | "Chưa đến" và "không có" cần hai cách diễn đạt khác nhau | Đưa `pending` vào union |
 
-## Examples
+## Ví dụ
 
-### The seam, in one line
+### Seam, gói trong một dòng
 
 ```tsx
 // the block owns the situation; the leaf owns what resting looks like
@@ -104,9 +104,9 @@ const isLoading = input.state === "pending"
 {input.state === "pending" ? <div className="h-4 w-24 animate-pulse rounded bg-default" /> : <Text ... />}
 ```
 
-They differ in one thing: which file knows the shape of the thing that is resting.
+Chúng chỉ khác nhau ở một điểm: file nào biết hình dạng của thứ đang ở trạng thái nghỉ.
 
-### The same element, emptied
+### Cùng phần tử, chỉ làm rỗng
 
 ```tsx
 <Avatar props={{ name }} isLoading={isLoading} />
@@ -116,9 +116,9 @@ They differ in one thing: which file knows the shape of the thing that is restin
 {isLoading ? <AvatarSkeleton /> : <Avatar props={{ name }} />}
 ```
 
-They differ in one thing: whether the waiting version changes when the real one does.
+Chúng chỉ khác nhau ở một điểm: phiên bản chờ có thay đổi khi phiên bản thật thay đổi hay không.
 
-### The height
+### Chiều cao
 
 ```tsx
 // a run of rows rests as a run of rows, so nothing moves when the data lands
@@ -130,9 +130,9 @@ const rows = isLoading ? RESTING_ROWS : props.rows
 {isLoading ? null : props.rows.map(...)}
 ```
 
-They differ in one thing: whether the reader keeps their place.
+Chúng chỉ khác nhau ở một điểm: người đọc có giữ được vị trí hay không.
 
-### The control with nowhere to go
+### Control chưa có nơi để đi tới
 
 ```tsx
 {item === undefined ? null : <SeeMoreLink props={{ label: resumeLabel }} on={{ press }} />}
@@ -142,4 +142,4 @@ They differ in one thing: whether the reader keeps their place.
 <SeeMoreLink props={{ label: resumeLabel }} isLoading={isLoading} on={{ press }} />
 ```
 
-They differ in one thing: whether a reader can press something that does not lead anywhere yet.
+Chúng chỉ khác nhau ở một điểm: người đọc có thể bấm vào thứ hiện chưa dẫn tới đâu hay không.

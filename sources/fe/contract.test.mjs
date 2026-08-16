@@ -23,6 +23,7 @@ import {
   noDuplicateEntryShape,
   noHandWrittenContractAttrs,
   noLiteralStructuralClass,
+  noStructuralArrangementInLeaf,
   noStructuralHostOutsideContractFrame,
   noUnknownContractKey,
   noDeadContractKey,
@@ -216,6 +217,54 @@ test("CONTRACT-7: a structural host outside the frame is a node with no key", ()
         filename: BLOCK,
         code: "export const E = () => <form className=\"flex flex-col\" />",
         errors: [{ messageId: "styledSemantic" }],
+      },
+    ],
+  })
+})
+
+test("CONTRACT-7B: a leaf owns one atomic host, not a structural arrangement", () => {
+  tester.run("no-structural-arrangement-in-leaf", noStructuralArrangementInLeaf, {
+    valid: [
+      { filename: LEAF, code: "export const T = () => <div />" },
+      { filename: LEAF, code: "export const T = () => <button><span>Buy</span><Icon /></button>" },
+      { filename: LEAF, code: "export const T = ({ list }) => list ? <ul /> : <section />" },
+      { filename: BLOCK, code: "export const B = () => <div><div /></div>" },
+    ],
+    invalid: [
+      {
+        filename: LEAF,
+        code: "export const T = () => <div><div /></div>",
+        errors: [{ messageId: "arrangement" }],
+      },
+      {
+        filename: LEAF,
+        code: "export const T = () => <div><ul /></div>",
+        errors: [{ messageId: "arrangement" }],
+      },
+      {
+        filename: LEAF,
+        code: "export const T = () => <ul><li /></ul>",
+        errors: [{ messageId: "arrangement" }],
+      },
+      {
+        filename: LEAF,
+        code: "export const T = () => <><div /><section /></>",
+        errors: [{ messageId: "arrangement" }],
+      },
+      {
+        filename: LEAF,
+        code: "export const T = () => <Vendor><div /><section /></Vendor>",
+        errors: [{ messageId: "arrangement" }],
+      },
+      {
+        filename: LEAF,
+        code: "const Box = 'div'; export const T = () => <Box><section /></Box>",
+        errors: [{ messageId: "arrangement" }],
+      },
+      {
+        filename: LEAF,
+        code: "export const T = defineLeafComponent({ render: () => <div><section /></div> })",
+        errors: [{ messageId: "arrangement" }],
       },
     ],
   })

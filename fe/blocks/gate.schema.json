@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.academy/schema/fe/blocks/gate.schema.json",
+  "title": "Gate 2 - blocks",
+  "description": "Cổng thứ hai: nhận nguyên bố cục của gate layouts và trả về, cho từng phần như hero, khối nào render nó, tiêu đề gì, mô tả gì, đủ trạng thái nào và ai sở hữu pending.",
+  "$comment": "input là $ref thẳng vào LayoutPlan của .claude/fe/layouts/gate.schema.json, nên 'output gate 1 = input gate 2' do máy giữ. output là $ref của gate principles.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "description": "Bố cục đã chốt ở gate layouts, đưa nguyên vào chứ không tóm tắt lại.",
+      "$ref": "https://starci.academy/schema/fe/layouts/gate.schema.json#/$defs/LayoutPlan"
+    },
+    "output": {
+      "description": "Kế hoạch khối cho từng phần của bố cục, và đúng bằng input của gate principles.",
+      "$ref": "#/$defs/BlockPlan"
+    }
+  },
+  "$defs": {
+    "Reason": {
+      "description": "Lý do có neo, dùng chung một định nghĩa duy nhất kéo theo chuỗi từ gate layouts.",
+      "$ref": "https://starci.academy/schema/fe/layouts/gate.schema.json#/$defs/Reason"
+    },
+
+    "StateName": {
+      "description": "Tên một trạng thái của khối, lấy từ đúng mười lăm literal đang chạy trong tầng block.",
+      "$comment": "Nguồn đo: 15 tên literal khác nhau qua 28 union trong src/components/blocks. Đo cũng cho thấy settled và ready là hai tên cho một việc, empty và hidden cũng thế; nên chọn settled hoặc hidden phải kèm lý do.",
+      "enum": [
+        "pending",
+        "empty",
+        "settled",
+        "ready",
+        "failed",
+        "hidden",
+        "guest",
+        "signedIn",
+        "onboarding",
+        "open",
+        "claimed",
+        "claimable",
+        "details",
+        "code",
+        "done"
+      ]
+    },
+
+    "BlockState": {
+      "type": "object",
+      "title": "Một trạng thái của khối",
+      "description": "Một tình huống chọn một CÂY khác; nếu bốn tình huống vẽ cùng một cây thì chúng là props chứ không phải state.",
+      "$comment": "Neo: docstring StreakStatRow ghi 'A state is a situation that picks a different TREE'.",
+      "additionalProperties": false,
+      "required": ["state", "reason"],
+      "properties": {
+        "state": {
+          "description": "Tên trạng thái.",
+          "$ref": "#/$defs/StateName"
+        },
+        "whySynonym": {
+          "type": "string",
+          "minLength": 20,
+          "description": "Vì sao dùng tên đồng nghĩa này thay vì tên kia, bắt buộc khi chọn settled hoặc hidden."
+        },
+        "reason": {
+          "description": "Vì sao tình huống này là một state chứ không phải một props, và cây nó chọn khác cây nào.",
+          "$ref": "#/$defs/Reason"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "state": { "enum": ["settled", "hidden"] } },
+            "required": ["state"]
+          },
+          "then": { "required": ["whySynonym"] }
+        }
+      ]
+    },
+
+    "FieldRendering": {
+      "type": "object",
+      "title": "Một field trong một hàng",
+      "description": "Một mẩu dữ liệu trong khối và cách nó được vẽ, quyết định chữ hay chip nằm ở đây.",
+      "additionalProperties": false,
+      "required": ["field", "render", "isRealState", "reason"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Tên field như backend đặt, không phải nhãn hiển thị."
+        },
+        "render": {
+          "description": "Field này vẽ bằng gì.",
+          "$comment": "Nguồn đo: Badge là ĐƯỜNG VÀO CHIP DUY NHẤT của repo (9 block import, 11 chỗ dựng); JudgeStatusStrip dùng StatusDot cộng Text; CoursePriceDetail dùng IconLabelFactRow endText; phần còn lại là Text.",
+          "enum": ["text", "badge", "status-dot-va-text", "icon-label-fact-row-endtext", "khong-ve"]
+        },
+        "isRealState": {
+          "type": "boolean",
+          "description": "Field này có phải một state thật của đối tượng hay chỉ là một nhãn phân loại."
+        },
+        "reason": {
+          "description": "Vì sao field này xứng đáng cách vẽ đó, biết rằng chip chỉ dành cho state thật.",
+          "$ref": "#/$defs/Reason"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "render": { "const": "badge" } },
+            "required": ["render"]
+          },
+          "then": {
+            "properties": { "isRealState": { "const": true } },
+            "$comment": "B2 đo được bốn mâu thuẫn sống: ProfileHero, CoursePricingRail, ProblemReadingColumn, SolutionEditor đều đeo chip lên nhãn phân loại. Schema chặn ngay chỗ đó."
+          }
+        }
+      ]
+    },
+
+    "ActionPending": {
+      "type": "object",
+      "title": "Một hành động và chủ pending của nó",
+      "description": "Một hành động của khối, kèm khai báo ai giữ cờ chờ cho riêng nó.",
+      "$comment": "Nguồn đo: WeeklyChallengeCard giữ isClaiming riêng; MyCoursesProgress, TopLearners, WhoToFollow, UpcomingLivestreamCard so pendingId từng dòng.",
+      "additionalProperties": false,
+      "required": ["actionId", "pendingOwner", "reason"],
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "pattern": "^on[A-Z].*$|^[a-z][a-zA-Z0-9]*:\\$\\{.+\\}$",
+          "description": "Tên handler theo tiền tố on, hoặc khoá index signature theo id của dòng khi khối là khối lặp."
+        },
+        "pendingOwner": {
+          "description": "Cờ chờ thuộc riêng hành động này, thuộc riêng một dòng, hay dùng chung cả khối.",
+          "enum": ["rieng-cua-hanh-dong", "rieng-tung-dong-theo-id", "co-chung-ca-khoi"]
+        },
+        "reason": {
+          "description": "Vì sao cờ chờ đặt ở đó, biết rằng một cờ chung từng bắt ví trả lời trong tám mươi mili giây phải chờ hạn mức AI sáu trăm.",
+          "$ref": "#/$defs/Reason"
+        }
+      }
+    },
+
+    "Block": {
+      "type": "object",
+      "title": "Một khối cho một phần của trang",
+      "description": "Khối render một phần: nó là archetype nào, có surface không, nói câu gì, đủ trạng thái nào và xử lý rỗng, lỗi, chờ ra sao.",
+      "additionalProperties": false,
+      "required": [
+        "sectionId",
+        "name",
+        "archetype",
+        "domain",
+        "world",
+        "fileShape",
+        "surface",
+        "isNested",
+        "states",
+        "emptyOwner",
+        "errorOwner",
+        "copy",
+        "receivesProps",
+        "acceptsReactNode",
+        "isLoadingDirection",
+        "reason"
+      ],
+      "properties": {
+        "sectionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Khoá phần của gate layouts mà khối này nhận, ví dụ hero."
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "description": "Tên khối theo PascalCase, đúng bằng tên thư mục nó sẽ sống."
+        },
+        "archetype": {
+          "description": "Khối này thuộc archetype nào trong chín archetype khối đo được.",
+          "$ref": "https://starci.academy/schema/fe/layouts/gate.schema.json#/$defs/RenderForm"
+        },
+        "domain": {
+          "description": "Miền nghiệp vụ mà khối thuộc về, quyết định thư mục cha của nó.",
+          "$comment": "Nguồn đo: 56 thư mục block trên đúng 10 miền - dashboard 27, courses 7, coding 5, learn 4, profile 4, ai 3, auth 2, commerce 2, locale 1, search 1.",
+          "enum": [
+            "dashboard",
+            "courses",
+            "coding",
+            "learn",
+            "profile",
+            "ai",
+            "auth",
+            "commerce",
+            "locale",
+            "search"
+          ]
+        },
+        "world": {
+          "description": "Khối này là nửa thuần hay nửa nối với thế giới.",
+          "$comment": "Nguồn đo: meta.world chỉ có hai giá trị trên 83 file khai - 52 pure, 31 connected.",
+          "enum": ["pure", "connected"]
+        },
+        "fileShape": {
+          "description": "Khối gồm những file nào.",
+          "$comment": "Nguồn đo: 31 cặp component.tsx + index.tsx, 18 khối chỉ có nửa pure, 4 khối-ghép-khối chỉ có index.tsx, 6 file phẳng ở profile/overview.",
+          "enum": ["cap-component-va-index", "chi-component", "chi-index", "file-phang"]
+        },
+        "surface": {
+          "description": "Khối dựng mặt phẳng nào, hay không dựng mặt phẳng nào cả.",
+          "$comment": "Nguồn đo: họ Surface*Card gồm SurfaceCard, SurfaceListCard, SurfaceFormCard; bốn hàng chỉ số trên rail cố ý không dựng surface vì contract rail đã khai rail trần.",
+          "enum": ["surface-card", "surface-list-card", "surface-form-card", "khong-dung-surface"]
+        },
+        "isNested": {
+          "type": "boolean",
+          "description": "Khối này có nằm lồng trong một surface owner khác hay không."
+        },
+        "outerSurfaceOwner": {
+          "type": "string",
+          "description": "Tên khối hoặc branch đang giữ surface bên ngoài, bắt buộc khi khối khai isNested."
+        },
+        "labelHidden": {
+          "type": "boolean",
+          "description": "Khối có ẩn nhãn của list surface hay không; chỉ hợp lệ khi một chủ bao ngoài đã vẽ đúng cái nhãn đã resolve đó."
+        },
+        "outerLabelDrawnBy": {
+          "type": "string",
+          "description": "Chủ bao ngoài đang vẽ cái nhãn bị ẩn, bắt buộc khi labelHidden là true."
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Đủ trạng thái của khối, liệt kê trước khi vẽ chứ không thêm dần khi gặp lỗi.",
+          "items": { "$ref": "#/$defs/BlockState" }
+        },
+        "stateShape": {
+          "description": "State viết dạng union rời rạc mỗi nhánh mang props riêng, hay enum phẳng cộng một props chung.",
+          "$comment": "Nguồn đo: hai hình dạng cùng tồn tại và không có luật nào chọn giữa hai - StreakStatRow dùng union rời rạc, CoursePricingRail dùng enum phẳng.",
+          "enum": ["union-roi-rac", "enum-phang"]
+        },
+        "emptyOwner": {
+          "description": "Rỗng được vẽ bằng gì.",
+          "$comment": "Nguồn đo: 11 khối dựng EmptyNotice thật trong SurfaceCard contract empty-notice-card; 9 khối trả null ở một state đã settle; nhóm profile/overview nhét câu rỗng vào danh sách như một hàng giả globalId state.",
+          "enum": ["empty-notice-card", "tra-null", "hang-gia-trong-danh-sach"]
+        },
+        "errorOwner": {
+          "description": "Lỗi có chủ thấy được hay bị giấu.",
+          "$comment": "Nguồn đo: 15 khối cho lỗi một chủ thấy được; 6 khối gộp lỗi vào một state vô hình; 4 khối không đọc .error, trong đó ProfileHero shimmer vĩnh viễn.",
+          "enum": ["state-failed-thay-duoc", "gop-vao-state-vo-hinh", "khong-doc-error"]
+        },
+        "restingCountSource": {
+          "description": "Số hàng nghỉ lấy từ đâu.",
+          "$comment": "Nguồn đo: 11 khối đọc CONTRACTS[key].children.<slot>.restingCount thay vì tự đặt số.",
+          "enum": ["contract-restingCount", "khoi-tu-dat", "khong-phai-khoi-lap"]
+        },
+        "copy": {
+          "type": "object",
+          "title": "Chữ của khối",
+          "description": "Tiêu đề và mô tả mà khối nói, cùng nguồn của chúng.",
+          "additionalProperties": false,
+          "required": ["labelKey", "source", "reason"],
+          "properties": {
+            "labelKey": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Khoá i18n của tiêu đề khối, hoặc chuỗi nguyên văn khi nguồn là hard-code."
+            },
+            "descriptionKey": {
+              "type": "string",
+              "description": "Khoá i18n của mô tả khối, vắng mặt khi khối không có mô tả."
+            },
+            "source": {
+              "description": "Chữ đến từ khoá dịch hay được gõ thẳng vào mã.",
+              "$comment": "Nguồn đo: đúng 3 chuỗi hiển thị hard-code trong toàn tầng block, hai trong đó là danh từ riêng GitHub và LinkedIn.",
+              "enum": ["next-intl-key", "hard-code-danh-tu-rieng", "hard-code-khac"]
+            },
+            "reason": {
+              "description": "Vì sao chữ này là chữ đúng, và nếu hard-code thì vì sao nó không thể là khoá dịch.",
+              "$ref": "#/$defs/Reason"
+            }
+          }
+        },
+        "fields": {
+          "type": "array",
+          "description": "Các field khối vẽ, mỗi field khai rõ vẽ bằng chữ hay bằng chip.",
+          "items": { "$ref": "#/$defs/FieldRendering" }
+        },
+        "inventedFields": {
+          "description": "Khối có vẽ dữ kiện mà backend chưa có hay không; B5 chốt là không.",
+          "$comment": "Nguồn đo: vi phạm sống duy nhất là StarCiAiFab vẽ Badge content 1 trong khi props chỉ có hasUnread boolean.",
+          "const": false
+        },
+        "actions": {
+          "type": "array",
+          "description": "Các hành động của khối, mỗi hành động mang chủ pending riêng.",
+          "items": { "$ref": "#/$defs/ActionPending" }
+        },
+        "recipe": {
+          "description": "Biến thể của hàng glyph-nhãn-con số khi khối dùng IconLabelFactRow.",
+          "$comment": "Nguồn đo: IconLabelFactRow phân biệt bằng props.recipe với đúng ba giá trị.",
+          "enum": ["peer", "label-led", "compact-action", "khong-dung"]
+        },
+        "receivesProps": {
+          "description": "Khối nhận gì từ nơi gọi.",
+          "$comment": "Nguồn đo: 27/33 khối connected nhận ZERO props; 6 khối nhận props và tất cả đều là danh tính phần tử hoặc outcome gửi lên chủ danh sách, không cái nào là kiểu dáng.",
+          "enum": ["khong-nhan-gi", "danh-tinh-phan-tu", "outcome-gui-len-chu-danh-sach"]
+        },
+        "ownsClassName": {
+          "description": "Khối có tự viết class hay không; B3 chốt là không vì sơn nằm trong union đóng LayoutClassName.",
+          "$comment": "Nguồn đo: 0 className trong toàn tầng block; vi phạm sống duy nhất là StarCiAiFab tự đặt position fixed bằng inline style.",
+          "const": false
+        },
+        "acceptsReactNode": {
+          "description": "Khối có nhận ReactNode hay children tuỳ ý hay không; B13 chốt là không.",
+          "$comment": "Nguồn đo: 0 ReactNode và 0 children trong toàn tầng block.",
+          "const": false
+        },
+        "isLoadingDirection": {
+          "description": "Cờ isLoading do khối tự viết xuống con, hay khối nhận nó từ nơi gọi.",
+          "$comment": "Nguồn đo: props.ts:215 viết 'a block writes the flag when it hands a tree down, and never receives one'; 5 khối vẫn nhận và không rule lint nào bắt.",
+          "enum": ["khoi-tu-viet-xuong", "nhan-tu-noi-goi"]
+        },
+        "reason": {
+          "description": "Vì sao phần này cần đúng khối này, với đúng mặt phẳng, đúng tập trạng thái và đúng câu chữ đó.",
+          "$ref": "#/$defs/Reason"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "isNested": { "const": true } }, "required": ["isNested"] },
+          "then": {
+            "required": ["outerSurfaceOwner"],
+            "$comment": "B1: lồng surface chỉ hợp lệ khi khai tường minh ai là chủ bên ngoài; 6 chỗ lồng sống đều khai isNested."
+          }
+        },
+        {
+          "if": { "properties": { "labelHidden": { "const": true } }, "required": ["labelHidden"] },
+          "then": {
+            "required": ["outerLabelDrawnBy"],
+            "$comment": "B9 và NESTED-5: ẩn nhãn chỉ hợp lệ khi một chủ bao ngoài đã vẽ đúng cái nhãn đã resolve đó; GlobalSearchResults hiện ẩn một nhãn không ai vẽ."
+          }
+        },
+        {
+          "if": {
+            "properties": { "isLoadingDirection": { "const": "nhan-tu-noi-goi" } },
+            "required": ["isLoadingDirection"]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "properties": { "anchorKind": { "enum": ["neo-tu-choi", "neo-code"] } }
+              }
+            },
+            "$comment": "Nhận isLoading là đi ngược props.ts:215, nên chỉ được phép khi có neo thật chứ không được suy luận."
+          }
+        }
+      ]
+    },
+
+    "BlockPlan": {
+      "type": "object",
+      "title": "Đầu ra của gate blocks",
+      "description": "Bố cục cũ kèm khối cho từng phần của nó; đây đúng bằng input của gate principles.",
+      "additionalProperties": false,
+      "required": ["layout", "blocks"],
+      "properties": {
+        "layout": {
+          "description": "Nguyên bố cục đến từ gate layouts, mang theo để bốn gate sau không phải đoán lại nó.",
+          "$ref": "https://starci.academy/schema/fe/layouts/gate.schema.json#/$defs/LayoutPlan"
+        },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Mỗi phần của bố cục một khối, không phần nào bị bỏ trống.",
+          "items": { "$ref": "#/$defs/Block" }
+        },
+        "chipVendorDoor": {
+          "description": "Đường vào chip duy nhất của repo, ghi lại để mọi quyết định chip ở trên đều đi qua đúng một cửa.",
+          "$comment": "Nguồn đo: chỉ có MỘT đường vào chip trong toàn repo - leaf Badge bọc HeroUI Chip.",
+          "const": "Badge"
+        },
+        "owed": {
+          "type": "array",
+          "description": "Những chỗ số đo không nói được ở tầng khối và gate này từ chối bịa.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["claim", "reason"],
+            "properties": {
+              "claim": {
+                "type": "string",
+                "description": "Điều chưa đo được, ví dụ ý định sản phẩm đằng sau một khối trả null."
+              },
+              "reason": {
+                "description": "Vì sao chỗ này để trống thay vì được đoán.",
+                "$ref": "#/$defs/Reason"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

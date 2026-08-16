@@ -8,6 +8,14 @@ description: Research, render and serve one tabbed HTML preview containing two t
 Read [`../../skill-shape.md`](../../skill-shape.md) first and use
 `<Source>/.workflows/designs/<app>/<id>.md`.
 
+Then read the Plan decision owners in
+[`../../fe/creativity/`](../../fe/creativity/INDEX.md):
+[`mode.md`](../../fe/creativity/mode.md),
+[`best-belief-source.md`](../../fe/creativity/best-belief-source.md),
+[`research.md`](../../fe/creativity/research.md),
+[`brief.md`](../../fe/creativity/brief.md) and
+[`divergence.md`](../../fe/creativity/divergence.md).
+
 Plan exists for a product choice. If a named reference, contract or test already settles the answer,
 route the bounded correction to `$starci-fe-fidelity-start`.
 
@@ -26,6 +34,11 @@ the app and database when the screen depends on backend behavior.
 Read the live GraphQL contracts, target components, governing `.claude` canon and named legacy
 references before proposing anything. A screen must not promise data the backend cannot serve or
 anatomy the target cannot own.
+
+For every user-visible interaction proposed by a direction, research the canonical
+`### INTERACTION CONSEQUENCE` row from `research.md`. Trace product ownership and behavior before
+using the interaction in preview HTML. `N/A` requires source evidence; a painted control is not
+proof of request, route, failure, navigation or persistence behavior.
 
 Brief two to four directions that differ in product decisions: reading order, CTA priority,
 disclosure, density or composition. Do not manufacture variants that differ only in colour or

@@ -1,63 +1,52 @@
-# event delivery
+# tổ chức sự kiện
 
-## Definition
+## Định nghĩa
 
-Event delivery carries an already-decided fact from one application instance to every instance that
-must react locally. The envelope identifies the producer and the delivery; the event payload carries
-the fact. NATS is transport, while the local event emitter remains the in-process fan-out boundary.
+Event delivery đưa một sự thật đã được quyết định ở một application instance đến mọi instance cần phản ứng cục bộ. Envelope nhận diện producer và mô tả delivery; event payload mang sự thật. NATS là transport, còn local event emitter vẫn là boundary phân phối trong process.
 
-The deciding question is: **can the same envelope return to its producer or arrive twice without
-causing the local consequence twice?** A cross-instance event is safe only when both answers are yes.
+Câu hỏi quyết định là: **cùng một envelope có thể quay lại producer hoặc đến hai lần mà không tạo ra cùng một local consequence hai lần không?** Một event liên instance chỉ an toàn khi cả hai câu trả lời đều là có.
 
-What holds the central bridge invariants is
-[`sources/be/event-delivery.mjs`](../../../sources/be/event-delivery.mjs).
+Invariant của central bridge được giữ bởi [`sources/be/event-delivery.mjs`](../../../sources/be/event-delivery.mjs).
 
-## Rules
+## Quy tắc
 
-**DELIVERY-1 · Every transport envelope carries producer identity and digest.**
+** GIAO HÀNG-1 · Mỗi transport envelope đều mang producer identity và notification.**
 
-Producer identity prevents a pod from replaying its own locally emitted fact; digest gives every pod
-a stable idempotency key. Subject names route event kinds and must never be used as producer ids.
+Producer identity ngăn một instance nhận lại chính phát hành local của mình; notification cung cấp stable idempotency key cho mọi consumer group. Topic name dùng để định tuyến event type, không bao giờ dùng làm producer id.
 
-**DELIVERY-2 · Local and NATS publication are explicit per event.**
+**DELIVERY-2 · Local publication và NATS được khai báo rõ cho từng event.**
 
-Every event in `configMap` declares `useLocal` and `useNats`. A fact needed by sockets connected to
-other pods uses both; a process-private event uses local only. Transport is a declared part of the
-event contract, not inferred at the call site.
+Mỗi event trong `configMap` khai báo `useLocal` và `useNats`. Sự thật cần đến các group khác thì dùng cả hai; event private trong process chỉ dùng local. Transport là phần được khai báo trong event contract, không được suy ra ở call site.
 
-**DELIVERY-3 · The bridge drops self-origin before local emit.**
+**DELIVERY-3 · Bridge loại bỏ self-origin trước khi emit local.**
 
-The bridge compares the parsed envelope id with `InstanceService.getId()`. Comparing the NATS
-subject to an instance id is invalid: a subject names the event and can never identify its producer.
+Bridge so sánh id của envelope đã parse với `InstanceService.getId()`. So sánh NATS subject với instance id là sai: subject đặt tên event và không bao giờ nhận diện producer.
 
-**DELIVERY-4 · The bridge claims the digest before local emit.**
+**DELIVERY-4 · Bridge yêu cầu notification trước khi emit local.**
 
-Duplicate delivery is checked and recorded before `EventEmitter2.emit`. Recording afterward leaves
-a race where two copies both cross the business boundary.
+Duplicate delivery phải được kiểm tra và ghi nhận trước `EventEmitter2.emit`. Ghi nhận sau đó tạo race trong đó hai bản sao đều vượt qua boundary nghiệp vụ.
 
-**DELIVERY-5 · A consumer asserts recipient and content, not listener count.**
+**DELIVERY-5 · Consumer xác nhận recipient và payload, không xác nhận số listener.**
 
-Realtime correctness is which actor received which fact. Listener count is deployment plumbing and
-changes when pods or sockets change.
+Độ đúng của realtime nằm ở việc actor nào nhận được sự thật nào. Số listener là plumbing detail và thay đổi khi topology hoặc socket thay đổi.
 
-**DELIVERY-6 · Cross-instance behaviour is proved with two real application instances.**
+**DELIVERY-6 · Hành vi multi-instance được chứng minh bằng hai application instance thật.**
 
-The E2E opens clients on separate instances, publishes once, and proves remote receipt without
-self-echo. Mocking NATS or calling the local emitter cannot establish this contract.
+E2E mở client trên các instance riêng, publish một lần và chứng minh remote delivery mà không self-echo. Mock NATS hoặc gọi local emitter không thể thiết lập contract này.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| Comparing a NATS subject to an instance id | Subject identifies event kind, not producer | Compare the parsed envelope producer id |
-| Deduplicating after local emit | Concurrent copies can both produce the consequence | Claim/check the digest before emit |
-| Omitting `useLocal` or `useNats` from event config | Deployment behaviour becomes an implicit call-site choice | Declare both flags for every event |
-| Asserting message count | Pod and listener topology becomes part of business correctness | Assert recipient and payload |
-| A single-instance test for cross-instance fan-out | It cannot detect self-echo or remote delivery failure | Boot two instances against real NATS |
+| So sánh NATS subject với instance id | Subject xác định event type, không xác định producer | So sánh producer id trong envelope đã parse |
+| Deduplicate sau khi emit local | Hai bản sao đồng thời đều có thể tạo consequence | Require/check notification trước khi emit |
+| Bỏ qua `useLocal` hoặc `useNats` trong event config | Deployment behavior trở thành lựa chọn ngầm tại call site | Khai báo cả hai cờ cho mọi event |
+| Assert số message | Pod và listener topology trở thành một phần của business correctness | Assert recipient và payload |
+| Kiểm thử multi-instance bằng một instance | Nó không phát hiện self-echo hoặc remote-delivery failure | Khởi động hai instance với NATS thật |
 
-## Examples
+## Ví dụ
 
-### Reject self-origin
+### Từ chối self-origin
 
 ```ts
 if (parsed.id === this.instanceService.getId()) continue
@@ -69,9 +58,9 @@ this.eventEmitter.emit(getEventName(subject), parsed.data)
 if (subject === this.instanceService.getId()) continue
 ```
 
-They differ in whether producer identity comes from the envelope.
+Chúng khác nhau ở việc producer identity có được lấy từ envelope hay không.
 
-### Claim before emit
+### Ghi nhận trước khi emit
 
 ```ts
 if (await this.cacheService.get({ key, args: [parsed.digest] })) continue
@@ -85,9 +74,9 @@ this.eventEmitter.emit(eventName, parsed.data)
 await this.cacheService.set({ key, args: [parsed.digest], cacheResult: true })
 ```
 
-They differ in whether deduplication guards the consequence.
+Chúng khác nhau ở việc deduplication có bảo vệ consequence hay không.
 
-### Prove the topology
+### Chứng minh topology
 
 ```ts
 await podA.publish(message)
@@ -100,4 +89,4 @@ await expectNoMessage(podAClient, message.event)
 podA.eventEmitter.emit(message.event, message.data)
 ```
 
-They differ in whether NATS and instance identity participate.
+Chúng khác nhau ở việc NATS và instance identity có thực sự tham gia hay không.

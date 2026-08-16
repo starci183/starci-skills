@@ -1,24 +1,23 @@
-# file layout
+# bố cục tập tin
 
-## Definition
+## Định nghĩa
 
-Where a file sits is a claim about what it is. A folder under `components/` says "this draws
-something"; a folder under `hooks/` says "this fetches"; a folder under `modules/` says "this is not
-React at all". A file in the wrong place is not untidy — it is mislabelled, and the cost is that
-nobody who would have reused it can find it.
+Vị trí của một tập tin là một xác nhận về nó là gì. Một thư mục dưới`components/`nói "điều này thu hút
+cái gì đó"; một thư mục dưới`hooks/`nói "cái này lấy"; một thư mục dưới`modules/`nói "đây không phải
+Phản ứng chút nào". Một hồ sơ đặt sai vị trí không phải là bừa bộn - nó bị dán nhãn sai và cái giá phải trả là
+không ai đã sử dụng lại nó có thể tìm thấy nó.
 
-The question that settles it: **what is this file, independent of who currently calls it?** "Only
-this screen uses it" describes today's call graph, not the thing, and it is the sentence that turns
-one screen's folder into a second codebase.
+Câu hỏi giải quyết nó: **tập tin này là gì, không phụ thuộc vào người hiện đang gọi nó?** "Chỉ
+màn hình này sử dụng nó" mô tả biểu đồ cuộc gọi ngày hôm nay, không phải sự vật và đó là câu chuyển hướng
+thư mục của một màn hình vào cơ sở mã thứ hai.
 
-What holds this law is [`sources/file-layout.mjs`](../../../sources/fe/file-layout.mjs), plus the tree
-below, which is the map the rules send things back to.
+Điều giữ luật này là[`sources/file-layout.mjs`](../../../sources/fe/file-layout.mjs), cộng với cây
+bên dưới, đây là bản đồ mà các quy tắc gửi mọi thứ trở lại.
 
-Implementation anchors in `starci-academy-fe`:
-`src/components/blocks/dashboard/CreditStatRow/index.tsx` and
+Implementation anchors in `starci-academy-fe`: `src/components/blocks/dashboard/CreditStatRow/index.tsx` and
 `src/components/blocks/dashboard/CreditStatRow/component.tsx`.
 
-## The tree
+## Cây thư mục
 
 ```
 src/
@@ -43,17 +42,14 @@ src/
     messages/               the copy itself, per locale
     tests/
 ```
+**Cấp độ danh mục không phải là trang trí.**`blocks/`Và`overlays/`nhóm theo tính năng bởi vì họ
+biết tên miền và tính năng là nhóm duy nhất vẫn đúng khi sản phẩm phát triển.`leaves/`, `branches/`, `layouts/`Và`pages/`phẳng vì họ không biết tính năng nào - một danh mục
+sẽ có người đoán xem màn hình nào sở hữu một thứ thuộc về tất cả chúng.
 
-**The category level is not decoration.** `blocks/` and `overlays/` group by feature because they
-know the domain, and a feature is the only grouping that stays true as the product grows.
-`leaves/`, `branches/`, `layouts/` and `pages/` are flat because they know no feature — a category
-there would be somebody's guess about which screen owns a thing that belongs to all of them.
+## Cùng một cây trong monorepo
 
-## The same tree in a monorepo
-
-A workspace with several apps splits the tree in exactly one place, and the split is not a packaging
-preference — it is the feature line drawn above.
-
+Một không gian làm việc có nhiều ứng dụng sẽ chia cây ở chính xác một nơi và phần chia không phải là một gói
+ưu tiên — đó là feature line được vẽ ở trên.
 ```
 packages/ui/src/            THE VOCABULARY - knows no feature
     contracts/                  the entry table and the slot types
@@ -70,102 +66,90 @@ apps/<app>/src/             THE SENTENCES - each knows its own domain
         layouts/<Name>/
         pages/<Name>/
 ```
+**Mọi thứ bên dưới một khối đều được chia sẻ; một khối và mọi thứ phía trên nó thì không.** Một chiếc lá, một tổ hợp,
+một nhánh và bảng hợp đồng mô tả SHAPE và một hình dạng có hình dạng giống nhau trong mọi ứng dụng - nghĩa là
+tại sao một bản sao có thể tồn tại và tại sao nó phải tồn tại. Một khối là một câu miền: nó biết một khóa học, một
+hóa đơn hoặc nguồn lực nhóm là. Đặt một cái vào gói chia sẻ và gói đó bây giờ đã biết một tính năng
+không cần phải biết kinh doanh và ứng dụng tiếp theo sẽ kế thừa từ vựng mà nó sẽ không bao giờ sử dụng.
 
-**Everything below a block is shared; a block and everything above it is not.** A leaf, a composite,
-a branch and the contract table describe SHAPE, and a shape is the same shape in every app — that is
-why one copy can exist and why it must. A block is a domain sentence: it knows what a course, an
-invoice or a fleet resource is. Put one in the shared package and the package now knows a feature it
-has no business knowing, and the next app inherits vocabulary it will never use.
+Bài kiểm tra là cùng một câu hỏi mà các câu trả lời của cấp độ, được hỏi về không gian làm việc: **ứng dụng thứ hai có muốn không
+điều này mà không muốn có tính năng mà nó được viết ra?** A`Badge`Đúng. MỘT`FleetRow`KHÔNG.
 
-The test is the same question the tier answers, asked about the workspace: **would a second app want
-this without wanting the feature it was written for?** A `Badge` yes. A `FleetRow` no.
+Không có gì khác di chuyển. Các tầng giữ nguyên tên của chúng, quy tắc phẳng hoặc phân loại và hai tệp của chúng
+hình dạng; monorepo chỉ quyết định phía nào của dòng tính năng mà mỗi tầng tồn tại. Một ứng cử viên dưới`.artifacts/**/candidate/`có thể phản ánh bố cục và lint đọc bất cứ thứ gì nó tìm thấy.
 
-Nothing else moves. The tiers keep their names, their flat-or-categorised rule and their two-file
-shape; a monorepo only decides which side of the feature line each tier lives on. A candidate under
-`.artifacts/**/candidate/` may mirror either layout, and lint reads whichever it finds.
+Các đích đến mà tên quy tắc được tạo trong lần sử dụng đầu tiên thay vì để trống: một người trợ giúp thuần túy sẽ đi tới`modules/utils/`, một hình dạng được chia sẻ để`modules/types/`, bản đồ cấu hình hoặc bản sao chưa được dịch sang`resources/`. Việc một thư mục chưa tồn tại không phải là lý do để để lại một tệp trong thành phần
+cây.
 
-Destinations the rules name are created on first use rather than kept empty: a pure helper goes to
-`modules/utils/`, a shared shape to `modules/types/`, a config map or non-translated copy to
-`resources/`. That a folder does not exist yet is not a reason to leave a file in the component
-tree.
+## Quy tắc
 
-## Rules
+**FILE-1 · Một thành phần, một thư mục và thư mục được đặt tên theo nội dung nó xuất.**
 
-**FILE-1 · One component, one folder, and the folder is named for what it exports.**
+Tên thư mục là tên của thành phần. Một người đọc biết tên sẽ biết đường dẫn và grep cho
+cái tên tìm thấy một nơi. Quy tắc giữ điều này chỉ yêu cầu xuất khẩu có tên trực tiếp có tên
+thuộc về họ thư mục, do đó một thành phần và các biến thể được gõ của nó có thể chia sẻ một thư mục trong khi một
+hành khách không liên quan không thể.
 
-The folder name is the component's name. A reader who knows the name knows the path, and a grep for
-the name finds one place. The rule that holds this asks only for a direct named export whose name
-belongs to the folder's family, so a component and its typed variants can share a folder while an
-unrelated passenger cannot.
+**FILE-2 · Một thư mục màn hình chứa hai nửa của nó và không có gì khác.**
 
-**FILE-2 · A screen folder holds its two halves and nothing else.**
+Một trang, một bố cục hoặc một thư mục lớp phủ chứa`index.tsx`Và`component.tsx`- hệ thống dây điện và
+hình dạng - cộng với bài kiểm tra song sinh của mỗi loại. Điều thứ ba xuất hiện đó là thông báo rằng có điều gì đó
+có thể tái sử dụng được phát minh ở một nơi mà không ai khác có thể tìm thấy.
 
-A page, a layout or an overlay folder holds `index.tsx` and `component.tsx` — the wiring and the
-shape — plus the twin test of each. A third thing appearing there is the notification that something
-reusable was invented in a place nobody else can find.
+Điều này luôn bắt đầu một cách vô hại: "chỉ trang này sử dụng nó". Nó kết thúc dưới dạng một thư mục màn hình chứa bốn
+các thành phần, một thư mục hằng, một thư mục utils và ba hình dạng còn lại được sao chép bằng tay, tại thời điểm đó
+màn hình là một cơ sở mã thứ hai với vốn từ vựng riêng của nó.
 
-This always begins harmlessly: "only this page uses it". It ends as a screen folder holding four
-components, a constants folder, a utils folder and three hand-copied resting shapes, at which point
-the screen is a second codebase with its own private vocabulary.
+**FILE-3 · Những gì không phải là mã component không nằm trong cây component.** `constants/`, `utils/`, `types/` và `hooks/` không phải là thư mục component. Mỗi loại có một nơi phù hợp, và
+ngôi nhà là điểm: bên cạnh thành phần, người trợ giúp sẽ vô hình đối với tất cả những người sẽ
+đã sử dụng lại nên tác giả thứ hai viết lại và cả hai trôi dạt.
 
-**FILE-3 · What is not component code does not live in the component tree.**
+**FILE-4 · Một thư mục export một family, không bao giờ là runtime namespace object.** `export const Card = { Root, Header }` gói tại thời điểm build thành một đơn vị, vì vậy import một member
+kéo cả nhà vào, không gì có thể lay chuyển được. Xuất khẩu các thành viên. Một cuộc gọi chấm
+trang web là một sự tiện lợi mà người đóng gói trả tiền.
 
-`constants/`, `utils/`, `types/` and `hooks/` are not component folders. Each has a real home, and
-the home is the point: left beside the component, the helper is invisible to everybody who would
-have reused it, so the second author writes it again and the two drift.
+**FILE-5 · Trong monorepo, shared package dừng bên dưới block.** `packages/ui/src/` chứa `contracts/`, `leaves/`, `composites/`, `branches/` và `shells/` — các
+các tầng không biết tính năng.`blocks/`, `overlays/`, `layouts/`Và`pages/`thuộc về ứng dụng đó
+sở hữu tính năng mà họ nói đến.
 
-**FILE-4 · A folder exports a family, never a runtime namespace object.**
+Một khối trong gói chia sẻ là toàn bộ lỗi trong một tệp: gói hiện đã biết tên miền,
+các ứng dụng không bao giờ muốn miền đó vẫn gửi miền đó và tác giả tiếp theo kết luận dòng này một cách hợp lý
+ở một nơi khác và cũng đặt một trang ở đó.
 
-`export const Card = { Root, Header }` bundles at build time as one unit, so importing the header
-drags the whole family in, and nothing can be tree-shaken away. Export the members. A dotted call
-site is a convenience the bundler pays for.
+**FILE-6 · Tệp tuyến đường được gắn kết và không có gì khác, và`app/`không chứa gì ngoài các tập tin lộ trình.**
 
-**FILE-5 · In a monorepo, the shared package stops below the block.**
+Một tập tin dưới`app/`đặt tên trang nào hiển thị tại URL nào. Không lấy, không sắp xếp, không có hợp đồng
+chìa khóa. Nếu tệp tuyến đường đang được vẽ thì trang cần tải lên chưa tồn tại - và bản vẽ
+bây giờ đang ở một nơi không ai tìm kiếm nó.
 
-`packages/ui/src/` holds `contracts/`, `leaves/`, `composites/`, `branches/` and `shells/` — the
-tiers that know no feature. `blocks/`, `overlays/`, `layouts/` and `pages/` belong to the app that
-owns the feature they speak for.
+Cây định tuyến giữ các vị trí riêng của khung —`page`, `layout`, `template`, `loading`, `error`,
+`not-found`, `default`, `route`và anh chị em của họ - cộng thêm`providers`Và`globals.css`, mà
+gắn kết bố cục gốc và không có nơi nào khác.`app/api/**`là mã máy chủ và`_folders`là lựa chọn không tham gia của riêng Next; cũng không phải là một màn hình. **Bất kỳ tệp nào khác đều có thành phần trong đó
+thư mục không ai grep.** Một màn hình chuyển đến`components/pages/<Name>/`, một câu tên miền để`components/blocks/<category>/<Name>/`.
 
-A block in the shared package is the whole failure in one file: the package now knows a domain, the
-apps that never wanted that domain still ship it, and the next author reasonably concludes the line
-is somewhere else and puts a page there too.
-
-**FILE-6 · The route file mounts and nothing else, and `app/` holds nothing but route files.**
-
-A file under `app/` names which page renders at which URL. No fetching, no arrangement, no contract
-key. If a route file is drawing, the page it should be mounting does not exist yet — and the drawing
-is now in the one place nobody looks for it.
-
-The routing tree holds the framework's own slots — `page`, `layout`, `template`, `loading`, `error`,
-`not-found`, `default`, `route` and their siblings — plus `providers` and `globals.css`, which the
-root layout mounts and which have nowhere else to be. `app/api/**` is server code and `_folders`
-are Next's own opt-out; neither is a screen. **Any other file there is a component in the one
-directory nobody greps.** A screen goes to `components/pages/<Name>/`, a domain sentence to
-`components/blocks/<category>/<Name>/`.
-
-That second sentence was not always written down, and the cost of leaving it implicit is on record:
-a page owner was written to `app/<segment>/fleet-page.tsx` and carried a build, a lint run, a
-typecheck, four sealed screenshots and an approval to the edge of a production write with every gate
-green — because every gate was reading rules, and this one was only prose.
+Câu thứ hai đó không phải lúc nào cũng được viết ra và cái giá phải trả cho việc để nó ngầm được ghi lại:
+một chủ sở hữu trang đã được viết thư cho`app/<segment>/fleet-page.tsx`và mang một dáng người, một đường chạy, một
+kiểm tra đánh máy, bốn ảnh chụp màn hình được niêm phong và phê duyệt ở phần cuối của bản viết sản xuất với mỗi cổng
+màu xanh lá cây - bởi vì mọi cổng đều đọc quy tắc, và cổng này chỉ là văn xuôi.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A third file in a page, layout or overlay folder | Something reusable was invented where nobody can find it | A component of its own goes to `blocks/<category>/`, a fetch to `hooks/`, a pure helper to `modules/utils/` |
-| `constants/`, `utils/`, `types/`, `hooks/` under `components/` | It is not component code, so the folder is mislabelled and the contents are invisible | Move it to the tree that names what it is |
-| A category folder under `leaves/` or `branches/` | Those tiers know no feature, so any category is a guess about which screen owns them | Keep them flat |
-| A flat `blocks/<Name>/` with no category | A domain component with no feature has nowhere to be found by the next person working on that feature | Put it under the feature it speaks for |
-| `blocks/`, `overlays/`, `layouts/` or `pages/` inside a shared package | The package learns a feature, and every app that never wanted it ships it anyway | Move it to `apps/<app>/src/components/` |
-| A leaf, composite, branch or contract inside one app of a monorepo | The second app writes it again, and the two drift with nothing to notice | Move it to `packages/ui/src/` |
-| A folder whose export does not match its name | The path stops predicting the name, and a grep finds nothing | Rename one of them so the two agree |
-| `export const X = { A, B }` as a namespace | It bundles as one unit, so importing one member drags in all of them | Export the members directly |
-| Fetching or drawing in a route file | The route becomes a second page, in the file nobody looks in | Mount the page; move the work into it |
-| A named component file under `app/` | The routing tree is addressed by URL, not browsed by tier, so the component is invisible to everyone looking for its siblings | `components/pages/<Name>/` for a screen, `components/blocks/<category>/<Name>/` for a domain sentence |
+| Tệp thứ ba trong thư mục trang, bố cục hoặc lớp phủ | Một thứ có thể tái sử dụng được phát minh ở nơi không ai có thể tìm thấy | Một thành phần của riêng nó đi tới`blocks/<category>/`, tìm nạp tới`hooks/`, một người trợ giúp thuần túy để`modules/utils/` |
+| `constants/`, `utils/`, `types/`, `hooks/`dưới`components/`| Nó không phải là mã thành phần nên thư mục bị gắn nhãn sai và nội dung không hiển thị | Di chuyển nó đến cây đặt tên cho nó là gì |
+| Một thư mục danh mục bên dưới`leaves/`hoặc`branches/`| Các cấp đó không biết tính năng nên bất kỳ danh mục nào cũng có thể đoán xem màn hình nào sở hữu chúng | Giữ chúng phẳng |
+| Một căn hộ`blocks/<Name>/`không có danh mục | Một thành phần miền không có tính năng sẽ không được người tiếp theo làm việc trên tính năng đó tìm thấy ở đâu | Đặt nó dưới tính năng mà nó đại diện |
+|`blocks/`, `overlays/`, `layouts/`hoặc`pages/`bên trong một gói chia sẻ | Gói này sẽ tìm hiểu một tính năng và mọi ứng dụng không bao giờ muốn nó đều sẽ gửi nó | Di chuyển nó đến`apps/<app>/src/components/`|
+| Một lá, tổ hợp, nhánh hoặc hợp đồng bên trong một ứng dụng của monorepo | Ứng dụng thứ hai viết lại và cả hai đều không có gì đáng chú ý | Di chuyển nó đến`packages/ui/src/`|
+| Một thư mục xuất ra không khớp với tên của nó | Đường dẫn ngừng dự đoán tên và grep không tìm thấy gì | Đổi tên một trong số họ để cả hai đồng ý |
+|`export const X = { A, B }`như một không gian tên | Nó tập hợp thành một đơn vị, vì vậy việc nhập một thành viên sẽ kéo theo tất cả chúng | Xuất trực tiếp các thành viên |
+| Tìm nạp hoặc vẽ trong tệp lộ trình | Lộ trình trở thành trang thứ hai, trong tệp không ai nhìn vào | Gắn trang; chuyển công việc vào đó |
+| Một tập tin thành phần được đặt tên bên dưới`app/`| Cây định tuyến được xử lý theo URL chứ không phải được duyệt theo cấp, vì vậy thành phần này không thể nhìn thấy đối với những người đang tìm kiếm anh chị em của nó |`components/pages/<Name>/`cho một màn hình,`components/blocks/<category>/<Name>/`cho một câu miền |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — a block lands where its feature is
+### Trường hợp thông thường — block nằm đúng feature
 
 ```
 components/blocks/dashboard/DailyQuest/
@@ -181,10 +165,9 @@ components/pages/DashboardPage/
     DailyQuest.tsx      <- wrong: invented here, so the feature that needs it next cannot find it
     utils/format.ts     <- wrong: not component code at all
 ```
+Chúng khác nhau ở một điều: liệu các bộ phận đó có tên bên ngoài màn hình mà lần đầu tiên cần đến chúng hay không.
 
-They differ in one thing: whether the parts have names outside the screen that first needed them.
-
-### The category trap
+### Bẫy category
 
 ```
 components/leaves/Text/                     flat: a line of copy belongs to no feature
@@ -195,10 +178,9 @@ components/blocks/dashboard/StreakStrip/    grouped: a streak is a dashboard sen
 components/leaves/dashboard/Text/           wrong: this leaf is not the dashboard's
 components/blocks/StreakStrip/              wrong: no feature, so nobody owns it
 ```
+Chúng khác nhau ở một điều: cấp độ đó có biết một tính năng nào không.
 
-They differ in one thing: whether the tier knows a feature at all.
-
-### The namespace trap
+### Bẫy namespace
 
 ```tsx
 export const CardRoot = ({ contract, render }: CardRootProps) => /* ... */
@@ -210,10 +192,9 @@ export const CardHeader = ({ props }: CardHeaderProps) => /* ... */
 // nothing can be dropped from the bundle.
 export const Card = { Root: CardRoot, Header: CardHeader }
 ```
+Chúng khác nhau ở một điều: liệu người đóng gói có thể phân biệt các thành viên hay không.
 
-They differ in one thing: whether the bundler can tell the members apart.
-
-### The route trap
+### Bẫy route
 
 ```tsx
 // route: it says which page renders here.
@@ -229,5 +210,4 @@ export default function DashboardRoute() {
     return <Tree contract="nav-over-body-page"><ShellNav /><DashboardPage /></Tree>
 }
 ```
-
-They differ in one thing: whether the route draws.
+Chúng khác nhau ở một điều: liệu tuyến đường có rút ra hay không.

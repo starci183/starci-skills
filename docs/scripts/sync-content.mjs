@@ -17,6 +17,9 @@ function normalizeDocument(source) {
     .replace(/^sidebar_label:.*\r?\n/gm, "")
     .replace(/^sidebar_position:.*\r?\n/gm, "")
     .replace(/\]\((?:\.\/)?INDEX\.md(#[^)]+)?\)/g, "](./$1)")
+    // A shelf INDEX links DOWN into its own modules as `child/INDEX.md`. Without
+    // this the link keeps the `.md` and resolves to nothing once published.
+    .replace(/\]\((?:\.\/)?([a-z0-9-]+)\/INDEX\.md(#[^)]+)?\)/g, "](./$1$2)")
     .replace(/\]\((?:\.\/)?(prompt|vi|example|audit|changelog)\.md(#[^)]+)?\)/g, "](./$1$2)")
     .replace(/\]\(\.\.\/([^/)]+)\/INDEX\.md(#[^)]+)?\)/g, "](../$1$2)")
     .replace(/\]\(\.\.\/([^/)]+)\/(prompt|vi|example|audit|changelog)\.md(#[^)]+)?\)/g, "](../$1/$2$3)")
@@ -47,6 +50,7 @@ await rm(contentRoot, {recursive: true, force: true});
 
 // The former `fe/design/` shelf no longer exists; it was split into these three shelves.
 const groups = [
+  {key: "layers", title: "Layers", description: "Turning a business requirement into a page composition: which archetype, and what each region holds."},
   {key: "principles", title: "Principles", description: "Primitive facts and principles that implementation must not violate."},
   {key: "senses", title: "Senses", description: "Contextual product judgement such as hierarchy, actions and affordance."},
   {key: "governance", title: "Governance", description: "Exception and refactor evidence; not visual design law."},

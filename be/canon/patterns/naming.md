@@ -1,97 +1,69 @@
-# naming
+# đặt tên
 
-## Definition
+## Định nghĩa
 
-A name is the only part of a symbol that reaches a reader who has not opened it. Everything else —
-the signature, the body, the tests — costs a file to consult; the name is what they get for free at
-every call site, in every import list, in every grep.
+Tên là phần duy nhất của symbol đến được với người đọc trước khi họ mở symbol. Mọi thứ khác — signature, implementation và test — cần thêm một file để tham khảo; tên xuất hiện miễn phí ở mọi call site, import list và grep.
 
-So a name here answers one question: **what is this thing, to somebody who does not already know?**
-Not what it happens to be implemented with, not which version of a format it was written for, not
-which folder it lived in when it was created. Those all change, and a name that encodes one of them
-becomes a lie without anything failing.
+Vì vậy, một cái tên phải trả lời: **đối với người chưa biết, thứ này là gì?** Không phải nó được triển khai bằng gì, viết cho schema version nào, hay đang nằm trong folder nào. Những điều đó thay đổi; tên mã hóa một trong số chúng sẽ trở thành lời nói dối mà không có phép kiểm tra nào bắt được.
 
-The test that settles a name: **will it still be true after the next reasonable change?** A name
-that has to be renamed when a schema version bumps, a folder moves, or a second caller appears was
-never naming the thing — it was describing a moment.
+Phép thử quyết định là: **sau lần thay đổi hợp lý tiếp theo, tên có còn đúng không?** Nếu tên phải đổi khi schema version, folder hoặc caller thứ hai xuất hiện, nó không đang đặt tên cho sự vật mà đang mô tả một thời điểm.
 
-What holds this law is [`sources/be/naming.mjs`](../../../sources/be/naming.mjs).
+Rule này được giữ bởi [`sources/be/naming.mjs`](../../../sources/be/naming.mjs).
 
-## Rules
+## Quy tắc
 
-**NAME-1 · The PATH carries the role and the scope; the file names the subject.**
+**TÊN-1 · PATH mang role và scope; file đặt tên cho subject.**
 
-`parsers/content.service.ts` declares `ContentParserService`. `path/content.service.ts` declares
-`ContentPathService`. Same file name, different folder, and the class name is the two read together
-— which is why a file is not called `content-parser.service.ts`, and why
-`mutations/ai/purchase-ai-subscription/` holds a plain `purchase-ai-subscription.module.ts` rather
-than `purchase-ai-subscription-single-mutation.module.ts`.
+`parsers/content.service.ts` khai báo `ContentParserService`. `path/content.service.ts` khai báo `ContentPathService`. Cùng file name nhưng khác path, và class name đọc cùng với path — đó là lý do file không được gọi `content-parser.service.ts`, và `mutations/ai/purchase-ai-subscription/` chứa `purchase-ai-subscription.module.ts` thay vì `purchase-ai-subscription-single-mutation.module.ts`.
 
-This was checked the hard way. A first version of this rule demanded the file name spell the whole
-class, and measured 616 offenders out of 4430 — which is not debt at fourteen percent of a tree, it
-is the convention. The law is what the code does.
+Rule này từng được kiểm tra bằng dữ liệu thực. Phiên bản đầu yêu cầu file name viết đầy đủ class name và đo được 616 vi phạm trên 4430 file — đó không phải debt 14% của cả tree mà là convention. Rule phải phản ánh điều code thực sự làm.
 
-What the suffix must still agree on is the ROLE: `*.service.ts` declares a `*Service`,
-`*.handler.ts` a `*Handler`. A file whose suffix disagrees with its export claims a role it does
-not have.
+Suffix vẫn phải khớp ROLE: `*.service.ts` khai báo `*Service`, `*.handler.ts` khai báo `*Handler`. File có suffix không khớp export đang khẳng định một role mà symbol không có.
 
-**NAME-2 · A name says what a thing IS, never which version it was built for.**
+**TÊN-2 · Tên nói sự vật LÀ gì, không nói nó được tạo cho version nào.**
 
-`isV2`, `IsContentV2Params`, `parseV2Body` — every one of these has to be renamed the day a V3
-arrives, and the rename is the easy part. The hard part is that until then, nobody can tell from
-the name whether "V2" means the current shape or an old one, so every reader has to go and find out.
+`isV2`, `IsContentV2Params`, `parseV2Body` đều phải rename khi V3 xuất hiện. Khó hơn việc rename là trước thời điểm đó, người đọc không biết “V2” chỉ hình hiện tại hay hình cũ, nên ai cũng phải tra cứu.
 
-Name the property instead. A marker that says the content has been checked is `hasVerifiedMarker`,
-and that name survives the version it was introduced for. This is not hypothetical: the V1 parser
-this codebase carried was reached through `isV2`, and when V1 died the name was left describing a
-fork that no longer exists.
+Hãy đặt tên cho property. Marker cho biết content đã được editor kiểm tra là `hasVerifiedMarker`, và tên đó vẫn đúng ở version giới thiệu nó. Đây không phải giả thuyết: parser V1 trong codebase từng bị gọi qua `isV2`; khi V1 biến mất, cái tên còn lại mô tả một fork không còn tồn tại.
 
-**NAME-3 · A name says what a thing IS, never where it happened to live.**
+**TÊN-3 · Tên nói sự vật LÀ gì, không nói nó được dùng ở đâu.**
 
-A helper reading the content mount was called `VolumeService` because the folder was `.volume` at
-the time. The folder has been renamed twice since, so for two renames the helper was named after a
-path that no longer existed — and the name gave no clue that anything was wrong.
+Helper đọc mounted content từng được gọi `VolumeService` vì lúc đó folder có tên `.volume`. Folder đã đổi tên hai lần; sau mỗi lần, helper vẫn mang tên của một path không còn tồn tại mà không có gì báo lỗi.
 
-Name the subject, not the address.
+Hãy đặt tên cho subject, không đặt tên cho địa chỉ.
 
-**NAME-4 · A name says what a thing IS, never the mechanism it currently uses.**
+**TÊN-4 · Tên nói sự vật LÀ gì, không nói cơ chế hiện đang dùng.**
 
-A tier table called `HARNESS_TIER` and a variable called `currentTier` named the ROUTING MECHANISM
-rather than the thing being chosen. When the mechanism went, every name around it was wrong at once
-— because none of them had ever said "model".
+Tier table tên `HARNESS_TIER` và biến `currentTier` phải được đặt theo routing mechanism hơn là thứ được chọn. Khi cơ chế thay đổi, mọi tên xung quanh sẽ đồng loạt sai — vì chưa từng nói đến “model”.
 
-**NAME-5 · An exported function is a verb phrase with an object.**
+**NAME-5 · Exported function là verb phrase có object.**
 
-`generate` is a bare verb: generate what? `askModel` says. At an import list, a bare verb collides
-with every other module's bare verb, and the reader has to look at the path to guess which one this
-is — which is the path doing the naming, and NAME-3 says why that fails.
+`generate` là bare verb: generate cái gì? `askModel` thì nói rõ. Trong import list, bare verb va vào bare verb của module khác và caller phải nhìn path để đoán — tức path đang làm phần việc đặt tên, trong khi NAME-3 giải thích vì sao đó là cách đặt tên không bền.
 
-**NAME-6 · A boolean is a question, and the question is about a property that lasts.**
+**TÊN-6 · Boolean là một câu hỏi về một property đang tồn tại.**
 
-`isX`, `hasX`, `canX`. Not `checkX` (which sounds like it does something) and not `xFlag`. And the
-property asked about follows NAME-2: `hasVerifiedMarker`, not `isV2`.
+`isX`, `hasX`, `canX`. Không `checkX` (nghe như function thực hiện một action), không `xFlag`. Property được hỏi cũng tuân theo TÊN-2: `hasVerifiedMarker`, không `isV2`.
 
-**NAME-7 · A name is not qualified by its first caller.**
+**TÊN-7 · Tên không được caller đầu tiên quyết định.**
 
-`DashboardContentService` dies the day a second surface needs it, and it dies quietly: it keeps
-working, and it keeps saying something false. Name the capability.
+`DashboardContentService` trở nên sai ngay khi surface thứ hai cần dùng nó, nhưng vẫn tiếp tục hoạt động và báo sai về capability. Hãy đặt tên cho capability.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A file suffix that disagrees with the export's role | The suffix claims a role the symbol does not have | Match `*.service.ts` to `*Service`, and so on |
-| Repeating the folder's role or scope in the file name | The path already says it, so the name is long and says nothing new | Name the subject; let the path carry the rest |
-| A version in a name (`isV2`, `V2Params`) | It has to be renamed at V3, and until then nobody can tell if it means current or old | Name the property the version happened to introduce |
-| A name taken from the folder it sits in | Folders move; the name then describes an address that no longer exists | Name the subject |
-| A name taken from the mechanism it uses | When the mechanism goes, every name around it is wrong at once | Name the thing being chosen or produced |
-| A bare-verb export (`generate`, `parse`, `run`) | It collides with every other module's bare verb, so the path ends up doing the naming | A verb plus its object |
-| `checkX` for a boolean | It sounds like it performs the check rather than answering it | `isX` / `hasX` / `canX` |
-| A name qualified by its first caller | The second caller makes it false, and it keeps working while being false | Name the capability |
+| File suffix không khớp role của export | Suffix khẳng định một role mà symbol không có | Khớp `*.service.ts` với `*Service`, v.v. |
+| Lặp lại role hoặc scope của folder trong file name | Path đã nói điều đó, nên tên dài hơn mà không thêm thông tin | Đặt tên cho subject; để path mang phần còn lại |
+| Tên chứa version (`isV2`, `V2Params`) | Nó sẽ phải rename khi có V3, và trước đó không ai biết nó là current hay legacy | Đặt tên cho property mà version tình cờ giới thiệu |
+| Tên lấy từ folder chứa nó | Folder di chuyển, rồi tên mô tả một địa chỉ không còn tồn tại | Đặt tên cho subject |
+| Tên lấy từ mechanism đang dùng | Khi mechanism thay đổi, mọi tên xung quanh đều sai | Đặt tên cho thứ được chọn hoặc tạo ra |
+| Bare verb export (`generate`, `parse`, `run`) | Nó va vào bare verb của module khác, khiến path phải làm việc đặt tên | Verb cộng với object |
+| `checkX` cho boolean | Nghe như đang thực hiện một phép kiểm tra thay vì trả lời | `isX` / `hasX` / `canX` |
+| Tên bị caller đầu tiên giới hạn | Caller thứ hai khiến tên sai nhưng code vẫn tiếp tục hoạt động | Đặt tên cho capability |
 
-## Examples
+## Ví dụ
 
-### The path carries the role
+### Path mang role
 
 ```
 parsers/content.service.ts  ->  export class ContentParserService
@@ -102,9 +74,9 @@ path/content.service.ts     ->  export class ContentPathService
 parsers/content-parser.service.ts  ->  export class ContentParserService
 ```
 
-They differ in one thing: whether the word "parser" is said once or twice.
+Chúng khác nhau ở việc “parser” được nói một lần hay hai lần.
 
-### The version trap
+### Bẫy version
 
 ```ts
 /** True when the content carries the marker saying an editor has checked it. */
@@ -117,9 +89,9 @@ async hasVerifiedMarker(params: ContentLookupParams): Promise<boolean>
 async isV2(params: IsContentV2Params): Promise<boolean>
 ```
 
-They differ in one thing: whether the name survives the next schema.
+Chúng khác nhau ở việc tên có còn đúng trong schema tiếp theo hay không.
 
-### The address trap
+### Bẫy địa chỉ
 
 ```ts
 /** Reads a doc out of the mounted content repo. */
@@ -132,9 +104,9 @@ export const readGitMountDoc = (relDir: string): GitMountDoc => { /* ... */ }
 export const readVolumeDoc = (relDir: string): VolumeDoc => { /* ... */ }
 ```
 
-They differ in one thing: whether the name is about the content or about a path.
+Chúng khác nhau ở việc tên nói về content hay về path.
 
-### The bare-verb trap
+### Bẫy bare verb
 
 ```ts
 import { askModel } from "@tests/helpers/models"
@@ -146,4 +118,4 @@ import { askModel } from "@tests/helpers/models"
 import { generate } from "@tests/helpers/models"
 ```
 
-They differ in one thing: whether the call site says what happens.
+Chúng khác nhau ở việc call site có nói rõ điều gì sẽ xảy ra hay không.

@@ -1,27 +1,26 @@
 # cqrs
 
-## Definition
+## Định nghĩa
 
-Every operation this backend exposes is a CQRS message with a handler. A mutation dispatches a
-command; a query dispatches a query; a side effect that must outlive the request is an event. The
-resolver does not do the work, and the service does not do the work — they carry the request to a
-handler, and the handler is where the work lives.
+Mọi hoạt động mà phần phụ trợ này hiển thị là một thông báo CQRS có trình xử lý. Một đột biến gửi đi một
+lệnh; một truy vấn gửi một truy vấn; một tác dụng phụ phải tồn tại lâu hơn yêu cầu là một sự kiện. các
+trình phân giải không thực hiện công việc và dịch vụ không thực hiện công việc - chúng chuyển yêu cầu đến một
+trình xử lý và trình xử lý là nơi tác phẩm tồn tại.
 
-The shape is not decoration. Putting the work behind a message means the same operation can be
-reached from a resolver, a controller, a CLI command, a job or a test **without any of them knowing
-about each other**, and it means the one place to read what "enroll a learner" actually does is a
-file named after enrolling a learner.
+Hình dạng không phải là trang trí. Đặt công việc đằng sau một thông báo có nghĩa là thao tác tương tự có thể được thực hiện
+đạt được từ trình phân giải, bộ điều khiển, lệnh CLI, công việc hoặc bài kiểm tra ** mà không ai trong số họ biết
+về nhau**, và điều đó có nghĩa là nơi duy nhất để đọc những gì "đăng ký học viên" thực sự làm là một
+tập tin được đặt tên sau khi đăng ký một người học.
 
-The question that settles whether something belongs here: **can this be invoked from more than one
-door?** If yes — and almost everything can, because the CLI and the test suite are doors — it is a
-message with a handler, not a method on a service.
+Câu hỏi quyết định liệu thứ gì đó có thuộc về nơi này hay không: **điều này có thể được gọi từ nhiều hơn một không
+cửa?** Nếu có — và hầu hết mọi thứ đều có thể, bởi vì CLI và bộ thử nghiệm đều là cửa — đó là một
+tin nhắn bằng trình xử lý chứ không phải phương thức trên dịch vụ.
 
-What holds this law is [`sources/be/cqrs.mjs`](../../../sources/be/cqrs.mjs).
+Điều giữ luật này là[`sources/be/cqrs.mjs`](../../../sources/be/cqrs.mjs).
 
-## Rules
+## Quy tắc
 
-**CQRS-1 · One operation, one folder, and the folder holds the whole operation.**
-
+**CQRS-1 · Một thao tác, một thư mục và thư mục đó chứa toàn bộ thao tác.**
 ```
 add-to-cart/
     add-to-cart.command.ts             the message
@@ -32,72 +31,66 @@ add-to-cart/
     add-to-cart.module-definition.ts   the wiring's own definition
     add-to-cart.handler.spec.ts        the twin
 ```
+Mỗi tệp được đặt tên cho thao tác, do đó, người đọc biết thao tác sẽ biết mọi tên tệp,
+và một grep cho nó tìm thấy toàn bộ chứ không phải một phần của nó. Một tập tin trong thư mục này là
+không được đặt tên cho hoạt động này là thứ được phát minh ở đây và thuộc về một nơi nào đó có thể tìm thấy được.
 
-Every file is named for the operation, so a reader who knows the operation knows every filename,
-and a grep for it finds the whole thing rather than one slice of it. A file in this folder that is
-not named for the operation is something that was invented here and belongs somewhere findable.
+**CQRS-2 · Thông báo mang ngữ cảnh yêu cầu và không có gì khác.**
 
-**CQRS-2 · The message carries the request context and nothing else.**
+Một lệnh hoặc truy vấn chứa một`params`trường và trường đó mang yêu cầu, được xác thực
+người dùng và miền địa phương. Nó không có phương thức, không có mặc định và không có logic: một thông báo tính toán một cái gì đó
+đã chuyển một quyết định đến một nơi không ai có thể nhìn thấy, và sau đó hai người gửi cùng một tin nhắn sẽ
+không đồng ý về ý nghĩa của nó.
 
-A command or query holds one `params` field, and that field carries the request, the authenticated
-user and the locale. It has no methods, no defaults and no logic: a message that computes something
-has moved a decision to a place nobody looks, and two dispatchers of the same message would then
-disagree about what it means.
+**CQRS-3 · Trình xử lý ghi đè`process`, không bao giờ`execute`.**
 
-**CQRS-3 · A handler overrides `process`, never `execute`.**
+`ICQRSHandler`là một phương thức mẫu:`execute`là mục công khai và nó gọi được bảo vệ`process`một trình xử lý thực hiện. Đường nối đó tồn tại nên có một mối quan tâm xuyên suốt - thời gian, nhật ký,
+giao dịch, thử lại - có thể được thêm một lần vào cơ sở thay vì trong hàng trăm trình xử lý.
 
-`ICQRSHandler` is a template method: `execute` is the public entry and it calls the protected
-`process` a handler implements. That seam exists so a cross-cutting concern — a timing, a log, a
-transaction, a retry — can be added once in the base rather than in a hundred handlers.
+Một trình xử lý ghi đè`execute`tự lấy nó ra khỏi khuôn mẫu và thực hiện điều đó một cách vô hình: nó
+biên dịch, nó chạy và nó là trình xử lý duy nhất mà thay đổi xuyên suốt tiếp theo bị âm thầm bỏ qua.
 
-A handler that overrides `execute` takes itself out of the template, and does so invisibly: it
-compiles, it runs, and it is the one handler the next cross-cutting change silently misses.
+**CQRS-4 · Dịch vụ gửi đi và chỉ có vậy thôi.**
 
-**CQRS-4 · The service dispatches, and that is all it does.**
+Dịch vụ bên cạnh bộ xử lý tồn tại nên cửa không nhập xe buýt và nó dài một dòng
+mục đích. Logic nghiệp vụ xuất hiện có logic ở một nơi không có thông báo, điều đó có nghĩa là nó
+không thể được gọi ra bởi bất kỳ cánh cửa nào khác và không thể được kiểm tra nếu không đứng lên cánh cửa mà nó thuộc về.
 
-The service beside a handler exists so the door does not import the bus, and it is one line long on
-purpose. Business logic that appears there is logic in a place with no message, which means it
-cannot be invoked by any other door and cannot be tested without standing up the door it belongs to.
+Độ mỏng trông vô nghĩa cho đến khi có cánh cửa thứ hai - CLI và dây nịt
+đã là cánh cửa thứ hai.
 
-The thinness looks pointless right up until the second door arrives — and the CLI and the harness
-are already second doors.
+**CQRS-5 · Trình xử lý gây ra lỗi và lỗi này là một ngoại lệ của miền.**
 
-**CQRS-5 · The handler owns the failure, and the failure is a domain exception.**
+Trình xử lý không thể thực hiện công việc của mình sẽ đưa ra ngoại lệ miền cho biết lý do. Nó không trở lại`null`và nó không trả về hình dạng thành công mang theo chuỗi lỗi: cả hai đều đưa ra quyết định
+tới người gọi có ít thông tin hơn người xử lý vừa thực hiện cuộc gọi đó.
 
-A handler that cannot do its work throws the domain exception that says why. It does not return
-`null`, and it does not return a success shape carrying an error string: both push the decision on
-to a caller who has less information than the handler that just made it.
+**CQRS-6 · Một sự kiện dành cho những gì phải xảy ra MỌI LÚC NÀO, không phải dành cho những gì người gọi đang chờ đợi.**
 
-**CQRS-6 · An event is for what must happen ANYWAY, not for what the caller is waiting on.**
+Gửi đi một sự kiện khi công việc phải diễn ra cho dù người gọi có còn ở đó hay không - một thư, một
+trình chiếu, đồng bộ. Bất kỳ câu trả lời nào của người gọi đều phụ thuộc vào việc duy trì lệnh, bởi vì
+sự kiện người gọi phải đợi là một lệnh có tính công thái học kém hơn và không có giá trị trả về.
 
-Dispatch an event when the work must happen whether or not the caller is still there — a mail, a
-projection, a sync. Anything the caller's own answer depends on stays in the command, because an
-event the caller must wait for is a command with worse ergonomics and no return value.
+**CQRS-7 · Trình xử lý có thông số kỹ thuật kép bên cạnh.**`<operation>.handler.spec.ts`, trong cùng một thư mục. Người xử lý là nơi đưa ra các quyết định, vì vậy nó là
+nơi kiểm tra đơn vị - và đặt thông số kỹ thuật bên cạnh tệp có nghĩa là bất kỳ ai cũng tìm thấy thông số kỹ thuật đó
+chỉnh sửa trình xử lý chứ không phải bởi bất kỳ ai tìm kiếm trong cây thử nghiệm.
 
-**CQRS-7 · The handler has a twin spec beside it.**
+## Bị cấm
 
-`<operation>.handler.spec.ts`, in the same folder. A handler is where the decisions are, so it is
-where the unit tests are — and putting the spec beside the file means the spec is found by whoever
-edits the handler rather than by whoever goes looking in a test tree.
-
-## Forbidden
-
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| Work in a resolver or controller | It is then reachable from exactly one door, and the CLI, the job and the test cannot get at it | Dispatch a message; put the work in the handler |
-| Work in the service beside the handler | Same, one layer down - it has no message, so nothing else can invoke it | Move it into the handler |
-| Overriding `execute` on a handler | It leaves the template silently, and the next cross-cutting change misses exactly this file | Override `process` |
-| A command or query with methods, defaults or logic | A message that computes moves a decision somewhere nobody reads | Keep it to `params`; compute in the handler |
-| A handler returning `null` to mean failure | The caller has to guess what went wrong with less information than the handler had | Throw the domain exception that names it |
-| A handler returning `{ ok: false, error }` | Same, wearing a shape - and every caller decodes it differently | Throw |
-| An event the caller waits on | It is a command with no return value and worse ergonomics | Make it a command |
-| A file in the operation folder not named for the operation | Something reusable was invented where nobody will find it | Move it to `modules/` under a name that says what it is |
-| A handler with no spec beside it | The decisions live here, so an untested handler is an untested decision | Write the twin |
+| Làm việc trong trình phân giải hoặc bộ điều khiển | Sau đó, nó có thể truy cập được từ chính xác một cửa và CLI, công việc và bài kiểm tra không thể truy cập được | Gửi tin nhắn; đưa công việc vào bộ xử lý |
+| Làm việc trong dịch vụ bên cạnh người xử lý | Tương tự, xuống một lớp - nó không có thông báo nên không có gì khác có thể gọi nó | Di chuyển nó vào trình xử lý |
+| Ghi đè`execute`trên một người xử lý | Nó rời khỏi mẫu một cách im lặng và thay đổi xuyên suốt tiếp theo bỏ sót chính xác tệp này | ghi đè`process`|
+| Lệnh hoặc truy vấn có phương thức, giá trị mặc định hoặc logic | Một thông báo tính toán sẽ chuyển quyết định đến nơi không ai đọc | Giữ nó để`params`; tính toán trong trình xử lý |
+| Một người xử lý quay trở lại`null`có nghĩa là thất bại | Người gọi phải đoán xem điều gì đã xảy ra với ít thông tin hơn người xử lý có | Ném ngoại lệ tên miền đặt tên cho nó |
+| Một người xử lý quay trở lại`{ ok: false, error }`| Tương tự, mặc một hình dạng - và mỗi người gọi giải mã nó theo cách khác nhau | Ném |
+| Một sự kiện mà người gọi chờ đợi | Đó là một lệnh không có giá trị trả về và tính công thái học kém hơn | Biến nó thành một lệnh |
+| Một tập tin trong thư mục thao tác không được đặt tên cho thao tác | Một thứ có thể tái sử dụng đã được phát minh ở nơi không ai có thể tìm thấy | Di chuyển nó đến`modules/`dưới một cái tên cho biết nó là gì |
+| Một trình xử lý không có thông số kỹ thuật bên cạnh | Các quyết định tồn tại ở đây, vì vậy một trình xử lý chưa được kiểm tra là một quyết định chưa được kiểm tra | Viết song sinh |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — the whole operation, in the shape
-
+### Trường hợp thông thường — toàn bộ hoạt động, trong hình dạng
 ```ts
 /** The message: request context, nothing else. */
 export class AddToCartCommand {
@@ -127,10 +120,9 @@ export class AddToCartHandler
     protected override async process(command: AddToCartCommand): Promise<CartItemEntity> { /* ... */ }
 }
 ```
-
-### The template trap
-
-```ts
+### Cái bẫy mẫu
+```
+ts
 // handler: inside the template, so a timing or a transaction added to the base reaches it.
 protected override async process(command: AddToCartCommand): Promise<CartItemEntity> {
     return this.entityManager.save(cartItem)
@@ -144,11 +136,9 @@ override async execute(command: AddToCartCommand): Promise<CartItemEntity> {
     return this.entityManager.save(cartItem)
 }
 ```
+Chúng khác nhau ở một điều: lớp cơ sở có còn chạy hay không.
 
-They differ in one thing: whether the base class still runs.
-
-### The fat-service trap
-
+### Cái bẫy phục vụ chất béo
 ```ts
 // service: it carries the request to the bus, and knows nothing about carts.
 async execute(params: ExecuteParams<AddToCartRequest>): Promise<CartItemEntity> {
@@ -166,11 +156,9 @@ async execute(params: ExecuteParams<AddToCartRequest>): Promise<CartItemEntity> 
     return this.commandBus.execute(new AddToCartCommand(params))
 }
 ```
+Chúng khác nhau ở một điều: liệu cánh cửa thứ hai có đạt được quy tắc hay không.
 
-They differ in one thing: whether a second door can reach the rule.
-
-### The failure trap
-
+### Cái bẫy thất bại
 ```ts
 // handler: it names the failure, and the name carries the data somebody will need.
 if (!courseExists) {
@@ -185,11 +173,9 @@ if (!courseExists) {
     return null
 }
 ```
+Chúng khác nhau ở một điều: liệu lý do có còn tồn tại khi quay trở lại hay không.
 
-They differ in one thing: whether the reason survives the return.
-
-### The event trap
-
+### Bẫy sự kiện
 ```ts
 // event: the mail must go whether or not the reader is still on the page.
 this.eventBus.publish(new EnrollmentOpenedEvent({ userId, courseId }))
@@ -202,5 +188,4 @@ return enrollment
 this.eventBus.publish(new OpenEnrollmentEvent({ userId, courseId }))
 return null
 ```
-
-They differ in one thing: whether the caller's own answer depends on it.
+Chúng khác nhau ở một điều: liệu câu trả lời của chính người gọi có phụ thuộc vào nó hay không.

@@ -1,75 +1,55 @@
-# module layering
+# phân lớp mô-đun
 
-## Definition
+## Định nghĩa
 
-A capability is a folder that owns one subject — the AI layer, the databases layer, a feature's
-API surface. The rules here are about the SEAMS between capabilities: what an import may name, what
-a capability may say about itself, and where a cross-capability dependency is allowed to be wired.
+Một capability là một folder sở hữu một chủ đề — AI layer, database layer hoặc một API feature. Các rule ở đây nói về SEAM giữa các capability: import có thể đặt tên gì, capability được nói về chính nó tới đâu, và cross-capability dependency được phép nối ở đâu.
 
-Every one of them exists because the alternatives produce cycles. Not the loud kind the compiler
-catches — the quiet kind where a capability reaches its own internals through its public door,
-where a barrel drags in a graph nobody asked for, and where a module imports a sibling directly and
-the two can no longer be started apart.
+Mỗi rule tồn tại vì phương án ngược lại tạo ra cycle. Không phải loại cycle compiler ồn ào bắt được ngay, mà là loại im lặng: capability chạm vào internal của chính nó qua public door, một barrel kéo vào dependency graph mà không ai yêu cầu, hoặc một module import thẳng sibling module khiến hai capability không thể khởi động tách rời.
 
-The question that settles a case: **could this file be moved to another repository with its
-capability, and still make sense?** If it names a barrel, or reaches sideways, or points at itself
-through the public alias, it cannot.
+Câu hỏi giải quyết một trường hợp là: **file này có thể chuyển sang repository khác cùng capability mà vẫn có nghĩa không?** Nếu nó đặt tên barrel, vươn ngang sang capability khác, hoặc trỏ vào chính mình qua public alias, thì không.
 
-What holds this law is [`sources/be/module-layering.mjs`](../../../sources/be/module-layering.mjs).
+Rule này được giữ bởi [`sources/be/module-layering.mjs`](../../../sources/be/module-layering.mjs).
 
-## Rules
+## Quy tắc
 
-**LAYERING-1 · An import names the file that declares the symbol, never a barrel.**
+**LAYERING-1 · Import phải nêu file khai báo symbol, không bao giờ nêu barrel.**
 
-`@modules/ai/ai-invoke.service`, not `@modules/ai`. A barrel is a file that re-exports a folder, and
-importing one pulls in the whole folder's import graph to get one symbol — which is how a unit spec
-ends up booting a database driver, and how two capabilities that never reference each other end up
-in a cycle through a third.
+`@modules/ai/ai-invoke.service`, không `@modules/ai`. Barrel là file re-export cả folder; import barrel để lấy một symbol kéo toàn bộ folder vào graph. Đó là cách unit spec cuối cùng khởi động database driver và hai capability vốn không tham chiếu nhau kết thúc trong cycle thông qua phần thứ ba.
 
-It also destroys the one thing a reader wants from an import list: which FILE this depends on.
+Barrel cũng phá hỏng điều người đọc cần biết từ import list: FILE này phụ thuộc vào cái gì.
 
-**LAYERING-2 · Inside a capability, imports are relative.**
+**LAYERING-2 · Bên trong một capability, import chỉ dùng relative path.**
 
-A file under `modules/ai/` reaching for `@modules/ai/...` is the capability talking to itself
-through its own front door. It is a cycle magnet, and it is a lie about the boundary: the alias
-exists to say "this comes from elsewhere", so using it for something that does not is exactly the
-signal that stops meaning anything.
+File dưới `modules/ai/` vươn tới `@modules/ai/...` nghĩa là capability đang nói chuyện với chính nó qua public front door. Đó là nam châm tạo cycle và là lời nói dối về boundary: alias có nghĩa “đến từ nơi khác”, nên dùng alias cho thứ không đến từ nơi khác là một tín hiệu cần dừng lại.
 
-**LAYERING-3 · A cross-capability dependency is registered at the composition root.**
+**LAYERING-3 · Cross-capability dependency được đăng ký tại composition root.**
 
-A `@Module` under the capability trees does not import another capability's module directly.
-Something has to know about both, and that something is the application's own root — the one place
-whose job IS knowing what the application is made of.
+`@Module` trong capability tree không được import trực tiếp module của capability khác. Việc đó cần biết về cả hai và thuộc về application root — nơi duy nhất có nhiệm vụ biết application được tạo từ gì.
 
-Nesting within a capability stays, and so do aggregators. The rule is about SIDEWAYS edges, not
-downward ones.
+Nesting bên trong một capability vẫn được phép, cũng như aggregator. Rule này nói về các edge SIDEWAYS, không nói về edge đi xuống.
 
-**LAYERING-4 · The composition root is the only place that knows the whole.**
+**LAYERING-4 · Composition root là nơi duy nhất biết toàn bộ hệ thống.**
 
-Which capabilities exist, which are global, what order they start in. Pushing any of that into a
-capability makes that capability un-startable alone — and the first thing you want when something
-breaks is to start one piece by itself.
+Capability nào tồn tại, capability nào global và chúng khởi động theo thứ tự nào đều thuộc về root. Đẩy bất kỳ kiến thức nào vào một capability khiến capability đó không thể tự khởi động — trong khi điều đầu tiên cần làm khi một phần hỏng là khởi động riêng phần đó.
 
-**LAYERING-5 · A capability's public surface is the files it means to be imported.**
+**LAYERING-5 · Public surface của capability là các file mà capability muốn caller import.**
 
-There is no index re-exporting everything; a caller names the file. That makes the surface visible
-in the import list of the callers rather than declared in a barrel nobody reads, and it makes an
-accidental dependency show up as a strange-looking import rather than as one more name in a list.
+Không có index barrel re-export mọi thứ; caller phải nêu file. Nhờ vậy, surface hiện ngay trong import list của caller thay vì được khai báo trong barrel mà không ai đọc, và dependency bất ngờ sẽ hiện ra như một import lạ chứ không phải một tên nữa trong danh sách.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| `@modules/<name>` with no file after it | A barrel drags the whole folder's import graph in to get one symbol, and hides which file is depended on | Name the declaring file |
-| `@features/<name>` or `@tests/<name>` as a barrel | Same | Same |
-| `@modules/<own capability>/...` from inside that capability | The capability is talking to itself through its public door: a cycle magnet, and the alias stops meaning "elsewhere" | A relative import |
-| A capability `@Module` importing another capability's module | Two capabilities that can no longer be started apart, wired somewhere that does not own the question | Register it at the composition root |
-| A barrel file that re-exports a folder | It is the thing that makes every rule above unenforceable | Let callers name files |
-| Start-order knowledge inside a capability | The capability can no longer be started alone, which is the first thing you want when it breaks | Keep it at the root |
+| `@modules/<name>` không có file phía sau | Barrel kéo toàn bộ folder vào graph để lấy một symbol và che mất file thực sự được dùng | Nêu file khai báo |
+| `@features/<name>` hoặc `@tests/<name>` như một barrel | Tương tự | Tương tự |
+| `@modules/<own capability>/...` từ bên trong capability đó | Capability nói với chính nó qua public door: cycle magnet và alias không còn mang nghĩa “ở nơi khác” | Một relative import |
+| `@Module` của capability import module capability khác | Hai capability không thể khởi động tách rời; edge được nối ở nơi không sở hữu quyết định | Đăng ký tại composition root |
+| Barrel file re-export cả folder | Nó làm mọi rule phía trên không thể thực thi được | Để caller nêu file |
+| Biết startup order bên trong capability | Capability không còn tự khởi động được, trong khi đó là điều cần nhất khi nó hỏng | Giữ ở root |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — the import names a file
+### Trường hợp thông thường — import nêu file
 
 ```ts
 import {
@@ -85,9 +65,9 @@ import {
 } from "@modules/ai"
 ```
 
-They differ in one thing: whether the dependency is a file or a folder.
+Chúng khác nhau ở việc dependency là file hay cả folder.
 
-### The self-alias trap
+### Bẫy alias
 
 ```ts
 // inside modules/ai/: the sibling is a relative import
@@ -104,9 +84,9 @@ import {
 } from "@modules/ai/ai-entitlement.service"
 ```
 
-They differ in one thing: whether the alias still signals a boundary crossing.
+Chúng khác nhau ở việc alias còn báo hiệu một lần vượt boundary hay không.
 
-### The sideways-wiring trap
+### Bẫy edge ngang
 
 ```ts
 // apps/<app>/src/app.module.ts -- the composition root, whose job IS knowing the whole
@@ -130,4 +110,4 @@ export class AppModule {}
 export class MembershipModule {}
 ```
 
-They differ in one thing: whether either capability can still be started by itself.
+Chúng khác nhau ở việc mỗi capability có còn tự khởi động được hay không.

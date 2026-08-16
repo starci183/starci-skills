@@ -1,73 +1,57 @@
 # cdc
 
-## Definition
+## Định nghĩa
 
-CDC turns committed source rows into recomputed read projections. A projection listener does not
-replay business commands and does not apply a second write delta; it translates one database change
-into the stable identity of a projection, then rebuilds that projection from source truth.
+CDC biến các source row đã commit thành những read projection được tính lại. Projection listener không phát lại business command và cũng không áp dụng delta lần thứ hai; nó chuyển một thay đổi trong database thành identity ổn định của projection, rồi dựng lại projection từ source truth.
 
-The deciding question is: **would processing the same row change twice produce the same projection?**
-If the answer is no, the code is not a CDC projection.
+Câu hỏi quyết định là: **xử lý cùng một thay đổi row hai lần có tạo ra cùng một projection không?** Nếu không, đó không phải CDC projection.
 
-What holds the machine-checkable listener shape is
-[`sources/be/cdc.mjs`](../../../sources/be/cdc.mjs).
+Hình dạng listener có thể kiểm tra bằng máy nằm trong [`sources/be/cdc.mjs`](../../../sources/be/cdc.mjs).
 
-## Rules
+## Quy tắc
 
-**CDC-1 · The shared listener owns Kafka lifecycle.**
+**CDC-1 · Shared listener sở hữu vòng đời Kafka.**
 
-Every concrete `*projection.listener.ts` extends `AbstractProjectionListener`. Connection,
-subscription, Debezium envelope parsing and failure isolation stay in that base, because one
-listener with private consumer plumbing will eventually disagree about offsets or tombstones.
+Mọi `*projection.listener.ts` cụ thể đều kế thừa `AbstractProjectionListener`. Connection, subscription, parsing Debezium envelope và isolation khi lỗi phải nằm trong base, vì một listener tự quản lý consumer sẽ sớm bất đồng về offset hoặc tombstone.
 
-**CDC-2 · A listener declares a stable group and explicit topics.**
+**CDC-2 · Listener khai báo group ổn định và topic rõ ràng.**
 
-`groupId` is the durable identity of the projection consumer, and `topics` is the complete source
-set that can invalidate it. Neither is generated per process. A random group replays history on
-every boot; an implicit topic silently leaves a projection stale.
+`groupId` là identity bền vững của projection consumer, còn `topics` là toàn bộ source set có thể làm projection mất hiệu lực. Không giá trị nào được tạo theo từng process. Group ngẫu nhiên sẽ replay history sau mỗi lần boot; topic ngầm định sẽ âm thầm để projection stale.
 
-**CDC-3 · The listener maps a change to targets; the service recomputes them.**
+**CDC-3 · Listener ánh xạ change sang target; service tính lại target.**
 
-`deriveTargets` reads the changed row and returns projection identities. `recomputeTarget` delegates
-to the projection service. The listener owns routing, not SQL policy, so replay and direct repair use
-the same recomputation path.
+`deriveTargets` đọc row đã thay đổi và trả về các projection identity. `recomputeTarget` ủy quyền cho projection service. Listener sở hữu việc định tuyến, không sở hữu chính sách SQL, để replay và repair trực tiếp cùng đi qua một đường recompute.
 
-**CDC-4 · Recompute is idempotent and source-derived.**
+**CDC-4 · Recompute là idempotent và bắt nguồn từ source.**
 
-A projection is rebuilt with an UPSERT from authoritative rows. It is never updated by adding the
-delta carried by the event, because duplicate delivery would then double the result and a missed
-event could never self-heal.
+Projection được dựng lại bằng UPSERT từ các row authoritative. Không bao giờ cập nhật projection bằng cách cộng delta trong event, vì delivery trùng lặp sẽ nhân đôi kết quả còn event bị mất thì không thể tự hồi phục.
 
-**CDC-5 · Tombstones do not invent current state.**
+**CDC-5 · Tombstone không được bịa ra current state.**
 
-A Debezium payload with no `after` image has no current row to map. The shared listener skips it;
-projections that need delete repair derive that target from another retained source or use a
-purpose-built deletion stream.
+Debezium payload không có `after` image thì không có current row để ánh xạ. Shared listener bỏ qua payload đó; projection cần repair khi xóa phải suy ra target từ một source khác còn lưu, hoặc dùng deletion stream được thiết kế riêng.
 
-**CDC-6 · One malformed message does not stop the consumer.**
+**CDC-6 · Một message lỗi không được dừng consumer.**
 
-Parsing or recompute failure is logged with topic and consumer group and is isolated to that
-message. Recompute being idempotent is what lets a later source change repair the same target.
+Lỗi parsing hoặc recompute phải được log cùng topic và consumer group, rồi cô lập ở message đó. Recompute idempotent là điều cho phép một source change sau này sửa lại cùng target.
 
-**CDC-7 · Delivery semantics are proved against a real broker.**
+**CDC-7 · Delivery semantics phải được chứng minh với broker thật.**
 
-An operational E2E publishes through Redpanda/Kafka and waits for the database projection. Calling
-`deriveTargets`, `recomputeTarget` or a listener method directly proves mapping code but not CDC.
+Operational E2E publish qua Redpanda/Kafka rồi chờ database projection. Gọi trực tiếp `deriveTargets`, `recomputeTarget` hoặc method của listener chỉ chứng minh mapping code, không chứng minh CDC.
 
-## Forbidden
+## Bị cấm
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A projection listener with its own `onModuleInit` consumer | It forks subscription, parsing and failure semantics | Extend `AbstractProjectionListener` |
-| A random or instance-scoped consumer group | Every restart becomes a new consumer and replays history | Declare a stable projection-specific `groupId` |
-| Incrementing a projection from an event delta | Duplicate delivery double-counts and missed delivery cannot heal | Recompute from source rows and UPSERT |
-| Business commands inside `deriveTargets` | CDC replay would repeat business side effects | Return projection identities only |
-| Treating a tombstone as an empty entity | It fabricates a current row that does not exist | Skip it or consume a deletion-specific source |
-| A direct listener call in E2E | It removes broker serialization and consumer-group behaviour | Publish through the real broker and poll the projection |
+| Projection listener có consumer `onModuleInit` riêng | Nó tách subscription, parsing và failure semantics thành một nhánh khác | Kế thừa `AbstractProjectionListener` |
+| Consumer group ngẫu nhiên hoặc chỉ tồn tại theo instance | Mỗi lần restart trở thành consumer mới và replay history | Khai báo `groupId` ổn định, riêng cho projection |
+| Tăng projection bằng event delta | Delivery trùng lặp sẽ đếm hai lần và delivery bị mất không thể tự sửa | Tính lại từ source row và UPSERT |
+| Đặt business command trong `deriveTargets` | CDC replay sẽ lặp lại business side effect | Chỉ trả về projection identity |
+| Coi tombstone là entity rỗng | Nó bịa ra current row không tồn tại | Bỏ qua hoặc consume source dành riêng cho deletion |
+| Gọi thẳng listener trong E2E | Nó loại bỏ serialization của broker và hành vi consumer group | Publish qua broker thật rồi poll projection |
 
-## Examples
+## Ví dụ
 
-### Recompute from source truth
+### Tính lại từ source truth
 
 ```ts
 protected async recomputeTarget(target: UserCourseTarget): Promise<void> {
@@ -82,9 +66,9 @@ protected async recomputeTarget(target: UserCourseTarget): Promise<void> {
 }
 ```
 
-They differ in whether replay changes the answer.
+Chúng khác nhau ở việc replay có làm thay đổi kết quả hay không.
 
-### Keep lifecycle in the base
+### Giữ vòng đời trong base
 
 ```ts
 export class UserXpProjectionListener extends AbstractProjectionListener<UserTarget> {
@@ -100,9 +84,9 @@ export class UserXpProjectionListener implements OnModuleInit {
 }
 ```
 
-They differ in whether every projection shares one delivery contract.
+Chúng khác nhau ở việc mọi projection có dùng chung một delivery contract hay không.
 
-### Prove broker delivery
+### Chứng minh delivery qua broker
 
 ```ts
 await world.cdc.publish(activityRow)
@@ -114,4 +98,4 @@ await until(() => world.db.userXp(userId).then((xp) => xp === expectedXp))
 await listener.recomputeTarget({ userId })
 ```
 
-They differ in whether CDC itself is under test.
+Chúng khác nhau ở việc CDC thật có được kiểm thử hay không.

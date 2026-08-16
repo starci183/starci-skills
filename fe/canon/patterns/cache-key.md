@@ -1,119 +1,111 @@
 # cache key
 
-## Definition
+## Định nghĩa
 
-A cache key is the NAME of one answer. Everything that shares a key shares that answer — its data,
-its error, and, for a mutation, its running state — so the key is not a label attached to a request
-afterwards. It is the question, written down.
+Cache key là TÊN của một câu trả lời. Mọi thứ dùng chung một key đều dùng chung câu trả lời đó — dữ
+liệu, lỗi và với mutation là cả trạng thái đang chạy — nên key không phải nhãn gắn vào request sau
+khi request đã được gọi. Key chính là câu hỏi được viết ra.
 
-That makes the key a claim, and the claim is checkable: *this answer is true for anybody who asks
-this question.* If two callers can produce the same key and need different answers back, the key is
-naming something coarser than the answer it stores, and one of them will read the other's.
+Vì thế key là một khẳng định có thể kiểm chứng: *câu trả lời này đúng với bất kỳ ai đặt câu hỏi này.*
+Nếu hai caller tạo ra cùng một key nhưng cần hai câu trả lời khác nhau, key đang đặt tên cho thứ thô
+hơn câu trả lời nó lưu, và một caller sẽ đọc phải câu trả lời của caller kia.
 
-The question that settles a fragment: **if this value were different, would the answer be
-different?** If it would, the fragment belongs in the key. If it would not, it is noise that splits
-one entry into several and refetches for nothing.
+Câu hỏi quyết định một mảnh có thuộc key không là: **nếu value này khác đi, câu trả lời có khác đi
+không?** Nếu có, mảnh đó phải nằm trong key. Nếu không, nó chỉ là nhiễu: tách một entry thành nhiều
+entry rồi fetch lại vô ích.
 
-A key is also either complete or absent. There is no partial key, because a key assembled from a
-fragment that has not arrived is a different question — one nobody asked — and the answer it caches
-is filed under a name that will never be requested again.
+Một key cũng chỉ có hai trạng thái: đầy đủ hoặc vắng mặt. Không có key một phần, vì key được ghép từ
+một mảnh chưa đến là một câu hỏi khác — câu hỏi không ai đặt — và câu trả lời bị cache dưới cái tên
+mà không caller nào tạo lại.
 
-What holds this law is only its edge: [`sources/fe/the-split.mjs`](../../../sources/fe/the-split.mjs)
-keeps the hook in the connected half, where a key has the viewer and the route parameters to be
-built from. What a key CONTAINS no rule can see, so that half is a matter for review, and this file
-is what review argues from.
+Phần biên của luật này được giữ bởi [`sources/fe/the-split.mjs`](../../../sources/fe/the-split.mjs):
+hook nằm ở connected half, nơi có viewer và route parameter để dựng key. Rule không nhìn thấy key
+CONTAINS gì, nên phần đó thuộc về review; file này là cơ sở để review lập luận.
 
 Implementation anchors in `starci-academy-fe`: `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` and
 `src/hooks/swr/useMutateAddToCartSwr.ts`.
 
-## Rules
+## Luật
 
-**CACHE-1 · A key names one answer, so every value that changes the answer is IN the key.**
+**CACHE-1 · Key đặt tên cho một câu trả lời, nên mọi value làm đổi câu trả lời đều nằm IN key.**
 
-The cache does not compare requests, it compares keys. Two calls with one key are one entry, and the
-second caller is served the first caller's answer without a request going out — that is the point of
-a cache and also its entire failure mode. So a fragment the answer depends on and the key omits does
-not produce a stale entry sometimes; it produces a WRONG entry deterministically, and it looks
-correct, because a plausible answer to the wrong question is indistinguishable from the right one.
+Cache không so sánh request mà so sánh key. Hai lần gọi có cùng key là một entry, và caller thứ hai
+nhận câu trả lời của caller thứ nhất mà không phát sinh request — đó là mục đích của cache, đồng
+thời cũng là toàn bộ cách cache hỏng. Mảnh mà câu trả lời phụ thuộc vào nhưng key bỏ sót không chỉ
+thỉnh thoảng tạo dữ liệu cũ; nó luôn tạo entry SAI, nhưng trông vẫn đúng vì câu trả lời hợp lý cho
+câu hỏi sai không thể phân biệt bằng mắt với câu trả lời đúng.
 
-The same reason settles where the fetcher gets its arguments: it reads them back out of the key
-rather than closing over the parameter it was called with. A key and a closure are two copies of one
-fact, and after a re-render they can disagree — the entry is then filed under one question and holds
-the answer to another.
+Cùng lý do đó, fetcher phải đọc argument từ key thay vì đóng (closure) parameter mà nó được gọi cùng.
+Key và closure là hai bản sao của một sự thật; sau re-render chúng có thể lệch nhau, khiến entry
+được xếp dưới tên câu hỏi này nhưng chứa câu trả lời của câu hỏi kia.
 
-**CACHE-2 · A personal answer carries the viewer in its key.**
+**CACHE-2 · Câu trả lời riêng tư phải mang viewer trong key.**
 
-An answer computed from who is asking is not shared data that happens to be behind auth; it is a
-different answer per reader, and a key that does not mention the reader promises otherwise. Two
-failures follow, and the second is worse than the first. Signing IN changes nothing, because the key
-did not change, so a reader who has just signed in keeps reading the refusal fetched a second
-earlier. Signing OUT changes nothing either, so the next person on that tab reads the previous
-reader's figures — and those figures look entirely plausible.
+Câu trả lời được tính từ người đang hỏi không phải dữ liệu chung tình cờ nằm sau auth; đó là câu trả
+lời khác nhau cho từng người. Key không nhắc đến viewer đang hứa điều ngược lại. Đăng nhập không đổi
+key nên người vừa đăng nhập tiếp tục đọc lời từ chối được fetch một giây trước. Đăng xuất cũng không
+đổi key nên người tiếp theo trên tab đọc được số liệu của người trước — và số liệu đó trông hoàn toàn
+hợp lý.
 
-Both stop being possible once the viewer is a fragment of the key: a change of viewer is a change of
-key, and an unfetched key has nothing to serve.
+Cả hai lỗi đều không thể xảy ra khi viewer là một mảnh của key: đổi viewer là đổi key, còn key chưa
+được fetch thì không có gì để phục vụ.
 
-What goes in is a stable, non-reversible fingerprint of the session, never the credential itself.
-The key is handed to devtools, to any cache inspector, and to whatever logs a key when a request
-fails; a bearer token there is the same mistake as a bearer token in web storage. The fingerprint is
-not a security boundary and is not claimed to be one — it only has to differ when the viewer
-differs.
+Mảnh đưa vào phải là fingerprint ổn định, không thể đảo ngược của session, không bao giờ là credential.
+Key đi tới devtools, cache inspector và log ghi key khi request fail; đặt bearer token ở đó cũng sai
+như đặt bearer token trong web storage. Fingerprint không phải security boundary và không được tuyên
+bố là như vậy — nó chỉ cần khác khi viewer khác.
 
-**CACHE-3 · A per-item action carries the item in its key.**
+**CACHE-3 · Action trên từng item phải mang item trong key.**
 
-Hooks sharing a key share their STATE, not only their data. For a mutation that state includes
-`isMutating`, which is what a control reads to show it is working. So one key across a list is a
-list where pressing one row puts every other row's control into the running state: one press, a
-whole column of spinners, and every other row's button disabled for a press the reader never made.
+Các hook dùng chung key sẽ dùng chung STATE, không chỉ dùng chung data. Với mutation, state đó có
+`isMutating`, thứ control đọc để hiển thị nó đang chạy. Vì vậy một key dùng cho cả list sẽ khiến bấm
+một row đặt mọi control khác vào trạng thái running: một lần bấm, cả cột spinner, và mọi button khác
+bị disable vì một lần bấm người đọc không thực hiện.
 
-The item is what makes this press a different press from the one on the row beside it. Without it in
-the key, the list has one button as far as the cache is concerned.
+Item giúp phân biệt lần bấm này với lần bấm ở row bên cạnh. Không có item trong key, cache coi cả list
+chỉ có một button.
 
-**CACHE-4 · A key that is not ready is `null`, not a key with a gap in it.**
+**CACHE-4 · Key chưa sẵn sàng là `null`, không phải key có một mảnh bị khuyết.**
 
-Every fragment must be known before the question exists. While one is still `undefined` — the viewer
-before the session resolves, an id belonging to a resting placeholder, a parameter for a surface
-nobody has opened — the hook passes `null` and fetches nothing.
+Mọi mảnh phải được biết trước khi câu hỏi tồn tại. Khi một mảnh còn `undefined` — viewer trước khi
+session resolve, id của placeholder đang nghỉ hoặc parameter của surface chưa mở — hook truyền `null`
+và không fetch gì.
 
-The alternative is worse than a wasted request. A key built around a missing fragment asks something
-nobody wanted an answer to, and caches the reply under a name no later caller will produce. An
-auth-gated query fired without a token does not fail once, it fails on a retry backoff, and it
-reports itself as loading each time — which is how a signed-out surface ends up shimmering at
-somebody who is not waiting for anything.
+Key dựng quanh mảnh còn thiếu sẽ hỏi điều không ai muốn biết rồi cache câu trả lời dưới tên mà không
+caller nào tạo lại. Query cần auth nhưng chạy khi chưa có token sẽ fail trong retry backoff và tự báo
+loading mỗi lần; đó là cách surface đã sign out cứ shimmer trước người không hề chờ gì.
 
-A placeholder substituted for the missing fragment is the same defect wearing a valid key: an empty
-string, a zero or the word `guest` produces a real entry holding a real answer to a question the
-caller did not ask, and nothing about it reads as broken later.
+Placeholder thay cho mảnh thiếu là cùng một lỗi khoác lên key hợp lệ: `""`, `0` hoặc `guest` tạo ra
+entry thật, chứa câu trả lời thật cho câu hỏi caller không đặt, và về sau không có dấu hiệu cho thấy
+entry đó sai.
 
-**CACHE-5 · Failure and emptiness are different answers, and the unwrapping says which one a `null`
-means where the caller reads it.**
+**CACHE-5 · Failure và rỗng là hai câu trả lời khác nhau; chỗ unwrapping phải nói `null` có nghĩa gì.**
 
-"The request did not arrive" and "there is genuinely none" want different words on screen, and a
-fetcher that folds an error into `null` has destroyed the difference before any caller can tell them
-apart. A failure stays a failure — it belongs to the hook's error, where a caller can decide to
-retry, say so, or fall back deliberately.
+"Request không tới nơi" và "thật sự không có gì" cần hai cách hiển thị khác nhau. Fetcher gộp error
+thành `null` đã phá hủy khác biệt trước khi caller có thể phân biệt. Failure phải vẫn là failure —
+nó thuộc về error của hook, nơi caller có thể retry, thông báo hoặc fallback có chủ ý.
 
-That leaves `null` free to mean exactly one thing, and the hook is where that meaning is written
-down, next to the unwrapping that produces it: a price preview returns `null` when no personal price
-can be computed, so the catalog prices from the phase instead — which is the honest answer, not a
-swallowed error. A caller cannot infer that from a type, and it must not have to guess.
+Nhờ vậy `null` chỉ cần mang một nghĩa, và hook là nơi ghi nghĩa đó ngay cạnh đoạn unwrapping tạo ra
+nó: price preview trả `null` khi không tính được giá riêng, nên dùng giá catalog của phase — đó là
+câu trả lời trung thực, không phải error bị nuốt. Caller không thể suy ra nghĩa này từ type và không
+được buộc phải đoán.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
 |---|---|---|
-| A constant string as the whole key for a personal answer | Two readers share one entry, and signing out leaves the previous reader's figures on the tab | Add the viewer fragment to the key |
-| The bearer token itself as the viewer fragment | The key reaches devtools, cache inspectors and failure logs, where a credential must never be | A stable, non-reversible fingerprint of it |
-| One mutation key across a list of rows | Hooks on one key share `isMutating`, so one press runs every row's control | Put the row's id in the key |
-| A key assembled while a fragment is still `undefined` | It asks a question nobody asked, and an auth-gated retry loop reports itself as loading forever | Pass `null` until every fragment is known |
-| A placeholder standing in for a missing fragment | `""`, `0` or `guest` is a valid key holding a real answer to the wrong question, and nothing about it reads as broken | Pass `null` |
-| A fetcher closing over the parameter instead of reading the key | Key and request are two copies of one fact and can disagree after a re-render | Take the arguments back out of the key |
-| A fetcher that returns `null` on failure | "It did not arrive" and "there is none" become the same value, and the surface says there is nothing | Let the failure stay the hook's error |
-| A `null` whose meaning is written only at the call site | Every later caller re-decides it, and they will not agree | State what a `null` means at the unwrapping that produces it |
+| Dùng một chuỗi hằng làm toàn bộ key cho câu trả lời riêng tư | Hai viewer dùng chung entry và sign out để lại số liệu của viewer trước trên tab | Thêm mảnh viewer vào key |
+| Dùng bearer token làm mảnh viewer | Key đi tới devtools, cache inspector và failure log, nơi credential tuyệt đối không được xuất hiện | Fingerprint ổn định, không thể đảo ngược |
+| Dùng một mutation key cho cả list row | Hook cùng key chia sẻ `isMutating`, nên một lần bấm chạy control của mọi row | Đưa id của row vào key |
+| Dựng key khi một mảnh còn `undefined` | Nó hỏi điều không ai hỏi, còn retry loop auth tự báo loading mãi | Truyền `null` cho tới khi mọi mảnh đã biết |
+| Dùng placeholder cho mảnh còn thiếu | `""`, `0` hoặc `guest` là key hợp lệ chứa câu trả lời thật cho câu hỏi sai | Truyền `null` |
+| Fetcher đóng parameter thay vì đọc key | Key và request là hai bản sao của một sự thật và có thể lệch sau re-render | Đọc argument từ key |
+| Fetcher trả `null` khi failure | "Không tới nơi" và "không có" thành cùng một value, khiến surface báo không có gì | Để failure nằm trong error của hook |
+| Chỉ giải thích nghĩa của `null` ở call site | Caller sau sẽ tự diễn giải lại và không thống nhất | Ghi nghĩa tại chỗ unwrapping tạo ra `null` |
 
-## Examples
+## Ví dụ
 
-### The viewer in the key
+### Viewer trong key
 
 ```ts
 // the answer is personal, so the key says whose it is
@@ -125,9 +117,9 @@ useSWR(viewer === undefined ? null : [QUERY_MY_KPIS_SWR_KEY, viewer], fetcher)
 useSWR(QUERY_MY_KPIS_SWR_KEY, fetcher)
 ```
 
-They differ in one thing: whether signing out changes the question being asked.
+Chúng chỉ khác nhau ở một điểm: sign out có làm thay đổi câu hỏi hay không.
 
-### The item in the key
+### Item trong key
 
 ```ts
 // one hook per row, so a press runs only the row that was pressed
@@ -139,9 +131,9 @@ useSWRMutation([MUTATE_ADD_TO_CART_SWR_KEY, courseId], fetcher)
 useSWRMutation(MUTATE_ADD_TO_CART_SWR_KEY, fetcher)
 ```
 
-They differ in one thing: whether the cache can tell one row's press from another's.
+Chúng chỉ khác nhau ở một điểm: cache có phân biệt được lần bấm của row này với row khác hay không.
 
-### Not ready is null
+### Chưa sẵn sàng nghĩa là `null`
 
 ```ts
 // no question until both fragments are known
@@ -153,9 +145,9 @@ viewer === undefined || courseId === undefined ? null : [KEY, viewer, courseId]
 [KEY, viewer ?? "guest", courseId ?? ""]
 ```
 
-They differ in one thing: whether an incomplete question gets asked anyway.
+Chúng chỉ khác nhau ở một điểm: câu hỏi chưa hoàn chỉnh có bị hỏi hay không.
 
-### The fetcher's arguments
+### Argument của fetcher
 
 ```ts
 async ([, , id]: [string, string, string]) => queryCoursePricePreview({ request: { courseId: id } })
@@ -165,9 +157,9 @@ async ([, , id]: [string, string, string]) => queryCoursePricePreview({ request:
 async () => queryCoursePricePreview({ request: { courseId } })
 ```
 
-They differ in one thing: whether the entry's name and the request that filled it can disagree.
+Chúng chỉ khác nhau ở một điểm: tên entry và request tạo ra entry có thể lệch nhau hay không.
 
-### Failure is not emptiness
+### Thất bại không phải là rỗng
 
 ```ts
 // the request failing is the hook's error; null means the server had no personal price
@@ -185,4 +177,4 @@ try {
 }
 ```
 
-They differ in one thing: whether a caller can still tell a failure from an empty answer.
+Chúng chỉ khác nhau ở một điểm: caller còn phân biệt được failure với câu trả lời rỗng hay không.

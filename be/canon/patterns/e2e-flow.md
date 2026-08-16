@@ -1,136 +1,121 @@
-# e2e flow
+# dòng chảy e2e
 
-## Definition
+## Định nghĩa
 
-This is the shape of one flow file: how a business sentence becomes a test that fails when the
-business breaks and at no other time.
+Đây là hình dạng của một tệp luồng: làm thế nào một câu kinh doanh trở thành một bài kiểm tra thất bại khi
+thời gian nghỉ kinh doanh và không vào lúc nào khác.`testing.md`giải quyết NHỮNG bài kiểm tra nào thuộc về làn đường này và những gì họ phải khẳng định. Tập tin này giải quyết
+một trong số chúng được viết như thế nào - các phần mà một quy trình cần có, thứ tự chúng đi vào và bốn thói quen mà
+biến một bài kiểm tra dòng chảy tốt thành một bài kiểm tra chậm.
 
-`testing.md` settles WHICH tests belong in this lane and what they must assert. This file settles
-how one of them is written — the parts a flow needs, the order they go in, and the four habits that
-turn a good flow test into a slow flaky one.
+Câu hỏi mà nó trả lời: **khi nút này chuyển sang màu đỏ lúc 3 giờ sáng, liệu người đọc có biết bước nào không
+bị hỏng và tại sao?** Luồng trả lời "không" là luồng được chạy lại thay vì đọc và kiểm tra
+được chạy lại thay vì đọc đã không còn là thử nghiệm nữa.
 
-The question it answers: **when this goes red at 3am, will the person reading it know which step
-broke and why?** A flow that answers "no" is a flow that gets re-run rather than read, and a test
-that gets re-run rather than read has stopped being a test.
+Những gì giữ phần có thể kiểm tra bằng máy là[`sources/be/e2e-flow.mjs`](../../../sources/be/e2e-flow.mjs),
+và đó là **năm trong số mười hai quy tắc bên dưới** — E2E-3, một nửa trạng thái bền vững của E2E-4,
+E2E-7, một nửa tác nhân nội bộ trực tiếp của E2E-11 và một nửa nhập khẩu nhà cung cấp của E2E-12.
+Đó là con số trung thực, không hề chênh lệch.
+Phần còn lại xem ý nghĩa của tên, điều gì đang được khẳng định hoặc ai đang hành động và quy tắc kích hoạt
+dựa trên phán quyết là một trong những tác giả học cách vô hiệu hóa - điều này khiến luật pháp trở nên tồi tệ hơn khi không có gì
+thực thi nó. Mô-đun ghi lại những gì đã được đo và để yên, vì vậy đầu đọc tiếp theo sẽ không
+“hoàn thành công việc”.
 
-What holds the machine-checkable part is [`sources/be/e2e-flow.mjs`](../../../sources/be/e2e-flow.mjs),
-and it is **five of the twelve rules below** — E2E-3, the persisted-state half of E2E-4,
-E2E-7, the direct-internal-actor half of E2E-11, and the provider-import half of E2E-12.
-That is the honest number, not a gap.
-The rest turn on what a name means, what is being asserted, or who is acting, and a rule that fires
-on a judgement is one authors learn to disable — which leaves the law worse off than when nothing
-enforced it. The module records what was measured and left alone, so the next reader does not
-"finish the job".
+## Quy tắc
 
-## Rules
+**E2E-1 · Một tệp, một luồng và tệp được đặt tên theo câu.**`course-purchase.e2e-spec.ts`, mô tả "người học mua một khóa học và có thể bắt đầu khóa học đó". Không phải một
+nhóm giải quyết, không phải là điểm cuối. Cái tên là lời hứa; tập tin là bằng chứng.
 
-**E2E-1 · One file, one flow, and the file is named for the sentence.**
+**E2E-2 · Quy trình là một chuỗi các bước CÓ TÊN, không phải một trường hợp dài.**
 
-`course-purchase.e2e-spec.ts`, describing "a learner buys a course and can start it". Not a
-resolver group, not an endpoint. The name is the promise; the file is the proof.
+Mỗi bước là của riêng nó`it`, theo thứ tự, trạng thái chia sẻ thông qua phạm vi mô tả. Một đĩa đơn 300 dòng
+trường hợp đưa ra một đường màu đỏ và không biết thao tác nào trong số mười một thao tác đã bị hỏng; mười một bước được đặt tên cung cấp cho
+bước và những bước sau đó được bỏ qua thay vì chuyển thành tiếng ồn.
 
-**E2E-2 · The flow is a sequence of NAMED steps, not one long case.**
+Các bước được sắp xếp theo thứ tự vì công việc kinh doanh được sắp xếp theo thứ tự. Đó là nơi mà bài kiểm tra có thể phụ thuộc vào
+trường hợp trước nó, và nó chính xác là dòng chảy.
 
-Each step is its own `it`, in order, sharing state through the describe scope. A 300-line single
-case gives one red line and no idea which of eleven operations broke; eleven named steps give the
-step, and the ones after it are skipped rather than cascading into noise.
+**E2E-3 · Không bao giờ ngủ. Thăm dò ý kiến ​​cho đến khi tiểu bang ổn định, có thời hạn.**`await sleep(500)`là nguồn tạo vảy lớn nhất trong bộ quy trình và nó không thành công ở cả hai khía cạnh
+chỉ đường cùng một lúc: quá ngắn và bộ phần mềm chuyển sang màu đỏ vì một lý do không phải là lỗi; quá dài
+và mỗi lần chạy đều phải trả giá cho trường hợp xấu nhất. Cả hai đều được "sửa" bằng cách tăng số lượng, điều này làm cho
+suite chậm hơn mà không làm cho nó chính xác.
 
-The steps are ordered because the business is ordered. That is the one place a test may depend on
-the case before it, and it is exactly what a flow is.
+Thay vào đó hãy thăm dò tiểu bang -`await until(() => enrollmentExists(userId, courseId))`- có thời hạn
+điều đó thất bại LỚN và nói những gì nó đang chờ đợi. Thời hạn là một lời khẳng định thực sự: “điều này sẽ
+giải quyết trong vòng N giây" là một tuyên bố về hệ thống.
 
-**E2E-3 · Never sleep. Poll until the state settles, with a deadline.**
+**E2E-4 · Khẳng định hệ quả và đọc nó từ nơi nó tồn tại.**
 
-`await sleep(500)` is the single largest source of flake in a flow suite, and it fails in both
-directions at once: too short and the suite goes red for a reason that is not a defect; too long
-and every run pays for the worst case. Both get "fixed" by raising the number, which makes the
-suite slower without making it correct.
+Hàng từ cơ sở dữ liệu, thông báo tắt ổ cắm, số dư từ truy vấn tiếp theo. Không phải
+phong bì phản hồi, điều này chỉ chứng tỏ rằng máy chủ đã trả lời.
 
-Poll the state instead — `await until(() => enrollmentExists(userId, courseId))` — with a deadline
-that fails LOUDLY and says what it was waiting for. A deadline is a real assertion: "this should
-settle within N seconds" is a claim about the system.
+**E2E-5 · Một bước thời gian thực sẽ mở ra một khách hàng thực sự và xác nhận những gì đã đến — không bao giờ là bao nhiêu.**`expect(messages.length).toBe(2)`mã hóa số lượng người nghe tình cờ được kết nối. Thêm một
+thuê bao thứ ba và hệ thống đúng chuyển sang màu đỏ; phân phối tải trọng sai đến đúng số lượng
+người và một cái bị hỏng vẫn xanh.
 
-**E2E-4 · Assert the consequence, and read it from where it lives.**
+Chờ tin nhắn TIẾP THEO khớp với một vị từ và xác nhận nội dung của nó cũng như người nhận. Số lượng là
+chi tiết triển khai của phân xuất; nội dung là lời hứa.
 
-The row from the database, the message off the socket, the balance from the next query. Not the
-response envelope, which proves only that the server replied.
+**E2E-6 · Âm là một phần của dòng chảy.**
 
-**E2E-5 · A realtime step opens a real client, and asserts what arrived — never how many.**
+Trước khi khách truy cập đăng ký, họ không được nhận gì cả. Trước khi thanh toán được giải quyết, quyền được hưởng
+phải đóng cửa. Luồng chỉ xác nhận những gì NÊN đến không thể bắt được hệ thống gửi
+mọi thứ đối với mọi người - đó là thất bại quan trọng nhất, bởi vì nó vô hình trước mắt mọi người.
+con đường hạnh phúc.
 
-`expect(messages.length).toBe(2)` encodes how many listeners happened to be connected. Add a
-third subscriber and a correct system goes red; deliver the wrong payload to the right count of
-people and a broken one stays green.
+**E2E-7 · Không có nhánh nào trong bài kiểm tra.**`if (state === NeedWater) { ...assert... }`có nghĩa là tập tin xác nhận những điều khác nhau trên các
+chạy và đường chạy ở nơi nhánh bị bỏ qua có màu xanh lá cây trong khi tỏ ra ít hơn. Nếu điều kiện là một phần
+của dòng chảy, ép buộc nó và khẳng định vô điều kiện. Nếu không, nó không thuộc về nơi này.
 
-Await the NEXT message matching a predicate, and assert its content and its recipient. The count is
-an implementation detail of the fan-out; the content is the promise.
+**E2E-8 · Một nơi đứng vững trên thế giới.**
 
-**E2E-6 · The negative is part of the flow.**
+Một mô-đun hồng ngoại thử nghiệm khởi động ứng dụng, cơ sở dữ liệu, trình môi giới và ổ cắm, do đó, một tệp luồng
+mở ra với những gì nó đang thử nghiệm thay vì với hai trăm đường dây. Khi hệ thống dây điện thay đổi,
+một tập tin thay đổi.
 
-Before the visitor subscribes, they must receive nothing. Before payment settles, the entitlement
-must be closed. A flow that only asserts what SHOULD arrive cannot catch a system that sends
-everything to everybody — which is the failure that matters most, because it is invisible from the
-happy path.
+**E2E-9 · Các tác nhân được đặt tên và được tạo theo quy trình.**`learner`, `otherLearner`, `company`- không`accountNumber: 8`. Một thứ tự ma thuật nói với người đọc
+không có gì và xung đột âm thầm khi hai luồng chọn cùng một luồng. Người trợ giúp kiếm được một diễn viên mới cho mỗi
+luồng, do đó các luồng không bao giờ chia sẻ trạng thái và có thể chạy theo bất kỳ thứ tự nào.
 
-**E2E-7 · No branch in a test.**
+**E2E-10 · Luồng không ghi nhật ký gì.**`console.log`bên trong một bài kiểm tra là đầu ra không ai đọc được khi chạy màu xanh lá cây và tiếng ồn sẽ chôn vùi
+khẳng định về một màu đỏ. Điều người đọc cần khi thất bại là tên bước và xác nhận, cả hai đều
+trong đó người chạy đã in.
 
-`if (state === NeedWater) { ...assert... }` means the file asserts different things on different
-runs, and the run where the branch is skipped is green while proving less. If the condition is part
-of the flow, force it and assert unconditionally. If it is not, it does not belong here.
+**E2E-11 · Chuỗi hoạt động đi vào ranh giới sản xuất của họ và đảm bảo mọi bước nhảy nội bộ đều thực tế.**
 
-**E2E-8 · One place stands the world up.**
+Luồng dự phòng, thử lại, xếp hàng, lên lịch, chiếu, vô hiệu hóa bộ đệm hoặc phân phối theo thời gian thực là
+chỉ E2E khi thử nghiệm đi vào thông qua GraphQL/HTTP/socket, xuất bản cho nhà môi giới thực sự hoặc cho phép
+lịch trình thực sự bị cháy. Nhập một công nhân để Nest có thể đăng ký là đúng; giải quyết chuyện đó
+công nhân và gọi điện`process`, `finalize`hoặc một phương pháp nội bộ khác thì không. Cuộc gọi trực tiếp sẽ xóa
+tuần tự hóa, khóa, thử lại, xác nhận và hành vi cạnh tranh của người tiêu dùng - chính xác là
+hành vi mà luồng hoạt động tồn tại để chứng minh.
 
-A testing-infra module that boots the app, the database, the broker and the sockets, so a flow file
-opens with what it is testing rather than with two hundred lines of wiring. When the wiring changes,
-one file changes.
+**E2E-12 · Ghi đè kết quả bên ngoài, không bao giờ ghi đè chính sách nội bộ chọn kết quả đó.**
 
-**E2E-9 · Actors are named, and they are created by the flow.**
+AI E2E giữ`AiInvokeService`, bộ cân bằng, xoay khóa, bộ đệm tình trạng, quyền lợi và thanh toán
+thực; Jest chỉ viết kịch bản cho khách hàng của nhà cung cấp cụ thể`invoke`/`stream`kết quả hoặc sai sót. Thanh toán
+E2E duy trì sự đối chiếu, định tuyến hành động và trợ cấp thực tế; Tập lệnh Jest chỉ có Stripe/PayOS/PayPal/
+NOWThanh toán. Ranh giới tương tự áp dụng cho Keycloak, SMTP, GitHub, Judge0 và FFmpeg. Chế giễu một
+người điều phối nội bộ làm cho tính năng dự phòng, phân bổ, khôi phục và tính bình thường biến mất trong khi
+bài kiểm tra vẫn xanh.
 
-`learner`, `otherLearner`, `company` — not `accountNumber: 8`. A magic ordinal tells a reader
-nothing and collides silently when two flows pick the same one. The helper mints a fresh actor per
-flow, so flows never share state and can run in any order.
+## Bị cấm
 
-**E2E-10 · A flow logs nothing.**
-
-`console.log` inside a test is output nobody reads on a green run and noise that buries the
-assertion on a red one. What a reader needs when it fails is the step name and the assertion, both
-of which the runner already prints.
-
-**E2E-11 · Operational chains enter at their production boundary and keep every internal hop real.**
-
-A fallback, retry, queue, scheduler, projection, cache-invalidation or realtime-delivery flow is
-an E2E only when the test enters through GraphQL/HTTP/socket, publishes to the real broker, or lets
-the real scheduler fire. Importing a worker so Nest can register it is correct; resolving that
-worker and calling `process`, `finalize` or another internal method is not. The direct call erases
-serialization, locking, retry, acknowledgement and competing-consumer behaviour — exactly the
-behaviour the operational flow exists to prove.
-
-**E2E-12 · Override the external result, never the internal policy that chooses it.**
-
-AI E2E keeps `AiInvokeService`, the balancer, key rotation, health cache, entitlement and billing
-real; Jest scripts only the concrete provider client's `invoke`/`stream` result or error. Payment
-E2E keeps reconciliation, action routing and grants real; Jest scripts only Stripe/PayOS/PayPal/
-NOWPayments. The same boundary applies to Keycloak, SMTP, GitHub, Judge0 and FFmpeg. Mocking an
-internal orchestrator makes fallback, attribution, rollback and idempotency disappear while the
-test remains green.
-
-## Forbidden
-
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| `await sleep(ms)` | Flaky when short, slow when long, and both are "fixed" by raising the number | `await until(predicate, { timeout })` |
-| One `it` covering the whole flow | A single red line for eleven operations, so nobody knows which broke | One named `it` per step |
-| Asserting a message COUNT | It encodes how many listeners exist; a third subscriber reddens a correct system | Await the next matching message; assert content and recipient |
-| A mutable recorder reset by hand between steps | One forgotten reset and a later step counts an earlier event | A helper that awaits the next N matching messages |
-| `if` around an assertion | The run that skips the branch is green while proving less | Force the condition, or drop the case |
-| A magic actor ordinal (`accountNumber: 8`) | It says nothing, and two flows silently collide on it | A named actor minted per flow |
-| `console.log` in a test | Unread when green, noise when red | The step name and the assertion |
-| Asserting only the response status | It proves the server replied and nothing else | Read the state back |
-| Calling a resolved `*Worker` / `*Handler` | It skips the broker/CQRS boundary and all delivery semantics | Register it, then trigger the real queue/transport |
-| Mocking an internal fallback/orchestration service | It removes the policy the operational E2E is meant to prove | Mock only the external SDK result/error |
+|`await sleep(ms)`| Lúng túng khi ngắn, chậm khi dài và cả hai đều được “sửa” bằng cách nâng số |`await until(predicate, { timeout })`|
+| Một`it`bao trùm toàn bộ dòng chảy | Một đường màu đỏ duy nhất cho mười một thao tác, vì vậy không ai biết thao tác nào bị hỏng | Một người có tên`it`mỗi bước |
+| Khẳng định một tin nhắn COUNT | Nó mã hóa số lượng người nghe tồn tại; thuê bao thứ ba chuyển sang hệ thống chính xác | Chờ tin nhắn phù hợp tiếp theo; khẳng định nội dung và người nhận |
+| Một máy ghi âm có thể thay đổi được đặt lại bằng tay giữa các bước | Một lần đặt lại bị quên và bước sau sẽ tính một sự kiện trước đó | Một người trợ giúp đang chờ N tin nhắn phù hợp tiếp theo |
+|`if`xung quanh một khẳng định | Đường chạy bỏ qua nhánh có màu xanh lá cây trong khi tỏ ra ít hơn | Buộc điều kiện, hoặc bỏ vụ án |
+| Một diễn viên ảo thuật thứ tự (`accountNumber: 8`) | Nó không nói gì, và hai luồng âm thầm va chạm vào nó | Một diễn viên được đặt tên được đúc theo mỗi luồng |
+|`console.log`trong một bài kiểm tra | Chưa đọc khi xanh, nhiễu khi đỏ | Tên bước và xác nhận |
+| Chỉ xác nhận trạng thái phản hồi | Nó chứng tỏ máy chủ đã trả lời và không có gì khác | Đọc lại trạng thái |
+| Gọi một giải quyết`*Worker` / `*Handler`| Nó bỏ qua ranh giới của nhà môi giới/CQRS và tất cả ngữ nghĩa phân phối | Đăng ký nó, sau đó kích hoạt hàng đợi/vận chuyển thực sự |
+| Chế giễu một dịch vụ điều phối/dự phòng nội bộ | Nó loại bỏ chính sách mà E2E hoạt động nhằm chứng minh | Chỉ mô phỏng kết quả/lỗi SDK bên ngoài |
 
-## Examples
+## Ví dụ
 
-### The shape
-
+###Hình dạng
 ```ts
 describe("a learner buys a course and can start it", () => {
     let learner: Actor
@@ -158,10 +143,9 @@ describe("a learner buys a course and can start it", () => {
     })
 })
 ```
-
-### The sleep trap
-
-```ts
+### Bẫy ngủ
+```
+ts
 // the deadline is an assertion: this flow claims the webhook settles within ten seconds
 await until(() => world.db.isEnrolled(learner.id, COURSE),
     { timeout: 10_000, describe: "the enrollment to open after the PAID webhook" })
@@ -173,11 +157,9 @@ await until(() => world.db.isEnrolled(learner.id, COURSE),
 await sleep(500)
 expect(await world.db.isEnrolled(learner.id, COURSE)).toBe(true)
 ```
+Chúng khác nhau ở một điều: sự chờ đợi bị giới hạn bởi kết quả hay sự phỏng đoán.
 
-They differ in one thing: whether the wait is bounded by the outcome or by a guess.
-
-### The fan-out trap
-
+### Cái bẫy quạt ra
 ```ts
 // what arrived, and to whom
 const delivered = await world.socket(learner).nextMessage("notification")
@@ -190,11 +172,9 @@ expect(delivered.courseId).toBe(COURSE)
 // system, and delivering the wrong payload to two people keeps this green.
 expect(messageRecorder[EVENT].length).toBe(2)
 ```
+Chúng khác nhau ở một điều: khẳng định là về lời hứa hay về hệ thống ống nước.
 
-They differ in one thing: whether the assertion is about the promise or about the plumbing.
-
-### The negative
-
+### Tiêu cực
 ```ts
 it("does not notify a learner who is not watching this course", async () => {
     await world.graphql(learner).markLessonComplete({ lessonId: LESSON })
@@ -207,5 +187,4 @@ it("does not notify a learner who is not watching this course", async () => {
 // to everybody passes every case in the file.
 it("notifies the learner", async () => { /* ... */ })
 ```
-
-They differ in one thing: whether over-delivery is detectable.
+Chúng khác nhau ở một điều: liệu có thể phát hiện được việc phân phối quá mức hay không.

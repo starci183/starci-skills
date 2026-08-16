@@ -1,81 +1,79 @@
-# served locale
+# ngôn ngữ được phục vụ
 
-## Definition
+## Định nghĩa
 
-Some data is translated on the server. A course document, a content body, a category name — the API
-stores one per locale and hands back the one it was asked for. Which means the request has to ask,
-and a request that says nothing gets the server's default, forever, in every language.
+Một số dữ liệu được dịch trên máy chủ. Tài liệu khóa học, nội dung, tên danh mục - API
+lưu trữ một cái cho mỗi ngôn ngữ và trả lại cái mà nó được yêu cầu. Có nghĩa là yêu cầu phải hỏi,
+và một yêu cầu không nói gì sẽ nhận được mặc định của máy chủ, mãi mãi, ở mọi ngôn ngữ.
 
-This is not the same law as [`translation`](translation.md). That one settles **who chooses the
-word** inside the component tree: the connected half resolves copy, nothing below a block says a word
-of its own. This one settles **what the request declares** on its way out. A screen can obey
-`translation` perfectly — every label resolved, no literal below a block — and still show a
-Vietnamese reader an English course, because the chrome came from the dictionary and the content came
-from an API that was never told which language to serve.
+Đây không phải là luật tương tự như[`translation`](translation.md). Người đó quyết định **ai chọn
+word** bên trong cây thành phần: nửa được kết nối giải quyết bản sao, không có gì bên dưới khối nói một từ
+của riêng nó. Điều này giải quyết **những gì yêu cầu tuyên bố** trên đường đi. Một màn hình có thể tuân theo`translation`một cách hoàn hảo — mọi nhãn đều được giải quyết, không có chữ nào bên dưới một khối — và vẫn hiển thị một
+Người đọc Việt một khóa học tiếng Anh, vì chrome đến từ từ điển và nội dung đến
+từ một API chưa bao giờ được cho biết sẽ phân phát ngôn ngữ nào.
 
-The question that settles whether something belongs here: **would a reader in another language get
-different DATA back from this call?** If yes, the request must declare the locale, and it must
-declare it in one place rather than at each call site.
+Câu hỏi quyết định xem nội dung nào đó có thuộc về nơi này hay không: **liệu người đọc bằng ngôn ngữ khác có nhận được
+DATA khác với cuộc gọi này?** Nếu có, yêu cầu phải khai báo ngôn ngữ và phải
+khai báo nó ở một nơi thay vì ở mỗi địa điểm cuộc gọi.
 
-What holds this law is [`sources/fe/served-locale.mjs`](../../../sources/fe/served-locale.mjs).
+Điều giữ luật này là[`sources/fe/served-locale.mjs`](../../../sources/fe/served-locale.mjs).
 
 Implementation anchors in `starci-academy-fe`:
-`src/modules/api/graphql/clients/links/locale.ts` and
-`src/modules/api/graphql/clients/create-apollo-client.ts`.
+`src/modules/api/graphql/clients/links/locale.ts` and `src/modules/api/graphql/clients/create-apollo-client.ts`.
 
-## Rules
+## Quy tắc
 
-**LOCALE-1 · The client attaches the locale, and every client does.**
+**LOCALE-1 · Client gắn locale, và mọi client đều phải làm vậy.**
 
-The locale rides in the transport chain beside the auth token, not in the hook that happens to need
-it. Attaching it per call means the whole surface is bilingual only while every author remembers,
-and the first one who forgets ships a page that is bilingual in its chrome and monolingual in its
-content — which reads as a translation gap rather than a missing header, so it is looked for in the
-dictionary.
+Ngôn ngữ nằm trong chuỗi truyền tải bên cạnh mã thông báo xác thực chứ không phải trong hook cần thiết
+nó. Đính kèm nó cho mỗi cuộc gọi có nghĩa là toàn bộ bề mặt chỉ có song ngữ trong khi mọi tác giả đều nhớ,
+và người đầu tiên quên gửi một trang song ngữ bằng chrome và đơn ngữ trong đó
+nội dung — được đọc dưới dạng khoảng trống dịch thuật chứ không phải là tiêu đề bị thiếu, vì vậy nó được tìm kiếm trong
+từ điển.
 
-A guest reads in a language too, so this is unconditional. Unlike the bearer token, there is no
-anonymous path that legitimately declares nothing.
+Một vị khách cũng đọc bằng một ngôn ngữ nào đó nên điều này là vô điều kiện. Không giống như mã thông báo mang, không có
+đường dẫn ẩn danh không khai báo gì một cách hợp pháp.
 
-**LOCALE-2 · The transport reads the locale from the address, not from an argument.**
+**LOCALE-2 · Transport đọc locale từ address, không đọc từ argument.**
 
-The URL already carries the reader's language, and a middleware already redirected them to it. That
-makes the address the strongest available statement of intent and, more usefully, one nobody has to
-remember to pass. A `locale` parameter threaded through hooks and query functions is a parameter the
-next hook omits, and the omission is invisible: the call succeeds and returns the default language.
+URL đã mang ngôn ngữ của người đọc và phần mềm trung gian đã chuyển hướng họ đến ngôn ngữ đó. Đó
+làm cho địa chỉ trở thành tuyên bố có ý định mạnh mẽ nhất và hữu ích hơn là không ai phải làm vậy
+nhớ vượt qua nhé MỘT`locale`tham số được xâu chuỗi qua các hook và các hàm truy vấn là một tham số
+hook tiếp theo bị bỏ qua và sự thiếu sót này là vô hình: cuộc gọi thành công và trả về ngôn ngữ mặc định.
 
-**LOCALE-3 · A cookie is not transport when the API is another origin.**
+**LOCALE-3 · Cookie không phải transport khi API ở origin khác.**
 
-The app may well remember the reader's choice in a cookie, and the server may well read one. Neither
-fact carries the value across an origin boundary: a cross-origin request sends no cookie unless it
-opts into credentials, and the anonymous path deliberately does not. A cookie the server can read in
-principle and never receives in practice is the most expensive kind of correct.
+Ứng dụng có thể ghi nhớ lựa chọn của người đọc trong cookie và máy chủ cũng có thể đọc lựa chọn đó. cũng không
+thực tế mang giá trị qua ranh giới nguồn gốc: yêu cầu có nguồn gốc chéo sẽ không gửi cookie trừ khi nó
+chọn thông tin xác thực và đường dẫn ẩn danh có chủ ý không làm như vậy. Một cookie mà máy chủ có thể đọc
+nguyên tắc và không bao giờ nhận được trong thực tế là loại đúng đắt nhất.
 
-**LOCALE-4 · The server's default is a floor, not a fallback the client may lean on.**
+**LOCALE-4 · Default của server là floor, không phải fallback để client dựa vào.**
 
-A server that answers an undeclared request with English is being careful, not permissive. Treating
-that default as "the fallback works" turns a missing header into a silent product decision, and the
-reader who notices is the one being served the wrong language.
+Máy chủ trả lời yêu cầu không được khai báo bằng tiếng Anh là cẩn thận, không dễ dãi. điều trị
+mặc định đó là "dự phòng hoạt động" biến tiêu đề bị thiếu thành quyết định sản phẩm im lặng và
+người đọc để ý là người được phục vụ sai ngôn ngữ.
 
-**LOCALE-5 · One place sets the header, so one place can be checked.**
+**LOCALE-5 · Một nơi set header để một nơi có thể được kiểm tra.**
 
-The header is written by the link and by nothing else. A second call site setting it by hand is a
-second answer to "which locale is this request in", and the two disagree the first time one of them
-is updated.
+Tiêu đề được viết bởi liên kết và không có gì khác. Trang web cuộc gọi thứ hai cài đặt nó bằng tay là một
+câu trả lời thứ hai cho "yêu cầu này ở địa điểm nào" và cả hai không đồng ý ngay lần đầu tiên một trong số họ
+được cập nhật.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A GraphQL client assembled without the locale link | Every call it makes is served the default language, and the gap reads as a translation bug | Put the locale link in the chain, beside the auth link |
-| Attaching the locale per hook or per query | The first author who forgets ships a monolingual surface, and nothing reports it | Attach it once in the transport |
-| Threading a `locale` argument through hooks | It is a parameter that gets omitted, and omission returns the default rather than an error | Read the address in the link |
-| Relying on the cookie to reach a cross-origin API | It is not sent unless the request opts into credentials, and the anonymous path does not | Send the header |
-| Treating the server default as the fallback | It converts a missing header into a silent product decision | Declare the locale on every request |
-| Setting the locale header at a call site | Two answers to one question, and they diverge on the first edit | Let the link own it |
+| Một ứng dụng khách GraphQL được lắp ráp mà không có liên kết ngôn ngữ | Mọi cuộc gọi mà nó thực hiện đều được cung cấp ngôn ngữ mặc định và khoảng trống được coi là lỗi dịch thuật | Đặt liên kết miền địa phương vào chuỗi, bên cạnh liên kết xác thực |
+| Đính kèm ngôn ngữ cho mỗi hook hoặc mỗi truy vấn | Tác giả đầu tiên quên tàu một mặt đơn ngữ, không có gì báo cáo | Đính kèm nó một lần trong quá trình vận chuyển |
+| Luồng một`locale`tranh luận thông qua hook | Đó là một tham số bị bỏ qua và sự thiếu sót trả về giá trị mặc định thay vì lỗi | Đọc địa chỉ trong liên kết |
+| Dựa vào cookie để tiếp cận API có nguồn gốc chéo | Nó không được gửi trừ khi yêu cầu chọn thông tin xác thực và đường dẫn ẩn danh không | Gửi tiêu đề |
+| Coi máy chủ mặc định là dự phòng | Nó chuyển đổi một tiêu đề bị thiếu thành một quyết định im lặng về sản phẩm | Khai báo miền địa phương theo mọi yêu cầu |
+| Đặt tiêu đề ngôn ngữ tại trang web cuộc gọi | Hai câu trả lời cho một câu hỏi và chúng khác nhau ở lần chỉnh sửa đầu tiên | Hãy để liên kết sở hữu nó |
 
-## Examples
+## Ví dụ
 
-### Where the locale is attached
+### Nơi locale được gắn vào
 
 ```ts
 // the chain: unconditional, beside the auth link, so every call declares a language
@@ -97,10 +95,9 @@ export const createLinkChain = (params) => [
     createHttpLink({ uri, headers, signal }),
 ]
 ```
+Chúng khác nhau ở một điểm: liệu người đọc trên URL tiếng Việt có được cung cấp tài liệu tiếng Việt hay không.
 
-They differ in one thing: whether a reader on a Vietnamese URL is served a Vietnamese document.
-
-### Where the locale comes from
+### Locale đến từ đâu
 
 ```ts
 // the link reads the address, so no caller has to remember anything
@@ -112,10 +109,9 @@ const locale = localeFromPath(window.location.pathname) ?? localeFromCookie(docu
 export const useQueryCourseSwr = ({ displayId, locale }) =>
     useSWR([KEY, displayId, locale], () => queryCourse({ request: { displayId }, headers: { "x-locale": locale } }))
 ```
+Chúng khác nhau ở một điều: việc có đúng hay không phụ thuộc vào khả năng ghi nhớ của mỗi tác giả tương lai.
 
-They differ in one thing: whether being right depends on every future author remembering.
-
-### The header nobody should write twice
+### Header không ai nên viết hai lần
 
 ```ts
 // one link owns it
@@ -126,5 +122,4 @@ operation.setContext((previous) => ({ headers: { ...previous.headers, "x-locale"
 // Wrong: a second answer to the same question, in a file that will not be updated with the first
 const result = await queryCourse({ request, headers: { "x-locale": "vi" } })
 ```
-
-They differ in one thing: how many places have to agree for the answer to be right.
+Chúng khác nhau ở một điều: phải có bao nhiêu nơi đồng ý thì câu trả lời mới là đúng.

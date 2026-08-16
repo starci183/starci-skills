@@ -1,113 +1,108 @@
-# props and slots
+# đạo cụ và slot
 
-## Definition
+## Định nghĩa
 
-A component's props are a CLOSED set of named slots, and the set is written as a type alias per
-layer rather than assembled per component. What a caller may hand a component is therefore not a
-convention anybody has to remember — it is the only thing that compiles.
+Đạo cụ của một thành phần là một tập hợp ĐÓNG các vị trí được đặt tên và tập hợp này được viết dưới dạng bí danh loại cho mỗi
+lớp thay vì được lắp ráp trên mỗi thành phần. Do đó, thứ mà người gọi có thể giao một thành phần không phải là một
+quy ước mà bất cứ ai cũng phải nhớ - đó là thứ duy nhất được biên dịch.
 
-The distinction that matters: **a rule is correct today; a fence is correct next month.** An
-interface spelling out `props` and `isLoading` is a rule — correct when written, one `extends` away
-from carrying a caller's own styling. An alias that IS the whole shape is a fence: there is nowhere
-to put a fourth slot, so an author who wanted one has to decide which layer they are actually
-writing.
+Sự khác biệt quan trọng: **quy tắc ngày nay là đúng; một hàng rào sẽ đúng vào tháng tới.** Một
+giao diện đánh vần`props`Và`isLoading`là một quy tắc - đúng khi viết, một`extends`đi xa
+từ việc mang phong cách riêng của người gọi. Một bí danh LÀ toàn bộ hình dạng là một hàng rào: không có nơi nào
+để đặt một ô thứ tư, do đó tác giả muốn có một ô đó phải quyết định xem chúng thực sự thuộc lớp nào
+viết.
 
-Five slots exist across the whole system, and no component has all five. `props` is what it draws.
-`on` is what it does. `contract` is the key it renders, and `render` is one named component per slot
-that key declares — having those two is what makes a container a container. `isLoading` is handed
-down, never decided locally.
+Năm vị trí tồn tại trên toàn bộ hệ thống và không có thành phần nào có đủ năm vị trí.`props`là những gì nó vẽ ra.`on`đó là những gì nó làm.`contract`là chìa khóa mà nó hiển thị và`render`là một thành phần được đặt tên trên mỗi vị trí
+khóa đó khai báo - có hai cái đó là điều làm cho một thùng chứa trở thành một thùng chứa.`isLoading`được trao
+xuống, không bao giờ quyết định tại địa phương.`render`là nội dung hợp đồng có thương hiệu, không bao giờ đánh dấu hoặc thành phần React tùy ý. Cây có thể mất
+ràng buộc`ContractSlots<K>`hoặc`ContractProjection<K>`. Một máy chủ bề mặt mất`ContractComponent<K, LeafProps<D,A>>`: một loại thành phần thực mang khóa chính xác khi thay đổi
+dữ liệu thời gian chạy tiếp tục thông qua thông thường`props`, `on`, Và`isLoading`khe cắm. Trang web cuộc gọi thực hiện
+không xây dựng lại descriptor hoặc đóng data vào callback. Xem [`contract`](contract.md), CONTRACT-11.
 
-`render` is branded contract content, never markup or an arbitrary React component. Tree may take
-bound `ContractSlots<K>` or `ContractProjection<K>`. A surface host takes
-`ContractComponent<K, LeafProps<D,A>>`: a real component type carrying the exact key while changing
-runtime data continues through the ordinary `props`, `on`, and `isLoading` slots. The call site does
-not rebuild a descriptor or close data into callbacks. See [`contract`](contract.md), CONTRACT-11.
+Điều giữ luật này là[`sources/fe/props.ts`](../../../sources/fe/props.ts), đó là hàng rào
+chính nó, và[`sources/fe/props-and-slots.mjs`](../../../sources/fe/props-and-slots.mjs)cho một
+thứ mà hàng rào không thể nhìn thấy: một hình được viết nội tuyến tại tham số, nơi nó không có tên để đọc
+bởi.
 
-What holds this law is [`sources/fe/props.ts`](../../../sources/fe/props.ts), which is the fence
-itself, and [`sources/fe/props-and-slots.mjs`](../../../sources/fe/props-and-slots.mjs) for the one
-thing a fence cannot see: a shape written inline at the parameter, where it has no name to be read
-by.
+Implementation anchors in `starci-academy-fe`: `src/components/contracts/props.ts` and `src/components/branches/SurfaceListCard/index.tsx`.
 
-Implementation anchors in `starci-academy-fe`: `src/components/contracts/props.ts` and
-`src/components/branches/SurfaceListCard/index.tsx`.
+## Quy tắc
 
-## Rules
+**SLOTS-1 · Khe dữ liệu mang DỮ LIỆU và một chức năng không đáp ứng được.**
 
-**SLOTS-1 · The data slot carries DATA, and a function does not satisfy it.**
+Bất kể tài liệu JSON nào có thể chứa được. Ràng buộc duy nhất đó là thứ ngăn chặn một thành phần bị buôn lậu
+thông qua khe dữ liệu, đó là lý do tại sao trình xử lý di chuyển trong khe riêng của chúng thay vì bên cạnh các giá trị
+họ hành động tiếp. Một thành phần đến dưới dạng dữ liệu sẽ khiến người gọi nó trở thành tác giả của một hình dạng mà không ai có thể
+tìm từ bên ngoài.
 
-Whatever a JSON document could hold. That single constraint is what stops a component being smuggled
-through the data slot, which is why handlers travel in their own slot rather than beside the values
-they act on. A component arriving as data would make its caller the author of a shape nobody can
-find from the outside.
+**SLOTS-2 · Dữ liệu được khai báo bằng bí danh loại, không bao giờ có giao diện.**
 
-**SLOTS-2 · Data is declared with a type alias, never an interface.**
+Không phải là một sở thích phong cách. Bí danh loại có chữ ký chỉ mục ngầm còn giao diện thì không, vì vậy
+một giao diện âm thầm phá vỡ hàng rào dữ liệu - nó biên dịch khi khai báo và ngừng đáp ứng
+ràng buộc giữ cho các chức năng bị loại bỏ. Bí danh là ràng buộc đang hoạt động; giao diện là
+ràng buộc lặng lẽ vắng mặt.
 
-Not a style preference. A type alias gets an implicit index signature and an interface does not, so
-an interface silently fails the data fence — it compiles at the declaration and stops satisfying the
-constraint that keeps functions out. The alias is the constraint working; the interface is the
-constraint quietly absent.
+**SLOTS-3 · Hình dạng của tham số có tên.**
 
-**SLOTS-3 · A parameter's shape has a name.**
+Một loại đối tượng nội tuyến tại tham số là một hình dạng không thể đọc được từ đâu: nó không thể được
+được nhập, không thể được tham chiếu bởi bản sao kiểm tra nó và không thể được tìm thấy bởi bất kỳ ai đang tìm kiếm
+những gì thành phần này chấp nhận. Việc đặt tên nó tốn một dòng và là sự khác biệt giữa hợp đồng và
+chữ ký.
 
-An inline object type at the parameter is a shape with nowhere to be read from: it cannot be
-imported, cannot be referenced by the twin that tests it, and cannot be found by anybody looking for
-what this component accepts. Naming it costs one line and is the difference between a contract and a
-signature.
+Tên là`XProps`cho thành phần`X`và nó đặt tên đầu vào hoàn chỉnh trước hàm. Một
+ngã tư như`Frame & { signOutLabel: string }`được viết nội tuyến tại tham số vẫn là một
+hình dạng ẩn danh và bị từ chối vì lý do tương tự như đối tượng nội tuyến.
 
-The name is `XProps` for component `X`, and it names the complete input before the function. An
-intersection such as `Frame & { signOutLabel: string }` written inline at the parameter is still an
-anonymous shape and is refused for the same reason as an inline object.
+**SLOTS-4 · Sự hiện diện của`contract`Và`render`là ranh giới lớp và là ranh giới duy nhất
+điều đó không bao giờ cần phải tranh cãi.**
 
-**SLOTS-4 · The presence of `contract` and `render` is the layer boundary, and it is the only one
-that never needs arguing about.**
+Một hình khép kín không có; một container mở có cả hai. Cả hai hướng đều có thể nhìn thấy trong đạo cụ
+bí danh, do đó, một tệp đã vượt qua ranh giới sẽ được hiển thị từ loại của nó chứ không phải từ một
+xem xét. Một vùng chứa mà người gọi không thể điền vào sẽ thuộc một lớp bên dưới bất kể nó được gọi là gì, và một
+các khe đã cho có hình dạng đóng đã trở thành một thùng chứa bất kỳ thư mục nào nó nằm trong đó.
 
-A closed shape has neither; an open container has both. Both directions are visible in the props
-alias, so a file that has drifted across the boundary is visible from its type rather than from a
-review. A container the caller cannot fill belongs one layer down whatever it is called, and a
-closed shape given slots has become a container whatever folder it sits in.
+Khe cắm không được gọi`children`và cái tên không mang tính thẩm mỹ.`children`chấp nhận đánh dấu có
+đã được xây dựng - một`.map`, một cây ba, một cây con không ai đặt tên — vậy bên trong thùng chứa có gì
+không bao giờ có thể được nêu ở bất cứ đâu.`render`chấp nhận một thành phần cho mỗi vị trí được đặt tên, điều này cho phép
+ranh giới là một thực tế mà trình biên dịch nắm giữ chứ không phải là một thói quen mà người đánh giá giữ.
 
-The slot is not called `children` and the name is not cosmetic. `children` accepts markup that has
-already been built — a `.map`, a ternary, a subtree nobody named — so what is inside a container
-could never be stated anywhere. `render` accepts one component per named slot, which is what lets
-the boundary be a fact the compiler holds rather than a habit reviewers keep.
+**SLOTS-5 ·`isLoading`được nhận, không bao giờ được quyết định.**
 
-**SLOTS-5 · `isLoading` is received, never decided.**
+Một thành phần bên dưới lớp sở hữu một yêu cầu sẽ được thông báo liệu thứ mà nó vẽ đã đến hay chưa. Nó
+không hỏi. Lớp sở hữu yêu cầu sẽ ghi cờ một lần khi nó hạ cây và
+không bao giờ nhận được chính nó - đó là lý do tại sao các đạo cụ riêng của khối thay vào đó lại mang một tình huống.
 
-A component below the layer that owns a request is told whether the thing it draws has arrived. It
-does not ask. The layer that owns the request writes the flag once when it hands a tree down, and
-never receives one itself — which is why the block's own props carry a situation instead.
+**SLOTS-6 · Không có khe xuất hiện.**
 
-**SLOTS-6 · There is no appearance slot.**
+Không có tên lớp, không có kiểu dáng, không có khoảng cách, không có móc kiểu dáng cho mỗi phần. Người gọi có thể định kiểu lại một nút có
+trở thành chủ sở hữu thứ hai của nó và thành phần này hiện có hai tác giả không bao giờ lên tiếng. Dù người gọi là ai
+đang cố gắng nói là một BIẾN THỂ có tên, được quyết định bên trong.
 
-No class name, no style, no gap, no per-part styling hook. A caller who can restyle a node has
-become its second owner, and the component now has two authors who never speak. Whatever the caller
-was trying to say is a VARIANT with a name, decided inside.
+**SLOTS-7 · Bề mặt danh sách nhận các bộ sưu tập miền thông qua tên miền`props`, không bao giờ`items`.**
 
-**SLOTS-7 · A list surface receives domain collections through named `props`, never `items`.**
-
-`SurfaceListCard` is a contract host, not a data model. Its stable branded `render` component owns
-the domain props shape, so `tasks`, `courses`, or any later collection travels under its real name
-inside `props`. A generic top-level `items` slot would create a second data lane and teach the shared
-surface every caller's model. The strict rule rejects that lane at the JSX call site.
+`SurfaceListCard`là máy chủ hợp đồng, không phải là mô hình dữ liệu. Thương hiệu ổn định của nó`render`thành phần sở hữu
+hình dạng đạo cụ miền, vì vậy`tasks`, `courses`hoặc bất kỳ bộ sưu tập nào sau này được chuyển dưới tên thật của nó
+bên trong`props`. Cấp cao nhất chung`items`khe cắm sẽ tạo làn dữ liệu thứ hai và dạy chia sẻ
+hiển thị mô hình của mọi người gọi. Quy tắc nghiêm ngặt từ chối làn đường đó tại địa điểm gọi JSX.
 
 ## Forbidden
 
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| A function in the data slot | It smuggles a component through data, and the shape becomes unfindable from outside | Put it in the handler slot |
-| An interface for a component's data | It silently fails the fence that keeps functions out | A type alias |
-| An inline object type on a parameter | The shape has no name, so nothing can import it, test it or find it | Name it in the module |
-| A slot the alias does not have | The alias IS the shape; wanting one more means the layer was chosen wrongly | Decide which layer this is |
-| `children` outside ModalShell/DrawerShell/DropdownShell | Markup arrives already built, so what a container holds can never be stated or checked | `contract` plus a branded `ContractComponent<K>` |
-| `items` on `SurfaceListCard` | It creates a second data lane and makes the shared surface know a caller's collection model | Put the collection under its domain name in the render component's named `props` type |
-| `render` on a closed shape | It has become a container, whatever its folder says | Move it to the container layer |
-| A component that decides its own `isLoading` | It asks a question the layer above already answered | Take the flag |
-| A class name, style or spacing prop | The component gains a second author who is invisible from inside | A named variant |
-| A per-part styling hook | Every internal element becomes public surface, and the component can never change | A named variant, decided inside |
+| Một chức năng trong khe dữ liệu | Nó đưa lậu một thành phần thông qua dữ liệu và không thể tìm thấy hình dạng đó từ bên ngoài | Đặt nó vào khe xử lý |
+| Giao diện cho dữ liệu của thành phần | Nó âm thầm làm hỏng hàng rào ngăn chặn các chức năng | Một bí danh loại |
+| Loại đối tượng nội tuyến trên một tham số | Hình dạng không có tên nên không có gì có thể nhập, kiểm tra hoặc tìm thấy nó | Đặt tên cho nó trong mô-đun |
+| Một vị trí mà bí danh không có | Bí danh LÀ hình dạng; muốn thêm một lớp nữa có nghĩa là lớp đã được chọn sai | Quyết định đây là lớp nào |
+|`children`bên ngoài ModalShell/DrawerShell/DropdownShell | Đánh dấu đến nơi đã được xây dựng sẵn, vì vậy những gì vùng chứa chứa không bao giờ có thể được nêu hoặc kiểm tra |`contract`cộng với một thương hiệu`ContractComponent<K>` |
+| `items`TRÊN`SurfaceListCard`| Nó tạo ra làn dữ liệu thứ hai và làm cho bề mặt chia sẻ biết mô hình thu thập của người gọi | Đặt bộ sưu tập dưới tên miền của nó trong tên của thành phần kết xuất`props`gõ |
+|`render`trên một hình dạng khép kín | Nó đã trở thành một thùng chứa, bất kể thư mục của nó nói gì | Di chuyển nó đến lớp chứa |
+| Một thành phần tự quyết định`isLoading`| Nó hỏi một câu hỏi lớp trên đã trả lời | Lấy cờ |
+| Tên lớp, kiểu hoặc khoảng cách | Thành phần này có được tác giả thứ hai, người vô hình từ bên trong | Một biến thể được đặt tên |
+| Móc tạo kiểu cho từng phần | Mọi phần tử bên trong đều trở thành bề mặt công khai và thành phần không bao giờ có thể thay đổi | Một biến thể được đặt tên, được quyết định bên trong |
 
-## Examples
+## Ví dụ
 
-### The fence, and the rule that looks like it
+### Hàng rào và rule trông giống nhau
 
 ```ts
 type TextProps = LeafProps<TextData>
@@ -119,10 +114,9 @@ interface TextProps {
     isLoading?: boolean
 }
 ```
+Chúng khác nhau ở một điều: liệu vị trí thứ tư có thể được bổ sung vào tháng tới mà không ai để ý hay không.
 
-They differ in one thing: whether a fourth slot can be added next month without anybody noticing.
-
-### The alias trap
+### Bẫy type alias
 
 ```ts
 type TextData = {
@@ -135,11 +129,10 @@ interface TextData {
     readonly content: string
 }
 ```
+Chúng khác nhau ở một điều: liệu hàng rào dữ liệu có còn tồn tại hay không. Giao diện biên dịch ở đây và dừng lại
+thỏa mãn ràng buộc lên một lớp.
 
-They differ in one thing: whether the data fence still holds. The interface compiles here and stops
-satisfying the constraint one layer up.
-
-### The naming trap
+### Bẫy đặt tên
 
 ```tsx
 export const Row = ({ props }: RowProps) => /* ... */
@@ -148,10 +141,9 @@ export const Row = ({ props }: RowProps) => /* ... */
 ```tsx
 export const Row = ({ props }: { props: { label: string; value: string } }) => /* ... */
 ```
+Chúng khác nhau ở một điều: liệu có điều gì khác có thể đề cập đến hình dạng hay không.
 
-They differ in one thing: whether anything else can refer to the shape.
-
-### The intersection trap
+### Bẫy intersection
 
 ```tsx
 export type DashboardPageProps = DashboardFrame & DashboardCopy
@@ -163,10 +155,9 @@ export const _DashboardPage = (
     input: DashboardFrame & { readonly signOutLabel: string; readonly unavailableMessage: string },
 ) => /* ... */
 ```
+Chúng khác nhau ở một điều: liệu đầu vào công khai hoàn chỉnh có tên thành phần hay không.
 
-They differ in one thing: whether the complete public input has the component's name.
-
-### The escape-hatch trap
+### Bẫy lối thoát
 
 ```tsx
 <StatRow props={{ label, value, isOwnRow: true }} />
@@ -175,5 +166,4 @@ They differ in one thing: whether the complete public input has the component's 
 ```tsx
 <StatRow props={{ label, value }} nameClassName={isMe ? "text-accent" : undefined} />
 ```
-
-They differ in one thing: whether the component decides what its own emphasis looks like.
+Chúng khác nhau ở một điều: liệu thành phần có quyết định điểm nhấn của chính nó trông như thế nào hay không.

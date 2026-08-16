@@ -39,6 +39,17 @@ have been added without a grouping or recognition job.
 Use keep, revise or reject, followed by the smallest change that resolves the evidence. Endless
 commentary without a decision only delays implementation.
 
+**CRITIQUE-6 · Every added visual element names its job.**
+
+Every added icon, badge, chip, border, surface, wrapper or selected paint must name one observable
+recognition, grouping or interaction-state job. If removing it preserves meaning and affordance,
+reject it as noise. Similar decoration elsewhere is not a job.
+
+Record the challenge under `### VISUAL JOB`:
+
+| Visual element | Owner / state | Recognition, grouping or interaction job | Existing reference | Verdict | Evidence |
+|---|---|---|---|---|---|
+
 ## Forbidden
 
 | Never | Why it is refused | Instead |
@@ -48,6 +59,7 @@ commentary without a decision only delays implementation.
 | Criticize without an alternative | The team cannot distinguish a defect from preference | State the smallest viable repair |
 | Add a new surface or icon as the default repair | Decoration often masks hierarchy problems | Repair order, copy, grouping or disclosure first |
 | Let passing types end the critique | Types do not inspect rendered hierarchy | Test the browser and state matrix |
+| Keep chrome whose job cannot be named | Decoration acquires false semantic weight and repeated noise | Remove it or identify the exact recognition, grouping or interaction job |
 
 ## Examples
 
@@ -62,4 +74,3 @@ reject: the header feels busy
 ```
 
 They differ in one thing: whether the critique identifies a failure and repair.
-

@@ -1,199 +1,189 @@
-# testing
+# thử nghiệm
 
-## Definition
+## Định nghĩa
 
-There are two kinds of test here and they answer different questions. An **e2e** answers *does the
-business run?* — one flow, start to finish, the way money and state actually move through the
-system. A **unit spec** answers *does this decision come out right?* — one branch, one rule, one
-calculation, with nothing real behind it.
+Có hai loại bài kiểm tra ở đây và chúng trả lời các câu hỏi khác nhau. Câu trả lời **e2e** *thực hiện
+hoạt động kinh doanh?* — một dòng, bắt đầu đến kết thúc, cách tiền và nhà nước thực sự di chuyển qua
+hệ thống. **thông số đơn vị** trả lời *quyết định này có đúng không?* — một nhánh, một quy tắc, một
+tính toán, không có gì thực sự đằng sau nó.
 
-An e2e is therefore long on purpose. "The reader adds a course to the cart, checks out, the payment
-provider calls back, the enrollment opens, the XP lands" is ONE test, because that sentence is the
-promise the business makes. Split into five tests it stops being a promise and becomes five
-descriptions of five endpoints, none of which says whether the thing works.
+Do đó, e2e có mục đích dài. "Người đọc thêm khóa học vào giỏ hàng, thanh toán, thanh toán
+nhà cung cấp gọi lại, đăng ký mở, XP hạ cánh" là MỘT bài kiểm tra, vì câu đó là
+lời hứa mà doanh nghiệp đưa ra. Chia thành năm bài kiểm tra, nó không còn là một lời hứa nữa mà trở thành năm
+mô tả về năm điểm cuối, không có mô tả nào cho biết liệu thiết bị có hoạt động hay không.
 
-The question that settles which lane a test belongs to: **could this break in production without
-the test noticing?** If the answer is yes, the test is not covering the thing it appears to cover —
-and for a flow, that usually means it asserted the response instead of the consequence.
+Câu hỏi quyết định bài kiểm tra thuộc về làn đường nào: **điều này có thể ngừng sản xuất mà không có
+bài kiểm tra có nhận thấy không?** Nếu câu trả lời là có, bài kiểm tra không bao gồm nội dung mà nó có vẻ đề cập —
+và đối với một luồng, điều đó thường có nghĩa là nó xác nhận phản hồi thay vì hậu quả.
 
-What holds the machine-checkable half is [`sources/be/testing.mjs`](../../../sources/be/testing.mjs).
-Most of this law is not machine-checkable, which is the reason it is written this carefully.
+Những gì giữ một nửa có thể kiểm tra bằng máy là[`sources/be/testing.mjs`](../../../sources/be/testing.mjs).
+Hầu hết luật này không thể kiểm tra được bằng máy, đó là lý do nó được viết cẩn thận.
 
-## Rules
+## Quy tắc
 
-**TESTING-1 · An e2e is one business flow, and its name is the flow.**
+**KIỂM TRA-1 · e2e là một luồng kinh doanh và tên của nó là luồng.**`course-enroll`, `courses-checkout`, `rewards-redeem`là những dòng chảy.`jobs-queries`,
+`rewards-queries`, `coding-queries`thì không - họ là một nhóm người giải quyết mặc trang phục của bài kiểm tra,
+và không có tệp nào trong hình dạng đó có thể cho biết liệu mọi thứ có hoạt động hay không, chỉ có một số điểm cuối đã phản hồi.
 
-`course-enroll`, `courses-checkout`, `rewards-redeem` are flows. `jobs-queries`,
-`rewards-queries`, `coding-queries` are not — they are a resolver group wearing a test's clothes,
-and no file in that shape can say whether anything works, only that several endpoints replied.
+Bài kiểm tra là tên của tập tin. Nếu cái tên trung thực là một cụm danh từ chỉ một phần của
+API chứ không phải là một câu về doanh nghiệp, tập tin có hình dạng sai.
 
-The test is what the file is called after. If the honest name is a noun phrase for a part of the
-API rather than a sentence about the business, the file is in the wrong shape.
+**KIỂM TRA-2 · Khẳng định là hậu quả, không bao giờ là phong bì.**`status === 200`Và`__typename`chứng minh máy chủ còn sống. Họ không chứng minh một hàng đã di chuyển, một
+số dư đã thay đổi, quyền được hưởng được mở hoặc một sự kiện đã xảy ra. Đọc lại trạng thái - từ
+cơ sở dữ liệu, từ truy vấn tiếp theo, từ sự kiện mà luồng phát ra - và xác nhận ĐÓ.
 
-**TESTING-2 · The assertion is the consequence, never the envelope.**
+Một luồng mà quá trình kiểm tra chỉ đọc phản hồi của chính nó là một luồng có thể âm thầm ngừng tồn tại.
 
-`status === 200` and `__typename` prove the server is alive. They do not prove a row moved, a
-balance changed, an entitlement opened or an event went out. Read the state back — from the
-database, from the next query, from the event the flow emits — and assert THAT.
+**KIỂM TRA-3 · Thử nghiệm di chuyển theo cách dòng chảy di chuyển.**
 
-A flow whose test only reads its own response is a flow that can silently stop persisting.
+Bất kể phương thức vận chuyển nào được sử dụng trong sản xuất thì thử nghiệm sẽ sử dụng. Một bước không đồng bộ - một công việc, một
+webhook, một mã hóa — được thăm dò cho đến khi trạng thái ổn định thay vì được xác nhận trên dòng sau
+gọi, bởi vì việc xác nhận ngay lập tức kiểm tra tốc độ của bộ lập lịch và không có gì khác. Một bước thời gian thực
+mở một máy khách THỰC SỰ và chờ tin nhắn. Một bản ghi được đọc lại từ cơ sở dữ liệu.
 
-**TESTING-3 · The test travels the way the flow travels.**
+Bus CQRS, trình xử lý, trình phân giải và phương thức worker là các phần bên trong của ứng dụng, không phải là phương thức vận chuyển.
+Đang gọi`commandBus.execute(...)`, `handler.execute(...)`, `resolver.execute(...)`hoặc`worker.process(...)`bắt đầu sau khi định tuyến, xác thực, xác thực và tuần tự hóa
+đã thành công nên dòng chảy có thể vẫn xanh trong khi cánh cửa sản xuất của nó bị phá vỡ. Họ thuộc về
+làn đường tích hợp hoặc đơn vị. Một e2e nhập thông qua GraphQL, HTTP, ổ cắm thực, thông báo của người môi giới
+hoặc ranh giới của bộ lập lịch mà hoạt động sản xuất đi qua.
 
-Whatever transport the flow uses in production, the test uses. An asynchronous step — a job, a
-webhook, an encode — is polled until the state settles rather than asserted on the line after the
-call, because asserting immediately tests the scheduler's speed and nothing else. A realtime step
-opens a REAL client and waits for the message. A write is read back out of the database.
+Không có giải thưởng cho bài kiểm tra chỉ nói một giao thức. Một luồng nửa HTTP và một nửa
+socket, chỉ được thử nghiệm qua HTTP, đã được thử nghiệm một nửa - và nửa chưa được kiểm tra là nửa cứng.
 
-The CQRS bus, a handler, a resolver and a worker method are application internals, not transports.
-Calling `commandBus.execute(...)`, `handler.execute(...)`, `resolver.execute(...)` or
-`worker.process(...)` starts after routing, authentication, validation and serialization have
-already succeeded, so the flow can stay green while its production door is broken. They belong in
-the integration or unit lane. An e2e enters through GraphQL, HTTP, a real socket, a broker message
-or the scheduler boundary that production enters through.
+**KIỂM TRA-4 · Con đường hạnh phúc là chủ đề; một con đường không vui kiếm được e2e bằng cách kéo một điểm quan trọng
+chảy đằng sau nó.**
 
-There is no prize for a test that only speaks one protocol. A flow that is half HTTP and half
-socket, tested over HTTP alone, is half tested — and the untested half is the half that is hard.
+Con đường hạnh phúc LÀ công việc kinh doanh, vì vậy đó chính là mục đích của e2e. Một con đường bất hạnh chỉ thuộc về nơi đây khi
+thất bại chứng tỏ một điều gì đó cũng phải đúng: thanh toán thành công và ngân hàng sau đó cũng thất bại,
+vì vậy phải thực hiện HOÀN TIỀN; một khoản phí đã đến hai lần, vì vậy sự bình thường phải được giữ nguyên; hai nhà văn chạy đua, vì vậy
+sự ràng buộc phải bắt được nó.
 
-**TESTING-4 · The happy path is the subject; an unhappy path earns an e2e by dragging a critical
-flow behind it.**
+Một đường dẫn không hài lòng chỉ trả về lỗi xác thực là một quyết định chứ không phải một luồng. Nó thuộc về một
+thông số đơn vị, trong đó chi phí tính bằng mili giây thay vì cơ sở dữ liệu.
 
-The happy path IS the business, so it is what an e2e is for. An unhappy path belongs here only when
-failing sets off something that must also be right: the payment succeeded and the bank then failed,
-so a REFUND has to run; a charge arrived twice, so idempotency has to hold; two writers raced, so
-the constraint has to catch it.
+**TESTING-5 · Thông số kỹ thuật đơn vị bao gồm các nhánh quyết định.**
 
-An unhappy path that merely returns a validation error is a decision, not a flow. It belongs in a
-unit spec, where it costs milliseconds instead of a database.
+Mỗi nhánh có thể thay đổi kết quả đều có một trường hợp: ranh giới, tập trống, tập đã hoàn thành,
+điều không được phép. Bảo hiểm ở đây có nghĩa là các QUYẾT ĐỊNH được bảo hiểm, không phải các dòng đã được thực thi -
+một tập tin có thể chạy mọi dòng mà vẫn không bao giờ lấy nhánh quan trọng.
 
-**TESTING-5 · A unit spec covers the decision branches.**
+**TESTING-6 · Thông số kỹ thuật chỉ xác nhận cuộc gọi sẽ kiểm tra quá trình triển khai.**`expect(service.charge).toHaveBeenCalledWith(...)`không có khẳng định nào về kết quả, trình bày lại
+nguồn riêng của người xử lý. Viết lại trình xử lý một cách chính xác và thông số kỹ thuật chuyển sang màu đỏ; phá vỡ quy tắc kinh doanh
+trong khi vẫn giữ hình dạng cuộc gọi và nó vẫn có màu xanh. Điều đó ngược lại và đó chính xác là lý do
+bộ có thể lớn và chứng tỏ ít.
 
-Every branch that can change the outcome gets a case: the boundary, the empty set, the already-done,
-the not-permitted. Coverage here means the DECISIONS are covered, not that the lines were executed —
-a file can run every line and still never take the branch that matters.
+Khẳng định điều gì đã quay lại hoặc điều gì đã thay đổi. Xác nhận cuộc gọi chỉ hợp lệ dưới dạng xác nhận THỨ HAI,
+trong đó bản thân cuộc gọi là hiệu ứng có thể quan sát được - một email được gửi, một sự kiện được xuất bản.
 
-**TESTING-6 · A spec that only asserts a call tests the implementation.**
+**KIỂM TRA-7 · Các làn đường được phân tách bằng hậu tố chứ không phải theo lối đi.**`*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`, `*.harness-spec.ts`. Đây là điều cho phép mọi làn đường
+sống gần mã mà nó thực hiện trong khi đơn vị chạy nhanh vẫn ở tốc độ nhanh và điều đó có nghĩa là làn đường của bài kiểm tra đang
+hiển thị trong tên tệp của nó thay vì được suy ra từ nơi ai đó đã lưu trữ nó.
 
-`expect(service.charge).toHaveBeenCalledWith(...)` with no assertion on the result restates the
-handler's own source. Rewrite the handler correctly and the spec goes red; break the business rule
-while keeping the call shape and it stays green. That is backwards, and it is the exact reason a
-suite can be large and prove little.
+**KIỂM TRA-8 · Làn đường không có hồ sơ không phải là làn đường vượt.**
 
-Assert what came back, or what changed. A call assertion is legitimate only as a SECOND assertion,
-where the call itself is the observable effect — an email sent, an event published.
+Một bộ được định cấu hình để vượt qua khi không tìm thấy gì báo cáo màu xanh lục mãi mãi và màu xanh lá cây là màu xanh lá cây mà mọi người đều có.
+đọc. Làn đường có các bài kiểm tra hoặc làn đường đó bị loại bỏ - làn đường trống được định cấu hình, có kịch bản là yêu cầu của
+bảo hiểm mà không có gì ủng hộ.
 
-**TESTING-7 · The lanes are separated by suffix, not by path.**
+**KIỂM TRA-9 · Một e2e không bao giờ gọi một mô hình. Dây nịt là làn đường duy nhất làm được điều đó.**
 
-`*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`, `*.harness-spec.ts`. This is what lets every lane
-live near the code it exercises while the fast unit run stays fast, and it means a test's lane is
-visible in its filename rather than inferred from where somebody filed it.
+Một cuộc gọi mẫu sẽ tốn tiền, mất vài giây và mỗi lần trả lời sẽ khác nhau. Cả ba thuộc tính
+nghiêm trọng trong thử nghiệm luồng: bộ phần mềm trở nên tốn kém khi chạy, đủ chậm để mọi người ngừng chạy
+nó và không ổn định theo cách huấn luyện mọi người chạy lại thay vì đọc.
 
-**TESTING-8 · A lane with no files is not a passing lane.**
+Vì vậy, một luồng đi qua một mô hình sẽ giữ cho việc vận chuyển sản xuất và điều phối nội bộ trở nên thực tế,
+sau đó chỉ thay thế kết quả SDK của nhà cung cấp bên ngoài bằng một bản cố định xác định. Nó khẳng định rằng
+yêu cầu đã được ghi lại, hạn ngạch đã được chi tiêu, quyền được kiểm tra, câu trả lời vẫn được duy trì
+và quay trở lại. Đó là những phần bị gãy. Liệu câu mà mô hình tạo ra có tốt hay không
+là một câu hỏi khác, được hỏi ở một làn đường khác.
 
-A suite configured to pass when it finds nothing reports green forever, and green is what everybody
-reads. Either the lane has tests or it is removed — a configured, scripted, empty lane is a claim of
-coverage that nothing backs.
+**STUB TRẢ LẠI JSON THỰC TẾ, THEO HÌNH THỨC MỤC ĐÍCH PHÂN TÍCH.** Đây là phần dễ dàng
+mắc sai lầm và phải trả giá đắt nếu mắc sai lầm. Câu trả lời sơ khai`"stubbed"`bỏ qua trình phân tích cú pháp JSON nghiêm ngặt
+hoàn toàn — và bộ phân tích cú pháp là phần có nhiều khả năng bị hỏng nhất, bởi vì đó là nơi đầu ra của mô hình
+đáp ứng một lược đồ. Một luồng mà phần sơ khai trả về một điểm đánh dấu chứng tỏ hệ thống ống nước và ẩn một đường nối
+thực sự thất bại trong sản xuất.
 
-**TESTING-9 · An e2e never calls a model. The harness is the only lane that does.**
+Vì vậy, tải trọng đóng hộp mang các trường thực, với các giá trị mà một câu trả lời thực có thể có: điểm số trong
+phạm vi, các mảng không trống, các thành viên enum mà lược đồ khai báo. Nó là một vật cố định của
+OUTPUT của mô hình, không phải là phần giữ chỗ thay thế cho một mô hình.
 
-A model call costs money, takes seconds, and answers differently every time. All three properties
-are fatal in a flow test: the suite becomes expensive to run, slow enough that people stop running
-it, and flaky in a way that trains everybody to re-run rather than read.
+**Sơ khai nhà cung cấp bên ngoài là mặc định, không bao giờ là thứ mà tác giả luồng ghi nhớ.** Thế giới
+khởi động với kết quả SDK bị lỗi trong khi`AiInvokeService`, định tuyến, hạn ngạch và tính bền vững vẫn có thật;
+việc tiếp cận nhà cung cấp cần có sự từ chối có chủ ý. Một quy tắc phụ thuộc vào việc được ghi nhớ là một quy tắc
+đó là một buổi chiều mất tập trung vì bị hỏng, và sự đổ vỡ xuất hiện như một sự chậm chạp, tốn kém,
+dãy màu đỏ ngắt quãng mà không ai có thể giải thích được.
 
-So a flow that passes through a model keeps production transport and internal orchestration real,
-then replaces only the external provider SDK result with a deterministic fixture. It asserts that
-the request was recorded, the quota was spent, the entitlement was checked, the answer was persisted
-and returned. Those are the parts that break. Whether the sentence the model produced was any good
-is a different question, asked in a different lane.
+Phần ghi đè là ranh giới giữa hai làn đường và nó chạy theo hướng khác trong dây nịt: ở đó,
+một cuộc gọi giả không chứng tỏ được gì cả, vì vậy **nếu nó gọi, nó thực sự gọi**.
 
-**THE STUB RETURNS REALISTIC JSON, IN THE SHAPE THE PARSER EXPECTS.** This is the part that is easy
-to get wrong and expensive to get wrong. A stub answering `"stubbed"` skips the strict-JSON parser
-entirely — and the parser is the piece most likely to break, because it is where a model's output
-meets a schema. A flow whose stub returns a marker proves the plumbing and hides the one seam that
-actually fails in production.
+**KIỂM TRA-10 · Dây nịt gọi trực tiếp cho nhà cung cấp và xử lý một hoặc hai trường hợp.**
 
-So the canned payload carries the real fields, with values a real answer could have: the scores in
-range, the arrays non-empty, the enum members ones the schema declares. It is a fixture of the
-model's OUTPUT, not a placeholder standing in for one.
+Dây nịt tồn tại để hỏi *câu trả lời của mô hình có được chấp nhận không?* — vì vậy nó nói chuyện với chính nhà cung cấp
+khách hàng và không có gì khác, và nó biến cuộc gọi trở thành hiện thực. Một cuộc gọi giả ở đây chẳng chứng tỏ được điều gì cả:
+toàn bộ chủ đề về làn đường chính là những gì người mẫu thực sự đã nói.
 
-**The external provider stub is the default, never something a flow author remembers.** The world
-boots with the SDK result stubbed while `AiInvokeService`, routing, quota and persistence remain real;
-reaching a provider takes a deliberate opt-out. A rule that depends on being remembered is a rule
-that is one distracted afternoon from being broken, and the breakage shows up as a slow, expensive,
-intermittently-red suite that nobody can explain.
+Mỗi lớp giữa dây nịt và nhà cung cấp là một lớp có thể làm cho dây nịt đi qua trong khi
+quá trình sản xuất không thành công: chuyển hướng cấp độ, ghi đè định tuyến, trình bao bọc nội bộ chọn mô hình. Mỗi
+một có nghĩa là thứ được thử nghiệm không phải là thứ được vận chuyển.
 
-The override is the boundary between the two lanes, and it runs the other way in the harness: there,
-a call that is faked proves nothing, so **if it calls, it really calls**.
+Dây nịt chất lượng kiểu mẫu sở hữu một mục tiêu nhà cung cấp rõ ràng. Nó nhập SDK của nhà cung cấp đã được phê duyệt,
+cung cấp khóa API máy chủ do nhà cung cấp cấp từ một biến môi trường khai thác rõ ràng, đặt tên cho
+mô hình và điểm cuối chính xác, đồng thời gọi trực tiếp SDK đó. Nó có thể sử dụng lại trình tạo lời nhắc sản xuất
+và trình phân tích cú pháp sản xuất; nó không được cung cấp, ghi đè, bọc hoặc mạo danh`AiInvokeService`, và nó
+không được định tuyến qua cấp, danh mục, chuỗi dự phòng, nhóm khóa hoặc trình trợ giúp cuộc gọi mô hình nội bộ.
 
-**TESTING-10 · The harness calls the provider directly, and keeps to one or two cases.**
+Thông tin xác thực của người tiêu dùng hoặc CLI không phải là thông tin xác thực API của nhà cung cấp. Mã thông báo OAuth của Mã Claude,
+Mã thông báo phiên ChatGPT/Codex, hồ sơ CLI và tệp mã thông báo bị cấm khai thác bởi các cơ quan có thẩm quyền. A
+Thẩm phán LLM riêng biệt, khi được sử dụng, sẽ khai báo bộ dữ liệu nhà cung cấp/mô hình/điểm cuối/khóa rõ ràng của chính nó. cũng không
+SUT cũng như không Judge âm thầm kế thừa hoặc quay trở lại bộ dữ liệu khác.
 
-The harness exists to ask *is the model's answer acceptable?* — so it talks to the provider's own
-client and nothing else, and it makes the call for real. A faked call here proves nothing at all:
-the whole subject of the lane is what the model actually said.
+Quyền sở hữu làn đường vẫn không đối xứng: e2e giữ cho việc vận chuyển sản xuất và điều phối nội bộ trở nên thực tế
+trong khi chỉ thay thế kết quả của nhà cung cấp bên ngoài; dây nịt chất lượng kiểu mẫu gọi cho nhà cung cấp trực tiếp
+nhưng chỉ chứng minh chất lượng của dấu nhắc/mô hình/trình phân tích cú pháp. Nó không thay thế phạm vi bảo hiểm dòng chảy. Giữ một hoặc hai sống
+các trường hợp chất lượng theo khả năng và số lần thử bị ràng buộc đối với các lỗi của nhà cung cấp tạm thời.
 
-Every layer between the harness and the provider is a layer that can make the harness pass while
-production fails: a tier indirection, a routing override, a house wrapper choosing the model. Each
-one means the thing under test is not the thing that ships.
+Và nó vẫn nhỏ. Một hoặc hai trường hợp cho mỗi khả năng, được chọn vì chúng là những trường hợp sẽ
+hiển thị hồi quy - không phải ma trận. Khai thác được tính phí cho mỗi cuộc gọi phát triển trường hợp trên mỗi cạnh là
+khai thác ai đó cuối cùng ngừng chạy và một eval không ai chạy có giá trị nhỏ hơn không có eval,
+bởi vì kết quả màu xanh lá cây cuối cùng của nó vẫn còn trên bảng.
 
-A model-quality harness owns one explicit provider target. It imports the approved provider SDK,
-supplies a provider-issued server API key from an explicit harness environment variable, names the
-exact model and endpoint, and calls that SDK directly. It may reuse the production prompt builder
-and production parser; it must not provide, override, wrap or impersonate `AiInvokeService`, and it
-must not route through a tier, catalog, fallback chain, key pool or house model-call helper.
+**KIỂM TRA-11 · Hạt giống demo đại diện cho một thế giới sản phẩm sống động chứ không phải một tài khoản trống.**
 
-A consumer or CLI credential is not a provider API credential. Claude Code OAuth tokens,
-ChatGPT/Codex session tokens, CLI profiles and token files are forbidden harness authorities. A
-separate LLM judge, when used, declares its own explicit provider/model/endpoint/key tuple. Neither
-SUT nor judge silently inherits or falls back to another tuple.
+Hạt giống cục bộ tồn tại để người đọc có thể kiểm tra trạng thái sản phẩm thực thông qua đường dẫn đọc sản phẩm. Nó
+do đó gieo mầm một nhóm xác định với nhiều tiến bộ khác nhau: tiếp tục công việc, hoạt động liên tục,
+tiền kiếm được, tổng hợp dân số và kết quả xã hội liên quan đến một số tác nhân. Trạng thái trống
+vẫn xứng đáng có lịch thi đấu, nhưng một thế giới hoàn toàn trống rỗng không thể tiết lộ liệu danh sách, số lượng, thứ hạng,
+tiến trình hoặc sự tham gia của nhiều người dùng là chính xác.
 
-Lane ownership remains asymmetric: an e2e keeps production transport and internal orchestration real
-while replacing only the external provider result; a model-quality harness calls the live provider
-but proves only prompt/model/parser quality. It does not replace flow coverage. Keep one or two live
-quality cases per capability and bound retries to transient provider failures.
+Hạt giống ghi các bản ghi nguồn và vô hiệu hóa các phép chiếu dẫn xuất để các trình xử lý thông thường xây dựng lại chúng.
+Nó bình thường và chấp nhận tài khoản đang được kiểm tra; nó không bao giờ ghim JSON chỉ có ảnh chụp màn hình hoặc
+giả định một danh tính được mã hóa cứng là người hiện đang đăng nhập.
 
-And it stays small. One or two cases per capability, chosen because they are the ones that would
-expose a regression — not a matrix. A harness billed per call that grows a case per edge is a
-harness somebody eventually stops running, and an eval nobody runs is worth less than no eval,
-because its last green result is still on the board.
+## Bị cấm
 
-**TESTING-11 · A demo seed represents a living product world, not one empty account.**
-
-A local seed exists so a reader can inspect real product states through production read paths. It
-therefore seeds a deterministic cohort with varied progress: resumed work, consecutive activity,
-earned currency, populated aggregates and social outcomes involving several actors. Empty states
-still deserve fixtures, but an all-empty world cannot reveal whether lists, counts, rankings,
-progress or cross-user joins are correct.
-
-The seed writes source records and invalidates derived projections so normal handlers rebuild them.
-It is idempotent and accepts the account being inspected; it never pins screenshot-only JSON or
-assumes one hard-coded identity is the person currently signed in.
-
-## Forbidden
-
-| Never | Why it is refused | Instead |
+| Không bao giờ | Tại sao nó bị từ chối | Thay vào đó |
 |---|---|---|
-| An e2e named for a resolver group (`*-queries`) | No file in that shape represents a flow, so passing says only that endpoints replied | Name it for the business sentence and make it one flow |
-| Asserting only `status` / `__typename` in an e2e | It proves the server is alive and nothing else; the flow can stop persisting silently | Read the state back and assert the consequence |
-| Asserting an async result on the line after the call | It tests how fast the scheduler happened to be, and is flaky by construction | Poll until the state settles, with a bounded wait |
-| Testing a realtime flow over HTTP only | The untested half is the half that is hard | Open a real client and wait for the message |
-| Calling `CommandBus`, `QueryBus`, a handler, resolver or worker method from an e2e | It enters after production routing, guards, validation and serialization, so those seams can break while the flow stays green | Enter through GraphQL, HTTP, a real socket, broker or scheduler boundary |
-| An e2e for a plain validation error | It costs a database to prove a branch | Put it in a unit spec |
-| A unit spec whose every assertion is `toHaveBeenCalled*` | It restates the source: correct rewrites go red, broken rules stay green | Assert the returned value or the changed state |
-| Splitting one flow into a test per endpoint | The promise disappears; five endpoint descriptions do not add up to one working flow | One file, one flow, start to finish |
-| A configured lane with no specs in it | It reports green forever, and green is what gets read | Fill it or delete it |
-| Calling a model from an e2e | It costs money, takes seconds and answers differently every time - so the suite becomes expensive, slow and flaky all at once | Keep internal orchestration real, stub the external provider result, then assert quota, persistence and response |
-| A stub returning a marker string (`"stubbed"`, `"ok"`) | It skips the strict-JSON parser, which is the seam most likely to break, so the flow proves the plumbing and hides the failure | Return realistic JSON in the shape the parser expects |
-| Relying on each flow author to remember the stub | A rule that must be remembered is one distracted afternoon from being broken | Stub by default in the world; make reaching a provider a deliberate opt-out |
-| A harness reaching the provider through a tier or routing layer | The thing under test is then not the thing that ships, and the harness can pass while production fails | Call the provider's own client directly |
-| A harness providing or overriding `AiInvokeService` with a live provider adapter | It disguises a provider call as the production gateway and can invent provider, token and cost metadata | Reuse the production prompt/parser around a direct provider SDK call |
-| A harness authenticated by Claude Code OAuth, a ChatGPT/Codex session, CLI profile or token file | Consumer credentials are not provider-issued server API credentials and do not prove the deployed authority | Read one explicit provider API key from the harness runtime environment |
-| A harness that grows a case per edge | It is billed per call, so it becomes something people stop running - and a stale green is worse than no green | One or two cases per capability, chosen to expose a regression |
-| A demo seed containing one all-zero learner | It hides populated branches and every relationship involving another actor | Seed an idempotent cohort with varied source data, then let production read models derive the screen |
+| Một e2e được đặt tên cho nhóm trình phân giải (`*-queries`) | Không có tệp nào trong hình dạng đó đại diện cho một luồng, vì vậy việc chuyển chỉ cho biết các điểm cuối đã trả lời | Đặt tên cho câu kinh doanh và biến nó thành một dòng |
+| Chỉ khẳng định`status` / `__typename`trong một e2e | Nó chứng tỏ máy chủ vẫn hoạt động và không có gì khác; dòng chảy có thể ngừng âm thầm tồn tại | Đọc lại trạng thái và khẳng định hệ quả |
+| Xác nhận kết quả không đồng bộ trên dòng sau lệnh gọi | Nó kiểm tra tốc độ của bộ lập lịch và không ổn định khi xây dựng | Thăm dò ý kiến ​​cho đến khi trạng thái ổn định, với thời gian chờ có giới hạn |
+| Chỉ kiểm tra luồng thời gian thực qua HTTP | Nửa chưa thử là nửa khó | Mở một khách hàng thực sự và chờ tin nhắn |
+| Đang gọi`CommandBus`, `QueryBus`, một trình xử lý, trình phân giải hoặc phương thức worker từ e2e | Nó đi vào sau quá trình định tuyến, bảo vệ, xác thực và tuần tự hóa sản xuất, vì vậy các đường nối đó có thể bị đứt trong khi luồng vẫn xanh | Nhập thông qua GraphQL, HTTP, ranh giới ổ cắm thực, nhà môi giới hoặc bộ lập lịch |
+| Một e2e cho một lỗi xác thực đơn giản | Tốn một cơ sở dữ liệu để chứng minh chi nhánh | Đặt nó trong thông số đơn vị |
+| Một thông số đơn vị có mọi khẳng định là`toHaveBeenCalled*`| Nó trình bày lại nguồn: các bản viết lại đúng sẽ chuyển sang màu đỏ, các quy tắc bị hỏng vẫn có màu xanh | Khẳng định giá trị trả về hoặc trạng thái đã thay đổi |
+| Tách một luồng thành một bài kiểm tra cho mỗi điểm cuối | Lời hứa biến mất; năm mô tả điểm cuối không cộng lại thành một quy trình làm việc | Một tập tin, một luồng, bắt đầu kết thúc |
+| Một làn đường được định cấu hình không có thông số kỹ thuật trong đó | Nó báo màu xanh mãi mãi và màu xanh lá cây là nội dung được đọc | Điền vào nó hoặc xóa nó |
+| Gọi một mô hình từ e2e | Nó tốn tiền, mất vài giây và mỗi lần trả lời đều khác nhau - vì vậy bộ phần mềm này đồng thời trở nên đắt tiền, chậm và không ổn định | Giữ sự điều phối nội bộ thực tế, bỏ qua kết quả của nhà cung cấp bên ngoài, sau đó xác nhận hạn ngạch, tính kiên trì và phản hồi |
+| Một sơ khai trả về một chuỗi đánh dấu (`"stubbed"`, `"ok"`) | Nó bỏ qua trình phân tích cú pháp JSON nghiêm ngặt, đây là đường nối có nhiều khả năng bị đứt nhất, do đó luồng chứng minh hệ thống ống nước và che giấu lỗi | Trả về JSON thực tế theo hình dạng mà trình phân tích cú pháp mong đợi |
+| Dựa vào từng luồng tác giả để ghi nhớ sơ khai | Một quy tắc cần phải ghi nhớ là một buổi chiều mất tập trung vì bị vi phạm | Sơ khai theo mặc định trên thế giới; làm cho việc liên hệ với nhà cung cấp trở thành một lựa chọn không tham gia có chủ ý |
+| Dây nịt tiếp cận nhà cung cấp thông qua một cấp hoặc lớp định tuyến | Thứ được thử nghiệm không phải là thứ được vận chuyển và dây nịt có thể vượt qua trong khi quá trình sản xuất không thành công | Gọi trực tiếp cho khách hàng của nhà cung cấp |
+| Một dây nịt cung cấp hoặc ghi đè`AiInvokeService`với bộ chuyển đổi nhà cung cấp trực tiếp | Nó cải trang cuộc gọi của nhà cung cấp thành cổng sản xuất và có thể phát minh ra siêu dữ liệu về nhà cung cấp, mã thông báo và chi phí | Sử dụng lại lời nhắc/trình phân tích cú pháp sản xuất xung quanh lệnh gọi SDK của nhà cung cấp trực tiếp |
+| Khai thác được xác thực bởi Claude Code OAuth, phiên ChatGPT/Codex, hồ sơ CLI hoặc tệp mã thông báo | Thông tin xác thực của người tiêu dùng không phải là thông tin xác thực API máy chủ do nhà cung cấp cấp và không chứng minh quyền được triển khai | Đọc một khóa API của nhà cung cấp rõ ràng từ môi trường thời gian chạy khai thác |
+| Dây nịt phát triển vỏ trên mỗi cạnh | Nó được tính phí cho mỗi cuộc gọi, vì vậy nó trở thành thứ mà mọi người ngừng chạy - và màu xanh cũ còn tệ hơn là không có màu xanh lục | Một hoặc hai trường hợp cho mỗi khả năng, được chọn để hiển thị hồi quy |
+| Một hạt giống demo chứa một người học hoàn toàn bằng không | Nó ẩn các nhánh đông dân cư và mọi mối quan hệ liên quan đến một tác nhân khác | Tạo một nhóm bình thường với dữ liệu nguồn đa dạng, sau đó để các mô hình đọc sản xuất lấy được màn hình |
 
-## Examples
+## Ví dụ
 
-### The ordinary case — a flow says the business runs
-
+### Trường hợp thông thường — một luồng cho biết doanh nghiệp đang hoạt động
 ```ts
 // e2e: one sentence about the business, end to end. The assertion is the consequence.
 it("a paid checkout opens the enrollment and lands the XP", async () => {
@@ -218,11 +208,9 @@ it("addToCart returns 200", async () => expect((await addToCart(courseId)).statu
 it("checkout returns 200", async () => expect((await checkout()).status).toBe(200))
 it("webhook returns 200", async () => expect((await postProviderWebhook({})).status).toBe(200))
 ```
+Họ khác nhau ở một điều: liệu sự thất bại thầm lặng trong việc kiên trì có bị phát hiện hay không.
 
-They differ in one thing: whether a silent failure to persist would be caught.
-
-### The unhappy path that earns its place
-
+### Con đường bất hạnh đã giành được vị trí của nó
 ```ts
 // e2e: the payment succeeded and the bank then failed, so the refund must run and the
 // entitlement must close again. This is critical, so it is a flow.
@@ -244,11 +232,9 @@ it("checkout rejects an empty cart", async () => {
     expect(response.errors[0].message).toContain("empty")
 })
 ```
+Chúng khác nhau ở một điều: liệu thất bại có tạo ra điều gì khác mà điều đó cũng phải đúng hay không.
 
-They differ in one thing: whether failing sets off something else that must also be right.
-
-### The transport trap
-
+### Bẫy vận chuyển
 ```ts
 // e2e: the flow ends on a socket, so the test opens one and waits for the message.
 const socket = await connectSocket(token)
@@ -265,11 +251,9 @@ expect((await delivered).type).toBe("STREAK_EXTENDED")
 await markLessonComplete(lessonId)
 expect((await getNotifications()).length).toBe(1)
 ```
+Chúng khác nhau ở một điểm: liệu một nửa luồng phân phối có được thực hiện hay không.
 
-They differ in one thing: whether the delivery half of the flow was exercised at all.
-
-### The call-assertion trap
-
+### Bẫy xác nhận cuộc gọi
 ```ts
 // unit: it asserts the DECISION - what the handler concluded from what it was given.
 it("charges the discounted price when a coupon applies", async () => {
@@ -286,11 +270,9 @@ it("charges the discounted price when a coupon applies", async () => {
     expect(payments.charge).toHaveBeenCalledWith(expect.anything())
 })
 ```
+Chúng khác nhau ở một điều: liệu có bị bắt nhầm số hay không.
 
-They differ in one thing: whether a wrong number would be caught.
-
-### The lane trap — a flow through a model
-
+### Bẫy làn đường — một dòng chảy qua mô hình
 ```ts
 // e2e: the model is stubbed with realistic JSON, so the flow still runs the strict parser -- and
 // the test asserts what can actually break: the entitlement check, the quota spend, the persistence.
@@ -315,20 +297,17 @@ expect(await remainingQuota(learner.id)).toBe(startingQuota - 1)
 // the piece most likely to break -- is the one piece this flow does not touch.
 aiInvoke.run.mockResolvedValue({ text: "stubbed" })
 ```
-
-They differ in one thing: whether the parser is exercised.
-
-```ts
+Chúng khác nhau ở một điều: liệu trình phân tích cú pháp có được thực hiện hay không.
+```
+ts
 // Wrong lane entirely: a real model call inside a flow test. It costs money, adds seconds, and the
 // assertion has to be loose enough to survive a different wording - so it stops catching anything.
 const response = await ask(CONTENT, "what is a closure?")
 expect(response.answer.toLowerCase()).toContain("closure")
 ```
+Chúng khác nhau ở một điều: liệu bài kiểm thử có thể thất bại vì một lý do không phải là lỗi hay không.
 
-They differ in one thing: whether the test can fail for a reason that is not a defect.
-
-### The harness trap — testing the wrapper instead of the model
-
+### Bẫy dây nịt — kiểm tra lớp bọc thay vì mô hình
 ```ts
 // harness: the provider's own client and an explicit provider-issued API key, one case chosen
 // because a regression would show here. gradingPrompt and scoreFrom are production seams.
@@ -348,12 +327,10 @@ const aiInvoke = createHarnessInvoke(() => ({ model: "claude-sonnet-5" }))
 const text = await aiInvoke.run({ messages: gradingPrompt(submission) })
 expect(scoreFrom(text)).toBeGreaterThanOrEqual(PASSING)
 ```
+Chúng khác nhau ở một điểm: dây nịt có gọi mục tiêu của nhà cung cấp đã khai báo hay mạo danh
+cửa ngõ sản xuất.
 
-They differ in one thing: whether the harness calls the declared provider target or impersonates the
-production gateway.
-
-### Covering the decision, not the line
-
+### Che quyết định chứ không phải dòng
 ```ts
 // unit: every branch that changes the outcome has a case.
 it.each([
@@ -372,11 +349,9 @@ it("resolves the attempt state", async () => {
     expect(await handler.execute(command({ attempts: 2 }))).toBe("FIRST_TRY")
 })
 ```
+Chúng khác nhau ở một điều: ranh giới có được thực hiện hay không.
 
-They differ in one thing: whether the boundary was taken.
-
-### The seed trap — painting a screenshot instead of building its world
-
+### Bẫy hạt giống — vẽ ảnh chụp màn hình thay vì xây dựng thế giới của nó
 ```ts
 await seedDemoWorld({
     currentLearner: { resumedLessons, activeDays, earnedCurrency, gradedWork },
@@ -390,5 +365,4 @@ await invalidateDerivedProjections(currentLearner.id)
 // Wrong: the screen looks populated, but no production join or projection can prove it.
 await writeDashboardProjection(currentLearner.id, screenshotShapedJson)
 ```
-
-They differ in one thing: whether the UI is reading a real world or a painted result.
+Chúng khác nhau ở một điểm: giao diện người dùng đang đọc thế giới thực hay kết quả được vẽ.

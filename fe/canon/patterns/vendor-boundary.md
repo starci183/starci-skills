@@ -1,87 +1,90 @@
-# vendor boundary
+# ranh giới nhà cung cấp
 
-## Definition
+## Định nghĩa
 
-Vendor ownership is a closed list:
+Quyền sở hữu của nhà cung cấp là một danh sách đóng:
 
-- `leaves/` own closed primitives;
-- `ModalShell`, `DrawerShell`, and `DropdownShell` own closed vendor mechanics and the only uninterpreted `children` slots;
-- `SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` own vendor wrappers that project a
-  typed content contract into the vendor body.
+-`leaves/`nguyên thủy khép kín của riêng mình;
+-`ModalShell`, `DrawerShell`, Và`DropdownShell`cơ chế nhà cung cấp khép kín của riêng mình và duy nhất chưa được giải thích`children`khe cắm;
+-`SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, Và`SurfaceFormCard`trình bao bọc của nhà cung cấp riêng dự án
+  hợp đồng nội dung đã gõ vào cơ thể nhà cung cấp.
 
-Everything else composes those owners. A provider outside the component tree may stand the library
-up for the app; that is not a component reaching for a widget.
+Mọi thứ khác đều do những chủ sở hữu đó sáng tác. Một nhà cung cấp bên ngoài cây thành phần có thể chịu trách nhiệm về thư viện
+lên cho ứng dụng; đó không phải là một thành phần đạt tới một widget.
 
-What holds this law is
-[`sources/fe/vendor-boundary.mjs`](../../../sources/fe/vendor-boundary.mjs).
+Điều giữ luật này là[`sources/fe/vendor-boundary.mjs`](../../../sources/fe/vendor-boundary.mjs).
 
 Implementation anchors in `starci-academy-fe`: `src/components/leaves/Button/index.tsx`,
-`src/components/shells/ModalShell/index.tsx`, and
-`src/components/branches/SurfaceListCard/index.tsx`.
+`src/components/shells/ModalShell/index.tsx`, Và`src/components/branches/SurfaceListCard/index.tsx`.
 
-## Rules
+## Quy tắc
 
-**VENDOR-1 · Every vendor primitive has one named owner.**
+**VENDOR-1 · Mỗi nhà cung cấp nguyên thủy đều có một chủ sở hữu được đặt tên.**
 
-**VENDOR-2 · `shells/` is closed to ModalShell, DrawerShell, and DropdownShell.** A fourth file is not
-made lawful by importing the vendor.
+**VENDOR-2 · `shells/` chỉ dành cho ModalShell, DrawerShell và DropdownShell.** Tệp thứ tư không trở nên hợp lệ
+được thực hiện hợp pháp bằng cách nhập khẩu nhà cung cấp.
 
-**VENDOR-3 · Surface branches keep typed interiors.** Importing Card or Accordion does not grant
-React `children`; their content remains `contract + render`.
+**VENDOR-3 · Các nhánh bề mặt giữ nội thất được đánh máy.** Thẻ nhập hoặc Accordion không cấp
+phản ứng`children`; nội dung của họ vẫn còn`contract + render`.
 
-**VENDOR-4 · No `CardShell`.** `Card > Card.Content` is wrapper syntax, not an independent mechanics
-policy. The named surface branch owns it directly.
+**VENDOR-4 · Không có `CardShell`.** `Card > Card.Content` là cú pháp wrapper, không phải một policy mechanics độc lập
+chính sách. Nhánh bề mặt được đặt tên sở hữu nó trực tiếp.
 
-**VENDOR-5 · Glyph libraries keep their own boundary.**
+**VENDOR-5 · Thư viện Glyph có ranh giới riêng.**
 
-**VENDOR-6 · ModalShell owns one zero-inset scroll body.** `Modal.Body` is the vendor's scroll
-mechanics for the same dialog, not a second content surface. It wraps the uninterpreted `children`
-with `p-0`: the mounted contract owns layout, while the shell preserves scrolling without adding a
-second inset.
+**VENDOR-6 · ModalShell sở hữu một thân cuộn không có phần bên trong.**`Modal.Body`là cuộn giấy của nhà cung cấp
+cơ chế cho cùng một hộp thoại chứ không phải bề mặt nội dung thứ hai. Nó gói gọn những điều chưa được giải thích`children`với`p-0`: hợp đồng được gắn sở hữu bố cục, trong khi Shell tiếp tục cuộn mà không cần thêm
+phần chèn thứ hai.
 
-**VENDOR-7 · The house Field fixes the bounded-surface input variant.** Its HeroUI `Input` uses
-`secondary`; callers do not receive an appearance slot and the default field surface cannot return
-inside a dialog or card.
+**VENDOR-7 · Trường nhà sửa biến thể đầu vào có bề mặt giới hạn.** HeroUI của nó`Input`công dụng`secondary`; người gọi không nhận được vị trí xuất hiện và bề mặt trường mặc định không thể trả về
+bên trong hộp thoại hoặc thẻ.
 
-**VENDOR-8 · An overlay cannot directly mount a named surface branch.** The overlay is already the
-bounded object. `SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, and `SurfaceFormCard` belong on page ground,
-not inside `overlays/**`.
+**VENDOR-8 · Lớp phủ không thể gắn trực tiếp nhánh bề mặt được đặt tên.** Lớp phủ đã là
+đối tượng bị giới hạn.`SurfaceCard`, `SurfaceAccordionCard`, `SurfaceListCard`, Và`SurfaceFormCard`thuộc về mặt đất của trang,
+không ở bên trong`overlays/**`.
 
-**VENDOR-9 · Field labels are text-only.** Input kind does not license a decorative email, lock, or
-code icon before the label. A glyph appears only when it owns a separate action, such as password
-visibility, and then the action—not the label—owns it.
+**VENDOR-9 · Nhãn trường chỉ có văn bản.** Loại đầu vào không cấp phép cho email, khóa hoặc khóa trang trí
+biểu tượng mã trước nhãn. Một glyph chỉ xuất hiện khi nó sở hữu một hành động riêng biệt, chẳng hạn như mật khẩu
+khả năng hiển thị và sau đó hành động—không phải nhãn—sẽ sở hữu nó.
 
-**VENDOR-10 · TextLink is HeroUI Link.** Navigation semantics, keyboard handling, focus and hover
-belong to the vendor primitive. A raw button with a handwritten `hover:underline` class is not a
-link and must not imitate one.
+**VENDOR-10 · TextLink là HeroUI Link.** Ngữ nghĩa điều hướng, xử lý bàn phím, lấy tiêu điểm và di chuột
+thuộc về nhà cung cấp nguyên thủy. Một nút thô có chữ viết tay`hover:underline`lớp học không phải là một
+liên kết và không được bắt chước một.
 
-**VENDOR-11 · Dropdown mechanics and account meaning have different owners.** Pressing the account
-icon reveals the guest summary plus Sign in and Sign up choices; it does not jump directly into one
-auth mode. `DropdownShell` alone imports HeroUI Dropdown, accepts typed section/item data plus one
-action dispatcher, and expands them into trigger/popover/menu/section/item mechanics. `AccountMenu`
-is a block over that shell because it owns the guest sentence, grouping and authentication actions;
-it must not import Section or Item pieces and assemble vendor anatomy. `ShellNav` composes the block;
-it does not fake the control with a direct icon action.
+**VENDOR-11 · Cơ chế thả xuống và ý nghĩa tài khoản có chủ sở hữu khác nhau.** Nhấn tài khoản
+biểu tượng hiển thị tóm tắt về khách cùng với các lựa chọn Đăng nhập và Đăng ký; nó không nhảy trực tiếp vào một
+chế độ xác thực.`DropdownShell`một mình nhập HeroUI Dropdown, chấp nhận dữ liệu mục/phần đã nhập cộng với một
+bộ điều phối hành động và mở rộng chúng thành cơ chế kích hoạt/popover/menu/phần/mục.`AccountMenu`là một khối trên lớp vỏ đó vì nó sở hữu câu khách, các hành động nhóm và xác thực;
+nó không được nhập các phần Phần hoặc Hạng mục và lắp ráp giải phẫu của nhà cung cấp.`ShellNav`soạn khối;
+nó không giả mạo điều khiển bằng hành động biểu tượng trực tiếp.
 
-**VENDOR-12 · Auth projection has one zero-inset host.** `ModalShell` supplies the zero-inset scroll
-body, `AuthenticationPanel` owns `centred-page-column`, and `SignInOverlay` projects it with
-`ContractContent`. Re-wrapping the projection in `Tree` duplicates the contract host; adding
-`py-*`, `pt-*`, or `pb-*` to `centred-page-column` recreates the second padding band.
+**VENDOR-12 · Phép chiếu xác thực có một máy chủ không có sẵn.**`ModalShell`cung cấp cuộn không có nội dung
+cơ thể,`AuthenticationPanel`sở hữu`centred-page-column`, Và`SignInOverlay`dự án nó với`ContractContent`. Gói lại hình chiếu trong`Tree`sao chép máy chủ hợp đồng; thêm`py-*`, `pt-*`, hoặc`pb-*`ĐẾN`centred-page-column`tạo lại dải đệm thứ hai.
 
-**VENDOR-13 · A HeroUI compound control keeps its required anatomy.** A checkbox is not complete
-at `Checkbox.Root`: `Checkbox.Content` wraps `Checkbox.Control` (which wraps
-`Checkbox.Indicator`) and the visible label. Control and Content as siblings may draw a tick, but
-leave the visible words outside the checkbox's press target. Passing label text directly to the
-root may preserve an accessible name while drawing no box at all, so neither visual nor interaction
-failure can hide behind a semantically queryable control.
+**VENDOR-13 · Bộ điều khiển phức hợp HeroUI giữ nguyên cấu trúc cần thiết.** Hộp kiểm chưa hoàn tất
+tại`Checkbox.Root`: `Checkbox.Content`kết thúc tốt đẹp`Checkbox.Control`(bao bọc`Checkbox.Indicator`) và nhãn nhìn thấy được. Kiểm soát và Nội dung như anh chị em có thể vẽ một dấu tích, nhưng
+để lại các từ hiển thị bên ngoài mục tiêu nhấn của hộp kiểm. Truyền văn bản nhãn trực tiếp tới
+root có thể giữ nguyên tên có thể truy cập trong khi không vẽ hộp nào cả, do đó cả hình ảnh và tương tác đều không
+lỗi có thể ẩn đằng sau một điều khiển có thể truy vấn ngữ nghĩa.
 
-**VENDOR-14 · Internal StarCi navigation is an action, never an href.** Pure components report an
-id or `on.press`; the connected owner keeps the path and calls `router.push`. This applies even when
-the control is visually and semantically a link, including brand, navbar, tabs and legal copy.
-`href` is reserved for destinations outside StarCi. Internal-only leaves such as `NavLink`,
-`QuickActionRow`, `SeeMoreLink` and compound checkbox labels must not expose an `href` field at all.
+**VENDOR-14 · Điều hướng StarCi nội bộ là một hành động, không bao giờ là href.** Các thành phần thuần túy báo cáo một
+id hoặc`on.press`; chủ sở hữu được kết nối giữ đường dẫn và cuộc gọi`router.push`. Điều này áp dụng ngay cả khi
+điều khiển là một liên kết trực quan và ngữ nghĩa, bao gồm thương hiệu, thanh điều hướng, tab và bản sao hợp pháp.`href`được dành riêng cho các điểm đến bên ngoài StarCi. Các lá chỉ dành cho nội bộ như`NavLink`,
+`QuickActionRow`, `SeeMoreLink`và nhãn hộp kiểm kết hợp không được để lộ`href`lĩnh vực nào cả.
 
-## Examples
+## Forbidden
+
+| Không bao giờ | Vì sao bị từ chối | Thay vào đó |
+|---|---|---|
+| Vendor primitive không có owner được đặt tên | Không ai chịu trách nhiệm về vendor mechanics và boundary bị mở | Đặt primitive vào owner duy nhất của nó |
+| Thêm file thứ tư vào `shells/` | Import vendor không tự tạo thêm một owner hợp lệ | Giữ `shells/` ở ModalShell, DrawerShell và DropdownShell |
+| Cho `children` vào surface branch | Wrapper trở thành markup không được type và content contract biến mất | Dùng `contract + render` |
+| Tạo `CardShell` | Nó biến wrapper syntax thành vocabulary mechanics thứ hai | Để named surface branch sở hữu wrapper |
+| Đặt glyph vendor ngoài Icon leaf | Caller tự chọn vendor, family và size, tạo vocabulary thứ hai | Truyền meaning và role cho Icon |
+| Thêm inset thứ hai vào auth projection | Một host đã sở hữu padding và layout; dải padding thứ hai làm sai contract | Giữ zero-inset host, `centred-page-column` và `ContractContent` |
+| Cho internal navigation dùng `href` | Path và router bị đẩy vào pure component | Pure component báo id hoặc `on.press`; owner gọi `router.push` |
+
+## Ví dụ
 
 ```tsx
 import { Button as HeroButton } from "@heroui/react" // leaves/Button
