@@ -23,7 +23,7 @@ with no job and route valid candidates to their owning module instead of inventi
 
 1. Apply this file only as a subtraction/routing gate.
 2. For emphasis/reading order, load [hierarchy](../hierarchy/INDEX.md).
-3. For an edge/surface boundary, load [surface-in-surface](../../principles/surface-in-surface/INDEX.md).
+3. For an edge/surface boundary, load [surface-in-surface](../../gates/principles/surface-in-surface/INDEX.md).
 4. For a control/ask/path onward, load [call-to-action](../call-to-action/INDEX.md).
 5. Read `vi.md` for guided Vietnamese reasoning and `example.md` for concrete cases.
 6. Do not load `audit.md` or `changelog.md` during ordinary implementation.
@@ -33,7 +33,7 @@ with no job and route valid candidates to their owning module instead of inventi
 | Candidate | It earns a job only by proving | Owning module |
 |---|---|---|
 | Emphasis | A specific reading rank/semantic state that cannot be carried by existing structure | [hierarchy](../hierarchy/INDEX.md) |
-| Edge | A membership/boundary claim not already made by an enclosing surface | [surface-in-surface](../../principles/surface-in-surface/INDEX.md) |
+| Edge | A membership/boundary claim not already made by an enclosing surface | [surface-in-surface](../../gates/principles/surface-in-surface/INDEX.md) |
 | Control | A usable outcome, utility, recovery, disclosure, or path onward needed in this context | [call-to-action](../call-to-action/INDEX.md) |
 
 ## Decision Procedure

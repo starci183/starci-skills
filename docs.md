@@ -12,7 +12,7 @@ và không còn tồn tại; mọi đường dẫn dưới đây trỏ vào cây
 
 | Nhóm | Chứa gì | Không chứa |
 |---|---|---|
-| `fe/principles/` | Primitive facts và principles không được phá luật | Product judgement, migration process |
+| `fe/gates/principles/` | Primitive facts và principles không được phá luật | Product judgement, migration process |
 | `fe/senses/` | Quyết định cần business context như CTA, hierarchy, input | Primitive token/geometry law |
 | `fe/governance/` | Exception và parity evidence | Visual design output |
 
@@ -26,7 +26,7 @@ Module chuẩn có **năm** record:
 | `audit.md` | Phản biện ambiguity, hallucination và re-audit trigger |
 | `changelog.md` | Lịch sử version, audit decision và verification |
 
-Toàn bộ `fe/principles/` đã **gộp `prompt.md` vào `example.md`** ở version `2.00`: bảng ánh xạ từ
+Toàn bộ `fe/gates/principles/` đã **gộp `prompt.md` vào `example.md`** ở version `2.00`: bảng ánh xạ từ
 yêu cầu bằng lời sang class nay nằm cùng chỗ với ví dụ mà nó phân định, nên không module principles
 nào còn `prompt.md`. Ở `fe/senses/`, hai module `call-to-action` và `input` vẫn còn `prompt.md` như
 record thứ sáu; ba module senses còn lại và cả hai module `fe/governance/` đều dừng ở năm record.
@@ -35,14 +35,14 @@ record thứ sáu; ba module senses còn lại và cả hai module `fe/governanc
 
 | Module | Luật AI | Hướng dẫn Việt | UI/Code | Audit | Changelog |
 |---|---|---|---|---|---|
-| Colour | [INDEX](fe/principles/colour/INDEX.md) | [vi](fe/principles/colour/vi.md) | [example](fe/principles/colour/example.md) | [audit](fe/principles/colour/audit.md) | [changelog](fe/principles/colour/changelog.md) |
-| Gap | [INDEX](fe/principles/gap/INDEX.md) | [vi](fe/principles/gap/vi.md) | [example](fe/principles/gap/example.md) | [audit](fe/principles/gap/audit.md) | [changelog](fe/principles/gap/changelog.md) |
-| Margin | [INDEX](fe/principles/margin/INDEX.md) | [vi](fe/principles/margin/vi.md) | [example](fe/principles/margin/example.md) | [audit](fe/principles/margin/audit.md) | [changelog](fe/principles/margin/changelog.md) |
-| Padding | [INDEX](fe/principles/padding/INDEX.md) | [vi](fe/principles/padding/vi.md) | [example](fe/principles/padding/example.md) | [audit](fe/principles/padding/audit.md) | [changelog](fe/principles/padding/changelog.md) |
-| Position | [INDEX](fe/principles/position/INDEX.md) | [vi](fe/principles/position/vi.md) | [example](fe/principles/position/example.md) | [audit](fe/principles/position/audit.md) | [changelog](fe/principles/position/changelog.md) |
-| Responsive | [INDEX](fe/principles/responsive/INDEX.md) | [vi](fe/principles/responsive/vi.md) | [example](fe/principles/responsive/example.md) | [audit](fe/principles/responsive/audit.md) | [changelog](fe/principles/responsive/changelog.md) |
-| Surface in surface | [INDEX](fe/principles/surface-in-surface/INDEX.md) | [vi](fe/principles/surface-in-surface/vi.md) | [example](fe/principles/surface-in-surface/example.md) | [audit](fe/principles/surface-in-surface/audit.md) | [changelog](fe/principles/surface-in-surface/changelog.md) |
-| Typography | [INDEX](fe/principles/typography/INDEX.md) | [vi](fe/principles/typography/vi.md) | [example](fe/principles/typography/example.md) | [audit](fe/principles/typography/audit.md) | [changelog](fe/principles/typography/changelog.md) |
+| Colour | [INDEX](fe/gates/principles/colour/INDEX.md) | [vi](fe/gates/principles/colour/vi.md) | [example](fe/gates/principles/colour/example.md) | [audit](fe/gates/principles/colour/audit.md) | [changelog](fe/gates/principles/colour/changelog.md) |
+| Gap | [INDEX](fe/gates/principles/gap/INDEX.md) | [vi](fe/gates/principles/gap/vi.md) | [example](fe/gates/principles/gap/example.md) | [audit](fe/gates/principles/gap/audit.md) | [changelog](fe/gates/principles/gap/changelog.md) |
+| Margin | [INDEX](fe/gates/principles/margin/INDEX.md) | [vi](fe/gates/principles/margin/vi.md) | [example](fe/gates/principles/margin/example.md) | [audit](fe/gates/principles/margin/audit.md) | [changelog](fe/gates/principles/margin/changelog.md) |
+| Padding | [INDEX](fe/gates/principles/padding/INDEX.md) | [vi](fe/gates/principles/padding/vi.md) | [example](fe/gates/principles/padding/example.md) | [audit](fe/gates/principles/padding/audit.md) | [changelog](fe/gates/principles/padding/changelog.md) |
+| Position | [INDEX](fe/gates/principles/position/INDEX.md) | [vi](fe/gates/principles/position/vi.md) | [example](fe/gates/principles/position/example.md) | [audit](fe/gates/principles/position/audit.md) | [changelog](fe/gates/principles/position/changelog.md) |
+| Responsive | [INDEX](fe/gates/principles/responsive/INDEX.md) | [vi](fe/gates/principles/responsive/vi.md) | [example](fe/gates/principles/responsive/example.md) | [audit](fe/gates/principles/responsive/audit.md) | [changelog](fe/gates/principles/responsive/changelog.md) |
+| Surface in surface | [INDEX](fe/gates/principles/surface-in-surface/INDEX.md) | [vi](fe/gates/principles/surface-in-surface/vi.md) | [example](fe/gates/principles/surface-in-surface/example.md) | [audit](fe/gates/principles/surface-in-surface/audit.md) | [changelog](fe/gates/principles/surface-in-surface/changelog.md) |
+| Typography | [INDEX](fe/gates/principles/typography/INDEX.md) | [vi](fe/gates/principles/typography/vi.md) | [example](fe/gates/principles/typography/example.md) | [audit](fe/gates/principles/typography/audit.md) | [changelog](fe/gates/principles/typography/changelog.md) |
 
 ## Senses
 

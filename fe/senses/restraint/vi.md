@@ -21,7 +21,7 @@ Module này không tự quyết heading to bao nhiêu, card có border gì hay b
 mọi thứ mới xuất hiện khai báo job, rồi chuyển quyết định cho module có evidence sâu hơn:
 
 - emphasis → [hierarchy](../hierarchy/INDEX.md);
-- edge → [surface-in-surface](../../principles/surface-in-surface/INDEX.md);
+- edge → [surface-in-surface](../../gates/principles/surface-in-surface/INDEX.md);
 - control → [call-to-action](../call-to-action/INDEX.md).
 
 Restraint cũng không đồng nghĩa “ít content”. Curriculum cần module, bài, thời lượng, trạng thái và

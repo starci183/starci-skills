@@ -74,7 +74,7 @@ theo sau.
 
 Một value lớn đứng cạnh các item không có grouping chỉ trông như một object xa lạ. Trước khi rank,
 phải làm rõ member thuộc cùng group bằng proximity, shared ground hoặc boundary có nghĩa. Hierarchy
-hoạt động bên trong grouping đã được thiết lập; xem [surface-in-surface](../../principles/surface-in-surface/INDEX.md).
+hoạt động bên trong grouping đã được thiết lập; xem [surface-in-surface](../../gates/principles/surface-in-surface/INDEX.md).
 
 ## Không hạ size để vừa
 

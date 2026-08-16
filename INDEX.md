@@ -35,6 +35,10 @@ finding it costs one skill run.
 
 ## The axes
 
+The current five-gate test root is [`fe/gates/`](fe/gates/INDEX.md): `layouts -> blocks -> principles ->
+patterns -> lints`. Only those five shelves moved under the dedicated `fe/gates/` root; this is a discoverability experiment,
+not yet a workflow-execution guarantee.
+
 An axis answers a different KIND of question, which is why they are separate trees rather than
 folders inside one shelf. A file that seems to fit two axes is usually two files.
 
@@ -43,7 +47,7 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 | Axis | The question it answers | Where |
 |---|---|---|
 | **canon** | How is this spelled here? The law the code already follows, and the machine enforces. | `fe/canon/` |
-| **principles** | Which primitive facts must implementation never violate? The binding construction rules — closed, non-subjective outputs such as spacing, colour, type, position, responsive behavior and surface ownership. | `fe/principles/` |
+| **principles** | Which primitive facts must implementation never violate? The binding construction rules — closed, non-subjective outputs such as spacing, colour, type, position, responsive behavior and surface ownership. | `fe/gates/principles/` |
 | **senses** | What does the reader PERCEIVE, and which contextual product judgement selects among otherwise legal choices? Actions, hierarchy, input behavior, affordance and restraint. | `fe/senses/` |
 | **governance** | How are exceptions and observable parity recorded without becoming visual law? | `fe/governance/` |
 | **creativity** | How are researched alternatives generated, challenged and selected without escaping canon? | `fe/creativity/` |
@@ -128,14 +132,14 @@ writes those files and no others.
 Three shelves stand where `design/` used to. One folder was answering three different kinds of
 question, and a path that says `design` tells a reader nothing about which kind they are holding.
 
-`fe/principles/` holds the binding construction rules: primitive facts that map visible UI intent to
+`fe/gates/principles/` holds the binding construction rules: primitive facts that map visible UI intent to
 portable semantic `className` patterns and that implementation may never violate. It does not depend
 on a product component registry and is not a shelf for taste, strategy or migration process.
-[`colour`](fe/principles/colour/INDEX.md) · [`gap`](fe/principles/gap/INDEX.md) ·
-[`margin`](fe/principles/margin/INDEX.md) · [`padding`](fe/principles/padding/INDEX.md) ·
-[`position`](fe/principles/position/INDEX.md) · [`responsive`](fe/principles/responsive/INDEX.md) ·
-[`surface-in-surface`](fe/principles/surface-in-surface/INDEX.md) ·
-[`typography`](fe/principles/typography/INDEX.md).
+[`colour`](fe/gates/principles/colour/INDEX.md) · [`gap`](fe/gates/principles/gap/INDEX.md) ·
+[`margin`](fe/gates/principles/margin/INDEX.md) · [`padding`](fe/gates/principles/padding/INDEX.md) ·
+[`position`](fe/gates/principles/position/INDEX.md) · [`responsive`](fe/gates/principles/responsive/INDEX.md) ·
+[`surface-in-surface`](fe/gates/principles/surface-in-surface/INDEX.md) ·
+[`typography`](fe/gates/principles/typography/INDEX.md).
 
 `fe/senses/` holds what the reader PERCEIVES — contextual judgement that can be correct only after
 product job, state and moment are known:
@@ -151,7 +155,7 @@ product job, state and moment are known:
 
 Every module on all three shelves carries `INDEX.md`, `vi.md`, `example.md`, `audit.md` and
 `changelog.md`. The shape stops being uniform there, so open the folder rather than assume it:
-a `fe/principles/` module carries those FIVE and no more, its `prompt.md` having been folded into
+a `fe/gates/principles/` module carries those FIVE and no more, its `prompt.md` having been folded into
 `example.md`, while two `fe/senses/` modules — `call-to-action` and `input` — still carry a sixth
 record, `prompt.md`.
 

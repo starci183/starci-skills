@@ -22,7 +22,7 @@ const RECORDS = ["INDEX.md", "vi.md", "example.md", "audit.md", "changelog.md"];
 
 // A module may sit at the shelf root or inside one family folder. Two levels is the whole shape.
 async function modulesOf(shelf) {
-  const root = join(trustRoot, "fe", shelf);
+  const root = join(trustRoot, "fe", "gates", shelf);
   if (!existsSync(root)) return [];
   const found = [];
   for (const entry of await readdir(root, {withFileTypes: true})) {
@@ -57,7 +57,7 @@ async function everyMarkdown(dir) {
 const DEAD_REPO = /Repositories[\\/]starci-academy[\\/](?!.*\.workflows)/i;
 
 async function auditGate(shelf) {
-  const root = join(trustRoot, "fe", shelf);
+  const root = join(trustRoot, "fe", "gates", shelf);
   const report = {
     shelf,
     exists: existsSync(root),

@@ -77,8 +77,8 @@ peers such as navigation or a list, not on a lone business summary.
 ### EXPLORE-7 — Existing presentation laws remain the single source of truth
 
 Explore creates no local spacing, supporting-copy, or nested-surface exception. Apply
-[`gap`](../principles/gap/INDEX.md), [`TYPESET-7`](../canon/patterns/typography.md), and
-[`surface-in-surface/INDEX.md`](../principles/surface-in-surface/INDEX.md) directly instead of restating their values
+[`gap`](../gates/principles/gap/INDEX.md), [`TYPESET-7`](../canon/patterns/typography.md), and
+[`surface-in-surface/INDEX.md`](../gates/principles/surface-in-surface/INDEX.md) directly instead of restating their values
 here.
 
 ## Forbidden
