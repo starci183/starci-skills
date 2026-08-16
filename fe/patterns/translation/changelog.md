@@ -19,8 +19,8 @@ chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó n�
 ## 2.00 — 2026-08-16
 
 Đổi số chính vì hình dạng của luật đổi, không phải vì nội dung luật đổi. Sáu mã `COPY-1`…`COPY-6` giữ
-nguyên số và nguyên nghĩa; mọi quyết định của bản phẳng được mang sang nguyên vẹn, và chỗ nào audit
-không đồng ý thì nói ra ở `Rủi ro còn mở` chứ không sửa lặng lẽ.
+nguyên số và nguyên nghĩa; mọi quyết định của file luật phẳng được mang sang nguyên vẹn, và chỗ nào audit
+không đồng ý thì nói ra ở `Rủi ro còn mở` chứ không sửa âm thầm.
 
 - **Từ một file phẳng thành module năm record.** `fe/canon/patterns/translation.md` được **tái diễn
   đạt** thành `fe/patterns/translation/` với `INDEX.md`, `vi.md`, `example.md`, `audit.md`,
@@ -41,12 +41,12 @@ không đồng ý thì nói ra ở `Rủi ro còn mở` chứ không sửa lặn
   thật không tìm được dòng nào vừa mang dấu `vn-ok:` vừa đúng là giá trị chương trình so khớp.
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống, dấu hiệu nhận biết, câu tự hỏi, ranh giới
   với mã kề, và danh sách tình huống nghiệp vụ hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại
   lệ và mục "trông giống nhưng không phải mã đó"; cuối trang là ánh xạ yêu cầu, bảng phân định ranh
   giới và danh sách sai lầm lặp lại.
-- **Rút mọi ví dụ về TSX thường.** Ví dụ trong bản phẳng gọi tên component riêng của một sản phẩm;
+- **Rút mọi ví dụ về TSX thường.** Ví dụ trong file luật phẳng gọi tên component riêng của một sản phẩm;
   bản này gọi tên theo vai trò. Một luật ở shelf này phải đúng với bất kỳ front end nào, nên ví dụ
-  cần tên riêng của một sản phẩm mới đọc được là ví dụ đứng sai chỗ.
+  cần tên riêng của một sản phẩm mới đọc được là ví dụ nằm sai chỗ.
 - **Nêu rõ luật là bắt buộc.** Bổ sung tuyên bố rằng mọi chuỗi người đọc thấy hoặc nghe đều rơi vào
   đúng một mã, kể cả một chữ `alt` duy nhất.
 - **Nói rõ `COPY-5` và `COPY-6` không phải miễn trừ khỏi luật mà là một phần của luật.** Đặt tên cho

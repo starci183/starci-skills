@@ -13,7 +13,7 @@ description: Lịch sử phiên bản của luật Testing.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
+Mỗi thay đổi luật được chấp nhận làm tăng phiên bản module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
 Thêm, bớt hoặc đánh số lại một mã `TESTING-<n>` **luôn** là thay đổi số chính, kể cả khi nội dung

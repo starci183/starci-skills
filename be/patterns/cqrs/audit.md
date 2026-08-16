@@ -11,12 +11,12 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 
 > Version: `2.00` · Module: `cqrs`
 
-Audit này kiểm hai chuyện: luật có chọn được **một vị trí file duy nhất** từ dữ kiện đã nêu hay
+Audit này kiểm hai việc: luật có chọn được **một vị trí file duy nhất** từ dữ kiện đã nêu hay
 không, và mỗi mã đang được giữ ở **tầng nào** — chứ không phải tầng nào ta muốn nó được giữ.
 
 ## Verdict
 
-Chấp nhận. Bảy mã giữ nguyên số và nguyên nghĩa, cả bảy đều neo được vào code thật, và bảng tầng giữ
+Chấp nhận. Bảy mã giữ nguyên số và nguyên nghĩa, cả bảy đều neo được vào code thật; bảng tầng giữ
 nói thẳng rằng bốn mã hiện chỉ có người đọc giữ.
 
 ## Kiểm phân định
@@ -68,7 +68,7 @@ nói thẳng rằng bốn mã hiện chỉ có người đọc giữ.
   vào code thật là đề xuất, không phải luật.
 - Giữ mọi ví dụ ở dạng TypeScript thường, không tên sản phẩm, không tên repository. Path repository
   chỉ xuất hiện trong bảng Anchor, và ở đó chúng là bằng chứng chứ không phải minh hoạ.
-- Giữ nguyên chính sách ra mắt rule: `warn` kèm số nợ, đốt về không, rồi mới `error`.
+- Giữ nguyên chính sách ra mắt rule: `warn` kèm số nợ, giảm số nợ về không, rồi mới `error`.
 
 ## Rủi ro còn mở
 

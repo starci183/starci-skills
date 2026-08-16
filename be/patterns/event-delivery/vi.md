@@ -13,23 +13,23 @@ description: Từng tình huống DELIVERY-N, nhận diện bằng hậu quả n
 
 # Event delivery
 
-Event delivery là việc mang **một sự thật đã được quyết xong** từ một instance sang mọi instance
-khác cần phản ứng tại chỗ. Envelope nói **ai phát** và **đây là lần giao nào**; payload nói **sự
-thật là gì**. Broker chỉ là đường đi; ranh giới thật nằm ở chỗ event emitter trong process biến sự
-thật đó thành **hậu quả**.
+Event delivery là việc mang **một sự thật đã được quyết xong** từ một instance đến mọi instance khác
+cần phản ứng tại chỗ. Envelope cho biết **ai phát** và **đây là lần giao nào**; payload cho biết **sự
+thật là gì**. Broker chỉ là đường vận chuyển. Ranh giới thực sự nằm ở chỗ event emitter trong process
+biến sự thật đó thành **hậu quả**.
 
 Câu hỏi phân định duy nhất không phải "đi bằng transport nào" mà là:
 
 > Cùng một envelope quay lại đúng nơi phát ra, hoặc đến hai lần, thì hậu quả có xảy ra hai lần không?
 
-Một event xuyên instance chỉ an toàn khi **cả hai** câu trả lời đều là không. Một câu trả lời "có"
-không phải là log hơi ồn — đó là hậu quả chạy hai lần: một notification thứ hai, một lần trừ tiền
-thứ hai, một dòng ghi thứ hai.
+Một event xuyên instance chỉ an toàn khi **cả hai** câu trả lời đều là không. Chỉ một câu trả lời
+"có" cũng không phải là log hơi ồn — đó là hậu quả chạy hai lần: một notification thứ hai, một lần
+trừ tiền thứ hai, hoặc một dòng ghi thứ hai.
 
-**Đây là luật bắt buộc.** Mọi event rời khỏi process rơi vào đúng một mã dưới đây, và mọi event cố ý
+**Đây là luật bắt buộc.** Mọi event rời khỏi process đều thuộc đúng một mã dưới đây, và event cố ý
 **không** rời khỏi process cũng vậy. Không có event nào nhỏ đến mức được miễn: heartbeat vẫn phải
-khai transport đúng cùng một lý do như một event thanh toán, vì bản khai chính là thứ người đọc soi
-vào — và một sự thật không có bản khai là sự thật không ai chứng minh được là sai.
+khai transport vì cùng lý do như event thanh toán. Bản khai là thứ người đọc kiểm tra; một sự thật
+không có bản khai là sự thật không ai chứng minh được là sai.
 
 ## Bảng tra nhanh
 

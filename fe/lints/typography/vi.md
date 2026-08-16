@@ -9,7 +9,7 @@ description: Luật lint của typography — bắt gì, giữ mã nào, phát h
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `typography`
+> Phiên bản: `2.00` · Mô-đun: `typography`
 
 # Máy giữ luật typography
 
@@ -41,7 +41,7 @@ cho nó.
 
 ## `no-heading-tag-outside-heading-component`
 
-**Bắt gì.** Một thẻ tiêu đề nội tại — `h1`, `h2`, `h3`, `h4`, `h5`, `h6` — được mở ra bằng tay ở một
+**Bắt gì?** Một thẻ tiêu đề nội tại — `h1`, `h2`, `h3`, `h4`, `h5`, `h6` — được mở ra bằng tay ở một
 tệp nguồn bất kỳ, trừ tệp kiểm thử và trừ thư mục chiếc lá tiêu đề. Viết như vậy là tách rời hai dữ
 kiện vốn là một: cái thẻ dựng dàn ý và cái cỡ người đọc thấy. Tách ra thì chúng trôi, và dòng chữ to
 thứ ba trên màn hình trở thành tiêu đề số một của trang.
@@ -54,11 +54,11 @@ Luật có **hai** thông điệp, chọn bằng một phép so duy nhất trên
   chuyện **cấu trúc** — phần nội dung đã lồng sâu hơn mức người đọc giữ nổi trong đầu. Hãy làm phẳng
   phần đó trước, rồi mới đặt tiêu đề bằng một bậc mà thang có.
 
-**Giữ mã nào.** `TYPESET-1` cho thông điệp `tag`, `TYPESET-2` cho thông điệp `tooDeep`. Đây không
+**Giữ mã nào?** `TYPESET-1` cho thông điệp `tag`, `TYPESET-2` cho thông điệp `tooDeep`. Đây không
 phải ánh xạ bịa ra ở đây: câu chữ của hai thông điệp là câu chữ của hai mã đó, gần như nguyên văn.
 Một luật giữ hai mã, và cả hai đều chỉ tay được vào văn bản luật.
 
-**Cách phát hiện.** Cổng tệp chạy **một lần** trong `create`, không phải trên từng nút: lấy
+**Phát hiện thế nào?** Cổng tệp chạy **một lần** trong `create`, không phải trên từng nút: lấy
 `context.filename` (dự phòng `context.getFilename()`), đổi hết dấu chéo ngược thành chéo xuôi, rồi
 ba phép thử — đường dẫn phải chứa `/src/`; không được kết thúc bằng `.test.ts`, `.test.tsx`,
 `.spec.ts` hay `.spec.tsx`; và không được chứa `/src/components/leaves/Heading/`. Trượt một phép
@@ -72,7 +72,7 @@ trong tập sáu thẻ tiêu đề. Cuối cùng, `Number(tag.slice(1))` so vớ
 
 Không thuộc tính nào được đọc. Không câu nhập nào được lần theo. Không kiểu nào được hỏi.
 
-**Vì sao luật này đáng có máy giữ.** Vì đây đúng là chỗ mà kiểu dữ liệu mù. Tập bậc đóng chỉ bảo vệ
+**Vì sao nên để máy giữ luật này?** Vì đây đúng là chỗ mà kiểu dữ liệu mù. Tập bậc đóng chỉ bảo vệ
 được những người **đã** gọi thành phần tiêu đề; nó không nói được gì về một tệp chưa từng nhắc tới
 thành phần đó. Một `<h2>` viết tay đi qua kiểm kiểu, đi qua mọi luật canh prop, và đi thẳng vào dàn
 ý mà không ai duyệt.
@@ -82,7 +82,7 @@ lắp từ một cỡ to cộng một độ đậm nặng trên một thẻ khá
 nên nó được ghi ở kệ của mô-đun đó chứ không phải ở đây. Hai luật cộng lại phủ được "đúng thẻ, sai
 dáng" và "đúng dáng, không thẻ". Khe giữa chúng thì xem mục dưới.
 
-**Cửa còn mở.** Rộng nhất là **thẻ động**: `const Tag = "h2"` rồi `<Tag>` — tên là `JSXIdentifier`
+**Những chỗ còn lọt.** Rộng nhất là **thẻ động**: `const Tag = "h2"` rồi `<Tag>` — tên là `JSXIdentifier`
 nhưng `"Tag"` không bằng `"tag"`, nên phép thử nội tại trả `null` và luật không hề thấy tiêu đề nào.
 Đây không phải phá hoại: viết hoa là **cách duy nhất** để dùng một thẻ nội tại tính được trong JSX,
 nên thành ngữ chuẩn để đổi bậc tiêu đề theo biến rơi đúng vào điểm mù.
@@ -113,7 +113,7 @@ tiêu đề không có dàn ý, đi qua cả hai.
    về quyền sở hữu, một chuyện về cấu trúc.
 5. Phát hiện thuần cú pháp. Nhanh, và vì thế dễ lách bằng cách đổi **hình dạng cú pháp** chứ không
    cần đổi ý đồ.
-6. Mục "Cửa còn mở" là danh sách **chỗ mù**, không phải danh sách cách viết được phép.
+6. Mục "Những chỗ còn lọt" là danh sách **chỗ mù**, không phải danh sách cách viết được phép.
 
 ## Ngoại lệ
 

@@ -18,7 +18,7 @@ nêu** và chỉ từ đó hay không, và mỗi mã đang được **giữ bằ
 ## Verdict
 
 Chấp nhận, kèm một cảnh báo đã ghi rõ: **năm trên chín mã chỉ được giữ bằng người đọc**. Luật đúng và
-neo được ở source thật, nhưng đừng đọc bảng `Tầng giữ` như một bản báo cáo độ phủ của lint — nó là
+neo được ở source thật, nhưng đừng đọc bảng `Tầng giữ` như một bản báo cáo mức bao phủ của lint — nó là
 bản kê chỗ luật này còn hở.
 
 ## Kiểm phân định
@@ -53,7 +53,7 @@ bản kê chỗ luật này còn hở.
   sai** (`size: "xs"` + tông chính, `level: 5`, `weight` trên heading). Cái mà luật này thật sự bị vi
   phạm nhiều nhất là **quan hệ giữa hai dòng đều hợp lệ** — và không kiểu nào nhìn thấy quan hệ.
 - **Luật phẳng gọi tên một component riêng ở `TYPESET-8`.** Đã tổng quát hoá thành "surface danh sách
-  đã có nhãn của chính nó", giữ nguyên quyết định (nhãn nằm ngoài surface, surface ẩn nhãn của nó).
+  đã có nhãn của chính nó", bảo toàn quyết định (nhãn nằm ngoài surface, surface ẩn nhãn của nó).
 - **Rule lint có một twin ở `tokens.mjs`** bắt heading ghép từ cỡ to và độ đậm nặng. Nó thật và nó
   giữ một nửa của `TYPESET-1`, nhưng nó **không** do `sources/fe/typography.mjs` publish, nên bảng
   `Tầng giữ` không tính nó. Ghi ở đây để người đọc sau không kết luận rằng nửa đó đang bỏ ngỏ.
@@ -109,7 +109,7 @@ bản kê chỗ luật này còn hở.
 **Hai chỗ từ vựng lệch nhau, chưa sửa vì sửa là đổi luật.**
 
 - Luật gọi bậc 16px là `text-base`; leaf sở hữu chữ gọi cùng bậc đó là `size: "md"`. Người đọc luật
-  literally sẽ đi tìm một giá trị **không tồn tại** trong union. Đã giữ nguyên từ vựng của luật phẳng
+  literally sẽ đi tìm một giá trị **không tồn tại** trong union. Đã bảo toàn từ vựng của luật phẳng
   trong luật và dùng lớp CSS trong ví dụ; hợp nhất tên là một đề xuất rule change.
 - Leaf sở hữu chữ mặc định `size = "md"`, tức **16px là mặc định khi không nói gì**, trong khi bảng
   quyết định của `TYPESET-9` coi 14px là bậc của phần lớn body. Mặc định đang kéo ngược luật, và một
@@ -118,7 +118,7 @@ bản kê chỗ luật này còn hở.
 
 **Một chỗ mặc định làm `TYPESET-1` hở.** Leaf heading khai `level` là **tuỳ chọn**, mặc định `2`. Một
 caller quên nói cấp vẫn compile và vẫn render ra `h2`. Rule lint chỉ bắt tag viết tay, không bắt một
-cấp **không được nói ra**. Nếu muốn `TYPESET-1` chặt đúng như câu chữ của nó ("một prop quyết cả
+cấp **không được nêu ra**. Nếu muốn `TYPESET-1` chặt đúng như câu chữ của nó ("một prop quyết cả
 hai"), prop đó phải là bắt buộc — và đó là một breaking change trên toàn bộ call site, nên nó nằm ở
 đây chứ không nằm trong một lần sửa im lặng.
 

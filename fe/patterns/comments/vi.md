@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/comments/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống COMMENTS-N, nhận diện bằng nghiệp vụ đọc code chứ không bằng cảm giác "viết cho đẹp".
+description: Các tình huống COMMENTS-N, nhận diện bằng nghiệp vụ đọc code chứ không bằng cảm giác "viết cho đẹp".
 ---
 
 # vi.md
@@ -196,7 +196,7 @@ nói vì sao biến đếm được reset vào Chủ nhật.
   nữa, đó là `COMMENTS-6`, và hãy viết.
 
 **Vì sao là "xoá" chứ không phải "viết lại".** Viết lại một restatement thành một restatement hay hơn
-vẫn giữ nguyên chi phí: người đọc vẫn phải đọc nó để phát hiện ra nó không nói gì. Chi phí nằm ở **sự
+vẫn bảo toàn chi phí: người đọc vẫn phải đọc nó để phát hiện ra nó không nói gì. Chi phí nằm ở **sự
 tồn tại**, không nằm ở chất lượng câu chữ.
 
 **Tình huống nghiệp vụ hay gặp.** Comment sinh tự động trên getter/setter · `// handle click` trên

@@ -11,14 +11,14 @@ description: Phản biện mức phân định, mức giữ và khả năng ch�
 
 > Version: `2.00` · Module: `event-delivery`
 
-Audit này kiểm hai chuyện. Một: luật có chọn được đúng một mã từ **dữ kiện nghiệp vụ đã nêu**, và chỉ
-từ đó. Hai: bảng `Tầng giữ` có nói thật về việc thứ gì đang thực sự giữ mỗi mã hay không.
+Bản audit này kiểm tra hai việc. Một là luật có chọn được đúng một mã từ **dữ kiện nghiệp vụ đã nêu**,
+và chỉ từ đó hay không. Hai là bảng `Tầng giữ` có nói đúng thứ đang thực sự giữ mỗi mã hay không.
 
 ## Verdict
 
-Chấp nhận. Sáu mã đóng, mỗi mã neo được vào code thật đang chạy. Nhưng phải đọc kèm một điều kiện:
-**bốn trên sáu mã không có gì cơ học giữ**, và hai mã còn lại chỉ được giữ **tại đúng một file**. Đây
-là một luật chủ yếu do người đọc giữ, và nó được viết cẩn thận chính vì lý do đó.
+Chấp nhận. Sáu mã đã được chốt và mỗi mã đều gắn được với code thật đang chạy. Tuy nhiên, cần đọc kèm
+một điều kiện: **bốn trên sáu mã không có cơ chế máy móc nào giữ**, còn hai mã kia chỉ được giữ **tại
+đúng một file**. Đây là một bộ luật chủ yếu do người đọc giữ, và nó được viết cẩn thận chính vì vậy.
 
 ## Kiểm phân định
 

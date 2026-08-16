@@ -13,8 +13,8 @@ description: Lịch sử phiên bản của luật e2e flow.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
-chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
+Mỗi thay đổi luật được chấp nhận sẽ tăng version của module thêm `0.01` và cập nhật cả **năm** record.
+Đổi số chính (`x.00`) dành cho thay đổi cấu trúc của module hoặc shelf mà module nằm trên.
 
 **Mã `E2E-<n>` không bao giờ được đánh số lại.** Chúng được trích dẫn từ các file luật khác và từ các
 task record cũ; đổi số một mã là làm hỏng lặng lẽ một trích dẫn đã có người viết ra. Bỏ một mã cũng
@@ -22,9 +22,9 @@ vậy. Cả hai đều là thay đổi cấu trúc và ăn vào số chính.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hình dạng của luật đổi, trong khi **nội dung luật giữ nguyên**.
+Đổi số chính vì hình dạng của luật thay đổi, trong khi **nội dung luật vẫn giữ nguyên**.
 
-- **Từ một file phẳng thành module năm record.** `be/canon/patterns/e2e-flow.md` được diễn đạt lại
+- **Từ một file phẳng thành module năm record.** `be/canon/patterns/e2e-flow.md` được biên tập lại
   thành `be/patterns/e2e-flow/` với `INDEX.md`, `vi.md`, `example.md`, `audit.md`, `changelog.md`.
   File luật phẳng không bị xoá và không bị sửa: module này là một cách **diễn đạt đầy đủ hơn** cùng
   một luật, không phải một luật mới.

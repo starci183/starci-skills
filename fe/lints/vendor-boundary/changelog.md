@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của hồ sơ thi hành luật ranh giớ
 
 # changelog.md
 
-> Current version: `2.00` · Mô-đun: `vendor-boundary`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `vendor-boundary`
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu cùng lúc.
 Đổi số chính (`x.00`) dành cho thay đổi hình dạng mô-đun hoặc kệ mà nó nằm trên.

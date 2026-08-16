@@ -13,11 +13,11 @@ description: Từng tình huống OBSERVABILITY-N, nhận diện bằng nghiệp
 
 # Observability
 
-Một dòng log là **một sự kiện có tên ổn định và có dữ liệu kèm theo**, không phải một câu tiếng Anh.
+Một dòng log là **một sự kiện có tên ổn định và dữ liệu đi kèm**, không phải một câu tiếng Anh.
 Nó đi ra qua **một** service duy nhất, đối số đầu tiên là **một thành viên enum**, và mọi thứ thay
 đổi được đi **bên cạnh** cái tên đó dưới dạng dữ liệu.
 
-Lý do nằm ở chỗ dòng log rời khỏi tiến trình rồi thì chuyện gì xảy ra. Câu
+Lý do nằm ở những gì xảy ra sau khi dòng log rời khỏi tiến trình. Câu
 `handling order 4f2a for user 91` người đọc hiểu được, còn mọi thứ khác thì không: không đếm được,
 không group được, không đặt alert được, không lọc theo user được — trừ khi viết một regex, và regex
 đó vỡ ngay lần đầu có người sửa lại câu chữ. Cùng sự kiện ấy viết thành `ORDER_HANDLED` kèm
@@ -26,9 +26,9 @@ không group được, không đặt alert được, không lọc theo user đư
 Câu hỏi chốt hạ: **có bao giờ mình muốn biết chuyện này xảy ra bao nhiêu lần không?** Nếu có — và với
 bất cứ thứ gì đáng log thì câu trả lời là có — nó cần một cái tên sống sót qua việc bị viết lại.
 
-**Đây là luật bắt buộc.** Mọi dòng rời khỏi tiến trình đều rơi vào đúng một mã dưới đây, và mọi tiến
-trình telemetry chở những dòng đó cũng vậy. Không có service nào nhỏ đến mức được miễn: một cron ba
-dòng vẫn log qua house service, đúng cùng lý do mà một HTTP handler phải làm thế. Câu "có mỗi một
+**Đây là luật bắt buộc.** Mọi dòng rời khỏi tiến trình đều thuộc đúng một mã dưới đây, và mọi tiến
+  trình telemetry vận chuyển những dòng đó cũng vậy. Không có service nào nhỏ đến mức được miễn: một cron ba
+  dòng vẫn log qua house service, vì cùng lý do một HTTP handler phải làm thế. Câu "chỉ là một
 dòng debug thôi mà" là chỗ luật này bị bỏ qua nhiều nhất.
 
 ## Bảng tra nhanh

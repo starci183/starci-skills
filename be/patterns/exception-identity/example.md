@@ -11,9 +11,9 @@ description: Mọi case và ngoại lệ của từng mã IDENTITY-N, viết b�
 
 > Version: `2.00` · Module: `exception-identity` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường**, ở dáng một ứng dụng Nest viết ra. Không tên sản phẩm,
-không tên module riêng, không tên repository. Một luật chỉ đúng khi nó đúng ở bất kỳ back end nào —
-nên nếu một ví dụ cần tên riêng của một hệ thống cụ thể để đọc được, ví dụ đó đứng sai chỗ.
+Mọi ví dụ dưới đây là **TypeScript thường**, có dáng một ứng dụng Nest. Không dùng tên sản phẩm, tên
+module riêng hay tên repository. Một luật chỉ đúng khi nó đúng ở bất kỳ back end nào — vì vậy nếu một
+ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được, ví dụ đó không phù hợp ở đây.
 
 Hai import dùng chung cho tất cả các ví dụ, không lặp lại ở từng khối:
 

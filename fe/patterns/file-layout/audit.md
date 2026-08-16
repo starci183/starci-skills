@@ -24,7 +24,7 @@ Hai điều kiện:
 
 1. **`enforced` ở đây nói rằng có rule, không nói rằng luật đã được giữ đủ.** Bốn trong sáu rule đọc
    **đường dẫn** trong khi luật nói về **nội dung**. Cột cuối của bảng `## Tầng giữ` là chỗ khoảng
-   cách đó được nói ra, và nó không được đọc thành chú thích.
+   cách đó được nêu ra, và nó không được đọc thành chú thích.
 2. **`FILE-5` không neo được vào code sản xuất.** Nó ở lại trong luật vì cây một app là một **ảnh
    chụp**, không phải một quyết định.
 
@@ -62,7 +62,7 @@ Hai điều kiện:
   hoặc `apps/*/src/`. Không có gì sai với rule; chỉ là hiện không có gì để nó đọc.
 - **Có những khẳng định trong luật gốc không mang mã nào.** Bảng Forbidden cấm "category folder dưới
   `leaves/` hoặc `branches/`" và cấm "`blocks/<Name>/` phẳng không có category". Hai điều này là luật
-  thật, được giữ nguyên trong `## Law`, nhưng chúng **không thuộc `FILE-1..6`** và không có rule
+  thật, được bảo toàn trong `## Law`, nhưng chúng **không thuộc `FILE-1..6`** và không có rule
   nào. Module này có sáu mã và kết thúc với sáu mã, nên chúng được ghi ở đây thay vì được đánh số.
 - **Đích đến `modules/types/` lệch với cây thật.** Cây hiện tại có `src/types/` ở gốc. Rule không hề
   vi phạm — nó chỉ cấm bốn tên đó **dưới `components/`** — nhưng luật nêu đích đến là `modules/types/`,
@@ -79,7 +79,7 @@ Hai điều kiện:
   không được phép làm mờ tầng, mà được ghi thành một cột riêng.
 - Neo mỗi mã vào **file test của chính rule** làm neo chính, vì file đó gọi thẳng tên từng mã, và vào
   glob của cây làm neo phụ, vì đó là nơi luật thật sự được sống.
-- Ghi `FILE-5` là `chưa neo được` trong code sản xuất, và giữ nguyên mã.
+- Ghi `FILE-5` là `chưa neo được` trong code sản xuất, và bảo toàn mã.
 - Giữ mọi ví dụ ở dạng cây thư mục thường và TSX thường, không tên sản phẩm, không tên repository.
   Nơi luật gốc gọi tên một component riêng, ví dụ được viết lại thành tên tổng quát.
 - Không sửa `sources/fe/file-layout.mjs` trong lần chuyển shelf này. Mọi bất đồng ở trên là **đề xuất
@@ -88,7 +88,7 @@ Hai điều kiện:
 ## Rủi ro còn mở
 
 **Không mã nào ở tầng `documented`.** Cả sáu đều có rule mang tên, nên phần này không liệt kê mã
-`documented` — nó liệt kê **phần luật mà rule không nhìn thấy**, và với mỗi phần, nói rõ một rule sẽ
+`documented` — nó liệt kê **phần luật mà rule không nhìn thấy**, và với mỗi phần, làm rõ một rule sẽ
 phải **thấy được cái gì** thì mới giữ nổi.
 
 - **`FILE-1` — hành khách đi nhờ.** Rule dùng "có ít nhất một export thuộc họ", trong khi luật nói

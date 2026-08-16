@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của hồ sơ thi hành luật cấm tự
 
 # changelog.md
 
-> Current version: `2.00` · Module: `lint-escape-hatch`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `lint-escape-hatch`
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu. Đổi số chính
 (`x.00`) dành cho thay đổi cấu trúc mô-đun hoặc nhóm mà nó nằm trên.
@@ -40,7 +40,7 @@ nhìn thấy gì của luật đó, và — phần gần như không ai chịu v
   nửa — rule báo cáo, `linterOptions.noInlineConfig` mới vô hiệu hoá — nên nửa còn lại là cấu hình chứ
   không phải rule. `LINT-ESCAPE-3` **không có rule nào**; điều đó được ghi thẳng thành phát hiện, thay
   vì bịa ra một ánh xạ cho đủ bảng.
-- **Ghi 9 cửa đã khép và 9 cửa còn mở.** Cửa còn mở lớn nhất: chú thích cấu hình trần dạng
+- **Ghi 9 cửa đã khép và 9 cửa còn mở.** Những chỗ còn lọt lớn nhất: chú thích cấu hình trần dạng
   `/* eslint some-rule: "off" */` không hề bị bắt, dù tên rule hứa nhiều hơn thế; và một miễn trừ viết
   trong cấu hình phẳng đạt đúng thứ `LINT-ESCAPE-3` cấm mà không có gì đi soi.
 - **Ghi nhận một chênh lệch tên–hành vi.** Tên rule rộng hơn phần rule thật sự bắt. Ghi ở

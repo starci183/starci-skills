@@ -4,7 +4,7 @@ title: changelog.md
 slug: /be/lints/cqrs/changelog
 sidebar_label: changelog.md
 sidebar_position: 4
-description: Lịch sử phiên bản của hồ sơ thi hành ba quy tắc lint CQRS.
+description: Lịch sử phiên bản của hồ sơ về cơ chế thi hành ba quy tắc lint CQRS.
 ---
 
 # changelog.md
@@ -13,7 +13,7 @@ description: Lịch sử phiên bản của hồ sơ thi hành ba quy tắc lint
 
 ## Version Policy
 
-Một thay đổi được chấp nhận về **những gì tài liệu này ghi** thì tăng cả mô-đun thêm `0.01` và cập
+Mỗi thay đổi được chấp nhận về **những gì tài liệu này ghi** phải tăng phiên bản mô-đun thêm `0.01` và cập
 nhật **năm** tài liệu cùng lúc. Nguồn công bố thêm hoặc bớt một quy tắc, đổi tên một quy tắc, đổi mức
 nghiêm khắc, hoặc đóng một cửa còn mở — mỗi việc đó đều là một thay đổi như vậy.
 
@@ -27,10 +27,10 @@ phải được ghi ở đây kèm tên cũ.
 
 ## 2.00 — 2026-08-16
 
-Mô-đun được **tạo mới** để ghi lại **việc thi hành**, không phải để chép lại luật. Luật CQRS đã có
+Mô-đun được **tạo mới** để ghi lại **cơ chế thi hành**, không phải để chép lại luật. Luật CQRS đã có
 chỗ của nó; thứ chưa ai viết ra là **máy nhìn thấy được đến đâu, và hết thấy từ chỗ nào**.
 
-- **Ghi ba quy tắc có thật.** Các quy tắc ship trong gói `@starci/eslint-canon-be`, dưới không gian
+- **Ghi ba quy tắc có thật.** Các quy tắc được phát hành trong gói `@starci/eslint-canon-be`, dưới không gian
   tên `starci-be`:
 
   | Quy tắc | Mã luật | Mức ship |
@@ -62,13 +62,13 @@ chỗ của nó; thứ chưa ai viết ra là **máy nhìn thấy được đế
   3. **Cổng tên tệp là sự tồn tại của quy tắc.** Hai trong ba quy tắc tắt hẳn khi tên tệp không khớp
      `[a-z0-9-]+` trước hậu tố. Không ai đổi tên tệp để né lint; người ta đổi vì thấy gọn hơn.
 
-- **Ghi mức ship thật, không ghi mức mong muốn.** `handler-has-twin-spec` được ghi là `off` và trơ
+- **Ghi mức phát hành thực tế, không ghi mức mong muốn.** `handler-has-twin-spec` được ghi là `off` và trơ
   khi cấu hình không truyền danh sách thư mục, nên `CQRS-7` hiện **không** được chặn ở cổng dựng trừ
   khi kho mã tự nối danh sách vào.
 
 - **Ghi ba miễn trừ kèm bằng chứng đứng sau chúng**: 10 báo cáo sai trên 3 đúng cho miễn trừ lớp cha,
   19 trên 21 cho miễn trừ decorator trong tệp thông điệp, và lý do tái lập được cho việc quy tắc cặp
-  song sinh im lặng khi thiếu danh sách.
+  song sinh không báo khi thiếu danh sách.
 
 - **`example.md` mang code lách qua được, dán nhãn rõ.** Mỗi quy tắc có nhiều cặp **SAI**/**ĐÚNG**
   rồi tới mục **Cửa lách và nhầm lẫn**. Code trong mục đó là code **vi phạm luật mà quy tắc không

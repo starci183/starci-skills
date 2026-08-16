@@ -9,9 +9,9 @@ description: Mã thật cho từng rule - chỗ nổ, chỗ không nổ, và ch�
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `served-locale` · Máy: [`INDEX.md`](./INDEX.md) · Vì sao: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `served-locale` · Máy: [`INDEX.md`](./INDEX.md) · Vì sao: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mỗi rule có nhiều cặp **SAI** (rule nổ) và **ĐÚNG** (rule im), rồi tới mục **Cửa lách và nhầm lẫn**.
+Mỗi rule có nhiều cặp **SAI** (rule nổ) và **ĐÚNG** (rule im), rồi tới mục **Chỗ lách và chỗ dễ nhầm**.
 Mã trong mục cuối cùng đó **không phải mã được phép viết** — nó là mã mà rule **không nhìn thấy**.
 Đọc nhầm chỗ này là biến một lỗ hổng thành một giấy phép.
 
@@ -134,7 +134,7 @@ it("puts the terminal link last", () => {
 })
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Mã dưới đây **lọt lưới**. Không cái nào trong số này là cách viết được luật cho phép.
 
@@ -270,7 +270,7 @@ export const createAttachLocaleLink = () =>
 export const queryCourse = ({ request }: Params) => client.query({ query: COURSE, variables: request })
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Mã dưới đây **lọt lưới**. Tất cả đều đặt đúng cái header mà rule tưởng mình đang giữ.
 

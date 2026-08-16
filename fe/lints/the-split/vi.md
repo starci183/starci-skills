@@ -9,7 +9,7 @@ description: Hai luật máy giữ được của the split — bắt gì, nhìn
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `the-split`
+> Phiên bản: `2.00` · Mô-đun: `the-split`
 
 # Hai luật máy giữ được
 
@@ -34,14 +34,14 @@ cũng biết là chưa được giữ, còn một luật máy rò rỉ thì ai c
 
 ## `presentational-purity`
 
-**Bắt gì.** Trong tệp tên `component.tsx`, mọi lời gọi mà **tên hàm** rơi vào một trong bốn họ: yêu
+**Bắt gì?** Trong tệp tên `component.tsx`, mọi lời gọi mà **tên hàm** rơi vào một trong bốn họ: yêu
 cầu mạng (`useSWR`, `useSWRMutation`, `use…Swr`), kho trạng thái (`useAppSelector`, `useDispatch`,
 `use…Store`), thời gian chạy dịch thuật (`useTranslations`, `useLocale`, `useFormatter`), và truy vấn
 trực tiếp (`query<ChữHoa>…`, `mutation<ChữHoa>…`). Mỗi lời gọi khớp là một báo lỗi `reaches`.
 
-**Giữ mã nào.** `SPLIT-1` — nửa vẽ nhận mọi thứ đã quyết và không tự đi hỏi cái gì.
+**Giữ mã nào?** `SPLIT-1` — nửa vẽ nhận mọi thứ đã quyết và không tự đi hỏi cái gì.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 - Phạm vi: lấy `context.filename` (không có thì `context.getFilename()`), đổi hết `\` thành `/`, rồi
   thử với `/(?:^|\/)component\.tsx$/`. Ngoài phạm vi, `create` trả về **object rỗng** — luật không
@@ -50,14 +50,14 @@ trực tiếp (`query<ChữHoa>…`, `mutation<ChữHoa>…`). Mỗi lời gọi
   rồi thử `callee.name` với một biểu thức chính quy hợp của bốn họ. Báo lỗi neo vào chính node lời gọi
   và chèn tên đã khớp vào thông điệp.
 
-**Vì sao luật này đáng có máy giữ.** Vì hậu quả của nó là **không dựng được từ dữ liệu mẫu**. Một tệp
+**Vì sao nên để máy giữ luật này?** Vì hậu quả của nó là **không dựng được từ dữ liệu mẫu**. Một tệp
 vẽ có gọi mạng thì muốn kiểm thử nó phải dựng cả thế giới lên trước; và cái giá đó không hiện ra lúc
 viết, nó hiện ra sáu tháng sau khi ai đó muốn viết bài kiểm thử đầu tiên. Con mắt người duyệt bỏ sót
 một dòng `useTranslations` giữa hai trăm dòng JSX là chuyện thường; máy thì không bỏ sót dòng nào.
 Thêm nữa, mỗi báo lỗi ở đây là một **lần dời chỗ**, không phải một lần xoá: lời gọi vẫn phải nằm đâu
 đó, và chỗ đó là nửa còn lại.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Gọi qua thuộc tính.** `hooks.useTranslations()`, `store.useAppSelector()`, `client.queryOrder()` —
   visitor thoát ngay khi `callee.type !== "Identifier"`. Thế giới đi vào qua một namespace và không ai
@@ -80,7 +80,7 @@ Thêm nữa, mỗi báo lỗi ở đây là một **lần dời chỗ**, không 
 
 ## `connected-block-has-presentational-twin`
 
-**Bắt gì.** Một tệp `index.tsx` nằm trong một thư mục block viết hoa, **và đã đọc thế giới**. Khi đó:
+**Bắt gì?** Một tệp `index.tsx` nằm trong một thư mục block viết hoa, **và đã đọc thế giới**. Khi đó:
 
 - không nhập đúng `_<TênThưMục>` từ `./component` ⇒ `missing`, và dừng ở đó;
 - có nhập, nhưng vẽ thêm bất kỳ thẻ JSX nào khác ⇒ một `bypass` cho **mỗi** thẻ lạ;
@@ -88,9 +88,9 @@ Thêm nữa, mỗi báo lỗi ở đây là một **lần dời chỗ**, không 
 
 Tệp không đọc thế giới thì không bao giờ bị báo.
 
-**Giữ mã nào.** `SPLIT-5` — nửa đã nối không tự vẽ gì cả.
+**Giữ mã nào?** `SPLIT-5` — nửa đã nối không tự vẽ gì cả.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 - Phạm vi: tên tệp đã chuẩn hoá thử với
   `/\/src\/components\/blocks\/(?:[^/]+\/)*([A-Z][A-Za-z0-9]*)\/index\.tsx$/`. Nhóm bắt số 1 là tên
@@ -104,14 +104,14 @@ Tệp không đọc thế giới thì không bao giờ bị báo.
   `rendersTwin` khi trùng khít.
 - `Program:exit`: chưa đọc thế giới thì im lặng; rồi mới lần lượt `missing` → `bypass` → `unused`.
 
-**Vì sao luật này đáng có máy giữ.** Vì đây là chỗ luật bị lách bằng **lý lẽ nghe rất hợp lý**: "block
+**Vì sao nên để máy giữ luật này?** Vì đây là chỗ luật bị lách bằng **lý lẽ nghe rất hợp lý**: "block
 này mỏng thôi", "có mỗi một lá", "trạng thái nào cũng cùng một cây". Ba câu đó đều đúng vào lúc nói và
 đều sai sáu tuần sau, khi trạng thái thứ hai xuất hiện và ranh giới đã mất từ lâu. Người duyệt rất khó
 từ chối một lý lẽ hợp lý; máy thì không có nhánh nào để nghe lý lẽ — trong mã nguồn **không hề có**
 ngoại lệ block mỏng. Thêm nữa, `bypass` bắt cả thẻ HTML thường: một `<div>` bọc ngoài cũng là nửa đã
 nối bắt đầu tự vẽ.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Giặt sạch lời gọi thế giới là tắt luôn cả luật.** `readsWorld` là cổng duy nhất. Một
   `useOrderData()` bọc sẵn khiến `Program:exit` trả về ngay, và block **biến mất** khỏi tầm nhìn chứ

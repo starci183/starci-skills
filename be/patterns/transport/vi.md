@@ -13,10 +13,10 @@ description: Từng tình huống TRANSPORT-N, nhận diện bằng nghiệp v�
 
 # Transport
 
-**Cửa** là bất cứ file nào thế giới bên ngoài chạm tới được: một resolver, một controller, một socket
+**Cửa** là bất kỳ file nào mà thế giới bên ngoài có thể chạm tới: một resolver, một controller, một socket
 gateway, một broker consumer.
 
-Module này giải đúng **một** câu hỏi về cửa, và chỉ một: **khi nào một cửa được phép không phải
+Module này chỉ giải **một** câu hỏi về cửa: **khi nào một cửa được phép không phải
 GraphQL** — cùng với việc câu trả lời ấy nằm ở đâu trên đĩa.
 
 Câu hỏi này quan trọng vì đáp án gần như luôn là "không được". Mặt sản phẩm là một schema GraphQL
@@ -25,7 +25,7 @@ type sinh ra và đúng một endpoint. Mỗi route REST dựng thêm bên cạn
 cũng client ấy phải học, **một chỗ thứ hai** để đặt xác thực, và một hình dáng mà không type sinh
 ra nào phủ.
 
-Cái giá đó đáng trả đúng vào lúc GraphQL **không làm nổi** việc — và không bao giờ vì viết một route
+Cái giá đó chỉ đáng trả khi GraphQL **không làm nổi** việc — không bao giờ chỉ vì viết một route
 thì nhanh tay hơn.
 
 Thứ luật này ngăn không phải là một controller tồi. Nó là dáng vẻ của một codebase sau hai mươi lần
@@ -34,8 +34,8 @@ người đọc sau không cách nào biết một route là REST **vì có lý 
 bản luật phẳng được viết: mười lăm trong mười tám cửa có lý do nhìn thấy được ngay trong file, ba cái
 thì không — nên thiết kế phần lớn là mạch lạc mà **trông** như một mớ hỗn độn, tức là tệ cả hai bề.
 
-**Đây là luật bắt buộc.** Không có cửa nào nhỏ tới mức được miễn khai báo mã. Câu "có mỗi một
-endpoint thôi mà" chính là chỗ luật này bị bỏ qua nhiều nhất — và hai mươi lần "có mỗi một endpoint"
+**Đây là luật bắt buộc.** Không có cửa nào nhỏ đến mức được miễn khai báo mã. Câu "chỉ là một
+endpoint thôi mà" chính là chỗ luật này bị bỏ qua nhiều nhất — và hai mươi lần "chỉ là một endpoint"
 đúng là mớ hỗn độn mà luật sinh ra để ngăn.
 
 ## Bảng tra nhanh

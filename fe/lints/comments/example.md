@@ -9,10 +9,10 @@ description: Mã thật cho từng rule — chỗ nào rule kêu, chỗ nào kh�
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `comments` · Luật: [`INDEX.md`](./INDEX.md) · Giải thích: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `comments` · Luật: [`INDEX.md`](./INDEX.md) · Giải thích: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây là một rule, đọc theo từng cặp **SAI** (rule kêu) và **ĐÚNG** (rule im). Sau các cặp
-là mục **Cửa lách và nhầm lẫn**: đoạn mã ở đó **lọt qua rule**, và lọt không có nghĩa là được phép. Đó
+là mục **Chỗ lách và chỗ dễ nhầm**: đoạn mã ở đó **lọt qua rule**, và lọt không có nghĩa là được phép. Đó
 là mã vi phạm luật mà không có máy nào bắt — người review phải bắt.
 
 ---
@@ -97,7 +97,7 @@ export interface AttemptSummary {
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Bốn đoạn dưới đây **vi phạm `COMMENTS-1`** nhưng rule không kêu một tiếng nào.
 
@@ -233,7 +233,7 @@ const CANCELLED_STATUS = "Đã huỷ"
 Chúng khác nhau ở đúng một thứ: người đọc sau có phân biệt được **một giá trị** với **một câu ai đó
 quên dịch** hay không.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Mọi đoạn dưới đây **vi phạm `COMMENTS-2`** và rule im lặng.
 
@@ -374,7 +374,7 @@ const skipProjection = (previous: Row, next: Row) => previous.hash === next.hash
 const skipProjection = (previous: Row, next: Row) => previous.hash === next.hash
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Ba đoạn đầu **vi phạm `COMMENTS-4`** và rule im lặng.
 

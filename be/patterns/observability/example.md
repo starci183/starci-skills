@@ -11,11 +11,11 @@ description: Mọi case và ngoại lệ của từng mã OBSERVABILITY-N, viế
 
 > Version: `2.00` · Module: `observability` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong hình dạng NestJS thường**. Không tên sản phẩm, không
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có cấu trúc kiểu NestJS**. Không tên sản phẩm, không
 tên repository, không tên module riêng của ai. Một luật back end chỉ đúng khi nó đúng ở bất kỳ dịch
 vụ nào — nên nếu một ví dụ cần tên riêng của một hệ thống mới đọc được, ví dụ đó sai chỗ.
 
-Hai cái tên được giữ nguyên vì lint rule **khoá theo chúng**: receiver `winstonService` và enum
+Hai tên được giữ nguyên vì lint rule **khớp trực tiếp với chúng**: receiver `winstonService` và enum
 `WinstonLog`. Đó là tên của house service và tập tên sự kiện, không phải tên sản phẩm; đổi chúng
 trong ví dụ thì ví dụ không còn kiểm được bằng rule nữa.
 

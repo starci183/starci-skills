@@ -13,7 +13,7 @@ description: Từng tình huống NAME-N, nhận diện bằng nghiệp vụ ch�
 
 # Naming
 
-Tên là **phần duy nhất** của một symbol chạm tới người đọc chưa mở nó ra. Signature, thân hàm, test
+Tên là **phần duy nhất** của một symbol đến được với người đọc trước khi họ mở file. Signature, thân hàm, test
 — muốn biết đều phải mở một file. Tên thì hiện ra miễn phí ở mọi call site, mọi import list, mọi lần
 grep.
 
@@ -21,8 +21,8 @@ Nên một cái tên chỉ trả lời một câu:
 
 > Đây là **cái gì**, với người chưa biết gì về nó?
 
-Không phải nó được cài đặt bằng gì, không phải nó viết cho đời schema nào, không phải nó nằm ở thư
-mục nào lúc được tạo ra. Cả ba thứ đó đều đổi, và một cái tên gói một trong ba thứ đó vào sẽ **thành
+Tên không nói về cách cài đặt, đời schema mà nó phục vụ hay thư mục lúc được tạo ra. Cả ba thứ đó đều
+đổi, và một cái tên gói một trong ba thứ đó vào sẽ **thành
 lời nói dối mà không có gì đỏ lên**.
 
 Phép thử chốt một cái tên:
@@ -32,9 +32,9 @@ Phép thử chốt một cái tên:
 Một cái tên buộc phải đổi khi schema lên đời sau, khi thư mục bị dời, khi cơ chế bị thay, hoặc khi
 xuất hiện caller thứ hai — thì nó chưa bao giờ đặt tên cho **vật**; nó đang mô tả một **thời điểm**.
 
-**Đây là luật bắt buộc.** Mọi symbol export, mọi file, mọi biến boolean đều rơi vào đúng một mã dưới
+**Đây là luật bắt buộc.** Mọi symbol export, mọi file, mọi biến boolean đều thuộc đúng một mã dưới
 đây. Không có tên nào nhỏ đến mức được miễn: một helper cục bộ vẫn thuộc `NAME-5` đúng như một
-service public thuộc `NAME-1`. Câu "có mỗi cái helper nội bộ thôi mà" là chỗ luật này bị bỏ qua nhiều
+service public thuộc `NAME-1`. Câu "chỉ là helper nội bộ thôi mà" là chỗ luật này bị bỏ qua nhiều
 nhất — và helper nội bộ chính là thứ sáu tháng sau bị export ra mà không ai đọc lại tên.
 
 ## Bảng tra nhanh
@@ -232,7 +232,7 @@ kế tiếp.
 
 ## `NAME-7` — tên nói capability, không nói người gọi đầu tiên
 
-**Tình huống.** Một capability dùng chung được đặt tên theo **bề mặt đã đặt hàng nó đầu tiên**:
+**Tình huống.** Một capability dùng chung được đặt tên theo **bề mặt đầu tiên yêu cầu nó**:
 `DashboardContentService`.
 
 **Dấu hiệu nhận biết**
@@ -249,7 +249,7 @@ gì không?
 - ↔ `NAME-1`: một thư mục operation **theo bề mặt** là phạm vi hợp lệ của chính operation đó. Cái bị
   cấm là mang tên bề mặt sang một service dùng chung.
 - ↔ ngoại lệ: nếu chữ trông giống tên người gọi thật ra **là khái niệm nghiệp vụ** — một read model
-  của đúng bề mặt ấy — thì đó là chủ thể, không phải người đặt hàng.
+  của đúng bề mặt ấy — thì đó là chủ thể, không phải bên yêu cầu đầu tiên.
 
 **Vì sao mã này khó thấy nhất.** Sáu mã kia sai vì một thứ đã đổi. Mã này sai vì một thứ **được thêm
 vào**, và thêm vào thì không ai đi đọc lại tên cũ.

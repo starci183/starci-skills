@@ -9,12 +9,12 @@ description: Ba quy tắc giữ được bao nhiêu phần của luật loading,
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `loading`
+> Phiên bản: `2.00` · Mô-đun: `loading`
 
 Phản biện này kiểm đúng một câu hỏi: **máy nhìn thấy được bao nhiêu phần của luật này, và người đọc
 báo cáo lint có bị dẫn tới kết luận sai không.**
 
-## Verdict
+## Kết luận
 
 Chấp nhận **có điều kiện**. Ba quy tắc là thật, đọc được, và mỗi quy tắc bắt đúng cái nó nói. Điều
 kiện nằm ở chỗ khác: **hai trên bảy mã luật có người giữ**, và cả ba quy tắc đều dựa trên những dấu
@@ -37,7 +37,7 @@ tắc thứ tư nào bị bỏ sót, và không có quy tắc nào được khai
 | Có quy tắc nào nhận tuỳ chọn không | Không. Cả ba `schema: []`, nên một kho không thể nới lỏng bằng cấu hình, chỉ có thể tắt hẳn |
 | Thông báo lỗi có nói được **cách sửa** không | Có, cả ba. Mỗi thông báo đều kết thúc bằng một hành động: cho thành phần một trạng thái nghỉ, hoặc đẩy cờ chờ xuống |
 
-## Findings
+## Phát hiện
 
 1. **`no-placeholder-prop` chỉ đúng một nửa với cái tên của nó.** Nó công bố hai `messageId`: `prop`
    và `import`. Nửa `import` không xét prop nào cả — nó xét câu lệnh nhập. Một người đọc tên quy tắc
@@ -78,7 +78,7 @@ tắc thứ tư nào bị bỏ sót, và không có quy tắc nào được khai
    không bao giờ hai cây" — cũng mô tả đúng tội này. Ghi lại như một chỗ mờ của luật, không tự chọn
    lại.
 
-## Decisions
+## Quyết định
 
 - **Chỉ ghi ba quy tắc có thật.** Không quy tắc nào được suy ra, không mã luật nào được ánh xạ cho
   đủ bảng. Năm mã không có người giữ được nêu tên thẳng ở `INDEX.md` và ở bảng ánh xạ yêu cầu trong
@@ -96,7 +96,7 @@ tắc thứ tư nào bị bỏ sót, và không có quy tắc nào được khai
 
 Từng cửa còn mở, kèm **thứ quy tắc sẽ phải xét để đóng nó** — hoặc lý do đóng đắt hơn để mở.
 
-| Cửa còn mở | Phải xét thêm gì để đóng | Đáng đóng không |
+| Những chỗ còn lọt | Phải xét thêm gì để đóng | Đáng đóng không |
 |---|---|---|
 | Ra khỏi `/src/components/` là cả ba quy tắc biến mất | Một danh sách thư mục lấy từ cấu hình, thay cho phép kiểm tra chuỗi con cứng | **Đáng.** Đây là cửa rộng nhất và rẻ nhất để đóng: chuyển phạm vi sang `files` của cấu hình lint, để mỗi kho tự khai chỗ áp dụng. Rủi ro hiện tại là một lần đổi tên thư mục vô hiệu hoá cả mô-đun mà không ai biết |
 | Bản sao khai báo **bên trong** một tệp tên hợp lệ | Duyệt khai báo cấp cao nhất và tên biến/hàm được xuất, thay vì chỉ tên tệp | **Đáng.** Chi phí thấp, và nó biến quy tắc tên tệp thành quy tắc thật. Đây là lỗ hổng làm quy tắc số một gần như vô nghĩa với một tác giả đã biết nó tồn tại |
@@ -118,7 +118,7 @@ thuộc tính đó nhận phần tử trực tiếp, và không có ba ngôi nà
 khác nhau. Nó **không** chứng minh màn hình không nhảy, không chứng minh trình đọc màn hình im, và
 không chứng minh hình dạng lúc chờ là cùng một hình dạng.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - `sources/fe/loading.mjs` thêm, bớt hoặc đổi tên một quy tắc trong `export const rules`.
 - Một mã `LOADING-<n>` mới xuất hiện trong luật, hoặc một mã hiện có đổi nghĩa.

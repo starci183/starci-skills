@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/type-safety/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã TYPE-SAFETY-N, viết bằng TS/TSX thuần.
+description: Tất cả case và ngoại lệ của từng mã TYPE-SAFETY-N, viết bằng TS/TSX thuần.
 ---
 
 # example.md
@@ -14,9 +14,9 @@ description: Mọi case và ngoại lệ của từng mã TYPE-SAFETY-N, viết 
 Mọi ví dụ dưới đây là **TypeScript và TSX thường**. Không tên sản phẩm, không tên thư viện thật:
 những chỗ cần một vendor thì import từ `@vendor/*` — một module giữ chỗ. Một luật chỉ đúng khi nó
 đúng ở bất kỳ front end nào, nên nếu một ví dụ cần tên riêng của một sản phẩm mới đọc được thì ví dụ
-đó đứng sai chỗ.
+đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục **ngoại lệ và nhầm lẫn**.
 Phần cuối trang ánh xạ từ một yêu cầu bằng lời sang một mã duy nhất.
 
 ---
@@ -249,7 +249,7 @@ xử lý một lỗi khác, tức lúc tệ nhất.
   // value.name        <- không biên dịch, và đó là điều đúng
   ```
 
-- **Generic không phải `any`.** Chỗ nào chỉ cần "kiểu nào cũng được, nhưng giữ nguyên kiểu ấy" thì
+- **Generic không phải `any`.** Chỗ nào chỉ cần "kiểu nào cũng được, nhưng bảo toàn kiểu ấy" thì
   đó là một tham số kiểu:
 
   ```ts
@@ -330,7 +330,7 @@ sửa cách viết thứ hai**. Đó là toàn bộ lý do đây là một luậ
 - **Tuple không phải mảng.** `[number, number]` là một tuple; luật này không đụng tới nó.
 
   ```ts
-  // ĐÚNG - tuple giữ nguyên
+  // ĐÚNG - tuple bảo toàn
   const bounds: readonly [number, number] = [0, 100]
   ```
 
@@ -480,7 +480,7 @@ const expiresAt = (token: string): number | undefined => {
 ```
 
 Cast này sống sót vì ba lý do đọc được ngay trên màn hình: nó **chỉ mở đúng một field**, field ấy vẫn
-là `unknown` nên vẫn phải kiểm, và câu bên trên nói rõ phần nào của việc kiểm **không** thuộc về
+là `unknown` nên vẫn phải kiểm, và câu bên trên làm rõ phần nào của việc kiểm **không** thuộc về
 client. Cast mở đủ chỗ để kiểm, chứ không thay cho kiểm.
 
 ### Case: implementation của một factory có overload
@@ -559,7 +559,7 @@ hỏi **một** câu cụ thể rồi dừng.
 | "Cho tạm `any` chỗ này, mai sửa" | Việc xoá kiểu sẽ đi theo giá trị sang file khác | `TYPE-SAFETY-2` | `unknown`, thu hẹp ở một chỗ có tên |
 | "Bắt lỗi rồi lấy `error.response.data.message`" | `throw` nhận mọi giá trị | `TYPE-SAFETY-2` | `catch (error: unknown)` + `instanceof` |
 | "Khai một mảng khoá học" | Một thứ một cách viết | `TYPE-SAFETY-3` | `Array<CourseSummary>` |
-| "Viết test chứng minh API từ chối payload thiếu field" | Dựng giá trị sai chính là thứ đang chứng minh | `TYPE-SAFETY-4` | cast trong `.test.`, kèm câu nói rõ đang canh gì |
+| "Viết test chứng minh API từ chối payload thiếu field" | Dựng giá trị sai chính là thứ đang chứng minh | `TYPE-SAFETY-4` | cast trong `.test.`, kèm câu làm rõ đang canh gì |
 | "Kiểu vendor thiếu field mà runtime luôn gửi" | Biên thật, lý do viết ra được | `TYPE-SAFETY-5` | cast một tầng + mệnh đề lý do, hoặc một type extension có tên |
 | "Ép cái này thành kiểu kia cho nó hết đỏ" | Lỗi là trình biên dịch đang nói một điều đúng | `TYPE-SAFETY-1` | sửa hình dạng, hoặc viết phép biến đổi |
 | "Widen giá trị này ra `unknown` trước khi parse" | Đi ngược chiều xoá kiểu | *không mã nào* | hợp lệ, không cần xin phép |

@@ -9,12 +9,12 @@ description: Phản biện xem một rule có giữ nổi năm mã luật hay kh
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `type-safety`
+> Phiên bản: `2.00` · Mô-đun: `type-safety`
 
 Phản biện này hỏi một câu duy nhất: **máy đang giữ được bao nhiêu phần của luật này, và phần còn lại
 đang nằm ở đâu?**
 
-## Verdict
+## Kết luận
 
 Chấp nhận, có kèm ba nhận định và một danh sách cửa còn mở dài hơn phần được giữ.
 
@@ -44,7 +44,7 @@ tên của luật gợi ra.
 | Tệp trợ giúp kiểm thử so với tệp sản phẩm | **Không phân định được**: cùng bị quản như production |
 | Mã nguồn sản phẩm so với công cụ và cấu hình | Phân định được bằng `/src/`, với một lỗi ngược chiều đã ghi |
 
-## Findings
+## Phát hiện
 
 **1 — Hai mã luật được giữ bởi một gói mà mô-đun này không phát hành.** `TYPE-SAFETY-2` (dạng viết
 tắt của phép xoá) và `TYPE-SAFETY-3` (một cách viết cho mảng) không công bố rule nào ở đây. Mô-đun
@@ -80,7 +80,7 @@ một vị trí thuộc tính, nên hằng số, mảng, object literal, tham s�
 không rửa được nó. Đáng ghi nhận, và đáng nói ra, vì phản xạ "gom vào hằng cho gọn" đến từ những
 rule khác nơi nó **có** tác dụng — và ở đây nó chỉ dời báo cáo đi một dòng.
 
-## Decisions
+## Quyết định
 
 - Giữ **đúng một** rule trong tài liệu này: `no-double-cast`. Không đặt số cho nó; danh tính của nó
   là tên đã công bố.
@@ -90,7 +90,7 @@ rule khác nơi nó **có** tác dụng — và ở đây nó chỉ dời báo c
   đếm nó thành hai.
 - Giữ nguyên lập luận uỷ thác của mô-đun rule cho `TYPE-SAFETY-2` và `TYPE-SAFETY-3`, và ghi hệ quả
   của nó thành một rủi ro chứ không phải một lỗi.
-- Giữ bảng **Cửa còn mở** dài hơn bảng **Cửa đã đóng**. Đó là hình dạng đúng của tầng này: một luật
+- Giữ bảng **Những chỗ còn lọt** dài hơn bảng **Cửa đã đóng**. Đó là hình dạng đúng của tầng này: một luật
   không có rule thì ai cũng biết là không được giữ, còn một rule hở thì bị tin là đã kín.
 - Không đề nghị một bản vá tự động. Mọi bản sửa thật đều phải chọn cho giá trị một hình dạng mà nó
   chưa từng có, và máy không chọn được hình dạng ấy.
@@ -155,7 +155,7 @@ tốn hơn phần thu được.
   trị một hình dạng mà nó chưa có. Một kho có lịch sử nên coi mỗi báo cáo là một khoản việc thật, chứ
   không phải một lần sửa nhanh.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Mô-đun rule thêm, xoá hoặc đổi tên một rule.
 - Một trong ba cửa được đánh dấu **nên đóng** (ngoặc nhọn, nút chen giữa, đường dẫn tương đối gốc

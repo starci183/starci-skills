@@ -13,14 +13,14 @@ description: Lịch sử phiên bản của luật naming.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
-chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên. Thêm, bỏ hoặc đánh số lại
-một mã `NAME-<n>` là **thay đổi lớn**, không phải một lần tăng `0.01`: số mã được trích dẫn từ luật
-anh em và từ task record cũ, nên đánh số lại là làm gãy lặng lẽ một trích dẫn ai đó đã viết ra.
+Mỗi thay đổi luật được chấp nhận làm tăng phiên bản module thêm `0.01` và cập nhật **năm** record. Đổi
+số chính (`x.00`) dành cho thay đổi cấu trúc của module hoặc shelf chứa nó. Thêm, bỏ hoặc đánh số lại
+một mã `NAME-<n>` là **thay đổi lớn**, không phải một lần tăng `0.01`: các luật liên quan và task record
+cũ đã trích dẫn những mã này, nên đánh số lại sẽ âm thầm làm hỏng một trích dẫn đã tồn tại.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hình dạng của luật đổi: từ **một file phẳng** thành **module năm record**.
+Đổi số chính vì cấu trúc của luật đổi: từ **một file phẳng** thành **module năm record**.
 
 - **Chuyển shelf.** `be/canon/patterns/naming.md` → `be/patterns/naming/`. File phẳng cũ không bị
   xoá và không bị sửa; module này **diễn đạt lại** nó đầy đủ hơn, không thay nó bằng một luật khác.

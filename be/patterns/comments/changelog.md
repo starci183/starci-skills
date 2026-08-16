@@ -16,7 +16,7 @@ description: Lịch sử phiên bản của luật Comments.
 Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
-Thêm, bỏ hoặc đánh số lại một mã `COMMENT-<n>` là **thay đổi lớn**, không phải một lần tăng. Số của
+Thêm, bỏ hoặc đánh số lại một mã `COMMENT-<n>` là **thay đổi lớn**, không phải một lần tăng nhỏ. Số của
 mã được trích dẫn ở các luật anh em và ở các bản ghi task cũ, nên đánh số lại một mã sẽ **âm thầm làm
 hỏng một trích dẫn ai đó đã viết ra rồi**.
 

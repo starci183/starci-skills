@@ -31,7 +31,7 @@ nhất — `COPY-6` — vừa không có rule vừa **chưa neo được** vào 
 | `COPY-4` vs `COPY-1` | Loại trừ được khi đã nêu chữ đến bằng `props` hay bằng provider |
 | `COPY-5` vs `COPY-6` | Loại trừ được: miễn vì **là nội dung** khác với giữ vì **bị so khớp** |
 | `selectedKey` vs `labelKey` | Loại trừ được bằng phép thử "xoá hết từ điển thì cái nào còn render đúng" |
-| Thiếu dữ kiện | Mặc định coi chuỗi là copy; chỉ hỏi một câu khi bên yêu cầu nói rõ có bên thứ ba so khớp |
+| Thiếu dữ kiện | Mặc định coi chuỗi là copy; chỉ hỏi một câu khi bên yêu cầu làm rõ có bên thứ ba so khớp |
 
 ## Findings
 
@@ -98,7 +98,7 @@ mới giữ được nó.
   không nằm trong `INDEX.md`.
 
 - **`COPY-6` chưa neo được.** Bảng `Anchor` ghi `chưa neo được` vì trong code thật không tìm được một
-  dòng nào vừa mang dấu vừa đúng là giá trị được so khớp. Mã vẫn giữ nguyên: nó mô tả một tình huống
+  dòng nào vừa mang dấu vừa đúng là giá trị được so khớp. Mã vẫn bảo toàn: nó mô tả một tình huống
   có thật và một cách hỏng **im lặng**, mà im lặng là lý do nó cần một cái tên. Nhưng cho tới khi có
   một neo dương, phần này của luật vẫn ở mức đề xuất theo đúng thước đo của canon, và audit này nói ra
   điều đó thay vì đi tìm một neo dễ dãi.

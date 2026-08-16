@@ -33,7 +33,7 @@ task record đã đóng; đánh số lại một mã là làm gãy một trích 
   production thật · `LINT-ADOPTION-3` mọi rule ở `error` · `LINT-ADOPTION-4` config đã resolve từ
   chối inline config · `LINT-ADOPTION-5` audit đỏ thì dừng trước khi sửa source. Nguyên số, nguyên
   nghĩa.
-- **Thêm bảng `Tầng giữ`.** Mỗi mã nói rõ tầng nào đang thực sự giữ nó. Cả năm dòng là `documented`,
+- **Thêm bảng `Tầng giữ`.** Mỗi mã làm rõ tầng nào đang thực sự giữ nó. Cả năm dòng là `documented`,
   vì artifact của module publish `rules = {}`. Lý do được viết ra thay vì để trống: một ESLint rule
   chạy **bên trong** cái config mà luật này phải phán xét, nên nó không nhìn thấy được rule nào vắng
   mặt, rule nào bị hạ mức, hay directive có bị vô hiệu hay không. Thứ giữ luật này là một audit chạy
@@ -54,7 +54,7 @@ task record đã đóng; đánh số lại một mã là làm gãy một trích 
 - **Tổng quát hoá phần neo triển khai.** Luật phẳng nêu anchor bằng tên một repository cụ thể. Ở
   shelf này, ví dụ phải đọc được ở bất kỳ front end nào, nên neo giữ ở artifact và script, còn ví dụ
   dùng flat config thường, TSX thường và một namespace plugin chỉ để đọc được.
-- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại lệ
+- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại lệ
   và mục "trông giống nhưng không phải mã này"; đóng lại bằng ánh xạ yêu cầu, bảng phân định ranh
   giới và danh sách sai lầm lặp lại.
 - **Không có `prompt.md`.** Ánh xạ yêu cầu nằm cùng chỗ với ví dụ mà nó phân định. Module có đúng

@@ -11,12 +11,12 @@ description: Phản biện mức phân định, mức thi hành và khả năng 
 
 > Version: `2.00` · Module: `authorization`
 
-Audit này kiểm ba thứ: luật có chọn được **một** mã từ dữ kiện nghiệp vụ đã nêu; bảng `Tầng giữ` có
+Audit này kiểm ba việc: luật có chọn được **một** mã từ dữ kiện nghiệp vụ đã nêu; bảng `Tầng giữ` có
 nói thật về chỗ nào có máy giữ và chỗ nào không; và mỗi mã có chỉ được vào code thật hay không.
 
 ## Verdict
 
-Chấp nhận. Sáu mã giữ nguyên số và nguyên nghĩa, một mã có lint rule, năm mã chỉ có người đọc, và cả
+Chấp nhận. Sáu mã giữ nguyên số và nguyên nghĩa: một mã có lint rule, năm mã chỉ có người đọc giữ, và cả
 sáu đều neo được vào code đang chạy.
 
 Phần đáng phản biện nhất của module này **không** phải nội dung luật — nội dung đã ổn định từ bản
@@ -38,7 +38,7 @@ phẳng. Nó là khoảng cách 1/6 giữa thi hành và tài liệu, và audit 
 ## Findings
 
 - **Sáu mã, một rule.** Bản phẳng đã nói rõ điều này và module chỉ dựng nó thành bảng: `AUTHZ-2` là
-  nửa duy nhất trả lời được trong phạm vi một file. Bảng `Tầng giữ` làm cho khoảng cách ấy **đọc được**
+  nửa duy nhất trả lời được trong phạm vi một file. Bảng `Tầng giữ` khiến khoảng cách ấy **hiện rõ**
   thay vì phải suy ra từ một đoạn văn.
 - **Cả sáu mã đều neo được.** Không mã nào phải ghi `chưa neo được`. `AUTHZ-5` neo vào một **cặp**
   guard trên cùng một quan hệ — một guard tạo dòng dùng thử và luôn cho qua, một guard đọc cột đã trả

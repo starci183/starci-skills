@@ -23,7 +23,7 @@ trên năm mã có rule giữ**, và đó là con số phải nói ra chứ khô
 Bốn mã còn lại chia làm hai loại khác hẳn nhau, và gộp chúng lại là cách đọc sai bản audit này:
 
 - **Bàn giao có chủ đích** — `TYPE-SAFETY-2`, `TYPE-SAFETY-3`. Có rule giữ, chỉ là rule của người
-  khác, và module này nói rõ tên rule ấy.
+  khác, và module này làm rõ tên rule ấy.
 - **Không cơ chế nào giữ được** — `TYPE-SAFETY-4`, `TYPE-SAFETY-5`. Đây là phần của luật mà một
   checker không thể nhận lấy nếu không biến thành thủ tục.
 
@@ -87,7 +87,7 @@ Bốn mã còn lại chia làm hai loại khác hẳn nhau, và gộp chúng l�
 
 ## Rủi ro còn mở
 
-Mục này liệt kê **mọi mã chỉ ở tầng `documented`**, và với mỗi mã nói rõ một rule sẽ phải **nhìn
+Mục này liệt kê **mọi mã chỉ ở tầng `documented`**, và với mỗi mã làm rõ một rule sẽ phải **nhìn
 thấy điều gì** mới giữ được nó — hoặc vì sao không rule nào giữ được.
 
 - **`TYPE-SAFETY-2` — `any`.** *Giữ được, nhưng cố ý giao ra ngoài.*
@@ -123,7 +123,7 @@ Ngoài tầng giữ, ba rủi ro nữa còn mở:
 - **`TYPE-SAFETY-3` có thể bị cho là đứng sai module.** Nó không nói về việc tắt kiểm — bốn mã kia
   đều nói. Lập luận giữ nó ở đây: cùng một cơ chế hỏng, là "không có thứ gì sửa cách viết thứ hai".
   Lập luận phản đối: module này tự phát biểu mình chỉ có **một** việc, và mã này không phải việc ấy.
-  **Luật giữ nguyên năm mã**; nếu tách, đó là một rule change có changelog, không phải một lần đọc
+  **Luật bảo toàn năm mã**; nếu tách, đó là một rule change có changelog, không phải một lần đọc
   khác đi.
 - **Neo của `TYPE-SAFETY-1` là một sự vắng mặt**, nên nó **hết hạn khi cây nguồn đổi**. Đúng một
   lần khớp mới là đủ để neo này sai, và không có ai canh việc đó ngoài chính rule.

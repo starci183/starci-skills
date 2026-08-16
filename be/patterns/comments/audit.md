@@ -11,12 +11,12 @@ description: Phản biện mức phân định, mức enforcement thật và kh�
 
 > Version: `2.00` · Module: `comments`
 
-Audit này kiểm hai chuyện, và **chỉ** hai chuyện: luật có phân định được từng tình huống bằng dữ kiện
+Audit này kiểm hai việc, và **chỉ** hai việc: luật có phân định được từng tình huống bằng dữ kiện
 đã nêu không, và bảng `Tầng giữ` có nói thật về mức mà cơ chế **thực sự** giữ được không.
 
 ## Verdict
 
-Chấp nhận. Năm mã đóng, ba mã có rule đứng sau, hai mã chỉ có người đọc — và bảng tầng nói đúng như
+Chấp nhận. Năm mã đã khép kín, ba mã có rule đứng sau, hai mã chỉ có người đọc giữ — và bảng tầng nói đúng như
 thế thay vì làm tròn lên.
 
 Điểm mạnh nhất của phiên bản này không phải ba rule. Nó là chỗ luật **tự khai** rằng hai trong ba
@@ -76,7 +76,7 @@ rule hẹp hơn mã mà chúng giữ, kèm ví dụ sống chứng minh. Một b
   phải nới.
 - Giữ `COMMENT-4` ở định nghĩa ba lớp ký tự, **không** nâng lên "ASCII only".
 - Giữ ngoại lệ file locale: soi `messages/`, `locales/`, `i18n/` là đi soi sản phẩm.
-- Giữ mọi ví dụ ở dạng TypeScript thường hình dạng NestJS, không tên sản phẩm, không tên repository.
+- Giữ mọi ví dụ ở dạng TypeScript thường trong ứng dụng có hình dạng NestJS, không tên sản phẩm, không tên repository.
   Đường dẫn thật chỉ xuất hiện ở bảng `Anchor`, vì một anchor bắt buộc phải là đường dẫn thật — đó
   chính là thứ làm nó thành anchor.
 

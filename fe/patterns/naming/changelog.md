@@ -31,9 +31,9 @@ mã cũng nằm trong cùng chính sách này — một số hiệu mới là m�
 - **Giữ nguyên ba mã.** `NAMING-1`, `NAMING-2`, `NAMING-3`, nguyên số, nguyên nghĩa, nguyên cả ngoại
   lệ "khai báo lồng không phải mức module" và nguyên cả lập luận hai phần của phép kiểm đường dẫn.
   Module có ba mã và kết thúc với ba mã.
-- **Không phát mã thứ tư.** Bảng Forbidden của bản phẳng có một dòng — *một cái tên nói **nơi** nó
-  được dùng* — mà chính bản phẳng đã giao cho **từng layer** trả lời. Dòng đó được giữ nguyên nghĩa và
-  được nói rõ là chỗ module này dừng lại, thay vì được gán một số hiệu ở đây rồi bị trích dẫn ở đây
+- **Không phát mã thứ tư.** Bảng Forbidden của file luật phẳng có một dòng — *một cái tên nói **nơi** nó
+  được dùng* — mà chính file luật phẳng đã giao cho **từng layer** trả lời. Dòng đó được bảo toàn nghĩa và
+  được nêu rõ là chỗ module này dừng lại, thay vì được gán một số hiệu ở đây rồi bị trích dẫn ở đây
   trong khi câu trả lời nằm nơi khác.
 - **Thêm bảng `Tầng giữ`.** Mỗi mã ghi rõ thứ **thật sự** giữ nó: `unrepresentable`, `enforced` kèm
   **tên rule**, hay `documented`. Cả ba mã đều `enforced` và đều gọi được tên rule
@@ -44,16 +44,16 @@ mã cũng nằm trong cùng chính sách này — một số hiệu mới là m�
   và twin test của nó. Cả ba mã đều neo được, không mã nào phải ghi `chưa neo được`. Anchor mạnh nhất
   là chính file rule — nó tuân thủ `NAMING-1` mà nó phát ra, nên tính chất ấy **đọc thấy** chứ không
   phải được khẳng định.
-- **Không chép hai anchor sản phẩm của bản phẳng.** Bản phẳng trỏ vào hai file trong một repository
+- **Không chép hai anchor sản phẩm của file luật phẳng.** Bản phẳng trỏ vào hai file trong một repository
   frontend cụ thể. Shelf này không gọi tên repository nào, và một đường dẫn repository này không mở
   được thì người đọc không kiểm được. Mất mát này được ghi ở [`audit.md`](./audit.md) chứ không được
   thay bằng một đường dẫn không ai xác minh nổi.
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống, dấu hiệu nhận biết, câu tự hỏi, ranh giới
   với mã kề, và danh sách tình huống nghiệp vụ hay gặp. Lý do hoisting, lý do `on` sống sót qua ranh
-  giới, và lý do phép kiểm đường dẫn phải có hai phần đều được giữ nguyên vẹn.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt SAI và ĐÚNG cạnh nhau, kèm
+  giới, và lý do phép kiểm đường dẫn phải có hai phần đều được bảo toàn vẹn.
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt SAI và ĐÚNG cạnh nhau, kèm
   mục ngoại lệ và nhầm lẫn. Thêm phần ánh xạ yêu cầu, bảng phân định ranh giới và danh sách sai lầm
-  lặp lại. Ba cặp ví dụ của bản phẳng — một dáng khai báo, bẫy đổi tên ở ranh giới, và handler không
+  lặp lại. Ba cặp ví dụ của file luật phẳng — một dáng khai báo, bẫy đổi tên ở ranh giới, và handler không
   phải handler — được giữ lại nguyên lập luận.
 - **Không có `prompt.md`.** Ánh xạ yêu cầu nằm cùng chỗ với ví dụ mà nó phân định. Module có đúng năm
   record.
@@ -64,7 +64,7 @@ mã cũng nằm trong cùng chính sách này — một số hiệu mới là m�
   `export default () => {}` đi qua `NAMING-1`; `handleX` trong object literal và trong tham số
   destructure đi qua `NAMING-2`; rule chỉ **cấm** `handle` chứ không **đòi** `on`; và `ROMANISED` là
   một danh sách hai mươi đoạn nên một đoạn ngoài danh sách đi qua `NAMING-3`. Cả bốn nằm ở "Rủi ro còn
-  mở" — bất đồng không bao giờ đi vào một lần sửa lặng lẽ.
+  mở" — bất đồng không bao giờ đi vào một lần sửa âm thầm.
 
 ## Các phiên bản trước
 

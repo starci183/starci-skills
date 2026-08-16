@@ -9,7 +9,7 @@ description: Mã thật cho từng luật máy — chỗ nó nổ, chỗ nó im,
 
 # example.md
 
-> Version: `2.00`
+> Phiên bản: `2.00`
 
 Mô-đun: `translation` · Luật máy: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản
 biện: [`audit.md`](./audit.md)
@@ -18,7 +18,7 @@ Mọi ví dụ dưới đây giả định tệp nằm trong một thư mục nh
 `src/components/leaves/StatRow/component.tsx`. Ngoài bốn thư mục đó cả hai luật đều **không cài
 visitor nào**, nên toàn bộ trang này im lặng.
 
-**SAI** nghĩa là luật nổ. **ĐÚNG** nghĩa là luật im. Mục **Cửa lách và nhầm lẫn** ở cuối mỗi luật
+**SAI** nghĩa là luật nổ. **ĐÚNG** nghĩa là luật im. Mục **Chỗ lách và chỗ dễ nhầm** ở cuối mỗi luật
 chứa mã mà luật **không bắt được** — đó là mã lọt lưới, không phải mã được phép.
 
 ---
@@ -103,7 +103,7 @@ export const useCaption = () => useTranslations("stats")("caption")
 export const toPercent = (done: number, total: number) => Math.round((done / total) * 100)
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Toàn bộ mã dưới đây **không bị báo cáo**. Không cái nào trong số này là hợp lệ theo luật — chúng chỉ
 là những chỗ máy không nhìn tới.
@@ -226,7 +226,7 @@ export const EmptyState = ({ message }: Props) => <p className="text-sm">{messag
 <span className="text-sm text-neutral-500">{value}</span>
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Đây là phần đắt nhất của trang. Mọi khối dưới đây **không bị báo cáo**, và không khối nào trong số
 chúng hợp luật.

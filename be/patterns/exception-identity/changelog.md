@@ -13,8 +13,8 @@ description: Lịch sử phiên bản của luật exception identity.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
-chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
+Mỗi thay đổi luật được chấp nhận sẽ tăng version của module thêm `0.01` và cập nhật cả **năm** record.
+Đổi số chính (`x.00`) dành cho thay đổi cấu trúc của module hoặc shelf mà module nằm trên.
 
 Mã tình huống **không bao giờ được đánh số lại**. Mã được trích dẫn từ các file luật khác và từ các
 task record đã đóng; đánh số lại một mã sẽ phá im lặng một trích dẫn ai đó đã viết ra. Một mã bị cho
@@ -22,8 +22,8 @@ là sai vẫn được giữ, và chỗ để nói nó sai là mục "Rủi ro c
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hình dạng của luật đổi, không phải vì nội dung luật đổi. **Không ruling nào bị sửa
-nghĩa trong lần này.**
+Đổi số chính vì hình dạng của luật thay đổi, không phải vì nội dung luật thay đổi. **Không quyết định
+nào bị sửa nghĩa trong lần này.**
 
 - **Từ một file phẳng thành module năm record.** `be/canon/patterns/exception-identity.md` được
   re-express thành `be/patterns/exception-identity/` với `INDEX.md`, `vi.md`, `example.md`,

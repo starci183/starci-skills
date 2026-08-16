@@ -4,15 +4,15 @@ title: audit.md
 slug: /be/lints/data-access/audit
 sidebar_label: audit.md
 sidebar_position: 3
-description: Phản biện xem ba quy tắc truy cập dữ liệu có giữ được đúng phần luật mà người ta tin là chúng giữ.
+description: Đánh giá xem ba quy tắc truy cập dữ liệu có giữ đúng phần luật mà người dùng tưởng chúng đang giữ hay không.
 ---
 
 # audit.md
 
 > Version: `2.00` · Module: `data-access`
 
-Phản biện này không hỏi luật có đúng không — luật nằm ở tài liệu khác. Nó hỏi một câu duy nhất: **cái
-mà mọi người tin là máy đang giữ có bằng cái máy thật sự giữ không?**
+Bản đánh giá này không hỏi luật có đúng không — luật nằm ở tài liệu khác. Nó chỉ hỏi một câu: **những gì
+mọi người tin máy đang giữ có trùng với những gì máy thật sự giữ không?**
 
 ## Verdict
 
@@ -51,11 +51,11 @@ ghi nhận chứ không đáng coi là mặc định.
    tên** nguồn dữ liệu, nó chỉ đòi một cái tên decorator **có hình dạng** như thể nêu tên.
 2. **Regex `^Inject\w*EntityManager$` cho phần giữa rỗng.** Nên chính decorator trần của khung nền —
    `@InjectEntityManager()` — đi lọt. Đối số của decorator không bao giờ được đọc, mà đó lại là chỗ dạng
-   trần đặt tên kết nối. Kết quả: một cách viết **không nêu tên kết nối nào** làm im một quy tắc mà
+   trần đặt tên kết nối. Kết quả: một cách viết **không nêu tên kết nối nào** khiến quy tắc không báo dù
    toàn bộ thông báo của nó là về việc nêu tên kết nối. Đây là phát hiện nặng nhất của bản phản biện này.
 3. **Toàn mô-đun mù trước tiền tố không gian tên và bí danh.** `orm.EntityManager`, `orm.Repository<T>`,
    `type Manager = EntityManager`, `import { Entity as Table }` — bốn cách viết bình thường, ba quy tắc
-   im hết. Không phải ba lỗ riêng lẻ: đây là **một** lựa chọn kiến trúc — quyết định bằng chữ đã viết,
+   đều không bị báo. Không phải ba lỗ riêng lẻ: đây là **một** lựa chọn kiến trúc — quyết định bằng chữ đã viết,
    không phân giải import — và nó phải được đọc như một lựa chọn, có giá của nó.
 4. **`no-injected-repository` chỉ biết ba cái tên.** Một lớp kho lưu trữ tự viết kế thừa từ kho lưu trữ
    gốc là **đúng thứ luật cấm**, và quy tắc không có cách nào nhận ra. Ai muốn né chỉ cần đặt tên khác.
@@ -65,7 +65,7 @@ ghi nhận chứ không đáng coi là mặc định.
 6. **`require-entity-table-name` đòi một *chuỗi ký tự*, không đòi một *cái tên*.** Đây là chỗ duy nhất
    trong mô-đun mà quy tắc **bắt nhầm**: `@Entity(TABLES.cartItems)` và `@Entity({ name: TABLE_NAME })`
    đã đặt tên bảng đàng hoàng mà vẫn bị báo lỗi. Mẫu "hằng số rửa sạch chuỗi ký tự" ở đây chạy **ngược
-   chiều** so với chỗ nó thường xuất hiện: gom vào hằng số không mở cửa cho lỗi, nó tạo ra tiếng kêu oan.
+   chiều** so với chỗ nó thường xuất hiện: gom vào hằng số không mở cửa cho lỗi, mà tạo ra báo nhầm.
 7. **`@Entity("")` lọt qua nhánh chấp nhận.** Chuỗi rỗng là `Literal` có `value` kiểu chuỗi. Bộ ánh xạ
    sau đó quay về suy ra tên từ tên lớp — tức là **đúng cái hậu quả** quy tắc sinh ra để chặn, đi vào
    bằng chính cánh cửa quy tắc mở ra để công nhận cách viết đúng.
@@ -162,7 +162,7 @@ Mỗi dòng: cửa còn mở, rồi **cái mà quy tắc phải soi để đóng
   báo import trong cùng tệp, và chấp nhận thêm `MemberExpression` khi phần thuộc tính tên `Entity`. Vế
   sau rẻ; vế trước là một lượng việc đáng kể cho một cách né hiếm gặp.
 - **Các decorator khai báo thực thể khác.** Đóng được bằng cách nới tập tên được canh. Cần khảo sát
-  trước: mỗi decorator có bộ đối số riêng, và công nhận sai dạng đối số sẽ tạo ra một loại kêu oan mới.
+  trước: mỗi decorator có bộ đối số riêng, và công nhận sai dạng đối số sẽ tạo ra một loại báo nhầm mới.
 - **Lược đồ dựng bằng mã, không dùng decorator.** Không đóng được từ quy tắc này. Muốn giữ thì phải là
   một quy tắc riêng đọc đối tượng cấu hình — đúng chỗ hơn, và ngoài phạm vi mô-đun này.
 - **Không kiểm nút được trang trí.** Đóng được và rẻ: đòi `node.parent.type` là một khai báo lớp. Ít
@@ -172,7 +172,7 @@ Mỗi dòng: cửa còn mở, rồi **cái mà quy tắc phải soi để đóng
 
 - **`DATA-4` — giao dịch phải được truyền vào.** Muốn giữ thì phải biết, ở mỗi lời gọi, hàm được gọi
   đang dùng bộ quản lý nào: tức là cần **đồ thị lời gọi**, không phải cây cú pháp một tệp. Nguồn nói
-  thẳng lý do không làm: một quy tắc đoán bừa sẽ kêu trên đoạn mã đúng, và một quy tắc kêu oan là một
+  thẳng lý do không làm: một quy tắc đoán bừa sẽ báo trên đoạn mã đúng, và một quy tắc báo nhầm là một
   quy tắc bị tắt. Đây là luật do người đọc lại giữ, và điều đúng đắn duy nhất cần làm là **nói ra** rằng
   nó chưa được giữ.
 - **`DATA-5` — truy vấn tự nêu thứ nó cần.** Cùng một lời, vì lý do khác: muốn biết một quan hệ có đáng

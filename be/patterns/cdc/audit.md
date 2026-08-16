@@ -11,12 +11,12 @@ description: Phản biện mức phân định, mức giữ và khả năng neo 
 
 > Version: `2.00` · Module: `cdc`
 
-Audit này kiểm hai thứ: luật có chọn được **đúng một mã** từ dữ kiện đã nêu hay không, và mỗi mã
+Audit này kiểm hai việc: luật có chọn được **đúng một mã** từ dữ kiện đã nêu hay không, và mỗi mã
 đang được **giữ bằng gì** — chứ không phải nó *nên* được giữ bằng gì.
 
 ## Verdict
 
-Chấp nhận. Bảy mã giữ nguyên số và nguyên nghĩa từ luật phẳng. Mọi mã đều neo được vào source đọc
+Chấp nhận. Bảy mã giữ nguyên số và nguyên nghĩa từ luật phẳng. Mọi mã đều neo được vào source có thể đọc
 được hôm nay. Một mã `enforced`, sáu mã `documented`, và khoảng cách đó được ghi thẳng vào
 [`INDEX.md`](./INDEX.md) thay vì được che.
 

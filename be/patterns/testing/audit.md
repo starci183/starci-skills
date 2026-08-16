@@ -11,14 +11,14 @@ description: Phản biện mức phân định, mức enforce thật và khả n
 
 > Version: `2.00` · Module: `testing`
 
-Audit này kiểm hai thứ: luật có chọn được **một lane và một mã** từ dữ kiện đã nêu hay không, và
+Audit này kiểm tra hai việc: luật có chọn được **một lane và một mã** từ dữ kiện đã nêu hay không, và
 bảng `Tầng giữ` có nói **đúng sự thật** về mức enforce hay không. Câu hỏi thứ hai quan trọng ngang
 câu hỏi thứ nhất: một module ghi `enforced` cho một mã không có rule đứng sau thì tệ hơn là một
 module ghi thẳng `documented`.
 
 ## Verdict
 
-Chấp nhận. Mười một mã được giữ nguyên số và nguyên nghĩa từ luật phẳng. Năm mã có lint rule, sáu mã
+Chấp nhận. Mười một mã giữ nguyên số và nguyên nghĩa của luật phẳng. Năm mã có lint rule, sáu mã
 chỉ có người đọc, và cả mười một mã đều neo được vào code thật.
 
 Điều kiện của lần chấp nhận này: bảng `Tầng giữ` phải giữ đúng tỉ lệ 5/6. Nếu ai đó thêm một rule mà

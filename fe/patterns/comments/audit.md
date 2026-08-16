@@ -12,16 +12,16 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 > Version: `2.00` · Module: `comments`
 
 Audit này kiểm hai thứ. Một: sáu mã có phân định được **từ dữ kiện đã nêu**, và chỉ từ đó, hay không.
-Hai: bảng `Tầng giữ` có nói thật hay không — vì một bảng làm tròn "giữ được một nửa" thành `enforced`
+Hai: bảng `Tầng giữ` có phản ánh đúng thực tế hay không — vì một bảng làm tròn "giữ được một nửa" thành `enforced`
 là cách một repository tin rằng mình đang được bảo vệ.
 
 ## Verdict
 
 Chấp nhận, kèm bốn chênh lệch giữa **luật** và **rule** được ghi lại nguyên vẹn ở dưới. Không chênh
-lệch nào được sửa lặng lẽ trong lần chuyển shelf này: luật gốc quyết định nội dung, và bất đồng thì
+lệch nào được sửa âm thầm trong lần chuyển shelf này: luật gốc quyết định nội dung, và bất đồng thì
 xuống mục "Rủi ro còn mở".
 
-Sáu mã, đúng sáu, giữ nguyên số và nguyên nghĩa. Ba rule. Bốn mã có rule mang tên gọi được, hai mã
+Sáu mã, đúng sáu, bảo toàn số và nguyên nghĩa. Ba rule. Bốn mã có rule mang tên gọi được, hai mã
 không. Sáu mã đều neo được vào code thật.
 
 ## Kiểm phân định

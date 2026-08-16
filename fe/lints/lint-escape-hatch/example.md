@@ -9,7 +9,7 @@ description: Mã thật cho rule no-inline-lint-config — chỗ nó nổ, chỗ
 
 # example.md
 
-> Version: `2.00` · Module: `lint-escape-hatch` · Luật: [`INDEX.md`](./INDEX.md) · Bối cảnh: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `lint-escape-hatch` · Luật: [`INDEX.md`](./INDEX.md) · Bối cảnh: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mọi ví dụ dưới đây là mã nguồn thường, đặt trong một tệp có đoạn `/src/` trên đường dẫn — vì ngoài
 cổng đó rule không có mặt. Không tên sản phẩm, không thư viện thành phần riêng; chỉ những định danh
@@ -238,7 +238,7 @@ không neo sẽ bắt trúng **chữ** thay vì bắt trúng **directive**, và 
 tắt lint lại bị báo là đang tắt lint. Cách duy nhất cho im khi ấy là thôi viết lời giải thích — ngược
 hẳn ý luật.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Mã trong mục này **lọt qua** rule. Không mục nào ở đây là mã được phép; đây là danh sách những chỗ
 người gác nhìn không ra, để ai đọc còn biết mà tự canh.

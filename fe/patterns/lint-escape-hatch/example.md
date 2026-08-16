@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/lint-escape-hatch/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã LINT-ESCAPE-N, viết bằng TSX thường và flat config thường.
+description: Tất cả case và ngoại lệ của từng mã LINT-ESCAPE-N, viết bằng TSX thường và flat config thường.
 ---
 
 # example.md
@@ -13,9 +13,9 @@ description: Mọi case và ngoại lệ của từng mã LINT-ESCAPE-N, viết 
 
 Mọi ví dụ dưới đây là **TSX thường và flat config thường**. Namespace plugin viết là `fe-canon` chỉ
 để đọc được; luật không đổi khi nó được đánh vần khác đi. Nếu một ví dụ cần tên riêng của một sản
-phẩm mới hiểu được thì ví dụ đó đứng sai chỗ.
+phẩm mới hiểu được thì ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt ĐÚNG cạnh SAI, rồi tới mục **ngoại lệ và nhầm lẫn**. Phần
+Mỗi mã có **nhiều case**, từng case đặt ĐÚNG cạnh SAI, sau đó là mục **ngoại lệ và nhầm lẫn**. Phần
 cuối trang ánh xạ từ yêu cầu bằng lời sang một hành động duy nhất.
 
 ---
@@ -288,7 +288,7 @@ export default [
 ```
 
 ```js
-// ĐÚNG — eslint.config.mjs — giữ nguyên mức của canon, trả nợ trước khi merge
+// ĐÚNG — eslint.config.mjs — bảo toàn mức của canon, trả nợ trước khi merge
 export default [base]
 ```
 
@@ -354,7 +354,7 @@ và mỗi state sau đó sẽ được thêm vào cùng chỗ sai đó.
   Ghi lại một khoảng thiếu giữ cho con số trung thực; hạ mức hoặc `ignores` làm ranh giới thành tuỳ
   chọn cho tất cả những người tới sau.
 
-- **Sửa rule là đường thoát hợp lệ duy nhất, và nó cố ý đắt.** Một ca hợp lệ được nói ra trong matcher
+- **Sửa rule là đường thoát hợp lệ duy nhất, và nó cố ý đắt.** Một ca hợp lệ được nêu ra trong matcher
   dùng chung, kèm twin test, trong một diff được review như một thay đổi luật — vì nó là một thay đổi
   luật.
 - **Component mỏng, ranh giới vendor, file khai báo: không cái nào là một hạng miễn trừ.** Chúng là

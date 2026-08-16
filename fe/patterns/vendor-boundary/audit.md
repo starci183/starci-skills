@@ -22,7 +22,7 @@ Luật phân định tốt vì tiêu chí của nó là **đường dẫn**, kh�
 danh sách chủ sở hữu đóng hoặc không; không có phán quyết nào phụ thuộc vào việc người viết thấy nó
 tiện hay không. Đó là lý do mười trên mười bốn mã giữ được bằng máy.
 
-Điểm yếu không nằm ở phân định mà nằm ở **độ phủ**: bốn mã hiện chỉ có người đọc giữ, và hai trong số
+Điểm yếu không nằm ở phân định mà nằm ở **mức bao phủ**: bốn mã hiện chỉ có người đọc giữ, và hai trong số
 đó có rule tồn tại nhưng đang canh một đường dẫn cây không có.
 
 ## Kiểm phân định
@@ -61,10 +61,10 @@ tiện hay không. Đó là lý do mười trên mười bốn mã giữ đượ
 - **Văn bản luật cũ nói `shells/` đóng ở BA; rule và cây thật đều nói BỐN.** Rule nhận thêm
   `RouteShell` và tự ghi trong message rằng một danh sách lệch với canon là **gate bug**. Module này
   carry con số **bốn**, vì cây thật có bốn và tuyên bố ba sẽ khiến luật sai ngay lần đọc đầu tiên.
-  Đây là một bất đồng được khai báo, không phải một lần sửa lặng lẽ — xem "Rủi ro còn mở".
+  Đây là một bất đồng được khai báo, không phải một lần sửa âm thầm — xem "Rủi ro còn mở".
 - **Ba tên riêng trong luật cũ không tồn tại trong cây thật:** `SurfaceAccordionCard` (không có trong
   `branches/`), `leaves/Field` (đã thành `composites/Field`), `QuickActionRow` (cây có
-  `QuickActionsList`). Mã và ý nghĩa được giữ nguyên; drift được ghi thành finding.
+  `QuickActionsList`). Mã và ý nghĩa được bảo toàn; drift được ghi thành finding.
 - **`VENDOR-5` là một khoảng trống có chủ ý, và cái giá của nó đã hiện thực hoá một lần.** Một caret
   từng được import thẳng từ package glyph ở một kích thước không tồn tại ở đâu khác, và không có gì
   báo. Mã tồn tại để lần sau không phải phát hiện lại.
@@ -78,7 +78,7 @@ tiện hay không. Đó là lý do mười trên mười bốn mã giữ đượ
 
 - Giữ đúng **mười bốn** mã, nguyên số và nguyên nghĩa: `VENDOR-1` … `VENDOR-14`. Không đánh số lại,
   không thêm, không bớt. Các mã này được trích dẫn từ file luật khác và từ record công việc cũ.
-- Danh sách chủ sở hữu là **đóng**, và ranh giới soi **hai chiều**. Nửa soi-vào-trong được giữ nguyên
+- Danh sách chủ sở hữu là **đóng**, và ranh giới soi **hai chiều**. Nửa soi-vào-trong được bảo toàn
   hiệu lực.
 - Ghi tầng giữ **trung thực**: chỉ gọi `enforced` khi tìm được rule và gọi được tên nó. Một rule
   không bao giờ chạy được ghi là `documented`, kèm lý do.

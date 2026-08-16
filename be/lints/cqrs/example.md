@@ -4,18 +4,18 @@ title: example.md
 slug: /be/lints/cqrs/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Code nổ và code không nổ cho từng quy tắc, kèm code lách qua được.
+description: Ví dụ bị báo lỗi, không bị báo lỗi và lọt qua từng quy tắc.
 ---
 
 # example.md
 
 > Version: `2.00` · Mô-đun: `cqrs` · Luật: [`INDEX.md`](./INDEX.md) · Từng quy tắc: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mỗi mục dưới đây là **một quy tắc**, với nhiều cặp **SAI** (quy tắc nổ) và **ĐÚNG** (quy tắc im), rồi
-tới **Cửa lách và nhầm lẫn** — nơi chứa code **lách qua được**.
+Mỗi mục dưới đây là **một quy tắc**, với nhiều cặp **SAI** (quy tắc báo lỗi) và **ĐÚNG** (quy tắc không báo), rồi
+tới **Cửa lách và nhầm lẫn** — nơi chứa code **lọt qua được**.
 
 Đọc kỹ nhãn ở mục cuối mỗi phần: code trong đó **không phải code được phép viết**. Nó là code vi
-phạm luật mà quy tắc **không thấy**. Luật vẫn cấm; chỉ có cái máy là không bắt.
+phạm luật mà quy tắc **không thấy**. Luật vẫn cấm; chỉ là máy không bắt được.
 
 Tên tệp được ghi ngay trên mỗi khối, vì với hai trong ba quy tắc, **tên tệp là một phần của phép
 kiểm**.
@@ -338,7 +338,7 @@ export class ArchiveOrderCommand {
 
 Phép kiểm hình dạng thoát sớm khi không tìm thấy hàm dựng, và các trường là `PropertyDefinition` mà
 quy tắc không hề đọc. Đây đúng là vi phạm mà luật mô tả — nhiều trường thay vì một `params` — viết ở
-dạng cái máy không nhìn thấy.
+dạng mà máy không nhìn thấy.
 
 **Lách 2 — logic nằm trong thân hàm dựng.**
 

@@ -9,12 +9,12 @@ description: Phản biện xem bốn luật máy có thật sự giữ được 
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `tokens`
+> Phiên bản: `2.00` · Mô-đun: `tokens`
 
 Phản biện này hỏi đúng một câu: **một máy nhìn thấy được bao nhiêu phần của luật token, và phần còn
 lại thì ai giữ?**
 
-## Verdict
+## Kết luận
 
 Chấp nhận, có bảo lưu.
 
@@ -40,7 +40,7 @@ biết là không có ai canh.
 | Luật có đọc được lời gọi hàm gộp class không | **Không.** Bộ đọc không có ca cho `CallExpression` |
 | Cổng phạm vi là gì | Đường dẫn chứa `/src/`, phân biệt hoa thường. Ngoài cổng: không luật nào chạy |
 
-## Findings
+## Phát hiện
 
 **F1 — Luật thứ tư không có biển `-- TOKEN-n --`.** Ba luật đầu có biển ngăn cách ghi rõ mã luật
 trong tệp nguồn; `no-unresolved-token-class` thì không. Ánh xạ sang `TOKEN-9` được đọc từ chú thích
@@ -74,7 +74,7 @@ một tiến trình lint dài, hoặc trong chế độ theo dõi dùng chung ti
 cũ. Chấp nhận được với một lượt chạy một lần; đáng nhớ khi chẩn đoán một phát hiện "không chịu biến
 mất".
 
-## Decisions
+## Quyết định
 
 - **Giữ đúng bốn luật, tên giữ nguyên từng chữ.** Tên là định danh; đổi tên là đổi chuỗi xuất hiện
   trong nhật ký bản dựng và trong mọi chú thích tắt luật đang có.
@@ -173,7 +173,7 @@ hình dạng mà bộ duyệt hiện có đã đọc được. `TOKEN-8` thì **
 **R16 — Chỉ báo hit đầu tiên mỗi nút.** Một chuỗi ba bậc lẻ cần ba lượt sửa. Đóng bằng cách đổi
 `match` sang khớp toàn cục và báo từng hit. Rẻ, và cải thiện rõ trải nghiệm sửa lỗi.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn công bố thêm hoặc bớt một luật, hoặc đổi tên bất kỳ luật nào.
 - Bất kỳ danh sách họ nào trong bốn biểu thức chính quy được sửa.

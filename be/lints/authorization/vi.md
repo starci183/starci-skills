@@ -4,14 +4,14 @@ title: vi.md
 slug: /be/lints/authorization/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Quy tắc lint duy nhất giữ luật authorization - bắt gì, phát hiện bằng cách nào, và cửa nào còn mở.
+description: Quy tắc lint duy nhất giữ luật authorization — bắt gì, phát hiện bằng cách nào và còn bỏ sót điều gì.
 ---
 
 # vi.md
 
 > Version: `2.00` · Mô-đun: `authorization`
 
-# Một cái máy giữ một nửa của luật authorization
+# Máy chỉ giữ được một nửa luật authorization
 
 Luật authorization có sáu mã, `AUTHZ-1` đến `AUTHZ-6`. **Chỉ một mã là hình dạng mà một bộ phân tích
 cú pháp nhìn thấy được.** Năm mã còn lại đều xoay quanh **một hàng dữ liệu đã nạp**: ai sở hữu hàng
@@ -21,10 +21,10 @@ biết "sở hữu" hàng đó nghĩa là gì.
 
 `AUTHZ-1` thì khác: nó **đo rồi và cố tình để yên**. Một lớp xử lý tự kiểm tra rằng mình có danh tính
 trông giống chép lại việc của cổng, nhưng không phải — cổng thuộc về một cánh cửa, còn lớp xử lý
-thuộc về mọi người gọi. Một quy tắc từ chối chuyện đó sẽ nổ vào phần lớn code **đúng** trong cây này,
+  thuộc về mọi người gọi. Một quy tắc từ chối chuyện đó sẽ báo nhầm trên phần lớn code **đúng** trong cây này,
 tức là một cái cổng đi ngược canon chứ không phải giữ canon.
 
-Cái còn kiểm được trong phạm vi một tệp là **cánh cửa**: một phương thức **đọc** danh tính đã xác thực
+Trong phạm vi một tệp, thứ có thể kiểm được là **cánh cửa**: một phương thức **đọc** danh tính đã xác thực
 trong khi không có gì trên phương thức đó hay trên lớp của nó chứng minh danh tính ấy.
 
 Tài liệu này không chép lại luật. Nó nói **máy thấy được đến đâu** và **hết thấy từ chỗ nào**.
@@ -75,17 +75,16 @@ lên trong bản khác biệt, không hiện lên trong lần đọc lại, khô
 
 Thêm một lý do nữa: đây là sai lầm **rẻ để tạo ra**. Sao chép một cánh cửa cũ rồi sửa nội dung là thao
 tác thường ngày, và decorator cổng là dòng dễ rơi rụng nhất trong lúc sao chép, vì nó là dòng duy nhất
-không nói gì về nghiệp vụ. Sai ở chỗ vô hình lúc viết, đắt về sau: đó là định nghĩa của việc cần một
-cái máy.
+không nói gì về nghiệp vụ. Sai ở chỗ vô hình lúc viết, đắt về sau: đó là lý do cần có máy kiểm tra.
 
 **Cửa còn mở.**
 
 - **Đọc danh tính qua ngữ cảnh thay vì qua decorator.** `@Context() ctx` rồi `ctx.req.user`, hoặc
   `@Req() req` rồi `req.user`. Đây là **lỗ lớn nhất**: toàn bộ khái niệm "đọc danh tính" của quy tắc
   là ba decorator tham số, còn thân phương thức thì không có gì nhìn tới. Cánh cửa đó đọc đúng cái
-  danh tính chưa ai chứng minh, và máy im lặng hoàn toàn.
-- **Một nhịp trung gian.** Cửa nhận `@Context() ctx`, một phương thức riêng tư trong cùng lớp móc
-  `user` ra từ đó. Quy tắc không đi theo lời gọi bao giờ, nên cả cửa lẫn phương thức phụ đều im.
+  danh tính chưa ai chứng minh, và máy hoàn toàn không báo.
+- **Qua một lớp trung gian.** Cửa nhận `@Context() ctx`, một phương thức riêng tư trong cùng lớp móc
+  `user` ra từ đó. Quy tắc không lần theo lời gọi, nên cả cửa lẫn phương thức phụ đều không bị báo.
 - **Decorator có không gian tên.** `@auth.CurrentUser()` sau `import * as auth`. Callee là
   `MemberExpression`, tên đọc ra là `undefined`, không nằm trong tập — phương thức thậm chí không
   thành ứng viên.
@@ -94,19 +93,19 @@ cái máy.
 - **Một decorator danh tính thứ tư.** Tập là chữ đóng gồm ba chuỗi. Thêm một decorator danh tính mới
   — kể cả một lớp bọc do chính cây này viết ra — là mọi cánh cửa dùng nó trở nên vô hình, và không có
   gì báo cho ai biết chuyện đó.
-- **`@UseGuards()` rỗng, hoặc cổng không xác thực.** Đã đo: `@UseGuards()` không tham số **làm im**
+- **`@UseGuards()` rỗng, hoặc cổng không xác thực.** Đã đo: `@UseGuards()` không tham số **khiến quy tắc không báo**
   quy tắc. `@UseGuards(RolesGuard)` hay một cổng luôn trả về đúng cũng vậy. "Có cổng" và "danh tính
   đã được chứng minh" là hai dữ kiện khác nhau, và quy tắc chỉ giữ được dữ kiện thứ nhất.
 - **Một hàm nội bộ tên `UseGuards`.** Phép kiểm là **cách viết**. Một hàm rỗng mang tên đó làm sạch
   mọi cánh cửa trong tệp.
-- **Cổng ở cấp lớp là tấm chăn vĩnh viễn.** Lớp đã mang `UseGuards` thì mọi phương thức thêm vào sau
+- **Cổng ở cấp lớp che phủ vĩnh viễn.** Lớp đã mang `UseGuards` thì mọi phương thức thêm vào sau
   đó — kể cả một năm sau, kể cả phục vụ một **chủ thể khác** — được tha mà không ai quyết lại. Đây
-  cũng là chỗ `AUTHZ-6` hỏng trong im lặng.
+  cũng là chỗ `AUTHZ-6` hỏng mà không bị phát hiện.
 - **Cửa không phải phương thức của lớp.** Một tuyến đường đăng ký bằng mã, một lớp xử lý ráp bằng nhà
   máy, một bảng ánh xạ. Trình thăm duy nhất là `MethodDefinition`; thứ gì không phải nó thì nằm hẳn
   ngoài thế giới của quy tắc.
 
-**Nhầm lẫn theo chiều ngược lại** — những chỗ quy tắc **nổ vào code đúng**, đã đo bằng bộ phân tích cú
+**Nhầm lẫn theo chiều ngược lại** — những chỗ quy tắc **báo nhầm trên code đúng**, đã đo bằng bộ phân tích cú
 pháp đang dùng. `@nest.UseGuards(G)` bị báo, vì tên đọc ra là `undefined`. Một decorator gộp kiểu
 `@Authenticated()` — bên trong là `applyDecorators(UseGuards(...))` — bị báo. Cổng chỉ đặt trên **lớp
 cơ sở** còn cửa khai ở lớp con bị báo. Và một lớp phục vụ có phạm vi theo yêu cầu, nhận `@CurrentUser()`
@@ -135,7 +134,7 @@ Mỗi miễn trừ dưới đây là cố ý và đã đóng.
 - **Cửa không đọc danh tính thì không bị báo.** Một truy vấn công khai không có gì để chứng minh, và
   coi nó là lỗi là cách nhanh nhất để cả quy tắc bị tắt.
 - **Cổng trên lớp tha cho mọi phương thức của lớp.** Từ chối chuyện này sẽ đẩy người viết tới việc lặp
-  decorator ở từng phương thức, không phải cách cây này đang làm. Cái giá là tấm chăn đã ghi ở trên.
+  decorator ở từng phương thức, không phải cách cây này đang làm. Cái giá là lớp che phủ đã nêu ở trên.
 - **Không có cổng theo tên tệp.** Cố ý: quy tắc rộng đúng bằng cấu hình nạp nó, kể cả những tệp không
   ai nghĩ là cửa.
 - **`AUTHZ-1` không có quy tắc.** Đã đo và cố tình để yên.

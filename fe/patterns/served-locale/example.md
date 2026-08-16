@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/served-locale/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã LOCALE-N, viết bằng TSX/TS thường.
+description: Tất cả case và ngoại lệ của từng mã LOCALE-N, viết bằng TSX/TS thường.
 ---
 
 # example.md
@@ -13,9 +13,9 @@ description: Mọi case và ngoại lệ của từng mã LOCALE-N, viết bằn
 
 Mọi ví dụ dưới đây là **TS/TSX thường**. Không design system riêng, không tên sản phẩm, không tên
 repository. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một ví dụ cần tên riêng của
-một dự án mới đọc được, ví dụ đó đứng sai chỗ.
+một dự án mới đọc được, ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục ngoại lệ và những thứ trông
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục ngoại lệ và những thứ trông
 giống nhưng không phải mã đó. Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một quyết định.
 
 Quy ước đọc: một **chain** là nơi các link được lắp ráp thành đường truyền; một **link** là một mắt
@@ -498,7 +498,7 @@ Câu hỏi phân định **chỉ** được hỏi khi dữ kiện thật sự th
 | `LOCALE-1` / `LOCALE-2` | Chain có link locale chưa, và nếu có thì link đó lấy giá trị từ đâu? |
 | `LOCALE-2` / `LOCALE-3` | Cookie đang được dùng làm **nguồn đọc** ở client, hay làm **phương tiện** sang server? |
 | `LOCALE-3` / `LOCALE-4` | Vấn đề là giá trị **không đi tới được**, hay là câu trả lời mặc định **được chấp nhận**? |
-| `LOCALE-4` / mọi mã khác | Câu trả lời đúng vì request đã nói rõ, hay vì tôi tình cờ đọc đúng ngôn ngữ mặc định? |
+| `LOCALE-4` / mọi mã khác | Câu trả lời đúng vì request đã làm rõ, hay vì tôi tình cờ đọc đúng ngôn ngữ mặc định? |
 | `LOCALE-5` / `LOCALE-2` | Call site đang **viết** header, hay đang **nhận** ngôn ngữ qua tham số? Nếu cả hai, ghi cả hai mã |
 
 ## Sai lầm lặp lại nhiều nhất

@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/props-and-slots/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống SLOTS-N, nhận diện bằng nghiệp vụ chứ không bằng thói quen viết props.
+description: Các tình huống SLOTS-N, nhận diện bằng nghiệp vụ chứ không bằng thói quen viết props.
 ---
 
 # vi.md

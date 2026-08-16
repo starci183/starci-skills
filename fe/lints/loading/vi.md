@@ -9,7 +9,7 @@ description: Ba quy tắc giữ luật loading — bắt gì, giữ mã nào, v�
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `loading`
+> Phiên bản: `2.00` · Mô-đun: `loading`
 
 Tài liệu này không viết lại luật. Luật nằm ở `fe/canon/patterns/loading.md`. Ở đây chỉ ghi **phần
 máy nhìn thấy được** của luật đó, và — phần hiếm ai chịu viết ra — **phần máy không nhìn thấy**.
@@ -34,22 +34,22 @@ tắc nào. Xem `audit.md`; không bịa ánh xạ để bảng trông cho đầ
 
 ## `no-resting-twin-component`
 
-**Bắt gì.** Một tệp **mang tên** một bản sao hình dạng. Đường dẫn kết thúc bằng
+**Bắt gì?** Một tệp **mang tên** một bản sao hình dạng. Đường dẫn kết thúc bằng
 `<Tên>Skeleton/index.tsx` hoặc `<Tên>Skeleton.tsx`, trong đó `<Tên>` chỉ gồm chữ và số. Báo một lần
 duy nhất trên nút `Program`, nghĩa là **cả tệp** là phát hiện, không phải một dòng nào trong đó.
 
-**Giữ mã nào.** `LOADING-1` — một hình dạng, hai trạng thái; không bao giờ hai cây.
+**Giữ mã nào?** `LOADING-1` — một hình dạng, hai trạng thái; không bao giờ hai cây.
 
-**Cách phát hiện.** Chỉ bằng **tên tệp**. Nội dung tệp không hề được đọc để ra quyết định này. Đường
+**Phát hiện thế nào?** Chỉ bằng **tên tệp**. Nội dung tệp không hề được đọc để ra quyết định này. Đường
 dẫn được chuẩn hoá `\` thành `/`, phải chứa `/src/components/`, không được kết thúc bằng
 `.test.tsx`/`.spec.tsx`, rồi khớp với hai biểu thức chính quy nói trên. Bộ đếm dừng ở đó.
 
-**Vì sao luật này đáng có máy giữ.** Một bản sao hình dạng **không thể được giữ cho khớp**. Nó chỉ
+**Vì sao nên để máy giữ luật này?** Một bản sao hình dạng **không thể được giữ cho khớp**. Nó chỉ
 có thể bị phát hiện *sau khi* đã lệch. Người sửa thành phần thật không có lý do gì để mở tệp bên
 cạnh, và không có gì nhắc họ. Một quy tắc theo tên tệp thì thô, nhưng nó bắt được đúng cái khoảnh
 khắc bản sao *ra đời* — lúc rẻ nhất để từ chối nó.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Đổi tên là thoát sạch: `AvatarPlaceholder`, `AvatarLoading`, `AvatarShimmer`, `AvatarResting`,
   `avatar-skeleton.tsx`, `Card.Skeleton.tsx` — không cái nào khớp. Chỉ chữ `Skeleton` viết đúng hoa
@@ -64,7 +64,7 @@ khắc bản sao *ra đời* — lúc rẻ nhất để từ chối nó.
 
 ## `no-placeholder-prop`
 
-**Bắt gì.** Hai chuyện, cùng một tội.
+**Bắt gì?** Hai chuyện, cùng một tội.
 
 1. `prop` — một phần tử JSX dựng sẵn đưa vào qua thuộc tính tên đúng là `skeleton`, `placeholder`
    hoặc `fallback`.
@@ -72,19 +72,19 @@ khắc bản sao *ra đời* — lúc rẻ nhất để từ chối nó.
    Tên đúng bằng `Skeleton` được miễn: đó là nguyên thuỷ mà một thành phần **nghỉ bằng**, không phải
    bản sao của một thành phần.
 
-**Giữ mã nào.** `LOADING-1`, ở dạng "trao từ bên ngoài". Xa hơn một bản sao thường một bậc: thành
+**Giữ mã nào?** `LOADING-1`, ở dạng "trao từ bên ngoài". Xa hơn một bản sao thường một bậc: thành
 phần bị mô tả thậm chí không nhìn thấy bản mô tả của chính nó.
 
-**Cách phát hiện.** Nửa `prop`: thăm `JSXAttribute`, `name.type` phải là `JSXIdentifier`, `name.name`
+**Phát hiện thế nào?** Nửa `prop`: thăm `JSXAttribute`, `name.type` phải là `JSXIdentifier`, `name.name`
 phải nằm trong đúng ba chuỗi trên, giá trị phải là `JSXExpressionContainer`, và
 `expression.type` phải là `JSXElement` hoặc `JSXFragment`. Nửa `import`: thăm `ImportDeclaration`,
 `source.value` phải khớp `^\.\.?\/`, rồi từng `specifier.local.name` khớp `^[A-Za-z0-9]*Skeleton$`.
 
-**Vì sao luật này đáng có máy giữ.** Một cây nghỉ truyền vào bằng prop là thứ trông **lịch sự nhất**
+**Vì sao nên để máy giữ luật này?** Một cây nghỉ truyền vào bằng prop là thứ trông **lịch sự nhất**
 trong ba tội: nơi gọi có vẻ đang "cấu hình", không phải đang vẽ lại. Chính vẻ lịch sự đó khiến không
 ai chặn nó trong review. Máy không bị vẻ ngoài đánh lừa.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Gom vào một cái tên là thoát.** `const resting = <AvatarBar/>` rồi `skeleton={resting}`: biểu
   thức là `Identifier`, không phải `JSXElement`. Tương tự `skeleton={SHAPES.avatar}`,
@@ -103,12 +103,12 @@ ai chặn nó trong review. Máy không bị vẻ ngoài đánh lừa.
 
 ## `no-resting-branch-at-call-site`
 
-**Bắt gì.** Một biểu thức ba ngôi mà **văn bản điều kiện** chứa `isLoading`, `isSkeleton` hoặc
+**Bắt gì?** Một biểu thức ba ngôi mà **văn bản điều kiện** chứa `isLoading`, `isSkeleton` hoặc
 `isPending`, và **hai nhánh là hai phần tử gốc khác tên nhau**.
 
-**Giữ mã nào.** `LOADING-2` — phần tử lúc nghỉ là **cùng một phần tử**, đã rút giá trị ra.
+**Giữ mã nào?** `LOADING-2` — phần tử lúc nghỉ là **cùng một phần tử**, đã rút giá trị ra.
 
-**Cách phát hiện.** Thăm `ConditionalExpression`. Điều kiện được **đọc ngược lại thành chuỗi** bằng
+**Phát hiện thế nào?** Thăm `ConditionalExpression`. Điều kiện được **đọc ngược lại thành chuỗi** bằng
 `sourceCode.getText(node.test)` rồi khớp `\bis(?:Loading|Skeleton|Pending)\b` — đây là so khớp văn
 bản, không phải phân tích ngữ nghĩa. Mỗi nhánh được rút về **một chuỗi**: `JSXElement` thành tên thẻ
 mở (kể cả dạng `Card.Body`), `JSXFragment` thành `"<>"`, mọi thứ khác thành `null`. Chỉ báo khi cả
@@ -117,12 +117,12 @@ hai chuỗi đều tồn tại **và khác nhau**.
 `null` ở một nhánh cố ý không bị báo: một điều khiển chưa có nơi để đi là `LOADING-5` đang **đúng**,
 không phải một cây thứ hai.
 
-**Vì sao luật này đáng có máy giữ.** Nhánh tại nơi gọi là cách rẻ nhất để viết ra một cây thứ hai —
+**Vì sao nên để máy giữ luật này?** Nhánh tại nơi gọi là cách rẻ nhất để viết ra một cây thứ hai —
 không cần tạo tệp, không cần đặt tên, không để lại dấu vết nào ngoài một dòng dài. Nó cũng là cách
 duy nhất trong ba cách mà tác giả *biết* mình đang mô tả hình dạng của thứ khác, nên là chỗ đáng
 chặn ngay khi gõ.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Cùng tên thẻ gốc là đi lọt.** `isLoading ? <div className="h-4 animate-pulse"/> : <div><Avatar/><Text/></div>`
   — hai bên đều rút về `div`, bằng nhau, quy tắc trả về. Hai cây hoàn toàn khác nhau đi qua như một.

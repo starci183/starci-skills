@@ -9,10 +9,10 @@ description: Mã thật cho từng quy tắc — chỗ nào nổ, chỗ nào kh�
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `loading` · Enforcement: [`INDEX.md`](./INDEX.md) · Vì sao: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `loading` · Enforcement: [`INDEX.md`](./INDEX.md) · Vì sao: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây là **một quy tắc**. **SAI** nghĩa là quy tắc nổ. **ĐÚNG** nghĩa là quy tắc im. Mục
-**Cửa lách và nhầm lẫn** ở cuối mỗi quy tắc mang mã mà quy tắc **không bắt được** — đọc nó như một
+**Chỗ lách và chỗ dễ nhầm** ở cuối mỗi quy tắc mang mã mà quy tắc **không bắt được** — đọc nó như một
 lỗ hổng đã biết, không phải như một cách viết được cho phép.
 
 ---
@@ -111,7 +111,7 @@ const restingRow = <div data-testid="resting" className="h-4 w-24" />
 expect(render(<RecentActivity input={{ state: "pending" }} />)).toContainElement(restingRow)
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Mã dưới đây **lọt qua**. Đó là lỗ hổng, không phải giấy phép.
 
@@ -217,7 +217,7 @@ export const Price = ({ props, isLoading }: PriceProps) =>
   isLoading ? <Skeleton className="h-4 w-16" /> : <span className="text-lg">{props.amount}</span>
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 // LỌT — gom phần tử vào một cái tên trước; biểu thức không còn là JSXElement
@@ -327,7 +327,7 @@ theo luật, nhưng cần biết trước để không tưởng là lỗi của 
 {isLoading ? <Text props={{ value: "" }} isLoading /> : <Text props={{ value: name }} />}
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 // LỌT — cùng tên thẻ gốc "div"; hai cây hoàn toàn khác nhau vẫn đi qua như một

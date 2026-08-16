@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/the-split/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống SPLIT-N, nhận diện bằng câu hỏi "sai được khi mạng vẫn tốt không".
+description: Các tình huống SPLIT-N, nhận diện bằng câu hỏi "sai được khi mạng vẫn tốt không".
 ---
 
 # vi.md

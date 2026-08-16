@@ -9,7 +9,7 @@ description: Luật type-safety có đúng một rule; đây là thứ nó bắt
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `type-safety`
+> Phiên bản: `2.00` · Mô-đun: `type-safety`
 
 Hệ kiểu là phần canon mà máy giữ hộ mà không cần ai nhắc. Phần lớn các luật khác được giữ bằng một
 union đóng hoặc một alias kiểu chứ không phải bằng rule — nghĩa là giá trị của hệ kiểu ở đây không
@@ -42,7 +42,7 @@ rule nào giữ**, ở đây cũng như ở chỗ được uỷ thác.
 
 ## `no-double-cast`
 
-**Bắt gì.** Đúng một hình dạng cú pháp: một phép cast mà toán hạng của nó lại là một phép cast sang
+**Bắt gì?** Đúng một hình dạng cú pháp: một phép cast mà toán hạng của nó lại là một phép cast sang
 đúng từ khoá `unknown`. Nói cách khác là vế ngoài của cặp `giá_trị as unknown as Đích`.
 
 Cast một tầng **không** bị bắt, và đó là chủ ý. `giá_trị as Đích` là một khẳng định mà trình biên
@@ -53,9 +53,9 @@ Cast sang riêng `unknown` cũng không bị bắt, và cũng là chủ ý: đó
 đòi. Nói "tôi chưa biết giá trị này là gì" là một câu trung thực; nói "nó là `Đích`" ngay sau đó mà
 không kiểm gì mới là câu nói dối.
 
-**Giữ mã nào.** `TYPE-SAFETY-1`, trọn vẹn một mã và chỉ một mã.
+**Giữ mã nào?** `TYPE-SAFETY-1`, trọn vẹn một mã và chỉ một mã.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. **Cổng tệp, xét một lần trước khi cài visitor.** Lấy `context.filename` (không có thì
    `context.getFilename()`), ép về chuỗi, đổi mọi dấu gạch ngược thành gạch chéo, rồi đòi đường dẫn
@@ -69,7 +69,7 @@ Ba tính chất của cách phát hiện ấy quyết định toàn bộ phần 
 module, không hỏi kiểu, không chạy code); nó khớp **một từ khoá**, không khớp một ý nghĩa; và nó khớp
 một quan hệ **kề nhau** — hai phép cast phải là cha con trực tiếp.
 
-**Vì sao luật này đáng có máy giữ.**
+**Vì sao nên để máy giữ luật này?**
 
 Câu hỏi quyết định là: *trình biên dịch đang biết gì mà dòng này bảo nó quên đi?* Nếu câu trả lời là
 "không gì cả, hai kiểu vốn khớp" thì phép cast là thừa. Nếu câu trả lời là bất cứ thứ gì khác thì
@@ -85,7 +85,7 @@ Ba lý do khiến việc này không nên để cho người soát tay:
   hình dạng mà nó chưa từng có** — nên rule này không có bản vá tự động, và một kho có lịch sử nên
   chuẩn bị tinh thần rằng mỗi báo cáo là một khoản việc thật.
 
-**Cửa còn mở.** Đây mới là phần đáng đọc của trang này.
+**Những chỗ còn lọt.** Đây mới là phần đáng đọc của trang này.
 
 - **Cách viết ngoặc nhọn.** `<Đích><unknown>giá_trị` xoá y hệt nhưng là một loại nút khác
   (`TSTypeAssertion`), rule không hề thăm. Đây là cách viết cũ hơn, nên nó thường đến cùng người đang

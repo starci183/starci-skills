@@ -16,7 +16,7 @@ sự đang được **tầng nào** giữ — chứ không phải tầng nào ng
 
 ## Verdict
 
-Chấp nhận. Bảy mã giữ nguyên số và nguyên nghĩa; cả bảy đều neo được vào code thật. Nhưng bốn trong
+Chấp nhận. Bảy mã bảo toàn số và nguyên nghĩa; cả bảy đều neo được vào code thật. Nhưng bốn trong
 bảy chỉ do người đọc giữ, và đó là kết luận quan trọng nhất của bản audit này chứ không phải một ghi
 chú bên lề.
 
@@ -44,7 +44,7 @@ chú bên lề.
   kèm `restingCount: number` và cấm `repeats: false` mang con số đó. Nó làm cho việc **quên khai báo**
   số dòng nghỉ trở thành không viết được. Nó **không** ép ai render những dòng ấy ra màn hình.
 - **`LOADING-5` sống trong một NGOẠI LỆ của lint, không phải trong một rule.**
-  `no-resting-branch-at-call-site` bỏ qua ternary có nhánh `null` và nói rõ trong comment rằng đó là
+  `no-resting-branch-at-call-site` bỏ qua ternary có nhánh `null` và làm rõ trong comment rằng đó là
   `LOADING-5` và nó đúng. Một ngoại lệ bảo vệ dạng đúng khỏi bị báo nhầm; nó không phát hiện được
   dạng sai.
 - **Bốn mã còn lại không có gì cơ học đứng sau.** `LOADING-4`, `LOADING-5`, `LOADING-6`, `LOADING-7`
@@ -64,7 +64,7 @@ chú bên lề.
   defect mà luật được viết để chặn.
 - Ghi **anchor** ra thành một bảng riêng. Luật không chỉ được vào code thật là đề xuất, không phải
   luật.
-- Xếp `LOADING-3` vào `unrepresentable` và nói rõ ngay tại chỗ rằng tầng đó chỉ giữ phần **khai báo**.
+- Xếp `LOADING-3` vào `unrepresentable` và làm rõ ngay tại chỗ rằng tầng đó chỉ giữ phần **khai báo**.
   Không làm tròn lên, cũng không hạ xuống `documented` — cả hai cách đều nói sai một nửa sự thật.
 - Giữ mọi ví dụ ở dạng TSX thường, không tên sản phẩm, không component library.
 
@@ -113,9 +113,9 @@ chú bên lề.
   được giữ bởi hai tầng khác nhau — cái sau là `unrepresentable`, cái trước là `documented` — và một
   mã mang hai tầng là chỗ bảng *Tầng giữ* buộc phải nói thêm một câu. Nếu thực tế cho thấy hai việc
   ấy cần tách, đó là một **đề xuất rule change** và phải qua changelog, không phải một lần đọc khác
-  đi. Luật phẳng đã gộp chúng, nên bản này giữ nguyên.
+  đi. Luật phẳng đã gộp chúng, nên bản này bảo toàn.
 - **Bảy mã không phải một thang.** Ai quen với các module đánh số theo bậc sẽ đọc `LOADING-1`…`7` như
-  thể `7` nặng hơn `1`. Không phải. Đã nói rõ ở `INDEX.md`, và vẫn là chỗ dễ đọc nhầm nhất của bản
+  thể `7` nặng hơn `1`. Không phải. Đã làm rõ ở `INDEX.md`, và vẫn là chỗ dễ đọc nhầm nhất của bản
   này.
 
 ## Re-audit Triggers

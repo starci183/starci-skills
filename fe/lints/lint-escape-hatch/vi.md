@@ -9,7 +9,7 @@ description: Một luật cấm tự tắt lint, một rule giữ nó — bắt 
 
 # vi.md
 
-> Version: `2.00` · Module: `lint-escape-hatch`
+> Phiên bản: `2.00` · Mô-đun: `lint-escape-hatch`
 
 # Cấm tự tắt lint
 
@@ -42,15 +42,15 @@ Hai chỗ cần nói thẳng ngay ở đây:
 
 ## `no-inline-lint-config`
 
-**Bắt gì.** Mọi chú thích nằm trong mã nguồn sản phẩm mà **thân chú thích bắt đầu** bằng một directive
+**Bắt gì?** Mọi chú thích nằm trong mã nguồn sản phẩm mà **thân chú thích bắt đầu** bằng một directive
 đổi tập rule đang chạy: `eslint-disable`, `eslint-disable-line`, `eslint-disable-next-line`,
 `eslint-enable`. Kèm lý do phía sau cũng không thay đổi gì — lý do chỉ ghi lại việc né luật, nó không
 ngăn việc né luật.
 
-**Giữ mã nào.** `LINT-ESCAPE-1`, trọn vẹn. Một nửa của `LINT-ESCAPE-2` — nửa *báo cáo*. `LINT-ESCAPE-3`
+**Giữ mã nào?** `LINT-ESCAPE-1`, trọn vẹn. Một nửa của `LINT-ESCAPE-2` — nửa *báo cáo*. `LINT-ESCAPE-3`
 thì không, và đó là một phát hiện chứ không phải một ánh xạ để bịa cho đủ bảng.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. **Cổng đường dẫn.** Lấy `context.filename`, thiếu thì lấy `context.getFilename()`, đổi mọi dấu `\`
    thành `/`, rồi đòi chuỗi kết quả **chứa** `/src/`. Không chứa thì `create` trả về `{}` — rule không
@@ -71,7 +71,7 @@ Ba chi tiết trong mẫu đó quyết định gần hết hành vi thật:
 - **`\b` đóng phép khớp ngay sau tên directive**, nên phần lý do phía sau không được đọc tới, và một từ
   dài hơn như `eslint-disabled` thì không khớp.
 
-**Vì sao luật này đáng có máy giữ.** Ba lý do, không lý do nào thuộc về thẩm mỹ:
+**Vì sao nên để máy giữ luật này?** Ba lý do, không lý do nào thuộc về thẩm mỹ:
 
 - Một ngoại lệ cục bộ **không bao giờ tự chết**. Nó sống bằng tuổi của tệp, và ai đọc chỗ gọi cũng
   không thấy nó.
@@ -80,7 +80,7 @@ Ba chi tiết trong mẫu đó quyết định gần hết hành vi thật:
 - Người ta chỉ tắt lint ở đúng chỗ luật đang phát huy tác dụng nhất — ranh giới kiến trúc, kiểu dữ
   liệu, phụ thuộc của hook. Cái bị tắt không phải là mấy rule vặt, mà là mấy rule đắt nhất.
 
-**Cửa còn mở.** Từng cửa dưới đây đều là **thiếu sót đã ghi nhận**, không phải giấy phép. Viết theo
+**Những chỗ còn lọt.** Từng cửa dưới đây đều là **thiếu sót đã ghi nhận**, không phải giấy phép. Viết theo
 một trong các dạng đó để khỏi bị báo lỗi vẫn là đúng cái hành vi luật cấm, dù bản dựng có xanh:
 
 1. **Chú thích cấu hình trần: `/* eslint some-rule: "off" */`.** Đây mới là dạng đổi cấu hình lint tại

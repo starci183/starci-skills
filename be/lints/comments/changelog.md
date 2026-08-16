@@ -4,7 +4,7 @@ title: changelog.md
 slug: /be/lints/comments/changelog
 sidebar_label: changelog.md
 sidebar_position: 4
-description: Lịch sử phiên bản của mô-đun tài liệu thực thi luật chú thích.
+description: Lịch sử phiên bản của mô-đun về cơ chế thi hành luật chú thích.
 ---
 
 # changelog.md
@@ -13,7 +13,7 @@ description: Lịch sử phiên bản của mô-đun tài liệu thực thi lu�
 
 ## Version Policy
 
-Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu. Đổi số chính
+Mỗi thay đổi được chấp nhận phải tăng phiên bản mô-đun thêm `0.01` và cập nhật **cả năm** tài liệu. Đổi số chính
 (`x.00`) dành cho thay đổi cấu trúc mô-đun hoặc kệ mà nó nằm trên.
 
 Mô-đun này ghi **cơ chế thực thi**, không ghi luật. Nên nó tăng phiên bản vì một lý do mà mô-đun luật
@@ -25,7 +25,7 @@ ghi**, dù không dòng mã nào của quy tắc đổi. Cửa đó đã mở s�
 
 ## 2.00 — 2026-08-16
 
-Dựng mới mô-đun. Số chính là `2` để đứng cùng thế hệ tài liệu hiện hành, không phải vì có bản `1`
+Dựng mới mô-đun. Số chính là `2` để cùng thế hệ với bộ tài liệu hiện hành, không phải vì có bản `1`
 nào trước đó.
 
 **Vì sao có mô-đun này.** Luật chú thích đã được ghi ở tầng luật, và tầng đó trả lời câu hỏi "phải
@@ -33,7 +33,7 @@ viết thế nào". Nó không trả lời câu hỏi mà một bản dựng xan
 điều gì.** Kệ này ghi phần đó — máy nhìn thấy gì, và phần nào nó không nhìn thấy.
 
 **Phủ những quy tắc nào.** Ba quy tắc, đúng bằng số quy tắc mà tệp nguồn công bố trong `rules` và đặt
-mức `error` trong `recommended`. Chúng ship trong gói `@starci/eslint-canon-be` dưới tiền tố
+mức `error` trong `recommended`. Chúng được phát hành trong gói `@starci/eslint-canon-be` dưới tiền tố
 `starci-be/`:
 
 - `require-export-jsdoc` — giữ `COMMENT-1`.

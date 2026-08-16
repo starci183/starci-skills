@@ -13,8 +13,8 @@ description: Lịch sử phiên bản của luật module layering.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
-chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
+Mỗi thay đổi luật được chấp nhận sẽ tăng version của module thêm `0.01` và cập nhật cả **năm** record.
+Đổi số chính (`x.00`) dành cho thay đổi cấu trúc của module hoặc shelf mà module nằm trên.
 
 Thêm, bớt hoặc đánh số lại một mã `LAYERING-<n>` là **thay đổi lớn**, không phải một bước tăng. Số mã
 đang được trích dẫn từ luật anh em và từ task record cũ; đổi số là bẻ gãy một trích dẫn ai đó đã
@@ -22,7 +22,7 @@ viết ra rồi.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hình dạng của module đổi, không phải vì luật đổi.
+Đổi số chính vì hình dạng của module thay đổi, không phải vì luật thay đổi.
 
 - **Từ một file luật phẳng thành module năm record.** `be/canon/patterns/module-layering.md` được
   diễn đạt lại thành `be/patterns/module-layering/` với `INDEX.md`, `vi.md`, `example.md`,

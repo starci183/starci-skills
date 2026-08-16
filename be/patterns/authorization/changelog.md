@@ -16,7 +16,7 @@ description: Lịch sử phiên bản của luật Authorization.
 Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
-Thêm, bớt hoặc đánh lại số một mã `AUTHZ-<n>` là **thay đổi lớn**, không phải một lần tăng nhỏ. Số mã
+Thêm, bớt hoặc đánh lại số một mã `AUTHZ-<n>` là **thay đổi lớn**, không phải một lần tăng phiên bản nhỏ. Số mã
 được trích dẫn từ các luật anh em và từ task record cũ, nên đánh lại số là làm hỏng một trích dẫn ai
 đó đã viết.
 
@@ -26,7 +26,7 @@ Thêm, bớt hoặc đánh lại số một mã `AUTHZ-<n>` là **thay đổi l�
 
 - **Chuyển từ một file phẳng sang module năm record.** `be/canon/patterns/authorization.md` được
   diễn đạt lại thành `be/patterns/authorization/` với `INDEX.md`, `vi.md`, `example.md`, `audit.md`,
-  `changelog.md`. Không mã nào bị thêm, bớt hay đổi nghĩa; mọi quyết định của bản phẳng được giữ
+  `changelog.md`. Không mã nào bị thêm, bớt hay đổi nghĩa; mọi quyết định của bản phẳng đều được giữ
   nguyên. File phẳng không bị xoá trong lần này.
 - **Giữ nguyên sáu mã.** `AUTHZ-1` (handler tự sở hữu điều kiện tiên quyết), `AUTHZ-2` (cửa đọc danh
   tính thì mang guard), `AUTHZ-3` (sở hữu quyết định trên dòng đã load), `AUTHZ-4` (từ chối làm lộ sự
@@ -37,7 +37,7 @@ Thêm, bớt hoặc đánh lại số một mã `AUTHZ-<n>` là **thay đổi l�
   `enforced` duy nhất là `AUTHZ-2`, giữ bởi rule `identity-needs-guard` (export `identityNeedsGuard`)
   trong `sources/be/authorization.mjs`.
 
-  Bảng này tồn tại để khoảng cách 1/6 **đọc được** thay vì phải suy ra. Bản phẳng đã nói đúng điều
+  Bảng này tồn tại để khoảng cách 1/6 **hiện rõ** thay vì phải suy ra. Bản phẳng đã nói đúng điều
   này bằng văn xuôi ("nửa máy kiểm được là `AUTHZ-2` và chỉ `AUTHZ-2`"); bảng chỉ làm cho nó không
   trượt khỏi mắt người đọc vội.
 - **Thêm bảng `Anchor`.** Mỗi mã chỉ vào code thật kèm điều cần tìm ở đó, vì một luật không chỉ được

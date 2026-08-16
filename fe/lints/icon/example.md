@@ -9,9 +9,9 @@ description: Mã thật cho từng luật lint biểu tượng — cái gì bị
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `icon` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `icon` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mỗi luật có nhiều cặp **SAI** (luật nổ) và **ĐÚNG** (luật im), rồi tới mục **Cửa lách và nhầm lẫn**
+Mỗi luật có nhiều cặp **SAI** (luật nổ) và **ĐÚNG** (luật im), rồi tới mục **Chỗ lách và chỗ dễ nhầm**
 mang mã đi lọt.
 
 Đọc mục cuối đó cho kỹ: mã trong đó **không phải mã được phép**. Nó là mã mà luật **không nhìn thấy**.
@@ -74,7 +74,7 @@ Tên gói mang chữ `icon`, nên nó bị coi là gói hình dù chẳng ai li�
 import { format } from "date-fns"
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Toàn bộ mã dưới đây **đi lọt**. Không cái nào trong số này là cách viết được phép.
 
@@ -166,7 +166,7 @@ import { Flame } from "lucide-react"
 Từ một tệp thường, câu này vi phạm **cả hai** luật nhập: một lần vì nhập gói hình ngoài chiếc lá,
 một lần vì gói đó không thuộc hai họ. Hai thông điệp trên cùng một dòng là đúng thiết kế.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```ts
 // src/components/leaves/Icon/index.tsx
@@ -239,7 +239,7 @@ const a = <i class="size-4" />
 const b = <i className={`size-4`} />
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 // LỌT: cỡ nguyên lệch thang không khớp mẫu, vì mẫu chỉ nhận phân số hoặc ngoặc vuông.
@@ -332,7 +332,7 @@ Luật không phân biệt hình tính năng với hình trạng thái. Trong t�
 
 Ô điều hướng có các lựa chọn ngang hàng để phân biệt, nên hình ở đây làm đúng việc của nó.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 // src/components/composites/LabelledProgressRow/row.tsx
@@ -418,7 +418,7 @@ it("từ chối tranh ngoài tập", () => {
 Muốn chứng minh một tập là đóng thì phải gọi tên cả cái ở trong lẫn cái ở ngoài, nên tệp kiểm thử
 được miễn.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```ts
 // src/components/leaves/RankMark/index.tsx

@@ -15,7 +15,7 @@ Phản biện này **không** kiểm luật. Luật nằm ở `patterns/contract
 thi**: mười luật máy giữ có thật sự giữ được điều chúng mang tên không, và chỗ nào chúng chỉ **trông
 như** đang giữ.
 
-## Verdict
+## Kết luận
 
 **Chấp nhận, kèm ba mươi mốt cửa còn mở được ghi tên.**
 
@@ -45,7 +45,7 @@ giống hệt nhau**. Xem "Rủi ro còn mở", mục đầu tiên.
 | Hai luật cùng phạm vi có chốt phạm vi giống nhau không | **Không đạt**. Xem F-3 |
 | Hành vi thật có khớp với tên luật không | **Không đạt ở hai chỗ**. Xem F-1 và F-2 |
 
-## Findings
+## Phát hiện
 
 **F-1 · `no-unknown-contract-key` không giữ mã nào, và tên nó hứa nhiều hơn nó làm.**
 Mã nguồn xếp nó dưới banner `CONTRACT-9`, thông điệp của nó dẫn cả `CONTRACT-9` lẫn `CONTRACT-5`.
@@ -105,7 +105,7 @@ không chỉ chuỗi dùng làm class. Một câu tài liệu hay một khoá i1
 `hoisted`. Đây là hướng an toàn hơn hướng ngược lại, nhưng nó là báo thừa và cần được gọi tên như
 vậy.
 
-## Decisions
+## Quyết định
 
 - **Giữ danh tính luật là TÊN công bố.** Không bịa mã số. Tên là thứ hiện trong log build, trong
   comment tắt luật, và trong mọi cuộc trao đổi về lần hỏng đó; một định danh thứ hai sẽ thành một
@@ -226,7 +226,7 @@ thứ nên đóng sớm nhất vì nó **đã** được đo là gây thiệt h�
 thật sự nói: cái tên có cố định được nội dung không. *Kết luận:* danh sách đen là thứ rẻ và có thật;
 phần còn lại thuộc về người soát. Ghi vào đây để không ai tưởng `CONTRACT-5` đang được giữ.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Thêm, bỏ, hoặc đổi tên bất kỳ luật nào trong `rules` — kể cả khi hành vi không đổi.
 - `COMPONENT_ROOTS`, `CONTRACT_TABLE_RELATIVE`, `LEAF_DIR_RELATIVE` hoặc danh sách bốn nhánh bề mặt

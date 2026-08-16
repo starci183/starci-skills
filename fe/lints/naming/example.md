@@ -9,10 +9,10 @@ description: Mã thật cho từng quy tắc — chỗ nó kêu, chỗ nó im, v
 
 # example.md
 
-> Version: `2.00` · Module: `naming`
+> Phiên bản: `2.00` · Mô-đun: `naming`
 
 Mỗi mục dưới đây là một quy tắc. **SAI** là đoạn mã làm quy tắc kêu. **ĐÚNG** là đoạn mã nó không
-kêu. Mục **Cửa lách và nhầm lẫn** ở cuối mỗi quy tắc là đoạn mã **quy tắc không thấy** — đọc kỹ nhãn:
+kêu. Mục **Chỗ lách và chỗ dễ nhầm** ở cuối mỗi quy tắc là đoạn mã **quy tắc không thấy** — đọc kỹ nhãn:
 đó là chỗ máy bỏ sót, **không phải** chỗ luật cho phép.
 
 ---
@@ -95,7 +95,7 @@ export const walkRows = function* (rows: Row[]) {
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Đoạn dưới đây **quy tắc không kêu**. Không phải vì được phép — vì cha của nút là `BlockStatement`
 chứ không phải một trong ba loại cha mà quy tắc nhận. Hiện tượng hoisting vẫn nguyên vẹn: `total`
@@ -210,7 +210,7 @@ const onRetry = useCallback(() => {
 }, [refetch])
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Đoạn dưới đây **quy tắc không kêu**, và đây là cửa nặng nhất của nó: `id` của declarator là một
 `ObjectPattern`, mà điều kiện đòi `Identifier`. Tên hàm phản hồi thường **đến bằng đúng đường này**.
@@ -342,7 +342,7 @@ src/app/DANG-XUAT/page.tsx             → kêu tại đoạn "dang-xuat"
 src/app/sign-out/page.tsx
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Những đường dẫn dưới đây **quy tắc không kêu**. Chúng vi phạm luật y như các trường hợp SAI ở trên;
 chỉ là máy không với tới. Đây là bỏ sót, không phải cho phép.

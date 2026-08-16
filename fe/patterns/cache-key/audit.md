@@ -39,7 +39,7 @@ máy**. Luật đúng, phân định được, neo được vào code thật, nh
   xuất, hỏng ở trạng thái chạy của một danh sách); `CACHE-4` và `CACHE-5` giữ hai đầu mà key không
   với tới. Gộp lại thì đúng nhưng vô dụng.
 - Chữ `null` mang **hai** nghĩa trong cùng một module — `null` ở vị trí key (`CACHE-4`) và `null` ở
-  vị trí kết quả (`CACHE-5`). Đây là chỗ dễ đọc nhầm nhất của phiên bản này và đã được nói rõ ở cả
+  vị trí kết quả (`CACHE-5`). Đây là chỗ dễ đọc nhầm nhất của phiên bản này và đã được nêu rõ ở cả
   ba record.
 - Cả năm mã đều **neo được** vào code thật. Không mã nào phải ghi `chưa neo được`.
 - Bốn trong năm mã neo vào **cùng một file**. Đó là một dấu hiệu tốt (một hook đúng thì đúng nhiều
@@ -50,7 +50,7 @@ máy**. Luật đúng, phân định được, neo được vào code thật, nh
 ## Decisions
 
 - Giữ đúng năm mã, đúng số và đúng nghĩa: `CACHE-1`, `CACHE-2`, `CACHE-3`, `CACHE-4`, `CACHE-5`.
-- Giữ nguyên mọi quyết định của bản phẳng: fetcher đọc tham số ra từ key; fingerprint chứ không phải
+- Giữ nguyên mọi quyết định của file luật phẳng: fetcher đọc tham số ra từ key; fingerprint chứ không phải
   credential; một hook một dòng; `null` thay cho placeholder; lỗi ở `error` chứ không ở dữ liệu;
   nghĩa của `null` viết tại chỗ bóc.
 - Ghi `documented` cho cả năm thay vì để trống hoặc suy diễn ra `enforced` từ một rule của luật khác.

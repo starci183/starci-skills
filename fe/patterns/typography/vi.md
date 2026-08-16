@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/typography/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống TYPESET-N, nhận diện bằng quyền sở hữu nội dung chứ không bằng mắt.
+description: Các tình huống TYPESET-N, nhận diện bằng quyền sở hữu nội dung chứ không bằng mắt.
 ---
 
 # vi.md
@@ -30,7 +30,7 @@ bổ nghĩa cho một dòng khác thì nó là supporting copy. Còn "trông cho
 hữu.
 
 **Đây là luật bắt buộc.** Mọi dòng chữ render ra đều rơi vào đúng một mã dưới đây. Không có dòng nào
-ngắn tới mức được miễn: một category ba chữ nằm trên tên card là `TYPESET-5`, đúng cùng một lý do mà
+ngắn tới mức được miễn: một category ba chữ nằm trên tên card là `TYPESET-5`, cũng vì lý do đó mà
 tên trang là `TYPESET-1`. Câu "có mỗi cái label thôi mà" là chỗ luật này bị bỏ qua nhiều nhất, vì một
 dòng ngắn chính là chỗ người viết với tay lấy đại cỡ chữ nào nhìn thuận mắt.
 
@@ -220,7 +220,7 @@ tiêu đề card muốn đậm hơn tiêu đề bên cạnh.
 
 ## `TYPESET-7` — bậc 12px luôn có nghĩa là copy phụ trợ, và luôn muted
 
-**Tình huống.** Cần một dòng nhỏ. Người viết coi 12px như "phiên bản gọn của chữ chính" và giữ nguyên
+**Tình huống.** Cần một dòng nhỏ. Người viết coi 12px như "phiên bản gọn của chữ chính" và bảo toàn
 tông foreground.
 
 **Dấu hiệu nhận biết**

@@ -9,7 +9,7 @@ description: Phản biện mức enforcement của luật landmark — cái gì 
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `landmark`
+> Phiên bản: `2.00` · Mô-đun: `landmark`
 
 Phản biện này không hỏi luật có đúng không. Nó hỏi **máy giữ được bao nhiêu phần của luật**, và mọi
 chỗ máy không giữ được đã được **viết ra** hay chưa.
@@ -17,7 +17,7 @@ chỗ máy không giữ được đã được **viết ra** hay chưa.
 Tiền đề: một luật không có rule là luật **biết mình không được giữ**. Một rule rò rỉ là luật **được
 tin là đã giữ**. Cái thứ hai nguy hiểm hơn.
 
-## Verdict
+## Kết luận
 
 **Chấp nhận, kèm ba finding.** Nguồn publish **đúng hai** rule — số đếm khớp với con số dự kiến. Cả
 hai đều ánh xạ được vào một mã luật có thật, không phải bịa. Nhưng ba trong năm mã luật không có rule
@@ -41,7 +41,7 @@ là "rule tự nhận một bảo đảm nó không có". Tài liệu này giữ
 | Tài liệu có mô tả rule nào không tồn tại không | Không. Mọi mục đều chỉ được vào một `export` có thật |
 | Văn xuôi và ví dụ có nêu tên sản phẩm nào không | Không. Định danh publish được giữ nguyên văn theo đúng quy định |
 
-## Findings
+## Phát hiện
 
 **Finding 1 — Ba mã luật không có rule nào.** `LANDMARK-1` (mỗi phần tử landmark một nhánh),
 `LANDMARK-2` (nhánh không mang class), `LANDMARK-3` (không truyền phần tử vào khung bằng prop) đều
@@ -71,7 +71,7 @@ nguyên vẹn, dưới một cái vỏ khác.
 tiếp nhất nằm ngoài phạm vi cả hai rule ở đây. Một mô-đun luật khác có cấm nó, nhưng đó là một mô-đun
 khác: nếu nó không được bật, luật landmark không nói gì.
 
-## Decisions
+## Quyết định
 
 - Giữ **đúng hai** rule làm đơn vị tài liệu, theo đúng những gì nguồn publish. Không viết mục cho rule
   "đáng lẽ phải có".
@@ -143,7 +143,7 @@ luật landmark chỉ kín ở điểm này khi mô-đun kia cũng đang bật.
 **Cả ba nên có rule.** Cho tới lúc đó, chúng là luật được giữ bằng mắt, và câu này phải nằm ở chỗ
 người ta đọc được.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Nguồn publish thêm hoặc bớt một rule, hoặc đổi tên một rule đang có.
 - Tập nhánh landmark có thêm thành viên thứ hai.

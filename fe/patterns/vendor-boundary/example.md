@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/vendor-boundary/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã VENDOR-N, viết bằng TSX thường với một vendor thay thế.
+description: Tất cả case và ngoại lệ của từng mã VENDOR-N, viết bằng TSX thường với một vendor thay thế.
 ---
 
 # example.md
@@ -15,7 +15,7 @@ Mọi ví dụ dưới đây là **TSX thường**. Thư viện component đư�
 `@vendor/glyphs`. Tên thật của thư viện không đổi kết luận nào ở đây: luật nói về **file nào được
 import**, không về việc import cái gì.
 
-Mỗi mã có **nhiều case**, rồi tới **ngoại lệ và nhầm lẫn**. Phần cuối trang ánh xạ từ yêu cầu bằng
+Mỗi mã có **nhiều case**, sau đó là **ngoại lệ và nhầm lẫn**. Phần cuối trang ánh xạ từ yêu cầu bằng
 lời sang một phán quyết duy nhất.
 
 ---

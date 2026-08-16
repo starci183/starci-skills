@@ -13,9 +13,9 @@ description: Từng tình huống COMMENT-N, nhận diện bằng nghiệp vụ 
 
 # Comments
 
-Một comment ở đây trả lời đúng **một** câu mà code không trả lời được: **tại sao**.
+Một comment ở đây chỉ trả lời **một** câu mà code không tự trả lời được: **tại sao**.
 
-Code làm gì thì bản thân code đã nói, bằng một ngôn ngữ được thiết kế để nói chuyện đó cho chính xác.
+Code làm gì thì bản thân code đã nói, bằng một ngôn ngữ được thiết kế để diễn đạt điều đó chính xác.
 Viết lại điều đó bằng tiếng Anh là tạo ra **bản mô tả thứ hai** cho cùng một sự việc — và bản thứ hai
 không có compiler nào đứng sau. Lần đầu tiên code đổi mà không ai sửa câu văn nằm cạnh, bản thứ hai
 thành lời nói dối, và **không có gì đỏ lên cả**.
@@ -24,9 +24,9 @@ Câu tự hỏi quyết định một comment có đáng tồn tại không:
 
 > Người đọc có tự suy ra được điều này từ đoạn code đang nằm trước mắt họ không?
 
-Có — xoá. Không — viết xuống, vì nó **sắp mất**.
+Có — xoá. Không — viết xuống, vì nếu không, thông tin ấy **sắp mất**.
 
-**Đây là luật bắt buộc.** Mọi export, mọi member của enum export ra, mọi comment và mọi ký tự
+**Đây là luật bắt buộc.** Mọi export, mọi member của enum được export, mọi comment và mọi ký tự
 non-ASCII trong cây source đều rơi vào đúng một mã dưới đây. Không có khai báo nào nhỏ đến mức được
 miễn: một arrow function một dòng vẫn là `COMMENT-1`, đúng cùng lý do với một service class. Câu "có
 mỗi một helper thôi mà" là chỗ luật này bị bỏ qua nhiều nhất — và helper chính là thứ có thêm ba
@@ -51,7 +51,7 @@ tức là một thứ **có bề mặt** — được export ra. Đây chính l�
 quyết định có dùng nó hay không thường **không mở file này ra**. Họ chỉ nhìn thấy cái tên ở dòng
 import và chữ ký khi hover.
 
-Tên cộng chữ ký nói được nó **nhận vào gì**. Nó không bao giờ nói được nó **để làm gì**, và càng
+Tên cùng chữ ký cho biết nó **nhận vào gì**. Chúng không bao giờ nói được nó **để làm gì**, và càng
 không nói được **khi nào nên chọn nó thay vì thứ nằm ngay bên cạnh**.
 
 **Dấu hiệu nhận biết**
@@ -83,9 +83,9 @@ factory dựng client cho một hệ thống ngoài · util được ba nơi g�
 member thì nằm ở một `switch` hoặc một bảng tra **ở file khác**. Người viết call site không mở file
 kia ra.
 
-Vì thế doc của member phải trả lời: **chọn cái này thì hệ thống làm gì?** Không phải nó tên là gì.
+Vì thế doc của member phải trả lời: **chọn cái này thì hệ thống làm gì?**, chứ không chỉ nói nó tên là gì.
 
-`Pending` viết thành "trạng thái pending" là một dòng dạy được **không gì cả**. "Chưa có khoản thanh
+`Pending` viết thành "trạng thái pending" là một dòng **không dạy được gì cả**. "Chưa có khoản thanh
 toán nào settle, nên chưa cấp quyền gì và giỏ hàng vẫn sửa được" mới là dữ kiện người viết tiếp theo
 cần và **không tự suy ra được**.
 
@@ -117,7 +117,7 @@ ngoài · lý do từ chối · giai đoạn của một phiên chấm.
 ngoài gửi webhook hai lần, một ràng buộc từ schema, một thứ tự trông tuỳ tiện mà không tuỳ tiện, một
 bug mà hình dạng này ngăn được, một race giữa hai replica.
 
-Comment chép lại dòng bên dưới **tệ hơn không có comment**: nó nhân đôi chi phí bảo trì, và nó là nửa
+Comment chép lại dòng bên dưới **tệ hơn không có comment**: nó nhân đôi chi phí bảo trì và trở thành phần
 sẽ **âm thầm sai**, vì không có gì hỏng khi một câu văn thôi đúng.
 
 **Dấu hiệu nhận biết**
@@ -145,7 +145,7 @@ thứ ba.
 
 ## `COMMENT-4` — prose trong source là tiếng Anh, không emoji, không trang trí
 
-**Tình huống.** Không phải vì tiếng Anh hay hơn. Vì một codebase có **hai ngôn ngữ** trong đó là một
+**Tình huống.** Không phải vì tiếng Anh hay hơn. Một codebase có **hai ngôn ngữ** là một
 codebase có ít nhất một người đọc mà **một nửa phần lập luận không đọc được** — và đúng nửa đó là nửa
 giải thích những chỗ bất ngờ. Chỗ hiển nhiên thì ai cũng đọc được từ code; chỗ cần comment mới là chỗ
 mất.
@@ -211,7 +211,7 @@ Dịch những thứ này **làm hỏng chương trình**, và hỏng theo kiể
 sai không ném lỗi, nó chỉ **không bao giờ khớp nữa**. Một nhánh so sánh dịch sai không đỏ, nó chỉ
 không bao giờ đúng nữa.
 
-Vì thế chúng **ở lại**, và được đánh dấu bằng một ghi chú ngắn nói **vì sao** ở lại — để đợt rà soát
+Vì thế chúng **ở lại** và được đánh dấu bằng một ghi chú ngắn nói **vì sao** — để đợt rà soát
 sau không "sửa" chúng thành bug.
 
 **Dấu hiệu nhận biết**

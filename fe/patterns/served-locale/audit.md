@@ -34,7 +34,7 @@ client **luôn khai báo một cái gì đó**, không chứng minh rằng thứ
 | `LOCALE-3` vs `LOCALE-4` | Loại trừ được khi đã nêu giá trị **không tới được** hay câu trả lời mặc định **được chấp nhận** |
 | `LOCALE-4` vs mọi mã | Loại trừ được bằng phép thử "đổi người đọc sang ngôn ngữ kia thì câu trả lời có đổi không" |
 | `LOCALE-5` vs `LOCALE-2` | Không loại trừ nhau: một call site vừa viết header vừa nhận `locale` vi phạm cả hai, và luật nói ghi cả hai |
-| Thiếu dữ kiện | Mặc định coi lời gọi là có dữ liệu dịch theo server; chỉ hỏi một câu khi bên yêu cầu nói rõ câu trả lời không đổi theo người đọc |
+| Thiếu dữ kiện | Mặc định coi lời gọi là có dữ liệu dịch theo server; chỉ hỏi một câu khi bên yêu cầu làm rõ câu trả lời không đổi theo người đọc |
 
 ## Findings
 
@@ -71,14 +71,14 @@ client **luôn khai báo một cái gì đó**, không chứng minh rằng thứ
   báo — đó là neo. Nhưng nhánh không có địa chỉ (render phía server) trả về app default, nghĩa là với
   người đọc ngôn ngữ kia, lần render đầu tiên khai báo **đúng cái ngôn ngữ sai**, và chỉ được sửa ở
   lần fetch phía client. Quyết định này có trong source, có lý do viết kèm, và cùng hình dạng với link
-  bearer; nó được **giữ nguyên** ở `INDEX.md` như một ngoại lệ đóng. Chỗ audit không đồng ý nằm ở
-  `Rủi ro còn mở`, không nằm trong một lần sửa lặng lẽ.
+  bearer; nó được **bảo toàn** ở `INDEX.md` như một ngoại lệ đóng. Chỗ audit không đồng ý nằm ở
+  `Rủi ro còn mở`, không nằm trong một lần sửa âm thầm.
 
 ## Decisions
 
 - Giữ đúng năm mã: `LOCALE-1`…`LOCALE-5`, nguyên số và nguyên nghĩa. Chúng đang được trích dẫn từ nơi
   khác; đổi số ở đây là làm gãy một trích dẫn đã có người viết ra.
-- Giữ nguyên mọi quyết định của bản phẳng: gắn **vô điều kiện** vì khách vãng lai cũng đọc bằng một
+- Giữ nguyên mọi quyết định của file luật phẳng: gắn **vô điều kiện** vì khách vãng lai cũng đọc bằng một
   ngôn ngữ; **địa chỉ** là nguồn mạnh nhất; **cookie không phải phương tiện** cross-origin; mặc định
   của server là **sàn**; **một** file viết header.
 - Không tô một mã thành `enforced` khi rule chỉ chạm được vỏ của nó. `LOCALE-2` có một nửa **có thể**
@@ -86,7 +86,7 @@ client **luôn khai báo một cái gì đó**, không chứng minh rằng thứ
   bảng `Tầng giữ` mất luôn công dụng.
 - Ghi ngoại lệ `links/` vào luật thay vì để nó sống trong comment của rule. Một ngoại lệ đã được đo
   mà chỉ nằm trong file rule là một ngoại lệ người đọc luật không biết mình được hưởng.
-- Giữ mọi ví dụ ở dạng TS/TSX thường, không tên sản phẩm, không tên repository. Chỗ nào bản phẳng gọi
+- Giữ mọi ví dụ ở dạng TS/TSX thường, không tên sản phẩm, không tên repository. Chỗ nào file luật phẳng gọi
   tên một component riêng thì bản này gọi theo vai trò.
 - Luật là **bắt buộc**: không có lời gọi nào nhỏ tới mức được miễn khai báo mã.
 
@@ -122,7 +122,7 @@ mới giữ được nó — hoặc vì sao không rule nào giữ được.
   sẽ bị đóng vì "không tái hiện được".
 
 - **Nhánh render không có địa chỉ.** Ngoại lệ đóng ở `LOCALE-2`/`LOCALE-4` cho phép trả app default
-  khi không đọc được địa chỉ. Audit này giữ nguyên quyết định đó vì nó có trong source thật và có
+  khi không đọc được địa chỉ. Audit này bảo toàn quyết định đó vì nó có trong source thật và có
   cùng hình dạng với link bearer, nhưng ghi lại chỗ không đồng ý: với người đọc ngôn ngữ kia, lần
   render đầu **khai báo sai ngôn ngữ một cách tự tin**, và một khai báo sai tự tin khó nhìn ra hơn một
   khai báo thiếu. Nếu địa chỉ đọc được ở phía server — nó **có** ở phía server, chỉ là không ở trong

@@ -4,7 +4,7 @@ title: vi.md
 slug: /be/lints/data-access/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Ba quy tắc truy cập dữ liệu — bắt gì, phát hiện bằng cách nào, và cửa nào còn mở.
+description: Ba quy tắc truy cập dữ liệu — bắt gì, phát hiện bằng cách nào và còn bỏ sót điều gì.
 ---
 
 # vi.md
@@ -65,12 +65,12 @@ sai lầm mà mắt người bỏ qua đều đặn và máy thì không bao gi�
 
 - **Chính decorator của khung nền, viết trần.** `@InjectEntityManager()` khớp regex, vì `\w*` khớp cả
   chuỗi rỗng. Mà **đối số của decorator thì không bao giờ được đọc** — nên một decorator không nêu tên
-  kết nối nào vẫn làm im một quy tắc mà toàn bộ thông báo của nó là về việc nêu tên kết nối. Đây là
+  kết nối nào vẫn khiến quy tắc không báo dù toàn bộ thông báo của nó nói về việc nêu tên kết nối. Đây là
   dòng nặng nhất của cả mô-đun.
 - **Tên đúng dạng nhưng trỏ vào hư không.** `@InjectSandboxEntityManager()` cho một nguồn dữ liệu chưa
-  hề đăng ký vẫn im. Quy tắc kiểm **hình dạng của cái tên**, không kiểm cái tên có thật.
+  hề đăng ký vẫn không bị báo. Quy tắc kiểm **hình dạng của cái tên**, không kiểm cái tên có thật.
 - **Decorator tự định nghĩa tại chỗ.** Không import nào được phân giải, nên bất kỳ hàm nào đặt tên đúng
-  dạng cũng làm im quy tắc.
+  dạng cũng khiến quy tắc không báo.
 - **Tên kiểu có tiền tố không gian tên.** `em: orm.EntityManager` phân tích ra `TSQualifiedName`, mà
   điều kiện đòi `Identifier`. Cách viết import cả không gian tên **vô hình** với cả mô-đun này.
 - **Bí danh và bí danh kiểu.** `import { EntityManager as Manager }`, hoặc `type Manager = EntityManager`
@@ -110,7 +110,7 @@ tiên**, nên nó phải bị chặn ngay tại chỗ khai báo.
 **Cửa còn mở.**
 
 - **Lớp kho lưu trữ tự viết.** `class UserRepository extends Repository<UserEntity>` rồi tiêm
-  `repo: UserRepository` — tên không nằm trong ba tên nên **im hoàn toàn**. Đây chính là thứ luật cấm,
+  `repo: UserRepository` — tên không nằm trong ba tên nên **hoàn toàn không bị báo**. Đây chính là thứ luật cấm,
   mặc đúng bộ đồ mà quy tắc không nhận ra.
 - **Mọi tên tay cầm khác.** `AbstractRepository`, `MongoEntityManager`, một lớp bao bọc nội bộ — cùng
   một lý do: danh sách chỉ có ba phần tử.
@@ -166,7 +166,7 @@ sự chênh lệch lớn như vậy giữa **ý định** và **hậu quả** l�
   không có nút decorator nào; quy tắc không có gì để nhìn.
 - **Chiều ngược lại — bắt nhầm.** `@Entity(TABLES.cartItems)` và `@Entity({ name: TABLE_NAME })`
   **đều bị báo lỗi**, dù bảng đã được đặt tên hẳn hoi. Đây là chỗ mẫu "hằng số rửa sạch chuỗi ký tự"
-  chạy **ngược**: gom chuỗi vào một hằng số không làm quy tắc im, nó làm quy tắc kêu oan. Khoá tính
+  chạy **ngược**: gom chuỗi vào một hằng số không khiến quy tắc không báo, mà khiến quy tắc báo nhầm. Khoá tính
   toán `@Entity({ ["name"]: "cart" })` và `@Entity({ ...OPTIONS })` cũng vậy.
 
 ---

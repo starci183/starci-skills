@@ -13,8 +13,8 @@ description: Lịch sử phiên bản của luật Exceptions.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
-chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
+Mỗi thay đổi luật được chấp nhận sẽ tăng version của module thêm `0.01` và cập nhật cả **năm** record.
+Đổi số chính (`x.00`) dành cho thay đổi cấu trúc của module hoặc shelf mà module nằm trên.
 
 Mã tình huống **không bao giờ được đánh số lại**. Chúng được trích dẫn từ file luật khác và từ task
 record cũ; đổi số một mã là làm gãy lặng lẽ một trích dẫn người khác đã viết. Một mã bị cho là sai thì

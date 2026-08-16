@@ -9,12 +9,12 @@ description: Phản biện mức che phủ thật của hai luật máy giữ lu
 
 # audit.md
 
-> Version: `2.00`
+> Phiên bản: `2.00`
 
 Phản biện này chỉ hỏi một câu: **những gì trang này nói máy bắt được, máy có thật sự bắt được không**
 — và những gì máy không bắt được đã được viết ra hết chưa.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm ba nhận định phải đọc trước khi tin vào một lần chạy xanh.
 
@@ -41,7 +41,7 @@ này chấp nhận được vì nó **nói ra** điều đó; bộ luật máy t
 | Cổng thư mục có chạy trên Windows không | Có. Mọi `\` được đổi thành `/` trước phép thử chuỗi con |
 | Mỗi luật có ít nhất một cửa còn mở trung thực không | Có: mười lăm cửa, năm cửa chạm luật thứ nhất và mười hai chạm luật thứ hai |
 
-## Findings
+## Phát hiện
 
 1. **Luật thứ hai bỏ lọt hình dạng túi prop.** `<Input props={{ placeholder: "Search courses" }} />`
    không sinh báo cáo nào: thuộc tính tên là `props`, chuỗi nằm trong một `ObjectExpression`. Văn bản
@@ -80,12 +80,12 @@ này chấp nhận được vì nó **nói ra** điều đó; bộ luật máy t
    một câu; chúng tra một cách trình bày. Bắt chúng là đúng theo tinh thần phụ thuộc, nhưng người đọc
    tên luật sẽ không đoán ra.
 
-## Decisions
+## Quyết định
 
 - Giữ đúng hai luật, đúng hai tên đã công bố, không đặt thêm mã số nào cho chúng.
 - Ghi ánh xạ `COPY-1` và `COPY-2`, và ghi thẳng ra bốn mã còn lại là **luật chưa được giữ** thay vì
   bịa cho mỗi mã một luật máy.
-- Bảng **Cửa còn mở** là bắt buộc và đặt ngang hàng với bảng **Đã đóng** ở `INDEX.md`. Kệ tài liệu
+- Bảng **Những chỗ còn lọt** là bắt buộc và đặt ngang hàng với bảng **Đã đóng** ở `INDEX.md`. Kệ tài liệu
   này tồn tại vì bảng đó.
 - Không đề xuất luật máy mới ở đây. Một luật chưa trỏ tay vào được là một đề xuất, không phải một
   luật; mọi đề xuất nằm ở mục dưới.
@@ -96,7 +96,7 @@ này chấp nhận được vì nó **nói ra** điều đó; bộ luật máy t
 
 Từng cửa còn mở, kèm thứ mà luật máy sẽ phải soi để đóng được nó — hoặc lý do đóng đắt hơn để mở.
 
-| Cửa còn mở | Muốn đóng thì phải soi gì | Đáng đóng không |
+| Những chỗ còn lọt | Muốn đóng thì phải soi gì | Đáng đóng không |
 |---|---|---|
 | Túi prop `props={{ … }}` | Đi vào `ObjectExpression` bên trong `JSXExpressionContainer` và kiểm từng `Property` có khoá nằm trong tập tên nhìn/nghe thấy | **Đáng.** Đây là hình dạng thường dùng nhất và là chỗ mù lớn nhất; chi phí là vài chục dòng visitor |
 | Hằng số giặt sạch chuỗi | Phân giải binding qua scope, hoặc kiểm mọi `Literal` chuỗi trong tệp bất kể vị trí | **Nửa đáng.** Kiểm mọi `Literal` sẽ nổ vào khoá, className, tên biến; muốn đúng thì phải lần theo scope, đắt nhưng làm được trong một tệp |
@@ -115,7 +115,7 @@ Từng cửa còn mở, kèm thứ mà luật máy sẽ phải soi để đóng 
 | Thư mục tầng mới không có trong danh sách | Không đóng được bằng cách liệt kê; cần một quy ước mà thư mục **tự khai** mình là tầng nhận chữ | **Chưa đóng được.** Ghi nhận là rủi ro thường trực, không phải một lần sửa |
 | `COPY-3`, `COPY-4`, `COPY-6` không có luật máy | `COPY-3` cần một luật riêng nhìn tên prop kết thúc bằng `Key` và giá trị là token có dấu chấm; `COPY-4` trùng phần lớn với luật hàng rào dữ liệu ở nơi khác; `COPY-6` cần một dấu máy đọc được thay cho chú thích tự do | `COPY-3` **đáng làm và làm được**; `COPY-6` đáng, nhưng phải thống nhất một dấu trước đã |
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn thêm, bớt hoặc đổi tên một luật — kể cả khi hành vi không đổi.
 - `VOCABULARY_DIRS`, `VISIBLE_ATTRS` hoặc `RESOLVES_COPY` đổi phần tử.

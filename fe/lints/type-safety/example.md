@@ -9,7 +9,7 @@ description: Mã nổ rule, mã không nổ rule, và mã lọt qua rule mà v�
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `type-safety` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `type-safety` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mọi ví dụ dưới đây là mã nguồn thường. Không thư viện thành phần, không kho đăng ký, không tên sản
 phẩm. Một rule chỉ đáng tin khi nó đúng ở bất kỳ mã nguồn nào.
@@ -183,7 +183,7 @@ export const execute = (input: RawOperation) => run(input as unknown as Operatio
 
 Hai đoạn khác nhau đúng một thứ: dựng một giá trị sai có phải **việc** của tệp đó hay không.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Mọi đoạn dưới đây **lọt qua rule**. Không đoạn nào trong số này là cách viết được phép — chúng là
 thứ rule **không thấy**, và biết một cửa còn mở thì đỡ nguy hiểm hơn nhiều so với tưởng rằng nó đã

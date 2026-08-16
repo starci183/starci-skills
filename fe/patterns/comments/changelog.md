@@ -41,7 +41,7 @@ Sáu mã `COMMENTS-1` … `COMMENTS-6` được trích dẫn từ các file lu�
   này — nằm ở [`audit.md`](./audit.md).
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống, dấu hiệu nhận biết, câu tự hỏi, ranh giới
   với mã kề, và danh sách tình huống nghiệp vụ hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt SAI và ĐÚNG cạnh nhau, kèm
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt SAI và ĐÚNG cạnh nhau, kèm
   mục ngoại lệ và nhầm lẫn. Thêm phần ánh xạ yêu cầu, bảng phân định ranh giới và danh sách sai lầm
   lặp lại.
 - **Không có `prompt.md`.** Ánh xạ yêu cầu nằm cùng chỗ với ví dụ mà nó phân định. Module có đúng năm
@@ -52,7 +52,7 @@ Sáu mã `COMMENTS-1` … `COMMENTS-6` được trích dẫn từ các file lu�
 - **Ghi lại bốn chênh lệch giữa luật và rule, không sửa cái nào.** Emoji trong locale data (luật cấm,
   rule miễn), endonym `Tiếng Việt` (rule cho qua, luật chỉ nêu ba ngoại lệ), `vn-ok:` rỗng (rule chấp
   nhận), và các dạng khai báo `COMMENTS-1` không với tới. Cả bốn nằm ở "Rủi ro còn mở" — bất đồng
-  không bao giờ đi vào một lần sửa lặng lẽ.
+  không bao giờ đi vào một lần sửa âm thầm.
 
 ## Các phiên bản trước
 

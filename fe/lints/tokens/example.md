@@ -9,7 +9,7 @@ description: Mã nguồn thật cho từng luật — chỗ luật nổ, chỗ l
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `tokens` · Cơ chế: [`INDEX.md`](./INDEX.md) · Giải thích: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `tokens` · Cơ chế: [`INDEX.md`](./INDEX.md) · Giải thích: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây có nhiều cặp **SAI** (luật nổ) và **ĐÚNG** (luật im), rồi tới một mục **Cửa lách và
 nhầm lẫn**. Mã trong mục cuối cùng ấy **không phải là mã được phép** — nó là mã luật **không nhìn
@@ -95,7 +95,7 @@ Ranh giới từ khớp ngay sau `:`, sau `!` và sau dấu trừ, nên cả ba 
 <section className="md:p-3 !gap-2 -mt-2" />
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Ba đoạn dưới đây **không bị báo**. Không đoạn nào hợp lệ hơn phần SAI ở trên.
 
@@ -187,7 +187,7 @@ export const railEntry = {
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Tên luật hứa "mọi giá trị tuỳ ý". Ba đoạn dưới **không bị báo**, và cả ba đều là giá trị tuỳ ý.
 
@@ -267,7 +267,7 @@ export const bannerEntry = {
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Ba đoạn dưới **không bị báo**, và cả ba đều là tiêu đề ráp tay.
 
@@ -370,7 +370,7 @@ Bộ gỡ tiền tố xử lý được **một** biến thể, nên dòng dư�
 <section className="lg:min-h-panel" />
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Ba đoạn dưới **không bị báo**, và cả ba đều là class chết.
 

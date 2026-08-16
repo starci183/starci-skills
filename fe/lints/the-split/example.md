@@ -9,11 +9,11 @@ description: Mã thật cho từng thông điệp của hai luật, kèm mã đi
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `the-split` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `the-split` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi khối mã dưới đây mở đầu bằng **đường dẫn tệp**, vì với cả hai luật thì đường dẫn chính là thứ
 quyết định luật có tồn tại hay không. **SAI** nghĩa là luật nổ; **ĐÚNG** nghĩa là luật im. Trong mục
-**Cửa lách và nhầm lẫn**, mã được ghi rõ là *luật không thấy* — đó không phải mã được phép viết, đó là
+**Chỗ lách và chỗ dễ nhầm**, mã được ghi rõ là *luật không thấy* — đó không phải mã được phép viết, đó là
 mã lọt qua.
 
 ---
@@ -106,7 +106,7 @@ const isPending = input.state === "pending"
 
 Quyết định một tình huống **đã chốt** trông ra sao chính là việc của tệp này. Luật không đụng tới nó.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 > Mã trong mục này là mã **luật không thấy**, không phải mã được phép viết.
 
@@ -302,7 +302,7 @@ export const OrderSummary = ({ props }: Props) => <OrderRows props={props} />
 
 Tệp này chỉ nhận và chuyển tiếp. `readsWorld` không bật, `Program:exit` trả về ngay, không báo gì.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 > Mã trong mục này là mã **luật không thấy**, không phải mã được phép viết.
 

@@ -13,7 +13,7 @@ description: Lịch sử phiên bản của luật Transport.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
+Mỗi thay đổi luật được chấp nhận làm tăng phiên bản module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
 Mã tình huống **không bao giờ được đánh số lại**. Mã được trích dẫn từ các file luật khác và từ task
@@ -22,7 +22,7 @@ thì ghi là bị bỏ, và số của nó không được dùng lại.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hai thứ đổi cùng lúc: shelf và hình dạng module.
+Đổi số chính vì hai thứ đổi cùng lúc: shelf và cấu trúc module.
 
 - **Chuyển shelf.** `be/canon/patterns/transport.md` (một file phẳng) → `be/patterns/transport/`
   (module năm record). `id` và `slug` đổi theo: `be-patterns-transport-<record>` và

@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/landmark/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã LANDMARK-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã LANDMARK-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -21,7 +21,7 @@ riêng của một sản phẩm nào; hãy thay bằng tên mà ứng dụng c�
 | `registry` | Bảng entry: `classes`, `host`, `children`, `why` |
 | `defineNode` · `defineProjection` · `defineLeaf` | Khai báo nội dung khớp đúng một key |
 
-Mỗi mã có **nhiều case**, rồi tới **ngoại lệ** và **những thứ trông giống nhưng không phải mã đó**.
+Mỗi mã có **nhiều case**, sau đó là **ngoại lệ** và **những thứ trông giống nhưng không phải mã đó**.
 Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một file và một vật mang.
 
 ---
@@ -351,7 +351,7 @@ registry["profile-main"] = {
 ```
 
 ```tsx
-// ĐÚNG: không khai host. Cột đọc mở `div`, và `why` nói rõ nó là một phần của trang.
+// ĐÚNG: không khai host. Cột đọc mở `div`, và `why` làm rõ nó là một phần của trang.
 registry["profile-main"] = {
     classes: ["flex", "min-w-0", "grow", "flex-col", "gap-6"],
     children: { section: { contract: "label-row-over-card", repeats: true } },

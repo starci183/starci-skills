@@ -11,15 +11,15 @@ description: Phản biện mức phân định, mức được giữ và mức n
 
 > Version: `2.00` · Module: `observability`
 
-Audit này kiểm hai chuyện: luật có chọn được một quyết định từ **dữ kiện đã nêu** và chỉ từ đó, và
-mỗi mã có **chỉ được vào code thật** hay không.
+Audit này kiểm tra hai việc: luật có chọn được một quyết định chỉ từ **dữ kiện đã nêu** hay không, và
+mỗi mã có **neo được vào code thật** hay không.
 
 ## Verdict
 
-Chấp nhận, với hai lệch đã đo được ghi lại nguyên trạng. Tám mã giữ nguyên số và nguyên nghĩa. Không
+Chấp nhận, kèm hai điểm lệch đã đo được và được ghi lại nguyên trạng. Tám mã giữ nguyên số và nguyên nghĩa. Không
 mã nào bị đổi tên, không mã nào bị gộp, không mã mới nào được thêm.
 
-Lệch được ghi vào Findings và Rủi ro còn mở, **không** được sửa lặng trong luật. Luật nói `catch` ghi
+Các điểm lệch được ghi vào Findings và Rủi ro còn mở, **không** được âm thầm sửa trong luật. Luật nói `catch` ghi
 danh tính; code hiện tại ghi câu chữ. Cái sai là code, và audit này nói ra chỗ đó thay vì hạ luật
 xuống cho khớp.
 

@@ -11,12 +11,12 @@ description: Mọi case và ngoại lệ của từng mã NAME-N, viết bằng 
 
 > Version: `2.00` · Module: `naming` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng hình dạng NestJS**. Không tên sản phẩm,
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có cấu trúc kiểu NestJS**. Không tên sản phẩm,
 không tên repository, không tên khoá học. Một luật đặt tên chỉ đúng khi nó đúng ở bất kỳ back end
 nào — nên nếu một ví dụ cần tên riêng của một sản phẩm mới đọc được, ví dụ đó đứng sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** và **SAI** cạnh nhau, rồi tới mục **ngoại lệ và nhầm
-lẫn**. Hai bên của một case chỉ khác nhau **đúng một thứ**, và câu ngay dưới nói thứ đó là gì.
+Mỗi mã có **nhiều case**; trong mỗi case, bản **ĐÚNG** và **SAI** được đặt cạnh nhau, sau đó là mục
+**ngoại lệ và nhầm lẫn**. Hai bản chỉ khác nhau **đúng một điểm**, và câu ngay dưới nêu rõ điểm đó.
 
 ---
 

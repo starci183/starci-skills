@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/contract/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã CONTRACT-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã CONTRACT-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -15,7 +15,7 @@ Mọi ví dụ dưới đây là **TSX thường**. Không tên sản phẩm, kh
 component duy nhất biến key thành element. `Panel` là một primitive vendor bất kỳ có thân riêng; thay
 nó bằng primitive của bạn thì luật không đổi một chữ nào.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục **ngoại lệ và nhầm lẫn**.
 Ba mục cuối trang ánh xạ từ yêu cầu bằng lời sang một mã, phân định các ranh giới, và liệt kê những
 sai lầm lặp lại nhiều nhất.
 
@@ -434,7 +434,7 @@ export const contractNodeProps = (name: ContractKey) => {
 ```tsx
 // ĐÚNG — cần một móc cho test thì dùng một attribute có tên khác, không mượn từ vựng của contract.
 <Tree contract="task-list" render={rowsFrom(props.tasks)} />
-// test: [data-node="task-list"] — do frame vẽ, nên nó nói thật.
+// test: [data-node="task-list"] — do frame vẽ, nên nó phản ánh đúng thực tế.
 ```
 
 ```tsx

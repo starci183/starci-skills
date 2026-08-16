@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/file-layout/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã LAYOUT-N, viết bằng cây thư mục thường và TSX thường.
+description: Tất cả case và ngoại lệ của từng mã LAYOUT-N, viết bằng cây thư mục thường và TSX thường.
 ---
 
 # example.md
@@ -13,9 +13,9 @@ description: Mọi case và ngoại lệ của từng mã LAYOUT-N, viết bằn
 
 Mọi ví dụ dưới đây là **cây thư mục thường và TSX thường**. Không component library, không design
 system riêng, không tên sản phẩm. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một
-ví dụ cần tên riêng của một sản phẩm để đọc được, ví dụ đó đứng sai chỗ.
+ví dụ cần tên riêng của một sản phẩm để đọc được, ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, rồi tới **ngoại lệ** và **những thứ trông giống nhưng không phải mã đó**.
+Mỗi mã có **nhiều case**, sau đó là **ngoại lệ** và **những thứ trông giống nhưng không phải mã đó**.
 Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một đích đến duy nhất.
 
 ---

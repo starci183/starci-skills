@@ -11,13 +11,13 @@ description: Mọi case và ngoại lệ của từng mã CDC-N, viết bằng T
 
 > Version: `2.00` · Module: `cdc` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một class dáng NestJS**. Không tên sản phẩm, không
+Mọi ví dụ dưới đây là **TypeScript thường trong một class có hình dạng NestJS**. Không có tên sản phẩm,
 tên repository, không tên module riêng của ai. Một luật CDC chỉ đúng khi nó đúng ở bất kỳ service
-nào projection dữ liệu — nên nếu một ví dụ cần tên riêng của một hệ thống mới đọc được, ví dụ đó sai
-chỗ.
+nào projection dữ liệu — nên nếu một ví dụ cần tên riêng của một hệ thống mới đọc được, ví dụ đó không
+phù hợp ở đây.
 
-Mỗi mã có **nhiều case**, mỗi case đặt ĐÚNG cạnh SAI, rồi tới mục **ngoại lệ và nhầm lẫn**. Phần
-cuối trang ánh xạ từ yêu cầu bằng lời sang một mã duy nhất.
+Mỗi mã có **nhiều case**, mỗi case đặt ĐÚNG cạnh SAI, sau đó là mục **ngoại lệ và nhầm lẫn**. Phần
+cuối trang ánh xạ một yêu cầu bằng lời sang một mã duy nhất.
 
 ---
 

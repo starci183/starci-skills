@@ -17,14 +17,14 @@ CDC biến **một dòng đã commit trong database** thành **một read projec
 không phát lại business command, không cộng thêm một delta thứ hai; nó dịch một thay đổi dữ liệu
 thành **danh tính** của projection, rồi dựng lại projection đó từ nguồn sự thật.
 
-Câu hỏi quyết định, hỏi trước mọi câu khác:
+Câu hỏi quyết định, cần đặt ra trước mọi câu hỏi khác, là:
 
 > Xử lý **đúng một dòng thay đổi đó hai lần** thì projection có ra cùng một kết quả không?
 
-Nếu không — đoạn code đang viết không phải CDC projection, dù nó nằm trong file tên
+Nếu không — đoạn code đang viết không phải CDC projection, dù nó nằm trong file có tên
 `*projection.listener.ts`, dù nó subscribe đúng topic.
 
-**Đây là luật bắt buộc.** Mọi listener projection đều rơi vào các mã dưới đây; không có projection
+**Đây là luật bắt buộc.** Mọi projection listener đều rơi vào các mã dưới đây; không có projection
 nào nhỏ đến mức được miễn. Lý do luật xoay quanh **replay** chứ không xoay quanh "chạy đúng ở lần
 giao đầu tiên": broker chỉ hứa *at-least-once*. Giao trùng không phải sự cố cần xử lý, nó là **hợp
 đồng**. Code chỉ đúng khi mỗi message tới đúng một lần là code đang giả định một bảo đảm chưa ai
@@ -48,7 +48,7 @@ từng cấp cho nó.
 
 **Tình huống.** Bạn thêm một projection mới. Nó cần kết nối, cần subscribe, cần parse envelope
 Debezium, cần biết làm gì khi một message hỏng. Bốn thứ đó **không** phải việc của projection này —
-chúng đã có chủ.
+đã có nơi phụ trách.
 
 **Dấu hiệu nhận biết**
 
@@ -73,7 +73,7 @@ dùng · tách một projection cũ thành hai · một projection cần thêm t
 
 ## `CDC-2` — danh tính consumer và tập nguồn phải khai báo rõ
 
-**Tình huống.** `groupId` là **danh tính bền** của consumer projection này; `topics` là **tập nguồn
+**Tình huống.** `groupId` là **danh tính bền vững** của consumer projection này; `topics` là **tập nguồn
 đầy đủ** có thể làm projection sai. Cả hai đều được viết ra, không được suy ra lúc chạy.
 
 **Dấu hiệu nhận biết**
@@ -100,7 +100,7 @@ với prefix topic khác nhau.
 
 ## `CDC-3` — listener định tuyến, service tính lại
 
-**Tình huống.** `deriveTargets` đọc dòng vừa đổi và trả về **danh tính** những projection bị ảnh
+**Tình huống.** `deriveTargets` đọc dòng vừa đổi và trả về **danh tính** của những projection bị ảnh
 hưởng. `recomputeTarget` giao việc tính lại cho projection service. Listener sở hữu **định tuyến**,
 không sở hữu **chính sách SQL**.
 
@@ -127,7 +127,7 @@ ghi danh phải tính lại cả tiến độ lẫn quyền truy cập.
 
 ## `CDC-4` — tính lại từ nguồn, không cộng delta
 
-**Tình huống.** Projection được dựng lại bằng một **UPSERT** từ những dòng có thẩm quyền. Nó không
+**Tình huống.** Projection được dựng lại bằng một **UPSERT** từ các dòng nguồn có thẩm quyền. Nó không
 bao giờ được cập nhật bằng cách cộng con số mà event mang theo.
 
 **Dấu hiệu nhận biết**
@@ -181,7 +181,7 @@ ghim một dự án · rời khỏi một nhóm.
 
 ## `CDC-6` — một message hỏng không giết consumer
 
-**Tình huống.** Lỗi parse hoặc lỗi recompute được log kèm **topic** và **consumer group**, và chỉ
+**Tình huống.** Lỗi parse hoặc lỗi recompute được log kèm **topic** và **consumer group**, chỉ
 ảnh hưởng đúng message đó. Consumer không dừng.
 
 **Dấu hiệu nhận biết**
@@ -205,7 +205,7 @@ dòng có JSON không hợp lệ · database tạm thời từ chối kết nố
 
 ## `CDC-7` — chứng minh bằng broker thật
 
-**Tình huống.** Một E2E vận hành **đẩy qua Kafka thật** rồi **chờ projection trong database**. Gọi
+**Tình huống.** Một E2E vận hành **đẩy qua Kafka thật** rồi **chờ projection trong database**. Việc gọi
 thẳng `deriveTargets`, `recomputeTarget` hay một method của listener chỉ chứng minh code ánh xạ, chứ
 không chứng minh CDC.
 

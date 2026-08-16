@@ -11,11 +11,11 @@ description: Mọi case và ngoại lệ của từng mã TESTING-N, viết bằ
 
 > Version: `2.00` · Module: `testing` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng dáng NestJS**. Không tên sản phẩm, không
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có cấu trúc kiểu NestJS**. Không tên sản phẩm, không
 tên repository, không tên khoá học. Nghiệp vụ dùng làm nền là những thứ mọi back-end đều có: đơn
 hàng, quyền truy cập, ví, hạn mức, bài nộp được chấm.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **Ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**; trong mỗi case, bản **ĐÚNG** được đặt cạnh **SAI**, rồi tới mục **Ngoại lệ và nhầm lẫn**.
 Cuối trang là ánh xạ từ một yêu cầu bằng lời sang một lane và một mã.
 
 Một lưu ý đọc suốt trang: hai đoạn ĐÚNG/SAI trong mỗi case **chỉ khác nhau đúng một điều**, và câu

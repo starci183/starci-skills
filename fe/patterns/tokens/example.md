@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/tokens/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã TOKEN-N, viết bằng TSX thường và class thường.
+description: Tất cả case và ngoại lệ của từng mã TOKEN-N, viết bằng TSX thường và class thường.
 ---
 
 # example.md
@@ -15,7 +15,7 @@ Mọi ví dụ dưới đây là **TSX thường với class thường**. Không
 riêng. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một ví dụ cần tên riêng của một
 sản phẩm mới đọc được, ví dụ đó sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục **ngoại lệ và nhầm lẫn**.
 Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một quyết định duy nhất.
 
 ---
@@ -326,7 +326,7 @@ không.**
 
 ## `TOKEN-6` — rule phải nhìn vào cái thư mục union không thấy
 
-### Case: cùng một giá trị, hai chỗ đứng, hai thứ bắt nó
+### Case: cùng một giá trị, hai vị trí, hai thứ bắt nó
 
 ```ts
 // tầng entry — compiler từ chối

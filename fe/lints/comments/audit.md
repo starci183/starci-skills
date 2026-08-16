@@ -9,14 +9,14 @@ description: Phản biện mức thực thi — rule giữ được bao nhiêu p
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `comments`
+> Phiên bản: `2.00` · Mô-đun: `comments`
 
 Phản biện này hỏi đúng một câu: **luật `comments` được máy giữ tới đâu, và chỗ nào chỉ còn người giữ?**
 
 Mọi kết luận dưới đây được lấy bằng cách chạy thật ba rule qua trình lint trên các đoạn mã dựng riêng,
 không phải bằng cách đọc tên rule rồi suy ra.
 
-## Verdict
+## Kết luận
 
 Chấp nhận có điều kiện. Ba rule tồn tại, tên rõ, mức `error`, và cả ba đều với xa hơn tên gọi của
 chúng gợi ra — chúng đọc năm chỗ chữ có thể trốn chứ không chỉ đọc chú thích. Đó là thiết kế đúng.
@@ -46,7 +46,7 @@ thứ tư nào bị bỏ sót, và không có rule nào được tài liệu nà
 | Ngoại lệ là đường dẫn chứ không phải phán đoán | Đúng, bảy mẫu đường dẫn, không có ngoại lệ theo nội dung |
 | Ví dụ trong tài liệu không cần tên sản phẩm mới đọc được | Đúng |
 
-## Findings
+## Phát hiện
 
 1. **`COMMENTS-5` và `COMMENTS-6` hoàn toàn không có rule.** Một chú thích chép lại dòng bên dưới, và
    một chú thích cãi mà không nêu tên quyết định nó cãi, đều vô hình. Đây **không** phải chỗ để bịa ánh
@@ -88,7 +88,7 @@ thứ tư nào bị bỏ sót, và không có rule nào được tài liệu nà
    bắt. Đây là chi phí đã biết, không phải lỗi, nhưng phải được viết ra để không ai sửa nhầm bằng cách
    nới rule.
 
-## Decisions
+## Quyết định
 
 - Giữ đúng **ba** rule, gọi bằng **tên đã publish**, không đặt thêm mã số.
 - Ánh xạ `require-export-jsdoc` → `COMMENTS-1`, `no-second-language-in-source` → `COMMENTS-2` (kèm phần
@@ -170,7 +170,7 @@ Mỗi rủi ro kèm câu trả lời cho đúng một câu hỏi: **rule phải 
 - **File nằm ngoài phạm vi lint thì rule không tồn tại.** Điều này quyết định ở cấu hình của từng kho mã,
   không ở đây — nhưng nó là giả định ngầm của mọi câu khẳng định trong mô-đun này.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn thêm, bỏ hoặc đổi tên một rule.
 - Danh sách bảy mẫu đường dẫn miễn trừ thay đổi.

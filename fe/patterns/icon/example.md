@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/icon/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã ICON-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã ICON-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -15,7 +15,7 @@ Mọi ví dụ dưới đây là **TSX thường**. `Icon` ở đây là icon le
 viện glyph — và người gọi chỉ truyền vào **ý nghĩa** cùng **vai trò**. Không tên sản phẩm, không tên
 repository, không component library.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục ngoại lệ và những thứ trông
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục ngoại lệ và những thứ trông
 giống nhưng không phải mã đó. Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một quyết định duy nhất.
 
 ---
@@ -79,7 +79,7 @@ Một ý nghĩa duy nhất, ba công việc khác nhau, ba bản vẽ khác nhau
 
 ### Ngoại lệ và nhầm lẫn
 
-- **`isLoading` không phải một vai trò.** Trạng thái tải giữ nguyên chỗ và giữ nguyên bậc; đổi role
+- **`isLoading` không phải một vai trò.** Trạng thái tải bảo toàn chỗ và bảo toàn bậc; đổi role
   khi đang tải làm layout nhảy đúng lúc người đọc đang chờ.
 - **Density hay viewport không đổi vai trò.** Màn hẹp không biến `heading` thành `leading`.
 
@@ -177,7 +177,7 @@ thật sự quan trọng của màn.
 
 ### Ngoại lệ và nhầm lẫn
 
-- **Có `role: "leading"` đúng không có nghĩa là được đặt ở đó** — `ICON-12` quyết định chỗ đứng.
+- **Có `role: "leading"` đúng không có nghĩa là được đặt ở đó** — `ICON-12` quyết định vị trí.
 - **Row trong một danh sách đồng nhất** (mười dòng cùng loại) thì glyph giống hệt nhau ở mọi dòng
   không phân biệt được gì; đó lại là `ICON-12`.
 
@@ -349,7 +349,7 @@ import { Rocket } from "lucide-react"
 <Icon props={{ name: "talents", role: "leading" }} />
 ```
 
-`ICON-6` cố ý không nhìn vào icon leaf, vì đó là file được phép import. `ICON-7` là mã nhìn vào đúng
+`ICON-6` cố ý không nhìn vào icon leaf, vì đó là file được phép nhập. `ICON-7` là mã nhìn vào đúng
 chỗ đó — nếu thiếu nó, quyền sở hữu bản đồ sẽ tự biến thành giấy phép mở một ngôn ngữ hình thứ hai.
 
 ### Case: brand mark lấy từ package tổng hợp
@@ -375,7 +375,7 @@ import { SiSomeProvider } from "react-icons/si"
 ### Case: row hẹp, tên dài
 
 ```tsx
-{/* ĐÚNG — glyph giữ nguyên, chữ nhường bằng truncate */}
+{/* ĐÚNG — glyph bảo toàn, chữ nhường bằng truncate */}
 <div className="flex min-w-0 items-center gap-2">
     <Icon props={{ name: "cv", role: "leading" }} />
     <span className="truncate">ho-so-ung-vien-phien-ban-cuoi-cung.pdf</span>
@@ -438,7 +438,7 @@ Người đọc không phân biệt được hai đích, và người viết sau
 
 ### Ngoại lệ và nhầm lẫn
 
-- **Bảng có dòng ≠ được vẽ ở mọi chỗ.** `ICON-10` và `ICON-12` vẫn quyết định chỗ đứng.
+- **Bảng có dòng ≠ được vẽ ở mọi chỗ.** `ICON-10` và `ICON-12` vẫn quyết định vị trí.
 - **Luật gốc nói có test parity giữa bảng và map**; trong source hiện tại không tìm thấy test đó —
   xem [`audit.md`](./audit.md).
 
@@ -668,7 +668,7 @@ import { Icon as ArtworkCatalogue } from "@some/artwork-catalogue"
 
 ## Ánh xạ yêu cầu sang một quyết định
 
-Nêu ý nghĩa, chỗ đứng và tập xung quanh. Nếu thiếu **một** dữ kiện quyết định, hỏi **một** câu cụ thể
+Nêu ý nghĩa, vị trí và tập xung quanh. Nếu thiếu **một** dữ kiện quyết định, hỏi **một** câu cụ thể
 rồi dừng. Câu trả lời phải là một quyết định hoặc một câu hỏi — không bao giờ cả hai.
 
 | Yêu cầu bằng lời | Lập luận | Mã | Kết quả |

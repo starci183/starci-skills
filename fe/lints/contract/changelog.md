@@ -11,7 +11,7 @@ description: Lịch sử phiên bản của mô-đun thực thi hợp đồng n�
 
 > Phiên bản hiện tại: `2.00` · Mô-đun: `contract`
 
-## Version Policy
+## Quy ước phiên bản
 
 Mô-đun này ghi lại **phần thực thi**, không ghi lại luật. Vì thế nó đổi phiên bản theo nhịp của mã
 nguồn luật máy giữ, không theo nhịp của `patterns/contract.md`.
@@ -72,7 +72,7 @@ biết một luật "đã được giữ" và không có chỗ nào nói **giữ
   ghi khe kiểm bằng trình biên dịch giữ — thêm luật ở đó là canh một cánh cửa đã khoá. `CONTRACT-10`
   là một **miễn trừ** chứ không phải một luật. `CONTRACT-5` thì **không ai giữ**, và điều đó được
   chép ra thay vì bỏ qua.
-- **Bảng "Cửa còn mở" là bắt buộc, và là lý do mô-đun này tồn tại.** Ghi tên **31 hàng cửa mở**, mỗi
+- **Bảng "Những chỗ còn lọt" là bắt buộc, và là lý do mô-đun này tồn tại.** Ghi tên **31 hàng cửa mở**, mỗi
   luật ít nhất một, không hàng nào ghi "không có". Cửa nặng nhất: cả mười luật **tắt** cho tệp ngoài
   `/src/`; toán tử ba ngôi lọt **cả hai** luật class; luật cấp bảng **không cắt biến thể** trong khi
   luật cấp nơi gọi thì có; và bốn trên năm dạng gọi tên khoá **không được kiểm** trong khi vẫn được

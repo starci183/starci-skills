@@ -11,7 +11,7 @@ description: Mọi case và ngoại lệ của từng mã TRANSPORT-N, viết b�
 
 > Version: `2.00` · Module: `transport` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng hình dáng Nest**. Không tên sản phẩm,
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có cấu trúc kiểu Nest**. Không tên sản phẩm,
 không tên công ty, không tên repository. Một luật chỉ đúng khi nó đúng ở bất kỳ backend nào — nên nếu
 một ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được thì ví dụ đó đứng sai chỗ.
 

@@ -9,12 +9,12 @@ description: Phản biện mức phủ của hai rule so với luật, và mọi
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `served-locale`
+> Phiên bản: `2.00` · Mô-đun: `served-locale`
 
 Phản biện này kiểm một câu hỏi: **hai rule này giữ được bao nhiêu phần của luật, và phần còn lại
 được nói ra hay bị lờ đi.**
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm một cảnh báo lớn.
 
@@ -42,7 +42,7 @@ dưới một build hoàn toàn xanh.
 | Gắn vô điều kiện so với gắn có điều kiện | **Không** phân định được, dù `LOCALE-1` nói rõ là vô điều kiện |
 | Giá trị ngôn ngữ đúng so với sai | **Không** phân định được, và tệp nguồn tự nói ra điều đó |
 
-## Findings
+## Phát hiện
 
 1. **Đúng hai rule, khớp số dự kiến.** `api-client-attaches-the-locale` và
    `locale-header-belongs-to-the-link`. Không có rule thứ ba ẩn trong tệp; `recommended` chỉ là ánh
@@ -72,7 +72,7 @@ dưới một build hoàn toàn xanh.
    `error`. Không có cách nới nào ngoài chú thích tắt rule, mà chú thích tắt rule thì nhìn thấy
    được trong diff.
 
-## Decisions
+## Quyết định
 
 - Tài liệu hoá **đúng hai** rule, đặt tiêu đề bằng **tên đã xuất bản**, không gán thêm mã số. Tên đó
   là thứ in ra trong log build và viết trong chú thích tắt rule; một rule hai tên là một rule không
@@ -136,7 +136,7 @@ Mỗi mục nêu rule phải **nhìn thêm cái gì** mới đóng được cử
     không có rule. **Giữ ở phản biện của người, và nói ra ở mọi tài liệu để không ai đọc xanh thành
     an toàn.**
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn xuất thêm, bớt hoặc đổi tên một rule.
 - Một tên trong tập mắt xích cuối cùng hoặc tập mắt xích ngôn ngữ được thêm, bỏ hoặc đổi cách viết.

@@ -16,7 +16,7 @@ description: Lịch sử phiên bản của luật Tokens.
 Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
-Số mã **không** đi theo phiên bản. Một mã `TOKEN-<n>` đã phát ra thì giữ nguyên số và nguyên nghĩa
+Số mã **không** đi theo phiên bản. Một mã `TOKEN-<n>` đã phát ra thì bảo toàn số và nguyên nghĩa
 mãi mãi, vì các file luật khác và các task record cũ đã trỏ vào nó. Đổi số một mã là làm gãy một
 citation người khác đã viết, và không phiên bản nào cho phép việc đó.
 
@@ -30,12 +30,12 @@ citation người khác đã viết, và không phiên bản nào cho phép vi�
   biện) và `changelog.md`. Toàn bộ `id` và `slug` đổi theo. **File luật phẳng gốc không bị xoá và
   không bị sửa**; bản này là một cách diễn đạt lại đầy đủ hơn, không phải một luật mới.
 
-- **Giữ nguyên chín mã.** `TOKEN-1` … `TOKEN-9` giữ nguyên số và nguyên nghĩa. Không mã nào bị đánh
+- **Giữ nguyên chín mã.** `TOKEN-1` … `TOKEN-9` bảo toàn số và nguyên nghĩa. Không mã nào bị đánh
   lại số, không mã nào bị thêm vào. Quy trình chuyển đổi đếm module này có **mười** mã; luật chỉ có
   **chín**, và luật là nguồn sự thật. Sai lệch được ghi ở `audit.md` § *Verdict* và § *Rủi ro còn
-  mở* thay vì được sửa lặng lẽ bằng cách bịa thêm một mã.
+  mở* thay vì được sửa âm thầm bằng cách bịa thêm một mã.
 
-- **Thêm bảng `## Tầng giữ`.** Mỗi mã nay nói rõ **cái gì thật sự giữ nó**, chứ không chỉ nói nó yêu
+- **Thêm bảng `## Tầng giữ`.** Mỗi mã nay làm rõ **cái gì thật sự giữ nó**, chứ không chỉ nói nó yêu
   cầu điều gì. Kết quả đo được: một mã `unrepresentable` (`TOKEN-1`, do union đóng), bốn mã
   `enforced` với tên rule gọi ra được (`TOKEN-3` → `no-fractional-step`, `TOKEN-4` →
   `no-arbitrary-value`, `TOKEN-5` → `no-hand-rolled-heading`, `TOKEN-9` →
@@ -57,14 +57,14 @@ citation người khác đã viết, và không phiên bản nào cho phép vi�
   ranh giới với các mã kề, và danh sách tình huống hay gặp — thay cho một danh sách luật đọc từ trên
   xuống.
 
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại
   lệ và nhầm lẫn. Thêm bảng ánh xạ yêu cầu, bảng phân định ranh giới và danh sách sai lầm lặp lại.
   Không có `prompt.md`; ánh xạ yêu cầu nằm cùng chỗ với ví dụ mà nó phân định. Module có đúng **năm**
   record.
 
 - **Rút mọi ví dụ về TSX thuần.** Bỏ tên sản phẩm, tên repository và tên component library. Chỗ nào
   luật gốc gọi tên một component riêng thì bản này gọi theo vai trò của nó. Đường dẫn repository chỉ
-  còn xuất hiện trong bảng anchor, và `## Scope` nói rõ chúng là **bằng chứng**, không phải từ vựng
+  còn xuất hiện trong bảng anchor, và `## Scope` làm rõ chúng là **bằng chứng**, không phải từ vựng
   mà luật định nghĩa.
 
 ## Các phiên bản trước

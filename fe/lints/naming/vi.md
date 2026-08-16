@@ -9,7 +9,7 @@ description: Ba quy tắc đặt tên — bắt gì, phát hiện bằng cách n
 
 # vi.md
 
-> Version: `2.00` · Module: `naming`
+> Phiên bản: `2.00` · Mô-đun: `naming`
 
 # Đặt tên — phần máy giữ được
 
@@ -18,7 +18,7 @@ hơn: **máy không nhìn thấy chỗ nào**.
 
 Một điều luật không có quy tắc nào giữ thì ai cũng biết là chưa được giữ, nên vẫn còn người đọc lại.
 Một quy tắc **thủng** thì nguy hiểm hơn hẳn: mọi người tin là cửa đã đóng nên không ai đọc lại nữa.
-Vì vậy mục **Cửa còn mở** dưới mỗi quy tắc mới là phần chính của trang này, không phải phần phụ lục.
+Vì vậy mục **Những chỗ còn lọt** dưới mỗi quy tắc mới là phần chính của trang này, không phải phần phụ lục.
 
 Danh tính của một quy tắc là **cái tên nó công bố**. Không có mã số nào cho quy tắc, vì cái tên đã là
 chuỗi ký tự hiện trong log build, trong dòng chú thích tắt quy tắc, và trong mọi cuộc trao đổi về lỗi
@@ -37,22 +37,22 @@ chuỗi ký tự hiện trong log build, trong dòng chú thích tắt quy tắc
 
 ## `prefer-arrow-export`
 
-**Bắt gì.** Một khai báo `function` mà cha trực tiếp của nó là thân mô-đun, một lệnh `export` có tên,
+**Bắt gì?** Một khai báo `function` mà cha trực tiếp của nó là thân mô-đun, một lệnh `export` có tên,
 hoặc một lệnh `export default`. Thông báo gọi đúng tên hàm và viết sẵn dạng thay thế:
 `const <tên> = (...) => {...}`.
 
-**Giữ mã nào.** `NAMING-1`.
+**Giữ mã nào?** `NAMING-1`.
 
-**Cách phát hiện.** Thăm nút `FunctionDeclaration`, đọc `node.parent.type`, chỉ tiếp tục khi giá trị
+**Phát hiện thế nào?** Thăm nút `FunctionDeclaration`, đọc `node.parent.type`, chỉ tiếp tục khi giá trị
 đó nằm trong tập ba loại cha kể trên. Báo lỗi tại `node.id`; nếu hàm không có tên thì báo tại chính
 nút đó và điền chữ `default` vào thông báo.
 
-**Vì sao luật này đáng có máy giữ.** Vì cả hai cách viết đều chạy được. Không có gì hỏng, không có
+**Vì sao nên để máy giữ luật này?** Vì cả hai cách viết đều chạy được. Không có gì hỏng, không có
 test nào đỏ, nên không có lực tự nhiên nào kéo hai cách viết về một. Chỉ sau vài tháng là một tệp
 viết hôm nay đọc khác hẳn tệp bên cạnh, và mọi diff về sau đều mang thêm nhiễu không liên quan gì
 đến thay đổi thật. Đây đúng là loại luật mà con người bỏ qua và máy thì không.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Khai báo lồng bên trong.** Một `function` nằm trong thân một hàm khác, trong một khối `if`, trong
   một callback của test, hay trong một khối tĩnh của lớp thì cha là `BlockStatement`, quy tắc thoát
@@ -70,21 +70,21 @@ viết hôm nay đọc khác hẳn tệp bên cạnh, và mọi diff về sau đ
 
 ## `handler-on-prefix`
 
-**Bắt gì.** Một cái tên khớp `/^handle[A-Z]/` ở đúng ba vị trí: một `VariableDeclarator` mà `id` là
+**Bắt gì?** Một cái tên khớp `/^handle[A-Z]/` ở đúng ba vị trí: một `VariableDeclarator` mà `id` là
 `Identifier`, một thuộc tính JSX, và một `TSPropertySignature` mà khoá là `Identifier`. Thông báo tự
 cắt tiền tố `handle` và đọc lại thành `on…`.
 
-**Giữ mã nào.** `NAMING-2`.
+**Giữ mã nào?** `NAMING-2`.
 
-**Cách phát hiện.** Ba visitor, một hàm kiểm chung. Không đọc giá trị khởi tạo, không đọc kiểu, không
+**Phát hiện thế nào?** Ba visitor, một hàm kiểm chung. Không đọc giá trị khởi tạo, không đọc kiểu, không
 truy vết import. Chỉ có chuỗi ký tự của cái tên và loại nút chứa nó.
 
-**Vì sao luật này đáng có máy giữ.** Vì cái tên bị đổi ở mọi ranh giới nó đi qua. Ô nhận đã tên là
+**Vì sao nên để máy giữ luật này?** Vì cái tên bị đổi ở mọi ranh giới nó đi qua. Ô nhận đã tên là
 `on`, thuộc tính DOM đã tên là `onClick`, kiểu của props đã tên là `on…` — nên một biến cục bộ tên
 `handleX` sẽ bị đổi tên đúng một lần ở mỗi lần truyền, và mỗi lần đổi tên là một cơ hội sai. Đặt tên
 `onX` ngay từ lúc sinh ra thì tên ở chỗ khai báo, chỗ gọi và trong kiểu là cùng một chuỗi.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Props phá cấu trúc.** `({ handleClick }) => …` có `id` là `ObjectPattern`, mà điều kiện đòi
   `Identifier`. Đây là cửa nặng nhất, vì tên hàm phản hồi **thường đến bằng đường này**.
@@ -111,17 +111,17 @@ truy vết import. Chỉ có chuỗi ký tự của cái tên và loại nút ch
 
 ## `no-second-language-in-path`
 
-**Bắt gì.** Đúng **một** đoạn đường dẫn — đoạn đầu tiên phạm — của chính tệp đang được kiểm. Đoạn đó
+**Bắt gì?** Đúng **một** đoạn đường dẫn — đoạn đầu tiên phạm — của chính tệp đang được kiểm. Đoạn đó
 phạm khi nó chứa một chữ cái có dấu thuộc bảng chữ đã mã hoá sẵn, **hoặc** khi bỏ đi `(`, `)`, `[`,
 `]` rồi trùng khít một phần tử trong danh sách hai mươi đoạn đã viết thẳng vào quy tắc.
 
-**Giữ mã nào.** `NAMING-3`.
+**Giữ mã nào?** `NAMING-3`.
 
-**Cách phát hiện.** Đọc `context.filename` **trước khi** trả về bất kỳ visitor nào: đổi `\` thành `/`,
+**Phát hiện thế nào?** Đọc `context.filename` **trước khi** trả về bất kỳ visitor nào: đổi `\` thành `/`,
 hạ chữ thường toàn bộ, tách theo `/`, bỏ đoạn rỗng. Nếu không có đoạn nào phạm thì trả về một đối
 tượng visitor rỗng và tệp không bị duyệt lần nào. Nếu có thì báo một lần tại nút `Program`.
 
-**Vì sao luật này đáng có máy giữ.** Vì quy tắc đọc mã nguồn nhìn được định danh, chú thích và chuỗi,
+**Vì sao nên để máy giữ luật này?** Vì quy tắc đọc mã nguồn nhìn được định danh, chú thích và chuỗi,
 nhưng **không nhìn được tên của chính tệp nó đang đọc**. Nên một tuyến đường có thể mang tên bằng ngôn
 ngữ thứ hai trong khi từng định danh bên trong đều bằng ngôn ngữ chung, và không có gì lên tiếng —
 trong khi cái tên đó là URL người dùng dẫn lại trong một phiếu hỗ trợ, là thư mục hiện trong thanh bên
@@ -129,7 +129,7 @@ của mọi trình soạn thảo, là chuỗi lặp lại trong mọi câu lện
 vết ngăn xếp. Một đoạn đường dẫn là **địa chỉ**, không phải nội dung; chữ mà người ta **đọc** thì thuộc
 về danh mục ngôn ngữ, chỗ mà ngôn ngữ thứ hai là mục đích chứ không phải tai nạn.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Từ phiên âm ngoài danh sách.** Danh sách chỉ có hai mươi đoạn. Bất kỳ từ nào khác đều đi lọt. Đây
   là lựa chọn **cố ý**, không phải cẩu thả: đoán theo hình dạng sẽ từ chối `capacity` và `dangerous`,

@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/type-safety/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống TYPE-SAFETY-N, nhận diện bằng việc trình biên dịch bị bắt quên cái gì.
+description: Các tình huống TYPE-SAFETY-N, nhận diện bằng việc trình biên dịch bị bắt quên cái gì.
 ---
 
 # vi.md
@@ -30,7 +30,7 @@ thứ gì khác, cast đó đang **giấu** điều đó.
 
 **Đây là luật bắt buộc.** Mọi lần xoá kiểu trong source đều rơi vào đúng một trong năm tình huống
 dưới đây. Không có kích thước nào nhỏ đến mức được miễn mang mã: một dòng `as unknown as` trong một
-helper là `TYPE-SAFETY-1`, đúng cùng lý do mà một `any` lan khắp module là `TYPE-SAFETY-2`. Câu "có
+helper là `TYPE-SAFETY-1`, cũng vì lý do đó mà một `any` lan khắp module là `TYPE-SAFETY-2`. Câu "có
 mỗi một dòng thôi mà" chính là câu mở ra cái seam.
 
 ## Bảng tra nhanh
@@ -169,7 +169,7 @@ vội. Một đường dẫn thì cãi **một lần**, ở đây.
 - File kết thúc bằng `.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`.
 - Giá trị được dựng là một fake **cố tình thiếu**: đủ để hàm dưới test chạm tới, không đủ để khớp
   kiểu thật.
-- Xung quanh có một câu nói rõ file này đang canh điều gì.
+- Xung quanh có một câu làm rõ file này đang canh điều gì.
 
 **Tự hỏi.** Giá trị sai này có phải **chính là thứ đang được chứng minh** không? Nếu chỉ là dựng
 fixture cho nhanh thì miễn trừ không áp dụng — nó chỉ đang mượn quyền của một mã khác.
@@ -223,7 +223,7 @@ thấy comment **đúng**. Một rule đòi "phải có comment" sẽ được t
 duy nhất trong module mà người đọc là cơ chế duy nhất.
 
 **Tình huống nghiệp vụ hay gặp.** Implementation của một factory có overload · claim công khai đã
-decode từ token · một `.d.ts` vendor thiếu field mà runtime luôn gửi · một literal cần giữ nguyên
+decode từ token · một `.d.ts` vendor thiếu field mà runtime luôn gửi · một literal cần bảo toàn
 kiểu hẹp · một branded type dựng ở đúng một chỗ đã kiểm.
 
 ---

@@ -11,13 +11,13 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 
 > Version: `2.00` · Module: `exceptions`
 
-Audit này kiểm ba thứ: luật có phân định được sáu tình huống bằng **dữ kiện đã nêu** hay không, mỗi mã
-**thật sự** được giữ ở tầng nào, và mỗi mã có neo được vào source thật hay không.
+Bản audit này kiểm tra ba việc: luật có phân định được sáu tình huống bằng **dữ kiện đã nêu** hay không,
+mỗi mã **thật sự** được giữ ở tầng nào, và mỗi mã có gắn được với source thật hay không.
 
 ## Verdict
 
-Chấp nhận. Sáu mã giữ nguyên số và nguyên nghĩa từ bản luật phẳng; bốn mã có rule giữ, hai mã chỉ có
-người đọc giữ, và cả sáu đều neo được vào source.
+Chấp nhận. Sáu mã giữ nguyên số và nguyên nghĩa từ bản luật phẳng; bốn mã có rule giữ, hai mã chỉ do
+người đọc kiểm tra, và cả sáu đều gắn được với source.
 
 ## Kiểm phân định
 

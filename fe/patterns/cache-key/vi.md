@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/cache-key/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống CACHE-N, nhận diện bằng nghiệp vụ chứ không bằng cảm giác về hiệu năng.
+description: Các tình huống CACHE-N, nhận diện bằng nghiệp vụ chứ không bằng cảm giác về hiệu năng.
 ---
 
 # vi.md

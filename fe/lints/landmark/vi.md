@@ -9,7 +9,7 @@ description: Hai rule của luật landmark — bắt gì, giữ mã nào, phát
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `landmark`
+> Phiên bản: `2.00` · Mô-đun: `landmark`
 
 # Landmark
 
@@ -38,13 +38,13 @@ Ba mã `LANDMARK-1`, `LANDMARK-2`, `LANDMARK-3` **không có rule nào**. Đây 
 
 ## `routed-page-is-a-main-landmark`
 
-**Bắt gì.** Một layout của route đã **tự dựng chrome** — tức là nó tự vẽ khung điều hướng quanh trang
+**Bắt gì?** Một layout của route đã **tự dựng chrome** — tức là nó tự vẽ khung điều hướng quanh trang
 được route tới — nhưng không hề đánh dấu trang đó là landmark. Người dùng bàn phím và trình đọc màn
 hình không có chỗ nào để nhảy tới; họ phải đi hết thanh điều hướng mỗi lần đổi trang.
 
-**Giữ mã nào.** `LANDMARK-4`.
+**Giữ mã nào?** `LANDMARK-4`.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. **Cổng theo tên file.** Chỉ chạy khi đường dẫn (đã đổi `\` thành `/`) khớp
    `/\/app\/(?:.*\/)?layout\.tsx$/`. Ngoài đó rule không tồn tại.
@@ -64,12 +64,12 @@ hình không có chỗ nào để nhảy tới; họ phải đi hết thanh đi�
   `contract` với giá trị là **string literal**, và bảng entry tìm được bằng cách đi ngược lên từ file
   đang lint khai `host: "main"` cho khoá đó. Bảng được đọc **bằng văn bản**, không parse.
 
-**Vì sao luật này đáng có máy giữ.** Vì đây đúng là loại sai sót mà **không có gì đỏ lên**. Trang
+**Vì sao nên để máy giữ luật này?** Vì đây đúng là loại sai sót mà **không có gì đỏ lên**. Trang
 render đẹp, khoá đặt tên chuẩn, test xanh, TypeScript im lặng. Cái mất đi chỉ hiện ra khi có người
 thật dùng bàn phím thật — và lúc đó nó đã đi qua mọi lần review. Một luật mà mắt người review không
 nhìn thấy được hậu quả là luật cần máy.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Đổi tên prop là rule biến mất.** `function Layout({ children: content })` — chữ `children` bây
   giờ là **key của một `Property`**, đúng nhánh bị bỏ qua; và không còn định danh nào tên `children`
@@ -98,15 +98,15 @@ nhìn thấy được hậu quả là luật cần máy.
 
 ## `main-landmark-belongs-to-a-route-file`
 
-**Bắt gì.** Một landmark được vẽ ở tầng **dưới** người sở hữu cả màn hình. Landmark thứ hai không phải
+**Bắt gì?** Một landmark được vẽ ở tầng **dưới** người sở hữu cả màn hình. Landmark thứ hai không phải
 landmark mạnh hơn, nó là landmark **mơ hồ**: khi có ba cái, "nhảy tới nội dung chính" không còn nghĩa gì.
 
 Đây chính là cái bẫy mà luật được viết ra để chặn: các khoá tên `<vùng>-main` là **cột đọc** bên trong
 một trang, và vẽ chúng bằng nhánh landmark là đòi landmark ba lần trên một màn hình.
 
-**Giữ mã nào.** `LANDMARK-5`.
+**Giữ mã nào?** `LANDMARK-5`.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. **Miễn trừ theo đường dẫn.** File nào có đoạn thư mục của chính nhánh landmark trong đường dẫn thì
    rule trả về rỗng ngay.
@@ -130,12 +130,12 @@ cây route để thoả luật bố cục đều bị báo là đặt sai landma
 sở hữu trang nằm lại trong cây route — đúng cái khuyết tật luật bố cục sinh ra để chặn. **Một rule chỉ
 thoả được bằng cách vi phạm rule khác là một finding về rule, không phải về code.**
 
-**Vì sao luật này đáng có máy giữ.** Vì hậu quả của nó **không nhìn thấy được trên màn hình**. Hai
+**Vì sao nên để máy giữ luật này?** Vì hậu quả của nó **không nhìn thấy được trên màn hình**. Hai
 landmark trông y hệt một landmark. Chỉ có công nghệ trợ năng đọc ra sự mơ hồ, và không ai review bằng
 công nghệ trợ năng. Thêm nữa, tầng dưới là nơi sai sót **thật sự xảy ra**: người viết một block thấy
 khoá tên `-main` và với tay lấy nhánh landmark cho hợp tên.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Phần tử landmark viết tay bằng chữ thường.** Không hình dạng nào khớp: hình dạng một đòi tên nhánh
   viết hoa, hình dạng hai đòi một khoá contract. Cách viết sai **trực tiếp nhất** thì rule của luật này

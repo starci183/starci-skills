@@ -48,25 +48,25 @@ xem mục của nó và mục "Findings" trong `audit.md`.
 
 ## `no-literal-structural-class`
 
-**Bắt gì.** Một token cấu trúc (`flex`, `grid`, `gap-4`, `items-center`, `col-span-2`, `absolute`…)
+**Bắt gì?** Một token cấu trúc (`flex`, `grid`, `gap-4`, `items-center`, `col-span-2`, `absolute`…)
 nằm trong một chuỗi class tĩnh, ở bất kỳ tệp nào bị quản. Và cùng token đó khi đã bị nâng lên thành
 một hằng số chuỗi cấp mô-đun — vì nâng lên một dòng không biến quyết định thành hợp lệ, nó chỉ làm
 quyết định **không ai nhìn thấy nữa**.
 
-**Giữ mã nào.** `CONTRACT-1`. Đây là luật mà chín luật còn lại tồn tại để bảo vệ.
+**Giữ mã nào?** `CONTRACT-1`. Đây là luật mà chín luật còn lại tồn tại để bảo vệ.
 
-**Cách phát hiện.** Hai bộ thăm. `JSXAttribute` tên `className`/`class`, giá trị là `Literal` chuỗi
+**Phát hiện thế nào?** Hai bộ thăm. `JSXAttribute` tên `className`/`class`, giá trị là `Literal` chuỗi
 hoặc `JSXExpressionContainer` chứa `Literal` hoặc `TemplateLiteral` **không có lỗ**. Mỗi token bị cắt
 hết phần trước dấu `:` cuối cùng và bỏ dấu `!` đầu, rồi đối chiếu một tập chín phần tử và một biểu
 thức chính quy tiền tố. Bộ thăm thứ hai: `VariableDeclarator` có `id` là `Identifier` và `init` là
 chuỗi tĩnh, quét token y hệt.
 
-**Vì sao luật này đáng có máy giữ.** Vì khoảnh khắc một nơi gọi gõ được `flex gap-3`, cái cây bị
+**Vì sao nên để máy giữ luật này?** Vì khoảnh khắc một nơi gọi gõ được `flex gap-3`, cái cây bị
 quyết định ở đúng bằng số nơi gọi, và không ai đọc bảng khoá mà đoán ra được hình dạng nữa. Kiểu dữ
 liệu **không** chặn được chuyện này: `"flex gap-3"` là một `string` hợp lệ ở mọi nơi. Chỉ có luật máy
 giữ mới trả lời được câu hỏi "**tệp nào** viết ra chuỗi này".
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Gom vào cấu trúc: `const CLASSES = { root: "flex flex-col gap-4" }` rồi `className={CLASSES.root}`.
   `init` là `ObjectExpression`, không phải `Literal` — cả hai bộ thăm đều mù. Đây **không phải** phá
@@ -89,21 +89,21 @@ giữ mới trả lời được câu hỏi "**tệp nào** viết ra chuỗi n�
 
 ## `no-class-composition-outside-contract`
 
-**Bắt gì.** Một lời gọi tới tám cái tên quen thuộc chuyên ghép class, và một thuộc tính class được
+**Bắt gì?** Một lời gọi tới tám cái tên quen thuộc chuyên ghép class, và một thuộc tính class được
 dựng bằng nội suy hoặc bằng phép `+`.
 
-**Giữ mã nào.** `CONTRACT-2`.
+**Giữ mã nào?** `CONTRACT-2`.
 
-**Cách phát hiện.** `CallExpression` có callee là `Identifier` **trần** nằm trong tập
+**Phát hiện thế nào?** `CallExpression` có callee là `Identifier` **trần** nằm trong tập
 `cn`, `clsx`, `classnames`, `classNames`, `twMerge`, `twJoin`, `cva`, `tv` — báo ngay tại lời gọi, bất
 kể nó trả về cái gì và được dùng ở đâu. Cộng thêm `JSXAttribute` class có biểu thức là
 `TemplateLiteral` **có lỗ** hoặc `BinaryExpression` toán tử `+`.
 
-**Vì sao luật này đáng có máy giữ.** Vì một chuỗi class ghép lúc chạy là **một bảng thứ hai không có
+**Vì sao nên để máy giữ luật này?** Vì một chuỗi class ghép lúc chạy là **một bảng thứ hai không có
 khoá**: không lý do, không tên, không ai đọc ngược lại được. Cái khác biệt mà nhánh đó đang rẽ là một
 khác biệt **thật** — mà một khác biệt thật thì xứng đáng có một cái tên.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - `utils.cn(...)`: callee là `MemberExpression` → không bắt. Trớ trêu là
   `only-the-frame-wears-a-node` **có** xử `MemberExpression` — hai luật cùng nhà bất đồng về đúng
@@ -118,21 +118,21 @@ khác biệt **thật** — mà một khác biệt thật thì xứng đáng có
 
 ## `only-the-frame-wears-a-node`
 
-**Bắt gì.** Mọi lời gọi `contractNodeProps` ở bất kỳ tệp nguồn nào không phải khung dựng.
+**Bắt gì?** Mọi lời gọi `contractNodeProps` ở bất kỳ tệp nguồn nào không phải khung dựng.
 
-**Giữ mã nào.** `CONTRACT-4`.
+**Giữ mã nào?** `CONTRACT-4`.
 
-**Cách phát hiện.** `CallExpression` có callee là `Identifier` tên đó, **hoặc** `MemberExpression`
+**Phát hiện thế nào?** `CallExpression` có callee là `Identifier` tên đó, **hoặc** `MemberExpression`
 không tính toán mà thuộc tính mang tên đó. Không xét đối số, không xét kết quả.
 
-**Vì sao luật này đáng có máy giữ.** Vì đây là hỏng hóc **không đỏ ở đâu cả**. Hàm đó trả về class và
+**Vì sao nên để máy giữ luật này?** Vì đây là hỏng hóc **không đỏ ở đâu cả**. Hàm đó trả về class và
 các dấu, **không** trả về phần tử. Trải chúng lên một phần tử của thư viện là đặt hợp đồng của một
 khoá lên phần tử **do tệp này chọn**: mục ghi `ol`, tài liệu nhận về `div`, danh sách rơi khỏi cây trợ
 năng, không còn gì thông báo có bao nhiêu mục — mà khoá vẫn phân giải đúng, dấu vẫn đọc đúng, mọi cổng
 vẫn xanh. Không có kiểu dữ liệu nào bắt được điều đó, vì kiểu dữ liệu **không biết** props này rồi sẽ
 được trải lên đâu.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Luật cấm **một cái tên**, không cấm **hành vi**: `CONTRACTS["key"].classes.join(" ")` rồi trải, tái
   tạo y nguyên hỏng hóc mà không nói tên nào.
@@ -145,22 +145,22 @@ vẫn xanh. Không có kiểu dữ liệu nào bắt được điều đó, vì 
 
 ## `contract-why-is-a-reason`
 
-**Bắt gì.** Một `why` ngắn dưới mười hai từ, hoặc một `why` mà **mọi** từ đều lấy ra từ chính cái
+**Bắt gì?** Một `why` ngắn dưới mười hai từ, hoặc một `why` mà **mọi** từ đều lấy ra từ chính cái
 khoá.
 
-**Giữ mã nào.** `CONTRACT-6`.
+**Giữ mã nào?** `CONTRACT-6`.
 
-**Cách phát hiện.** Chỉ chạy trong tệp bảng. `Property` có khoá đọc ra `why`, giá trị là `Literal`
+**Phát hiện thế nào?** Chỉ chạy trong tệp bảng. `Property` có khoá đọc ra `why`, giá trị là `Literal`
 chuỗi. Đếm từ; dưới mười hai thì báo `tooShort`. Ngược lại, chuẩn hoá từng từ về `a-z` và kiểm xem
 **tất cả** có nằm trong tập từ tách theo dấu gạch của khoá không. Khoá được lấy bằng
 `node.parent.parent`.
 
-**Vì sao luật này đáng có máy giữ.** Vì lý do là thứ **duy nhất** không tái dựng lại được từ mã nguồn
+**Vì sao nên để máy giữ luật này?** Vì lý do là thứ **duy nhất** không tái dựng lại được từ mã nguồn
 về sau. Class đọc được, phần tử đọc được — còn chuyện "vì sao nút này tồn tại" thì mất là mất hẳn. Một
 cái nhãn ("hàng chip") tốn một dòng và không dạy ai điều gì; một dữ kiện ("các thẻ xuống dòng trước
 tiêu đề") là thứ đã sinh ra cái nút.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Viết bằng dấu backtick: ``why: `...` `` không phải `Literal` → **tắt sạch** luật cho mục đó, kể cả
   sàn mười hai từ.
@@ -176,23 +176,23 @@ tiêu đề") là thứ đã sinh ra cái nút.
 
 ## `no-structural-host-outside-contract-frame`
 
-**Bắt gì.** Bảy hộp trung tính viết tay (`div`, `section`, `main`, `header`, `footer`, `aside`,
+**Bắt gì?** Bảy hộp trung tính viết tay (`div`, `section`, `main`, `header`, `footer`, `aside`,
 `nav`) — cấm vô điều kiện. Và bốn phần tử ngữ nghĩa (`ul`, `ol`, `li`, `form`) — chỉ cấm **khi chúng
 đeo class**.
 
-**Giữ mã nào.** `CONTRACT-7`.
+**Giữ mã nào?** `CONTRACT-7`.
 
-**Cách phát hiện.** `JSXOpeningElement` có tên là `JSXIdentifier` viết thường. Thuộc tập trung tính
+**Phát hiện thế nào?** `JSXOpeningElement` có tên là `JSXIdentifier` viết thường. Thuộc tập trung tính
 thì báo ngay. Thuộc tập ngữ nghĩa thì chỉ báo khi có ít nhất một `JSXAttribute` tên `className`/
 `class`.
 
-**Vì sao luật này đáng có máy giữ.** Vì một hộp trung tính viết tay là **một nút không khoá**: không
+**Vì sao nên để máy giữ luật này?** Vì một hộp trung tính viết tay là **một nút không khoá**: không
 gì ghi nó phải mặc class nào, con nào được phép nằm trong, và vì sao nó ở đó. Còn ranh giới ngữ nghĩa
 thì tinh hơn: một `form` tồn tại để gửi, một `ul` tồn tại vì nội dung của nó **là** một danh sách —
 công nghệ trợ giúp đọc ra phần tử, nên không thay bằng hộp trung tính được. Bản trước cấm thẳng cả
 bốn và đã báo sai ba cái bọc lương thiện chỉ mang một handler và không mang class nào.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Mọi phần tử chứa khác **không** nằm trong mười một cái tên: `span`, `article`, `figure`, `label`,
   `fieldset`, `table`, `tr`, `td`, `dl`, `dd`. `<article className="rounded border p-4">` hoàn toàn
@@ -207,19 +207,19 @@ bốn và đã báo sai ba cái bọc lương thiện chỉ mang một handler v
 
 ## `no-hand-written-contract-attrs`
 
-**Bắt gì.** Thuộc tính `data-node` hoặc `data-why` viết tay ở bất kỳ tệp nguồn nào không phải khung
+**Bắt gì?** Thuộc tính `data-node` hoặc `data-why` viết tay ở bất kỳ tệp nguồn nào không phải khung
 dựng và không phải tệp kiểm thử.
 
-**Giữ mã nào.** `CONTRACT-8`.
+**Giữ mã nào?** `CONTRACT-8`.
 
-**Cách phát hiện.** `JSXAttribute` có tên node là `JSXIdentifier` với văn bản đúng bằng một trong hai
+**Phát hiện thế nào?** `JSXAttribute` có tên node là `JSXIdentifier` với văn bản đúng bằng một trong hai
 chuỗi đó.
 
-**Vì sao luật này đáng có máy giữ.** Vì một dấu viết tay **tệ hơn một nút không dấu**. Nút không dấu
+**Vì sao nên để máy giữ luật này?** Vì một dấu viết tay **tệ hơn một nút không dấu**. Nút không dấu
 thì ít nhất còn thành thật. Nút mang dấu viết tay tuyên bố một hợp đồng **không ai giữ**, và mọi bài
 kiểm thử, mọi công cụ đi dọc theo các thuộc tính đó đều tin lời tuyên bố ấy.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Spread: `<div {...{ "data-node": key }} />`.
 - Không qua JSX: `element.setAttribute("data-node", key)`, hoặc gói vào một đối tượng props thường
@@ -232,25 +232,25 @@ kiểm thử, mọi công cụ đi dọc theo các thuộc tính đó đều tin
 
 ## `no-unknown-contract-key`
 
-**Bắt gì.** Một khoá không có trong bảng, kèm theo danh sách các khoá **có** trong bảng.
+**Bắt gì?** Một khoá không có trong bảng, kèm theo danh sách các khoá **có** trong bảng.
 
-**Giữ mã nào.** **Không mã nào.** Mã nguồn xếp nó dưới `CONTRACT-9` và thông điệp của nó có nhắc
+**Giữ mã nào?** **Không mã nào.** Mã nguồn xếp nó dưới `CONTRACT-9` và thông điệp của nó có nhắc
 `CONTRACT-9` lẫn `CONTRACT-5` như lời khuyên — nhưng phép kiểm nó thực hiện là **phép thuộc tập**:
 chuỗi này có xuất hiện làm khoá trong bảng không. Không mã đánh số nào phát biểu điều đó. `CONTRACT-9`
 nói về việc **một khoá mới có xứng đáng ra đời không** — một phán đoán không luật máy nào cầm — và
 luật thật sự giữ `CONTRACT-9` là `no-duplicate-entry-shape`. Ghi nhận là **finding**, không bịa ánh
 xạ.
 
-**Cách phát hiện.** `JSXOpeningElement` có tên đúng bằng `Tree`, đọc thuộc tính `contract` tĩnh; và
+**Phát hiện thế nào?** `JSXOpeningElement` có tên đúng bằng `Tree`, đọc thuộc tính `contract` tĩnh; và
 `CallExpression` trên `Identifier` trần `contractSpec` với đối số đầu là chuỗi. Danh sách khoá đọc từ
 đĩa: đi ngược thư mục tối đa bốn mươi bậc, thử ba đường dẫn tương đối, cắt lời gọi `buildContracts({`
 theo **cân bằng ngoặc**, rồi bắt khoá bằng `/^\s{4}"([a-z][a-z-]*)":\s*\{/gm`.
 
-**Vì sao luật này đáng có máy giữ.** Vì một khoá gõ sai không mô tả class nào, phần tử nào, lý do
+**Vì sao nên để máy giữ luật này?** Vì một khoá gõ sai không mô tả class nào, phần tử nào, lý do
 nào — mà nó **vẫn dịch được**. Và vì thông điệp liệt kê ra các khoá đang có, nó là chỗ duy nhất một
 người mới học được bảng từ vựng ngay tại chỗ mình gõ sai.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Bốn trên năm dạng tham chiếu không được kiểm.** `defineContractComponent("sai-khoa")`,
   `defineContractProjection("sai-khoa")`, `CONTRACTS["sai-khoa"]` và `contract: "sai-khoa"` đều là
@@ -268,22 +268,22 @@ người mới học được bảng từ vựng ngay tại chỗ mình gõ sai.
 
 ## `no-duplicate-entry-shape`
 
-**Bắt gì.** Một mục đánh vần đúng cái hình dạng mà một mục khác đã đánh vần: cùng bộ class (không kể
+**Bắt gì?** Một mục đánh vần đúng cái hình dạng mà một mục khác đã đánh vần: cùng bộ class (không kể
 thứ tự), cùng `host`, cùng các khe mang cùng thứ.
 
-**Giữ mã nào.** `CONTRACT-9`.
+**Giữ mã nào?** `CONTRACT-9`.
 
-**Cách phát hiện.** Đọc mục từ đối số đầu của `buildContracts`. Mỗi mục rút về một chuỗi so sánh:
+**Phát hiện thế nào?** Đọc mục từ đối số đầu của `buildContracts`. Mỗi mục rút về một chuỗi so sánh:
 class **sắp xếp** như một đa tập, `host` literal, và từng khe theo tên với danh tính khai báo
 (`contract` / `composite` / `leaf`, các phương án được khử trùng và sắp xếp) cùng hai cờ `optional`,
 `repeats`. **Cố ý bỏ ra ngoài**: tên khoá, `why`, `restingCount`, và `props` của khe.
 
-**Vì sao luật này đáng có máy giữ.** Vì bảng từ vựng nở ra **từng nơi gọi một**. Một `restingCount`
+**Vì sao nên để máy giữ luật này?** Vì bảng từ vựng nở ra **từng nơi gọi một**. Một `restingCount`
 khác không phải một hình dạng khác; một cái tên khác cũng không. Đây chính là chỗ `CONTRACT-9` được
 cầm bằng máy: không phán xét "khoá mới này có đáng không", mà phát biểu chính xác **khi nào hai khoá
 là một khoá**.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Một `SpreadElement` trong mục — `{ ...shared, classes: [...] }` — làm `propertyName` trả `null`,
   mục bị **bỏ qua** chứ không bị báo. Một dấu ba chấm giấu được bản sao vĩnh viễn.
@@ -296,24 +296,24 @@ là một khoá**.
 
 ## `no-interaction-class-in-entry`
 
-**Bắt gì.** Ba họ class mà một mục **không được** giữ: hành vi (`cursor-`, `group`, `hover:`,
+**Bắt gì?** Ba họ class mà một mục **không được** giữ: hành vi (`cursor-`, `group`, `hover:`,
 `active:`, `focus:`, `disabled:`…), màu của một giá trị (sáu tên màu chữ, `decoration-`, `underline`),
 và vật thể nổi (`bg-surface*`, `shadow*`).
 
-**Giữ mã nào.** `CONTRACT-12`.
+**Giữ mã nào?** `CONTRACT-12`.
 
-**Cách phát hiện.** Đọc mục từ `buildContracts`, duyệt từng phần tử literal của mảng `classes`/
+**Phát hiện thế nào?** Đọc mục từ `buildContracts`, duyệt từng phần tử literal của mảng `classes`/
 `classNames`, đối chiếu **chuỗi thô** với ba biểu thức chính quy. Một nền được tha khi cùng mảng đó có
 `w-full` **và** `border-b` hoặc `border-t` — nghĩa là mục được viết như một **dải chạy hết bề ngang và
 tự kẻ ranh giới**, thứ duy nhất được phép có nền.
 
-**Vì sao luật này đáng có máy giữ.** Vì một nút mang `cursor-pointer` đang **hứa** rằng nó bấm được,
+**Vì sao nên để máy giữ luật này?** Vì một nút mang `cursor-pointer` đang **hứa** rằng nó bấm được,
 trong khi thứ thật sự bấm được — cái nút, cái liên kết, thứ giữ handler và trạng thái vô hiệu — nằm ở
 chỗ khác. Hai chủ cho một lời hứa, và cái bảng là bên **không thể được báo** rằng lời hứa đã tắt. Nền
 cộng độ nổi thì thành một **vật thể**, mà vật thể đã có chủ: nhánh bề mặt vẽ nó. Vẽ hai lần thì không
 ai đọc ngược lại được.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Không cắt biến thể.** Ba biểu thức đối chiếu chuỗi **thô**, khác hẳn
   `no-literal-structural-class` vốn có cắt. Nên `md:cursor-pointer`, `lg:bg-surface`,
@@ -328,24 +328,24 @@ ai đọc ngược lại được.
 
 ## `no-dead-contract-key`
 
-**Bắt gì.** Một khoá nằm trong bảng mà **không tệp nào được đi qua** gọi tên, và **không khe con nào**
+**Bắt gì?** Một khoá nằm trong bảng mà **không tệp nào được đi qua** gọi tên, và **không khe con nào**
 của mục khác khai báo.
 
-**Giữ mã nào.** `CONTRACT-13`.
+**Giữ mã nào?** `CONTRACT-13`.
 
-**Cách phát hiện.** Đi bộ trên hệ tệp. Gốc kho được suy ra từ đường dẫn bảng theo hậu tố **dài
+**Phát hiện thế nào?** Đi bộ trên hệ tệp. Gốc kho được suy ra từ đường dẫn bảng theo hậu tố **dài
 nhất**, rồi duyệt các gốc thành phần cộng **mọi** `apps/*/src` và `packages/*/src`, bỏ qua
 `node_modules`, `.next`, `dist`, `.artifacts`, đọc sáu phần mở rộng mã nguồn. Năm mẫu tham chiếu chạy
 trên văn bản từng tệp; **thêm vào đó**, trong bất kỳ tệp nào có chữ `ContractKey`, **mọi** literal
 thường có gạch nối đều được tính là tham chiếu. Khoá do khe `children.*.contract` khai báo được gom
 riêng trước khi báo cáo.
 
-**Vì sao luật này đáng có máy giữ.** Vì một khoá không ai vẽ là **một lời hứa về một cái không tồn
+**Vì sao nên để máy giữ luật này?** Vì một khoá không ai vẽ là **một lời hứa về một cái không tồn
 tại**, và nó không nằm yên: nó sống sót qua mọi lần đổi tên (đổi tên đi theo nơi gọi, mà nó không có
 nơi gọi nào), nó theo cả bảng đi sang kho tiếp theo, và nó làm cái bảng dài hơn phần mã đọc nó — tới
 lúc muốn biết một khoá tả màn hình thật hay tả ý định thì phải đi tìm trong nguồn.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Khoá chỉ được gọi tên trong `.md`, `.mdx`, `.json` hoặc bất kỳ phần mở rộng nào ngoài sáu cái được
   duyệt → **báo chết oan**, và finding tới dưới dạng lệnh xoá.

@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/props-and-slots/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã SLOTS-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã SLOTS-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -18,7 +18,7 @@ riêng của một sản phẩm mới đọc được, ví dụ đó sai chỗ.
 Bốn alias tầng được dùng xuyên suốt trang này là `LeafProps`, `CompositeProps`, `BranchProps` và
 `BlockProps`. Chúng là hàng rào; chúng không được sửa ở nơi dùng.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục **ngoại lệ và nhầm lẫn**.
 Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một quyết định slot duy nhất.
 
 ---
@@ -108,7 +108,7 @@ object vẫn là một hàm nằm trong slot dữ liệu.
 ### Ngoại lệ và nhầm lẫn
 
 - **`boolean` là dữ liệu hợp lệ.** `isOverdue`, `isSelected`, `isLoading` đều qua được `SLOTS-1`. Nếu
-  một cờ vẫn sai chỗ thì mã cần tra là `SLOTS-5` hoặc `SLOTS-6`, không phải mã này.
+  một cờ vẫn sai chỗ thì mã cần xem là `SLOTS-5` hoặc `SLOTS-6`, không phải mã này.
 - **Chuỗi class cũng là dữ liệu hợp lệ về kiểu** — và vẫn bị `SLOTS-6` từ chối vì lý do khác hẳn.
 - **Đừng "sửa" bằng cách nới ràng buộc:**
 

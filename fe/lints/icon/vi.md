@@ -9,7 +9,7 @@ description: Từng luật lint của biểu tượng — bắt gì, giữ mã n
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `icon`
+> Phiên bản: `2.00` · Mô-đun: `icon`
 
 # Máy giữ luật biểu tượng
 
@@ -39,26 +39,26 @@ luật nào cả.
 
 ## `no-vendor-icon-outside-icon-leaf`
 
-**Bắt gì.** Một tệp nguồn bất kỳ, trừ chiếc lá biểu tượng, viết `import` từ một gói hình. Nhập ở chỗ
+**Bắt gì?** Một tệp nguồn bất kỳ, trừ chiếc lá biểu tượng, viết `import` từ một gói hình. Nhập ở chỗ
 gọi là quyết định cùng lúc ba việc — thư viện nào, hình nào, to bao nhiêu — và màn hình kế tiếp sẽ
 trả lời cả ba khác đi.
 
-**Giữ mã nào.** `ICON-6`.
+**Giữ mã nào?** `ICON-6`.
 
-**Cách phát hiện.** Duyệt nút `ImportDeclaration`, đọc chuỗi nguồn. Một nguồn bị coi là gói hình khi
+**Phát hiện thế nào?** Duyệt nút `ImportDeclaration`, đọc chuỗi nguồn. Một nguồn bị coi là gói hình khi
 nó bằng hoặc **bắt đầu bằng** một trong mười tiền tố gói đã liệt kê, hoặc khi nó là gói ngoài (không
 mở đầu bằng `.` hay `@/`) mà tên có chứa `icon`, `glyph`, `lucide`, `feather`, `tabler` hay
 `fortawesome`. Cổng tệp: đường dẫn đã đổi hết dấu chéo ngược thành chéo xuôi, phải chứa `/src/` và
 không được kết thúc bằng `/leaves/Icon/index.tsx`. Một miễn trừ duy nhất: tệp kết thúc bằng
 `/leaves/RankMark/index.tsx` **và** nguồn đúng bằng gói tranh giải.
 
-**Vì sao luật này đáng có máy giữ.** Kiểu dữ liệu đóng được tập tên ý nghĩa, nhưng không hề biết một
+**Vì sao nên để máy giữ luật này?** Kiểu dữ liệu đóng được tập tên ý nghĩa, nhưng không hề biết một
 tệp vừa nhập gì. Escape mở màn cho cả mô-đun này là một chiếc lá nhập thẳng một hình từ thư viện, ở
 một cỡ ngoài thang — không có gì báo cả, vì luật canh thư viện thành phần chỉ gọi tên thư viện đó,
 còn luật canh thang chỉ đọc tiện ích khoảng cách. Bài học đáng chép lại: một luật gọi tên một nhà
 cung cấp thì bảo vệ đúng nhà cung cấp đó, và khe giữa hai luật chính là chỗ bậc thứ ba ra đời.
 
-**Cửa còn mở.** `require()` và `import()` động không phải `ImportDeclaration`, nên không bị nhìn.
+**Những chỗ còn lọt.** `require()` và `import()` động không phải `ImportDeclaration`, nên không bị nhìn.
 `export { X } from "gói-hình"` cũng vậy — một tệp trung chuyển một dòng là giặt sạch cả gói. Mọi tệp
 không nằm dưới `/src/` hoàn toàn không bị soi, nên đặt phần nhập ở một thư mục gói khác rồi xuất lại
 dưới cái tên trung tính là đi lọt. Và cổng tệp là phép so **đuôi** đường dẫn, nên bất kỳ thư mục nào
@@ -68,24 +68,24 @@ kết thúc bằng `leaves/Icon/index.tsx` cũng được tự do y hệt chiế
 
 ## `heroicons-is-the-glyph-vendor`
 
-**Bắt gì.** Một gói hình nằm ngoài hai họ đã duyệt — họ nét 24 cho vai trò tiêu đề và dẫn dắt, họ
+**Bắt gì?** Một gói hình nằm ngoài hai họ đã duyệt — họ nét 24 cho vai trò tiêu đề và dẫn dắt, họ
 đặc 16 cho vai trò chip — bị nhập từ **bất kỳ** tệp nguồn nào. Luật này cố tình không miễn trừ cho
 chiếc lá biểu tượng: quyền sở hữu bản đồ ý nghĩa không phải giấy phép mở thêm một bộ từ vựng hình
 thứ hai ngay bên trong.
 
-**Giữ mã nào.** `ICON-7`.
+**Giữ mã nào?** `ICON-7`.
 
-**Cách phát hiện.** Cùng nút `ImportDeclaration` và cùng phép thử gói hình như luật trên, nhưng bỏ
+**Phát hiện thế nào?** Cùng nút `ImportDeclaration` và cùng phép thử gói hình như luật trên, nhưng bỏ
 cổng chiếc lá: mọi tệp chứa `/src/` đều bị quét. Một lần trúng chỉ được tha khi nguồn đúng bằng
 `@heroicons/react/24/outline` hoặc `@heroicons/react/16/solid`, hoặc khi đúng cặp
 chiếc-lá-xếp-hạng-cộng-gói-tranh-giải.
 
-**Vì sao luật này đáng có máy giữ.** Vì luật trên một mình thì để lộ đúng một chỗ, và đó là chỗ nguy
+**Vì sao nên để máy giữ luật này?** Vì luật trên một mình thì để lộ đúng một chỗ, và đó là chỗ nguy
 nhất: người sửa chiếc lá là người tin rằng mình có thẩm quyền. Hai luật chồng lên nhau cũng có nghĩa
 là một câu `import` sai từ một trang thường sẽ bị báo **hai lần**, mỗi lần một thông điệp khác —
 đúng theo thiết kế, nhưng người đọc log nên biết trước.
 
-**Cửa còn mở.** Một bộ hình mà tên gói không mang sáu dấu hiệu tên nào và cũng không nằm trong danh
+**Những chỗ còn lọt.** Một bộ hình mà tên gói không mang sáu dấu hiệu tên nào và cũng không nằm trong danh
 sách thì lọt sạch — các gói pictogram, emoji hay mark thường rơi vào đúng ô đó. Tệp `.svg` cục bộ và
 thành phần SVG viết tay cũng lọt, vì mọi nguồn tương đối bị loại trước khi thử. Theo chiều ngược lại,
 `import type` từ một gói hình vẫn bị báo dù chẳng có gì được đóng gói ra — một lần báo nhầm nơi
@@ -95,24 +95,24 @@ không có escape nào.
 
 ## `no-off-scale-glyph-size`
 
-**Bắt gì.** Một tiện ích `size-` viết bằng phân số thập phân (`size-4.5`) hoặc bằng giá trị tuỳ ý
+**Bắt gì?** Một tiện ích `size-` viết bằng phân số thập phân (`size-4.5`) hoặc bằng giá trị tuỳ ý
 trong ngoặc vuông (`size-[18px]`). Bậc thứ ba là bậc không ai áp dụng nhất quán: người viết chọn nó
 vì một lý do đúng trên màn hình của họ, và mọi người sau đó chép lại cái gần nhất trong ba.
 
-**Giữ mã nào.** `ICON-1`, và chỉ nửa về cỡ của nó. Việc vai trò nào đi với cỡ nào — `ICON-2`,
+**Giữ mã nào?** `ICON-1`, và chỉ nửa về cỡ của nó. Việc vai trò nào đi với cỡ nào — `ICON-2`,
 `ICON-3`, `ICON-4` — không có luật lint nào giữ.
 
-**Cách phát hiện.** Duyệt `JSXAttribute` tên `className` hoặc `class`, và duyệt **mọi**
+**Phát hiện thế nào?** Duyệt `JSXAttribute` tên `className` hoặc `class`, và duyệt **mọi**
 `VariableDeclarator`. Rút chuỗi tĩnh ra từ `Literal` chuỗi, từ `TemplateLiteral` không có biểu thức
 nào, hoặc xuyên qua `JSXExpressionContainer` bọc một trong hai. Thử chuỗi đó với mẫu
 `/\bsize-(?:\d+\.\d+|\[[^\]]+\])/` và chỉ báo lần trúng **đầu tiên**.
 
-**Vì sao luật này đáng có máy giữ.** Vì một cỡ lệch không bao giờ tự nhận mình là quyết định thiết
+**Vì sao nên để máy giữ luật này?** Vì một cỡ lệch không bao giờ tự nhận mình là quyết định thiết
 kế; nó trông như một con số. Người sau đọc `size-[18px]` không thấy một luật bị phá, chỉ thấy một
 lựa chọn có vẻ chín, và chép lại. Việc quét cả `VariableDeclarator` là điểm đáng khen: nó bịt sẵn
 kiểu giặt literal đơn giản nhất — gom chuỗi lớp vào một hằng rồi rải đi khắp nơi.
 
-**Cửa còn mở.** Đây là luật rò nhất trên kệ. Tên luật nói "cỡ hình", nhưng phép phát hiện không có
+**Những chỗ còn lọt.** Đây là luật rò nhất trên kệ. Tên luật nói "cỡ hình", nhưng phép phát hiện không có
 lấy một mẩu ngữ cảnh hình nào: nó chỉ là "một tiện ích `size-` viết bằng phân số hoặc ngoặc vuông" —
 nên một ảnh đại diện `size-[44px]` bị báo, còn `size-9` trên một hình thì không. **Cỡ nguyên lệch
 thang lọt hết**, và đó chính là cách dễ viết hơn của cùng một sai lầm. Dạng hai tiện ích rộng-cao
@@ -125,21 +125,21 @@ cùng một chuỗi không bao giờ được đọc tới.
 
 ## `no-decorative-icon-in-metric-cell`
 
-**Bắt gì.** Một thẻ JSX tên `Icon` bên trong đúng một tệp: ô số liệu lặp lại có nhãn và tiến độ. Bản
+**Bắt gì?** Một thẻ JSX tên `Icon` bên trong đúng một tệp: ô số liệu lặp lại có nhãn và tiến độ. Bản
 tham chiếu của ô đó thuần chữ, nên một hình ở đây là bịa ra nhấn mạnh và lặp lại nghĩa mà chữ đã
 đóng, nhân lên trên khắp lưới.
 
-**Giữ mã nào.** `ICON-10`.
+**Giữ mã nào?** `ICON-10`.
 
-**Cách phát hiện.** Duyệt `JSXOpeningElement`, báo khi `node.name.type === "JSXIdentifier"` và
+**Phát hiện thế nào?** Duyệt `JSXOpeningElement`, báo khi `node.name.type === "JSXIdentifier"` và
 `node.name.name === "Icon"`. Cổng tệp **là** toàn bộ luật: đường dẫn phải kết thúc bằng
 `/composites/LabelledProgressRow/index.tsx`, không thì bộ duyệt còn chẳng được lắp.
 
-**Vì sao luật này đáng có máy giữ.** Vì thêm một hình nhỏ vào một ô số liệu là việc nhìn qua thấy tử
+**Vì sao nên để máy giữ luật này?** Vì thêm một hình nhỏ vào một ô số liệu là việc nhìn qua thấy tử
 tế. Nó chỉ hỏng khi ô đó lặp mười lần và lưới mọc ra một hệ chỉ mục thị giác thứ hai, lúc đó thì một
 lần dọn dẹp đã biến thành một lần vẽ lại.
 
-**Cửa còn mở.** Đây là "phạm vi theo tên tệp" ở dạng thuần khiết nhất: luật chỉ tồn tại cho một
+**Những chỗ còn lọt.** Đây là "phạm vi theo tên tệp" ở dạng thuần khiết nhất: luật chỉ tồn tại cho một
 đường dẫn, nên đổi tên tệp, hoặc chuyển phần đánh dấu sang một tệp anh em cùng thư mục, là xoá được
 luật mà không chạm vào luật. Tên thẻ cũng phải đúng chữ `Icon`: đặt bí danh khi nhập, gọi qua thuộc
 tính của một object, dùng một thành phần khác tự vẽ hình bên trong, hay truyền hình xuống bằng prop
@@ -150,27 +150,27 @@ chung cho mọi ô, còn máy giữ đúng một ô.
 
 ## `rank-artwork-is-a-closed-set`
 
-**Bắt gì.** Hai chuyện, bằng hai thông điệp. Một định danh tranh giải nêu **ngoài** chiếc lá xếp
+**Bắt gì?** Hai chuyện, bằng hai thông điệp. Một định danh tranh giải nêu **ngoài** chiếc lá xếp
 hạng — vì bản đồ hạng-sang-tranh phải nằm một chỗ, để màn hình thứ hai không trả lời khác đi. Và một
 định danh nêu **bên trong** chiếc lá đó nhưng không thuộc bốn cái đã duyệt — vì miễn trừ mua về bốn
 tấm huy chương chứ không mua về nguyên một catalog.
 
-**Giữ mã nào.** Không mã nào. Mô-đun luật đề `ICON-11` cho luật này, nhưng `ICON-11` trong văn bản
+**Giữ mã nào?** Không mã nào. Mô-đun luật đề `ICON-11` cho luật này, nhưng `ICON-11` trong văn bản
 luật nói mỗi ô hình luôn mang hình vai trò dẫn dắt ở cỡ năm — một câu về cỡ hình so với cỡ tấm nền,
 không liên quan gì tới tranh giải. Toàn bộ lập luận về bộ từ vựng tranh giải chỉ nằm trong chú thích
 của mô-đun luật. Ở đây ghi lại đúng như thế thay vì bịa ra một ánh xạ.
 
-**Cách phát hiện.** Duyệt **mọi** `Literal`; bỏ qua giá trị không phải chuỗi và mọi chuỗi không mở
+**Phát hiện thế nào?** Duyệt **mọi** `Literal`; bỏ qua giá trị không phải chuỗi và mọi chuỗi không mở
 đầu bằng tiền tố bộ sưu tập `fluent-emoji-flat:`. Cổng tệp: phải chứa `/src/`, không được khớp
 `/\.test\.tsx?$/`. Tệp kết thúc bằng `/leaves/RankMark/index.tsx` đi nhánh kiểm tập đóng; mọi tệp
 khác đi nhánh "nêu ngoài chiếc lá".
 
-**Vì sao luật này đáng có máy giữ.** Vì nếu không có nó, miễn trừ ở hai luật nhập kia sẽ tự nở ra:
+**Vì sao nên để máy giữ luật này?** Vì nếu không có nó, miễn trừ ở hai luật nhập kia sẽ tự nở ra:
 một tệp được phép nhập một gói, rồi từ tệp đó gọi tên **bất kỳ** tranh nào trong gói — đúng thất bại
 mà chiếc lá biểu tượng sinh ra để chặn, dựng lại nguyên vẹn ở thư mục bên cạnh. Luật này là thứ biến
 một miễn trừ thành một **bộ từ vựng**.
 
-**Cửa còn mở.** Định danh ghép bằng template làm **cả hai** nhánh biến mất cùng lúc, và ghép chuỗi
+**Những chỗ còn lọt.** Định danh ghép bằng template làm **cả hai** nhánh biến mất cùng lúc, và ghép chuỗi
 lại chính là cách tự nhiên nhất để viết một bản đồ hạng-sang-tranh. Chỉ một tiền tố bộ sưu tập được
 nhận ra, nên một tấm huy chương lấy từ bộ sưu tập khác trong cùng catalog lọt cả trong lẫn ngoài
 chiếc lá. Miễn trừ theo tên tệp kiểm thử là có lập luận nhưng không có biên: mọi tệp `.test.tsx` ở

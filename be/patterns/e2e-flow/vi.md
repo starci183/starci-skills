@@ -13,15 +13,15 @@ description: Từng tình huống E2E-N, nhận diện bằng nghiệp vụ ch�
 
 # e2e flow
 
-Một file flow là **một câu nghiệp vụ**, được chứng minh xuyên qua **ranh giới production**, và nó đỏ
-khi câu đó không còn đúng — không đỏ vì bất cứ lý do nào khác.
+Một file flow là **một câu nghiệp vụ**, được kiểm chứng xuyên qua **ranh giới production**, và chỉ đỏ
+khi câu đó không còn đúng — không phải vì một lý do nào khác.
 
 Câu hỏi mà cả mười hai mã dưới đây cùng trả lời chỉ có một:
 
 > Ba giờ sáng nó đỏ. Người mở file ra có biết **bước nào** vỡ và **vì sao** không?
 
-File trả lời "không" là file người ta **chạy lại** thay vì **đọc**. Một test bị chạy lại thay vì đọc
-thì đã thôi làm test.
+Một file trả lời "không" sẽ bị người ta **chạy lại** thay vì **đọc**. Khi test chỉ được chạy lại mà
+không được đọc, nó đã không còn làm bằng chứng.
 
 **Đây là luật bắt buộc.** Mọi file `*.e2e-spec.ts` đều nằm trong phạm vi của **cả mười hai mã cùng
 lúc**. Chúng không phải thực đơn để chọn: mười hai mã mô tả mười hai cách độc lập khiến một file
@@ -74,7 +74,7 @@ tin · mở khoá thành tựu · đăng ký dùng thử · phát thông báo ·
 
 ## `E2E-2` — flow là chuỗi bước **có tên**, không phải một case dài
 
-**Tình huống.** Câu nghiệp vụ có nhiều chặng: đặt vào giỏ, thanh toán, mở quyền học. Mỗi chặng là
+**Tình huống.** Câu nghiệp vụ có nhiều chặng: đặt vào giỏ, thanh toán, mở quyền học. Mỗi chặng được
 một `it` riêng, xếp theo thứ tự, chia state qua scope của `describe`.
 
 **Dấu hiệu nhận biết**
@@ -103,7 +103,8 @@ nội dung · đặt lịch rồi xác nhận · thanh toán rồi phát quyền
 
 ## `E2E-3` — không bao giờ ngủ; poll tới khi trạng thái lắng, kèm deadline
 
-**Tình huống.** Có một chặng bất đồng bộ: webhook, queue, projection, socket. Cần chờ.
+**Tình huống.** Có một chặng bất đồng bộ như webhook, queue, projection hoặc socket nên hệ thống cần
+thời gian để hoàn tất.
 
 **Dấu hiệu nhận biết**
 
@@ -144,8 +145,8 @@ CDC bắt kịp · cache bị vô hiệu · scheduler nổ · email vào outbox.
 
 **Tự hỏi.** Nếu server trả lời đúng nhưng **không ghi gì**, bước này có đỏ không?
 
-**Envelope chứng minh cái gì.** Chỉ chứng minh server đã trả lời. Đó là một sự kiện về transport,
-không phải một hệ quả nghiệp vụ.
+**Envelope chứng minh điều gì.** Nó chỉ chứng minh server đã trả lời. Đó là một sự kiện của transport,
+không phải hệ quả nghiệp vụ.
 
 **Ranh giới**
 
@@ -203,7 +204,7 @@ quyền học phải **đóng**.
 
 **Tự hỏi.** Nếu hệ thống gửi mọi thứ cho mọi người, file này có bắt được không?
 
-**Vì sao đây là hỏng quan trọng nhất.** Vì nó **vô hình từ happy path**. Rò rỉ không làm ai báo lỗi:
+**Vì sao đây là hỏng quan trọng nhất.** Vì nó **vô hình trên happy path**. Rò rỉ không làm ai báo lỗi:
 người đáng nhận vẫn nhận được. Chỉ có một bước phủ định mới nhìn thấy nó.
 
 **Ranh giới**
@@ -230,7 +231,7 @@ nhóm không nhận thông báo nữa.
 
 **Tự hỏi.** Lần chạy **bỏ qua** nhánh này thì file đang chứng minh cái gì?
 
-**Vì sao xanh mà rỗng.** Nhánh trong một bước nghĩa là test **sẵn sàng cho cả hai đường**, nên lần
+**Vì sao xanh mà rỗng.** Nhánh trong một bước nghĩa là test **chấp nhận cả hai đường**, nên lần
 xanh không còn là bằng chứng nghiệp vụ đã đúng — nó chỉ chứng minh code chạy tới cuối.
 
 **Cách sửa.** Nếu điều kiện **là** một phần của flow, hãy **ép** nó xảy ra rồi khẳng định vô điều

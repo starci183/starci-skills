@@ -18,7 +18,7 @@ chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó n�
 
 Mã tình huống **không bao giờ được đánh số lại và không bao giờ bị xoá**. Mã được trích dẫn từ những
 file luật khác và từ các bản ghi công việc cũ; đổi số một mã là bẻ gãy im lặng một trích dẫn đã có.
-Một mã bị cho là sai thì vẫn giữ nguyên và được tranh luận trong [`audit.md`](./audit.md).
+Một mã bị cho là sai thì vẫn bảo toàn và được tranh luận trong [`audit.md`](./audit.md).
 
 ## 2.00 — 2026-08-16
 
@@ -27,7 +27,7 @@ Một mã bị cho là sai thì vẫn giữ nguyên và được tranh luận tr
 - **Chuyển hình dạng.** `fe/canon/patterns/icon.md` (một file, 13 luật viết liền) → `fe/patterns/icon/`
   với `INDEX.md`, `vi.md`, `example.md`, `audit.md`, `changelog.md`. File luật phẳng **không bị xoá và
   không bị sửa**; nó vẫn giữ bảng vận hành 42 dòng ý nghĩa → hình.
-- **Giữ nguyên 13 mã.** `ICON-1` … `ICON-13`, đúng số hiệu và đúng nghĩa của bản phẳng. Không thêm mã
+- **Giữ nguyên 13 mã.** `ICON-1` … `ICON-13`, đúng số hiệu và đúng nghĩa của file luật phẳng. Không thêm mã
   mới, không gộp, không tách. Mọi quyết định thật của luật cũ được mang sang: ba vai trò, hai family,
   một vendor, `currentColor`, `shrink-0`, bảng nguồn sở hữu việc chọn hình, và hai ngoại lệ artwork
   (reaction, giải thưởng).
@@ -35,7 +35,7 @@ Một mã bị cho là sai thì vẫn giữ nguyên và được tranh luận tr
   hoặc prop shape làm giá trị sai không viết ra được), `enforced` (có rule trong `sources/fe/icon.mjs`,
   **gọi đúng tên rule**), hay `documented` (chỉ có người đọc giữ). Kết quả đo được: **1 unrepresentable,
   3 enforced, 9 documented**. Khoảng hở đó là nội dung của bảng, không phải một thất bại của bảng.
-- **Thêm bảng `Anchor`.** Mỗi mã trỏ vào một đường dẫn code thật và nói rõ **nhìn cái gì ở đó** —
+- **Thêm bảng `Anchor`.** Mỗi mã trỏ vào một đường dẫn code thật và làm rõ **nhìn cái gì ở đó** —
   union vai trò, map role → class, hai block import tách riêng, file brand giữ màu gốc, leaf plate
   truyền `leading`, composite metric không có glyph, thư mục artwork reaction kèm attribution. Luật
   không trỏ được vào code thật thì chỉ là một đề xuất.
@@ -46,14 +46,14 @@ Một mã bị cho là sai thì vẫn giữ nguyên và được tranh luận tr
   bằng cách đánh số lại.
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống nghiệp vụ, dấu hiệu nhận biết, câu tự hỏi,
   ranh giới với các mã kề, và danh sách tình huống hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt **ĐÚNG** cạnh **SAI**, kèm
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt **ĐÚNG** cạnh **SAI**, kèm
   mục ngoại lệ và mục "trông giống nhưng không phải mã này"; cuối trang là ánh xạ yêu cầu → quyết
   định, bảng phân định ranh giới và danh sách sai lầm lặp lại.
 - **Rút mọi ví dụ về TSX thường.** Bỏ tên sản phẩm, tên repository và tên component library. Vendor
   glyph vẫn được gọi tên, vì lựa chọn vendor đóng **chính là** nội dung của `ICON-7`.
 - **Không chép bảng ý nghĩa 42 dòng.** `ICON-9` trỏ về bảng nguồn trong source thay vì mang thêm bản
   sao thứ ba: một bảng vận hành bị nhân đôi sẽ trôi, và bảng đó gọi tên tính năng của một sản phẩm cụ
-  thể nên đứng sai shelf. Mất mát so với bản phẳng được nhận trong `audit.md`.
+  thể nên đứng sai shelf. Mất mát so với file luật phẳng được nhận trong `audit.md`.
 - **Không có `prompt.md`.** Ánh xạ yêu cầu và bảng phân định nằm trong `example.md`, cùng chỗ với ví
   dụ mà chúng phân định. Module có đúng năm record.
 

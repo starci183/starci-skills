@@ -14,11 +14,11 @@ description: Từng tình huống AUTHZ-N, nhận diện bằng nghiệp vụ ch
 # Authorization
 
 Xác thực (authentication) hỏi **người này là ai**. Phân quyền (authorization) hỏi **người này có được
-làm việc này, lên chính bản ghi này không**. Hai câu hỏi khác nhau, được trả lời ở hai chỗ khác nhau,
-và lý do phải tách là: một câu trả lời được mà không cần đọc dữ liệu nào, câu kia thì không.
+làm việc này trên đúng bản ghi này không**. Hai câu hỏi khác nhau nên được trả lời ở hai chỗ khác nhau:
+một câu không cần đọc dữ liệu, còn câu kia thì có.
 
-Guard nhìn thấy request. Nó chứng minh được token, dựng được user, từ chối được người vô danh — và
-hết. Bản ghi mà người gọi đang với tới **chưa được load**. Người này có sở hữu bản ghi kia không, có
+Guard nhìn thấy request. Nó xác minh token, dựng được user, từ chối người vô danh — và chỉ đến đó.
+Bản ghi mà người gọi đang với tới **chưa được load**. Người này có sở hữu bản ghi kia không, có
 đang giữ quan hệ đã trả tiền không, có thuộc tenant sở hữu dòng dữ liệu đó không — đều là câu hỏi về
 một **dòng dữ liệu**, và chỉ handler mới cầm cả dòng dữ liệu lẫn danh tính cùng một lúc.
 
@@ -29,7 +29,7 @@ Câu hỏi quyết định một check nằm ở đâu:
 "Có ai đang đăng nhập không" thì không — đó là việc của cửa. "Người này có được sửa **cái đó** không"
 thì có — đó là việc của handler.
 
-**Đây là luật bắt buộc.** Mọi cửa có đọc danh tính và mọi handler có với tới một bản ghi đều rơi vào
+**Đây là luật bắt buộc.** Mọi cửa đọc danh tính và mọi handler chạm tới một bản ghi đều rơi vào
 đúng một mã dưới đây. Không có operation nào nhỏ đến mức được miễn: một mutation xoá một dòng là
 `AUTHZ-3`, đúng cùng một lý do mà một query nội dung trả phí là `AUTHZ-5`. Câu "có mỗi mutation nội bộ
 thôi mà" là chỗ luật này bị bỏ qua nhiều nhất — vì mutation nội bộ chính là cái sau này mọc thêm caller
@@ -51,7 +51,7 @@ thứ hai.
 ## `AUTHZ-1` — handler tự sở hữu điều kiện tiên quyết của nó
 
 **Tình huống.** Handler nhận `user` trong command và tự kiểm tra `user` có tồn tại không, dù resolver
-đứng trước nó đã gắn guard. Người đọc sau thấy hai lớp check và tưởng là thừa.
+đứng trước đã gắn guard. Người đọc sau có thể thấy hai lớp kiểm tra và tưởng chúng là thừa.
 
 **Dấu hiệu nhận biết**
 
@@ -96,7 +96,7 @@ thứ gọi là `user`.
 - ↔ `AUTHZ-6`: `AUTHZ-2` hỏi **có guard hay không**. `AUTHZ-6` hỏi **guard của chủ thể nào**. Một cửa
   operator gắn guard người dùng thì thoả `AUTHZ-2` và vi phạm `AUTHZ-6`.
 
-**Nửa duy nhất máy kiểm được.** Đây là mã duy nhất trong module có lint rule, vì câu hỏi trả lời được
+**Phần duy nhất máy kiểm được.** Đây là mã duy nhất trong module có lint rule, vì câu hỏi trả lời được
 trong phạm vi **một file**: method này, hoặc class của nó, có mang guard không. Không cần biết dòng dữ
 liệu nào cả.
 
@@ -108,8 +108,8 @@ query đọc dữ liệu riêng của người gọi.
 
 ## `AUTHZ-3` — quyền sở hữu quyết định trên dòng đã load
 
-**Tình huống.** Request nói bản ghi nào, không nói bản ghi đó **của ai**. `request.reviewId` là bản ghi
-người gọi **gọi tên**, không phải bản ghi người gọi **sở hữu**.
+**Tình huống.** Request chỉ ra bản ghi nào, chứ không nói bản ghi đó **của ai**. `request.reviewId` là
+bản ghi người gọi **gọi tên**, không phải bản ghi người gọi **sở hữu**.
 
 **Dấu hiệu nhận biết**
 
@@ -138,7 +138,7 @@ tiết hoá đơn · đổi thiết lập của một hồ sơ · thao tác trê
 ## `AUTHZ-4` — từ chối kiểu nào là một quyết định
 
 **Tình huống.** "Bạn không được sửa cái này" và "cái này không tồn tại" là hai **sự thật khác nhau**, và
-client hiển thị hai thứ khác nhau cho chúng. Bình thường mỗi cái xứng đáng một exception riêng.
+client thường hiển thị chúng theo hai cách khác nhau. Thông thường, mỗi trường hợp nên có một exception riêng.
 
 Ngoại lệ nằm ở bản ghi mà người gọi **lẽ ra không thể biết là có**: ở đó, trả lời "forbidden" chính là
 xác nhận bản ghi tồn tại, mà sự tồn tại mới là bí mật.
@@ -169,8 +169,8 @@ liên kết chia sẻ chưa công khai · hồ sơ đã khoá · bản ghi thu�
 
 ## `AUTHZ-5` — entitlement là một trạng thái, không phải một dòng
 
-**Tình huống.** Ghi danh, thành viên, gói đăng ký, bản dùng thử. Một dòng nói rằng người này **có quan
-hệ** với một sản phẩm; nó không nói **quan hệ nào**. Một dòng dùng thử và một dòng đã trả tiền đều là
+**Tình huống.** Ghi danh, thành viên, gói đăng ký, bản dùng thử. Một dòng cho biết người này **có quan
+hệ** với một sản phẩm; nó không cho biết **quan hệ nào**. Một dòng dùng thử và một dòng đã trả tiền đều là
 "ghi danh", và chúng cho hai quyền khác nhau.
 
 **Dấu hiệu nhận biết**
@@ -199,8 +199,8 @@ gói cao hơn · quyền bình luận sau khi mua · hạn mức còn hiệu l�
 
 ## `AUTHZ-6` — operator là một chủ thể khác với người dùng
 
-**Tình huống.** Người vận hành nền tảng, một service token, và một người dùng sản phẩm là **ba danh
-tính**. Treo cả ba lên một guard nghĩa là quản trị viên của một khách hàng có thể vận hành nền tảng.
+**Tình huống.** Người vận hành nền tảng, một service token và một người dùng sản phẩm là **ba danh
+tính**. Gộp cả ba vào một guard có thể khiến quản trị viên của một khách hàng vận hành được nền tảng.
 
 **Dấu hiệu nhận biết**
 
@@ -240,7 +240,7 @@ xác thực với tư cách operator và nói rõ nó đang đọc dữ liệu c
 
 ## Ngoại lệ
 
-Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ dưới đây đều đóng và nêu rõ mã
+Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ dưới đây đều khép kín và nêu rõ mã
 nó áp dụng vào.
 
 - **Cửa công khai.** `AUTHZ-2` chỉ áp cho cửa **có đọc** danh tính. Cửa không đọc danh tính nào thì

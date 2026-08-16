@@ -9,12 +9,12 @@ description: Phản biện xem ba quy tắc đặt tên có giữ được đún
 
 # audit.md
 
-> Version: `2.00` · Module: `naming`
+> Phiên bản: `2.00` · Mô-đun: `naming`
 
 Phản biện này không hỏi luật có đúng không — luật nằm ở tài liệu khác. Nó hỏi một câu duy nhất: **cái
 mà mọi người tin là máy đang giữ có bằng cái máy thật sự giữ không?**
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm điều kiện: mô-đun chỉ được đọc **cùng với** bảng cửa còn mở. Ba quy tắc đều chính xác
 trong phạm vi của mình và không quy tắc nào bắt bừa ngoài phạm vi đó, nhưng phạm vi hẹp hơn hẳn cái
@@ -39,7 +39,7 @@ thích ở đầu tệp vẫn viết như thể chỉ có **hai**: nó nói "Nei
 | Có quy tắc nào bắt nhầm không | Có hai: danh từ nghiệp vụ `handle`, và đường dẫn tuyệt đối nằm ngoài kho mã |
 | `recommended` có khớp `meta.type` không | Không khớp về phân loại: hai quy tắc khai `suggestion`, một khai `problem`, nhưng `recommended` đặt cả ba ở mức `error` |
 
-## Findings
+## Phát hiện
 
 1. **Chú thích đầu tệp đã lạc hậu.** Nó mô tả một tệp hai quy tắc, trong khi tệp công bố ba. Một
    người đọc chú thích trước khi đọc mã sẽ không biết `NAMING-3` tồn tại. Đây là dạng sai lệch tệ
@@ -76,7 +76,7 @@ thích ở đầu tệp vẫn viết như thể chỉ có **hai**: nó nói "Nei
     `recommended` đặt cả ba ở `error`. Không gây hậu quả vận hành vì cấu hình của kho tiêu thụ mới là
     quyền quyết định thật, nhưng nó làm phân loại mất nghĩa.
 
-## Decisions
+## Quyết định
 
 - Tài liệu hoá **đúng ba** quy tắc có thật trong tệp nguồn. Không quy tắc nào được bịa thêm cho đẹp
   bảng ánh xạ.
@@ -164,7 +164,7 @@ Mỗi dòng: cửa còn mở, rồi **cái mà quy tắc phải soi để đóng
   **bản thân sự vật** với một cái tên gọi tên **người gọi đầu tiên** là một phán đoán ngữ nghĩa. Đây
   là luật do người đọc lại giữ, và điều đúng đắn duy nhất cần làm là **nói ra** rằng nó chưa được giữ.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn công bố thêm hoặc bớt một quy tắc, hoặc đổi một tên công bố.
 - Một mã `NAMING-<n>` mới xuất hiện trong luật, hoặc một mã hiện có đổi phạm vi.

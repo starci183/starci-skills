@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/translation/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã COPY-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã COPY-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -13,9 +13,9 @@ description: Mọi case và ngoại lệ của từng mã COPY-N, viết bằng 
 
 Mọi ví dụ dưới đây là **TSX thường**. Không component library, không design system riêng, không tên
 sản phẩm. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một ví dụ cần tên riêng của
-một dự án mới đọc được, ví dụ đó đứng sai chỗ.
+một dự án mới đọc được, ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục ngoại lệ và những thứ trông
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục ngoại lệ và những thứ trông
 giống nhưng không phải mã đó. Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một quyết định.
 
 Quy ước đọc: `index.tsx` là **nửa connected** — nó gọi dữ liệu và biết tình huống. `component.tsx` là
@@ -533,7 +533,7 @@ thể rồi dừng. Câu trả lời phải là một quyết định hoặc m�
 | Trạng thái server gửi bằng tiếng Việt, code so khớp với nó | Chương trình đọc chuỗi này, không phải người đọc | `COPY-6` | Giữ nguyên, đánh dấu lý do trên dòng |
 | Một hằng số tiếng Việt trong page, không có chỗ nào so khớp | Chưa chứng minh được là value ⇒ mặc định là copy | `COPY-1` | Đưa vào từ điển, resolve tại nửa connected |
 
-Ở dòng cuối, chỉ hỏi khi bên yêu cầu nói rõ chuỗi đó có bên thứ ba so khớp:
+Ở dòng cuối, chỉ hỏi khi bên yêu cầu làm rõ chuỗi đó có bên thứ ba so khớp:
 *"Có đoạn code hoặc hệ thống nào so sánh với đúng chuỗi này không?"*
 
 ## Bảng phân định ranh giới

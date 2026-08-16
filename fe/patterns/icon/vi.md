@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/icon/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống ICON-N, nhận diện bằng nghiệp vụ chứ không bằng kích thước trên màn hình.
+description: Các tình huống ICON-N, nhận diện bằng nghiệp vụ chứ không bằng kích thước trên màn hình.
 ---
 
 # vi.md

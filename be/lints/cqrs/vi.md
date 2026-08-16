@@ -4,19 +4,19 @@ title: vi.md
 slug: /be/lints/cqrs/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Ba quy tắc lint giữ luật CQRS - bắt gì, phát hiện bằng cách nào, và cửa nào còn mở.
+description: Ba quy tắc lint giữ luật CQRS — bắt gì, phát hiện bằng cách nào và còn bỏ sót điều gì.
 ---
 
 # vi.md
 
 > Version: `2.00` · Mô-đun: `cqrs`
 
-# Ba cái máy giữ luật CQRS
+# Ba quy tắc máy giữ luật CQRS
 
 Luật CQRS có bảy mã, `CQRS-1` đến `CQRS-7`. **Chỉ ba mã là hình dạng mà một bộ phân tích cú pháp
 nhìn thấy được.** Bốn mã còn lại — công việc nằm ở đâu, lớp điều phối mỏng đến mức nào, thất bại
 được ném ra hay trả về, người gọi có đang đợi một sự kiện hay không — là **phán đoán**. Một quy tắc
-đoán mò mấy thứ đó sẽ nổ vào code đúng đủ nhiều lần để mọi người học được cách tắt nó đi, và một quy
+đoán mò mấy thứ đó sẽ báo nhầm trên code đúng đủ nhiều lần để mọi người học được cách tắt nó đi, và một quy
 tắc bị tắt thì không giữ gì cả trong khi trông vẫn như đang giữ.
 
 Tài liệu này không chép lại luật. Nó nói **máy thấy được đến đâu** và **hết thấy từ chỗ nào**.
@@ -61,7 +61,7 @@ và báo nếu vắng. **Không có cổng theo tên tệp** — quy tắc này 
 `execute` **vẫn biên dịch và vẫn chạy**. Không có gì đỏ lên. Tệp đó nằm sai chỗ một cách yên lặng
 cho tới ngày ai đó thêm một mối quan tâm cắt ngang vào lớp cơ sở — một phép đo thời gian, một giao
 dịch, một lần thử lại — và đúng tệp này là tệp duy nhất không nhận được. Sai ở chỗ vô hình tại điểm
-gọi, đắt về sau: đó là định nghĩa của việc cần một cái máy.
+  gọi, đắt về sau: đó là lý do cần có máy kiểm tra.
 
 **Cửa còn mở.**
 
@@ -118,7 +118,7 @@ Máy giữ được chỗ này vì hình dạng của một thông điệp đún
   thể tính toán một cách vô hình lại là chỗ duy nhất không có ai nhìn.
 - **Logic viết thành trường.** `isValid = () => true` — vẫn là `PropertyDefinition`, cùng một lỗ.
 - **Một decorator bất kỳ là tắt cả lớp.** Miễn trừ này được mua để một họ tệp cùng đuôi nhưng khác
-  bản chất không nổ oan. Cái giá: thông điệp nào mọc thêm một decorator vì lý do gì cũng thành không
+  bản chất không báo oan. Cái giá: thông điệp nào mọc thêm một decorator vì lý do gì cũng thành không
   đo được.
 - **Tên `params` là quy ước, không phải nội dung.** Một tham số duy nhất tên `params` chứa gì cũng
   qua — một kho dữ liệu, một bộ nhớ đệm, một hàm gọi lại. Quy tắc kiểm **tên**, không kiểm kiểu.
@@ -147,14 +147,14 @@ trả lời khác nhau tuỳ theo cây làm việc đang có gì, và một quy 
 việc thì không ai tái lập lại được lúc rà soát. Nó báo tên tệp *đáng lẽ phải có*; việc đếm là của
 cổng bên ngoài.
 
-**Vì sao luật này đáng có máy giữ.** Vì cặp song sinh là thứ dễ quên nhất và im lặng nhất khi thiếu:
+**Vì sao luật này đáng có máy giữ.** Vì cặp song sinh là thứ dễ quên nhất và khó nhận ra nhất khi thiếu:
 không có gì đỏ lên khi một thư mục thao tác thiếu bản kiểm thử, và mỗi lần thiếu lại làm chuẩn "ở
 đây luôn có cặp song sinh" yếu đi một chút. Máy nói tên tệp còn thiếu, ngay tại tệp mà người ta đang
 mở.
 
 **Cửa còn mở.**
 
-- **Mặc định là tắt.** Quy tắc giữ `CQRS-7` trực tiếp nhất lại đang ship ở mức `off`, và kể cả bật
+- **Mặc định là tắt.** Quy tắc giữ `CQRS-7` trực tiếp nhất lại đang được phát hành ở mức `off`, và kể cả bật
   lên thì vẫn trơ nếu cấu hình không truyền `specs`. Nó là bộ báo cáo cho một cái cổng nằm ngoài nó.
 - **Có tệp không có nghĩa là có kiểm thử.** Một bản kiểm thử rỗng, bị `describe.skip`, hoặc chỉ có
   một khẳng định luôn đúng vẫn làm quy tắc im. Nó kiểm một cái tên trong một danh sách, không đọc nội
@@ -163,7 +163,7 @@ mở.
   một bản kiểm thử làm cả hai cùng qua.
 - **Vẫn là cổng tên tệp.** `<thao-tác>.handler.tsx`, `.handler.mts`, hay lớp xử lý khai trong tệp
   gom đều nằm ngoài.
-- **Danh sách cũ là câu trả lời sai mà im lặng.** Ai truyền `specs` thì người đó quyết kết quả. Một
+- **Danh sách cũ là câu trả lời sai mà không bị phát hiện.** Ai truyền `specs` thì người đó quyết kết quả. Một
   danh sách dựng một lần rồi nhớ đệm, hoặc dựng từ sai thư mục gốc, làm mọi lớp xử lý qua hết trong
   khi không có gì được kiểm.
 

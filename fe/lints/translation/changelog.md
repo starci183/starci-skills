@@ -9,12 +9,12 @@ description: Lịch sử phiên bản của hồ sơ thực thi luật chữ ngh
 
 # changelog.md
 
-> Current version: `2.00`
+> Phiên bản hiện tại: `2.00`
 
 Mô-đun: `translation`. Hai luật máy được ghi ở đây ship trong gói `@starci/eslint-canon-fe`, dưới
 tiền tố `starci-fe/`.
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu:
 `INDEX.md`, `vi.md`, `example.md`, `audit.md`, `changelog.md`. Đổi số chính (`x.00`) dành cho thay

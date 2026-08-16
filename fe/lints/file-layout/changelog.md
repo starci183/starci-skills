@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của hồ sơ thực thi file-layout.
 
 # changelog.md
 
-> Current version: `2.00` · Mô-đun: `file-layout`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `file-layout`
 
-## Version Policy
+## Quy ước phiên bản
 
 Tăng cả năm tài liệu thêm `0.01` khi một luật lint đổi hành vi, khi một luật được thêm vào hoặc bỏ
 khỏi mã nguồn, hoặc khi một cửa lách chuyển giữa bảng **Closed** và bảng **Open**. Đổi số chính
@@ -59,7 +59,7 @@ file ở đâu, mô-đun này nói máy nhìn thấy được bao nhiêu phần 
   đã kín.
 
 - **`example.md` viết bằng mã thật**, 53 khối mã: mỗi luật vài cặp SAI/ĐÚNG, rồi một mục
-  **Cửa lách và nhầm lẫn** mang đúng đoạn mã lọt qua — dán nhãn rõ là **thứ luật không thấy**, không
+  **Chỗ lách và chỗ dễ nhầm** mang đúng đoạn mã lọt qua — dán nhãn rõ là **thứ luật không thấy**, không
   phải thứ được phép viết.
 
 - **Năm tài liệu, không có `prompt.md`.** Phần ánh xạ yêu cầu và bảng phân định ranh giới nằm cuối

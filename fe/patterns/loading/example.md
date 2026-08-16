@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/loading/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã LOADING-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã LOADING-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -13,10 +13,10 @@ description: Mọi case và ngoại lệ của từng mã LOADING-N, viết bằ
 
 Mọi ví dụ dưới đây là **TSX thường**. Không component library, không design system riêng, không
 registry key, không tên sản phẩm. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một
-ví dụ cần tên riêng của một sản phẩm mới đọc được, ví dụ đó đứng sai chỗ.
+ví dụ cần tên riêng của một sản phẩm mới đọc được, ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt bản **ĐÚNG** cạnh bản **SAI**, rồi tới mục **ngoại lệ và nhầm
-lẫn**. Sau mỗi cặp là một câu nói rõ hai bản khác nhau ở đúng **một** điều — vì nếu phải kể ra hai
+Mỗi mã có **nhiều case**, từng case đặt bản **ĐÚNG** cạnh bản **SAI**, sau đó là mục **ngoại lệ và nhầm
+lẫn**. Sau mỗi cặp là một câu làm rõ hai bản khác nhau ở đúng **một** điều — vì nếu phải kể ra hai
 điều thì cặp đó chưa phải là một phép thử.
 
 ---
@@ -144,7 +144,7 @@ chính `InvoiceRow` cũng không nhìn thấy nó.
 
 Chúng khác nhau ở đúng một điều: hình nghỉ được viết ở trong component hay ở ngoài nó.
 
-### Case: giữ nguyên thẻ và measure
+### Case: bảo toàn thẻ và measure
 
 ```tsx
 // ĐÚNG
@@ -212,7 +212,7 @@ Chúng khác nhau ở đúng một điều: `rounded-full` được khai báo m�
 
 ---
 
-## `LOADING-3` — vùng nghỉ giữ nguyên chiều cao
+## `LOADING-3` — vùng nghỉ bảo toàn chiều cao
 
 ### Case: danh sách nghỉ bằng đúng số dòng đã khai báo
 

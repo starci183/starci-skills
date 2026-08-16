@@ -61,7 +61,7 @@ mà ai đó phải chọn chạy.
   bảng Situation Codes chứ không bỏ đi cái nào.
 - Ghi cả năm dòng `Tầng giữ` là `documented` thay vì gọi audit repo là "enforced". Audit là một
   script, không phải một lint rule; gọi khác đi là làm bảng này nói dối đúng vào chỗ nó tồn tại để
-  nói thật.
+  phản ánh đúng thực tế.
 - Rút mọi neo về đường dẫn trong cây trust. Luật phẳng nêu neo bằng tên một repository cụ thể; ở
   shelf này ví dụ phải đúng với bất kỳ front end nào, nên neo giữ ở artifact và script — thứ vẫn
   kiểm chứng được mà không cần một repo có tên.

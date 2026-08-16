@@ -13,8 +13,8 @@ description: Lịch sử phiên bản của luật event delivery.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
-chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
+Mỗi thay đổi luật được chấp nhận sẽ tăng version của module thêm `0.01` và cập nhật cả **năm** record.
+Đổi số chính (`x.00`) dành cho thay đổi cấu trúc của module hoặc shelf mà module nằm trên.
 
 Thêm, bớt hoặc đánh số lại một mã `DELIVERY-<n>` là thay đổi **major**, không phải một lần tăng
 `0.01`. Các mã này được trích dẫn từ luật anh em và từ task record cũ; đổi số một mã là làm hỏng một
@@ -22,7 +22,7 @@ trích dẫn đã có người viết ra.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hai thứ đổi cùng lúc: shelf và hình dạng module.
+Đổi số chính vì hai yếu tố thay đổi cùng lúc: shelf và hình dạng module.
 
 - **Chuyển shelf.** `be/canon/patterns/event-delivery.md` (một file phẳng) → `be/patterns/event-delivery/`
   (module năm record). Toàn bộ `id` và `slug` đổi theo. File phẳng vẫn còn nguyên tại chỗ cũ; bản

@@ -13,12 +13,12 @@ description: Từng tình huống DATA-N, nhận diện bằng nghiệp vụ ch�
 
 # Data access
 
-Mọi lần chạm vào dữ liệu đều đi qua một `EntityManager`, và `EntityManager` ấy được tiêm bằng một
+Mọi lần chạm vào dữ liệu đều đi qua một `EntityManager`, được tiêm bằng một
 decorator **gọi tên datasource** mà nó thuộc về. Ở đây không có repository injection, cũng không có
 connection mặc định ngầm: cả hai đều là những cái tay cầm **trông giống hệt nhau** dù đang trỏ vào
 database nào, mà ứng dụng này thì có nhiều hơn một database.
 
-Toàn bộ luật suy ra từ đúng một tính chất. `EntityManager` là **một đơn vị công việc có thể truyền
+Toàn bộ luật bắt nguồn từ một tính chất duy nhất. `EntityManager` là **một đơn vị công việc có thể truyền
 đi** — đưa cho helper, bọc vào transaction, đánh tráo bằng bản transactional — còn repository thì
 không, vì nó bị buộc vào một entity duy nhất suốt đời.
 
@@ -26,12 +26,12 @@ Câu hỏi duy nhất phân định:
 
 > Thao tác này **có thể mọc thêm một lệnh ghi thứ hai** không?
 
-Gần như luôn luôn có thể. Và một cái tay cầm không mang nổi transaction sang lệnh ghi thứ hai thì nó
+Gần như luôn luôn có thể. Một tay cầm không mang nổi transaction sang lệnh ghi thứ hai thì nó
 đã sai **ngay từ đầu**, chứ không phải sai vào cái ngày lệnh ghi thứ hai xuất hiện. Cái giá không
-nằm ở lúc chọn sai, nó nằm ở lúc phải viết lại — và bản viết lại rơi vào tay module nào phát hiện ra
-trước.
+nằm ở lúc chọn sai, mà nằm ở lúc phải viết lại — và module nào phát hiện ra trước sẽ phải gánh lần
+viết lại đó.
 
-**Đây là luật bắt buộc.** Không có thao tác nào nhỏ tới mức được miễn khai báo mã. Đọc một dòng vẫn
+**Đây là luật bắt buộc.** Không có thao tác nào nhỏ đến mức được miễn khai báo mã. Đọc một dòng vẫn
 là `DATA-1` đúng cùng lý do mà tất toán một đơn hàng là `DATA-1`. Câu "có mỗi một bảng thôi mà" là
 chỗ luật này bị bỏ qua nhiều nhất, bởi vì bảng thứ hai đến sau, và lúc nó đến thì tay cầm đã sai rồi.
 
@@ -49,7 +49,7 @@ chỗ luật này bị bỏ qua nhiều nhất, bởi vì bảng thứ hai đế
 
 ## `DATA-1` — handle phải nói nó trỏ vào database nào
 
-**Tình huống.** Bạn viết constructor cho một service, một handler, một cron. Bạn cần chạm dữ liệu.
+**Tình huống.** Bạn viết constructor cho một service, một handler hoặc một cron để chạm vào dữ liệu.
 Kiểu `EntityManager` **không** nói gì về connection: manager của database chính và manager của một
 bản replica phân tích hay một sandbox là **cùng một kiểu**.
 
@@ -77,7 +77,7 @@ seeder · guard cần tra quyền · job xử lý hàng đợi · service dọn 
 
 ## `DATA-2` — handle phải mang được lệnh ghi thứ hai
 
-**Tình huống.** Bạn đang chọn hình dáng của cái tay cầm. Repository trông tiện hơn: nó đã biết
+**Tình huống.** Bạn đang chọn hình dáng của tay cầm. Repository trông tiện hơn: nó đã biết
 entity, gọi ngắn hơn, IDE gợi ý đẹp hơn. Nhưng nó **buộc vào một entity**, nên cái ngày thao tác này
 phải ghi thêm một bảng nữa, nó không đi cùng được.
 
@@ -91,7 +91,7 @@ phải ghi thêm một bảng nữa, nó không đi cùng được.
 
 **Tự hỏi.** Nếu lệnh ghi thứ hai fail, lệnh ghi thứ nhất có bị hoàn lại không? Với hai repository,
 câu trả lời là **không**, và không có gì trong kiểu dữ liệu phản đối cả — đó chính là lý do lỗi này
-đi qua review được.
+lọt qua review.
 
 **Ranh giới**
 
@@ -107,7 +107,7 @@ mọi thứ có chữ "và" trong câu mô tả nghiệp vụ.
 
 ## `DATA-3` — entity phải tự gọi tên cái bảng của nó
 
-**Tình huống.** Bạn khai một entity mới, hoặc — nguy hiểm hơn — bạn đang **đổi tên một class
+**Tình huống.** Bạn khai báo một entity mới, hoặc — nguy hiểm hơn — bạn đang **đổi tên một class
 entity** cho hợp nghiệp vụ mới. Nếu tên bảng để ORM tự suy ra, nó suy ra từ tên class.
 
 **Dấu hiệu nhận biết**
@@ -133,7 +133,7 @@ một entity làm hai · gộp hai entity làm một · entity cần nằm trong
 
 ## `DATA-4` — transaction là đơn vị công việc, và nó được **truyền**, không phải được **ngầm hiểu**
 
-**Tình huống.** Bạn đã mở một transaction. Bên trong, bạn gọi một helper của service khác — cộng
+**Tình huống.** Bạn đã mở một transaction. Bên trong, bạn gọi một helper của service khác để cộng
 điểm, ghi nhật ký, phát thông báo. Helper ấy có manager riêng của nó, được tiêm ở constructor của nó.
 
 **Dấu hiệu nhận biết**
@@ -163,7 +163,7 @@ thành tích · huỷ rồi hoàn · mọi service dùng chung được gọi t�
 
 ## `DATA-5` — query nói ra cái nó cần, entity không quyết hộ
 
-**Tình huống.** Bạn đang lấy dữ liệu cho một câu trả lời cụ thể. Relation, cột và thứ tự là thuộc
+**Tình huống.** Bạn đang lấy dữ liệu cho một câu trả lời cụ thể. Relation, cột và thứ tự thuộc về
 tính của **câu trả lời ấy**, không phải thuộc tính của entity. Người biết cần gì là call site.
 
 **Dấu hiệu nhận biết**
@@ -203,7 +203,7 @@ dịch · bảng xếp hạng chỉ cần tên và điểm · export chỉ cần
 
 ## Ngoại lệ
 
-Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ dưới đây đều đóng và nêu rõ
+Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ dưới đây đều khép kín và nêu rõ
 mã nó áp dụng vào.
 
 - **Dạng options của `@Entity`.** Thuộc `DATA-3`. `@Entity({ name: "t", schema: "s" })` hợp lệ ngang

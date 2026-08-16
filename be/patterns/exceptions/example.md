@@ -11,13 +11,13 @@ description: Mọi case và ngoại lệ của từng mã EXCEPTION-N, viết b�
 
 > Version: `2.00` · Module: `exceptions` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường, hình dạng một ứng dụng Nest hay viết**. Không tên sản
-phẩm, không tên module riêng, không tên repository. Một luật ở shelf này chỉ đúng khi nó đúng ở bất kỳ
-back end nào — nên nếu một ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được, ví dụ đó đứng sai
-chỗ.
+Mọi ví dụ dưới đây là **TypeScript thường, có hình dạng một ứng dụng Nest quen thuộc**. Không dùng tên
+sản phẩm, tên module riêng hay tên repository. Một luật ở shelf này chỉ đúng khi nó đúng ở bất kỳ back
+end nào — vì vậy nếu một ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được, ví dụ đó không phù
+hợp ở đây.
 
-Mỗi mã có **nhiều case**, rồi tới mục **ngoại lệ và nhầm lẫn**. Phần cuối trang ánh xạ từ yêu cầu
-bằng lời sang một cách viết duy nhất.
+Mỗi mã có **nhiều case**, sau đó là mục **ngoại lệ và nhầm lẫn**. Cuối trang ánh xạ yêu cầu bằng lời
+sang một cách viết duy nhất.
 
 ---
 
@@ -653,8 +653,8 @@ trong config của repository dùng rule. Hai chỗ đó lệch nhau là một f
 
 ## Ánh xạ yêu cầu sang một cách viết
 
-Nêu chỗ throw, file khai báo và người đọc thất bại. Nếu thiếu **một** dữ kiện quyết định, hỏi **một**
-câu cụ thể rồi dừng.
+Hãy nêu chỗ throw, file khai báo và người đọc thất bại. Nếu thiếu **một** dữ kiện quyết định, hãy hỏi
+**một** câu cụ thể rồi dừng.
 
 | Yêu cầu bằng lời | Lập luận | Mã | Kết quả |
 |---|---|---|---|

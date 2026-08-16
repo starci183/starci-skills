@@ -27,7 +27,7 @@ chỉ là chữ.
 |---|---|
 | `ICON-1` vs `ICON-2/3/4` | Loại trừ được: một bên hỏi **có mấy vai trò**, một bên hỏi **vai trò vẽ bằng bản nào** |
 | `ICON-2` vs `ICON-3` | Loại trừ được khi đã nêu glyph mở đầu một vùng hay dẫn một dòng |
-| `ICON-3` vs `ICON-4` | Loại trừ được khi đã nêu chỗ đứng có vỏ riêng hay chưa |
+| `ICON-3` vs `ICON-4` | Loại trừ được khi đã nêu vị trí có vỏ riêng hay chưa |
 | `ICON-3` vs `ICON-12` | Loại trừ được: **vẽ bằng gì** khác **có được vẽ không** |
 | `ICON-5` vs ngoại lệ brand | Loại trừ được bằng một câu hỏi: đổi màu thì mark còn là mark đó không |
 | `ICON-6` vs `ICON-7` | Loại trừ được: **file nào import** khác **import cái gì**; hai rule cũng tách đúng theo đường đó |
@@ -110,7 +110,7 @@ nó — hoặc vì sao không rule nào giữ được.
   source, (2) một literal đường dẫn tới thư mục artwork reaction xuất hiện ngoài reaction leaf, (3)
   một import artwork ngoài leaf đó. Cả ba đều là literal, đều thấy được.
 - **Va chạm số hiệu `ICON-11`.** File rule chú thích ngoại lệ artwork giải thưởng là `ICON-11`, còn
-  luật đánh số `ICON-11` cho glyph trên plate. Ở đây **giữ nguyên nghĩa của luật** và ghi lại va chạm,
+  luật đánh số `ICON-11` cho glyph trên plate. Ở đây **bảo toàn nghĩa của luật** và ghi lại va chạm,
   vì đổi số là bẻ gãy một trích dẫn ai đó đã viết. Nếu founder muốn dọn, cách đúng là cấp cho ngoại lệ
   artwork giải thưởng **một mã mới** ở lần tăng phiên bản tiếp theo, chứ không phải đổi số cái đang có.
 - **Bảng ý nghĩa không nằm trong module.** Ai đọc module này sẽ không tra được "ý nghĩa nào → hình

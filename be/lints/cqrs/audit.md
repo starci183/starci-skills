@@ -4,14 +4,14 @@ title: audit.md
 slug: /be/lints/cqrs/audit
 sidebar_label: audit.md
 sidebar_position: 3
-description: Phản biện mức bao phủ thật của ba quy tắc CQRS và liệt kê mọi cửa còn mở.
+description: Đánh giá độ phủ thực của ba quy tắc CQRS và ghi lại mọi kẽ hở còn tồn tại.
 ---
 
 # audit.md
 
 > Version: `2.00` · Mô-đun: `cqrs`
 
-Phản biện này hỏi đúng một câu: **luật CQRS được máy giữ tới đâu, và từ đâu trở đi chỉ còn con
+Bản đánh giá này chỉ hỏi một câu: **luật CQRS được máy giữ tới đâu, và từ đâu trở đi chỉ còn con
 người?**
 
 ## Verdict
@@ -23,7 +23,7 @@ Nguồn công bố **đúng ba** quy tắc — `handler-overrides-process`, `mes
 luật có thật, không quy tắc nào phải bịa ánh xạ, và không quy tắc nào ở đây thiếu bản cài đặt.
 
 Điều kiện đọc: **mô-đun này không được đọc như "luật CQRS đã có máy giữ".** Bốn trên bảy mã không có
-quy tắc nào, và trong ba mã còn lại, một mã được giữ bởi một quy tắc ship ở mức `off`. Số mã thật sự
+quy tắc nào, và trong ba mã còn lại, một mã được giữ bởi một quy tắc phát hành ở mức `off`. Số mã thật sự
 được chặn ở cổng dựng là **hai**.
 
 ## Kiểm phân định
@@ -59,7 +59,7 @@ quy tắc nào, và trong ba mã còn lại, một mã được giữ bởi mộ
    vi thật là "tên thao tác của tệp này có mặt trong một danh sách chuỗi do cấu hình truyền vào".
    Nó không đọc đĩa, không biết bản kiểm thử nằm ở thư mục nào, không đọc nội dung bản kiểm thử, và
    mặc định là `off`. Quyết định không đọc đĩa là **đúng** — một quy tắc mà câu trả lời phụ thuộc cây
-   làm việc thì không tái lập được — nhưng cái tên vẫn hứa nhiều hơn cái máy.
+   làm việc thì không tái lập được — nhưng cái tên vẫn hứa nhiều hơn khả năng thực tế của máy.
 
 4. **`handler-overrides-process` giữ hai mệnh đề rất lệch nhau về sức mạnh.** Nhánh
    `overridesExecute` gần như kín: nó bắt phương thức ở mọi mức truy cập, mọi loại truy xuất, có hay
@@ -90,7 +90,7 @@ quy tắc nào, và trong ba mã còn lại, một mã được giữ bởi mộ
 - Ghi bốn mã không có quy tắc là **chưa có ai giữ**, ở đây, thay vì gán chúng cho quy tắc gần nhất.
 - Giữ bảng **Cửa còn mở** là phần bắt buộc của `INDEX.md`, không phải phụ lục. Một cửa chưa ai biết
   nguy hiểm hơn một luật chưa có quy tắc: luật chưa có quy tắc thì ai cũng biết là chưa được giữ.
-- Giữ nguyên `off` cho `handler-has-twin-spec` trong tài liệu. Ghi mức ship thật, không ghi mức mong
+- Giữ nguyên `off` cho `handler-has-twin-spec` trong tài liệu. Ghi mức phát hành thực tế, không ghi mức mong
   muốn.
 - Không đề xuất sửa nguồn trong mô-đun này. Đây là hồ sơ **thi hành**, và một đề xuất quy tắc mới
   thuộc về `Rủi ro còn mở` cho tới khi có bản cài đặt chỉ tay vào được.
@@ -136,7 +136,7 @@ Mỗi mục nói rõ **quy tắc phải soi thêm cái gì** mới đóng đư�
 - **`params` là tên, không phải nội dung.** Không đóng được bằng lint mà không đọc kiểu qua thông
   tin kiểu — nghĩa là bật lint có nhận biết kiểu, đắt hơn nhiều lần cho một phép kiểm mà lợi ích
   không rõ. **Giữ mở; đây là chỗ con người đọc.**
-- **Cổng tên tệp.** Không đóng được mà không bỏ cổng, mà bỏ cổng thì quy tắc nổ vào mọi lớp trong
+- **Cổng tên tệp.** Không đóng được mà không bỏ cổng, mà bỏ cổng thì quy tắc báo trên mọi lớp trong
   kho mã. Cách rẻ hơn nằm ở chỗ khác: một quy tắc giữ `CQRS-1` (mọi tệp trong thư mục thao tác mang
   tên thao tác) sẽ làm việc đổi tên tệp trở thành lỗi của **chính nó**, và như vậy cửa này đóng gián
   tiếp. **Giữ mở tại đây; ghi lại như lý do để cân nhắc một quy tắc cho `CQRS-1`.**

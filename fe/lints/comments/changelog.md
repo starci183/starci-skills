@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của mô-đun thực thi luật comments.
 
 # changelog.md
 
-> Current version: `2.00` · Mô-đun: `comments`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `comments`
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu. Đổi số chính
 (`x.00`) dành cho thay đổi cấu trúc mô-đun hoặc nhóm mà nó nằm trên.

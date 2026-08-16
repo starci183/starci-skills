@@ -11,15 +11,15 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 
 > Version: `2.00` · Module: `exception-identity`
 
-Audit này kiểm ba thứ: luật có phán được một verdict từ **những dữ kiện đã nêu** và chỉ từ đó; mỗi mã
-có được **neo vào code thật** không; và **tầng giữ** ghi trong `INDEX.md` có đúng với source hay
-không.
+Bản audit này kiểm tra ba việc: luật có đưa ra một verdict chỉ từ **những dữ kiện đã nêu** hay không;
+mỗi mã có được **gắn với code thật** không; và **tầng giữ** ghi trong `INDEX.md` có khớp với source
+hay không.
 
 ## Verdict
 
-Chấp nhận, có bảo lưu. Năm mã đóng, phân định được, và cả năm đều neo được vào source thật. Bảo lưu
-nằm ở hai chỗ: **số lượng mã trong brief không khớp luật gốc** (mục Findings 1), và **ba trong bốn
-rule của gate không nhìn thấy hết dáng khai báo thật** (Findings 4-6).
+Chấp nhận, có bảo lưu. Năm mã đã được chốt, phân định được, và cả năm đều gắn được với source thật.
+Bảo lưu nằm ở hai điểm: **số lượng mã trong brief không khớp luật gốc** (mục Findings 1), và **ba
+trong bốn rule của gate không nhìn thấy đầy đủ hình dạng khai báo thật** (Findings 4-6).
 
 ## Kiểm phân định
 

@@ -13,16 +13,15 @@ description: Từng tình huống EXCEPTION-N, nhận diện bằng người đ�
 
 # Exceptions
 
-Mọi thất bại mà back end này sinh ra đều là **một class**, khai báo trong **một thư mục**, và được
-throw kèm **một object metadata**. Ba câu đó nói về cùng một ý:
+Mọi thất bại do back end này sinh ra đều là **một class**, được khai báo trong **một thư mục**, và
+được throw kèm **một object metadata**. Ba điều đó cùng diễn đạt một ý:
 
 > Một thất bại là **một thứ có tên, mang theo dữ liệu** — không phải một câu văn.
 
-`new Error("không tìm thấy bản ghi")` mang theo một câu tiếng Anh. Không ai group được theo nó, khớp
-được theo nó, quyết định được nó có retry được không, dịch được nó, hay lấy lại được cái id — trừ khi
-đi parse câu văn đó. Exception của framework khá hơn một chút thôi: nó mang một HTTP status và không
-mang gì khác, tức là lấy một mối quan tâm về **transport** đứng thay cho một mối quan tâm về
-**nghiệp vụ**.
+`new Error("không tìm thấy bản ghi")` chỉ mang theo một câu tiếng Anh. Không ai có thể group, khớp,
+quyết định khả năng retry, dịch, hay lấy lại id từ câu đó nếu không parse nó. Exception của framework
+chỉ khá hơn ở chỗ mang một HTTP status, nhưng không mang gì khác; nó lấy mối quan tâm về **transport**
+đứng thay cho mối quan tâm về **nghiệp vụ**.
 
 Câu hỏi quyết định:
 
@@ -31,10 +30,10 @@ Câu hỏi quyết định:
 
 Nếu có, nó cần class riêng. Và câu trả lời gần như luôn là có.
 
-**Đây là luật bắt buộc.** Mọi `throw` trong product code đều rơi vào một mã dưới đây, và mọi khai báo
+**Đây là luật bắt buộc.** Mọi `throw` trong product code đều thuộc một mã dưới đây, và mọi khai báo
 `*Exception` cũng vậy. Không có thất bại nào "nội bộ" tới mức được miễn: câu "cái này có ai bắt đâu"
-chính là chỗ luật này bị bỏ qua nhiều nhất — và đó cũng là dòng sẽ hiện lên trong alert lúc 3 giờ
-sáng mà không có tên.
+chính là nơi luật này bị bỏ qua nhiều nhất — và cũng là dòng sẽ hiện lên trong alert lúc 3 giờ sáng
+mà không có tên.
 
 Còn **tên nào**, code nào, type metadata tên gì — đó là việc của module `exception-identity` bên
 cạnh. Module này chỉ quyết: có class hay không, class extends đúng base hay không, nằm đúng chỗ hay

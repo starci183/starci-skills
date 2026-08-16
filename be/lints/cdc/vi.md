@@ -4,14 +4,14 @@ title: vi.md
 slug: /be/lints/cdc/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Một quy tắc lint giữ luật CDC - bắt gì, phát hiện bằng cách nào, và cửa nào còn mở.
+description: Một quy tắc lint giữ luật CDC — bắt gì, phát hiện bằng cách nào và còn bỏ sót điều gì.
 ---
 
 # vi.md
 
 > Version: `2.00` · Mô-đun: `cdc`
 
-# Một cái máy giữ hình dạng, không giữ ngữ nghĩa
+# Máy giữ hình dạng, không giữ ngữ nghĩa
 
 Luật CDC có bảy mã, `CDC-1` đến `CDC-7`. Nguồn công bố **đúng một** quy tắc, và quy tắc đó đọc **tên**:
 tên tệp, tên lớp cha, tên các thành viên mà một lớp khai báo. Hết.
@@ -42,8 +42,8 @@ bị tin là kín mà thật ra hở thì tệ hơn: nó mua sự im lặng và 
 |---|---|---|
 | `projection-listener-contract` | `CDC-1`, `CDC-2`, `CDC-3` | Lớp trong tệp bộ lắng nghe không kế thừa `AbstractProjectionListener` (`base`); thiếu một trong bốn tên `groupId`, `topics`, `deriveTargets`, `recomputeTarget` (`member`, mỗi tên thiếu một báo cáo); tự khai `onModuleInit` (`lifecycle`) |
 
-Một quy tắc gánh **ba mã** — chuyện này phải nói ra chứ không được làm cho tròn. Ba phép kiểm bên trong
-nó độc lập, nổ độc lập, và người đọc nhật ký dựng thấy `projection-listener-contract` vẫn phải đọc
+Một quy tắc giữ **ba mã** — điều này cần được nói rõ, không nên làm cho bảng trông cân đối giả tạo. Ba phép kiểm bên trong
+nó độc lập, báo độc lập, và người đọc nhật ký dựng thấy `projection-listener-contract` vẫn phải đọc
 thông báo mới biết mã nào bị vi phạm.
 
 `CDC-4`, `CDC-5`, `CDC-6` và `CDC-7` **không có quy tắc nào**, và quy tắc ở đây không nhận vơ chúng.
@@ -55,7 +55,7 @@ thông báo mới biết mã nào bị vi phạm.
 **Bắt gì.** Ba chuyện khác nhau, ba thông báo khác nhau, không cái nào chặn cái nào.
 
 - `base` — một lớp trong tệp bộ lắng nghe không kế thừa `AbstractProjectionListener`. Lớp cơ sở đó sở
-  hữu kết nối, đăng ký chủ đề, bóc phong bì thay đổi và cô lập lỗi. Một bộ lắng nghe tự cắm ống của
+  hữu kết nối, đăng ký chủ đề, bóc phong bì thay đổi và cô lập lỗi. Một bộ lắng nghe tự nối dây của
   riêng nó rồi sẽ bất đồng với những bộ khác về offset hoặc về bia mộ, và ngày đó không ai nhớ ra là
   vì nó không đứng chung một lớp cơ sở.
 - `member` — thiếu một trong bốn tên `groupId`, `topics`, `deriveTargets`, `recomputeTarget`. Mỗi tên
@@ -114,7 +114,7 @@ những tệp không kế thừa nó là những tệp duy nhất không nhận 
 tìm.
 
 Còn `lifecycle` là cùng một chuyện nhìn từ phía kia: một lớp **có** kế thừa lớp cơ sở nhưng vẫn khai
-`onModuleInit` sẽ **che** cái móc của lớp cơ sở, và lớp cơ sở im lặng ngừng đăng ký. Kết quả là một
+`onModuleInit` sẽ **che** cái móc của lớp cơ sở, và lớp cơ sở âm thầm ngừng đăng ký. Kết quả là một
 projection không bao giờ cập nhật, không có ngoại lệ nào ném ra, không có dòng nhật ký nào lạ.
 
 **Cửa còn mở.**
@@ -141,7 +141,7 @@ projection không bao giờ cập nhật, không có ngoại lệ nào ném ra, 
   cạnh các tệp anh em thì đọc hợp hơn.
 - **Lớp cha được so bằng cách viết tại chỗ.** `import { AbstractProjectionListener as Base }` rồi
   `extends Base` cho ra một **báo cáo sai**; ngược lại, một lớp cùng tệp viết dưới dạng biểu thức và
-  đặt tên `AbstractProjectionListener` làm quy tắc **im**. Không có `import` nào được phân giải.
+  đặt tên `AbstractProjectionListener` làm quy tắc **không báo**. Không có `import` nào được phân giải.
 - **Lớp cơ sở trung gian bị báo oan.** `class OrderTotalsListener extends AbstractOrderProjectionListener`,
   trong đó lớp trung gian kia mới kế thừa lớp cơ sở chung, vẫn bị báo `base`. Quy tắc đọc một tệp và so
   một định danh. Cách chữa rẻ nhất là một chú thích tắt quy tắc ở đầu tệp — và chú thích đó tắt luôn cả

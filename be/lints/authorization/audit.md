@@ -4,27 +4,27 @@ title: audit.md
 slug: /be/lints/authorization/audit
 sidebar_label: audit.md
 sidebar_position: 3
-description: Phản biện độ phủ thực của quy tắc authorization và mọi cửa còn mở.
+description: Đánh giá độ phủ thực của quy tắc authorization và ghi lại mọi kẽ hở còn tồn tại.
 ---
 
 # audit.md
 
 > Version: `2.00` · Mô-đun: `authorization`
 
-Phản biện này kiểm xem tài liệu có mô tả đúng **thứ máy thật sự thấy**, và chỉ thứ đó. Mọi khẳng định
+Bản đánh giá này kiểm tra xem tài liệu có mô tả đúng **những gì máy thật sự thấy**, và chỉ những gì đó. Mọi khẳng định
 về hành vi ở đây đều được đo bằng cách chạy quy tắc qua trình kiểm với bộ phân tích cú pháp mà gói
 đang dùng, không suy từ việc đọc code.
 
 ## Verdict
 
-Chấp nhận, kèm hai ghi nhận nặng.
+Chấp nhận, kèm hai ghi nhận nghiêm trọng.
 
 Mô-đun nguồn công bố **đúng một quy tắc**, `identity-needs-guard`, và tài liệu này ghi đúng một quy
 tắc. Con số khớp với dự kiến. Quy tắc giữ đúng mã nó nhận — `AUTHZ-2` — và không nhận vơ mã nào khác;
 năm mã còn lại được ghi là **không có máy giữ**, chứ không được gán bừa cho quy tắc gần nhất.
 
-Hai ghi nhận nặng: quy tắc **so khớp theo cách viết** ở cả hai đầu (danh tính và cổng), nên nó vừa bỏ
-lọt code sai vừa nổ vào code đúng; và nó **đếm sự có mặt của cổng chứ không đo tác dụng của cổng**,
+Hai ghi nhận nghiêm trọng: quy tắc **so khớp theo cách viết** ở cả hai đầu (danh tính và cổng), nên nó vừa bỏ
+lọt code sai vừa báo nhầm vào code đúng; và nó **đếm sự có mặt của cổng chứ không đo tác dụng của cổng**,
 nên "im lặng" của nó là một lời khẳng định yếu hơn nhiều so với cách đọc tự nhiên của tên quy tắc.
 
 ## Kiểm phân định
@@ -64,13 +64,13 @@ nên "im lặng" của nó là một lời khẳng định yếu hơn nhiều so
    nên nhánh đầu đã đủ. Nhưng nếu một phiên bản sau chuyển decorator vào nút trong, quy tắc sẽ **im
    lặng trên mọi tham số thuộc tính**, và đúng đoạn code viết ra để cứu tình huống đó sẽ không chạy.
    Bộ kiểm thử hiện tại **không có ca nào** cho tham số thuộc tính, nên không có gì ghim hành vi này.
-4. **Quy tắc nổ vào code đúng ở bốn hình dạng, đã đo.** `@nest.UseGuards(G)`; một decorator gộp kiểu
+4. **Quy tắc báo nhầm vào code đúng ở bốn hình dạng, đã đo.** `@nest.UseGuards(G)`; một decorator gộp kiểu
    `@Authenticated()` dựng bằng `applyDecorators`; cổng chỉ đặt ở **lớp cơ sở** trong khi cửa khai ở
    lớp con; và một lớp có phạm vi theo yêu cầu nhận danh tính ở hàm dựng mà không phải cửa. Ba trong
    bốn hình dạng này là những bước một cây code **trưởng thành** thường đi, nghĩa là tỉ lệ báo nhầm sẽ
    **tăng theo thời gian**, không giảm.
-5. **Báo nhầm là lỗ hổng, không phải phiền toái.** Mỗi lần nổ nhầm sinh ra một dòng
-   `eslint-disable-next-line`, và dòng đó không hết hạn. Nó nằm lại đúng chỗ cánh cửa, và làm im lặng
+5. **Báo nhầm là lỗ hổng, không phải phiền toái.** Mỗi lần báo nhầm sinh ra một dòng
+   `eslint-disable-next-line`, và dòng đó không hết hạn. Nó nằm lại đúng chỗ cánh cửa, rồi tiếp tục che lấp
    luôn trường hợp thật tiếp theo tại chỗ đó. Đây là con đường thực tế mà một quy tắc bị vô hiệu.
 6. **Quy tắc không có tuỳ chọn nào.** `schema: []`. Tập ba decorator danh tính và chuỗi `UseGuards`
    đều là chữ cứng trong nguồn. Một kho không thể khai báo decorator danh tính của riêng mình mà không
@@ -89,9 +89,9 @@ nên "im lặng" của nó là một lời khẳng định yếu hơn nhiều so
   một quy tắc hai tên và không cách nào biết thông điệp đến từ tên nào.
 - **Ghi `AUTHZ-1` là *cố tình không giữ*, không phải *chưa giữ*.** Hai chuyện đó khác nhau: một cái
   chờ ai đó viết quy tắc, một cái cấm viết. Ghi nhầm thành "chưa giữ" là mời người đọc sau "làm nốt"
-  bằng một quy tắc nổ vào phần lớn code đúng.
+  bằng một quy tắc báo nhầm trên phần lớn code đúng.
 - **Giữ mức `error`.** Số đo hiện tại bằng không, và hình dạng bị bắt thì hẹp.
-- **Ghi cả bốn hình dạng nổ nhầm vào tài liệu người đọc, không giấu trong audit.** Người gặp chúng là
+- **Ghi cả bốn hình dạng báo nhầm vào tài liệu người đọc, không giấu trong audit.** Người gặp chúng là
   người viết code, không phải người rà canon.
 - **Không đổi tên quy tắc.** Tên đã in ra trong nhật ký dựng; đổi tên là một quy tắc hai tên.
 
@@ -158,4 +158,4 @@ Mỗi mục nói **quy tắc phải soi thêm cái gì** thì mới đóng đư�
 - Quy tắc được thêm `schema` tuỳ chọn, hoặc tập ba decorator đổi.
 - Một cánh cửa được dựng ngoài dạng phương thức của lớp.
 - Có ai đề xuất quy tắc cho `AUTHZ-3`, `AUTHZ-4` hoặc `AUTHZ-5`: đề xuất đó phải mang theo phép đo số
-  lần nổ vào code đúng, trước khi bàn tiếp.
+  lần báo nhầm trên code đúng, trước khi bàn tiếp.

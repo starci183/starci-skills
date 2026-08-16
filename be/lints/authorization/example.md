@@ -4,18 +4,18 @@ title: example.md
 slug: /be/lints/authorization/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Code nổ và code không nổ cho quy tắc authorization, kèm code lách qua được.
+description: Ví dụ bị báo lỗi, không bị báo lỗi và lọt qua quy tắc authorization.
 ---
 
 # example.md
 
 > Version: `2.00` · Mô-đun: `authorization` · Luật: [`INDEX.md`](./INDEX.md) · Từng quy tắc: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mục dưới đây là **một quy tắc**, với nhiều cặp **SAI** (quy tắc nổ) và **ĐÚNG** (quy tắc im), rồi tới
-**Cửa lách và nhầm lẫn** — nơi chứa code **lách qua được**.
+Mục dưới đây trình bày **một quy tắc**, với nhiều cặp **SAI** (quy tắc báo lỗi) và **ĐÚNG** (quy tắc không báo), rồi tới
+**Cửa lách và nhầm lẫn** — nơi chứa code **lọt qua được**.
 
 Đọc kỹ nhãn ở mục cuối: code trong đó **không phải code được phép viết**. Nó là code vi phạm luật mà
-quy tắc **không thấy**. Luật vẫn cấm; chỉ có cái máy là không bắt.
+quy tắc **không thấy**. Luật vẫn cấm; chỉ là máy không bắt được.
 
 Bốn định danh `KeycloakGraphQLUser`, `KeycloakUser`, `CurrentUser` và `UseGuards` được viết nguyên
 văn ở mọi ví dụ, vì quy tắc so **đúng từng ký tự** với chúng. Đổi cách viết là đổi kết quả, và đó
@@ -430,7 +430,7 @@ router.post("/orders/:id/refund", async (req, res) => {
 })
 ```
 
-**Nhầm lẫn 1 — quy tắc nổ vào code đúng: cổng có không gian tên.**
+**Nhầm lẫn 1 — quy tắc báo nhầm trên code đúng: cổng có không gian tên.**
 
 ```ts
 // BÁO unguarded, dù cánh cửa này hoàn toàn đúng. Callee là MemberExpression nên tên đọc ra là

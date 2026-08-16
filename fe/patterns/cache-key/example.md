@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/cache-key/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã CACHE-N, viết bằng hook và TSX thường.
+description: Tất cả case và ngoại lệ của từng mã CACHE-N, viết bằng hook và TSX thường.
 ---
 
 # example.md
@@ -15,7 +15,7 @@ Mọi ví dụ dưới đây là **hook thường trên TSX thường**. Không 
 riêng, không registry key. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một ví dụ
 cần tên riêng của một sản phẩm để đọc được, ví dụ đó sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**, từng case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục **ngoại lệ và nhầm lẫn**.
 Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một quyết định key duy nhất.
 
 ---
@@ -75,7 +75,7 @@ useSWR([ARTICLE_KEY, slug, locale], async ([, id, lang]: [string, string, string
 ```
 
 ```tsx
-// SAI — đổi ngôn ngữ, màn hình vẫn giữ nguyên bản dịch cũ cho tới khi reload
+// SAI — đổi ngôn ngữ, màn hình vẫn bảo toàn bản dịch cũ cho tới khi reload
 useSWR([ARTICLE_KEY, slug], async ([, id]: [string, string]) =>
     queryArticle({ request: { slug: id, locale } }),
 )
@@ -477,7 +477,7 @@ Ngoại lệ này hẹp, và nó chỉ hợp lệ khi **server** phân biệt đ
 xuống.
 
 ```ts
-// ĐÚNG — server nói rõ "chưa từng có phiên nào", đó là một câu trả lời chứ không phải một lỗi
+// ĐÚNG — server làm rõ "chưa từng có phiên nào", đó là một câu trả lời chứ không phải một lỗi
 const result = await queryLatestSession({ request: { itemId: id } })
 if (result.data?.latestSession?.reason === "NEVER_STARTED") return null
 return result.data?.latestSession?.data ?? null

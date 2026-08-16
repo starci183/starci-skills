@@ -42,7 +42,7 @@ Mã bị rút thì để trống chỗ của nó.
   còn mở".
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống nghiệp vụ, dấu hiệu nhận biết, câu tự hỏi,
   ranh giới với mã kề, và danh sách tình huống hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại
   lệ và nhầm lẫn; cuối trang là ánh xạ yêu cầu, bảng phân định ranh giới và danh sách sai lầm lặp
   lại.
 - **Tổng quát hoá mọi tên component riêng.** Ví dụ ở shelf này phải đọc được ở bất kỳ front end nào,
@@ -57,5 +57,5 @@ Mã bị rút thì để trống chỗ của nó.
 ## Các phiên bản trước
 
 `1.x` là file luật phẳng: định nghĩa, bảy quy tắc, bảng "Forbidden" và năm ví dụ đối chiếu. Nội dung
-đó được giữ nguyên quyết định và diễn đạt lại ở `2.00`; bản gốc vẫn nằm tại
+đó được bảo toàn quyết định và diễn đạt lại ở `2.00`; bản gốc vẫn nằm tại
 `fe/canon/patterns/props-and-slots.md`.

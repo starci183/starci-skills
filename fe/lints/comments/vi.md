@@ -9,7 +9,7 @@ description: Ba rule của luật comments — bắt gì, phát hiện bằng c�
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `comments`
+> Phiên bản: `2.00` · Mô-đun: `comments`
 
 Ba rule dưới đây giữ luật `comments`. Chúng không giữ hết luật, và chỗ chúng **không** với tới mới là
 phần đáng đọc kỹ nhất của tài liệu này.
@@ -32,27 +32,27 @@ lỗi vừa rồi đến từ tên nào.
 
 ## `require-export-jsdoc`
 
-**Bắt gì.** Một khai báo được export mà ngay trước nó không có khối chú thích nào bắt đầu bằng dấu `*`.
+**Bắt gì?** Một khai báo được export mà ngay trước nó không có khối chú thích nào bắt đầu bằng dấu `*`.
 Thông báo lỗi gọi thẳng tên cái được export và nhắc: hãy nói **vai trò** của nó, đừng chép lại chữ ký —
 chữ ký đã tự nói rồi.
 
-**Giữ mã nào.** `COMMENTS-1`, và chỉ giữ được **một nửa**. Nửa "phải có khối chú thích" thì máy kiểm
+**Giữ mã nào?** `COMMENTS-1`, và chỉ giữ được **một nửa**. Nửa "phải có khối chú thích" thì máy kiểm
 được. Nửa "khối ấy phải nói vai trò chứ không chép chữ ký" thì không: đánh giá một câu có thêm thông tin
 so với dòng bên dưới hay không không phải việc mà một lượt duyệt cây cú pháp làm được.
 
-**Cách phát hiện.** Rule vào hai nút `ExportNamedDeclaration` và `ExportDefaultDeclaration`. Nếu nút
+**Phát hiện thế nào?** Rule vào hai nút `ExportNamedDeclaration` và `ExportDefaultDeclaration`. Nếu nút
 không có `declaration` thì thoát ngay. Nếu có, kiểu của nó phải nằm trong đúng **bốn** loại:
 `VariableDeclaration`, `TSInterfaceDeclaration`, `FunctionDeclaration`, `TSTypeAliasDeclaration`.
 Điều kiện thoả mãn là `getCommentsBefore(node)` tìm thấy một chú thích loại `Block` có `value` bắt đầu
 bằng ký tự `*`.
 
-**Vì sao luật này đáng có máy giữ.** Một export là thứ file khác phụ thuộc vào. Nó được đọc nhiều hơn
+**Vì sao nên để máy giữ luật này?** Một export là thứ file khác phụ thuộc vào. Nó được đọc nhiều hơn
 hẳn số lần được viết, và người đọc phần lớn sẽ không bao giờ mở thân hàm ra xem. Con người quên viết
 khối ấy một cách rất đều đặn, còn máy thì đếm được từng chỗ quên trong toàn cây thư mục chỉ trong một
 lượt chạy. Đây cũng là rule duy nhất trong ba rule mà một kho mã có lịch sử nên chuẩn bị tinh thần nhận
 về một con số lớn ngay lần chạy đầu.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Tách khai báo ra khỏi export thì rule biến mất: `const a = 1` một dòng, `export { a }` một dòng khác.
   Nút export ấy không có `declaration`, và rule thoát trước mọi phép kiểm.
@@ -67,28 +67,28 @@ về một con số lớn ngay lần chạy đầu.
 
 ## `no-second-language-in-source`
 
-**Bắt gì.** Chữ mang dấu của ngôn ngữ thứ hai xuất hiện ở **năm** chỗ: chú thích (mọi loại), tên định
+**Bắt gì?** Chữ mang dấu của ngôn ngữ thứ hai xuất hiện ở **năm** chỗ: chú thích (mọi loại), tên định
 danh, chuỗi ký tự, mảnh template, và chữ nằm giữa hai thẻ JSX. Rule không chỉ đọc chú thích, và đó là
 chủ ý: một câu bị cấm trong chú thích mà lại hợp lệ khi dời xuống một dòng thành tên biến thì luật ấy
 không giữ được gì.
 
-**Giữ mã nào.** `COMMENTS-2`. Nó cũng là chỗ cài đặt hai ngoại lệ của `COMMENTS-3`: miễn theo đường dẫn,
+**Giữ mã nào?** `COMMENTS-2`. Nó cũng là chỗ cài đặt hai ngoại lệ của `COMMENTS-3`: miễn theo đường dẫn,
 và miễn theo dòng có đánh dấu `vn-ok:`.
 
-**Cách phát hiện.** Trước hết là cổng đường dẫn: bảy mẫu đường dẫn được thử trên tên file đã đổi hết dấu
+**Phát hiện thế nào?** Trước hết là cổng đường dẫn: bảy mẫu đường dẫn được thử trên tên file đã đổi hết dấu
 gạch ngược thành gạch chéo. File nào khớp thì rule trả về rỗng, tức là **không tồn tại** trong file đó.
 Còn lại, rule gom trước tập dòng có dấu `vn-ok:` — dòng chứa chú thích ấy, cộng thêm đúng một dòng ngay
 sau nó — rồi duyệt năm chỗ trên. Phép thử là **một lớp ký tự** gồm các chữ dựng sẵn có dấu. Ba đường
 thoát: chuỗi chứa tên gọi bản ngữ của ngôn ngữ, chuỗi chứa chính dấu `vn-ok:`, hoặc dòng bắt đầu của nút
 nằm trong tập dòng đã đánh dấu.
 
-**Vì sao luật này đáng có máy giữ.** Không phải vì một câu chú thích lạc lõng gây hỏng gì. Mà vì thứ nó
+**Vì sao nên để máy giữ luật này?** Không phải vì một câu chú thích lạc lõng gây hỏng gì. Mà vì thứ nó
 tạo ra: một kho mã có hai ngôn ngữ là một kho mã có **hai nhóm người đọc**, và nhóm nhỏ hơn sẽ lặng lẽ
 bỏ qua những phần nó không đọc được. Việc bỏ qua ấy không ai báo cáo, không ai đo được, và nó tích lại
 thành những vùng mã chỉ một nửa đội hiểu. Máy giữ được chỗ này vì nó nhìn được cả năm chỗ chữ có thể trốn
 — việc mà mắt người rà tay sẽ bỏ sót ngay từ file thứ ba.
 
-**Cửa còn mở.** Đây là rule có cửa mở rộng nhất trong ba rule, và cần nói thẳng:
+**Những chỗ còn lọt.** Đây là rule có cửa mở rộng nhất trong ba rule, và cần nói thẳng:
 
 - **Nó bắt DẤU, không bắt NGÔN NGỮ.** Cùng câu ấy gõ không dấu — đúng kiểu người ta gõ trong khung chat —
   không chứa chữ nào trong lớp ký tự, và rule im lặng hoàn toàn. Chính ví dụ mà luật dùng để minh hoạ cái
@@ -116,23 +116,23 @@ thành những vùng mã chỉ một nửa đội hiểu. Máy giữ được ch
 
 ## `no-emoji-in-source`
 
-**Bắt gì.** Ký tự tượng hình mở rộng, hoặc hai ký tự chỉ vùng đứng liền nhau, ở đúng năm chỗ mà rule
+**Bắt gì?** Ký tự tượng hình mở rộng, hoặc hai ký tự chỉ vùng đứng liền nhau, ở đúng năm chỗ mà rule
 trên duyệt.
 
-**Giữ mã nào.** `COMMENTS-4`.
+**Giữ mã nào?** `COMMENTS-4`.
 
-**Cách phát hiện.** Cùng cổng đường dẫn, cùng năm nút. Phép thử là **hai** biểu thức tách rời chứ không
+**Phát hiện thế nào?** Cùng cổng đường dẫn, cùng năm nút. Phép thử là **hai** biểu thức tách rời chứ không
 phải một lớp ký tự gộp: một cho thuộc tính `Extended_Pictographic`, một cho cặp ký tự chỉ vùng. Tách đôi
 là có lý do được ghi ngay trong mã nguồn: gộp cả hai vào một lớp ký tự sẽ kích hoạt chính một rule khác
 về lớp ký tự dễ gây hiểu nhầm, mà một rule phải tắt một rule khác đi mới tồn tại được thì không ai tin nó.
 Rule này **không** có dấu miễn trừ nào tương đương `vn-ok:`.
 
-**Vì sao luật này đáng có máy giữ.** Một ký tự tượng hình hiện khác nhau trên từng nền tảng, sắp xếp
+**Vì sao nên để máy giữ luật này?** Một ký tự tượng hình hiện khác nhau trên từng nền tảng, sắp xếp
 không đoán trước được, làm vỡ một terminal không chờ đợi nó, và mang nghĩa không giống nhau ở hai quốc
 gia. Đây đúng là loại lỗi mà mắt người không bắt được: trên máy người viết nó hiện ra rất đẹp. Máy thì
 nhìn mã điểm ký tự, không nhìn hình.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Chuỗi kiểu phím số.** Một chữ số hoặc dấu `#`, cộng một ký tự chọn biến thể, cộng dấu bao ô vuông —
   hiện ra đúng như một emoji và không khớp biểu thức nào, vì không mảnh nào của nó mang thuộc tính tượng

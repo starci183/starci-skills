@@ -9,7 +9,7 @@ description: Ba rule của luật props và slot, đọc bằng nghiệp vụ, k
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `props-and-slots`
+> Phiên bản: `2.00` · Mô-đun: `props-and-slots`
 
 Luật này **phần lớn do KIỂU giữ, không phải do rule giữ**. Bộ alias slot chính là hàng rào: thêm slot
 thứ năm không phải là bị bắt lỗi khi review, mà là không biên dịch được. Vì vậy mô-đun rule ở đây rất
@@ -38,25 +38,25 @@ này**. Hai mã đầu do hàng rào kiểu giữ; hai mã sau hiện không ai 
 
 ## `no-inline-parameter-type`
 
-**Bắt gì.** Một tham số hàm mà kiểu khai báo của nó chứa object vô danh. Bắt cả bốn loại hàm: mũi
+**Bắt gì?** Một tham số hàm mà kiểu khai báo của nó chứa object vô danh. Bắt cả bốn loại hàm: mũi
 tên, biểu thức hàm, khai báo hàm, và chữ ký hàm không thân.
 
-**Giữ mã nào.** `SLOTS-3` — hình dạng của một tham số phải có tên.
+**Giữ mã nào?** `SLOTS-3` — hình dạng của một tham số phải có tên.
 
-**Cách phát hiện.** Đọc `param.typeAnnotation.typeAnnotation` rồi hỏi một câu duy nhất: đây có phải
+**Phát hiện thế nào?** Đọc `param.typeAnnotation.typeAnnotation` rồi hỏi một câu duy nhất: đây có phải
 hình dạng vô danh không? `TSTypeLiteral` là có. `TSParenthesizedType` thì đi tiếp vào trong.
 `TSIntersectionType` và `TSUnionType` thì duyệt từng thành viên, **một** thành viên vô danh là đủ.
 Ngoài ba nhánh đó, không đi đâu nữa. Rule này **không lọc theo tên file** và **không có thông tin
 kiểu**.
 
-**Vì sao luật này đáng có máy giữ.** Alias chặn được slot thứ tư, nhưng không chặn được một shape
+**Vì sao nên để máy giữ luật này?** Alias chặn được slot thứ tư, nhưng không chặn được một shape
 **không có tên**. Một object vô danh đặt tại tham số thoả mãn mọi ràng buộc mà alias áp lên, và vẫn
 sai — cái sai không nằm ở chỗ có trường nào, mà ở chỗ **không thứ gì khác trỏ tới nó được**: không
 import được, bài kiểm thử song sinh không tham chiếu được, người đi tìm "thành phần này nhận gì"
 không tra ra. Trình biên dịch không có ý kiến gì về việc một hình dạng có tìm được hay không. Đó
 đúng là khoảng trống mà một rule phải lấp.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - `Readonly<{ … }>`, `Partial<{ … }>`, `Array<{ … }>`, `{ … }[]`: hàm kiểm tra chỉ đi qua type
   literal, ngoặc, giao và hợp. Một `TSTypeReference` mang object vô danh trong đối số kiểu, hay một
@@ -75,12 +75,12 @@ không tra ra. Trình biên dịch không có ý kiến gì về việc một h�
 
 ## `no-children-slot`
 
-**Bắt gì.** Một slot `children` trong file thành phần bị quản — dù nó được khai như một thuộc tính
+**Bắt gì?** Một slot `children` trong file thành phần bị quản — dù nó được khai như một thuộc tính
 trong kiểu, hay được tách trực tiếp tại tham số của hàm.
 
-**Giữ mã nào.** `SLOTS-4` — có `contract` và `render` mới là container; `children` thì không.
+**Giữ mã nào?** `SLOTS-4` — có `contract` và `render` mới là container; `children` thì không.
 
-**Cách phát hiện.** Trước hết là một cổng theo tên file, chuẩn hoá dấu gạch chéo:
+**Phát hiện thế nào?** Trước hết là một cổng theo tên file, chuẩn hoá dấu gạch chéo:
 
 - file bảng đăng ký hợp đồng: **miễn**;
 - bốn thư mục shell `ModalShell`, `DrawerShell`, `DropdownShell`, `RouteShell`: **miễn**;
@@ -91,14 +91,14 @@ báo. `Property` thì phải có cha là `ObjectPattern` (tức là đang tách 
 object), và phải **không** có ông là `VariableDeclarator` (tức là tách tại tham số, không phải tách
 trong thân hàm), rồi mới báo.
 
-**Vì sao luật này đáng có máy giữ.** Đây là chỗ **kiểu bó tay**. Alias từ chối slot thứ tư trên những
+**Vì sao nên để máy giữ luật này?** Đây là chỗ **kiểu bó tay**. Alias từ chối slot thứ tư trên những
 alias mà nó định nghĩa, nhưng không có gì cấm một file tự khai shape props bằng tay rồi đặt
 `children` vào đó. Thứ mà alias làm cho **không biểu diễn được**, một interface viết tay lại làm cho
 thành **chuyện thường**. Và hệ quả không nhỏ: `children` nhận vào phần giao diện **đã dựng xong** —
 một `.map`, một biểu thức ba ngôi, một cây con không ai đặt tên — nên bên trong một container chứa gì
 sẽ vĩnh viễn không phát biểu được ở đâu cả.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Kế thừa: `interface CardProps extends PropsWithChildren<CardData> {}`. Trong file không hề có chữ
   ký thuộc tính nào tên `children`, và rule không có thông tin kiểu để lần theo.
@@ -118,13 +118,13 @@ sẽ vĩnh viễn không phát biểu được ở đâu cả.
 
 ## `no-surface-list-items-slot`
 
-**Bắt gì.** Thuộc tính JSX `items` đặt lên một phần tử mà tên của nó đang gắn với import
+**Bắt gì?** Thuộc tính JSX `items` đặt lên một phần tử mà tên của nó đang gắn với import
 `SurfaceListCard`.
 
-**Giữ mã nào.** `SLOTS-7` — một bề mặt danh sách nhận bộ sưu tập nghiệp vụ qua `props` có tên thật,
+**Giữ mã nào?** `SLOTS-7` — một bề mặt danh sách nhận bộ sưu tập nghiệp vụ qua `props` có tên thật,
 không qua làn `items` chung chung.
 
-**Cách phát hiện.** Ba bước, tất cả đều là so khớp cú pháp:
+**Phát hiện thế nào?** Ba bước, tất cả đều là so khớp cú pháp:
 
 1. tên file phải chứa `/src/`;
 2. gom các ràng buộc tên từ `ImportDeclaration` có nguồn khớp đúng mẫu kết thúc bằng
@@ -133,12 +133,12 @@ không qua làn `items` chung chung.
 3. tại `JSXOpeningElement`, tên phần tử phải là định danh và phải nằm trong tập ràng buộc; sau đó
    duyệt các thuộc tính, thấy `items` thì báo cả thuộc tính.
 
-**Vì sao luật này đáng có máy giữ.** Một bề mặt danh sách dùng chung là **chủ nhà của hợp đồng, không
+**Vì sao nên để máy giữ luật này?** Một bề mặt danh sách dùng chung là **chủ nhà của hợp đồng, không
 phải mô hình dữ liệu**. Thêm một slot `items` ở cấp cao nhất là mở làn dữ liệu chạy song song với
 `props` và bắt bề mặt dùng chung phải biết bộ sưu tập của từng bên gọi. Kiểu không chặn được, vì
 `items` là một prop hợp lệ như mọi prop khác; chỉ có chỗ gọi mới lộ ra là đã có hai làn.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Trải object: `<SurfaceListCard {...config} />` với `config` mang `items`. Vòng lặp bỏ qua mọi thứ
   không phải `JSXAttribute`. `{...{ items }}` cũng vậy. Một phím là qua.

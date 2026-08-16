@@ -4,18 +4,18 @@ title: audit.md
 slug: /be/lints/comments/audit
 sidebar_label: audit.md
 sidebar_position: 3
-description: Phản biện mức phủ của ba quy tắc so với năm mã luật, và mọi cửa còn mở.
+description: Đánh giá độ phủ của ba quy tắc so với năm mã luật và ghi lại mọi kẽ hở còn tồn tại.
 ---
 
 # audit.md
 
 > Version: `2.00`
 
-Phản biện này hỏi đúng một câu: **màu xanh của bản dựng chứng minh được điều gì, và không chứng minh
+Bản đánh giá này chỉ hỏi một câu: **màu xanh của bản dựng chứng minh được điều gì, và không chứng minh
 được điều gì.**
 
 Mọi khẳng định dưới đây được **đo**, không suy ra từ tên quy tắc: từng cấu trúc được chạy qua chính
-ba quy tắc đó với bộ phân tích cú pháp thật, và ghi lại nổ hay im.
+ba quy tắc đó với bộ phân tích cú pháp thật, rồi ghi lại trường hợp bị báo hay không bị báo.
 
 ## Verdict
 
@@ -71,7 +71,7 @@ liệu, `export const f = memoize(() => {})` thì không, và hai dòng đó cô
 
 **F5 — chữ ký nạp chồng bị đảo ngược.** Tài liệu bị đòi ở phần cài đặt — chữ ký duy nhất người gọi
 không đọc — trong khi các chữ ký nạp chồng, thứ thật sự tạo nên bề mặt, không bị đòi gì. Một tệp chỉ
-có chữ ký thì im hoàn toàn.
+có chữ ký thì hoàn toàn không bị báo.
 
 **F6 — báo nhầm khi có bộ trang trí.** Đã đo: `/** … */` đặt **trên** một bộ trang trí thì lớp bên
 dưới vẫn bị báo thiếu tài liệu; đặt **giữa** bộ trang trí và `export` thì qua. Trong một nền tảng

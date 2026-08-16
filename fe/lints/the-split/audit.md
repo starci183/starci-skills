@@ -9,12 +9,12 @@ description: Phản biện mức thực thi thật của hai luật, và kê đ�
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `the-split`
+> Phiên bản: `2.00` · Mô-đun: `the-split`
 
 Phản biện này kiểm một câu duy nhất: **cái gì trong văn bản luật thật sự được máy giữ, và giữ chặt tới
 đâu.** Nguồn sự thật là tệp luật, không phải tên luật và không phải văn bản luật.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, với một điều kiện đọc kèm: mô-đun này **không được đọc như bằng chứng rằng `the split` đã
 được thực thi**. Hai trong sáu điều luật có máy giữ, và hai luật đó dùng chung một bộ dò duy nhất mà
@@ -37,7 +37,7 @@ và cả hai được `export const recommended` đặt ở mức `error`.
 | Luật có kiểm được nửa còn lại không | Không. Mỗi luật đọc đúng một tệp và không bao giờ mở tệp kia |
 | Có tuỳ chọn hay danh sách miễn không | Không. Cả hai khai báo `schema: []` |
 
-## Findings
+## Phát hiện
 
 1. **Cả hai luật đứng trên cùng một hằng số `REACHES_FOR_THE_WORLD`.** Đây là điểm hỏng chung duy
    nhất của mô-đun: một hàm bọc tên bình thường vừa làm luật thứ nhất câm, vừa làm luật thứ hai tắt
@@ -69,7 +69,7 @@ và cả hai được `export const recommended` đặt ở mức `error`.
     thư mục viết hoa, và cửa vào `index.tsx`. Bề mặt đặt ở nơi khác, hay vào bằng `index.ts`, là
     không có luật — chứ không phải là đạt.
 
-## Decisions
+## Quyết định
 
 - Ghi **tên luật** làm tiêu đề mục, đúng từng ký tự như build in ra. Không đặt mã số cho luật: một
   luật hai tên là một luật không truy được nguồn thông điệp.
@@ -125,7 +125,7 @@ Mỗi mục nêu **luật sẽ phải nhìn thêm cái gì** để đóng, hoặ
   cạnh một `index.tsx` mà `index.tsx` không đọc thế giới là đủ dữ kiện để báo. Đây là mã duy nhất
   trong bốn mã còn thiếu mà bộ dò hiện có **đã đủ** để giữ.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn thêm, bớt hoặc đổi tên một luật.
 - Hằng số `REACHES_FOR_THE_WORLD` được nới hoặc thu.

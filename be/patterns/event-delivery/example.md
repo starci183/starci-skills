@@ -11,12 +11,12 @@ description: Mọi case và ngoại lệ của từng mã DELIVERY-N, viết b�
 
 > Version: `2.00` · Module: `event-delivery` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng dáng NestJS**. Không tên sản phẩm,
-không tên repository, không tên module riêng của ai. Một luật chỉ đúng khi nó đúng ở bất kỳ back end
-nào — nên nếu một ví dụ cần tên riêng của một hệ thống để đọc được, ví dụ đó đứng sai chỗ.
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có dáng NestJS**. Không dùng tên sản
+phẩm, tên repository hay tên module riêng. Một luật chỉ đúng khi nó đúng ở bất kỳ back end nào — vì
+vậy nếu một ví dụ cần tên riêng của một hệ thống mới đọc được, ví dụ đó không phù hợp ở đây.
 
-Mỗi mã có **nhiều case**, rồi tới mục **ngoại lệ và nhầm lẫn**. Phần cuối trang ánh xạ từ một yêu
-cầu bằng lời sang đúng một mã.
+Mỗi mã có **nhiều case**, sau đó là mục **ngoại lệ và nhầm lẫn**. Cuối trang ánh xạ một yêu cầu bằng
+lời sang đúng một mã.
 
 ---
 

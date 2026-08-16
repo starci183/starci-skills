@@ -4,18 +4,18 @@ title: audit.md
 slug: /be/lints/cdc/audit
 sidebar_label: audit.md
 sidebar_position: 3
-description: Phản biện mức bao phủ thật của quy tắc CDC và liệt kê mọi cửa còn mở.
+description: Đánh giá độ phủ thực của quy tắc CDC và ghi lại mọi kẽ hở còn tồn tại.
 ---
 
 # audit.md
 
 > Version: `2.00` · Mô-đun: `cdc`
 
-Phản biện này hỏi đúng một câu: **luật CDC được máy giữ tới đâu, và từ đâu trở đi chỉ còn con người?**
+Bản đánh giá này chỉ hỏi một câu: **luật CDC được máy giữ tới đâu, và từ đâu trở đi chỉ còn con người?**
 
 ## Verdict
 
-Chấp nhận, kèm một điều kiện đọc gắt hơn mọi mô-đun khác trên kệ này.
+Chấp nhận, kèm một điều kiện đọc nghiêm ngặt hơn mọi mô-đun khác trong nhóm này.
 
 Nguồn công bố **đúng một** quy tắc — `projection-listener-contract` — khớp với con số một mà nhiệm vụ
 dự đoán. Quy tắc có bản cài đặt đầy đủ, có bản kiểm thử song sinh, và ánh xạ được vào ba mã luật có
@@ -42,7 +42,7 @@ thoát được qua một cái móc vòng đời khác tên hoặc một cái t�
 | Có đọc hệ thống tệp, `import` hay tệp thứ hai không | Không; toàn bộ bằng chứng nằm trong tệp đang lint |
 | Ba phép kiểm có chặn nhau không | Không; không có lệnh thoát sớm giữa chúng, một lớp có thể lĩnh sáu báo cáo trong một lượt |
 | Phép quét thành viên có bỏ sót trường của lớp không | **Không** — và đây là điểm mạnh nhất của quy tắc: hàm ánh xạ nhận bất kỳ nút nào có `key` |
-| Mức nghiêm khắc có kèm số đo | **Không.** Nguồn ship `error` mà không có ghi chú đo nào đi kèm |
+| Mức nghiêm khắc có kèm số đo | **Không.** Nguồn phát hành ở `error` mà không có ghi chú đo nào đi kèm |
 | Quy tắc có bao giờ báo vào code đúng không | **Có, bốn cách** — xem Findings 3 |
 | Luật có bảo vệ được chính lớp cơ sở khỏi quy tắc của nó không | Có, nhưng bằng một phép so đường dẫn chính xác, dễ trượt — xem Finding 5 |
 
@@ -76,8 +76,8 @@ thoát được qua một cái móc vòng đời khác tên hoặc một cái t�
 
    Ba trong bốn cách này là **cách viết hợp lệ và thông dụng**, không phải cách viết kỳ quặc.
 
-4. **Mức `error` không có số đo đứng sau.** Các mô-đun khác trên kệ ghi rõ một quy tắc chỉ lên `error`
-   khi nợ về không, và chép lại phép đo. Nguồn của mô-đun này ship `error` mà không có ghi chú nào. Với
+4. **Mức `error` không có số đo đứng sau.** Các mô-đun khác ghi rõ một quy tắc chỉ lên `error`
+   khi nợ về không, và chép lại phép đo. Nguồn của mô-đun này phát hành ở `error` mà không có ghi chú nào. Với
    một quy tắc mà **bốn** kiểu báo cáo sai đã biết đều là code hợp lệ, đó là một khoảng trống đáng ghi:
    không có gì chứng minh rằng ở thời điểm bật lên, không có tệp hợp lệ nào đang bị báo.
 
@@ -97,16 +97,16 @@ thoát được qua một cái móc vòng đời khác tên hoặc một cái t�
 7. **Điểm mạnh đáng ghi: không có gì trốn được trong một trường của lớp.** Hàm `memberName` nhận bất kỳ
    nút thành viên nào có `key` và đọc `key.name || key.value`. Nghĩa là trường mũi tên, getter, khoá
    dạng chuỗi và khai báo trừu tượng đều bị nhìn thấy như nhau. Trên kệ này, đó là lỗ hổng phổ biến
-   nhất của các quy tắc anh em, và quy tắc này không có nó.
+   nhất của các quy tắc cùng nhóm, còn quy tắc này không mắc phải.
 
-8. **Tên quy tắc hứa nhiều hơn cái máy.** `projection-listener-contract` nghe như "hợp đồng của bộ lắng
+8. **Tên quy tắc hứa nhiều hơn khả năng thực tế của máy.** `projection-listener-contract` nghe như "hợp đồng của bộ lắng
    nghe được giữ". Hành vi thật là "trong một tệp có tên đúng, mỗi lớp khai đúng một tên lớp cha và bốn
    tên thành viên, và không khai một tên móc". Hợp đồng thật sự của một bộ lắng nghe — nhóm ổn định, chủ
    đề đủ, ánh xạ không có tác dụng phụ, recompute luỹ đẳng — không có phần nào trong đó được kiểm.
 
-9. **Một báo cáo hơi lệch về ngữ nghĩa.** Bốn thành viên `static` cùng tên làm bốn phép kiểm `member` im
-   lặng, dù thành viên tĩnh không cài đặt gì cho hợp đồng ở mức thực thể. Ít gặp, chi phí thấp, nhưng là
-   một lần im lặng sai về mặt ngữ nghĩa.
+9. **Một báo cáo hơi lệch về ngữ nghĩa.** Bốn thành viên `static` cùng tên khiến bốn phép kiểm `member` không
+   báo, dù thành viên tĩnh không cài đặt gì cho hợp đồng ở mức thực thể. Ít gặp, chi phí thấp, nhưng vẫn là
+   một lần không báo dù sai về mặt ngữ nghĩa.
 
 ## Decisions
 
@@ -114,7 +114,7 @@ thoát được qua một cái móc vòng đời khác tên hoặc một cái t�
   thêm mã số cho quy tắc: tên đó đã là chuỗi in ra trong nhật ký dựng và viết trong chú thích tắt quy
   tắc; một danh tính thứ hai nghĩa là một quy tắc hai tên và không cách nào biết thông báo đến từ tên
   nào.
-- Ghi rõ quy tắc gánh **ba** mã, và ghi rõ mỗi `messageId` gánh mã nào, vì đó là thứ duy nhất giúp đọc
+- Ghi rõ quy tắc giữ **ba** mã, và ghi rõ mỗi `messageId` phụ trách mã nào, vì đó là thứ duy nhất giúp đọc
   một dòng nhật ký dựng ngược về đúng điều luật.
 - Ghi bốn mã không có quy tắc là **chưa có ai giữ**, ở đây, thay vì gán chúng cho quy tắc gần nhất.
 - Giữ bảng **Cửa còn mở** là phần bắt buộc của `INDEX.md`, không phải phụ lục. Một cửa chưa ai biết
@@ -122,7 +122,7 @@ thoát được qua một cái móc vòng đời khác tên hoặc một cái t�
 - Ghi **báo cáo sai** thành một hạng mục riêng ngang hàng với cửa còn mở. Trên một quy tắc ba-phép-kiểm
   dùng chung một cổng, một báo cáo sai không chỉ gây phiền: nó mua một chú thích tắt quy tắc, và chú
   thích đó tắt cả ba.
-- Ghi mức ship thật (`error`) và ghi luôn việc **không có số đo** đứng sau nó, thay vì suy ra một con
+- Ghi mức phát hành thực tế (`error`) và ghi luôn việc **không có số đo** đứng sau nó, thay vì suy ra một con
   số không có trong nguồn.
 - Không đề xuất sửa nguồn trong mô-đun này. Đây là hồ sơ **thi hành**, và một đề xuất quy tắc mới thuộc
   về `Rủi ro còn mở` cho tới khi có bản cài đặt chỉ tay vào được.

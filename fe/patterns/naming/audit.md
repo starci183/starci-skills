@@ -12,16 +12,16 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 > Version: `2.00` · Module: `naming`
 
 Audit này kiểm hai thứ. Một: ba mã có phân định được **từ dữ kiện đã nêu**, và chỉ từ đó, hay không.
-Hai: bảng `Tầng giữ` có nói thật hay không — vì một bảng làm tròn "giữ được một nửa" thành `enforced`
+Hai: bảng `Tầng giữ` có phản ánh đúng thực tế hay không — vì một bảng làm tròn "giữ được một nửa" thành `enforced`
 là cách một repository tin rằng mình đang được bảo vệ.
 
 ## Verdict
 
 Chấp nhận, kèm bốn chênh lệch giữa **luật** và **rule** được ghi lại nguyên vẹn ở dưới. Không chênh
-lệch nào được sửa lặng lẽ trong lần chuyển shelf này: luật gốc quyết định nội dung, và bất đồng thì
+lệch nào được sửa âm thầm trong lần chuyển shelf này: luật gốc quyết định nội dung, và bất đồng thì
 xuống mục "Rủi ro còn mở".
 
-Ba mã, đúng ba, giữ nguyên số và nguyên nghĩa. Ba rule, mỗi mã một rule gọi được tên. Không mã nào ở
+Ba mã, đúng ba, bảo toàn số và nguyên nghĩa. Ba rule, mỗi mã một rule gọi được tên. Không mã nào ở
 tầng `documented`. Nhưng **không mã nào được giữ trọn**: cả ba rule đều hẹp hơn luật chúng giữ, và
 chỗ hẹp nằm ngay trong bảng.
 
@@ -40,8 +40,8 @@ chỗ hẹp nằm ngay trong bảng.
 ## Findings
 
 - **Ba mã đều có rule, và đó là điều hiếm ở shelf này.** Hầu hết module ở đây có mã không ai giữ.
-  Ở đây tỉ lệ là ba trên ba — nhưng con số ấy nói về **số lượng** rule, không nói về **độ phủ**, và
-  phần còn lại của mục này là về độ phủ.
+  Ở đây tỉ lệ là ba trên ba — nhưng con số ấy nói về **số lượng** rule, không nói về **mức bao phủ**, và
+  phần còn lại của mục này là về mức bao phủ.
 
 - **`NAMING-1` chỉ với tới hình dạng `FunctionDeclaration`.** `preferArrowExport` báo khi cha của một
   `FunctionDeclaration` nằm trong `MODULE_LEVEL_PARENTS`. Hai chỗ lọt: `const X = function () {}` giữ
@@ -61,7 +61,7 @@ chỗ hẹp nằm ngay trong bảng.
 
 - **`NAMING-2` chỉ giữ được nửa cấm, không giữ được nửa đòi.** Rule bắt tiền tố `handle`. Nó **không**
   đòi tên phải là `on`. Một handler tên `submit`, `doClaim` hay `runIt` đi qua sạch sẽ, trong khi luật
-  nói rõ thứ chạy do người đọc thì tên là `onX`. Đây là chênh lệch lớn nhất giữa luật và rule trong
+  làm rõ thứ chạy do người đọc thì tên là `onX`. Đây là chênh lệch lớn nhất giữa luật và rule trong
   module này.
 
 - **Sự hẹp của `NAMING-2` là cố ý và đã được ghi.** Chính comment đầu file rule nói ra: một rule âm
@@ -82,11 +82,11 @@ chỗ hẹp nằm ngay trong bảng.
   tiếng, `ROMANISED` liệt kê từ của chính thứ tiếng ấy. Luật nói "một thứ tiếng mọi người cùng đọc" —
   tổng quát; rule giữ đúng một cặp. Với một repository có cặp ngôn ngữ khác, rule này im lặng.
 
-- **Bảng Forbidden của bản phẳng có một dòng không mang mã.** Dòng "một cái tên nói **nơi** nó được
-  dùng" bị cấm, nhưng chính bản phẳng đã nói câu trả lời nằm ở **từng layer**. Lần chuyển này **không**
+- **Bảng Forbidden của file luật phẳng có một dòng không mang mã.** Dòng "một cái tên nói **nơi** nó được
+  dùng" bị cấm, nhưng chính file luật phẳng đã nói câu trả lời nằm ở **từng layer**. Lần chuyển này **không**
   phát mã thứ tư cho nó. Đây là một quyết định, không phải một chỗ sót.
 
-- **Anchor sản phẩm của bản phẳng không được chép sang.** Bản phẳng trỏ vào hai file trong một
+- **Anchor sản phẩm của file luật phẳng không được chép sang.** Bản phẳng trỏ vào hai file trong một
   repository frontend cụ thể. Shelf này không gọi tên repository nào, và một đường dẫn repository này
   không mở được thì không phải thứ người đọc kiểm được. Mọi anchor ở đây nằm trong lint source của cây
   trust.
@@ -148,9 +148,9 @@ hoàn toàn nhờ người đọc. Phần thật sự hở nằm ở mục kế 
 
 ### Các rủi ro khác
 
-- **Một dòng Forbidden không có mã.** "Cái tên nói nơi nó được dùng" bị cấm ở bản phẳng, và câu trả
+- **Một dòng Forbidden không có mã.** "Cái tên nói nơi nó được dùng" bị cấm ở file luật phẳng, và câu trả
   lời được giao cho từng layer. Ai chỉ đọc module này sẽ không biết luật ấy tồn tại ở đâu; ai đi tìm
-  `NAMING-4` sẽ không thấy gì. Cả `INDEX.md` và `example.md` đều nói rõ chỗ dừng này, nhưng nó vẫn là
+  `NAMING-4` sẽ không thấy gì. Cả `INDEX.md` và `example.md` đều làm rõ chỗ dừng này, nhưng nó vẫn là
   một mối nối cần một cái tên ở phía layer.
 - **Luật tổng quát, rule gắn một cặp ngôn ngữ.** `NAMING-3` phát biểu "một thứ tiếng mọi người cùng
   đọc"; hai hằng số trong rule chỉ biết một thứ tiếng. Với một đội có cặp ngôn ngữ khác, mã vẫn đúng

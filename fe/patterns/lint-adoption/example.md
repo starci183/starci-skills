@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/lint-adoption/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã LINT-ADOPTION-N, viết bằng flat config thường và TSX thường.
+description: Tất cả case và ngoại lệ của từng mã LINT-ADOPTION-N, viết bằng flat config thường và TSX thường.
 ---
 
 # example.md
@@ -13,9 +13,9 @@ description: Mọi case và ngoại lệ của từng mã LINT-ADOPTION-N, viế
 
 Mọi ví dụ dưới đây là **flat config thường và TSX thường**. Namespace plugin viết là `fe-canon` chỉ
 để đọc được; luật không đổi khi nó được đánh vần khác đi. Nếu một ví dụ cần tên riêng của một sản
-phẩm mới hiểu được thì ví dụ đó đứng sai chỗ.
+phẩm mới hiểu được thì ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt ĐÚNG cạnh SAI, rồi tới mục **ngoại lệ và nhầm lẫn**. Phần
+Mỗi mã có **nhiều case**, từng case đặt ĐÚNG cạnh SAI, sau đó là mục **ngoại lệ và nhầm lẫn**. Phần
 cuối trang ánh xạ từ yêu cầu bằng lời sang một hành động duy nhất.
 
 ---
@@ -383,7 +383,7 @@ export const PriceTag = ({ tone, amount }: Props) => (
 ```
 
 Hai bản khác nhau đúng một thứ: bản dưới không còn cho người gọi mở một cánh cửa CSS vào node mà họ
-không sở hữu. Bản trên giữ nguyên cánh cửa đó và chỉ tắt người đang chỉ vào nó.
+không sở hữu. Bản trên bảo toàn cánh cửa đó và chỉ tắt người đang chỉ vào nó.
 
 ### Case: directive kèm lý do rất hợp lý
 

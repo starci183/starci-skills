@@ -4,16 +4,16 @@ title: vi.md
 slug: /be/lints/comments/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Ba quy tắc giữ luật chú thích, giữ được tới đâu và hở ở chỗ nào.
+description: Ba quy tắc giữ luật chú thích, giữ được tới đâu và còn bỏ sót điều gì.
 ---
 
 # vi.md
 
 > Version: `2.00`
 
-# Chú thích — phần mà máy giữ được
+# Chú thích — phần máy giữ được
 
-Luật chú thích có **năm mã**, từ `COMMENT-1` đến `COMMENT-5`. Bộ quy tắc có **ba cái**.
+Luật chú thích có **năm mã**, từ `COMMENT-1` đến `COMMENT-5`, còn bộ quy tắc chỉ có **ba**.
 
 Chênh lệch đó không phải thiếu sót cần lấp cho tròn. Một luật là câu mà người đọc tuân theo; một
 quy tắc là khuôn mà chương trình khớp. Hai thứ không bao giờ bằng nhau, và toàn bộ nội dung tài liệu
@@ -48,7 +48,7 @@ khớp** hoặc **phát ra** thì được giữ nguyên, kèm dấu `vn-ok`.
 `interface`, `type`, `enum`, hàm khai báo, và `const` được gán **trực tiếp** bằng một hàm mũi tên
 hoặc một biểu thức hàm. Cả dạng `export` có tên lẫn `export default` đều bị soi.
 
-**Giữ mã nào.** `COMMENT-1`, gần như trọn vẹn ở phần mà một cái máy có thể nhìn thấy: khối tài liệu
+**Giữ mã nào.** `COMMENT-1`, gần như trọn vẹn trong phần máy có thể nhìn thấy: khối tài liệu
 **có tồn tại** hay không. Nội dung bên trong khối đó thì không.
 
 **Cách phát hiện.** Quy tắc thăm hai nút `ExportNamedDeclaration` và `ExportDefaultDeclaration`. Nếu
@@ -63,7 +63,7 @@ gọi `sourceCode.getCommentsBefore(node)` và cho qua nếu **bất kỳ** chú
 đọc nó lúc đang quyết định có nên dùng hay không, và cái tên cộng chữ ký chỉ nói được nó **nhận** gì
 — không bao giờ nói nó **để làm gì**, cũng không nói khi nào nên với tay lấy nó thay vì thứ nằm ngay
 bên cạnh. Đây cũng là loại thiếu sót mà con người soi rất tệ: một tệp sáu trăm dòng đủ để không ai
-nhận ra đã có hai thứ được xuất ra trần trụi.
+  nhận ra có hai thứ đã được xuất ra mà không có tài liệu.
 
 Hằng số dữ liệu được cố tình bỏ ra ngoài. `export const MAX_ATTEMPTS = 3` đã tự mô tả xong bằng
 chính cái tên của nó, và ép viết một câu bên cạnh chỉ đẻ ra những câu chép lại tên — đúng thứ mà
@@ -77,7 +77,7 @@ chính cái tên của nó, và ép viết một câu bên cạnh chỉ đẻ ra
 - **Gói hàm vào một lời gọi là thoát.** `export const run = memo(() => {})`, `= make(1)`,
   `= other.bind(null)`, `= class {}` — init không còn là biểu thức hàm nguyên dạng, nên một thứ gọi
   được bị coi là hằng số dữ liệu.
-- **`export default () => {}` im lặng**, trong khi `export const f = () => {}` thì bị bắt. Miễn trừ
+- **`export default () => {}` không bị báo**, trong khi `export const f = () => {}` thì bị bắt. Miễn trừ
   ở đây phụ thuộc vào **hình thức xuất**, không phụ thuộc vào thứ được xuất.
 - **Chỉ khai báo đầu tiên được xét.** `export const MAX = 3, run = () => {}` lọt sạch. Đảo thứ tự
   lại thì bắt.
@@ -119,7 +119,7 @@ thành viên có tài liệu là thao tác một dòng, và một dòng thì kh�
 - **`/** */` rỗng vẫn qua.**
 - **Tách từ khoá `export` ra là tắt quy tắc.** Viết `enum State { … }` rồi `export { State }` ở dòng
   sau thì `parent` không còn là nút xuất, và mọi yêu cầu biến mất.
-- **Đối tượng hằng thay cho enum thì cả hai quy tắc đều im.**
+- **Đối tượng hằng thay cho enum thì cả hai quy tắc đều không báo.**
   `export const State = { Pending: "pending" } as const` là hằng số dữ liệu với quy tắc thứ nhất, và
   không phải `TSEnumDeclaration` với quy tắc thứ hai. Cấu trúc hay được dùng thay enum nhất lại đúng
   là cấu trúc không quy tắc nào phủ.

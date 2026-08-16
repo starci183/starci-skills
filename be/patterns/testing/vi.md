@@ -13,7 +13,7 @@ description: Từng tình huống TESTING-N, nhận diện bằng câu hỏi mà
 
 # Testing
 
-Một test được mua bằng **câu hỏi nó trả lời**, không phải bằng thứ nó chạm vào.
+Giá trị của một test nằm ở **câu hỏi nó trả lời**, không phải ở thứ nó chạm vào.
 
 - **e2e** trả lời: *nghiệp vụ có chạy không?*
 - **unit spec** trả lời: *quyết định này có ra đúng không?*
@@ -26,7 +26,7 @@ Câu hỏi phân lane không phải "test này gọi tới đâu" mà là:
 Nếu có, test đang **không** phủ cái mà nó trông như đang phủ. Với một flow, gần như lúc nào lý do
 cũng là một: nó assert cái response thay vì assert cái hệ quả.
 
-**Đây là luật bắt buộc.** Mọi file test đều rơi vào đúng một lane và mang đúng một nghĩa vụ hình
+**Đây là luật bắt buộc.** Mọi file test đều thuộc đúng một lane và mang đúng một nghĩa vụ về hình
 dạng. Không có kích thước nào nhỏ đến mức được miễn: một bảng ba nhánh là `TESTING-5` đúng cùng lý do
 mà một flow checkout-tới-entitlement là `TESTING-2`.
 

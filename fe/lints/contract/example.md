@@ -12,7 +12,7 @@ description: Mã thật cho từng luật máy giữ — chỗ nó bắn, chỗ 
 > Phiên bản: `2.00` · Mô-đun: `contract` · Luật máy giữ: [`INDEX.md`](./INDEX.md) · Giải thích: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây có **vài cặp SAI / ĐÚNG** — SAI là mã làm luật **bắn**, ĐÚNG là mã làm luật **im** —
-rồi tới mục **Cửa lách và nhầm lẫn**.
+rồi tới mục **Chỗ lách và chỗ dễ nhầm**.
 
 Đọc mục cuối đó cho kỹ. Mã trong đó là mã **luật bỏ sót**, **không phải** mã được phép viết. Nó vi
 phạm luật y hệt mã SAI ngay phía trên; khác biệt duy nhất là **không ai báo**. Đừng chép nó đi dùng.
@@ -73,7 +73,7 @@ export const Entry = ({ props }: EntryProps) => (
 <Amount className="tabular-nums" props={{ value }} />
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 {/* LUẬT KHÔNG BẮT — và đây vẫn là vi phạm CONTRACT-1 y như cặp 2.
@@ -152,7 +152,7 @@ const HINT = "đặt gap-4 giữa hai nhóm ngang hàng"
 const tone = cva("badge", { variants: { intent: { danger: "danger" } } })
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 {/* LUẬT KHÔNG BẮT — callee là MemberExpression, mà tập tên chỉ so với Identifier trần.
@@ -228,7 +228,7 @@ it("marks the node", () => {
 })
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 {/* LUẬT KHÔNG BẮT — luật cấm MỘT CÁI TÊN, không cấm HÀNH VI.
@@ -292,7 +292,7 @@ const worn = helpers["contractNodeProps"]("weekday-run")
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```ts
 // LUẬT KHÔNG BẮT — dấu backtick làm giá trị không còn là Literal,
@@ -371,7 +371,7 @@ export const Region = ({ props }: RegionProps) => (
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 {/* LUẬT KHÔNG BẮT — chỉ mười một tên thẻ được liệt kê.
@@ -430,7 +430,7 @@ export const Divider = () => <div className="flex h-px w-full bg-neutral-200" />
 <Card data-component="SurfaceListCardSurface">{children}</Card>
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 {/* LUẬT KHÔNG BẮT — spread; chỉ tên thuộc tính viết thẳng trong JSX mới được so */}
@@ -478,7 +478,7 @@ const spec = contractSpec("title-with-baselinefact")
 const spec = contractSpec("title-with-baseline-fact")
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 {/* LUẬT KHÔNG BẮT — BỐN TRÊN NĂM dạng tham chiếu đều không được kiểm.
@@ -559,7 +559,7 @@ export const CONTRACTS = buildContracts({
 })
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```ts
 // LUẬT KHÔNG BẮT — một SpreadElement làm mục KHÔNG ĐỌC TĨNH ĐƯỢC,
@@ -647,7 +647,7 @@ export const CONTRACTS = buildContracts({
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```ts
 // LUẬT KHÔNG BẮT — ba biểu thức đối chiếu chuỗi THÔ, KHÔNG cắt biến thể,
@@ -705,7 +705,7 @@ export const CONTRACTS = buildContracts({
 export const Resting = () => <Tree contract="planned-detail-stack" render={detail} />
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```md
 <!-- BÁO CHẾT OAN — chỉ sáu phần mở rộng mã nguồn được đi bộ.

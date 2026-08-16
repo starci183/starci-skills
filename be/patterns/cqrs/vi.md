@@ -13,20 +13,20 @@ description: Từng tình huống CQRS-N, nhận diện bằng nghiệp vụ ch�
 
 # CQRS
 
-Mọi thao tác backend này phơi ra đều là **một message có handler**. Mutation thì dispatch một
+Mọi thao tác backend phơi ra đều là **một message có handler**. Mutation dispatch một
 command, query thì dispatch một query, còn việc phụ phải sống lâu hơn request thì là một event.
 
-Resolver không làm việc. Service không làm việc. Cả hai chỉ **bê request tới handler**, và handler là
+Resolver không làm việc. Service cũng không làm việc. Cả hai chỉ **chuyển request tới handler**, còn handler là
 chỗ công việc thật sự nằm.
 
-Câu hỏi duy nhất phân định một đoạn code thuộc về đâu:
+Câu hỏi duy nhất để phân định một đoạn code thuộc về đâu là:
 
 > Việc này có thể bị gọi từ **nhiều hơn một cửa** không?
 
 Nếu có — và gần như luôn có, vì CLI và bộ test đã là hai cửa — thì đó là một message có handler,
 không phải một method trên service.
 
-**Đây là luật bắt buộc.** Không có thao tác nào nhỏ tới mức được miễn khai báo mã. Một lệnh đọc một
+**Đây là luật bắt buộc.** Không có thao tác nào nhỏ đến mức được miễn khai báo mã. Một lệnh đọc một
 dòng vẫn là `CQRS-1` đúng cùng lý do mà một lệnh tất toán thanh toán là `CQRS-1`. Câu "có mỗi cái
 getter thôi mà" là chỗ luật này bị bỏ qua nhiều nhất.
 
@@ -242,7 +242,7 @@ handler mà spec không đổi.
 
 ## Ngoại lệ
 
-Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ đều đóng và nêu rõ mã nó áp
+Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ đều khép kín và nêu rõ mã nó áp
 vào.
 
 - **Handler trừu tượng trung gian** (`CQRS-3`). Một họ thao tác làm cùng một việc với tham số khác

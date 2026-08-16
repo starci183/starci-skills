@@ -9,7 +9,7 @@ description: Hai luật máy giữ được của luật chữ nghĩa — bắt 
 
 # vi.md
 
-> Version: `2.00`
+> Phiên bản: `2.00`
 
 Mô-đun: `translation`. Nguồn sự thật là
 [`sources/fe/translation.mjs`](../../../sources/fe/translation.mjs); luật nằm ở
@@ -33,14 +33,14 @@ chứ không bằng một phép kiểm. Chi tiết ở `audit.md`.
 
 ## `no-copy-resolution-below-block`
 
-**Bắt gì.** Mọi `CallExpression` mà tên hàm được gọi viết đúng một trong bốn chữ:
+**Bắt gì?** Mọi `CallExpression` mà tên hàm được gọi viết đúng một trong bốn chữ:
 `useTranslations`, `useLocale`, `useFormatter`, `getTranslations` — với điều kiện tệp đang lint nằm
 trong một trong bốn thư mục nhận chữ. Gọi ở đâu trong tệp cũng bị bắt: trong thân thành phần, ở cấp
 mô-đun, trong một hàm phụ, trong một callback.
 
-**Giữ mã nào.** `COPY-1` — nửa có kết nối tra chữ, mọi thứ bên dưới chỉ nhận chuỗi đã tra xong.
+**Giữ mã nào?** `COPY-1` — nửa có kết nối tra chữ, mọi thứ bên dưới chỉ nhận chuỗi đã tra xong.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. Cổng thư mục chạy **một lần** trong `create`: lấy `context.filename` (thiếu thì
    `context.getFilename()`), đổi mọi `\` thành `/`, rồi kiểm chuỗi con `/src/components/<dir>/` với
@@ -51,13 +51,13 @@ mô-đun, trong một hàm phụ, trong một callback.
 3. Không đọc đường dẫn import, không phân giải binding. Luật khớp **cách viết**, không khớp **ký
    hiệu**.
 
-**Vì sao luật này đáng có máy giữ.** Không phải vì chữ sai, mà vì **phụ thuộc**. Một thành phần tra
+**Vì sao nên để máy giữ luật này?** Không phải vì chữ sai, mà vì **phụ thuộc**. Một thành phần tra
 chữ thì phải có runtime dịch mới dựng lên được từ một fixture, và nó phải tự biết người đọc đang ở
 tình huống nào mới chọn đúng câu — hai việc đó đều thuộc về nửa có kết nối, cách đó đúng một tệp. Lỗi
 này không hiện ra trên màn hình; nó chỉ hiện ra khi ai đó cố dựng thành phần một mình và không dựng
 được.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - Đổi tên khi import (`import { useTranslations as useCopy }`) thì tên không còn khớp.
 - Gọi dạng thuộc tính (`i18n.useTranslations()`) thì `callee` là `MemberExpression`, bị loại trước cả
@@ -75,7 +75,7 @@ này không hiện ra trên màn hình; nó chỉ hiện ra khi ai đó cố d�
 
 ## `no-hardcoded-copy-in-vocabulary`
 
-**Bắt gì.** Trong bốn thư mục nhận chữ:
+**Bắt gì?** Trong bốn thư mục nhận chữ:
 
 - một `JSXAttribute` tên thuộc `aria-label`, `placeholder`, `title`, `alt`, `aria-description`, giá
   trị là chuỗi thường hoặc chuỗi thường bọc trong ngoặc nhọn — và chuỗi đó "trông như câu";
@@ -84,9 +84,9 @@ này không hiện ra trên màn hình; nó chỉ hiện ra khi ai đó cố d�
 "Trông như câu" ở đây có nghĩa rất hẹp: **có ít nhất một khoảng trắng, và bắt đầu bằng một chữ hoa
 A–Z**.
 
-**Giữ mã nào.** `COPY-2` — thành phần dưới block không giữ chữ mà người đọc nhìn hoặc nghe thấy.
+**Giữ mã nào?** `COPY-2` — thành phần dưới block không giữ chữ mà người đọc nhìn hoặc nghe thấy.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. Cùng một cổng thư mục như luật trên.
 2. `JSXAttribute`: tên phải là `JSXIdentifier` (nên `xlink:title` dạng namespace bị bỏ qua) và nằm
@@ -95,7 +95,7 @@ A–Z**.
 3. `JSXText`: lấy `node.value`, ép chuỗi, `trim()`.
 4. Cả hai đi qua đúng một phép thử: `/\s/` và `/^[A-Z]/`.
 
-**Vì sao luật này đáng có máy giữ.** Vì chữ **trốn trong thuộc tính**. Không thuộc tính nào trong năm
+**Vì sao nên để máy giữ luật này?** Vì chữ **trốn trong thuộc tính**. Không thuộc tính nào trong năm
 cái đó đọc giống một câu khi mắt lướt qua tệp, nên chúng là chỗ chữ sống sót lâu nhất qua mọi lần
 soát tay. Riêng `aria-label` không phải chuyện nhỏ: trình đọc màn hình coi nó là **chữ chính**, nên
 một nhãn tiếng Anh nằm trên một màn hình đã dịch là lỗi to tiếng nhất trang, giáng đúng vào người ít
@@ -104,7 +104,7 @@ có khả năng lách qua nó nhất.
 Phép thử cố tình thô. Một phép thử tinh vi hơn sẽ phải tranh cãi từng chuỗi xem có phải câu không, và
 một phép thử hay cãi là phép thử không ai tin.
 
-**Cửa còn mở.** Cái giá của sự thô đó, viết ra đủ:
+**Những chỗ còn lọt.** Cái giá của sự thô đó, viết ra đủ:
 
 - **Túi prop của nhà.** `<Input props={{ placeholder: "Search courses" }} />` — thuộc tính tên là
   `props`, không nằm trong tập năm tên; chuỗi nằm trong một `ObjectExpression` mà không visitor nào

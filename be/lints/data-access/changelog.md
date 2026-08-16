@@ -4,7 +4,7 @@ title: changelog.md
 slug: /be/lints/data-access/changelog
 sidebar_label: changelog.md
 sidebar_position: 4
-description: Lịch sử phiên bản của kệ enforcement cho luật truy cập dữ liệu.
+description: Lịch sử phiên bản của mô-đun về cơ chế thi hành luật truy cập dữ liệu.
 ---
 
 # changelog.md
@@ -16,7 +16,7 @@ description: Lịch sử phiên bản của kệ enforcement cho luật truy c�
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu. Đổi số chính
 (`x.00`) dành cho việc tạo mô-đun hoặc thay đổi hình dạng của nó.
 
-Ở kệ này, "một thay đổi" gồm cả ba loại sau, và loại thứ ba dễ bị bỏ quên nhất:
+Trong mô-đun này, "một thay đổi" gồm cả ba loại sau, và loại thứ ba dễ bị bỏ quên nhất:
 
 1. Tệp nguồn thêm, bớt hoặc đổi tên một quy tắc.
 2. Một quy tắc đổi cái nó nhìn — thêm một loại nút, nới một biểu thức chính quy, nối thêm một tên vào
@@ -24,12 +24,12 @@ Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` v
 3. **Một cửa còn mở được phát hiện hoặc được đóng lại.** Bảng cửa còn mở là nội dung chính của kệ này,
    không phải phần chú thích, nên nó đổi thì phiên bản đổi.
 
-Số phiên bản của kệ enforcement **không** buộc phải bằng số phiên bản của tài liệu luật mà nó giữ. Luật
+Số phiên bản của mô-đun **không** buộc phải bằng số phiên bản của tài liệu luật mà nó giữ. Luật
 đứng yên trong khi quy tắc siết chặt là chuyện bình thường, và ngược lại cũng vậy.
 
 ## 2.00 — 2026-08-16
 
-Tạo mô-đun. Kệ `principles` và `patterns` ghi **luật**; kệ này ghi **việc thi hành**: máy nhìn thấy được
+Tạo mô-đun. Kệ `principles` và `patterns` ghi **luật**; mô-đun này ghi **cơ chế thi hành**: máy nhìn thấy được
 đến đâu, và — phần không ai chịu viết ra — máy **không** nhìn thấy chỗ nào.
 
 - **Phủ đúng ba quy tắc đang được công bố** trong gói `@starci/eslint-canon-be`:

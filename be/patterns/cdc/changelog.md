@@ -49,7 +49,7 @@ thì vẫn giữ nguyên và được ghi vào mục *Rủi ro còn mở* của 
 - **Mở rộng ví dụ.** Ba cặp ĐÚNG/SAI của luật phẳng trở thành hơn bốn mươi block code: mỗi mã nhiều
   case, mỗi case đặt ĐÚNG cạnh SAI, cộng mục *Ngoại lệ và nhầm lẫn*, bảng ánh xạ yêu cầu, bảng phân
   định ranh giới và danh sách sai lầm lặp lại.
-- **Đóng gói ngoại lệ.** Năm ngoại lệ được viết ra và đóng lại: boot best-effort (`CDC-1`), đọc để
+- **Đóng gói ngoại lệ.** Năm ngoại lệ được viết ra và khép kín: boot best-effort (`CDC-1`), đọc để
   phân giải cha (`CDC-3`), trả về mảng rỗng (`CDC-3`, `CDC-5`), projection thật sự cần xử lý xoá
   (`CDC-5`), unit test cho mapping (`CDC-7`). Chúng vốn nằm rải trong luật phẳng dưới dạng câu văn.
 - **Tổng quát hoá tên riêng.** Module riêng tư mà luật phẳng nêu tên đã thành projection điểm,

@@ -4,17 +4,17 @@ title: example.md
 slug: /be/lints/comments/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mã nổ quy tắc, mã không nổ, và mã lọt qua kẽ hở của từng quy tắc.
+description: Mã bị quy tắc báo lỗi, mã không bị báo lỗi và mã lọt qua kẽ hở của từng quy tắc.
 ---
 
 # example.md
 
 > Version: `2.00` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mỗi mục dưới đây là một quy tắc. Trong mỗi mục có nhiều cặp **SAI** (quy tắc nổ) và **ĐÚNG** (quy
-tắc im), rồi tới **Cửa lách và nhầm lẫn**.
+Mỗi mục dưới đây là một quy tắc. Trong mỗi mục có nhiều cặp **SAI** (quy tắc báo lỗi) và **ĐÚNG** (quy
+tắc không báo), rồi tới **Cửa lách và nhầm lẫn**.
 
-Đọc kỹ phần cửa lách. Mã trong đó **không nổ quy tắc**, nhưng đó là **thiếu sót của quy tắc**, không
+Đọc kỹ phần cửa lách. Mã trong đó **không bị quy tắc báo lỗi**, nhưng đó là **thiếu sót của quy tắc**, không
 phải sự cho phép của luật. Không dòng nào trong phần đó được coi là mẫu để chép.
 
 Mọi ví dụ là mã nguồn thường. Không tên sản phẩm, không thư viện riêng.
@@ -175,7 +175,7 @@ export class RefundService {}
 
 **Lọt — chữ ký nạp chồng.** Hai chữ ký mà người gọi thật sự đọc thì không bị đòi gì; tài liệu bị đòi
 ở phần cài đặt, là chữ ký duy nhất không ai đọc. Một tệp chỉ có chữ ký, không có phần cài đặt, thì
-im hoàn toàn.
+hoàn toàn không bị báo.
 
 ```ts
 export function refund(payment: string): Promise<void>

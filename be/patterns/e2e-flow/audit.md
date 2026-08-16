@@ -11,15 +11,15 @@ description: Phản biện mức phân định, mức neo và khả năng cưỡ
 
 > Version: `2.00` · Module: `e2e-flow`
 
-Audit này kiểm ba thứ: mỗi mã có **phân định được** khỏi mã kề không, mỗi mã có **neo được vào code
-thật** không, và bảng **tầng giữ** có nói đúng sự thật không — kể cả khi sự thật là "không có gì giữ
-cả".
+Bản audit này kiểm tra ba việc: mỗi mã có **phân định được** với mã kề không, mỗi mã có **gắn được vào
+code thật** không, và bảng **tầng giữ** có phản ánh đúng thực tế không — kể cả khi thực tế là "không
+có gì giữ cả".
 
 ## Verdict
 
-Chấp nhận. Mười hai mã được giữ nguyên số và nguyên nghĩa từ luật phẳng. Năm mã có rule cưỡng chế,
-bảy mã chỉ có người đọc, và mười hai mã đều neo được vào code thật đang chạy trong repository. Con số
-5/12 là **con số đã đo**, không phải một mục tiêu chưa hoàn thành.
+Chấp nhận. Mười hai mã giữ nguyên số và nguyên nghĩa từ luật phẳng. Năm mã có rule cưỡng chế, bảy mã
+chỉ do người đọc kiểm tra, và cả mười hai mã đều gắn được với code thật đang chạy trong repository.
+Con số 5/12 là **con số đã đo**, không phải một mục tiêu chưa hoàn thành.
 
 ## Kiểm phân định
 

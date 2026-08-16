@@ -80,7 +80,7 @@ thông báo lỗi thanh toán · nhãn của một tab phụ thuộc quyền · 
 **nghe thấy**. Không chỉ trong nội dung: `aria-label`, `placeholder`, `title`, `alt` là bốn chỗ copy
 trốn nhiều nhất, vì khi lướt file thì cả bốn đều **không trông giống một câu**.
 
-`aria-label` không phải trường hợp nhỏ. Screen reader đọc nó như **văn bản chính**, nên một nhãn
+`aria-label` không phải trường hợp nhỏ. Screen reader hiểu đó là **văn bản chính**, nên một nhãn
 tiếng Anh nằm trên một màn hình tiếng Việt là lỗi to nhất trang, rơi đúng vào người ít có cách xoay
 xở nhất.
 
@@ -187,7 +187,7 @@ chữ cho người đọc ở đây)?
   đúng nguyên văn.
 
 **Tình huống nghiệp vụ hay gặp.** File từ điển từng ngôn ngữ · fixture dựng lại nguyên văn payload
-của server · snapshot test giữ nguyên chữ hiển thị.
+của server · snapshot test bảo toàn chữ hiển thị.
 
 ---
 
@@ -234,7 +234,7 @@ analytics.
 4. Chuỗi đã resolve là value, đi trong `props`.
 5. Nửa drawing phải render đúng khi không có từ điển nào trong dự án.
 6. Thư mục locale là nội dung, miễn theo đường dẫn.
-7. Chuỗi chương trình so khớp thì giữ nguyên và đánh dấu lý do trên chính dòng đó.
+7. Chuỗi chương trình so khớp thì bảo toàn và đánh dấu lý do trên chính dòng đó.
 
 ## Ngoại lệ
 
@@ -242,7 +242,7 @@ Ngoại lệ là **một phần của luật**, không phải chỗ để lách.
 dụng vào.
 
 - **Nội dung locale (`COPY-5`).** File trong thư mục locale là ngôn ngữ kia. Miễn theo đường dẫn.
-- **Fixture và spec (`COPY-2`, `COPY-4`).** Tái hiện chuỗi thật thì phải giữ nguyên văn; dịch đi là
+- **Fixture và spec (`COPY-2`, `COPY-4`).** Tái hiện chuỗi thật thì phải bảo toàn văn; dịch đi là
   đang test một thứ khác. Cũng miễn theo đường dẫn.
 - **Giá trị matched (`COPY-6`).** Giữ nguyên, đánh dấu lý do trên dòng.
 - **Key không phải key từ điển (`COPY-3`).** `selectedKey` của tab hay hàng danh sách là định danh,

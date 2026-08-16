@@ -18,7 +18,7 @@ chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó n�
 
 **Mã không bao giờ được đánh số lại và không bao giờ bị xoá.** `CONTRACT-<n>` được trích dẫn từ những
 file luật khác và từ những task record đã viết xong; đổi số một mã là làm gãy trong im lặng một trích
-dẫn ai đó đã đặt. Một tình huống bị rút lại vẫn giữ số của nó và nói rõ là đã rút.
+dẫn ai đó đã đặt. Một tình huống bị rút lại vẫn giữ số của nó và làm rõ là đã rút.
 
 ## 2.00 — 2026-08-16
 
@@ -32,7 +32,7 @@ dẫn ai đó đã đặt. Một tình huống bị rút lại vẫn giữ số 
 
 - **Giữ nguyên mười ba mã.** `CONTRACT-1` đến `CONTRACT-13`, đúng số và đúng nghĩa như luật phẳng đã
   đặt. Không mã nào được thêm, gộp, tách hay đánh số lại. Chỗ nào module này không đồng ý với luật
-  phẳng thì **giữ nguyên luật phẳng** và ghi bất đồng vào *Rủi ro còn mở* của `audit.md` — cụ thể là
+  phẳng thì **bảo toàn luật phẳng** và ghi bất đồng vào *Rủi ro còn mở* của `audit.md` — cụ thể là
   `text-left` (luật cấm, rule cố ý cho phép).
 
 - **Thêm bảng `Tầng giữ`.** Mỗi mã ghi rõ tầng thật sự giữ nó: `unrepresentable` khi một union đóng
@@ -44,7 +44,7 @@ dẫn ai đó đã đặt. Một tình huống bị rút lại vẫn giữ số 
   ghi trong `audit.md`: hai mã được type giữ chứ không cần rule, và `CONTRACT-9` được **hai** rule
   giữ. Bảng nói cái đo được, không nói cái tính ra được.
 
-- **Thêm bảng `Anchor`.** Mỗi mã chỉ vào một đường dẫn code thật và nói rõ nhìn cái gì ở đó. Luật
+- **Thêm bảng `Anchor`.** Mỗi mã chỉ vào một đường dẫn code thật và làm rõ nhìn cái gì ở đó. Luật
   không chỉ được vào code thật là một đề xuất, không phải một luật. Cả mười ba mã đều neo được; không
   mã nào phải ghi `chưa neo được`.
 
@@ -54,7 +54,7 @@ dẫn ai đó đã đặt. Một tình huống bị rút lại vẫn giữ số 
 
 - **Viết lại theo từng mã.** `vi.md` cho mỗi mã một mục gồm tình huống, dấu hiệu nhận biết, câu tự
   hỏi, ranh giới với các mã kề, và danh sách tình huống nghiệp vụ hay gặp. `example.md` cho mỗi mã
-  nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại lệ và nhầm lẫn.
+  nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại lệ và nhầm lẫn.
 
 - **Rút mọi ví dụ về TSX thường.** Bỏ tên sản phẩm, tên repository và tên component riêng. Chỗ luật
   gốc gọi tên một component private, ví dụ gọi bằng vai trò: frame là `Tree`, primitive vendor là

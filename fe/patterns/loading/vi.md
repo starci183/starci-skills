@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/loading/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống LOADING-N, nhận diện bằng nghiệp vụ chứ không bằng cách nhìn màn hình.
+description: Các tình huống LOADING-N, nhận diện bằng nghiệp vụ chứ không bằng cách nhìn màn hình.
 ---
 
 # vi.md
@@ -79,7 +79,7 @@ nằm đó, không biết gì.
 **Ranh giới**
 
 - ↔ `LOADING-2`: `LOADING-1` là **tồn tại** một cây thứ hai (một file, một prop). `LOADING-2` là cây
-  thứ hai được viết **ngay tại call site** bằng một ternary. Cùng một sai lầm, khác chỗ đứng.
+  thứ hai được viết **ngay tại call site** bằng một ternary. Cùng một sai lầm, khác vị trí.
 - ↔ `LOADING-7`: `LOADING-1` nói **ai vẽ**; `LOADING-7` nói **tình huống có tên chưa**. Một block có
   `pending` trong union vẫn có thể vi phạm `LOADING-1` nếu nhánh `pending` render một twin.
 - **Không phải twin:** một primitive nghỉ dùng chung — thứ mà component *nghỉ BẰNG nó* — không mô tả
@@ -106,7 +106,7 @@ một ternary ở call site: `isLoading ? <A/> : <B/>` với `A` và `B` là hai
 **Ranh giới**
 
 - ↔ `LOADING-1`: xem trên.
-- ↔ `LOADING-3`: `LOADING-2` là **một phần tử** giữ nguyên hình; `LOADING-3` là **cả vùng** giữ nguyên
+- ↔ `LOADING-3`: `LOADING-2` là **một phần tử** bảo toàn hình; `LOADING-3` là **cả vùng** bảo toàn
   chiều cao. Một dòng chữ nghỉ đúng luật vẫn có thể nằm trong một section co lại còn 0 pixel.
 - ↔ `LOADING-5`: ternary có một nhánh là `null` **không** thuộc mã này. Đó là `LOADING-5`, và nó đúng.
 
@@ -115,7 +115,7 @@ badge trạng thái · số liệu trong ô thống kê · caption dưới ảnh
 
 ---
 
-## `LOADING-3` — vùng nghỉ giữ nguyên chiều cao của section
+## `LOADING-3` — vùng nghỉ bảo toàn chiều cao của section
 
 **Tình huống.** Vùng đang chờ không vẽ gì cả, nên nó co lại; đến khi câu trả lời về thì cả cột bên
 dưới nhảy xuống. Người đọc đang đọc dở một thứ và mất chỗ.
@@ -145,7 +145,7 @@ học · danh sách mục tiêu tuần · kết quả tìm kiếm · dòng bình
 ## `LOADING-4` — phần đang nghỉ được giấu khỏi trợ năng
 
 **Tình huống.** Một shimmer, hoặc một giá trị đã bị rút ruột, vẫn nằm trong cây trợ năng. Screen
-reader đọc ra tiếng ồn, hoặc đọc ra một chuỗi rỗng, đúng vào lúc người dùng đang chờ được nói cho
+reader đọc ra tiếng ồn, hoặc đọc ra một chuỗi rỗng, đúng vào lúc người dùng đang chờ được nêu cho
 biết một điều gì đó.
 
 **Dấu hiệu nhận biết**
@@ -159,7 +159,7 @@ trợ năng?
 
 **Ranh giới**
 
-- ↔ `LOADING-2`: `LOADING-2` lo phần **nhìn thấy** giữ nguyên hình; `LOADING-4` lo phần **nghe thấy**
+- ↔ `LOADING-2`: `LOADING-2` lo phần **nhìn thấy** bảo toàn hình; `LOADING-4` lo phần **nghe thấy**
   im lặng. Một element có thể đúng `LOADING-2` mà vẫn sai `LOADING-4`.
 - ↔ `LOADING-7`: thông báo **một** lần ở cấp vùng rằng "đang tải" là chuyện của khung — của
   `LOADING-7`, nơi `pending` mang theo tên vùng. Thông báo ở **từng ô nghỉ** là tiếng ồn.
@@ -257,8 +257,8 @@ thử thách tuần · feed cộng đồng · kết quả tìm kiếm · giỏ h
 
 1. Component vẽ dữ liệu chính là component vẽ lúc chờ. Không có file thứ hai, không có prop đưa hình
    nghỉ từ ngoài vào.
-2. Phần tử nghỉ giữ nguyên thẻ, cách sắp xếp và measure của nó.
-3. Vùng nghỉ giữ nguyên chiều cao của một vùng thật; số dòng lặp là một quyết định được khai báo.
+2. Phần tử nghỉ bảo toàn thẻ, cách sắp xếp và measure của nó.
+3. Vùng nghỉ bảo toàn chiều cao của một vùng thật; số dòng lặp là một quyết định được khai báo.
 4. Phần tử nghỉ được giấu khỏi trợ năng, và chỉ trong đúng lúc nó nghỉ.
 5. Control chưa có đích thì **vắng mặt**, không phải `disabled`, cũng không phải shimmer.
 6. Một cờ chờ cho một request. Nhiều request độc lập thì nhiều cờ.

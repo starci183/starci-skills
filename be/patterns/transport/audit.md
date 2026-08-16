@@ -11,13 +11,13 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 
 > Version: `2.00` · Module: `transport`
 
-Audit này kiểm hai chuyện: luật có chọn được **một cửa duy nhất** từ dữ kiện đã nêu hay không, và mỗi
-mã đang được giữ ở **tầng nào** — chứ không phải tầng nào ta muốn nó được giữ.
+Audit này kiểm tra hai việc: luật có chọn được **một cửa duy nhất** từ dữ kiện đã nêu hay không, và mỗi
+mã đang được bảo đảm ở **tầng nào** — chứ không phải tầng nào ta muốn nó được bảo đảm.
 
 ## Verdict
 
 Chấp nhận. Ba mã giữ nguyên số và nguyên nghĩa, cả ba đều neo được vào code thật, và bảng tầng giữ
-nói thẳng rằng một mã hiện chỉ có người đọc giữ. Nhưng chấp nhận **kèm hai finding phải mang theo**:
+  nói thẳng rằng hiện chỉ có người đọc bảo đảm một mã. Tuy nhiên, chấp nhận **kèm hai finding phải mang theo**:
 danh sách bốn ca không phủ hết những cửa đang tồn tại, và rule đọc route đang bị dạng khai báo phổ
 biến nhất trong source làm cho mù một nửa.
 

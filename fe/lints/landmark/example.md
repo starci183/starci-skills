@@ -9,9 +9,9 @@ description: Mã thật cho từng rule landmark — chỗ rule nổ, chỗ rule
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `landmark` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `landmark` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mỗi rule có nhiều cặp **SAI** (rule nổ) và **ĐÚNG** (rule im), rồi tới mục **Cửa lách và nhầm lẫn**.
+Mỗi rule có nhiều cặp **SAI** (rule nổ) và **ĐÚNG** (rule im), rồi tới mục **Chỗ lách và chỗ dễ nhầm**.
 
 Mục cửa lách **không phải danh sách những gì được phép**. Đó là mã **đi lọt** — mã vi phạm luật mà
 rule không nhìn thấy. Đọc nhầm hai thứ này là cách nhanh nhất để biến một tài liệu enforcement thành
@@ -137,7 +137,7 @@ export default function ReportsLayout({ children }: { children: ReactNode }) {
 
 Uỷ quyền toàn bộ chrome cho layout bên trên. Rule im, và im là đúng.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 > Toàn bộ mã dưới đây **vi phạm luật**. Rule **không thấy**. Đây là lỗ hổng, không phải giấy phép.
 
@@ -376,7 +376,7 @@ Miễn trừ có chủ đích: đây là **một** chỗ duy nhất phần tử 
 tính là một chỗ duy nhất một hộp trung tính được viết tay. Rule trả về rỗng ngay từ dòng đầu, không
 kiểm gì trong file này.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 > Toàn bộ mã dưới đây **vi phạm luật**. Rule **không thấy**.
 

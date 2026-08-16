@@ -16,13 +16,13 @@ description: Lịch sử phiên bản của luật CQRS.
 Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
-Mã tình huống **không bao giờ được đánh số lại**. Mã được trích dẫn từ các file luật khác và từ task
+Mã tình huống **không bao giờ được đánh số lại**. Mã được các file luật khác và task
 record đã đóng; đổi số một mã là làm hỏng trong im lặng một trích dẫn đã có người viết ra. Mã bị bỏ
 thì ghi là bị bỏ, và số của nó không được dùng lại.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hai thứ đổi cùng lúc: shelf và hình dạng module.
+Đổi số chính vì cả shelf lẫn cấu trúc module đều thay đổi.
 
 - **Chuyển shelf.** `be/canon/patterns/cqrs.md` (một file phẳng) → `be/patterns/cqrs/` (module năm
   record). `id` và `slug` đổi theo: `be-patterns-cqrs-<record>` và `/be/patterns/cqrs`.
@@ -32,7 +32,7 @@ thì ghi là bị bỏ, và số của nó không được dùng lại.
   sai không viết được, `enforced` khi có một rule **gọi tên được** trong `sources/be/cqrs.mjs` bắt
   nó, `documented` khi không có gì cơ học giữ và chỉ người đọc giữ. Kết quả: `CQRS-2`, `CQRS-3`,
   `CQRS-7` là `enforced`; `CQRS-1`, `CQRS-4`, `CQRS-5`, `CQRS-6` là `documented`. Bốn dòng
-  `documented` được viết ra đúng như hiện trạng — khoảng trống ấy chính là **mục đích** của bảng,
+  `documented` được ghi đúng như hiện trạng — khoảng trống ấy chính là **mục đích** của bảng,
   không phải một thất bại của nó.
 - **Thêm bảng `Anchor`.** Mỗi mã trỏ vào một file thật và nói rõ phải nhìn cái gì ở đó. Luật không
   chỉ được vào code thật là đề xuất, không phải luật. Cả bảy mã đều neo được; không mã nào phải ghi

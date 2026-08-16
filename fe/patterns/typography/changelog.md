@@ -21,7 +21,7 @@ hay một neo chết đều là thay đổi luật và đều phải tăng phiê
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hai thứ đổi cùng lúc: hình dạng của record và chỗ đứng của luật.
+Đổi số chính vì hai thứ đổi cùng lúc: hình dạng của record và vị trí của luật.
 
 - **Từ một file phẳng thành module năm record.** `fe/canon/patterns/typography.md` được diễn đạt lại
   thành `fe/patterns/typography/` gồm `INDEX.md`, `vi.md`, `example.md`, `audit.md`, `changelog.md`.
@@ -36,10 +36,10 @@ hay một neo chết đều là thay đổi luật và đều phải tăng phiê
   Khoảng hở đó là **nội dung** của bảng, không phải khuyết điểm của nó.
 - **Thêm bảng `Anchor`.** Mỗi mã chỉ vào code thật kiểm chứng được: đường dẫn cộng thứ cần tìm ở đó.
   Cả chín mã đều neo được; không mã nào phải ghi `chưa neo được`. Hai neo yếu hơn vẻ ngoài
-  (`TYPESET-4` neo vào trần thang, `TYPESET-9` neo vào phân bố call site) đã được nói rõ ở `audit.md`.
+  (`TYPESET-4` neo vào trần thang, `TYPESET-9` neo vào phân bố call site) đã được nêu rõ ở `audit.md`.
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống, dấu hiệu nhận biết, câu tự hỏi, ranh giới
   với các mã kề, và danh sách tình huống nghiệp vụ hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại
   lệ và nhầm lẫn. Bổ sung ánh xạ yêu cầu bằng lời sang một bộ cỡ/đậm/tông, bảng phân định ranh giới,
   và danh sách sai lầm lặp lại.
 - **Đóng các ngoại lệ.** Ngoại lệ mốc thời gian giữ 14px, ngoại lệ hai peer cùng cỡ khác độ đậm,
@@ -48,7 +48,7 @@ hay một neo chết đều là thay đổi luật và đều phải tăng phiê
 - **Tổng quát hoá mọi ví dụ.** Bỏ tên sản phẩm, tên repository, tên component riêng và tên vendor.
   Component chỉ còn xuất hiện ở chỗ ranh giới component **chính là** luật. Tên component riêng mà luật
   phẳng nhắc ở `TYPESET-8` được diễn đạt lại thành "surface danh sách đã có nhãn của chính nó",
-  quyết định giữ nguyên.
+  quyết định bảo toàn.
 - **Ghi lại các lệch từ vựng thay vì sửa lén.** Luật gọi bậc 16px là `text-base` trong khi leaf gọi nó
   là `size: "md"`; leaf chữ mặc định 16px trong khi bảng quyết định coi 14px là bậc phổ biến; leaf
   heading để `level` tuỳ chọn nên `TYPESET-1` còn hở một đường. Cả ba nằm ở "Rủi ro còn mở".

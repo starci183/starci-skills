@@ -9,11 +9,11 @@ description: Phản biện mức phủ của một rule so với ba mã luật, 
 
 # audit.md
 
-> Version: `2.00` · Module: `lint-escape-hatch`
+> Phiên bản: `2.00` · Mô-đun: `lint-escape-hatch`
 
 Phản biện này kiểm đúng một câu hỏi: **cái máy có giữ được luật không, và ở đâu thì không.**
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm điều kiện. Rule duy nhất của mô-đun bắt đúng thứ nó nhận là bắt, phần bắt hụt ở
 directive-trong-lời-văn là **có chủ ý và đúng**, và không có chỗ nào truyền được ngoại lệ vào rule.
@@ -42,7 +42,7 @@ với con số dự kiến. Ba export còn lại không phải rule và không �
 | Tệp không có đoạn `/src/` | **Không chạy**. `create` trả `{}` |
 | Miễn trừ viết trong cấu hình phẳng | **Không nhìn thấy**. Rule không đọc cấu hình |
 
-## Findings
+## Phát hiện
 
 1. **Tên rule rộng hơn phần rule bắt.** `no-inline-lint-config` gợi ý mọi dạng cấu hình lint tại chỗ;
    mẫu chỉ phủ họ `eslint-disable`/`eslint-enable`. Dạng trần `/* eslint rule: "off" */`,
@@ -62,7 +62,7 @@ với con số dự kiến. Ba export còn lại không phải rule và không �
 6. **Không có gì canh việc rule được đăng ký.** `recommended` đặt mức `error`, nhưng một cấu hình
    trải rồi ghi đè vẫn hạ được mức, và mô-đun không tự phát hiện.
 
-## Decisions
+## Quyết định
 
 - **Giữ đúng một rule trong tài liệu này.** Rule "đáng lẽ nên có" — chẳng hạn một rule bắt dạng chú
   thích cấu hình trần, hay một rule soi cấu hình phẳng — **không** được viết vào `INDEX.md`. Luật cao
@@ -116,7 +116,7 @@ Mỗi mục nêu **rule sẽ phải soi cái gì** mới khép được cửa, h
    *Khép bằng cách nào:* cũng bằng phép kiểm cấu hình hiệu dụng ở trên, cộng một kiểm thử sinh đôi
    khẳng định rule có nổ trên một mẫu vi phạm. Không rule nào tự canh được việc mình có được nối dây.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Tệp nguồn công bố thêm hoặc bớt một rule, hoặc đổi tên một rule đang có.
 - Mẫu `INLINE_DIRECTIVE` được sửa, kể cả chỉ thêm một nhánh.

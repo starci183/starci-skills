@@ -16,12 +16,12 @@ nào, và mỗi mã có **neo được vào code thật** không.
 
 ## Verdict
 
-Chấp nhận, có bảo lưu. Mười ba mã giữ nguyên số và nguyên nghĩa từ luật phẳng. Chín mã có rule giữ,
+Chấp nhận, có bảo lưu. Mười ba mã bảo toàn số và nguyên nghĩa từ luật phẳng. Chín mã có rule giữ,
 hai mã có type giữ, hai mã chỉ có người đọc giữ. Cả mười ba neo được.
 
 Bảo lưu nằm ở `CONTRACT-12`: từ vựng class hiện vẫn **chứa** những token mà rule của chính `CONTRACT-12`
 bác. Đó là nợ đã đo được và đã ghi, không phải một chỗ luật tự mâu thuẫn với chính nó — nhưng nó là
-chỗ dễ bị đọc thành giấy phép nhất, nên nó được nói ra ở cả `INDEX.md`, `vi.md` và `example.md`.
+chỗ dễ bị đọc thành giấy phép nhất, nên nó được nêu ra ở cả `INDEX.md`, `vi.md` và `example.md`.
 
 ## Kiểm phân định
 
@@ -68,8 +68,8 @@ chỗ dễ bị đọc thành giấy phép nhất, nên nó được nói ra ở
 ## Decisions
 
 - **Giữ đúng mười ba mã, đúng số, đúng nghĩa** như luật phẳng đã đặt. Không đổi số, không gộp, không
-  thêm. Mã bị cho là sai thì **giữ nguyên** và tranh luận ở mục dưới.
-- **Bảng *Tầng giữ* nói thật, kể cả khi sự thật không khớp phép trừ.** Một mã chỉ được ghi `enforced`
+  thêm. Mã bị cho là sai thì **bảo toàn** và tranh luận ở mục dưới.
+- **Bảng *Tầng giữ* phản ánh đúng thực tế, kể cả khi sự thật không khớp phép trừ.** Một mã chỉ được ghi `enforced`
   khi đã tìm ra rule và gọi được tên nó.
 - **Giữ mọi quyết định thật của luật phẳng**, kể cả những quyết định nghe như chi tiết triển khai:
   công thức lề bất đối xứng của joined-list row, luật fact-thuộc-list-host và `description` dành cho
@@ -114,7 +114,7 @@ chỗ dễ bị đọc thành giấy phép nhất, nên nó được nói ra ở
   toàn bộ `CONTRACT-1` và `CONTRACT-7` trong im lặng. Chiều thứ hai là chiều nguy hiểm, và không gì
   báo.
 
-### Mâu thuẫn giữa luật và rule, giữ nguyên cả hai
+### Mâu thuẫn giữa luật và rule, bảo toàn cả hai
 
 - **`text-left` / `text-center`.** Bảng *Forbidden* của luật phẳng liệt `text-left` là class sơn bị
   cấm trong entry. Rule `no-interaction-class-in-entry` **cố ý** để `text-left` và `text-center` hợp

@@ -13,33 +13,31 @@ description: Từng tình huống LAYERING-N, nhận diện bằng đường đi
 
 # Module layering
 
-Một **capability** là một thư mục sở hữu **một** chủ thể. Luật ở đây không nói về những gì nằm bên
-trong một capability — nó nói về **đường nối giữa các capability**: một import được phép gọi tên cái
-gì, một capability được phép nói gì về chính nó, và một phụ thuộc bắc ngang giữa hai capability được
-phép nối ở đâu.
+Một **capability** là một thư mục sở hữu **một** chủ thể. Luật này không nói về những gì nằm bên
+trong capability; nó nói về **đường nối giữa các capability**: một import được phép gọi tên gì, một
+capability được phép nói gì về chính nó, và một phụ thuộc bắc ngang giữa hai capability được nối ở đâu.
 
 Cả năm mã đều tồn tại vì lý do giống nhau:
 
 > Mọi cách khác đều sinh ra vòng lặp phụ thuộc.
 
-Không phải loại vòng lặp ồn ào mà compiler bắt được. Là loại **im lặng**: capability với tay vào ruột
-của chính nó qua cửa chính, một barrel kéo theo cả đồ thị import mà không ai yêu cầu, một module gọi
-thẳng sang module hàng xóm để rồi hai bên **không còn khởi động rời nhau được nữa**. Vòng lặp kiểu đó
-không làm gì đỏ lên cả. Nó chỉ làm mọi câu hỏi về sau khó trả lời hơn, cho tới hôm một unit spec khởi
-động luôn database driver và không ai chỉ ra được import nào đã yêu cầu điều đó.
+Đó không phải loại vòng lặp ồn ào mà compiler bắt được, mà là loại **im lặng**: capability với tay vào
+ruột của chính nó qua cửa chính, một barrel kéo theo cả đồ thị import mà không ai yêu cầu, hoặc một
+module gọi thẳng sang module hàng xóm để rồi hai bên **không còn khởi động rời nhau được nữa**. Vòng
+lặp kiểu đó không làm gì đỏ lên ngay. Nó chỉ khiến mọi câu hỏi về sau khó trả lời hơn, cho tới ngày
+một unit spec khởi động luôn database driver mà không ai chỉ ra được import nào đã yêu cầu điều đó.
 
 Câu hỏi chốt một ca:
 
 > Nếu bê file này sang một repository khác **cùng với capability của nó**, nó có còn đọc được không?
 
-Nếu nó gọi tên một barrel, hoặc với ngang sang hàng xóm, hoặc trỏ về chính mình qua alias công khai —
-thì không. Và lý do nó không được là vì nó **đang giữ một phụ thuộc mà nó chưa bao giờ khai báo**.
+Nếu file gọi tên một barrel, với ngang sang hàng xóm, hoặc trỏ về chính mình qua alias công khai thì
+câu trả lời là không. Lý do là file đó **đang giữ một phụ thuộc mà nó chưa bao giờ khai báo**.
 
-**Đây là luật bắt buộc.** Mọi import specifier và mọi khai báo `@Module` đều rơi vào đúng một mã dưới
-đây. Không có import nào nhỏ đến mức được miễn: một file re-export hai dòng vẫn thuộc `LAYERING-5`
+**Đây là luật bắt buộc.** Mọi import specifier và mọi khai báo `@Module` đều thuộc đúng một mã dưới
+đây. Không có import nào nhỏ đến mức được miễn: một file re-export hai dòng vẫn thuộc `LAYERING-5`,
 đúng như một application root thuộc `LAYERING-4`. Câu "có mỗi một symbol, ngay bên cạnh thôi mà" là
-chỗ luật này bị bỏ qua nhiều nhất — và cái import "ngay bên cạnh" chính là cái hoá ra đã bước qua một
-ranh giới.
+nơi luật này bị bỏ qua nhiều nhất — và import "ngay bên cạnh" đó có thể đã bước qua một ranh giới.
 
 Hai trong năm mã có lint rule đứng sau; ba mã còn lại chỉ có người đọc. Bảng `Tầng giữ` trong
 [`INDEX.md`](./INDEX.md) nói rõ mã nào thuộc loại nào — nó không giả vờ rằng cả năm được giữ như

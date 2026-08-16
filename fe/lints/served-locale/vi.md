@@ -9,7 +9,7 @@ description: Hai rule của luật ngôn ngữ được phục vụ - bắt gì,
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `served-locale`
+> Phiên bản: `2.00` · Mô-đun: `served-locale`
 
 Có những dữ liệu được dịch ở phía máy chủ. Một tài liệu, một phần nội dung, một tên danh mục — máy
 chủ lưu mỗi ngôn ngữ một bản và trả về đúng bản mà lời gọi **hỏi xin**. Lời gọi không nói gì thì
@@ -35,13 +35,13 @@ xanh không phải bằng chứng cho ba mã đó.
 
 ## `api-client-attaches-the-locale`
 
-**Bắt gì.** Trong một tệp, nếu có lời gọi dựng mắt xích cuối cùng — mắt xích thật sự đi ra mạng — mà
+**Bắt gì?** Trong một tệp, nếu có lời gọi dựng mắt xích cuối cùng — mắt xích thật sự đi ra mạng — mà
 không có lời gọi nào dựng mắt xích ngôn ngữ, rule nổ tại chính lời gọi mắt xích cuối cùng đầu tiên
 nó thấy.
 
-**Giữ mã nào.** `LOCALE-1` — chuỗi truyền tải phải gắn ngôn ngữ, và mọi chuỗi đều phải gắn.
+**Giữ mã nào?** `LOCALE-1` — chuỗi truyền tải phải gắn ngôn ngữ, và mọi chuỗi đều phải gắn.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. Hai cổng miễn trừ đọc `context.filename` (thiếu thì `context.getFilename()`), sau khi đã đổi mọi
    dấu `\` thành `/`: tệp nằm **trực tiếp** trong một thư mục tên `links`, và tệp có đuôi
@@ -53,13 +53,13 @@ nó thấy.
    `BatchHttpLink`. Tập ngôn ngữ: `createAttachLocaleLink`, `createLocaleLink`.
 5. Tới `Program:exit` mới kết luận, nên thứ tự trong tệp không quan trọng.
 
-**Vì sao luật này đáng có máy giữ.** Sự cố sinh ra nó không giống một lỗi truyền tải. Phần khung của
+**Vì sao nên để máy giữ luật này?** Sự cố sinh ra nó không giống một lỗi truyền tải. Phần khung của
 giao diện lấy chữ từ từ điển nên hiển thị đúng ngôn ngữ; phần nội dung lấy từ máy chủ nên hiển thị
 ngôn ngữ mặc định. Người đọc thấy một trang **song ngữ ở khung, đơn ngữ ở ruột**, và ai cũng đi tìm
 trong từ điển — nơi hoàn toàn không có gì sai. Không cổng nào nói được một câu về một header chưa ai
 viết. Rule này biến "quên" thành "đỏ".
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Đổi tên khi nhập khẩu.** `import { createHttpLink as createTransport }` rồi gọi
   `createTransport(...)`: tập chuỗi so theo cách viết, còn rule thì không truy vết nhập khẩu.
@@ -78,12 +78,12 @@ viết. Rule này biến "quên" thành "đỏ".
 
 ## `locale-header-belongs-to-the-link`
 
-**Bắt gì.** Bất kỳ thuộc tính đối tượng nào có khoá đúng bằng `x-locale`, ở bất kỳ tệp nào không
+**Bắt gì?** Bất kỳ thuộc tính đối tượng nào có khoá đúng bằng `x-locale`, ở bất kỳ tệp nào không
 phải tệp mắt xích ngôn ngữ. Mỗi thuộc tính vi phạm là một báo lỗi riêng.
 
-**Giữ mã nào.** `LOCALE-5` — một chỗ viết header, nên một chỗ kiểm được.
+**Giữ mã nào?** `LOCALE-5` — một chỗ viết header, nên một chỗ kiểm được.
 
-**Cách phát hiện.**
+**Phát hiện thế nào?**
 
 1. Một cổng miễn trừ trên đường dẫn đã chuẩn hoá: đường dẫn kết thúc bằng `links/locale` cộng phần
    đuôi thuộc nhóm `[cm]?tsx?`.
@@ -92,12 +92,12 @@ phải tệp mắt xích ngôn ngữ. Mỗi thuộc tính vi phạm là một b�
    `.name`; khoá `Literal` có giá trị chuỗi cho `.value`, dù có tính toán hay không.
 4. So bằng nhau tuyệt đối với chuỗi `x-locale`.
 
-**Vì sao luật này đáng có máy giữ.** Hai chỗ cùng trả lời câu hỏi "lời gọi này thuộc ngôn ngữ nào"
+**Vì sao nên để máy giữ luật này?** Hai chỗ cùng trả lời câu hỏi "lời gọi này thuộc ngôn ngữ nào"
 thì hai chỗ đó phân kỳ ngay lần đầu một trong hai được sửa. Kết cục quen thuộc: đúng một hook đúng,
 phần còn lại của màn hình chạy theo mặc định của máy chủ. Cái sai này không kêu — lời gọi vẫn thành
 công, chỉ trả về sai thứ tiếng.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Gán chứ không khai báo.** `headers["x-locale"] = locale` là một phép gán vào biểu thức thành
   viên, không phải nút `Property`. Rule chỉ đi trong đối tượng khai báo thẳng.

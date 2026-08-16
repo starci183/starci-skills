@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/contract/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống CONTRACT-N, nhận diện bằng nghiệp vụ chứ không bằng mắt.
+description: Các tình huống CONTRACT-N, nhận diện bằng nghiệp vụ chứ không bằng mắt.
 ---
 
 # vi.md
@@ -27,7 +27,7 @@ Có ⇒ nó là node ⇒ node đến từ một key. Một file tự mở `div` 
 contract sinh ra để trả lời.
 
 **Đây là luật bắt buộc.** Mọi element cấu trúc đi vào production đều rơi vào đúng một mã dưới đây.
-Không có hình dạng nào nhỏ tới mức được miễn: một hàng hai con là `CONTRACT-1` đúng cùng lý do mà một
+Không có hình dạng nào nhỏ tới mức được miễn: một hàng hai con là `CONTRACT-1` cũng vì lý do đó mà một
 page shell là `CONTRACT-1`. Câu "có mỗi cái wrapper thôi mà" là chỗ luật này bị bỏ qua nhiều nhất.
 
 ## Bảng tra nhanh

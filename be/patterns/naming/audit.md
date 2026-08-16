@@ -11,15 +11,15 @@ description: Phản biện mức phân định, mức giữ được và khả n
 
 > Version: `2.00` · Module: `naming`
 
-Audit này kiểm hai chuyện. Một: từ **chủ thể, vai trò, path và tập người gọi** đã nêu, luật có chọn
-được đúng **một** cái tên không. Hai: bảy mã này thật sự được giữ bằng cái gì — và bản audit từ chối
-làm tròn "một phần" thành "đã được enforce".
+Audit này kiểm tra hai việc. Thứ nhất: từ **chủ thể, vai trò, path và tập người gọi** đã nêu, luật có
+chọn được đúng **một** cái tên hay không. Thứ hai: bảy mã này thật sự được bảo đảm bằng gì — và bản
+audit từ chối gọi "một phần" là "đã được enforce".
 
 ## Verdict
 
-Chấp nhận. Bảy mã đóng, tổng quát, không phụ thuộc tên sản phẩm nào, và mỗi mã neo được vào mã nguồn
-thật. Điểm yếu không nằm ở phân định mà nằm ở **tầng giữ**: năm trên bảy mã chỉ có người đọc giữ, và
-hai mã có lint thì cả hai đều hẹp hơn luật.
+Chấp nhận. Bảy mã đóng, có tính khái quát, không phụ thuộc tên sản phẩm nào, và mỗi mã đều neo được
+vào mã nguồn thật. Điểm yếu không nằm ở khả năng phân định mà ở **tầng giữ**: năm trên bảy mã chỉ có
+người đọc bảo đảm, còn hai mã có lint thì cả hai đều hẹp hơn luật.
 
 ## Kiểm phân định
 
@@ -50,12 +50,12 @@ hai mã có lint thì cả hai đều hẹp hơn luật.
   property, tham số. Bằng chứng sống: `src/features/api/processors/ai/review-milestone-task/steps/review-milestone-task-grade-step.service.ts`
   có `const isV2Task = Boolean(milestoneTask.verified)` — đúng vi phạm mà luật viết ra để cấm, và
   rule không thấy.
-- **Rule `no-bare-verb-export` giữ một danh sách đóng mười tám động từ.** `src/tests/helpers/judge.ts`
+- **Rule `no-bare-verb-export` chỉ kiểm tra một danh sách đóng gồm mười tám động từ.** `src/tests/helpers/judge.ts`
   export `judge`, một động từ trần không nằm trong danh sách, nên lint im lặng trong khi luật thì
   không. Danh sách đóng là lựa chọn đúng (một rule đoán "cái này có phải động từ không" sẽ báo sai
   hàng loạt), nhưng nó có nghĩa là mã `NAME-5` được giữ **một phần**, không phải toàn phần.
-- **Hai rule đang tồn tại trong plugin nhưng chưa được bật trong `eslint.config.mjs` của repository
-  tham chiếu.** Chính rule file dặn như vậy: đo trước, vào ở mức `warn` kèm số, rồi mới lên `error`.
+- **Hai rule đã có trong plugin nhưng chưa được bật trong `eslint.config.mjs` của repository tham
+  chiếu.** Chính rule file dặn như vậy: đo trước, vào ở mức `warn` kèm số, rồi mới lên `error`.
   Nên trên thực tế hôm nay, `NAME-2` và `NAME-5` cũng đang được giữ bằng người đọc. Bảng
   `Tầng giữ` ghi `enforced` theo nghĩa **rule tồn tại và bắt được**; câu này là phần còn lại của sự
   thật.

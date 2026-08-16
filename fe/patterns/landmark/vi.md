@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/landmark/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống LANDMARK-N, nhận diện bằng vai trò của file chứ không bằng tên key.
+description: Các tình huống LANDMARK-N, nhận diện bằng vai trò của file chứ không bằng tên key.
 ---
 
 # vi.md

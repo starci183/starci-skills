@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của mô-đun tài liệu hoá hai rule n
 
 # changelog.md
 
-> Current version: `2.00` · Mô-đun: `served-locale`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `served-locale`
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc mô-đun hoặc nhóm mà nó nằm trên.
@@ -45,7 +45,7 @@ thêm mã số. Tên đó là thứ in ra trong log build, viết trong chú th�
 cuộc trao đổi về lần đỏ đó; đặt thêm một định danh thứ hai là tạo ra một rule hai tên mà không ai
 truy được thông báo đến từ đâu.
 
-**Cửa còn mở: mười bốn dòng, không dòng nào ghi "không có".** Sáu dòng thuộc rule chuỗi, tám dòng
+**Những chỗ còn lọt: mười bốn dòng, không dòng nào ghi "không có".** Sáu dòng thuộc rule chuỗi, tám dòng
 thuộc rule header. `audit.md` xếp mười ba rủi ro và với mỗi rủi ro nói rõ rule phải nhìn thêm cái gì
 mới đóng được, hoặc vì sao đóng đắt hơn để mở.
 

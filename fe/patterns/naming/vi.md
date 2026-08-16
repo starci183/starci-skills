@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/naming/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống NAMING-N, nhận diện bằng chỗ cái tên sẽ đi qua chứ không bằng thói quen gõ.
+description: Các tình huống NAMING-N, nhận diện bằng chỗ cái tên sẽ đi qua chứ không bằng thói quen gõ.
 ---
 
 # vi.md

@@ -35,7 +35,7 @@ thêm vào hay bỏ đi.**
   "luật này không giữ được trường hợp xuyên file"; bảng chỉ mở rộng sự thành thật đó xuống từng mã,
   để không ai đọc một mã rồi tưởng có cổng đang canh.
 
-- **Thêm bảng `Anchor`.** Mỗi mã trỏ vào code thật và nói rõ phải nhìn cái gì ở đó. Ba mã neo được
+- **Thêm bảng `Anchor`.** Mỗi mã trỏ vào code thật và làm rõ phải nhìn cái gì ở đó. Ba mã neo được
   (`LANDMARK-3`, `LANDMARK-4`, `LANDMARK-5`). Hai mã ghi `chưa neo được trong ứng dụng`
   (`LANDMARK-1`, `LANDMARK-2`): ứng dụng đã bỏ hẳn branch landmark và chuyển element sang entry, nên
   không còn branch nào để trỏ tới; neo còn lại chỉ ở phía lint. Cả hai được ghi vào "Rủi ro còn mở".
@@ -43,7 +43,7 @@ thêm vào hay bỏ đi.**
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống, dấu hiệu nhận biết, câu tự hỏi, ranh giới
   với mã kề, và danh sách tình huống nghiệp vụ hay gặp.
 
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case có ĐÚNG và SAI đặt cạnh nhau, kèm
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case có ĐÚNG và SAI đặt cạnh nhau, kèm
   mục ngoại lệ và mục "trông giống nhưng không phải mã này". Cuối trang là ánh xạ yêu cầu, bảng phân
   định ranh giới và danh sách sai lầm lặp lại.
 

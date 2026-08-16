@@ -9,7 +9,7 @@ description: Mã thật cho luật lint typography — chỗ nổ, chỗ im, và
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `typography` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `typography` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây là **mã thật**, kèm đường dẫn tệp, vì đường dẫn chính là dữ kiện chịu lực của phép
 phát hiện: đổi thư mục là đổi kết quả, và đó không phải chuyện phụ.
@@ -210,7 +210,7 @@ it("bậc hai sinh ra thẻ h2", () => {
 </div>
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 ```tsx
 // src/components/blocks/AccordionSection/index.tsx

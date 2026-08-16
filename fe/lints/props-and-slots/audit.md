@@ -9,12 +9,12 @@ description: Phản biện xem ba rule có thật sự giữ được luật pro
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `props-and-slots`
+> Phiên bản: `2.00` · Mô-đun: `props-and-slots`
 
 Phản biện này kiểm một câu duy nhất: **máy có thật sự thấy thứ mà luật cấm không**, và nếu không thì
 hở ở đâu.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, có điều kiện. Ba rule đều có thật, đều chạy, đều ánh xạ đúng một mã luật. Nhưng hai trong
 ba rule bắt theo **một chữ** chứ không theo **một hình dạng**, nên chúng chặn được cách viết vô tình,
@@ -36,7 +36,7 @@ không có rule nào công bố mà mô-đun này bỏ sót.
 | Có rule nào canh cánh cửa mà kiểu đã đóng? | Không. Không rule nào lặp lại việc kiểm nội dung của một slot, vì kiểu đã từ chối trước. |
 | Hành vi thật có khớp tên rule không? | **Không, ở cả ba.** Xem Findings. |
 
-## Findings
+## Phát hiện
 
 1. **`no-inline-parameter-type` rộng hơn tên nó gợi ra.** Nó không có cổng tên file, không kiểm slot,
    không kiểm tầng. Nó nổ trên **mọi tham số của mọi hàm trong mọi file** thuộc glob — kể cả tiện
@@ -67,7 +67,7 @@ không có rule nào công bố mà mô-đun này bỏ sót.
    là nguyên nhân gốc của phần lớn cửa mở bên dưới, nên phải được nêu như một dữ kiện chứ không phải
    một chi tiết cài đặt.
 
-## Decisions
+## Quyết định
 
 - Giữ đúng ba rule, viết đúng tên công bố, không gán thêm mã số cho rule.
 - Chỉ ghi vào shelf này những rule **có thật** trong nguồn. Rule đáng lẽ nên có thì nằm ở phần "Rủi
@@ -151,7 +151,7 @@ Mỗi mục nêu cửa còn mở và nói rõ rule sẽ phải soi thêm **cái 
   đều đâm vào cùng một quyết định, và quyết định ấy nên được cân **một lần** cho cả bộ rule, không
   phải cân riêng từng rule.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Nguồn công bố thêm, bớt hoặc đổi tên một rule.
 - Một mã `SLOTS-<n>` được thêm, bỏ hoặc đổi nghĩa trong văn bản luật.

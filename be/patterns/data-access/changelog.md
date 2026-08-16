@@ -16,13 +16,13 @@ description: Lịch sử phiên bản của luật data access.
 Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
-Mã tình huống **không bao giờ được đánh số lại**. Một mã bị rút thì ghi là đã rút và số của nó không
+Mã tình huống **không bao giờ được đánh số lại**. Nếu một mã bị rút, ghi rõ việc đó và không
 dùng lại — vì mã được trích dẫn từ file luật khác và từ task record cũ, nên đổi số một mã là làm gãy
 một trích dẫn ai đó đã viết ra rồi.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hai thứ đổi cùng lúc: shelf và hình dạng module.
+Đổi số chính vì cả shelf lẫn cấu trúc module đều thay đổi.
 
 - **Chuyển shelf.** `be/canon/patterns/data-access.md` (một file phẳng) → `be/patterns/data-access/`
   (module năm record). File phẳng **không bị xoá và không bị sửa**; nó vẫn là bản ghi lịch sử của

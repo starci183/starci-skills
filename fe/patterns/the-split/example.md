@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/the-split/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã SPLIT-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã SPLIT-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -18,7 +18,7 @@ cần tên riêng của một sản phẩm mới đọc được, ví dụ đó 
 Tên hook trong ví dụ (`useQuery*Swr`, `useTranslations`, `useLocale`, `useAppSelector`) là **đúng
 những họ tên mà rule đọc**. Chúng ở đây để ví dụ kiểm được, không phải để giới thiệu một thư viện.
 
-Mỗi mã có **nhiều case**, mỗi case có ĐÚNG và SAI đặt cạnh nhau, rồi tới **ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**, từng case có ĐÚNG và SAI đặt cạnh nhau, sau đó là **ngoại lệ và nhầm lẫn**.
 Phần cuối trang ánh xạ từ yêu cầu bằng lời sang hai nửa.
 
 ---
@@ -387,7 +387,7 @@ export const _StatRail = (input: { readonly children: ReactNode }) => <aside>{in
 ```
 
 Ba con tự trả lời theo nhịp riêng của chúng. Nếu cha gom chúng lại thành một trạng thái chung, cả rail
-sẽ chờ con chậm nhất — đó là một quyết định nghiệp vụ khác, và nó phải được nói ra chứ không phải rơi
+sẽ chờ con chậm nhất — đó là một quyết định nghiệp vụ khác, và nó phải được nêu ra chứ không phải rơi
 ra từ một lần tách file.
 
 ### Case: chỉ có state UI cục bộ

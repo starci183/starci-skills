@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/naming/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã NAMING-N, viết bằng TSX thường, ĐÚNG và SAI đặt cạnh nhau.
+description: Tất cả case và ngoại lệ của từng mã NAMING-N, viết bằng TSX thường, ĐÚNG và SAI đặt cạnh nhau.
 ---
 
 # example.md
@@ -13,9 +13,9 @@ description: Mọi case và ngoại lệ của từng mã NAMING-N, viết bằn
 
 Mọi ví dụ dưới đây là **TSX thường**. Không component library, không design system riêng, không tên
 sản phẩm. Một luật chỉ đúng khi nó đúng ở bất kỳ front end nào — nên nếu một ví dụ cần tên riêng của
-một sản phẩm mới đọc được, ví dụ đó đứng sai chỗ.
+một sản phẩm mới đọc được, ví dụ đó nằm sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **SAI** và **ĐÚNG** cạnh nhau, rồi tới mục **ngoại lệ và
+Mỗi mã có **nhiều case**, từng case đặt **SAI** và **ĐÚNG** cạnh nhau, sau đó là mục **ngoại lệ và
 nhầm lẫn**. Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một cách viết duy nhất.
 
 ---
@@ -92,7 +92,7 @@ function toMinutes(seconds: number) {
 ### Case: giữ từ khoá `function` sau dấu `=`
 
 ```tsx
-// SAI — vẫn là từ khoá luật này từ chối, chỉ đổi chỗ đứng.
+// SAI — vẫn là từ khoá luật này từ chối, chỉ đổi vị trí.
 export const parsePage = function (raw: string) {
     return Number.parseInt(raw, 10) || 1
 }
@@ -391,7 +391,7 @@ Nêu vị trí của cái tên, ai đọc nó, và nó sẽ đi qua ranh giới 
 | Hiển thị tiêu đề trang bằng tiếng Việt | Chữ người đọc là nội dung | `NAMING-3` | Địa chỉ tiếng Anh + catalogue locale |
 | Đặt tên component theo màn hình đang dùng nó | Câu hỏi này thuộc về từng layer | — | Hỏi luật của layer tương ứng |
 
-Dòng cuối là chỗ module này **cố ý dừng lại**: nó nói rõ câu hỏi tồn tại và nói rõ nó không trả lời ở
+Dòng cuối là chỗ module này **cố ý dừng lại**: nó làm rõ câu hỏi tồn tại và làm rõ nó không trả lời ở
 đây, thay vì trả lời một nửa.
 
 ## Bảng phân định ranh giới

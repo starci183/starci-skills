@@ -9,10 +9,10 @@ description: Mã thật cho từng luật lint — chỗ nào báo lỗi, chỗ 
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `file-layout` · Luật lint: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `file-layout` · Luật lint: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây là **một luật lint**, với vài cặp **SAI** (luật báo lỗi) và **ĐÚNG** (luật im), rồi
-một mục **Cửa lách và nhầm lẫn**.
+một mục **Chỗ lách và chỗ dễ nhầm**.
 
 Đọc mục cuối của mỗi phần cho kỹ. Mã trong đó **không phải mã được phép viết** — nó là mã mà luật
 lint **không nhìn thấy**. Hai chuyện đó khác hẳn nhau, và lẫn lộn giữa chúng là cách một cây thư mục
@@ -82,7 +82,7 @@ src/components/overlays/auth/SignInOverlay/
     index.test.tsx
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Gom ba thành phần vào một file thì luật hết đếm được.** Đây là mã **lọt qua**, không phải mã hợp
 lệ — nó vi phạm đúng cái thói quen mà `FILE-2` sinh ra để chặn, và không có gì báo:
@@ -172,7 +172,7 @@ src/app/
             route.ts       <- mã máy chủ: được miễn
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Cây định tuyến ở gốc kho thì luật không tồn tại.** Cùng một file, hai bố cục, hai kết quả:
 
@@ -264,7 +264,7 @@ src/components/leaves/Text/
 src/resources/text-tone.ts
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Đặt nông một tầng là thoát.** Đây là cửa lách nghiêm trọng nhất của luật này — chỗ đặt hiển nhiên
 nhất lại đúng là chỗ luật không nhìn thấy:
@@ -336,7 +336,7 @@ export { Paragraph } from "./component"
 // specifier vẫn được thu, nên luật vẫn thấy `Paragraph`
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Barrel bằng `export *` thì luật không thu được tên nào, nên nó im.** Đây là dạng barrel thông dụng
 nhất, và nó **lọt qua**:
@@ -414,7 +414,7 @@ export const Card = { Root: CardRoot }
 // im lặng: ngưỡng là hai thành viên trở lên
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **`Object.assign` là cách dựng họ có dấu chấm phổ biến nhất, và luật không thấy nó:**
 
@@ -516,7 +516,7 @@ src/components/blocks/dashboard/StreakStrip/index.tsx    <- im lặng, đúng ch
 src/components/leaves/Badge/index.tsx                    <- im lặng, đúng chủ ý
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Bất đối xứng một đoạn thư mục.** Phía ứng dụng chấp nhận `components/`, phía gói thì không, nên
 cùng một vi phạm viết thừa một thư mục là thoát:

@@ -11,12 +11,12 @@ description: Mọi case và ngoại lệ của từng mã COMMENT-N, viết bằ
 
 > Version: `2.00` · Module: `comments` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường** trong một ứng dụng hình dạng NestJS. Không tên sản phẩm,
+Mọi ví dụ dưới đây là **TypeScript thường** trong một ứng dụng có hình dạng NestJS. Không có tên sản phẩm,
 không tên repository, không tên module riêng. Một luật chỉ đúng khi nó đúng ở bất kỳ back end nào —
-nên nếu một ví dụ cần tên riêng của một hệ thống mới đọc được, ví dụ đó sai chỗ.
+nên nếu một ví dụ cần tên riêng của một hệ thống mới đọc được, ví dụ đó không phù hợp ở đây.
 
-Mỗi mã có **nhiều case**, mỗi case đặt bản **ĐÚNG** cạnh bản **SAI**, rồi tới mục **ngoại lệ và nhầm
-lẫn**. Phần cuối trang ánh xạ từ một yêu cầu bằng lời sang một quyết định duy nhất.
+Mỗi mã có **nhiều case**, mỗi case đặt bản **ĐÚNG** cạnh bản **SAI**, sau đó là mục **ngoại lệ và nhầm
+lẫn**. Phần cuối trang ánh xạ một yêu cầu bằng lời sang một quyết định duy nhất.
 
 Trong toàn bộ trang này, **prose trong code là tiếng Anh** — vì đó chính là điều `COMMENT-4` đòi. Văn
 xuôi giải thích quanh code thì bằng tiếng Việt, vì nó không phải source.

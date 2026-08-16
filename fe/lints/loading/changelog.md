@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của hồ sơ thi hành luật loading.
 
 # changelog.md
 
-> Current version: `2.00` · Mô-đun: `loading`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `loading`
 
-## Version Policy
+## Quy ước phiên bản
 
 Tăng cả **năm** tài liệu thêm `0.01` khi:
 

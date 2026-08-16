@@ -29,7 +29,7 @@ mã thì nối vào cuối; bỏ một mã thì để lại chỗ trống chứ 
   **diễn đạt lại** nó đầy đủ hơn, không thay nó bằng một luật khác. Toàn bộ `id` và `slug` đặt theo
   shelf mới.
 - **Giữ nguyên năm mã và nghĩa của chúng.** `CACHE-1` đến `CACHE-5` giữ đúng số, đúng phạm vi, đúng
-  từng quyết định của bản phẳng: fetcher đọc tham số ra từ key; fingerprint chứ không phải
+  từng quyết định của file luật phẳng: fetcher đọc tham số ra từ key; fingerprint chứ không phải
   credential; một hook một dòng; `null` thay cho placeholder; lỗi ở `error` chứ không ở dữ liệu;
   nghĩa của `null` viết tại chỗ bóc kết quả. Không mã nào được thêm, bớt hay đánh số lại.
 - **Thêm bảng `Tầng giữ`.** Mỗi mã nói ra tầng thật sự đang giữ nó: `unrepresentable`, `enforced` hay
@@ -37,7 +37,7 @@ mã thì nối vào cuối; bỏ một mã thì để lại chỗ trống chứ 
   `sources/fe/cache-key.mjs` và không publish rule nào. Bảng này tồn tại để khoảng trống đó **được
   nhìn thấy**, chứ không phải để lấp nó.
 - **Tách bạch rule của luật hàng xóm.** Bản phẳng có một câu về `sources/fe/the-split.mjs` dễ bị đọc
-  thành "đã có lint giữ". Bảng `Tầng giữ` nói rõ: rule `presentational-purity` giữ **chỗ** key được
+  thành "đã có lint giữ". Bảng `Tầng giữ` làm rõ: rule `presentational-purity` giữ **chỗ** key được
   dựng — trong nửa connected, nơi có người đọc và tham số route để dựng nó — và không giữ gì về
   **thứ** nằm trong key. Đó là quan hệ hàng xóm, không phải enforcement, và không được đếm vào bảng.
 - **Thêm bảng `Anchor`.** Mỗi mã trỏ vào một đoạn code thật kiểm chứng được, kèm thứ cần tìm ở đó.
@@ -47,7 +47,7 @@ mã thì nối vào cuối; bỏ một mã thì để lại chỗ trống chứ 
   đều rơi vào ít nhất một mã, và không có query nào nhỏ tới mức được miễn.
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống nghiệp vụ, dấu hiệu nhận biết, câu tự hỏi,
   ranh giới với mã kề, và danh sách tình huống hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại
   lệ và nhầm lẫn. Thêm bảng ánh xạ yêu cầu, bảng phân định ranh giới và danh sách sai lầm lặp lại.
 - **Nói rõ hai nghĩa của chữ `null`.** `null` ở vị trí key (`CACHE-4`, chưa hỏi) và `null` ở vị trí
   kết quả (`CACHE-5`, đã hỏi và câu trả lời là không có gì) được tách bạch ở cả ba record, vì đây là

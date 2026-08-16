@@ -11,15 +11,16 @@ description: Phản biện mức phân định, mức được giữ thật và 
 
 > Version: `2.00` · Module: `module-layering`
 
-Audit này kiểm hai thứ. Một: luật có chọn được **một** đường đi từ dữ kiện đã nêu, và chỉ từ đó. Hai:
-mỗi mã đang được giữ ở **tầng nào thật sự** — chứ không phải tầng mà bảng muốn nó thuộc về.
+Bản audit này kiểm tra hai việc. Một là luật có chọn được **một** đường đi từ dữ kiện đã nêu, và chỉ
+từ đó hay không. Hai là mỗi mã đang được giữ ở **tầng nào thật sự** — không phải tầng mà bảng muốn gán
+cho nó.
 
 ## Verdict
 
-Chấp nhận, với ba mã ở tầng `documented` được nói thẳng thay vì làm tròn lên.
+Chấp nhận, với ba mã ở tầng `documented` được ghi rõ thay vì được làm tròn lên.
 
-Năm mã đóng, tổng quát, không phụ thuộc tên sản phẩm hay tên repository nào. Phép thử chốt — *bê file
-này sang repository khác cùng với capability của nó, còn đọc được không?* — trả lời được cả năm mã
+Năm mã đã được chốt, có tính tổng quát và không phụ thuộc tên sản phẩm hay tên repository nào. Phép thử
+chốt — *bê file này sang repository khác cùng với capability của nó, còn đọc được không?* — trả lời được cả năm mã
 mà không cần thêm dữ kiện nào ngoài đường dẫn của file và specifier.
 
 Điểm yếu thật nằm ở chỗ khác: **hai mã có rule, ba mã chỉ có người đọc**, và hai rule đang có thì hẹp

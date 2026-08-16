@@ -4,7 +4,7 @@ title: changelog.md
 slug: /be/lints/cdc/changelog
 sidebar_label: changelog.md
 sidebar_position: 4
-description: Lịch sử phiên bản của hồ sơ thi hành quy tắc lint CDC.
+description: Lịch sử phiên bản của hồ sơ về cơ chế thi hành quy tắc lint CDC.
 ---
 
 # changelog.md
@@ -13,7 +13,7 @@ description: Lịch sử phiên bản của hồ sơ thi hành quy tắc lint CD
 
 ## Version Policy
 
-Một thay đổi được chấp nhận về **những gì tài liệu này ghi** thì tăng cả mô-đun thêm `0.01` và cập nhật
+Mỗi thay đổi được chấp nhận về **những gì tài liệu này ghi** phải tăng phiên bản mô-đun thêm `0.01` và cập nhật
 **năm** tài liệu cùng lúc. Nguồn công bố thêm hoặc bớt một quy tắc, đổi tên một quy tắc, đổi mức nghiêm
 khắc, hoặc đóng một cửa còn mở — mỗi việc đó đều là một thay đổi như vậy.
 
@@ -27,10 +27,10 @@ biết thông báo đến từ tên nào. Đổi tên một quy tắc trong ngu�
 
 ## 2.00 — 2026-08-16
 
-Mô-đun được **tạo mới** để ghi lại **việc thi hành**, không phải để chép lại luật. Luật CDC đã có chỗ
+Mô-đun được **tạo mới** để ghi lại **cơ chế thi hành**, không phải để chép lại luật. Luật CDC đã có chỗ
 của nó; thứ chưa ai viết ra là **máy nhìn thấy được đến đâu, và hết thấy từ chỗ nào**.
 
-- **Ghi đúng một quy tắc có thật.** Quy tắc ship trong gói `@starci/eslint-canon-be`, dưới không gian
+- **Ghi đúng một quy tắc có thật.** Quy tắc được phát hành trong gói `@starci/eslint-canon-be`, dưới không gian
   tên `starci-be`:
 
   | Quy tắc | Mã luật | Mức ship |
@@ -40,7 +40,7 @@ của nó; thứ chưa ai viết ra là **máy nhìn thấy được đến đâ
   Nguồn công bố **một** quy tắc, đúng bằng con số mà hồ sơ này dự đoán, và quy tắc đó ánh xạ được vào ba
   mã luật có thật. Không phải bịa ánh xạ nào.
 
-- **Ghi rõ một quy tắc gánh ba mã.** Ba `messageId` gánh ba phần khác nhau của luật: `base` và
+- **Ghi rõ một quy tắc giữ ba mã.** Ba `messageId` phụ trách ba phần khác nhau của luật: `base` và
   `lifecycle` giữ `CDC-1`, hai tên `groupId`/`topics` giữ `CDC-2`, hai tên `deriveTargets`/`recomputeTarget`
   giữ `CDC-3`. Điều này được ghi ở cả `INDEX.md`, `vi.md` và `audit.md`, vì một dòng nhật ký dựng chỉ in
   tên quy tắc — muốn ngược về đúng điều luật thì phải đọc thông báo.
@@ -63,7 +63,7 @@ của nó; thứ chưa ai viết ra là **máy nhìn thấy được đến đâ
   1. **Quy tắc giữ cái tên, không giữ giá trị.** `groupId` sinh theo tiến trình và `topics` rỗng đều
      khai đủ tên và đi qua sạch — đúng hai hỏng hóc mà `CDC-2` sinh ra để cấm.
   2. **Thân hàm không bao giờ được thăm.** `recomputeTarget` cộng lượng chênh lệch (`CDC-4`) và
-     `deriveTargets` phát lệnh nghiệp vụ (`CDC-3`) đều im lặng.
+     `deriveTargets` phát lệnh nghiệp vụ (`CDC-3`) đều không bị báo.
   3. **Cổng tên tệp là sự tồn tại của quy tắc.** Bỏ chữ `projection` khỏi tên tệp, đổi sang `.tsx` hay
      `.mts`, hoặc khai bộ lắng nghe trong một tệp gom, và quy tắc không còn tồn tại ở đó. Không ai đổi
      tên tệp để né lint; người ta đổi vì thấy gọn hơn.
@@ -78,8 +78,8 @@ của nó; thứ chưa ai viết ra là **máy nhìn thấy được đến đâ
   lệ và thông dụng. Hạng mục này ngang hàng với cửa còn mở vì trên một quy tắc ba-phép-kiểm dùng chung
   một cổng, một báo cáo sai mua một chú thích tắt quy tắc, và chú thích đó tắt **cả ba**.
 
-- **Ghi mức ship thật, kèm khoảng trống bằng chứng.** Quy tắc ship ở `error`, và nguồn **không** kèm
-  ghi chú đo nào — khác với các mô-đun anh em trên kệ này. Điều đó được ghi là nhận định trong
+- **Ghi mức phát hành thực tế, kèm khoảng trống bằng chứng.** Quy tắc được phát hành ở `error`, và nguồn **không** kèm
+  ghi chú đo nào — khác với các mô-đun cùng nhóm. Điều đó được ghi là nhận định trong
   `audit.md` chứ không được suy ra thành một con số.
 
 - **`example.md` mang code lách qua được, dán nhãn rõ.** Bảy cặp **SAI**/**ĐÚNG** rồi tới mục **Cửa

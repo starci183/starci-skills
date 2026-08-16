@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/lint-escape-hatch/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống LINT-ESCAPE-N, nhận diện bằng việc ai đang quyết định chứ không bằng độ hẹp của directive.
+description: Các tình huống LINT-ESCAPE-N, nhận diện bằng việc ai đang quyết định chứ không bằng độ hẹp của directive.
 ---
 
 # vi.md
@@ -33,7 +33,7 @@ kiến trúc, cho tất cả mọi người — đúng cái sửa mà directive 
 |---|---|---|
 | `LINT-ESCAPE-1` | Source sản phẩm **không chứa** directive nào của ESLint | Không comment nào bắt đầu bằng `eslint-disable`/`-next-line`/`-line`/`eslint-enable` |
 | `LINT-ESCAPE-2` | Config đã gắn rule thì cũng gắn `linterOptions.noInlineConfig` | Một directive nhắm vào chính rule đang báo lỗi vẫn không tắt được nó |
-| `LINT-ESCAPE-3` | Ca hợp lệ được nói ở **config dùng chung hoặc type đóng** | Không có allowlist theo đường dẫn, thư mục, vendor hay component; không rule kiến trúc nào ở mức `warn` |
+| `LINT-ESCAPE-3` | Ca hợp lệ được nêu ở **config dùng chung hoặc type đóng** | Không có allowlist theo đường dẫn, thư mục, vendor hay component; không rule kiến trúc nào ở mức `warn` |
 
 ---
 
@@ -129,7 +129,7 @@ ai đó thêm `linterOptions` của riêng họ cho một glob hẹp.
 nên không ai đọc code mà thấy được.
 
 Component mỏng, ranh giới vendor, file khai báo, file trông như generated, việc migration tạm thời —
-không cái nào **kiếm được** một suất miễn trừ cục bộ. Cú pháp hợp lệ thì được nói ra **một lần** ở
+không cái nào **kiếm được** một suất miễn trừ cục bộ. Cú pháp hợp lệ thì được nêu ra **một lần** ở
 config dùng chung hoặc ở một type đóng, nơi mọi call site thừa hưởng và người review nhìn thấy. Nợ
 thì trả trước khi merge, không giấu bên cạnh chỗ nó phát sinh.
 

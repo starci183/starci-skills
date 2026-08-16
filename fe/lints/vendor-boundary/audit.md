@@ -9,12 +9,12 @@ description: Phản biện mức thi hành — rule nào giữ được mã nào
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `vendor-boundary`
+> Phiên bản: `2.00` · Mô-đun: `vendor-boundary`
 
 Phản biện này không hỏi luật có đúng không. Nó hỏi **máy nhìn thấy được bao nhiêu phần của luật**, và
 phần không nhìn thấy có được ghi ra hay không.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm bảy nhận định và một danh sách cửa mở dài.
 
@@ -39,7 +39,7 @@ còn mở", không được vá bằng một ánh xạ tưởng tượng.
 | Có rule nào nổ **oan** không? | Có, năm chỗ — ghi ở Findings. Nổ oan không phải hở, nhưng là chi phí nuôi rule |
 | Nhận diện thư viện ngoài có nhất quán không? | **Không.** Một rule dùng tiền tố, ba rule dùng so bằng chính xác |
 
-## Findings
+## Phát hiện
 
 **F1 · Danh sách vỏ không khớp văn bản luật.** Rule nhận **bốn** vỏ; `VENDOR-2` viết **ba**. Vỏ thứ
 tư là vỏ của framework, và rule cho nó một ngoại lệ riêng ở phép kiểm rỗng vì nó không import thư
@@ -108,7 +108,7 @@ làm luật biến thể **im lặng hoàn toàn**.
 **F14 · Địa chỉ không-giao-thức bị đọc nhầm thành nội bộ.** `isInternal` bắt đầu bằng
 `value.startsWith("/")`, nên một địa chỉ ngoài viết dạng `//host/path` bị báo `internal`.
 
-## Decisions
+## Quyết định
 
 - Giữ đúng **10 mục**, đặt tên bằng **tên rule đã công bố**, nguyên văn, kể cả khi tên chứa một từ
   sản phẩm. Không gán mã số thứ hai cho rule: một rule hai tên là một rule không truy được nguồn
@@ -117,7 +117,7 @@ làm luật biến thể **im lặng hoàn toàn**.
   thi hành**.
 - Không tạo mục cho `VENDOR-3`, `VENDOR-4`. Rule không chỉ tay được là một đề xuất, không phải một
   rule.
-- Ghi bảng **Cửa còn mở** là bắt buộc, mỗi rule ít nhất một dòng. Không rule nào được ghi "không có".
+- Ghi bảng **Những chỗ còn lọt** là bắt buộc, mỗi rule ít nhất một dòng. Không rule nào được ghi "không có".
 - Trong prose và ví dụ, gói thư viện ngoài viết là `@vendor/react` / `<tiền-tố-vendor>`; định danh
   ship thật (tên rule, `messageId`, tên thành viên JSX được so chuỗi) giữ nguyên văn.
 - Không sửa nguồn từ tài liệu này. Mọi F ở trên là **nhận định**, không phải bản vá.
@@ -212,7 +212,7 @@ gói con làm cả một rule im lặng**.
 phải bỏ lọt, nên không nguy hiểm — nhưng nổ oan là thứ dạy người ta viết comment tắt luật, và một
 comment tắt luật đặt trong thư mục vỏ thì tắt luôn phần chiều-vào vốn là lý do luật này tồn tại.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Nguồn công bố thêm hoặc bớt một rule, hoặc đổi một khoá trong `rules` — vì khoá **là** danh tính.
 - Văn bản luật thêm hoặc bớt một mã `VENDOR-<n>`, hoặc sửa danh sách vỏ (F1).

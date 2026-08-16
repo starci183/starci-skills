@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/comments/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã COMMENTS-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã COMMENTS-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -15,7 +15,7 @@ Mọi ví dụ dưới đây là **TSX thường**. Không component library, kh
 sản phẩm. Chỗ nào luật chạm tới một component riêng, ví dụ gọi **vai trò** của nó — *leaf reaction*,
 *bộ từ vựng icon* — chứ không gọi tên định danh của nó trong một codebase.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **SAI** và **ĐÚNG** cạnh nhau, rồi tới mục **ngoại lệ và nhầm
+Mỗi mã có **nhiều case**, từng case đặt **SAI** và **ĐÚNG** cạnh nhau, sau đó là mục **ngoại lệ và nhầm
 lẫn**. Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một mã duy nhất.
 
 ---

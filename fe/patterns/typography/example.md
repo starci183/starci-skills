@@ -4,7 +4,7 @@ title: example.md
 slug: /fe/patterns/typography/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mọi case và ngoại lệ của từng mã TYPESET-N, viết bằng TSX thường.
+description: Tất cả case và ngoại lệ của từng mã TYPESET-N, viết bằng TSX thường.
 ---
 
 # example.md
@@ -13,12 +13,12 @@ description: Mọi case và ngoại lệ của từng mã TYPESET-N, viết bằ
 
 Mọi ví dụ dưới đây là **TSX thường**. Không component library, không design system riêng, không tên
 sản phẩm. Chỗ duy nhất xuất hiện một component là `Heading` — vì ở mã `TYPESET-1` và `TYPESET-2`,
-**ranh giới component chính là luật**, nên viết bằng markup thô sẽ giấu mất điều đang được nói.
+**ranh giới component chính là luật**, nên viết bằng markup thô sẽ giấu mất điều đang được nêu.
 
-`text-muted` trong các ví dụ là **token tông phụ** của hệ thống bất kỳ; đọc nó như "tông muted", đừng
-đọc nó như tên class của một sản phẩm cụ thể.
+`text-muted` trong các ví dụ là **token tông phụ** của hệ thống bất kỳ; hiểu đó là "tông muted", đừng
+hiểu đó là tên class của một sản phẩm cụ thể.
 
-Mỗi mã có **nhiều case**, mỗi case đặt ĐÚNG cạnh SAI, rồi tới mục **ngoại lệ và nhầm lẫn**. Cuối
+Mỗi mã có **nhiều case**, từng case đặt ĐÚNG cạnh SAI, sau đó là mục **ngoại lệ và nhầm lẫn**. Cuối
 trang ánh xạ từ yêu cầu bằng lời sang một bộ cỡ/đậm/tông duy nhất.
 
 ---
@@ -693,6 +693,6 @@ Chỉ hỏi khi dữ kiện thật sự thiếu.
 5. Nâng dòng quan trọng lên thay vì hạ hàng xóm xuống.
 6. Cho dòng phụ cùng cỡ với title rồi chỉ đổi màu.
 7. Đẩy `font-bold` lên một heading.
-8. Dùng 12px làm bản gọn của chữ chính, giữ nguyên tông foreground.
+8. Dùng 12px làm bản gọn của chữ chính, bảo toàn tông foreground.
 9. Cho "Hôm nay" một cấp heading.
 10. Chọn 16px vì card có hover, vì đó là con số, hoặc vì còn chỗ trống.

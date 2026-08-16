@@ -9,12 +9,12 @@ description: Phản biện mức thực thi của luật biểu tượng — lu�
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `icon`
+> Phiên bản: `2.00` · Mô-đun: `icon`
 
 Bài phản biện này không hỏi luật văn bản có đúng không. Nó hỏi **máy có giữ được luật không**, và
 nếu không thì hở ở đâu.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm ba nhận định phải ghi ra chứ không được làm gọn.
 
@@ -35,7 +35,7 @@ chuyện khác. Không luật nào bị bịa thêm mã, và không mã nào đ�
 | Phát hiện có phụ thuộc phân giải mô-đun hay kiểu không | Không. Thuần cú pháp, nên nhanh và nên dễ lách bằng cách đổi hình dạng cú pháp |
 | Tên luật có tả đúng hành vi thật không | 4/5. `no-off-scale-glyph-size` không hề biết cái nó đo có phải hình hay không |
 
-## Findings
+## Phát hiện
 
 1. **Một luật trỏ vào mã mà văn bản luật không có.** Mô-đun đề `ICON-11` cho
    `rank-artwork-is-a-closed-set`, và hai luật nhập cùng bỏ qua một nhánh miễn trừ dưới nhãn đó.
@@ -58,7 +58,7 @@ chuyện khác. Không luật nào bị bịa thêm mã, và không mã nào đ�
    `ImportDeclaration` nên vẫn nổ. Đây là báo thừa chứ không phải escape, và nó rẻ hơn nhiều so với
    rủi ro ngược lại.
 
-## Decisions
+## Quyết định
 
 - **Ghi đúng năm luật đang tồn tại.** Một luật đáng lẽ nên có mà chưa có thì không được ghi ở đây;
   nó nằm dưới "Rủi ro còn mở". Luật cao nhất của kệ này: thứ không chỉ tay vào được là một đề nghị,
@@ -130,7 +130,7 @@ Mỗi mục dưới đây là một cửa còn mở, kèm thứ mà luật sẽ 
   công bố mà không có máy nào giữ. Ba cái đầu đóng được bằng cú pháp; cái cuối cần biết ngữ cảnh
   quanh một hàng, mà lint không có.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Bảng `rules` xuất ra thêm, bớt hoặc đổi tên một luật.
 - Một mã `ICON-<n>` được thêm, bỏ hoặc viết lại trong văn bản luật — đặc biệt là `ICON-11`, vốn đang

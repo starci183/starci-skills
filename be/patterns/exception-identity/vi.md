@@ -13,8 +13,8 @@ description: Từng tình huống IDENTITY-N, nhận diện bằng người đ�
 
 # Exception identity
 
-Danh tính của một lỗi là **một từ** phân biệt nó với mọi lỗi khác mà ứng dụng có thể sinh ra. Từ đó
-được viết bằng **ba bảng chữ**, và cả ba phải nói cùng một thứ:
+Danh tính của một lỗi là **một từ** phân biệt nó với mọi lỗi khác mà ứng dụng có thể sinh ra. Danh tính
+đó được viết qua **ba bảng chữ**, và cả ba phải nói cùng một điều:
 
 | Bảng chữ | Ai đọc | Đọc để làm gì |
 |---|---|---|
@@ -22,8 +22,8 @@ Danh tính của một lỗi là **một từ** phân biệt nó với mọi l�
 | Code | Client | Khớp code để rẽ nhánh, vì một response có thể mang nhiều lỗi khác severity |
 | Tên type metadata | Nơi throw | Là hợp đồng mà call site phải thoả, và là chỗ trường thứ hai sẽ rơi vào |
 
-Ba người đọc này **không đọc được của nhau**. Class name không tới được client. Code không tới được
-throw site. Vì thế đây không phải ba quyết định — đây là **một** quyết định viết ba lần.
+Ba nơi đọc này **không thay thế được cho nhau**. Tên class không tới được client; code không tới được
+throw site. Vì thế đây không phải ba quyết định, mà là **một** quyết định được viết ra ở ba nơi.
 
 Câu hỏi quyết định một khai báo có danh tính hay không:
 
@@ -32,9 +32,9 @@ Câu hỏi quyết định một khai báo có danh tính hay không:
 
 Nếu câu trả lời là *message*, khai báo đó không có danh tính. Nó có một câu văn.
 
-**Đây là luật bắt buộc.** Mọi class extends `AbstractException` đều rơi vào cả năm mã dưới đây. Không
-có lỗi nào nhỏ tới mức được miễn: câu "lỗi nội bộ, có ai bắt đâu" chính là chỗ luật này bị bỏ qua
-nhiều nhất — và đó cũng là lỗi sẽ xuất hiện trong alert lúc 3 giờ sáng, không có tên.
+**Đây là luật bắt buộc.** Mọi class extends `AbstractException` đều thuộc cả năm mã dưới đây. Không
+có lỗi nào nhỏ tới mức được miễn: câu "lỗi nội bộ, có ai bắt đâu" chính là nơi luật này bị bỏ qua
+nhiều nhất — và cũng là lỗi sẽ xuất hiện trong alert lúc 3 giờ sáng mà không có tên.
 
 ## Bảng tra nhanh
 

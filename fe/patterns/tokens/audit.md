@@ -21,7 +21,7 @@ Chấp nhận, với hai điều phải nói to.
 Thứ nhất: **module này có chín mã, không phải mười.** Luật phẳng gốc đánh số `TOKEN-1` tới `TOKEN-9`
 và không có mã thứ mười ở bất kỳ đâu trong cây trust. Yêu cầu chuyển đổi ghi là mười. Luật là nguồn
 sự thật, và bịa thêm một mã để cho đủ số sẽ tạo ra một citation không ai từng viết. Chín mã được
-giữ nguyên số, nguyên nghĩa; sai lệch về số lượng ghi ở đây thay vì được sửa lặng lẽ.
+bảo toàn số, nguyên nghĩa; sai lệch về số lượng ghi ở đây thay vì được sửa âm thầm.
 
 Thứ hai: **chỉ bốn trên chín mã có thứ gì đó cơ học giữ.** Một mã được union giữ, bốn mã được rule
 giữ, bốn mã còn lại chỉ có người đọc giữ. Đó là số đo, không phải lời than.
@@ -59,7 +59,7 @@ giữ, bốn mã còn lại chỉ có người đọc giữ. Đó là số đo, 
 - **Luật phẳng gốc có những quyết định thật mà không mang số**: bảng sáu bậc, phép thử hai dữ kiện của
   `gap-2`, việc **không có bậc số không**, các inset 16/24 đối xứng và 12/8, 16/12 bất đối xứng, cặp
   "mép 16px quanh seam 16px", và toàn bộ cách joined list giữ mép 16px mà không pad đường kẻ. Chúng
-  được giữ nguyên trong `## Law` của `INDEX.md` và được neo ở hai dòng cuối bảng `## Anchor`. Chúng
+  được bảo toàn trong `## Law` của `INDEX.md` và được neo ở hai dòng cuối bảng `## Anchor`. Chúng
   **không** được nâng thành mã mới, vì thêm mã là bịa citation.
 - **Mọi mã đều neo được vào code thật.** Không mã nào phải ghi `chưa neo được`.
 
@@ -73,7 +73,7 @@ giữ, bốn mã còn lại chỉ có người đọc giữ. Đó là số đo, 
 - Ghi `unrepresentable` **chỉ** cho `TOKEN-1`, nơi union thật sự làm giá trị sai không gõ được.
 - Ghi `enforced` **chỉ** khi đã đọc được rule trong `tokens.mjs` và gọi được tên nó.
 - Giữ mọi ví dụ ở dạng TSX thường, class thường, không tên sản phẩm và không component library.
-- Neo bằng đường dẫn tương đối repository, và nói rõ trong `## Scope` rằng đường dẫn là **bằng
+- Neo bằng đường dẫn tương đối repository, và làm rõ trong `## Scope` rằng đường dẫn là **bằng
   chứng**, không phải từ vựng mà luật định nghĩa.
 
 ## Rủi ro còn mở

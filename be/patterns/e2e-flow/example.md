@@ -11,14 +11,14 @@ description: Mọi case và ngoại lệ của từng mã E2E-N, viết bằng T
 
 > Version: `2.00` · Module: `e2e-flow` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường**, hình dạng một spec của framework DI quen thuộc: một
-`describe`, các `it` xếp theo thứ tự, một entity manager, một queue, một socket. Không tên sản phẩm,
-không tên repository, không tên module riêng. Nơi luật gốc gọi tên một service nội bộ, ở đây nó được
-gọi bằng **vai trò** — vì vai trò chuyển được sang hệ thống khác, còn tên thì không.
+Mọi ví dụ dưới đây là **TypeScript thường**, có hình dạng một spec của framework DI quen thuộc: một
+`describe`, các `it` xếp theo thứ tự, một entity manager, một queue và một socket. Không dùng tên sản
+phẩm, tên repository hay tên module riêng. Nơi luật gốc gọi tên một service nội bộ, ở đây service đó
+được gọi bằng **vai trò** — vì vai trò có thể chuyển sang hệ thống khác, còn tên riêng thì không.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **Ngoại lệ và nhầm lẫn**.
-Cuối trang là ánh xạ từ một yêu cầu bằng lời sang một quyết định, bảng phân định ranh giới, và danh
-sách sai lầm lặp lại nhiều nhất.
+Mỗi mã có **nhiều case**; mỗi case đặt **ĐÚNG** cạnh **SAI**, sau đó là mục **Ngoại lệ và nhầm lẫn**.
+Cuối trang là phần ánh xạ từ một yêu cầu bằng lời sang một quyết định, bảng phân định ranh giới và
+danh sách những sai lầm lặp lại nhiều nhất.
 
 ---
 
@@ -1064,8 +1064,8 @@ world = await bootWorld({
 
 ## Ánh xạ yêu cầu sang một quyết định
 
-Nêu câu nghiệp vụ, cửa vào, hệ quả và seam ngoài. Nếu thiếu **một** dữ kiện quyết định, hỏi **một**
-câu cụ thể rồi dừng.
+Hãy nêu câu nghiệp vụ, cửa vào, hệ quả và seam ngoài. Nếu thiếu **một** dữ kiện quyết định, hãy hỏi
+**một** câu cụ thể rồi dừng.
 
 | Yêu cầu bằng lời | Lập luận | Mã | Kết quả |
 |---|---|---|---|

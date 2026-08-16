@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của bản ghi thực thi cho luật prop
 
 # changelog.md
 
-> Current version: `2.00` · Mô-đun: `props-and-slots`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `props-and-slots`
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận về **phần thực thi được ghi ở đây** thì tăng mô-đun thêm `0.01` và cập
 nhật cả **năm** bản ghi. Đổi số chính (`x.00`) dành cho thay đổi về hình dạng mô-đun hoặc về shelf mà

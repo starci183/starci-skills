@@ -11,16 +11,16 @@ description: Mọi case và ngoại lệ của từng mã LAYERING-N, viết b�
 
 > Version: `2.00` · Module: `module-layering` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng hình dáng NestJS**. Không tên sản phẩm,
-không tên repository, không tên module riêng của ai. Một luật chỉ đúng khi nó đúng ở bất kỳ back end
-nào — nên nếu một ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được, ví dụ đó sai chỗ.
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có dáng NestJS**. Không dùng tên sản
+phẩm, tên repository hay tên module riêng. Một luật chỉ đúng khi nó đúng ở bất kỳ back end nào — vì
+vậy nếu một ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được, ví dụ đó không phù hợp ở đây.
 
 Các capability trong ví dụ được đặt tên trung tính: `billing`, `notifications`, `catalog`, `search`.
 Các thư mục **chứa** capability (category folder) đặt là `platform/`, `lib/`, `integrations/`,
 `databases/`.
 
-Mỗi mã có **nhiều case**, rồi tới **ngoại lệ** và **những thứ trông giống nhưng không phải mã đó**.
-Phần cuối trang ánh xạ từ yêu cầu bằng lời sang một đường đi duy nhất.
+Mỗi mã có **nhiều case**, sau đó là **ngoại lệ** và **những thứ trông giống nhưng không phải mã đó**.
+Cuối trang ánh xạ yêu cầu bằng lời sang một đường đi duy nhất.
 
 ---
 
@@ -594,8 +594,8 @@ người gọi. Không có file thứ ba nào phải được viết ra để n�
 
 ## Ánh xạ yêu cầu sang một đường đi
 
-Nêu file đang viết, specifier định dùng và loại cạnh. Nếu thiếu **một** dữ kiện quyết định, hỏi
-**một** câu cụ thể rồi dừng. Câu trả lời phải là một đường đi hoặc một câu hỏi — không bao giờ cả hai.
+Hãy nêu file đang viết, specifier định dùng và loại cạnh. Nếu thiếu **một** dữ kiện quyết định, hãy
+hỏi **một** câu cụ thể rồi dừng. Câu trả lời phải là một đường đi hoặc một câu hỏi — không bao giờ cả hai.
 
 | Yêu cầu bằng lời | Lập luận | Mã | Kết quả |
 |---|---|---|---|

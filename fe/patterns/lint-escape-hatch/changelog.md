@@ -32,7 +32,7 @@ task record đã đóng; đánh số lại một mã là làm gãy một trích 
 - **Giữ nguyên ba mã.** `LINT-ESCAPE-1` source sản phẩm không chứa inline directive ·
   `LINT-ESCAPE-2` flat config làm inline configuration vô hiệu · `LINT-ESCAPE-3` không có allowlist.
   Nguyên số, nguyên nghĩa.
-- **Thêm bảng `Tầng giữ`.** Mỗi mã nói rõ tầng nào đang thực sự giữ nó. `LINT-ESCAPE-1` là
+- **Thêm bảng `Tầng giữ`.** Mỗi mã làm rõ tầng nào đang thực sự giữ nó. `LINT-ESCAPE-1` là
   `enforced` bởi `no-inline-lint-config` — rule duy nhất module này publish. `LINT-ESCAPE-2` và
   `LINT-ESCAPE-3` là `documented`, và lý do được viết ra thay vì để trống: một ESLint rule chạy **bên
   trong** cái config mà hai mã kia phải phán xét, nên nó không nhìn thấy được `linterOptions` đã
@@ -61,7 +61,7 @@ task record đã đóng; đánh số lại một mã là làm gãy một trích 
   giữ ở artifact và twin test, còn ví dụ dùng TSX thường, flat config thường và một namespace plugin
   chỉ để đọc được. Cặp connected/presentational trong ví dụ kiến trúc được viết lại bằng tên chung;
   phán quyết của nó không đổi.
-- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục ngoại lệ
+- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục ngoại lệ
   và mục "trông giống nhưng không phải mã này"; đóng lại bằng ánh xạ yêu cầu, bảng phân định ranh
   giới và danh sách sai lầm lặp lại.
 - **Không có `prompt.md`.** Ánh xạ yêu cầu nằm cùng chỗ với ví dụ mà nó phân định. Module có đúng

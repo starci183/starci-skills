@@ -11,7 +11,7 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 
 > Version: `2.00` · Module: `data-access`
 
-Audit này kiểm ba chuyện: luật có chọn được **một** handle từ dữ kiện đã nêu và chỉ từ đó; mỗi mã có
+Audit này kiểm ba việc: luật có chọn được **một** handle từ dữ kiện đã nêu và chỉ từ đó; mỗi mã có
 **đúng một tầng giữ** được nói thật; và mỗi mã có **neo được vào code thật** hay không.
 
 ## Verdict

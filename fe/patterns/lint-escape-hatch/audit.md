@@ -41,7 +41,7 @@ sống bằng người đọc, bằng một twin test chứng minh artifact, và
 - Ba mã ánh xạ gọn sang ba **chỗ** một escape hatch có thể sống: trong file, trong điều kiện của
   config, trong hình dạng của ngoại lệ. Đó là lý do chúng phân định được mà không cần bàn xem cái nào
   tệ hơn cái nào.
-- Mã 1 và mã 2 là hai nửa của **một** hàng rào. Luật phẳng đã nói điều này và nó được giữ nguyên: một
+- Mã 1 và mã 2 là hai nửa của **một** hàng rào. Luật phẳng đã nói điều này và nó được bảo toàn: một
   repo chỉ có mã 1 đang báo cáo những cú bypass đã thành công.
 - Áp lực không biến mất khi mã 1 được giữ, nó **chuyển chỗ** sang mã 3. Đó là quan sát quan trọng
   nhất của module: mã 3 nguy hiểm hơn mã 1 vì nó không để lại dấu vết trong bất kỳ file source nào,
@@ -67,7 +67,7 @@ sống bằng người đọc, bằng một twin test chứng minh artifact, và
   về mã 1; allowlist theo đường dẫn và rule kiến trúc mức `warn` về mã 3. Không dòng nào bị bỏ.
 - Ghi mã 2 và mã 3 là `documented` thay vì gọi twin test hoặc audit repo là "enforced". Twin test
   chứng minh **artifact**, không chứng minh một repo; audit là script chứ không phải lint rule. Gọi
-  khác đi là làm bảng này nói dối đúng vào chỗ nó tồn tại để nói thật.
+  khác đi là làm bảng này nói dối đúng vào chỗ nó tồn tại để phản ánh đúng thực tế.
 - Rút mọi neo về đường dẫn trong cây trust. Luật phẳng nêu neo triển khai bằng tên một repository cụ
   thể (`eslint.config.mjs` và thư mục plugin của nó); ở shelf này ví dụ phải đúng với bất kỳ front end
   nào, nên neo giữ ở artifact và twin test — thứ vẫn kiểm chứng được mà không cần một repo có tên.

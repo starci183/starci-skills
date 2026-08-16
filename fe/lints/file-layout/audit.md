@@ -9,13 +9,13 @@ description: Phản biện mức phủ của sáu luật lint file-layout, và t
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `file-layout`
+> Phiên bản: `2.00` · Mô-đun: `file-layout`
 
 Phản biện này kiểm một câu hỏi duy nhất: **máy nhìn thấy được bao nhiêu phần của luật, và phần còn
 lại nằm ở đâu.** Mọi kết luận dưới đây đã được chạy thật trên chính các luật lint đó, không suy ra từ
 tên luật.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, có điều kiện. Sáu luật lint, sáu mã luật, ánh xạ một-đối-một — không mã nào thiếu máy giữ,
 không luật lint nào không neo vào một mã. Điều kiện là mô-đun này phải được đọc cùng bảng **Cửa còn
@@ -39,7 +39,7 @@ rules` là nguồn sự thật; phần đầu file đã cũ và cần sửa.
 | Ví dụ có cần tên riêng của sản phẩm mới đọc được không | Không — mọi ví dụ là đường dẫn thường và `className` thường |
 | Tên luật có bị viết lại cho "sạch" không | Không — giữ nguyên chuỗi mà bản dựng in ra |
 
-## Findings
+## Phát hiện
 
 1. **Phần đầu mã nguồn nói "bốn luật", thực tế publish sáu.** Bảng `rules` liệt kê
    `surface-folder-two-files-only`, `route-tree-holds-routes-only`, `no-helper-folder-in-components`,
@@ -97,7 +97,7 @@ rules` là nguồn sự thật; phần đầu file đã cũ và cần sửa.
     không có thư mục PascalCase nào ngoài cây thành phần, nên hiện tại vô hại; nó chỉ đáng ghi vì đó
     là một giả định chưa được viết ra.
 
-## Decisions
+## Quyết định
 
 - Giữ nguyên sáu luật, sáu mã, ánh xạ một-đối-một. Không đặt thêm mã số cho luật lint: tên đã publish
   là chuỗi mà bản dựng in ra và là danh tính duy nhất.
@@ -181,7 +181,7 @@ Ba mươi tư cửa. Mỗi dòng nêu luật đang hở, cửa đó là gì, và
 | Thành phần biết nghiệp vụ nằm trong `packages/ui/src/leaves/` | Không đóng được bằng đường dẫn, và có lẽ không đóng được bằng máy: "biết một nghiệp vụ" là một phán đoán về ý nghĩa. Đây là phần mà `FILE-5` vẫn phải do người giữ, và cần được nói ra thay vì để người đọc tưởng luật đã kín |
 | Từ vựng dùng chung nằm trong tầng nghiệp vụ của một ứng dụng | Cùng loại với dòng trên, chiều ngược lại |
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Mã nguồn thêm, bớt hoặc đổi tên một luật lint — kể cả khi hành vi không đổi, vì tên là danh tính.
 - Một cửa trong bảng `Open` được đóng, hoặc một cửa mới được tìm ra.

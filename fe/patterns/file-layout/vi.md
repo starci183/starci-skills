@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/file-layout/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống LAYOUT-N, nhận diện bằng bản chất của file chứ không bằng ai đang import nó.
+description: Các tình huống LAYOUT-N, nhận diện bằng bản chất của file chứ không bằng ai đang import nó.
 ---
 
 # vi.md

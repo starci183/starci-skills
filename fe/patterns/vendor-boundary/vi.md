@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/vendor-boundary/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống VENDOR-N, nhận diện bằng quyền sở hữu chứ không bằng cảm giác tiện tay.
+description: Các tình huống VENDOR-N, nhận diện bằng quyền sở hữu chứ không bằng cảm giác tiện tay.
 ---
 
 # vi.md
@@ -32,7 +32,7 @@ Mọi file còn lại **compose** các chủ sở hữu đó.
 cái lỗ.** Chiều ra ngoài: một component import thư viện từ thư mục sai là để nhầm chỗ — nửa này ai
 cũng thấy. Chiều vào trong: một file nằm trong thư mục wrapper mà **không wrap gì cả** là một
 component thường đang giữ một đặc quyền nó không cần. Thiếu nửa này, thư mục wrapper trở thành chỗ để
-những thứ khó xếp. Thứ đầu tiên xin vào luôn là thứ khó xếp nhất.
+những thứ khó xếp. Thứ đầu tiên được đưa vào luôn là thứ khó xếp nhất.
 
 **Đây là luật bắt buộc.** Mọi file trong cây component hoặc là chủ sở hữu trong danh sách đóng, hoặc
 là người compose. Không có trạng thái thứ ba, và câu "nó chỉ cần đúng một widget nhỏ" chính là câu mở
@@ -117,7 +117,7 @@ vào `shells/` cho gọn.
 
 ## `VENDOR-3` — surface branch giữ ruột có kiểu
 
-**Tình huống.** Một branch được phép import wrapper vendor (Card, Accordion). Nó lập tức trở thành
+**Tình huống.** Một branch được phép nhập wrapper vendor (Card, Accordion). Nó lập tức trở thành
 chỗ hấp dẫn để nhận luôn `children`, vì wrapper vendor vốn nhận `children`.
 
 **Dấu hiệu nhận biết**
@@ -335,7 +335,7 @@ nào là **ý nghĩa** (khách là ai, chọn được gì)? Hai loại câu đ�
 
 **Ranh giới**
 
-- ↔ `VENDOR-2`: shell được phép import vendor; đây là chuyện block **không** được.
+- ↔ `VENDOR-2`: shell được phép nhập vendor; đây là chuyện block **không** được.
 - ↔ `VENDOR-14`: lựa chọn trong menu báo hành động, không mang `href`.
 
 **Tình huống nghiệp vụ hay gặp.** Menu tài khoản khi chưa đăng nhập · menu tài khoản khi đã đăng nhập

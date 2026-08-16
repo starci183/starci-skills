@@ -13,10 +13,10 @@ description: Từng tình huống TYPE-N, nhận diện bằng nghiệp vụ ch�
 
 # Type safety
 
-Trình biên dịch là **người review rẻ nhất** mà một back end có: nó đọc từng dòng, không bao giờ mệt,
+Trình biên dịch là **người review rẻ nhất** mà một back end có: nó đọc từng dòng, không bao giờ mệt
 và nó phản đối **trước khi** code chạy.
 
-Mọi mã dưới đây đều nói về một việc duy nhất: **đừng tắt nó đi.**
+Mọi mã dưới đây đều xoay quanh một việc: **đừng tắt nó đi.**
 
 Điều khó là mỗi cách tắt đều trông hợp lý **ngay tại lúc viết**, và vô hình **ngay sau đó**. Không ai
 gõ `any` vì muốn bỏ kiểm tra; người ta gõ `any` vì đang vội và vì dòng đó "chỉ là tạm". Dòng tạm ấy
@@ -30,7 +30,7 @@ Nếu câu trả lời là không, dòng đó đã **tiêu mất một bảo đ�
 tốt hơn "cho tiện", và lý do ấy phải đọc được ngay tại chỗ.
 
 **Đây là luật bắt buộc.** Mọi giá trị đi qua một ranh giới, mọi danh sách tham số, mọi enum và mọi
-tập trạng thái đều rơi vào đúng một mã dưới đây. Không có ranh giới nào nhỏ đến mức được miễn: một
+tập trạng thái đều thuộc đúng một mã dưới đây. Không có ranh giới nào nhỏ đến mức được miễn: một
 params hai field trả lời `TYPE-3` đúng cùng một lý do mà một kết quả chấm bốn trạng thái trả lời
 `TYPE-5`. Câu "có mỗi cái helper thôi mà" là chỗ luật này bị bỏ qua nhiều nhất — và helper chính là
 thứ có thêm caller thứ hai mà không ai đọc lại.

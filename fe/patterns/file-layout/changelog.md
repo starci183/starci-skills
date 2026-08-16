@@ -17,7 +17,7 @@ Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
 Các mã `LAYOUT-<n>` **không** theo chính sách này: chúng là địa chỉ mà file luật khác và task record
-cũ đã trích dẫn, nên một mã giữ nguyên số và nguyên nghĩa qua mọi phiên bản. Một mã bị cho là sai thì
+cũ đã trích dẫn, nên một mã bảo toàn số và nguyên nghĩa qua mọi phiên bản. Một mã bị cho là sai thì
 được **giữ lại và tranh luận** ở `audit.md`, không được đánh số lại và không được xoá.
 
 ## 2.00 — 2026-08-16
@@ -44,11 +44,11 @@ cũ đã trích dẫn, nên một mã giữ nguyên số và nguyên nghĩa qua 
   `audit.md` như một đề xuất rule change, **không** thành một lần sửa lén ở hai đầu.
 - **Ghi lại những khẳng định không mang mã.** "Category dưới `leaves/`/`branches/`" và "`blocks/<Name>/`
   phẳng không có category" là luật thật trong bảng Forbidden gốc nhưng không thuộc `FILE-1..6`.
-  Chúng được giữ nguyên trong `## Law` và được nêu ở "Rủi ro còn mở", vì module này có sáu mã và kết
+  Chúng được bảo toàn trong `## Law` và được nêu ở "Rủi ro còn mở", vì module này có sáu mã và kết
   thúc với sáu mã.
 - **Viết `vi.md` theo từng mã.** Mỗi mã có tình huống nghiệp vụ, dấu hiệu nhận biết, câu tự hỏi, ranh
   giới với các mã kề, và danh sách tình huống hay gặp.
-- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt ĐÚNG cạnh SAI, kèm mục "ngoại lệ
+- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt ĐÚNG cạnh SAI, kèm mục "ngoại lệ
   và nhầm lẫn". Bổ sung các ví dụ **rule xanh mà luật vẫn sai**, vì đó là chỗ người đọc tin nhầm nhiều
   nhất. Thêm bảng ánh xạ yêu cầu, bảng phân định ranh giới và danh sách sai lầm lặp lại.
 - **Gộp `prompt.md`.** Ánh xạ yêu cầu và bảng phân định ranh giới nằm cùng chỗ với ví dụ mà chúng phân
@@ -56,7 +56,7 @@ cũ đã trích dẫn, nên một mã giữ nguyên số và nguyên nghĩa qua 
 - **Rút mọi tên riêng ra khỏi ví dụ.** Bỏ tên repository và tên component riêng mà luật phẳng dùng làm
   implementation anchor; mọi ví dụ viết lại bằng tên tổng quát. Một luật ở shelf này phải đúng với bất
   kỳ front end nào có cây component và cây route theo file; ví dụ cần tên riêng của một sản phẩm mới
-  đọc được là ví dụ đứng sai chỗ.
+  đọc được là ví dụ nằm sai chỗ.
 - **Giữ nguyên mọi quyết định thật của luật phẳng.** Cây thư mục, luật category-hay-phẳng, đường ranh
   feature trong workspace nhiều app, danh sách slot của cây route, hai thứ được nhận (`providers`,
   `globals.css`), miễn trừ cho `app/api/**`, `_folder` và file test, quy tắc tạo thư mục đích ở lần

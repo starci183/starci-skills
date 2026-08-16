@@ -4,18 +4,18 @@ title: example.md
 slug: /be/lints/cdc/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Code nổ và code không nổ cho quy tắc CDC, kèm code lách qua được.
+description: Ví dụ bị báo lỗi, không bị báo lỗi và lọt qua quy tắc CDC.
 ---
 
 # example.md
 
 > Version: `2.00` · Mô-đun: `cdc` · Luật: [`INDEX.md`](./INDEX.md) · Từng quy tắc: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mục dưới đây là **một quy tắc**, với nhiều cặp **SAI** (quy tắc nổ) và **ĐÚNG** (quy tắc im), rồi tới
-**Cửa lách và nhầm lẫn** — nơi chứa code **lách qua được**.
+Mục dưới đây trình bày **một quy tắc**, với nhiều cặp **SAI** (quy tắc báo lỗi) và **ĐÚNG** (quy tắc không báo), rồi tới
+**Cửa lách và nhầm lẫn** — nơi chứa code **lọt qua được**.
 
 Đọc kỹ nhãn ở mục cuối: code trong đó **không phải code được phép viết**. Nó là code **vi phạm luật mà
-quy tắc không thấy**. Luật vẫn cấm; chỉ có cái máy là không bắt.
+quy tắc không thấy**. Luật vẫn cấm; chỉ là máy không bắt được.
 
 Tên tệp được ghi ngay trên mỗi khối, vì **tên tệp là toàn bộ điều kiện tồn tại của quy tắc này**.
 
@@ -48,7 +48,7 @@ export class OrderTotalsProjectionListener implements OnModuleInit {
 
 Sáu báo cáo trong một lượt: `base` tại tên lớp, bốn `member` cho `groupId`, `topics`, `deriveTargets`,
 `recomputeTarget`, và `lifecycle` tại khoá `onModuleInit`. Tệp này biên dịch sạch và chạy được — đó
-chính là lý do nó cần một cái máy.
+chính là lý do cần có máy kiểm tra.
 
 **ĐÚNG** — cùng tệp
 

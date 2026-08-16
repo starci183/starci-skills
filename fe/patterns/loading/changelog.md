@@ -30,7 +30,7 @@ dẫn từ file luật khác và từ task record cũ; đánh số lại một m
   huống nghiệp vụ), `example.md` (case và ngoại lệ), `audit.md` (phản biện), `changelog.md`. Toàn bộ
   `id` và `slug` đặt mới theo shelf `patterns`. File luật phẳng không bị xoá và không bị sửa.
 - **Giữ nguyên bảy mã.** `LOADING-1` … `LOADING-7` giữ đúng số và đúng nghĩa đã có. Không mã nào được
-  thêm, bớt hay đánh số lại. Bảng **Forbidden** của bản phẳng không mất đi: nó trở thành cột *Forbids*
+  thêm, bớt hay đánh số lại. Bảng **Forbidden** của file luật phẳng không mất đi: nó trở thành cột *Forbids*
   của bảng Situation Codes, đứng cạnh cột *Requires*, để mỗi mã nói cả hai vế ở cùng một dòng.
 - **Thêm bảng `Tầng giữ`.** Mỗi mã nay khai báo tầng thật đang giữ nó: `unrepresentable`, `enforced`
   hay `documented`. Kết quả là hai mã `enforced` (bởi ba rule của
@@ -48,7 +48,7 @@ dẫn từ file luật khác và từ task record cũ; đánh số lại một m
   `LOADING-5` được xếp `documented` dù `no-resting-branch-at-call-site` có nhắc tới nó: rule đó **miễn
   trừ** nhánh `null` chứ không **đòi** nhánh `null`. Một ngoại lệ bảo vệ dạng đúng khỏi bị báo nhầm;
   nó không phát hiện được dạng sai.
-- **Thêm bảng `Anchor`.** Mỗi mã chỉ vào một đường dẫn code thật và nói rõ phải nhìn cái gì ở đó. Cả
+- **Thêm bảng `Anchor`.** Mỗi mã chỉ vào một đường dẫn code thật và làm rõ phải nhìn cái gì ở đó. Cả
   bảy mã đều neo được; không mã nào phải ghi `chưa neo được`. Neo trải trên ba loại bằng chứng khác
   nhau — một leaf, một union kiểu, một file test — và điều đó tự nó nói rằng luật này không chỉ sống
   ở một tầng.
@@ -59,11 +59,11 @@ dẫn từ file luật khác và từ task record cũ; đánh số lại một m
   file, nên nó được đặt ngay trong phần `Law` của `INDEX.md` thay vì nằm ở một mục phụ.
 - **Đóng năm ngoại lệ.** Twin trong file test, primitive nghỉ dùng chung, control mà bề rộng chính là
   nhãn của nó, dữ liệu đã có trong cache, và nhánh `null`. Bốn cái đầu vốn nằm rải trong comment của
-  bản phẳng và của file lint; nay chúng là ngoại lệ có tên, đóng, và nêu rõ mã mà chúng áp vào.
+  file luật phẳng và của file lint; nay chúng là ngoại lệ có tên, đóng, và nêu rõ mã mà chúng áp vào.
 - **Viết lại `vi.md` theo từng mã.** Mỗi mã có tình huống nghiệp vụ, dấu hiệu nhận biết, câu tự hỏi,
   ranh giới với các mã kề, và danh sách tình huống hay gặp.
-- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case đặt bản ĐÚNG cạnh bản SAI, kèm
-  mục ngoại lệ và mục "trông giống nhưng không phải mã này". Bốn ví dụ của bản phẳng được giữ lại
+- **Viết lại `example.md` cho đủ case.** Mỗi mã nhiều case, từng case đặt bản ĐÚNG cạnh bản SAI, kèm
+  mục ngoại lệ và mục "trông giống nhưng không phải mã này". Bốn ví dụ của file luật phẳng được giữ lại
   nguyên ý và viết lại bằng TSX tổng quát.
 - **Rút mọi ví dụ về TSX thuần.** Bỏ mọi tên sản phẩm, tên repository và tên component library. Bản
   phẳng có nêu đường dẫn neo kèm tên repository; bản này giữ đường dẫn và bỏ tên repository, vì một

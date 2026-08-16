@@ -9,7 +9,7 @@ description: Từng luật lint của file-layout — bắt gì, giữ mã nào,
 
 # vi.md
 
-> Version: `2.00` · Mô-đun: `file-layout`
+> Phiên bản: `2.00` · Mô-đun: `file-layout`
 
 # Sáu luật lint giữ file-layout
 
@@ -24,7 +24,7 @@ với một hình dạng thuần.
 
 **Một luật không có máy giữ thì ai cũng biết là chưa được giữ. Một luật có máy giữ nhưng hở thì mọi
 người tin là đã kín.** Cái thứ hai đắt hơn nhiều. Vì vậy mỗi mục dưới đây đều kết thúc bằng phần
-**Cửa còn mở**, và không mục nào được phép ghi "không có".
+**Những chỗ còn lọt**, và không mục nào được phép ghi "không có".
 
 ## Bảng tra nhanh
 
@@ -44,25 +44,25 @@ một mã.
 
 ## `surface-folder-two-files-only`
 
-**Bắt gì.** Một thư mục màn hình chỉ được chứa hai nửa của chính nó — `component.tsx` là hình dạng,
+**Bắt gì?** Một thư mục màn hình chỉ được chứa hai nửa của chính nó — `component.tsx` là hình dạng,
 `index.tsx` là phần nối dây — cộng với file kiểm thử song sinh của mỗi nửa. Thứ ba xuất hiện ở đó là
 tín hiệu rằng có một thứ dùng lại được vừa được phát minh ở chỗ không ai tìm thấy.
 
-**Giữ mã nào.** `FILE-2`.
+**Giữ mã nào?** `FILE-2`.
 
-**Cách phát hiện.** Đọc `context.filename`, đổi dấu gạch chéo ngược thành gạch chéo xuôi, rồi so với
+**Phát hiện thế nào?** Đọc `context.filename`, đổi dấu gạch chéo ngược thành gạch chéo xuôi, rồi so với
 hai biểu thức: `/src/components/(pages|layouts)/<Tên>/<phần còn lại>` và
 `/src/components/overlays/<nhóm>/<Tên>/<phần còn lại>`. Nếu khớp, phần còn lại được so với
 `^(component|index)(\.test)?\.tsx?$`. Không khớp thì báo lỗi một lần trên nút `Program`.
 
-**Vì sao luật này đáng có máy giữ.** Câu mở đầu luôn vô hại: "chỉ mỗi màn này dùng thôi". Câu đó mô
+**Vì sao nên để máy giữ luật này?** Câu mở đầu luôn vô hại: "chỉ mỗi màn này dùng thôi". Câu đó mô
 tả đồ thị lời gọi của hôm nay, không mô tả bản chất của cái file. Kết cục thì đã biết trước: một thư
 mục màn hình ôm bốn thành phần, một thư mục hằng số, một thư mục tiện ích và ba hình dạng chờ được
 chép tay — tới lúc đó màn hình đã thành một cơ sở mã thứ hai với từ vựng riêng mà không ai dùng lại
 được. Đây là loại sai không bao giờ vỡ ở lần commit đầu, nên không có máy đếm file thì nó chỉ bị bắt
 khi đã quá muộn.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Chuyển thành phần thứ ba vào thẳng `component.tsx`.** Luật đếm **file**, không đếm thành phần.
   Ba thành phần trong một file vẫn là một file.
@@ -81,23 +81,23 @@ khi đã quá muộn.
 
 ## `route-tree-holds-routes-only`
 
-**Bắt gì.** Một file nằm dưới cây định tuyến mà tên của nó không phải một khe do khung nền định
+**Bắt gì?** Một file nằm dưới cây định tuyến mà tên của nó không phải một khe do khung nền định
 nghĩa. File đó là một thành phần, và một thành phần thuộc về tầng gom nó với anh em của nó.
 
-**Giữ mã nào.** `FILE-6`.
+**Giữ mã nào?** `FILE-6`.
 
-**Cách phát hiện.** Đọc `context.filename`, khớp `/src/app/<phần còn lại>`. Ba cổng miễn trừ chạy
+**Phát hiện thế nào?** Đọc `context.filename`, khớp `/src/app/<phần còn lại>`. Ba cổng miễn trừ chạy
 theo đúng thứ tự: phần còn lại bắt đầu bằng `api/` hoặc `_`; tên file kết thúc bằng
 `.test.tsx`/`.test.ts`/`.test.jsx`/`.test.js`; tên file nằm trong danh sách khe của khung nền. Qua cả
 ba cổng mà vẫn còn thì báo lỗi một lần trên `Program`.
 
-**Vì sao luật này đáng có máy giữ.** Vì đã có một lần trả giá và lần đó được ghi lại trong chính mã
+**Vì sao nên để máy giữ luật này?** Vì đã có một lần trả giá và lần đó được ghi lại trong chính mã
 nguồn: một file chủ của màn hình được viết vào cây định tuyến, đi qua một lần build, một lần lint,
 một lần kiểm kiểu, bốn ảnh chụp niêm phong và một lần phê duyệt, rồi dừng ngay trước một lần ghi vào
 môi trường thật — **với mọi cổng đều xanh**, bởi vì mọi cổng đều đang đọc luật lint, còn điều này thì
 mới chỉ là văn xuôi.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Cây định tuyến đặt ở gốc kho, không có `src/`.** Biểu thức đòi `/src/app/`. Bố cục không có
   `src/` là bố cục phổ biến hơn ngoài đời, và luật này không tồn tại ở đó.
@@ -117,22 +117,22 @@ mới chỉ là văn xuôi.
 
 ## `no-helper-folder-in-components`
 
-**Bắt gì.** Thư mục `constants/`, `utils/`, `types/` hoặc `hooks/` nằm bên trong cây thành phần. Đó
+**Bắt gì?** Thư mục `constants/`, `utils/`, `types/` hoặc `hooks/` nằm bên trong cây thành phần. Đó
 không phải mã dựng hình, nên thư mục đang gắn nhãn sai và nội dung bên trong thì vô hình.
 
-**Giữ mã nào.** `FILE-3`.
+**Giữ mã nào?** `FILE-3`.
 
-**Cách phát hiện.** Một biểu thức duy nhất trên đường dẫn:
+**Phát hiện thế nào?** Một biểu thức duy nhất trên đường dẫn:
 `/src/components/.*/(constants|utils|types|hooks)/`. Dấu gạch chéo cuối biến nó thành phép thử
 **thư mục**; đoạn `.*/` phía trước bắt buộc phải có **ít nhất một đoạn đường dẫn** nằm giữa gốc cây
 thành phần và tên thư mục tiện ích.
 
-**Vì sao luật này đáng có máy giữ.** Vì cái giá không nằm ở chỗ lộn xộn mà ở chỗ **vô hình**. Hàm
+**Vì sao nên để máy giữ luật này?** Vì cái giá không nằm ở chỗ lộn xộn mà ở chỗ **vô hình**. Hàm
 định dạng nằm cạnh thành phần thì người thứ hai cần đúng hàm đó sẽ không bao giờ tìm ra, nên họ viết
 lại, rồi hai bản trôi khỏi nhau và không có gì báo động. Một quy ước như thế không tự sửa được bằng
 đọc code review, vì mỗi lần thêm chỉ là một thư mục nhỏ và luôn có lý do.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Thư mục tiện ích đặt thẳng dưới gốc cây thành phần thì thoát.** `src/components/utils/format.ts`
   **không** khớp, vì biểu thức đòi ít nhất một đoạn ở giữa. Chỗ đặt nông nhất và hiển nhiên nhất lại
@@ -147,21 +147,21 @@ lại, rồi hai bản trôi khỏi nhau và không có gì báo động. Một 
 
 ## `export-matches-folder`
 
-**Bắt gì.** `index.tsx` trong một thư mục PascalCase phải có ít nhất một export tên trực tiếp thuộc
+**Bắt gì?** `index.tsx` trong một thư mục PascalCase phải có ít nhất một export tên trực tiếp thuộc
 họ của thư mục — đúng tên thư mục, hoặc tên thư mục cộng thêm một hậu tố bắt đầu bằng chữ hoa.
 
-**Giữ mã nào.** `FILE-1`.
+**Giữ mã nào?** `FILE-1`.
 
-**Cách phát hiện.** Cổng đường dẫn `/<ThưMụcPascalCase>/index.tsx?$` chọn file. Sau đó là AST: mỗi
+**Phát hiện thế nào?** Cổng đường dẫn `/<ThưMụcPascalCase>/index.tsx?$` chọn file. Sau đó là AST: mỗi
 `ExportNamedDeclaration` góp tên từ khai báo biến, từ khai báo hàm, và từ mọi specifier. Tới
 `Program:exit`, nếu tập tên **rỗng** thì im lặng; nếu không rỗng mà không tên nào thuộc họ thì báo
 lỗi kèm danh sách tên đã thu được.
 
-**Vì sao luật này đáng có máy giữ.** Vì đường dẫn có nhiệm vụ **đoán trước cái tên**. Ai biết tên thì
+**Vì sao nên để máy giữ luật này?** Vì đường dẫn có nhiệm vụ **đoán trước cái tên**. Ai biết tên thì
 biết đường dẫn, và một lần tìm theo tên phải ra đúng một chỗ. Khi hai thứ đó lệch nhau, chi phí không
 rơi vào người viết mà rơi vào mọi người đọc sau đó, mỗi lần một ít, mãi mãi.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **`export * from "./component"` — chính là dạng barrel thông dụng nhất — không góp tên nào**, nên
   tập tên rỗng và luật thoát ra trước khi phán xét bất cứ điều gì.
@@ -177,22 +177,22 @@ rơi vào người viết mà rơi vào mọi người đọc sau đó, mỗi l�
 
 ## `no-runtime-namespace`
 
-**Bắt gì.** Một object literal gán cho một tên viết hoa, gom từ hai thành viên viết hoa trở lên. Nó
+**Bắt gì?** Một object literal gán cho một tên viết hoa, gom từ hai thành viên viết hoa trở lên. Nó
 đóng gói thành một khối duy nhất, nên một chỗ gọi chỉ cần một thành viên là kéo theo cả họ và không
 thứ gì rụng ra khỏi bản dựng được.
 
-**Giữ mã nào.** `FILE-4`.
+**Giữ mã nào?** `FILE-4`.
 
-**Cách phát hiện.** Thuần AST, **không có cổng đường dẫn**. Với mỗi `ExportNamedDeclaration` là khai
+**Phát hiện thế nào?** Thuần AST, **không có cổng đường dẫn**. Với mỗi `ExportNamedDeclaration` là khai
 báo biến: tên phải bắt đầu bằng chữ hoa; phần khởi tạo, sau khi bóc lớp `as`, phải là một
 `ObjectExpression`; thành viên là những khoá `Property` không tính toán và có dạng `Identifier`. Báo
 lỗi khi có từ hai thành viên trở lên và **mọi** thành viên đều bắt đầu bằng chữ hoa.
 
-**Vì sao luật này đáng có máy giữ.** Vì chi phí là chi phí **bản dựng**, mà bản dựng thì không ai
+**Vì sao nên để máy giữ luật này?** Vì chi phí là chi phí **bản dựng**, mà bản dựng thì không ai
 nhìn thấy khi đọc code. Cú pháp gọi có dấu chấm đọc rất dễ chịu, và chính vì dễ chịu nên nó lan.
 Không có máy đếm, không ai phát hiện ra rằng một trang nhập một thành viên đang phải tải cả họ.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **`Object.assign(CardRoot, { Header, Footer })` — cách dựng họ có dấu chấm phổ biến nhất — thoát
   hoàn toàn**, vì phần khởi tạo là một lời gọi chứ không phải object literal.
@@ -212,23 +212,23 @@ Không có máy đếm, không ai phát hiện ra rằng một trang nhập mộ
 
 ## `monorepo-tier-belongs-to-its-side`
 
-**Bắt gì.** Trong một workspace nhiều ứng dụng, gói dùng chung giữ những tầng **không biết nghiệp
+**Bắt gì?** Trong một workspace nhiều ứng dụng, gói dùng chung giữ những tầng **không biết nghiệp
 vụ**; những tầng **biết nghiệp vụ** thuộc về ứng dụng sở hữu nghiệp vụ đó. Luật báo hai chiều: tầng
 nghiệp vụ nằm trong gói, và tầng từ vựng nằm trong ứng dụng.
 
-**Giữ mã nào.** `FILE-5`.
+**Giữ mã nào?** `FILE-5`.
 
-**Cách phát hiện.** Hai biểu thức đường dẫn:
+**Phát hiện thế nào?** Hai biểu thức đường dẫn:
 `/packages/<tên>/src/(blocks|overlays|pages|layouts)/` và
 `/apps/<tên>/src/(components/)?(contracts|leaves|composites|branches|shells)/`. Phép thử phía gói
 chạy trước và thoát ngay; phía ứng dụng chạy sau.
 
-**Vì sao luật này đáng có máy giữ.** Vì đây là trường hợp mà **tài liệu đã đúng và cây thư mục đã
+**Vì sao nên để máy giữ luật này?** Vì đây là trường hợp mà **tài liệu đã đúng và cây thư mục đã
 sai, và không bên nào đỏ lên cả**. Một gói dùng chung mang trong nó đúng một thư mục nghiệp vụ, trong
 khi phần đầu của chính tài liệu đó khẳng định rằng tầng ấy thuộc về ứng dụng. Một đoạn văn không giữ
 được một cây thư mục; đó là toàn bộ lập luận cho việc viết luật này thành mã.
 
-**Cửa còn mở.**
+**Những chỗ còn lọt.**
 
 - **Bất đối xứng một đoạn.** Phía ứng dụng chấp nhận đoạn `components/` tuỳ chọn, phía gói thì không.
   `packages/ui/src/components/blocks/…` là cùng một vi phạm, viết thừa một thư mục, và không ai thấy.
@@ -253,7 +253,7 @@ khi phần đầu của chính tài liệu đó khẳng định rằng tầng �
    phạm vi hoặc không; không có phán quyết nửa vời.
 5. Mức nghiêm trọng thuộc về cấu hình của kho tiêu thụ. Gói luật chỉ publish một ý kiến.
 6. Một luật lint chỉ được từ chối những gì máy nhìn thấy. Phần còn lại thuộc về tài liệu luật, và
-   khoảng cách giữa hai bên phải được ghi vào phần **Cửa còn mở**, không được im lặng cho gọn.
+   khoảng cách giữa hai bên phải được ghi vào phần **Những chỗ còn lọt**, không được im lặng cho gọn.
 
 ## Ngoại lệ
 

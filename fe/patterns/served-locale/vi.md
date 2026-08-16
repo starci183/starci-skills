@@ -163,7 +163,7 @@ request từ một worker.
 - Có người kết luận "fallback hoạt động tốt".
 - Người test và người đọc thật không cùng một ngôn ngữ.
 
-**Tự hỏi.** Câu trả lời này đúng vì **request đã nói rõ**, hay đúng vì **tôi tình cờ đọc đúng ngôn
+**Tự hỏi.** Câu trả lời này đúng vì **request đã làm rõ**, hay đúng vì **tôi tình cờ đọc đúng ngôn
 ngữ mặc định**?
 
 **Vì sao phải nói ra.** Coi bản mặc định là fallback biến một header thiếu thành một **quyết định sản

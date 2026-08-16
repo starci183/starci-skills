@@ -13,16 +13,16 @@ description: Lịch sử phiên bản của luật Observability.
 
 ## Version Policy
 
-Một thay đổi luật được chấp nhận thì tăng cả module thêm `0.01` và cập nhật **năm** record. Đổi số
+Mỗi thay đổi luật được chấp nhận làm tăng phiên bản module thêm `0.01` và cập nhật **năm** record. Đổi số
 chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó nằm trên.
 
-Mã tình huống **không** được đánh số lại trong bất kỳ phiên bản nào. Một mã đã được trích dẫn từ file
-luật khác và từ các bản ghi công việc cũ; đổi số một mã là làm hỏng một trích dẫn ai đó đã tạo, mà
-không ai nhận ra. Mã sai thì được giữ nguyên và nói ra ở `audit.md`.
+Mã tình huống **không** được đánh số lại trong bất kỳ phiên bản nào. Các file luật khác và bản ghi công
+việc cũ đã trích dẫn những mã này; đổi số một mã sẽ âm thầm làm hỏng một trích dẫn đã tồn tại. Mã sai
+thì giữ nguyên và nêu rõ trong `audit.md`.
 
 ## 2.00 — 2026-08-16
 
-Đổi số chính vì hình dạng của module đổi: từ **một file luật phẳng** thành **năm record**.
+Đổi số chính vì cấu trúc của module đổi: từ **một file luật phẳng** thành **năm record**.
 
 - **Tách năm record.** `be/canon/patterns/observability.md` được diễn đạt lại thành
   `be/patterns/observability/` gồm `INDEX.md` (máy đọc, tiếng Anh), `vi.md` (tình huống nghiệp vụ),

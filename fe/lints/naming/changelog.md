@@ -9,9 +9,9 @@ description: Lịch sử phiên bản của kệ enforcement cho luật đặt t
 
 # changelog.md
 
-> Current version: `2.00` · Module: `naming`
+> Phiên bản hiện tại: `2.00` · Mô-đun: `naming`
 
-## Version Policy
+## Quy ước phiên bản
 
 Một thay đổi được chấp nhận thì tăng cả mô-đun thêm `0.01` và cập nhật **năm** tài liệu. Đổi số chính
 (`x.00`) dành cho việc tạo mô-đun hoặc thay đổi hình dạng của nó.

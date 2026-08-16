@@ -4,14 +4,14 @@ title: example.md
 slug: /be/lints/data-access/example
 sidebar_label: example.md
 sidebar_position: 2
-description: Mã thật cho từng quy tắc — chỗ nó kêu, chỗ nó im, và chỗ nó im mà lẽ ra nên kêu.
+description: Mã thật cho từng quy tắc — chỗ nó báo lỗi, chỗ nó không báo và chỗ nó bỏ sót lỗi.
 ---
 
 # example.md
 
 > Version: `2.00` · Module: `data-access`
 
-Mỗi mục dưới đây là một quy tắc. **SAI** là đoạn mã làm quy tắc kêu. **ĐÚNG** là đoạn mã nó không kêu.
+Mỗi mục dưới đây là một quy tắc. **SAI** là đoạn mã khiến quy tắc báo lỗi. **ĐÚNG** là đoạn mã không bị báo lỗi.
 Mục **Cửa lách và nhầm lẫn** ở cuối mỗi quy tắc là đoạn mã **quy tắc không thấy** — đọc kỹ nhãn: đó là
 chỗ máy bỏ sót, **không phải** chỗ luật cho phép.
 
@@ -438,23 +438,23 @@ Cũng **không bị kêu**: các decorator khai báo thực thể khác không �
 export class ActiveCartView {}
 ```
 
-Còn đây là **chiều ngược lại — kêu oan**. Bảng đã được đặt tên đàng hoàng, nhưng đối số là một truy cập
+Còn đây là **chiều ngược lại — báo nhầm**. Bảng đã được đặt tên đàng hoàng, nhưng đối số là một truy cập
 thành viên chứ không phải một chuỗi ký tự, nên quy tắc báo lỗi. Mẫu "gom chuỗi vào hằng số" ở đây chạy
-**ngược**: nó không làm quy tắc im, nó làm quy tắc kêu nhầm.
+**ngược**: nó không khiến quy tắc không báo, mà khiến quy tắc báo nhầm.
 
 ```ts
 @Entity(TABLES.cartItems)
 export class CartItemEntity {}
 ```
 
-Cùng một kiểu kêu oan, viết ở dạng đối tượng tuỳ chọn.
+Cùng một kiểu báo nhầm, viết ở dạng đối tượng tuỳ chọn.
 
 ```ts
 @Entity({ name: CART_ITEMS_TABLE, schema: "public" })
 export class CartItemEntity {}
 ```
 
-Và một kiểu kêu oan nữa: khoá tính toán bị điều kiện `!property.computed` loại ra.
+Và một kiểu báo nhầm nữa: khoá tính toán bị điều kiện `!property.computed` loại ra.
 
 ```ts
 @Entity({ ["name"]: "cart_items" })
@@ -501,7 +501,7 @@ Chỉ hỏi khi thật sự thiếu dữ kiện.
 2. Dùng decorator trần của khung nền rồi coi là đã theo `DATA-1`; nó thoát quy tắc và không nêu kết nối nào.
 3. Đổi kho lưu trữ thành một lớp tự viết cho hết lỗi, thay vì đổi sang bộ quản lý.
 4. Tiêm bộ quản lý đúng luật rồi gọi `getRepository(...)` ngay trong phương thức, tưởng là đã xong.
-5. Viết `@Entity("")` để làm im quy tắc, đúng lúc đang tạo ra cái hậu quả quy tắc sinh ra để chặn.
-6. Gom tên bảng vào hằng số cho gọn, rồi tắt quy tắc cho cả tệp vì nó kêu oan một chỗ.
+5. Viết `@Entity("")` để khiến quy tắc không báo, đúng lúc đang tạo ra cái hậu quả quy tắc sinh ra để chặn.
+6. Gom tên bảng vào hằng số cho gọn, rồi tắt quy tắc cho cả tệp vì nó báo nhầm một chỗ.
 7. Lấy bộ quản lý bằng `dataSource.manager` rồi tưởng bản build xanh nghĩa là nguồn dữ liệu đã được nêu tên.
 8. Coi `DATA-4` và `DATA-5` là đã được giữ, chỉ vì ba mã còn lại có quy tắc.

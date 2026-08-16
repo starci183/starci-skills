@@ -18,7 +18,7 @@ không, và mỗi mã có được **giữ bởi thứ mà bảng tầng giữ n
 
 Chấp nhận, có điều kiện. Bảy mã phân định được bằng dữ kiện nghiệp vụ, và bốn trong bảy mã được giữ
 bởi kiểu chứ không phải bởi review — đó là thế mạnh thật của luật này. Điều kiện nằm ở `SLOTS-5`:
-nó là mã duy nhất không có gì cơ học giữ, và module giữ nguyên nó thay vì hạ cấp thành khuyến nghị.
+nó là mã duy nhất không có gì cơ học giữ, và module bảo toàn nó thay vì hạ cấp thành khuyến nghị.
 
 ## Kiểm phân định
 
@@ -46,8 +46,8 @@ nó là mã duy nhất không có gì cơ học giữ, và module giữ nguyên 
   tầng sở hữu request không nhận cờ; không có gì chứng minh một leaf không tự tính cờ.
 - **Số shell được miễn ở `SLOTS-4` không khớp giữa luật phẳng và rule đang chạy.** Bảng "Forbidden"
   của luật gốc nêu **ba** shell; `CHILDREN_SHELLS` trong rule liệt **bốn**, thêm chỗ nối route, và
-  thông báo lỗi của rule nói rõ lý do: nó chuyển đổi thứ mà layout của framework trao xuống. Module
-  này giữ nguyên quyết định của luật gốc trong phần Exceptions và ghi lại độ lệch ở đây thay vì âm
+  thông báo lỗi của rule làm rõ lý do: nó chuyển đổi thứ mà layout của framework trao xuống. Module
+  này bảo toàn quyết định của luật gốc trong phần Exceptions và ghi lại độ lệch ở đây thay vì âm
   thầm sửa một trong hai bên.
 - **`SLOTS-7` được viết cho một component có tên riêng.** Rule bind theo đúng một import path, nên
   luật phát biểu tổng quát mà enforcement thì hẹp. Ví dụ trong `example.md` đã tổng quát hoá tên đó

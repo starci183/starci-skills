@@ -28,11 +28,11 @@ công việc cũ, nên một lần đánh số lại lặng lẽ sẽ làm hỏn
   với `INDEX.md`, `vi.md`, `example.md`, `audit.md`, `changelog.md`. File luật phẳng cũ được giữ
   nguyên tại chỗ; module này **tái diễn đạt** nó đầy đủ hơn, không thay nó bằng một luật mới.
 - **Giữ nguyên mười bốn mã.** `VENDOR-1` … `VENDOR-14`, nguyên số và nguyên nghĩa. Không thêm mã,
-  không bớt mã, không đánh số lại. Mọi bất đồng được ghi vào `audit.md` thay vì sửa lặng lẽ.
+  không bớt mã, không đánh số lại. Mọi bất đồng được ghi vào `audit.md` thay vì sửa âm thầm.
 - **Thêm bảng `Tầng giữ`.** Mỗi mã khai báo tầng thật đang giữ nó: `unrepresentable`, `enforced` (kèm
   **tên rule** trong `sources/fe/vendor-boundary.mjs`), hay `documented`. Kết quả: **mười** mã
-  `enforced`, **bốn** mã `documented`. Bảng này tồn tại để khoảng hở có chỗ đứng công khai — một luật
-  không nói rõ ai giữ nó thì được đọc như thể máy đang giữ.
+  `enforced`, **bốn** mã `documented`. Bảng này tồn tại để khoảng hở có vị trí công khai — một luật
+  không làm rõ ai giữ nó thì dễ bị hiểu như thể máy đang giữ.
 - **Hạ hai mã xuống `documented` một cách có chủ ý.** `VENDOR-7` và `VENDOR-9` **có** rule, nhưng cả
   hai scope vào `src/components/leaves/Field/index.tsx`, một đường dẫn cây không có; chúng return sớm
   cho mọi file và không bao giờ chạy. Một rule không bao giờ chạy không giữ gì cả. Gọi chúng là
@@ -46,11 +46,11 @@ công việc cũ, nên một lần đánh số lại lặng lẽ sẽ làm hỏn
   thành một finding đang mở trong `audit.md`.
 - **Ghi ba tên đã trôi khỏi cây.** `SurfaceAccordionCard`, `leaves/Field` (nay là `composites/Field`)
   và `QuickActionRow` (cây có `QuickActionsList`) vẫn nằm trong luật và trong regex của rule nhưng
-  không tồn tại trong cây thật. Tên được giữ nguyên; drift được ghi thành finding, không sửa ở đây.
+  không tồn tại trong cây thật. Tên được bảo toàn; drift được ghi thành finding, không sửa ở đây.
 - **Viết `vi.md` theo từng mã.** Mỗi mã có tình huống nghiệp vụ, dấu hiệu nhận biết, một câu tự hỏi,
   ranh giới với các mã kề, và danh sách tình huống hay gặp. Phần `Luật` và `Ngoại lệ` đặt ở cuối, và
   mỗi ngoại lệ đều đóng, đều nêu rõ mã nó áp vào.
-- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, mỗi case có ĐÚNG và SAI đặt cạnh nhau, cộng
+- **Viết `example.md` cho đủ case.** Mỗi mã nhiều case, từng case có ĐÚNG và SAI đặt cạnh nhau, cộng
   một mục **Ngoại lệ và nhầm lẫn**. Đóng trang bằng ánh xạ yêu-cầu-sang-phán-quyết, bảng phân định
   ranh giới, và danh sách sai lầm lặp lại.
 - **Gộp `prompt.md` vào `example.md`.** Ánh xạ yêu cầu và bảng phân định nay nằm cùng chỗ với ví dụ

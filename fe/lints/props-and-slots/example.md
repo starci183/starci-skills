@@ -9,10 +9,10 @@ description: Mã thật cho từng rule — chỗ nó nổ, chỗ nó im, và ch
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `props-and-slots` · Luật: [`INDEX.md`](./INDEX.md) · Nghiệp vụ: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `props-and-slots` · Luật: [`INDEX.md`](./INDEX.md) · Nghiệp vụ: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây là **một rule**, viết bằng tên nó công bố. Trong mỗi mục: nhiều cặp **SAI** (rule
-nổ) và **ĐÚNG** (rule im), rồi tới **Cửa lách và nhầm lẫn** — phần này chứa mã **lọt qua** rule.
+nổ) và **ĐÚNG** (rule im), rồi tới **Chỗ lách và chỗ dễ nhầm** — phần này chứa mã **lọt qua** rule.
 
 > Mã trong mục "Cửa lách" **không phải mã được phép viết**. Nó là mã mà rule **không nhìn thấy**.
 > Luật vẫn cấm; chỉ là không có máy nào bắt được. Đọc nhầm chỗ này thành "vậy là hợp lệ" là cách
@@ -105,7 +105,7 @@ export function toRow(entry: { id: string; title: string }) {
 const truncate = (value: string, limit: number) => value.slice(0, limit)
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Bốn đoạn dưới đây **lọt qua rule**. Không đoạn nào trong số đó là cách viết được phép.
 
@@ -242,7 +242,7 @@ export const SurfaceCard = (props: SurfaceCardProps) => {
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Năm đoạn dưới đây **lọt qua rule** và không đoạn nào được phép viết.
 
@@ -375,7 +375,7 @@ export const QuestBlock = () => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Bốn đoạn dưới đây **lọt qua rule**. Không đoạn nào được phép viết.
 

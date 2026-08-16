@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/tokens/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống TOKEN-N, nhận diện bằng nghiệp vụ và bằng tầng file chứ không bằng mắt.
+description: Các tình huống TOKEN-N, nhận diện bằng nghiệp vụ và bằng tầng file chứ không bằng mắt.
 ---
 
 # vi.md
@@ -58,7 +58,7 @@ chính là chỗ giá trị lệch thang cuối cùng của một codebase thậ
 
 **Ranh giới**
 
-- ↔ `TOKEN-4`: cùng nói về `[13px]`, nhưng khác chỗ đứng. Trong entry đã gõ kiểu thì compiler từ
+- ↔ `TOKEN-4`: cùng nói về `[13px]`, nhưng khác vị trí. Trong entry đã gõ kiểu thì compiler từ
   chối, đó là `TOKEN-1`. Trong leaf — nơi union không với tới — thì rule bắt, đó là `TOKEN-4`.
 - ↔ `TOKEN-2`: `TOKEN-1` nói **không gõ được**; `TOKEN-2` nói **muốn gõ được thì phải làm gì**.
 

@@ -4,7 +4,7 @@ title: vi.md
 slug: /fe/patterns/lint-adoption/vi
 sidebar_label: vi.md
 sidebar_position: 1
-description: Từng tình huống LINT-ADOPTION-N, nhận diện bằng config ESLint đã resolve chứ không bằng tên file.
+description: Các tình huống LINT-ADOPTION-N, nhận diện bằng config ESLint đã resolve chứ không bằng tên file.
 ---
 
 # vi.md
@@ -221,7 +221,7 @@ mã nó áp dụng vào.
 - **Config thuộc về repo.** `LINT-ADOPTION-1` ràng buộc rule, mức của rule và việc từ chối inline.
   Luật áp lên **glob nào** là việc của repo: monorepo lint package dùng chung và từng app, single-app
   lint một cây source. Rule là luật; glob là nơi luật có hiệu lực.
-- **Plugin khác của repo.** Repo giữ nguyên plugin không liên quan, `ignores` và `languageOptions`
+- **Plugin khác của repo.** Repo bảo toàn plugin không liên quan, `ignores` và `languageOptions`
   của nó. Thứ nó không được giữ là một ý kiến thứ hai về bộ rule canon.
 - **Source candidate không được miễn.** Candidate chính là source sẽ được port vào production, nên
   nó nằm trong glob **có chủ đích**.

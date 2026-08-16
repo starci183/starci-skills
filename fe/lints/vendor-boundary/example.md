@@ -9,10 +9,10 @@ description: Mã thật cho từng rule — chỗ nó nổ, chỗ nó im, và ch
 
 # example.md
 
-> Version: `2.00` · Mô-đun: `vendor-boundary` · Cơ chế: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.00` · Mô-đun: `vendor-boundary` · Cơ chế: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi mục dưới đây là **tên rule đã công bố**, nguyên văn. Mỗi mục có vài cặp **SAI** (rule nổ) và
-**ĐÚNG** (rule im), rồi một mục **Cửa lách và nhầm lẫn** chứa mã **đi lọt**.
+**ĐÚNG** (rule im), rồi một mục **Chỗ lách và chỗ dễ nhầm** chứa mã **đi lọt**.
 
 > Mã trong mục "Cửa lách" là mã mà rule **không nhìn thấy**, không phải mã được phép viết. Luật vẫn
 > cấm nó; chỉ là không có máy nào bắt. Đó là lý do kệ tài liệu này tồn tại: một luật không có rule
@@ -87,7 +87,7 @@ export const RouteShell = ({ children }) => <div className="min-h-dvh">{children
 Không có `emptyShell` ở đây, và đó là ngoại lệ **duy nhất** có tên: cơ chế của vỏ này là của
 framework, nên bắt nó import một nguyên thể là bắt nó thêm rác.
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Re-export không phải `ImportDeclaration`. Cả hai file dưới đây **không có báo cáo nào**:
 
@@ -165,7 +165,7 @@ export const ModalShell = ({ children }) => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Đổi tên object là phép kiểm đệm biến mất. File dưới đây **không có báo cáo nào**, vì thân thứ nhất
 làm thoả phép kiểm hiện diện còn thân thứ hai không mang tên `Modal.Body`:
@@ -228,7 +228,7 @@ export const Field = ({ label, value }) => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Nguồn phải **bằng đúng**. Import gói con thì tập ràng buộc rỗng và rule không còn việc gì:
 
@@ -300,7 +300,7 @@ export const Field = ({ label, on }) => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Chỉ **phần tử `label` chữ thường** mới là tổ tiên rule biết. Cả ba dạng dưới đây đi lọt:
 
@@ -350,7 +350,7 @@ export const ProfileOverlay = ({ contract }) => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Import tương đối **trượt hoàn toàn**, vì chuỗi không chứa đoạn `components/branches/`:
 
@@ -420,7 +420,7 @@ import { Link } from "@vendor/react"
 export const TextLink = ({ label, on }) => <Link onPress={on?.press}>{label}</Link>
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Hằng số rửa sạch chuỗi** — đây là dạng kinh điển, và không ai làm nó để phá luật; người ta làm nó
 khi dọn dẹp:
@@ -523,7 +523,7 @@ export const DropdownShell = ({ sections, trigger, on }) => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Phép kiểm `direct` đòi đúng một hình dạng chữ. Cả hai dạng dưới đây làm đúng việc bị cấm mà đi lọt:
 
@@ -596,7 +596,7 @@ export const contracts = {
 }
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Biểu thức đệm **neo vào dấu nháy**: nó chỉ khớp khi class đệm dọc là token **đầu tiên**. Đổi thứ tự
 là đi lọt, và kết quả render y hệt khối SAI ở trên:
@@ -680,7 +680,7 @@ export const Checkbox = ({ label }) => (
 )
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 Ba biến là **toàn file**. Một điều khiển đúng làm thoả cả ba cho một điều khiển hỏng đứng cạnh:
 
@@ -772,7 +772,7 @@ export const ShellNavConnected = () => {
 <a href="https://an-external-host.example/docs" rel="noreferrer" target="_blank">Tài liệu</a>
 ```
 
-### Cửa lách và nhầm lẫn
+### Chỗ lách và chỗ dễ nhầm
 
 **Mọi đích tính toán được đều đi lọt** — và đây là dạng phổ biến nhất của một đường dẫn nội bộ thật:
 

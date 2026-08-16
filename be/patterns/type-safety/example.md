@@ -11,11 +11,11 @@ description: Mọi case và ngoại lệ của từng mã TYPE-N, viết bằng 
 
 > Version: `2.00` · Module: `type-safety` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
-Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng dạng NestJS**. Không tên sản phẩm,
+Mọi ví dụ dưới đây là **TypeScript thường trong một ứng dụng có cấu trúc kiểu NestJS**. Không tên sản phẩm,
 không tên repository, không tên khoá học. Một luật chỉ đúng khi nó đúng ở bất kỳ back end nào — nên
 nếu một ví dụ cần tên riêng của một hệ thống cụ thể mới đọc được, ví dụ đó đứng sai chỗ.
 
-Mỗi mã có **nhiều case**, mỗi case đặt **ĐÚNG** cạnh **SAI**, rồi tới mục **Ngoại lệ và nhầm lẫn**.
+Mỗi mã có **nhiều case**; trong mỗi case, bản **ĐÚNG** được đặt cạnh **SAI**, rồi tới mục **Ngoại lệ và nhầm lẫn**.
 Phần cuối trang ánh xạ từ một yêu cầu bằng lời sang đúng một mã.
 
 ---

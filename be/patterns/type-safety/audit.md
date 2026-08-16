@@ -11,7 +11,7 @@ description: Phản biện mức phân định, mức neo và mức thực thi t
 
 > Version: `2.00` · Module: `type-safety`
 
-Audit này kiểm ba thứ, theo đúng thứ tự đó: luật có **phân định** được một trường hợp về đúng một mã
+Audit này kiểm tra ba việc, theo đúng thứ tự đó: luật có **phân định** được một trường hợp về đúng một mã
 không, mỗi mã có **neo** được vào code thật không, và tầng ghi trong `Tầng giữ` có **đúng với thực
 tế trên đĩa** không.
 
@@ -19,7 +19,7 @@ tế trên đĩa** không.
 
 Chấp nhận, kèm ba findings về khoảng cách giữa luật và mức thực thi thật.
 
-Sáu mã giữ nguyên số và nguyên nghĩa từ bản phẳng. Sáu mã đều neo được. Nhưng bảng `Tầng giữ` nói
+Sáu mã giữ nguyên số và nguyên nghĩa của bản phẳng. Sáu mã đều neo được. Nhưng bảng `Tầng giữ` nói
 "bốn enforced" ở mức **canon**, còn ở mức **repository đang chạy** con số nhỏ hơn — và chênh lệch
 đó là finding, không phải là chỗ để làm tròn lên.
 

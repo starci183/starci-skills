@@ -9,12 +9,12 @@ description: Phản biện mức thực thi của luật typography — máy gi�
 
 # audit.md
 
-> Version: `2.00` · Mô-đun: `typography`
+> Phiên bản: `2.00` · Mô-đun: `typography`
 
 Bài phản biện này không hỏi văn bản luật có đúng không. Nó hỏi **máy có giữ được luật không**, và
 nếu không thì hở ở đâu.
 
-## Verdict
+## Kết luận
 
 Chấp nhận, kèm bốn nhận định phải ghi ra chứ không được làm gọn.
 
@@ -44,7 +44,7 @@ giữ. Đó là phát hiện lớn nhất của bài này, và nó nằm ở m�
 | Cổng tệp chạy ở đâu | Trong `create`, một lần cho mỗi tệp. Tệp ngoài phạm vi không nhận luật im — nó không nhận luật |
 | Hai nhánh thông điệp có phân định được không | Có, bằng đúng một phép so: `Number(tag.slice(1)) > 4` |
 
-## Findings
+## Phát hiện
 
 1. **Một luật, hai mã, và đó là điều đúng đắn.** Việc gộp `TYPESET-1` và `TYPESET-2` vào một luật
    không phải sự lười: cả hai chỉ có thể phát hiện được ở cùng một nút, bằng cùng một phép lấy tên
@@ -76,7 +76,7 @@ giữ. Đó là phát hiện lớn nhất của bài này, và nó nằm ở m�
    `<h2 className="sr-only">` — và đó không phải báo thừa, vì một tiêu đề ẩn vẫn là một dòng dàn ý
    thật.
 
-## Decisions
+## Quyết định
 
 - **Ghi đúng một luật đang tồn tại.** Một luật đáng lẽ nên có mà chưa có thì không được ghi ở đây;
   nó nằm dưới "Rủi ro còn mở". Luật cao nhất của kệ này: thứ không chỉ tay vào được là một đề nghị,
@@ -164,7 +164,7 @@ Mỗi mục dưới đây là một cửa còn mở, kèm thứ mà luật sẽ 
   phải một dữ kiện cú pháp. Ghi lại như một rủi ro thường trực để không ai tưởng lint xanh nghĩa là
   thứ bậc đúng.
 
-## Re-audit Triggers
+## Khi nào cần kiểm lại
 
 - Bảng `rules` xuất ra thêm, bớt hoặc đổi tên một luật.
 - Một thông điệp được thêm, bớt hoặc tách ra khỏi luật hiện có — vì mã luật đi theo **thông điệp**,
