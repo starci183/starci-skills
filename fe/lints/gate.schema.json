@@ -6,7 +6,10 @@
   "$comment": "input là $ref thẳng vào SourcePlan của .claude/fe/patterns/gate.schema.json. Sau gate này là code, không còn gate nào nữa nên output phải tự mang đủ bằng chứng.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["input", "output"],
+  "required": [
+    "input",
+    "output"
+  ],
   "properties": {
     "input": {
       "description": "Mã đã dựng ở gate patterns, đưa nguyên vào chứ không tóm tắt lại.",
@@ -22,7 +25,6 @@
       "description": "Lý do có neo, kéo theo chuỗi từ gate patterns nên cả năm gate dùng đúng một định nghĩa.",
       "$ref": "https://starci.academy/schema/fe/patterns/gate.schema.json#/$defs/Reason"
     },
-
     "Law": {
       "description": "Luật sở hữu rule này, lấy đúng danh sách law mà plugin canon công bố.",
       "$comment": "Nguồn: lawOwners của .claude/sources/fe/index.mjs, đọc bằng cách chạy chính file đó.",
@@ -46,7 +48,6 @@
         "vendor-boundary"
       ]
     },
-
     "RuleName": {
       "description": "Tên rule đã công bố của canon front end, đúng năm mươi chín cái và không cái nào được đặt lại tên.",
       "$comment": "Nguồn: ruleDeclarations của .claude/sources/fe/index.mjs, đọc bằng cách chạy chính file đó. Tên công bố là thứ xuất hiện trong build log và trong mọi cuộc nói chuyện về lỗi, nên đổi tên ở đây là đổi luật.",
@@ -112,13 +113,18 @@
         "no-internal-starci-href"
       ]
     },
-
     "RuleResult": {
       "type": "object",
       "title": "Kết quả một rule",
       "description": "Một rule canon chạy trên mã của gate patterns và cho ra một kết quả, kèm lý do.",
       "additionalProperties": false,
-      "required": ["rule", "law", "severity", "result", "reason"],
+      "required": [
+        "rule",
+        "law",
+        "severity",
+        "result",
+        "reason"
+      ],
       "properties": {
         "rule": {
           "description": "Tên rule đã công bố.",
@@ -133,13 +139,22 @@
           "const": "error"
         },
         "result": {
-          "description": "Rule này xanh, đỏ, hay không áp vào mã lần này.",
-          "enum": ["pass", "fail", "khong-ap-dung"]
+          "description": "Rule xanh, đỏ, hay KHÔNG ĐO ĐƯỢC. Giá trị thứ ba tách im-vì-không-đọc-được-thứ-nó-cần khỏi đã-xét-và-chấp-thuận.",
+          "enum": [
+            "pass",
+            "fail",
+            "chua-do-duoc"
+          ],
+          "$comment": "Gộp hai thứ đó là cách một rule rò rỉ được tin là đã đóng — fe/lints/file-layout/INDEX.md nói thẳng điều này."
         },
         "evidence": {
           "description": "Kết quả này đến từ chạy thật hay chỉ từ đọc nguồn rule.",
           "$comment": "Kỷ luật đo: 'không gate nào bắt cái này' đọc từ nguồn rule chưa phải bằng chứng chạy.",
-          "enum": ["chay-that", "doc-nguon", "chua-do"]
+          "enum": [
+            "chay-that",
+            "doc-nguon",
+            "chua-do"
+          ]
         },
         "messageId": {
           "type": "string",
@@ -157,30 +172,52 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "result": { "const": "fail" } }, "required": ["result"] },
+          "if": {
+            "properties": {
+              "result": {
+                "const": "fail"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          },
           "then": {
-            "required": ["at", "messageId"],
+            "required": [
+              "at",
+              "messageId"
+            ],
             "$comment": "Một rule đỏ mà không chỉ được chỗ đỏ thì không phải một finding, nó là một cảm giác."
           }
         }
       ]
     },
-
     "AuditResult": {
       "type": "object",
       "title": "Kết quả một audit mức kho",
       "description": "Audit không phải rule AST: nó soi cả kho, và nó là thứ chứng minh canon thật sự đang có hiệu lực.",
       "$comment": "Nguồn: audits của .claude/sources/fe/index.mjs công bố đúng một audit tên effective-config.",
       "additionalProperties": false,
-      "required": ["audit", "result", "reason"],
+      "required": [
+        "audit",
+        "result",
+        "reason"
+      ],
       "properties": {
         "audit": {
           "description": "Tên audit mức kho.",
-          "enum": ["effective-config"]
+          "enum": [
+            "effective-config"
+          ]
         },
         "result": {
-          "description": "Audit xanh hay đỏ.",
-          "enum": ["pass", "fail"]
+          "description": "Audit xanh, đỏ, hay chưa đo được.",
+          "enum": [
+            "pass",
+            "fail",
+            "chua-do-duoc"
+          ],
+          "$comment": "Một trang trong phép thử đã khai PASS 59 trên 59 trên một file production thật, trong khi bị cấm đọc repo, mâu thuẫn measurementMethod của chính nó. Ô này đóng đường đó lại."
         },
         "strictRuleCount": {
           "type": "integer",
@@ -198,13 +235,18 @@
         }
       }
     },
-
     "LintVerdict": {
       "type": "object",
       "title": "Đầu ra của gate lints",
       "description": "Mã cũ kèm phán quyết cuối chuỗi: từng rule, từng audit, và mã có được ra hay không.",
       "additionalProperties": false,
-      "required": ["source", "ruleResults", "auditResults", "gates", "verdict"],
+      "required": [
+        "source",
+        "ruleResults",
+        "auditResults",
+        "gates",
+        "verdict"
+      ],
       "properties": {
         "source": {
           "description": "Nguyên mã đến từ gate patterns, mang theo để phán quyết này tự đứng được mà không cần hỏi lại chuỗi.",
@@ -214,13 +256,17 @@
           "type": "array",
           "minItems": 1,
           "description": "Kết quả của từng rule canon trên mã này; một rule không được nhắc tới là một rule chưa được chạy.",
-          "items": { "$ref": "#/$defs/RuleResult" }
+          "items": {
+            "$ref": "#/$defs/RuleResult"
+          }
         },
         "auditResults": {
           "type": "array",
           "minItems": 1,
           "description": "Kết quả của các audit mức kho, trước hết là cấu hình hiệu lực.",
-          "items": { "$ref": "#/$defs/AuditResult" }
+          "items": {
+            "$ref": "#/$defs/AuditResult"
+          }
         },
         "gates": {
           "type": "array",
@@ -229,16 +275,31 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["gate", "result", "command"],
+            "required": [
+              "gate",
+              "result",
+              "command"
+            ],
             "properties": {
               "gate": {
                 "description": "Cổng nào đã chạy.",
                 "$comment": "Nguồn: lint, build webpack, tsc --noEmit và test là các cổng tự chạy; e2e chỉ chạy khi được yêu cầu rõ.",
-                "enum": ["lint", "build", "typecheck", "test", "gate-canon", "e2e"]
+                "enum": [
+                  "lint",
+                  "build",
+                  "typecheck",
+                  "test",
+                  "gate-canon",
+                  "e2e"
+                ]
               },
               "result": {
                 "description": "Cổng xanh, đỏ, hay chưa chạy.",
-                "enum": ["pass", "fail", "chua-chay"]
+                "enum": [
+                  "pass",
+                  "fail",
+                  "chua-chay"
+                ]
               },
               "command": {
                 "type": "string",
@@ -254,7 +315,10 @@
         },
         "verdict": {
           "description": "Mã này được ra hay bị chặn.",
-          "enum": ["xanh-cho-ra-code", "do-chan-lai"]
+          "enum": [
+            "xanh-cho-ra-code",
+            "do-chan-lai"
+          ]
         },
         "blocking": {
           "type": "array",
@@ -262,7 +326,11 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["rule", "at", "reason"],
+            "required": [
+              "rule",
+              "at",
+              "reason"
+            ],
             "properties": {
               "rule": {
                 "description": "Rule đang chặn.",
@@ -287,7 +355,11 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["law", "claim", "reason"],
+            "required": [
+              "law",
+              "claim",
+              "reason"
+            ],
             "properties": {
               "law": {
                 "description": "Luật có câu chữ nhưng không có rule.",
@@ -310,7 +382,11 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["claim", "evidence", "reason"],
+            "required": [
+              "claim",
+              "evidence",
+              "reason"
+            ],
             "properties": {
               "claim": {
                 "type": "string",
@@ -318,7 +394,11 @@
               },
               "evidence": {
                 "description": "Khẳng định này dựa vào chạy thật, đọc nguồn, hay chưa đo gì cả.",
-                "enum": ["chay-that", "doc-nguon", "chua-do"]
+                "enum": [
+                  "chay-that",
+                  "doc-nguon",
+                  "chua-do"
+                ]
               },
               "reason": {
                 "description": "Vì sao mức bằng chứng đó là mức cao nhất lấy được lúc này.",
@@ -331,23 +411,50 @@
       "allOf": [
         {
           "if": {
-            "properties": { "verdict": { "const": "do-chan-lai" } },
-            "required": ["verdict"]
+            "properties": {
+              "verdict": {
+                "const": "do-chan-lai"
+              }
+            },
+            "required": [
+              "verdict"
+            ]
           },
           "then": {
-            "required": ["blocking"],
-            "properties": { "blocking": { "minItems": 1 } }
+            "required": [
+              "blocking"
+            ],
+            "properties": {
+              "blocking": {
+                "minItems": 1
+              }
+            }
           }
         },
         {
           "if": {
-            "properties": { "verdict": { "const": "xanh-cho-ra-code" } },
-            "required": ["verdict"]
+            "properties": {
+              "verdict": {
+                "const": "xanh-cho-ra-code"
+              }
+            },
+            "required": [
+              "verdict"
+            ]
           },
           "then": {
             "properties": {
               "ruleResults": {
-                "items": { "properties": { "result": { "enum": ["pass", "khong-ap-dung"] } } }
+                "items": {
+                  "properties": {
+                    "result": {
+                      "enum": [
+                        "pass",
+                        "khong-ap-dung"
+                      ]
+                    }
+                  }
+                }
               }
             },
             "$comment": "Không có đường nào cho phán quyết xanh trong khi còn một rule đỏ; zero findings vẫn phải chứng minh bằng ruleResults chứ không bằng im lặng."

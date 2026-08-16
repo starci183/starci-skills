@@ -6,10 +6,13 @@
   "$comment": "input là $ref thẳng vào BlockPlan của .claude/fe/blocks/gate.schema.json. output là $ref của gate patterns. Gate này quyết bố trí bên trong một vùng, không quyết mã.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["input", "output"],
+  "required": [
+    "input",
+    "output"
+  ],
   "properties": {
     "input": {
-      "description": "Kế hoạch khối đã chốt ở gate blocks, đưa nguyên vào chứ không tóm tắt lại.",
+      "description": "Phương án ĐƯỢC KHUYÊN của gate blocks: candidates[recommended].plan. Cả tập ở lại gate blocks để chấm best-of-set.",
       "$ref": "https://starci.academy/schema/fe/blocks/gate.schema.json#/$defs/BlockPlan"
     },
     "output": {
@@ -22,7 +25,6 @@
       "description": "Lý do có neo, kéo theo chuỗi từ gate blocks nên cả năm gate dùng đúng một định nghĩa.",
       "$ref": "https://starci.academy/schema/fe/blocks/gate.schema.json#/$defs/Reason"
     },
-
     "PrincipleModule": {
       "description": "Module nguyên tắc sở hữu quyết định này, lấy từ đúng các module đang có trên shelf principles.",
       "$comment": "Nguồn: các thư mục module trong D:\\Repositories\\starci-academy-backend\\.claude\\fe\\principles.",
@@ -55,13 +57,16 @@
         "typography"
       ]
     },
-
     "PrincipleDecision": {
       "type": "object",
       "title": "Một quyết định nguyên tắc trên một node",
       "description": "Một tình huống mà một module nguyên tắc sở hữu, kèm mã tình huống và vì sao node rơi vào đúng mã đó.",
       "additionalProperties": false,
-      "required": ["module", "code", "reason"],
+      "required": [
+        "module",
+        "code",
+        "reason"
+      ],
       "properties": {
         "module": {
           "description": "Module nguyên tắc sở hữu tình huống này.",
@@ -83,12 +88,29 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "module": { "const": "gap" } }, "required": ["module"] },
+          "if": {
+            "properties": {
+              "module": {
+                "const": "gap"
+              }
+            },
+            "required": [
+              "module"
+            ]
+          },
           "then": {
             "properties": {
               "code": {
                 "description": "Mã seam của module gap; thang bỏ 5 và 7 một cách cố ý và GAP-0 là một tình huống chứ không phải một nấc.",
-                "enum": ["GAP-0", "GAP-1", "GAP-2", "GAP-3", "GAP-4", "GAP-6", "GAP-8"]
+                "enum": [
+                  "GAP-0",
+                  "GAP-1",
+                  "GAP-2",
+                  "GAP-3",
+                  "GAP-4",
+                  "GAP-6",
+                  "GAP-8"
+                ]
               }
             },
             "$comment": "Nguồn: bảng Situation Codes trong .claude/fe/principles/gap/INDEX.md."
@@ -96,13 +118,18 @@
         }
       ]
     },
-
     "Node": {
       "type": "object",
       "title": "Một node của cây HTML",
       "description": "Một phần tử có chứa phần tử khác: nó mở thẻ gì, mang class nào, và các con của nó ngồi cạnh nhau vì lý do gì.",
       "additionalProperties": false,
-      "required": ["nodeId", "host", "classNames", "decisions", "reason"],
+      "required": [
+        "nodeId",
+        "host",
+        "classNames",
+        "decisions",
+        "reason"
+      ],
       "properties": {
         "nodeId": {
           "type": "string",
@@ -121,13 +148,19 @@
             "type": "string",
             "minLength": 1,
             "description": "Một class sắp xếp; giá trị tuỳ ý có số kèm đơn vị bị chặn ngay tại đây.",
-            "not": { "pattern": "\\[[^\\]]*[0-9]+(px|rem|em|%|vh|vw|ch|dvh)" }
+            "not": {
+              "pattern": "\\[[^\\]]*[0-9]+(px|rem|em|%|vh|vw|ch|dvh)"
+            }
           }
         },
         "identity": {
           "description": "Node được nhắm bằng định danh hay bằng vị trí con thứ mấy.",
           "$comment": "Neo từ chối đã có: positional first-child/last-child bị bác vì React Aria chèn sibling ẩn nên vị trí con không phải danh tính component.",
-          "enum": ["dinh-danh-data-node", "vi-tri-first-child", "khong-can-nham"]
+          "enum": [
+            "dinh-danh-data-node",
+            "vi-tri-first-child",
+            "khong-can-nham"
+          ]
         },
         "surfaceDepth": {
           "type": "integer",
@@ -139,12 +172,16 @@
           "type": "array",
           "minItems": 1,
           "description": "Các quyết định nguyên tắc áp lên node này, mỗi cái một mã và một lý do.",
-          "items": { "$ref": "#/$defs/PrincipleDecision" }
+          "items": {
+            "$ref": "#/$defs/PrincipleDecision"
+          }
         },
         "children": {
           "type": "array",
           "description": "Các node con, đặt tên chứ không phải một danh sách vị trí.",
-          "items": { "$ref": "#/$defs/Node" }
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
         },
         "leaf": {
           "type": "string",
@@ -156,13 +193,17 @@
         }
       }
     },
-
     "RenderedState": {
       "type": "object",
       "title": "HTML của một trạng thái",
       "description": "Một trạng thái của một khối và đoạn HTML mà nó vẽ ra, để ma trận trạng thái không bị thiếu nhánh.",
       "additionalProperties": false,
-      "required": ["blockName", "state", "html", "reason"],
+      "required": [
+        "blockName",
+        "state",
+        "html",
+        "reason"
+      ],
       "properties": {
         "blockName": {
           "type": "string",
@@ -184,13 +225,18 @@
         }
       }
     },
-
     "MarkupPlan": {
       "type": "object",
       "title": "Đầu ra của gate principles",
       "description": "Kế hoạch khối cũ kèm HTML đã dựng, cây node và mọi quyết định nguyên tắc; đây đúng bằng input của gate patterns.",
       "additionalProperties": false,
-      "required": ["blocks", "html", "root", "renderedStates", "narrow"],
+      "required": [
+        "blocks",
+        "html",
+        "root",
+        "renderedStates",
+        "narrow"
+      ],
       "properties": {
         "blocks": {
           "description": "Nguyên kế hoạch khối đến từ gate blocks, mang theo để hai gate sau không phải đoán lại nó.",
@@ -209,19 +255,29 @@
           "type": "array",
           "minItems": 1,
           "description": "Mọi trạng thái của mọi khối đều có một đoạn HTML riêng, không trạng thái nào rơi xuống cây của trạng thái khác.",
-          "items": { "$ref": "#/$defs/RenderedState" }
+          "items": {
+            "$ref": "#/$defs/RenderedState"
+          }
         },
         "narrow": {
           "type": "object",
           "title": "Bản hẹp",
           "description": "Chuyện gì xảy ra khi các vùng không ngồi cạnh nhau được nữa.",
           "additionalProperties": false,
-          "required": ["measure", "html", "reason"],
+          "required": [
+            "measure",
+            "html",
+            "reason"
+          ],
           "properties": {
             "measure": {
               "description": "Bản hẹp đo bằng viewport, bằng container query của chính vùng, hay không đổi gì cả.",
               "$comment": "Nguồn đo: profile-rail-then-main dùng @app-md của chính vùng; các layout khác dùng md: theo viewport; playground-session-frame không một breakpoint nào.",
-              "enum": ["viewport-md", "container-query-cua-chinh-vung", "khong-doi"]
+              "enum": [
+                "viewport-md",
+                "container-query-cua-chinh-vung",
+                "khong-doi"
+              ]
             },
             "html": {
               "type": "string",
@@ -230,7 +286,9 @@
             "dropped": {
               "type": "array",
               "description": "Những gì bị bỏ đi khi hẹp lại, mỗi cái nêu tên node.",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             },
             "reason": {
               "description": "Vì sao thứ tự hẹp lại là thứ tự đó và vì sao những thứ bị bỏ là bỏ được.",
@@ -243,7 +301,12 @@
           "title": "Danh tính so sánh",
           "description": "Điều kiện mà mọi ảnh so sánh phải trùng nhau thì so sánh mới có giá trị.",
           "additionalProperties": false,
-          "required": ["route", "viewport", "locale", "theme"],
+          "required": [
+            "route",
+            "viewport",
+            "locale",
+            "theme"
+          ],
           "properties": {
             "route": {
               "type": "string",
@@ -256,16 +319,25 @@
             },
             "locale": {
               "description": "Locale đang phục vụ khi dựng HTML này.",
-              "enum": ["vi", "en"]
+              "enum": [
+                "vi",
+                "en"
+              ]
             },
             "theme": {
               "description": "Giao diện sáng hay tối khi dựng HTML này.",
-              "enum": ["light", "dark"]
+              "enum": [
+                "light",
+                "dark"
+              ]
             },
             "persona": {
               "description": "Nhân dạng người xem, vì cùng một trang đổi cây theo việc đã đăng nhập hay chưa.",
               "$comment": "Nguồn đo: union state của tầng block có guest và signedIn.",
-              "enum": ["guest", "signedIn"]
+              "enum": [
+                "guest",
+                "signedIn"
+              ]
             }
           }
         },
@@ -275,7 +347,11 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["claim", "evidence", "reason"],
+            "required": [
+              "claim",
+              "evidence",
+              "reason"
+            ],
             "properties": {
               "claim": {
                 "type": "string",
@@ -283,7 +359,11 @@
               },
               "evidence": {
                 "description": "Khẳng định này dựa vào chạy thật, đọc nguồn, hay chưa đo gì cả.",
-                "enum": ["chay-that", "doc-nguon", "chua-do"]
+                "enum": [
+                  "chay-that",
+                  "doc-nguon",
+                  "chua-do"
+                ]
               },
               "reason": {
                 "description": "Vì sao mức bằng chứng đó là mức cao nhất lấy được lúc này.",

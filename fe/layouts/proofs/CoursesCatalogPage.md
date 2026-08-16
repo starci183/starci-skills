@@ -41,7 +41,7 @@ Người vào đây là học viên đã có tài khoản hoặc khách chưa đ
 | 21 | Lưới khi hẹp | `grid-cols-1` → `sm:grid-cols-2` → `lg:grid-cols-3`, gap-2 | contracts/index.ts:2120 |
 | 22 | Danh sách khi hẹp | `catalog-card-list` và `catalog-card-line` KHÔNG có tiền tố responsive nào; hàng vẫn là hàng ở mọi bề rộng, cover cố định `w-36 shrink-0` | contracts/index.ts:2133 |
 | 23 | Loại truy vấn | Viewport media query (`sm:`/`lg:`); không container query nào trong cây này | contracts/index.ts:2120 |
-| 24 | Ai mở landmark | Route layout (`nav-over-body-page` + `routed-page-main`); entry trang KHÔNG khai `host` nên Tree mở `div` | app/[lang]/courses/layout.tsx:27 · contracts/index.ts:741 |
+| 24 | Ai mở landmark | Route layout (`nav-over-body-page` + `routed-page-main`); entry trang KHÔNG khai `host` nên Tree mở `div` | src/app/[lang]/courses/layout.tsx:27 · contracts/index.ts:741 |
 | 25 | Overlay giá | `pricedCourseId` là state của TRANG; `CoursePriceOverlay` render như anh em ngang hàng của cây trang | index.tsx:51,84 |
 | 26 | Cách nhận cây con | Chỉ `state` / `props` / `on`; không prop nào kiểu ReactNode; cây con qua prop `render` của Tree | component.tsx:116 |
 | 27 | Sticky và offset | Không có sticky nào ở tầng trang, nên không có token offset nào | contracts/index.ts:2048 |

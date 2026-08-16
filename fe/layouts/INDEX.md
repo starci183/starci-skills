@@ -10,7 +10,7 @@ template: shelf-v1
 
 # INDEX.md
 
-Version: `1.00` · Shelf: `layouts` · Gate `1` of `6`
+Version: `1.01` · Shelf: `layouts` · Gate `1` of `5`
 
 ## What this gate takes and returns
 
@@ -75,10 +75,10 @@ emits in `LayoutPlan.archetype`, so routing is checkable by string equality rath
 
 | `archetype` | Module | Choose it when | Frame contract | Serves |
 |---|---|---|---|---|
-| `bang-chrome-tren-than-trang` | [`bang-chrome-tren-than-trang/`](./bang-chrome-tren-than-trang/INDEX.md) | The reader must be able to LEAVE this page: the cluster carries brand, destinations and account tools above the body | `double-navbar` over `routed-page-main` | 6 route clusters, 49 of 51 pages |
-| `cot-dich-den-dung-canh-than-trang` | [`cot-dich-den-dung-canh-than-trang/`](./cot-dich-den-dung-canh-than-trang/INDEX.md) | One purchase opens MANY modes and the reader moves between them without losing the frame | `learn-shell-frame`, `personal-project-workspace-frame` | 33 pages (30 learn, 3 personal-project) |
-| `khung-danh-tinh-bao-quanh-bang-chung` | [`khung-danh-tinh-bao-quanh-bang-chung/`](./khung-danh-tinh-bao-quanh-bang-chung/INDEX.md) | The page is ABOUT a subject and the body shows changing evidence about that same subject | `profile-tabs-over-body` → `profile-rail-then-main` | 10 pages under `/profile/[username]` |
-| `nguoi-giu-phien-vo-hinh` | [`nguoi-giu-phien-vo-hinh/`](./nguoi-giu-phien-vo-hinh/INDEX.md) | Nothing needs drawing; something needs to SURVIVE navigation | `playground-session-frame`, `global-ai-layout` | 2 playground pages, plus 51 pages minus 5 for the AI owner |
+| `sticky-chrome-band` | [`sticky-chrome-band/`](./archetypes/sticky-chrome-band/INDEX.md) | The reader must be able to LEAVE this page: the cluster carries brand, destinations and account tools above the body | `double-navbar` over `routed-page-main` | 6 route clusters, 49 of 51 pages |
+| `destination-column` | [`destination-column/`](./archetypes/destination-column/INDEX.md) | One purchase opens MANY modes and the reader moves between them without losing the frame | `learn-shell-frame`, `personal-project-workspace-frame` | 33 pages (30 learn, 3 personal-project) |
+| `subject-and-evidence` | [`subject-and-evidence/`](./archetypes/subject-and-evidence/INDEX.md) | The page is ABOUT a subject and the body shows changing evidence about that same subject | `profile-tabs-over-body` → `profile-rail-then-main` | 10 pages under `/profile/[username]` |
+| `invisible-owner` | [`invisible-owner/`](./archetypes/invisible-owner/INDEX.md) | Nothing needs drawing; something needs to SURVIVE navigation | `playground-session-frame`, `global-ai-layout` | 2 playground pages, plus 51 pages minus 5 for the AI owner |
 | `chua-co-archetype-do-duoc` | *no module* | None of the four fits and no shipped screen proves a fifth | — | see `## Owed` |
 
 Archetypes compose. A learn page is `cot-dich-den` INSIDE `bang-chrome` UNDER `nguoi-giu-phien`.
@@ -93,17 +93,31 @@ binding.
 
 | Law | Subject | Owner module | Kind |
 |---|---|---|---|
-| L1 | A global visual owner mounts at the locale root | `nguoi-giu-phien-vo-hinh` (`KEEPER-1`) | fixed |
-| L2 | The assistant and the page's content faces are different axes | `nguoi-giu-phien-vo-hinh` (`KEEPER-3`) | fixed |
-| L3 | A page's section tabs are the navbar's second row, joined to it | `bang-chrome-tren-than-trang` (`CHROME-2`, `CHROME-8`) | fixed |
-| L4 | A tab changes a panel; a route changes a page | `bang-chrome-tren-than-trang` (`CHROME-5`) | fixed |
-| L5 | Every route has a real page owner; which route is the DOOR is a product decision | `cot-dich-den-dung-canh-than-trang` (`SPINE-6`) | **criterion — founder flipped** |
-| L6 | An overlay is already a surface; no card inside it | `bang-chrome-tren-than-trang` (`CHROME-7`) | fixed |
-| L7 | Overlay width is a product decision, never "modals are narrow" | `bang-chrome-tren-than-trang` (`CHROME-7`) | fixed |
-| L8 | Each field belongs to exactly one region | `khung-danh-tinh-bao-quanh-bang-chung` (`IDENT-3`) | fixed |
-| L9 | A sticky offset subtracts the chrome of ITS OWN page | `bang-chrome-tren-than-trang` (`CHROME-1`, `CHROME-2`) | fixed |
-| L10 | A region's width belongs to that region's layout owner, not a sibling | `cot-dich-den-dung-canh-than-trang` (`SPINE-5`) | fixed |
-| L11 | Full-width line versus compact control beside the figure | `bang-chrome-tren-than-trang` (`CHROME-3`, `CHROME-4`) | **criterion — founder flipped** |
+| L1 | A persistent owner mounts once at the root; repeatable chrome does not | [`laws/l1-persistent-owner-mounts-once`](laws/l1-persistent-owner-mounts-once/INDEX.md) | fixed |
+| L2 | The assistant and the page's content faces are different axes | [`laws/l2-assistant-and-content-are-different-axes`](laws/l2-assistant-and-content-are-different-axes/INDEX.md) | fixed |
+| L3 | A page's section tabs are the navbar's second row, joined to it | [`laws/l3-section-tabs-are-navbar-second-row`](laws/l3-section-tabs-are-navbar-second-row/INDEX.md) | fixed |
+| L4 | A tab changes a panel; a route changes a page | [`laws/l4-tab-switches-panel-route-switches-page`](laws/l4-tab-switches-panel-route-switches-page/INDEX.md) | fixed |
+| L5 | Every route has a real page owner; which route is the DOOR is a product decision | [`laws/l5-every-route-has-a-real-owner`](laws/l5-every-route-has-a-real-owner/INDEX.md) | **criterion — founder flipped** |
+| L6 | An overlay is already a surface; no card inside it | [`laws/l6-overlay-is-already-a-surface`](laws/l6-overlay-is-already-a-surface/INDEX.md) | fixed |
+| L7 | Overlay width is a product decision, never "modals are narrow" | [`laws/l7-overlay-width-is-a-product-decision`](laws/l7-overlay-width-is-a-product-decision/INDEX.md) | fixed |
+| L8 | Each field belongs to exactly one region | [`laws/l8-one-field-one-region`](laws/l8-one-field-one-region/INDEX.md) | fixed |
+| L9 | A sticky offset subtracts the chrome of ITS OWN page | [`laws/l9-sticky-offset-is-page-local`](laws/l9-sticky-offset-is-page-local/INDEX.md) | fixed |
+| L10 | A region's width belongs to that region's layout owner, not a sibling | [`laws/l10-region-width-belongs-to-its-owner`](laws/l10-region-width-belongs-to-its-owner/INDEX.md) | fixed |
+| L11 | Full-width line versus compact control beside the figure | [`laws/l11-full-width-run-versus-compact-control`](laws/l11-full-width-run-versus-compact-control/INDEX.md) | **criterion — founder flipped** |
+
+**L1's earlier statement is withdrawn.** It said a global visual owner must not mount into chrome that
+repeats per route cluster — and `ShellNav` mounts in six of them (`cart`, `courses`, `dashboard`,
+`league`, `practice`, `profile`), which a live test requires rather than merely tolerates. The law
+only ever governed an owner holding state that must survive navigation. Six copies of one navbar is
+the correct answer, and the module says so.
+*Anchor: `D:\Repositories\starci-academy-fe\src\app\[lang]\authentication\layout-boundary.test.ts:24-25`
+requires the mount inside the families that own it; `:18` keeps it out of the shell authentication
+shares.*
+
+**The three owed laws are now routed.** L2, L7 and L11 each hold a module of their own, so every row
+in this table leads somewhere and no law is claimed by a neighbour that does not own it. `L6` cites
+`L7` for overlay width and that citation now resolves; `L4` and `L10` both send a control's shape to
+`L11`, which is where the criterion lives.
 
 A criterion is not a default. Where a law is marked *criterion*, the module states both rulings with
 both anchors and gives the question that separates them. Answering that question with "whichever we
@@ -116,11 +130,11 @@ copy the breach into a new plan.
 
 | Breach | Where | Module |
 |---|---|---|
-| `<main>` inside `<main>` on 30 learn routes and course detail: `routed-page-main` declares `host: "main"` and wraps everything under `/courses`, while 23 page contracts declare `host: "main"` too | `contracts\index.ts:744`; `app\[lang]\courses\layout.tsx:32-39`; `contracts\index.ts:302,313,428,472,584,2009` | all four |
-| The primary navbar still repeats `Trang chủ / Khóa học / Liên hệ` above course-detail tabs, which was rejected | `ShellNav\index.tsx:113-121` | `bang-chrome-tren-than-trang` |
-| `personal-project-workspace-frame` claims a milestone column in its `why` but flattens repeats as direct children and sizes `*:first-child`, so one NavLink gets the width, not a column | `contracts\index.ts:388,392,395` | `cot-dich-den-dung-canh-than-trang` |
-| `PublicProfileLayout` declares five states and branches four; `loading` falls through to the ready tree and draws chrome over absent data | `PublicProfileLayout\component.tsx:15,101` | `khung-danh-tinh-bao-quanh-bang-chung` |
-| `CourseLearnTodayPage` is mounted by no route, so `isToday` is never true and `TODAY_TABS` is unreachable | `LearnShellLayout\index.tsx:128,95-99` | `cot-dich-den-dung-canh-than-trang` |
+| `<main>` inside `<main>` on 30 learn routes and course detail: `routed-page-main` declares `host: "main"` and wraps everything under `/courses`, while 23 page contracts declare `host: "main"` too | `contracts\index.ts:744`; `src\app\[lang]\courses\layout.tsx:32-39`; `contracts\index.ts:302,313,428,472,584,2009` | all four |
+| The primary navbar still repeats `Trang chủ / Khóa học / Liên hệ` above course-detail tabs, which was rejected | `ShellNav\index.tsx:113-121` | `sticky-chrome-band` |
+| `personal-project-workspace-frame` claims a milestone column in its `why` but flattens repeats as direct children and sizes `*:first-child`, so one NavLink gets the width, not a column | `contracts\index.ts:388,392,395` | `destination-column` |
+| `PublicProfileLayout` declares five states and branches four; `loading` falls through to the ready tree and draws chrome over absent data | `PublicProfileLayout\component.tsx:15,101` | `subject-and-evidence` |
+| `CourseLearnTodayPage` is mounted by no route, so `isToday` is never true and `TODAY_TABS` is unreachable | `LearnShellLayout\index.tsx:128,95-99` | `destination-column` |
 
 ## Proofs
 

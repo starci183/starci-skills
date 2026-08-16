@@ -10,13 +10,18 @@ description: Bảng điểm phép thử giữ kín đáp án cho ba trang founde
 
 > Gate: layouts · Ngày: 2026-08-16 · Phép thử: một agent đọc code ghi cấu trúc thật, một agent khác chỉ nhận yêu cầu nghiệp vụ cộng gate và dựng lại từ đầu.
 
+Trang này giữ hai lần chấm:
+
+- **Lần 1 — phép thử một-gate** (bên dưới): mỗi màn được dựng lại độc lập từ yêu cầu nghiệp vụ.
+- **Lần 2 — [phép thử chuỗi đầy đủ](#lần-2--phép-thử-chuỗi-đầy-đủ)**: năm gate chạy nối tiếp, mỗi gate chỉ nhận đầu ra gate trước, không gate nào đọc repo.
+
 ## Bảng điểm
 
 | Màn | Trang | Mục chấm | TRÚNG | KHÁC MÀ ĐƯỢC | LỆCH | THIẾU | Tỉ lệ trúng |
 |---|---|---|---|---|---|---|---|
-| [DashboardPage](./dashboard-page) | dashboard | 28 | 17 | 1 | 6 | 4 | 61% |
-| [CoursesCatalogPage](./courses-catalog-page) | courses | 27 | 13 | 1 | 8 | 5 | 48% |
-| [CourseDetailPage](./course-detail-page) | course-details | 27 | 11 | 1 | 7 | 8 | 41% |
+| [DashboardPage](./DashboardPage.md) | dashboard | 28 | 17 | 1 | 6 | 4 | 61% |
+| [CoursesCatalogPage](./CoursesCatalogPage.md) | courses | 27 | 13 | 1 | 8 | 5 | 48% |
+| [CourseDetailPage](./CourseDetailPage.md) | course-details | 27 | 11 | 1 | 7 | 8 | 41% |
 | **Cộng** | | **82** | **41** | **3** | **21** | **17** | **50%** |
 
 Một nửa. Và mức trúng tụt đều theo độ phức tạp của trang: trang càng nhiều tầng thì gate càng hụt.
@@ -70,3 +75,48 @@ Gom từ trường `uncertain` của cả ba bản dựng mù, xếp theo số b
 | Thứ tự các khối bên trong một vùng (B8 chỉ nói nhóm trước gap sau) | 2/3 |
 | Khoá cache có phải mang danh tính người xem không | 1/3 (gate không có một chữ nào về cache) |
 | B9 và B12 không có trong bản gate được cấp | 2/3 nêu thẳng |
+
+---
+
+## Lần 2 — phép thử chuỗi đầy đủ
+
+> Ngày: 2026-08-16 · Chuỗi: layouts → blocks → principles → patterns → lints · Mỗi gate chỉ nhận đầu ra gate trước; không gate nào đọc repo.
+
+### Bảng điểm
+
+| Trang | best-of-set | recommended | TRÚNG | KHÁC MÀ ĐƯỢC | LỆCH | THIẾU | Không đo được |
+|---|---|---|---|---|---|---|---|
+| [dashboard](./dashboard.md) | không đo được | **9.5/16 · 59%** | 9 | 1 | 3 | 3 | 0 |
+| [courses](./courses.md) | không đo được | **3/10 · 30%** | 3 | 0 | 4 | 3 | 5 |
+| [course-details](./course-details.md) | không đo được | **7/14 · 50%** | 7 | 0 | 5 | 2 | 2 |
+| **Trung bình** | — | **46%** | | | | | |
+
+**Vì sao best-of-set không đo được ở cả ba trang.** Gate layouts được yêu cầu trả 3–4 phương án; chuỗi mù chỉ mang **một** phương án qua ranh giới layouts → blocks. Ba phương án còn lại không tồn tại trong đầu vào của các gate sau và không tồn tại trong bản ghi. Nghĩa là **không ai — kể cả người chấm — có thể biết gate đã đẻ ra phương án đúng rồi khuyên nhầm, hay chưa bao giờ đẻ ra nó.** Đây là lỗi của giao thức chuỗi, không phải của gate: cận dưới của best-of-set bằng đúng điểm recommended, và khoảng cách giữa hai con số bị vứt đi ở ranh giới đầu tiên.
+
+Sửa: `output` của gate layouts và gate blocks phải mang cả tập phương án qua ranh giới, kèm đúng một trường `recommended`.
+
+### Gate còn thiếu luật gì (lần 2)
+
+| # | Câu luật lẽ ra đã ngăn được | Trang |
+|---|---|---|
+| 1 | **Measure của một trang thuộc về đúng một node, và node đó phải được gọi tên tại gate layouts.** | 3/3 |
+| 2 | **Gate phải chỉ đích danh file mở landmark `main`; khai `mainLandmarkOwner` mà không có file tương ứng là một lời khai không có chủ.** | 3/3 |
+| 3 | **Tập state của một màn hình phải bao gồm người chưa đăng nhập, kể cả khi câu trả lời là không vẽ gì.** | 2/3 |
+| 4 | **Trang phải liệt kê từng vùng cấp một cùng với bắt buộc hay tùy chọn, và "tùy chọn" nghĩa là slot KHÔNG TỒN TẠI.** | 2/3 |
+| 5 | **Nếu một slot nhận nhiều hơn một hình dạng thì nó là một union được liệt kê, không phải một khoá gộp.** | 2/3 |
+| 6 | **Hai trạng thái do hai nguyên nhân khác nhau phải mang hai tên khác nhau**: `empty` ≠ `not-found` ≠ `filtered-empty` ≠ `failed`. | 2/3 |
+| 7 | **Nếu một cụm có nhịp dữ liệu riêng thì nó có thang state riêng, liệt kê ngay tại gate layouts.** | 1/3 |
+| 8 | **Nếu cột đọc dài hơn một màn thì phải quyết định có vùng điều hướng theo phần hay không.** | 1/3 |
+| 9 | **Preference của người đọc phải nói rõ nó sống ở đâu và ai hydrate nó.** | 1/3 |
+
+Bốn câu 1, 3, 6, 9 trùng đúng với các câu 11, 13, 1 và 12 của lần 1 — nghĩa là **cùng một chỗ thiếu bị bắt lại lần thứ hai bằng một phép thử khác.**
+
+### Chỗ gate im lặng nhất (lần 2)
+
+`uncertain` của gate layouts **không tồn tại trong chuỗi mù**. Đây là chỗ im lặng lớn nhất của lần 2: gate đầu tiên là gate duy nhất còn có thể hỏi ngược người dùng trước khi mọi thứ khác được suy ra từ một giả định, và không có bản ghi nào cho thấy nó đã hỏi hay đã im.
+
+Ba câu hỏi thuộc gate layouts nhưng chỉ được nêu ra ở gate cuối, sau khi mã đã được viết:
+
+1. Ai giữ landmark `main` — layout của route family hay trang? (dashboard, course-details)
+2. Một landmark do entry mở thì lấy nhãn đọc được ở đâu, khi frame chỉ phát `data-node`, `data-why`, `className`? (courses)
+3. Một trang có bao nhiêu chủ hành động, và hành động đi xuống bằng đường nào? (course-details)

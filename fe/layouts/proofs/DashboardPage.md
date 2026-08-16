@@ -19,7 +19,7 @@ Học viên đã đăng nhập cần một chỗ mở đầu mỗi ngày để b
 | # | Mục | Sự thật | Neo |
 |---|---|---|---|
 | 1 | Archetype trang | `rail-then-main`, contract `dashboard-rail-then-main`, đúng 2 slot cứng `rail` + `main`, không có slot thứ ba | contracts/index.ts:1048 |
-| 2 | Ai mở landmark | Trang KHÔNG tự mở `main`; route layout mở qua contract `routed-page-main`. Trang chỉ là một `<div>` Tree bên trong | app/[lang]/dashboard/layout.tsx:30 · contracts/index.ts:741 |
+| 2 | Ai mở landmark | Trang KHÔNG tự mở `main`; route layout mở qua contract `routed-page-main`. Trang chỉ là một `<div>` Tree bên trong | src/app/[lang]/dashboard/layout.tsx:30 · contracts/index.ts:741 |
 | 3 | Số slot cấp trang | 2 | contracts/index.ts:1048 |
 | 4 | Rail chứa gì | `IdentityRail` + `QuickActions`, restingCount 2 | pages/DashboardPage/component.tsx:56-61 |
 | 5 | Rail đứng yên | Dựng TRƯỚC nhánh rẽ, không đọc `selectedTab`; cả 4 tab nhận đúng một cây rail | component.tsx:51-61 |

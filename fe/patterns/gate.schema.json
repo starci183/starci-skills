@@ -6,7 +6,10 @@
   "$comment": "input là $ref thẳng vào MarkupPlan của .claude/fe/principles/gate.schema.json. output là $ref của gate lints.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["input", "output"],
+  "required": [
+    "input",
+    "output"
+  ],
   "properties": {
     "input": {
       "description": "HTML và cây node đã chốt ở gate principles, đưa nguyên vào chứ không tóm tắt lại.",
@@ -22,7 +25,6 @@
       "description": "Lý do có neo, kéo theo chuỗi từ gate principles nên cả năm gate dùng đúng một định nghĩa.",
       "$ref": "https://starci.academy/schema/fe/principles/gate.schema.json#/$defs/Reason"
     },
-
     "PatternModule": {
       "description": "Module luật sở hữu quyết định mã này, lấy từ đúng các module đang có trên shelf patterns.",
       "$comment": "Nguồn: các thư mục module trong .claude/fe/patterns, khớp một-một với 17 law của .claude/sources/fe/index.mjs cộng cache-key.",
@@ -47,7 +49,6 @@
         "vendor-boundary"
       ]
     },
-
     "Tier": {
       "description": "Tầng component mà một file thuộc về, lấy từ các thư mục tầng đang có thật trong repo sống.",
       "$comment": "Nguồn đo: src/components có contracts, pages, layouts, overlays, blocks, branches, composites, leaves, shells.",
@@ -65,13 +66,16 @@
         "app"
       ]
     },
-
     "PatternDecision": {
       "type": "object",
       "title": "Một quyết định mã",
       "description": "Một tình huống mà một module luật sở hữu ở tầng mã, kèm mã tình huống và vì sao file rơi vào đúng mã đó.",
       "additionalProperties": false,
-      "required": ["module", "code", "reason"],
+      "required": [
+        "module",
+        "code",
+        "reason"
+      ],
       "properties": {
         "module": {
           "description": "Module luật sở hữu tình huống này.",
@@ -89,7 +93,16 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "module": { "const": "contract" } }, "required": ["module"] },
+          "if": {
+            "properties": {
+              "module": {
+                "const": "contract"
+              }
+            },
+            "required": [
+              "module"
+            ]
+          },
           "then": {
             "properties": {
               "code": {
@@ -116,13 +129,18 @@
         }
       ]
     },
-
     "SourceFile": {
       "type": "object",
       "title": "Một file mã",
       "description": "Một file sẽ được ghi hoặc sửa, kèm tầng của nó và vai trò của nó trong cặp file.",
       "additionalProperties": false,
-      "required": ["path", "tier", "role", "reason"],
+      "required": [
+        "path",
+        "tier",
+        "role",
+        "reason",
+        "source"
+      ],
       "properties": {
         "path": {
           "type": "string",
@@ -136,7 +154,16 @@
         "role": {
           "description": "Vai trò của file trong cặp file của tầng đó.",
           "$comment": "Nguồn đo: thứ tự cố định của component.tsx và index.tsx trong tầng block; regex TWO_FILE_TIERS chỉ khớp pages và layouts, nên tầng block không bị luật file-layout phủ.",
-          "enum": ["component", "index", "test", "story", "contract-entry", "hook", "route-file", "global-css"]
+          "enum": [
+            "component",
+            "index",
+            "test",
+            "story",
+            "contract-entry",
+            "hook",
+            "route-file",
+            "global-css"
+          ]
         },
         "exportName": {
           "type": "string",
@@ -150,16 +177,27 @@
         "reason": {
           "description": "Vì sao file này tồn tại ở đúng tầng đó với đúng vai trò đó.",
           "$ref": "#/$defs/Reason"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nội dung mã của file, nguyên văn. Không phải tóm tắt, không phải phác thảo.",
+          "$comment": "Thiếu ô này thì gate lints nhận một danh sách đường dẫn và không có gì để lint: đo được 8 trên 60 file ở dashboard. Cả ba bước mù đều phải tự chế field vì additionalProperties false chặn chúng lại."
         }
       }
     },
-
     "ContractEntry": {
       "type": "object",
       "title": "Một khoá hợp đồng",
       "description": "Mô tả một node đúng một lần: khoá sở hữu class, thẻ nó mở và lý do các con ngồi như thế.",
       "additionalProperties": false,
-      "required": ["key", "host", "classNames", "children", "why"],
+      "required": [
+        "key",
+        "host",
+        "classNames",
+        "children",
+        "why"
+      ],
       "properties": {
         "key": {
           "type": "string",
@@ -182,7 +220,9 @@
             "type": "string",
             "minLength": 1,
             "description": "Một class sắp xếp thuộc union đóng LayoutClassName của registry sống.",
-            "not": { "pattern": "\\[[^\\]]*[0-9]+(px|rem|em|%|vh|vw|ch|dvh)" }
+            "not": {
+              "pattern": "\\[[^\\]]*[0-9]+(px|rem|em|%|vh|vw|ch|dvh)"
+            }
           }
         },
         "children": {
@@ -191,7 +231,9 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["slot"],
+            "required": [
+              "slot"
+            ],
             "properties": {
               "slot": {
                 "type": "string",
@@ -222,8 +264,21 @@
             },
             "allOf": [
               {
-                "if": { "properties": { "repeats": { "const": true } }, "required": ["repeats"] },
-                "then": { "required": ["restingCount"] }
+                "if": {
+                  "properties": {
+                    "repeats": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "repeats"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "restingCount"
+                  ]
+                }
               }
             ]
           }
@@ -239,13 +294,19 @@
         }
       }
     },
-
     "SourcePlan": {
       "type": "object",
       "title": "Đầu ra của gate patterns",
       "description": "HTML cũ kèm mã đã dựng: file, khoá hợp đồng, lát cắt pure và connected, chủ landmark main; đây đúng bằng input của gate lints.",
       "additionalProperties": false,
-      "required": ["markup", "files", "contractEntries", "split", "mainLandmarkOwner", "decisions"],
+      "required": [
+        "markup",
+        "files",
+        "contractEntries",
+        "split",
+        "mainLandmarkOwner",
+        "decisions"
+      ],
       "properties": {
         "markup": {
           "description": "Nguyên HTML và cây node đến từ gate principles, mang theo để gate lints không phải đoán lại nó.",
@@ -255,12 +316,16 @@
           "type": "array",
           "minItems": 1,
           "description": "Mọi file sẽ được ghi hoặc sửa, không file nào nằm ngoài danh sách này.",
-          "items": { "$ref": "#/$defs/SourceFile" }
+          "items": {
+            "$ref": "#/$defs/SourceFile"
+          }
         },
         "contractEntries": {
           "type": "array",
           "description": "Các khoá hợp đồng được dùng lại hoặc thêm mới cho cây node ở trên.",
-          "items": { "$ref": "#/$defs/ContractEntry" }
+          "items": {
+            "$ref": "#/$defs/ContractEntry"
+          }
         },
         "split": {
           "type": "object",
@@ -268,7 +333,12 @@
           "description": "Ai giữ request, dịch, router và mutation, và ai giữ cây.",
           "$comment": "Nguồn đo: rule the-split khoá bằng ĐƯỜNG DẪN FILE và bằng tên twin gạch dưới, không bao giờ đọc meta.",
           "additionalProperties": false,
-          "required": ["pureExport", "connectedExport", "worldReachedFrom", "reason"],
+          "required": [
+            "pureExport",
+            "connectedExport",
+            "worldReachedFrom",
+            "reason"
+          ],
           "properties": {
             "pureExport": {
               "type": "string",
@@ -283,7 +353,10 @@
             "worldReachedFrom": {
               "description": "Nửa nào được phép chạm thế giới.",
               "$comment": "Nguồn đo: regex REACHES_FOR_THE_WORLD liệt kê bốn họ bị cấm ở nửa thuần - request, store, runtime dịch, query trực tiếp.",
-              "enum": ["chi-nua-connected", "ca-hai-nua"]
+              "enum": [
+                "chi-nua-connected",
+                "ca-hai-nua"
+              ]
             },
             "reExportsComponent": {
               "type": "boolean",
@@ -300,11 +373,17 @@
           "title": "Nhãn meta",
           "description": "Chú thích khai báo của khối; không gate nào đọc nó nên nó là lời khai chứ không phải bằng chứng.",
           "additionalProperties": false,
-          "required": ["world", "domain"],
+          "required": [
+            "world",
+            "domain"
+          ],
           "properties": {
             "world": {
               "description": "Nửa thuần hay nửa nối, theo lời khai.",
-              "enum": ["pure", "connected"]
+              "enum": [
+                "pure",
+                "connected"
+              ]
             },
             "domain": {
               "description": "Miền nghiệp vụ, lấy đúng mười miền đo được ở tầng block.",
@@ -313,14 +392,23 @@
             "shape": {
               "description": "Hình dạng của đơn vị khi nó không phải một khối thường.",
               "$comment": "Nguồn đo: marker shape layout chỉ có ở 3 trên 6 layout sống; ba lược đồ meta khác nhau cùng tồn tại.",
-              "enum": ["layout", "block", "page", "overlay"]
+              "enum": [
+                "layout",
+                "block",
+                "page",
+                "overlay"
+              ]
             }
           }
         },
         "mainLandmarkOwner": {
           "description": "Ai mở landmark main cho route này.",
           "$comment": "Nguồn đo: luật landmark có hai rule - routed-page-is-a-main-landmark và main-landmark-belongs-to-a-route-file. Repo sống đang lồng main trong main trên 30 route learn vì 23 contract page cùng khai host main dưới một routed-page-main đã mở sẵn.",
-          "enum": ["route-file", "contract-page", "khong-mo-main"]
+          "enum": [
+            "route-file",
+            "contract-page",
+            "khong-mo-main"
+          ]
         },
         "translationKeys": {
           "type": "array",
@@ -328,7 +416,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["key", "resolvedAt"],
+            "required": [
+              "key",
+              "resolvedAt"
+            ],
             "properties": {
               "key": {
                 "type": "string",
@@ -337,7 +428,12 @@
               "resolvedAt": {
                 "description": "Tầng giải khoá này thành chữ.",
                 "$comment": "Nguồn: rule no-copy-resolution-below-block của luật translation.",
-                "enum": ["block", "page", "layout", "overlay"]
+                "enum": [
+                  "block",
+                  "page",
+                  "layout",
+                  "overlay"
+                ]
               }
             }
           }
@@ -346,7 +442,9 @@
           "type": "array",
           "minItems": 1,
           "description": "Mọi quyết định mã, mỗi cái gắn với một module luật và một mã tình huống.",
-          "items": { "$ref": "#/$defs/PatternDecision" }
+          "items": {
+            "$ref": "#/$defs/PatternDecision"
+          }
         },
         "owed": {
           "type": "array",
@@ -354,7 +452,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["claim", "reason"],
+            "required": [
+              "claim",
+              "reason"
+            ],
             "properties": {
               "claim": {
                 "type": "string",

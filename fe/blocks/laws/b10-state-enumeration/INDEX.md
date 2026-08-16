@@ -84,7 +84,7 @@ a ladder. Everything downstream of it is present or absent.
 | A partial state matrix is not acceptance | neo TỪ CHỐI | `.workflows\designs\starci-academy\global-ai-chatbot.md:1116` | "User required full coverage." |
 | A state is a situation that picks a different tree | neo CODE | `D:\Repositories\starci-academy-fe\src\components\blocks\dashboard\StreakStatRow\index.tsx:14-16` | — |
 | The four-rung settle ladder | neo CODE | `D:\Repositories\starci-academy-fe\src\components\blocks\dashboard\WeeklyChallengeCard\index.tsx:31-37` | — |
-| Eleven situations, the eleventh declared by nobody | neo CODE | `D:\Repositories\starci-academy-fe\src\components\blocks\coding\JudgeStatusStrip\component.tsx:26-28` | — |
+| Eleven situations, the eleventh declared by nobody | neo CODE | `D:\Repositories\starci-academy-fe\src\components\blocks\coding\JudgeStatusStrip\component.tsx:33-45` (the union), reason at `:26-28` | — |
 | The two coexisting state shapes | neo CODE | `D:\Repositories\starci-academy-fe\src\components\blocks\courses\CoursePricingRail\component.tsx:119` | — |
 
 ## Scope

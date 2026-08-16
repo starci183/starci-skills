@@ -44,6 +44,24 @@ fe/<shelf>/
 `fe/<shelf>/INDEX.md` is the only file in the shelf root besides the schema. A shelf that grows a
 second loose `.md` has a module it has not admitted yet.
 
+### Families
+
+A shelf holding two kinds of module may sort them one level down, and `blocks` does:
+
+```
+fe/blocks/
+├── archetypes/<module>/   which shapes exist
+└── laws/<module>/         which constraints apply to any of them
+```
+
+The two answer different questions and mixing them in one flat list loses that. **One level only** —
+a family folder holds modules, never another family. A module's id is its path under the shelf, so it
+reads `laws/b1-one-surface-owner`.
+
+This nesting was invisible to the docs sync until `discoverModules` was taught to walk into a folder
+that holds no `INDEX.md` of its own. Before that, 21 modules published as zero — no error, no count,
+nothing to notice.
+
 ## A module
 
 One concept. Five records, no more, and none of the five is optional — the docs sync

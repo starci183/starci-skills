@@ -67,7 +67,7 @@ per course, each pricing itself for this viewer, is a request whose count only t
 the row owns it. A figure the page already fetched once is handed down settled. This is the only
 rule that adjudicates block-fetch versus page-fetch, and getting it wrong is the most expensive
 single mistake on this shelf: it is the difference between one request and N.
-Anchor: `D:\Repositories\starci-academy-fe\src\components\blocks\courses\CourseCatalogCard\index.tsx:48-52`
+Anchor: `D:\Repositories\starci-academy-fe\src\components\blocks\courses\CourseCatalogCard\index.tsx:64-67`
 — neo CODE.
 
 **`BLOCK-3` · A viewer-scoped request keys on the viewer, and keys on `null` until the viewer
@@ -82,15 +82,15 @@ rather than a judgement.
 
 | `renderForm` | Module | What it serves |
 |---|---|---|
-| `bang-danh-sach-co-nhan` | [`archetypes/bang-danh-sach-co-nhan`](archetypes/bang-danh-sach-co-nhan/INDEX.md) | A set of comparable rows under one name |
-| `hang-chi-so-khong-mat-phang` | [`archetypes/hang-chi-so-khong-mat-phang`](archetypes/hang-chi-so-khong-mat-phang/INDEX.md) | One standing figure on a bare rail |
-| `the-tong-ket-mot-chi-so-kem-hanh-dong` | [`archetypes/the-tong-ket-mot-chi-so-kem-hanh-dong`](archetypes/the-tong-ket-mot-chi-so-kem-hanh-dong/INDEX.md) | One figure, one story, one button that changes the outcome |
-| `the-hoac-hang-nhan-state-tu-noi-goi` | [`archetypes/the-hoac-hang-nhan-state-tu-noi-goi`](archetypes/the-hoac-hang-nhan-state-tu-noi-goi/INDEX.md) | An item whose data belongs to the list around it |
-| `khoi-ghep-khoi` | [`archetypes/khoi-ghep-khoi`](archetypes/khoi-ghep-khoi/INDEX.md) | A region made of child blocks that each settle alone |
-| `bang-thao-tac-nhieu-buoc` | [`archetypes/bang-thao-tac-nhieu-buoc`](archetypes/bang-thao-tac-nhieu-buoc/INDEX.md) | A place the reader works, not reads |
-| `rail-quyet-dinh-mua` | [`archetypes/rail-quyet-dinh-mua`](archetypes/rail-quyet-dinh-mua/INDEX.md) | The purchase column and its mobile bar |
-| `cua-vao-toan-cuc` | [`archetypes/cua-vao-toan-cuc`](archetypes/cua-vao-toan-cuc/INDEX.md) | A touch point that is always present and belongs to no page |
-| `o-bang-chung-ho-so` | [`archetypes/o-bang-chung-ho-so`](archetypes/o-bang-chung-ho-so/INDEX.md) | The public-profile evidence tiles — the branch that broke the mould |
+| `named-run` | [`archetypes/named-run`](archetypes/named-run/INDEX.md) | A set of comparable rows under one name |
+| `standing-figure` | [`archetypes/standing-figure`](archetypes/standing-figure/INDEX.md) | One standing figure on a bare rail |
+| `figure-and-offer` | [`archetypes/figure-and-offer`](archetypes/figure-and-offer/INDEX.md) | One figure, one story, one button that changes the outcome |
+| `owned-item` | [`archetypes/owned-item`](archetypes/owned-item/INDEX.md) | An item whose data belongs to the list around it |
+| `block-of-blocks` | [`archetypes/block-of-blocks`](archetypes/block-of-blocks/INDEX.md) | A region made of child blocks that each settle alone |
+| `workbench` | [`archetypes/workbench`](archetypes/workbench/INDEX.md) | A place the reader works, not reads |
+| `purchase-column` | [`archetypes/purchase-column`](archetypes/purchase-column/INDEX.md) | The purchase column and its mobile bar |
+| `global-touchpoint` | [`archetypes/global-touchpoint`](archetypes/global-touchpoint/INDEX.md) | A touch point that is always present and belongs to no page |
+| `evidence-tile` | [`archetypes/evidence-tile`](archetypes/evidence-tile/INDEX.md) | The public-profile evidence tiles — the branch that broke the mould |
 
 Nine archetypes, and every one of them is a shape the app already runs. A tenth is admitted only
 with an `Anchor` to a shipped block; a shape nobody has built is a proposal, and proposals do not

@@ -10,13 +10,18 @@ description: Bảng điểm phép thử giữ kín đáp án cho ba khối thu�
 
 > Gate: blocks · Ngày: 2026-08-16 · Phép thử: một agent đọc code ghi cấu trúc thật, một agent khác chỉ nhận yêu cầu nghiệp vụ cộng gate và dựng lại từ đầu.
 
+Trang này giữ hai lần chấm:
+
+- **Lần 1 — phép thử một-gate** (bên dưới): ba KHỐI được dựng lại độc lập.
+- **Lần 2 — [phép thử chuỗi đầy đủ](#lần-2--phép-thử-chuỗi-đầy-đủ)**: năm gate chạy nối tiếp trên ba TRANG, mỗi gate chỉ nhận đầu ra gate trước.
+
 ## Bảng điểm
 
 | Khối | Trang | Mục chấm | TRÚNG | KHÁC MÀ ĐƯỢC | LỆCH | THIẾU | Tỉ lệ trúng |
 |---|---|---|---|---|---|---|---|
-| [DailyQuest](./daily-quest) | dashboard | 26 | 16 | 1 | 3 | 6 | 62% |
-| [CourseCatalogCard](./course-catalog-card) | courses | 27 | 11 | 0 | 9 | 7 | 41% |
-| [CoursePricingRail](./course-pricing-rail) | course-details | 30 | 17 | 0 | 9 | 4 | 57% |
+| [DailyQuest](./DailyQuest.md) | dashboard | 26 | 16 | 1 | 3 | 6 | 62% |
+| [CourseCatalogCard](./CourseCatalogCard.md) | courses | 27 | 11 | 0 | 9 | 7 | 41% |
+| [CoursePricingRail](./CoursePricingRail.md) | course-details | 30 | 17 | 0 | 9 | 4 | 57% |
 | **Cộng** | | **83** | **44** | **1** | **21** | **17** | **53%** |
 
 `DailyQuest` cao nhất vì nó là khối đơn giản nhất và vì `standing-offer` mô tả nó gần như từng chữ. `CourseCatalogCard` thấp nhất vì gate không có gì để nói về một khối vừa tự fetch, vừa mang hai bố cục đọc, vừa chỉ báo cáo ý định mở overlay.
@@ -76,3 +81,54 @@ Gom từ trường `uncertain` của cả ba bản dựng mù, xếp theo số b
 | Nút thử lại ở `failed` có hợp lệ không, khi `standing-offer` chỉ nói về control nghiệp vụ | 2/3 |
 | Ảnh/media không khớp archetype khối nào trong năm cái | 1/3 nêu thẳng |
 | Mode BÊN TRONG một khối (mua ↔ học thử) — gate chỉ định nghĩa tab ở tầng navbar | 1/3 nêu thẳng |
+
+---
+
+## Lần 2 — phép thử chuỗi đầy đủ
+
+> Ngày: 2026-08-16 · Chuỗi: layouts → blocks → principles → patterns → lints · Chấm cả TẬP khối của mỗi trang, không chỉ một khối.
+
+### Bảng điểm
+
+| Trang | best-of-set | recommended | TRÚNG | KHÁC MÀ ĐƯỢC | LỆCH | THIẾU | Không đo được |
+|---|---|---|---|---|---|---|---|
+| [dashboard](./dashboard.md) | không đo được | **12/21 · 57%** | 12 | 0 | 7 | 3 | 1 |
+| [courses](./courses.md) | không đo được | **4/12 · 33%** | 4 | 0 | 4 | 4 | 3 |
+| [course-details](./course-details.md) | không đo được | **12/17 · 71%** | 11 | 1 | 0 | 4 | 4 |
+| **Trung bình** | — | **54%** | | | | | |
+
+**best-of-set không đo được** vì chuỗi chỉ mang một phương án qua ranh giới. Cận dưới bằng điểm recommended.
+
+**Một quan sát quyết định về hình dạng điểm.** Ba trang trải từ 33% tới 71%, và biến số phân biệt chúng không phải độ khó của trang mà là **cách câu nghiệp vụ gọi tên thứ nó muốn**:
+
+- `course-details` (71%) — nghiệp vụ nói bằng DANH TỪ: "điều kiện nên có trước khi bắt đầu (theo thứ tự)", "toàn bộ chương trình học", "các câu hỏi thường gặp". Gate đoán trúng tên khối mà không cần đọc repo. Không có LỆCH nào.
+- `courses` (33%) — nghiệp vụ nói bằng QUAN HỆ: "khóa nào đã sở hữu thì tuyệt đối không được chào bán lại lần nữa". Quan hệ giữa hai nhóm không có danh từ nào để bám, nên nó không sinh ra khối nào.
+- Mọi mệnh đề ĐIỀU KIỆN đều rơi ở cả ba trang: "khóa miễn phí hay đã sở hữu thì không còn chuyện thêm vào giỏ", "chưa đăng nhập thì phải đăng nhập trước", "không mảng chậm nào được giữ cả màn hình lại chờ".
+
+Gate blocks hiện **đọc danh từ tốt, đọc quan hệ kém, và gần như không đọc điều kiện.**
+
+### Gate còn thiếu luật gì (lần 2)
+
+| # | Câu luật lẽ ra đã ngăn được | Trang |
+|---|---|---|
+| 1 | **Mọi mệnh đề điều kiện trong câu nghiệp vụ phải trở thành một dòng "trường này ẩn khi …" gắn vào đúng khối.** | 3/3 |
+| 2 | **Trước khi đặt tên một hook mới, gate phải liệt kê hook đã có trả lời cùng câu hỏi. Không có bảng hook làm đầu vào thì gate DỪNG và hỏi.** | 3/3 |
+| 3 | **Mọi nguồn dữ liệu của mọi khối phải trỏ về một file trong danh sách.** | 2/3 |
+| 4 | **Một điều khiển đã có leaf trong từ vựng thì không được dựng lại thành khối hay leaf mới.** | 2/3 |
+| 5 | **Một danh sách hành động do nghiệp vụ liệt kê phải được ĐẾM lại.** | 2/3 |
+| 6 | **Một khối chỉ ghép các khối đã tự fetch thì không có twin và không giữ request.** | 1/3 |
+| 7 | **Mỗi danh từ trong câu nghiệp vụ phải đối chiếu ngược ra một khối; danh từ không có khối phải thành một dòng nợ.** | 1/3 |
+| 8 | **Tham số truy vấn của một trang phải có đúng một chủ.** | 1/3 |
+| 9 | **`restingCount` phải khớp cardinality thật khi cardinality đó do nghiệp vụ cố định.** | 1/3 |
+
+Câu 2, 4 và 9 là bản lặp lại của câu 3, 4 và 6 ở lần 1 — cùng một chỗ thiếu, bắt lại bằng một phép thử khác.
+
+### Chỗ gate im lặng nhất (lần 2)
+
+`uncertain` của gate blocks **không tồn tại trong chuỗi mù**. Dấu vết duy nhất là hai dòng nợ do các gate sau chép lại:
+
+> "Ba lược đồ meta cùng tồn tại trong repo sống và không gate nào đọc meta, nên nhãn meta trong kế hoạch này là lời khai chứ không phải bằng chứng."
+
+> "Gate không nói khối được nhận làn hành động bằng cách nào: `BlockProps` chỉ có state và props, mà chín khối vẫn cần handler… đó là một chỗ luật im, không phải một chỗ luật cho phép."
+
+Câu thứ hai là chỗ im lặng đắt nhất của cả ba trang: nó không sai ở đâu cả nên không cổng nào chặn, và hệ quả là hàng rào hai-slot của `BlockProps` mất hiệu lực trên mọi khối của mọi trang.

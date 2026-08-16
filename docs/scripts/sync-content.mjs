@@ -48,31 +48,49 @@ async function writeGenerated(path, source) {
 
 await rm(contentRoot, {recursive: true, force: true});
 
-// The former `fe/design/` shelf no longer exists; it was split into these three shelves.
+// Listed in chain order: a requirement enters at `layouts` and leaves `lints` as code. The three
+// shelves after `blocks` resolve to something closed - a contract, then code, then what the linter
+// refuses - which is why only the first two offer alternatives.
 const groups = [
-  {key: "layers", title: "Layers", description: "Turning a business requirement into a page composition: which archetype, and what each region holds."},
+  {key: "layouts", title: "Layouts", description: "Từ một yêu cầu nghiệp vụ ra bố cục trang: archetype nào, mỗi vùng giữ gì."},
+  {key: "blocks", title: "Blocks", description: "Từ một vùng ra giải phẫu khối: khối nào, gồm những phần nào, mỗi trạng thái vẽ gì."},
   {key: "principles", title: "Principles", description: "Primitive facts and principles that implementation must not violate."},
   {key: "senses", title: "Senses", description: "Contextual product judgement such as hierarchy, actions and affordance."},
   {key: "governance", title: "Governance", description: "Exception and refactor evidence; not visual design law."},
 ];
 
-async function discoverGroup(group) {
-  const root = resolve(trustRoot, `fe/${group.key}`);
-  const entries = await readdir(root, {withFileTypes: true});
-  const modules = [];
-  const promptModules = new Set();
+const REQUIRED = ["INDEX.md", "vi.md", "example.md", "audit.md"];
 
-  for (const entry of entries) {
+// A module id is its path under the shelf, so a nested one reads `laws/b1-one-surface-owner`.
+// Shelves that sort their modules into families - `blocks` keeps `archetypes/` apart from `laws/` -
+// were invisible before this walked one level down: the family folder holds no `INDEX.md`, so the
+// old flat scan skipped it and every module inside it, silently and without a count to notice.
+// `proofs/` is excluded by the same test it always was: it has no `vi.md`.
+async function discoverModules(root, prefix = "") {
+  const found = [];
+  for (const entry of await readdir(root, {withFileTypes: true})) {
     if (!entry.isDirectory()) continue;
-    const names = new Set(await readdir(resolve(root, entry.name)));
-    if (names.has("INDEX.md") && names.has("vi.md") && names.has("example.md") && names.has("audit.md")) {
-      modules.push(entry.name);
-      if (names.has("prompt.md")) promptModules.add(entry.name);
+    const here = resolve(root, entry.name);
+    const id = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const names = new Set(await readdir(here));
+    if (REQUIRED.every((file) => names.has(file))) {
+      found.push({id, prompt: names.has("prompt.md")});
+      continue;
     }
+    // Not a module. One level of family nesting is allowed; deeper is not a shape this tree has.
+    if (!prefix) found.push(...(await discoverModules(here, entry.name)));
   }
+  return found;
+}
 
-  modules.sort((a, b) => a.localeCompare(b));
-  return {...group, modules, promptModules};
+async function discoverGroup(group) {
+  const found = await discoverModules(resolve(trustRoot, `fe/${group.key}`));
+  found.sort((a, b) => a.id.localeCompare(b.id));
+  return {
+    ...group,
+    modules: found.map((entry) => entry.id),
+    promptModules: new Set(found.filter((entry) => entry.prompt).map((entry) => entry.id)),
+  };
 }
 
 const publishedGroups = await Promise.all(groups.map(discoverGroup));
