@@ -48,30 +48,30 @@ comes from the STEP, not from shouting one line as loudly as the type system all
 
 ## Rules
 
-**TYPE-1 · A heading is a level, and the level decides the tag as well as the look.**
+**TYPESET-1 · A heading is a level, and the level decides the tag as well as the look.**
 
 The tag a screen reader builds the document outline from, and the size a reader sees, are two facts
 about one thing. Written separately they drift: the third-largest text on a screen becomes its first
 heading, and the outline stops describing the page. One prop decides both, so they cannot disagree.
 
-**TYPE-2 · Four levels, and a fifth means the page nested too far.**
+**TYPESET-2 · Four levels, and a fifth means the page nested too far.**
 
 If a surface needs a fifth, the answer is not a smaller step — it is that the section has nested
 further than a reader can hold. That is a structure problem wearing a styling problem's clothes.
 
-**TYPE-3 · Rank comes from size, weight and tone. Never from a box.**
+**TYPESET-3 · Rank comes from size, weight and tone. Never from a box.**
 
 A border, a background or a chip drawn around the thing you want noticed is jewellery that does not
 correspond to rank, and once a surface has taught a reader that its boxes mean nothing, the box that
 does mean something is invisible too.
 
-**TYPE-4 · When something is competing for attention, quieten its neighbours.**
+**TYPESET-4 · When something is competing for attention, quieten its neighbours.**
 
 Emphasis is relative. Making the important thing louder raises the floor for everything, and the
 next author raises it again. Most rank problems are solved a step earlier, by making everything
 around the thing quieter.
 
-**TYPE-5 · A secondary line ranks below the title it belongs to.**
+**TYPESET-5 · A secondary line ranks below the title it belongs to.**
 
 An eyebrow, a count, a category, a piece of meta: smaller and dimmer, never larger or heavier. A
 card whose loudest element is its category tag is a card whose name nobody read, and that is a
@@ -80,26 +80,26 @@ defect rather than a successful emphasis.
 A muted caption below a primary `text-sm` label therefore uses the reserved `text-xs` step. Tone
 alone is not enough: two lines at the same size still claim the same rank even when one is grey.
 
-**TYPE-6 · Weight is a body-text axis. A heading does not take one.**
+**TYPESET-6 · Weight is a body-text axis. A heading does not take one.**
 
 Headings already carry weight as part of their level. Pushing another onto one is asking two systems
 to decide the same thing, and the loser is whichever the reader sees second.
 
-**TYPE-7 · `text-xs` always means muted supporting copy.**
+**TYPESET-7 · `text-xs` always means muted supporting copy.**
 
 The smaller step is not a compact version of primary copy. It is the right-hand fact beside a
 `text-sm` label, a relative time such as "55 minutes ago", or a caption under the thing it explains.
 If the words must keep the foreground tone, they are primary enough to remain `text-sm` or larger.
 The `Text` leaf encodes this pairing: selecting `size: "xs"` resolves and types the tone as muted.
 
-**TYPE-8 · A temporal result marker is a muted subtitle, not a heading.**
+**TYPESET-8 · A temporal result marker is a muted subtitle, not a heading.**
 
 Today, Yesterday and equivalent local-time partitions qualify the joined results immediately below
 them. They render outside that surface as `text-sm` with muted tone. They remain `text-sm` because
 they name a scan partition; they are not explanatory caption copy. Giving them a heading level or
 the label treatment of `SurfaceListCard` falsely promotes each time bucket into a page section.
 
-**TYPE-9 · Body title rank follows content ownership, not hover, numeric value or available space.**
+**TYPESET-9 · Body title rank follows content ownership, not hover, numeric value or available space.**
 
 `text-base font-medium` belongs to a short dominant title representing one important object or large
 card. Compact, repeated or long titles use `text-sm font-medium`; their descriptions, metadata and

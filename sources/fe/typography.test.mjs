@@ -32,7 +32,7 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("TYPE-1: a heading comes from the component that owns tag and size together", () => {
+test("TYPESET-1: a heading comes from the component that owns tag and size together", () => {
   tester.run("no-heading-tag-outside-heading-component", noHeadingTagOutsideHeadingComponent, {
     valid: [
       { filename: BLOCK, code: "const E = () => <Heading props={{ content: t, level: 2 }} />" },

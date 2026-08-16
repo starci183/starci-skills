@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [".academy-src/*"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

@@ -34,7 +34,7 @@ const surfaceFolder = (filename) => {
   return hit ? { tier: hit[1], name: hit[2], rest: hit[3] } : null
 }
 
-// -- LAYOUT-2 --------------------------------------------------------------------------------------
+// -- FILE-2 --------------------------------------------------------------------------------------
 
 /** A page, layout or overlay folder holds its two halves and nothing else. */
 export const surfaceFolderTwoFilesOnly = {
@@ -58,7 +58,7 @@ export const surfaceFolderTwoFilesOnly = {
   },
 }
 
-// -- LAYOUT-3 --------------------------------------------------------------------------------------
+// -- FILE-3 --------------------------------------------------------------------------------------
 
 /** What is not component code does not live in the component tree. */
 export const noHelperFolderInComponents = {
@@ -82,7 +82,7 @@ export const noHelperFolderInComponents = {
   },
 }
 
-// -- LAYOUT-1 --------------------------------------------------------------------------------------
+// -- FILE-1 --------------------------------------------------------------------------------------
 
 /** A PascalCase folder exports a family whose name belongs to the folder. */
 export const exportMatchesFolder = {
@@ -121,7 +121,7 @@ export const exportMatchesFolder = {
   },
 }
 
-// -- LAYOUT-4 --------------------------------------------------------------------------------------
+// -- FILE-4 --------------------------------------------------------------------------------------
 
 /** Members that make an object literal look like a component family rather than data. */
 const looksLikeComponentMember = (name) => /^[A-Z]/.test(String(name))
@@ -158,7 +158,7 @@ export const noRuntimeNamespace = {
   },
 }
 
-// -- LAYOUT-5 --------------------------------------------------------------------------------------
+// -- FILE-5 --------------------------------------------------------------------------------------
 
 /** Tiers that know a feature, and therefore belong to the app that owns it. */
 const FEATURE_TIERS = /\/packages\/[^/]+\/src\/(blocks|overlays|pages|layouts)\//
@@ -209,7 +209,7 @@ export const monorepoTierBelongsToItsSide = {
   },
 }
 
-// -- LAYOUT-6 --------------------------------------------------------------------------------------
+// -- FILE-6 --------------------------------------------------------------------------------------
 
 /** Anything under a routing tree, in either workspace shape. */
 const ROUTE_TREE = /\/src\/app\/(.+)$/
@@ -260,7 +260,7 @@ const ROUTE_TREE_TEST = /\.test\.(?:tsx?|jsx?)$/
  * groups it with its siblings - `components/pages/<Name>/`, where the next author looks for it.
  *
  * The cost is stated where it bites: a route file that draws inside `page.tsx` still passes. That is
- * LAYOUT-2's `component.tsx` split to catch, and no path rule can see it.
+ * FILE-2's `component.tsx` split to catch, and no path rule can see it.
  */
 export const routeTreeHoldsRoutesOnly = {
   meta: {

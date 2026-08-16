@@ -1,0 +1,12 @@
+/node_modules
+/.docusaurus
+/build
+/.cache-loader
+/.next
+/out
+/content
+/.academy-src
+/public/vendor/heroui.min.css
+/static/vendor/heroui.min.css
+npm-debug.log*
+/ac

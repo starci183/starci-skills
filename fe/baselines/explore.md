@@ -26,7 +26,7 @@ When the request names legacy Explore or asks to preserve, fork, port, or match 
 legacy source and inspect its rendered behaviour before designing. Preserve composition, content
 priority, states, interaction, and responsive intent. The new architecture may relocate ownership,
 but it does not authorize a redesign. Follow [`mode.md`](../creativity/mode.md) and
-[`refactor-parity.md`](../design/refactor-parity.md).
+[`refactor-parity/INDEX.md`](../governance/refactor-parity/INDEX.md).
 
 ### EXPLORE-2 — Preserve the product sequence and behaviour
 
@@ -62,7 +62,8 @@ boundary rather than carrying one.
 ### EXPLORE-5 — Visible StarCi copy says content, never lesson
 
 All user-visible Explore copy follows
-[`EXCEPTION-4`](../design/exception.md#exception-4--starci-visible-copy-uses-content-never-lesson).
+the archived product-vocabulary evidence in
+[`exception/changelog.md`](../governance/exception/changelog.md#internal-source-evidence-preserved--non-normative).
 An upstream API, persistence field, or event name may retain `lesson`; the connected boundary maps it
 to `content` before it becomes visible.
 
@@ -76,8 +77,8 @@ peers such as navigation or a list, not on a lone business summary.
 ### EXPLORE-7 — Existing presentation laws remain the single source of truth
 
 Explore creates no local spacing, supporting-copy, or nested-surface exception. Apply
-[`gap.md`](../design/gap.md), [`TYPE-7`](../canon/patterns/typography.md), and
-[`surface-in-surface.md`](../design/surface-in-surface.md) directly instead of restating their values
+[`gap`](../principles/gap/INDEX.md), [`TYPESET-7`](../canon/patterns/typography.md), and
+[`surface-in-surface/INDEX.md`](../principles/surface-in-surface/INDEX.md) directly instead of restating their values
 here.
 
 ## Forbidden
@@ -152,7 +153,7 @@ Incorrect:
 
 Correct:
 
-> Choose seams from `gap.md`, render supporting `text-xs` through `TYPE-7`, and use the documented
+> Choose seams from `gap/INDEX.md`, render supporting `text-xs` through `TYPESET-7`, and use the documented
 > border treatment for a nested surface.
 
 Incorrect:

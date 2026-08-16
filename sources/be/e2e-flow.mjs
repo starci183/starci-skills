@@ -8,16 +8,16 @@
  *
  * What was measured and left alone, so the next reader does not "finish the job":
  *
- *   - FLOW-1 (one file, one flow, named for the sentence). A filename cannot be checked against a
+ *   - E2E-1 (one file, one flow, named for the sentence). A filename cannot be checked against a
  *     business sentence. `course-purchase.e2e-spec.ts` and `resolver-group.e2e-spec.ts` are the same
  *     shape to a parser and opposite things to a reader.
- *   - FLOW-2 (named steps, not one long case). Counting `it` blocks would refuse a flow that is
+ *   - E2E-2 (named steps, not one long case). Counting `it` blocks would refuse a flow that is
  *     genuinely one step, and a rule whose first false positive is legitimate teaches authors that
  *     the rule is wrong rather than that they are.
- *   - FLOW-5, FLOW-6 and FLOW-9 turn on WHAT is asserted or WHO is acting, which is meaning.
- *   - FLOW-8 (one place stands the world up) is a fact about a repository's fixtures, not about a
+ *   - E2E-5, E2E-6 and E2E-9 turn on WHAT is asserted or WHO is acting, which is meaning.
+ *   - E2E-8 (one place stands the world up) is a fact about a repository's fixtures, not about a
  *     file, so it belongs to a gate that can see the tree rather than to a rule that sees one file.
- *   - FLOW-10 (a flow logs nothing) is already held: `no-console` and `no-framework-logger` in the
+ *   - E2E-10 (a flow logs nothing) is already held: `no-console` and `no-framework-logger` in the
  *     observability law cover every call site, and a second rule saying the same thing in this lane
  *     would double every report.
  *
@@ -112,7 +112,7 @@ export const noModelCallInE2e = {
   },
 }
 
-// -- FLOW-3 ----------------------------------------------------------------------------------------
+// -- E2E-3 ----------------------------------------------------------------------------------------
 
 /** A flow polls until the state settles; it never waits for a duration. */
 export const noSleepInFlow = {
@@ -149,7 +149,7 @@ export const noSleepInFlow = {
   },
 }
 
-// -- FLOW-7 ----------------------------------------------------------------------------------------
+// -- E2E-7 ----------------------------------------------------------------------------------------
 
 /** A step asserts one outcome. A branch means the test is prepared for either, which is no assertion. */
 export const noBranchInFlowStep = {

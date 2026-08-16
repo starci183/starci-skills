@@ -1,0 +1,307 @@
+.preview {
+  border-color: color-mix(in srgb, var(--heroui-accent, #2563eb) 18%, transparent);
+  overflow: hidden;
+}
+
+.previewHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.eyebrow {
+  color: var(--heroui-accent, #2563eb);
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.stage {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--heroui-accent, #2563eb) 8%, transparent), transparent 40%),
+    color-mix(in srgb, var(--heroui-background, #fff) 96%, var(--heroui-accent, #2563eb));
+}
+
+.note {
+  color: var(--heroui-muted-foreground, #64748b);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.grid,
+.compareGrid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
+.scenario {
+  min-width: 0;
+}
+
+.scenarioHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.scenarioTitle {
+  font-size: 0.88rem;
+}
+
+.scenarioContent,
+.stack,
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tightStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.row,
+.spread,
+.toolbar,
+.actions,
+.person,
+.statusRow,
+.inputShell {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.spread {
+  justify-content: space-between;
+}
+
+.toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+.identity {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.identity strong {
+  line-height: 1.35;
+}
+
+.muted,
+.help,
+.status {
+  color: var(--heroui-muted-foreground, #64748b);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.error {
+  color: var(--heroui-danger, #dc2626);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.success {
+  color: var(--heroui-success, #15803d);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.metric {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.resultPanel,
+.summaryPanel,
+.openGround,
+.touchCue {
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+}
+
+.utilityButton {
+  flex: 0 0 auto;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.surfaceButton {
+  height: auto;
+  justify-content: stretch;
+  padding: 0;
+  text-align: start;
+  white-space: normal;
+  width: 100%;
+}
+
+.surfaceButton > * {
+  width: 100%;
+}
+
+.surfaceButton[data-pressed] {
+  opacity: 0.7;
+  transform: scale(0.995);
+}
+
+.surfaceAnswer {
+  transition: background-color 120ms ease, opacity 120ms ease, transform 120ms ease;
+}
+
+.surfaceAnswer:hover,
+.surfaceAnswer:focus-visible {
+  background: color-mix(in srgb, var(--heroui-accent, #2563eb) 8%, transparent);
+}
+
+.destinationLink {
+  color: inherit;
+  font-weight: 750;
+  text-decoration: none;
+  text-underline-offset: 0.18em;
+}
+
+.destinationLink:hover,
+.destinationLink:focus-visible {
+  color: var(--heroui-accent, #2563eb);
+  text-decoration: underline;
+  text-decoration-thickness: 0.1em;
+}
+
+.pressCard {
+  position: relative;
+}
+
+.mainLink {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 0.75rem;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.mainLink:hover .pressTitle,
+.mainLink:focus-visible .pressTitle {
+  color: var(--heroui-accent, #2563eb);
+  text-decoration: underline;
+  text-decoration-thickness: 0.1em;
+  text-underline-offset: 0.18em;
+}
+
+.pressTitle {
+  font-weight: 750;
+}
+
+.touchCueIcon {
+  color: var(--heroui-accent, #2563eb);
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.currentRow {
+  border-color: color-mix(in srgb, var(--heroui-accent, #2563eb) 40%, transparent);
+  background: color-mix(in srgb, var(--heroui-accent, #2563eb) 10%, transparent);
+}
+
+.dragCard {
+  cursor: grab;
+}
+
+.dragCard:active,
+.dragging {
+  cursor: grabbing;
+  opacity: 0.65;
+}
+
+.reducedMotionButton {
+  transition: opacity 100ms linear, background-color 100ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surfaceAnswer,
+  .reducedMotionButton {
+    transition: none;
+  }
+}
+
+.inputShell {
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 0.75rem;
+  padding-inline: 0.75rem;
+}
+
+.inputShell input {
+  border: 0;
+  min-width: 0;
+  outline: none;
+}
+
+.prefix {
+  color: var(--heroui-muted-foreground, #64748b);
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+}
+
+.codeState {
+  background: color-mix(in srgb, var(--heroui-accent, #2563eb) 8%, transparent);
+  border-radius: 0.55rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.srOnly {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@media (max-width: 760px) {
+  .grid,
+  .compareGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .spread {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar,
+  .actions {
+    justify-content: flex-start;
+  }
+}

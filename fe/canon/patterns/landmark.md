@@ -57,12 +57,12 @@ BRANCH is a component somebody imports in order to wrap a screen; it stays in ro
 page reaching for it is the trap this law was written for. A frame whose CONTRACT ENTRY declares
 `host: "main"` is not that — nobody imported a landmark, the registry says which element the key's
 node opens and the frame obeys. That entry is rendered by whoever renders the screen's outermost
-node, and [LAYOUT-6](file-layout.md) says the route file is emphatically not it: a route mounts a
+node, and [FILE-6](file-layout.md) says the route file is emphatically not it: a route mounts a
 page and draws nothing.
 
 Held to route files only, the two laws refused each other. Every page moved out of `app/` to satisfy
-LAYOUT-6 was reported for misplacing its landmark, and the only way to satisfy both at once was to
-leave the page owner in the routing tree — the exact defect LAYOUT-6 exists to prevent. A rule that
+FILE-6 was reported for misplacing its landmark, and the only way to satisfy both at once was to
+leave the page owner in the routing tree — the exact defect FILE-6 exists to prevent. A rule that
 can only be satisfied by breaking another rule is a finding about the rule.
 
 That refusal is what settles the trap this law was written for: registry keys named `dashboard-main`,

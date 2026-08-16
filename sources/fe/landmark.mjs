@@ -51,13 +51,13 @@ export const isRouteFile = (filename) => /\/app\/(?:.*\/)?(?:layout|page)\.tsx$/
  * The landmark used to be a named branch, so "the outermost file that composes the screen" and "a
  * file under `app/`" were the same sentence — the branch was imported into the route file and that
  * was that. Then the mark moved into the contract entry as `host: "main"`, and the two sentences
- * came apart: the entry is rendered by whoever renders the screen's outermost frame, and LAYOUT-6
+ * came apart: the entry is rendered by whoever renders the screen's outermost frame, and FILE-6
  * says that is emphatically NOT the route file. A route names which page renders at which URL and
  * draws nothing.
  *
  * Held to route files only, the two laws then refused each other. Every page moved out of `app/` to
- * satisfy LAYOUT-6 was reported for misplacing its landmark, and the only way to satisfy both at
- * once was to leave the page owner in the routing tree — which is the defect LAYOUT-6 exists to
+ * satisfy FILE-6 was reported for misplacing its landmark, and the only way to satisfy both at
+ * once was to leave the page owner in the routing tree — which is the defect FILE-6 exists to
  * prevent. A rule that can only be satisfied by breaking another rule is a finding about the rule.
  *
  * What the guarantee actually was, and still is: ONE main per document, owned by whoever owns the
@@ -213,10 +213,10 @@ export const rules = {
      *
      * A frame whose CONTRACT ENTRY declares `host: "main"` is not that. Nobody imported a landmark;
      * the registry says which element this key's node opens, and the frame obeys. That entry is
-     * rendered by whoever renders the screen's outermost node - and LAYOUT-6 says the route file is
+     * rendered by whoever renders the screen's outermost node - and FILE-6 says the route file is
      * emphatically not it, because a route mounts a page and draws nothing. Holding both shapes to
      * route files only made the two laws refuse each other, and the only way to satisfy both was to
-     * leave the page owner in the routing tree, which is the defect LAYOUT-6 exists to prevent.
+     * leave the page owner in the routing tree, which is the defect FILE-6 exists to prevent.
      */
     create(context) {
       const filename = context.filename || context.getFilename()

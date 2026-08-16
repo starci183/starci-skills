@@ -1,0 +1,39 @@
+.structureFrame { width: 100%; overflow: hidden; }
+.structureHeader { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: .9rem; }
+.structureIdentity { display: flex; min-width: 0; flex-direction: column; gap: .25rem; }
+.structureIdentity > span, .structureSupport { color: var(--muted, #64748b); font-size: .8rem; }
+.structureEyebrow, .structureKicker { color: var(--accent, #2e8555); font-size: .68rem; font-weight: 750; letter-spacing: .075em; text-transform: uppercase; }
+.structureGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding-block: 1rem; }
+.structureGrid > :only-child { grid-column: 1 / -1; }
+.structureSingle { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding-block: 1rem; }
+.structurePanel { min-width: 0; overflow: hidden; }
+.structurePanelHeader { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: .8rem; padding-bottom: .75rem; }
+.structurePanelBody { display: flex; min-width: 0; flex-direction: column; gap: .85rem; }
+.structureMetric { flex: none; font-size: 1.7rem; line-height: 1.1; }
+.structureSummary { margin: 0; line-height: 1.58; }
+.structureRows { display: flex; min-width: 0; flex-direction: column; }
+.structureRow { display: flex; min-width: 0; align-items: center; gap: .7rem; padding: .72rem 0; }
+.structureRow > .structureIdentity { flex: 1; }
+.structureRow > strong { flex: none; font-size: .82rem; }
+.structureActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; padding-top: .85rem; }
+.structureNote { color: var(--muted, #64748b); font-size: .82rem; line-height: 1.5; }
+.structureField { display: flex; flex-direction: column; gap: .5rem; }
+.structureDanger { color: var(--danger, #b91c1c); font-size: .78rem; }
+.structureProgress { display: flex; flex-direction: column; gap: .55rem; }
+.structureProgress > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.structureProgress span { color: var(--muted, #64748b); font-size: .78rem; }
+.structureTrack { height: .48rem; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); }
+.structureTrack > span { display: block; height: 100%; border-radius: inherit; background: var(--accent, #2e8555); }
+.structureBars { display: flex; flex-direction: column; gap: .65rem; }
+.structureBars > div { display: flex; flex-direction: column; gap: .3rem; }
+.structureBars > div > div:first-child { display: flex; justify-content: space-between; gap: 1rem; font-size: .78rem; }
+.structureAvatarSkeleton { width: 2.25rem; height: 2.25rem; flex: none; border-radius: 50%; }
+.structureLine { width: min(12rem, 70%); height: .78rem; border-radius: 999px; }
+.structureShortLine { width: min(8rem, 48%); height: .68rem; border-radius: 999px; }
+
+@media (max-width: 720px) {
+  .structureGrid { grid-template-columns: minmax(0, 1fr); }
+  .structurePanelHeader { flex-wrap: wrap; }
+  .structureActions { align-items: stretch; flex-direction: column; }
+  .structureActions :global(.button) { width: 100%; }
+}

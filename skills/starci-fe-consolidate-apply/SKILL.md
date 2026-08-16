@@ -12,7 +12,7 @@ in two places, and the version that wins would be whichever is held by whoever i
 files.
 
 The promise is narrow and total: **ownership changes, the render does not.** That is
-[`refactor-parity`](../../fe/design/refactor-parity.md), and it is the only thing this half is judged
+[`refactor-parity`](../../fe/governance/refactor-parity/INDEX.md), and it is the only thing this half is judged
 on.
 
 ## CONTEXT

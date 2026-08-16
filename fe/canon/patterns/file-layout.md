@@ -91,14 +91,14 @@ tree.
 
 ## Rules
 
-**LAYOUT-1 · One component, one folder, and the folder is named for what it exports.**
+**FILE-1 · One component, one folder, and the folder is named for what it exports.**
 
 The folder name is the component's name. A reader who knows the name knows the path, and a grep for
 the name finds one place. The rule that holds this asks only for a direct named export whose name
 belongs to the folder's family, so a component and its typed variants can share a folder while an
 unrelated passenger cannot.
 
-**LAYOUT-2 · A screen folder holds its two halves and nothing else.**
+**FILE-2 · A screen folder holds its two halves and nothing else.**
 
 A page, a layout or an overlay folder holds `index.tsx` and `component.tsx` — the wiring and the
 shape — plus the twin test of each. A third thing appearing there is the notification that something
@@ -108,19 +108,19 @@ This always begins harmlessly: "only this page uses it". It ends as a screen fol
 components, a constants folder, a utils folder and three hand-copied resting shapes, at which point
 the screen is a second codebase with its own private vocabulary.
 
-**LAYOUT-3 · What is not component code does not live in the component tree.**
+**FILE-3 · What is not component code does not live in the component tree.**
 
 `constants/`, `utils/`, `types/` and `hooks/` are not component folders. Each has a real home, and
 the home is the point: left beside the component, the helper is invisible to everybody who would
 have reused it, so the second author writes it again and the two drift.
 
-**LAYOUT-4 · A folder exports a family, never a runtime namespace object.**
+**FILE-4 · A folder exports a family, never a runtime namespace object.**
 
 `export const Card = { Root, Header }` bundles at build time as one unit, so importing the header
 drags the whole family in, and nothing can be tree-shaken away. Export the members. A dotted call
 site is a convenience the bundler pays for.
 
-**LAYOUT-5 · In a monorepo, the shared package stops below the block.**
+**FILE-5 · In a monorepo, the shared package stops below the block.**
 
 `packages/ui/src/` holds `contracts/`, `leaves/`, `composites/`, `branches/` and `shells/` — the
 tiers that know no feature. `blocks/`, `overlays/`, `layouts/` and `pages/` belong to the app that
@@ -130,7 +130,7 @@ A block in the shared package is the whole failure in one file: the package now 
 apps that never wanted that domain still ship it, and the next author reasonably concludes the line
 is somewhere else and puts a page there too.
 
-**LAYOUT-6 · The route file mounts and nothing else, and `app/` holds nothing but route files.**
+**FILE-6 · The route file mounts and nothing else, and `app/` holds nothing but route files.**
 
 A file under `app/` names which page renders at which URL. No fetching, no arrangement, no contract
 key. If a route file is drawing, the page it should be mounting does not exist yet — and the drawing

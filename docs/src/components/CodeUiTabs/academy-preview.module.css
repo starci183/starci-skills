@@ -1,0 +1,51 @@
+/*
+ * The demo frame is documentation chrome, so it states its own edge rather than borrowing a
+ * product surface: a 2px stroke reads as "this is an exhibit", where a card's 1px hairline would
+ * read as "this IS the product".
+ *
+ * The two measurements are NAMED, not chosen. `calc(var(--spacing) * 4)` and
+ * `min(32px, var(--radius-3xl))` are the exact expressions HeroUI's own `.card` resolves, copied
+ * as expressions so the frame keeps tracking the card the day either number moves. Writing `1rem`
+ * and `24px` here would compute the same today and drift silently tomorrow - which is the whole
+ * defect this file is being cleaned of.
+ */
+.frame {
+  margin: 1.25rem 0 2.25rem;
+  overflow: hidden;
+  padding: calc(var(--spacing) * 4);
+  border: 2px solid var(--border);
+  border-radius: min(32px, var(--radius-3xl));
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/*
+ * The frame owns the inset now, so the header carries no horizontal padding of its own and its
+ * separator is inset with it. The tinted header band is gone with the eyebrow: a second surface
+ * colour inside an exhibit competes with the product surfaces the exhibit is showing.
+ */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: calc(var(--spacing) * 4);
+  border-bottom: 1px solid var(--separator);
+}
+
+.identity { min-width: 0; }
+.eyebrow { display: block; margin-bottom: .2rem; color: var(--accent); font-size: .68rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.title { margin: 0; color: var(--foreground); font-size: 1rem; line-height: 1.4; }
+.subtitle { margin: .25rem 0 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.stage { padding-top: calc(var(--spacing) * 4); }
+.note { margin-top: calc(var(--spacing) * 4); padding-top: calc(var(--spacing) * 4); border-top: 1px solid var(--separator); color: var(--muted); font-size: .82rem; line-height: 1.5; }
+
+.scenario { min-width: 0; }
+.scenarioHeader { display: flex; min-height: 1.7rem; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
+.scenarioHeader h4 { margin: 0; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.scenarioBody { min-width: 0; }
+
+/* The frame's own inset is the inset at every width now, so only the header's axis changes. */
+@media (max-width: 680px) {
+  .header { align-items: stretch; flex-direction: column; }
+}

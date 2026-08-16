@@ -14,8 +14,8 @@ broke and why?** A flow that answers "no" is a flow that gets re-run rather than
 that gets re-run rather than read has stopped being a test.
 
 What holds the machine-checkable part is [`sources/be/e2e-flow.mjs`](../../../sources/be/e2e-flow.mjs),
-and it is **five of the twelve rules below** — FLOW-3, the persisted-state half of FLOW-4,
-FLOW-7, the direct-internal-actor half of FLOW-11, and the provider-import half of FLOW-12.
+and it is **five of the twelve rules below** — E2E-3, the persisted-state half of E2E-4,
+E2E-7, the direct-internal-actor half of E2E-11, and the provider-import half of E2E-12.
 That is the honest number, not a gap.
 The rest turn on what a name means, what is being asserted, or who is acting, and a rule that fires
 on a judgement is one authors learn to disable — which leaves the law worse off than when nothing
@@ -24,12 +24,12 @@ enforced it. The module records what was measured and left alone, so the next re
 
 ## Rules
 
-**FLOW-1 · One file, one flow, and the file is named for the sentence.**
+**E2E-1 · One file, one flow, and the file is named for the sentence.**
 
 `course-purchase.e2e-spec.ts`, describing "a learner buys a course and can start it". Not a
 resolver group, not an endpoint. The name is the promise; the file is the proof.
 
-**FLOW-2 · The flow is a sequence of NAMED steps, not one long case.**
+**E2E-2 · The flow is a sequence of NAMED steps, not one long case.**
 
 Each step is its own `it`, in order, sharing state through the describe scope. A 300-line single
 case gives one red line and no idea which of eleven operations broke; eleven named steps give the
@@ -38,7 +38,7 @@ step, and the ones after it are skipped rather than cascading into noise.
 The steps are ordered because the business is ordered. That is the one place a test may depend on
 the case before it, and it is exactly what a flow is.
 
-**FLOW-3 · Never sleep. Poll until the state settles, with a deadline.**
+**E2E-3 · Never sleep. Poll until the state settles, with a deadline.**
 
 `await sleep(500)` is the single largest source of flake in a flow suite, and it fails in both
 directions at once: too short and the suite goes red for a reason that is not a defect; too long
@@ -49,12 +49,12 @@ Poll the state instead — `await until(() => enrollmentExists(userId, courseId)
 that fails LOUDLY and says what it was waiting for. A deadline is a real assertion: "this should
 settle within N seconds" is a claim about the system.
 
-**FLOW-4 · Assert the consequence, and read it from where it lives.**
+**E2E-4 · Assert the consequence, and read it from where it lives.**
 
 The row from the database, the message off the socket, the balance from the next query. Not the
 response envelope, which proves only that the server replied.
 
-**FLOW-5 · A realtime step opens a real client, and asserts what arrived — never how many.**
+**E2E-5 · A realtime step opens a real client, and asserts what arrived — never how many.**
 
 `expect(messages.length).toBe(2)` encodes how many listeners happened to be connected. Add a
 third subscriber and a correct system goes red; deliver the wrong payload to the right count of
@@ -63,38 +63,38 @@ people and a broken one stays green.
 Await the NEXT message matching a predicate, and assert its content and its recipient. The count is
 an implementation detail of the fan-out; the content is the promise.
 
-**FLOW-6 · The negative is part of the flow.**
+**E2E-6 · The negative is part of the flow.**
 
 Before the visitor subscribes, they must receive nothing. Before payment settles, the entitlement
 must be closed. A flow that only asserts what SHOULD arrive cannot catch a system that sends
 everything to everybody — which is the failure that matters most, because it is invisible from the
 happy path.
 
-**FLOW-7 · No branch in a test.**
+**E2E-7 · No branch in a test.**
 
 `if (state === NeedWater) { ...assert... }` means the file asserts different things on different
 runs, and the run where the branch is skipped is green while proving less. If the condition is part
 of the flow, force it and assert unconditionally. If it is not, it does not belong here.
 
-**FLOW-8 · One place stands the world up.**
+**E2E-8 · One place stands the world up.**
 
 A testing-infra module that boots the app, the database, the broker and the sockets, so a flow file
 opens with what it is testing rather than with two hundred lines of wiring. When the wiring changes,
 one file changes.
 
-**FLOW-9 · Actors are named, and they are created by the flow.**
+**E2E-9 · Actors are named, and they are created by the flow.**
 
 `learner`, `otherLearner`, `company` — not `accountNumber: 8`. A magic ordinal tells a reader
 nothing and collides silently when two flows pick the same one. The helper mints a fresh actor per
 flow, so flows never share state and can run in any order.
 
-**FLOW-10 · A flow logs nothing.**
+**E2E-10 · A flow logs nothing.**
 
 `console.log` inside a test is output nobody reads on a green run and noise that buries the
 assertion on a red one. What a reader needs when it fails is the step name and the assertion, both
 of which the runner already prints.
 
-**FLOW-11 · Operational chains enter at their production boundary and keep every internal hop real.**
+**E2E-11 · Operational chains enter at their production boundary and keep every internal hop real.**
 
 A fallback, retry, queue, scheduler, projection, cache-invalidation or realtime-delivery flow is
 an E2E only when the test enters through GraphQL/HTTP/socket, publishes to the real broker, or lets
@@ -103,7 +103,7 @@ worker and calling `process`, `finalize` or another internal method is not. The 
 serialization, locking, retry, acknowledgement and competing-consumer behaviour — exactly the
 behaviour the operational flow exists to prove.
 
-**FLOW-12 · Override the external result, never the internal policy that chooses it.**
+**E2E-12 · Override the external result, never the internal policy that chooses it.**
 
 AI E2E keeps `AiInvokeService`, the balancer, key rotation, health cache, entitlement and billing
 real; Jest scripts only the concrete provider client's `invoke`/`stream` result or error. Payment

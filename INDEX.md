@@ -43,7 +43,9 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 | Axis | The question it answers | Where |
 |---|---|---|
 | **canon** | How is this spelled here? The law the code already follows, and the machine enforces. | `fe/canon/` |
-| **design** | Why is it shaped this way? The thinking a rule came out of — hierarchy, restraint, what earns attention. Written in a universal voice: a file here should read as true of any front end, and name no product. | `fe/design/` |
+| **principles** | Which primitive facts must implementation never violate? The binding construction rules — closed, non-subjective outputs such as spacing, colour, type, position, responsive behavior and surface ownership. | `fe/principles/` |
+| **senses** | What does the reader PERCEIVE, and which contextual product judgement selects among otherwise legal choices? Actions, hierarchy, input behavior, affordance and restraint. | `fe/senses/` |
+| **governance** | How are exceptions and observable parity recorded without becoming visual law? | `fe/governance/` |
 | **creativity** | How are researched alternatives generated, challenged and selected without escaping canon? | `fe/creativity/` |
 | **baselines** | What does ONE screen already promise its users? Named product behaviour a parity request must preserve. Names its product, unlike every shelf above. | `fe/baselines/` |
 | **references** | What does the outside world say? Vendor docs, platform behaviour, prior art. Cited, never paraphrased into law. | `fe/references/` |
@@ -123,29 +125,49 @@ enumerated. [`starci-be-feature-review`](skills/starci-be-feature-review/SKILL.m
 revises that brief until one exact tree is approved. [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md)
 writes those files and no others.
 
-`fe/design/` carries the laws no machine can hold — no file there names a number of its own, which
-is why none of them ships an artifact: [`gap`](fe/design/gap.md) · [`margin`](fe/design/margin.md) ·
-[`padding`](fe/design/padding.md) · [`surface-in-surface`](fe/design/surface-in-surface.md) ·
-[`hierarchy`](fe/design/hierarchy.md) · [`call-to-action`](fe/design/call-to-action.md) ·
-[`input`](fe/design/input.md) · [`exception`](fe/design/exception.md) ·
-[`press-affordance`](fe/design/press-affordance.md) ·
-[`refactor-parity`](fe/design/refactor-parity.md).
-Still owed: position, responsive, restraint, colour, typography.
+Three shelves stand where `design/` used to. One folder was answering three different kinds of
+question, and a path that says `design` tells a reader nothing about which kind they are holding.
 
-Two of them answer the questions a reader meets first, and in this order: `hierarchy` settles what
-is read and in what sequence, then `call-to-action` settles what the surface asks for once it has
-been understood. A primary action nobody reaches was never a call-to-action failure.
+`fe/principles/` holds the binding construction rules: primitive facts that map visible UI intent to
+portable semantic `className` patterns and that implementation may never violate. It does not depend
+on a product component registry and is not a shelf for taste, strategy or migration process.
+[`colour`](fe/principles/colour/INDEX.md) · [`gap`](fe/principles/gap/INDEX.md) ·
+[`margin`](fe/principles/margin/INDEX.md) · [`padding`](fe/principles/padding/INDEX.md) ·
+[`position`](fe/principles/position/INDEX.md) · [`responsive`](fe/principles/responsive/INDEX.md) ·
+[`surface-in-surface`](fe/principles/surface-in-surface/INDEX.md) ·
+[`typography`](fe/principles/typography/INDEX.md).
 
-**Which shelf a concept goes on is decided by whether anything can hold it.** A law with an
-enforceable half belongs in `canon/patterns/` beside its artifact — `icon` began in `design/` and
+`fe/senses/` holds what the reader PERCEIVES — contextual judgement that can be correct only after
+product job, state and moment are known:
+[`call-to-action`](fe/senses/call-to-action/INDEX.md) ·
+[`hierarchy`](fe/senses/hierarchy/INDEX.md) ·
+[`input`](fe/senses/input/INDEX.md) ·
+[`press-affordance`](fe/senses/press-affordance/INDEX.md) ·
+[`restraint`](fe/senses/restraint/INDEX.md).
+
+`fe/governance/` holds exceptions and parity — process evidence rather than design outputs:
+[`exception`](fe/governance/exception/INDEX.md) ·
+[`refactor-parity`](fe/governance/refactor-parity/INDEX.md).
+
+Every module on all three shelves carries `INDEX.md`, `vi.md`, `example.md`, `audit.md` and
+`changelog.md`. The shape stops being uniform there, so open the folder rather than assume it:
+a `fe/principles/` module carries those FIVE and no more, its `prompt.md` having been folded into
+`example.md`, while two `fe/senses/` modules — `call-to-action` and `input` — still carry a sixth
+record, `prompt.md`.
+
+**Which shelf a concept goes on is decided first by what kind of answer it produces.** A primitive,
+non-negotiable fact belongs in `principles/`; a contextual choice belongs in `senses/`; lifecycle and
+evidence rules belong in `governance/`. A law with an
+enforceable half belongs in `canon/patterns/` beside its artifact — `icon` began as a principle and
 moved, because it turned out to have measurable steps and a rule that can see them. A law that
-states only a reason stays in `design/`.
+states a contextual reason rather than a primitive fact stays in `senses/`.
 
-Reading design without canon leaves a reader with taste and no spelling; reading canon without
-design leaves them able to type a legal value for the wrong reason.
+Reading principles and senses without canon leaves a reader with taste and no spelling; reading canon
+without them leaves them able to type a legal value for the wrong reason.
 
 `fe/creativity/` is the operating workflow for page and flow invention. Start at
-[`creativity/INDEX.md`](fe/creativity/INDEX.md). It uses canon as fixed grammar, design as judgement,
+[`creativity/INDEX.md`](fe/creativity/INDEX.md). It uses canon as fixed grammar, principles and
+senses as judgement,
 backend behavior as business truth and the contract `why` plus existing components as reuse
 evidence. It is not another canon shelf. Net-new UI and work that still needs a product or
 composition choice follow **Plan -> Review revisions -> Apply**. Three task procedures execute it

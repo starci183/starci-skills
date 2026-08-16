@@ -121,7 +121,7 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("FLOW-3: a flow polls for a state and never waits for a duration", () => {
+test("E2E-3: a flow polls for a state and never waits for a duration", () => {
   tester.run("no-sleep-in-flow", noSleepInFlow, {
     valid: [
       // the shape the rule exists to push people towards
@@ -144,7 +144,7 @@ test("FLOW-3: a flow polls for a state and never waits for a duration", () => {
   })
 })
 
-test("FLOW-7: a step asserts one outcome, so it takes no branch", () => {
+test("E2E-7: a step asserts one outcome, so it takes no branch", () => {
   tester.run("no-branch-in-flow-step", noBranchInFlowStep, {
     valid: [
       { filename: FLOW, code: "it(\"pays\", async () => { expect(order.status).toBe(\"paid\") })" },

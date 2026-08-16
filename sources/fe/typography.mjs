@@ -35,7 +35,7 @@ const tagName = (opening) => {
   return name.name === name.name.toLowerCase() ? name.name : null
 }
 
-// -- TYPE-1 · TYPE-2 -------------------------------------------------------------------------------
+// -- TYPESET-1 · TYPESET-2 -------------------------------------------------------------------------------
 
 /** A heading comes from the component that owns its tag and its size as one decision. */
 export const noHeadingTagOutsideHeadingComponent = {
