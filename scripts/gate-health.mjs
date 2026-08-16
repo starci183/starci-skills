@@ -116,6 +116,11 @@ async function auditGate(shelf) {
         }
         if (/^-+$/.test(cells[0] ?? "")) continue;
         const owner = cells[ownerColumn] ?? "";
+        // A row can be ownerless on purpose: the escape hatch a gate emits when no archetype fits is
+        // not a module and never will be. It says `by design` so the two cases stay apart, because a
+        // test that counts a deliberate hole can never reach zero, and a stopping condition that
+        // cannot be met is not one.
+        if (/by design/i.test(line)) continue;
         const empty = owner === "" || owner === "—" || owner === "-" || /^\*{0,2}(owed|tbd|no module)\*{0,2}$/i.test(owner);
         if (empty) report.danglingRows.push(`${shown}: ${line.trim().slice(0, 90)}`);
       }

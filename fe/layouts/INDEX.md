@@ -79,7 +79,7 @@ emits in `LayoutPlan.archetype`, so routing is checkable by string equality rath
 | `destination-column` | [`destination-column/`](./archetypes/destination-column/INDEX.md) | One purchase opens MANY modes and the reader moves between them without losing the frame | `learn-shell-frame`, `personal-project-workspace-frame` | 33 pages (30 learn, 3 personal-project) |
 | `subject-and-evidence` | [`subject-and-evidence/`](./archetypes/subject-and-evidence/INDEX.md) | The page is ABOUT a subject and the body shows changing evidence about that same subject | `profile-tabs-over-body` → `profile-rail-then-main` | 10 pages under `/profile/[username]` |
 | `invisible-owner` | [`invisible-owner/`](./archetypes/invisible-owner/INDEX.md) | Nothing needs drawing; something needs to SURVIVE navigation | `playground-session-frame`, `global-ai-layout` | 2 playground pages, plus 51 pages minus 5 for the AI owner |
-| `chua-co-archetype-do-duoc` | *no module* | None of the four fits and no shipped screen proves a fifth | — | see `## Owed` |
+| `chua-co-archetype-do-duoc` | *no module — by design* | None of the four fits and no shipped screen proves a fifth | — | see `## Owed` |
 
 Archetypes compose. A learn page is `cot-dich-den` INSIDE `bang-chrome` UNDER `nguoi-giu-phien`.
 Declare the archetype of the frame this plan OWNS, and name the enclosing ones in `routeCluster` and

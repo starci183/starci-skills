@@ -89,6 +89,15 @@ checking where it was moving to, and the second was caused by the fix for the fi
 | `docs/` | the Nextra site that publishes the tree | anything the tree does not already say |
 | `.workflows/` | one append-only record per task, including every `REJECTED` row | law; a rejection becomes law only by being written into a shelf |
 
+### Một hàng cố ý không có chủ
+
+A routing row may name no module on purpose: the escape hatch a gate emits when nothing in the shelf
+fits is not a module and never becomes one. Mark it `by design` in the owner cell.
+
+Without that mark it is indistinguishable from a law the shelf claims and has not written, and
+`scripts/gate-health.mjs` counts it as a conflict — which makes the stopping condition unreachable,
+and a condition that cannot be met is not one.
+
 ## Where a new thing goes
 
 **A new law.** Which shelf is decided by the KIND of answer it produces, not by the topic it mentions.
