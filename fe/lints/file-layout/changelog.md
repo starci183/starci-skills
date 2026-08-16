@@ -30,9 +30,9 @@ file ở đâu, mô-đun này nói máy nhìn thấy được bao nhiêu phần 
   phần chú thích đầu file — vốn còn nói "bốn luật" và đã được ghi thành một `Finding`.
 
 - **Sáu luật được ghi hồ sơ**, mỗi luật giữ đúng một mã:
-  `surface-folder-two-files-only` (`LAYOUT-2`), `route-tree-holds-routes-only` (`LAYOUT-6`),
-  `no-helper-folder-in-components` (`LAYOUT-3`), `export-matches-folder` (`LAYOUT-1`),
-  `no-runtime-namespace` (`LAYOUT-4`), `monorepo-tier-belongs-to-its-side` (`LAYOUT-5`).
+  `surface-folder-two-files-only` (`FILE-2`), `route-tree-holds-routes-only` (`FILE-6`),
+  `no-helper-folder-in-components` (`FILE-3`), `export-matches-folder` (`FILE-1`),
+  `no-runtime-namespace` (`FILE-4`), `monorepo-tier-belongs-to-its-side` (`FILE-5`).
   Ánh xạ một-đối-một, không mã nào thiếu máy giữ và không luật nào không neo vào một mã.
 
 - **Danh tính là tên đã publish.** Không đặt mã số riêng cho luật lint. Tên là chuỗi mà bản dựng in

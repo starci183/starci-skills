@@ -29,6 +29,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 /** Directories the tool writes rather than the tree owns; they carry no trust and no links. */
 const NOT_OURS = new Set([
   ".git",
+  ".testtmp",
   "worktrees",
   "projects",
   "todos",
@@ -37,6 +38,26 @@ const NOT_OURS = new Set([
   "ide",
   "node_modules",
 ])
+
+/**
+ * Strip code before looking for links, because code is not a claim about the filesystem.
+ *
+ * `](x)` is a link in prose and an accident in source. JavaScript alone produces it constantly -
+ * `rows[i](arg)`, a destructured call, a regex holding `|`. Reading those as links does not merely
+ * add noise: it makes the gate fail on files that are perfectly correct, and a gate that cries wolf
+ * gets muted, which costs more than the dangling link it was written to catch.
+ *
+ * This mattered the moment the shelves grew past a thousand worked examples. Before that the gate
+ * was accidentally right - there was almost no code for it to misread.
+ *
+ * Fenced blocks go first, then inline spans. Order matters: an inline backtick inside a fence is
+ * part of the code, not a span of its own, and stripping spans first would leave the fence torn open
+ * and swallow the prose after it.
+ */
+const withoutCode = (text) =>
+  text
+    .replace(/^[ \t]*(`{3,}|~{3,})[\s\S]*?^[ \t]*\1[ \t]*$/gm, "")
+    .replace(/(`+)[^`\n]*?\1/g, "")
 
 const markdownFiles = (directory) =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -51,7 +72,7 @@ const shown = (absolute) => absolute.slice(ROOT.length + 1).replace(/\\/g, "/")
 test("every relative link in the trust tree resolves to something that exists", () => {
   const broken = []
   for (const file of markdownFiles(ROOT)) {
-    const text = readFileSync(file, "utf8")
+    const text = withoutCode(readFileSync(file, "utf8"))
     for (const [, target] of text.matchAll(/\]\(([^)]+)\)/g)) {
       // A scheme, a bare anchor or a placeholder is not a claim about the filesystem.
       if (/^(?:[a-z][a-z0-9+.-]*:|#|<)/i.test(target)) continue

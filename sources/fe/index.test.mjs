@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname } from "node:path"
 import test from "node:test"
-import plugin, { audits, lawOwners, linterOptions, recommended, ruleOwners, rules } from "./index.mjs"
+import plugin, { audits, lawOwners, linterOptions, recommended, ruleDeclarations, ruleOwners, rules } from "./index.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -36,13 +36,30 @@ test("repository audits are gathered with the plugin laws", () => {
   assert.equal(typeof audits["effective-config"], "function")
 })
 
+/*
+ * Walk the DECLARATIONS, never the gathered map. Reading `ruleOwners` here would mean reading a map
+ * whose duplicates were already discarded, so the check could never fail - which is how the
+ * back-end twin passed for its whole life while three collided rules shipped underneath it.
+ */
 test("no two laws publish the same rule name", () => {
   const counted = new Map()
-  for (const [name, law] of Object.entries(ruleOwners)) {
+  for (const { name, law } of ruleDeclarations) {
     counted.set(name, [...(counted.get(name) ?? []), law])
   }
   const clashes = [...counted.entries()].filter(([, owners]) => owners.length > 1)
   assert.deepEqual(clashes, [], "two laws claim one rule name; whichever imports last would win silently")
+})
+
+/*
+ * The arithmetic the name check cannot do for itself: a discarded declaration makes these two counts
+ * disagree, whatever the reason it was discarded.
+ */
+test("every declared rule survives into the published set", () => {
+  assert.equal(
+    ruleDeclarations.length,
+    Object.keys(rules).length,
+    "a declared rule was discarded while gathering; the laws declare more rules than the plugin ships",
+  )
 })
 
 test("every published rule is in the recommended set", () => {

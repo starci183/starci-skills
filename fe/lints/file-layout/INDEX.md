@@ -16,7 +16,7 @@ Version: `2.00` · Module: `file-layout`
 
 Where a file sits is a claim about what it is. The law that states this is
 [`patterns/file-layout.md`](../../canon/patterns/file-layout.md), and it carries six codes,
-`LAYOUT-1` through `LAYOUT-6`.
+`FILE-1` through `FILE-6`.
 
 This record documents something narrower and more useful: **enforcement**. Six rules hold those six
 codes. Five of them read the PATH and one reads only the export list, which is what makes them cheap
@@ -36,12 +36,12 @@ rule — there is no code here without enforcement and no rule here without a co
 
 | Rule | Code | What it reports |
 |---|---|---|
-| `surface-folder-two-files-only` | `LAYOUT-2` | `extra` — names the tier, the surface folder and the remaining path, then names the destination each kind of stray belongs to |
-| `route-tree-holds-routes-only` | `LAYOUT-6` | `stray` — names the path under the routing tree and the basename that is not a framework slot, then sends a screen to the page tier and a domain sentence to the block tier |
-| `no-helper-folder-in-components` | `LAYOUT-3` | `helper` — names which of the four folder kinds was found, then names the tree that folder belongs in |
-| `export-matches-folder` | `LAYOUT-1` | `mismatch` — names the folder, lists every direct named export it collected, and asks for the folder's own name or a prefixed member |
-| `no-runtime-namespace` | `LAYOUT-4` | `namespace` — names the binding and lists the members, then states the bundling cost |
-| `monorepo-tier-belongs-to-its-side` | `LAYOUT-5` | `featureInPackage` when a feature tier sits in the shared package, `vocabularyInApp` when a shape tier sits inside one app; each names the tier and the destination |
+| `surface-folder-two-files-only` | `FILE-2` | `extra` — names the tier, the surface folder and the remaining path, then names the destination each kind of stray belongs to |
+| `route-tree-holds-routes-only` | `FILE-6` | `stray` — names the path under the routing tree and the basename that is not a framework slot, then sends a screen to the page tier and a domain sentence to the block tier |
+| `no-helper-folder-in-components` | `FILE-3` | `helper` — names which of the four folder kinds was found, then names the tree that folder belongs in |
+| `export-matches-folder` | `FILE-1` | `mismatch` — names the folder, lists every direct named export it collected, and asks for the folder's own name or a prefixed member |
+| `no-runtime-namespace` | `FILE-4` | `namespace` — names the binding and lists the members, then states the bundling cost |
+| `monorepo-tier-belongs-to-its-side` | `FILE-5` | `featureInPackage` when a feature tier sits in the shared package, `vocabularyInApp` when a shape tier sits inside one app; each names the tier and the destination |
 
 The source's own file header describes "four rules". It publishes six. The header is stale; the
 export table is the truth. See `audit.md`.
@@ -169,7 +169,7 @@ Each exception is closed and names the rule it applies to.
 
 ```text
 rule: <published rule name>
-code: <LAYOUT-1 … LAYOUT-6>
+code: <FILE-1 … FILE-6>
 file: <path the rule was given>
 mechanism: <path match | export list | both>
 verdict: <reported | silent | out of scope>

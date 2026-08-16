@@ -85,7 +85,7 @@ src/components/overlays/auth/SignInOverlay/
 ### Cửa lách và nhầm lẫn
 
 **Gom ba thành phần vào một file thì luật hết đếm được.** Đây là mã **lọt qua**, không phải mã hợp
-lệ — nó vi phạm đúng cái thói quen mà `LAYOUT-2` sinh ra để chặn, và không có gì báo:
+lệ — nó vi phạm đúng cái thói quen mà `FILE-2` sinh ra để chặn, và không có gì báo:
 
 ```tsx
 // src/components/pages/DashboardPage/component.tsx — im lặng, vì luật đếm FILE
@@ -182,7 +182,7 @@ app/provisioning/fleet-page.tsx        <- IM LẶNG: biểu thức đòi `/src/a
 ```
 
 **Route vẫn vẽ được thoải mái, miễn là tên đúng.** Mã dưới đây **lọt qua** và vi phạm đúng câu đầu
-của `LAYOUT-6`:
+của `FILE-6`:
 
 ```tsx
 // src/app/dashboard/page.tsx — IM LẶNG: luật đọc TÊN, không đọc việc file đang làm gì
@@ -535,7 +535,7 @@ services/ui/src/blocks/FleetRow/index.tsx    <- IM LẶNG
 ```
 
 **Và cửa lách lớn nhất: luật giữ vị trí của TẦNG, không giữ việc file có biết nghiệp vụ hay không.**
-File dưới đây nằm ở một đường dẫn hoàn toàn hợp lệ, và nó chính là thất bại mà `LAYOUT-5` mô tả:
+File dưới đây nằm ở một đường dẫn hoàn toàn hợp lệ, và nó chính là thất bại mà `FILE-5` mô tả:
 
 ```tsx
 // packages/ui/src/leaves/FleetStatusDot/component.tsx — IM LẶNG, dù nó biết rõ một nghiệp vụ
@@ -553,14 +553,14 @@ publish**, không bao giờ là một mã số tự đặt.
 
 | Yêu cầu bằng lời | Đường dẫn hoặc mã | Luật lint | Mã luật | Kết quả |
 |---|---|---|---|---|
-| "Thêm một thành phần nhỏ vào thư mục màn hình cho tiện" | `components/pages/<Tên>/Extra.tsx` | `surface-folder-two-files-only` | `LAYOUT-2` | Báo lỗi; đưa sang `blocks/<nhóm>/` |
-| "Để hàm định dạng cạnh thành phần dùng nó" | `components/blocks/<nhóm>/<Tên>/utils/x.ts` | `no-helper-folder-in-components` | `LAYOUT-3` | Báo lỗi; đưa sang `modules/utils/` |
-| "Viết luôn màn hình trong thư mục route cho gần" | `src/app/<đoạn>/<Tên>.tsx` | `route-tree-holds-routes-only` | `LAYOUT-6` | Báo lỗi; đưa sang `components/pages/<Tên>/` |
-| "Thư mục `Text` export `Paragraph`" | `components/leaves/Text/index.tsx` | `export-matches-folder` | `LAYOUT-1` | Báo lỗi; đổi tên một trong hai |
-| "Gói họ thẻ lại cho gọn để gọi `Card.Header`" | `export const Card = { Root, Header }` | `no-runtime-namespace` | `LAYOUT-4` | Báo lỗi; export thẳng từng thành viên |
-| "Đưa hàng danh sách dùng chung lên gói `ui`" | `packages/ui/src/blocks/<Tên>/` | `monorepo-tier-belongs-to-its-side` | `LAYOUT-5` | Báo lỗi `featureInPackage`; đưa về ứng dụng |
-| "Nhân bản `Badge` sang ứng dụng thứ hai" | `apps/<app>/src/components/leaves/Badge/` | `monorepo-tier-belongs-to-its-side` | `LAYOUT-5` | Báo lỗi `vocabularyInApp`; đưa lên gói dùng chung |
-| "Thêm kiểm thử cho route" | `src/app/<đoạn>/access.test.tsx` | `route-tree-holds-routes-only` | `LAYOUT-6` | Được miễn, có chủ ý |
+| "Thêm một thành phần nhỏ vào thư mục màn hình cho tiện" | `components/pages/<Tên>/Extra.tsx` | `surface-folder-two-files-only` | `FILE-2` | Báo lỗi; đưa sang `blocks/<nhóm>/` |
+| "Để hàm định dạng cạnh thành phần dùng nó" | `components/blocks/<nhóm>/<Tên>/utils/x.ts` | `no-helper-folder-in-components` | `FILE-3` | Báo lỗi; đưa sang `modules/utils/` |
+| "Viết luôn màn hình trong thư mục route cho gần" | `src/app/<đoạn>/<Tên>.tsx` | `route-tree-holds-routes-only` | `FILE-6` | Báo lỗi; đưa sang `components/pages/<Tên>/` |
+| "Thư mục `Text` export `Paragraph`" | `components/leaves/Text/index.tsx` | `export-matches-folder` | `FILE-1` | Báo lỗi; đổi tên một trong hai |
+| "Gói họ thẻ lại cho gọn để gọi `Card.Header`" | `export const Card = { Root, Header }` | `no-runtime-namespace` | `FILE-4` | Báo lỗi; export thẳng từng thành viên |
+| "Đưa hàng danh sách dùng chung lên gói `ui`" | `packages/ui/src/blocks/<Tên>/` | `monorepo-tier-belongs-to-its-side` | `FILE-5` | Báo lỗi `featureInPackage`; đưa về ứng dụng |
+| "Nhân bản `Badge` sang ứng dụng thứ hai" | `apps/<app>/src/components/leaves/Badge/` | `monorepo-tier-belongs-to-its-side` | `FILE-5` | Báo lỗi `vocabularyInApp`; đưa lên gói dùng chung |
+| "Thêm kiểm thử cho route" | `src/app/<đoạn>/access.test.tsx` | `route-tree-holds-routes-only` | `FILE-6` | Được miễn, có chủ ý |
 
 ## Bảng phân định ranh giới
 

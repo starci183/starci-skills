@@ -30,7 +30,7 @@ rules` là nguồn sự thật; phần đầu file đã cũ và cần sửa.
 
 | Phép thử | Kết quả |
 |---|---|
-| Mỗi luật lint có đúng một mã luật | Đạt — `LAYOUT-1` … `LAYOUT-6`, mỗi mã đúng một luật |
+| Mỗi luật lint có đúng một mã luật | Đạt — `FILE-1` … `FILE-6`, mỗi mã đúng một luật |
 | Mỗi mã luật có ít nhất một luật lint | Đạt — không mã nào chỉ còn là văn xuôi |
 | Tên luật là danh tính duy nhất | Đạt — không có mã số thứ hai nào được đặt ra trong mô-đun này |
 | Một luật đường dẫn có bị mô tả như đọc nội dung không | Đạt — cả sáu mục đều nêu rõ cơ chế thật |
@@ -70,7 +70,7 @@ rules` là nguồn sự thật; phần đầu file đã cũ và cần sửa.
 6. **`no-runtime-namespace` bỏ lọt cách dựng họ có dấu chấm phổ biến nhất.** `Object.assign`, gán
    thuộc tính sau khai báo, khai-báo-rồi-export, `export default {}`, `satisfies`, khoá trong ngoặc
    kép, và một khoá viết thường — bảy cách viết, tất cả đều im lặng, tất cả đều tạo ra đúng cái object
-   lúc chạy mà `LAYOUT-4` cấm.
+   lúc chạy mà `FILE-4` cấm.
 
 7. **Cổng miễn trừ của `route-tree-holds-routes-only` neo vào đầu chuỗi, không neo theo đoạn.**
    `app/_components/Card.tsx` được miễn; `app/dashboard/_components/Card.tsx` bị báo. Chú thích trong
@@ -120,10 +120,10 @@ Ba mươi tư cửa. Mỗi dòng nêu luật đang hở, cửa đó là gì, và
 
 | Cửa | Đóng được bằng cách soi thêm cái gì |
 |---|---|
-| Gom nhiều thành phần vào `component.tsx` | Phải đọc AST và đếm số hàm trả về JSX được export, cộng một định nghĩa "thành phần" mà `LAYOUT-2` chưa từng nêu. Đắt và dễ dương tính giả với thành phần con thuần trình bày; nên để mở và ghi lại |
+| Gom nhiều thành phần vào `component.tsx` | Phải đọc AST và đếm số hàm trả về JSX được export, cộng một định nghĩa "thành phần" mà `FILE-2` chưa từng nêu. Đắt và dễ dương tính giả với thành phần con thuần trình bày; nên để mở và ghi lại |
 | Thư mục chỉ có một nửa | Phải soi hệ thống tệp chứ không soi từng file — lint chạy theo file, nên đây là việc của một cổng cấu trúc riêng, không phải của một luật lint |
 | Lớp phủ đặt phẳng | Thêm một biểu thức thứ ba cho `overlays/<Tên>/<phần còn lại>`. Rẻ và an toàn; đề xuất được. Chưa làm vì đó là thay đổi hành vi |
-| File thứ ba trong block/composite/branch/leaf/shell | Phải mở rộng danh sách tầng, nhưng `LAYOUT-2` **cố ý** chỉ nói về ba tầng. Đóng cửa này là sửa luật trước, sửa luật lint sau |
+| File thứ ba trong block/composite/branch/leaf/shell | Phải mở rộng danh sách tầng, nhưng `FILE-2` **cố ý** chỉ nói về ba tầng. Đóng cửa này là sửa luật trước, sửa luật lint sau |
 | `.json`, `.md`, `.css` cạnh hai nửa | Phải mở rộng glob của kho tiêu thụ, không phải sửa luật. Thuộc về cấu hình adoption |
 | Thư mục màn hình ngoài `src/components/` | Phải bỏ tiền tố `components/`, và như thế biểu thức sẽ bắt cả `packages/ui/src/pages/`, chồng lấn với `monorepo-tier-belongs-to-its-side`. Cần quyết định luật trước |
 
@@ -144,7 +144,7 @@ Ba mươi tư cửa. Mỗi dòng nêu luật đang hở, cửa đó là gì, và
 |---|---|
 | Thư mục tiện ích ngay dưới gốc cây thành phần | Đổi `.*\/` thành `(?:.*\/)?`. Một ký tự, đóng được cửa nghiêm trọng nhất của luật này. Đề xuất được ngay |
 | `helpers/`, `lib/`, `shared/`, `util/`, `models/` | Mở rộng danh sách tên. Rẻ nhưng vô hạn: cái tên kế tiếp luôn có thể được nghĩ ra. Cách đóng thật là đảo ngược — chỉ cho phép một danh sách tầng đã biết dưới `components/` — và đó là một luật khác |
-| Tiện ích viết thành FILE thay vì thư mục | Cần một luật cấm file không phải `component`/`index`/kiểm thử ở **mọi** tầng thành phần, tức là mở rộng `LAYOUT-2` sang mọi tầng. Sửa luật trước |
+| Tiện ích viết thành FILE thay vì thư mục | Cần một luật cấm file không phải `component`/`index`/kiểm thử ở **mọi** tầng thành phần, tức là mở rộng `FILE-2` sang mọi tầng. Sửa luật trước |
 | `.json` trong `constants/` | Cấu hình adoption, không phải luật |
 
 ### `export-matches-folder` — 6 cửa
@@ -152,9 +152,9 @@ Ba mươi tư cửa. Mỗi dòng nêu luật đang hở, cửa đó là gì, và
 | Cửa | Đóng được bằng cách soi thêm cái gì |
 |---|---|
 | `export * from "./component"` | Phải đi theo import sang file kia, tức là cần thông tin liên-file mà một luật lint thường không có. Cách rẻ hơn: **cấm** `export *` trong `index.tsx` bằng một luật riêng, rồi luật này lại có tên để đọc |
-| `export default` | Cùng cách: cấm `export default` ở tầng thành phần bằng một luật riêng. Rẻ, và hợp với `LAYOUT-1` vốn đòi tên |
+| `export default` | Cùng cách: cấm `export default` ở tầng thành phần bằng một luật riêng. Rẻ, và hợp với `FILE-1` vốn đòi tên |
 | `export class` / `export enum` | Thu thêm `ClassDeclaration` và `TSEnumDeclaration` vào tập tên. Rẻ, an toàn, đề xuất được |
-| Một export đúng họ gánh cả hành khách | Đổi `some` thành `every`, nhưng thế thì `TextProps` hay một hằng nội bộ cũng đỏ. Cần một định nghĩa "export nào phải thuộc họ" mà `LAYOUT-1` chưa nêu. Để mở cho tới khi luật nói rõ |
+| Một export đúng họ gánh cả hành khách | Đổi `some` thành `every`, nhưng thế thì `TextProps` hay một hằng nội bộ cũng đỏ. Cần một định nghĩa "export nào phải thuộc họ" mà `FILE-1` chưa nêu. Để mở cho tới khi luật nói rõ |
 | Thư mục không PascalCase, `component.tsx`, `.jsx` | Đây là cổng chọn file, và nới nó ra là luật bắt đầu chạy trên cả cây không phải thành phần. Đóng bằng cách neo vào tầng đã biết chứ không neo vào kiểu chữ |
 | `export type Foo = …` | Thu thêm `TSTypeAliasDeclaration`/`TSInterfaceDeclaration`. Rẻ, nhưng sẽ kéo theo dương tính giả với các kiểu phụ; cân nhắc cùng cửa "hành khách" |
 
@@ -178,7 +178,7 @@ Ba mươi tư cửa. Mỗi dòng nêu luật đang hở, cửa đó là gì, và
 |---|---|
 | `packages/<tên>/src/components/<tầng>/` | Thêm `(?:components\/)?` vào biểu thức phía gói, đúng như phía ứng dụng đã có. Một đoạn, đối xứng lại hai vế. Đề xuất được ngay |
 | Workspace tên `libs/`, `services/`, `modules/` | Phải đọc `workspaces` trong manifest của kho thay vì đoán theo tên thư mục — tức là cần I/O ngoài file đang lint. Đắt; cách rẻ hơn là để kho tiêu thụ khai báo qua option, mà luật hiện có `schema: []` |
-| Thành phần biết nghiệp vụ nằm trong `packages/ui/src/leaves/` | Không đóng được bằng đường dẫn, và có lẽ không đóng được bằng máy: "biết một nghiệp vụ" là một phán đoán về ý nghĩa. Đây là phần mà `LAYOUT-5` vẫn phải do người giữ, và cần được nói ra thay vì để người đọc tưởng luật đã kín |
+| Thành phần biết nghiệp vụ nằm trong `packages/ui/src/leaves/` | Không đóng được bằng đường dẫn, và có lẽ không đóng được bằng máy: "biết một nghiệp vụ" là một phán đoán về ý nghĩa. Đây là phần mà `FILE-5` vẫn phải do người giữ, và cần được nói ra thay vì để người đọc tưởng luật đã kín |
 | Từ vựng dùng chung nằm trong tầng nghiệp vụ của một ứng dụng | Cùng loại với dòng trên, chiều ngược lại |
 
 ## Re-audit Triggers

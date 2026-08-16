@@ -13,7 +13,7 @@ import { readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname } from "node:path"
 import test from "node:test"
-import plugin, { lawOwners, recommended, ruleOwners, rules } from "./index.mjs"
+import plugin, { lawOwners, recommended, ruleDeclarations, ruleOwners, rules } from "./index.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -33,13 +33,36 @@ test("every law in the folder is gathered - a new module cannot be forgotten her
     )
 })
 
+/*
+ * WALK THE DECLARATIONS, NEVER THE GATHERED MAP.
+ *
+ * This test used to read `ruleOwners`, which is built with `Object.fromEntries` - so the duplicate
+ * it was hunting had already been discarded before it looked. Every name appeared once by
+ * construction, `owners.length > 1` could never be true, and the test passed for as long as it
+ * existed while three real collisions shipped underneath it. `ruleDeclarations` is the raw list,
+ * one entry per DECLARATION rather than per surviving name, so a second claim is still visible.
+ */
 test("no two laws publish the same rule name", () => {
     const counted = new Map()
-    for (const [name, law] of Object.entries(ruleOwners)) {
+    for (const { name, law } of ruleDeclarations) {
         counted.set(name, [...(counted.get(name) ?? []), law])
     }
     const clashes = [...counted.entries()].filter(([, owners]) => owners.length > 1)
     assert.deepEqual(clashes, [], "two laws claim one rule name; whichever imports last would win silently")
+})
+
+/*
+ * The arithmetic check the name-collision test cannot make on its own: if any name were dropped,
+ * the count of declarations and the count of shipped rules would disagree. It is cheap, it needs no
+ * knowledge of which names collided, and it fails even if a future collision slips past the map
+ * comparison above for a reason nobody predicted.
+ */
+test("every declared rule survives into the published set", () => {
+    assert.equal(
+        ruleDeclarations.length,
+        Object.keys(rules).length,
+        "a declared rule was discarded while gathering; the laws declare more rules than the plugin ships",
+    )
 })
 
 test("every published rule is in the recommended set", () => {

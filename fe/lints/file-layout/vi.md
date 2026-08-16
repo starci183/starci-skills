@@ -30,12 +30,12 @@ người tin là đã kín.** Cái thứ hai đắt hơn nhiều. Vì vậy mỗ
 
 | Luật lint | Mã luật | Bắt gì |
 |---|---|---|
-| `surface-folder-two-files-only` | `LAYOUT-2` | Một file thứ ba nằm trong thư mục của một màn hình, một khung hoặc một lớp phủ |
-| `route-tree-holds-routes-only` | `LAYOUT-6` | Một file trong cây định tuyến mà tên của nó không phải một khe của khung nền |
-| `no-helper-folder-in-components` | `LAYOUT-3` | Thư mục `constants/`, `utils/`, `types/`, `hooks/` nằm lồng trong cây thành phần |
-| `export-matches-folder` | `LAYOUT-1` | `index.tsx` trong thư mục PascalCase mà không export tên nào thuộc họ của thư mục |
-| `no-runtime-namespace` | `LAYOUT-4` | Một object literal viết hoa gom từ hai thành viên viết hoa trở lên |
-| `monorepo-tier-belongs-to-its-side` | `LAYOUT-5` | Tầng biết nghiệp vụ nằm trong gói dùng chung, hoặc tầng không biết nghiệp vụ nằm trong một ứng dụng |
+| `surface-folder-two-files-only` | `FILE-2` | Một file thứ ba nằm trong thư mục của một màn hình, một khung hoặc một lớp phủ |
+| `route-tree-holds-routes-only` | `FILE-6` | Một file trong cây định tuyến mà tên của nó không phải một khe của khung nền |
+| `no-helper-folder-in-components` | `FILE-3` | Thư mục `constants/`, `utils/`, `types/`, `hooks/` nằm lồng trong cây thành phần |
+| `export-matches-folder` | `FILE-1` | `index.tsx` trong thư mục PascalCase mà không export tên nào thuộc họ của thư mục |
+| `no-runtime-namespace` | `FILE-4` | Một object literal viết hoa gom từ hai thành viên viết hoa trở lên |
+| `monorepo-tier-belongs-to-its-side` | `FILE-5` | Tầng biết nghiệp vụ nằm trong gói dùng chung, hoặc tầng không biết nghiệp vụ nằm trong một ứng dụng |
 
 Sáu luật, sáu mã, ánh xạ một-đối-một. Không mã nào thiếu máy giữ, không luật lint nào không neo vào
 một mã.
@@ -48,7 +48,7 @@ một mã.
 `index.tsx` là phần nối dây — cộng với file kiểm thử song sinh của mỗi nửa. Thứ ba xuất hiện ở đó là
 tín hiệu rằng có một thứ dùng lại được vừa được phát minh ở chỗ không ai tìm thấy.
 
-**Giữ mã nào.** `LAYOUT-2`.
+**Giữ mã nào.** `FILE-2`.
 
 **Cách phát hiện.** Đọc `context.filename`, đổi dấu gạch chéo ngược thành gạch chéo xuôi, rồi so với
 hai biểu thức: `/src/components/(pages|layouts)/<Tên>/<phần còn lại>` và
@@ -84,7 +84,7 @@ khi đã quá muộn.
 **Bắt gì.** Một file nằm dưới cây định tuyến mà tên của nó không phải một khe do khung nền định
 nghĩa. File đó là một thành phần, và một thành phần thuộc về tầng gom nó với anh em của nó.
 
-**Giữ mã nào.** `LAYOUT-6`.
+**Giữ mã nào.** `FILE-6`.
 
 **Cách phát hiện.** Đọc `context.filename`, khớp `/src/app/<phần còn lại>`. Ba cổng miễn trừ chạy
 theo đúng thứ tự: phần còn lại bắt đầu bằng `api/` hoặc `_`; tên file kết thúc bằng
@@ -120,7 +120,7 @@ mới chỉ là văn xuôi.
 **Bắt gì.** Thư mục `constants/`, `utils/`, `types/` hoặc `hooks/` nằm bên trong cây thành phần. Đó
 không phải mã dựng hình, nên thư mục đang gắn nhãn sai và nội dung bên trong thì vô hình.
 
-**Giữ mã nào.** `LAYOUT-3`.
+**Giữ mã nào.** `FILE-3`.
 
 **Cách phát hiện.** Một biểu thức duy nhất trên đường dẫn:
 `/src/components/.*/(constants|utils|types|hooks)/`. Dấu gạch chéo cuối biến nó thành phép thử
@@ -150,7 +150,7 @@ lại, rồi hai bản trôi khỏi nhau và không có gì báo động. Một 
 **Bắt gì.** `index.tsx` trong một thư mục PascalCase phải có ít nhất một export tên trực tiếp thuộc
 họ của thư mục — đúng tên thư mục, hoặc tên thư mục cộng thêm một hậu tố bắt đầu bằng chữ hoa.
 
-**Giữ mã nào.** `LAYOUT-1`.
+**Giữ mã nào.** `FILE-1`.
 
 **Cách phát hiện.** Cổng đường dẫn `/<ThưMụcPascalCase>/index.tsx?$` chọn file. Sau đó là AST: mỗi
 `ExportNamedDeclaration` góp tên từ khai báo biến, từ khai báo hàm, và từ mọi specifier. Tới
@@ -181,7 +181,7 @@ rơi vào người viết mà rơi vào mọi người đọc sau đó, mỗi l�
 đóng gói thành một khối duy nhất, nên một chỗ gọi chỉ cần một thành viên là kéo theo cả họ và không
 thứ gì rụng ra khỏi bản dựng được.
 
-**Giữ mã nào.** `LAYOUT-4`.
+**Giữ mã nào.** `FILE-4`.
 
 **Cách phát hiện.** Thuần AST, **không có cổng đường dẫn**. Với mỗi `ExportNamedDeclaration` là khai
 báo biến: tên phải bắt đầu bằng chữ hoa; phần khởi tạo, sau khi bóc lớp `as`, phải là một
@@ -216,7 +216,7 @@ Không có máy đếm, không ai phát hiện ra rằng một trang nhập mộ
 vụ**; những tầng **biết nghiệp vụ** thuộc về ứng dụng sở hữu nghiệp vụ đó. Luật báo hai chiều: tầng
 nghiệp vụ nằm trong gói, và tầng từ vựng nằm trong ứng dụng.
 
-**Giữ mã nào.** `LAYOUT-5`.
+**Giữ mã nào.** `FILE-5`.
 
 **Cách phát hiện.** Hai biểu thức đường dẫn:
 `/packages/<tên>/src/(blocks|overlays|pages|layouts)/` và

@@ -90,6 +90,23 @@ export const ruleOwners = Object.fromEntries(
   CONTRIBUTIONS.flatMap((entry) => Object.keys(entry.rules).map((name) => [name, entry.law])),
 )
 
+/**
+ * Every (law, rule name) pair as DECLARED, before any collapsing.
+ *
+ * `ruleOwners` above and `rules` below are both built with `Object.fromEntries`, which silently
+ * keeps the last writer when two laws declare one name. A guard that walks either of them cannot
+ * see a collision - the duplicate is gone before it looks, so every name appears exactly once BY
+ * CONSTRUCTION and the check passes forever while being blind.
+ *
+ * That is not hypothetical. The back-end twin had this exact shape, three rules were declared by two
+ * laws each, one copy was discarded on import, and its guard reported green throughout. This axis
+ * has no collision today; publishing the raw declarations is what keeps that a FACT rather than an
+ * assumption nobody can test.
+ */
+export const ruleDeclarations = CONTRIBUTIONS.flatMap((entry) =>
+  Object.keys(entry.rules).map((name) => ({ law: entry.law, name })),
+)
+
 /** Every rule this canon publishes, keyed by its published name. */
 export const rules = Object.fromEntries(
   CONTRIBUTIONS.flatMap((entry) => Object.entries(entry.rules)),

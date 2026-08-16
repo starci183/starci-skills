@@ -55,11 +55,28 @@ const CONTRIBUTIONS = [
 export const lawOwners = CONTRIBUTIONS.map((entry) => entry.law)
 
 /**
+ * Every (law, rule name) pair as DECLARED, before any collapsing.
+ *
+ * This exists because `ruleOwners` and `rules` below are both built with `Object.fromEntries`, which
+ * silently keeps the last writer when two laws declare one name. A test that walks either of them
+ * therefore cannot see a collision: the duplicate is already gone by the time it looks, so every
+ * name appears exactly once BY CONSTRUCTION and the check passes forever while being blind.
+ *
+ * That is exactly what happened - three back-end rules were declared by two laws each, one copy was
+ * discarded on import, and the guard reported green the whole time. A gate that cannot fail is
+ * indistinguishable from no gate, so the raw declarations are published here and the guard walks
+ * these instead.
+ */
+export const ruleDeclarations = CONTRIBUTIONS.flatMap((entry) =>
+  Object.keys(entry.rules).map((name) => ({ law: entry.law, name })),
+)
+
+/**
  * Which law declares each rule.
  *
  * Exported because a failing rule is a question about a LAW, and the shortest path from a build log
- * to the document that explains it is this map. It is also what the twin test walks to prove no two
- * laws claim one name.
+ * to the document that explains it is this map. It answers "who owns this name" for a name that
+ * SHIPPED; proving no two laws claim one name is `ruleDeclarations`' job, not this map's.
  */
 export const ruleOwners = Object.fromEntries(
     CONTRIBUTIONS.flatMap((entry) => Object.keys(entry.rules).map((name) => [name, entry.law])),
