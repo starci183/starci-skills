@@ -18,11 +18,15 @@ from what it still owes has not finished.
 
 Detection is not permission. Finding that something must change is never authority to change it.
 
-## The seven capabilities
+## The eight capabilities
+
+Seven do work. `starci-diagnose` does not: it traces one of the seven and writes nothing that skill
+would write, which is why it is the only capability with no apply stage.
 
 | Skill | Journey | Owns |
 |---|---|---|
 | `starci-init` | plan → review → apply, internal | the Source bootstrap: `AGENTS.md` and `CLAUDE.md` |
+| `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-fe-design-layout` | opens or resumes the session, then layout rounds | 3–4 layout candidates per surface, hash-bound |
 | `starci-fe-design-block` | block rounds | 3–4 anatomies per region, hash-bound |
 | `starci-fe-design-execute` | execution | frontend source, only after every reachable hash is accepted |

@@ -19,11 +19,15 @@ quyết** với **cái nó đã ghi** với **cái nó còn nợ** thì chưa xo
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
-## Bảy năng lực
+## Tám năng lực
+
+Bảy cái làm việc. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
+thứ gì mà skill đó sẽ ghi — vì vậy nó là năng lực duy nhất không có stage apply.
 
 | Skill | Hành trình | Sở hữu |
 |---|---|---|
 | `starci-init` | plan → review → apply, nội bộ | bootstrap của Source: `AGENTS.md` và `CLAUDE.md` |
+| `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-fe-design-layout` | mở hoặc tiếp session, rồi các lượt layout | 3–4 phương án layout mỗi bề mặt, buộc theo hash |
 | `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region, buộc theo hash |
 | `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
