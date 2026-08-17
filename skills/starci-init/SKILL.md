@@ -117,9 +117,26 @@ rules — a runtime that cannot find its name gets no bootstrap at all. Nobody m
 
 ### 8 — Apply: workspace routes
 
-Refresh route configuration only. Never clone, link, copy, mount or edit a target repository: the route
-**describes** a checkout, it never mirrors one. Route values stay machine-local — never committed into
-the trust tree — and runtime secrets, environment values and tokens are never route values at all.
+Refresh route configuration only. Never clone, link, copy, mount or edit a **target** repository: the
+route **describes** a checkout, it never mirrors one. Route values stay machine-local — never committed
+into the trust tree — and runtime secrets, environment values and tokens are never route values at all.
+
+**One narrow exception, and it is not a loosening of that rule.** A repository the tree itself owns — its
+console, its lint machines — may be **cloned when its route names it and the checkout is absent**, and
+pulled when it is present. The guarantee that matters is untouched: nothing clones, mirrors or edits a
+product target, because a product's history is the product team's and a setup run has no business in it.
+The tree's own tooling has no such owner to answer to; it is this tree's.
+
+These live under the project `starci`, one role per repository:
+
+```text
+.workspace/starci/console/config.json    the read-only console over this machine's state
+.workspace/starci/eslint/config.json     the lint machines the gates cite
+```
+
+A tooling route carries `contract: null` — it has no domain contract, and that absence is not a stale
+route. Print what happened per repository, `cloned` or `pulled` or `reused`, because a clone is the one
+thing here that puts a new directory on the disk.
 
 ### 9 — Apply: worktree state
 
