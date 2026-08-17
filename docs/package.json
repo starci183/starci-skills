@@ -1,5 +1,5 @@
 {
-  "name": "starci-skills-v3-nextra",
+  "name": "starci-skills-docs",
   "version": "0.0.0",
   "private": true,
   "description": "Nextra site generated from the StarCi v3 trust records. Builds from a clean clone: no source repository, no machine path, no workspace route.",

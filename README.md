@@ -1,6 +1,6 @@
 # starci-skills
 
-The v3 StarCi trust tree: one source of truth an agent reads so that a loose business prompt still
+StarCi skills — one source of truth an agent reads so that a loose business prompt still
 lands as correct code.
 
 Four species, split by **what each is allowed to return** — not by the order they run in:

@@ -159,8 +159,8 @@ await (await exists(indexPath)
   : writeGenerated(
       "index.mdx",
       rootChildren.length === 0
-        ? `---\ntitle: Docs\n---\n\n# StarCi trust v3\n\nNothing is published yet. Write \`${indexSource}\` at the root of \`.claude-v3/\`, declare a shelf in \`docs/publication.mjs\`, then run \`npm run sync\`.\n`
-        : `---\ntitle: Docs\n---\n\n# StarCi trust v3\n\nEvery page below sits at exactly its own address in the \`.claude-v3/\` tree.\n\n${publishedGroups.map((group) => `- [${group.route}](./${group.route}) — ${group.description}`).join("\n")}\n\nThis home page is generated. Write \`${indexSource}\` at the root of \`.claude-v3/\` to replace it.\n`
+        ? `---\ntitle: Docs\n---\n\n# StarCi skills\n\nNothing is published yet. Write \`${indexSource}\` at the root of \`.claude/\`, declare a shelf in \`docs/publication.mjs\`, then run \`npm run sync\`.\n`
+        : `---\ntitle: Docs\n---\n\n# StarCi skills\n\nEvery page below sits at exactly its own address in the \`.claude/\` tree.\n\n${publishedGroups.map((group) => `- [${group.route}](./${group.route}) — ${group.description}`).join("\n")}\n\nThis home page is generated. Write \`${indexSource}\` at the root of \`.claude/\` to replace it.\n`
     ));
 
 await Promise.all(

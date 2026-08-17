@@ -2,7 +2,7 @@
 title: Docs
 ---
 
-# StarCi trust v3
+# StarCi skills
 
 Read this before planning, before reading target source, and before running a skill.
 

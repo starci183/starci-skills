@@ -1,6 +1,6 @@
-# StarCi trust v3 docs — Nextra
+# StarCi skills docs — Nextra
 
-The site is generated from the v3 trust tree; nothing under `content/` is hand-authored.
+The site is generated from the tree; nothing under `content/` is hand-authored.
 
 A module is a directory holding `en.md` — the binding rules an agent reads, and the module's own
 page — with `vi.md` beside it as the human guide:
