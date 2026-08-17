@@ -233,7 +233,7 @@ query written "sub-optimally" to avoid a lock.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a rule in `starci-eslint/packages/fe/comments.mjs` reports it;
+wrong value impossible to write; `enforced` means a rule in `@starci/eslint-canon-fe` reports it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | Held by | What the tier does not reach |
@@ -257,12 +257,12 @@ proposal, not a law.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `COMMENTS-1` | `starci-eslint/packages/fe/comments.mjs` | Every `export const` in the file opens with a block that names a role — `SECOND_LANGUAGE_LETTER` says which letters and why they matter, not that it is a regex. Compare with `hasBlock` inside `requireExportJsdoc.create`, which is the whole of what the rule actually reads |
-| `COMMENTS-2` | `starci-eslint/packages/fe/comments.test.mjs` | The three invalid cases are one sentence in three positions: a comment, a string, a template chunk. That triple is the argument for the rule's reach, written as a test |
-| `COMMENTS-3` | `starci-eslint/packages/fe/comments.mjs` | `CONTENT_PATHS` and `isContentFile` for the two path exceptions, `OK_PRAGMA` and the `marked` set inside `noSecondLanguageInSource.create` for the third. The valid cases at the `LOCALE` and `FIXTURE` filenames in the twin test show each exception exercised |
-| `COMMENTS-4` | `starci-eslint/packages/fe/comments.mjs` | `hasEmoji`, and its block explaining why it is two tests rather than one character class. The regional-indicator pair case in the twin test is the one a single pictograph test misses |
-| `COMMENTS-5` | `starci-eslint/packages/fe/comments.mjs` | The one-line block on `normalizePath`: it says why forward slashes are chosen, not that a replace happens. The restating version of that same block would be legal everywhere and teach nothing |
-| `COMMENTS-6` | `starci-eslint/packages/fe/comments.mjs` | The block above `const marked` inside `noSecondLanguageInSource.create`: it records what the exemption used to test, why no phrasing could satisfy it, and why the rule's own valid fixture passed for the wrong reason. That is a refusal a reader would otherwise undo |
+| `COMMENTS-1` | `@starci/eslint-canon-fe` | Every `export const` in the file opens with a block that names a role — `SECOND_LANGUAGE_LETTER` says which letters and why they matter, not that it is a regex. Compare with `hasBlock` inside `requireExportJsdoc.create`, which is the whole of what the rule actually reads |
+| `COMMENTS-2` | `@starci/eslint-canon-fe` | The three invalid cases are one sentence in three positions: a comment, a string, a template chunk. That triple is the argument for the rule's reach, written as a test |
+| `COMMENTS-3` | `@starci/eslint-canon-fe` | `CONTENT_PATHS` and `isContentFile` for the two path exceptions, `OK_PRAGMA` and the `marked` set inside `noSecondLanguageInSource.create` for the third. The valid cases at the `LOCALE` and `FIXTURE` filenames in the twin test show each exception exercised |
+| `COMMENTS-4` | `@starci/eslint-canon-fe` | `hasEmoji`, and its block explaining why it is two tests rather than one character class. The regional-indicator pair case in the twin test is the one a single pictograph test misses |
+| `COMMENTS-5` | `@starci/eslint-canon-fe` | The one-line block on `normalizePath`: it says why forward slashes are chosen, not that a replace happens. The restating version of that same block would be legal everywhere and teach nothing |
+| `COMMENTS-6` | `@starci/eslint-canon-fe` | The block above `const marked` inside `noSecondLanguageInSource.create`: it records what the exemption used to test, why no phrasing could satisfy it, and why the rule's own valid fixture passed for the wrong reason. That is a refusal a reader would otherwise undo |
 
 Every anchor above is lint source inside the trust tree, which is the code this repository can
 actually open. No component-tree anchor is verifiable from here; that limit is recorded as a gap

@@ -250,7 +250,7 @@ thử thách tuần · feed cộng đồng · kết quả tìm kiếm · giỏ h
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `starci-eslint/packages/fe/loading.mjs` báo
+giá trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `@starci/eslint-canon-fe` báo
 nó; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -277,13 +277,13 @@ luật. Đường dẫn tính từ cây component của front end.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `LOADING-1` | `src/components/leaves/Text/index.tsx` | Leaf nhận `isLoading` và nghỉ dưới dạng chính nó. Không có file thứ hai nằm cạnh mô tả lại cùng một dòng đó |
-| `LOADING-2` | `src/components/leaves/Text/index.tsx` (~133–160) | Một element trên cả hai đường: class set và việc thay ký tự thì đổi, thẻ và cách sắp xếp thì không |
-| `LOADING-3` | `src/components/contracts/index.ts` (~146–147) và `src/components/blocks/dashboard/WeeklyGoals/component.tsx` (~60, ~109) | Union ghép `repeats` với `restingCount`; và một hằng số có tên cho số dòng nghỉ thế chỗ cho các dòng thật |
-| `LOADING-4` | `src/components/leaves/Avatar/index.tsx` (~67) | `aria-hidden` chỉ có mặt trong lúc leaf nghỉ, và biến mất khi nó mang một cái tên |
-| `LOADING-5` | `src/components/blocks/dashboard/ContinueLearning/component.tsx` (~145–147) | Slot chứa lối ra bị bỏ hẳn khỏi record trong lúc item chưa được giải — không render `disabled`, không render dạng nghỉ |
-| `LOADING-6` | `src/components/blocks/dashboard/pending-gate.test.tsx` | Mỗi block được assert ở trạng thái nghỉ đối chiếu với request chưa giải của CHÍNH NÓ, mỗi lần một cái |
-| `LOADING-7` | `src/components/blocks/dashboard/ContinueLearning/component.tsx` (~68–73) | `pending` đứng trong union bên cạnh `onboarding`, `empty`, `failed` và `ready`, mang theo phần khung chứ không mang theo con số không |
+| `LOADING-1` | `components/leaves/Text/index.tsx` | Leaf nhận `isLoading` và nghỉ dưới dạng chính nó. Không có file thứ hai nằm cạnh mô tả lại cùng một dòng đó |
+| `LOADING-2` | `components/leaves/Text/index.tsx` (~133–160) | Một element trên cả hai đường: class set và việc thay ký tự thì đổi, thẻ và cách sắp xếp thì không |
+| `LOADING-3` | `components/contracts/index.ts` (~146–147) và `components/blocks/dashboard/WeeklyGoals/component.tsx` (~60, ~109) | Union ghép `repeats` với `restingCount`; và một hằng số có tên cho số dòng nghỉ thế chỗ cho các dòng thật |
+| `LOADING-4` | `components/leaves/Avatar/index.tsx` (~67) | `aria-hidden` chỉ có mặt trong lúc leaf nghỉ, và biến mất khi nó mang một cái tên |
+| `LOADING-5` | `components/blocks/dashboard/ContinueLearning/component.tsx` (~145–147) | Slot chứa lối ra bị bỏ hẳn khỏi record trong lúc item chưa được giải — không render `disabled`, không render dạng nghỉ |
+| `LOADING-6` | `components/blocks/dashboard/pending-gate.test.tsx` | Mỗi block được assert ở trạng thái nghỉ đối chiếu với request chưa giải của CHÍNH NÓ, mỗi lần một cái |
+| `LOADING-7` | `components/blocks/dashboard/ContinueLearning/component.tsx` (~68–73) | `pending` đứng trong union bên cạnh `onboarding`, `empty`, `failed` và `ready`, mang theo phần khung chứ không mang theo con số không |
 
 Mọi mã đều đã neo được. Không mã nào chưa neo.
 

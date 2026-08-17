@@ -205,7 +205,7 @@ thái job do worker ở pod khác cập nhật · snapshot health phát lại tr
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc branded type khiến giá
-trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `starci-eslint/packages/be/event-delivery.mjs`
+trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `@starci/eslint-canon-be`
 bắt được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -245,12 +245,12 @@ Code thật để đối chiếu từng luật. Một luật không chỉ tay v�
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `DELIVERY-1` | `src/modules/platform/event/nats/nats-message-factory.service.ts` → `createMessage` · `src/modules/platform/event/nats/types.ts` → `NatsMessage` | Envelope được dựng với `id` lấy từ instance service và `digest` băm từ payload, không bao giờ từ subject. Interface là nơi khai nghĩa vụ của envelope, và là nơi nhìn thấy `digest` đang là tuỳ chọn |
-| `DELIVERY-2` | `src/modules/platform/event/config.ts` → `configMap` · `src/modules/platform/event/event-emitter.service.ts` → `emit` | Mọi entry đều khai cả hai cờ, và vài entry kèm comment nêu vì sao một cờ vẫn còn `false`. Emitter đọc đúng hai cờ đó để chọn nhánh, nên config là hợp đồng chứ không phải gợi ý |
-| `DELIVERY-3` | `src/modules/platform/event/nats/nats-bridge.service.ts` → guard nằm trên nhánh ping · `starci-eslint/packages/be/event-delivery.mjs` → `originIndex > emitIndex` | Guard so `parsed.id` với id instance, và mang comment ghi lại con bug mà phép so với subject đã gây ra. Rule kiểm tra phép so có tồn tại *và* đứng trước emit — thứ tự chính là toàn bộ nội dung của mã |
-| `DELIVERY-4` | `src/modules/platform/event/nats/nats-bridge.service.ts` → cặp get/set digest · `starci-eslint/packages/be/event-delivery.mjs` → `digestIndex > emitIndex` | Đọc digest, ghi digest, rồi mới emit — ba câu lệnh mà thứ tự là bất biến. Message thứ hai của rule nhắm đúng vào thứ tự đó |
-| `DELIVERY-5` | `src/tests/e2e/notification-delivery.e2e-spec.ts` | Assertion gọi tên đúng dòng người nhận và đúng loại payload, và tiêu đề của chính test khẳng định mệnh đề phủ định: sự thật không rò sang socket khác. Không assertion nào ở đâu đếm listener |
-| `DELIVERY-6` | `src/tests/e2e/cross-instance-event-routing.e2e-spec.ts` · `src/tests/helpers/nats-cross-instance-world.ts` | Hai instance boot độc lập dùng chung một broker thật; helper đếm message ở broker để "đúng một lần giao" ở nơi phát được chứng minh sau khi tiếng vọng đã tới, chứ không phải trước khi nó kịp tới |
+| `DELIVERY-1` | `modules/platform/event/nats/nats-message-factory.service.ts` → `createMessage` · `modules/platform/event/nats/types.ts` → `NatsMessage` | Envelope được dựng với `id` lấy từ instance service và `digest` băm từ payload, không bao giờ từ subject. Interface là nơi khai nghĩa vụ của envelope, và là nơi nhìn thấy `digest` đang là tuỳ chọn |
+| `DELIVERY-2` | `modules/platform/event/config.ts` → `configMap` · `modules/platform/event/event-emitter.service.ts` → `emit` | Mọi entry đều khai cả hai cờ, và vài entry kèm comment nêu vì sao một cờ vẫn còn `false`. Emitter đọc đúng hai cờ đó để chọn nhánh, nên config là hợp đồng chứ không phải gợi ý |
+| `DELIVERY-3` | `modules/platform/event/nats/nats-bridge.service.ts` → guard nằm trên nhánh ping · `@starci/eslint-canon-be` → `originIndex > emitIndex` | Guard so `parsed.id` với id instance, và mang comment ghi lại con bug mà phép so với subject đã gây ra. Rule kiểm tra phép so có tồn tại *và* đứng trước emit — thứ tự chính là toàn bộ nội dung của mã |
+| `DELIVERY-4` | `modules/platform/event/nats/nats-bridge.service.ts` → cặp get/set digest · `@starci/eslint-canon-be` → `digestIndex > emitIndex` | Đọc digest, ghi digest, rồi mới emit — ba câu lệnh mà thứ tự là bất biến. Message thứ hai của rule nhắm đúng vào thứ tự đó |
+| `DELIVERY-5` | `tests/e2e/notification-delivery.e2e-spec.ts` | Assertion gọi tên đúng dòng người nhận và đúng loại payload, và tiêu đề của chính test khẳng định mệnh đề phủ định: sự thật không rò sang socket khác. Không assertion nào ở đâu đếm listener |
+| `DELIVERY-6` | `tests/e2e/cross-instance-event-routing.e2e-spec.ts` · `tests/helpers/nats-cross-instance-world.ts` | Hai instance boot độc lập dùng chung một broker thật; helper đếm message ở broker để "đúng một lần giao" ở nơi phát được chứng minh sau khi tiếng vọng đã tới, chứ không phải trước khi nó kịp tới |
 
 Mọi mã đều đã có neo. Không mã nào ghi "chưa neo được".
 

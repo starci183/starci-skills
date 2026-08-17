@@ -236,7 +236,7 @@ file — out of scope is unjudged, not clean.
 
 ## Worked example
 
-**Input.** `src/orders/order-totals.projection.listener.ts`:
+**Input.** `orders/order-totals.projection.listener.ts`:
 
 ```ts
 export class OrderTotalsListener {

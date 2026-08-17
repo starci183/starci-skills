@@ -38,7 +38,7 @@ Three of the five codes have a lint rule behind them, and one of those three can
 what its code asks. The layer table below says which is which rather than implying uniform
 enforcement.
 
-What holds this law is `starci-eslint/packages/be/comments.mjs`.
+What holds this law is `@starci/eslint-canon-be`.
 
 ## Situation codes
 
@@ -242,7 +242,7 @@ per-locale email content.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule in `starci-eslint/packages/be/comments.mjs` catches it;
+wrong value impossible to write; `enforced` means a lint rule in `@starci/eslint-canon-be` catches it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -278,15 +278,15 @@ Real code each law can be checked against. A law that cannot be pointed at is a 
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `COMMENT-1` | `src/modules/databases/postgresql/primary/primary.decorators.ts` → `InjectPrimaryPostgreSQLEntityManager` | A one-line arrow-function export whose doc block is three lines long, because the whole risk is invisible in the signature: the wrong connection has the identical type and reads the wrong data. This is the anchor for "no declaration is too small" |
-| `COMMENT-1` | `src/modules/databases/postgresql/primary/constants/connection.ts` | The other side of the same rule: a plain data constant, no doc block, no finding. Read it beside the decorator to see where the rule's exemption is drawn |
-| `COMMENT-2` | `src/modules/ai/balancer/enums/ai-error-kind.ts` → `AiErrorKind` | Four members, four consequences — hard-disable the key, short cooldown, light cooldown, do not penalize. None of the four is derivable from the member's name, and each is chosen at a call site far from the switch that acts on it |
-| `COMMENT-2` | `src/modules/ai/balancer/enums/key-status.ts` | A second enum in the same folder, so the pair shows the shape holding across a family rather than in one lucky file |
-| `COMMENT-3` | `src/modules/bussiness/streak/streak-freeze-cron.service.ts` (the insert-and-spend block) | The clearest live example of a reason that lives outside the line: why `RETURNING id` is read at all, why zero affected rows means the provisional row must be removed rather than retried, and why a racing replica is the case being defended against. Delete those sentences and the code still compiles and stops being explicable |
+| `COMMENT-1` | `modules/databases/postgresql/primary/primary.decorators.ts` → `InjectPrimaryPostgreSQLEntityManager` | A one-line arrow-function export whose doc block is three lines long, because the whole risk is invisible in the signature: the wrong connection has the identical type and reads the wrong data. This is the anchor for "no declaration is too small" |
+| `COMMENT-1` | `modules/databases/postgresql/primary/constants/connection.ts` | The other side of the same rule: a plain data constant, no doc block, no finding. Read it beside the decorator to see where the rule's exemption is drawn |
+| `COMMENT-2` | `modules/ai/balancer/enums/ai-error-kind.ts` → `AiErrorKind` | Four members, four consequences — hard-disable the key, short cooldown, light cooldown, do not penalize. None of the four is derivable from the member's name, and each is chosen at a call site far from the switch that acts on it |
+| `COMMENT-2` | `modules/ai/balancer/enums/key-status.ts` | A second enum in the same folder, so the pair shows the shape holding across a family rather than in one lucky file |
+| `COMMENT-3` | `modules/bussiness/streak/streak-freeze-cron.service.ts` (the insert-and-spend block) | The clearest live example of a reason that lives outside the line: why `RETURNING id` is read at all, why zero affected rows means the provisional row must be removed rather than retried, and why a racing replica is the case being defended against. Delete those sentences and the code still compiles and stops being explicable |
 | `COMMENT-4` | `eslint.config.mjs` (the rule block wiring the back-end plugin) | Where this code is switched on for the whole tree, at `error`. Also the anchor for a recorded drift: the consuming config still wires three legacy rules that canon replaced with one |
-| `COMMENT-4` | `src/tests/harness/ai-tutor.harness-spec.ts` | The fixture lane, rendered: a Vietnamese instruction is the fixture's entire point, and the file's prose is still English. This is the boundary between "prose in a second language" and "data that happens to be prose" |
-| `COMMENT-5` | `src/features/api/core/graphql/queries/contents/content/content.handler.ts` (the heading regex, `vn-ok` marked) | A pattern MATCHED against real authored content. Translate the literal and the branch stops matching anything, silently — no test fails on a regex that simply never fires |
-| `COMMENT-5` | `src/features/api/core/graphql/mutations/**/*.resolver.ts` (the per-locale success messages) | The EMIT side of the same code, repeated across the whole mutation surface with a one-clause reason on every line. Read it as the volume test: the marker only survives being written hundreds of times because it carries a reason each time |
+| `COMMENT-4` | `tests/harness/ai-tutor.harness-spec.ts` | The fixture lane, rendered: a Vietnamese instruction is the fixture's entire point, and the file's prose is still English. This is the boundary between "prose in a second language" and "data that happens to be prose" |
+| `COMMENT-5` | `features/api/core/graphql/queries/contents/content/content.handler.ts` (the heading regex, `vn-ok` marked) | A pattern MATCHED against real authored content. Translate the literal and the branch stops matching anything, silently — no test fails on a regex that simply never fires |
+| `COMMENT-5` | `features/api/core/graphql/mutations/**/*.resolver.ts` (the per-locale success messages) | The EMIT side of the same code, repeated across the whole mutation surface with a one-clause reason on every line. Read it as the volume test: the marker only survives being written hundreds of times because it carries a reason each time |
 
 Every code is anchored. None is left unanchored.
 

@@ -79,10 +79,10 @@ từ giây phút dòng đó tồn tại, không còn ai ngoài file đó trả l
 không".
 
 **Nó sinh ra gì trong source.** Một rule duy nhất được publish, `no-inline-lint-config`, nằm ở
-`starci-eslint/packages/fe/lint-escape-hatch.mjs`. Nó duyệt mọi comment trong một file sản phẩm bằng visitor
+`@starci/eslint-canon-fe`. Nó duyệt mọi comment trong một file sản phẩm bằng visitor
 `Program()` đi qua `getAllComments()` thay vì match text nguồn, và báo bất kỳ comment nào có phần thân
 mở đầu bằng một directive. Pattern là `INLINE_DIRECTIVE`, được neo ở đầu thân comment. `isProductSource`
-là điều kiện đường dẫn duy nhất trong file đó. Twin test ở `starci-eslint/packages/fe/lint-escape-hatch.test.mjs` mang
+là điều kiện đường dẫn duy nhất trong file đó. Twin test ở `@starci/eslint-canon-fe` mang
 các ca hợp lệ giữ cho prose nói về directive vẫn viết được, kèm comment giải thích vì sao pattern được
 neo và bản không neo đã phải trả giá gì. Còn source sản phẩm thì không sinh ra gì cả: không một
 directive nào, dưới bất kỳ dạng nào.
@@ -115,14 +115,14 @@ cái cửa, và chìa khoá nằm trong tay người muốn đi qua. Vì thế m
 Nó là thứ đổi kết quả từ *bị coi là sai* sang *không xảy ra*. Cần cả hai: mã 1 giải thích vì sao hỏng,
 mã 2 bảo đảm directive không tự bịt miệng được người canh nó.
 
-**Nó sinh ra gì trong source.** `linterOptions` trong `starci-eslint/packages/fe/lint-escape-hatch.mjs`, được freeze
+**Nó sinh ra gì trong source.** `linterOptions` trong `@starci/eslint-canon-fe`, được freeze
 và export ngay cạnh `rules` để hai thứ không thể bị gắn tách rời do sơ ý, rồi được re-export từ plugin
-tổng `starci-eslint/packages/fe/index.mjs` để một config tiêu thụ lấy chúng từ đúng cái import đã lấy rules. Ca thứ
+tổng `@starci/eslint-canon-fe` để một config tiêu thụ lấy chúng từ đúng cái import đã lấy rules. Ca thứ
 hai của twin test sinh ra bằng chứng: một linter thật, options đã freeze được áp vào, một disable gọi
 đích danh chính người canh, và assertion rằng người canh vẫn báo ở severity `2`. Mã này được giữ ở
 tầng `documented` chứ không phải `enforced`: không có gì kiểm tra rằng một config tiêu thụ thực sự đã
 spread options vào. Cái kiểm tra được điều đó, `refusesInlineConfig`, thuộc về module `lint-adoption`
-và là một script — `starci-eslint/packages/fe/lint-adoption.mjs` và `scripts/audit-fe-lint-adoption.mjs`, đọc ra từ
+và là một script — `@starci/eslint-canon-fe` và `scripts/audit-fe-lint-adoption.mjs`, đọc ra từ
 config đã in. Nó là thứ duy nhất đo một repo thật, và nó thuộc về một module khác.
 
 **Dấu hiệu nhận biết.** Config gắn `plugins` và `rules` nhưng không thấy `linterOptions` đâu.
@@ -156,9 +156,9 @@ trúc ở mức `warn` là cùng một chuyện kể theo cách khác: vi phạm
 đã có người cai quản. Kiến trúc yếu hơn luôn là cái thắng, vì nó là cái không chặn ai.
 
 **Nó sinh ra gì trong source.** `schema: []` trong phần meta của rule ở
-`starci-eslint/packages/fe/lint-escape-hatch.mjs`, đóng rule lại trước mọi option nên không allowlist nào cấu hình
+`@starci/eslint-canon-fe`, đóng rule lại trước mọi option nên không allowlist nào cấu hình
 *vào trong* rule được, và `recommended` publish đúng một entry ở đúng một mức, không có key đường dẫn —
-không còn field nào để viết một suất miễn trừ vào. Trong `starci-eslint/packages/fe/index.mjs`, `recommended` được gom
+không còn field nào để viết một suất miễn trừ vào. Trong `@starci/eslint-canon-fe`, `recommended` được gom
 từ mọi module mà không module nào có quyền tự quyết mức, và một rule đã publish không bao giờ bị đổi
 tên; đó là hai chỗ mà một carve-out theo đường dẫn hay theo tên buộc phải trú. Một ca hợp lệ thì sinh
 ra một bổ sung vào matcher dùng chung hoặc một type đóng, kèm twin test, chứ không bao giờ là một suất
@@ -187,7 +187,7 @@ codegen · file `.d.ts` khai báo cho thư viện ngoài · một cây source đ
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã — `unrepresentable` (một union đóng hoặc branded type khiến giá trị sai
-không viết ra được), `enforced` (một lint rule từ `starci-eslint/packages/fe/lint-escape-hatch.mjs` bắt được, nêu đích
+không viết ra được), `enforced` (một lint rule từ `@starci/eslint-canon-fe` bắt được, nêu đích
 danh ở đây), hay `documented` (không có gì cơ học giữ; chỉ có người đọc giữ).
 
 | Mã | Tầng | Cái thực sự giữ nó |
@@ -211,23 +211,23 @@ tìm ở đó.
 
 | Mã | Đường dẫn | Cần tìm gì ở đó |
 |---|---|---|
-| `LINT-ESCAPE-1` | `starci-eslint/packages/fe/lint-escape-hatch.mjs` | `INLINE_DIRECTIVE`, neo ở đầu thân comment; visitor `Program()` đi qua `getAllComments()` thay vì match text nguồn; và `isProductSource`, điều kiện đường dẫn duy nhất trong file |
-| `LINT-ESCAPE-2` | `starci-eslint/packages/fe/lint-escape-hatch.mjs` | `linterOptions`, được freeze và export ngay cạnh `rules` để hai thứ không thể bị gắn tách rời do sơ ý. **Neo một phần** — xem dưới |
-| `LINT-ESCAPE-3` | `starci-eslint/packages/fe/lint-escape-hatch.mjs` | `schema: []` trong meta của rule, và `recommended` publish đúng một entry ở đúng một mức, không có key đường dẫn — không còn field nào để viết một suất miễn trừ vào. **Neo một phần** — xem dưới |
+| `LINT-ESCAPE-1` | `@starci/eslint-canon-fe` | `INLINE_DIRECTIVE`, neo ở đầu thân comment; visitor `Program()` đi qua `getAllComments()` thay vì match text nguồn; và `isProductSource`, điều kiện đường dẫn duy nhất trong file |
+| `LINT-ESCAPE-2` | `@starci/eslint-canon-fe` | `linterOptions`, được freeze và export ngay cạnh `rules` để hai thứ không thể bị gắn tách rời do sơ ý. **Neo một phần** — xem dưới |
+| `LINT-ESCAPE-3` | `@starci/eslint-canon-fe` | `schema: []` trong meta của rule, và `recommended` publish đúng một entry ở đúng một mức, không có key đường dẫn — không còn field nào để viết một suất miễn trừ vào. **Neo một phần** — xem dưới |
 
 Bằng chứng phụ, dùng khi neo chính đang bị sửa:
 
-- `LINT-ESCAPE-1` — `starci-eslint/packages/fe/lint-escape-hatch.test.mjs`: các ca hợp lệ giữ cho prose nói về một
+- `LINT-ESCAPE-1` — `@starci/eslint-canon-fe`: các ca hợp lệ giữ cho prose nói về một
   directive vẫn viết được, kèm comment giải thích vì sao pattern được neo và bản không neo đã phải trả
   giá gì.
 - `LINT-ESCAPE-2` — ca thứ hai của chính twin test đó: một linter thật, options đã freeze được áp vào,
   một disable gọi đích danh người canh, và assertion rằng người canh vẫn báo ở severity `2`.
-- `LINT-ESCAPE-2` — `starci-eslint/packages/fe/index.mjs`: options được re-export từ plugin tổng, để một config tiêu
+- `LINT-ESCAPE-2` — `@starci/eslint-canon-fe`: options được re-export từ plugin tổng, để một config tiêu
   thụ lấy chúng từ đúng cái import đã lấy rules.
-- `LINT-ESCAPE-2` — `starci-eslint/packages/fe/lint-adoption.mjs` và `scripts/audit-fe-lint-adoption.mjs`:
+- `LINT-ESCAPE-2` — `@starci/eslint-canon-fe` và `scripts/audit-fe-lint-adoption.mjs`:
   `refusesInlineConfig`, đọc ra từ config đã in. Nó là thứ duy nhất đo một repo thật, và nó thuộc về
   một module khác.
-- `LINT-ESCAPE-3` — `starci-eslint/packages/fe/index.mjs`: `recommended` được gom từ mọi module mà không module nào có
+- `LINT-ESCAPE-3` — `@starci/eslint-canon-fe`: `recommended` được gom từ mọi module mà không module nào có
   quyền tự quyết mức, và việc từ chối đổi tên một rule đã publish — hai chỗ mà một carve-out theo đường
   dẫn hay theo tên buộc phải trú.
 

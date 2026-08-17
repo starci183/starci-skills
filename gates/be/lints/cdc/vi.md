@@ -236,7 +236,7 @@ tệp đó — ngoài phạm vi là chưa được xét, không phải sạch.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/orders/order-totals.projection.listener.ts`:
+**Đầu vào.** `orders/order-totals.projection.listener.ts`:
 
 ```ts
 export class OrderTotalsListener {

@@ -100,7 +100,7 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong `starci-eslint/packages/be/data-access.mjs` báo nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
+Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong `@starci/eslint-canon-be` báo nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
 |---|---|---|
@@ -118,11 +118,11 @@ Một luật không chỉ được vào code thật thì mới chỉ là một �
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `DATA-1` | `src/modules/databases/postgresql/primary/primary.decorators.ts` | Wrapper của nhà chỉ dài một dòng: nó buộc injector của chính framework vào một hằng connection có tên. Bên cạnh đó, `src/modules/databases/` giữ ba họ datasource — chính dữ kiện này khiến một `EntityManager` không decorator trở thành mập mờ chứ không chỉ luộm thuộm. |
-| `DATA-2` | `src/features/api/core/graphql/mutations/courses/courses-checkout/courses-checkout.handler.ts` | Một `entityManager.transaction` ghi nhiều bảng qua `manager` của callback. Một handler dựng bằng repository không thể viết được như vậy nếu không có mỗi bảng một tay cầm, và khi đó các bảng commit tách rời nhau. Trên toàn `src/`, `@InjectRepository` và tham số `Repository<…>` xuất hiện đúng không lần nào. |
-| `DATA-3` | `src/modules/databases/postgresql/primary/entities/cart-item.entity.ts` | `@Entity("cart_items")` trên một class tên `CartItemEntity`. Hai cái tên cố tình khác nhau, và đó là điểm mấu chốt: class đổi tên được mà bảng không phải chạy theo. |
-| `DATA-4` | `src/features/api/core/graphql/mutations/courses/course-enroll/checkout-advisory-lock.ts` | Chữ ký của helper nhận phần việc dưới dạng `(manager: EntityManager) => Promise<Result>` và gọi nó bằng manager của session đang giữ lock. Không có gì bên trong tự đi lấy manager tiêm sẵn. `src/modules/bussiness/achievements/achievements.service.ts` cho thấy đúng hình dáng ấy trên các private method: cái nào cũng nhận `manager` qua tham số. |
-| `DATA-5` | `src/features/api/core/graphql/queries/courses/my-cart/my-cart.handler.ts` | Cây `relations` được viết ngay tại call site, kèm ghi chú gọi tên màn hình nào cần nhánh nào. Rồi đọc lại `cart-item.entity.ts`: các relation `@ManyToOne` của nó không mang tuỳ chọn `eager`, nên ai chỉ cần một cột thì chỉ trả giá cho một cột. |
+| `DATA-1` | `modules/databases/postgresql/primary/primary.decorators.ts` | Wrapper của nhà chỉ dài một dòng: nó buộc injector của chính framework vào một hằng connection có tên. Bên cạnh đó, `modules/databases/` giữ ba họ datasource — chính dữ kiện này khiến một `EntityManager` không decorator trở thành mập mờ chứ không chỉ luộm thuộm. |
+| `DATA-2` | `features/api/core/graphql/mutations/courses/courses-checkout/courses-checkout.handler.ts` | Một `entityManager.transaction` ghi nhiều bảng qua `manager` của callback. Một handler dựng bằng repository không thể viết được như vậy nếu không có mỗi bảng một tay cầm, và khi đó các bảng commit tách rời nhau. Trên toàn `src/`, `@InjectRepository` và tham số `Repository<…>` xuất hiện đúng không lần nào. |
+| `DATA-3` | `modules/databases/postgresql/primary/entities/cart-item.entity.ts` | `@Entity("cart_items")` trên một class tên `CartItemEntity`. Hai cái tên cố tình khác nhau, và đó là điểm mấu chốt: class đổi tên được mà bảng không phải chạy theo. |
+| `DATA-4` | `features/api/core/graphql/mutations/courses/course-enroll/checkout-advisory-lock.ts` | Chữ ký của helper nhận phần việc dưới dạng `(manager: EntityManager) => Promise<Result>` và gọi nó bằng manager của session đang giữ lock. Không có gì bên trong tự đi lấy manager tiêm sẵn. `modules/bussiness/achievements/achievements.service.ts` cho thấy đúng hình dáng ấy trên các private method: cái nào cũng nhận `manager` qua tham số. |
+| `DATA-5` | `features/api/core/graphql/queries/courses/my-cart/my-cart.handler.ts` | Cây `relations` được viết ngay tại call site, kèm ghi chú gọi tên màn hình nào cần nhánh nào. Rồi đọc lại `cart-item.entity.ts`: các relation `@ManyToOne` của nó không mang tuỳ chọn `eager`, nên ai chỉ cần một cột thì chỉ trả giá cho một cột. |
 
 Mã nào cũng có điểm neo. Điểm neo là đường dẫn trong repository tham chiếu và chỉ tồn tại để kiểm chứng.
 

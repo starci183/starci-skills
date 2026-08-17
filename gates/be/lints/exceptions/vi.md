@@ -284,8 +284,8 @@ Một tệp sạch xuất một khối cho mỗi quy tắc đã chạy, với `m
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một tệp service, `src/modules/enrollment/enrollment.service.ts`, và một tệp lớp nằm cạnh
-nó, `src/modules/enrollment/course-already-enrolled.exception.ts`:
+**Đầu vào.** Một tệp service, `modules/enrollment/enrollment.service.ts`, và một tệp lớp nằm cạnh
+nó, `modules/enrollment/course-already-enrolled.exception.ts`:
 
 ```ts
 // enrollment.service.ts
@@ -363,7 +363,7 @@ message:  place
 verdict:  fires
 ```
 
-**Đã sửa.** Lớp chuyển vào `src/modules/enrollment/exceptions/errors/` và kế thừa lớp nền nhà mình; mọi
+**Đã sửa.** Lớp chuyển vào `modules/enrollment/exceptions/errors/` và kế thừa lớp nền nhà mình; mọi
 chỗ ném đều gọi tên một ngoại lệ nhà mình và truyền đúng một object literal:
 
 ```ts

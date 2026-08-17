@@ -295,7 +295,7 @@ xét, chứ không phải đã được tha.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một tệp block, `src/components/blocks/LeaderboardRow/index.tsx`:
+**Đầu vào.** Một tệp block, `components/blocks/LeaderboardRow/index.tsx`:
 
 ```tsx
 import { Flame } from "lucide-react"

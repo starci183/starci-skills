@@ -379,7 +379,7 @@ cấp token IdP · SMTP từ chối rồi chấp nhận · sandbox chấm bài t
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `enforced` nghĩa là có một rule trong `starci-eslint/packages/be/e2e-flow.mjs` nổ vào nó,
+Tầng nào thật sự giữ từng mã. `enforced` nghĩa là có một rule trong `@starci/eslint-canon-be` nổ vào nó,
 và rule đó được gọi tên.
 
 | Mã | Tầng | Ai giữ |
@@ -415,18 +415,18 @@ không phải luật.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `E2E-1` | `src/tests/e2e/course-purchase.e2e-spec.ts` | Tên file và chuỗi `describe` nói cùng một câu; file chứng minh một lần mua, không phải một nhóm resolver |
-| `E2E-2` | `src/tests/e2e/background-worker-resilience.e2e-spec.ts` | Mười bốn bước `it` có tên trong một `describe`, mỗi bước gọi tên bước nghiệp vụ nó chứng minh |
-| `E2E-3` | `src/tests/helpers/flow-wait.ts` → `until`, `DEFAULT_TIMEOUT_MS`, `WaitOptions.describe` | Deadline cộng predicate đã thay cho `sleep`; trường `describe` tồn tại để lần đỏ nêu tên trạng thái, không phải chữ timeout |
-| `E2E-4` | `src/tests/helpers/flow-world.ts` → `FlowWorld.entityManager`, resolve qua `getEntityManagerToken(POSTGRESQL_PRIMARY)` | Flow nhận entity manager THẬT của datasource chính, nên hệ quả được đọc từ đúng row đã ghi |
-| `E2E-5` | `src/tests/helpers/flow-wait.ts` → `nextMessage`, dùng trong `src/tests/e2e/community-chat.e2e-spec.ts` | Chờ message khớp kế tiếp trên một socket thật; không có assertion đếm ở bất cứ đâu trên bề mặt helper |
-| `E2E-6` | `src/tests/helpers/flow-wait.ts` → `expectNoMessage`, `DEFAULT_SILENCE_MS`; dùng trong `src/tests/e2e/notification-delivery.e2e-spec.ts` | Một bước chứng minh socket của người lạ im lặng trong khi người nhận đúng đã được phục vụ |
-| `E2E-7` | `.claude/starci-eslint/packages/be/e2e-flow.test.mjs` → `tester.run("no-branch-in-flow-step", …)` | Các fixture hợp lệ và không hợp lệ ghim chính xác hình dạng nào tính là nhánh bên trong một bước |
-| `E2E-8` | `src/tests/helpers/flow-world.ts` → `bootFlowWorld`; `src/tests/helpers/create-e2e-app.ts` → `createE2eApp` | Hai entry point dựng thế giới lên, để một spec mở đầu bằng đúng thứ nó đang test |
-| `E2E-9` | `src/tests/helpers/flow-world.ts` → `FlowWorld.mintLearner(name)` | Hàm tạo actor nhận một TÊN và ghi một row mới cho mỗi flow; không số thứ tự nào được chấp nhận |
-| `E2E-10` | `src/tests/e2e/` (84 file spec) | Không có call site `console` thật nào. Hai lần khớp văn bản duy nhất, ở `coding-submission.e2e-spec.ts:550` và `:646`, là chuỗi source BÊN TRONG một chương trình được nộp, không phải logging |
-| `E2E-11` | `src/tests/e2e/background-worker-resilience.e2e-spec.ts`; `src/tests/helpers/nats-cross-instance-world.ts` | Retry, cạn lượt và replay chứng minh qua queue thật; một thế giới dựng kết nối broker thật và `ScheduleModule` thật |
-| `E2E-12` | `src/tests/helpers/ai-provider-invoke-script.ts` | Một kịch bản FIFO các kết cục của nhà cung cấp chỉ thay client ngoài, trong khi cache, khoá và đường invoke vẫn thật |
+| `E2E-1` | `tests/e2e/course-purchase.e2e-spec.ts` | Tên file và chuỗi `describe` nói cùng một câu; file chứng minh một lần mua, không phải một nhóm resolver |
+| `E2E-2` | `tests/e2e/background-worker-resilience.e2e-spec.ts` | Mười bốn bước `it` có tên trong một `describe`, mỗi bước gọi tên bước nghiệp vụ nó chứng minh |
+| `E2E-3` | `tests/helpers/flow-wait.ts` → `until`, `DEFAULT_TIMEOUT_MS`, `WaitOptions.describe` | Deadline cộng predicate đã thay cho `sleep`; trường `describe` tồn tại để lần đỏ nêu tên trạng thái, không phải chữ timeout |
+| `E2E-4` | `tests/helpers/flow-world.ts` → `FlowWorld.entityManager`, resolve qua `getEntityManagerToken(POSTGRESQL_PRIMARY)` | Flow nhận entity manager THẬT của datasource chính, nên hệ quả được đọc từ đúng row đã ghi |
+| `E2E-5` | `tests/helpers/flow-wait.ts` → `nextMessage`, dùng trong `tests/e2e/community-chat.e2e-spec.ts` | Chờ message khớp kế tiếp trên một socket thật; không có assertion đếm ở bất cứ đâu trên bề mặt helper |
+| `E2E-6` | `tests/helpers/flow-wait.ts` → `expectNoMessage`, `DEFAULT_SILENCE_MS`; dùng trong `tests/e2e/notification-delivery.e2e-spec.ts` | Một bước chứng minh socket của người lạ im lặng trong khi người nhận đúng đã được phục vụ |
+| `E2E-7` | `.claude/@starci/eslint-canon-be` → `tester.run("no-branch-in-flow-step", …)` | Các fixture hợp lệ và không hợp lệ ghim chính xác hình dạng nào tính là nhánh bên trong một bước |
+| `E2E-8` | `tests/helpers/flow-world.ts` → `bootFlowWorld`; `tests/helpers/create-e2e-app.ts` → `createE2eApp` | Hai entry point dựng thế giới lên, để một spec mở đầu bằng đúng thứ nó đang test |
+| `E2E-9` | `tests/helpers/flow-world.ts` → `FlowWorld.mintLearner(name)` | Hàm tạo actor nhận một TÊN và ghi một row mới cho mỗi flow; không số thứ tự nào được chấp nhận |
+| `E2E-10` | `tests/e2e/` (84 file spec) | Không có call site `console` thật nào. Hai lần khớp văn bản duy nhất, ở `coding-submission.e2e-spec.ts:550` và `:646`, là chuỗi source BÊN TRONG một chương trình được nộp, không phải logging |
+| `E2E-11` | `tests/e2e/background-worker-resilience.e2e-spec.ts`; `tests/helpers/nats-cross-instance-world.ts` | Retry, cạn lượt và replay chứng minh qua queue thật; một thế giới dựng kết nối broker thật và `ScheduleModule` thật |
+| `E2E-12` | `tests/helpers/ai-provider-invoke-script.ts` | Một kịch bản FIFO các kết cục của nhà cung cấp chỉ thay client ngoài, trong khi cache, khoá và đường invoke vẫn thật |
 
 Mười hai mã, mười hai điểm neo. Không dòng nào ghi "chưa neo được".
 

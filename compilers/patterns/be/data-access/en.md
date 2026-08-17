@@ -100,7 +100,7 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 
 ## Layer held
 
-Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written; `enforced` means a named rule from `starci-eslint/packages/be/data-access.mjs` reports it; `documented` means nothing mechanical holds it and only a reader does.
+Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written; `enforced` means a named rule from `@starci/eslint-canon-be` reports it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |
 |---|---|---|
@@ -118,11 +118,11 @@ A law that cannot be pointed at in real code is a proposal. Each code names a fi
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `DATA-1` | `src/modules/databases/postgresql/primary/primary.decorators.ts` | The house wrapper is one line: it binds the framework's own injector to a named connection constant. Beside it, `src/modules/databases/` holds three datasource families — which is the fact that makes an undecorated `EntityManager` ambiguous rather than merely untidy. |
-| `DATA-2` | `src/features/api/core/graphql/mutations/courses/courses-checkout/courses-checkout.handler.ts` | One `entityManager.transaction` writing several tables through the callback's `manager`. A repository-shaped handler could not have written this without one handle per table, and the tables would then commit separately. Across `src/`, `@InjectRepository` and `Repository<…>` parameters occur zero times. |
-| `DATA-3` | `src/modules/databases/postgresql/primary/entities/cart-item.entity.ts` | `@Entity("cart_items")` on a class named `CartItemEntity`. The two names deliberately differ, which is the point: the class can be renamed without the table following it. |
-| `DATA-4` | `src/features/api/core/graphql/mutations/courses/course-enroll/checkout-advisory-lock.ts` | The helper's signature takes the work as `(manager: EntityManager) => Promise<Result>` and invokes it with the manager of the session that holds the lock. Nothing inside reaches for an injected manager. `src/modules/bussiness/achievements/achievements.service.ts` shows the same shape on private methods: every one takes `manager` as a parameter. |
-| `DATA-5` | `src/features/api/core/graphql/queries/courses/my-cart/my-cart.handler.ts` | The `relations` tree is written at the call site, with a comment naming which screen needs each branch. Then read `cart-item.entity.ts` again: its `@ManyToOne` relations carry no `eager` option, so a caller wanting one column pays for one column. |
+| `DATA-1` | `modules/databases/postgresql/primary/primary.decorators.ts` | The house wrapper is one line: it binds the framework's own injector to a named connection constant. Beside it, `modules/databases/` holds three datasource families — which is the fact that makes an undecorated `EntityManager` ambiguous rather than merely untidy. |
+| `DATA-2` | `features/api/core/graphql/mutations/courses/courses-checkout/courses-checkout.handler.ts` | One `entityManager.transaction` writing several tables through the callback's `manager`. A repository-shaped handler could not have written this without one handle per table, and the tables would then commit separately. Across `src/`, `@InjectRepository` and `Repository<…>` parameters occur zero times. |
+| `DATA-3` | `modules/databases/postgresql/primary/entities/cart-item.entity.ts` | `@Entity("cart_items")` on a class named `CartItemEntity`. The two names deliberately differ, which is the point: the class can be renamed without the table following it. |
+| `DATA-4` | `features/api/core/graphql/mutations/courses/course-enroll/checkout-advisory-lock.ts` | The helper's signature takes the work as `(manager: EntityManager) => Promise<Result>` and invokes it with the manager of the session that holds the lock. Nothing inside reaches for an injected manager. `modules/bussiness/achievements/achievements.service.ts` shows the same shape on private methods: every one takes `manager` as a parameter. |
+| `DATA-5` | `features/api/core/graphql/queries/courses/my-cart/my-cart.handler.ts` | The `relations` tree is written at the call site, with a comment naming which screen needs each branch. Then read `cart-item.entity.ts` again: its `@ManyToOne` relations carry no `eager` option, so a caller wanting one column pays for one column. |
 
 Every code is anchored. Anchors are paths in the reference repository and exist for verification only.
 

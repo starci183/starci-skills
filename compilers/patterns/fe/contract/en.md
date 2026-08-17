@@ -454,7 +454,7 @@ that was never approved; a key copied into a new repository along with the whole
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write. `enforced` means a rule in `starci-eslint/packages/fe/contract.mjs` catches it.
+wrong value impossible to write. `enforced` means a rule in `@starci/eslint-canon-fe` catches it.
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -488,19 +488,19 @@ what to look for there.
 
 | Code | Path | What to look for |
 |---|---|---|
-| `CONTRACT-1` | `src/components/contracts/index.ts` | every entry's `classes: [...]` array — and the absence of any `className=` literal in the block, page and composite tiers |
+| `CONTRACT-1` | `components/contracts/index.ts` | every entry's `classes: [...]` array — and the absence of any `className=` literal in the block, page and composite tiers |
 | `CONTRACT-2` | the whole governed tree under `src/` | zero call sites of `cn`, `clsx`, `twMerge`, `cva`; zero interpolated `className` |
-| `CONTRACT-3` | `src/components/contracts/index.ts` → `export type LayoutClassName` | the union itself; a value outside it fails to compile rather than failing review |
-| `CONTRACT-4` | `src/components/contracts/index.ts` → `export type ContractHost`; `src/components/branches/Tree/index.tsx` | `const Host = spec.host ?? "div"` — the element read off the entry, and no `host`/`as` on the frame's props |
-| `CONTRACT-5` | `src/components/contracts/index.ts` key names | names that fix a child (`label-fact-over-progress`, `page-header-stack`) against the banned generic (`card`, `row`) |
-| `CONTRACT-6` | `src/components/contracts/index.ts` → every `why:` field | a sentence naming what breaks, wraps or overflows without the node |
-| `CONTRACT-7` | `src/components/branches/Tree/index.tsx` | the one `<Host>` opened from a spec anywhere in the tree |
-| `CONTRACT-8` | `src/components/contracts/index.ts` → `contractNodeProps` | `data-node` and `data-why` produced in exactly one function |
-| `CONTRACT-9` | `src/components/contracts/index.ts` → `export type ContractKey = keyof typeof CONTRACTS` | the key union a call site is checked against |
-| `CONTRACT-10` | `src/components/branches/SurfaceCard`, `SurfaceListCard`, `SurfaceFormCard` | the fixed vendor seam written as ordinary branch code, with the contract node standing INSIDE the content body |
-| `CONTRACT-11` | `src/components/contracts/props.ts` → `ContractSlots`, `ContractProjection`, `ContractComponent`, `defineContractComponent`; `index.ts` → `ContractChildCardinality`, `ChildrenOf` | the named slot record, and the union that makes `repeats: true` without `restingCount` unwritable |
-| `CONTRACT-12` | `src/components/contracts/index.ts` → `LayoutClassName` | live debt in plain sight: the union still admits `cursor-pointer`, `group`, `bg-surface`, `shadow-surface` that the rule refuses in an entry |
-| `CONTRACT-13` | `src/components/contracts/index.ts` → `CONTRACT_KEYS` | every key reachable from a `contract="…"`, a `defineContractComponent("…")`, or another entry's slot |
+| `CONTRACT-3` | `components/contracts/index.ts` → `export type LayoutClassName` | the union itself; a value outside it fails to compile rather than failing review |
+| `CONTRACT-4` | `components/contracts/index.ts` → `export type ContractHost`; `components/branches/Tree/index.tsx` | `const Host = spec.host ?? "div"` — the element read off the entry, and no `host`/`as` on the frame's props |
+| `CONTRACT-5` | `components/contracts/index.ts` key names | names that fix a child (`label-fact-over-progress`, `page-header-stack`) against the banned generic (`card`, `row`) |
+| `CONTRACT-6` | `components/contracts/index.ts` → every `why:` field | a sentence naming what breaks, wraps or overflows without the node |
+| `CONTRACT-7` | `components/branches/Tree/index.tsx` | the one `<Host>` opened from a spec anywhere in the tree |
+| `CONTRACT-8` | `components/contracts/index.ts` → `contractNodeProps` | `data-node` and `data-why` produced in exactly one function |
+| `CONTRACT-9` | `components/contracts/index.ts` → `export type ContractKey = keyof typeof CONTRACTS` | the key union a call site is checked against |
+| `CONTRACT-10` | `components/branches/SurfaceCard`, `SurfaceListCard`, `SurfaceFormCard` | the fixed vendor seam written as ordinary branch code, with the contract node standing INSIDE the content body |
+| `CONTRACT-11` | `components/contracts/props.ts` → `ContractSlots`, `ContractProjection`, `ContractComponent`, `defineContractComponent`; `index.ts` → `ContractChildCardinality`, `ChildrenOf` | the named slot record, and the union that makes `repeats: true` without `restingCount` unwritable |
+| `CONTRACT-12` | `components/contracts/index.ts` → `LayoutClassName` | live debt in plain sight: the union still admits `cursor-pointer`, `group`, `bg-surface`, `shadow-surface` that the rule refuses in an entry |
+| `CONTRACT-13` | `components/contracts/index.ts` → `CONTRACT_KEYS` | every key reachable from a `contract="…"`, a `defineContractComponent("…")`, or another entry's slot |
 
 All thirteen are anchored. `CONTRACT-12`'s anchor is deliberately an anchor to a CONTRADICTION and is
 argued in the audit record; it is still an anchor, because the thing the law is about can be pointed

@@ -42,7 +42,7 @@ about any of them.
    passed — it means no visitor was installed and the rule did not exist for that file.
 2. **`presentational-purity` needs a filename ending in `component.tsx`.** Any other name, including
    `view.tsx`, `Component.tsx` or `component.jsx`, switches the rule off.
-3. **The twin rule needs a block index** — `src/components/blocks/**/<Folder>/index.tsx`, with a
+3. **The twin rule needs a block index** — `components/blocks/**/<Folder>/index.tsx`, with a
    capitalised folder — and it needs the file to read the world. No world read, no check at all.
 4. **Read the callee type first.** Both rules stop the moment a callee is not a bare `Identifier`, so
    one namespace defeats both.
@@ -95,7 +95,7 @@ directly. `JSXOpeningElement` pushes every `JSXIdentifier` tag onto a rendered l
 than non-compliant — the two rules share one detector, so one launder defeats both. Rendering without
 JSX, `createElement(Row, props)` beside a JSX `<_X />`, leaves an entire alternate tree undrawn in the
 rendered list while `rendersTwin` is true. A namespaced tag, `<Ui.Card>`, is a `JSXMemberExpression`
-and never enters the list. A path outside the one literal — `src/features/…`, `src/app/…`,
+and never enters the list. A path outside the one literal — `features/…`, `app/…`,
 `components/blocks/…` without `src`, a lowercase folder, an entrypoint named `index.ts` — has no rule
 on it. And the twin is never opened: `_X` may not exist, may fetch, may draw nothing. "Has
 presentational twin" is decided from a NAME.
@@ -192,7 +192,7 @@ hatch: <the open hatch that would have hidden this, or none>
 
 ## Worked example
 
-**Input.** Two files of one block, `src/components/blocks/order/OrderTotal/`:
+**Input.** Two files of one block, `components/blocks/order/OrderTotal/`:
 
 ```tsx
 // index.tsx

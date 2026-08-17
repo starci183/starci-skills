@@ -251,12 +251,12 @@ thanh toán · danh sách thông báo · bảng thành viên.
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng, hoặc một alias chính là toàn
 bộ hình dạng, làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong
-`starci-eslint/packages/fe/props-and-slots.mjs` báo lỗi nó; `documented` nghĩa là không có cơ chế nào giữ nó và chỉ
+`@starci/eslint-canon-fe` báo lỗi nó; `documented` nghĩa là không có cơ chế nào giữ nó và chỉ
 người đọc giữ.
 
 | Mã | Tầng | Ai giữ | Cái gì vẫn lọt |
 |---|---|---|---|
-| `SLOTS-1` | `unrepresentable` | `DataValue` trong `starci-eslint/packages/fe/props.ts` — một union đóng không có thành viên nào là hàm | Không gì cả, ở mọi chỗ dùng alias tầng |
+| `SLOTS-1` | `unrepresentable` | `DataValue` trong `@starci/eslint-canon-fe/props` — một union đóng không có thành viên nào là hàm | Không gì cả, ở mọi chỗ dùng alias tầng |
 | `SLOTS-2` | `unrepresentable` | Ràng buộc `D extends ComponentData` trên mọi alias tầng | Lỗi rơi ở slot, không rơi ở `interface`; một kiểu dữ liệu không bao giờ đi qua slot thì vẫn biên dịch được |
 | `SLOTS-3` | `enforced` | `no-inline-parameter-type` | Một kiểu có tên nhưng không phải `XProps` cho component `X` — cái tên được đọc, không được kiểm |
 | `SLOTS-4` | `enforced` | `no-children-slot`, cộng `BranchProps` cho nửa khẳng định | Rule thấy lỗ markup; không gì thấy một shape đóng mọc thêm `render` |
@@ -276,13 +276,13 @@ Từng mã, và code thật để đối chiếu.
 
 | Mã | Đường dẫn | Nhìn cái gì |
 |---|---|---|
-| `SLOTS-1` | `starci-eslint/packages/fe/props.ts` | Union `DataValue` và `ComponentData`; xác nhận không thành viên nào là kiểu hàm, rồi thử gán một handler vào `props` |
-| `SLOTS-2` | `starci-eslint/packages/fe/props.ts` | `LeafProps<D extends ComponentData>`; khai một shape dữ liệu bằng `interface` rồi truyền vào — ràng buộc sẽ hỏng |
-| `SLOTS-3` | `starci-eslint/packages/fe/props-and-slots.mjs` | `isInlineObjectType`, hàm đi xuyên intersection và dấu ngoặc, cùng các fixture invalid trong `props-and-slots.test.mjs` |
-| `SLOTS-4` | `starci-eslint/packages/fe/props.ts` · `starci-eslint/packages/fe/props-and-slots.mjs` | `BranchProps` mang `contract` + `render` và không có lỗ markup; rồi `CHILDREN_SHELLS` và `isGoverned` cho các shell được miễn và các tầng rule quản |
-| `SLOTS-5` | `starci-eslint/packages/fe/props.ts` | `BlockProps` — hai slot, không có `isLoading`, tức chỉ neo được nửa NHẬN. Nửa TỰ QUYẾT thì chưa neo được |
-| `SLOTS-6` | `starci-eslint/packages/fe/props.ts` | `LeafProps`, `CompositeProps`, `BranchProps`; xác nhận không có thành viên ngoại hình và không có index signature nào cho phép một thành viên như vậy lọt vào |
-| `SLOTS-7` | `starci-eslint/packages/fe/props-and-slots.mjs` · `starci-eslint/packages/fe/props.ts` | `noSurfaceListItemsSlot` — phép kiểm import source bind nó, và phép kiểm attribute `items`; rồi `ContractRenderBranchProps`, nơi dữ liệu runtime ở lại trong `props` |
+| `SLOTS-1` | `@starci/eslint-canon-fe/props` | Union `DataValue` và `ComponentData`; xác nhận không thành viên nào là kiểu hàm, rồi thử gán một handler vào `props` |
+| `SLOTS-2` | `@starci/eslint-canon-fe/props` | `LeafProps<D extends ComponentData>`; khai một shape dữ liệu bằng `interface` rồi truyền vào — ràng buộc sẽ hỏng |
+| `SLOTS-3` | `@starci/eslint-canon-fe` | `isInlineObjectType`, hàm đi xuyên intersection và dấu ngoặc, cùng các fixture invalid trong `props-and-slots.test.mjs` |
+| `SLOTS-4` | `@starci/eslint-canon-fe/props` · `@starci/eslint-canon-fe` | `BranchProps` mang `contract` + `render` và không có lỗ markup; rồi `CHILDREN_SHELLS` và `isGoverned` cho các shell được miễn và các tầng rule quản |
+| `SLOTS-5` | `@starci/eslint-canon-fe/props` | `BlockProps` — hai slot, không có `isLoading`, tức chỉ neo được nửa NHẬN. Nửa TỰ QUYẾT thì chưa neo được |
+| `SLOTS-6` | `@starci/eslint-canon-fe/props` | `LeafProps`, `CompositeProps`, `BranchProps`; xác nhận không có thành viên ngoại hình và không có index signature nào cho phép một thành viên như vậy lọt vào |
+| `SLOTS-7` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe/props` | `noSurfaceListItemsSlot` — phép kiểm import source bind nó, và phép kiểm attribute `items`; rồi `ContractRenderBranchProps`, nơi dữ liệu runtime ở lại trong `props` |
 
 Điểm neo không phải đồ trang trí. Một luật không chỉ ra được trong code thật thì chỉ là một đề nghị,
 và cái dòng neo được có một nửa ở trên là cái giá thành thật của việc giữ `SLOTS-5`.

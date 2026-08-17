@@ -260,7 +260,7 @@ means the law was broken and no rule saw it, which is a finding about enforcemen
 
 ## Worked example
 
-**Input.** One ordinary file, `src/features/attempt/streak-badge.tsx`, which the path gate does not
+**Input.** One ordinary file, `features/attempt/streak-badge.tsx`, which the path gate does not
 exempt:
 
 ```tsx

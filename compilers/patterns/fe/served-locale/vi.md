@@ -228,7 +228,7 @@ một test helper bị copy vào production · một request tới endpoint th�
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã — một kiểu đóng, một lint rule, hay chỉ một người đọc. Các dòng
-`enforced` được cài đặt ở `starci-eslint/packages/fe/served-locale.mjs`.
+`enforced` được cài đặt ở `@starci/eslint-canon-fe`.
 
 | Mã | Tầng | Giữ bởi |
 |---|---|---|
@@ -264,10 +264,10 @@ Một luật không chỉ được vào code thật thì mới là một đề x
 
 | Mã | Điểm neo | Cần nhìn cái gì |
 |---|---|---|
-| `LOCALE-1` | `src/modules/api/graphql/clients/create-apollo-client.ts` | Link locale là phần tử thường của mảng chain — trước link terminal, ngoài cái spread có điều kiện chèn link auth. Thêm auth thì thêm đúng một link; link locale có mặt ở cả hai hình dạng |
-| `LOCALE-2` | `src/modules/api/graphql/clients/links/locale.ts` | Resolver không nhận tham số locale. Nó đọc path segment đầu tiên, và nó từ chối một segment không phải locale đã ship thay vì chấp nhận bất cứ thứ gì phép thu hẹp mặc định trả về. Call site công khai không truyền gì |
-| `LOCALE-3` | `src/modules/api/graphql/clients/links/http.ts` | `credentials` chỉ là `"include"` khi người gọi chủ động bật, và mặc định là tắt — nên request ẩn danh, tức gần như mọi lượt đọc, không gửi cookie. Header là phương tiện duy nhất sống sót trên đường đó |
-| `LOCALE-4` | `src/modules/api/graphql/clients/links/locale.ts`, kiểu trả về của resolver và nhánh không có địa chỉ | Kiểu trả về là union locale đóng, không phải optional. Không có đường nào trả về rỗng, nên không có đường nào đưa cho server một request không khai báo để nó phải cẩn thận |
+| `LOCALE-1` | `modules/api/graphql/clients/create-apollo-client.ts` | Link locale là phần tử thường của mảng chain — trước link terminal, ngoài cái spread có điều kiện chèn link auth. Thêm auth thì thêm đúng một link; link locale có mặt ở cả hai hình dạng |
+| `LOCALE-2` | `modules/api/graphql/clients/links/locale.ts` | Resolver không nhận tham số locale. Nó đọc path segment đầu tiên, và nó từ chối một segment không phải locale đã ship thay vì chấp nhận bất cứ thứ gì phép thu hẹp mặc định trả về. Call site công khai không truyền gì |
+| `LOCALE-3` | `modules/api/graphql/clients/links/http.ts` | `credentials` chỉ là `"include"` khi người gọi chủ động bật, và mặc định là tắt — nên request ẩn danh, tức gần như mọi lượt đọc, không gửi cookie. Header là phương tiện duy nhất sống sót trên đường đó |
+| `LOCALE-4` | `modules/api/graphql/clients/links/locale.ts`, kiểu trả về của resolver và nhánh không có địa chỉ | Kiểu trả về là union locale đóng, không phải optional. Không có đường nào trả về rỗng, nên không có đường nào đưa cho server một request không khai báo để nó phải cẩn thận |
 | `LOCALE-5` | một lần tìm chuỗi header trong cả cây | Nó xuất hiện ở đúng một file production — file link locale — và các lần xuất hiện khác là prose của chính file đó. Một lần trúng thứ hai trong production chính là vi phạm |
 
 Điểm neo của `LOCALE-4` là yếu nhất trong năm cái và được ghi nhận đúng như vậy: nó chứng minh client

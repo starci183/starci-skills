@@ -41,7 +41,7 @@ behaviour), `SLOTS-2` (a component's data is declared with a type alias, never a
 state) and `SLOTS-6` (appearance is a named variant decided inside, never `className`, `style`,
 spacing props or per-part styling hooks) have **no rule at all** here. Three of them are held
 elsewhere — `SLOTS-1`, `SLOTS-2` and `SLOTS-6` are `unrepresentable`, held by `DataValue`, by the
-`D extends ComponentData` constraint and by the three closed tier aliases in `starci-eslint/packages/fe/props.ts` —
+`D extends ComponentData` constraint and by the three closed tier aliases in `@starci/eslint-canon-fe/props` —
 and `SLOTS-5` is `documented`, held by nothing at all. A green run of this module says nothing about
 any of the four, and where the type never covered the file the code is simply unenforced rather than
 covered.
@@ -116,7 +116,7 @@ identifier and nothing about ReactNode. `PropsWithChildren<XData>`, or any impor
 carries the member, because the rule never opens another file. The positive half of the code is
 unwatched entirely: nothing here checks that a container declares `contract` and `render` together,
 and nothing sees a closed shape that grows `render`. And the tier gate is a path: the same component
-filed under `apps/web/features/…`, or under a `src/ui/` that is neither component root, has no rule
+filed under `apps/web/features/…`, or under a `ui/` that is neither component root, has no rule
 on it — the layout literal is the cheapest thing in a repository to change.
 
 **Boundary.** This rule sees the markup hole and only the markup hole. `BranchProps` holds the
@@ -267,8 +267,8 @@ because no visitor looked.
 
 ## Worked example
 
-**Input.** One branch inside the component tier, `src/components/branches/ModalBranch/index.tsx`, and
-one call site under `src/app/tasks/page.tsx`:
+**Input.** One branch inside the component tier, `components/branches/ModalBranch/index.tsx`, and
+one call site under `app/tasks/page.tsx`:
 
 ```tsx
 // src/components/branches/ModalBranch/index.tsx
@@ -394,5 +394,5 @@ hatch: the annotation is a TSTypeReference and isInlineObjectType recurses only 
 This module documents enforcement, not law. It names no product, no component library and no
 repository. Rule names, message ids, code tokens and the plugin prefix are identifiers that ship in
 build output and are reproduced verbatim; everything written around them is ordinary TSX. What the
-type holds — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — belongs to `starci-eslint/packages/fe/props.ts`, and what nothing
+type holds — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — belongs to `@starci/eslint-canon-fe/props`, and what nothing
 holds — `SLOTS-5` — belongs to a reader.

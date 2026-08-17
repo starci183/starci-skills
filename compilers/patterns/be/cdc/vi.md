@@ -154,14 +154,14 @@ Một luật không chỉ tay được vào code thật thì chỉ là một đ�
 
 | Mã | Điểm neo | Cần tìm gì |
 |---|---|---|
-| `CDC-1` | `src/modules/platform/projection/abstract-projection.listener.ts` | Đúng một `onModuleInit` gọi `ensureTopics`, `createConsumer`, `subscribe` và `run`; rồi kiểm rằng cả 17 file khớp `src/modules/**/*projection.listener.ts` đều không khai báo vòng đời riêng nào |
-| `CDC-2` | `src/modules/bussiness/projections/user-xp/user-xp-projection.listener.ts` | `groupId = "user-xp-projection"` là một chuỗi hằng, và `topics` dựng từ `envConfig().kafka.cdcTopicPrefix` cộng với tên bảng tường minh — prefix gắn theo môi trường, tập bảng thì không |
-| `CDC-2` | `src/tests/helpers/projection-cdc-world.ts` | `PROGRESS_GROUP` / `USER_XP_GROUP` lặp lại đúng group id của production dưới dạng hằng; một group mà test gọi tên được từ ngoài tiến trình là một group sống sót qua restart |
-| `CDC-3` | `src/modules/bussiness/projections/progress/progress-projection.listener.ts` | `deriveTarget` phân nhánh theo `topic.endsWith(...)` và trả về `{ userId, courseId }` hoặc `null`; `recomputeTarget` chứa đúng một lời gọi tới projection service và không gì khác |
-| `CDC-4` | `src/modules/bussiness/projections/user-xp/user-xp-projection.service.ts` | `recompute` nhận một user id và không nhận amount; câu SQL select `SUM(x.amount)` từ ledger và kết bằng `ON CONFLICT (user_id) DO UPDATE SET value = EXCLUDED.value` |
-| `CDC-5` | `src/modules/platform/projection/abstract-projection.listener.ts` | `unwrapRow` trả về `null` khi `after` có mặt nhưng rỗng, và `handleMessage` thoát sớm khi `row === null` cũng như khi thiếu `message.value` |
-| `CDC-6` | `src/modules/platform/projection/abstract-projection.listener.ts` | Cái `catch` trong `handleMessage` dựng một CDC exception có kiểu, log nó kèm `groupId` và `topic`, và không ném lại |
-| `CDC-7` | `src/tests/e2e/projection-cdc-routing.e2e-spec.ts` | `world.publishChange(...)` rồi tới `until(...)` poll bảng projection — bước arrange ghi dòng nguồn, bước act chỉ chạm vào broker |
+| `CDC-1` | `modules/platform/projection/abstract-projection.listener.ts` | Đúng một `onModuleInit` gọi `ensureTopics`, `createConsumer`, `subscribe` và `run`; rồi kiểm rằng cả 17 file khớp `modules/**/*projection.listener.ts` đều không khai báo vòng đời riêng nào |
+| `CDC-2` | `modules/bussiness/projections/user-xp/user-xp-projection.listener.ts` | `groupId = "user-xp-projection"` là một chuỗi hằng, và `topics` dựng từ `envConfig().kafka.cdcTopicPrefix` cộng với tên bảng tường minh — prefix gắn theo môi trường, tập bảng thì không |
+| `CDC-2` | `tests/helpers/projection-cdc-world.ts` | `PROGRESS_GROUP` / `USER_XP_GROUP` lặp lại đúng group id của production dưới dạng hằng; một group mà test gọi tên được từ ngoài tiến trình là một group sống sót qua restart |
+| `CDC-3` | `modules/bussiness/projections/progress/progress-projection.listener.ts` | `deriveTarget` phân nhánh theo `topic.endsWith(...)` và trả về `{ userId, courseId }` hoặc `null`; `recomputeTarget` chứa đúng một lời gọi tới projection service và không gì khác |
+| `CDC-4` | `modules/bussiness/projections/user-xp/user-xp-projection.service.ts` | `recompute` nhận một user id và không nhận amount; câu SQL select `SUM(x.amount)` từ ledger và kết bằng `ON CONFLICT (user_id) DO UPDATE SET value = EXCLUDED.value` |
+| `CDC-5` | `modules/platform/projection/abstract-projection.listener.ts` | `unwrapRow` trả về `null` khi `after` có mặt nhưng rỗng, và `handleMessage` thoát sớm khi `row === null` cũng như khi thiếu `message.value` |
+| `CDC-6` | `modules/platform/projection/abstract-projection.listener.ts` | Cái `catch` trong `handleMessage` dựng một CDC exception có kiểu, log nó kèm `groupId` và `topic`, và không ném lại |
+| `CDC-7` | `tests/e2e/projection-cdc-routing.e2e-spec.ts` | `world.publishChange(...)` rồi tới `until(...)` poll bảng projection — bước arrange ghi dòng nguồn, bước act chỉ chạm vào broker |
 
 Mọi mã đều đã có điểm neo. Không mã nào còn chưa neo được ở phiên bản này.
 

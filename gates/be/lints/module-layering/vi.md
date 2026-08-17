@@ -111,9 +111,9 @@ tố alias đó, và báo khi phần còn lại `=== key` hoặc `startsWith(key
 `"./ai/x"`, không khớp `key` cũng không khớp `key + "/"`. Với **vào** một năng lực khác bằng đường
 tương đối — `../../billing/billing.service` từ trong `modules/ai/` — là một lần vượt ranh giới không
 có alias nào để báo, mà quy tắc chỉ soi những specifier có tiền tố alias. Một cây năng lực đặt ở
-`apps/api/modules/`, `src/module/`, hay bất kỳ đường dẫn nào không chứa đúng cặp đoạn `/src/modules/`
+`apps/api/modules/`, `module/`, hay bất kỳ đường dẫn nào không chứa đúng cặp đoạn `/src/modules/`
 thì không tìm thấy root và không được kiểm chút nào; hình dạng thư mục là thứ rẻ nhất trong một kho mã
-để đổi, mà ở đây nó chịu lực. Một tệp viết thẳng ở `src/modules/platform/config.ts` cho ra khoá tự
+để đổi, mà ở đây nó chịu lực. Một tệp viết thẳng ở `modules/platform/config.ts` cho ra khoá tự
 thân `["platform/config.ts", "config.ts"]` — tên tệp nằm ở chỗ đáng lẽ là tên năng lực — và vì không
 specifier nào mang đuôi `.ts`, quy tắc tắt hẳn với tệp đó trong khi trông vẫn như đang bật. Khoá ngắn
 dưới thư mục nhóm không mang tên nhóm, nên từ trong `modules/platform/exceptions/` một import tới
@@ -171,8 +171,8 @@ kiểu, hay biết được đoạn cuối của một specifier là tệp, là 
 | cả hai | `import { X } from "@shared/utils"`, `"@app/..."`, `"src/modules/ai"` — `ALIASES` là ba tiền tố viết tay. Thêm một alias thứ tư vào cấu hình biên dịch là có ngay một cây không được cưỡng chế, im lặng, không tín hiệu nào |
 | `must-deep-module-import` | `import { X } from "@modules/adapters/mailer"` — `META_ROOTS` cũng là ba tên viết tay. Thư mục nhóm thứ tư làm các năng lực dưới nó đọc thành "năng lực kèm tệp", nên mọi barrel dưới nó đi lọt |
 | cả hai | `import { X } from "@features/platform/billing"` — nhận biết thư mục nhóm chỉ thuộc về `@modules/`. Dưới hai alias kia, một thư mục nhóm bị coi là năng lực, nên barrel của nó đi lọt và, trong `no-self-module-alias`, anh em của nó bị đọc nhầm thành chính nó |
-| `no-self-module-alias` | Một cây năng lực đặt ở `apps/api/modules/`, `src/module/`, hay bất kỳ đường dẫn nào không chứa đúng cặp đoạn `/src/modules/` — không tìm thấy root, trả `{}`, và tệp không phải là kiểm một nửa mà là không kiểm. Hình dạng thư mục là thứ rẻ nhất trong một kho mã để đổi, mà ở đây nó chịu lực |
-| `no-self-module-alias` | Một tệp viết thẳng ở `src/modules/platform/config.ts` — khoá tự thân thành `["platform/config.ts", "config.ts"]`, tức tên tệp nằm ở chỗ đáng lẽ là tên năng lực. Không specifier nào mang đuôi `.ts`, nên quy tắc tắt hẳn với tệp đó trong khi trông vẫn như đang bật |
+| `no-self-module-alias` | Một cây năng lực đặt ở `apps/api/modules/`, `module/`, hay bất kỳ đường dẫn nào không chứa đúng cặp đoạn `/src/modules/` — không tìm thấy root, trả `{}`, và tệp không phải là kiểm một nửa mà là không kiểm. Hình dạng thư mục là thứ rẻ nhất trong một kho mã để đổi, mà ở đây nó chịu lực |
+| `no-self-module-alias` | Một tệp viết thẳng ở `modules/platform/config.ts` — khoá tự thân thành `["platform/config.ts", "config.ts"]`, tức tên tệp nằm ở chỗ đáng lẽ là tên năng lực. Không specifier nào mang đuôi `.ts`, nên quy tắc tắt hẳn với tệp đó trong khi trông vẫn như đang bật |
 | `no-self-module-alias` | Một năng lực cấp cao thật sự trùng tên với một năng lực nằm dưới thư mục nhóm — khoá ngắn không mang tên nhóm. Từ trong `modules/platform/exceptions/`, một import tới `@modules/exceptions/...` thật sự khác vẫn bị báo là tự trỏ. Một cửa mở ngược: quy tắc bắn vào mã đúng, và thói quen nó dạy người đọc là cuộn qua nó |
 | cả hai | Một lần tự trỏ đi vòng qua tệp thứ ba tái xuất hộ — cả hai quy tắc đọc một specifier trong một tệp. Một năng lực với về chính mình qua tệp tái xuất của hàng xóm là hai dòng import trông đều đúng, và không quy tắc một-tệp nào thấy được vòng đó |
 | cả hai | `// eslint-disable-next-line` trên đầu một trong hai quy tắc — không quy tắc nào ở đây là không tắt được. Mọi cửa mở phía trên cũng đều với tới được bằng một dòng, bởi một người đang vội |
@@ -257,7 +257,7 @@ không phải là một lần qua.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/modules/ai/ai-invoke.service.ts`:
+**Đầu vào.** `modules/ai/ai-invoke.service.ts`:
 
 ```ts
 import { Injectable } from "@nestjs/common"

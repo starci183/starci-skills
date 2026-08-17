@@ -233,13 +233,13 @@ the wrong value impossible to write; `enforced` means a lint rule catches it and
 | `CACHE-4` | `documented` | none — no rule can see what a key contains |
 | `CACHE-5` | `documented` | none — no rule can see what a key contains |
 
-There is no `starci-eslint/packages/fe/cache-key.mjs`. This module publishes **zero** rules, so all five codes are
+There is no `@starci/eslint-canon-fe`. This module publishes **zero** rules, so all five codes are
 held by review and by this file alone. That is not an omission waiting to be filled: an ESLint rule
 sees a key EXPRESSION, and what makes a key correct is whether the values in it are the ones the
 answer varies by — a fact about the server, not about the syntax. A rule can see that a key is an
 array of three identifiers. It cannot see that the third one should have been a fourth.
 
-The nearest mechanical neighbour is `starci-eslint/packages/fe/the-split.mjs`, whose `presentational-purity` rule
+The nearest mechanical neighbour is `@starci/eslint-canon-fe`, whose `presentational-purity` rule
 keeps every `useSWR` call in the connected half. That holds WHERE a key is built — in the file that
 has the viewer and the route parameters to build it from — and nothing at all about what goes into
 it. It is adjacency, not enforcement, and it is not counted above.
@@ -251,11 +251,11 @@ root.
 
 | Code | Path | What to look for |
 |---|---|---|
-| `CACHE-1` | `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` | The fetcher signature `async ([, , id]: [string, string, string])` — it destructures the id back out of the key and passes THAT to the request, while the parameter of the same name sits in scope unused |
-| `CACHE-2` | `src/hooks/auth/useViewerKey.ts` | `fingerprint()` folding the session token to a short base-36 string, and the hook returning `undefined` when nobody is signed in. The token itself never leaves this file |
-| `CACHE-3` | `src/hooks/swr/useMutateAddToCartSwr.ts` | The key `[MUTATE_ADD_TO_CART_SWR_KEY, courseId]` on a `useSWRMutation` the caller instantiates once per row, so `isMutating` belongs to one row |
-| `CACHE-4` | `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` | The gate `viewer === undefined \|\| courseId === undefined ? null : [...]` — two fragments, both required, and no `??` supplying a stand-in for either |
-| `CACHE-5` | `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` | The fetcher has no `try`/`catch`; the only `?? null` sits on the unwrapping of a present response, and the doc comment states what that `null` means |
+| `CACHE-1` | `hooks/swr/useQueryCoursePricePreviewSwr.ts` | The fetcher signature `async ([, , id]: [string, string, string])` — it destructures the id back out of the key and passes THAT to the request, while the parameter of the same name sits in scope unused |
+| `CACHE-2` | `hooks/auth/useViewerKey.ts` | `fingerprint()` folding the session token to a short base-36 string, and the hook returning `undefined` when nobody is signed in. The token itself never leaves this file |
+| `CACHE-3` | `hooks/swr/useMutateAddToCartSwr.ts` | The key `[MUTATE_ADD_TO_CART_SWR_KEY, courseId]` on a `useSWRMutation` the caller instantiates once per row, so `isMutating` belongs to one row |
+| `CACHE-4` | `hooks/swr/useQueryCoursePricePreviewSwr.ts` | The gate `viewer === undefined \|\| courseId === undefined ? null : [...]` — two fragments, both required, and no `??` supplying a stand-in for either |
+| `CACHE-5` | `hooks/swr/useQueryCoursePricePreviewSwr.ts` | The fetcher has no `try`/`catch`; the only `?? null` sits on the unwrapping of a present response, and the doc comment states what that `null` means |
 
 Every code is anchored. No code reads `chưa neo được`.
 

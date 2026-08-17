@@ -282,8 +282,8 @@ the rules looked and found nothing. An out-of-scope file emits a block naming th
 
 ## Worked example
 
-**Input.** One service file, `src/modules/enrollment/enrollment.service.ts`, and one class file beside
-it, `src/modules/enrollment/course-already-enrolled.exception.ts`:
+**Input.** One service file, `modules/enrollment/enrollment.service.ts`, and one class file beside
+it, `modules/enrollment/course-already-enrolled.exception.ts`:
 
 ```ts
 // enrollment.service.ts
@@ -360,7 +360,7 @@ message:  place
 verdict:  fires
 ```
 
-**Repaired.** The class moves into `src/modules/enrollment/exceptions/errors/` and extends the house
+**Repaired.** The class moves into `modules/enrollment/exceptions/errors/` and extends the house
 base; every throw names a house exception and passes one object literal:
 
 ```ts

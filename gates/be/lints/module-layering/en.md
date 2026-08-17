@@ -113,9 +113,9 @@ specifier to `startsWith` that one alias prefix, and reports when the remainder 
 `"./ai/x"`, matching neither `key` nor `key + "/"`. Reaching **into** another capability relatively —
 `../../billing/billing.service` from inside `modules/ai/` — is a boundary crossing with no alias to
 report, and the rule inspects only alias-prefixed specifiers. A capability tree at
-`apps/api/modules/`, `src/module/`, or any path without the exact `/src/modules/` segment pair finds
+`apps/api/modules/`, `module/`, or any path without the exact `/src/modules/` segment pair finds
 no root and is not checked at all; path shape is the cheapest thing in a repository to change, and
-here it is load-bearing. A file written directly at `src/modules/platform/config.ts` derives self
+here it is load-bearing. A file written directly at `modules/platform/config.ts` derives self
 keys `["platform/config.ts", "config.ts"]` — the file's own name where a capability name belongs —
 and since no specifier carries a `.ts` extension the rule is effectively off for that file while
 appearing to be on. The short self key under a meta root is unqualified, so from inside
@@ -174,8 +174,8 @@ type, or knows whether the last segment of a specifier is a file, a folder, or n
 | both | `import { X } from "@shared/utils"`, `"@app/..."`, `"src/modules/ai"` — `ALIASES` is three hand-written prefixes. A fourth path alias added to the compiler config is unenforced from the moment it is added, silently, with no signal anywhere |
 | `must-deep-module-import` | `import { X } from "@modules/adapters/mailer"` — `META_ROOTS` is three hand-written names. A fourth category folder makes its capabilities read as capability-plus-file, so every barrel under it passes |
 | both | `import { X } from "@features/platform/billing"` — meta awareness belongs to `@modules/` alone. Under the other two aliases a category folder is treated as a capability, so its barrels pass and, in `no-self-module-alias`, its siblings are misread as self |
-| `no-self-module-alias` | A capability tree at `apps/api/modules/`, `src/module/`, or any path without the exact `/src/modules/` segment pair — no root is found, `{}` is returned, and the file is not partially checked, it is not checked at all. Path shape is the cheapest thing in a repository to change, and here it is load-bearing |
-| `no-self-module-alias` | A file written directly at `src/modules/platform/config.ts` — the self keys become `["platform/config.ts", "config.ts"]`, the file's own name where a capability name belongs. No specifier carries a `.ts` extension, so the rule is effectively off for that file while appearing to be on |
+| `no-self-module-alias` | A capability tree at `apps/api/modules/`, `module/`, or any path without the exact `/src/modules/` segment pair — no root is found, `{}` is returned, and the file is not partially checked, it is not checked at all. Path shape is the cheapest thing in a repository to change, and here it is load-bearing |
+| `no-self-module-alias` | A file written directly at `modules/platform/config.ts` — the self keys become `["platform/config.ts", "config.ts"]`, the file's own name where a capability name belongs. No specifier carries a `.ts` extension, so the rule is effectively off for that file while appearing to be on |
 | `no-self-module-alias` | A genuine top-level capability named the same as one under a meta root — the short self key is unqualified. From inside `modules/platform/exceptions/`, an import of a real, separate `@modules/exceptions/...` is reported as a self alias. An inverted hatch: the rule fires on correct code, and the habit it teaches is to scroll past it |
 | both | A self-import laundered through a third file that re-exports it — both rules read one specifier in one file. A capability that reaches itself through a neighbour's re-export is two correct-looking imports, and no single-file rule can see the loop |
 | both | `// eslint-disable-next-line` above either rule — neither rule is unsuppressible. Every hatch above is also reachable in one line by somebody in a hurry |
@@ -261,7 +261,7 @@ not a pass.
 
 ## Worked example
 
-**Input.** `src/modules/ai/ai-invoke.service.ts`:
+**Input.** `modules/ai/ai-invoke.service.ts`:
 
 ```ts
 import { Injectable } from "@nestjs/common"

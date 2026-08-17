@@ -83,7 +83,7 @@ thiếu. Lớp phủ đặt phẳng, `components/overlays/<Name>/extra.tsx`, vì
 tầng nhóm giữa tên tầng và tên màn; bỏ tầng nhóm đi là cả thư mục ra ngoài vùng phủ. File thứ ba trong
 thư mục block, composite, branch, leaf hay shell — chỉ `pages`, `layouts` và `overlays` là tầng màn
 hình. `constants.json`, `copy.md`, `styles.css` nằm cạnh hai nửa, vì trình chạy chỉ ghé những phần mở
-rộng mà cấu hình giao cho nó. Và một thư mục màn hình nằm ngoài `src/components/` — một gói dùng chung
+rộng mà cấu hình giao cho nó. Và một thư mục màn hình nằm ngoài `components/` — một gói dùng chung
 đặt page thẳng dưới `src/` thiếu đúng đoạn `components/` mà biểu thức đòi.
 
 **Ranh giới.** Luật này đếm cái nằm cạnh hai nửa, trong ba tầng. Việc một thư mục tiện ích có hợp lệ ở
@@ -126,7 +126,7 @@ mục**; đoạn `.*/` phía trước bắt buộc phải có ít nhất một �
 và tên thư mục tiện ích.
 
 **Nó không thấy gì.** Thư mục tiện ích đặt thẳng dưới gốc cây thành phần —
-`src/components/utils/format.ts` — vì biểu thức đòi ít nhất một đoạn ở giữa, nên chỗ đặt nông nhất và
+`components/utils/format.ts` — vì biểu thức đòi ít nhất một đoạn ở giữa, nên chỗ đặt nông nhất và
 hiển nhiên nhất lại đúng là chỗ luật không nhìn thấy. `helpers/`, `lib/`, `shared/`, `util/`,
 `const/`, `models/`, `data/`: bốn cái tên là một danh sách đóng, và một từ đồng nghĩa là một thư mục
 luật chưa từng nghe tới. Một tiện ích viết thành FILE chứ không phải thư mục —
@@ -254,7 +254,7 @@ lint trong kho.
 
 | Luật lint | Cái gì đi qua |
 |---|---|
-| `surface-folder-two-files-only` | **Thành phần thứ ba chuyển vào thẳng `component.tsx`**, một thư mục chỉ có `index.tsx` và vẽ luôn bên trong, **lớp phủ đặt phẳng** không có tầng nhóm, file thứ ba trong thư mục block, composite, branch, leaf hay shell, `constants.json` / `copy.md` / `styles.css` nằm cạnh hai nửa, và mọi thư mục màn hình ngoài `src/components/` |
+| `surface-folder-two-files-only` | **Thành phần thứ ba chuyển vào thẳng `component.tsx`**, một thư mục chỉ có `index.tsx` và vẽ luôn bên trong, **lớp phủ đặt phẳng** không có tầng nhóm, file thứ ba trong thư mục block, composite, branch, leaf hay shell, `constants.json` / `copy.md` / `styles.css` nằm cạnh hai nửa, và mọi thư mục màn hình ngoài `components/` |
 | `route-tree-holds-routes-only` | **Cây định tuyến ở gốc kho, không có `src/`**, một file route vừa fetch vừa sắp xếp ngay trong `page.tsx`, gạch dưới trên một FILE ở gốc cây, tấm gương lật ngược nơi `app/dashboard/_components/Card.tsx` nổ còn `app/_components/Card.tsx` thì không, một màn hình đầy đủ đội tên khe như `template.tsx` hay `default.tsx`, và một thành phần đội tên `.test.tsx` |
 | `no-helper-folder-in-components` | **Thư mục tiện ích đặt thẳng dưới gốc cây thành phần**, mọi từ đồng nghĩa — `helpers/`, `lib/`, `shared/`, `util/`, `const/`, `models/`, `data/` — một tiện ích viết thành FILE chứ không phải thư mục, và những phần mở rộng không được lint như `constants/tone.json` |
 | `export-matches-folder` | **`export * from "./component"`**, `export default`, `export class` và `export enum`, **một export đúng họ gánh theo bao nhiêu hành khách không liên quan cũng được**, thư mục không PascalCase hoặc nửa không tên `index` hoặc phần mở rộng không phải `.ts`/`.tsx`, và `export type` |
@@ -328,7 +328,7 @@ chưa hề qua.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một thư mục màn hình, `src/components/pages/FleetPage/`:
+**Đầu vào.** Một thư mục màn hình, `components/pages/FleetPage/`:
 
 ```
 src/components/pages/FleetPage/index.tsx

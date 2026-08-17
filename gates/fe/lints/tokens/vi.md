@@ -125,7 +125,7 @@ hay một thẻ `<strong>` cấp độ đậm bằng chính thẻ — mỗi nử
 trong stylesheet rule tìm thấy, gọi tên cả class lẫn biến bị thiếu.
 
 **Nó phát hiện bằng gì.** Hệ thống tệp, không phải AST. Từ thư mục của file đang lint, nó đi ngược lên
-tối đa 12 tầng, mỗi tầng thử `existsSync` với năm đường dẫn tương đối — `src/app/globals.css`,
+tối đa 12 tầng, mỗi tầng thử `existsSync` với năm đường dẫn tương đối — `app/globals.css`,
 `apps/app/src/app/globals.css`, `apps/expert/src/app/globals.css`, `apps/landing/src/app/globals.css`,
 `packages/ui/src/styles/globals.css` — đọc và ghép mọi file tìm được, có nhớ đệm theo thư mục cho cả
 lượt chạy. Không tìm thấy gì thì rule trả về `{}`. Ngược lại nó tách chữ class theo khoảng trắng, bóc
@@ -229,7 +229,7 @@ kết quả đó không phải một.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một file lá ở `src/components/leaves/Row/index.tsx`:
+**Đầu vào.** Một file lá ở `components/leaves/Row/index.tsx`:
 
 ```tsx
 const GLUE = "inline-flex gap-1.5"

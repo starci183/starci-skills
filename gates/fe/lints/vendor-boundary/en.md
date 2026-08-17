@@ -14,7 +14,7 @@ class literal it refuses on.
 
 Ownership of a vendor is held by path, by import, by JSX anatomy and by the class literal that is
 required to be written. The gate exposes the strict rules implemented by
-`starci-eslint/packages/fe/vendor-boundary.mjs`. It deliberately does not measure design by regex: the contract stays
+`@starci/eslint-canon-fe`. It deliberately does not measure design by regex: the contract stays
 the source of shape, and lint only blocks the source lines that can be proven wrong.
 
 Two directions must hold at once. A vendor import under the wrong owner is reported, and a mechanics
@@ -75,7 +75,7 @@ import in it.
 a local module and imported from there is not an `@heroui/react` import in the offending file. A
 renamed owner folder changes the owner without changing a line of behaviour. Whether a leaf that is
 allowed to import HeroUI uses it well is not judged at all — the exact node predicate lives in
-`starci-eslint/packages/fe/vendor-boundary.mjs` and is not published by this gate.
+`@starci/eslint-canon-fe` and is not published by this gate.
 
 **Boundary.** This rule decides who may import a vendor. What the owner must then render is the
 business of the anatomy and literal rules below.
@@ -212,8 +212,8 @@ href rather than whether the destination is correct.
 | both directions | A vendor import under the wrong owner fires, and a named mechanics branch that owns no vendor fires |
 | JSX anatomy | Named tags and their nesting — `Modal.Body`, `ContractContent`, Content → Control → Indicator, DropdownBranch → AccountMenu → ShellNav |
 | required class literal | `p-0` on `Modal.Body`, matched as written |
-| implementation | The exact node predicates live in `starci-eslint/packages/fe/vendor-boundary.mjs` and are not restated by this gate |
-| twin test | `node --test starci-eslint/packages/fe/vendor-boundary.test.mjs` |
+| implementation | The exact node predicates live in `@starci/eslint-canon-fe` and are not restated by this gate |
+| twin test | `node --test @starci/eslint-canon-fe` |
 
 ## Escape hatches
 
@@ -270,7 +270,7 @@ rename or one indirection defeats.
 6. Design is not measured by regex. The contract stays the source of shape.
 7. Every rule is recommended at `error`.
 8. No warning adoption and no suppression is valid.
-9. The twin test `node --test starci-eslint/packages/fe/vendor-boundary.test.mjs` is the proof that the rules still
+9. The twin test `node --test @starci/eslint-canon-fe` is the proof that the rules still
    behave as published.
 
 ## Exceptions

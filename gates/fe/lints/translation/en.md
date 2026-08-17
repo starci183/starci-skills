@@ -149,9 +149,9 @@ key crossing the line is `COPY-3`, which has no rule.
 | `no-hardcoded-copy-in-vocabulary` | **Copy that does not start with an ASCII capital.** `aria-label="close dialog"`, and every sentence beginning `Đ`, `Ê`, `Ô`, `Ơ`, `Ư`, `Á`, `Ổ` |
 | `no-hardcoded-copy-in-vocabulary` | **Any attribute outside the five**, and **spread**, and **arrays and objects** mapped into markup |
 | `no-copy-resolution-below-block` | **Aliased or member-form resolution**, and **any resolver whose name is not one of four** — the rule matches spelling, not the symbol behind it |
-| both | **Filename and folder scoping.** A tier folder spelled `leaf/`, `atoms/`, `overlays/`, `pages/`, or a component under `src/ui/leaves/`. Folder names are the cheapest thing in a repository to change, and a new tier folder is a silent hole rather than a failing build |
-| both | **A relative filename.** Programmatic linting, or stdin with a relative `--stdin-filename`, yields `src/components/leaves/…` with no leading slash; the gate tests for `/src/components/leaves/`, both rules deactivate, and the run is green for the wrong reason |
-| both | **Resolution moved one file out.** A hook in `src/hooks/` that calls the runtime, imported by a leaf: the dependency the rule exists to prevent is still there, and the call is not in a gated file |
+| both | **Filename and folder scoping.** A tier folder spelled `leaf/`, `atoms/`, `overlays/`, `pages/`, or a component under `ui/leaves/`. Folder names are the cheapest thing in a repository to change, and a new tier folder is a silent hole rather than a failing build |
+| both | **A relative filename.** Programmatic linting, or stdin with a relative `--stdin-filename`, yields `components/leaves/…` with no leading slash; the gate tests for `/src/components/leaves/`, both rules deactivate, and the run is green for the wrong reason |
+| both | **Resolution moved one file out.** A hook in `hooks/` that calls the runtime, imported by a leaf: the dependency the rule exists to prevent is still there, and the call is not in a gated file |
 | neither | **Everything `COPY-3`, `COPY-4` and `COPY-6` forbid** — a key crossing the line, a resolved string breaking the data fence, a matched-on value treated as copy |
 
 ## Inputs
@@ -220,7 +220,7 @@ hatch that applies. A file outside the gate emits one block with `scope: out`, `
 
 ## Worked example
 
-**Input.** `src/components/leaves/SearchField/component.tsx`:
+**Input.** `components/leaves/SearchField/component.tsx`:
 
 ```tsx
 import {useTranslations} from "next-intl"

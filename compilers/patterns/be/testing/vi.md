@@ -317,7 +317,7 @@ người theo dõi.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hay branded type khiến giá trị
-sai không viết ra được; `enforced` nghĩa là một lint rule trong `starci-eslint/packages/be/testing.mjs` bắt được nó;
+sai không viết ra được; `enforced` nghĩa là một lint rule trong `@starci/eslint-canon-be` bắt được nó;
 `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -351,16 +351,16 @@ xuất.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `TESTING-1` | `src/tests/e2e/course-purchase.e2e-spec.ts` · `src/tests/e2e/rewards-queries.e2e-spec.ts` | Tên thứ nhất là một câu nghiệp vụ; tên thứ hai là một nhóm resolver khoác áo test, đúng cái hình dạng mã này từ chối. Cả hai đều đang sống |
-| `TESTING-2` | `starci-eslint/packages/be/testing.mjs` → `STATE_READERS` · bất kỳ file nào dưới `src/tests/e2e/` đọc qua `entityManager` | Những identifier mà rule chấp nhận là bằng chứng state đã được đọc lại, và một flow thật sự đọc nó |
-| `TESTING-3` | `src/tests/helpers/flow-world.ts` · `src/tests/helpers/flow-wait.ts` | World vào bằng GraphQL qua một HTTP client thật; các helper chờ thay `sleep` bằng deadline cộng predicate |
-| `TESTING-4` | `src/tests/e2e/course-refund.e2e-spec.ts` · `src/tests/e2e/community-concurrency.e2e-spec.ts` | Hai nhánh hỏng giành được một flow: một lần đảo chiều bắt buộc phải chạy, và một cuộc đua mà constraint phải bắt |
-| `TESTING-5` | `src/features/api/processors/ai/score-uploaded-cv/enqueue-score-uploaded-cv.service.spec.ts` | Một bảng nhánh chạy bằng `it.each`, mỗi hàng một case đổi kết quả chứ không phải một case nằm giữa dải |
-| `TESTING-6` | `starci-eslint/packages/be/testing.mjs` → `CALL_MATCHERS`, `matcherOf` | Chín matcher được tính là call assertion, và cú leo member-chain khiến `.not` và `.resolves` vẫn lọt qua |
-| `TESTING-7` | `jest.config.ts` → `testPathIgnorePatterns` · `src/tests/e2e/jest-e2e.json` → `testRegex` · `src/tests/harness/jest-harness.json` → `testRegex` | Ba config chỉ phân biệt bằng hậu tố, và đó chính là thứ cho phép các lane ở chung thư mục mà lần chạy nhanh không nhặt phải |
+| `TESTING-1` | `tests/e2e/course-purchase.e2e-spec.ts` · `tests/e2e/rewards-queries.e2e-spec.ts` | Tên thứ nhất là một câu nghiệp vụ; tên thứ hai là một nhóm resolver khoác áo test, đúng cái hình dạng mã này từ chối. Cả hai đều đang sống |
+| `TESTING-2` | `@starci/eslint-canon-be` → `STATE_READERS` · bất kỳ file nào dưới `tests/e2e/` đọc qua `entityManager` | Những identifier mà rule chấp nhận là bằng chứng state đã được đọc lại, và một flow thật sự đọc nó |
+| `TESTING-3` | `tests/helpers/flow-world.ts` · `tests/helpers/flow-wait.ts` | World vào bằng GraphQL qua một HTTP client thật; các helper chờ thay `sleep` bằng deadline cộng predicate |
+| `TESTING-4` | `tests/e2e/course-refund.e2e-spec.ts` · `tests/e2e/community-concurrency.e2e-spec.ts` | Hai nhánh hỏng giành được một flow: một lần đảo chiều bắt buộc phải chạy, và một cuộc đua mà constraint phải bắt |
+| `TESTING-5` | `features/api/processors/ai/score-uploaded-cv/enqueue-score-uploaded-cv.service.spec.ts` | Một bảng nhánh chạy bằng `it.each`, mỗi hàng một case đổi kết quả chứ không phải một case nằm giữa dải |
+| `TESTING-6` | `@starci/eslint-canon-be` → `CALL_MATCHERS`, `matcherOf` | Chín matcher được tính là call assertion, và cú leo member-chain khiến `.not` và `.resolves` vẫn lọt qua |
+| `TESTING-7` | `jest.config.ts` → `testPathIgnorePatterns` · `tests/e2e/jest-e2e.json` → `testRegex` · `tests/harness/jest-harness.json` → `testRegex` | Ba config chỉ phân biệt bằng hậu tố, và đó chính là thứ cho phép các lane ở chung thư mục mà lần chạy nhanh không nhặt phải |
 | `TESTING-8` | `package.json` → `test:int`, `test:ci` | Cả hai đều mang `--passWithNoTests`. Cờ đó đúng là chế độ hỏng mà mã này gọi tên, nên nó là điểm neo để người đọc đối chiếu số file của lane |
-| `TESTING-9` | `src/tests/helpers/flow-world.ts` → stub `AiInvokeService` mặc định | Stub do world cài, trả về JSON đúng dạng chứ không phải một chuỗi đánh dấu, và là một jest mock mà flow lập trình lại được theo từng bước |
-| `TESTING-10` | `src/tests/helpers/harness-credentials.ts` · `src/tests/harness/` | Mỗi authority một credential bắt buộc chỉ nằm trong process, không fallback qua file, OAuth, key pool hay biến anh em, và judge có biến riêng |
+| `TESTING-9` | `tests/helpers/flow-world.ts` → stub `AiInvokeService` mặc định | Stub do world cài, trả về JSON đúng dạng chứ không phải một chuỗi đánh dấu, và là một jest mock mà flow lập trình lại được theo từng bước |
+| `TESTING-10` | `tests/helpers/harness-credentials.ts` · `tests/harness/` | Mỗi authority một credential bắt buộc chỉ nằm trong process, không fallback qua file, OAuth, key pool hay biến anh em, và judge có biến riêng |
 | `TESTING-11` | `scripts/seed-dashboard-test-data.mjs` · `scripts/seed-profile-test-data.mjs` | Seed ghi các hàng nguồn rồi vô hiệu hoá projection dẫn xuất, và nhận tài khoản đang soi làm tham số thay vì ghim cứng một identity |
 
 Mọi mã đều đã có neo. Không mã nào còn "chưa neo được".

@@ -179,7 +179,7 @@ toast sau khi submit · nhãn cột của bảng · chuỗi đã format sẵn s�
 vào thư mục locale là đọc sai cả hai luật.
 
 **Nó sinh ra gì trong source.** File locale được miễn theo một danh sách ĐƯỜNG DẪN —
-`src/messages/<locale>.json` và danh sách `CONTENT_PATHS` — nên không file nào phải tự biện hộ cho
+`messages/<locale>.json` và danh sách `CONTENT_PATHS` — nên không file nào phải tự biện hộ cho
 mình. Fixture và spec cũng được miễn đúng cách đó, theo đường dẫn.
 
 **Dấu hiệu nhận biết.** File nằm trong thư mục locale, đuôi `.json`, mỗi khoá là một câu. Không có
@@ -222,7 +222,7 @@ tên phương thức thanh toán dùng làm khoá map · giá trị enum trong q
 ## Tầng giữ
 
 Tier nào thật sự giữ từng mã — một kiểu đóng, một luật lint, hay chỉ một người đọc. Những dòng
-`enforced` được hiện thực bởi `starci-eslint/packages/fe/translation.mjs`.
+`enforced` được hiện thực bởi `@starci/eslint-canon-fe`.
 
 | Mã | Tier | Ai giữ |
 |---|---|---|
@@ -237,7 +237,7 @@ Bốn trên sáu dòng ghi `documented`, và bảng này tồn tại để nói 
 `enforced` khiến người ta tưởng cả module đã được giữ.
 
 Hai trong bốn dòng đó có hỗ trợ máy móc, nhưng hỗ trợ ấy thuộc về một luật LÁNG GIỀNG nên không được
-tính ở đây: `starci-fe/no-second-language-in-source`, do `.claude/starci-eslint/packages/fe/comments.mjs` công bố,
+tính ở đây: `starci-fe/no-second-language-in-source`, do `.claude/@starci/eslint-canon-fe` công bố,
 miễn các từ điển locale theo đường dẫn (`COPY-5`) và đọc pragma `vn-ok:` trên dòng được đánh dấu
 (`COPY-6`). Tính luật của láng giềng thành enforcement của module này sẽ làm module trông như được giữ
 ở chỗ nó không được giữ: luật đó bắn theo NGÔN NGỮ, nên nó không bao giờ thấy một key tiếng Anh đang
@@ -255,11 +255,11 @@ với repository; chính hình dạng của cây, chứ không phải tên sản
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `COPY-1` | `src/components/blocks/**/index.tsx` cạnh file `component.tsx` sinh đôi | Hook dịch xuất hiện trong entrypoint connected và không xuất hiện trong file sinh đôi nào. Một cây tuân thủ sẽ có số đếm dương ở glob thứ nhất và bằng không ở glob thứ hai |
-| `COPY-2` | `src/components/{leaves,composites,branches,shells}/**` | Không `aria-label`, `placeholder`, `title` hay `alt` nào mang prose, và không đoạn text JSX nào đọc lên như một câu |
-| `COPY-3` | kiểu của props trong `src/components/blocks/**/component.tsx` | Prop mang chữ được khai kiểu bằng chính giá trị đã resolve (`label: string`). Mọi prop `*Key` đều gọi tên một hàng đang được chọn, không bao giờ là một mục từ điển |
-| `COPY-4` | `src/components/blocks/**/component.test.tsx` | File sinh đôi render từ những chuỗi fixture trần, không mount provider dịch nào — test chạy qua chính là bằng chứng chữ đã đến bằng đường value |
-| `COPY-5` | `src/messages/<locale>.json`, và `CONTENT_PATHS` trong `.claude/starci-eslint/packages/fe/comments.mjs` | Miễn trừ là một danh sách đường dẫn, nên không file nào tự biện hộ cho mình |
+| `COPY-1` | `components/blocks/**/index.tsx` cạnh file `component.tsx` sinh đôi | Hook dịch xuất hiện trong entrypoint connected và không xuất hiện trong file sinh đôi nào. Một cây tuân thủ sẽ có số đếm dương ở glob thứ nhất và bằng không ở glob thứ hai |
+| `COPY-2` | `components/{leaves,composites,branches,shells}/**` | Không `aria-label`, `placeholder`, `title` hay `alt` nào mang prose, và không đoạn text JSX nào đọc lên như một câu |
+| `COPY-3` | kiểu của props trong `components/blocks/**/component.tsx` | Prop mang chữ được khai kiểu bằng chính giá trị đã resolve (`label: string`). Mọi prop `*Key` đều gọi tên một hàng đang được chọn, không bao giờ là một mục từ điển |
+| `COPY-4` | `components/blocks/**/component.test.tsx` | File sinh đôi render từ những chuỗi fixture trần, không mount provider dịch nào — test chạy qua chính là bằng chứng chữ đã đến bằng đường value |
+| `COPY-5` | `messages/<locale>.json`, và `CONTENT_PATHS` trong `.claude/@starci/eslint-canon-fe` | Miễn trừ là một danh sách đường dẫn, nên không file nào tự biện hộ cho mình |
 | `COPY-6` | `chưa neo được` | Có tồn tại những dòng đánh dấu `// vn-ok: <reason>`, nhưng các literal được đánh dấu tìm thấy lại là copy chứ không phải giá trị chương trình so khớp. Chính tình huống của mã này thì chưa có điểm neo |
 
 ## Đầu vào

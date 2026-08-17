@@ -248,7 +248,7 @@ Exceptions here are properties of the rules, not relief from the law.
 - **The locale folder.** Paths containing `messages/`, `locales/` or `i18n/` disable the third rule
   completely, releasing `COMMENT-4` over every line of the file. Policing product copy would be policing
   the product.
-- **The fixture lane.** In `*.spec.ts`, `*-spec.ts` and `src/tests/`, only comment lines are policed. It
+- **The fixture lane.** In `*.spec.ts`, `*-spec.ts` and `tests/`, only comment lines are policed. It
   releases `COMMENT-4` over data lines only: a sentence a real person would type is data being fed to a
   system, while a comment in a spec is prose, and is still refused.
 - **The data constant.** `export const MAX_ATTEMPTS = 3` is exempt from `require-export-jsdoc` by design,
@@ -277,7 +277,7 @@ visitor — it was not judged, and it did not pass.
 
 ## Worked example
 
-**Input.** `src/payment/state.ts`, ordinary source, no lane exemption:
+**Input.** `payment/state.ts`, ordinary source, no lane exemption:
 
 ```ts
 export enum PaymentState {

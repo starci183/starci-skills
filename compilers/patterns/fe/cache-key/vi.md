@@ -233,13 +233,13 @@ giá trị sai không viết ra được; `enforced` nghĩa là có một lint r
 | `CACHE-4` | `documented` | không có — không rule nào nhìn được bên trong một key có gì |
 | `CACHE-5` | `documented` | không có — không rule nào nhìn được bên trong một key có gì |
 
-Không có `starci-eslint/packages/fe/cache-key.mjs`. Module này công bố **không** rule nào, nên cả năm mã đều do
+Không có `@starci/eslint-canon-fe`. Module này công bố **không** rule nào, nên cả năm mã đều do
 review và do chính file này giữ. Đó không phải một chỗ khuyết đang chờ lấp: một ESLint rule nhìn thấy
 BIỂU THỨC key, còn thứ làm cho một key đúng lại là chuyện các giá trị trong đó có phải là những giá
 trị mà câu trả lời đổi theo hay không — một sự thật về server, không phải về cú pháp. Rule nhìn được
 rằng key là một mảng ba định danh. Nó không nhìn được rằng cái thứ ba lẽ ra phải là cái thứ tư.
 
-Hàng xóm cơ học gần nhất là `starci-eslint/packages/fe/the-split.mjs`, với rule `presentational-purity` giữ mọi lời
+Hàng xóm cơ học gần nhất là `@starci/eslint-canon-fe`, với rule `presentational-purity` giữ mọi lời
 gọi `useSWR` nằm ở nửa connected. Cái đó giữ CHỖ dựng key — trong file có sẵn người đọc và tham số
 route để dựng — và hoàn toàn không giữ gì về chuyện cái gì được bỏ vào trong. Đó là chuyện kề cận,
 không phải chuyện cưỡng chế, và nó không được tính vào bảng trên.
@@ -250,11 +250,11 @@ Code thật để đối chiếu từng mã. Đường dẫn tính từ gốc re
 
 | Mã | Đường dẫn | Nhìn vào đâu |
 |---|---|---|
-| `CACHE-1` | `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` | Chữ ký fetcher `async ([, , id]: [string, string, string])` — nó destructure id ra từ key rồi đưa CHÍNH cái đó vào request, trong khi tham số trùng tên vẫn nằm trong scope mà không ai dùng |
-| `CACHE-2` | `src/hooks/auth/useViewerKey.ts` | `fingerprint()` gấp session token thành một chuỗi base-36 ngắn, và hook trả `undefined` khi chưa ai đăng nhập. Bản thân token không bao giờ rời khỏi file này |
-| `CACHE-3` | `src/hooks/swr/useMutateAddToCartSwr.ts` | Key `[MUTATE_ADD_TO_CART_SWR_KEY, courseId]` trên một `useSWRMutation` mà phía gọi khởi tạo mỗi dòng một lần, nên `isMutating` thuộc về đúng một dòng |
-| `CACHE-4` | `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` | Cái cổng `viewer === undefined \|\| courseId === undefined ? null : [...]` — hai mảnh, cả hai đều bắt buộc, và không có `??` nào cấp hàng thay thế cho mảnh nào |
-| `CACHE-5` | `src/hooks/swr/useQueryCoursePricePreviewSwr.ts` | Fetcher không có `try`/`catch`; chỗ `?? null` duy nhất nằm ở đoạn bóc một response đã có, và doc comment nói rõ `null` đó nghĩa là gì |
+| `CACHE-1` | `hooks/swr/useQueryCoursePricePreviewSwr.ts` | Chữ ký fetcher `async ([, , id]: [string, string, string])` — nó destructure id ra từ key rồi đưa CHÍNH cái đó vào request, trong khi tham số trùng tên vẫn nằm trong scope mà không ai dùng |
+| `CACHE-2` | `hooks/auth/useViewerKey.ts` | `fingerprint()` gấp session token thành một chuỗi base-36 ngắn, và hook trả `undefined` khi chưa ai đăng nhập. Bản thân token không bao giờ rời khỏi file này |
+| `CACHE-3` | `hooks/swr/useMutateAddToCartSwr.ts` | Key `[MUTATE_ADD_TO_CART_SWR_KEY, courseId]` trên một `useSWRMutation` mà phía gọi khởi tạo mỗi dòng một lần, nên `isMutating` thuộc về đúng một dòng |
+| `CACHE-4` | `hooks/swr/useQueryCoursePricePreviewSwr.ts` | Cái cổng `viewer === undefined \|\| courseId === undefined ? null : [...]` — hai mảnh, cả hai đều bắt buộc, và không có `??` nào cấp hàng thay thế cho mảnh nào |
+| `CACHE-5` | `hooks/swr/useQueryCoursePricePreviewSwr.ts` | Fetcher không có `try`/`catch`; chỗ `?? null` duy nhất nằm ở đoạn bóc một response đã có, và doc comment nói rõ `null` đó nghĩa là gì |
 
 Mọi mã đều đã neo được. Không mã nào ghi `chưa neo được`.
 

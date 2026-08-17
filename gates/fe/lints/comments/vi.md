@@ -262,7 +262,7 @@ chứ không phải một lượt qua.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một file bình thường, `src/features/attempt/streak-badge.tsx`, mà cổng đường dẫn không
+**Đầu vào.** Một file bình thường, `features/attempt/streak-badge.tsx`, mà cổng đường dẫn không
 miễn:
 
 ```tsx

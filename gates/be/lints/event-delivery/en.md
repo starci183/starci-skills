@@ -243,7 +243,7 @@ guarantee.
 
 ## Worked example
 
-**Input.** `src/event/nats/nats-bridge.service.ts`, as written:
+**Input.** `event/nats/nats-bridge.service.ts`, as written:
 
 ```ts
 private async onMessage(raw: Buffer) {

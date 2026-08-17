@@ -81,5 +81,17 @@ Every module is one document in two records: `en.md` for the agent, `vi.md` for 
 section for section and neither refers to the other. A shelf may carry its own `en.md`, which becomes
 that shelf's page.
 
+**A path in a rule is relative to the role's source root, and the tree never writes that root.** A
+pattern says `components/leaves/<Name>/index.tsx`, not `src/components/...`: one product keeps its
+components at `src/components`, another at `packages/ui/src`, and the workspace route is what knows
+which. A rule that hardcodes the root is a rule that is false for the second product to read it.
+
+The exception is a rule describing **its own machine**: when a lint gates on a filename containing
+`/src/tests/`, that string is the mechanism, not a layout claim, and it is quoted exactly.
+
+**A law names a rule, never a rule's file.** The published rule name is the only identifier —
+`@starci/eslint-canon-fe` and `@starci/eslint-canon-be` are where the implementations live, and how they
+are arranged into files is the machine's business, not the law's.
+
 Rules live in the tree. This file routes; it never restates a rule, and neither does the Source
 bootstrap.

@@ -251,7 +251,7 @@ export function courseHeaders(locale: string) {
 }
 ```
 
-`src/api/client.ts` sits in no folder named `links` and is not a spec, so the chain rule runs. It calls
+`api/client.ts` sits in no folder named `links` and is not a spec, so the chain rule runs. It calls
 `createHttpLink` and never calls a locale factory.
 
 ```text
@@ -263,7 +263,7 @@ code: LOCALE-1
 hatch: none
 ```
 
-`src/hooks/use-course.ts` is not `links/locale.<ext>`, so the header rule runs, and the `Literal` key
+`hooks/use-course.ts` is not `links/locale.<ext>`, so the header rule runs, and the `Literal` key
 `"x-locale"` matches exactly.
 
 ```text

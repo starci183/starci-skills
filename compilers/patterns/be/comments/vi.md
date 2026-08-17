@@ -38,7 +38,7 @@ Ba trong năm mã có một lint rule đứng sau, và một trong ba cái đó 
 đòi. Bảng tầng giữ bên dưới nói rõ cái nào là cái nào, thay vì để người đọc tưởng cả năm mã được canh
 đều nhau.
 
-Thứ giữ luật này là `starci-eslint/packages/be/comments.mjs`.
+Thứ giữ luật này là `@starci/eslint-canon-be`.
 
 ## Mã tình huống
 
@@ -235,7 +235,7 @@ trong prompt template · fixture hội thoại trong spec · nội dung email th
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho giá
-trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `starci-eslint/packages/be/comments.mjs` bắt được;
+trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `@starci/eslint-canon-be` bắt được;
 `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Thứ giữ nó |
@@ -270,15 +270,15 @@ Code thật để đối chiếu từng luật. Một luật không chỉ tay v�
 
 | Mã | Điểm neo | Cần nhìn gì |
 |---|---|---|
-| `COMMENT-1` | `src/modules/databases/postgresql/primary/primary.decorators.ts` → `InjectPrimaryPostgreSQLEntityManager` | Một arrow function một dòng được export mà doc block dài ba dòng, vì toàn bộ rủi ro vô hình trong chữ ký: sai connection thì kiểu vẫn y hệt và đọc nhầm dữ liệu. Đây là điểm neo cho "không khai báo nào nhỏ đến mức được miễn" |
-| `COMMENT-1` | `src/modules/databases/postgresql/primary/constants/connection.ts` | Mặt bên kia của cùng một rule: một hằng số dữ liệu thuần, không doc block, không finding. Đọc nó cạnh cái decorator để thấy chỗ vạch ngoại lệ của rule |
-| `COMMENT-2` | `src/modules/ai/balancer/enums/ai-error-kind.ts` → `AiErrorKind` | Bốn member, bốn hậu quả — disable cứng key, cooldown ngắn, cooldown nhẹ, không phạt. Không cái nào trong bốn suy ra được từ tên member, và mỗi cái được chọn ở một call site xa cái switch hành động trên nó |
-| `COMMENT-2` | `src/modules/ai/balancer/enums/key-status.ts` | Một enum thứ hai trong cùng thư mục, để cặp này cho thấy hình dạng đứng vững trên cả một họ chứ không phải trong một file may mắn |
-| `COMMENT-3` | `src/modules/bussiness/streak/streak-freeze-cron.service.ts` (khối insert-and-spend) | Ví dụ sống rõ nhất về một lý do nằm ngoài dòng: vì sao `RETURNING id` được đọc, vì sao không có dòng nào bị ảnh hưởng nghĩa là phải xoá dòng tạm chứ không phải retry, và vì sao một replica đang đua mới là trường hợp đang được phòng. Xoá những câu ấy đi thì code vẫn compile và thôi giải thích được |
+| `COMMENT-1` | `modules/databases/postgresql/primary/primary.decorators.ts` → `InjectPrimaryPostgreSQLEntityManager` | Một arrow function một dòng được export mà doc block dài ba dòng, vì toàn bộ rủi ro vô hình trong chữ ký: sai connection thì kiểu vẫn y hệt và đọc nhầm dữ liệu. Đây là điểm neo cho "không khai báo nào nhỏ đến mức được miễn" |
+| `COMMENT-1` | `modules/databases/postgresql/primary/constants/connection.ts` | Mặt bên kia của cùng một rule: một hằng số dữ liệu thuần, không doc block, không finding. Đọc nó cạnh cái decorator để thấy chỗ vạch ngoại lệ của rule |
+| `COMMENT-2` | `modules/ai/balancer/enums/ai-error-kind.ts` → `AiErrorKind` | Bốn member, bốn hậu quả — disable cứng key, cooldown ngắn, cooldown nhẹ, không phạt. Không cái nào trong bốn suy ra được từ tên member, và mỗi cái được chọn ở một call site xa cái switch hành động trên nó |
+| `COMMENT-2` | `modules/ai/balancer/enums/key-status.ts` | Một enum thứ hai trong cùng thư mục, để cặp này cho thấy hình dạng đứng vững trên cả một họ chứ không phải trong một file may mắn |
+| `COMMENT-3` | `modules/bussiness/streak/streak-freeze-cron.service.ts` (khối insert-and-spend) | Ví dụ sống rõ nhất về một lý do nằm ngoài dòng: vì sao `RETURNING id` được đọc, vì sao không có dòng nào bị ảnh hưởng nghĩa là phải xoá dòng tạm chứ không phải retry, và vì sao một replica đang đua mới là trường hợp đang được phòng. Xoá những câu ấy đi thì code vẫn compile và thôi giải thích được |
 | `COMMENT-4` | `eslint.config.mjs` (khối rule nối plugin back end) | Chỗ mã này được bật cho cả cây, ở mức `error`. Cũng là điểm neo cho một drift đã ghi nhận: config tiêu thụ vẫn nối ba rule cũ mà canon đã thay bằng một |
-| `COMMENT-4` | `src/tests/harness/ai-tutor.harness-spec.ts` | Lane fixture, hiện ra rõ: một chỉ dẫn tiếng Việt chính là toàn bộ mục đích của fixture, còn prose của file vẫn là tiếng Anh. Đây là ranh giới giữa "prose bằng ngôn ngữ thứ hai" và "dữ liệu tình cờ là văn xuôi" |
-| `COMMENT-5` | `src/features/api/core/graphql/queries/contents/content/content.handler.ts` (regex bắt heading, có đánh dấu `vn-ok`) | Một pattern KHỚP vào nội dung người dùng thật đã viết. Dịch literal đi thì nhánh thôi khớp bất cứ gì, một cách im lặng — không test nào đỏ vì một regex đơn giản là không bao giờ chạy |
-| `COMMENT-5` | `src/features/api/core/graphql/mutations/**/*.resolver.ts` (message thành công theo locale) | Mặt PHÁT RA của cùng một mã, lặp trên toàn bộ bề mặt mutation với một mệnh đề lý do trên từng dòng. Đọc nó như bài kiểm tra khối lượng: marker chỉ sống nổi qua hàng trăm lần viết vì mỗi lần nó đều mang theo một lý do |
+| `COMMENT-4` | `tests/harness/ai-tutor.harness-spec.ts` | Lane fixture, hiện ra rõ: một chỉ dẫn tiếng Việt chính là toàn bộ mục đích của fixture, còn prose của file vẫn là tiếng Anh. Đây là ranh giới giữa "prose bằng ngôn ngữ thứ hai" và "dữ liệu tình cờ là văn xuôi" |
+| `COMMENT-5` | `features/api/core/graphql/queries/contents/content/content.handler.ts` (regex bắt heading, có đánh dấu `vn-ok`) | Một pattern KHỚP vào nội dung người dùng thật đã viết. Dịch literal đi thì nhánh thôi khớp bất cứ gì, một cách im lặng — không test nào đỏ vì một regex đơn giản là không bao giờ chạy |
+| `COMMENT-5` | `features/api/core/graphql/mutations/**/*.resolver.ts` (message thành công theo locale) | Mặt PHÁT RA của cùng một mã, lặp trên toàn bộ bề mặt mutation với một mệnh đề lý do trên từng dòng. Đọc nó như bài kiểm tra khối lượng: marker chỉ sống nổi qua hàng trăm lần viết vì mỗi lần nó đều mang theo một lý do |
 
 Mọi mã đều đã neo. Không mã nào còn chưa neo được.
 

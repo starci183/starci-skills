@@ -222,7 +222,7 @@ branded type dựng ở đúng một chỗ đã kiểm.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `starci-eslint/packages/fe/type-safety.mjs` báo cáo
+giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `@starci/eslint-canon-fe` báo cáo
 nó, tên rule nêu bên dưới; `documented` nghĩa là không có gì trong file rule của module này giữ nó, chỉ
 người đọc giữ.
 
@@ -245,11 +245,11 @@ Một luật không chỉ được vào code thật thì chỉ là một đề x
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `TYPE-SAFETY-1` | `src/components/contracts/props.ts`, và sự vắng mặt trên toàn cây | Các kiểu contract được khai báo, không bao giờ bị cast vào chỗ. Trên toàn cây, mọi lần xuất hiện của `as unknown as` đều nằm trong file `.test.`/`.spec.`; không có file source bị canh nào chứa nó. Chính sự vắng mặt đó là điểm neo — bằng chứng của mã này là một con số không, và một hit mới duy nhất đã là toàn bộ finding. |
-| `TYPE-SAFETY-2` | `src/modules/code/sandbox-repo.ts`, `src/components/leaves/Article/index.tsx` | Cả hai nhận giá trị bên ngoài dưới dạng `unknown` — `parseSandboxRepoSnapshot(raw: unknown)`, `toNode(value: unknown)` — và mỗi file mang một predicate `isRecord` cục bộ để thu hẹp nó. Việc thu hẹp nhìn thấy được ngay trong file cần nó, đó là thứ `unknown` mua được còn `any` thì tiêu mất. |
-| `TYPE-SAFETY-3` | `src/components/contracts/props.ts` | `ReadonlyArray<DataValue>` bên trong union `DataValue` và `Array<never>` trong `ComponentActions`. Cả hai đều là kiểu phần tử tự nó generic hoặc lạ, và đó chính là chỗ cách viết thôi không còn là chuyện hình thức. |
-| `TYPE-SAFETY-4` | `src/modules/api/graphql/clients/links/bearer.test.ts` | Một operation transport giả được ráp từ ba method mà link chạm tới rồi trả về qua một double cast. Doc comment của chính file nói nó đang canh gì; cast tồn tại vì muốn chứng minh một API đóng kiểu từ chối một operation dị dạng thì phải dựng ra một cái. |
-| `TYPE-SAFETY-5` | `src/hooks/auth/useSessionRefresh.ts`, `src/components/contracts/props.ts` | Ở file thứ nhất, đích của cast là `{ exp?: unknown }` và dòng doc phía trên nói vì sao hình dạng ấy không được tin thêm nữa; sau đó giá trị được thu hẹp bằng `typeof`. Ở file thứ hai, implementation của một factory có overload được cast sang chính tập overload của nó, dưới một doc comment nói bề mặt nào mới là bề mặt được kiểm. Ca ngược trong cùng cây: `src/app/sitemap.ts` cast một response body sang một kiểu có tên mà không có mệnh đề lý do, và không có gì báo cáo nó. |
+| `TYPE-SAFETY-1` | `components/contracts/props.ts`, và sự vắng mặt trên toàn cây | Các kiểu contract được khai báo, không bao giờ bị cast vào chỗ. Trên toàn cây, mọi lần xuất hiện của `as unknown as` đều nằm trong file `.test.`/`.spec.`; không có file source bị canh nào chứa nó. Chính sự vắng mặt đó là điểm neo — bằng chứng của mã này là một con số không, và một hit mới duy nhất đã là toàn bộ finding. |
+| `TYPE-SAFETY-2` | `modules/code/sandbox-repo.ts`, `components/leaves/Article/index.tsx` | Cả hai nhận giá trị bên ngoài dưới dạng `unknown` — `parseSandboxRepoSnapshot(raw: unknown)`, `toNode(value: unknown)` — và mỗi file mang một predicate `isRecord` cục bộ để thu hẹp nó. Việc thu hẹp nhìn thấy được ngay trong file cần nó, đó là thứ `unknown` mua được còn `any` thì tiêu mất. |
+| `TYPE-SAFETY-3` | `components/contracts/props.ts` | `ReadonlyArray<DataValue>` bên trong union `DataValue` và `Array<never>` trong `ComponentActions`. Cả hai đều là kiểu phần tử tự nó generic hoặc lạ, và đó chính là chỗ cách viết thôi không còn là chuyện hình thức. |
+| `TYPE-SAFETY-4` | `modules/api/graphql/clients/links/bearer.test.ts` | Một operation transport giả được ráp từ ba method mà link chạm tới rồi trả về qua một double cast. Doc comment của chính file nói nó đang canh gì; cast tồn tại vì muốn chứng minh một API đóng kiểu từ chối một operation dị dạng thì phải dựng ra một cái. |
+| `TYPE-SAFETY-5` | `hooks/auth/useSessionRefresh.ts`, `components/contracts/props.ts` | Ở file thứ nhất, đích của cast là `{ exp?: unknown }` và dòng doc phía trên nói vì sao hình dạng ấy không được tin thêm nữa; sau đó giá trị được thu hẹp bằng `typeof`. Ở file thứ hai, implementation của một factory có overload được cast sang chính tập overload của nó, dưới một doc comment nói bề mặt nào mới là bề mặt được kiểm. Ca ngược trong cùng cây: `app/sitemap.ts` cast một response body sang một kiểu có tên mà không có mệnh đề lý do, và không có gì báo cáo nó. |
 
 ## Đầu vào
 

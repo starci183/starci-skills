@@ -124,20 +124,20 @@ tới.
 được kiểm một phần nào cả — nó không được kiểm gì hết. Khớp thì thăm `Decorator`, đòi cùng định danh
 `Controller`, rồi báo lỗi vô điều kiện.
 
-**Nó không thấy gì.** Đổi tên thư mục `src/modules/` thành `src/services/`, `src/domains/` hay
-`src/capabilities/` thì tầng vẫn còn nguyên, cửa vẫn đậu sai chỗ, mà quy tắc biến mất: cấm một **thư
+**Nó không thấy gì.** Đổi tên thư mục `modules/` thành `services/`, `domains/` hay
+`capabilities/` thì tầng vẫn còn nguyên, cửa vẫn đậu sai chỗ, mà quy tắc biến mất: cấm một **thư
 mục** không phải cấm một **tầng**. Chỉ `@Controller` được nhận ra, nên `@WebSocketGateway()`,
-`@MessagePattern(…)`, `@EventPattern(…)` và `@Resolver` nằm dưới `src/modules/` đều đi qua sạch sẽ —
+`@MessagePattern(…)`, `@EventPattern(…)` và `@Resolver` nằm dưới `modules/` đều đi qua sạch sẽ —
 luật định nghĩa cửa là mọi thứ thế giới bên ngoài chạm tới được và gọi tên socket lẫn consumer hàng
 đợi một cách tường minh, nên cái tên quy tắc hứa nhiều hơn thứ nó kiểm. Cùng ba cách viết decorator đã
 làm quy tắc kia im — `MemberExpression`, đổi tên khi import, gán qua biến — cũng làm quy tắc này im.
 Cổng đòi một **dấu gạch đứng trước** `src`, nên một trình chạy đưa vào tên tệp tương đối như
-`src/modules/x.controller.ts` sẽ tắt nó; đường dẫn tuyệt đối luôn có dấu gạch ấy, nên khe này hẹp
+`modules/x.controller.ts` sẽ tắt nó; đường dẫn tuyệt đối luôn có dấu gạch ấy, nên khe này hẹp
 nhưng có thật — nó là phụ thuộc vào **cách trình chạy đặt tên tệp**, không phải vào vị trí thật của
 tệp.
 
-**Ranh giới.** Quy tắc còn chạy **rộng hơn luật** ở đúng một chỗ: luật chỉ ràng buộc `src/modules/**`
-của ứng dụng chính và miễn cho một ứng dụng riêng tự giữ thư mục `src/modules/` của nó, còn cổng chặn
+**Ranh giới.** Quy tắc còn chạy **rộng hơn luật** ở đúng một chỗ: luật chỉ ràng buộc `modules/**`
+của ứng dụng chính và miễn cho một ứng dụng riêng tự giữ thư mục `modules/` của nó, còn cổng chặn
 thì khớp mọi đường dẫn có chứa `/src/modules/`. Chỗ lệch đó là một phát hiện đã được ghi lại, không
 phải một sự cho phép.
 
@@ -161,8 +161,8 @@ phải một sự cho phép.
 | Một dòng chú thích trên lớp ghi `// this is a webhook receiver` | `webhook` chỉ được so với **route** và **đường dẫn**, không bao giờ so với văn bản tệp. Một lời khai bằng văn xuôi không mua được gì |
 | Đặt tên lớp là `WebhookController` trong khi route là `api/reports` và tệp là `reports.controller.ts` | Không quy tắc nào đọc tên lớp. Danh tính đến từ chuỗi route và đường dẫn |
 | Chuyển một controller không có lý do vào `features/` | `rest-door-needs-a-reason` không có cổng đường dẫn cho phần biện minh. Đứng đúng cây là một câu khác của luật, do một quy tắc khác giữ |
-| Một controller webhook để lại dưới `src/modules/` | Hai quy tắc độc lập nhau. Một lý do `TRANSPORT-2` hoàn hảo không miễn được gì ở `TRANSPORT-3` |
-| Đào sâu thêm: `src/modules/billing/http/controllers/x.controller.ts` | Cổng khớp **cặp** `/src/modules/` ở bất kỳ đâu trên đường dẫn, nên thêm bao nhiêu tầng cũng không đổi |
+| Một controller webhook để lại dưới `modules/` | Hai quy tắc độc lập nhau. Một lý do `TRANSPORT-2` hoàn hảo không miễn được gì ở `TRANSPORT-3` |
+| Đào sâu thêm: `modules/billing/http/controllers/x.controller.ts` | Cổng khớp **cặp** `/src/modules/` ở bất kỳ đâu trên đường dẫn, nên thêm bao nhiêu tầng cũng không đổi |
 | Một `@Controller` khai bên trong một spec hay một fixture | Không quy tắc nào có làn kiểm thử. Một cửa dựng tạm trong tệp test bị báo như mọi cửa khác |
 | `@Controller("ops/tenants")` với ý định làm màn vận hành | Phép thử route vận hành neo vào `api/ops`. `ops/…` trần không phải nó, và cửa vẫn bị báo trừ khi tệp còn mang một định danh guard hoặc service-token |
 | `@Controller("internal")` không có đoạn thứ hai | Phép thử máy đòi một dấu gạch phía sau. Một tiền tố trần không thoả |
@@ -181,9 +181,9 @@ phải một sự cho phép.
 | `rest-door-needs-a-reason` | `@Controller("api/ops/anything")` cho một cửa người xem thường vẫn tới được. Tiền tố là toàn bộ bằng chứng, và guard không được kiểm một khi tiền tố đã khớp |
 | `rest-door-needs-a-reason` | `@Controller("healthz")` trả về dữ liệu nghiệp vụ. Phép thử probe so đúng chuỗi route và không bao giờ nhìn handler trả về gì |
 | `rest-door-needs-a-reason` | Một route không phải `Literal` chuỗi — cửa mở này chạy theo chiều ngược: một cửa **đúng luật** bị báo sai, và cách sửa nhanh nhất là tắt cảnh báo. Route cấp phương thức không bao giờ được đọc, nên `@Controller()` rỗng cộng `@Post("webhook/settlement")` là một webhook thật mà vẫn bị báo |
-| `door-lives-in-features` | Đổi tên `src/modules/` thành `src/services/`, `src/domains/` hay `src/capabilities/`. Cấm thư mục không phải cấm tầng; tầng sống sót qua lần đổi tên với quy tắc đã tắt |
-| `door-lives-in-features` | `@WebSocketGateway()`, `@MessagePattern(…)`, `@EventPattern(…)` nằm dưới `src/modules/`. Quy tắc nhận `@Controller` và không nhận gì khác, nên cái tên nó hứa nhiều hơn thứ nó kiểm |
-| `door-lives-in-features` | Một tên tệp tương đối như `src/modules/x.controller.ts`. Cổng đòi một dấu gạch đứng trước `src` — một phụ thuộc vào cách trình chạy đặt tên tệp |
+| `door-lives-in-features` | Đổi tên `modules/` thành `services/`, `domains/` hay `capabilities/`. Cấm thư mục không phải cấm tầng; tầng sống sót qua lần đổi tên với quy tắc đã tắt |
+| `door-lives-in-features` | `@WebSocketGateway()`, `@MessagePattern(…)`, `@EventPattern(…)` nằm dưới `modules/`. Quy tắc nhận `@Controller` và không nhận gì khác, nên cái tên nó hứa nhiều hơn thứ nó kiểm |
+| `door-lives-in-features` | Một tên tệp tương đối như `modules/x.controller.ts`. Cổng đòi một dấu gạch đứng trước `src` — một phụ thuộc vào cách trình chạy đặt tên tệp |
 | cả hai | `@Nest.Controller("api/theme")`, hoặc `import { Controller as Route }` rồi `@Route("api/theme")`, hoặc `const Door = Controller` rồi `@Door("api/theme")`. Một `MemberExpression` trả về `null`, và một binding đổi tên so ra là một cái tên khác |
 | cả hai | Một handler đăng ký tay ngoài lớp — `app.use(…)`, `server.get("/api/theme", …)` trong tệp khởi động. Không có decorator nào để thăm, mà một cửa REST lắp bằng tay vẫn là một cửa luật ràng buộc |
 | cả hai | `// eslint-disable-next-line`. Không quy tắc nào ở đây là không tắt được, nên mọi cửa mở phía trên còn với tới được bằng một dòng, bởi một người đang vội |
@@ -232,7 +232,7 @@ Mọi ngoại lệ ở đây được viết **bên trong** quy tắc, không ph
   tiên. Một cửa có route webhook không bao giờ được xét tới phần byte, nên không thông điệp nào nói
   được lý do *nào* đã cứu nó.
 - **Mọi thứ ngoài `/src/modules/` được miễn `door-lives-in-features`** — kể cả một ứng dụng riêng có
-  thư mục `src/modules/` của chính nó, thứ mà luật miễn còn cổng chặn thì không. Miễn trừ này chỉ giải
+  thư mục `modules/` của chính nó, thứ mà luật miễn còn cổng chặn thì không. Miễn trừ này chỉ giải
   phóng tệp khỏi `TRANSPORT-3`; `TRANSPORT-2` vẫn chạy trên nó.
 - **Không có làn kiểm thử.** Không quy tắc nào cắt riêng spec hay fixture.
 
@@ -262,7 +262,7 @@ cho `door-lives-in-features`, và vẫn bị `rest-door-needs-a-reason` xét nh�
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một cửa nằm giữa cây năng lực, `src/modules/billing/billing.controller.ts`:
+**Đầu vào.** Một cửa nằm giữa cây năng lực, `modules/billing/billing.controller.ts`:
 
 ```ts
 @Controller("api/billing/callback")
@@ -302,7 +302,7 @@ verdict:  fires
 Hai quy tắc, hai phát hiện. Một lý do hợp lệ cũng không cứu được cái thứ hai.
 
 **Đã sửa.** Cửa chuyển sang tầng cửa và nói ngay trong route rằng nó là gì,
-`src/features/billing/billing-webhook.controller.ts`:
+`features/billing/billing-webhook.controller.ts`:
 
 ```ts
 @Controller("api/billing/webhook")

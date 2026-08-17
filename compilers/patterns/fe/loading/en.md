@@ -255,7 +255,7 @@ weekly challenge list · community feed · search results · shopping cart.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule from `starci-eslint/packages/fe/loading.mjs` reports it;
+wrong value impossible to write; `enforced` means a lint rule from `@starci/eslint-canon-fe` reports it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -282,13 +282,13 @@ not a law. Paths are relative to the front-end component tree.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `LOADING-1` | `src/components/leaves/Text/index.tsx` | The leaf accepts `isLoading` and rests as itself. There is no second file beside it describing the same line |
-| `LOADING-2` | `src/components/leaves/Text/index.tsx` (~133–160) | One element on both paths: the class set and the character swap change, the tag and the arrangement do not |
-| `LOADING-3` | `src/components/contracts/index.ts` (~146–147) and `src/components/blocks/dashboard/WeeklyGoals/component.tsx` (~60, ~109) | The union that pairs `repeats` with `restingCount`; and a named constant of resting rows substituted for the real rows |
-| `LOADING-4` | `src/components/leaves/Avatar/index.tsx` (~67) | `aria-hidden` present only while the leaf rests, and absent once it carries a name |
-| `LOADING-5` | `src/components/blocks/dashboard/ContinueLearning/component.tsx` (~145–147) | The slot holding the way out is omitted from the record entirely while the item is unresolved — not rendered disabled, not rendered resting |
-| `LOADING-6` | `src/components/blocks/dashboard/pending-gate.test.tsx` | Each block is asserted resting against its OWN unresolved request, one at a time |
-| `LOADING-7` | `src/components/blocks/dashboard/ContinueLearning/component.tsx` (~68–73) | `pending` standing in the union beside `onboarding`, `empty`, `failed` and `ready`, carrying the frame rather than nothing |
+| `LOADING-1` | `components/leaves/Text/index.tsx` | The leaf accepts `isLoading` and rests as itself. There is no second file beside it describing the same line |
+| `LOADING-2` | `components/leaves/Text/index.tsx` (~133–160) | One element on both paths: the class set and the character swap change, the tag and the arrangement do not |
+| `LOADING-3` | `components/contracts/index.ts` (~146–147) and `components/blocks/dashboard/WeeklyGoals/component.tsx` (~60, ~109) | The union that pairs `repeats` with `restingCount`; and a named constant of resting rows substituted for the real rows |
+| `LOADING-4` | `components/leaves/Avatar/index.tsx` (~67) | `aria-hidden` present only while the leaf rests, and absent once it carries a name |
+| `LOADING-5` | `components/blocks/dashboard/ContinueLearning/component.tsx` (~145–147) | The slot holding the way out is omitted from the record entirely while the item is unresolved — not rendered disabled, not rendered resting |
+| `LOADING-6` | `components/blocks/dashboard/pending-gate.test.tsx` | Each block is asserted resting against its OWN unresolved request, one at a time |
+| `LOADING-7` | `components/blocks/dashboard/ContinueLearning/component.tsx` (~68–73) | `pending` standing in the union beside `onboarding`, `empty`, `failed` and `ready`, carrying the frame rather than nothing |
 
 Every code is anchored. None is unanchored.
 

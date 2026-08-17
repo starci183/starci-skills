@@ -152,7 +152,7 @@ tài nguyên tĩnh.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến
-giá trị sai không viết ra được; `enforced` nghĩa là một luật trong `starci-eslint/packages/fe/naming.mjs` báo nó;
+giá trị sai không viết ra được; `enforced` nghĩa là một luật trong `@starci/eslint-canon-fe` báo nó;
 `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ | Tầng này không với tới đâu |
@@ -173,12 +173,12 @@ một luật.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `NAMING-1` | `starci-eslint/packages/fe/naming.mjs` | File tuân đúng luật nó phát ra. Mọi khai báo trong đó — `MODULE_LEVEL_PARENTS`, `segmentsOf`, cả ba object luật — đều là const, và mỗi cái đều xuất hiện phía trên chỗ dùng đầu tiên. Đọc từ trên xuống thì không có gì được nhắc tới trước khi nó tồn tại; chính tính chất đó là toàn bộ lập luận, và nó nhìn thấy được chứ không phải nói suông |
-| `NAMING-1` | `starci-eslint/packages/fe/naming.test.mjs` | Bộ ba ca sai: một export theo tên, một khai báo trần ở mức module, và `export default function Route()`. Bên cạnh là ca đúng `export const E = () => { function inner() {…} }` — đúng cái khai báo lồng được cố ý cho phép, viết thành test chứ không thành một câu |
-| `NAMING-2` | `starci-eslint/packages/fe/naming.test.mjs` | Bộ ba ca sai là **một** hàm ở ba vị trí: một biến cục bộ, một thuộc tính JSX, một field trong kiểu props. Bộ ba đó là lập luận cho tầm với của luật. Các ca đúng `handled` và `handler` là lập luận cho sự hẹp của nó — một luật nổ trên chúng sẽ là nhiễu, mà nhiễu thì không ai đọc |
-| `NAMING-2` | `starci-eslint/packages/fe/naming.mjs` | `flag` cùng phép thử `/^handle[A-Z]/` của nó, và ba visitor gọi tới nó. Danh sách visitor **chính là** tầm với; thứ gì không nằm trong đó thì nằm ngoài luật, bất kể nó tên là gì |
-| `NAMING-3` | `starci-eslint/packages/fe/naming.mjs` | `SECOND_LANGUAGE_PATH` và `ROMANISED` — hai dụng cụ cho một luật, vì filesystem làm rụng dấu. Rồi tới `segmentsOf`, và cái `replace(/[()[\]]/g, "")` trong hàm dò: ngoặc của route group là dấu câu bọc quanh một cái tên, không phải một phần của cái tên |
-| `NAMING-3` | `starci-eslint/packages/fe/naming.test.mjs` | Các ca đúng `capacity` và `DangerBadge`. Chúng là lý do `ROMANISED` là một danh sách chứ không phải một mẫu, và chúng là ca mà một luật khôn hơn sẽ trượt |
+| `NAMING-1` | `@starci/eslint-canon-fe` | File tuân đúng luật nó phát ra. Mọi khai báo trong đó — `MODULE_LEVEL_PARENTS`, `segmentsOf`, cả ba object luật — đều là const, và mỗi cái đều xuất hiện phía trên chỗ dùng đầu tiên. Đọc từ trên xuống thì không có gì được nhắc tới trước khi nó tồn tại; chính tính chất đó là toàn bộ lập luận, và nó nhìn thấy được chứ không phải nói suông |
+| `NAMING-1` | `@starci/eslint-canon-fe` | Bộ ba ca sai: một export theo tên, một khai báo trần ở mức module, và `export default function Route()`. Bên cạnh là ca đúng `export const E = () => { function inner() {…} }` — đúng cái khai báo lồng được cố ý cho phép, viết thành test chứ không thành một câu |
+| `NAMING-2` | `@starci/eslint-canon-fe` | Bộ ba ca sai là **một** hàm ở ba vị trí: một biến cục bộ, một thuộc tính JSX, một field trong kiểu props. Bộ ba đó là lập luận cho tầm với của luật. Các ca đúng `handled` và `handler` là lập luận cho sự hẹp của nó — một luật nổ trên chúng sẽ là nhiễu, mà nhiễu thì không ai đọc |
+| `NAMING-2` | `@starci/eslint-canon-fe` | `flag` cùng phép thử `/^handle[A-Z]/` của nó, và ba visitor gọi tới nó. Danh sách visitor **chính là** tầm với; thứ gì không nằm trong đó thì nằm ngoài luật, bất kể nó tên là gì |
+| `NAMING-3` | `@starci/eslint-canon-fe` | `SECOND_LANGUAGE_PATH` và `ROMANISED` — hai dụng cụ cho một luật, vì filesystem làm rụng dấu. Rồi tới `segmentsOf`, và cái `replace(/[()[\]]/g, "")` trong hàm dò: ngoặc của route group là dấu câu bọc quanh một cái tên, không phải một phần của cái tên |
+| `NAMING-3` | `@starci/eslint-canon-fe` | Các ca đúng `capacity` và `DangerBadge`. Chúng là lý do `ROMANISED` là một danh sách chứ không phải một mẫu, và chúng là ca mà một luật khôn hơn sẽ trượt |
 
 Mọi điểm neo ở trên đều là source lint nằm trong trust tree, tức là phần code repository này thật sự
 mở ra được. Bộ luật phẳng còn nêu tên hai file nằm trong một repository sản phẩm; chúng không được

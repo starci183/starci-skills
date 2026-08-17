@@ -149,9 +149,9 @@ vượt qua ranh giới là `COPY-3`, và `COPY-3` không có luật máy.
 | `no-hardcoded-copy-in-vocabulary` | **Chữ không mở đầu bằng chữ hoa ASCII.** `aria-label="close dialog"`, và mọi câu mở đầu bằng `Đ`, `Ê`, `Ô`, `Ơ`, `Ư`, `Á`, `Ổ` |
 | `no-hardcoded-copy-in-vocabulary` | **Mọi thuộc tính ngoài năm cái**, và **spread**, và **mảng, đối tượng** rồi map ra markup |
 | `no-copy-resolution-below-block` | **Đổi tên khi import hoặc gọi dạng thuộc tính**, và **mọi tên tra chữ ngoài bốn tên** — luật khớp cách viết, không khớp ký hiệu đứng sau nó |
-| cả hai | **Cổng thư mục và tên tệp.** Thư mục tầng đặt tên `leaf/`, `atoms/`, `overlays/`, `pages/`, hay thành phần nằm ở `src/ui/leaves/`. Tên thư mục là thứ rẻ nhất trong một kho mã để thay đổi, và một thư mục tầng mới là một lỗ hổng im lặng chứ không phải một lần build đỏ |
-| cả hai | **Đường dẫn tương đối.** Lint bằng chương trình, hoặc đẩy stdin với `--stdin-filename` tương đối, cho ra `src/components/leaves/…` không có dấu gạch đứng đầu; cổng kiểm `/src/components/leaves/`, cả hai luật cùng tắt, và lần chạy đó xanh vì lý do sai |
-| cả hai | **Dời lời gọi ra ngoài một tệp.** Một hook ở `src/hooks/` gọi runtime rồi được một leaf import: phụ thuộc mà luật sinh ra để chặn vẫn còn nguyên, còn lời gọi thì không nằm trong tệp đã qua cổng |
+| cả hai | **Cổng thư mục và tên tệp.** Thư mục tầng đặt tên `leaf/`, `atoms/`, `overlays/`, `pages/`, hay thành phần nằm ở `ui/leaves/`. Tên thư mục là thứ rẻ nhất trong một kho mã để thay đổi, và một thư mục tầng mới là một lỗ hổng im lặng chứ không phải một lần build đỏ |
+| cả hai | **Đường dẫn tương đối.** Lint bằng chương trình, hoặc đẩy stdin với `--stdin-filename` tương đối, cho ra `components/leaves/…` không có dấu gạch đứng đầu; cổng kiểm `/src/components/leaves/`, cả hai luật cùng tắt, và lần chạy đó xanh vì lý do sai |
+| cả hai | **Dời lời gọi ra ngoài một tệp.** Một hook ở `hooks/` gọi runtime rồi được một leaf import: phụ thuộc mà luật sinh ra để chặn vẫn còn nguyên, còn lời gọi thì không nằm trong tệp đã qua cổng |
 | không luật nào | **Mọi thứ `COPY-3`, `COPY-4` và `COPY-6` cấm** — một khoá vượt ranh giới, một chuỗi đã tra xong phá hàng rào dữ liệu, một giá trị đem ra so khớp bị coi là chữ nghĩa |
 
 ## Đầu vào
@@ -219,7 +219,7 @@ còn mở dính vào nó. Một tệp ngoài cổng xuất một khối với `s
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/components/leaves/SearchField/component.tsx`:
+**Đầu vào.** `components/leaves/SearchField/component.tsx`:
 
 ```tsx
 import {useTranslations} from "next-intl"

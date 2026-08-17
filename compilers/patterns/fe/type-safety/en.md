@@ -222,7 +222,7 @@ narrow type · a branded type constructed at exactly one checked place.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a rule in `starci-eslint/packages/fe/type-safety.mjs` reports it,
+wrong value impossible to write; `enforced` means a rule in `@starci/eslint-canon-fe` reports it,
 named below; `documented` means nothing in this module's rule file holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -245,11 +245,11 @@ tree.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `TYPE-SAFETY-1` | `src/components/contracts/props.ts`, and the tree-wide absence | The contract types are declared, never asserted into place. Tree-wide, every occurrence of `as unknown as` sits in a `.test.`/`.spec.` file; there is no governed source file that contains one. That absence is the anchor — this code's evidence is a count of zero, and a single new hit is the whole finding. |
-| `TYPE-SAFETY-2` | `src/modules/code/sandbox-repo.ts`, `src/components/leaves/Article/index.tsx` | Both take the outside value as `unknown` — `parseSandboxRepoSnapshot(raw: unknown)`, `toNode(value: unknown)` — and each carries a local `isRecord` predicate that narrows it. The narrowing is visible in the file that needs it, which is what `unknown` buys and `any` spends. |
-| `TYPE-SAFETY-3` | `src/components/contracts/props.ts` | `ReadonlyArray<DataValue>` inside the `DataValue` union and `Array<never>` in `ComponentActions`. Both are element types that are themselves generic or exotic, which is where the spelling stops being cosmetic. |
-| `TYPE-SAFETY-4` | `src/modules/api/graphql/clients/links/bearer.test.ts` | A fake transport operation is assembled from the three methods the link touches and returned through a double cast. The file's own doc comment states what it guards; the cast exists because proving a closed API refuses a malformed operation means constructing one. |
-| `TYPE-SAFETY-5` | `src/hooks/auth/useSessionRefresh.ts`, `src/components/contracts/props.ts` | In the first, the cast target is `{ exp?: unknown }` and the doc line above says why the shape is not trusted further; the value is then narrowed with `typeof`. In the second, the implementation of an overloaded factory is cast to its own overload set, under a doc comment that says which surface is the checked one. Counter-case in the same tree: `src/app/sitemap.ts` casts a response body to a named type with no reason clause and nothing reports it. |
+| `TYPE-SAFETY-1` | `components/contracts/props.ts`, and the tree-wide absence | The contract types are declared, never asserted into place. Tree-wide, every occurrence of `as unknown as` sits in a `.test.`/`.spec.` file; there is no governed source file that contains one. That absence is the anchor — this code's evidence is a count of zero, and a single new hit is the whole finding. |
+| `TYPE-SAFETY-2` | `modules/code/sandbox-repo.ts`, `components/leaves/Article/index.tsx` | Both take the outside value as `unknown` — `parseSandboxRepoSnapshot(raw: unknown)`, `toNode(value: unknown)` — and each carries a local `isRecord` predicate that narrows it. The narrowing is visible in the file that needs it, which is what `unknown` buys and `any` spends. |
+| `TYPE-SAFETY-3` | `components/contracts/props.ts` | `ReadonlyArray<DataValue>` inside the `DataValue` union and `Array<never>` in `ComponentActions`. Both are element types that are themselves generic or exotic, which is where the spelling stops being cosmetic. |
+| `TYPE-SAFETY-4` | `modules/api/graphql/clients/links/bearer.test.ts` | A fake transport operation is assembled from the three methods the link touches and returned through a double cast. The file's own doc comment states what it guards; the cast exists because proving a closed API refuses a malformed operation means constructing one. |
+| `TYPE-SAFETY-5` | `hooks/auth/useSessionRefresh.ts`, `components/contracts/props.ts` | In the first, the cast target is `{ exp?: unknown }` and the doc line above says why the shape is not trusted further; the value is then narrowed with `typeof`. In the second, the implementation of an overloaded factory is cast to its own overload set, under a doc comment that says which surface is the checked one. Counter-case in the same tree: `app/sitemap.ts` casts a response body to a named type with no reason clause and nothing reports it. |
 
 ## Inputs
 

@@ -210,7 +210,7 @@ gate half that excluded it. It did not pass; no visitor was installed.
 
 ## Worked example
 
-**Input.** `src/data/profile.ts`, the seam where data from outside the program comes in:
+**Input.** `data/profile.ts`, the seam where data from outside the program comes in:
 
 ```ts
 const response = await fetch(url)

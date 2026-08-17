@@ -242,10 +242,10 @@ imports. `ShellNav` is a product name, not an exemption from any ownership rule.
 
 ## Anchor
 
-The rules live in `starci-eslint/packages/fe/vendor-boundary.mjs` with their twin tests in
-`starci-eslint/packages/fe/vendor-boundary.test.mjs`. Product anchors are `src/components/branches/ModalBranch`,
-`DrawerBranch`, `DropdownBranch`, the SurfaceCard family, `src/components/leaves/Field`, `TextLink`,
-`Checkbox`, `src/components/blocks/auth/AccountMenu`, and `src/components/layouts/ShellNav`.
+The rules live in `@starci/eslint-canon-fe` with their twin tests in
+`@starci/eslint-canon-fe`. Product anchors are `components/branches/ModalBranch`,
+`DrawerBranch`, `DropdownBranch`, the SurfaceCard family, `components/leaves/Field`, `TextLink`,
+`Checkbox`, `components/blocks/auth/AccountMenu`, and `components/layouts/ShellNav`.
 
 ## Inputs
 
@@ -253,8 +253,8 @@ The rules live in `starci-eslint/packages/fe/vendor-boundary.mjs` with their twi
 |---|---|
 | The accepted shape | The surface it is, what it contains, and how it opens, dismisses or navigates |
 | The component tier position | Whether the file is a leaf, a named mechanics branch, a SurfaceCard family member, or a block/layout/overlay/page/composite |
-| Existing product anchor | The path under `src/components/…` that already owns this concern, from the Anchor list |
-| The rule source | `starci-eslint/packages/fe/vendor-boundary.mjs` and its twin test `starci-eslint/packages/fe/vendor-boundary.test.mjs` |
+| Existing product anchor | The path under `components/…` that already owns this concern, from the Anchor list |
+| The rule source | `@starci/eslint-canon-fe` and its twin test `@starci/eslint-canon-fe` |
 | Route origin, if any | Whether the value arrives from a framework route and is closed into a named contract projection before the component tier |
 
 ## Rules
@@ -305,7 +305,7 @@ owns: HeroUI Modal lifecycle, focus, portal, dismiss, placement; exactly one zer
 imports: @heroui/react
 exports: ModalBranch
 forbidden: children passthrough; padding on Modal.Body; any components/shells directory
-anchor: starci-eslint/packages/fe/vendor-boundary.mjs
+anchor: @starci/eslint-canon-fe
 ```
 
 ```text
@@ -316,7 +316,7 @@ owns: the single named content contract projected into ModalBranch; all visible 
 imports: none from @heroui/react
 exports: <authOverlayContract>
 forbidden: duplicate Tree/content hosts; a second vertical inset; a named SurfaceCard branch inside the overlay
-anchor: starci-eslint/packages/fe/vendor-boundary.mjs
+anchor: @starci/eslint-canon-fe
 ```
 
 ## Worked example

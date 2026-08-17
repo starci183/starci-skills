@@ -364,7 +364,7 @@ một quyết định sang một loại nút khác thì không phải bản sử
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một file khối ở `src/components/blocks/course/CourseRow/index.tsx`:
+**Đầu vào.** Một file khối ở `components/blocks/course/CourseRow/index.tsx`:
 
 ```tsx
 const ROOT = "flex items-center gap-4"

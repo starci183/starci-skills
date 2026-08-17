@@ -237,7 +237,7 @@ test helper copied into production · a request to a second endpoint written by 
 ## Layer held
 
 Which tier actually holds each code — a closed type, a lint rule, or only a reader. The enforced rows
-are implemented by `starci-eslint/packages/fe/served-locale.mjs`.
+are implemented by `@starci/eslint-canon-fe`.
 
 | Code | Tier | Held by |
 |---|---|---|
@@ -273,10 +273,10 @@ paths; the shape of the tree, not the name of any product, is what makes them ch
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `LOCALE-1` | `src/modules/api/graphql/clients/create-apollo-client.ts` | The locale link is a plain element of the chain array — before the terminal link, outside the conditional spread that inserts the auth link. Adding auth adds exactly one link; the locale link is in both shapes |
-| `LOCALE-2` | `src/modules/api/graphql/clients/links/locale.ts` | The resolver takes no locale argument. It reads the first path segment, and it rejects a segment that is not a shipped locale rather than accepting whatever the default narrowing returns. Public callers pass nothing |
-| `LOCALE-3` | `src/modules/api/graphql/clients/links/http.ts` | `credentials` is `"include"` only when the caller opts in, and it defaults to off — so the anonymous request, which is nearly every read, sends no cookie. The header is the only carrier that survives that path |
-| `LOCALE-4` | `src/modules/api/graphql/clients/links/locale.ts`, the resolver's return type and its no-address branch | The return type is the closed locale union, not an optional. There is no path that returns nothing, so there is no path that hands the server an undeclared request to be careful about |
+| `LOCALE-1` | `modules/api/graphql/clients/create-apollo-client.ts` | The locale link is a plain element of the chain array — before the terminal link, outside the conditional spread that inserts the auth link. Adding auth adds exactly one link; the locale link is in both shapes |
+| `LOCALE-2` | `modules/api/graphql/clients/links/locale.ts` | The resolver takes no locale argument. It reads the first path segment, and it rejects a segment that is not a shipped locale rather than accepting whatever the default narrowing returns. Public callers pass nothing |
+| `LOCALE-3` | `modules/api/graphql/clients/links/http.ts` | `credentials` is `"include"` only when the caller opts in, and it defaults to off — so the anonymous request, which is nearly every read, sends no cookie. The header is the only carrier that survives that path |
+| `LOCALE-4` | `modules/api/graphql/clients/links/locale.ts`, the resolver's return type and its no-address branch | The return type is the closed locale union, not an optional. There is no path that returns nothing, so there is no path that hands the server an undeclared request to be careful about |
 | `LOCALE-5` | one search of the tree for the header literal | It appears in exactly one production file — the locale link — and its other occurrences are that file's own prose. A second production hit is the violation itself |
 
 `LOCALE-4`'s anchor is the weakest of the five and is recorded as such: it proves the client always

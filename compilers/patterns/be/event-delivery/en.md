@@ -217,7 +217,7 @@ job status updated by a worker on another pod · a health snapshot re-emitted on
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule in `starci-eslint/packages/be/event-delivery.mjs`
+wrong value impossible to write; `enforced` means a lint rule in `@starci/eslint-canon-be`
 catches it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -255,12 +255,12 @@ Real code each law can be checked against. A law that cannot be pointed at is a 
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `DELIVERY-1` | `src/modules/platform/event/nats/nats-message-factory.service.ts` → `createMessage` · `src/modules/platform/event/nats/types.ts` → `NatsMessage` | The envelope is built with `id` taken from the instance service and `digest` hashed from the payload, never from the subject. The interface is where the envelope's obligation is declared, and where `digest` being optional is visible |
-| `DELIVERY-2` | `src/modules/platform/event/config.ts` → `configMap` · `src/modules/platform/event/event-emitter.service.ts` → `emit` | Every entry declares both flags, and several carry a comment naming why one is still `false`. The emitter reads exactly those two flags to choose its branches, so the config is the contract and not a hint |
-| `DELIVERY-3` | `src/modules/platform/event/nats/nats-bridge.service.ts` → the guard above the ping branch · `starci-eslint/packages/be/event-delivery.mjs` → `originIndex > emitIndex` | The guard compares `parsed.id` with the instance id, and carries the comment recording the bug the subject comparison caused. The rule checks the comparison exists *and* precedes the emit — order is the whole content of the code |
-| `DELIVERY-4` | `src/modules/platform/event/nats/nats-bridge.service.ts` → the digest get/set pair · `starci-eslint/packages/be/event-delivery.mjs` → `digestIndex > emitIndex` | Read the digest, record the digest, then emit — three statements whose order is the invariant. The rule's second message is aimed at exactly that order |
-| `DELIVERY-5` | `src/tests/e2e/notification-delivery.e2e-spec.ts` | The assertions name the recipient row and the payload type, and the test's own title claims the negative: the fact did not leak to another socket. No assertion anywhere counts listeners |
-| `DELIVERY-6` | `src/tests/e2e/cross-instance-event-routing.e2e-spec.ts` · `src/tests/helpers/nats-cross-instance-world.ts` | Two independently booted instances share a real broker; the helper counts broker messages so the origin's "exactly one delivery" is proved after its echo arrived, not before it could have |
+| `DELIVERY-1` | `modules/platform/event/nats/nats-message-factory.service.ts` → `createMessage` · `modules/platform/event/nats/types.ts` → `NatsMessage` | The envelope is built with `id` taken from the instance service and `digest` hashed from the payload, never from the subject. The interface is where the envelope's obligation is declared, and where `digest` being optional is visible |
+| `DELIVERY-2` | `modules/platform/event/config.ts` → `configMap` · `modules/platform/event/event-emitter.service.ts` → `emit` | Every entry declares both flags, and several carry a comment naming why one is still `false`. The emitter reads exactly those two flags to choose its branches, so the config is the contract and not a hint |
+| `DELIVERY-3` | `modules/platform/event/nats/nats-bridge.service.ts` → the guard above the ping branch · `@starci/eslint-canon-be` → `originIndex > emitIndex` | The guard compares `parsed.id` with the instance id, and carries the comment recording the bug the subject comparison caused. The rule checks the comparison exists *and* precedes the emit — order is the whole content of the code |
+| `DELIVERY-4` | `modules/platform/event/nats/nats-bridge.service.ts` → the digest get/set pair · `@starci/eslint-canon-be` → `digestIndex > emitIndex` | Read the digest, record the digest, then emit — three statements whose order is the invariant. The rule's second message is aimed at exactly that order |
+| `DELIVERY-5` | `tests/e2e/notification-delivery.e2e-spec.ts` | The assertions name the recipient row and the payload type, and the test's own title claims the negative: the fact did not leak to another socket. No assertion anywhere counts listeners |
+| `DELIVERY-6` | `tests/e2e/cross-instance-event-routing.e2e-spec.ts` · `tests/helpers/nats-cross-instance-world.ts` | Two independently booted instances share a real broker; the helper counts broker messages so the origin's "exactly one delivery" is proved after its echo arrived, not before it could have |
 
 Every code is anchored. None reads "not yet anchored".
 

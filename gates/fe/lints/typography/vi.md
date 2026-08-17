@@ -214,7 +214,7 @@ còn mở nào lẽ ra đã che được một lỗi, hoặc `hatch: none`. Mộ
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/components/blocks/order/OrderSummary/index.tsx`:
+**Đầu vào.** `components/blocks/order/OrderSummary/index.tsx`:
 
 ```tsx
 export function OrderSummary({title, notes}) {

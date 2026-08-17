@@ -436,7 +436,7 @@ chưa được duyệt; key copy sang repository mới cùng cả bảng.
 ## Tầng giữ
 
 Tầng nào thật sự giữ mỗi mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được. `enforced` nghĩa là một rule trong `starci-eslint/packages/fe/contract.mjs` bắt được
+giá trị sai không viết ra được. `enforced` nghĩa là một rule trong `@starci/eslint-canon-fe` bắt được
 nó. `documented` nghĩa là không có gì cơ học giữ, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -470,19 +470,19 @@ nêu phải tìm gì ở đó.
 
 | Mã | Đường dẫn | Tìm gì ở đó |
 |---|---|---|
-| `CONTRACT-1` | `src/components/contracts/index.ts` | mảng `classes: [...]` của từng entry — và sự vắng mặt của mọi literal `className=` ở tầng block, page và composite |
+| `CONTRACT-1` | `components/contracts/index.ts` | mảng `classes: [...]` của từng entry — và sự vắng mặt của mọi literal `className=` ở tầng block, page và composite |
 | `CONTRACT-2` | toàn bộ cây được cai quản dưới `src/` | không một call site `cn`, `clsx`, `twMerge`, `cva` nào; không một `className` nội suy nào |
-| `CONTRACT-3` | `src/components/contracts/index.ts` → `export type LayoutClassName` | chính cái union; một giá trị ngoài nó thì trượt lúc biên dịch chứ không trượt lúc review |
-| `CONTRACT-4` | `src/components/contracts/index.ts` → `export type ContractHost`; `src/components/branches/Tree/index.tsx` | `const Host = spec.host ?? "div"` — element đọc ra từ entry, và không `host`/`as` nào trên props của frame |
-| `CONTRACT-5` | tên key trong `src/components/contracts/index.ts` | những cái tên cố định được một đứa con (`label-fact-over-progress`, `page-header-stack`) đối lại những cái tên chung bị cấm (`card`, `row`) |
-| `CONTRACT-6` | `src/components/contracts/index.ts` → mọi trường `why:` | một câu nêu cái gì vỡ, xuống dòng hay tràn ra khi không có node |
-| `CONTRACT-7` | `src/components/branches/Tree/index.tsx` | đúng một `<Host>` mở ra từ một spec trong toàn cây |
-| `CONTRACT-8` | `src/components/contracts/index.ts` → `contractNodeProps` | `data-node` và `data-why` được sinh ra trong đúng một hàm |
-| `CONTRACT-9` | `src/components/contracts/index.ts` → `export type ContractKey = keyof typeof CONTRACTS` | union key mà một call site bị kiểm đối chiếu |
-| `CONTRACT-10` | `src/components/branches/SurfaceCard`, `SurfaceListCard`, `SurfaceFormCard` | cái seam vendor cố định viết như code branch bình thường, với contract node đứng BÊN TRONG content body |
-| `CONTRACT-11` | `src/components/contracts/props.ts` → `ContractSlots`, `ContractProjection`, `ContractComponent`, `defineContractComponent`; `index.ts` → `ContractChildCardinality`, `ChildrenOf` | record slot có tên, và cái union làm cho `repeats: true` mà thiếu `restingCount` không viết ra được |
-| `CONTRACT-12` | `src/components/contracts/index.ts` → `LayoutClassName` | nợ đang sống phơi ra trước mắt: union vẫn nhận `cursor-pointer`, `group`, `bg-surface`, `shadow-surface` mà rule từ chối trong một entry |
-| `CONTRACT-13` | `src/components/contracts/index.ts` → `CONTRACT_KEYS` | mọi key với tới được từ một `contract="…"`, một `defineContractComponent("…")`, hoặc từ slot của entry khác |
+| `CONTRACT-3` | `components/contracts/index.ts` → `export type LayoutClassName` | chính cái union; một giá trị ngoài nó thì trượt lúc biên dịch chứ không trượt lúc review |
+| `CONTRACT-4` | `components/contracts/index.ts` → `export type ContractHost`; `components/branches/Tree/index.tsx` | `const Host = spec.host ?? "div"` — element đọc ra từ entry, và không `host`/`as` nào trên props của frame |
+| `CONTRACT-5` | tên key trong `components/contracts/index.ts` | những cái tên cố định được một đứa con (`label-fact-over-progress`, `page-header-stack`) đối lại những cái tên chung bị cấm (`card`, `row`) |
+| `CONTRACT-6` | `components/contracts/index.ts` → mọi trường `why:` | một câu nêu cái gì vỡ, xuống dòng hay tràn ra khi không có node |
+| `CONTRACT-7` | `components/branches/Tree/index.tsx` | đúng một `<Host>` mở ra từ một spec trong toàn cây |
+| `CONTRACT-8` | `components/contracts/index.ts` → `contractNodeProps` | `data-node` và `data-why` được sinh ra trong đúng một hàm |
+| `CONTRACT-9` | `components/contracts/index.ts` → `export type ContractKey = keyof typeof CONTRACTS` | union key mà một call site bị kiểm đối chiếu |
+| `CONTRACT-10` | `components/branches/SurfaceCard`, `SurfaceListCard`, `SurfaceFormCard` | cái seam vendor cố định viết như code branch bình thường, với contract node đứng BÊN TRONG content body |
+| `CONTRACT-11` | `components/contracts/props.ts` → `ContractSlots`, `ContractProjection`, `ContractComponent`, `defineContractComponent`; `index.ts` → `ContractChildCardinality`, `ChildrenOf` | record slot có tên, và cái union làm cho `repeats: true` mà thiếu `restingCount` không viết ra được |
+| `CONTRACT-12` | `components/contracts/index.ts` → `LayoutClassName` | nợ đang sống phơi ra trước mắt: union vẫn nhận `cursor-pointer`, `group`, `bg-surface`, `shadow-surface` mà rule từ chối trong một entry |
+| `CONTRACT-13` | `components/contracts/index.ts` → `CONTRACT_KEYS` | mọi key với tới được từ một `contract="…"`, một `defineContractComponent("…")`, hoặc từ slot của entry khác |
 
 Cả mười ba đều có neo. Neo của `CONTRACT-12` cố ý là neo vào một MÂU THUẪN và được tranh luận trong
 bản audit; nó vẫn là một cái neo, vì thứ mà luật nói đến chỉ ra được.

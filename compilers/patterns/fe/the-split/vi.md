@@ -257,7 +257,7 @@ wrapper mở overlay; layout chỉ nhận children.
 
 ## Tầng giữ
 
-Tầng nào thực sự giữ từng mã. `enforced` nêu tên rule trong `starci-eslint/packages/fe/the-split.mjs` bắt được nó;
+Tầng nào thực sự giữ từng mã. `enforced` nêu tên rule trong `@starci/eslint-canon-fe` bắt được nó;
 `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
@@ -280,11 +280,11 @@ phải folder của riêng sản phẩm nào.
 
 | Mã | Đường dẫn | Nhìn cái gì |
 |---|---|---|
-| `SPLIT-1` | `src/components/**/component.tsx` | Import chỉ gồm component, type và helper thuần. Grep toàn cây các họ hook request, store, locale và formatter trên mọi `component.tsx` trả về rỗng — chính kết quả rỗng ấy là điểm neo, và mọi lần trúng đều là vi phạm mà rule đã báo sẵn |
-| `SPLIT-2` | `src/components/**/index.tsx` có import `./component` | Không `className`, không giá trị spacing, không lựa chọn element ở bất cứ đâu trong file connected. Grep `className` trên mọi index connected và ra zero là phép kiểm; một prop kiểu `variant` đặt tên cho hình thức là phần điểm neo này không nhìn thấy được |
-| `SPLIT-3` | `src/components/**/component.tsx` | Props type export là một union phân biệt bằng literal `state`. Kiểm ngược cùng những file ấy tìm `readonly isLoading?: boolean` và các cờ đi vào tương tự — mỗi lần trúng là một dòng đã băng qua dưới dạng cờ |
+| `SPLIT-1` | `components/**/component.tsx` | Import chỉ gồm component, type và helper thuần. Grep toàn cây các họ hook request, store, locale và formatter trên mọi `component.tsx` trả về rỗng — chính kết quả rỗng ấy là điểm neo, và mọi lần trúng đều là vi phạm mà rule đã báo sẵn |
+| `SPLIT-2` | `components/**/index.tsx` có import `./component` | Không `className`, không giá trị spacing, không lựa chọn element ở bất cứ đâu trong file connected. Grep `className` trên mọi index connected và ra zero là phép kiểm; một prop kiểu `variant` đặt tên cho hình thức là phần điểm neo này không nhìn thấy được |
+| `SPLIT-3` | `components/**/component.tsx` | Props type export là một union phân biệt bằng literal `state`. Kiểm ngược cùng những file ấy tìm `readonly isLoading?: boolean` và các cờ đi vào tương tự — mỗi lần trúng là một dòng đã băng qua dưới dạng cờ |
 | `SPLIT-4` | Các prop biên khai trong `component.tsx`, và JSX điền chúng trong `index.tsx` | Prop mang chữ có kiểu `string` và chứa câu chữ. Không prop nào tên `*Key`, không literal namespace chấm nào bị truyền xuống. Một prop định danh kiểu `selectedKey` không phải copy và không tính là trúng |
-| `SPLIT-5` | `src/components/**/index.tsx` và `starci-eslint/packages/fe/the-split.mjs` | `import { _X } from "./component"` với `X` là tên folder, và `_X` là JSX identifier duy nhất file ấy render. Matcher `connectedBlock` của rule chốt `X` từ folder, nên tên sinh đôi không phải một quy ước mà file được phép phát biểu lại kiểu khác |
+| `SPLIT-5` | `components/**/index.tsx` và `@starci/eslint-canon-fe` | `import { _X } from "./component"` với `X` là tên folder, và `_X` là JSX identifier duy nhất file ấy render. Matcher `connectedBlock` của rule chốt `X` từ folder, nên tên sinh đôi không phải một quy ước mà file được phép phát biểu lại kiểu khác |
 | `SPLIT-6` | Folder chỉ có `index.tsx` và không có `component.tsx` | Index không gọi gì ra thế giới: nó ghép các surface connected khác, hoặc chỉ giữ state UI cục bộ như overlay nào đang mở. Việc vắng `component.tsx` chỉ đúng chừng nào việc vắng request còn đúng |
 
 Một mã không có điểm neo là một đề xuất, không phải một luật. Cả sáu mã đều đã neo; không mã nào chưa

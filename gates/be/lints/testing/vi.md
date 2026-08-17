@@ -203,7 +203,7 @@ trong đó là `TemplateElement`. Cổng khoác kiểu hoặc mã thông báo kh
 token chỉ tìm đúng một chuỗi ba token, còn các phép kiểm kia đều so với đúng một tên lớp. Trợ giúp đổi
 tên là ra khỏi lệnh cấm: trợ giúp mô hình nội bộ dời sang `./judge-client` thì mã y hệt vẫn hợp lệ, vì
 mẫu chỉ liệt kê hai tên. Và trợ giúp nằm ngoài đúng một thư mục thì ngoài tầm hoàn toàn: chỉ
-`/src/tests/helpers/` nằm trong phạm vi chứng thư, nên `test/helpers/`, `src/test/helpers/` và bất kỳ
+`/src/tests/helpers/` nằm trong phạm vi chứng thư, nên `test/helpers/`, `test/helpers/` và bất kỳ
 `helpers/` lồng nào dưới một gốc khác đều không chạy phép kiểm nào, kể cả phép kiểm chứng thư.
 
 **Ranh giới.** Quy tắc này đòi một lời gọi nhà cung cấp thật trong làn harness. Làn luồng đòi điều
@@ -268,7 +268,7 @@ ngược lại, và đó là `TESTING-9`.
 | `harness-calls-provider-directly` | **Chứng thư đọc theo cách thông thường.** `process.env.CLAUDE_CODE_OAUTH_TOKEN`, hoặc một chuỗi mẫu | Chỉ `Literal` chuỗi được duyệt; thuộc tính thành viên là định danh và mảnh chuỗi mẫu là `TemplateElement` |
 | `harness-calls-provider-directly` | **Cổng khoác kiểu hoặc mã thông báo khác.** `Partial<AiInvokeService>`, `Omit<AiInvokeService, "x">`, một interface tự viết, `provide: AI_INVOKE_TOKEN`, `overrideProvider(AI_INVOKE_TOKEN)`, một nhập khẩu mặc định đổi tên | Đúng một chuỗi ba token, đúng một tên lớp |
 | `harness-calls-provider-directly` | **Trợ giúp đổi tên ra khỏi lệnh cấm.** Trợ giúp mô hình nội bộ dời sang `./judge-client` | Mẫu chỉ liệt kê hai tên |
-| `harness-calls-provider-directly` | **Trợ giúp nằm ngoài đúng một thư mục.** `test/helpers/`, `src/test/helpers/`, bất kỳ `helpers/` lồng nào dưới gốc khác | Cổng trợ giúp là một mảnh đường dẫn viết cứng, và ngoài tầm nghĩa là mọi phép kiểm, kể cả phép kiểm chứng thư |
+| `harness-calls-provider-directly` | **Trợ giúp nằm ngoài đúng một thư mục.** `test/helpers/`, `test/helpers/`, bất kỳ `helpers/` lồng nào dưới gốc khác | Cổng trợ giúp là một mảnh đường dẫn viết cứng, và ngoài tầm nghĩa là mọi phép kiểm, kể cả phép kiểm chứng thư |
 | không quy tắc nào | **Mọi điều `TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` và `TESTING-11` đòi hỏi** | Sáu trong mười một mã không có máy; một lần chạy xanh là im lặng về tất cả chúng |
 
 ## Đầu vào
@@ -341,7 +341,7 @@ chưa được xét chứ không phải đã được xét là sạch.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một unit spec, `src/orders/charge.handler.spec.ts`:
+**Đầu vào.** Một unit spec, `orders/charge.handler.spec.ts`:
 
 ```ts
 it("charges the order", async () => {

@@ -41,7 +41,7 @@ hành vi), `SLOTS-2` (dữ liệu của component khai bằng type alias, không
 `SLOTS-6` (diện mạo là một variant có tên quyết định bên trong, không phải `className`, `style`, prop
 khoảng cách hay hook style theo từng phần) **hoàn toàn không có luật máy** ở đây. Ba trong số đó được
 giữ ở nơi khác — `SLOTS-1`, `SLOTS-2` và `SLOTS-6` thuộc tầng `unrepresentable`, do `DataValue`, do
-ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `starci-eslint/packages/fe/props.ts` giữ — còn
+ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `@starci/eslint-canon-fe/props` giữ — còn
 `SLOTS-5` là `documented`, tức chẳng có gì giữ cả. Một lần chạy sạch của module này không nói được gì
 về bốn mã ấy, và ở đâu type chưa từng phủ tới file thì mã đó đơn giản là chưa được cưỡng chế, chứ
 không phải đã được bao phủ.
@@ -116,7 +116,7 @@ ReactNode. `PropsWithChildren<XData>`, hay bất kỳ props type nào import v�
 vì luật máy không bao giờ mở file khác. Nửa khẳng định của mã luật thì hoàn toàn không ai canh: ở đây
 không có gì kiểm rằng một container khai `contract` và `render` cùng nhau, và không có gì thấy một
 closed shape mọc thêm `render`. Và cổng tầng chỉ là một đường dẫn: chính component đó nằm dưới
-`apps/web/features/…`, hay dưới một `src/ui/` không phải component root nào, thì không có luật máy nào
+`apps/web/features/…`, hay dưới một `ui/` không phải component root nào, thì không có luật máy nào
 đụng tới — literal về bố cục là thứ rẻ nhất trong một repository để thay.
 
 **Ranh giới.** Luật máy này chỉ thấy cái lỗ markup và không thấy gì hơn. `BranchProps` giữ nửa khẳng
@@ -266,8 +266,8 @@ Một file sạch và trong phạm vi xuất một block cho mỗi luật máy �
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một branch nằm trong component tier, `src/components/branches/ModalBranch/index.tsx`, và
-một call site dưới `src/app/tasks/page.tsx`:
+**Đầu vào.** Một branch nằm trong component tier, `components/branches/ModalBranch/index.tsx`, và
+một call site dưới `app/tasks/page.tsx`:
 
 ```tsx
 // src/components/branches/ModalBranch/index.tsx
@@ -393,5 +393,5 @@ hatch: the annotation is a TSTypeReference and isInlineObjectType recurses only 
 Module này ghi lại việc cưỡng chế, không ghi lại luật. Nó không gọi tên sản phẩm, thư viện component
 hay repository nào. Tên luật máy, message id, token mã và tiền tố plugin là những định danh xuất hiện
 trong build output nên được chép lại nguyên văn; mọi thứ viết quanh chúng là TSX bình thường. Phần do
-type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `starci-eslint/packages/fe/props.ts`, còn phần không gì giữ —
+type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `@starci/eslint-canon-fe/props`, còn phần không gì giữ —
 `SLOTS-5` — thuộc về người đọc.

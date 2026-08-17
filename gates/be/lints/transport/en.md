@@ -123,20 +123,20 @@ backslash-normalized `context.filename`. A non-match returns an **empty visitor*
 partially checked — it is not checked at all. On a match it visits `Decorator`, requires the same
 `Controller` identifier, and reports unconditionally.
 
-**What it cannot see.** Renaming the folder `src/modules/` to `src/services/`, `src/domains/` or
-`src/capabilities/` leaves the layer intact and the door still parked in the wrong place, with the
+**What it cannot see.** Renaming the folder `modules/` to `services/`, `domains/` or
+`capabilities/` leaves the layer intact and the door still parked in the wrong place, with the
 rule gone: banning a **folder** is not banning a **layer**. Only `@Controller` is recognised, so
-`@WebSocketGateway()`, `@MessagePattern(…)`, `@EventPattern(…)` and `@Resolver` under `src/modules/`
+`@WebSocketGateway()`, `@MessagePattern(…)`, `@EventPattern(…)` and `@Resolver` under `modules/`
 all pass clean — the law defines a door as anything the outside world can reach and names sockets and
 broker consumers explicitly, so this rule's name promises more than it checks. The same three
 decorator spellings that silence the other rule — `MemberExpression`, renamed import, assignment
 through a variable — silence this one. The gate demands a **leading slash** before `src`, so a runner
-that hands the rule a relative filename such as `src/modules/x.controller.ts` switches it off; an
+that hands the rule a relative filename such as `modules/x.controller.ts` switches it off; an
 absolute path always has the slash, which makes this narrow but real — a dependency on how the runner
 names the file, not on where the file is.
 
-**Boundary.** The rule also runs **wider than the law** in one place: the law binds `src/modules/**`
-of the main application and exempts a separate application that keeps its own `src/modules/` folder,
+**Boundary.** The rule also runs **wider than the law** in one place: the law binds `modules/**`
+of the main application and exempts a separate application that keeps its own `modules/` folder,
 while the gate matches every path containing `/src/modules/` regardless. That divergence is a
 recorded finding, not a permission.
 
@@ -160,8 +160,8 @@ recorded finding, not a permission.
 | A comment above the class saying `// this is a webhook receiver` | `webhook` is matched against the **route** and the **path** only, never the file text. A claim in prose buys nothing |
 | Naming the class `WebhookController` while the route is `api/reports` and the file is `reports.controller.ts` | No rule reads the class name. Identity comes from the route string and the path |
 | Moving an unjustified controller into `features/` | `rest-door-needs-a-reason` has no path gate for justification. Being in the right tree is a different sentence of the law, held by a different rule |
-| A webhook controller left under `src/modules/` | The two rules are independent. A perfect `TRANSPORT-2` reason does not exempt anything from `TRANSPORT-3` |
-| Nesting deeper: `src/modules/billing/http/controllers/x.controller.ts` | The gate matches the `/src/modules/` **pair anywhere in the path**, so extra depth changes nothing |
+| A webhook controller left under `modules/` | The two rules are independent. A perfect `TRANSPORT-2` reason does not exempt anything from `TRANSPORT-3` |
+| Nesting deeper: `modules/billing/http/controllers/x.controller.ts` | The gate matches the `/src/modules/` **pair anywhere in the path**, so extra depth changes nothing |
 | A `@Controller` declared inside a spec or a fixture | Neither rule has a test-lane gate. A throwaway door in a test file reports like any other |
 | `@Controller("ops/tenants")` intending an operator surface | The operator route test is anchored to `api/ops`. `ops/…` alone is not it, and the door reports unless the file also carries an operator-guard or service-token identifier |
 | `@Controller("internal")` with no second segment | The machine test requires a trailing `/`. A bare prefix does not satisfy it |
@@ -180,9 +180,9 @@ recorded finding, not a permission.
 | `rest-door-needs-a-reason` | `@Controller("api/ops/anything")` on a door a normal viewer can reach. The prefix is the entire evidence; the guard is not checked once it matched |
 | `rest-door-needs-a-reason` | `@Controller("healthz")` returning business data. The probe test is an exact route match and never inspects what the handler answers with |
 | `rest-door-needs-a-reason` | A route that is not a string `Literal` — this one runs backwards: a **lawful** door is reported, and the fastest repair is a disable comment. Method-level routes are never read, so an empty `@Controller()` plus `@Post("webhook/settlement")` is a real webhook that reports |
-| `door-lives-in-features` | Renaming `src/modules/` to `src/services/`, `src/domains/` or `src/capabilities/`. Folder bans are not layer bans; the layer survives the rename with the rule switched off |
-| `door-lives-in-features` | `@WebSocketGateway()`, `@MessagePattern(…)`, `@EventPattern(…)` under `src/modules/`. The rule recognises `@Controller` and nothing else, so its name promises more than it checks |
-| `door-lives-in-features` | A relative filename such as `src/modules/x.controller.ts`. The gate demands a leading slash before `src` — a dependency on how the runner names the file |
+| `door-lives-in-features` | Renaming `modules/` to `services/`, `domains/` or `capabilities/`. Folder bans are not layer bans; the layer survives the rename with the rule switched off |
+| `door-lives-in-features` | `@WebSocketGateway()`, `@MessagePattern(…)`, `@EventPattern(…)` under `modules/`. The rule recognises `@Controller` and nothing else, so its name promises more than it checks |
+| `door-lives-in-features` | A relative filename such as `modules/x.controller.ts`. The gate demands a leading slash before `src` — a dependency on how the runner names the file |
 | both | `@Nest.Controller("api/theme")`, or `import { Controller as Route }` then `@Route("api/theme")`, or `const Door = Controller` then `@Door("api/theme")`. A `MemberExpression` returns `null` and a renamed binding compares as a different name |
 | both | A raw handler registered outside a class — `app.use(…)`, `server.get("/api/theme", …)` in the bootstrap file. There is no decorator to visit, and a REST door assembled by hand is a door the law governs |
 | both | `// eslint-disable-next-line`. Neither rule is unsuppressible, so every hatch above is also reachable in one line by a person in a hurry |
@@ -228,7 +228,7 @@ Every exception here is written into the rules, not granted beside them.
 - **First match wins.** The five tests run in order and return on the first hit. A door with a webhook
   route is never examined for bytes, so a message never states *which* reason saved it.
 - **Everything outside `/src/modules/` is exempt from `door-lives-in-features`** — including a
-  separate application that keeps its own `src/modules/` folder, which the law exempts but the gate
+  separate application that keeps its own `modules/` folder, which the law exempts but the gate
   does not. The exemption releases the file from `TRANSPORT-3` only; `TRANSPORT-2` still runs on it.
 - **No test lane.** Neither rule carves out specs or fixtures.
 
@@ -258,7 +258,7 @@ empty visitor` for `door-lives-in-features` and is still judged by `rest-door-ne
 
 ## Worked example
 
-**Input.** One door under the capabilities tree, `src/modules/billing/billing.controller.ts`:
+**Input.** One door under the capabilities tree, `modules/billing/billing.controller.ts`:
 
 ```ts
 @Controller("api/billing/callback")
@@ -298,7 +298,7 @@ verdict:  fires
 Two rules, two findings. A valid reason would not have saved the second one.
 
 **Repaired.** The door moves to the doors tier and says in its route what it is,
-`src/features/billing/billing-webhook.controller.ts`:
+`features/billing/billing-webhook.controller.ts`:
 
 ```ts
 @Controller("api/billing/webhook")

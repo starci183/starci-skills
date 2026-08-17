@@ -278,7 +278,7 @@ là một hình dạng có thật phải được gấp lại vào thành phần
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Hai tệp dưới `src/components/leaves/Avatar/`:
+**Đầu vào.** Hai tệp dưới `components/leaves/Avatar/`:
 
 ```tsx
 // src/components/leaves/AvatarSkeleton/index.tsx

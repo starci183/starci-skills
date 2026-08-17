@@ -26,7 +26,7 @@ npm run build
 HeroUI stylesheet. Run it after changing a source record; `dev`, `build` and `serve` run it first.
 
 Live examples in a record use `<CodeUiTabs example="…" />`, resolved from
-[`src/components/CodeUiTabs/examples.js`](src/components/CodeUiTabs/examples.js). The registry is
+[`components/CodeUiTabs/examples.js`](components/CodeUiTabs/examples.js). The registry is
 empty until v3 has examples to show; an unknown id renders a visible notice rather than failing the
 build.
 

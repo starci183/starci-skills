@@ -126,7 +126,7 @@ alone.
 stylesheet the rule found, naming both the class and the missing variable.
 
 **How it detects.** Filesystem, not AST. From the linted file's directory it walks up at most 12
-levels and at each level tests `existsSync` for five relative paths — `src/app/globals.css`,
+levels and at each level tests `existsSync` for five relative paths — `app/globals.css`,
 `apps/app/src/app/globals.css`, `apps/expert/src/app/globals.css`,
 `apps/landing/src/app/globals.css`, `packages/ui/src/styles/globals.css` — reading and joining every
 one it finds, cached per directory for the run. If nothing is found the rule returns `{}`. Otherwise
@@ -229,7 +229,7 @@ not the same result.
 
 ## Worked example
 
-**Input.** A leaf file at `src/components/leaves/Row/index.tsx`:
+**Input.** A leaf file at `components/leaves/Row/index.tsx`:
 
 ```tsx
 const GLUE = "inline-flex gap-1.5"

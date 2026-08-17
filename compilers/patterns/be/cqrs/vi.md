@@ -234,7 +234,7 @@ handler mà spec không đổi.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được;
-`enforced` nghĩa là một rule có tên trong `starci-eslint/packages/be/cqrs.mjs` báo cáo nó; `documented` nghĩa là
+`enforced` nghĩa là một rule có tên trong `@starci/eslint-canon-be` báo cáo nó; `documented` nghĩa là
 không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
@@ -260,13 +260,13 @@ repository tham chiếu và nêu phải nhìn cái gì ở đó.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `CQRS-1` | `src/features/api/core/graphql/mutations/courses/add-to-cart/` | Mọi file đều mang tên thao tác: `.command.ts`, `.handler.ts`, `.service.ts`, `.resolver.ts`, `.module.ts`, `.module-definition.ts`. |
-| `CQRS-2` | `src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.command.ts` | Một class trần mà constructor nhận đúng một `readonly params`, và không khai báo gì khác. |
-| `CQRS-3` | `src/modules/platform/cqrs/icqrs-handler.ts` | `execute` là method cụ thể và nó gọi `process`; `process` là `protected abstract`. Đây là cái seam mà handler không được bước ra khỏi. |
-| `CQRS-4` | `src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.service.ts` | Toàn bộ thân method là một `commandBus.execute(new …Command(params))`; service không import repository nào. |
-| `CQRS-5` | `src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts` | Mỗi nhánh thất bại ném một domain exception có tên, chở theo định danh gây ra nó; không nhánh nào trả `null` để nói "không". |
-| `CQRS-6` | `src/modules/platform/cqrs/event-bus/send-mail/` | Một class event chở payload, và một handler đẩy vào hàng đợi — không có gì trên đường request chờ kết quả của nó. |
-| `CQRS-7` | `src/features/api/core/graphql/mutations/courses/course-enroll/course-enroll.handler.spec.ts` | Spec nằm cạnh `course-enroll.handler.ts`, không nằm trong một cây test song song. |
+| `CQRS-1` | `features/api/core/graphql/mutations/courses/add-to-cart/` | Mọi file đều mang tên thao tác: `.command.ts`, `.handler.ts`, `.service.ts`, `.resolver.ts`, `.module.ts`, `.module-definition.ts`. |
+| `CQRS-2` | `features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.command.ts` | Một class trần mà constructor nhận đúng một `readonly params`, và không khai báo gì khác. |
+| `CQRS-3` | `modules/platform/cqrs/icqrs-handler.ts` | `execute` là method cụ thể và nó gọi `process`; `process` là `protected abstract`. Đây là cái seam mà handler không được bước ra khỏi. |
+| `CQRS-4` | `features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.service.ts` | Toàn bộ thân method là một `commandBus.execute(new …Command(params))`; service không import repository nào. |
+| `CQRS-5` | `features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts` | Mỗi nhánh thất bại ném một domain exception có tên, chở theo định danh gây ra nó; không nhánh nào trả `null` để nói "không". |
+| `CQRS-6` | `modules/platform/cqrs/event-bus/send-mail/` | Một class event chở payload, và một handler đẩy vào hàng đợi — không có gì trên đường request chờ kết quả của nó. |
+| `CQRS-7` | `features/api/core/graphql/mutations/courses/course-enroll/course-enroll.handler.spec.ts` | Spec nằm cạnh `course-enroll.handler.ts`, không nằm trong một cây test song song. |
 
 Mã nào cũng có neo. Neo là đường dẫn trong repository tham chiếu và chỉ tồn tại để kiểm chứng; các ví
 dụ ở đây không nêu tên sản phẩm nào và repository nào.

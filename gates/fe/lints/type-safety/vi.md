@@ -208,7 +208,7 @@ nửa nào của cổng đã loại nó ra. Nó không hề "qua"; không visito
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/data/profile.ts`, đúng chỗ dữ liệu từ ngoài chương trình đi vào:
+**Đầu vào.** `data/profile.ts`, đúng chỗ dữ liệu từ ngoài chương trình đi vào:
 
 ```ts
 const response = await fetch(url)

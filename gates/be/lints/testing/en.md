@@ -208,7 +208,7 @@ or a default import of the gateway module under a local name — the token scan 
 three-token sequence and the other checks compare against one literal class name. A helper renamed out
 of the ban, the house model helper moved to `./judge-client`, leaves the same code legal because the
 helper pattern lists two names. And a helper outside the one folder is out of scope entirely: only
-`/src/tests/helpers/` is in credential scope, so `test/helpers/`, `src/test/helpers/` and any nested
+`/src/tests/helpers/` is in credential scope, so `test/helpers/`, `test/helpers/` and any nested
 `helpers/` under another root run no check at all, credential check included.
 
 **Boundary.** This rule demands a real provider call in the harness lane. The flow lane demands the
@@ -273,7 +273,7 @@ opposite, and that is `TESTING-9`.
 | `harness-calls-provider-directly` | **The credential read in its ordinary form.** `process.env.CLAUDE_CODE_OAUTH_TOKEN`, or a template literal | Only a string `Literal` is visited; a member property is an identifier and a template chunk is a `TemplateElement` |
 | `harness-calls-provider-directly` | **The gateway wearing a different type or token.** `Partial<AiInvokeService>`, `Omit<AiInvokeService, "x">`, a hand-written interface, `provide: AI_INVOKE_TOKEN`, `overrideProvider(AI_INVOKE_TOKEN)`, a renamed default import | One exact three-token sequence, one literal class name |
 | `harness-calls-provider-directly` | **A helper renamed out of the ban.** The house model helper moved to `./judge-client` | The helper pattern lists two names |
-| `harness-calls-provider-directly` | **A helper outside the one folder.** `test/helpers/`, `src/test/helpers/`, any nested `helpers/` under another root | The helper gate is a literal path fragment, and out of scope means every check including the credential check |
+| `harness-calls-provider-directly` | **A helper outside the one folder.** `test/helpers/`, `test/helpers/`, any nested `helpers/` under another root | The helper gate is a literal path fragment, and out of scope means every check including the credential check |
 | none | **Everything `TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` and `TESTING-11` require** | Six of eleven codes have no machine; a green run is silence about all of them |
 
 ## Inputs
@@ -345,7 +345,7 @@ not judged rather than judged clean.
 
 ## Worked example
 
-**Input.** A unit spec, `src/orders/charge.handler.spec.ts`:
+**Input.** A unit spec, `orders/charge.handler.spec.ts`:
 
 ```ts
 it("charges the order", async () => {

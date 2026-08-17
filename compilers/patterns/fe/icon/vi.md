@@ -175,7 +175,7 @@ glyph ngay tại chỗ.
 
 **Nó sinh ra gì trong source.** `starci-fe/no-vendor-icon-outside-icon-leaf` — package glyph được khớp
 theo prefix, nên một subpath không thể lách qua — cùng với đúng một module path được phép trong
-[`starci-eslint/packages/fe/icon.mjs`](../../../../starci-eslint/packages/fe/icon.mjs).
+[`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe).
 
 **Dấu hiệu nhận biết.** Trong một file màn hình có `import { XxxIcon } from "..."`. Một file "phụ trợ"
 cạnh icon leaf cũng import package đó "cho tiện". Cùng một khái niệm được vẽ bằng hai hình khác nhau ở
@@ -327,7 +327,7 @@ lượng reaction · picker chọn reaction.
 Icon leaf sở hữu vendor, family, hình vẽ và kích thước; mọi tầng gọi phải hoàn toàn không biết gì về cả
 bốn thứ đó. Còn đây là tầng thực sự đang giữ từng mã hôm nay: `unrepresentable` nghĩa là một union đóng
 hay một prop shape làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule trong
-[`starci-eslint/packages/fe/icon.mjs`](../../../../starci-eslint/packages/fe/icon.mjs) báo được, và rule đó được gọi tên ngay ở đây;
+[`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) báo được, và rule đó được gọi tên ngay ở đây;
 `documented` nghĩa là chỉ người đọc giữ.
 
 | Mã | Tầng | Cái gì đang giữ |
@@ -359,19 +359,19 @@ dẫn dưới `starci-eslint/packages/fe/` là các rule trong trust tree này.
 
 | Mã | Đường dẫn | Nhìn cái gì |
 |---|---|---|
-| `ICON-1` | `src/components/leaves/Icon/index.tsx` · `src/components/contracts/props.ts` | Union ba tên vai trò và map vai trò → class; prop shape của leaf đúng gồm `props`, `on`, `isLoading` — và do đó không có chỗ nào để viết một size |
-| `ICON-2` | `src/components/leaves/Icon/index.tsx` · `src/components/leaves/Icon/index.test.tsx` | Khối import 24 outline; entry `heading` đọc là `size-6 shrink-0`; twin test khẳng định `size-6` |
-| `ICON-3` | `src/components/leaves/Icon/index.tsx` | Entry `leading` đọc là `size-5 shrink-0`, chọn từ đúng khối import outline mà `heading` dùng |
-| `ICON-4` | `src/components/leaves/Icon/index.tsx` | Khối import 16 solid riêng, alias theo từng ý nghĩa, và entry `chip` đọc là `size-4 shrink-0` |
-| `ICON-5` | `src/components/leaves/Icon/index.tsx` · `src/components/leaves/Icon/brands.tsx` | `stroke="currentColor"` trên những glyph vẽ cục bộ; trong file brand, một mark giữ bốn hex fill được vẽ sẵn còn mark đơn sắc dùng `currentColor` — ngoại lệ và luật nằm cạnh nhau |
-| `ICON-6` | `starci-eslint/packages/fe/icon.mjs` | `noVendorIconOutsideIconLeaf`; đúng một module path được phép; danh sách package khớp theo prefix |
-| `ICON-7` | `starci-eslint/packages/fe/icon.mjs` | `heroiconsIsTheGlyphVendor`; allow set hai package; ngoại lệ rank luồn qua cả hai rule vendor |
-| `ICON-8` | `src/components/leaves/Icon/index.tsx` | Cả ba chuỗi vai trò đều kết thúc bằng `shrink-0` — kể cả `chip`, cái hay bị cho là quá nhỏ để phải bận tâm |
-| `ICON-9` | `src/components/leaves/Icon/icon.md` · `src/components/leaves/Icon/index.tsx` | Bảng tính năng nằm cạnh union ý nghĩa và glyph map, trong một thư mục. Bài test parity mà luật gọi tên: chưa neo được |
-| `ICON-10` | `starci-eslint/packages/fe/icon.mjs` · `src/components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` và đường dẫn nó buộc vào; composite đó render một label, một con số và một thanh bar, không glyph |
-| `ICON-11` | `src/components/leaves/IconTile/index.tsx` | Hai bậc plate trong size map, và một dòng ngay dưới truyền `role: "leading"` vô điều kiện |
-| `ICON-12` | `src/components/composites/IconLabelFactRow/index.tsx` | Ba recipe; recipe peer là ca đúng của mã này. Recipe label-led đã render fact phụ nhỏ và muted **mà vẫn vẽ một glyph** — nửa phần của mã mà source chưa giữ được |
-| `ICON-13` | `src/components/leaves/ReactionPicker/index.tsx` · `public/reactions/` | Danh sách identity đóng trong leaf; sáu file artwork đã check-in và attribution đi kèm chúng |
+| `ICON-1` | `components/leaves/Icon/index.tsx` · `components/contracts/props.ts` | Union ba tên vai trò và map vai trò → class; prop shape của leaf đúng gồm `props`, `on`, `isLoading` — và do đó không có chỗ nào để viết một size |
+| `ICON-2` | `components/leaves/Icon/index.tsx` · `components/leaves/Icon/index.test.tsx` | Khối import 24 outline; entry `heading` đọc là `size-6 shrink-0`; twin test khẳng định `size-6` |
+| `ICON-3` | `components/leaves/Icon/index.tsx` | Entry `leading` đọc là `size-5 shrink-0`, chọn từ đúng khối import outline mà `heading` dùng |
+| `ICON-4` | `components/leaves/Icon/index.tsx` | Khối import 16 solid riêng, alias theo từng ý nghĩa, và entry `chip` đọc là `size-4 shrink-0` |
+| `ICON-5` | `components/leaves/Icon/index.tsx` · `components/leaves/Icon/brands.tsx` | `stroke="currentColor"` trên những glyph vẽ cục bộ; trong file brand, một mark giữ bốn hex fill được vẽ sẵn còn mark đơn sắc dùng `currentColor` — ngoại lệ và luật nằm cạnh nhau |
+| `ICON-6` | `@starci/eslint-canon-fe` | `noVendorIconOutsideIconLeaf`; đúng một module path được phép; danh sách package khớp theo prefix |
+| `ICON-7` | `@starci/eslint-canon-fe` | `heroiconsIsTheGlyphVendor`; allow set hai package; ngoại lệ rank luồn qua cả hai rule vendor |
+| `ICON-8` | `components/leaves/Icon/index.tsx` | Cả ba chuỗi vai trò đều kết thúc bằng `shrink-0` — kể cả `chip`, cái hay bị cho là quá nhỏ để phải bận tâm |
+| `ICON-9` | `components/leaves/Icon/icon.md` · `components/leaves/Icon/index.tsx` | Bảng tính năng nằm cạnh union ý nghĩa và glyph map, trong một thư mục. Bài test parity mà luật gọi tên: chưa neo được |
+| `ICON-10` | `@starci/eslint-canon-fe` · `components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` và đường dẫn nó buộc vào; composite đó render một label, một con số và một thanh bar, không glyph |
+| `ICON-11` | `components/leaves/IconTile/index.tsx` | Hai bậc plate trong size map, và một dòng ngay dưới truyền `role: "leading"` vô điều kiện |
+| `ICON-12` | `components/composites/IconLabelFactRow/index.tsx` | Ba recipe; recipe peer là ca đúng của mã này. Recipe label-led đã render fact phụ nhỏ và muted **mà vẫn vẽ một glyph** — nửa phần của mã mà source chưa giữ được |
+| `ICON-13` | `components/leaves/ReactionPicker/index.tsx` · `public/reactions/` | Danh sách identity đóng trong leaf; sáu file artwork đã check-in và attribution đi kèm chúng |
 
 ## Đầu vào
 

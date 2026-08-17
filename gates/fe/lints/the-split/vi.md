@@ -42,7 +42,7 @@ chạy xanh không nói được gì về bất kỳ mã nào trong số đó.
    nó nghĩa là không visitor nào được cài và rule không tồn tại với file đó.
 2. **`presentational-purity` cần tên file kết thúc bằng `component.tsx`.** Mọi tên khác, kể cả
    `view.tsx`, `Component.tsx` hay `component.jsx`, đều tắt rule.
-3. **Rule twin cần một index của khối** — `src/components/blocks/**/<Folder>/index.tsx` với thư mục
+3. **Rule twin cần một index của khối** — `components/blocks/**/<Folder>/index.tsx` với thư mục
    viết hoa — và cần file đó có đọc thế giới. Không đọc thế giới thì không kiểm gì cả.
 4. **Xem loại callee trước.** Cả hai rule dừng ngay khi callee không phải một `Identifier` trần, nên
    đúng một namespace là hạ được cả hai.
@@ -95,8 +95,8 @@ khớp chính xác. `Program:exit` lặng lẽ thoát nếu không có `readsWor
 chứ không phải không tuân thủ — hai rule dùng chung một bộ dò, nên một lần giặt hạ cả hai. Render
 không qua JSX, `createElement(Row, props)` đặt cạnh một `<_X />`, để nguyên một cây thay thế không lọt
 vào danh sách trong khi `rendersTwin` vẫn đúng. Một thẻ có namespace, `<Ui.Card>`, là
-`JSXMemberExpression` nên không bao giờ vào danh sách. Một đường dẫn ngoài đúng một khuôn — `src/features/…`,
-`src/app/…`, `components/blocks/…` mà thiếu `src`, thư mục viết thường, entrypoint tên `index.ts` — thì
+`JSXMemberExpression` nên không bao giờ vào danh sách. Một đường dẫn ngoài đúng một khuôn — `features/…`,
+`app/…`, `components/blocks/…` mà thiếu `src`, thư mục viết thường, entrypoint tên `index.ts` — thì
 không có rule nào trên nó. Và twin **không bao giờ được mở ra**: `_X` có thể không tồn tại, có thể đi
 fetch, có thể chẳng vẽ gì. "Có twin trình bày" được quyết từ một **cái tên**.
 
@@ -192,7 +192,7 @@ hatch: <lỗ hổng mở lẽ ra đã giấu được cái này, hoặc none>
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Hai file của một khối, `src/components/blocks/order/OrderTotal/`:
+**Đầu vào.** Hai file của một khối, `components/blocks/order/OrderTotal/`:
 
 ```tsx
 // index.tsx

@@ -236,7 +236,7 @@ branch added to the handler with the spec unchanged.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written;
-`enforced` means a named rule from `starci-eslint/packages/be/cqrs.mjs` reports it; `documented` means nothing
+`enforced` means a named rule from `@starci/eslint-canon-be` reports it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |
@@ -261,13 +261,13 @@ repository and what to look for there.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `CQRS-1` | `src/features/api/core/graphql/mutations/courses/add-to-cart/` | Every file carries the operation name: `.command.ts`, `.handler.ts`, `.service.ts`, `.resolver.ts`, `.module.ts`, `.module-definition.ts`. |
-| `CQRS-2` | `src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.command.ts` | A plain class whose constructor takes exactly one `readonly params`, and declares nothing else. |
-| `CQRS-3` | `src/modules/platform/cqrs/icqrs-handler.ts` | `execute` is concrete and calls `process`; `process` is `protected abstract`. The seam a handler must not step out of. |
-| `CQRS-4` | `src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.service.ts` | The whole method body is one `commandBus.execute(new …Command(params))`; the service imports no repository. |
-| `CQRS-5` | `src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts` | Each failure path throws a named domain exception carrying the identifier that caused it; no path returns `null` to mean "no". |
-| `CQRS-6` | `src/modules/platform/cqrs/event-bus/send-mail/` | An event class carrying a payload, and a handler that enqueues — nothing on the request path awaits its result. |
-| `CQRS-7` | `src/features/api/core/graphql/mutations/courses/course-enroll/course-enroll.handler.spec.ts` | The spec sits beside `course-enroll.handler.ts`, not in a parallel test tree. |
+| `CQRS-1` | `features/api/core/graphql/mutations/courses/add-to-cart/` | Every file carries the operation name: `.command.ts`, `.handler.ts`, `.service.ts`, `.resolver.ts`, `.module.ts`, `.module-definition.ts`. |
+| `CQRS-2` | `features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.command.ts` | A plain class whose constructor takes exactly one `readonly params`, and declares nothing else. |
+| `CQRS-3` | `modules/platform/cqrs/icqrs-handler.ts` | `execute` is concrete and calls `process`; `process` is `protected abstract`. The seam a handler must not step out of. |
+| `CQRS-4` | `features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.service.ts` | The whole method body is one `commandBus.execute(new …Command(params))`; the service imports no repository. |
+| `CQRS-5` | `features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts` | Each failure path throws a named domain exception carrying the identifier that caused it; no path returns `null` to mean "no". |
+| `CQRS-6` | `modules/platform/cqrs/event-bus/send-mail/` | An event class carrying a payload, and a handler that enqueues — nothing on the request path awaits its result. |
+| `CQRS-7` | `features/api/core/graphql/mutations/courses/course-enroll/course-enroll.handler.spec.ts` | The spec sits beside `course-enroll.handler.ts`, not in a parallel test tree. |
 
 Every code is anchored. Anchors are paths in the reference repository and exist for verification
 only; the examples here name no product and no repository.

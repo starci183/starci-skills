@@ -297,7 +297,7 @@ it was not judged, not cleared.
 
 ## Worked example
 
-**Input.** One block file, `src/components/blocks/LeaderboardRow/index.tsx`:
+**Input.** One block file, `components/blocks/LeaderboardRow/index.tsx`:
 
 ```tsx
 import { Flame } from "lucide-react"

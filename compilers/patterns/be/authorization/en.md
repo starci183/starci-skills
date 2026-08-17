@@ -113,7 +113,7 @@ still receives something called `user`.
 
 **What it emits in source.** A guard decorator on the method that reads the identity, or on its
 class: `@UseGuards(...)` standing above the parameter that reads the user. The lint rule
-`identity-needs-guard` (export `identityNeedsGuard`, in `starci-eslint/packages/be/authorization.mjs`) counts three
+`identity-needs-guard` (export `identityNeedsGuard`, in `@starci/eslint-canon-be`) counts three
 parameter decorators as identity readers — `IDENTITY_PARAM_DECORATORS` — and climbs from the method
 to its class via `hasGuard`.
 
@@ -225,7 +225,7 @@ export.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule in `starci-eslint/packages/be/authorization.mjs`
+wrong value impossible to write; `enforced` means a lint rule in `@starci/eslint-canon-be`
 catches it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -259,12 +259,12 @@ Real code each law can be checked against. A law that cannot be pointed at is a 
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `AUTHZ-1` | `src/features/api/core/graphql/mutations/courses/submit-course-review/submit-course-review.handler.ts` · `src/features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` | An `if (!user)` refusal at the top of `process`, above the cheap validation and both queries, in handlers whose resolvers already carry a guard. That redundancy is the code |
-| `AUTHZ-2` | `starci-eslint/packages/be/authorization.mjs` → `IDENTITY_PARAM_DECORATORS`, `hasGuard`, `identityNeedsGuard` · `src/features/api/core/graphql/mutations/courses/update-course-review/update-course-review.resolver.ts` | The three parameter decorators the rule counts as identity readers, the climb from the method to its class, and a live door carrying `@UseGuards(...)` above the parameter that reads the user |
-| `AUTHZ-3` | `src/features/api/core/graphql/mutations/courses/delete-course-review/delete-course-review.handler.ts` | `findOne` by the requested id, a not-found on the miss, then `review.userId !== user.id` — the comparison reads the loaded row, and the request supplied only which row to load |
-| `AUTHZ-4` | `src/features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` · `src/tests/e2e/installment-plan-queries.e2e-spec.ts` | `if (!plan \|\| plan.userId !== user.id)` collapses "missing" and "not yours" into one not-found; the flow proves an intruder gets that answer and that nothing was written |
-| `AUTHZ-5` | `src/modules/bussiness/guards/graphql-must-enrolled.guard.ts` · `src/modules/bussiness/guards/graphql-enrollment.guard.ts` · `src/modules/bussiness/user/user.service.ts` → `checkEnrollment`, `resolveOrCreateTrialEnrollment` | Two guards over one relationship: one resolves-or-creates a trial row and always returns true, the other reads the paid flag and refuses. The pair is the proof that the row and the state are different facts |
-| `AUTHZ-6` | `src/modules/bussiness/guards/admin-access.guard.ts` · `src/modules/bussiness/guards/graphql-admin-access.guard.ts` · `src/modules/integrations/keycloak/guards/keycloak-auth-graphql.guard.ts` | Two subjects, two guard families, no shared base: an operator authenticates with a mounted key on a header, a viewer with a session token, and neither can be reached through the other |
+| `AUTHZ-1` | `features/api/core/graphql/mutations/courses/submit-course-review/submit-course-review.handler.ts` · `features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` | An `if (!user)` refusal at the top of `process`, above the cheap validation and both queries, in handlers whose resolvers already carry a guard. That redundancy is the code |
+| `AUTHZ-2` | `@starci/eslint-canon-be` → `IDENTITY_PARAM_DECORATORS`, `hasGuard`, `identityNeedsGuard` · `features/api/core/graphql/mutations/courses/update-course-review/update-course-review.resolver.ts` | The three parameter decorators the rule counts as identity readers, the climb from the method to its class, and a live door carrying `@UseGuards(...)` above the parameter that reads the user |
+| `AUTHZ-3` | `features/api/core/graphql/mutations/courses/delete-course-review/delete-course-review.handler.ts` | `findOne` by the requested id, a not-found on the miss, then `review.userId !== user.id` — the comparison reads the loaded row, and the request supplied only which row to load |
+| `AUTHZ-4` | `features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` · `tests/e2e/installment-plan-queries.e2e-spec.ts` | `if (!plan \|\| plan.userId !== user.id)` collapses "missing" and "not yours" into one not-found; the flow proves an intruder gets that answer and that nothing was written |
+| `AUTHZ-5` | `modules/bussiness/guards/graphql-must-enrolled.guard.ts` · `modules/bussiness/guards/graphql-enrollment.guard.ts` · `modules/bussiness/user/user.service.ts` → `checkEnrollment`, `resolveOrCreateTrialEnrollment` | Two guards over one relationship: one resolves-or-creates a trial row and always returns true, the other reads the paid flag and refuses. The pair is the proof that the row and the state are different facts |
+| `AUTHZ-6` | `modules/bussiness/guards/admin-access.guard.ts` · `modules/bussiness/guards/graphql-admin-access.guard.ts` · `modules/integrations/keycloak/guards/keycloak-auth-graphql.guard.ts` | Two subjects, two guard families, no shared base: an operator authenticates with a mounted key on a header, a viewer with a session token, and neither can be reached through the other |
 
 Every code is anchored. None is unanchored.
 

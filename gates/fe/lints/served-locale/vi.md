@@ -254,7 +254,7 @@ export function courseHeaders(locale: string) {
 }
 ```
 
-`src/api/client.ts` không nằm trong thư mục nào tên `links` và không phải tệp spec, nên rule chuỗi chạy.
+`api/client.ts` không nằm trong thư mục nào tên `links` và không phải tệp spec, nên rule chuỗi chạy.
 Nó gọi `createHttpLink` và không hề gọi xưởng ngôn ngữ nào.
 
 ```text
@@ -266,7 +266,7 @@ code: LOCALE-1
 hatch: none
 ```
 
-`src/hooks/use-course.ts` không phải `links/locale.<ext>`, nên rule header chạy, và khoá `Literal`
+`hooks/use-course.ts` không phải `links/locale.<ext>`, nên rule header chạy, và khoá `Literal`
 `"x-locale"` khớp tuyệt đối.
 
 ```text

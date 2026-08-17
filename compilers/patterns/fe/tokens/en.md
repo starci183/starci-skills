@@ -339,17 +339,17 @@ this trust tree, `src/…` is a consuming front-end repository.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `TOKEN-1` | `starci-eslint/packages/fe/contracts.ts` · `src/components/contracts/index.ts` | `export type LayoutClassName` — a union of literals with the six gap rungs among them |
-| `TOKEN-2` | `starci-eslint/packages/fe/contracts.ts` | The comment above the union: grow this list deliberately, so the addition reads as a decision in the diff |
-| `TOKEN-3` | `starci-eslint/packages/fe/tokens.mjs` | The `FRACTIONAL` pattern and the `noFractionalStep` rule built from it |
-| `TOKEN-4` | `starci-eslint/packages/fe/tokens.mjs` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, and the two message ids in `noArbitraryValue` |
-| `TOKEN-5` | `starci-eslint/packages/fe/tokens.mjs` · `src/components/leaves/Heading/index.tsx` | `LARGE_TEXT` and `HEAVY_WEIGHT` tested together; and the leaf where `level` drives tag and metrics as one decision |
-| `TOKEN-6` | `starci-eslint/packages/fe/tokens.mjs` · `starci-eslint/packages/fe/contract.mjs` | `isSourceFile`, the `VariableDeclarator` branch of `classTextVisitors`; and `LEAF_DIR_RELATIVE` / `isLeafFile`, which name the exempt folder |
-| `TOKEN-7` | `src/components/leaves/IconTile/index.tsx` · `src/components/leaves/RankDeltaCaret/index.tsx` | A tone table pairing `bg-*-soft` with `text-*-soft-foreground`; and a bare mark using plain `text-success` |
-| `TOKEN-8` | `src/components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` and the comment stating size follows placement, independently of visual priority |
-| `TOKEN-9` | `starci-eslint/packages/fe/tokens.mjs` · `src/app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
-| inset pairing | `src/app/globals.css` · `src/components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` beside `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — the equal-strength semantic exception |
-| joined-list rows | `src/components/contracts/index.ts` | Entries carrying `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
+| `TOKEN-1` | `@starci/eslint-canon-fe/contracts` · `components/contracts/index.ts` | `export type LayoutClassName` — a union of literals with the six gap rungs among them |
+| `TOKEN-2` | `@starci/eslint-canon-fe/contracts` | The comment above the union: grow this list deliberately, so the addition reads as a decision in the diff |
+| `TOKEN-3` | `@starci/eslint-canon-fe` | The `FRACTIONAL` pattern and the `noFractionalStep` rule built from it |
+| `TOKEN-4` | `@starci/eslint-canon-fe` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, and the two message ids in `noArbitraryValue` |
+| `TOKEN-5` | `@starci/eslint-canon-fe` · `components/leaves/Heading/index.tsx` | `LARGE_TEXT` and `HEAVY_WEIGHT` tested together; and the leaf where `level` drives tag and metrics as one decision |
+| `TOKEN-6` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe` | `isSourceFile`, the `VariableDeclarator` branch of `classTextVisitors`; and `LEAF_DIR_RELATIVE` / `isLeafFile`, which name the exempt folder |
+| `TOKEN-7` | `components/leaves/IconTile/index.tsx` · `components/leaves/RankDeltaCaret/index.tsx` | A tone table pairing `bg-*-soft` with `text-*-soft-foreground`; and a bare mark using plain `text-success` |
+| `TOKEN-8` | `components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` and the comment stating size follows placement, independently of visual priority |
+| `TOKEN-9` | `@starci/eslint-canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
+| inset pairing | `app/globals.css` · `components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` beside `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — the equal-strength semantic exception |
+| joined-list rows | `components/contracts/index.ts` | Entries carrying `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 
 The last two rows anchor decisions the flat law made in prose without giving them a number. They are
 listed here so the decisions stay checkable; they are not new codes.
@@ -427,7 +427,7 @@ the success mark, the height of the action, the file tier any of these live in, 
 defines the container variable — so none of those are resolved by the shape, and all of them are
 resolved here.
 
-Entry file, `src/components/contracts/index.ts`:
+Entry file, `components/contracts/index.ts`:
 
 ```text
 value: p-0
@@ -456,7 +456,7 @@ verdict: define --container-app-lg
 reason: the name is a union member, so the compiler is satisfied — which excludes TOKEN-1 and leaves only the missing stylesheet variable
 ```
 
-Leaf file, `src/components/leaves/StatusMark/index.tsx`:
+Leaf file, `components/leaves/StatusMark/index.tsx`:
 
 ```text
 value: text-success
@@ -476,7 +476,7 @@ verdict: replace with size-4
 reason: the value is a half step rather than a bracketed length, which is what separates it from TOKEN-4
 ```
 
-Leaf file, `src/components/leaves/Button/index.tsx`:
+Leaf file, `components/leaves/Button/index.tsx`:
 
 ```text
 value: sm

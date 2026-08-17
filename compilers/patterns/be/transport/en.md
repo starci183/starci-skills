@@ -42,7 +42,7 @@ long as it exists.
 |---|---|---|
 | `TRANSPORT-1` | An operation that takes fields and answers with fields | It is declared as a mutation or a query. No second protocol chosen for convenience; no door argued out of the schema without one of the exits in `TRANSPORT-2` |
 | `TRANSPORT-2` | A door that **cannot** be GraphQL | A `@Controller` whose file itself shows which of four exits it takes: an external system posting to a URL you gave it, bytes rather than fields, a machine with no user session, or an identity that is not a user session. A controller showing none of them is forbidden, and so is a justification that lives in a registry, an allow-list or a document instead of in the file |
-| `TRANSPORT-3` | A door, whatever its transport | It lives under `features/`. No `@Controller` under `src/modules/**`, where it reads as a capability and gets imported like one |
+| `TRANSPORT-3` | A door, whatever its transport | It lives under `features/`. No `@Controller` under `modules/**`, where it reads as a capability and gets imported like one |
 
 `TRANSPORT-1` AND `TRANSPORT-2` ARE ONE DECISION READ FROM TWO SIDES, NOT TWO DECISIONS.
 `TRANSPORT-1` states the default and `TRANSPORT-2` states the complete list of exits from it. They
@@ -143,7 +143,7 @@ fetching configuration, an internal operations console, a load balancer probe.
 
 **What it emits in source.** The file lands under `features/`, whatever it carries: `@Controller`,
 `@Resolver`, `@WebSocketGateway` or a broker message handler. No door is written under
-`src/modules/**`.
+`modules/**`.
 
 **Recognition signs.** The file carries `@Controller`, `@Resolver`, `@WebSocketGateway` or a handler
 receiving messages from a broker. It is where a request **begins**, not somewhere another file calls
@@ -165,7 +165,7 @@ socket gateway, a topic consumer, a controller serving static files, an operatio
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written;
-`enforced` means a named rule from `starci-eslint/packages/be/transport.mjs` reports it; `documented` means nothing
+`enforced` means a named rule from `@starci/eslint-canon-be` reports it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |
@@ -192,9 +192,9 @@ repository and what to look for there.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `TRANSPORT-1` | `src/features/api/core/graphql/` beside `src/features/api/core/http/` | The ratio is the law made visible: hundreds of files carrying `@Resolver` against nineteen carrying `@Controller`. The default is not a preference somebody stated; it is what the tree already is. |
-| `TRANSPORT-2` | `src/features/api/core/http/*/webhook/webhook.controller.ts` and `src/features/api/core/http/mount/foundations/mount-foundations.controller.ts` | Five payment and storage gateways whose exit is spelled in the folder and the filename, and one file whose exit is the `@Res(` in its signature. In each, the reason is readable without leaving the file. |
-| `TRANSPORT-3` | `src/modules/**` | Grep `@Controller` across the whole capability tree and get nothing back. The anchor for this code is an **absence that holds** — every door in the repository sits under `src/features/`, and the tree proves it without a document being consulted. |
+| `TRANSPORT-1` | `features/api/core/graphql/` beside `features/api/core/http/` | The ratio is the law made visible: hundreds of files carrying `@Resolver` against nineteen carrying `@Controller`. The default is not a preference somebody stated; it is what the tree already is. |
+| `TRANSPORT-2` | `features/api/core/http/*/webhook/webhook.controller.ts` and `features/api/core/http/mount/foundations/mount-foundations.controller.ts` | Five payment and storage gateways whose exit is spelled in the folder and the filename, and one file whose exit is the `@Res(` in its signature. In each, the reason is readable without leaving the file. |
+| `TRANSPORT-3` | `modules/**` | Grep `@Controller` across the whole capability tree and get nothing back. The anchor for this code is an **absence that holds** — every door in the repository sits under `features/`, and the tree proves it without a document being consulted. |
 
 Every code is anchored. Anchors are paths in the reference repository and exist for verification
 only.
@@ -232,7 +232,7 @@ to.
 - **The liveness probe.** Under `TRANSPORT-2`, a route matching `health` or `healthz` is an exit
   outside the four. It exists because the probe must answer while the application is degraded, and a
   probe that needs the feature layer up cannot report that the feature layer is down.
-- **A separate application assembles its own doors.** Under `TRANSPORT-3`, the `src/modules/**`
+- **A separate application assembles its own doors.** Under `TRANSPORT-3`, the `modules/**`
   binding is the whole of the rule. An application under `apps/*` composes its own root and its own
   doors and is not subject to this split, because it is not choosing between two door layers in one
   tree — it has one.

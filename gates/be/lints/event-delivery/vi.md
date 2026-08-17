@@ -247,7 +247,7 @@ lời bảo đảm chuyển phát.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/event/nats/nats-bridge.service.ts`, đúng như đã viết:
+**Đầu vào.** `event/nats/nats-bridge.service.ts`, đúng như đã viết:
 
 ```ts
 private async onMessage(raw: Buffer) {

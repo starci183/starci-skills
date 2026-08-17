@@ -285,7 +285,7 @@ tồn tại đối với tệp đó, và khối này ghi lại đúng điều �
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/modules/enrollment/enrollment.service.ts` — một đường dẫn sản phẩm, nên cổng của
+**Đầu vào.** `modules/enrollment/enrollment.service.ts` — một đường dẫn sản phẩm, nên cổng của
 `no-double-cast` không miễn cho nó:
 
 ```ts

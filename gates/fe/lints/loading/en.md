@@ -278,7 +278,7 @@ to be folded back into the component it copies rather than deleted.
 
 ## Worked example
 
-**Input.** Two files under `src/components/leaves/Avatar/`:
+**Input.** Two files under `components/leaves/Avatar/`:
 
 ```tsx
 // src/components/leaves/AvatarSkeleton/index.tsx

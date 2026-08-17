@@ -42,7 +42,7 @@ chừng nào nó còn tồn tại.
 |---|---|---|
 | `TRANSPORT-1` | Một thao tác nhận field và trả lời bằng field | Nó được khai báo là mutation hoặc query. Không có giao thức thứ hai chọn cho tiện; không có cửa nào bị lý luận ra khỏi schema mà thiếu một lối ra trong `TRANSPORT-2` |
 | `TRANSPORT-2` | Một cửa **không thể** là GraphQL | Một `@Controller` mà chính file của nó nói ra nó đi lối nào trong bốn lối: một hệ thống ngoài post vào một URL ta phát ra, byte chứ không phải field, một cỗ máy không mang phiên người dùng nào, hoặc một danh tính không phải phiên người dùng. Cấm một controller không chỉ ra được lối nào, và cấm luôn cái lý do nằm trong sổ đăng ký, allow-list hay tài liệu thay vì nằm trong file |
-| `TRANSPORT-3` | Một cửa, bất kể giao thức gì | Nó nằm dưới `features/`. Không có `@Controller` nào dưới `src/modules/**`, nơi nó đọc như một năng lực rồi bị import như một năng lực |
+| `TRANSPORT-3` | Một cửa, bất kể giao thức gì | Nó nằm dưới `features/`. Không có `@Controller` nào dưới `modules/**`, nơi nó đọc như một năng lực rồi bị import như một năng lực |
 
 `TRANSPORT-1` VÀ `TRANSPORT-2` LÀ MỘT QUYẾT ĐỊNH NHÌN TỪ HAI PHÍA, KHÔNG PHẢI HAI QUYẾT ĐỊNH.
 `TRANSPORT-1` nói mặc định, `TRANSPORT-2` nói danh sách đầy đủ các lối ra khỏi mặc định ấy. Chúng là
@@ -138,7 +138,7 @@ thức chưa bao giờ là thứ quyết định địa chỉ; **việc là mộ
 
 **Nó sinh ra gì trong source.** File nằm dưới `features/`, bất kể nó mang gì: `@Controller`,
 `@Resolver`, `@WebSocketGateway` hay một handler nhận message từ broker. Không cửa nào được viết dưới
-`src/modules/**`.
+`modules/**`.
 
 **Dấu hiệu nhận biết.** File có `@Controller`, `@Resolver`, `@WebSocketGateway` hoặc một handler nhận
 message từ broker. Nó là điểm **bắt đầu** của một request, không phải chỗ được ai đó gọi vào. Hỏi
@@ -159,7 +159,7 @@ socket · consumer đọc topic · controller phục vụ file tĩnh · controll
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là không thể viết ra giá trị sai;
-`enforced` nghĩa là một rule có tên trong `starci-eslint/packages/be/transport.mjs` báo lỗi; `documented` nghĩa là
+`enforced` nghĩa là một rule có tên trong `@starci/eslint-canon-be` báo lỗi; `documented` nghĩa là
 không có cơ chế nào giữ, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
@@ -186,9 +186,9 @@ tham chiếu và thứ cần tìm ở đó.
 
 | Mã | Điểm neo | Cần nhìn gì |
 |---|---|---|
-| `TRANSPORT-1` | `src/features/api/core/graphql/` đặt cạnh `src/features/api/core/http/` | Tỉ lệ chính là luật được nhìn thấy: hàng trăm file mang `@Resolver` so với mười chín file mang `@Controller`. Mặc định không phải một sở thích ai đó phát biểu; nó là cái cây vốn đã như vậy. |
-| `TRANSPORT-2` | `src/features/api/core/http/*/webhook/webhook.controller.ts` và `src/features/api/core/http/mount/foundations/mount-foundations.controller.ts` | Năm cổng thanh toán và lưu trữ có lối ra viết thẳng trong tên thư mục và tên file, cùng một file có lối ra là cái `@Res(` trong chữ ký hàm. Ở mỗi cái, lý do đọc được mà không cần rời khỏi file. |
-| `TRANSPORT-3` | `src/modules/**` | Grep `@Controller` khắp cây năng lực và không nhận về gì. Điểm neo của mã này là **một sự vắng mặt đứng vững** — mọi cửa trong kho đều nằm dưới `src/features/`, và cái cây tự chứng minh điều đó mà không cần tra tài liệu nào. |
+| `TRANSPORT-1` | `features/api/core/graphql/` đặt cạnh `features/api/core/http/` | Tỉ lệ chính là luật được nhìn thấy: hàng trăm file mang `@Resolver` so với mười chín file mang `@Controller`. Mặc định không phải một sở thích ai đó phát biểu; nó là cái cây vốn đã như vậy. |
+| `TRANSPORT-2` | `features/api/core/http/*/webhook/webhook.controller.ts` và `features/api/core/http/mount/foundations/mount-foundations.controller.ts` | Năm cổng thanh toán và lưu trữ có lối ra viết thẳng trong tên thư mục và tên file, cùng một file có lối ra là cái `@Res(` trong chữ ký hàm. Ở mỗi cái, lý do đọc được mà không cần rời khỏi file. |
+| `TRANSPORT-3` | `modules/**` | Grep `@Controller` khắp cây năng lực và không nhận về gì. Điểm neo của mã này là **một sự vắng mặt đứng vững** — mọi cửa trong kho đều nằm dưới `features/`, và cái cây tự chứng minh điều đó mà không cần tra tài liệu nào. |
 
 Mã nào cũng có neo. Neo là đường dẫn trong kho tham chiếu và chỉ tồn tại để kiểm chứng.
 
@@ -224,7 +224,7 @@ vào.
 - **Liveness probe.** Thuộc `TRANSPORT-2`. Một route khớp `health` hay `healthz` là lối ra đứng ngoài
   bốn lối. Nó tồn tại vì probe phải trả lời khi ứng dụng đang hỏng, và một probe cần tầng feature
   sống mới chạy được thì không báo được rằng tầng feature đã chết.
-- **Ứng dụng riêng tự lắp cửa của nó.** Thuộc `TRANSPORT-3`. Ràng buộc `src/modules/**` là toàn bộ
+- **Ứng dụng riêng tự lắp cửa của nó.** Thuộc `TRANSPORT-3`. Ràng buộc `modules/**` là toàn bộ
   luật này. Một ứng dụng dưới `apps/*` tự dựng root của nó và tự lắp cửa của nó, nên không thuộc phạm
   vi chia đôi này — vì nó không đứng giữa hai tầng cửa trong cùng một cây, nó chỉ có một.
 - **Cửa REST có lý do không phải hạng hai.** Thuộc `TRANSPORT-1`. Bốn lối ra kia là **vĩnh viễn**:

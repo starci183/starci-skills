@@ -168,7 +168,7 @@ gì bên trong tệp đổi được phán quyết của nó, và không quy t�
 | `<Field handleChange={fn} />` | `handler-on-prefix` | Một thuộc tính JSX bị kiểm bằng chính tên nó, độc lập với kiểu của thành phần nhận |
 | `app/(marketing)/dang-nhap/page.tsx` | `no-second-language-in-path` | Ngoặc của nhóm tuyến và ngoặc vuông của đoạn động bị bóc trước khi so với danh sách |
 | `app/DANG-KY/page.tsx` | `no-second-language-in-path` | Toàn bộ đường dẫn bị hạ chữ thường trước mọi phép so |
-| `src/components/Đăng nhập/index.tsx` | `no-second-language-in-path` | Nhánh dấu khớp ở bất kỳ đâu trong đoạn; không đòi dấu phân cách hay ranh giới từ |
+| `components/Đăng nhập/index.tsx` | `no-second-language-in-path` | Nhánh dấu khớp ở bất kỳ đâu trong đoạn; không đòi dấu phân cách hay ranh giới từ |
 
 **Còn mở** — điểm mù đã xuất xưởng. Một phán quyết không được khẳng định là những chỗ này đã được xét.
 
@@ -255,7 +255,7 @@ một sự thật khác, và đúng là sự thật mà mô-đun này tồn tạ
 
 ## Ví dụ đã giải
 
-**Đầu vào.** Một tệp tuyến, `src/app/(marketing)/dang-nhap/page.tsx`:
+**Đầu vào.** Một tệp tuyến, `app/(marketing)/dang-nhap/page.tsx`:
 
 ```tsx
 export function LoginPage() {
@@ -299,7 +299,7 @@ verdict: fires
 hatch: none
 ```
 
-**Đã sửa**, `src/app/(marketing)/sign-in/page.tsx`:
+**Đã sửa**, `app/(marketing)/sign-in/page.tsx`:
 
 ```tsx
 export const LoginPage = () => {

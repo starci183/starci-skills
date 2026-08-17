@@ -360,7 +360,7 @@ node type sideways is not a repair, and the record has to say so.
 
 ## Worked example
 
-**Input.** A block file at `src/components/blocks/course/CourseRow/index.tsx`:
+**Input.** A block file at `components/blocks/course/CourseRow/index.tsx`:
 
 ```tsx
 const ROOT = "flex items-center gap-4"

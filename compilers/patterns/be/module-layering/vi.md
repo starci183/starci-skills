@@ -225,7 +225,7 @@ nhiều hàm nhỏ.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một closed union hoặc branded type làm cho giá
-trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `starci-eslint/packages/be/module-layering.mjs`
+trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `@starci/eslint-canon-be`
 bắt được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ |
@@ -270,12 +270,12 @@ Code thật để đối chiếu từng luật. Một luật không chỉ vào �
 | Mã | Điểm neo | Cần nhìn cái gì |
 |---|---|---|
 | `LAYERING-1` | `apps/core/src/app.module.ts` | Sáu mươi hai specifier dùng alias và không cái nào dừng ở một capability. Đọc `@modules/ai/ai.module` ngay cạnh `@modules/platform/exceptions/filters/abstract-exception-http.filter`: cùng một luật, và độ sâu tính là "đã chạm file" lệch nhau một đoạn vì `platform` là category folder còn `ai` là capability |
-| `LAYERING-1` | `src/modules/ai/ai-invoke.service.ts` | Mọi specifier bắc qua capability đều kết ở một file — `@modules/platform/env/config`, `@modules/databases/postgresql/primary/enums/model-provider`. Người đọc liệt kê được phụ thuộc thật của service này từ khối import mà không phải mở gì thêm |
-| `LAYERING-2` | `src/modules/ai/ai-invoke.service.ts` | Vẫn khối import đó, nhưng đọc phần KHÔNG có: các service anh em là `./ai-entitlement.service`, `./balancer/use-api.service`, `./utils/openrouter-cache-headers`, và không có `@modules/ai/...` ở bất cứ đâu trong file. Alias chỉ xuất hiện trên những dòng thật sự rời khỏi capability |
-| `LAYERING-2` | `src/modules/ai/ai.module.ts` | Một module nối bốn provider, hai module lồng bên trong và class option của chính nó — bảy specifier, tất cả đều tương đối. Đây là file mà self-alias cám dỗ nhất, vì module file chính là nơi một capability mô tả chính nó |
+| `LAYERING-1` | `modules/ai/ai-invoke.service.ts` | Mọi specifier bắc qua capability đều kết ở một file — `@modules/platform/env/config`, `@modules/databases/postgresql/primary/enums/model-provider`. Người đọc liệt kê được phụ thuộc thật của service này từ khối import mà không phải mở gì thêm |
+| `LAYERING-2` | `modules/ai/ai-invoke.service.ts` | Vẫn khối import đó, nhưng đọc phần KHÔNG có: các service anh em là `./ai-entitlement.service`, `./balancer/use-api.service`, `./utils/openrouter-cache-headers`, và không có `@modules/ai/...` ở bất cứ đâu trong file. Alias chỉ xuất hiện trên những dòng thật sự rời khỏi capability |
+| `LAYERING-2` | `modules/ai/ai.module.ts` | Một module nối bốn provider, hai module lồng bên trong và class option của chính nó — bảy specifier, tất cả đều tương đối. Đây là file mà self-alias cám dỗ nhất, vì module file chính là nơi một capability mô tả chính nó |
 | `LAYERING-3` | `apps/core/src/app.module.ts` | `AiModule.register({ isGlobal: true })` và `MembershipModule.register({ isGlobal: true })` trong cùng một danh sách. Rồi mở cả hai module capability và xác nhận không bên nào gọi tên bên kia: cạnh đó tồn tại, và nó tồn tại ở đây |
-| `LAYERING-3` | `eslint.config.mjs`, các khối config giới hạn vào `src/modules/**/*.module.ts` và `src/features/**/*.module.ts` | Gate đi khắp cây mà canon nói nên port, kèm comment burn-down ghi lại mười bảy vi phạm giảm về không và ba cái cuối cùng cần gì. `apps/*/src/**` cố tình nằm ngoài glob, tức là luật tự phát biểu ngay trong cấu hình rằng root là ngoại lệ |
-| `LAYERING-3` | `src/modules/bussiness/bussiness.module.ts` | Cạnh đi xuống mà mã này cho phép: một aggregator import các con của chính nó bằng đường tương đối rồi export lại. Lồng nhau không phải cạnh ngang mà mã này từ chối, và chính file này là lý do phải viết ra sự phân biệt đó |
+| `LAYERING-3` | `eslint.config.mjs`, các khối config giới hạn vào `modules/**/*.module.ts` và `features/**/*.module.ts` | Gate đi khắp cây mà canon nói nên port, kèm comment burn-down ghi lại mười bảy vi phạm giảm về không và ba cái cuối cùng cần gì. `apps/*/src/**` cố tình nằm ngoài glob, tức là luật tự phát biểu ngay trong cấu hình rằng root là ngoại lệ |
+| `LAYERING-3` | `modules/bussiness/bussiness.module.ts` | Cạnh đi xuống mà mã này cho phép: một aggregator import các con của chính nó bằng đường tương đối rồi export lại. Lồng nhau không phải cạnh ngang mà mã này từ chối, và chính file này là lý do phải viết ra sự phân biệt đó |
 | `LAYERING-4` | `apps/core/src/app.module.ts` · `apps/cli/src/app.module.ts` | Cùng một capability được hai root đăng ký với hai câu trả lời khác nhau — `PrimaryPostgreSQLModule.register({ withResolvers: true })` đối với `{ withResolvers: false })`. Không câu trả lời nào viết được bên trong capability, vì capability không biết nó đang được khởi động vào ứng dụng nào |
 | `LAYERING-4` | `apps/core/src/main.ts` | Câu lệnh đầu tiên trong file là một side-effect import bắt buộc phải đứng trước mọi import khác, kèm comment nói vì sao. Thứ tự khởi động là kiến thức về cái toàn cảnh, và nó được giữ trong file mà chủ thể chính là cái toàn cảnh |
 | `LAYERING-4` | `apps/cli/src/app.module.ts`, comment doc của class | Một root ghi lại nó cố tình KHÔNG kéo theo cái gì, và subcommand nào làm mỗi lần thêm vào trở nên cần thiết. Lập luận đó chỉ phát biểu được ở root; bên trong capability không có "ứng dụng nào" để mà nói tới |

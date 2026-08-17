@@ -339,17 +339,17 @@ trust tree này, `src/…` là một repository front-end tiêu thụ nó.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `TOKEN-1` | `starci-eslint/packages/fe/contracts.ts` · `src/components/contracts/index.ts` | `export type LayoutClassName` — một union các literal, trong đó có sáu bậc gap |
-| `TOKEN-2` | `starci-eslint/packages/fe/contracts.ts` | Lời chú thích bên trên union: hãy nới danh sách này có chủ ý, để phần thêm vào đọc ra như một quyết định trong diff |
-| `TOKEN-3` | `starci-eslint/packages/fe/tokens.mjs` | Pattern `FRACTIONAL` và rule `noFractionalStep` dựng từ nó |
-| `TOKEN-4` | `starci-eslint/packages/fe/tokens.mjs` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, và hai message id trong `noArbitraryValue` |
-| `TOKEN-5` | `starci-eslint/packages/fe/tokens.mjs` · `src/components/leaves/Heading/index.tsx` | `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau; và cái leaf nơi `level` điều khiển thẻ với cỡ chữ như một quyết định |
-| `TOKEN-6` | `starci-eslint/packages/fe/tokens.mjs` · `starci-eslint/packages/fe/contract.mjs` | `isSourceFile`, nhánh `VariableDeclarator` của `classTextVisitors`; và `LEAF_DIR_RELATIVE` / `isLeafFile`, chỗ gọi tên thư mục được miễn |
-| `TOKEN-7` | `src/components/leaves/IconTile/index.tsx` · `src/components/leaves/RankDeltaCaret/index.tsx` | Một bảng tone ghép `bg-*-soft` với `text-*-soft-foreground`; và một dấu trần dùng `text-success` trơn |
-| `TOKEN-8` | `src/components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` và lời chú thích nói kích cỡ đi theo vị trí đặt, độc lập với mức ưu tiên thị giác |
-| `TOKEN-9` | `starci-eslint/packages/fe/tokens.mjs` · `src/app/globals.css` | `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`; và các biến `--container-app-*` mà các tên `max-w-app-*` đang xin |
-| inset pairing | `src/app/globals.css` · `src/components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` đứng cạnh `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — ngoại lệ ngữ nghĩa ở cùng sức mạnh |
-| joined-list rows | `src/components/contracts/index.ts` | Các entry mang `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
+| `TOKEN-1` | `@starci/eslint-canon-fe/contracts` · `components/contracts/index.ts` | `export type LayoutClassName` — một union các literal, trong đó có sáu bậc gap |
+| `TOKEN-2` | `@starci/eslint-canon-fe/contracts` | Lời chú thích bên trên union: hãy nới danh sách này có chủ ý, để phần thêm vào đọc ra như một quyết định trong diff |
+| `TOKEN-3` | `@starci/eslint-canon-fe` | Pattern `FRACTIONAL` và rule `noFractionalStep` dựng từ nó |
+| `TOKEN-4` | `@starci/eslint-canon-fe` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, và hai message id trong `noArbitraryValue` |
+| `TOKEN-5` | `@starci/eslint-canon-fe` · `components/leaves/Heading/index.tsx` | `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau; và cái leaf nơi `level` điều khiển thẻ với cỡ chữ như một quyết định |
+| `TOKEN-6` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe` | `isSourceFile`, nhánh `VariableDeclarator` của `classTextVisitors`; và `LEAF_DIR_RELATIVE` / `isLeafFile`, chỗ gọi tên thư mục được miễn |
+| `TOKEN-7` | `components/leaves/IconTile/index.tsx` · `components/leaves/RankDeltaCaret/index.tsx` | Một bảng tone ghép `bg-*-soft` với `text-*-soft-foreground`; và một dấu trần dùng `text-success` trơn |
+| `TOKEN-8` | `components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` và lời chú thích nói kích cỡ đi theo vị trí đặt, độc lập với mức ưu tiên thị giác |
+| `TOKEN-9` | `@starci/eslint-canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`; và các biến `--container-app-*` mà các tên `max-w-app-*` đang xin |
+| inset pairing | `app/globals.css` · `components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` đứng cạnh `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — ngoại lệ ngữ nghĩa ở cùng sức mạnh |
+| joined-list rows | `components/contracts/index.ts` | Các entry mang `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 
 Hai hàng cuối neo những quyết định mà luật phẳng đã nói bằng văn xuôi nhưng chưa đánh số. Chúng được
 liệt kê ở đây để các quyết định đó vẫn kiểm được; chúng **không phải** mã mới.
@@ -427,7 +427,7 @@ dấu success, không nói chiều cao của hành động, không nói tầng f
 nói theme có định nghĩa biến container hay không — nên không thứ nào trong số đó được shape giải, và
 tất cả chúng được giải ở đây.
 
-File entry, `src/components/contracts/index.ts`:
+File entry, `components/contracts/index.ts`:
 
 ```text
 value: p-0
@@ -456,7 +456,7 @@ verdict: define --container-app-lg
 reason: the name is a union member, so the compiler is satisfied — which excludes TOKEN-1 and leaves only the missing stylesheet variable
 ```
 
-File leaf, `src/components/leaves/StatusMark/index.tsx`:
+File leaf, `components/leaves/StatusMark/index.tsx`:
 
 ```text
 value: text-success
@@ -476,7 +476,7 @@ verdict: replace with size-4
 reason: the value is a half step rather than a bracketed length, which is what separates it from TOKEN-4
 ```
 
-File leaf, `src/components/leaves/Button/index.tsx`:
+File leaf, `components/leaves/Button/index.tsx`:
 
 ```text
 value: sm

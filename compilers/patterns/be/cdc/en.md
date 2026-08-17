@@ -154,14 +154,14 @@ A law that cannot be pointed at in real code is a proposal. Each code names sour
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `CDC-1` | `src/modules/platform/projection/abstract-projection.listener.ts` | The single `onModuleInit` that calls `ensureTopics`, `createConsumer`, `subscribe` and `run`; then that all 17 files matching `src/modules/**/*projection.listener.ts` declare no lifecycle method of their own |
-| `CDC-2` | `src/modules/bussiness/projections/user-xp/user-xp-projection.listener.ts` | `groupId = "user-xp-projection"` as a string literal, and `topics` built from `envConfig().kafka.cdcTopicPrefix` plus explicit table names — the prefix is environment-scoped, the table set is not |
-| `CDC-2` | `src/tests/helpers/projection-cdc-world.ts` | `PROGRESS_GROUP` / `USER_XP_GROUP` repeating the production group ids as constants; a group a test can name from outside the process is a group that survives a restart |
-| `CDC-3` | `src/modules/bussiness/projections/progress/progress-projection.listener.ts` | `deriveTarget` branching on `topic.endsWith(...)` and returning `{ userId, courseId }` or `null`; `recomputeTarget` containing one call to the projection service and nothing else |
-| `CDC-4` | `src/modules/bussiness/projections/user-xp/user-xp-projection.service.ts` | `recompute` takes a user id and no amount; the SQL selects `SUM(x.amount)` from the ledger and ends `ON CONFLICT (user_id) DO UPDATE SET value = EXCLUDED.value` |
-| `CDC-5` | `src/modules/platform/projection/abstract-projection.listener.ts` | `unwrapRow` returning `null` when `after` is present but empty, and `handleMessage` returning early on `row === null` and on an absent `message.value` |
-| `CDC-6` | `src/modules/platform/projection/abstract-projection.listener.ts` | The `catch` in `handleMessage` building a typed CDC exception, logging it with `groupId` and `topic`, and not rethrowing |
-| `CDC-7` | `src/tests/e2e/projection-cdc-routing.e2e-spec.ts` | `world.publishChange(...)` followed by `until(...)` polling the projection table — the arrange step writes source rows, the act step touches only the broker |
+| `CDC-1` | `modules/platform/projection/abstract-projection.listener.ts` | The single `onModuleInit` that calls `ensureTopics`, `createConsumer`, `subscribe` and `run`; then that all 17 files matching `modules/**/*projection.listener.ts` declare no lifecycle method of their own |
+| `CDC-2` | `modules/bussiness/projections/user-xp/user-xp-projection.listener.ts` | `groupId = "user-xp-projection"` as a string literal, and `topics` built from `envConfig().kafka.cdcTopicPrefix` plus explicit table names — the prefix is environment-scoped, the table set is not |
+| `CDC-2` | `tests/helpers/projection-cdc-world.ts` | `PROGRESS_GROUP` / `USER_XP_GROUP` repeating the production group ids as constants; a group a test can name from outside the process is a group that survives a restart |
+| `CDC-3` | `modules/bussiness/projections/progress/progress-projection.listener.ts` | `deriveTarget` branching on `topic.endsWith(...)` and returning `{ userId, courseId }` or `null`; `recomputeTarget` containing one call to the projection service and nothing else |
+| `CDC-4` | `modules/bussiness/projections/user-xp/user-xp-projection.service.ts` | `recompute` takes a user id and no amount; the SQL selects `SUM(x.amount)` from the ledger and ends `ON CONFLICT (user_id) DO UPDATE SET value = EXCLUDED.value` |
+| `CDC-5` | `modules/platform/projection/abstract-projection.listener.ts` | `unwrapRow` returning `null` when `after` is present but empty, and `handleMessage` returning early on `row === null` and on an absent `message.value` |
+| `CDC-6` | `modules/platform/projection/abstract-projection.listener.ts` | The `catch` in `handleMessage` building a typed CDC exception, logging it with `groupId` and `topic`, and not rethrowing |
+| `CDC-7` | `tests/e2e/projection-cdc-routing.e2e-spec.ts` | `world.publishChange(...)` followed by `until(...)` polling the projection table — the arrange step writes source rows, the act step touches only the broker |
 
 Every code is anchored. No code is unanchored in this version.
 

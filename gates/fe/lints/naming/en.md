@@ -169,7 +169,7 @@ file changes its verdict, and no other rule here reads a path.
 | `<Field handleChange={fn} />` | `handler-on-prefix` | A JSX attribute is checked by its own name, independently of what the receiving component's type says |
 | `app/(marketing)/dang-nhap/page.tsx` | `no-second-language-in-path` | Route-group parentheses and dynamic-segment brackets are stripped before the list comparison |
 | `app/DANG-KY/page.tsx` | `no-second-language-in-path` | The whole path is lowercased before any comparison |
-| `src/components/Đăng nhập/index.tsx` | `no-second-language-in-path` | The accented branch matches anywhere in the segment; no separator or word boundary is required |
+| `components/Đăng nhập/index.tsx` | `no-second-language-in-path` | The accented branch matches anywhere in the segment; no separator or word boundary is required |
 
 **Open** — shipped blindness. A verdict must not claim these were judged.
 
@@ -257,7 +257,7 @@ this module exists to keep sayable.
 
 ## Worked example
 
-**Input.** One route file, `src/app/(marketing)/dang-nhap/page.tsx`:
+**Input.** One route file, `app/(marketing)/dang-nhap/page.tsx`:
 
 ```tsx
 export function LoginPage() {
@@ -301,7 +301,7 @@ verdict: fires
 hatch: none
 ```
 
-**Repaired**, `src/app/(marketing)/sign-in/page.tsx`:
+**Repaired**, `app/(marketing)/sign-in/page.tsx`:
 
 ```tsx
 export const LoginPage = () => {

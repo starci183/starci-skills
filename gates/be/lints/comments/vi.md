@@ -244,7 +244,7 @@ Ngoại lệ ở đây là thuộc tính của quy tắc, không phải chỗ đ
   tha cả dòng, kể cả phần văn xuôi trên đó.
 - **Thư mục nội dung hiển thị.** Đường dẫn chứa `messages/`, `locales/` hay `i18n/` tắt hẳn quy tắc thứ
   ba, tha `COMMENT-4` trên từng dòng của tệp. Soi nội dung hiển thị là soi chính sản phẩm.
-- **Làn dữ liệu thử.** Trong `*.spec.ts`, `*-spec.ts` và `src/tests/`, chỉ dòng chú thích bị soi. Nó tha
+- **Làn dữ liệu thử.** Trong `*.spec.ts`, `*-spec.ts` và `tests/`, chỉ dòng chú thích bị soi. Nó tha
   `COMMENT-4` trên các dòng dữ liệu mà thôi: một câu mà người dùng thật sẽ gõ là dữ liệu đang được nạp vào
   hệ thống, còn chú thích trong tệp thử vẫn là văn xuôi, và vẫn bị từ chối.
 - **Hằng số dữ liệu.** `export const MAX_ATTEMPTS = 3` được miễn `require-export-jsdoc` một cách cố ý,
@@ -274,7 +274,7 @@ chưa được xét, chứ không phải đã qua.
 
 ## Ví dụ đã giải
 
-**Đầu vào.** `src/payment/state.ts`, mã nguồn thường, không rơi vào làn miễn nào:
+**Đầu vào.** `payment/state.ts`, mã nguồn thường, không rơi vào làn miễn nào:
 
 ```ts
 export enum PaymentState {

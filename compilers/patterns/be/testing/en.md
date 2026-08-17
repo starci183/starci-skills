@@ -326,7 +326,7 @@ a public profile with followers.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule in `starci-eslint/packages/be/testing.mjs` catches it;
+wrong value impossible to write; `enforced` means a lint rule in `@starci/eslint-canon-be` catches it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
@@ -359,16 +359,16 @@ Real code each law can be checked against. A law that cannot be pointed at is a 
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `TESTING-1` | `src/tests/e2e/course-purchase.e2e-spec.ts` · `src/tests/e2e/rewards-queries.e2e-spec.ts` | The first filename is a business sentence; the second is a resolver group wearing a test's clothes, and is the shape this code refuses. Both are live |
-| `TESTING-2` | `starci-eslint/packages/be/testing.mjs` → `STATE_READERS` · any file under `src/tests/e2e/` reading through `entityManager` | The identifiers the rule accepts as evidence that state was read back, and a flow that actually reads it |
-| `TESTING-3` | `src/tests/helpers/flow-world.ts` · `src/tests/helpers/flow-wait.ts` | The world enters over GraphQL through a real HTTP client; the wait helpers replace `sleep` with a deadline plus a predicate |
-| `TESTING-4` | `src/tests/e2e/course-refund.e2e-spec.ts` · `src/tests/e2e/community-concurrency.e2e-spec.ts` | Two unhappy paths that earn a flow: a reversal that must run, and a race a constraint must catch |
-| `TESTING-5` | `src/features/api/processors/ai/score-uploaded-cv/enqueue-score-uploaded-cv.service.spec.ts` | A branch table driven by `it.each`, one row per outcome-changing case rather than one case in the middle of the range |
-| `TESTING-6` | `starci-eslint/packages/be/testing.mjs` → `CALL_MATCHERS`, `matcherOf` | The nine matchers counted as call assertions, and the member-chain climb that makes `.not` and `.resolves` pass through |
-| `TESTING-7` | `jest.config.ts` → `testPathIgnorePatterns` · `src/tests/e2e/jest-e2e.json` → `testRegex` · `src/tests/harness/jest-harness.json` → `testRegex` | Three configs discriminating on suffix alone, which is what lets the lanes share a folder without the fast run picking them up |
+| `TESTING-1` | `tests/e2e/course-purchase.e2e-spec.ts` · `tests/e2e/rewards-queries.e2e-spec.ts` | The first filename is a business sentence; the second is a resolver group wearing a test's clothes, and is the shape this code refuses. Both are live |
+| `TESTING-2` | `@starci/eslint-canon-be` → `STATE_READERS` · any file under `tests/e2e/` reading through `entityManager` | The identifiers the rule accepts as evidence that state was read back, and a flow that actually reads it |
+| `TESTING-3` | `tests/helpers/flow-world.ts` · `tests/helpers/flow-wait.ts` | The world enters over GraphQL through a real HTTP client; the wait helpers replace `sleep` with a deadline plus a predicate |
+| `TESTING-4` | `tests/e2e/course-refund.e2e-spec.ts` · `tests/e2e/community-concurrency.e2e-spec.ts` | Two unhappy paths that earn a flow: a reversal that must run, and a race a constraint must catch |
+| `TESTING-5` | `features/api/processors/ai/score-uploaded-cv/enqueue-score-uploaded-cv.service.spec.ts` | A branch table driven by `it.each`, one row per outcome-changing case rather than one case in the middle of the range |
+| `TESTING-6` | `@starci/eslint-canon-be` → `CALL_MATCHERS`, `matcherOf` | The nine matchers counted as call assertions, and the member-chain climb that makes `.not` and `.resolves` pass through |
+| `TESTING-7` | `jest.config.ts` → `testPathIgnorePatterns` · `tests/e2e/jest-e2e.json` → `testRegex` · `tests/harness/jest-harness.json` → `testRegex` | Three configs discriminating on suffix alone, which is what lets the lanes share a folder without the fast run picking them up |
 | `TESTING-8` | `package.json` → `test:int`, `test:ci` | Both carry `--passWithNoTests`. That flag is exactly the failure mode this code names, so it is the anchor a reader checks the lane's file count against |
-| `TESTING-9` | `src/tests/helpers/flow-world.ts` → the default `AiInvokeService` stub | The stub is installed by the world, returns well-formed JSON rather than a marker, and is a jest mock a flow can reprogram per step |
-| `TESTING-10` | `src/tests/helpers/harness-credentials.ts` · `src/tests/harness/` | One required process-only credential per authority, with no file, OAuth, key-pool or sibling-variable fallback, and a separate variable for the judge |
+| `TESTING-9` | `tests/helpers/flow-world.ts` → the default `AiInvokeService` stub | The stub is installed by the world, returns well-formed JSON rather than a marker, and is a jest mock a flow can reprogram per step |
+| `TESTING-10` | `tests/helpers/harness-credentials.ts` · `tests/harness/` | One required process-only credential per authority, with no file, OAuth, key-pool or sibling-variable fallback, and a separate variable for the judge |
 | `TESTING-11` | `scripts/seed-dashboard-test-data.mjs` · `scripts/seed-profile-test-data.mjs` | The seed writes source rows and then invalidates derived projections, and takes the inspected account as an argument rather than pinning one identity |
 
 Every code is anchored. None is unanchored.

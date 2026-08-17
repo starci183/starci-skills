@@ -296,7 +296,7 @@ component đặt tạm trong `app/` "cho gần route" · một file `helpers.ts`
 Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay — chính xác thứ mà cơ chế không nhìn thấy
 được. Cột cuối là phần trung thực của bảng này.
 
-| Mã | Tier | Rule trong `starci-eslint/packages/fe/file-layout.mjs` | Thứ rule không nhìn thấy |
+| Mã | Tier | Rule trong `@starci/eslint-canon-fe` | Thứ rule không nhìn thấy |
 |---|---|---|---|
 | `FILE-1` | `enforced` | `export-matches-folder` | Thư mục có giữ MỘT component hay không. Rule chấp nhận một thư mục ngay khi MỘT export thuộc họ, nên một hành khách đi nhờ ngồi cạnh một export khớp tên vẫn qua. |
 | `FILE-2` | `enforced` | `surface-folder-two-files-only` | Bên trong hai file đó. Một `component.tsx` đã phình ra bốn component trong một file thì không phải file thứ ba, nên nó qua. |
@@ -317,12 +317,12 @@ cây thư mục là điểm neo phụ vì đó là nơi luật thật sự đư�
 
 | Mã | Điểm neo | Cần nhìn gì |
 |---|---|---|
-| `FILE-1` | `starci-eslint/packages/fe/file-layout.test.mjs`, case `FILE-1: the path predicts the name` · `src/components/*/**/<Name>/index.tsx` | Một named export trực tiếp bằng đúng tên thư mục, hoặc bắt đầu bằng tên đó rồi nối tiếp bằng một chữ hoa |
-| `FILE-2` | Cùng file, case `FILE-2: a surface folder holds its two halves and their twins` · `src/components/pages/*/` và `src/components/overlays/*/*/` | Mỗi thư mục liệt kê đúng `component.tsx` và `index.tsx`, cộng bản sinh đôi `.test.tsx` ở nơi có |
-| `FILE-3` | Cùng file, case `FILE-3: a helper folder under components has a real home elsewhere` · `src/hooks/`, `src/modules/utils/` | Các đích đến tồn tại và có nội dung, và tìm đệ quy các thư mục `constants`, `utils`, `types` hoặc `hooks` dưới `src/components/` thì không ra gì |
-| `FILE-4` | Cùng file, case `FILE-4: a family is exported as members, not as one object` · mọi `index.tsx` dưới `src/components/` | Thành viên của họ được export mỗi câu lệnh một cái; không có `export const <Capital> = { … }` chỉ chứa các thành viên viết hoa |
+| `FILE-1` | `@starci/eslint-canon-fe`, case `FILE-1: the path predicts the name` · `components/*/**/<Name>/index.tsx` | Một named export trực tiếp bằng đúng tên thư mục, hoặc bắt đầu bằng tên đó rồi nối tiếp bằng một chữ hoa |
+| `FILE-2` | Cùng file, case `FILE-2: a surface folder holds its two halves and their twins` · `components/pages/*/` và `components/overlays/*/*/` | Mỗi thư mục liệt kê đúng `component.tsx` và `index.tsx`, cộng bản sinh đôi `.test.tsx` ở nơi có |
+| `FILE-3` | Cùng file, case `FILE-3: a helper folder under components has a real home elsewhere` · `hooks/`, `modules/utils/` | Các đích đến tồn tại và có nội dung, và tìm đệ quy các thư mục `constants`, `utils`, `types` hoặc `hooks` dưới `components/` thì không ra gì |
+| `FILE-4` | Cùng file, case `FILE-4: a family is exported as members, not as one object` · mọi `index.tsx` dưới `components/` | Thành viên của họ được export mỗi câu lệnh một cái; không có `export const <Capital> = { … }` chỉ chứa các thành viên viết hoa |
 | `FILE-5` | Cùng file, case `FILE-5: each tier sits on its own side of the feature line` — **chưa neo được trong code production** | Không có workspace nào có `packages/` và `apps/` để chỉ vào; bằng chứng sống duy nhất là các đường dẫn fixture của chính rule |
-| `FILE-6` | Cùng file, case `FILE-6: the routing tree holds route files and nothing else` · `src/app/**` | Mọi tên file đều là một slot của framework, `providers`, `globals.css`, một bản sinh đôi `.test.`, nằm dưới `api/`, hoặc nằm dưới một thư mục `_` — và không gì khác |
+| `FILE-6` | Cùng file, case `FILE-6: the routing tree holds route files and nothing else` · `app/**` | Mọi tên file đều là một slot của framework, `providers`, `globals.css`, một bản sinh đôi `.test.`, nằm dưới `api/`, hoặc nằm dưới một thư mục `_` — và không gì khác |
 
 `FILE-5` là mã duy nhất không có điểm neo production, và nó vẫn ở lại trong luật vì cây một app là một
 lát cắt thời điểm, không phải một quyết định. Nó được ghi lại như một rủi ro còn mở chứ không bị lặng lẽ

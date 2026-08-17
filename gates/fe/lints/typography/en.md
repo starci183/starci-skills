@@ -218,7 +218,7 @@ hatch could have hidden a failure, or `hatch: none`. A file out of scope emits o
 
 ## Worked example
 
-**Input.** `src/components/blocks/order/OrderSummary/index.tsx`:
+**Input.** `components/blocks/order/OrderSummary/index.tsx`:
 
 ```tsx
 export function OrderSummary({title, notes}) {

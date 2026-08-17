@@ -288,7 +288,7 @@ exist for that file, and the block records that rather than a pass.
 
 ## Worked example
 
-**Input.** `src/modules/enrollment/enrollment.service.ts` — a production path, so the
+**Input.** `modules/enrollment/enrollment.service.ts` — a production path, so the
 `no-double-cast` gate does not exempt it:
 
 ```ts
