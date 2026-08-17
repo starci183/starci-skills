@@ -18,14 +18,16 @@ from what it still owes has not finished.
 
 Detection is not permission. Finding that something must change is never authority to change it.
 
-## The eight capabilities
+## The nine capabilities
 
-Seven do work. `starci-diagnose` does not: it traces one of the seven and writes nothing that skill
-would write, which is why it is the only capability with no apply stage.
+Seven do work. Two only look — `starci-stale` at the machine, `starci-diagnose` at the other skills — and
+they are the two with no apply stage. The moment a report repairs something, nobody can trust it as a
+measurement: a route it quietly refreshed reads as a route that was fine.
 
 | Skill | Journey | Owns |
 |---|---|---|
 | `starci-init` | plan → review → apply, internal | making a Source ready: the bootstrap, the workspace routes, the worktree state — three roots, one approval each |
+| `starci-stale` | plan only | which projects' routes no longer describe this machine, and who clears each |
 | `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | plan → review → apply | a red source returned green: format, autofix and defect passes kept apart, and the defect pass fanned out |
 | `starci-fe-design-layout` | opens or resumes the session, then layout rounds | 3–4 layout candidates per surface, hash-bound |

@@ -14,8 +14,12 @@ import {fileURLToPath} from "node:url";
 
 const args = process.argv.slice(2);
 const out = args[args.indexOf("--out") + 1];
-if (!args.includes("--out") || !out) {
+// `--stale` reports instead of writing: one rollup per project, with the reason and the skill that
+// clears it. Exit 1 when anything is stale, so the same scan is usable from a shell that checks.
+const staleOnly = args.includes("--stale");
+if (!staleOnly && (!args.includes("--out") || !out)) {
   console.error("usage: export-console-state.mjs --out <console-checkout>/public/state.json");
+  console.error("       export-console-state.mjs --stale");
   process.exit(2);
 }
 
@@ -236,6 +240,100 @@ const state = {
   projects,
   warnings,
 };
+
+// The contract layer, measured without running anything: parse the entry table the route names and
+// classify it. Cheap enough to always run, and it answers the question a red gate cannot — whether the
+// index a lookup matches on is findable at all.
+function readContractHealth(row) {
+  if (!row.contract || !row.contractExists) return null;
+  let text;
+  try {
+    text = readFileSync(row.contract, "utf8");
+  } catch {
+    return null;
+  }
+  const keys = [...text.matchAll(/^\s{4}"([a-z0-9-]+)":/gm)].map((m) => m[1]);
+  const whys = [...text.matchAll(/why: "([^"]{8,})"/g)].map((m) => m[1]);
+  const pages = keys.filter((k) => k.endsWith("-page"));
+  const featured = keys.filter((k) => !k.endsWith("-page") && /^(flashcard|profile|course|learn|playground|personal|coding|billing|auth|weekly|mock|fleet)-/.test(k));
+  // A `why` that starts by describing states a shape; one that starts with a condition states a need,
+  // which is the only form a later lookup can match.
+  const needShaped = whys.filter((w) => /^(if |when |a reader |the reader )/i.test(w)).length;
+  return {
+    entries: keys.length,
+    pages: pages.length,
+    featurePrefixed: featured.length,
+    reasons: whys.length,
+    needShaped,
+    describing: whys.length - needShaped,
+  };
+}
+
+// Which skill clears which reason. A list of problems with no owner is a list nobody acts on, and
+// guessing the owner is how a route problem gets sent to a repair run.
+function clearedBy(reason) {
+  if (/head is behind/.test(reason)) return "starci-init — refresh the route's recorded head";
+  if (/not on this disk|no longer exists/.test(reason)) return "starci-init — the checkout moved; repoint or restore it";
+  if (/no contract recorded/.test(reason)) return "starci-init — declare the contract path; in a monorepo it is not where a one-app convention looks";
+  if (/no config.json/.test(reason)) return "starci-init — the role has no route on this machine";
+  return "starci-init";
+}
+
+if (staleOnly) {
+  const byProject = new Map();
+  for (const row of workspaces) {
+    if (row.verdict === "ok") continue;
+    const rows = byProject.get(row.project) ?? [];
+    rows.push(row);
+    byProject.set(row.project, rows);
+  }
+
+  const clean = workspaces.filter((w) => w.verdict === "ok").length;
+  console.log(`${workspaces.length} route(s) across ${new Set(workspaces.map((w) => w.project)).size} project(s) — ${clean} ok, ${workspaces.length - clean} stale\n`);
+
+  if (byProject.size === 0) {
+    console.log("no project is stale");
+  } else {
+    for (const [project, rows] of [...byProject.entries()].sort()) {
+      console.log(`${project}`);
+      for (const row of rows) {
+        console.log(`  ${row.role.padEnd(9)} ${row.verdict.padEnd(7)} ${row.reason}`);
+        console.log(`  ${" ".repeat(9)} ${" ".repeat(7)} → ${clearedBy(row.reason)}`);
+      }
+      console.log("");
+    }
+  }
+
+  // The contract layer. Not a route problem and not repaired by refreshing one: an index nobody can
+  // search means the next design run writes an entry that already exists.
+  let indexDebt = 0;
+  const contracts = workspaces.map((row) => [row, readContractHealth(row)]).filter(([, health]) => health);
+  if (contracts.length > 0) {
+    console.log("contract index:");
+    for (const [row, health] of contracts) {
+      const describing = health.describing;
+      indexDebt += describing;
+      console.log(`  ${row.project}/${row.role}  ${health.entries} entries · ${health.pages} page keys · ${health.featurePrefixed} feature-prefixed`);
+      console.log(`  ${" ".repeat((row.project + "/" + row.role).length)}  ${health.reasons} reasons · ${health.needShaped} state a need · ${describing} describe a shape`);
+      if (describing > 0) console.log(`  ${" ".repeat((row.project + "/" + row.role).length)}  → starci-repair, the \`why\` pass — a reason that describes is findable only by somebody who already knows it`);
+    }
+    console.log("");
+  }
+
+  if (warnings.length > 0) {
+    console.log(`${warnings.length} warning(s) that are not a route:`);
+    for (const warning of warnings) console.log(`  - ${warning}`);
+    console.log("");
+  }
+
+  // Say which layers ran. A list that silently skipped the expensive one reads as "nothing else is
+  // wrong", which is the one thing a report must never imply.
+  console.log("layers measured: route (filesystem + git) · contract index (parsed)");
+  console.log("layers NOT measured: lint, typecheck, build, tests — they belong to starci-repair, which");
+  console.log("  runs the repository's own gates and writes build output while doing it.");
+
+  process.exit(byProject.size > 0 || indexDebt > 0 ? 1 : 0);
+}
 
 await mkdir(dirname(resolve(out)), {recursive: true});
 await writeFile(resolve(out), JSON.stringify(state, null, 2) + "\n", "utf8");

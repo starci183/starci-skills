@@ -19,14 +19,17 @@ quyết** với **cái nó đã ghi** với **cái nó còn nợ** thì chưa xo
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
-## Tám năng lực
+## Chín năng lực
 
-Bảy cái làm việc. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
+Bảy cái làm việc. Hai cái chỉ **nhìn** — `starci-stale` nhìn cái máy, `starci-diagnose` nhìn các skill
+khác — và đó là hai năng lực duy nhất không có stage apply. Một bản báo cáo mà sửa thứ gì thì không ai còn
+tin nó là **phép đo**: cái route nó âm thầm làm mới sẽ đọc ra như một route vốn đã ổn. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
 thứ gì mà skill đó sẽ ghi — vì vậy nó là năng lực duy nhất không có stage apply.
 
 | Skill | Hành trình | Sở hữu |
 |---|---|---|
 | `starci-init` | plan → review → apply, nội bộ | làm một Source sẵn sàng: bootstrap, route workspace, state worktree — ba root, mỗi root một lần duyệt |
+| `starci-stale` | chỉ plan | project nào có route không còn mô tả đúng máy này, và ai dọn từng cái |
 | `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-repair` | plan → review → apply | một source đỏ trở lại xanh: pass format, autofix và defect giữ tách nhau, và pass defect được chia cho nhiều agent |
 | `starci-fe-design-layout` | mở hoặc tiếp session, rồi các lượt layout | 3–4 phương án layout mỗi bề mặt, buộc theo hash |
