@@ -19,15 +19,16 @@ quyết** với **cái nó đã ghi** với **cái nó còn nợ** thì chưa xo
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
-## Bảy năng lực
+## Tám năng lực
 
-Sáu cái làm việc. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
+Bảy cái làm việc. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
 thứ gì mà skill đó sẽ ghi — vì vậy nó là năng lực duy nhất không có stage apply.
 
 | Skill | Hành trình | Sở hữu |
 |---|---|---|
 | `starci-init` | plan → review → apply, nội bộ | làm một Source sẵn sàng: bootstrap, route workspace, state worktree — ba root, mỗi root một lần duyệt |
 | `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
+| `starci-repair` | plan → review → apply | một source đỏ trở lại xanh: pass format, autofix và defect giữ tách nhau, và pass defect được chia cho nhiều agent |
 | `starci-fe-design-layout` | mở hoặc tiếp session, rồi các lượt layout | 3–4 phương án layout mỗi bề mặt, buộc theo hash |
 | `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region, buộc theo hash |
 | `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
@@ -116,6 +117,7 @@ Một bản ghi chỉ-ghi-thêm tại `<Source>/.workflows/<kind>/<app>/<name>.m
 | `designs` | bề mặt, layout, block và overlay của frontend |
 | `feature` | năng lực backend |
 | `setup` | route workspace và state worktree |
+| `repair` | một source được đưa về xanh |
 
 Mỗi phase ghi thêm tiêu đề của nó, đúng bảng `CONTEXT` đã in cho lượt đó, các bảng bằng chứng của nó,
 rồi sáu bảng kết quả theo thứ tự. Phase được duyệt ghi `Approved revision: <identity>`, và Apply trích

@@ -18,15 +18,16 @@ from what it still owes has not finished.
 
 Detection is not permission. Finding that something must change is never authority to change it.
 
-## The seven capabilities
+## The eight capabilities
 
-Six do work. `starci-diagnose` does not: it traces one of the seven and writes nothing that skill
+Seven do work. `starci-diagnose` does not: it traces one of the seven and writes nothing that skill
 would write, which is why it is the only capability with no apply stage.
 
 | Skill | Journey | Owns |
 |---|---|---|
 | `starci-init` | plan → review → apply, internal | making a Source ready: the bootstrap, the workspace routes, the worktree state — three roots, one approval each |
 | `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
+| `starci-repair` | plan → review → apply | a red source returned green: format, autofix and defect passes kept apart, and the defect pass fanned out |
 | `starci-fe-design-layout` | opens or resumes the session, then layout rounds | 3–4 layout candidates per surface, hash-bound |
 | `starci-fe-design-block` | block rounds | 3–4 anatomies per region, hash-bound |
 | `starci-fe-design-execute` | execution | frontend source, only after every reachable hash is accepted |
@@ -115,6 +116,7 @@ One append-only record at `<Source>/.workflows/<kind>/<app>/<name>.md`:
 | `designs` | frontend surfaces, layouts, blocks and overlays |
 | `feature` | backend capability |
 | `setup` | workspace routes and worktree state |
+| `repair` | a source returned to green |
 
 Each phase appends its heading, the exact `CONTEXT` table printed for that run, its evidence tables,
 then the six output tables in order. An approved phase writes `Approved revision: <identity>`, and
