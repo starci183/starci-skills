@@ -93,9 +93,18 @@ classes a leaf is supposed to write, while every rule guarding the leaf tier qui
 anything. Measured once, pointed at a monorepo: 46 errors across 28 correct files, and the repository
 owed none of them.
 
+The machine does this without branching per layout, and the shape is worth copying: a predicate walks
+the closed list and passes if **any** root matches; a path builder maps the list and emits **one
+candidate per layout**; a resource that can be split — a theme stylesheet in a monorepo — has its own
+candidate list, and every file found is read and joined rather than the first one winning. So a layout
+added to the list is added to every rule at once, which is the whole reason there is one list instead
+of an `if` per rule.
+
 A monorepo also carries one law a single-app tree cannot have — `FILE-5`: a tier that knows a feature
 belongs to the app that owns the feature, a tier that knows none belongs to the shared package. In a
-single-app checkout that rule is inert by construction, not disabled.
+single-app checkout that rule is **inert by its own regex**, which requires an `apps/<name>/src/` or
+`packages/<name>/src/` segment — not disabled by configuration, so nobody has to remember to turn it
+off and nobody can turn it on wrongly.
 
 The exception is a rule describing **its own machine**: when a lint gates on a filename containing
 `/src/tests/`, that string is the mechanism, not a layout claim, and it is quoted exactly.
