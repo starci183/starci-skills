@@ -172,6 +172,7 @@ background agent, where nobody is watching the branch it stands on.
 
 | Input | Evidence required |
 |---|---|
+| roots | The three paths under `.worktrees/<project>/`, valid against [`schema.json`](./schema.json) beside this record |
 | project | A declared project name, never inferred from a folder |
 | source | The repository holding the trust tree and workflow root |
 | outputs | Each thing the run will write, and whether it is rebuildable |

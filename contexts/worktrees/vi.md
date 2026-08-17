@@ -171,6 +171,7 @@ từ một background agent, nơi không ai đang nhìn xem nó đứng trên nh
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
+| ba root | Ba đường dẫn dưới `.worktrees/<project>/`, hợp [`schema.json`](./schema.json) nằm cạnh bản ghi này |
 | project | Tên project do người khai, không bao giờ suy từ tên thư mục |
 | source | Repository chứa cây quy tắc và workflow root |
 | đầu ra | Từng thứ lượt chạy sẽ ghi, và nó có dựng lại được không |

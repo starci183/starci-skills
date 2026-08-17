@@ -168,7 +168,7 @@ workspace ngay từ đầu.
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
 | yêu cầu | Danh sách project và vai trò đúng nghĩa chữ |
-| route | `.workspace/<project>/<role>/config.json`, hợp `workspace.schema.json` |
+| route | `.workspace/<project>/<role>/config.json`, hợp [`schema.json`](./schema.json) nằm cạnh bản ghi này |
 | checkout | Thư mục tại `repository.diskPath`, có thật trên đĩa |
 | hợp đồng | Tệp tại `context.contract`, và `context.contractSource` cho xuất xứ của nó |
 | độ mới | Head và nhánh đã ghi còn mô tả đúng checkout đó |

@@ -169,7 +169,7 @@ machine only. Runtime secrets, environment values and tokens are never workspace
 | Input | Evidence required |
 |---|---|
 | request | The literal project and role list |
-| route | `.workspace/<project>/<role>/config.json`, valid against `workspace.schema.json` |
+| route | `.workspace/<project>/<role>/config.json`, valid against [`schema.json`](./schema.json) beside this record |
 | checkout | The directory at `repository.diskPath`, present on disk |
 | contract | The file at `context.contract`, and `context.contractSource` for its provenance |
 | freshness | Recorded head and branch still describing that checkout |
