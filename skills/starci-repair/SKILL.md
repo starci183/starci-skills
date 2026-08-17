@@ -1,19 +1,20 @@
 ---
 name: starci-repair
-description: Take a source that no longer builds, no longer lints clean, drifted out of format, or whose contract reasons nobody can find by need, and return it green — measured before and after with the repository's own gates, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, when lint debt has piled up, or before trusting a repository nobody has run in a while. Writes product source, after approval.
+description: Take a source that no longer builds, no longer lints clean, drifted out of format, or whose contract reasons nobody can find by need, or which still carries a `.claude/` left behind by an older tree, and return it green — measured before and after with the repository's own gates, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, when lint debt has piled up, or before trusting a repository nobody has run in a while. Writes product source, after approval.
 ---
 
 # starci-repair
 
 Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
 
-**Two different things are called stale, and repairing the wrong one wastes the run.**
+**Four different things are called stale, and repairing the wrong one wastes the run.**
 
 | What is stale | Symptom | Owner |
 |---|---|---|
 | the **route** | the recorded checkout, contract or head no longer holds | [`starci-init`](../starci-init/SKILL.md) |
 | the **source** | it does not build, does not lint clean, or drifted out of format | this skill |
 | the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, last pass |
+| a **remnant** | a target checkout still carries a `.claude/` left from an older tree | this skill, after the index |
 
 So this skill resolves the route first and **stops** if the route is the stale thing. Repairing source
 through a stale route means repairing a repository nobody asked about.
@@ -69,6 +70,7 @@ This is the number the run will be judged against. A repair with no before-count
 | `mechanical` | a fix the tool can make safely and the reader can verify by eye | autofix, then read the diff |
 | `defect` | real broken behaviour, a wrong type, a dead import, a missing case | repaired by hand, one at a time |
 | `index` | a contract `why` that describes something instead of stating when you would need it, so no lookup can find it | rewritten in its own pass, reasons only |
+| `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in 7d |
 | `decision` | the code is deliberate and the rule refuses it, or the rule and canon disagree | **returned to the owner** — the fix is a decision, not an edit |
 
 A `decision` misfiled as a `defect` is how a rule gets bent to match the code. A `defect` misfiled as a
@@ -93,8 +95,10 @@ Then, in this order, each pass its own commit:
 2. **mechanical** — autofix, then read every hunk. An autofix that changed behaviour is a defect the
    tool introduced, and it is caught here or not at all.
 3. **defects** — by hand, smallest first, re-running the gate that reported each one.
-4. **`why`** — the contract index, last, because it is the only pass no gate can judge and it must not be
-   mistaken for one of the three above.
+4. **`why`** — the contract index, because it is a pass no gate can judge and it must not be mistaken for
+   one of the three above.
+5. **remnant** — last, and the only pass that removes rather than repairs. Alone in its commit, so a
+   deletion is never read as part of a fix.
 
 A pass that would need to weaken a gate stops and returns the boundary. Unrelated work in the tree is
 preserved: this skill repairs what the gates named and nothing adjacent that caught the eye.
@@ -169,6 +173,39 @@ and builds, and the classification counts are printed before and after. A reason
 than a narrow one — it will match lookups it should not — so an entry whose need cannot be read off what
 it actually fixes is **asked about, not guessed**.
 
+### 7d — The remnant pass: one Source, so a second `.claude` is a corpse or a question
+
+**There is one Source and one trust tree. A project is a folder inside it —
+`<Source>/.worktrees/<project>/`, `<Source>/.workspace/<project>/` — never a tree of its own.** So a
+`.claude/` found inside a target checkout is not a second tree by design; it is what an older tree left
+when its enforcement code moved out, and the only harm it does is to the next reader, who sees the name
+and concludes the project owns rules of its own. That is exactly the wrong conclusion, and no gate in any
+repository will ever report it.
+
+This pass runs **only on the role targets the route resolved**, never on a path the run went looking for.
+
+Two questions decide it, and both must answer yes before anything is deleted:
+
+| Question | Yes | No |
+|---|---|---|
+| Is every file in it untracked by that repository? | it is nobody's committed configuration | **return it** — a tracked file is that repo's own state, and removing it edits a product's history |
+| Does it hold only empty directories and files no law here names? | it is a corpse | **return it** — a populated `.claude` may be a Source, and deleting a Source is unrecoverable |
+
+A tracked file is the common case and it is a `decision`, not a defect: `launch.json` is an editor
+configuration the product's own team may run every day. This skill does not delete other people's
+committed files to tidy a name.
+
+**Empty is proven by counting, not by listing.** A directory that looks empty because the listing was
+shallow is a directory this pass must refuse. Count files recursively and print the number.
+
+Proof is the count before, the approval, and the count after. The removal is its own commit, its message
+names what the directory held, and `CHANGES` says `removed` rather than `repaired` — a deletion recorded
+as a repair is a deletion nobody can review.
+
+Measured once: `nivo-fe/.claude` held `launch.json`, **tracked**, and `sources/` with **0 files**. So the
+verdict was split, and splitting it was the point — the empty directory is removable, the tracked file
+goes back to its owner with the reason.
+
 ### 8 — Prove it with the same commands
 
 Re-run the exact gates from step 4 and print before-and-after side by side. Zero errors means zero — not
@@ -191,13 +228,16 @@ tables.
   `starci-diagnose` calls it a `defect` rather than an environment problem.
 - The tree is already dirty with unrelated work → stop; a baseline taken from mixed state proves nothing
   and the diff will not be readable.
+- A `.claude/` in a target checkout holds tracked files or real content → stop the remnant pass and return
+  it; one of those is somebody's committed configuration and the other may be a Source.
 - A repository declares no gates at all → stop; there is nothing to measure, and inventing commands
   measures somebody else's project.
 
 ## OUTPUT
 
 The six tables from the skill shape, in order. `OUTPUTS` carries the before-and-after counts per gate;
-`CHANGES` names every path in each pass, and says which pass each belongs to; `NEED APPROVALS` carries
-one row per `decision`; `WARNINGS` carries every autofix hunk that changed more than formatting;
+`CHANGES` names every path in each pass, and says which pass each belongs to, marking a remnant path
+`removed` rather than `repaired`; `NEED APPROVALS` carries one row per `decision`, including each
+remnant proposed for removal with its recursive file count; `WARNINGS` carries every autofix hunk that changed more than formatting;
 `REJECTED` carries the owner's words on any repair they refused; `OWED` carries the findings still
 standing and the exact command that reproduces them.

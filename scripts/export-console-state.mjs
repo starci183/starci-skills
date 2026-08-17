@@ -38,6 +38,19 @@ const git = (cwd, ...rest) => {
 const dirs = (path) => (existsSync(path) ? readdirSync(path, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name) : []);
 const countFiles = (path) => (existsSync(path) ? readdirSync(path).filter((n) => n.endsWith(".json")).length : 0);
 
+// A `.claude/` inside a target checkout is what an older tree left behind, and nothing in that repository
+// will ever report it — so it is counted here. The Source itself is excluded by path: its `.claude` is the
+// tree. Count recursively, because a shallow listing calls a populated directory empty, and count tracked
+// files separately, because those are the product's own committed state and not this tree's to remove.
+function readRemnant(diskPath) {
+  const path = join(diskPath, ".claude");
+  if (resolve(diskPath) === resolve(source) || !existsSync(path)) return null;
+  const walk = (dir) => dirs(dir).map((name) => join(dir, name)).flatMap(walk).concat(readdirSync(dir, {withFileTypes: true}).filter((e) => e.isFile()).map((e) => join(dir, e.name)));
+  const files = walk(path);
+  const tracked = (git(diskPath, "ls-files", "--", ".claude") ?? "").split("\n").filter(Boolean);
+  return {path, files: files.length, tracked: tracked.length};
+}
+
 function readWorkspaces() {
   const root = join(source, ".workspace");
   const rows = [];
@@ -80,7 +93,14 @@ function readWorkspaces() {
         reason = "frontend role with no contract recorded — look for the registry before trusting this";
       }
 
-      rows.push({project, role, route, diskPath, diskPathExists, contract, contractExists, contractSource: config.context?.contractSource ?? null, branch: config.repository?.branch ?? null, recordedHead, liveHead, verdict, reason});
+      // Not a route verdict: the route is fine and the source may be green. It is a warning because the
+      // only thing it breaks is a later reader's belief that this project owns rules of its own.
+      const remnant = diskPathExists ? readRemnant(diskPath) : null;
+      if (remnant) {
+        warnings.push(`${project}/${role}: ${remnant.path} is a leftover tree — ${remnant.files} file(s), ${remnant.tracked} tracked → starci-repair, the remnant pass${remnant.tracked > 0 ? " (tracked files return to the owner)" : ""}`);
+      }
+
+      rows.push({project, role, route, diskPath, diskPathExists, contract, contractExists, contractSource: config.context?.contractSource ?? null, branch: config.repository?.branch ?? null, recordedHead, liveHead, verdict, reason, remnant});
     }
   }
   return rows;
