@@ -47,7 +47,7 @@ that it has. Green measured against a private copy is green against a rule nobod
 
 ### 1 — Print CONTEXT
 
-`Phase` is `plan`, then `review`, then `apply`. `Touching` is the workflow record until approval; after
+`Phase` is `plan`, then `review`, then `apply`. `Touching` is `None` until approval; after
 approval it is the exact source paths the approved boundary names.
 
 ### 2 — Resolve and verify the route, and stop if the route is the problem
@@ -269,8 +269,7 @@ lies.**
 
 ### 13 — Close the phase
 
-Append the workflow with the applied revision, the baseline commit, the tracked diff and the two count
-tables.
+Close with the applied revision, the baseline commit, the tracked diff and the two count tables.
 
 ## Stops
 

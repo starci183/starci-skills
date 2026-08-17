@@ -174,7 +174,7 @@ background agent, where nobody is watching the branch it stands on.
 |---|---|
 | roots | The three paths under `.worktrees/<project>/`, valid against [`schema.json`](./schema.json) beside this record |
 | project | A declared project name, never inferred from a folder |
-| source | The repository holding the trust tree and workflow root |
+| source | The repository holding the trust tree |
 | outputs | Each thing the run will write, and whether it is rebuildable |
 | worktree list | Git's own account of worktrees, with lock and prunable status |
 | ignore proof | That `sessions` and `cache` are ignored by Source |

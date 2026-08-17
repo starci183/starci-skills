@@ -15,8 +15,8 @@ hash, never to a rendered page.
 
 ### 1 — Print CONTEXT
 
-Print `### CONTEXT` before touching anything. `Phase` is `layout`. `Touching` names the workflow record
-and the project registry, and nothing in the frontend repository.
+Print `### CONTEXT` before touching anything. `Phase` is `layout`. `Touching` names the project registry
+and its session, and nothing in the frontend repository.
 
 ### 2 — Resolve and verify the workspace route
 
@@ -129,7 +129,7 @@ words.
 
 ### 11 — Close the phase
 
-Append the workflow and print the six tables. `OWED` names the block rounds that have not happened.
+Print the six tables. `OWED` names the block rounds that have not happened.
 
 ## Stops
 
@@ -143,6 +143,6 @@ Append the workflow and print the six tables. `OWED` names the block rounds that
 ## OUTPUT
 
 The six tables from the skill shape, in order. `OUTPUTS` names the session, the candidates and their
-hashes at concept level; `CHANGES` names the registry and workflow paths written; `NEED APPROVALS`
+hashes at concept level; `CHANGES` names the registry paths written; `NEED APPROVALS`
 carries the accept-or-feedback decision and any refusal; `WARNINGS` carries stale-reference risk;
 `REJECTED` carries the owner's words; `OWED` carries the block rounds.

@@ -30,8 +30,7 @@ Source ready?* — not because they are one write.
 
 ### 1 — Print CONTEXT
 
-`Phase` is `plan`, then `review`, then `apply`. `Touching` names only the roots this run will write,
-and the workflow record. `Project` is **user-declared** — never inferred from Source, from a sibling
+`Phase` is `plan`, then `review`, then `apply`. `Touching` names only the roots this run will write. `Project` is **user-declared** — never inferred from Source, from a sibling
 checkout name, or from what the last session used. A bootstrap-only run has no project, and says so
 rather than inventing one.
 
@@ -157,7 +156,7 @@ A branch that was never pushed is reported as local-only, not as missing.
 
 ### 11 — Close the phase
 
-Append the workflow and print the six tables. Never report the trust tree as a runtime storage root.
+Print the six tables. Never report the trust tree as a runtime storage root.
 
 ## Stops
 

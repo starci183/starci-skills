@@ -173,7 +173,7 @@ từ một background agent, nơi không ai đang nhìn xem nó đứng trên nh
 |---|---|
 | ba root | Ba đường dẫn dưới `.worktrees/<project>/`, hợp [`schema.json`](./schema.json) nằm cạnh bản ghi này |
 | project | Tên project do người khai, không bao giờ suy từ tên thư mục |
-| source | Repository chứa cây quy tắc và workflow root |
+| source | Repository chứa cây quy tắc |
 | đầu ra | Từng thứ lượt chạy sẽ ghi, và nó có dựng lại được không |
 | danh sách worktree | Chính lời khai của Git, kèm trạng thái khoá và prunable |
 | bằng chứng ignore | Rằng `sessions` và `cache` đang bị Source ignore |

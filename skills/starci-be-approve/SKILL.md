@@ -13,7 +13,7 @@ reversible, everything after it is in the product.
 
 ### 1 — Print CONTEXT
 
-`Phase` is `approve`. `Touching` is the workflow record until approval; after approval it becomes the
+`Phase` is `approve`. `Touching` is `None` until approval; after approval it becomes the
 exact backend paths the approved boundary names, and nothing else.
 
 ### 2 — Challenge the plan against reality
@@ -30,14 +30,14 @@ A plan that survives this unchanged is rare. Say what changed, and why.
 ### 3 — Loop until the owner explicitly approves
 
 ```text
-brief -> feedback -> revision -> workflow append -> brief
+brief -> feedback -> revision -> brief
 ```
 
 Batch every known question into one round; do not drip-feed. Record every rejection with its replacement
 and the owner's reason in their words. The loop ends only when the owner approves **one exact revision**
 and **one exact file boundary** — not "looks good", not silence, not an approval of an earlier revision.
 
-Write `Approved revision: <identity>` into the workflow. Nothing below this line runs without it.
+State `Approved revision: <identity>` in the phase output. Nothing below this line runs without it.
 
 ### 4 — Hard stop, then baseline
 

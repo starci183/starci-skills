@@ -15,7 +15,7 @@ hash, never to a rendered page.
 
 ### 1 — Print CONTEXT
 
-`Phase` is `block`. `Touching` names the workflow record and the project registry only.
+`Phase` is `block`. `Touching` names the project registry only.
 
 ### 2 — Require an accepted layout
 
@@ -100,7 +100,7 @@ append it, and record `REJECTED` with the actual anatomy, its replacement and th
 
 ### 11 — Close the phase
 
-Append the workflow and print the six tables. `OWED` names regions still without an accepted anatomy,
+Print the six tables. `OWED` names regions still without an accepted anatomy,
 because those are what `starci-fe-design-execute` will stop on.
 
 ## Stops

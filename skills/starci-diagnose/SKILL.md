@@ -43,7 +43,7 @@ because it retires a doubt that was still true.
 
 ### 1 — Print CONTEXT
 
-`Phase` is `plan`. `Touching` is the workflow record only. A diagnosis that writes anywhere else has
+`Phase` is `plan`. `Touching` is `None`. A diagnosis that writes anywhere else has
 broken its own law.
 
 ### 2 — Read the target skill, and take its steps literally
@@ -88,14 +88,14 @@ not contain is a `defect`, however sensible the sentence around it reads.
 
 ### 7 — Close the phase
 
-Append the workflow and print the six tables. `WARNINGS` carries every `cannot-tell` with what would
+Print the six tables. `WARNINGS` carries every `cannot-tell` with what would
 settle it. `OWED` carries the trace steps that could not be evaluated at all.
 
 ## Stops
 
 - The named skill does not exist → stop; list the skills that do rather than guessing which was meant.
 - The trace cannot proceed without writing → stop at that step and mark it `cannot-tell`.
-- The workflow root is missing, so the report has nowhere to be appended → say so, print the tables to
+- The session store is missing, so a report that must survive has nowhere to land → say so, print the tables to
   the conversation, and mark the record as `OWED`.
 
 ## Worked example
@@ -141,15 +141,15 @@ settled-by: the owner naming which app or package holds it, or confirming it doe
 ```
 
 ```text
-finding: skill-shape names a workflow validator this tree does not contain
+finding: skill-shape names a validator this tree does not contain
 label: defect
-evidence: the shape's workflow section invokes validate-workflows.mjs; scripts/ holds
+evidence: the shape names a validator; scripts/ holds
   validate-artifact.mjs and nothing else
 cleared-by: a trust-tree change — write the script, or stop naming it
 ```
 
 ```text
-finding: the workflow root is absent, so no phase can be appended anywhere
+finding: no session store for this project, so nothing hash-bound can be recorded
 label: blocked
 evidence: no session store under <Source>/.worktrees/<project>/sessions/
 cleared-by: restoring it, or declaring a new root; every skill's Touching names a path under it
@@ -171,5 +171,5 @@ to the tree, not to the project.
 ## OUTPUT
 
 The six tables from the skill shape, in order. `OUTPUTS` states the first stop and each finding's label
-at concept level; `CHANGES` lists the workflow record and nothing else, because a trace writes nothing
+at concept level; `CHANGES` is `None`, because a trace writes nothing
 else; `NEED APPROVALS` carries any decision the trace surfaced that only the owner can make.

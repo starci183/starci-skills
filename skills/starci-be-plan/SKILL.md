@@ -12,7 +12,7 @@ It invites `starci-be-approve`; it never writes backend source.
 
 ### 1 — Print CONTEXT
 
-`Phase` is `plan`. `Touching` is the workflow record only. A plan that writes product code has already
+`Phase` is `plan`. `Touching` is `None`. A plan that writes product code has already
 skipped its own approval.
 
 ### 2 — Resolve and verify the backend route
@@ -56,7 +56,7 @@ lost, and exactly what evidence will prove it works — which test, which query,
 
 ### 8 — Close the phase
 
-Append the workflow and print the six tables. `NEED APPROVALS` carries the decisions that could be
+Print the six tables. `NEED APPROVALS` carries the decisions that could be
 wrong; `OWED` carries the approval itself, cleared by `starci-be-approve`.
 
 ## Stops
@@ -68,4 +68,4 @@ wrong; `OWED` carries the approval itself, cleared by `starci-be-approve`.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `CHANGES` lists the workflow path only.
+The six tables from the skill shape, in order. `CHANGES` is `None`: a plan writes no path.

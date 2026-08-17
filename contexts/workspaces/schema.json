@@ -12,15 +12,14 @@
     "project": {"$ref": "#/$defs/slug", "description": "User-declared. Never inferred from a folder name — that is the WORKSPACE-1 failure."},
     "role": {"$ref": "#/$defs/slug", "description": "`fe`, `be`, a legacy role, or a role of the tree's own tooling such as `console`."},
     "source": {
-      "description": "Where the trust tree and its workflow root are, on this machine.",
+      "description": "Where the trust tree is, on this machine.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "trust", "skills", "workflowRoot", "workspaceRoot"],
+      "required": ["path", "trust", "skills", "workspaceRoot"],
       "properties": {
         "path": {"$ref": "#/$defs/absolutePath"},
         "trust": {"$ref": "#/$defs/absolutePath"},
         "skills": {"$ref": "#/$defs/absolutePath"},
-        "workflowRoot": {"$ref": "#/$defs/absolutePath"},
         "workspaceRoot": {"$ref": "#/$defs/absolutePath"}
       }
     },

@@ -63,7 +63,7 @@ approval named, not a substitute that is easier to produce.
 
 ### 7 — Close the phase
 
-Append the workflow with the applied revision, the baseline commit and the tracked diff. `CHANGES` lists
+Close with the applied revision, the baseline commit and the tracked diff. `CHANGES` lists
 every production path in that diff and it must match the approved boundary; a path outside `Touching`
 returns to its owner instead of arriving quietly.
 

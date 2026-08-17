@@ -58,7 +58,7 @@ exists and lies invites a confident wrong answer. They are reported apart becaus
 
 ### 1 — Print CONTEXT
 
-`Phase` is `plan`. `Touching` is nothing — this skill writes no file, not even the workflow record unless
+`Phase` is `plan`. `Touching` is nothing — this skill writes no file at all unless
 the reader asks for the list to be kept.
 
 ### 2 — Scan, with the tree's own script
@@ -114,8 +114,9 @@ record nothing; a project with a worktree root and no route can record nothing a
 is a stale route, and neither is repaired by refreshing one — they are reported under their own heading so
 the fix is not confused with the route fix.
 
-A missing workflow root belongs in that same list: every skill's `Touching` names a path under it, so its
-absence blocks every capability equally and is nobody's route problem.
+A checkout carrying a `.claude/` from an older tree belongs in that same list: no gate in that repository
+reports it, it is nobody's route problem, and what it breaks is a later reader's belief that the project
+owns rules of its own.
 
 ### 7 — Stop there
 
