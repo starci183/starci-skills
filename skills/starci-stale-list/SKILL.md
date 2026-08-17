@@ -1,9 +1,9 @@
 ---
-name: starci-stale
+name: starci-stale-list
 description: List every project in the workspace that is not in a state you can trust to work in — routes that no longer describe this machine, and contract reasons no lookup can find — with the reason for each and the skill that clears it. Deliberately does not run lint, typecheck or build: those execute the project and belong to starci-repair. Read-only — it reports and repairs nothing. Use at the start of a session, before trusting a project you have not touched in a while, or when a run stops on a route and you want to know what else is in the same state.
 ---
 
-# starci-stale
+# starci-stale-list
 
 Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
 

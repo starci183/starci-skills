@@ -50,7 +50,7 @@ record. Seven do the work; two only look — one at the machine, one at the othe
 | Skill | Owns |
 |---|---|
 | `starci-init` | making a Source ready: the bootstrap, `.workspace/<project>/`, `.worktrees/<project>/` — three roots, approved separately |
-| `starci-stale` | which projects' routes no longer describe this machine, why, and who clears each |
+| `starci-stale-list` | which projects' routes no longer describe this machine, why, and who clears each |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red source returned green — measured, in separated passes, never by silencing a finding |
 | `starci-fe-design-layout` | layout candidates, hash-bound |
