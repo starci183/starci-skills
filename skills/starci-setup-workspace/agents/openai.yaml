@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Setup Workspace"
+  short_description: "Configure project-scoped Source workspace routes"
+  default_prompt: "Use $starci-setup-workspace to configure and verify Source-local workspace routing for a declared project."

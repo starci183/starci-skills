@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Setup Worktrees"
+  short_description: "Create project-scoped Source worktrees"
+  default_prompt: "Use $starci-setup-worktrees to install and verify Source-local worktrees for a declared project."

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/schemas/workspace.schema.json",
+  "title": "StarCi Workspace Role Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "version", "project", "role", "source", "repository", "context", "updatedAt"],
+  "properties": {
+    "$schema": { "const": "../../../.claude/common/config/workspace.schema.json" },
+    "version": { "const": 1 },
+    "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "role": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "trust", "skills", "workflowRoot", "workspaceRoot"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "trust": { "type": "string", "minLength": 1 },
+        "skills": { "type": "string", "minLength": 1 },
+        "workflowRoot": { "type": "string", "minLength": 1 },
+        "workspaceRoot": { "type": "string", "minLength": 1 }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["diskPath", "gitRepository", "gitRoot", "branch", "head"],
+      "properties": {
+        "diskPath": { "type": "string", "minLength": 1 },
+        "gitRepository": { "type": "string", "minLength": 1 },
+        "gitRoot": { "type": "string", "minLength": 1 },
+        "branch": { "type": ["string", "null"] },
+        "head": { "type": ["string", "null"] }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructions", "contract", "contractSource", "manifests"],
+      "properties": {
+        "instructions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "contract": { "type": ["string", "null"] },
+        "contractSource": { "type": ["string", "null"] },
+        "manifests": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

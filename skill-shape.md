@@ -13,11 +13,12 @@ FE JSON rounds are the review surface: founder acceptance is hash-bound, and Exe
 after all reachable layout/block units are accepted. Backend Approve contains a hard approval stop
 before its first production write. Existing governance/data trios retain their normal phase rules.
 
-Workspace setup is the second named exception. It is one skill, `starci-workspace-setup`, with
-internal Plan → Review → Apply stages in one continuous run. It writes only Source's ignored local
-`.workspace/` routing and its workflow record; it never edits a target repository. Missing identity,
-ambiguous paths, collisions or an expanded write boundary still stop at Review for one batched
-approval.
+Source-local setup is the second named exception. It has two continuous skills with internal
+Plan → Review → Apply stages: `starci-setup-workspace` owns only
+`<Source>/.workspace/<project>/`, while `starci-setup-worktrees` owns only
+`<Source>/.worktrees/<project>/`. Neither stores runtime state below `.claude` or edits a target
+repository. Missing identity, ambiguous paths, collisions or an expanded write boundary still stop
+at Review for one batched approval.
 
 ## CONTEXT — print before doing anything
 
@@ -227,8 +228,8 @@ real `REJECTED` rows, deduplicates identical witnesses by workflow and phase, an
 - FE Design Plan routes Layout rounds, Block rounds and then Execute; no preview/review/apply sibling exists.
 - Backend Feature Plan invites Feature Approve; Approve loops until explicit approval before coding.
 - Other declared Plan/Review/Apply capabilities keep their existing routing.
-- Workspace Setup completes its internal Plan, Review and Apply stages without routing to sibling
-  skills.
+- Workspace and worktree setup complete their internal Plan, Review and Apply stages without routing
+  to sibling skills.
 - Upgrade changes future rules only after repeated workflow evidence passes Upgrade Review.
 
 No capability skips a declared decision boundary because the requested change looks small.

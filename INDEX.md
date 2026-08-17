@@ -37,9 +37,13 @@ finding it costs one skill run.
 | Trust upgrade | [`starci-fe-upgrade-plan`](skills/starci-fe-upgrade-plan/SKILL.md) | [`starci-fe-upgrade-review`](skills/starci-fe-upgrade-review/SKILL.md) | [`starci-fe-upgrade-apply`](skills/starci-fe-upgrade-apply/SKILL.md) |
 | Workflow drift | [`starci-workflow-drift-plan`](skills/starci-workflow-drift-plan/SKILL.md) | [`starci-workflow-drift-review`](skills/starci-workflow-drift-review/SKILL.md) | [`starci-workflow-drift-apply`](skills/starci-workflow-drift-apply/SKILL.md) |
 
-Workspace routing uses the single continuous
-[`starci-workspace-setup`](skills/starci-workspace-setup/SKILL.md) skill; its Plan, Review and Apply
-stages stay inside one run.
+Source-local setup uses two continuous skills whose Plan, Review and Apply stages stay inside one
+run:
+
+- [`starci-setup-workspace`](skills/starci-setup-workspace/SKILL.md) owns only
+  `<Source>/.workspace/<project>/` repository routes.
+- [`starci-setup-worktrees`](skills/starci-setup-worktrees/SKILL.md) owns only
+  `<Source>/.worktrees/<project>/` registry, session and cache state.
 
 [`common/config/workspace.md`](common/config/workspace.md) defines how
 `start <project> <role...>` resolves ignored, per-machine

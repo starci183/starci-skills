@@ -146,7 +146,8 @@ test("every skill carries a frontmatter name matching its folder", () => {
 
 test("every capability has its declared lifecycle", () => {
   const standaloneSkills = new Set([
-    "starci-workspace-setup",
+    "starci-setup-workspace",
+    "starci-setup-worktrees",
     "starci-fe-design-layout",
     "starci-fe-design-block",
     "starci-fe-design-execute",
@@ -181,14 +182,22 @@ test("every capability has its declared lifecycle", () => {
   assert.deepEqual(incomplete, [], `incomplete capability lifecycles: ${incomplete.join("; ")}`)
 })
 
-test("Workspace Setup is one continuous skill with internal Plan Review Apply stages", () => {
-  const directory = join(SKILLS, "starci-workspace-setup")
-  const skill = readFileSync(join(directory, "SKILL.md"), "utf8")
-  assert.match(skill, /### Plan[\s\S]*### Review[\s\S]*### Apply/)
-  assert.ok(existsSync(join(directory, "scripts", "workspace-setup.mjs")))
-  for (const phase of ["plan", "review", "apply"]) {
-    assert.equal(existsSync(join(SKILLS, `starci-workspace-setup-${phase}`)), false)
+test("Source-local setup uses two continuous project-scoped skills", () => {
+  const capabilities = [
+    ["starci-setup-workspace", "setup-workspace.mjs", "<Source>/.workspace/<project>"],
+    ["starci-setup-worktrees", "setup-worktrees.mjs", "<Source>/.worktrees/<project>"],
+  ]
+  for (const [name, script, root] of capabilities) {
+    const directory = join(SKILLS, name)
+    const skill = readFileSync(join(directory, "SKILL.md"), "utf8")
+    assert.match(skill, /### Plan[\s\S]*### Review[\s\S]*### Apply/)
+    assert.match(skill, new RegExp(root.replaceAll(".", "\\.")))
+    assert.ok(existsSync(join(directory, "scripts", script)))
+    for (const phase of ["plan", "review", "apply"]) {
+      assert.equal(existsSync(join(SKILLS, `${name}-${phase}`)), false)
+    }
   }
+  assert.equal(existsSync(join(SKILLS, "starci-workspace-setup", "SKILL.md")), false)
 })
 
 test("every phase carries the workflow contract", () => {
