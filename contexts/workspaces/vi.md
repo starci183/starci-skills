@@ -132,21 +132,16 @@ bất cứ điều gì về bố cục, và đường dẫn hợp đồng là th
 
 ## `WORKSPACE-5` — route đã cũ
 
-**Tình huống.** Tệp route vẫn hợp lệ và đầy đủ, nhưng máy không còn khớp với nó: checkout đã chuyển
-chỗ, tệp hợp đồng đã đổi tên, head đã ghi thuộc một nhánh đã bị viết lại.
+**Tình huống.** Tệp route vẫn hợp lệ và đầy đủ, và một giá trị trong nó không còn mô tả đúng máy: một
+đường dẫn đã ghi không có trên đĩa, hoặc checkout không còn tới được head đã ghi, hoặc nó đang ở một
+nhánh khác.
 
 **Dấu hiệu nhận biết**
 
 - Mọi trường đều có mặt và đúng dạng.
-- Có ít nhất một đường dẫn hoặc head không sống sót qua một lần kiểm với đĩa hoặc với git.
+- Một đường dẫn đã ghi không giải được, một head đã ghi không tới được từ checkout, hoặc nhánh đã khác.
 
 **Tự hỏi.** Mình đã **xác minh** route, hay chỉ **đọc cú pháp** của nó?
-
-**Một head mà checkout chỉ đơn giản đã đi qua thì không thuộc mã này.** Route vẫn mô tả đúng repository,
-đúng nhánh, đúng dòng lịch sử; chỉ có commit mới nhất là mới hơn. Thứ hỏng ở đây là một head đã ghi mà
-checkout **không còn tới được** — bị viết lại hoặc đã mất — hoặc một nhánh không còn khớp. Báo tiến độ
-bình thường thành stale thì mất nhiều hơn được: cứ commit một cái là báo động, và một bản báo cáo kêu mọi
-lúc là bản báo cáo không ai đọc vào đúng ngày nó nói thật.
 
 **Ranh giới**
 

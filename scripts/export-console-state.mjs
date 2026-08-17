@@ -94,9 +94,8 @@ function readWorkspaces() {
         verdict = "stale";
         reason = "recorded contract path no longer exists";
       } else if (recordedHead && liveHead && recordedHead !== liveHead && !reachable(diskPath, recordedHead)) {
-        // A moved head is not staleness — the route still describes this repository, and calling every
-        // commit stale is how a report trains its reader to skip it. What is stale is a recorded head the
-        // checkout can no longer reach: the branch was rewritten, so the route names a commit that is gone.
+        // `WORKSPACE-5`: stale is a recorded value the machine no longer matches — here, a head the
+        // checkout cannot reach, so the route names a commit that is gone.
         verdict = "stale";
         reason = "recorded head is not reachable from the checkout — the branch was rewritten under it";
       } else if (branch && liveBranch && branch !== liveBranch) {
