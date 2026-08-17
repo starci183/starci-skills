@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v3/brainstorms/blocks/schema.json",
+  "title": "Block anatomy batch",
+  "description": "One round of block brainstorming for one accepted region. `anatomies[i]` is what a hash binds to; `envelope` is what changes between runs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "envelope", "anatomies"],
+  "properties": {
+    "schema": {"const": 1},
+    "envelope": {"$ref": "#/$defs/envelope"},
+    "anatomies": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/anatomy"}
+    },
+    "refusal": {"$ref": "#/$defs/refusal"}
+  },
+  "$defs": {
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "round", "project", "region", "layoutHash"],
+      "properties": {
+        "session": {"$ref": "#/$defs/id"},
+        "round": {"type": "integer", "minimum": 1},
+        "project": {"$ref": "#/$defs/slug"},
+        "region": {"$ref": "#/$defs/slug"},
+        "layoutHash": {"$ref": "#/$defs/hash", "description": "The ACCEPTED layout hash this region came from. A proposed hash is not a starting point."},
+        "contractAt": {"type": "string", "minLength": 1}
+      }
+    },
+    "anatomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "axes", "states", "parts", "reason"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "axes": {"$ref": "#/$defs/axes"},
+        "citesPrecedent": {
+          "type": "string",
+          "pattern": "^(none|[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?)$",
+          "description": "A precedent id, or `none`. Written as one pattern rather than a choice, because `none` satisfies both branches and an ambiguous choice is not a choice."
+        },
+        "states": {
+          "description": "Every condition this region can enter, enumerated before the anatomy is designed. `populated` alone is the happy path, which the block laws reject.",
+          "type": "array",
+          "minItems": 1,
+          "items": {"enum": ["populated", "empty", "pending", "failed", "partial", "forbidden"]}
+        },
+        "restingCount": {"type": "integer", "minimum": 1, "description": "Required when axes.repetition is `repeats`."},
+        "parts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/part"}},
+        "reason": {"type": "string", "minLength": 12}
+      }
+    },
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataOwner", "repetition", "weight", "composition"],
+      "properties": {
+        "dataOwner": {"enum": ["block", "parent"]},
+        "repetition": {"enum": ["single", "repeats"]},
+        "weight": {"enum": ["populated", "absent"], "description": "Which state carries the block."},
+        "composition": {"enum": ["one-part", "label-value", "label-visual-caption"]}
+      }
+    },
+    "part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "cites", "whyMatch"],
+      "properties": {
+        "name": {"$ref": "#/$defs/slug"},
+        "cites": {"$ref": "#/$defs/citation"},
+        "optional": {"type": "boolean", "description": "Presence only. It does not distinguish pending from failed from empty — `states` does."},
+        "whyMatch": {"type": "string", "minLength": 12}
+      }
+    },
+    "citation": {
+      "description": "Every cited name must exist in the frontend's vocabulary. A citation that cannot be checked is an invented name.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "verdict", "key"],
+          "properties": {
+            "kind": {"enum": ["entry", "leaf", "composite", "block"]},
+            "verdict": {"const": "reuse"},
+            "key": {"$ref": "#/$defs/name"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "verdict", "from", "to", "callSites"],
+          "properties": {
+            "kind": {"enum": ["entry", "leaf", "composite", "block"]},
+            "verdict": {"const": "generalize"},
+            "from": {"$ref": "#/$defs/name"},
+            "to": {"$ref": "#/$defs/name"},
+            "callSites": {"type": "integer", "minimum": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "verdict", "key", "why"],
+          "properties": {
+            "kind": {"enum": ["entry", "leaf", "composite", "block"]},
+            "verdict": {"const": "new"},
+            "key": {"$ref": "#/$defs/name"},
+            "why": {"type": "string", "minLength": 12}
+          }
+        }
+      ]
+    },
+    "refusal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "blocked"],
+      "properties": {
+        "missing": {"type": "string", "minLength": 12},
+        "blocked": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/slug"}}
+      }
+    },
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "name": {"type": "string", "pattern": "^[a-zA-Z0-9]+([-a-zA-Z0-9]*)$"},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?$"}
+  }
+}

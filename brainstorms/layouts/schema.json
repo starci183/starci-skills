@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v3/brainstorms/layouts/schema.json",
+  "title": "Layout candidate batch",
+  "description": "One round of layout brainstorming. `candidates[i]` is what a hash binds to; `envelope` is what changes between runs and is deliberately outside the hash.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "envelope", "candidates"],
+  "properties": {
+    "schema": {"const": 1, "description": "Artifact version. A record written under an older schema is never rewritten."},
+    "envelope": {"$ref": "#/$defs/envelope"},
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/candidate"}
+    },
+    "refusal": {"$ref": "#/$defs/refusal"}
+  },
+  "$defs": {
+    "envelope": {
+      "description": "Never hashed. Two runs of the same decision must produce the same candidate hash, so nothing that varies per run may sit inside a candidate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "round", "project", "surface"],
+      "properties": {
+        "session": {"$ref": "#/$defs/id"},
+        "round": {"type": "integer", "minimum": 1},
+        "project": {"$ref": "#/$defs/slug"},
+        "surface": {"$ref": "#/$defs/slug", "description": "Session identity is the surface, not the prompt."},
+        "prompt": {"type": "string", "minLength": 1},
+        "contractAt": {"type": "string", "minLength": 1, "description": "The contract state these candidates were resolved against."}
+      }
+    },
+    "candidate": {
+      "description": "Hashed. Canonical JSON, keys sorted, no timestamps, no per-run ids.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "axes", "regions", "reason"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "axes": {"$ref": "#/$defs/axes"},
+        "citesPrecedent": {
+          "type": "string",
+          "pattern": "^(none|[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?)$",
+          "description": "A precedent id, or `none`. At least one candidate in a batch must be `none` — the departure. Written as one pattern rather than a choice between an id and a literal, because `none` satisfies both and an ambiguous choice is not a choice."
+        },
+        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}},
+        "reason": {"type": "string", "minLength": 12}
+      }
+    },
+    "axes": {
+      "description": "The closed diversity set. Two candidates with an identical set are one candidate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["navigation", "evidence", "secondary", "chrome"],
+      "properties": {
+        "navigation": {"enum": ["navbar", "rail", "none"]},
+        "evidence": {"enum": ["beside", "below"]},
+        "secondary": {"enum": ["route", "panel", "overlay"]},
+        "chrome": {"enum": ["sticky", "scrolls"]}
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "entry", "assembler", "mount", "whyMatch"],
+      "properties": {
+        "name": {"$ref": "#/$defs/slug"},
+        "entry": {"$ref": "#/$defs/entryVerdict"},
+        "assembler": {"$ref": "#/$defs/pascal", "description": "A branch that exists in the frontend's branch inventory."},
+        "mount": {"enum": ["mounts-once", "per-route", "overlay"]},
+        "whyMatch": {"type": "string", "minLength": 12, "description": "The business reason this region and that entry share. Matching is on `why`, never on shape."}
+      }
+    },
+    "entryVerdict": {
+      "description": "Exactly one of three. `generalize` without a measured call-site count is refused, not guessed.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verdict", "key"],
+          "properties": {
+            "verdict": {"const": "reuse"},
+            "key": {"$ref": "#/$defs/slug"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verdict", "from", "to", "callSites"],
+          "properties": {
+            "verdict": {"const": "generalize"},
+            "from": {"$ref": "#/$defs/slug"},
+            "to": {"$ref": "#/$defs/slug"},
+            "callSites": {"type": "integer", "minimum": 0, "description": "Measured, not estimated. A shared branch among them makes this a product-wide change."}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verdict", "key", "why"],
+          "properties": {
+            "verdict": {"const": "new"},
+            "key": {"$ref": "#/$defs/slug"},
+            "why": {"type": "string", "minLength": 12, "description": "The sentence the new contract entry will carry."}
+          }
+        }
+      ]
+    },
+    "refusal": {
+      "description": "An output, not a failure. Ships alongside whatever resolved.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "blocked"],
+      "properties": {
+        "missing": {"type": "string", "minLength": 12},
+        "blocked": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/slug"}}
+      }
+    },
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "pascal": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?$"}
+  }
+}

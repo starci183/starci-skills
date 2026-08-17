@@ -1,0 +1,7 @@
+/node_modules
+/.next
+/out
+/content
+/.academy-src
+/public/vendor/heroui.min.css
+npm-debug.log*
