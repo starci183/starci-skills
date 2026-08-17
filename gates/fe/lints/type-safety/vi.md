@@ -4,7 +4,16 @@ title: Type-safety · Vietnamese
 
 # An toàn kiểu
 
-Đầu vào là mã đã viết xong — một tệp, một mẩu diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mẩu diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, rule đã xuất bản nào nổ, nó báo cái gì và ở nút nào, mã luật tương ứng là mã nào,
 và cửa còn mở nào lẽ ra đã che đúng lỗi ấy. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải chỉ
 được ra đúng ký tự mà nó từ chối.
@@ -76,7 +85,7 @@ thăm `TSAsExpression`, đọc `node.expression`, đòi `node.expression.type ==
 `typeAnnotation.type` của cast bên trong đúng là `TSUnknownKeyword`. Khớp thì báo tại nút **NGOÀI**, với
 `messageId: "double"`.
 
-**Nó không thấy gì.** Ba tính chất của cách phát hiện ấy quyết định tất cả. Nó thuần cú pháp — không
+**Điểm mù.** Ba tính chất của cách phát hiện ấy quyết định tất cả. Nó thuần cú pháp — không
 giải module, không hỏi kiểu, không chạy code. Nó khớp **một nút từ khoá**, không khớp một ý nghĩa:
 `payload as any as Target`, `payload as never as Target`, `payload as {} as Target`, và
 `payload as Loose as Target` với `type Loose = unknown`, đều xoá đúng ngần ấy và đều vô hình ở đây. Và
@@ -282,7 +291,7 @@ hatch:   the erasure split across two statements — no double cast exists, the 
 ## Phạm vi
 
 Mô-đun này ghi lại đúng một rule do mô-đun rule của luật type-safety công bố, phát hành trong
-`@starci/eslint-canon-fe`. Nó không ghi rule đáng-lẽ-phải-có: một rule không chỉ ra được là một đề
+`@canon-fe`. Nó không ghi rule đáng-lẽ-phải-có: một rule không chỉ ra được là một đề
 xuất, không phải một sự thi hành. Nó không xét dạng viết tắt của phép xoá kiểu và cũng không xét cách
 viết mảng — hai thứ ấy thuộc rule no-explicit-any của bộ plugin TypeScript và rule array-type của nó
 với mặc định generic — và nó không xét việc một phép cast sống sót có mang theo lý do hay không, thứ

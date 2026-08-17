@@ -4,6 +4,13 @@ title: Event-delivery
 
 # Event-delivery
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, which message it emitted and on which
 node, which law code that maps to, and the open hatch that would have hidden the same failure. This

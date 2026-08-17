@@ -4,6 +4,13 @@ title: Grid
 
 # Grid
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "filters on the left, results on the right" — and you return,
 for every element that request implies, one situation code and one className. The request never states
 a column count you may invent: the count follows from what the page has already promised, and from

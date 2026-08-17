@@ -4,8 +4,17 @@ title: Icon · Vietnamese
 
 # Icon
 
-Đầu vào là một shape đã có người duyệt — một layout, một block, một row, một chip, một plated tile.
-Quyết định đó đã đóng, module này không mở lại. Đầu ra là kiến trúc source: file nào giữ glyph, tầng
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt — một layout, một block, một row, một chip, một plated tile.
+Quyết định đó đã đóng, module này không mở lại. Kết quả là kiến trúc source: file nào giữ glyph, tầng
 nào được phép gọi tên thư viện glyph, người gọi được nói gì, icon leaf phải sở hữu gì, và source phải
 trông ra sao sau khi shape đã hạ xuống code.
 
@@ -75,14 +84,14 @@ sau đó cứ chép lấy bậc gần nhất trong ba bậc.
 
 ## `ICON-1` — ba vai trò, không có bậc thứ tư
 
-**Tình huống.** Người gọi cần một glyph. Thứ họ được phép quyết định là VIỆC glyph đang làm, chứ không
+**Khi nào gặp.** Người gọi cần một glyph. Thứ họ được phép quyết định là VIỆC glyph đang làm, chứ không
 phải kích thước của nó.
 
-**Nó sinh ra gì trong source.** Một union vai trò đóng lại còn ba tên — `heading`, `leading`, `chip` —
+**Source phải thể hiện gì.** Một union vai trò đóng lại còn ba tên — `heading`, `leading`, `chip` —
 và một map vai trò → class nằm trong icon leaf. Prop shape của leaf không có ô nào cho size, class hay
 màu, nên vai trò thứ tư không compile được và một giá trị px không có đường nào để đi vào.
 
-**Dấu hiệu nhận biết.** Có người muốn truyền `size`, một class `size-*`, một `strokeWidth` hay một con
+**Cách nhận ra.** Có người muốn truyền `size`, một class `size-*`, một `strokeWidth` hay một con
 số px. Có người mô tả nhu cầu bằng "to hơn một chút", "nhỏ hơn cái kia". Xuất hiện một bậc nằm giữa hai
 bậc đang có.
 
@@ -95,13 +104,13 @@ icon trong empty state · icon cạnh nhãn trạng thái.
 
 ## `ICON-2` — glyph mở đầu một vùng
 
-**Tình huống.** Glyph đứng trước một tiêu đề vùng, một empty state, một khối giới thiệu. Nó GIỚI THIỆU
+**Khi nào gặp.** Glyph đứng trước một tiêu đề vùng, một empty state, một khối giới thiệu. Nó GIỚI THIỆU
 chứ không DẪN.
 
-**Nó sinh ra gì trong source.** Khối import 24 outline trong icon leaf, và một entry `heading` đọc là
+**Source phải thể hiện gì.** Khối import 24 outline trong icon leaf, và một entry `heading` đọc là
 `size-6 shrink-0`.
 
-**Dấu hiệu nhận biết.** Bên cạnh nó là một heading thật, không phải một dòng chữ trong danh sách. Vùng
+**Cách nhận ra.** Bên cạnh nó là một heading thật, không phải một dòng chữ trong danh sách. Vùng
 đó có thể rỗng, và lúc rỗng glyph là thứ đầu tiên người đọc thấy. Bỏ glyph đi thì vùng vẫn đúng, chỉ
 khó định vị hơn.
 
@@ -114,13 +123,13 @@ giới thiệu tính năng · màn hình lỗi toàn trang.
 
 ## `ICON-3` — glyph dẫn một control hoặc một row
 
-**Tình huống.** Glyph đứng trước chữ trong điều hướng, list row, field, switch, icon control. Nó dẫn
+**Khi nào gặp.** Glyph đứng trước chữ trong điều hướng, list row, field, switch, icon control. Nó dẫn
 lối, không đòi trọng lượng của một heading.
 
-**Nó sinh ra gì trong source.** Một entry `leading` đọc là `size-5 shrink-0`, chọn từ đúng khối import
+**Source phải thể hiện gì.** Một entry `leading` đọc là `size-5 shrink-0`, chọn từ đúng khối import
 outline mà `heading` dùng.
 
-**Dấu hiệu nhận biết.** Nó lặp lại nhiều lần trong cùng một cây, mỗi lần một ý nghĩa khác. Nó nằm cùng
+**Cách nhận ra.** Nó lặp lại nhiều lần trong cùng một cây, mỗi lần một ý nghĩa khác. Nó nằm cùng
 dòng với chữ, không đứng trên chữ. Bỏ nó đi thì cả cụm vẫn đọc được, chỉ chậm hơn khi quét mắt.
 
 **Ranh giới.** Không phải `ICON-2`: xem trên. Không phải `ICON-12`: mã này nói leading VẼ BẰNG GÌ;
@@ -132,13 +141,13 @@ chỉ có icon · dropdown item · breadcrumb.
 
 ## `ICON-4` — glyph trong một chip
 
-**Tình huống.** Chip đã có vỏ riêng: nền, bo góc, padding. Glyph bên trong chỉ còn việc đọc được ở kích
+**Khi nào gặp.** Chip đã có vỏ riêng: nền, bo góc, padding. Glyph bên trong chỉ còn việc đọc được ở kích
 thước rất nhỏ.
 
-**Nó sinh ra gì trong source.** Một khối import 16 solid riêng, alias theo từng ý nghĩa, và một entry
+**Source phải thể hiện gì.** Một khối import 16 solid riêng, alias theo từng ý nghĩa, và một entry
 `chip` đọc là `size-4 shrink-0`.
 
-**Dấu hiệu nhận biết.** Vỏ chip đã tự nói ranh giới; glyph không cần nét mảnh để "nhẹ" nữa. Ở `size-4`,
+**Cách nhận ra.** Vỏ chip đã tự nói ranh giới; glyph không cần nét mảnh để "nhẹ" nữa. Ở `size-4`,
 nét outline 24 bị nhoè thành một vệt xám. Bản micro có ít chi tiết hơn hẳn — đó là chủ ý của người vẽ,
 không phải thiếu sót.
 
@@ -151,14 +160,14 @@ nhãn "mới" · pill hiển thị tiến độ.
 
 ## `ICON-5` — glyph thừa hưởng màu
 
-**Tình huống.** Glyph nằm trong một vùng đang mang state: disabled, muted, selected, theme tối. Màu của
+**Khi nào gặp.** Glyph nằm trong một vùng đang mang state: disabled, muted, selected, theme tối. Màu của
 nó thuộc về vùng đó, không thuộc về nó.
 
-**Nó sinh ra gì trong source.** `stroke="currentColor"` trên những glyph vẽ cục bộ. Trong file brand,
+**Source phải thể hiện gì.** `stroke="currentColor"` trên những glyph vẽ cục bộ. Trong file brand,
 một mark giữ bốn hex fill được vẽ sẵn còn mark đơn sắc dùng `currentColor` — ngoại lệ và luật nằm cạnh
 nhau.
 
-**Dấu hiệu nhận biết.** Chữ bên cạnh đổi màu theo state, glyph thì không. Có người viết `text-*` hoặc
+**Cách nhận ra.** Chữ bên cạnh đổi màu theo state, glyph thì không. Có người viết `text-*` hoặc
 `fill="#..."` ngay trên glyph để "cho hợp". Ở theme tối, glyph vẫn còn màu của theme sáng.
 
 **Ranh giới.** Brand mark là ngoại lệ đóng: một mark nhiều màu được nhận ra NHỜ những màu đó, đổi màu
@@ -170,14 +179,14 @@ callout lỗi · icon nhà cung cấp đăng nhập · icon trong menu hover.
 
 ## `ICON-6` — người gọi nói ý nghĩa, không nói vendor
 
-**Tình huống.** Một màn cần một hình mà bản đồ ý nghĩa chưa có. Đường tắt là import thẳng từ package
+**Khi nào gặp.** Một màn cần một hình mà bản đồ ý nghĩa chưa có. Đường tắt là import thẳng từ package
 glyph ngay tại chỗ.
 
-**Nó sinh ra gì trong source.** `starci-fe/no-vendor-icon-outside-icon-leaf` — package glyph được khớp
+**Source phải thể hiện gì.** `starci-fe/no-vendor-icon-outside-icon-leaf` — package glyph được khớp
 theo prefix, nên một subpath không thể lách qua — cùng với đúng một module path được phép trong
-[`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe).
+`@canon-fe`.
 
-**Dấu hiệu nhận biết.** Trong một file màn hình có `import { XxxIcon } from "..."`. Một file "phụ trợ"
+**Cách nhận ra.** Trong một file màn hình có `import { XxxIcon } from "..."`. Một file "phụ trợ"
 cạnh icon leaf cũng import package đó "cho tiện". Cùng một khái niệm được vẽ bằng hai hình khác nhau ở
 hai màn.
 
@@ -190,14 +199,14 @@ có ý nghĩa nào khớp, đáp án là thêm một ý nghĩa, chứ không ph�
 
 ## `ICON-7` — một vendor, hai family
 
-**Tình huống.** Có người muốn thêm một bộ icon nữa: đẹp hơn, đủ hình hơn, hoặc "chỉ dùng đúng một cái
+**Khi nào gặp.** Có người muốn thêm một bộ icon nữa: đẹp hơn, đủ hình hơn, hoặc "chỉ dùng đúng một cái
 thôi".
 
-**Nó sinh ra gì trong source.** `starci-fe/heroicons-is-the-glyph-vendor` — một allow set gồm hai
+**Source phải thể hiện gì.** `starci-fe/heroicons-is-the-glyph-vendor` — một allow set gồm hai
 package, áp dụng cả bên trong icon leaf, tức là đúng nửa phần mà `ICON-6` không nhìn thấy, với ngoại lệ
 rank được luồn qua cả hai rule vendor.
 
-**Dấu hiệu nhận biết.** Trong `package.json` xuất hiện một thư viện glyph thứ hai. Một brand mark được
+**Cách nhận ra.** Trong `package.json` xuất hiện một thư viện glyph thứ hai. Một brand mark được
 chọn từ một package tổng hợp thay vì vẽ đúng. Có người lập luận "cái này bên kia không có" — đúng, và
 đó chính là lúc phải quyết định về Ý NGHĨA, không phải về PACKAGE.
 
@@ -210,12 +219,12 @@ marketing · icon file type · logo đối tác.
 
 ## `ICON-8` — glyph không bao giờ co lại
 
-**Tình huống.** Một row flex hẹp dần: tên dài, ngôn ngữ dịch dài ra, màn hình nhỏ lại.
+**Khi nào gặp.** Một row flex hẹp dần: tên dài, ngôn ngữ dịch dài ra, màn hình nhỏ lại.
 
-**Nó sinh ra gì trong source.** `shrink-0` được nướng sẵn vào cả ba chuỗi class của ba vai trò — kể cả
+**Source phải thể hiện gì.** `shrink-0` được nướng sẵn vào cả ba chuỗi class của ba vai trò — kể cả
 `chip`, cái hay bị cho là quá nhỏ để phải bận tâm.
 
-**Dấu hiệu nhận biết.** Icon tròn biến thành hình bầu dục. Icon vuông bị dẹt ở một phía. Chữ vẫn còn
+**Cách nhận ra.** Icon tròn biến thành hình bầu dục. Icon vuông bị dẹt ở một phía. Chữ vẫn còn
 nguyên trong khi glyph đã méo — tức là thứ tự nhường đang ngược.
 
 **Ranh giới.** Không phải `ICON-1`: co méo không tạo ra một vai trò mới, nó chỉ phá vai trò đang có.
@@ -227,13 +236,13 @@ chip trong một hàng cuộn ngang · toast có nhiều chữ.
 
 ## `ICON-9` — bảng nguồn sở hữu việc chọn hình
 
-**Tình huống.** Thêm hoặc đổi một ý nghĩa. Câu hỏi "hình nào cho ý nghĩa này" có đúng một chỗ trả lời.
+**Khi nào gặp.** Thêm hoặc đổi một ý nghĩa. Câu hỏi "hình nào cho ý nghĩa này" có đúng một chỗ trả lời.
 
-**Nó sinh ra gì trong source.** Bảng tính năng nằm cạnh union ý nghĩa và glyph map, trong cùng một thư
+**Source phải thể hiện gì.** Bảng tính năng nằm cạnh union ý nghĩa và glyph map, trong cùng một thư
 mục, được cập nhật bằng tay. Bài test parity mà luật phẳng tuyên bố là có thì **không tìm thấy trong
 source** — nó được luật gọi tên nhưng chưa neo được vào đâu.
 
-**Dấu hiệu nhận biết.** Union ý nghĩa có tên mới nhưng bảng nguồn thì chưa. Hai ý nghĩa khác nhau trỏ
+**Cách nhận ra.** Union ý nghĩa có tên mới nhưng bảng nguồn thì chưa. Hai ý nghĩa khác nhau trỏ
 về cùng một hình "vì trông cũng hợp". Bảng còn tên một component đã đổi tên từ lâu.
 
 **Ranh giới.** Không phải `ICON-6`: `ICON-6` chặn đường tắt, `ICON-9` mô tả con đường chính. Không phải
@@ -245,14 +254,14 @@ thêm một trạng thái mới cho bài học.
 
 ## `ICON-10` — dữ kiện nghiệp vụ gọn thì để nguyên chữ
 
-**Tình huống.** Một ô số liệu, một mục tiêu, một nhãn loại, một caption streak, một cell dữ kiện — mà
+**Khi nào gặp.** Một ô số liệu, một mục tiêu, một nhãn loại, một caption streak, một cell dữ kiện — mà
 reference gốc CHỈ CÓ CHỮ.
 
-**Nó sinh ra gì trong source.** `starci-fe/no-decorative-icon-in-metric-cell`, buộc vào đúng một
+**Source phải thể hiện gì.** `starci-fe/no-decorative-icon-in-metric-cell`, buộc vào đúng một
 composite path, nên rule giữ đúng cái cell đó và không cell nào khác. Composite nó buộc vào render một
 label, một con số và một thanh bar, không có glyph nào.
 
-**Dấu hiệu nhận biết.** Glyph đang lặp lại đúng thứ mà chữ ngay cạnh đã nói (một quyển sách cạnh chữ
+**Cách nhận ra.** Glyph đang lặp lại đúng thứ mà chữ ngay cạnh đã nói (một quyển sách cạnh chữ
 "Nội dung"). Trong một lưới, mỗi ô mọc một glyph khác nhau và tạo ra MỘT TRỤC THỊ GIÁC THỨ HAI. Người
 thêm glyph giải thích bằng "cho đỡ trống", không phải bằng "để phân biệt".
 
@@ -266,12 +275,12 @@ chuỗi ngày học · lưới thống kê hồ sơ.
 
 ## `ICON-11` — plate đổi, glyph không đổi
 
-**Tình huống.** Glyph nằm trên một đĩa nền (icon tile). Đĩa có hai bậc; glyph thì không.
+**Khi nào gặp.** Glyph nằm trên một đĩa nền (icon tile). Đĩa có hai bậc; glyph thì không.
 
-**Nó sinh ra gì trong source.** Hai bậc plate trong size map của tile, và ngay dưới đó một dòng truyền
+**Source phải thể hiện gì.** Hai bậc plate trong size map của tile, và ngay dưới đó một dòng truyền
 `role: "leading"` vô điều kiện, nên mọi plated tile đều vẽ glyph `leading` ở `size-5`.
 
-**Dấu hiệu nhận biết.** Có người muốn glyph "to theo" khi plate to lên. Cùng một ý nghĩa xuất hiện ở
+**Cách nhận ra.** Có người muốn glyph "to theo" khi plate to lên. Cùng một ý nghĩa xuất hiện ở
 hai màn với hai trọng lượng khác nhau, chỉ vì plate khác nhau. Người gọi đang tự suy ra role từ `size`
 của tile.
 
@@ -284,15 +293,15 @@ năng · item trong menu có nền.
 
 ## `ICON-12` — leading phải phân biệt được peer
 
-**Tình huống.** Glyph leading chỉ có nghĩa khi nó giúp nhận ra MỘT mục giữa NHIỀU mục khác loại. Một
+**Khi nào gặp.** Glyph leading chỉ có nghĩa khi nó giúp nhận ra MỘT mục giữa NHIỀU mục khác loại. Một
 row tóm tắt đứng một mình thì không có peer nào để phân biệt.
 
-**Nó sinh ra gì trong source.** Ba recipe trong composite fact-row; recipe peer là ca đúng của mã này.
+**Source phải thể hiện gì.** Ba recipe trong composite fact-row; recipe peer là ca đúng của mã này.
 Recipe label-led đã render fact phụ nhỏ và muted **mà vẫn vẽ một glyph** — đúng nửa phần của mã này mà
 source chưa giữ được. Khi một shape rơi vào mã này, source render label chính bình thường và fact phụ
 đứng cuối để `text-xs muted`, không có glyph.
 
-**Dấu hiệu nhận biết.** Trong cả section chỉ có MỘT row mang glyph. Section đã có heading nói đúng khái
+**Cách nhận ra.** Trong cả section chỉ có MỘT row mang glyph. Section đã có heading nói đúng khái
 niệm mà glyph đang lặp lại. Cả tập là đồng nhất — mười row cùng loại — nên glyph giống nhau ở mọi row
 cũng không phân biệt được gì.
 
@@ -305,13 +314,13 @@ dòng.
 
 ## `ICON-13` — reaction là artwork, không phải glyph
 
-**Tình huống.** Người dùng bày tỏ cảm xúc. Đây là ARTWORK BIỂU CẢM của sản phẩm, không phải một ký hiệu
+**Khi nào gặp.** Người dùng bày tỏ cảm xúc. Đây là ARTWORK BIỂU CẢM của sản phẩm, không phải một ký hiệu
 giao diện.
 
-**Nó sinh ra gì trong source.** Một danh sách identity đóng nằm trong reaction leaf, và những file
+**Source phải thể hiện gì.** Một danh sách identity đóng nằm trong reaction leaf, và những file
 artwork đã check-in với attribution đi kèm; call site chỉ truyền identity.
 
-**Dấu hiệu nhận biết.** Có người định render emoji Unicode "cho nhanh". Một call site truyền đường dẫn
+**Cách nhận ra.** Có người định render emoji Unicode "cho nhanh". Một call site truyền đường dẫn
 ảnh hoặc `<img>`. Có người muốn import cả bộ artwork đó như một catalogue glyph thứ hai.
 
 **Ranh giới.** Không phải `ICON-7`: đây là một biên artwork HẸP, nó không mở thêm vendor glyph; điều
@@ -327,7 +336,7 @@ lượng reaction · picker chọn reaction.
 Icon leaf sở hữu vendor, family, hình vẽ và kích thước; mọi tầng gọi phải hoàn toàn không biết gì về cả
 bốn thứ đó. Còn đây là tầng thực sự đang giữ từng mã hôm nay: `unrepresentable` nghĩa là một union đóng
 hay một prop shape làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule trong
-[`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) báo được, và rule đó được gọi tên ngay ở đây;
+`@canon-fe` báo được, và rule đó được gọi tên ngay ở đây;
 `documented` nghĩa là chỉ người đọc giữ.
 
 | Mã | Tầng | Cái gì đang giữ |
@@ -364,11 +373,11 @@ dẫn dưới `starci-eslint/packages/fe/` là các rule trong trust tree này.
 | `ICON-3` | `components/leaves/Icon/index.tsx` | Entry `leading` đọc là `size-5 shrink-0`, chọn từ đúng khối import outline mà `heading` dùng |
 | `ICON-4` | `components/leaves/Icon/index.tsx` | Khối import 16 solid riêng, alias theo từng ý nghĩa, và entry `chip` đọc là `size-4 shrink-0` |
 | `ICON-5` | `components/leaves/Icon/index.tsx` · `components/leaves/Icon/brands.tsx` | `stroke="currentColor"` trên những glyph vẽ cục bộ; trong file brand, một mark giữ bốn hex fill được vẽ sẵn còn mark đơn sắc dùng `currentColor` — ngoại lệ và luật nằm cạnh nhau |
-| `ICON-6` | `@starci/eslint-canon-fe` | `noVendorIconOutsideIconLeaf`; đúng một module path được phép; danh sách package khớp theo prefix |
-| `ICON-7` | `@starci/eslint-canon-fe` | `heroiconsIsTheGlyphVendor`; allow set hai package; ngoại lệ rank luồn qua cả hai rule vendor |
+| `ICON-6` | `@canon-fe` | `noVendorIconOutsideIconLeaf`; đúng một module path được phép; danh sách package khớp theo prefix |
+| `ICON-7` | `@canon-fe` | `heroiconsIsTheGlyphVendor`; allow set hai package; ngoại lệ rank luồn qua cả hai rule vendor |
 | `ICON-8` | `components/leaves/Icon/index.tsx` | Cả ba chuỗi vai trò đều kết thúc bằng `shrink-0` — kể cả `chip`, cái hay bị cho là quá nhỏ để phải bận tâm |
 | `ICON-9` | `components/leaves/Icon/icon.md` · `components/leaves/Icon/index.tsx` | Bảng tính năng nằm cạnh union ý nghĩa và glyph map, trong một thư mục. Bài test parity mà luật gọi tên: chưa neo được |
-| `ICON-10` | `@starci/eslint-canon-fe` · `components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` và đường dẫn nó buộc vào; composite đó render một label, một con số và một thanh bar, không glyph |
+| `ICON-10` | `@canon-fe` · `components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` và đường dẫn nó buộc vào; composite đó render một label, một con số và một thanh bar, không glyph |
 | `ICON-11` | `components/leaves/IconTile/index.tsx` | Hai bậc plate trong size map, và một dòng ngay dưới truyền `role: "leading"` vô điều kiện |
 | `ICON-12` | `components/composites/IconLabelFactRow/index.tsx` | Ba recipe; recipe peer là ca đúng của mã này. Recipe label-led đã render fact phụ nhỏ và muted **mà vẫn vẽ một glyph** — nửa phần của mã mà source chưa giữ được |
 | `ICON-13` | `components/leaves/ReactionPicker/index.tsx` · `public/reactions/` | Danh sách identity đóng trong leaf; sáu file artwork đã check-in và attribution đi kèm chúng |

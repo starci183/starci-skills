@@ -4,6 +4,13 @@ title: Testing
 
 # Testing
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one spec file, one hunk of a diff. The output is a
 **verdict**: which lane the file fell into, which published rule fired, what it reported and on which
 node, which law code that maps to, and the open hatch that would have hidden the same failure. This

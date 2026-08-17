@@ -4,7 +4,18 @@ title: Layouts · Vietnamese
 
 # Layouts
 
-Đầu vào là một yêu cầu nghiệp vụ viết bằng lời thường, và đầu ra là **3–4 phương án layout**, mỗi phương
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@contract-search` | `scripts/contract-search.mjs` | script | tìm contract entry theo nhu cầu đã nêu |
+| `@schema` | `brainstorms/layouts/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra và băm artifact ứng viên |
+
+
+## Bản ghi
+
+Mô-đun này nhận một yêu cầu nghiệp vụ viết bằng lời thường, rồi trả về **3–4 phương án layout**, mỗi phương
 án là một cấu trúc JSON để thầy chọn giữa chúng — hoặc **một lời từ chối** nêu tên quyết định sản phẩm
 còn thiếu. Đây không phải compiler: compiler trả về một đáp án vì luật của nó tự đóng lựa chọn. Ở đây lựa
 chọn là **quyết định sản phẩm**, nên trả về một đáp án là compiler đang giả vờ rằng người chủ đã quyết
@@ -33,7 +44,7 @@ Sáu, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuyệ
 | 6 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
 
 **Đầu vào số 2 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
-truy vấn qua `scripts/contract-search.mjs`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
+truy vấn qua `@contract-search`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
 để tiết kiệm. Một tầng **không thấy** class thì không thể ghi class vào đầu ra của nó, nên "JSON không có
 class" đứng vững vì **giá trị đó không bao giờ tới nơi**, chứ không vì một lời nhắc phải tuân theo. Đo
 trên một registry 299 entry: 192KB nằm trên đĩa, 69KB là mức được phép, và một truy vấn trả lời trong
@@ -147,7 +158,7 @@ blocked: <những region không giải được nếu thiếu nó>
 
 ## Đầu ra
 
-Đầu ra **chính là** JSON, và thẩm quyền của nó là [`schema.json`](./schema.json) nằm cạnh bản ghi này —
+Đầu ra **chính là** JSON, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này —
 không phải cái trích đoạn dưới đây. `envelope` giữ những thứ đổi theo lượt; hash chỉ phủ **một phương
 án**, nên cùng một quyết định chạy lại ở lượt sau vẫn ra đúng hash đó.
 
@@ -187,7 +198,7 @@ Mọi object trong schema đều đặt `additionalProperties: false`, nên mộ
 hiện để tranh luận — nó **không hợp lệ**. Validate trước khi ghi và trước khi hash:
 
 ```bash
-node <trust>/scripts/validate-artifact.mjs --schema <trust>/brainstorms/layouts/schema.json --data <batch.json> --hash
+node @validate-artifact --schema @schema --data <batch.json> --hash
 ```
 
 Validator còn ép ba luật cấp-lô mà schema không nói được: không class token ở bất cứ đâu trong lô, không

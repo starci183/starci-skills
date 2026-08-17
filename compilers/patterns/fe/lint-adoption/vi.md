@@ -4,7 +4,16 @@ title: Lint-adoption · Vietnamese
 
 # Lint adoption
 
-Đầu vào là một shape đã được duyệt: repo đã được chốt là chạy dưới bộ rule canon của front end, và không ai mở lại chuyện có nên hay không. Đầu ra là kiến trúc source — file nào giữ khối gắn, tầng nào giữ bằng chứng, thứ gì rời canon như một khối có version, config đã resolve phải in ra cái gì, và pass nào mới được phép sửa source sản phẩm. Pattern này không biện hộ cho bộ rule; nó hạ bộ rule đó xuống thành file.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: repo đã được chốt là chạy dưới bộ rule canon của front end, và không ai mở lại chuyện có nên hay không. Kết quả là kiến trúc source — file nào giữ khối gắn, tầng nào giữ bằng chứng, thứ gì rời canon như một khối có version, config đã resolve phải in ra cái gì, và pass nào mới được phép sửa source sản phẩm. Pattern này không biện hộ cho bộ rule; nó hạ bộ rule đó xuống thành file.
 
 ## Luật
 
@@ -35,16 +44,16 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 1. **Đọc xem shape nói gì.** Nó nói repo này được cai trị bởi bộ canon, và nói các glob mà repo sở hữu — luật áp lên những cây source nào. Đó là dữ kiện của riêng repo.
 2. **Đọc xem nó không nói gì, và vì thế không giải quyết gì.** Nó không nói config đã resolve in ra cái gì. Nó không nói rule kết thúc ở mức nào, không nói một block config đứng sau có ghi đè `linterOptions` hay không, không nói file probe có nằm trong glob được cai trị hay không. Không thứ nào trong đó do shape quyết; chúng do phép đo quyết.
 3. **Giải quyết từ ngoài vào trong.** Khối gắn đứng trước bằng chứng, bằng chứng đứng trước mức của rule, mức của rule đứng trước việc từ chối inline, và cả bốn đứng trước mọi câu hỏi về source sản phẩm. Một subset chưa bao giờ tới nơi thì không thể đo là `error`, và một audit đỏ quyết định câu hỏi cuối cùng bất kể mấy câu kia.
-4. **Hỏi câu hỏi của từng mã, theo thứ tự.** `LINT-ADOPTION-1`: plugin, recommendation và linter options có rời canon như một khối có version không, hay có ai đó đã chép tay một phần? `LINT-ADOPTION-2`: config đã resolve có được in ra bằng chính ESLint của repo đích, cho một file đang ship không? `LINT-ADOPTION-3`: `missing` có rỗng và `nonError` có rỗng không? `LINT-ADOPTION-4`: `linterOptions.noInlineConfig` in ra có đọc là `true` không? `LINT-ADOPTION-5`: pass này có sắp đụng vào source sản phẩm trong lúc `ok` đang là false không?
+4. **Hỏi câu hỏi của từng mã, theo thứ tự.** `LINT-ADOPTION-1`: plugin, recommendation và linter options có rời canon như một khối có version không, hay có ai đó đã chép tay một phần? `LINT-ADOPTION-2`: config đã resolve có được in ra bằng chính ESLint của repository đích, cho một file đang ship không? `LINT-ADOPTION-3`: `missing` có rỗng và `nonError` có rỗng không? `LINT-ADOPTION-4`: `linterOptions.noInlineConfig` in ra có đọc là `true` không? `LINT-ADOPTION-5`: pass này có sắp đụng vào source sản phẩm trong lúc `ok` đang là false không?
 5. **Khi hai mã cùng khớp, gọi tên cả hai và xử theo mã ngoài hơn.** Một subset chép tay mà lại toàn `error` là `LINT-ADOPTION-1`, không phải một `LINT-ADOPTION-3` sạch — `missing` thường là triệu chứng của mã 1, còn `nonError` gần như luôn là mã 3. Gắn đúng mà không bao giờ đo là `LINT-ADOPTION-2`, chưa phải adoption. Đo rồi làm ngơ kết quả đỏ là `LINT-ADOPTION-5`, không phải `LINT-ADOPTION-2`.
 
 ## `LINT-ADOPTION-1` — gắn nguyên khối, không tự cắt subset
 
-**Tình huống.** Một repo tiêu thụ canon phải nhận ba thứ cùng lúc: plugin, recommendation (tên rule kèm mức), và linter options. Ba thứ đó rời canon như một khối có version. Repo viết tay lại một phần bất kỳ trong ba thứ đó là đã tạo ra canon thứ hai — không phải vào ngày viết, mà vào ngày một trong hai danh sách thay đổi.
+**Khi nào gặp.** Một repo tiêu thụ canon phải nhận ba thứ cùng lúc: plugin, recommendation (tên rule kèm mức), và linter options. Ba thứ đó rời canon như một khối có version. Repo viết tay lại một phần bất kỳ trong ba thứ đó là đã tạo ra canon thứ hai — không phải vào ngày viết, mà vào ngày một trong hai danh sách thay đổi.
 
-**Nó sinh ra gì trong source.** Config của repo tiêu thụ spread khối gắn đã nhận. Attachment factory trong [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) cho glob, linter options, plugin và rule rời đi trong MỘT khối, và ném lỗi khi recommendation rỗng thay vì trả về một khối không có rule nào. Không giữ thư mục plugin tự nuôi bên cạnh bản mirror, và không có bản sao thứ hai của cùng bộ rule ở bất kỳ đâu trong repo.
+**Source phải thể hiện gì.** Config của repo tiêu thụ spread khối gắn đã nhận. Attachment factory trong `@canon-fe` cho glob, linter options, plugin và rule rời đi trong MỘT khối, và ném lỗi khi recommendation rỗng thay vì trả về một khối không có rule nào. Không giữ thư mục plugin tự nuôi bên cạnh bản mirror, và không có bản sao thứ hai của cùng bộ rule ở bất kỳ đâu trong repo.
 
-**Dấu hiệu nhận biết.** `eslint.config.mjs` tự liệt kê tên rule trong `rules: {}` thay vì spread cái đã nhận. Có một thư mục plugin do repo tự nuôi nằm cạnh bản mirror. Có nơi trong repo giữ thêm một bản sao thứ hai của cùng bộ rule. Ai đó nói "đã import plugin rồi" khi được hỏi repo đang bị cai trị bởi bao nhiêu rule. Phép thử: ngày mai canon thêm một rule, repo này có nhận được nó mà không ai phải sửa tay không? Nếu phải sửa tay, đây là một bản sao chứ không phải một khối.
+**Cách nhận ra.** `eslint.config.mjs` tự liệt kê tên rule trong `rules: {}` thay vì spread cái đã nhận. Có một thư mục plugin do repo tự nuôi nằm cạnh bản mirror. Có nơi trong repo giữ thêm một bản sao thứ hai của cùng bộ rule. Ai đó nói "đã import plugin rồi" khi được hỏi repo đang bị cai trị bởi bao nhiêu rule. Phép thử: ngày mai canon thêm một rule, repo này có nhận được nó mà không ai phải sửa tay không? Nếu phải sửa tay, đây là một bản sao chứ không phải một khối.
 
 **Ranh giới.** Đây không phải `LINT-ADOPTION-3`: mã 1 hỏi rule có tới nơi không, mã 3 hỏi tới rồi thì ở mức nào. Một subset viết tay có thể toàn `error` mà vẫn hỏng ở mã 1, vì thứ nó thiếu là những rule không được chép vào. Nó cũng không phải `LINT-ADOPTION-2`: mã 1 nói về cách gắn, mã 2 nói về cách chứng minh đã gắn. Gắn đúng mà không đo vẫn chưa phải bằng chứng.
 
@@ -52,11 +61,15 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 ## `LINT-ADOPTION-2` — đo trên file production thật
 
-**Tình huống.** Load được plugin chỉ chứng minh rule tồn tại. Nó không chứng minh ESLint bật rule đó cho file nào. Bằng chứng duy nhất có giá trị là config đã resolve cho một file thật đang ship, in ra bằng chính ESLint của repo đích chứ không phải đọc bằng mắt từ file config.
+**Khi nào gặp.** Load được plugin chỉ chứng minh rule tồn tại. Nó không chứng minh ESLint bật rule đó cho file nào. Bằng chứng duy nhất có giá trị là config đã resolve cho một file thật đang ship, in ra bằng chính ESLint của repository đích chứ không phải đọc bằng mắt từ file config.
 
-**Nó sinh ra gì trong source.** Một lần chạy [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs), trong đó `--probe` là bắt buộc và config bị đem ra xét được spawn ra từ chính ESLint của repo đích chứ không đọc từ file config của nó. Đường dẫn probe trỏ vào một file source production nằm trong glob được cai trị — không phải file test, không phải file config, không phải file script. Source candidate của một pass Preview nằm trong các glob đó một cách có chủ đích.
+**Kết quả phải để lại trong source.** Lượt audit phải chạy lại được, bắt buộc nhận `--probe`, rồi dùng
+chính ESLint của repository đích để dựng config cần xét; đọc file config bằng mắt không đủ. Probe phải là một
+file production thật nằm trong glob chịu luật, không phải test, config hay script. Source ứng viên của
+Preview cũng cố ý nằm trong những glob ấy. Cây này hiện không có wrapper cho lệnh audit, vì vậy lượt chạy
+phải giữ lại cả câu lệnh lẫn kết quả đã in làm bằng chứng.
 
-**Dấu hiệu nhận biết.** Kết luận adoption được rút ra từ việc mở `eslint.config.mjs` ra đọc. Không ai chạy được lệnh audit, hoặc chạy nhưng `--probe` trỏ vào file test, file config, file script. Repo xanh nhưng không ai nói được nó xanh dưới bao nhiêu rule. Glob không phủ tới file được chọn làm probe, và không ai nhận ra vì kết quả vẫn in ra bình thường. Phép thử: file vừa dùng làm probe có thật sự nằm trong tập file sẽ được ship không? Nếu nó là file test hay file cấu hình thì vừa đo một thứ không ai deploy.
+**Cách nhận ra.** Kết luận adoption được rút ra từ việc mở `eslint.config.mjs` ra đọc. Không ai chạy được lệnh audit, hoặc chạy nhưng `--probe` trỏ vào file test, file config, file script. Repo xanh nhưng không ai nói được nó xanh dưới bao nhiêu rule. Glob không phủ tới file được chọn làm probe, và không ai nhận ra vì kết quả vẫn in ra bình thường. Phép thử: file vừa dùng làm probe có thật sự nằm trong tập file sẽ được ship không? Nếu nó là file test hay file cấu hình thì vừa đo một thứ không ai deploy.
 
 **Ranh giới.** Đây không phải `LINT-ADOPTION-1`: xem trên. Nó cũng không phải `LINT-ADOPTION-5`: mã 2 là hành động đo, mã 5 là hệ quả khi kết quả đỏ. Đo xong rồi làm ngơ là hỏng ở mã 5, không phải mã 2.
 
@@ -64,11 +77,11 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 ## `LINT-ADOPTION-3` — mọi rule resolve ra `error`
 
-**Tình huống.** Rule đã tới nơi rồi thì phải ở mức `error`, tất cả, không trừ cái nào. Một bộ warning-level, hoặc một plugin viết tay chạy song song, tạo ra kiến trúc thứ hai yếu hơn — và kiến trúc yếu hơn là cái thắng, vì nó là cái không chặn merge.
+**Khi nào gặp.** Rule đã tới nơi rồi thì phải ở mức `error`, tất cả, không trừ cái nào. Một bộ warning-level, hoặc một plugin viết tay chạy song song, tạo ra kiến trúc thứ hai yếu hơn — và kiến trúc yếu hơn là cái thắng, vì nó là cái không chặn merge.
 
-**Nó sinh ra gì trong source.** Config in ra resolve mọi rule canon thành `error`. `severityOf` trong [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2`; cả `missing` lẫn `nonError` trả về rỗng. `recommended` trong [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) được gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết. Không có block config đứng sau ghi đè mức của rule cho một glob tạm thời.
+**Source phải thể hiện gì.** Config in ra resolve mọi rule canon thành `error`. `severityOf` trong `@canon-fe` thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2`; cả `missing` lẫn `nonError` trả về rỗng. `recommended` trong `@canon-fe` được gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết. Không có block config đứng sau ghi đè mức của rule cho một glob tạm thời.
 
-**Dấu hiệu nhận biết.** Trong output audit, `nonError` không rỗng: rule có mặt nhưng ở `warn` hoặc `off`. Trong output audit, `missing` không rỗng: rule không tồn tại trong config đã resolve. Có block config đứng sau ghi đè mức của một vài rule cho một glob tạm thời. Có người mô tả `warn` là giai đoạn rollout. Phép thử: nếu một violation mới của rule này được viết hôm nay, nó có chặn được không? Nếu chỉ in ra một dòng vàng rồi merge thì rule đó chưa được adopt, chỉ được nhắc tới.
+**Cách nhận ra.** Trong output audit, `nonError` không rỗng: rule có mặt nhưng ở `warn` hoặc `off`. Trong output audit, `missing` không rỗng: rule không tồn tại trong config đã resolve. Có block config đứng sau ghi đè mức của một vài rule cho một glob tạm thời. Có người mô tả `warn` là giai đoạn rollout. Phép thử: nếu một violation mới của rule này được viết hôm nay, nó có chặn được không? Nếu chỉ in ra một dòng vàng rồi merge thì rule đó chưa được adopt, chỉ được nhắc tới.
 
 **Ranh giới.** Đây không phải `LINT-ADOPTION-1`: `missing` thường là triệu chứng của mã 1, `nonError` gần như luôn là mã 3. Nó cũng không phải `LINT-ADOPTION-4`: mã 3 nói về mức của rule, mã 4 nói về việc rule đó có bị một comment trong chính file vi phạm tắt đi được không. Đủ `error` mà vẫn cho inline disable thì mức kia chỉ là mức mặc định.
 
@@ -76,11 +89,11 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 ## `LINT-ADOPTION-4` — config đã resolve từ chối inline config
 
-**Tình huống.** `noInlineConfig` không phải là một tuỳ chọn khắt khe thêm. Nó là thứ khiến một directive trong file không có tác dụng, thay vì chỉ bị coi là sai. Thiếu nó, tác giả của vi phạm đồng thời là người quyết định đó có phải vi phạm hay không.
+**Khi nào gặp.** `noInlineConfig` không phải là một tuỳ chọn khắt khe thêm. Nó là thứ khiến một directive trong file không có tác dụng, thay vì chỉ bị coi là sai. Thiếu nó, tác giả của vi phạm đồng thời là người quyết định đó có phải vi phạm hay không.
 
-**Nó sinh ra gì trong source.** `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, trong [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe), và được `ok` đòi hỏi song song với phép so danh sách rule, trả về `true`. Config của repo tiêu thụ áp bộ linter options đã đóng băng do [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) công bố bên cạnh rule báo cáo directive. Source sản phẩm không mang `eslint-disable`, `eslint-disable-next-line` hay `eslint-enable`.
+**Source phải thể hiện gì.** `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, trong `@canon-fe`, và được `ok` đòi hỏi song song với phép so danh sách rule, trả về `true`. Config của repo tiêu thụ áp bộ linter options đã đóng băng do `@canon-fe` công bố bên cạnh rule báo cáo directive. Source sản phẩm không mang `eslint-disable`, `eslint-disable-next-line` hay `eslint-enable`.
 
-**Dấu hiệu nhận biết.** `refusesInlineConfig: false` trong output audit, dù danh sách rule đã đủ. Config gắn rule nhưng quên spread linter options. Một block config đứng sau ghi đè `linterOptions` và không ai để ý, vì flat config lấy block sau. Source sản phẩm có `eslint-disable`, `eslint-disable-next-line`, hoặc `eslint-enable`. Phép thử: một dòng comment đặt đúng chỗ có tắt được rule đang báo lỗi chính dòng đó không? Nếu có thì cái đang đứng đó không phải hàng rào.
+**Cách nhận ra.** `refusesInlineConfig: false` trong output audit, dù danh sách rule đã đủ. Config gắn rule nhưng quên spread linter options. Một block config đứng sau ghi đè `linterOptions` và không ai để ý, vì flat config lấy block sau. Source sản phẩm có `eslint-disable`, `eslint-disable-next-line`, hoặc `eslint-enable`. Phép thử: một dòng comment đặt đúng chỗ có tắt được rule đang báo lỗi chính dòng đó không? Nếu có thì cái đang đứng đó không phải hàng rào.
 
 **Ranh giới.** Đây không phải `LINT-ADOPTION-3`: xem trên. Nó cũng không phải luật `lint-escape-hatch`: rule báo cáo directive thuộc luật kia, còn linter option làm directive vô hiệu là điều kiện adoption ở đây. Cần cả hai: một cái giải thích vì sao hỏng, một cái bảo đảm directive không tự bịt miệng được người canh nó.
 
@@ -88,29 +101,32 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 ## `LINT-ADOPTION-5` — audit đỏ thì dừng trước khi sửa source
 
-**Tình huống.** Code viết dưới một hàng rào chưa đủ có thể hợp lệ tại chỗ mà vẫn vi phạm canon. Nó không đỏ, nên không ai biết. Nó sẽ đỏ vào đúng ngày wiring được sửa xong — và lúc đó khoản nợ đã mang tên người khác.
+**Khi nào gặp.** Code viết dưới một hàng rào chưa đủ có thể hợp lệ tại chỗ mà vẫn vi phạm canon. Nó không đỏ, nên không ai biết. Nó sẽ đỏ vào đúng ngày wiring được sửa xong — và lúc đó khoản nợ đã mang tên người khác.
 
-**Nó sinh ra gì trong source.** Không có thay đổi nào trong source sản phẩm khi `ok` còn là false. [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) thoát với mã khác không khi `ok` là false, và cái exit khác không đó là tín hiệu mà một pass buộc phải dừng lại, chứ không phải ghi chú thêm vào. Diff wiring và diff sản phẩm nằm ở hai commit riêng, để còn đọc được cái nào gây ra cái nào.
+**Kết quả phải để lại trong source.** Khi phép so sánh còn trả `ok: false`, source sản phẩm không được
+đổi. Chính runner phải biến kết quả đó thành exit khác không; cây này hiện chưa có script giữ điểm dừng
+ấy, nên ở đây nó vẫn chỉ được ghi thành luật chứ chưa được máy cưỡng chế. Diff wiring và diff sản phẩm
+nằm ở hai commit riêng để còn truy ra thay đổi nào gây ra kết quả nào.
 
-**Dấu hiệu nhận biết.** Một pass Apply hoặc fidelity bắt đầu sửa `.tsx` trong khi audit chưa từng chạy, hoặc chạy ra `ok: false`. Có người nói sửa lint sau, giờ làm tính năng trước. Diff sản phẩm và diff wiring nằm chung một commit, nên không ai đọc được cái nào gây ra cái nào. Một pass đo lường — khảo sát trùng lặp, đối chiếu parity — chạy trên repo đang hỏng adoption và báo kết quả như thật. Phép thử: nếu wiring được sửa xong ngay sau commit này, diff vừa viết có còn xanh không? Nếu không chắc, nghĩa là nó đang được chấm bởi một tập luật khác với tập sẽ chấm nó ngày mai.
+**Cách nhận ra.** Một pass Apply hoặc fidelity bắt đầu sửa `.tsx` trong khi audit chưa từng chạy, hoặc chạy ra `ok: false`. Có người nói sửa lint sau, giờ làm tính năng trước. Diff sản phẩm và diff wiring nằm chung một commit, nên không ai đọc được cái nào gây ra cái nào. Một pass đo lường — khảo sát trùng lặp, đối chiếu parity — chạy trên repo đang hỏng adoption và báo kết quả như thật. Phép thử: nếu wiring được sửa xong ngay sau commit này, diff vừa viết có còn xanh không? Nếu không chắc, nghĩa là nó đang được chấm bởi một tập luật khác với tập sẽ chấm nó ngày mai.
 
-**Ranh giới.** Đây không phải `LINT-ADOPTION-2`: mã 2 là phép đo, mã 5 là thứ mà kết quả đỏ bắt buộc phải làm. Nó cũng không phải ngoại lệ của chính nó: sửa wiring không phải sửa source sản phẩm. Mã 5 chặn source sản phẩm; nó không chặn việc chữa đúng cái config vừa đỏ, trong một boundary đã được duyệt trước khi bắt đầu.
+**Ranh giới.** Đây không phải `LINT-ADOPTION-2`: mã 2 là phép đo, mã 5 là thứ mà kết quả đỏ bắt buộc phải làm. Nó cũng không phải ngoại lệ của chính nó: sửa wiring không phải sửa source sản phẩm. Mã 5 chặn source sản phẩm; nó không chặn việc chữa đúng config vừa đỏ, trong một boundary đã được duyệt trước khi bắt đầu.
 
 **Tình huống nghiệp vụ hay gặp.** Nhận task mới trên repo lâu không đụng tới · vừa pull về một loạt rule mới · sắp port candidate của pass Preview · deadline demo · một sửa lỗi chỉ một dòng · khảo sát consolidation trên một repo chưa adopt.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã — `unrepresentable` (một union đóng hoặc branded type khiến giá trị sai không viết ra được), `enforced` (một lint rule từ [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) bắt được, nêu tên ở đây), hay `documented` (không có gì cơ học giữ nó; chỉ có người đọc).
+Tầng nào thật sự giữ từng mã — `unrepresentable` (một union đóng hoặc branded type khiến giá trị sai không viết ra được), `enforced` (một lint rule từ `@canon-fe` bắt được, nêu tên ở đây), hay `documented` (không có gì cơ học giữ nó; chỉ có người đọc).
 
 | Mã | Tầng | Cái gì thật sự giữ nó |
 |---|---|---|
-| `LINT-ADOPTION-1` | `documented` | [`scripts/sync-fe-lint.mjs`](../../../../scripts/sync-fe-lint.mjs) báo cáo một thư mục plugin tự nuôi và một bản mirror đã lệch — nhưng đó là một script ai đó chọn chạy, không phải một rule mà build sẽ đỏ vì nó |
-| `LINT-ADOPTION-2` | `documented` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) thực hiện audit; không có gì bắt buộc được rằng audit đã được thực hiện |
+| `LINT-ADOPTION-1` | `documented` | cây này chưa có máy báo thư mục plugin tự nuôi hay mirror đã lệch; phải kiểm tra repo và ghi lại rằng chúng không tồn tại |
+| `LINT-ADOPTION-2` | `documented` | cây này chưa có máy chạy audit effective config; không có gì bắt buộc được rằng audit đã xảy ra |
 | `LINT-ADOPTION-3` | `documented` | `audits["effective-config"]` trả về `nonError`, và chỉ trả về khi được gọi |
-| `LINT-ADOPTION-4` | `documented` | cũng chính audit đó trả về `refusesInlineConfig`; giá trị nó tìm do [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) công bố, và đó là rule của một module khác |
+| `LINT-ADOPTION-4` | `documented` | cũng chính audit đó trả về `refusesInlineConfig`; giá trị nó tìm do `@canon-fe` công bố, và đó là rule của một module khác |
 | `LINT-ADOPTION-5` | `documented` | một người đọc, hoặc một skill biết dừng |
 
-Cả năm đều là `documented`, và artifact giữ luật này công bố `rules = {}` một cách có chủ đích chứ không phải do bỏ bê. Một ESLint rule nhìn thấy cây cú pháp bên trong một file, dưới một configuration đã được resolve xong. Toàn bộ đề tài của luật này chính là cái resolve đó: rule có mặt hay không, nó kết thúc ở mức severity nào, directive có được tôn trọng hay không. Một rule bị bắt phán xử những dữ kiện ấy sẽ đang phán xử chính cái config đã quyết định rule đó có chạy hay không — và kiểu hỏng ở đây là im lặng, vì một rule bị tắt thì không báo gì và một repo không bị cai trị bởi gì cả thì lint sạch trơn. Vì thế thứ giữ luật này là một audit ở tầm repo trên `eslint --print-config` chứ không phải một rule, và vì thế bảng này hiện năm dòng `documented` thay vì giả vờ khác đi. Tầng sở hữu mối quan tâm này là config đã resolve của repo cùng audit chạy trên nó; mọi tầng sản phẩm — component, block, page — phải ngu ngơ về nó và không bao giờ được mang một ý kiến cục bộ về việc rule nào cai trị mình.
+Cả năm đều là `documented`, và artifact giữ luật này công bố `rules = {}` có chủ ý chứ không phải do bỏ bê. Một ESLint rule nhìn thấy cây cú pháp bên trong một file, dưới một configuration đã được resolve xong. Toàn bộ đề tài của luật này chính là cái resolve đó: rule có mặt hay không, nó kết thúc ở mức severity nào, directive có được tôn trọng hay không. Một rule bị bắt phán xử những dữ kiện ấy sẽ đang phán xử chính config đã quyết định rule đó có chạy hay không — và kiểu hỏng ở đây là im lặng, vì một rule bị tắt thì không báo gì và một repo không bị cai trị bởi gì cả thì lint sạch trơn. Vì thế thứ giữ luật này là một audit ở tầm repo trên `eslint --print-config` chứ không phải một rule, và vì thế bảng này hiện năm dòng `documented` thay vì giả vờ khác đi. Tầng sở hữu mối quan tâm này là config đã resolve của repo cùng audit chạy trên nó; mọi tầng sản phẩm — component, block, page — phải ngu ngơ về nó và không bao giờ được mang một ý kiến cục bộ về việc rule nào cai trị mình.
 
 ## Điểm neo
 
@@ -118,17 +134,18 @@ Một luật không chỉ tay được vào code thật chỉ là một đề xu
 
 | Mã | Đường dẫn | Tìm gì ở đó |
 |---|---|---|
-| `LINT-ADOPTION-1` | [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) | Attachment factory được export: glob, linter options, plugin và rule rời đi trong MỘT khối, và một recommendation rỗng thì ném lỗi thay vì trả về một khối không có rule nào |
-| `LINT-ADOPTION-2` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) | `--probe` là bắt buộc, và config bị đem ra xét được spawn ra từ chính ESLint của repo đích chứ không đọc từ file config của nó |
-| `LINT-ADOPTION-3` | [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) | `severityOf`, thứ thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2` |
-| `LINT-ADOPTION-4` | [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) | `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, và được `ok` đòi hỏi song song với phép so danh sách rule |
-| `LINT-ADOPTION-5` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) | Cái exit khác không khi `ok` là false — tín hiệu mà một pass buộc phải dừng lại, chứ không phải ghi chú thêm vào. **Neo một phần** — xem bên dưới |
+| `LINT-ADOPTION-1` | `@canon-fe` | Attachment factory được export: glob, linter options, plugin và rule rời đi trong MỘT khối, và một recommendation rỗng thì ném lỗi thay vì trả về một khối không có rule nào |
+| `LINT-ADOPTION-2` | chưa có điểm neo resolve được trong cây này | Câu lệnh được lưu phải bắt buộc nhận `--probe`, rồi dùng chính ESLint của repository đích để dựng config cần xét thay vì đọc file config |
+| `LINT-ADOPTION-3` | `@canon-fe` | `severityOf`, thứ thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2` |
+| `LINT-ADOPTION-4` | `@canon-fe` | `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, và được `ok` đòi hỏi song song với phép so danh sách rule |
+| `LINT-ADOPTION-5` | chưa có điểm neo resolve được trong cây này | Runner vẫn còn nợ exit khác không khi `ok` là false — tín hiệu buộc pass dừng lại thay vì chỉ ghi chú |
 
 Bằng chứng thứ cấp, hữu ích khi chính điểm neo chính đang bị thay đổi:
 
-- `LINT-ADOPTION-1` — [`scripts/sync-fe-lint.mjs`](../../../../scripts/sync-fe-lint.mjs): digest nội dung của bản mirror, và phát hiện được nêu khi một thư mục plugin tự nuôi vẫn còn tồn tại bên cạnh nó.
-- `LINT-ADOPTION-3` — [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe): `recommended`, gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết.
-- `LINT-ADOPTION-4` — [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe): bộ linter options đã đóng băng mà một config tiêu thụ sẽ áp, công bố ngay bên cạnh rule báo cáo directive.
+- `LINT-ADOPTION-1` — diff và manifest của repo: đọc cùng nhau sẽ lộ ra thư mục plugin tự nuôi hoặc
+  một mirror không thuộc quyền sở hữu của package nào đã khai báo.
+- `LINT-ADOPTION-3` — `@canon-fe`: `recommended`, gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết.
+- `LINT-ADOPTION-4` — `@canon-fe`: bộ linter options đã đóng băng mà một config tiêu thụ sẽ áp, công bố ngay bên cạnh rule báo cáo directive.
 - `LINT-ADOPTION-5` — skill Apply của lint-sync nêu điều kiện đóng mà chỉ `ok: true` mới thoả, còn skill Plan của consolidation thì rẽ đi chỗ khác thay vì đo một repo đang hỏng adoption.
 
 `LINT-ADOPTION-5` có neo cho việc lint-sync và **chưa neo được** cho Apply của design và fidelity: không file nào trong các skill đó đọc audit này, nên cái điểm dừng mà chúng nợ chỉ tồn tại trong lời văn và không ở đâu khác. Nó được ghi lại như một rủi ro còn mở.
@@ -138,7 +155,7 @@ Bằng chứng thứ cấp, hữu ích khi chính điểm neo chính đang bị 
 | Đầu vào | Bằng chứng phải có |
 |---|---|
 | probe | Đường dẫn của một file source production thật nằm trong glob được cai trị |
-| printed config | Output của chính `eslint --print-config` của repo đích cho file probe đó |
+| printed config | Output của chính `eslint --print-config` của repository đích cho file probe đó |
 | recommendation | Bản đồ rule-sang-mức của canon, gom từ mọi module, không phải một subset |
 | linter options | `linterOptions` đã resolve, đọc từ config in ra chứ không phải từ file config nguồn |
 | phase | Việc nào đang hỏi: wiring, Apply, fidelity, hay một pass đo lường |
@@ -160,8 +177,8 @@ Ngoại lệ là một phần của luật, không phải chỗ để lách. M�
 
 - **Config thuộc về repo.** `LINT-ADOPTION-1` ràng buộc rule, mức của rule và việc từ chối inline. Luật áp lên glob nào là việc của repo: monorepo lint package dùng chung và từng app, single-app lint một cây source. Rule là luật; glob là nơi luật có hiệu lực.
 - **Plugin khác của repo.** `LINT-ADOPTION-1`: một config tiêu thụ bảo toàn plugin không liên quan của riêng nó, `ignores` của riêng nó và `languageOptions` của riêng nó. Thứ nó không được giữ là một ý kiến thứ hai về bộ rule canon.
-- **Source candidate không được miễn.** `LINT-ADOPTION-2`: một candidate của pass Preview chính là source mà một pass sau sẽ port vào production. Nó nằm trong glob được cai trị một cách có chủ đích, để đúng cái file sẽ thành production không phải là file được chấm bởi không gì cả.
-- **Sửa wiring không phải sửa sản phẩm.** `LINT-ADOPTION-5` chặn source sản phẩm, không chặn việc chữa đúng cái config đã hỏng, theo một boundary đã được duyệt trước khi bắt đầu.
+- **Source candidate không được miễn.** `LINT-ADOPTION-2`: một candidate của pass Preview chính là source mà một pass sau sẽ port vào production. Nó nằm trong glob được cai trị có chủ ý, để đúng file sẽ thành production không phải là file được chấm bởi không gì cả.
+- **Sửa wiring không phải sửa sản phẩm.** `LINT-ADOPTION-5` chặn source sản phẩm, không chặn việc chữa đúng config đã hỏng, theo một boundary đã được duyệt trước khi bắt đầu.
 - **Nợ được ghi, không được hạ.** `LINT-ADOPTION-3`: rule chưa mang sang được thì ghi vào sổ nợ kèm giá của nó, và ở mọi nơi nó đã tồn tại thì vẫn giữ nguyên mức cao nhất. Ghi lại một khoảng thiếu giữ cho con số trung thực; hạ mức làm ranh giới thành tuỳ chọn cho mọi người tới sau.
 
 ## Đầu ra

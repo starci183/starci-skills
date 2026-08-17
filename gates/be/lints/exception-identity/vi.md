@@ -4,7 +4,16 @@ title: Exception-identity · Vietnamese
 
 # Danh tính ngoại lệ
 
-Đầu vào là đoạn mã đã được viết ra rồi — một lớp, một tệp, một mảnh diff. Đầu ra là một **phán quyết**:
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận đoạn mã đã được viết ra rồi — một lớp, một tệp, một mảnh diff. Kết quả là một **phán quyết**:
 nút đó có nằm trong phạm vi hay không, luật máy nào đã nổ, nó báo gì và báo lên nút nào, mã luật tương
 ứng là mã nào, và cửa nào còn mở đủ để che đi đúng cái thất bại ấy. Mô-đun này không chọn cách đặt tên
 nào cả. Nó chỉ từ chối một cách đặt tên, và nó phải chỉ ra được đúng ký tự mà nó từ chối.
@@ -24,7 +33,7 @@ nguy hơn, vì nó đã lấy mất sự chú ý của người đọc mà khôn
 
 ## Luật máy đã xuất bản
 
-Ba luật máy ra đời cho điều luật này, nằm trong gói `@starci/eslint-canon-be`, cả ba đều đặt ở mức
+Ba luật máy ra đời cho điều luật này, nằm trong gói `@canon-be`, cả ba đều đặt ở mức
 `error`.
 
 | Luật máy | Mã luật | Nó báo cái gì |
@@ -71,7 +80,7 @@ thư mục khác nhau sẽ cùng đi qua sạch và cùng phát ra một mã.
 `node.superClass.type === "Identifier"` và `node.superClass.name === "AbstractException"`, rồi thử biểu
 thức chính quy `/Exception$/` lên `node.id.name`. Báo lên đúng nút `Identifier` của tên lớp.
 
-**Nó không thấy gì.** Một tầng kế thừa trung gian — `class DomainException extends AbstractException {}`
+**Điểm mù.** Một tầng kế thừa trung gian — `class DomainException extends AbstractException {}`
 rồi `class OrderNotFound extends DomainException {}` — vì cổng là một phép so định danh nguyên văn với
 đúng một chuỗi; dựng một lớp nền cho miền là cuộc tái cấu trúc thông thường nhất trên đời, và nó lặng lẽ
 gỡ bỏ sự giữ gìn khỏi mọi khai báo nằm dưới nó. Đổi tên khi nhập, `import { AbstractException as Base }`
@@ -98,7 +107,7 @@ hàm dựng để tìm một `ExpressionStatement` mà `expression` là `CallExp
 Lấy `arguments[1]`, đòi `type === "Literal"` mang giá trị `string`, rồi so hai vế sau khi bỏ hết `_` và
 viết hoa cả hai. Báo lên nút đối số.
 
-**Nó không thấy gì.** Một lời gọi `super()` nằm trong một khối — `if (cause) { super(msg, "A", meta) } else { super(msg, "B", meta) }`
+**Điểm mù.** Một lời gọi `super()` nằm trong một khối — `if (cause) { super(msg, "A", meta) } else { super(msg, "B", meta) }`
 — không nằm trong danh sách câu lệnh phẳng, nên luật trả về và không báo
 gì, mà đó lại đúng là hình dạng một mã có điều kiện sẽ mang. Không truyền mã, `super("Không tìm thấy")`,
 thì `arguments.length < 2` trả về sớm. Hàm dựng thừa kế chứ không khai báo thì gặp `if (!ctor) return`.
@@ -121,7 +130,7 @@ có khai kiểu, nhưng tên tham chiếu kiểu ấy không phải `<Class>Meta
 `typeName` kiểu `Identifier`, thì so định danh đó với `` `${className}Metadata` ``. Mọi hình dạng khác
 đều bị bỏ qua. Báo lên nút tham số hoặc nút khai kiểu.
 
-**Nó không thấy gì.** Một tham số dữ liệu kèm theo không tách rời —
+**Điểm mù.** Một tham số dữ liệu kèm theo không tách rời —
 `constructor(metadata: AbstractExceptionMetadata)` — là `Identifier` chứ không phải `ObjectPattern`, nên
 luật trả về trước khi kịp đọc phần khai kiểu: đúng cái lỗi luật sinh ra để bắt, viết lệch đi một dấu
 phẩy. Kiểu viết thẳng hoặc kiểu ghép, `{ id }: { id?: string }` hay

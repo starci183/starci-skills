@@ -4,7 +4,16 @@ title: Observability · Vietnamese
 
 # Quan trắc
 
-Đầu vào là một shape đã được duyệt: một handler, worker, cron, một nhánh quyết định, một khối `catch`, một entry point đứng một mình, một đường đi của tín hiệu, hay một tiến trình telemetry mà ai đó đã đồng ý là nên có. Module này không mở lại quyết định ấy. Đầu ra của nó là kiến trúc source — dòng log đi ra qua service nào, cái tên lấy từ tập đóng nào, object có kiểu nào đi bên cạnh, tầng nào giữ transport và correlation id, và lối ra hợp lệ được khai trong file nào.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một handler, worker, cron, một nhánh quyết định, một khối `catch`, một entry point đứng một mình, một đường đi của tín hiệu, hay một tiến trình telemetry mà ai đó đã đồng ý là nên có. Module này không mở lại quyết định ấy. Nó trả về kiến trúc source — dòng log đi ra qua service nào, cái tên lấy từ tập đóng nào, object có kiểu nào đi bên cạnh, tầng nào giữ transport và correlation id, và lối ra hợp lệ được khai trong file nào.
 
 ## Luật
 
@@ -45,11 +54,11 @@ Mọi tình huống module này quản đều mang một mã, `OBSERVABILITY-<n>
 
 ## `OBSERVABILITY-1` — log đi ra qua house service, và chỉ qua đó
 
-**Tình huống.** Một service, handler, worker hay cron cần ghi lại một chuyện vừa xảy ra, và tiến trình đang phục vụ một request hoặc một job.
+**Khi nào gặp.** Một service, handler, worker hay cron cần ghi lại một chuyện vừa xảy ra, và tiến trình đang phục vụ một request hoặc một job.
 
-**Nó sinh ra gì trong source.** House logging service được inject vào class và lời gọi thực hiện trên nó. Không có gì được tạo tại chỗ. Correlation id, cấu hình transport và phần redaction nằm trong đúng service đó và không lặp lại ở call site.
+**Source phải thể hiện gì.** House logging service được inject vào class và lời gọi thực hiện trên nó. Không có gì được tạo tại chỗ. Correlation id, cấu hình transport và phần redaction nằm trong đúng service đó và không lặp lại ở call site.
 
-**Dấu hiệu nhận biết.** Một logger được tạo tại chỗ trong class — `new Logger(...)` — hoặc một `console.*` còn sót. Dòng log ra đúng định dạng nhưng khi tra cứu thì **không có correlation id**. Cùng một request, có dòng thì tìm thấy trong log store, có dòng thì không.
+**Cách nhận ra.** Một logger được tạo tại chỗ trong class — `new Logger(...)` — hoặc một `console.*` còn sót. Dòng log ra đúng định dạng nhưng khi tra cứu thì **không có correlation id**. Cùng một request, có dòng thì tìm thấy trong log store, có dòng thì không.
 
 Câu tự hỏi: dòng này có mang theo được request đã sinh ra nó không, hay chỉ mang theo nội dung của chính nó?
 
@@ -59,11 +68,11 @@ Câu tự hỏi: dòng này có mang theo được request đã sinh ra nó khô
 
 ## `OBSERVABILITY-2` — tên sự kiện là thành viên enum
 
-**Tình huống.** Đang đặt đối số đầu tiên cho một lời gọi log. Đối số đó **đặt tên cho chuyện đã xảy ra**, và nó phải đến từ một tập đóng.
+**Khi nào gặp.** Đang đặt đối số đầu tiên cho một lời gọi log. Đối số đó **đặt tên cho chuyện đã xảy ra**, và nó phải đến từ một tập đóng.
 
-**Nó sinh ra gì trong source.** Một thành viên của enum tên log đóng ở vị trí đầu tiên. Nếu sự kiện chưa tồn tại, một thành viên mới được thêm vào chính enum đó kèm dòng JSDoc riêng — cái tên được sinh ra trong tập, không bao giờ tại call site.
+**Source phải thể hiện gì.** Một thành viên của enum tên log đóng ở vị trí đầu tiên. Nếu sự kiện chưa tồn tại, một thành viên mới được thêm vào chính enum đó kèm dòng JSDoc riêng — cái tên được sinh ra trong tập, không bao giờ tại call site.
 
-**Dấu hiệu nhận biết.** Có `${}` trong đối số đầu tiên. Có dấu `+` nối chuỗi trong đối số đầu tiên. Đối số đầu tiên là một chuỗi viết thẳng, dù không có biến nào bên trong.
+**Cách nhận ra.** Có `${}` trong đối số đầu tiên. Có dấu `+` nối chuỗi trong đối số đầu tiên. Đối số đầu tiên là một chuỗi viết thẳng, dù không có biến nào bên trong.
 
 Câu tự hỏi: nếu ngày mai có người sửa lại câu chữ cho hay hơn, dashboard dựng trên dòng này có tắt tiếng không?
 
@@ -73,11 +82,11 @@ Câu tự hỏi: nếu ngày mai có người sửa lại câu chữ cho hay hơ
 
 ## `OBSERVABILITY-3` — phần thay đổi được đi cạnh cái tên
 
-**Tình huống.** Sự kiện đã có tên, và còn id, số lượng, thời lượng, kết cục cần ghi lại kèm.
+**Khi nào gặp.** Sự kiện đã có tên, và còn id, số lượng, thời lượng, kết cục cần ghi lại kèm.
 
-**Nó sinh ra gì trong source.** Một đối số thứ hai: object có kiểu, với interface thuộc riêng sự kiện đó, để trường mới được thêm vào một chỗ và mọi call site sai kiểu đỏ ngay lúc build chứ không im lặng tới lúc có người đi tra cứu.
+**Source phải thể hiện gì.** Một đối số thứ hai: object có kiểu, với interface thuộc riêng sự kiện đó, để trường mới được thêm vào một chỗ và mọi call site sai kiểu đỏ ngay lúc build chứ không im lặng tới lúc có người đi tra cứu.
 
-**Dấu hiệu nhận biết.** Đối số thứ hai vắng mặt, trong khi câu chuyện rõ ràng có "cái nào" và "bao nhiêu". Dữ liệu bị nhét vào tên để "đọc cho tiện". Muốn thêm một trường mà lại phải sửa chính cái tên.
+**Cách nhận ra.** Đối số thứ hai vắng mặt, trong khi câu chuyện rõ ràng có "cái nào" và "bao nhiêu". Dữ liệu bị nhét vào tên để "đọc cho tiện". Muốn thêm một trường mà lại phải sửa chính cái tên.
 
 Câu tự hỏi: sáu tháng nữa cần lọc theo tenant, mình thêm một trường hay phải viết lại tên sự kiện?
 
@@ -87,11 +96,11 @@ Câu tự hỏi: sáu tháng nữa cần lọc theo tenant, mình thêm một tr
 
 ## `OBSERVABILITY-4` — log quyết định, không log việc đi ngang qua
 
-**Tình huống.** Đang chọn chỗ đặt dòng log trong một hàm. Có hai chỗ hấp dẫn: đầu hàm, và chỗ code vừa **chọn** một nhánh.
+**Khi nào gặp.** Đang chọn chỗ đặt dòng log trong một hàm. Có hai chỗ hấp dẫn: đầu hàm, và chỗ code vừa **chọn** một nhánh.
 
-**Nó sinh ra gì trong source.** Một dòng đặt tại nhánh, gọi tên thứ vừa được chọn và mang theo bằng chứng đã chọn trên đó. Không có gì ở đầu hàm hay cuối hàm.
+**Source phải thể hiện gì.** Một dòng đặt tại nhánh, gọi tên thứ vừa được chọn và mang theo bằng chứng đã chọn trên đó. Không có gì ở đầu hàm hay cuối hàm.
 
-**Dấu hiệu nhận biết.** Tên sự kiện nghe như tên hàm: `MethodEntered`, `HandlerStarted`, `LeavingService`. Đọc dòng log lên không biết được **vì sao** code làm thế, chỉ biết là nó có chạy. Xoá dòng log đi thì chẳng ai mất thông tin gì, vì source đã nói y hệt.
+**Cách nhận ra.** Tên sự kiện nghe như tên hàm: `MethodEntered`, `HandlerStarted`, `LeavingService`. Đọc dòng log lên không biết được **vì sao** code làm thế, chỉ biết là nó có chạy. Xoá dòng log đi thì chẳng ai mất thông tin gì, vì source đã nói y hệt.
 
 Câu tự hỏi: người đọc học được gì từ dòng này mà đọc source không suy ra được?
 
@@ -101,11 +110,11 @@ Câu tự hỏi: người đọc học được gì từ dòng này mà đọc s
 
 ## `OBSERVABILITY-5` — thất bại ghi danh tính, không ghi câu chữ
 
-**Tình huống.** Dòng log nằm trong một `catch`, và nó sẽ là thứ alert group theo.
+**Khi nào gặp.** Dòng log nằm trong một `catch`, và nó sẽ là thứ alert group theo.
 
-**Nó sinh ra gì trong source.** `code` của exception và metadata của nó nằm trong object dữ liệu, đóng vai khoá group. Câu thông báo dễ đọc cho người có thể tồn tại bên cạnh như một trường phụ.
+**Source phải thể hiện gì.** `code` của exception và metadata của nó nằm trong object dữ liệu, đóng vai khoá group. Câu thông báo dễ đọc cho người có thể tồn tại bên cạnh như một trường phụ.
 
-**Dấu hiệu nhận biết.** Có `error.message`, `String(error)` hoặc `${error}` đi vào trường dữ liệu. Một sự cố duy nhất hiện ra thành nhiều nhóm alert khác nhau trên dashboard. Sửa một câu thông báo cho dễ hiểu hơn xong thì alert cũ im lặng.
+**Cách nhận ra.** Có `error.message`, `String(error)` hoặc `${error}` đi vào trường dữ liệu. Một sự cố duy nhất hiện ra thành nhiều nhóm alert khác nhau trên dashboard. Sửa một câu thông báo cho dễ hiểu hơn xong thì alert cũ im lặng.
 
 Câu tự hỏi: nếu ngày mai có người viết lại câu thông báo của exception này, alert có tách làm hai không?
 
@@ -115,11 +124,11 @@ Câu tự hỏi: nếu ngày mai có người viết lại câu thông báo củ
 
 ## `OBSERVABILITY-6` — chương trình đứng một mình là lối ra duy nhất
 
-**Tình huống.** Một CLI, một agent, một script chạy ngoài vòng đời request. Không có request để correlate, không có transport được cấu hình sẵn cho nó.
+**Khi nào gặp.** Một CLI, một agent, một script chạy ngoài vòng đời request. Không có request để correlate, không có transport được cấu hình sẵn cho nó.
 
-**Nó sinh ra gì trong source.** Một logger thường trong entry point của chính chương trình đó, và một dòng trong lint config giới hạn lối ra theo path của chương trình. Không có gì khác thay đổi.
+**Source phải thể hiện gì.** Một logger thường trong entry point của chính chương trình đó, và một dòng trong lint config giới hạn lối ra theo path của chương trình. Không có gì khác thay đổi.
 
-**Dấu hiệu nhận biết.** Entry point là `main.ts` của một chương trình tự chạy rồi thoát. Logger được cần **trước khi** injector tồn tại. Không có `traceId` nào để gắn vào, vì không có ai gọi tới.
+**Cách nhận ra.** Entry point là `main.ts` của một chương trình tự chạy rồi thoát. Logger được cần **trước khi** injector tồn tại. Không có `traceId` nào để gắn vào, vì không có ai gọi tới.
 
 Câu tự hỏi: có tồn tại một request hoặc một job để dòng này gắn vào không? Nếu có thì đây **không** phải lối ra.
 
@@ -129,11 +138,11 @@ Câu tự hỏi: có tồn tại một request hoặc một job để dòng này
 
 ## `OBSERVABILITY-7` — Minimal trước, Full khi có bằng chứng
 
-**Tình huống.** Đang dựng hoặc mở rộng đường đi của tín hiệu: log, metric, trace, alert.
+**Khi nào gặp.** Đang dựng hoặc mở rộng đường đi của tín hiệu: log, metric, trace, alert.
 
-**Nó sinh ra gì trong source.** Con đường nhỏ nhất mà đầy đủ: các tín hiệu lõi đã nêu được thu, được giữ hoặc chuyển tiếp qua một backend đã duyệt, sức khoẻ xem được, alert nguy cấp bắn được. Mọi thứ vượt quá đó là hạng mục Phase 2 và không được viết bây giờ.
+**Source phải thể hiện gì.** Con đường nhỏ nhất mà đầy đủ: các tín hiệu lõi đã nêu được thu, được giữ hoặc chuyển tiếp qua một backend đã duyệt, sức khoẻ xem được, alert nguy cấp bắn được. Mọi thứ vượt quá đó là hạng mục Phase 2 và không được viết bây giờ.
 
-**Dấu hiệu nhận biết.** Brief liệt kê một danh sách công cụ thay vì một danh sách tín hiệu. Lý do thêm là "nó tích hợp sẵn rồi", "cloud có mà", "bật cho đủ bộ". Không ai nói được cái gì **đã** có, cái gì đang thêm, cái gì cố tình hoãn.
+**Cách nhận ra.** Brief liệt kê một danh sách công cụ thay vì một danh sách tín hiệu. Lý do thêm là "nó tích hợp sẵn rồi", "cloud có mà", "bật cho đủ bộ". Không ai nói được cái gì **đã** có, cái gì đang thêm, cái gì cố tình hoãn.
 
 Câu tự hỏi: con đường nhỏ nhất **đầy đủ** để thu được các tín hiệu lõi đã nêu, giữ hoặc chuyển tiếp chúng qua một backend đã duyệt, xem được sức khoẻ và bắn được các alert nguy cấp — con đường đó là gì?
 
@@ -143,11 +152,11 @@ Câu tự hỏi: con đường nhỏ nhất **đầy đủ** để thu được 
 
 ## `OBSERVABILITY-8` — mỗi tiến trình telemetry tự trả giá vòng đời của nó
 
-**Tình huống.** Sắp có một agent, collector, exporter, store hay dashboard service trở thành một phần của runtime.
+**Khi nào gặp.** Sắp có một agent, collector, exporter, store hay dashboard service trở thành một phần của runtime.
 
-**Nó sinh ra gì trong source.** Hoặc không sinh ra gì mới — tín hiệu đi qua tiến trình hoặc backend đã duyệt sẵn có — hoặc một tiến trình được khai báo với đầy đủ chủ sở hữu, tài nguyên, cổng, credential, cách lưu trữ, health check, backup và điều kiện gỡ bỏ, tất cả viết ra trước khi nó chạy.
+**Source phải thể hiện gì.** Hoặc không sinh ra gì mới — tín hiệu đi qua tiến trình hoặc backend đã duyệt sẵn có — hoặc một tiến trình được khai báo với đầy đủ chủ sở hữu, tài nguyên, cổng, credential, cách lưu trữ, health check, backup và điều kiện gỡ bỏ, tất cả viết ra trước khi nó chạy.
 
-**Dấu hiệu nhận biết.** Brief nói về tính năng của công cụ, không nói về tín hiệu mà đường hiện tại **không** chở nổi. Không ai trả lời được: ai sở hữu, chiếm bao nhiêu tài nguyên, mở cổng nào, credential ở đâu, lưu bao lâu, health check ra sao, ai backup, khi nào thì gỡ đi. Câu "cứ dựng lên đã, sau tính" xuất hiện.
+**Cách nhận ra.** Brief nói về tính năng của công cụ, không nói về tín hiệu mà đường hiện tại **không** chở nổi. Không ai trả lời được: ai sở hữu, chiếm bao nhiêu tài nguyên, mở cổng nào, credential ở đâu, lưu bao lâu, health check ra sao, ai backup, khi nào thì gỡ đi. Câu "cứ dựng lên đã, sau tính" xuất hiện.
 
 Câu tự hỏi: tín hiệu này có đi được qua tiến trình đã có hoặc một backend đã duyệt không? Nếu có thì tiến trình mới bị từ chối.
 
@@ -157,7 +166,7 @@ Câu tự hỏi: tín hiệu này có đi được qua tiến trình đã có ho
 
 ## Tầng giữ
 
-Tầng nào thực sự giữ từng mã ở thời điểm này. `unrepresentable` nghĩa là một union đóng hoặc kiểu branded làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `@starci/eslint-canon-be` báo lỗi, tên nêu bên dưới; `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc giữ.
+Tầng nào thực sự giữ từng mã ở thời điểm này. `unrepresentable` nghĩa là một union đóng hoặc kiểu branded làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `@canon-be` báo lỗi, tên nêu bên dưới; `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
 |---|---|---|
@@ -185,7 +194,7 @@ Code thật để đối chiếu từng mã. Một luật không chỉ tay vào 
 | `OBSERVABILITY-3` | `modules/platform/winston/types/messages/*.ts` cùng `configMap` trong `modules/platform/winston/config.ts` | Mỗi sự kiện ánh xạ tới một interface có tên (`jobId`, `queueName`, `durationMs`, `success`), truy tới qua `(typeof configMap)[TName]["messageType"]` |
 | `OBSERVABILITY-4` | `modules/platform/winston/enums/winston-log.ts` | Những thành viên có JSDoc nêu một quyết định — `EnrollmentAlreadyExists` "skipped create to stay idempotent", `CdnSynchronizerCourseAlreadySynced` "hash matched, upload skipped". Đồng thời nhìn họ `*StepExecuted` nằm ngay bên cạnh, vốn chỉ ghi việc đi ngang qua |
 | `OBSERVABILITY-5` | `features/api/processors/ai/generate-cv/generate-cv.worker.ts` (lời gọi `JobExecutedFailed` trong `catch`) và `JobExecutedMessage.error?: string` trong `types/messages/worker.ts` | Trường đó đang được điền bằng `error.message`. Điểm neo này cho thấy luật đang bị bỏ lỡ, và đó chính là việc của một điểm neo |
-| `OBSERVABILITY-6` | `apps/cli/src/main.ts` và `apps/playground-*-agent/src/main.ts` (đoạn bootstrap `new Logger()`) đối chiếu `standaloneProgramGlobs` trong `@starci/eslint-canon-be` | Bốn entry point đứng một mình, và những comment `eslint-disable` theo từng dòng chúng đang mang thay vì một glob khai một lần |
+| `OBSERVABILITY-6` | `apps/cli/src/main.ts` và `apps/playground-*-agent/src/main.ts` (đoạn bootstrap `new Logger()`) đối chiếu `standaloneProgramGlobs` trong `@canon-be` | Bốn entry point đứng một mình, và những comment `eslint-disable` theo từng dòng chúng đang mang thay vì một glob khai một lần |
 | `OBSERVABILITY-7` | `modules/platform/winston/winston.providers.ts` cùng cờ `loki` theo từng sự kiện trong `config.ts` | Ba provider — chỉ console, chỉ backend chuyển tiếp, cả hai — và một cờ cho mỗi sự kiện quyết định dòng nào được vượt sang. Đó CHÍNH LÀ con đường Minimal: không collector, không tracer, không pipeline metric nào bên cạnh |
 | `OBSERVABILITY-8` | `modules/platform/env/config.ts` phần `loki` | Host, cờ bật auth và credential khai thành config có kiểu cho một backend được quản lý. Những trường vòng đời mà mã này đòi — chủ sở hữu, cổng, lưu trữ, health, backup, điều kiện gỡ — không có điểm neo, vì chưa có tiến trình telemetry tại chỗ nào để mang chúng: nửa đó **chưa neo được** |
 

@@ -7,8 +7,17 @@ codes: [NAMING-1, NAMING-2, NAMING-3]
 
 # Đặt tên
 
-Đầu vào của pattern này là một shape đã có người duyệt — một layout, một block, một capability, một
-contract. Quyết định đó đã đóng ở đây; pattern này không mở lại nó. Đầu ra là **kiến trúc source**:
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt — một layout, một block, một capability, một
+contract. Quyết định đó đã đóng ở đây; pattern này không mở lại nó. Kết quả là **kiến trúc source**:
 đoạn code nằm ở file nào, khai báo viết ra sao, thứ chạy do người đọc tác động được gọi là gì ở mọi
 ranh giới nó đi qua, và đoạn đường dẫn viết bằng thứ tiếng nào. Mọi vị trí đặt tên mà một shape đã
 duyệt sinh ra đều rơi vào đúng một mã dưới đây, hoặc rơi vào luật theo từng layer mà module này chỉ
@@ -69,11 +78,11 @@ hữu nó.
 
 ## `NAMING-1` — hàm ở mức module là một arrow const
 
-**Tình huống.** Bạn đang khai báo một hàm ở **mức ngoài cùng** của file: một helper, một component,
+**Khi nào gặp.** Bạn đang khai báo một hàm ở **mức ngoài cùng** của file: một helper, một component,
 một hàm định dạng, một route. Hai cách viết đều chạy, nhưng chỉ một cách giữ được lời hứa về **thứ
 tự** của file.
 
-**Nó sinh ra gì trong source.** Một arrow const, export theo tên, xuất hiện phía trên chỗ dùng đầu
+**Source phải thể hiện gì.** Một arrow const, export theo tên, xuất hiện phía trên chỗ dùng đầu
 tiên của nó. Không `function X() {}` ở mức module, và không `export default function`. Lý do sâu hơn
 nằm ở **hoisting**: một khai báo `function` tồn tại **trước** dòng khai báo ra nó, nên một file có thể
 gọi xuống dưới mà vẫn xanh — và thứ tự của file lập tức không còn nghĩa gì, vì không có gì bắt buộc
@@ -81,7 +90,7 @@ một thứ phải được định nghĩa trước khi được dùng. Một `c
 nên file đọc từ trên xuống đúng theo thứ tự nó thật sự chạy. `export default function` còn thêm một
 cái giá nữa: bản export **không có tên để grep** ở phía các call site.
 
-**Dấu hiệu nhận biết.** Khai báo nằm sát lề trái, cha của nó là chính module hoặc một câu `export`.
+**Cách nhận ra.** Khai báo nằm sát lề trái, cha của nó là chính module hoặc một câu `export`.
 Trong file có chỗ gọi tới một cái tên được định nghĩa ở **phía dưới** mà vẫn chạy. Bạn phải cuộn lên
 rồi cuộn xuống mới biết một cái tên đến từ đâu. Tự hỏi: nếu tôi đọc file này từ trên xuống, có chỗ nào
 dùng một cái tên chưa hề xuất hiện chưa?
@@ -96,17 +105,17 @@ class · factory tạo cấu hình.
 
 ## `NAMING-2` — thứ chạy do người dùng thì tên là `onX`
 
-**Tình huống.** Một hàm chạy **vì người dùng đã làm gì đó**: bấm, gõ, chọn, gửi, đóng. Nó gần như luôn
+**Khi nào gặp.** Một hàm chạy **vì người dùng đã làm gì đó**: bấm, gõ, chọn, gửi, đóng. Nó gần như luôn
 được **truyền đi** — vào một slot, vào một prop, vào một thuộc tính DOM.
 
-**Nó sinh ra gì trong source.** Cùng một chữ ở cả ba chỗ: biến cục bộ lúc khai báo, chỗ gọi, và field
+**Source phải thể hiện gì.** Cùng một chữ ở cả ba chỗ: biến cục bộ lúc khai báo, chỗ gọi, và field
 trong kiểu props. `handleSubmit` và `onSubmit` mô tả **cùng một hàm**, nhưng một codebase dùng cả hai
 thì có **hai bộ từ vựng cho một ý**, và mỗi người viết phải tự quyết file này đang nói thứ tiếng nào.
 `on` là chữ **sống sót được qua chuyến đi**: slot đã là `on`, thuộc tính DOM đã là `onClick`, kiểu
 props đã khai `on…` — nên một biến cục bộ tên `handlePress` **bị đổi tên ở ranh giới, mỗi lần**, và
 mỗi lần đổi tên là một dịp để sai.
 
-**Dấu hiệu nhận biết.** Nó không trả về giá trị để hiển thị; nó **gây ra** một việc. Nó xuất hiện ở vế
+**Cách nhận ra.** Nó không trả về giá trị để hiển thị; nó **gây ra** một việc. Nó xuất hiện ở vế
 phải của một prop hoặc một thuộc tính DOM. Trong cùng một màn hình, cái tên này đang tồn tại ở hai
 dạng chữ khác nhau. Tự hỏi: cái chạy nó là **hành động của người đọc**, hay là quá trình render?
 
@@ -122,9 +131,9 @@ một phần thưởng.
 
 ## `NAMING-3` — đường dẫn viết bằng thứ tiếng mọi người cùng đọc
 
-**Tình huống.** Bạn đang đặt tên một **file**, một **thư mục**, hoặc một **đoạn route**.
+**Khi nào gặp.** Bạn đang đặt tên một **file**, một **thư mục**, hoặc một **đoạn route**.
 
-**Nó sinh ra gì trong source.** Một đoạn đường dẫn viết bằng thứ tiếng mà mọi người đọc repository này
+**Source phải thể hiện gì.** Một đoạn đường dẫn viết bằng thứ tiếng mà mọi người đọc repository này
 cùng có. Luật soi source đọc được định danh, comment và chuỗi — nhưng **không đọc được tên của chính
 file nó đang đọc**. Nên một route có thể là `app/cap-phat/page.tsx` với mọi định danh bên trong bằng
 tiếng Anh, và không có gì báo một tiếng — trong khi URL, chuỗi import, cái thư mục hiện trên sidebar
@@ -135,7 +144,7 @@ thành `cap-phat`. Dấu thanh bắt dạng thứ nhất; một **danh sách có
 là cố ý chứ không phải là lười: đoán theo hình dạng chữ sẽ từ chối luôn `capacity` và `dangerous`, mà
 một luật báo lỗi trên từ tiếng Anh là một luật bị tắt — và một luật đã tắt thì không giữ gì cả.
 
-**Dấu hiệu nhận biết.** Đoạn đường dẫn có dấu thanh, hoặc là một từ đã bỏ dấu của thứ tiếng khác. Chữ
+**Cách nhận ra.** Đoạn đường dẫn có dấu thanh, hoặc là một từ đã bỏ dấu của thứ tiếng khác. Chữ
 trên URL trùng với chữ hiển thị trên màn hình — dấu hiệu ai đó đã lấy nội dung làm địa chỉ. Import
 specifier đọc lên nghe như một câu, không như một địa chỉ. Tự hỏi: đoạn này là **địa chỉ** hay là **nội
 dung**? Nội dung thì thuộc về catalogue locale.
@@ -151,8 +160,8 @@ tài nguyên tĩnh.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến
-giá trị sai không viết ra được; `enforced` nghĩa là một luật trong `@starci/eslint-canon-fe` báo nó;
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến
+giá trị sai không viết ra được; `enforced` nghĩa là một luật trong `@canon-fe` báo nó;
 `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ | Tầng này không với tới đâu |
@@ -173,12 +182,12 @@ một luật.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `NAMING-1` | `@starci/eslint-canon-fe` | File tuân đúng luật nó phát ra. Mọi khai báo trong đó — `MODULE_LEVEL_PARENTS`, `segmentsOf`, cả ba object luật — đều là const, và mỗi cái đều xuất hiện phía trên chỗ dùng đầu tiên. Đọc từ trên xuống thì không có gì được nhắc tới trước khi nó tồn tại; chính tính chất đó là toàn bộ lập luận, và nó nhìn thấy được chứ không phải nói suông |
-| `NAMING-1` | `@starci/eslint-canon-fe` | Bộ ba ca sai: một export theo tên, một khai báo trần ở mức module, và `export default function Route()`. Bên cạnh là ca đúng `export const E = () => { function inner() {…} }` — đúng cái khai báo lồng được cố ý cho phép, viết thành test chứ không thành một câu |
-| `NAMING-2` | `@starci/eslint-canon-fe` | Bộ ba ca sai là **một** hàm ở ba vị trí: một biến cục bộ, một thuộc tính JSX, một field trong kiểu props. Bộ ba đó là lập luận cho tầm với của luật. Các ca đúng `handled` và `handler` là lập luận cho sự hẹp của nó — một luật nổ trên chúng sẽ là nhiễu, mà nhiễu thì không ai đọc |
-| `NAMING-2` | `@starci/eslint-canon-fe` | `flag` cùng phép thử `/^handle[A-Z]/` của nó, và ba visitor gọi tới nó. Danh sách visitor **chính là** tầm với; thứ gì không nằm trong đó thì nằm ngoài luật, bất kể nó tên là gì |
-| `NAMING-3` | `@starci/eslint-canon-fe` | `SECOND_LANGUAGE_PATH` và `ROMANISED` — hai dụng cụ cho một luật, vì filesystem làm rụng dấu. Rồi tới `segmentsOf`, và cái `replace(/[()[\]]/g, "")` trong hàm dò: ngoặc của route group là dấu câu bọc quanh một cái tên, không phải một phần của cái tên |
-| `NAMING-3` | `@starci/eslint-canon-fe` | Các ca đúng `capacity` và `DangerBadge`. Chúng là lý do `ROMANISED` là một danh sách chứ không phải một mẫu, và chúng là ca mà một luật khôn hơn sẽ trượt |
+| `NAMING-1` | `@canon-fe` | File tuân đúng luật nó phát ra. Mọi khai báo trong đó — `MODULE_LEVEL_PARENTS`, `segmentsOf`, cả ba object luật — đều là const, và mỗi cái đều xuất hiện phía trên chỗ dùng đầu tiên. Đọc từ trên xuống thì không có gì được nhắc tới trước khi nó tồn tại; chính tính chất đó là toàn bộ lập luận, và nó nhìn thấy được chứ không phải nói suông |
+| `NAMING-1` | `@canon-fe` | Bộ ba ca sai: một export theo tên, một khai báo trần ở mức module, và `export default function Route()`. Bên cạnh là ca đúng `export const E = () => { function inner() {…} }` — đúng cái khai báo lồng được cố ý cho phép, viết thành test chứ không thành một câu |
+| `NAMING-2` | `@canon-fe` | Bộ ba ca sai là **một** hàm ở ba vị trí: một biến cục bộ, một thuộc tính JSX, một field trong kiểu props. Bộ ba đó là lập luận cho tầm với của luật. Các ca đúng `handled` và `handler` là lập luận cho sự hẹp của nó — một luật nổ trên chúng sẽ là nhiễu, mà nhiễu thì không ai đọc |
+| `NAMING-2` | `@canon-fe` | `flag` cùng phép thử `/^handle[A-Z]/` của nó, và ba visitor gọi tới nó. Danh sách visitor **chính là** tầm với; thứ gì không nằm trong đó thì nằm ngoài luật, bất kể nó tên là gì |
+| `NAMING-3` | `@canon-fe` | `SECOND_LANGUAGE_PATH` và `ROMANISED` — hai dụng cụ cho một luật, vì filesystem làm rụng dấu. Rồi tới `segmentsOf`, và cái `replace(/[()[\]]/g, "")` trong hàm dò: ngoặc của route group là dấu câu bọc quanh một cái tên, không phải một phần của cái tên |
+| `NAMING-3` | `@canon-fe` | Các ca đúng `capacity` và `DangerBadge`. Chúng là lý do `ROMANISED` là một danh sách chứ không phải một mẫu, và chúng là ca mà một luật khôn hơn sẽ trượt |
 
 Mọi điểm neo ở trên đều là source lint nằm trong trust tree, tức là phần code repository này thật sự
 mở ra được. Bộ luật phẳng còn nêu tên hai file nằm trong một repository sản phẩm; chúng không được

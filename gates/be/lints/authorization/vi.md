@@ -4,7 +4,14 @@ title: Authorization · Vietnamese
 
 # Phân quyền
 
-Đầu vào là code đã viết xong — một tệp, một mẩu của bản khác biệt. Đầu ra là một **phán quyết**: quy tắc
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận code đã viết xong — một tệp, một mẩu của bản khác biệt. Kết quả là một **phán quyết**: quy tắc
 đã xuất bản nào nổ, nổ trên nút nào, ứng với mã luật nào, và lối thoát còn mở nào lẽ ra đã che đúng cái
 sai đó. Mô-đun này không chọn thiết kế phân quyền nào cả. Nó từ chối một thiết kế, và nó phải chỉ được ra
 đúng tham số mà nó từ chối.
@@ -78,7 +85,7 @@ thức trở thành ứng viên khi có tên decorator tham số nằm trong t�
 tên đúng `UseGuards`, hoặc — đi từ `node.parent` (là `ClassBody`) lên `parent` của nút đó để lấy lớp —
 nếu có decorator nào trên nút lớp ấy tên đúng `UseGuards`. Còn lại thì báo `unguarded` tại tham số.
 
-**Nó không thấy gì.** Một danh tính đến bằng bất cứ đường nào khác ba decorator đó: `@Context() ctx` rồi
+**Điểm mù.** Một danh tính đến bằng bất cứ đường nào khác ba decorator đó: `@Context() ctx` rồi
 `ctx.req.user`, `@Req() req` rồi `req.user`, hoặc chính phép đọc ấy được đẩy thêm một chặng vào một phương
 thức riêng tư của lớp — quy tắc không bao giờ nhìn vào thân phương thức và không bao giờ lần theo lời gọi.
 Một decorator có không gian tên, `@auth.CurrentUser()`, mà callee `MemberExpression` cho ra `undefined`.

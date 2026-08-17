@@ -4,7 +4,14 @@ title: Event-delivery · Vietnamese
 
 # Chuyển phát sự kiện
 
-Đầu vào là mã đã viết xong — một tệp, một mẩu diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mẩu diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, luật máy nào đã nổ, nó phát thông điệp nào và trên nút nào, thông điệp ấy giữ mã
 luật nào, và cửa còn mở nào lẽ ra đã che đúng cái hỏng ấy. Mô-đun này không chọn gì cả. Nó từ chối, và
 nó phải chỉ được tay vào những vị trí ký tự mà nó lấy làm căn cứ.
@@ -79,7 +86,7 @@ và bên trong lấy `sourceCode.getText()` — **toàn bộ tệp gộp thành 
 Báo `origin` khi `originIndex < 0 || emitIndex < 0 || originIndex > emitIndex`, và báo `digest` khi
 `digestIndex < 0 || emitIndex < 0 || digestIndex > emitIndex`.
 
-**Nó không thấy gì.** Không thấy được rằng phép so đã khớp có thật sự **bỏ qua** gì không: luật máy
+**Điểm mù.** Không thấy được rằng phép so đã khớp có thật sự **bỏ qua** gì không: luật máy
 chứng minh phép so tồn tại, không bao giờ chứng minh nó chặn, nên
 `if (parsed.id === this.instanceService.getId()) { }` không `continue`, không `return` thì cổng im
 lặng trong khi mọi bản vọng về chính mình đều được phát. Không thấy được rằng một chú thích, một chuỗi

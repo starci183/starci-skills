@@ -4,7 +4,16 @@ title: Translation · Vietnamese
 
 # Bản dịch
 
-Đầu vào là một shape đã được duyệt — một layout, một block, một capability hay một contract mà mọi câu
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một layout, một block, một capability hay một contract mà mọi câu
 hỏi thiết kế đã đóng lại rồi. Module này không mở lại bất kỳ câu hỏi nào trong số đó. Nó nhận shape đã
 duyệt ấy và nói chữ của shape nằm ở đâu trong source: file nào resolve từng chuỗi, tier nào được phép
 giữ chuỗi, thứ gì được vượt biên, thứ gì đi trong `props`, và chuỗi nào thật ra không phải copy. Đầu ra
@@ -79,14 +88,14 @@ task record; đổi số một mã ở đây là âm thầm làm hỏng một tr
 
 ## `COPY-1` — nửa connected chọn từng chữ
 
-**Tình huống.** Block sở hữu request cũng sở hữu những chữ mô tả câu trả lời của request đó. Lý do
+**Khi nào gặp.** Block sở hữu request cũng sở hữu những chữ mô tả câu trả lời của request đó. Lý do
 không phải là thói quen chia file: chỉ nửa đó mới biết người đọc đang ở tình huống nào — đang tải,
 rỗng, lỗi, hay đã có số liệu — nên chỉ nó mới biết **câu nào là câu đúng**.
 
-**Nó sinh ra gì trong source.** Hook dịch nằm trong entrypoint connected, ngay cạnh hook gọi dữ liệu.
+**Source phải thể hiện gì.** Hook dịch nằm trong entrypoint connected, ngay cạnh hook gọi dữ liệu.
 Nửa drawing chỉ nhận vào những giá trị `string` đã xong — không id, không điều kiện.
 
-**Dấu hiệu nhận biết.** File đang gọi một hook resolve chữ nằm cùng chỗ với hook gọi dữ liệu. Câu chữ
+**Cách nhận ra.** File đang gọi một hook resolve chữ nằm cùng chỗ với hook gọi dữ liệu. Câu chữ
 đổi theo state: pending nói một kiểu, settled nói kiểu khác. Nửa còn lại nhận vào toàn `string` đã
 xong.
 
@@ -101,18 +110,18 @@ thông báo lỗi thanh toán · nhãn của một tab phụ thuộc quyền · 
 
 ## `COPY-2` — dưới block thì không giữ chữ nào người đọc thấy
 
-**Tình huống.** Một leaf, composite, branch hay shell đang chứa literal mà người đọc nhìn thấy hoặc
+**Khi nào gặp.** Một leaf, composite, branch hay shell đang chứa literal mà người đọc nhìn thấy hoặc
 **nghe thấy**. Không chỉ trong nội dung: `aria-label`, `placeholder`, `title`, `alt` là bốn chỗ copy
 trốn nhiều nhất, vì khi lướt file thì cả bốn đều **không trông giống một câu**.
 
 `aria-label` không phải trường hợp nhỏ. Screen reader hiểu đó là **văn bản chính**, nên một nhãn tiếng
 Anh nằm trên một màn hình tiếng Việt là lỗi to nhất trang, rơi đúng vào người ít có cách xoay xở nhất.
 
-**Nó sinh ra gì trong source.** File dưới `leaves/`, `composites/`, `branches/` và `shells/` không mang
+**Source phải thể hiện gì.** File dưới `leaves/`, `composites/`, `branches/` và `shells/` không mang
 prose trong nội dung, `aria-label`, `placeholder`, `title` hay `alt`. Mọi chuỗi như vậy được nhấc lên
 nửa connected và đi xuống dưới dạng một value.
 
-**Dấu hiệu nhận biết.** Chuỗi có dấu cách và bắt đầu bằng chữ hoa — trông như một câu người ta nói ra.
+**Cách nhận ra.** Chuỗi có dấu cách và bắt đầu bằng chữ hoa — trông như một câu người ta nói ra.
 File nằm dưới `leaves/`, `composites/` hoặc `branches/`. Xoá chuỗi đi thì component vẫn dựng được, chỉ
 là không còn chữ.
 
@@ -127,15 +136,15 @@ nhãn "Xem thêm" trong branch phân trang.
 
 ## `COPY-3` — key không được vượt biên
 
-**Tình huống.** Có người định truyền `labelKey="quest.title"` xuống, coi như thế là đã "tách i18n ra
+**Khi nào gặp.** Có người định truyền `labelKey="quest.title"` xuống, coi như thế là đã "tách i18n ra
 ngoài". Không phải: nó **dời chỗ tra cứu**, chứ không dời **quyết định**. Con vẫn phải tra, nên con vẫn
 cần toàn bộ runtime dịch mới render được — và như vậy nó không còn dựng được từ một fixture.
 
-**Nó sinh ra gì trong source.** Prop mang chữ trong nửa drawing được khai kiểu bằng chính giá trị đã
+**Source phải thể hiện gì.** Prop mang chữ trong nửa drawing được khai kiểu bằng chính giá trị đã
 resolve (`label: string`). Không prop nào mang một đường dẫn từ điển vượt biên, và con không import bất
 kỳ hàm tra từ điển nào.
 
-**Dấu hiệu nhận biết.** Prop có tên kết thúc bằng `Key`, `I18nKey`, `MessageId`, và giá trị của nó là
+**Cách nhận ra.** Prop có tên kết thúc bằng `Key`, `I18nKey`, `MessageId`, và giá trị của nó là
 một đường dẫn có dấu chấm. Con phải import hàm tra từ điển để hiển thị được prop mình nhận. Test của
 con phải mount provider ngôn ngữ mới chạy.
 
@@ -151,18 +160,18 @@ liệu.
 
 ## `COPY-4` — chữ đã resolve là một value, nên theo đúng hàng rào dữ liệu
 
-**Tình huống.** Sau khi nửa connected chọn xong, chuỗi đó **không còn là chuyện ngôn ngữ nữa**. Nó là
+**Khi nào gặp.** Sau khi nửa connected chọn xong, chuỗi đó **không còn là chuyện ngôn ngữ nữa**. Nó là
 một value như số dư hay tên file, và nó đi đúng con đường mọi value khác đi: `props`.
 
 Đây là mã đổi lấy một thứ cụ thể chứ không phải một nguyên tắc thẩm mỹ: nhờ nó, một component render
 được từ fixture với chữ `"anything"` và vẫn đúng. Cái test không cần từ điển chính là bằng chứng chữ đã
 đến bằng đường value.
 
-**Nó sinh ra gì trong source.** Test của nửa drawing dựng component từ những chuỗi fixture trần, không
+**Source phải thể hiện gì.** Test của nửa drawing dựng component từ những chuỗi fixture trần, không
 mount provider dịch nào. Không chữ nào đến với component bằng context, ambient runtime hay module
 import.
 
-**Dấu hiệu nhận biết.** Kiểu của prop là `string`, không phải union của key. Test dựng component bằng
+**Cách nhận ra.** Kiểu của prop là `string`, không phải union của key. Test dựng component bằng
 chuỗi bịa, không mount provider nào. Đổi từ điển không làm test đổi.
 
 **Ranh giới.** Không phải `COPY-3` — xem trên. Không phải `COPY-1`: `COPY-1` nói ai chọn, còn `COPY-4`
@@ -174,15 +183,15 @@ toast sau khi submit · nhãn cột của bảng · chuỗi đã format sẵn s�
 
 ## `COPY-5` — từ điển chính là ngôn ngữ kia, nên nó không phải source
 
-**Tình huống.** Luật "source viết bằng tiếng Anh" tồn tại để một người vào dự án sau một năm vẫn đọc
+**Khi nào gặp.** Luật "source viết bằng tiếng Anh" tồn tại để một người vào dự án sau một năm vẫn đọc
 được mọi dòng. Từ điển thì ngược lại: **nội dung của nó buộc phải là ngôn ngữ kia**. Đem luật đó soi
 vào thư mục locale là đọc sai cả hai luật.
 
-**Nó sinh ra gì trong source.** File locale được miễn theo một danh sách ĐƯỜNG DẪN —
+**Source phải thể hiện gì.** File locale được miễn theo một danh sách ĐƯỜNG DẪN —
 `messages/<locale>.json` và danh sách `CONTENT_PATHS` — nên không file nào phải tự biện hộ cho
 mình. Fixture và spec cũng được miễn đúng cách đó, theo đường dẫn.
 
-**Dấu hiệu nhận biết.** File nằm trong thư mục locale, đuôi `.json`, mỗi khoá là một câu. Không có
+**Cách nhận ra.** File nằm trong thư mục locale, đuôi `.json`, mỗi khoá là một câu. Không có
 logic nào trong file — chỉ có chữ.
 
 **Ranh giới.** Miễn trừ này là một **đường dẫn**, không phải một phán đoán: đó là quyết định đắt nhất
@@ -195,7 +204,7 @@ server · snapshot test bảo toàn chữ hiển thị.
 
 ## `COPY-6` — chữ mà CHƯƠNG TRÌNH so khớp thì không phải copy
 
-**Tình huống.** Server gửi xuống một trạng thái, và màn hình **so sánh** với chuỗi đó để quyết định
+**Khi nào gặp.** Server gửi xuống một trạng thái, và màn hình **so sánh** với chuỗi đó để quyết định
 render nhánh nào. Dịch nó là làm hỏng phép so sánh — và cái hỏng đó **im lặng**: không có lỗi
 TypeScript, không có exception, chỉ có một nhánh không bao giờ chạy nữa.
 
@@ -203,11 +212,11 @@ Nên chuỗi đó ở nguyên, và **được đánh dấu ngay trên dòng củ
 tục: nó là thứ nói cho người đọc sau biết đây là một **quyết định**, chứ không phải một chỗ ai đó quên
 dịch.
 
-**Nó sinh ra gì trong source.** Literal được giữ nguyên văn và mang `// vn-ok: <reason>` trên dòng của
+**Source phải thể hiện gì.** Literal được giữ nguyên văn và mang `// vn-ok: <reason>` trên dòng của
 nó. Khi một giá trị vừa bị so khớp vừa được hiển thị, source giữ hai thứ: giá trị để so, và chữ để
 hiện.
 
-**Dấu hiệu nhận biết.** Có một phép `===`, một `switch`, hoặc một key của map, so vào đúng chuỗi này.
+**Cách nhận ra.** Có một phép `===`, một `switch`, hoặc một key của map, so vào đúng chuỗi này.
 Chuỗi đến từ ngoài hệ thống: server, webhook, cổng thanh toán, một enum của bên thứ ba. Đổi chuỗi này
 phải đổi cả phía kia mới đúng.
 
@@ -222,7 +231,7 @@ tên phương thức thanh toán dùng làm khoá map · giá trị enum trong q
 ## Tầng giữ
 
 Tier nào thật sự giữ từng mã — một kiểu đóng, một luật lint, hay chỉ một người đọc. Những dòng
-`enforced` được hiện thực bởi `@starci/eslint-canon-fe`.
+`enforced` được hiện thực bởi `@canon-fe`.
 
 | Mã | Tier | Ai giữ |
 |---|---|---|
@@ -237,7 +246,7 @@ Bốn trên sáu dòng ghi `documented`, và bảng này tồn tại để nói 
 `enforced` khiến người ta tưởng cả module đã được giữ.
 
 Hai trong bốn dòng đó có hỗ trợ máy móc, nhưng hỗ trợ ấy thuộc về một luật LÁNG GIỀNG nên không được
-tính ở đây: `starci-fe/no-second-language-in-source`, do `@starci/eslint-canon-fe` công bố,
+tính ở đây: `starci-fe/no-second-language-in-source`, do `@canon-fe` công bố,
 miễn các từ điển locale theo đường dẫn (`COPY-5`) và đọc pragma `vn-ok:` trên dòng được đánh dấu
 (`COPY-6`). Tính luật của láng giềng thành enforcement của module này sẽ làm module trông như được giữ
 ở chỗ nó không được giữ: luật đó bắn theo NGÔN NGỮ, nên nó không bao giờ thấy một key tiếng Anh đang
@@ -259,7 +268,7 @@ với repository; chính hình dạng của cây, chứ không phải tên sản
 | `COPY-2` | `components/{leaves,composites,branches,shells}/**` | Không `aria-label`, `placeholder`, `title` hay `alt` nào mang prose, và không đoạn text JSX nào đọc lên như một câu |
 | `COPY-3` | kiểu của props trong `components/blocks/**/component.tsx` | Prop mang chữ được khai kiểu bằng chính giá trị đã resolve (`label: string`). Mọi prop `*Key` đều gọi tên một hàng đang được chọn, không bao giờ là một mục từ điển |
 | `COPY-4` | `components/blocks/**/component.test.tsx` | File sinh đôi render từ những chuỗi fixture trần, không mount provider dịch nào — test chạy qua chính là bằng chứng chữ đã đến bằng đường value |
-| `COPY-5` | `messages/<locale>.json`, và `CONTENT_PATHS` trong `@starci/eslint-canon-fe` | Miễn trừ là một danh sách đường dẫn, nên không file nào tự biện hộ cho mình |
+| `COPY-5` | `messages/<locale>.json`, và `CONTENT_PATHS` trong `@canon-fe` | Miễn trừ là một danh sách đường dẫn, nên không file nào tự biện hộ cho mình |
 | `COPY-6` | `chưa neo được` | Có tồn tại những dòng đánh dấu `// vn-ok: <reason>`, nhưng các literal được đánh dấu tìm thấy lại là copy chứ không phải giá trị chương trình so khớp. Chính tình huống của mã này thì chưa có điểm neo |
 
 ## Đầu vào

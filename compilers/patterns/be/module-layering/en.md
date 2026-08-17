@@ -4,6 +4,15 @@ title: Module layering
 
 # Module layering
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input to this pattern is a shape that has already been accepted: a capability that exists, a
 module that is meant to be registered, a symbol that some other file has been granted the right to
 use. None of that is re-opened here. The output is source architecture — which file the specifier
@@ -233,7 +242,7 @@ path; a util folder with many small functions.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes
-the wrong value impossible to write; `enforced` means a lint rule in `@starci/eslint-canon-be`
+the wrong value impossible to write; `enforced` means a lint rule in `@canon-be`
 catches it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

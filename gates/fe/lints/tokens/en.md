@@ -4,6 +4,13 @@ title: Tokens
 
 # Tokens
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 for every finding, which published rule fired, which law code it enforces, which node it fired on, and
 the exact text it matched. This module chooses nothing. It refuses, and it must be able to point at

@@ -4,6 +4,13 @@ title: Colour
 
 # Colour
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "an order card showing the order number, the date and
 whether it has been paid" — and you return, for every element that request implies, one situation
 code and one className. The request never states a hue and you never pick one: the colour follows

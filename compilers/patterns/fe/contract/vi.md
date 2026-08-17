@@ -4,8 +4,17 @@ title: Contract · Vietnamese
 
 # Contract
 
-Đầu vào là một shape đã được duyệt — một layout, một block, một capability hay một contract đã có
-người chốt. Module này không mở lại quyết định đó. Đầu ra của nó là kiến trúc source: node được mô tả
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một layout, một block, một capability hay một contract đã có
+người chốt. Module này không mở lại quyết định đó. Nó trả về kiến trúc source: node được mô tả
 ở file nào, tầng nào giữ nó, nó được import gì, phải export gì, và mang tên gì. Một shape đã duyệt đi
 vào dưới dạng hình vẽ; nó đi ra dưới dạng một key trong bảng, một element mở ra ở đúng một frame, và
 một lý do ghi ngay cạnh cả hai.
@@ -27,7 +36,7 @@ lời.
 
 **Đây là luật bắt buộc, không phải lời khuyên.** Mọi element cấu trúc đi vào production đều rơi vào
 đúng một mã dưới đây. Không có hình dạng nào nhỏ tới mức được miễn: một hàng hai con là `CONTRACT-1`
-cũng vì đúng cái lý do khiến một page shell là `CONTRACT-1`. Câu "có mỗi cái wrapper thôi mà" không
+cũng vì đúng cái lý do khiến một page shell là `CONTRACT-1`. Câu "có mỗi wrapper thôi mà" không
 phải một ngoại lệ — đó là chỗ luật này bị bỏ qua nhiều nhất.
 
 ## Mã tình huống
@@ -73,7 +82,7 @@ thứ mười bốn thêm vào lúc không ai đọc.
    đã có trong union chưa (`CONTRACT-3`)? Nó mở ra element nào (`CONTRACT-4`)? Tên của nó có cố định
    được các con không (`CONTRACT-5`)? Bỏ nó đi thì cái gì vỡ (`CONTRACT-6`)? Ai vẽ marker cho nó
    (`CONTRACT-8`)? Có key nào sẵn đã đánh vần nó chưa (`CONTRACT-9`)? Quanh nó có vendor wrapper cố
-   định không (`CONTRACT-10`)? Mọi đứa con của nó đã có tên chưa (`CONTRACT-11`)? Có class nào nó mang
+   định không (`CONTRACT-10`)? Mọi phần tử con của nó đã có tên chưa (`CONTRACT-11`)? Có class nào nó mang
    là hành vi, sơn hay độ nổi không (`CONTRACT-12`)? Key nó resolve tới có thật sự được vẽ không
    (`CONTRACT-13`)?
 5. **Khi hai mã cùng khớp thì cả hai cùng áp, và cả hai cùng phải sửa.** Chúng không phải hai lựa
@@ -84,16 +93,16 @@ thứ mười bốn thêm vào lúc không ai đọc.
 
 ## `CONTRACT-1` — class cấu trúc đến từ key, không từ literal
 
-**Tình huống.** Bạn đang ở trong một block, một page hoặc một composite, và cần hai thứ đứng cạnh
+**Khi nào gặp.** Bạn đang ở trong một block, một page hoặc một composite, và cần hai thứ đứng cạnh
 nhau. Tay bạn định gõ `className="flex items-center gap-3"`. `flex`, `grid`, `gap-*`, `items-*`,
 `justify-*`, `col-*` và họ `position` quyết định hình dạng của một cây, không phải vẻ ngoài của một
 giá trị. Một hình dạng được quyết ở call site là một hình dạng không ai tìm ra được từ bất cứ chỗ nào
 khác.
 
-**Nó sinh ra gì trong source.** Class rơi vào mảng `classes: [...]` của entry trong bảng contract, còn
+**Source phải thể hiện gì.** Class rơi vào mảng `classes: [...]` của entry trong bảng contract, còn
 call site chỉ mang mỗi cái key. Tầng block, page và composite không chứa một literal `className=` nào.
 
-**Dấu hiệu nhận biết.** Chuỗi class có ít nhất một token thuộc họ cấu trúc; element đang mở ra để CHỨA
+**Cách nhận ra.** Chuỗi class có ít nhất một token thuộc họ cấu trúc; element đang mở ra để CHỨA
 thứ khác chứ không phải để hiển thị một giá trị; bạn vừa nhấc chuỗi class lên thành hằng số module
 "cho gọn". Tự hỏi: nếu ngày mai cần biết node này rộng bao nhiêu và các con xếp thế nào, tôi tra ở
 đâu? Nếu câu trả lời là "phải grep", đó là `CONTRACT-1`. Nhấc lên hằng số không cứu được gì —
@@ -111,14 +120,14 @@ trang chi tiết; footer của một form; thanh hành động dính đáy trên
 
 ## `CONTRACT-2` — không ghép chuỗi class lúc chạy
 
-**Tình huống.** Có hai trạng thái thật (`isCompact`, `isSelected`, `variant`), và bạn định diễn đạt nó
+**Khi nào gặp.** Có hai trạng thái thật (`isCompact`, `isSelected`, `variant`), và bạn định diễn đạt nó
 bằng `cn(base, isCompact && "gap-2")` hoặc bằng template string.
 
-**Nó sinh ra gì trong source.** Một entry thứ hai trong bảng, hoặc một prop có tên trên component sở
+**Source phải thể hiện gì.** Một entry thứ hai trong bảng, hoặc một prop có tên trên component sở
 hữu node. Không một call site `cn`, `clsx`, `twMerge`, `cva` hay `tv` nào trong cây được cai quản, và
 không một `className` nội suy nào.
 
-**Dấu hiệu nhận biết.** Có `cn`, `clsx`, `twMerge`, `cva`, `tv` trong file; có
+**Cách nhận ra.** Có `cn`, `clsx`, `twMerge`, `cva`, `tv` trong file; có
 `className={`…`${x}`…`}` hoặc `className={a + b}`; có một biến boolean đang chọn giữa hai chuỗi class.
 Tự hỏi: sau khi build, có ai đọc được đầy đủ chuỗi class mà node này sẽ mặc, mà không cần chạy
 component không? Phân biệt là thật, chỉ cách diễn đạt mới sai. Thứ bạn đang rẽ nhánh là một sự khác
@@ -135,14 +144,14 @@ mở; badge đổi màu theo trạng thái; nút đang loading.
 
 ## `CONTRACT-3` — từ vựng class là một union đóng
 
-**Tình huống.** Bạn cần một giá trị mà bảng từ vựng chưa có: `gap-[13px]`, `w-[42%]`,
+**Khi nào gặp.** Bạn cần một giá trị mà bảng từ vựng chưa có: `gap-[13px]`, `w-[42%]`,
 `items-stretch`.
 
-**Nó sinh ra gì trong source.** Hoặc hình dạng được diễn đạt bằng những member đã có, hoặc một member
+**Source phải thể hiện gì.** Hoặc hình dạng được diễn đạt bằng những member đã có, hoặc một member
 mới được thêm một cách cố ý vào `export type LayoutClassName` trong file bảng contract, như một lần
 sửa có tên vào một danh sách có tên.
 
-**Dấu hiệu nhận biết.** TypeScript báo đỏ ngay tại phần tử trong mảng `classes`; bạn đang định thêm
+**Cách nhận ra.** TypeScript báo đỏ ngay tại phần tử trong mảng `classes`; bạn đang định thêm
 `as string` hoặc `as LayoutClassName` để cho qua. Tự hỏi: giá trị này là một bậc mới của hệ, hay chỉ
 là một lần chỉnh cho vừa mắt ở đúng một màn hình? Đây là mã mạnh nhất trong module, chính vì nó không
 phải một rule: `gap-[13px]` không bị *cấm*, nó **không viết ra được**. Không có gì để đi tuần khi giá
@@ -158,14 +167,14 @@ grid mới cho bảng xếp hạng; một inset shadow mới cho verdict band.
 
 ## `CONTRACT-4` — element thuộc về entry, không thuộc về caller
 
-**Tình huống.** Node này LÀ một danh sách, hoặc LÀ một form, hoặc LÀ landmark chính của tài liệu.
+**Khi nào gặp.** Node này LÀ một danh sách, hoặc LÀ một form, hoặc LÀ landmark chính của tài liệu.
 `div` không diễn đạt được điều đó.
 
-**Nó sinh ra gì trong source.** Host được đặt tên trên entry, lấy từ union đóng `ContractHost`, và
+**Source phải thể hiện gì.** Host được đặt tên trên entry, lấy từ union đóng `ContractHost`, và
 frame đọc nó ra — `const Host = spec.host ?? "div"`. Props của frame không mang `host` và không mang
 `as` để caller truyền vào.
 
-**Dấu hiệu nhận biết.** Bạn đang muốn thêm prop `as` hoặc `host` vào frame; bạn đang định spread node
+**Cách nhận ra.** Bạn đang muốn thêm prop `as` hoặc `host` vào frame; bạn đang định spread node
 props của một entry lên một element của riêng bạn; assistive technology sẽ đọc sai nếu element bị đổi.
 Tự hỏi: nếu hai call site của cùng một key mở ra hai element khác nhau, chúng còn là một node không?
 Không — chúng là hai node mặc chung một cái tên. Đây là lỗi không có màu đỏ ở đâu cả: hàm trả node
@@ -188,16 +197,16 @@ landmark `main` của trang; nav đích của sidebar; row của một joined li
 
 ## `CONTRACT-5` — TÊN của key cố định thứ nằm bên trong nó
 
-**Tình huống.** Bạn vừa dựng xong một node và phải đặt tên cho nó.
+**Khi nào gặp.** Bạn vừa dựng xong một node và phải đặt tên cho nó.
 
-**Nó sinh ra gì trong source.** Một key trong bảng mà cái tên cố định được một đứa con —
+**Source phải thể hiện gì.** Một key trong bảng mà cái tên cố định được một phần tử con —
 `label-fact-over-progress`, `page-header-stack`, `title-with-baseline-fact`, `weekday-run` — và không
 bao giờ là những cái tên chung `card`, `box`, `wrapper`, `row`, `container`, `content`,
 `section-inner`, `main-wrapper`.
 
-**Dấu hiệu nhận biết.** Cái tên bạn định đặt là `card`, `box`, `wrapper`, `row`, `container` hoặc
+**Cách nhận ra.** Cái tên bạn định đặt là `card`, `box`, `wrapper`, `row`, `container` hoặc
 `content`; bạn không viết nổi một câu `why` đúng cho MỌI chỗ sẽ dùng key này; bạn thấy key này "chắc
-dùng được cho nhiều thứ". Tự hỏi: nếu ai đó đặt nhầm một đứa con vào key này, người đọc code có nhìn
+dùng được cho nhiều thứ". Tự hỏi: nếu ai đó đặt nhầm một phần tử con vào key này, người đọc code có nhìn
 ra ngay không? Cái tên chung luôn thắng anh em cụ thể của nó ở mọi call site, vì nó là cái không ai
 phải suy nghĩ — và một key vẽ hai mươi vùng thì không nói nổi vì sao MỘT vùng nào trong đó lại ở đó.
 
@@ -209,7 +218,7 @@ rule — nó là TYPE. Quyết định cũ đúng với hình dạng nó đượ
 **Ranh giới.** Không phải `CONTRACT-6`: tên cố định CÁI GÌ ở bên trong, còn `why` nói VÌ SAO chúng
 đứng như vậy; tên sai làm `why` không thể đúng, nên `CONTRACT-5` luôn phải sửa trước. Không phải
 `CONTRACT-11`: entry hợp thành khai báo TỪNG slot và compiler kiểm từng cái, nên với entry đó cái tên
-không còn là thứ DUY NHẤT giữ đứa con; với node nhận nội dung từ caller thì tên vẫn là thứ duy nhất.
+không còn là thứ DUY NHẤT giữ phần tử con; với node nhận nội dung từ caller thì tên vẫn là thứ duy nhất.
 Không phải `CONTRACT-9`: mã này hỏi *tên này có cố định được gì không*, mã kia hỏi *key này có đáng
 tồn tại không*.
 
@@ -219,12 +228,12 @@ tồn tại không*.
 
 ## `CONTRACT-6` — mỗi entry nói vì sao node của nó tồn tại
 
-**Tình huống.** Bạn đang điền trường `why` của một entry.
+**Khi nào gặp.** Bạn đang điền trường `why` của một entry.
 
-**Nó sinh ra gì trong source.** Một câu `why:` trên entry, nêu đúng cái gì vỡ, xuống dòng hay tràn ra
+**Source phải thể hiện gì.** Một câu `why:` trên entry, nêu đúng cái gì vỡ, xuống dòng hay tràn ra
 khi không có node — đủ dài để là một mệnh đề, và không phải một lần chép lại chính các chữ trong key.
 
-**Dấu hiệu nhận biết.** Câu `why` đọc lên chỉ là cái key viết thành chữ thường có dấu cách; câu `why`
+**Cách nhận ra.** Câu `why` đọc lên chỉ là cái key viết thành chữ thường có dấu cách; câu `why`
 ngắn hơn một mệnh đề; bỏ node đi mà câu `why` vẫn "đúng", vì nó không nói gì cả. Tự hỏi: nếu xoá node
 này, cái gì vỡ, xuống dòng, tràn ra, hoặc thôi bấm được? Viết đúng cái đó. Đây là thứ duy nhất không
 tái tạo được từ markup về sau: class đọc lại được, element đọc lại được, danh sách con đọc lại được;
@@ -240,15 +249,15 @@ sao total tách khỏi các dòng phía trên bằng một đường kẻ; vì s
 
 ## `CONTRACT-7` — đúng một file biến key thành element
 
-**Tình huống.** Bạn cần một hộp. Không có key nào vừa.
+**Khi nào gặp.** Bạn cần một hộp. Không có key nào vừa.
 
-**Nó sinh ra gì trong source.** Đúng một `<Host>` mở ra từ một spec, nằm trong contract frame và không
+**Source phải thể hiện gì.** Đúng một `<Host>` mở ra từ một spec, nằm trong contract frame và không
 ở đâu khác. Mọi file còn lại chỉ hợp thành key. Chỗ không key nào vừa thì thứ sinh ra là một entry mới
 trong bảng, không phải một `div`.
 
-**Dấu hiệu nhận biết.** Bạn vừa gõ `<div>`, `<section>`, `<main>`, `<header>`, `<footer>`, `<aside>`
+**Cách nhận ra.** Bạn vừa gõ `<div>`, `<section>`, `<main>`, `<header>`, `<footer>`, `<aside>`
 hoặc `<nav>` ở ngoài frame; bạn vừa gắn `className` lên một `<ul>`, `<ol>`, `<li>` hay `<form>`. Tự
-hỏi: cái hộp này có ghi lại được ở đâu không — nó mặc class gì, đứa con nào thuộc về nó, và nó tồn tại
+hỏi: cái hộp này có ghi lại được ở đâu không — nó mặc class gì, phần tử con nào thuộc về nó, và nó tồn tại
 vì cái gì? Nếu không có chỗ nào ghi, đó là node không key. Và "không có key nào vừa" là một PHÁT HIỆN,
 không phải giấy phép mở `div`.
 
@@ -267,12 +276,12 @@ trong lúc loading; `form` có `onSubmit` và không class nào — cái cuối 
 
 ## `CONTRACT-8` — marker do frame vẽ, không viết tay
 
-**Tình huống.** Bạn muốn một element đọc lên như "thuộc về contract" cho test hoặc cho công cụ.
+**Khi nào gặp.** Bạn muốn một element đọc lên như "thuộc về contract" cho test hoặc cho công cụ.
 
-**Nó sinh ra gì trong source.** `data-node` và `data-why` được sinh ra trong đúng một hàm,
+**Source phải thể hiện gì.** `data-node` và `data-why` được sinh ra trong đúng một hàm,
 `contractNodeProps`, và do frame gắn lên. Source sản phẩm không viết attribute nào trong hai cái đó.
 
-**Dấu hiệu nhận biết.** Có `data-node="..."` hoặc `data-why="..."` viết tay trong source sản phẩm. Tự
+**Cách nhận ra.** Có `data-node="..."` hoặc `data-why="..."` viết tay trong source sản phẩm. Tự
 hỏi: cái marker này đang BÁO CÁO một entry, hay đang KHẲNG ĐỊNH một entry mà không có gì giữ? Marker
 viết tay tệ hơn node không marker. Node không marker ít nhất thành thật. Node có marker viết tay khiến
 mọi người đọc và mọi test đi qua các attribute đó tin vào một lời khẳng định mà không rule nào giữ.
@@ -285,12 +294,12 @@ render rồi dán vào chỗ khác; fixture của story bị nhấc thành compo
 
 ## `CONTRACT-9` — key mới được biện minh bằng hình dạng, không bằng một cái gap khác
 
-**Tình huống.** Có key gần đúng, chỉ là "hơi chật" hoặc "hơi thưa".
+**Khi nào gặp.** Có key gần đúng, chỉ là "hơi chật" hoặc "hơi thưa".
 
-**Nó sinh ra gì trong source.** Không entry mới nào cả. Hoặc entry cũ đổi cho TẤT CẢ, hoặc dùng đúng
+**Source phải thể hiện gì.** Không entry mới nào cả. Hoặc entry cũ đổi cho TẤT CẢ, hoặc dùng đúng
 cái key đang có. Một entry mới chỉ được viết ở chỗ không key nào diễn đạt được hình dạng đó.
 
-**Dấu hiệu nhận biết.** Key mới khác key cũ đúng một token khoảng cách; đúng một `restingCount`; hoặc
+**Cách nhận ra.** Key mới khác key cũ đúng một token khoảng cách; đúng một `restingCount`; hoặc
 chỉ khác ở `why` và ở tên. Tự hỏi: trừ cái tên, cái lý do và số placeholder ra, hai entry này còn khác
 nhau ở đâu? Nếu không còn gì, chúng là MỘT entry dưới hai cái tên. Từ vựng phình lên theo từng call
 site cho tới khi các key mô tả CALL SITE chứ không mô tả HÌNH DẠNG, và danh sách dài hơn cả đoạn code
@@ -304,14 +313,14 @@ loading 4 dòng thay vì 3"; "y hệt nhưng dùng ở trang khác".
 
 ## `CONTRACT-10` — contract cố định nội dung; branch sở hữu cơ chế wrapper
 
-**Tình huống.** Nội dung đã có contract, nhưng nó phải nằm trong một vendor wrapper cố định: thân
+**Khi nào gặp.** Nội dung đã có contract, nhưng nó phải nằm trong một vendor wrapper cố định: thân
 card, thân accordion, thân list.
 
-**Nó sinh ra gì trong source.** Cái seam vendor cố định đó được viết như code branch bình thường trong
+**Source phải thể hiện gì.** Cái seam vendor cố định đó được viết như code branch bình thường trong
 các surface branch có tên — `SurfaceCard`, `SurfaceListCard`, `SurfaceFormCard` — với contract node
 đứng BÊN TRONG content body. Không bảng compound nào, và không node props nào trên `Card.Content`.
 
-**Dấu hiệu nhận biết.** Bạn định tạo key cho dòng tiêu đề, cho wrapper ngoài và cho caption chỉ để
+**Cách nhận ra.** Bạn định tạo key cho dòng tiêu đề, cho wrapper ngoài và cho caption chỉ để
 khỏi phải viết branch; bạn định tạo một bảng "compound" mô hình hoá `Card > Card.Content`; bạn định
 spread node props lên `Card.Content`. Tự hỏi: cái seam này có BIẾN ĐỔI THEO CALLER không? Nó có NHẬN
 CON không? Nếu cả hai đều không, nó là cơ chế của branch, không phải một từ vựng thứ hai.
@@ -330,19 +339,19 @@ joined list nằm trong card `p-0`; form card có footer hành động cố đ�
 
 ## `CONTRACT-11` — entry khai báo mọi slot bên trong, và mỗi slot có tên
 
-**Tình huống.** Bạn đang nói cho entry biết bên trong nó có gì.
+**Khi nào gặp.** Bạn đang nói cho entry biết bên trong nó có gì.
 
-**Nó sinh ra gì trong source.** Một record slot có tên trên entry — `ContractSlots`,
+**Source phải thể hiện gì.** Một record slot có tên trên entry — `ContractSlots`,
 `ContractProjection`, `ContractComponent`, `defineContractComponent` — với identity, tính tuỳ chọn và
 lực lượng cho từng slot, cùng union `ContractChildCardinality` / `ChildrenOf` khiến `repeats: true`
 mà thiếu `restingCount` không viết ra được.
 
-**Dấu hiệu nhận biết.** Bạn định dùng `children` theo nghĩa React; định truyền một mảng con THEO THỨ
+**Cách nhận ra.** Bạn định dùng `children` theo nghĩa React; định truyền một mảng con THEO THỨ
 TỰ; định viết một arrow trực tiếp vào một slot; hoặc bạn có slot lặp mà không nói bao nhiêu placeholder
-vẽ lúc chờ. Tự hỏi: nếu ngày mai ai đó chèn thêm một đứa con vào GIỮA, có gì bị đổi nghĩa trong im
+vẽ lúc chờ. Tự hỏi: nếu ngày mai ai đó chèn thêm một phần tử con vào GIỮA, có gì bị đổi nghĩa trong im
 lặng không?
 
-Slot có TÊN, không ĐẾM. Chèn một đứa con vào danh sách theo vị trí thì mọi vị trí sau nó âm thầm mang
+Slot có TÊN, không ĐẾM. Chèn một phần tử con vào danh sách theo vị trí thì mọi vị trí sau nó âm thầm mang
 nghĩa khác; một cái tên sống sót qua lần chèn đó, đọc được ngay tại call site mà không phải đếm, và
 cho `why` một thứ để nhắc đến.
 
@@ -376,12 +385,12 @@ sách module có skeleton; dòng label có fact đứng cuối.
 
 ## `CONTRACT-12` — class của entry là SẮP XẾP, không phải hành vi và không phải sơn
 
-**Tình huống.** Node cần bấm được, hoặc cần nền, hoặc cần đổ bóng.
+**Khi nào gặp.** Node cần bấm được, hoặc cần nền, hoặc cần đổ bóng.
 
-**Nó sinh ra gì trong source.** Một entry chỉ mang sắp xếp. Hành vi chuyển sang branch sở hữu control;
+**Source phải thể hiện gì.** Một entry chỉ mang sắp xếp. Hành vi chuyển sang branch sở hữu control;
 nền và độ nổi chuyển sang component surface vốn đã sở hữu chúng.
 
-**Dấu hiệu nhận biết.** Entry mang `cursor-*`, `hover:*`, `active:*`, `focus:*`, `group`; entry mang
+**Cách nhận ra.** Entry mang `cursor-*`, `hover:*`, `active:*`, `focus:*`, `group`; entry mang
 màu chữ, `underline`, `decoration-*`; entry mang `bg-surface*` hoặc `shadow-*`. Tự hỏi: class này nói
 CÁC CON ĐỨNG VỚI NHAU THẾ NÀO, hay nói NODE NÀY PHẢN ỨNG RA SAO / TRÔNG NHƯ CÁI GÌ?
 
@@ -409,13 +418,13 @@ nền; hàng có shadow riêng bên trong một card đã có shadow.
 
 ## `CONTRACT-13` — key không ai vẽ thì không phải từ vựng
 
-**Tình huống.** Trong bảng có key mà không màn nào render.
+**Khi nào gặp.** Trong bảng có key mà không màn nào render.
 
-**Nó sinh ra gì trong source.** Chỉ những key với tới được từ một `contract="…"`, một
+**Source phải thể hiện gì.** Chỉ những key với tới được từ một `contract="…"`, một
 `defineContractComponent("…")` hoặc từ slot của entry khác mới sống sót trong `CONTRACT_KEYS`. Một
 hình dạng chưa dựng thì sinh ra trong plan record thay vì trong bảng.
 
-**Dấu hiệu nhận biết.** Không `contract="key"`, không `defineContractComponent("key")`, không slot nào
+**Cách nhận ra.** Không `contract="key"`, không `defineContractComponent("key")`, không slot nào
 của entry khác gọi; key được thêm "để tuần sau dùng"; key sống sót qua một đợt đổi tên mà không ai
 chạm. Tự hỏi: có màn hình nào đang đứng trong tài liệu nhờ key này không?
 
@@ -436,7 +445,7 @@ chưa được duyệt; key copy sang repository mới cùng cả bảng.
 ## Tầng giữ
 
 Tầng nào thật sự giữ mỗi mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được. `enforced` nghĩa là một rule trong `@starci/eslint-canon-fe` bắt được
+giá trị sai không viết ra được. `enforced` nghĩa là một rule trong `@canon-fe` bắt được
 nó. `documented` nghĩa là không có gì cơ học giữ, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -474,7 +483,7 @@ nêu phải tìm gì ở đó.
 | `CONTRACT-2` | toàn bộ cây được cai quản dưới `src/` | không một call site `cn`, `clsx`, `twMerge`, `cva` nào; không một `className` nội suy nào |
 | `CONTRACT-3` | `components/contracts/index.ts` → `export type LayoutClassName` | chính cái union; một giá trị ngoài nó thì trượt lúc biên dịch chứ không trượt lúc review |
 | `CONTRACT-4` | `components/contracts/index.ts` → `export type ContractHost`; `components/branches/Tree/index.tsx` | `const Host = spec.host ?? "div"` — element đọc ra từ entry, và không `host`/`as` nào trên props của frame |
-| `CONTRACT-5` | tên key trong `components/contracts/index.ts` | những cái tên cố định được một đứa con (`label-fact-over-progress`, `page-header-stack`) đối lại những cái tên chung bị cấm (`card`, `row`) |
+| `CONTRACT-5` | tên key trong `components/contracts/index.ts` | những cái tên cố định được một phần tử con (`label-fact-over-progress`, `page-header-stack`) đối lại những cái tên chung bị cấm (`card`, `row`) |
 | `CONTRACT-6` | `components/contracts/index.ts` → mọi trường `why:` | một câu nêu cái gì vỡ, xuống dòng hay tràn ra khi không có node |
 | `CONTRACT-7` | `components/branches/Tree/index.tsx` | đúng một `<Host>` mở ra từ một spec trong toàn cây |
 | `CONTRACT-8` | `components/contracts/index.ts` → `contractNodeProps` | `data-node` và `data-why` được sinh ra trong đúng một hàm |
@@ -507,7 +516,7 @@ bản audit; nó vẫn là một cái neo, vì thứ mà luật nói đến ch�
 4. Element thuộc về entry; frame là kẻ duy nhất mặc nó.
 5. Đúng một file biến key thành element.
 6. Marker contract do chính frame đó phát ra, không bao giờ viết tay.
-7. Mọi slot đều có tên; không đứa con nào được với tới bằng cách đếm.
+7. Mọi slot đều có tên; không phần tử con nào được với tới bằng cách đếm.
 8. Slot lặp luôn khai resting count, và slot vô hướng không bao giờ khai.
 9. Hai entry không bao giờ đánh vần một hình dạng dưới hai cái tên.
 10. Class của entry là sắp xếp, không bao giờ là hành vi, là sơn hay là vật thể.
@@ -570,7 +579,7 @@ reason: without it the rows lose their shared divider and each row draws its own
 ```
 
 `reason` của mã: entry khai một slot CÓ TÊN và LẶP kèm resting count, và chính điều đó loại
-`CONTRACT-5` — cái tên không còn là thứ duy nhất giữ đứa con, record slot mới là.
+`CONTRACT-5` — cái tên không còn là thứ duy nhất giữ phần tử con, record slot mới là.
 
 ```text
 element: the row that holds the label and the trailing fact

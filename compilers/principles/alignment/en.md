@@ -4,6 +4,13 @@ title: Alignment
 
 # Alignment
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a settings row with a label and a toggle" — and you return,
 for every container that request implies, one situation code per axis and one className. The request
 never states an alignment and you never estimate one: alignment follows from what the children ARE,

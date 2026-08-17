@@ -4,7 +4,14 @@ title: Transport · Vietnamese
 
 # Cửa vào
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp có thuộc phạm
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp có thuộc phạm
 vi hay không, luật máy nào đã bắn, bắn tại node decorator nào, route nào và bằng chứng nào quyết định
 điều đó, ánh xạ sang mã luật nào, và cửa còn mở nào lẽ ra đã che đúng cái sai ấy. Mô-đun này không
 chọn giao thức nào cả. Nó từ chối một giao thức, và nó phải chỉ được đúng cái decorator mà nó từ chối.
@@ -88,7 +95,7 @@ hoặc làm `callee` của một `CallExpression` khi callee là `Identifier`. C
 `arguments[0]` là một `Literal` có `value` kiểu chuỗi, mọi hình dạng khác thành `""`. Sau đó chạy năm
 phép thử ở trên; không phép nào khớp thì báo lỗi tại node decorator.
 
-**Nó không thấy gì.** Phép thử byte và phép thử vận hành chạy trên **văn bản thô của tệp**, thứ không
+**Điểm mù.** Phép thử byte và phép thử vận hành chạy trên **văn bản thô của tệp**, thứ không
 phân biệt nổi dùng với nhắc tới: một dòng chú thích `// TODO: switch the export to StreamableFile
 later`, một `import { FileInterceptor } from "…"` bỏ quên sau lần dọn dẹp, hay một `const AUDIT_KEYS =
 ["OPS_TOKEN"]` nằm trong bảng cấu hình — mỗi thứ đó đều biện minh cho **mọi** `@Controller` trong tệp,
@@ -124,7 +131,7 @@ tới.
 được kiểm một phần nào cả — nó không được kiểm gì hết. Khớp thì thăm `Decorator`, đòi cùng định danh
 `Controller`, rồi báo lỗi vô điều kiện.
 
-**Nó không thấy gì.** Đổi tên thư mục `modules/` thành `services/`, `domains/` hay
+**Điểm mù.** Đổi tên thư mục `modules/` thành `services/`, `domains/` hay
 `capabilities/` thì tầng vẫn còn nguyên, cửa vẫn đậu sai chỗ, mà quy tắc biến mất: cấm một **thư
 mục** không phải cấm một **tầng**. Chỉ `@Controller` được nhận ra, nên `@WebSocketGateway()`,
 `@MessagePattern(…)`, `@EventPattern(…)` và `@Resolver` nằm dưới `modules/` đều đi qua sạch sẽ —

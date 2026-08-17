@@ -4,6 +4,13 @@ title: Contract
 
 # Contract
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 which published rule fired, which law code it enforces, which mechanism fired it, what it found, and —
 when one applies — the writing that would have avoided the report. This module chooses nothing. It

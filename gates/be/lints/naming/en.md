@@ -4,6 +4,13 @@ title: Naming
 
 # Naming
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 which published rule fired, what message it emitted, on which node, which law code that maps to, and
 the open hatch that would have hidden the same failure. This module chooses no name. It refuses one,

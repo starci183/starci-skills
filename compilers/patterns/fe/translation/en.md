@@ -4,6 +4,15 @@ title: Translation
 
 # Translation
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is a shape somebody already accepted — a layout, a block, a capability or a contract whose
 design questions are closed. This module does not reopen any of them. It takes that accepted shape and
 says where its words live in source: which file resolves each string, which tier may hold it, what may
@@ -222,7 +231,7 @@ name.
 ## Layer held
 
 Which tier actually holds each code — a closed type, a lint rule, or only a reader. The enforced rows
-are implemented by `@starci/eslint-canon-fe`.
+are implemented by `@canon-fe`.
 
 | Code | Tier | Held by |
 |---|---|---|
@@ -237,7 +246,7 @@ Four of six rows read `documented`, and the table exists to say so out loud rath
 enforced rows imply the module is covered.
 
 Two of those four have mechanical support that belongs to a NEIGHBOURING law and is therefore not
-counted here: `starci-fe/no-second-language-in-source`, published by `@starci/eslint-canon-fe`,
+counted here: `starci-fe/no-second-language-in-source`, published by `@canon-fe`,
 exempts the locale dictionaries by path (`COPY-5`) and reads the `vn-ok:` pragma on a marked line
 (`COPY-6`). Counting a neighbour's rule as this module's enforcement would make the module look held
 where it is not: that rule fires on a LANGUAGE, so it never sees an English key crossing a boundary,
@@ -259,7 +268,7 @@ the shape of the tree, not the name of any product, is what makes them checkable
 | `COPY-2` | `components/{leaves,composites,branches,shells}/**` | No `aria-label`, `placeholder`, `title` or `alt` carrying prose, and no JSX text that reads as a sentence |
 | `COPY-3` | props types in `components/blocks/**/component.tsx` | Word-bearing props are typed as the resolved value (`label: string`). Any `*Key` prop names a selected row, never a dictionary entry |
 | `COPY-4` | `components/blocks/**/component.test.tsx` | The twin renders from plain fixture strings with no translation provider mounted — the test passing is the proof the word arrived as a value |
-| `COPY-5` | `messages/<locale>.json`, and `CONTENT_PATHS` in `@starci/eslint-canon-fe` | The exemption is a path list, so no file argues its own case |
+| `COPY-5` | `messages/<locale>.json`, and `CONTENT_PATHS` in `@canon-fe` | The exemption is a path list, so no file argues its own case |
 | `COPY-6` | `chưa neo được` — not yet anchored | Lines marked `// vn-ok: <reason>` exist, but the marked literals found are copy rather than values the program matches on. The code's own situation has no anchor |
 
 ## Inputs

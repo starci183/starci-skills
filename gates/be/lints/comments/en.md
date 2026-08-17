@@ -4,6 +4,15 @@ title: Comments
 
 # Comments
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 which lane the file fell in, which published rule fired, on which AST node or raw line it fired, which
 law code that maps to, and the open hatch that would have hidden the same failure. This module chooses
@@ -24,7 +33,7 @@ here.
 ## Published rules
 
 Three rules are published, from the module's `rules` export, at `error` in its `recommended` export.
-They ship in the package `@starci/eslint-canon-be` under the plugin prefix `starci-be/`.
+They ship in the package `@canon-be` under the plugin prefix `starci-be/`.
 
 | Rule | Code | What it reports |
 |---|---|---|

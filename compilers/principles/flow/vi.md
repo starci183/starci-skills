@@ -4,7 +4,14 @@ title: Flow · Vietnamese
 
 # Luồng
 
-Đầu vào là một yêu cầu viết bằng lời thường — "thanh dọc lọc bên trái, thẻ khoá học bên phải" — và
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "thanh dọc lọc bên trái, thẻ khoá học bên phải" — và
 đầu ra là, với **mỗi vùng chứa** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu
 không bao giờ nói ra một trục, và không được phép đoán trục: trục suy ra từ việc các con là gì, và
 từ điều bắt buộc phải xảy ra khi hết bề rộng.
@@ -100,10 +107,10 @@ thì không, tình huống là một hàng xuống dòng.
 
 ## `FLOW-0` — chỉ có một con, không có trục nào để khai báo
 
-**Tình huống.** Vùng chứa chỉ bọc đúng **một** thứ, và không trạng thái nào làm nó thành nhiều thứ.
+**Khi nào gặp.** Vùng chứa chỉ bọc đúng **một** thứ, và không trạng thái nào làm nó thành nhiều thứ.
 Không có "cái thứ hai" thì không có phương hướng nào giữa hai cái cả.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chỉ có một con trực tiếp ở trạng thái tải, trạng thái rỗng và trạng thái lỗi.
 - Vùng chứa tồn tại vì một lý do khác: bo góc, nền, chiều rộng tối đa, hoặc một vùng có tên.
@@ -119,7 +126,7 @@ Không có "cái thứ hai" thì không có phương hướng nào giữa hai c�
 - `FLOW-1`: `FLOW-0` là một con; `FLOW-1` là nhiều con nhưng chúng là chữ trong một câu.
 
 **Không viết `flex` cho một con.** Viết `flex` ở đây là tuyên bố một trục không tồn tại, và nó âm
-thầm đổi hành vi của chính đứa con duy nhất: con đang là khối bỗng co lại theo nội dung, `w-full`
+thầm đổi hành vi của chính phần tử con duy nhất: con đang là khối bỗng co lại theo nội dung, `w-full`
 mất tác dụng, lề ngoài bị nuốt khác đi. Một khai báo không có nghĩa vẫn là một khai báo có hậu quả.
 
 **Tình huống nghiệp vụ hay gặp.** Bọc giới hạn bề rộng của trang · vùng nền của một phần nội dung ·
@@ -128,11 +135,11 @@ văn duy nhất · cổng hiển thị của một phần tử chồng lớp.
 
 ## `FLOW-1` — chữ trong câu, ngắt dòng đã lo
 
-**Tình huống.** Các con là chữ, cụm chữ, liên kết, nhãn nhỏ, biểu tượng nằm trong một câu. Trục nội
+**Khi nào gặp.** Các con là chữ, cụm chữ, liên kết, nhãn nhỏ, biểu tượng nằm trong một câu. Trục nội
 tuyến đã có sẵn, và cái sắp xếp chúng là thuật toán ngắt dòng của trình duyệt chứ không phải một
 class.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đọc thành một câu, không phải đọc thành một danh sách.
 - Giữa các phần có **dấu cách thật**, và dấu cách đó có nghĩa.
@@ -157,10 +164,10 @@ nhãn nhỏ · câu chào có tên người dùng.
 
 ## `FLOW-2` — một hàng, một dòng, không được xuống dòng
 
-**Tình huống.** Các phần tử chạy ngang và **bắt buộc** ở lại trên một dòng. Xuống dòng ở đây làm vỡ
+**Khi nào gặp.** Các phần tử chạy ngang và **bắt buộc** ở lại trên một dòng. Xuống dòng ở đây làm vỡ
 nghĩa: một thanh công cụ gãy đôi, một dòng trong danh sách tự nhiên cao gấp đôi các dòng khác.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một phần tử "chính" và một hoặc vài phần tử phụ ở hai đầu.
 - Chiều cao của hàng là một hằng số mà mắt người dùng dựa vào để quét dọc.
@@ -185,10 +192,10 @@ dẫn phân cấp ngắn · dòng tổng tiền · nhãn + nhãn trạng thái �
 
 ## `FLOW-3` — một chồng đọc từ trên xuống
 
-**Tình huống.** Các con xếp dọc và **thứ tự trên–dưới là thứ tự đọc**. Đây là mã phổ biến nhất và
+**Khi nào gặp.** Các con xếp dọc và **thứ tự trên–dưới là thứ tự đọc**. Đây là mã phổ biến nhất và
 cũng là mã bị bỏ qua nhiều nhất, vì khối vốn đã tự xếp chồng nên người ta tưởng không cần khai báo.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mỗi con chiếm trọn bề rộng và không cạnh tranh bề rộng với con nào.
 - Thứ tự có nghĩa: nhãn trước, ô nhập sau; tiêu đề trước, nội dung sau.
@@ -213,10 +220,10 @@ trên thiết bị di động · biểu mẫu.
 
 ## `FLOW-4` — một hàng được phép tràn xuống dòng sau
 
-**Tình huống.** Một **túi** các phần tử độc lập, cùng loại, kích thước tự nhiên khác nhau. Thứ tự có
+**Khi nào gặp.** Một **túi** các phần tử độc lập, cùng loại, kích thước tự nhiên khác nhau. Thứ tự có
 nghĩa, nhưng **cột thì không**. Phần tử nào không đủ chỗ thì xuống dòng, không ai bị cắt.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bề rộng mỗi phần tử do nội dung của chính nó quyết định, và các phần tử dài ngắn khác nhau.
 - Số lượng phần tử không biết trước: người dùng thêm thẻ, bộ lọc, kỹ năng.
@@ -242,10 +249,10 @@ chọn trả lời ngắn · chú giải biểu đồ.
 
 ## `FLOW-5` — hàng khi rộng, chồng khi hẹp
 
-**Tình huống.** Cùng một tập, hai trục ở hai bề rộng. Khi hết chỗ, cả tập **đổi trục** chứ không
+**Khi nào gặp.** Cùng một tập, hai trục ở hai bề rộng. Khi hết chỗ, cả tập **đổi trục** chứ không
 phải gãy dòng: mỗi phần tử chiếm trọn bề rộng và tập đọc từ trên xuống.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các phần tử **không** hoán đổi được: một bên là nội dung, một bên là hành động hoặc số liệu.
 - Khi hẹp, phần tử nào cũng cần trọn bề rộng để đọc hoặc để bấm.
@@ -274,10 +281,10 @@ thiết bị di động.
 
 ## `FLOW-6` — số cột do sản phẩm quyết
 
-**Tình huống.** Các phần tử **hoán đổi được** và phải **thẳng cột**, với số cột là một quyết định
+**Khi nào gặp.** Các phần tử **hoán đổi được** và phải **thẳng cột**, với số cột là một quyết định
 nội dung: ba lợi ích trên một hàng, hai trường nhập liệu một hàng, bốn số liệu một hàng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các phần tử cùng loại, cùng vai trò, và người đọc so sánh chúng với nhau.
 - Có một con số "đúng" cho số cột, và con số đó đến từ nội dung chứ không từ bề rộng màn hình.
@@ -303,10 +310,10 @@ trong một tháng.
 
 ## `FLOW-7` — số cột do bề rộng tối thiểu của phần tử quyết
 
-**Tình huống.** Một tập **không biết trước độ dài**, mỗi phần tử có một bề rộng mà dưới đó nó không
+**Khi nào gặp.** Một tập **không biết trước độ dài**, mỗi phần tử có một bề rộng mà dưới đó nó không
 còn đọc được. Số cột không phải quyết định của sản phẩm; nó là **hệ quả** của bề rộng còn lại.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Số phần tử đến từ dữ liệu và thay đổi theo bộ lọc.
 - Có thể nói ra một câu kiểu "dưới 16rem thì tiêu đề khoá học rối và ảnh vô nghĩa".
@@ -331,11 +338,11 @@ quả** phải trông như thế nào, và nói ra mình chọn cái nào — đ
 
 ## `FLOW-8` — các rãnh có vai trò khác nhau
 
-**Tình huống.** Các rãnh **không hoán đổi được**. Mỗi rãnh có một công việc riêng và một bề rộng
+**Khi nào gặp.** Các rãnh **không hoán đổi được**. Mỗi rãnh có một công việc riêng và một bề rộng
 được sở hữu riêng: một thanh dọc lọc rộng cố định, một vùng nội dung ăn phần còn lại, một khung ghim
 bên phải.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đổi chỗ hai rãnh cho nhau là đổi hẳn nghĩa của trang.
 - Ít nhất một rãnh có bề rộng là một quyết định bố cục, không phải hệ quả của nội dung.

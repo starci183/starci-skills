@@ -7,8 +7,17 @@ codes: [LOADING-1, LOADING-2, LOADING-3, LOADING-4, LOADING-5, LOADING-6, LOADIN
 
 # Trạng thái chờ
 
-Đầu vào là một shape đã được duyệt — một layout, một block, một capability hoặc một contract đã có
-người chốt. Pattern này không mở lại quyết định đó. Đầu ra của nó là kiến trúc source: file nào vẽ lúc
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một layout, một block, một capability hoặc một contract đã có
+người chốt. Pattern này không mở lại quyết định đó. Nó trả về kiến trúc source: file nào vẽ lúc
 chờ, tầng nào sở hữu tình huống và tầng nào sở hữu dáng nghỉ, file đó export gì, nhận được gì, và bị
 cấm nhận sẵn cái gì từ bên ngoài. Shape nói surface trông thế nào khi dữ liệu đã về; pattern này chốt
 source phải trông thế nào trong đúng một giây trước đó.
@@ -87,15 +96,15 @@ tình huống cùng lúc.
 
 ## `LOADING-1` — một hình, hai trạng thái; không bao giờ hai cây
 
-**Tình huống.** Dữ liệu chưa về, và có người muốn dựng thêm một component thứ hai để vẽ lúc chờ: một
+**Khi nào gặp.** Dữ liệu chưa về, và có người muốn dựng thêm một component thứ hai để vẽ lúc chờ: một
 file `…Skeleton`, hoặc một prop nhận sẵn markup nghỉ từ bên ngoài đưa vào. Component thật thì vẫn nằm
 đó, không biết gì.
 
-**Nó sinh ra gì trong source.** Một file duy nhất. Chính component vẽ dữ liệu nhận việc chờ như một
+**Source phải thể hiện gì.** Một file duy nhất. Chính component vẽ dữ liệu nhận việc chờ như một
 trạng thái của bản thân nó và nghỉ dưới dạng chính nó. Không có file anh em nào chỉ để nhại lại nó, và
 không có prop tên `skeleton`, `placeholder` hay `fallback` nhận vào một element.
 
-**Dấu hiệu nhận biết.** Có một file mà nhiệm vụ duy nhất là nhại lại hình của một file khác. Có prop
+**Cách nhận ra.** Có một file mà nhiệm vụ duy nhất là nhại lại hình của một file khác. Có prop
 tên `skeleton`, `placeholder` hoặc `fallback` nhận vào một element. Sửa component thật xong, phải nhớ
 sang sửa thêm một chỗ nữa — và không có gì nhắc. Tự hỏi: nếu ngày mai component này thêm một dòng, bản
 đang chờ có tự có dòng đó không?
@@ -112,14 +121,14 @@ báo · thẻ hồ sơ · bảng xếp hạng · card sản phẩm trong giỏ.
 
 ## `LOADING-2` — vẫn là phần tử đó, chỉ rút ruột ra
 
-**Tình huống.** Component đúng là một, nhưng lúc chờ nó bị thay bằng một element khác — thường bởi một
+**Khi nào gặp.** Component đúng là một, nhưng lúc chờ nó bị thay bằng một element khác — thường bởi một
 ternary ở call site: `isLoading ? <A/> : <B/>` với `A` và `B` là hai thứ khác nhau.
 
-**Nó sinh ra gì trong source.** Một element duy nhất trên cả hai đường. Class set và việc thay ký tự
+**Source phải thể hiện gì.** Một element duy nhất trên cả hai đường. Class set và việc thay ký tự
 có thể đổi; thẻ và cách sắp xếp thì không. Measure nằm trong component, không được viết lại bằng tay ở
 call site.
 
-**Dấu hiệu nhận biết.** Hai nhánh của ternary có tên element khác nhau. Kích thước, khoảng cách hoặc
+**Cách nhận ra.** Hai nhánh của ternary có tên element khác nhau. Kích thước, khoảng cách hoặc
 đường bo của bản nghỉ được viết lại bằng tay ở call site. Lúc dữ liệu về, chữ nhảy sang chỗ khác một
 chút — vì hai element không cùng measure. Tự hỏi: hai nhánh có phải cùng một element không? Nếu không,
 cái nào đang nói dối về measure?
@@ -135,15 +144,15 @@ trạng thái · số liệu trong ô thống kê · caption dưới ảnh.
 
 ## `LOADING-3` — vùng nghỉ bảo toàn chiều cao của section
 
-**Tình huống.** Vùng đang chờ không vẽ gì cả, nên nó co lại; đến khi câu trả lời về thì cả cột bên
+**Khi nào gặp.** Vùng đang chờ không vẽ gì cả, nên nó co lại; đến khi câu trả lời về thì cả cột bên
 dưới nhảy xuống. Người đọc đang đọc dở một thứ và mất chỗ.
 
-**Nó sinh ra gì trong source.** Một vùng nghỉ đứng cao bằng vùng thật, và một số dòng lặp là quyết
+**Source phải thể hiện gì.** Một vùng nghỉ đứng cao bằng vùng thật, và một số dòng lặp là quyết
 định được khai báo — một hằng số có tên cho số dòng nghỉ thế chỗ cho các dòng thật, chứ không phải một
 con số nằm rải rác trong JSX và cũng không phải chuyện tình cờ. Trong child-spec union, `repeats: true`
 không thể viết ra mà thiếu `restingCount: number`, và `repeats: false` thì không được mang theo nó.
 
-**Dấu hiệu nhận biết.** Có `isLoading ? null : …` ở cấp VÙNG, không phải cấp control. Danh sách lúc
+**Cách nhận ra.** Có `isLoading ? null : …` ở cấp VÙNG, không phải cấp control. Danh sách lúc
 chờ vẽ 0 dòng, lúc về vẽ 6 dòng. Không ở đâu khai báo "vùng này nghỉ bằng mấy dòng" — con số nằm rải
 rác trong JSX hoặc không có. Tự hỏi: nếu bây giờ dữ liệu về, có gì trên màn hình dịch chuyển không? Và
 số dòng lúc nghỉ là một QUYẾT ĐỊNH CÓ TÊN, hay là hệ quả tình cờ?
@@ -158,15 +167,15 @@ danh sách mục tiêu tuần · kết quả tìm kiếm · dòng bình luận.
 
 ## `LOADING-4` — phần đang nghỉ được giấu khỏi trợ năng
 
-**Tình huống.** Một shimmer, hoặc một giá trị đã bị rút ruột, vẫn nằm trong cây trợ năng. Screen reader
+**Khi nào gặp.** Một shimmer, hoặc một giá trị đã bị rút ruột, vẫn nằm trong cây trợ năng. Screen reader
 đọc ra tiếng ồn, hoặc đọc ra một chuỗi rỗng, đúng vào lúc người dùng đang chờ được nêu cho biết một
 điều gì đó.
 
-**Nó sinh ra gì trong source.** `aria-hidden` có mặt trên phần tử nghỉ đúng bằng khoảng thời gian nó
+**Source phải thể hiện gì.** `aria-hidden` có mặt trên phần tử nghỉ đúng bằng khoảng thời gian nó
 nghỉ, và biến mất ngay khi nó mang nội dung. Không có `aria-label` gắn lên từng ô để mô tả chính cái
 shimmer.
 
-**Dấu hiệu nhận biết.** Element nghỉ không có `aria-hidden`. Có `aria-label` mô tả chính cái shimmer
+**Cách nhận ra.** Element nghỉ không có `aria-hidden`. Có `aria-label` mô tả chính cái shimmer
 ("đang tải…") gắn lên từng ô một. Bật screen reader lên nghe thấy một chuỗi khoảng trắng, hoặc nghe
 thấy cùng một câu lặp mười lần. Tự hỏi: ở giây này, có NỘI DUNG nào để đọc không? Nếu không có, tại sao
 nó còn nằm trong cây trợ năng?
@@ -181,14 +190,14 @@ giải biểu đồ nghỉ · lưới đóng góp nghỉ.
 
 ## `LOADING-5` — chưa có nơi để đi thì chưa vẽ control
 
-**Tình huống.** Một card đang nghỉ vẫn vẽ ra cái nút của nó, hoặc vẽ một link ở dạng shimmer. Người
+**Khi nào gặp.** Một card đang nghỉ vẫn vẽ ra cái nút của nó, hoặc vẽ một link ở dạng shimmer. Người
 đọc bấm vào, và không có gì xảy ra — hoặc tệ hơn, có một cái gì đó sai xảy ra.
 
-**Nó sinh ra gì trong source.** Slot chứa lối ra bị bỏ hẳn khỏi record trong lúc item chưa được giải —
+**Source phải thể hiện gì.** Slot chứa lối ra bị bỏ hẳn khỏi record trong lúc item chưa được giải —
 không render `disabled`, cũng không render dạng nghỉ. Một ternary có nhánh `null` chính là hình đúng ở
 đây.
 
-**Dấu hiệu nhận biết.** Có control mà `href`, `id` đích hoặc handler của nó đang là `undefined`.
+**Cách nhận ra.** Có control mà `href`, `id` đích hoặc handler của nó đang là `undefined`.
 Control được vẽ ở dạng `disabled` "cho đỡ trống". Nhãn của control chưa được dịch xong nhưng khung nút
 đã có mặt. Tự hỏi: nếu người đọc bấm vào cái này NGAY BÂY GIỜ, họ học được điều gì? Nếu câu trả lời là
 "rằng surface này không đáng tin" — thì đừng vẽ nó.
@@ -203,14 +212,14 @@ cây thứ hai. Và là VẮNG MẶT, không phải `disabled`: một nút xám 
 
 ## `LOADING-6` — mỗi vùng tự sở hữu việc chờ của mình
 
-**Tình huống.** Một cờ `isLoading` duy nhất được kéo qua bốn vùng độc lập. Vùng nào cũng phải đợi vùng
+**Khi nào gặp.** Một cờ `isLoading` duy nhất được kéo qua bốn vùng độc lập. Vùng nào cũng phải đợi vùng
 chậm nhất, và bốn tình huống thật bị gộp thành một.
 
-**Nó sinh ra gì trong source.** Một cờ chờ cho một request. Mỗi vùng tự giải quyết request của mình và
+**Source phải thể hiện gì.** Một cờ chờ cho một request. Mỗi vùng tự giải quyết request của mình và
 về lúc nào thì hiện lúc đó, và mỗi block được assert ở trạng thái nghỉ đối chiếu với request chưa giải
 của CHÍNH NÓ, mỗi lần một cái.
 
-**Dấu hiệu nhận biết.** `const isLoading = a.isLoading || b.isLoading || c.isLoading`. Một
+**Cách nhận ra.** `const isLoading = a.isLoading || b.isLoading || c.isLoading`. Một
 `Promise.all` gom nhiều request không liên quan chỉ để có một trạng thái. Cả trang trắng ba giây rồi
 hiện ra một lượt, thay vì lấp dần trong một giây. Tự hỏi: hai vùng này có CÙNG MỘT CÂU TRẢ LỜI không?
 Nếu không, tại sao chúng dùng chung một cờ?
@@ -227,15 +236,15 @@ dung.
 
 ## `LOADING-7` — chờ là một tình huống thật, không phải sự vắng mặt của tình huống
 
-**Tình huống.** Component coi việc chờ là "chưa có dữ liệu": `data === undefined` thì trả về `null`,
+**Khi nào gặp.** Component coi việc chờ là "chưa có dữ liệu": `data === undefined` thì trả về `null`,
 hoặc trả về đúng cái giao diện của "không có gì". Từ đó nó không phân biệt được CHƯA VỀ với KHÔNG CÓ,
 mà hai thứ đó cần hai câu chữ khác nhau.
 
-**Nó sinh ra gì trong source.** `pending` đứng trong state union bên cạnh `ready`, `empty` và `failed`,
+**Source phải thể hiện gì.** `pending` đứng trong state union bên cạnh `ready`, `empty` và `failed`,
 mang theo phần khung chứ không mang theo con số không: nhãn của vùng, heading của nó — những thứ đã
 biết trước khi request được gửi đi. Chỉ phần nội dung là chưa biết.
 
-**Dấu hiệu nhận biết.** Union chỉ có `ready`, `empty`, `failed` — thiếu `pending`. Nhánh chờ trả về
+**Cách nhận ra.** Union chỉ có `ready`, `empty`, `failed` — thiếu `pending`. Nhánh chờ trả về
 `null`, hoặc trả về đúng empty state. Nhánh chờ không có `props`, nên tên của vùng biến mất trong lúc
 nội dung đang trên đường về. Tự hỏi: người đọc nhìn vào surface này lúc chờ, họ có còn biết HỌ ĐANG Ở
 VÙNG NÀO không?
@@ -250,7 +259,7 @@ thử thách tuần · feed cộng đồng · kết quả tìm kiếm · giỏ h
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `@starci/eslint-canon-fe` báo
+giá trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `@canon-fe` báo
 nó; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |

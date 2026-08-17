@@ -8,7 +8,16 @@ codes: [SPLIT-1, SPLIT-2, SPLIT-3, SPLIT-4, SPLIT-5, SPLIT-6]
 
 # Đường tách
 
-Đầu vào của pattern này là một shape đã có người duyệt: một layout, một block, một capability hay một
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt: một layout, một block, một capability hay một
 contract đã được chốt. Quyết định thiết kế đã đóng ở đây và không bao giờ được mở lại. Cái mà pattern
 này sinh ra là kiến trúc source — surface đã duyệt ấy thành mấy file, file nào giữ request, file nào
 giữ cây, cái gì được phép băng qua giữa chúng, file thứ hai tên là gì, và mỗi file được import những
@@ -63,7 +72,7 @@ tình huống thứ hai nhất. Chúng vẫn băng qua đúng cái sinh đôi �
    mấy cái boolean, và sinh đôi tên là gì. Đó không phải chỗ hổng của quyết định; đó chính là đầu ra
    của pattern này, và chỉ các mã bên dưới mới chốt được chúng.
 3. **Giải từ ngoài vào.** Lấy surface ngoài cùng trong shape, hỏi `SPLIT-6` cho nó trước, rồi mới đi
-   xuống. Một cha mà mỗi đứa con tự giữ request của mình thì bản thân nó chẳng giữ request nào; giải
+   xuống. Một cha mà mỗi phần tử con tự giữ request của mình thì bản thân nó chẳng giữ request nào; giải
    nó trước sẽ tránh việc bịa ra một nửa dữ liệu cho một file chẳng đọc gì.
 4. **Hỏi câu hỏi của từng mã cho từng surface, theo thứ tự.** File này có đọc thế giới không
    (`SPLIT-6`)? Nửa vẽ có đi hỏi ai điều gì không (`SPLIT-1`)? Nửa connected có quyết định hình thức
@@ -80,17 +89,17 @@ tình huống thứ hai nhất. Chúng vẫn băng qua đúng cái sinh đôi �
 
 ## `SPLIT-1` — nửa vẽ nhận hết, không hỏi gì
 
-**Tình huống.** `component.tsx` cần render được từ một fixture: đưa cho nó một object props là nó vẽ
+**Khi nào gặp.** `component.tsx` cần render được từ một fixture: đưa cho nó một object props là nó vẽ
 ra đúng cái nó phải vẽ, không cần dựng request, không cần dựng store, không cần dựng runtime dịch.
 
 Lý do không phải là "cho sạch". Một component không render được từ fixture thì không test được, vì
 muốn test phải dựng cả thế giới lên trước. Chi phí đó không nằm ở lần viết đầu tiên; nó nằm ở mọi lần
 sau, mỗi lần ai đó muốn kiểm một trạng thái.
 
-**Nó sinh ra gì trong source.** Một `component.tsx` mà import chỉ gồm component, type và helper thuần,
+**Source phải thể hiện gì.** Một `component.tsx` mà import chỉ gồm component, type và helper thuần,
 và props của nó mang sẵn mọi giá trị nó vẽ ra.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - File `component.tsx` có gọi hook request, hook store, hook dịch, hook đọc locale hoặc formatter.
 - Muốn viết test cho nó thì phải mock một cái gì đó không phải props.
@@ -109,7 +118,7 @@ khung kết quả tìm kiếm; bảng tiến độ; card khoá học; dòng thô
 
 ## `SPLIT-2` — nửa connected chốt tình huống, không chốt cách trông
 
-**Tình huống.** Nửa connected biết một điều mà không ai bên dưới biết: dữ liệu về rồi hay chưa, rỗng
+**Khi nào gặp.** Nửa connected biết một điều mà không ai bên dưới biết: dữ liệu về rồi hay chưa, rỗng
 hay có, hỏng hay lành. Nó chốt tình huống và đưa xuống. Nó không quyết định trạng thái đó trông thế
 nào, cách nhau bao xa, hay element nào vẽ cái gì.
 
@@ -117,10 +126,10 @@ Lý do: nửa connected không nhìn thấy hậu quả của quyết định tr
 nó có gì, không biết trạng thái kia trông ra sao, nên nó đang chọn một khoảng cách hoặc một biến thể
 trong tình trạng mù. Nửa vẽ thì nhìn thấy cả cây.
 
-**Nó sinh ra gì trong source.** Một `index.tsx` mang request và tình huống, trong đó không có
+**Source phải thể hiện gì.** Một `index.tsx` mang request và tình huống, trong đó không có
 `className`, không có giá trị spacing, và không có lựa chọn element nào cả.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Trong `index.tsx` có `className`, có giá trị spacing, có tên biến thể hình thức.
 - Nó truyền xuống một prop kiểu `size`, `tone`, `compact` mà không phải một sự kiện nghiệp vụ.
@@ -137,7 +146,7 @@ cho thử lại; hết hạn; chưa đủ quyền; đã hoàn tất.
 
 ## `SPLIT-3` — tình huống băng qua dưới dạng một cái tên
 
-**Tình huống.** Cái băng qua đường ranh là một giá trị lấy từ một tập đóng: `state="pending"`,
+**Khi nào gặp.** Cái băng qua đường ranh là một giá trị lấy từ một tập đóng: `state="pending"`,
 `state="failed"`, `state="settled"`. Không phải `isLoading`, `hasError`, `isEmpty` đi thành ba prop
 song song.
 
@@ -146,10 +155,10 @@ và rỗng là một trạng thái không tồn tại, nhưng kiểu dữ liệu
 union làm hai việc cùng lúc: mọi tình huống có thật đều bắt buộc phải được vẽ, và mọi tình huống không
 có thật đều không viết ra được.
 
-**Nó sinh ra gì trong source.** Một props type export trong `component.tsx` là một union gồm các thành
+**Source phải thể hiện gì.** Một props type export trong `component.tsx` là một union gồm các thành
 viên phân biệt nhau bằng một literal `state`.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Props của nửa vẽ có từ hai boolean độc lập trở lên mô tả cùng một vòng đời.
 - Trong nửa vẽ có `if (isLoading) … else if (hasError) …` — thứ tự các nhánh đang thay thế cho một tập
@@ -166,17 +175,17 @@ cập theo gói; phiên hết hạn; một ngày chưa tới so với một ngà
 
 ## `SPLIT-4` — chữ được dịch xong trước khi băng qua
 
-**Tình huống.** Nửa vẽ nhận chữ, không nhận key. Một chuỗi đã dịch là một giá trị như mọi giá trị
+**Khi nào gặp.** Nửa vẽ nhận chữ, không nhận key. Một chuỗi đã dịch là một giá trị như mọi giá trị
 khác; một key thì không — nó là một lời hứa rằng ở đâu đó có runtime dịch sẽ biến nó thành chữ.
 
 Lý do: một component tra key đã nhận thêm phụ thuộc vào toàn bộ runtime dịch, cho một việc đã làm xong
 cách đó một file. Cái giá hiện ra ở chỗ test: muốn kiểm một dòng chữ, phải dựng cả bộ dịch, và lúc đó
 `SPLIT-1` cũng gãy theo.
 
-**Nó sinh ra gì trong source.** Các prop biên mang chữ, khai trong `component.tsx` với kiểu `string` và
+**Source phải thể hiện gì.** Các prop biên mang chữ, khai trong `component.tsx` với kiểu `string` và
 chứa câu chữ thật, được JSX trong `index.tsx` điền vào.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Prop tên `*Key`, hoặc một `*Id` mang nghĩa chữ, hoặc một chuỗi có dấu chấm phân cấp kiểu
   `quest.failed`.
@@ -195,7 +204,7 @@ chuỗi số nhiều theo số lượng; nhãn trạng thái đơn hàng; tên �
 
 ## `SPLIT-5` — nửa connected không tự vẽ gì
 
-**Tình huống.** File connected import đúng `_${FolderName}` từ `./component`, và mọi nhánh JSX của nó
+**Khi nào gặp.** File connected import đúng `_${FolderName}` từ `./component`, và mọi nhánh JSX của nó
 đều render đúng component đó. Không nhánh nào rẽ sang một leaf khác, một branch khác, hay một cây thay
 thế.
 
@@ -203,14 +212,14 @@ Lý do: một file connected mà tự render một cây riêng đã trở thành
 ngay lần đầu bị vượt. Sau đó không ai còn nói được "review nửa này không cần đọc file kia" nữa, vì có
 thể có thứ gì đó nằm bên kia.
 
-**Nó sinh ra gì trong source.** Dòng `import { _X } from "./component"` trong `index.tsx`, với `X` là
+**Source phải thể hiện gì.** Dòng `import { _X } from "./component"` trong `index.tsx`, với `X` là
 tên folder, và `_X` là JSX identifier duy nhất mà file ấy render.
 
 **Không có ngoại lệ cho block mỏng.** Chỉ một leaf, một cây giống nhau ở mọi trạng thái, không có
 local domain state, hay một sinh đôi chỉ forward props — đó chính là những trường hợp dễ mọc thêm tình
 huống thứ hai nhất. Chúng vẫn băng qua đúng cái sinh đôi ấy.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - File connected có JSX identifier nào khác ngoài `_X`.
 - File connected import `_X` nhưng có một nhánh `return` không đi qua nó.
@@ -228,16 +237,16 @@ hàng danh sách có badge; widget chỉ hiện khi có dữ liệu.
 
 ## `SPLIT-6` — không có request thì không tách
 
-**Tình huống.** Một component không fetch gì thì hai file là nghi lễ: không có nửa dữ liệu, nên file
+**Khi nào gặp.** Một component không fetch gì thì hai file là nghi lễ: không có nửa dữ liệu, nên file
 thứ hai chẳng giữ điều gì mà file thứ nhất có thể làm sai.
 
 Đây là chỗ luật dừng lại, và chính nó giữ cho năm mã kia không biến thành thủ tục. Đường ranh có giá
 vì nó tách hai loại lỗi khác nhau; ở đâu chỉ có một loại lỗi, vạch thêm một đường chỉ tạo ra một file
 phải mở thêm.
 
-**Nó sinh ra gì trong source.** Một folder chỉ có `index.tsx` và không có `component.tsx`.
+**Source phải thể hiện gì.** Một folder chỉ có `index.tsx` và không có `component.tsx`.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - `index.tsx` không gọi request, không đọc store, không đọc locale — nó chỉ nhận props từ cha, hoặc
   ghép các surface connected khác lại.
@@ -257,7 +266,7 @@ wrapper mở overlay; layout chỉ nhận children.
 
 ## Tầng giữ
 
-Tầng nào thực sự giữ từng mã. `enforced` nêu tên rule trong `@starci/eslint-canon-fe` bắt được nó;
+Tầng nào thực sự giữ từng mã. `enforced` nêu tên rule trong `@canon-fe` bắt được nó;
 `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
@@ -284,7 +293,7 @@ phải folder của riêng sản phẩm nào.
 | `SPLIT-2` | `components/**/index.tsx` có import `./component` | Không `className`, không giá trị spacing, không lựa chọn element ở bất cứ đâu trong file connected. Grep `className` trên mọi index connected và ra zero là phép kiểm; một prop kiểu `variant` đặt tên cho hình thức là phần điểm neo này không nhìn thấy được |
 | `SPLIT-3` | `components/**/component.tsx` | Props type export là một union phân biệt bằng literal `state`. Kiểm ngược cùng những file ấy tìm `readonly isLoading?: boolean` và các cờ đi vào tương tự — mỗi lần trúng là một dòng đã băng qua dưới dạng cờ |
 | `SPLIT-4` | Các prop biên khai trong `component.tsx`, và JSX điền chúng trong `index.tsx` | Prop mang chữ có kiểu `string` và chứa câu chữ. Không prop nào tên `*Key`, không literal namespace chấm nào bị truyền xuống. Một prop định danh kiểu `selectedKey` không phải copy và không tính là trúng |
-| `SPLIT-5` | `components/**/index.tsx` và `@starci/eslint-canon-fe` | `import { _X } from "./component"` với `X` là tên folder, và `_X` là JSX identifier duy nhất file ấy render. Matcher `connectedBlock` của rule chốt `X` từ folder, nên tên sinh đôi không phải một quy ước mà file được phép phát biểu lại kiểu khác |
+| `SPLIT-5` | `components/**/index.tsx` và `@canon-fe` | `import { _X } from "./component"` với `X` là tên folder, và `_X` là JSX identifier duy nhất file ấy render. Matcher `connectedBlock` của rule chốt `X` từ folder, nên tên sinh đôi không phải một quy ước mà file được phép phát biểu lại kiểu khác |
 | `SPLIT-6` | Folder chỉ có `index.tsx` và không có `component.tsx` | Index không gọi gì ra thế giới: nó ghép các surface connected khác, hoặc chỉ giữ state UI cục bộ như overlay nào đang mở. Việc vắng `component.tsx` chỉ đúng chừng nào việc vắng request còn đúng |
 
 Một mã không có điểm neo là một đề xuất, không phải một luật. Cả sáu mã đều đã neo; không mã nào chưa
@@ -321,7 +330,7 @@ Ngoại lệ là một phần của luật, không phải chỗ để lách. M�
   rồi đưa boolean ấy xuống một thứ presentational nhỏ hơn là việc của nửa vẽ.
 - **State UI cục bộ không phải request.** `SPLIT-6` bật theo request. Giữ overlay nào đang mở, hay tab
   nào đang chọn, thì không đọc gì và không chốt gì, nên không tạo ra nửa dữ liệu.
-- **Surface ghép từ các surface connected.** Theo `SPLIT-6`, một file mà mỗi đứa con tự giữ request
+- **Surface ghép từ các surface connected.** Theo `SPLIT-6`, một file mà mỗi phần tử con tự giữ request
   của mình thì bản thân nó không giữ request nào: nó không có sinh đôi, vì nó chẳng có gì để resolve.
 - **Sinh đôi chỉ forward props.** Không phải ngoại lệ của `SPLIT-5`. Một sinh đôi mà cả thân chỉ
   forward props vẫn là điểm băng qua, và nó chính là file mà state được thêm đầu tiên sẽ rơi vào.
@@ -350,7 +359,7 @@ Shape đã duyệt: một rail tiến độ xếp ba block cạnh nhau, và mộ
 nó đọc tiến độ của học viên rồi hiện ra dưới dạng đang tải, rỗng, hỏng kèm nút thử lại, hoặc một con
 số đã hoàn tất.
 
-Rail được giải trước, vì surface ngoài cùng phải bị hỏi `SPLIT-6` trước khi động tới đứa con nào.
+Rail được giải trước, vì surface ngoài cùng phải bị hỏi `SPLIT-6` trước khi động tới phần tử con nào.
 
 ```text
 surface: ProgressRail
@@ -363,7 +372,7 @@ reason: the rail composes three connected children and reads nothing itself, so 
 ```
 
 Sự thật loại trừ mã kề bên: `SPLIT-5` lẽ ra đòi một sinh đôi `_ProgressRail`, nhưng `SPLIT-5` chỉ áp
-cho surface có request, còn file này không gọi gì ra thế giới — xếp ba đứa con mà mỗi đứa tự chốt tình
+cho surface có request, còn file này không gọi gì ra thế giới — xếp ba phần tử con mà mỗi đứa tự chốt tình
 huống của mình thì không phải một request.
 
 ```text

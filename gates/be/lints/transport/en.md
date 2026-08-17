@@ -4,6 +4,13 @@ title: Transport
 
 # Transport
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, on which decorator node, what route
 and what evidence decided it, which law code that maps to, and the open hatch that would have hidden

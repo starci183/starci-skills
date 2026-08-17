@@ -4,6 +4,13 @@ title: Divider
 
 # Divider
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a dialog with a header, a list of invitations and a footer"
 — and you return, for every adjacency that request implies, one situation code and one className. The
 request never asks for a line and you never add one to make a region look defined: whether a line

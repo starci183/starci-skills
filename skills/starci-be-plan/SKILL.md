@@ -5,8 +5,20 @@ description: Name every file a backend capability will need before any of them e
 
 # starci-be-plan
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first. This phase produces a brief and nothing else.
-It invites `starci-be-approve`; it never writes backend source.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+
+## HANDS OFF TO — named, never loaded
+
+`starci-init` · `starci-be-approve`
+
+## Run
+
+Read `@skill-shape` first. This phase produces a brief and nothing else.
+It ends with an approval-ready boundary; it never writes backend source.
 
 ## PROCESS
 
@@ -57,7 +69,7 @@ lost, and exactly what evidence will prove it works — which test, which query,
 ### 8 — Close the phase
 
 Print the six tables. `NEED APPROVALS` carries the decisions that could be
-wrong; `OWED` carries the approval itself, cleared by `starci-be-approve`.
+wrong; `OWED` carries explicit approval of the exact brief and boundary.
 
 ## Stops
 
@@ -69,3 +81,7 @@ wrong; `OWED` carries the approval itself, cleared by `starci-be-approve`.
 ## OUTPUT
 
 The six tables from the skill shape, in order. `CHANGES` is `None`: a plan writes no path.
+
+| Output | Owner |
+|---|---|
+| approval-ready brief and exact file boundary | `starci-be-approve` |

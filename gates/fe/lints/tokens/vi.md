@@ -4,7 +4,14 @@ title: Tokens · Vietnamese
 
 # Biến thiết kế
 
-Đầu vào là code đã viết rồi — một file, một khúc diff. Đầu ra là một **phán quyết**: với mỗi phát
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận code đã viết rồi — một file, một khúc diff. Kết quả là một **phán quyết**: với mỗi phát
 hiện, rule nào đã bắn, nó thi hành mã luật nào, bắn trên nút nào, và khớp đúng đoạn chữ nào. Mô-đun
 này không chọn gì cả. Nó từ chối, và nó phải chỉ được vào đúng ký tự mà nó từ chối.
 
@@ -72,7 +79,7 @@ sự im lặng ở đây là được phép.
 `space-y`, `inset`, `top`, `bottom`, `left`, `right`, `size`, `w`, `h` — theo sau bởi `-\d+\.\d+`, hai
 đầu chặn bằng `\b`. Nó dùng `String.match`, nên chỉ báo lần khớp đầu tiên.
 
-**Nó không thấy gì.** Bốn họ kích thước vắng mặt trong danh sách: `min-w-3.5`, `min-h-1.5`,
+**Điểm mù.** Bốn họ kích thước vắng mặt trong danh sách: `min-w-3.5`, `min-h-1.5`,
 `max-w-2.5` và `max-h-1.5` là bước thập phân thuộc những họ mà regex không gọi tên. Các thuộc tính
 logic và theo trục cũng vắng — `ps-1.5`, `pe-1.5`, `ms-1.5`, `me-1.5`, `inset-x-1.5`, `inset-y-1.5`.
 Và vì `match` trả về lần khớp đầu, `"gap-1.5 p-2.5 size-3.5"` chỉ báo một lần: ba lượt mới dọn xong
@@ -92,7 +99,7 @@ cách và kích thước cộng thêm `min-w`, `min-h`, `max-w`, `max-h`, trừ 
 `-\[` cho tới dấu `]` đầu tiên. Regex màu gọi tên `text`, `bg`, `border`, `ring`, `from`, `to`, `via`,
 `fill`, `stroke`, `shadow` và `decoration`, theo sau bởi đúng ba ký tự `-[#` và một chữ số hex.
 
-**Nó không thấy gì.** Kiểu chữ, giãn chữ, giãn dòng, lưới, thời lượng và tỷ lệ dùng ngoặc vuông thoải
+**Điểm mù.** Kiểu chữ, giãn chữ, giãn dòng, lưới, thời lượng và tỷ lệ dùng ngoặc vuông thoải
 mái: `text-[28px]`, `tracking-[0.2em]`, `leading-[1.15]`, `grid-cols-[14rem_1fr]`, `duration-[250ms]`,
 `aspect-[4/3]` đều không nằm trong danh sách nào và đều không mang `#`. Một màu thô không phải hex thì
 ở đây không tính là màu thô: `bg-[rgb(37,99,235)]`, `text-[hsl(210_20%_98%)]` và
@@ -111,7 +118,7 @@ tĩnh. Nó không gọi tên class nào, vì phát hiện là **cặp**, không 
 **Nó phát hiện bằng gì.** Hai regex, cả hai đều phải `test` đúng trên cùng một chuỗi:
 `text-(xl|2xl|3xl|4xl|5xl)` và `font-(bold|extrabold|black)`.
 
-**Nó không thấy gì.** `font-semibold` ở đây không phải độ đậm nặng, nên `text-2xl font-semibold` — cách
+**Điểm mù.** `font-semibold` ở đây không phải độ đậm nặng, nên `text-2xl font-semibold` — cách
 viết tiêu đề lắp tay phổ biến nhất trong source thường — không bắn. Danh sách cỡ dừng ở `5xl`, nên
 `text-6xl font-bold` qua được, còn `text-[2rem] font-bold` thì không rule nào trên kệ này nhìn thấy.
 Cặp đó cũng phải nằm trong một chuỗi: cỡ ở cha còn độ đậm ở con, cỡ trong hằng số còn độ đậm ở chỗ gọi,
@@ -134,7 +141,7 @@ lượt chạy. Không tìm thấy gì thì rule trả về `{}`. Ngược lại
 min max prose dvh svh lvh dvw svw lvw px` — thì bỏ qua. Còn lại, biến suy ra là `--container-app-<n>`,
 `--max-height-<n>` hoặc `--min-height-<n>`, và được tìm bằng `String.includes` trên chữ của stylesheet.
 
-**Nó không thấy gì.** Không có stylesheet thì không có rule: nếu trong 12 tầng không có ứng viên nào
+**Điểm mù.** Không có stylesheet thì không có rule: nếu trong 12 tầng không có ứng viên nào
 tồn tại, rule không báo gì, và điều đó không phân biệt được với một lượt chạy sạch. Chỉ ba họ được
 kiểm, nên một biến chết kiểu `w-app-*`, `rounded-*`, `shadow-*`, `text-*` hay `gap-*` — cùng một loại
 hỏng, cùng một sự im lặng — nằm ngoài phạm vi, và `max-w-*` không có đoạn `app-` cũng vậy. Biến thể thứ

@@ -4,7 +4,14 @@ title: CQRS · Vietnamese
 
 # Tách lệnh và truy vấn
 
-Đầu vào là mã đã viết xong — một tệp, một mẩu diff. Đầu ra là một **phán quyết**: tệp đó có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mẩu diff. Kết quả là một **phán quyết**: tệp đó có nằm trong
 phạm vi hay không, luật máy nào đã nổ, nó báo gì và trên nút nào, điều đó ứng với mã luật nào, và cách
 viết nào sẽ khiến chính luật máy ấy im lặng. Mô-đun này không chọn thiết kế nào cả. Nó từ chối một
 thiết kế, và nó phải chỉ được ra đúng cái nút mà nó từ chối.
@@ -79,7 +86,7 @@ là `Identifier`, hoặc là `CallExpression` với `callee` kiểu `Identifier`
 tại thì thôi, còn không thì tìm `MethodDefinition` có `key.name` là `process` và báo nếu vắng. Không
 có cổng theo tên tệp.
 
-**Nó không thấy gì.** `override execute = async (command: C) => { … }` — trường của lớp là
+**Điểm mù.** `override execute = async (command: C) => { … }` — trường của lớp là
 `PropertyDefinition`, không phải `MethodDefinition`; nó vẫn che phương thức của lớp cơ sở lúc chạy,
 nghĩa là khuôn mẫu **thật sự** bị bỏ, mà phép duyệt chỉ nhìn phương thức. `async ["execute"](command:
 C) { … }` hoặc bất kỳ khoá tính toán nào — phép duyệt so `member.key.name`, mà khoá dạng chuỗi hay
@@ -113,7 +120,7 @@ mang **bất kỳ** decorator nào. Còn lại: báo mọi `MethodDefinition` c�
 tìm hàm dựng `MethodDefinition`, gỡ `TSParameterProperty` về `parameter` bên trong, và đòi
 `params.length === 1` cùng `.name === "params"`.
 
-**Nó không thấy gì.** Thông điệp không có hàm dựng —
+**Điểm mù.** Thông điệp không có hàm dựng —
 `export class ArchiveOrderCommand { readonly request: R; readonly user: U }` — đi qua sạch, vì phép
 kiểm hình dạng thoát sớm khi không có hàm dựng, và các trường là `PropertyDefinition` mà quy tắc không
 hề đọc; đó đúng là vi phạm mà `CQRS-2` mô tả, viết ở dạng quy tắc không nhìn thấy. Logic nằm trong
@@ -147,7 +154,7 @@ phép kiểm là một chuỗi đối chiếu với một danh sách do cấu h�
 thẳng: một quy tắc đi `stat` đĩa sẽ trả lời khác nhau tuỳ theo cây làm việc đang có gì, và một quy tắc
 mà câu trả lời phụ thuộc cây làm việc thì không ai tái lập lại được lúc rà soát.
 
-**Nó không thấy gì.** Mặc định là mọi thứ — phát hành ở `off`, và kể cả bật lên vẫn trơ nếu cấu hình
+**Điểm mù.** Mặc định là mọi thứ — phát hành ở `off`, và kể cả bật lên vẫn trơ nếu cấu hình
 không truyền `specs`; quy tắc là bộ báo cáo cho một cái cổng nằm ngoài nó. Một bản kiểm thử có tồn tại
 mà không kiểm gì — rỗng, `describe.skip`, hoặc chỉ một khẳng định luôn đúng — vì phép kiểm là một tên
 tệp trong một danh sách và nội dung không bao giờ được đọc, nên "có cặp song sinh" và "có được kiểm

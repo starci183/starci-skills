@@ -4,7 +4,16 @@ title: Comments · Vietnamese
 
 # Chú thích trong source
 
-Đầu vào của pattern này là một shape đã được duyệt: một ranh giới module, một capability, một contract,
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một ranh giới module, một capability, một contract,
 một enum, một export mà ai đó đã quyết định là phải có. Pattern không mở lại quyết định ấy. Đầu ra của
 nó là kiến trúc source — khai báo nào mở đầu bằng doc block, doc block ấy phải nói gì, dòng nào mang
 theo một lý do, prose nào viết bằng tiếng Anh, chuỗi nào là dữ liệu phải giữ nguyên và mang một marker
@@ -38,7 +47,7 @@ Ba trong năm mã có một lint rule đứng sau, và một trong ba cái đó 
 đòi. Bảng tầng giữ bên dưới nói rõ cái nào là cái nào, thay vì để người đọc tưởng cả năm mã được canh
 đều nhau.
 
-Thứ giữ luật này là `@starci/eslint-canon-be`.
+Thứ giữ luật này là `@canon-be`.
 
 ## Mã tình huống
 
@@ -92,16 +101,16 @@ này đang được ghi lại.
 
 ## `COMMENT-1` — mọi export mở đầu bằng một doc block
 
-**Tình huống.** Một class, interface, type, enum, function, hoặc một `const` gắn với một function — tức
+**Khi nào gặp.** Một class, interface, type, enum, function, hoặc một `const` gắn với một function — tức
 là một thứ CÓ BỀ MẶT — được export ra. Đây chính là phần file khác phụ thuộc vào, và người quyết định có
 dùng nó hay không thường không mở file này ra. Họ chỉ nhìn thấy cái tên ở dòng import và chữ ký khi
 hover.
 
-**Nó sinh ra gì trong source.** Một doc block nằm ngay trên khai báo được export, nói symbol ấy DÙNG ĐỂ
+**Source phải thể hiện gì.** Một doc block nằm ngay trên khai báo được export, nói symbol ấy DÙNG ĐỂ
 LÀM GÌ và khi nào nên chọn nó thay vì thứ nằm ngay bên cạnh. Tên cùng chữ ký cho biết nó NHẬN VÀO gì;
 chúng không bao giờ nói được nó để làm gì.
 
-**Dấu hiệu nhận biết.** Có từ khoá `export` trước một khai báo có bề mặt. Có ít nhất một file khác import
+**Cách nhận ra.** Có từ khoá `export` trước một khai báo có bề mặt. Có ít nhất một file khác import
 nó — hoặc sẽ có, ngay khi ai đó cần. Có một thứ nằm cạnh trông giống hệt, và người đọc phải chọn giữa
 hai thứ đó. Tự hỏi: người đọc ở dòng import có biết vì sao họ nên gọi thứ này không? Nếu không thì đang
 thiếu doc.
@@ -119,15 +128,15 @@ dựng client cho một hệ thống ngoài · util được ba nơi gọi.
 
 ## `COMMENT-2` — mỗi member enum nói hậu quả của việc chọn nó
 
-**Tình huống.** Một enum được export ra. Member của nó được CHỌN Ở CALL SITE, còn ý nghĩa của member thì
+**Khi nào gặp.** Một enum được export ra. Member của nó được CHỌN Ở CALL SITE, còn ý nghĩa của member thì
 nằm ở một `switch` hoặc một bảng tra Ở FILE KHÁC. Người viết call site không mở file kia ra.
 
-**Nó sinh ra gì trong source.** Một doc block trên từng member, trả lời: chọn cái này thì hệ thống làm
+**Source phải thể hiện gì.** Một doc block trên từng member, trả lời: chọn cái này thì hệ thống làm
 gì? `Pending` viết thành "trạng thái pending" là một dòng không dạy được gì cả. "Chưa có khoản thanh
 toán nào settle, nên chưa cấp quyền gì và giỏ hàng vẫn sửa được" mới là dữ kiện người viết tiếp theo cần
 và không tự suy ra được.
 
-**Dấu hiệu nhận biết.** Enum có `export`. Có ít nhất một chỗ `switch` trên nó, hoặc một bảng map từ
+**Cách nhận ra.** Enum có `export`. Có ít nhất một chỗ `switch` trên nó, hoặc một bảng map từ
 member sang hành vi. Đọc riêng tên member thì không đoán được hệ thống sẽ làm gì. Tự hỏi: nếu tôi chọn
 member này ở một call site, cái gì thay đổi ở phía sau? Câu trả lời đó CHÍNH LÀ nội dung doc.
 
@@ -142,15 +151,15 @@ do từ chối · giai đoạn của một phiên chấm.
 
 ## `COMMENT-3` — comment nói tại sao, code nói cái gì
 
-**Tình huống.** Có một lý do NẰM NGOÀI dòng code khiến dòng đó phải viết như vậy: một hệ thống ngoài gửi
+**Khi nào gặp.** Có một lý do NẰM NGOÀI dòng code khiến dòng đó phải viết như vậy: một hệ thống ngoài gửi
 webhook hai lần, một ràng buộc từ schema, một thứ tự trông tuỳ tiện mà không tuỳ tiện, một bug mà hình
 dạng này ngăn được, một race giữa hai replica.
 
-**Nó sinh ra gì trong source.** Một câu văn phía trên dòng, mang theo dữ kiện bên ngoài ấy — và không có
+**Source phải thể hiện gì.** Một câu văn phía trên dòng, mang theo dữ kiện bên ngoài ấy — và không có
 gì mô tả lại câu lệnh nằm dưới. Comment chép lại dòng bên dưới TỆ HƠN không có comment: nó nhân đôi chi
 phí bảo trì và trở thành phần sẽ âm thầm sai, vì không có gì hỏng khi một câu văn thôi đúng.
 
-**Dấu hiệu nhận biết.** Xoá câu comment đi thì code vẫn compile, vẫn chạy, nhưng không còn giải thích
+**Cách nhận ra.** Xoá câu comment đi thì code vẫn compile, vẫn chạy, nhưng không còn giải thích
 được. Câu comment nói về một thứ không xuất hiện trong dòng bên dưới: một hệ thống khác, một lần chạy
 khác, một trường hợp biên, một lần đã hỏng trong quá khứ. Dấu hiệu vi phạm thì ngược lại: đọc câu comment
 rồi đọc dòng code, thấy cùng một thông tin hai lần. Tự hỏi: câu này có nói điều gì mà dòng code bên dưới
@@ -168,11 +177,11 @@ bắt buộc phải có vì query này quét toàn bảng · một giá trị h�
 
 ## `COMMENT-4` — prose trong source là tiếng Anh, không emoji, không trang trí
 
-**Tình huống.** Không phải vì tiếng Anh hay hơn. Một codebase có HAI ngôn ngữ là một codebase có ít nhất
+**Khi nào gặp.** Không phải vì tiếng Anh hay hơn. Một codebase có HAI ngôn ngữ là một codebase có ít nhất
 một người đọc mà một nửa phần lập luận không đọc được — và đúng nửa đó là nửa giải thích những chỗ bất
 ngờ. Chỗ hiển nhiên thì ai cũng đọc được từ code; chỗ cần comment mới là chỗ mất.
 
-**Nó sinh ra gì trong source.** Prose tiếng Anh trong mọi comment, log message, tên biến và message của
+**Source phải thể hiện gì.** Prose tiếng Anh trong mọi comment, log message, tên biến và message của
 exception nội bộ. Emoji và ký hiệu trang trí bị từ chối vì lý do khác: chúng mang SẮC THÁI chứ không mang
 THÔNG TIN, và sắc thái là thứ mỗi người đọc ra một kiểu. Một dấu tích trong comment không nói được nó
 nghĩa là "đã kiểm", "đã xong", hay "đúng".
@@ -186,7 +195,7 @@ ASCII; đo trên một back end thật thì báo 857 chỗ — và TẤT CẢ đ
 không phải luật này đang được ghi lại, đó là một luật nghiêm hơn đang được bịa ra, và bịa luật là thứ duy
 nhất canon không được làm.
 
-**Dấu hiệu nhận biết.** Một comment giải thích lý do, viết bằng tiếng Việt. Một emoji trong log message
+**Cách nhận ra.** Một comment giải thích lý do, viết bằng tiếng Việt. Một emoji trong log message
 hoặc trong banner. Một dấu tích, dấu nhân hay ngôi sao đứng thay cho một từ. Tự hỏi: một người không đọc
 được tiếng Việt mở file này ra, họ mất phần nào của lập luận?
 
@@ -207,17 +216,17 @@ nội bộ.
 
 ## `COMMENT-5` — chuỗi chương trình phụ thuộc không phải comment
 
-**Tình huống.** Một chuỗi tiếng Việt nằm trong source, nhưng nó KHÔNG phải lời của lập trình viên nói với
+**Khi nào gặp.** Một chuỗi tiếng Việt nằm trong source, nhưng nó KHÔNG phải lời của lập trình viên nói với
 lập trình viên. Nó là DỮ LIỆU: một message trả về cho client theo locale, một chuỗi hệ thống ngoài gửi
 sang mà mình đem ra so sánh, một pattern khớp vào nội dung người dùng thật đã viết, một nhãn mà một model
 bắt buộc phải phát ra đúng như thế, một fixture mô phỏng đúng câu người dùng sẽ gõ.
 
-**Nó sinh ra gì trong source.** Chính literal ấy, giữ nguyên, kèm marker `vn-ok: <reason>` trên dòng nói
+**Source phải thể hiện gì.** Chính literal ấy, giữ nguyên, kèm marker `vn-ok: <reason>` trên dòng nói
 vì sao nó ở lại — để đợt rà soát sau không "sửa" nó thành bug. Dịch những thứ này làm hỏng chương trình,
 và hỏng theo kiểu tệ nhất: IM LẶNG. Một regex dịch sai không ném lỗi, nó chỉ không bao giờ khớp nữa. Một
 nhánh so sánh dịch sai không đỏ, nó chỉ không bao giờ đúng nữa.
 
-**Dấu hiệu nhận biết.** Chuỗi nằm ở vế phải của một phép so sánh, trong một regex, trong một map theo
+**Cách nhận ra.** Chuỗi nằm ở vế phải của một phép so sánh, trong một regex, trong một map theo
 locale, hoặc trong một prompt template mà model phải phát lại đúng nguyên văn. Có một hệ thống BÊN NGOÀI
 quyết định nội dung chuỗi đó, không phải mình. Đổi chuỗi thì HÀNH VI đổi, chứ không phải chỉ chữ hiển thị
 đổi. Tự hỏi: chuỗi này có phải của mình để đổi không? Nếu không thì nó là dữ liệu.
@@ -234,8 +243,8 @@ trong prompt template · fixture hội thoại trong spec · nội dung email th
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho giá
-trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `@starci/eslint-canon-be` bắt được;
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho giá
+trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `@canon-be` bắt được;
 `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Thứ giữ nó |

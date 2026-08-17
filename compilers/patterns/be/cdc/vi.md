@@ -4,7 +4,14 @@ title: CDC · Vietnamese
 
 # CDC
 
-Đầu vào của pattern này là một shape đã được duyệt: một read model ai đó đã đồng ý hiển thị, một projection mà con số của nó đang được một màn hình phụ thuộc vào, một bảng nguồn mà thay đổi của nó phải chạy tới màn hình đó. Pattern này không mở lại quyết định ấy. Đầu ra của nó là kiến trúc source — code nằm ở file nào, tầng nào sở hữu kết nối và tầng nào phải hoàn toàn không biết tới nó, class kế thừa cái gì, khai báo cái gì, xuất ra cái gì, và một câu query được phép nói gì.
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một read model ai đó đã đồng ý hiển thị, một projection mà con số của nó đang được một màn hình phụ thuộc vào, một bảng nguồn mà thay đổi của nó phải chạy tới màn hình đó. Pattern này không mở lại quyết định ấy. Nó trả về kiến trúc source — code nằm ở file nào, tầng nào sở hữu kết nối và tầng nào phải hoàn toàn không biết tới nó, class kế thừa cái gì, khai báo cái gì, xuất ra cái gì, và một câu query được phép nói gì.
 
 ## Luật
 
@@ -48,11 +55,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-1` — vòng đời Kafka thuộc về base dùng chung
 
-**Tình huống.** Bạn thêm một projection mới. Nó cần kết nối, cần subscribe, cần parse envelope Debezium, cần biết làm gì khi một message hỏng. Bốn thứ đó không phải việc của projection này — đã có nơi phụ trách.
+**Khi nào gặp.** Bạn thêm một projection mới. Nó cần kết nối, cần subscribe, cần parse envelope Debezium, cần biết làm gì khi một message hỏng. Bốn thứ đó không phải việc của projection này — đã có nơi phụ trách.
 
-**Nó sinh ra gì trong source.** Đúng một class cụ thể trong file `*projection.listener.ts`, kế thừa `AbstractProjectionListener`, không khai báo vòng đời riêng nào và không tự inject client Kafka nào. Kết nối, subscribe, parse và cô lập lỗi ở lại trong base.
+**Source phải thể hiện gì.** Đúng một class cụ thể trong file `*projection.listener.ts`, kế thừa `AbstractProjectionListener`, không khai báo vòng đời riêng nào và không tự inject client Kafka nào. Kết nối, subscribe, parse và cô lập lỗi ở lại trong base.
 
-**Dấu hiệu nhận biết.** Trong file listener xuất hiện `onModuleInit`, `consumer.run`, `subscribe`, hoặc `JSON.parse` một message. Listener tự inject một client Kafka thay vì nhận qua constructor của base. Trong file có một `try/catch` quyết định "message hỏng thì làm gì".
+**Cách nhận ra.** Trong file listener xuất hiện `onModuleInit`, `consumer.run`, `subscribe`, hoặc `JSON.parse` một message. Listener tự inject một client Kafka thay vì nhận qua constructor của base. Trong file có một `try/catch` quyết định "message hỏng thì làm gì".
 
 **Ranh giới.** Không phải `CDC-2`: `CDC-1` nói AI SỞ HỮU việc kết nối; `CDC-2` nói KHAI BÁO CÁI GÌ để kết nối đó có danh tính — kế thừa đúng base mà `groupId` sinh ngẫu nhiên thì `CDC-1` đạt, `CDC-2` gãy. Không phải `CDC-6`: cô lập lỗi là HÀNH VI của base, nên một listener tự viết `try/catch` cho từng message đã vi phạm `CDC-1` trước khi kịp bàn tới `CDC-6`.
 
@@ -60,11 +67,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-2` — danh tính consumer và tập nguồn phải khai báo rõ
 
-**Tình huống.** `groupId` là danh tính bền vững của consumer projection này; `topics` là tập nguồn đầy đủ có thể làm projection sai. Cả hai đều được viết ra, không được suy ra lúc chạy.
+**Khi nào gặp.** `groupId` là danh tính bền vững của consumer projection này; `topics` là tập nguồn đầy đủ có thể làm projection sai. Cả hai đều được viết ra, không được suy ra lúc chạy.
 
-**Nó sinh ra gì trong source.** Một `groupId` là chuỗi hằng đọc lên biết ngay projection nào, và một mảng `topics` ghép từ prefix topic lấy theo môi trường cộng với tên bảng liệt kê tường minh. Prefix được phép lấy từ cấu hình; danh sách bảng thì không.
+**Source phải thể hiện gì.** Một `groupId` là chuỗi hằng đọc lên biết ngay projection nào, và một mảng `topics` ghép từ prefix topic lấy theo môi trường cộng với tên bảng liệt kê tường minh. Prefix được phép lấy từ cấu hình; danh sách bảng thì không.
 
-**Dấu hiệu nhận biết.** `groupId` là một chuỗi hằng, đọc lên là biết projection nào. `topics` liệt kê từng bảng nguồn một. Không có `randomUUID()`, không có `Date.now()`, không có tên instance trong `groupId`.
+**Cách nhận ra.** `groupId` là một chuỗi hằng, đọc lên là biết projection nào. `topics` liệt kê từng bảng nguồn một. Không có `randomUUID()`, không có `Date.now()`, không có tên instance trong `groupId`.
 
 **Ranh giới.** Không phải `CDC-1`: xem trên. Không phải `CDC-4`: group ngẫu nhiên CỘNG VỚI recompute idempotent thì không sai số liệu, chỉ tốn tài nguyên khủng khiếp; group ngẫu nhiên CỘNG VỚI cộng delta thì sai số liệu ngay lần restart đầu. Hai mã hỏng theo hai kiểu khác nhau và phải được sửa riêng.
 
@@ -72,11 +79,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-3` — listener định tuyến, service tính lại
 
-**Tình huống.** `deriveTargets` đọc dòng vừa đổi và trả về DANH TÍNH của những projection bị ảnh hưởng. `recomputeTarget` giao việc tính lại cho projection service. Listener sở hữu ĐỊNH TUYẾN, không sở hữu CHÍNH SÁCH SQL.
+**Khi nào gặp.** `deriveTargets` đọc dòng vừa đổi và trả về DANH TÍNH của những projection bị ảnh hưởng. `recomputeTarget` giao việc tính lại cho projection service. Listener sở hữu ĐỊNH TUYẾN, không sở hữu CHÍNH SÁCH SQL.
 
-**Nó sinh ra gì trong source.** Một `deriveTargets` chỉ đọc, phân nhánh theo topic, và trả về id hoặc mảng rỗng; một `recomputeTarget` chứa đúng một lời gọi tới projection service và không làm gì khác; câu SQL nằm trong service chứ không nằm trong listener.
+**Source phải thể hiện gì.** Một `deriveTargets` chỉ đọc, phân nhánh theo topic, và trả về id hoặc mảng rỗng; một `recomputeTarget` chứa đúng một lời gọi tới projection service và không làm gì khác; câu SQL nằm trong service chứ không nằm trong listener.
 
-**Dấu hiệu nhận biết.** Không có `save`, `insert`, `emit`, `sendMail`, `publish` nào trong listener. Lời gọi recompute mang theo một danh tính, không mang theo payload. `deriveTargets` phân nhánh theo topic và trả về id hoặc `null`/`[]`.
+**Cách nhận ra.** Không có `save`, `insert`, `emit`, `sendMail`, `publish` nào trong listener. Lời gọi recompute mang theo một danh tính, không mang theo payload. `deriveTargets` phân nhánh theo topic và trả về id hoặc `null`/`[]`.
 
 **Ranh giới.** Không phải `CDC-4`: `CDC-3` nói AI GỌI; `CDC-4` nói HÀM ĐƯỢC GỌI TÍNH TOÁN THẾ NÀO — uỷ quyền đúng cho service nhưng service lại `increment` thì `CDC-3` đạt, `CDC-4` gãy. Không phải `CDC-5`: trả về mảng rỗng vì không phân giải được cha là ĐÚNG `CDC-3`, không phải né tránh.
 
@@ -84,11 +91,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-4` — tính lại từ nguồn, không cộng delta
 
-**Tình huống.** Projection được dựng lại bằng một UPSERT từ các dòng nguồn có thẩm quyền. Nó không bao giờ được cập nhật bằng cách cộng con số mà event mang theo.
+**Khi nào gặp.** Projection được dựng lại bằng một UPSERT từ các dòng nguồn có thẩm quyền. Nó không bao giờ được cập nhật bằng cách cộng con số mà event mang theo.
 
-**Nó sinh ra gì trong source.** Một hàm recompute nhận id và không nhận amount; câu SQL tổng hợp trên bảng nguồn — `SUM(...)` / `COUNT(...)` — và kết bằng `ON CONFLICT ... DO UPDATE`; một hàm chạy lại ba lần liên tiếp cho ra ba kết quả giống nhau.
+**Source phải thể hiện gì.** Một hàm recompute nhận id và không nhận amount; câu SQL tổng hợp trên bảng nguồn — `SUM(...)` / `COUNT(...)` — và kết bằng `ON CONFLICT ... DO UPDATE`; một hàm chạy lại ba lần liên tiếp cho ra ba kết quả giống nhau.
 
-**Dấu hiệu nhận biết.** Chữ ký recompute không có tham số `amount`, `delta` hay `points`. Lệnh ghi là một UPSERT khoá theo danh tính projection. Giá trị ghi xuống là giá trị được select ra, không phải giá trị được cộng dồn.
+**Cách nhận ra.** Chữ ký recompute không có tham số `amount`, `delta` hay `points`. Lệnh ghi là một UPSERT khoá theo danh tính projection. Giá trị ghi xuống là giá trị được select ra, không phải giá trị được cộng dồn.
 
 **Ranh giới.** Không phải `CDC-3`: xem trên. Không phải `CDC-6`: nuốt một message hỏng chỉ AN TOÀN vì `CDC-4` đúng — nếu recompute không idempotent thì mỗi lần nuốt là một sai số vĩnh viễn, và `CDC-6` biến từ cơ chế tự lành thành cơ chế mất dữ liệu im lặng.
 
@@ -96,11 +103,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-5` — tombstone không dựng ra trạng thái hiện tại
 
-**Tình huống.** Một payload Debezium không có ảnh `after` thì không có dòng hiện tại nào để ánh xạ. Base bỏ qua nó. Projection nào thật sự cần sửa chữa khi xoá thì phải lấy danh tính từ một nguồn còn được giữ lại, hoặc từ một deletion stream dựng riêng.
+**Khi nào gặp.** Một payload Debezium không có ảnh `after` thì không có dòng hiện tại nào để ánh xạ. Base bỏ qua nó. Projection nào thật sự cần sửa chữa khi xoá thì phải lấy danh tính từ một nguồn còn được giữ lại, hoặc từ một deletion stream dựng riêng.
 
-**Nó sinh ra gì trong source.** Một `unwrapRow` trong base trả về `null` khi không có ảnh hiện tại dùng được, và một handler thoát sớm ngay tại cái `null` đó — không listener cụ thể nào viết lại phần bóc tách ấy. Ở nơi việc xoá thật sự quan trọng thì có thêm một nguồn còn giữ lại hoặc một deletion stream trong tập `topics`.
+**Source phải thể hiện gì.** Một `unwrapRow` trong base trả về `null` khi không có ảnh hiện tại dùng được, và một handler thoát sớm ngay tại cái `null` đó — không listener cụ thể nào viết lại phần bóc tách ấy. Ở nơi việc xoá thật sự quan trọng thì có thêm một nguồn còn giữ lại hoặc một deletion stream trong tập `topics`.
 
-**Dấu hiệu nhận biết.** Code đọc `payload.after` mà không kiểm `null`. Có chỗ ép kiểu một tombstone thành entity rỗng rồi ghi cái rỗng đó xuống. Có comment kiểu "xoá rồi thì coi như 0".
+**Cách nhận ra.** Code đọc `payload.after` mà không kiểm `null`. Có chỗ ép kiểu một tombstone thành entity rỗng rồi ghi cái rỗng đó xuống. Có comment kiểu "xoá rồi thì coi như 0".
 
 **Ranh giới.** Không phải `CDC-3`: mảng rỗng vì "cột này đổi nhưng không liên quan" là `CDC-3`; mảng rỗng vì "không có ảnh `after`" là `CDC-5`. Cả hai đều đúng, nhưng chúng là hai lý do khác nhau và hỏng theo hai cách khác nhau. Không phải `CDC-4`: ghi số 0 cho một dòng đã xoá vẫn là ghi SUY RA TỪ EVENT, không phải từ nguồn — nó hỏng cả hai mã cùng lúc.
 
@@ -108,11 +115,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-6` — một message hỏng không giết consumer
 
-**Tình huống.** Lỗi parse hoặc lỗi recompute được log kèm TOPIC và CONSUMER GROUP, chỉ ảnh hưởng đúng message đó. Consumer không dừng.
+**Khi nào gặp.** Lỗi parse hoặc lỗi recompute được log kèm TOPIC và CONSUMER GROUP, chỉ ảnh hưởng đúng message đó. Consumer không dừng.
 
-**Nó sinh ra gì trong source.** Một `catch` bọc quanh việc xử lý MỘT message — không bọc quanh cả vòng lặp — nằm trong `handleMessage` của base, dựng một CDC exception có kiểu, log nó kèm `groupId` và `topic`, và không ném lại.
+**Source phải thể hiện gì.** Một `catch` bọc quanh việc xử lý MỘT message — không bọc quanh cả vòng lặp — nằm trong `handleMessage` của base, dựng một CDC exception có kiểu, log nó kèm `groupId` và `topic`, và không ném lại.
 
-**Dấu hiệu nhận biết.** Log có đủ `groupId` và `topic`; thiếu một trong hai thì không lần ra được. Không `throw` ngược ra ngoài handler. Phạm vi của `catch` rộng đúng một message.
+**Cách nhận ra.** Log có đủ `groupId` và `topic`; thiếu một trong hai thì không lần ra được. Không `throw` ngược ra ngoài handler. Phạm vi của `catch` rộng đúng một message.
 
 **Ranh giới.** Không phải `CDC-1`: hành vi này NẰM TRONG BASE, nên một listener tự viết cơ chế cô lập lỗi đang vi phạm `CDC-1`. Không phải `CDC-4`: nuốt lỗi chỉ hợp lệ khi recompute idempotent — xem trên.
 
@@ -120,11 +127,11 @@ Mọi tình huống module này quản đều mang một mã, `CDC-<n>`. Mã đ�
 
 ## `CDC-7` — chứng minh bằng broker thật
 
-**Tình huống.** Một E2E vận hành đẩy qua Kafka thật rồi chờ projection trong database. Việc gọi thẳng `deriveTargets`, `recomputeTarget` hay một method của listener chỉ chứng minh code ánh xạ, chứ không chứng minh CDC.
+**Khi nào gặp.** Một E2E vận hành đẩy qua Kafka thật rồi chờ projection trong database. Việc gọi thẳng `deriveTargets`, `recomputeTarget` hay một method của listener chỉ chứng minh code ánh xạ, chứ không chứng minh CDC.
 
-**Nó sinh ra gì trong source.** Một file spec E2E mà bước ARRANGE ghi dòng nguồn trực tiếp và không gọi projection service, bước ACT chỉ chạm vào broker, và bước ASSERT poll bảng projection cho tới khi đúng, có timeout.
+**Source phải thể hiện gì.** Một file spec E2E mà bước ARRANGE ghi dòng nguồn trực tiếp và không gọi projection service, bước ACT chỉ chạm vào broker, và bước ASSERT poll bảng projection cho tới khi đúng, có timeout.
 
-**Dấu hiệu nhận biết.** Một helper publish rồi tới một vòng chờ poll trên bảng projection. Không có lời gọi projection service nào ở bước arrange. Chờ có giới hạn thay vì ngủ một khoảng cố định.
+**Cách nhận ra.** Một helper publish rồi tới một vòng chờ poll trên bảng projection. Không có lời gọi projection service nào ở bước arrange. Chờ có giới hạn thay vì ngủ một khoảng cố định.
 
 **Ranh giới.** Không phải `CDC-3`: unit test cho `deriveTargets` là HỢP LỆ và hữu ích — nó chỉ không được tính là bằng chứng CDC. Không phải `CDC-2`: đây là bài test duy nhất phát hiện được lỗi `CDC-2`, vì một `groupId` sai hoặc một topic thiếu chỉ lộ ra khi có broker thật ở giữa.
 

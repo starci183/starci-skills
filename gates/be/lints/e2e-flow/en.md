@@ -4,6 +4,15 @@ title: E2e-flow
 
 # E2e-flow
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one flow file, one hunk of a diff. The output is a
 **verdict**: whether the file was in scope at all, which published rule fired, what it reported and on
 which node, which law code that maps to, and the open hatch that would have hidden the same failure.
@@ -138,7 +147,7 @@ Any provider outside six patterns: cloud-hosted variants under a platform scope,
 self-hosted runtimes, the successor package names vendors publish after a rename, and near-miss names
 such as `openai-edge`, which fails both the exact and the slash-prefix alternative. A list is a thing
 that must be fed. The two largest holes have nothing to do with the list. **Reaching the provider
-without an SDK**: `fetch("https://api.…/v1/chat/completions", …)`, or the same call through the
+without an SDK**: `fetch(<provider-completion-endpoint>, …)`, or the same call through the
 repository's HTTP client, imports nothing the rule looks at while doing precisely what the rule is
 named against. And **leaving the real client wired**: the flow scripts nothing, the application's own
 policy resolves its configured provider, and a live paid nondeterministic call happens inside a green
@@ -426,7 +435,7 @@ Nothing was bypassed on that line. The two rules disagree, and the disagreement 
 ## Scope
 
 This module documents the five rules published by the flow law's rule module, shipped in
-`@starci/eslint-canon-be`. It documents no rule that ought to exist: a rule that cannot be pointed at
+`@canon-be`. It documents no rule that ought to exist: a rule that cannot be pointed at
 is a proposal, and this module records verdicts, not proposals.
 
 It does not judge the law's twelve codes — the law owns those, and seven of them have no machine

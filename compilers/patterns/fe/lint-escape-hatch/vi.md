@@ -4,8 +4,17 @@ title: Lint-escape-hatch · Vietnamese
 
 # Cửa thoát lint
 
-Đầu vào là một shape đã được duyệt — một component, một block config, một rule mà repo đã quyết định
-ship. Đầu ra là kiến trúc source: file nào giữ rule, config bật rule đó còn phải mang theo cái gì, ca
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một component, một block config, một rule mà repo đã quyết định
+ship. Kết quả là kiến trúc source: file nào giữ rule, config bật rule đó còn phải mang theo cái gì, ca
 hợp lệ được ghi ở đâu, và file đang bị báo lỗi được phép nói gì về chính nó. Pattern này không mở lại
 câu hỏi rule đúng hay sai. Nó hạ quyết định đã có xuống source, và câu duy nhất nó trả lời là từng
 phần của quyết định ấy nằm ở đâu.
@@ -70,7 +79,7 @@ lại để lấp một khoảng trống trong dãy.
 
 ## `LINT-ESCAPE-1` — source sản phẩm không chứa directive
 
-**Tình huống.** Một file gặp rule chặn nó. Cách rẻ nhất là viết một dòng comment cho rule đó im lặng —
+**Khi nào gặp.** Một file gặp rule chặn nó. Cách rẻ nhất là viết một dòng comment cho rule đó im lặng —
 và cách đó luôn hoạt động, nên nó là cách hay được chọn nhất. Cái nó đổi không phải một dòng code: nó
 chuyển quyền phán quyết từ repo về đúng file vừa vi phạm. Điều làm mã này khó nhìn ra là nó *trông
 giống một hành động kỹ thuật* trong khi nó là một hành động quản trị. Hai người review một PR có
@@ -78,16 +87,16 @@ giống một hành động kỹ thuật* trong khi nó là một hành động 
 từ giây phút dòng đó tồn tại, không còn ai ngoài file đó trả lời được câu "rule này có áp cho đây
 không".
 
-**Nó sinh ra gì trong source.** Một rule duy nhất được publish, `no-inline-lint-config`, nằm ở
-`@starci/eslint-canon-fe`. Nó duyệt mọi comment trong một file sản phẩm bằng visitor
+**Source phải thể hiện gì.** Một rule duy nhất được publish, `no-inline-lint-config`, nằm ở
+`@canon-fe`. Nó duyệt mọi comment trong một file sản phẩm bằng visitor
 `Program()` đi qua `getAllComments()` thay vì match text nguồn, và báo bất kỳ comment nào có phần thân
 mở đầu bằng một directive. Pattern là `INLINE_DIRECTIVE`, được neo ở đầu thân comment. `isProductSource`
-là điều kiện đường dẫn duy nhất trong file đó. Twin test ở `@starci/eslint-canon-fe` mang
+là điều kiện đường dẫn duy nhất trong file đó. Twin test ở `@canon-fe` mang
 các ca hợp lệ giữ cho prose nói về directive vẫn viết được, kèm comment giải thích vì sao pattern được
 neo và bản không neo đã phải trả giá gì. Còn source sản phẩm thì không sinh ra gì cả: không một
 directive nào, dưới bất kỳ dạng nào.
 
-**Dấu hiệu nhận biết.** Một comment mở đầu bằng `eslint-disable`, `eslint-disable-next-line`,
+**Cách nhận ra.** Một comment mở đầu bằng `eslint-disable`, `eslint-disable-next-line`,
 `eslint-disable-line` hoặc `eslint-enable` trong file đang ship. Có `eslint-disable` ở đầu file — cả
 file ra khỏi luật, và người đọc tiếp theo không biết mình đang đọc dưới tập luật nào. Có cặp
 `eslint-disable` … `eslint-enable` ôm một khối, tức là ai đó đã *thiết kế* một vùng miễn trừ chứ không
@@ -109,23 +118,22 @@ component "sẽ viết lại tuần sau" · một migration đang dở · một 
 
 ## `LINT-ESCAPE-2` — config đã resolve làm directive vô hiệu
 
-**Tình huống.** Một rule báo cáo directive là **chưa đủ**. Nếu config vẫn honour inline config thì
+**Khi nào gặp.** Một rule báo cáo directive là **chưa đủ**. Nếu config vẫn honour inline config thì
 directive đó vẫn có tác dụng — kể cả khi nó nhắm vào chính rule đang canh nó. Lúc ấy hàng rào có một
 cái cửa, và chìa khoá nằm trong tay người muốn đi qua. Vì thế mã 2 không phải một tuỳ chọn "chặt hơn".
 Nó là thứ đổi kết quả từ *bị coi là sai* sang *không xảy ra*. Cần cả hai: mã 1 giải thích vì sao hỏng,
 mã 2 bảo đảm directive không tự bịt miệng được người canh nó.
 
-**Nó sinh ra gì trong source.** `linterOptions` trong `@starci/eslint-canon-fe`, được freeze
+**Source phải thể hiện gì.** `linterOptions` trong `@canon-fe`, được freeze
 và export ngay cạnh `rules` để hai thứ không thể bị gắn tách rời do sơ ý, rồi được re-export từ plugin
-tổng `@starci/eslint-canon-fe` để một config tiêu thụ lấy chúng từ đúng cái import đã lấy rules. Ca thứ
+tổng `@canon-fe` để một config tiêu thụ lấy chúng từ đúng import đã lấy rules. Ca thứ
 hai của twin test sinh ra bằng chứng: một linter thật, options đã freeze được áp vào, một disable gọi
 đích danh chính người canh, và assertion rằng người canh vẫn báo ở severity `2`. Mã này được giữ ở
-tầng `documented` chứ không phải `enforced`: không có gì kiểm tra rằng một config tiêu thụ thực sự đã
-spread options vào. Cái kiểm tra được điều đó, `refusesInlineConfig`, thuộc về module `lint-adoption`
-và là một script — `@starci/eslint-canon-fe` và `scripts/audit-fe-lint-adoption.mjs`, đọc ra từ
-config đã in. Nó là thứ duy nhất đo một repo thật, và nó thuộc về một module khác.
+tầng `documented`, không phải `enforced`: chưa có gì kiểm tra config tiêu thụ đã spread options thật
+hay chưa. Có thể đọc `refusesInlineConfig` từ effective config đã in, nhưng cây này không ship script
+đo giá trị ấy trên một repo thật. Repo tiêu thụ vì vậy vẫn phải tự cung cấp bằng chứng đó.
 
-**Dấu hiệu nhận biết.** Config gắn `plugins` và `rules` nhưng không thấy `linterOptions` đâu.
+**Cách nhận ra.** Config gắn `plugins` và `rules` nhưng không thấy `linterOptions` đâu.
 `linterOptions` có ở block đầu, rồi một block sau ghi đè mất — flat config lấy block sau, và không ai
 để ý vì rule vẫn còn nguyên trong danh sách. Rule và linter options được import từ hai chỗ khác nhau,
 nên có thể gắn cái này mà quên cái kia. Một PR thêm `eslint-disable <tên-rule-canh-directive>` và CI
@@ -145,7 +153,7 @@ ai đó thêm `linterOptions` của riêng họ cho một glob hẹp.
 
 ## `LINT-ESCAPE-3` — không có allowlist
 
-**Tình huống.** Khi directive bị chặn, áp lực không biến mất — nó chuyển chỗ. Chỗ tiếp theo là
+**Khi nào gặp.** Khi directive bị chặn, áp lực không biến mất — nó chuyển chỗ. Chỗ tiếp theo là
 **config**: xin một đường dẫn được miễn, một thư mục được `ignores`, một rule được hạ xuống `warn`
 "trong lúc chuyển đổi". Kết quả giống hệt mã 1, chỉ khác là nó không để lại dấu vết trong file nào, nên
 không ai đọc code mà thấy được. Component mỏng, ranh giới vendor, file khai báo, file trông như
@@ -155,17 +163,17 @@ và người review nhìn thấy. Nợ thì trả trước khi merge, không gi�
 trúc ở mức `warn` là cùng một chuyện kể theo cách khác: vi phạm mới vẫn merge được trong khi trông như
 đã có người cai quản. Kiến trúc yếu hơn luôn là cái thắng, vì nó là cái không chặn ai.
 
-**Nó sinh ra gì trong source.** `schema: []` trong phần meta của rule ở
-`@starci/eslint-canon-fe`, đóng rule lại trước mọi option nên không allowlist nào cấu hình
+**Source phải thể hiện gì.** `schema: []` trong phần meta của rule ở
+`@canon-fe`, đóng rule lại trước mọi option nên không allowlist nào cấu hình
 *vào trong* rule được, và `recommended` publish đúng một entry ở đúng một mức, không có key đường dẫn —
-không còn field nào để viết một suất miễn trừ vào. Trong `@starci/eslint-canon-fe`, `recommended` được gom
+không còn field nào để viết một suất miễn trừ vào. Trong `@canon-fe`, `recommended` được gom
 từ mọi module mà không module nào có quyền tự quyết mức, và một rule đã publish không bao giờ bị đổi
 tên; đó là hai chỗ mà một carve-out theo đường dẫn hay theo tên buộc phải trú. Một ca hợp lệ thì sinh
 ra một bổ sung vào matcher dùng chung hoặc một type đóng, kèm twin test, chứ không bao giờ là một suất
 miễn trừ theo file. Mã này được giữ ở tầng `documented`: `schema: []` đóng rule trước option, còn một
 allowlist dựng *bao quanh* rule bằng một block config đứng sau thì không có gì giữ cả.
 
-**Dấu hiệu nhận biết.** Trong config có một `files`/`ignores` mang tên đúng một component hoặc đúng một
+**Cách nhận ra.** Trong config có một `files`/`ignores` mang tên đúng một component hoặc đúng một
 thư mục. Có block config đứng sau hạ mức một rule cho một glob "legacy" hoặc "tạm". Rule kiến trúc được
 mô tả là "đang rollout, tuần này để `warn`". Có ai đó đề nghị thêm option cho rule để rule tự bỏ qua
 một danh sách đường dẫn. Một finding kiến trúc được xử lý bằng cách đổi phạm vi rule thay vì sửa ranh
@@ -187,7 +195,7 @@ codegen · file `.d.ts` khai báo cho thư viện ngoài · một cây source đ
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã — `unrepresentable` (một union đóng hoặc branded type khiến giá trị sai
-không viết ra được), `enforced` (một lint rule từ `@starci/eslint-canon-fe` bắt được, nêu đích
+không viết ra được), `enforced` (một lint rule từ `@canon-fe` bắt được, nêu đích
 danh ở đây), hay `documented` (không có gì cơ học giữ; chỉ có người đọc giữ).
 
 | Mã | Tầng | Cái thực sự giữ nó |
@@ -199,7 +207,7 @@ danh ở đây), hay `documented` (không có gì cơ học giữ; chỉ có ng�
 Một hàng là `enforced` và hai hàng là `documented`, và sự chia đôi đó không phải tai nạn của công sức.
 Mã duy nhất mà một ESLint rule giữ được là mã có bằng chứng nằm ngay trong text của file. Hai mã còn
 lại là sự thật về config đã resolve: một option có được set hay không, một block sau có gỡ một đường
-dẫn ra khỏi tầm với của rule hay không. Rule chạy *bên trong* cái config đó, sau khi config đã quyết
+dẫn ra khỏi tầm với của rule hay không. Rule chạy *bên trong* config đó, sau khi config đã quyết
 xong rule có chạy hay không — nên rule về cấu trúc là công cụ sai, và kiểu hỏng của nó là im lặng, bởi
 một rule bị tắt cho một thư mục thì không báo gì và thư mục đó lint sạch. Ghi `enforced` lên hai hàng
 ấy là đặt câu trả lời dễ chịu vào đúng cái cột sinh ra để mang câu trả lời khó chịu.
@@ -211,23 +219,22 @@ tìm ở đó.
 
 | Mã | Đường dẫn | Cần tìm gì ở đó |
 |---|---|---|
-| `LINT-ESCAPE-1` | `@starci/eslint-canon-fe` | `INLINE_DIRECTIVE`, neo ở đầu thân comment; visitor `Program()` đi qua `getAllComments()` thay vì match text nguồn; và `isProductSource`, điều kiện đường dẫn duy nhất trong file |
-| `LINT-ESCAPE-2` | `@starci/eslint-canon-fe` | `linterOptions`, được freeze và export ngay cạnh `rules` để hai thứ không thể bị gắn tách rời do sơ ý. **Neo một phần** — xem dưới |
-| `LINT-ESCAPE-3` | `@starci/eslint-canon-fe` | `schema: []` trong meta của rule, và `recommended` publish đúng một entry ở đúng một mức, không có key đường dẫn — không còn field nào để viết một suất miễn trừ vào. **Neo một phần** — xem dưới |
+| `LINT-ESCAPE-1` | `@canon-fe` | `INLINE_DIRECTIVE`, neo ở đầu thân comment; visitor `Program()` đi qua `getAllComments()` thay vì match text nguồn; và `isProductSource`, điều kiện đường dẫn duy nhất trong file |
+| `LINT-ESCAPE-2` | `@canon-fe` | `linterOptions`, được freeze và export ngay cạnh `rules` để hai thứ không thể bị gắn tách rời do sơ ý. **Neo một phần** — xem dưới |
+| `LINT-ESCAPE-3` | `@canon-fe` | `schema: []` trong meta của rule, và `recommended` publish đúng một entry ở đúng một mức, không có key đường dẫn — không còn field nào để viết một suất miễn trừ vào. **Neo một phần** — xem dưới |
 
 Bằng chứng phụ, dùng khi neo chính đang bị sửa:
 
-- `LINT-ESCAPE-1` — `@starci/eslint-canon-fe`: các ca hợp lệ giữ cho prose nói về một
+- `LINT-ESCAPE-1` — `@canon-fe`: các ca hợp lệ giữ cho prose nói về một
   directive vẫn viết được, kèm comment giải thích vì sao pattern được neo và bản không neo đã phải trả
   giá gì.
 - `LINT-ESCAPE-2` — ca thứ hai của chính twin test đó: một linter thật, options đã freeze được áp vào,
   một disable gọi đích danh người canh, và assertion rằng người canh vẫn báo ở severity `2`.
-- `LINT-ESCAPE-2` — `@starci/eslint-canon-fe`: options được re-export từ plugin tổng, để một config tiêu
-  thụ lấy chúng từ đúng cái import đã lấy rules.
-- `LINT-ESCAPE-2` — `@starci/eslint-canon-fe` và `scripts/audit-fe-lint-adoption.mjs`:
-  `refusesInlineConfig`, đọc ra từ config đã in. Nó là thứ duy nhất đo một repo thật, và nó thuộc về
-  một module khác.
-- `LINT-ESCAPE-3` — `@starci/eslint-canon-fe`: `recommended` được gom từ mọi module mà không module nào có
+- `LINT-ESCAPE-2` — `@canon-fe`: options được re-export từ plugin tổng, để một config tiêu
+  thụ lấy chúng từ đúng import đã lấy rules.
+- `LINT-ESCAPE-2` — effective config đã in: phải giữ lại giá trị `refusesInlineConfig`. Hiện chưa có
+  script nào trong cây này đo nó trên một repo thật.
+- `LINT-ESCAPE-3` — `@canon-fe`: `recommended` được gom từ mọi module mà không module nào có
   quyền tự quyết mức, và việc từ chối đổi tên một rule đã publish — hai chỗ mà một carve-out theo đường
   dẫn hay theo tên buộc phải trú.
 

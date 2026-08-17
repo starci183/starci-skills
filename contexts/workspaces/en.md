@@ -4,6 +4,15 @@ title: Workspaces
 
 # Workspaces
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@schema` | `contexts/workspaces/schema.json` | file | validate the record's JSON shape |
+
+
+## Record
+
 You are given a plain start request — "start example-app fe be" — and you return, for every role
 it names, one resolved route and one verdict: read from this checkout, or stop and return to setup.
 This module decides **where the truth is read from**. Nothing downstream is correct if this is wrong,
@@ -174,7 +183,7 @@ machine only. Runtime secrets, environment values and tokens are never workspace
 | Input | Evidence required |
 |---|---|
 | request | The literal project and role list |
-| route | `.workspace/<project>/<role>/config.json`, valid against [`schema.json`](./schema.json) beside this record |
+| route | `.workspace/<project>/<role>/config.json`, valid against `@schema` beside this record |
 | checkout | The directory at `repository.diskPath`, present on disk |
 | contract | The file at `context.contract`, and `context.contractSource` for its provenance |
 | freshness | Recorded head and branch still describing that checkout |

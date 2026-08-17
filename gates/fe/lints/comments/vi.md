@@ -4,7 +4,16 @@ title: Comments · Vietnamese
 
 # Chú thích
 
-Đầu vào là mã đã viết xong rồi — một file, một mảnh diff. Đầu ra là một **phán quyết**: file ấy có
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong rồi — một file, một mảnh diff. Kết quả là một **phán quyết**: file ấy có
 nằm trong phạm vi hay không, rule đã publish nào lên tiếng, nó báo cái gì và trên nút nào, ứng với mã
 luật nào, và cửa mở nào lẽ ra đã che đúng lỗi ấy. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải
 chỉ được ra đúng ký tự mà nó từ chối.
@@ -19,7 +28,7 @@ Mô-đun này ghi một thứ hẹp hơn nhưng hữu ích hơn: **máy nhìn đ
 là tiêu chuẩn đặt lên người đọc. Rule là một phép so chuỗi, một loại nút cú pháp và một biểu thức trên
 tên file. Hai thứ ấy chưa bao giờ bằng nhau, và khoảng cách giữa chúng chính là nội dung của file này.
 
-Luật nêu **sáu mã. Ba rule được xuất xưởng**, trong gói plugin `@starci/eslint-canon-fe`, dưới tiền tố
+Luật nêu **sáu mã. Ba rule được xuất xưởng**, trong gói plugin `@canon-fe`, dưới tiền tố
 `starci-fe/`. Phép tính ấy là điều đầu tiên người đọc cần biết, và nó được nói thẳng ở đây chứ không
 được làm nhoè đi.
 
@@ -70,7 +79,7 @@ thoát ngay khi nút không có `declaration`. Có rồi thì nó chỉ đi ti�
 `value` bắt đầu bằng ký tự `*`. Tên đem đi báo là `declaration.id.name`, hoặc id của declarator đầu
 tiên, hoặc chuỗi dự phòng có sẵn.
 
-**Nó không thấy gì.** **Tách khai báo khỏi export**: `const a = 1` một dòng và `export { a }` một
+**Điểm mù.** **Tách khai báo khỏi export**: `const a = 1` một dòng và `export { a }` một
 dòng khác thì nút export không có `declaration`, rule thoát trước mọi phép kiểm; `export * from "./x"`
 và `export { a } from "./x"` cũng im hệt như thế. **Bốn loại, không hơn**: `class`, `enum`,
 `export default () => …`, `export default TênGìĐó` và `export default { … }` đều nằm ngoài danh sách
@@ -100,7 +109,7 @@ dòng ngay sau nó — rồi cài một bộ visitor dùng chung: `Program` (duy
 có dấu của ngôn ngữ thứ hai. Ba đường thoát: chuỗi chứa tên gọi bản ngữ của ngôn ngữ, chuỗi chứa
 chính dấu miễn trừ, hoặc `node.loc.start.line` nằm trong tập dòng đã đánh dấu.
 
-**Nó không thấy gì.** **Nó bắt DẤU, không bắt NGÔN NGỮ** — phép thử là một lớp chữ dựng sẵn, nên cùng
+**Điểm mù.** **Nó bắt DẤU, không bắt NGÔN NGỮ** — phép thử là một lớp chữ dựng sẵn, nên cùng
 câu ấy gõ không dấu, đúng kiểu người ta vẫn gõ trong khung chat, không chứa chữ nào trong lớp và rule
 im hoàn toàn; chính ví dụ mà luật dùng để minh hoạ cái bẫy này là một câu đúng hình dạng ấy, và nó
 lọt. **Chữ ở dạng tổ hợp** — cùng những chữ ấy chuẩn hoá về dạng tách dấu thì hiện trên màn hình y
@@ -133,7 +142,7 @@ tách rời chứ không phải một lớp ký tự gộp: `\p{Extended_Pictogr
 liền nhau nằm trong khoảng ký tự chỉ vùng. Rule này không có dấu miễn trừ nào, cũng không có đường
 thoát theo tên gọi bản ngữ.
 
-**Nó không thấy gì.** **Chuỗi kiểu phím số** — một chữ số hoặc dấu `#`, cộng một ký tự chọn biến thể,
+**Điểm mù.** **Chuỗi kiểu phím số** — một chữ số hoặc dấu `#`, cộng một ký tự chọn biến thể,
 cộng dấu bao ô vuông, hiện ra đúng như một emoji mà không khớp biểu thức nào, vì không mảnh nào của nó
 mang thuộc tính tượng hình mở rộng. **Hình vẽ không mang thuộc tính ấy** — ngôi sao dùng làm mức đánh
 giá, dấu tích ở dạng gầy, mũi tên, dấu chấm đầu dòng, ký tự vẽ khung, tất cả hiện ra là trang trí và

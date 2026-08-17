@@ -4,8 +4,15 @@ title: Size · Vietnamese
 
 # Kích thước
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một hàng tệp gồm ảnh đại diện, tên tệp có thể rất dài và
-nút Tải xuống" — và đầu ra là, với **mỗi hộp** mà yêu cầu đó ngụ ý và với **từng trục** của nó, một mã
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một hàng tệp gồm ảnh đại diện, tên tệp có thể rất dài và
+nút Tải xuống" — rồi trả về là, với **mỗi hộp** mà yêu cầu đó ngụ ý và với **từng trục** của nó, một mã
 tình huống và một className. Yêu cầu không bao giờ nói ra một con số, và không được phép đo một con số
 trên ảnh chụp màn hình: chiều dài suy ra từ việc **ai quyết định nó**.
 
@@ -80,10 +87,10 @@ khác nhận trục ấy. `w-full max-w-5xl` là **một** trục với **một*
 
 ## `SIZE-0` — nội dung tự đo
 
-**Tình huống.** Hộp đúng bằng thứ nó chứa. Không ai áp đặt gì lên nó: bỏ chữ ra thì hộp co lại, thêm
+**Khi nào gặp.** Hộp đúng bằng thứ nó chứa. Không ai áp đặt gì lên nó: bỏ chữ ra thì hộp co lại, thêm
 chữ vào thì hộp nở ra, và đó chính là điều mong muốn.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nội dung ngắn, đã biết trước, và không có trạng thái nào làm nó dài gấp mấy lần.
 - Hộp nằm cạnh những hộp khác trên một hàng và **không** được kỳ vọng thẳng cột với chúng.
@@ -107,10 +114,10 @@ siêu dữ liệu gọn của một bản ghi.
 
 ## `SIZE-1` — cha đo, hộp nhận trọn
 
-**Tình huống.** Cha đang giữ một phần chỗ và hộp này nhận **toàn bộ** phần đó. Chiều dài của hộp là hệ
+**Khi nào gặp.** Cha đang giữ một phần chỗ và hộp này nhận **toàn bộ** phần đó. Chiều dài của hộp là hệ
 quả của bố cục, không phải của chữ bên trong.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hộp phải thẳng cột với các hộp anh em ở trên và dưới nó.
 - Khi nội dung rỗng, hộp vẫn phải giữ nguyên chiều dài.
@@ -137,10 +144,10 @@ trong khung của nó · vùng kết quả tìm kiếm · phần thân của m�
 
 ## `SIZE-2` — có một trần
 
-**Tình huống.** Hộp sẵn sàng nở ra nhưng ai đó đã đặt mức không được vượt. Trần luôn có **lý do**, và
+**Khi nào gặp.** Hộp sẵn sàng nở ra nhưng ai đó đã đặt mức không được vượt. Trần luôn có **lý do**, và
 lý do ấy phải nói được thành lời trước khi con số được viết ra.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Vượt qua một mức nào đó thì hộp bắt đầu **hỏng chức năng**, chứ không phải chỉ xấu đi: mắt lạc dòng
   khi quay đầu dòng, phần tử chồng lớp tràn khỏi màn hình, trang căng ra trên màn siêu rộng.
@@ -166,10 +173,10 @@ không được vượt quá khung chứa · vùng cuộn của một danh sách
 
 ## `SIZE-3` — có một sàn
 
-**Tình huống.** Hộp có lúc rỗng hoặc gần rỗng, và nếu để nó co theo nội dung thì trang sẽ **nhảy** hoặc
+**Khi nào gặp.** Hộp có lúc rỗng hoặc gần rỗng, và nếu để nó co theo nội dung thì trang sẽ **nhảy** hoặc
 vùng đó biến mất. Sàn là chỗ được **giữ trước** cho một trạng thái chưa tới.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hộp có nhiều trạng thái nội dung: rỗng, đang tải, một dòng, mười dòng.
 - Người dùng sẽ **thao tác** vào vùng đó, nên vùng đó phải đủ lớn để bấm hoặc gõ ngay từ đầu.
@@ -194,10 +201,10 @@ dữ liệu về · thẻ trong lưới phải cao bằng nhau tối thiểu.
 
 ## `SIZE-4` — biến thiết kế ấn định
 
-**Tình huống.** Con số **không** đến từ nội dung và **không** đến từ cha. Nó là một quyết định của hệ
+**Khi nào gặp.** Con số **không** đến từ nội dung và **không** đến từ cha. Nó là một quyết định của hệ
 thống, giống nhau ở mọi nơi phần tử này xuất hiện.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Cùng một phần tử xuất hiện ở nhiều màn và phải trông y hệt nhau.
 - Nội dung bên trong không có chiều dài tự nhiên nào đáng tin: một hình dạng ký tự, một ảnh đại diện,
@@ -222,10 +229,10 @@ dính có chiều cao cố định để nội dung bên dưới trừ đúng co
 
 ## `SIZE-5` — một phần chia của cha
 
-**Tình huống.** Cha bị chia theo một tỉ lệ **đã nêu rõ**, và hộp này nhận đúng phần của nó. Tỉ lệ là
+**Khi nào gặp.** Cha bị chia theo một tỉ lệ **đã nêu rõ**, và hộp này nhận đúng phần của nó. Tỉ lệ là
 một phát biểu về nội dung: bên nào quan trọng hơn, bên nào phụ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có thể nói thành lời: "một nửa", "một phần ba", "hai phần ba".
 - Tỉ lệ đúng ở mọi bề rộng mà bố cục này còn hiệu lực.
@@ -249,13 +256,13 @@ hộp con bên trong rãnh · ba khối quyền lợi trên một hàng cuộn n
 
 ## `SIZE-6` — gỡ sàn tự nhiên
 
-**Tình huống.** Cha đã nói rõ hộp con được bao nhiêu chỗ, nhưng **nội dung bên trong không chịu**: một
+**Khi nào gặp.** Cha đã nói rõ hộp con được bao nhiêu chỗ, nhưng **nội dung bên trong không chịu**: một
 chuỗi dài không chỗ ngắt, một bảng, một vùng lẽ ra phải cuộn. Mặc định của flex và lưới là **không cho
 con nhỏ hơn nội dung tối thiểu của nó**, nên phép đo của cha bị vô hiệu trong im lặng.
 
 `SIZE-6` là lúc ta xử cho cha thắng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có `truncate`, `line-clamp`, hoặc một ô văn bản dài trong một hàng flex.
 - Có vùng cuộn nằm bên trong một cột flex có chiều cao xác định.
@@ -282,10 +289,10 @@ trong khung trò chuyện cao bằng màn hình · bảng đặt trong một c�
 
 ## `SIZE-7` — trục kia suy ra
 
-**Tình huống.** Chỉ **một** trục được đo, trục còn lại là hệ quả của một tỉ lệ đã chốt. Hộp giữ đúng chỗ
+**Khi nào gặp.** Chỉ **một** trục được đo, trục còn lại là hệ quả của một tỉ lệ đã chốt. Hộp giữ đúng chỗ
 cho một thứ chưa tới hoặc chưa biết chiều dài thật.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nội dung là ảnh, video, bản đồ hay nội dung nhúng — thứ mang theo kích thước mà **không ai trong cơ
   sở mã này chọn**.
@@ -329,7 +336,7 @@ thành viên · bản đồ nhúng · khung video · ảnh gợi ý giữ chỗ 
 5. Con của flex hoặc lưới mà phải cắt chữ, phải hiện dấu ba chấm hoặc phải cuộn thì mang `SIZE-6` trên
    trục đó. Thiếu nó, nội dung tối thiểu của chính nó âm thầm thắng phép đo của cha.
 6. Con số ấn định lấy từ thang biến thiết kế, không bao giờ lấy từ một điểm ảnh đo trên ảnh chụp.
-7. Cha và đứa con duy nhất của nó không cùng khai báo một chiều dài. Một trong hai là quyết định, cái
+7. Cha và phần tử con duy nhất của nó không cùng khai báo một chiều dài. Một trong hai là quyết định, cái
    còn lại chỉ là bản sao.
 8. Khung chờ, rỗng, lỗi và có dữ liệu dùng chung một mã trên cùng một trục.
 9. Không className nào phục vụ hai mã, và không mã nào được chọn vì nó làm ảnh chụp hiện tại trông cân.

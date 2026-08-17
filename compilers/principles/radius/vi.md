@@ -4,7 +4,14 @@ title: Radius · Vietnamese
 
 # Bán kính bo góc
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một thẻ khoá học chừa một viền mỏng quanh ảnh bìa" — và
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một thẻ khoá học chừa một viền mỏng quanh ảnh bìa" — và
 đầu ra là, với **mỗi ranh giới** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu không
 bao giờ nói ra một góc bo, và không được phép ước lượng một góc bo: góc bo suy ra từ việc phần tử là
 **loại ranh giới nào**, và từ **khoảng cách đo được** giữa mép của nó với mép bao quanh nó.
@@ -105,10 +112,10 @@ bằng `R / 2` = `0.375rem` (`rounded-md` = 6px), và các giá trị suy ra rơ
 
 ## `RADIUS-0` — không mang góc nào
 
-**Tình huống.** Hoặc phần tử **không phải** một ranh giới, hoặc nó là ranh giới thật nhưng **từ chối**
+**Khi nào gặp.** Hoặc phần tử **không phải** một ranh giới, hoặc nó là ranh giới thật nhưng **từ chối**
 bo góc. Hai chuyện khác nhau, nên phát ra hai thứ khác nhau.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không nền, không viền, không đổ bóng, không cắt nội dung — chỉ xếp con cái thành hàng, cột hoặc lưới.
 - Hoặc: là hàng, là ô nằm trong một cha đã `overflow-hidden` và cha đã bo sẵn.
@@ -136,10 +143,10 @@ một class chung có sẵn bo.
 
 ## `RADIUS-1` — bậc thành phần điều khiển
 
-**Tình huống.** Một ranh giới cỡ **một thao tác**: người dùng bấm nó, gõ vào nó, hoặc chọn nó. Nó đứng
+**Khi nào gặp.** Một ranh giới cỡ **một thao tác**: người dùng bấm nó, gõ vào nó, hoặc chọn nó. Nó đứng
 một mình, góc của nó không nằm trong cung của ai.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chiều cao cỡ một dòng chữ cộng khoảng đệm trong, không phải một vùng nội dung.
 - Nó có trạng thái tương tác: rê chuột, tiêu điểm, bị vô hiệu hoá, checked.
@@ -167,10 +174,10 @@ trong lịch · nút phân trang · ô nhập mã OTP.
 
 ## `RADIUS-2` — bậc bề mặt
 
-**Tình huống.** Một ranh giới **sở hữu cả một vùng nội dung**: nó có nền hoặc viền riêng, và bên trong
+**Khi nào gặp.** Một ranh giới **sở hữu cả một vùng nội dung**: nó có nền hoặc viền riêng, và bên trong
 nó là một cấu trúc chứ không phải một dòng chữ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bên trong có nhiều nhóm, có tiêu đề riêng, hoặc có cả thành phần điều khiển lẫn nội dung.
 - Nó có khoảng đệm trong riêng — chính con số đó sẽ nuôi phép trừ của `RADIUS-4` ở tầng dưới.
@@ -195,10 +202,10 @@ nhấn mạnh cảnh báo · khối mã · trạng thái rỗng · ảnh thu nh�
 
 ## `RADIUS-3` — bản thân hình là tròn
 
-**Tình huống.** Không phải "hình chữ nhật được bo nhiều", mà là **hình tròn hoặc viên nhộng**. Cung
+**Khi nào gặp.** Không phải "hình chữ nhật được bo nhiều", mà là **hình tròn hoặc viên nhộng**. Cung
 không nằm ở góc; cung **là cả hai đầu**.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chiều cao và chiều rộng bằng nhau (tròn), hoặc hai đầu là nửa đường tròn (viên nhộng).
 - Nội dung bên trong ngắn và luôn ngắn: một chữ cái, một con số, một hai từ.
@@ -223,7 +230,7 @@ biểu tượng tròn · rãnh và phần lấp đầy của thanh tiến độ 
 
 ## `RADIUS-4` — góc trong nằm trong cung góc ngoài
 
-**Tình huống.** Một ranh giới nằm bên trong một ranh giới đã bo, và **khoảng cách giữa hai mép nhỏ hơn
+**Khi nào gặp.** Một ranh giới nằm bên trong một ranh giới đã bo, và **khoảng cách giữa hai mép nhỏ hơn
 bán kính ngoài**. Lúc đó góc trong nằm gọn trong cung ngoài, và nó **không còn quyền tự chọn**:
 
 > `bán kính trong = bán kính ngoài − khoảng cách`, làm tròn **xuống** bậc gần nhất.
@@ -231,7 +238,7 @@ bán kính ngoài**. Lúc đó góc trong nằm gọn trong cung ngoài, và nó
 Khoảng cách là **khoảng cách đo được giữa hai mép**: khoảng đệm trong của cha, cộng độ dày đường viền
 nếu cha có vẽ đường viền.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hộp trong chạm tới sát ba hoặc bốn mép trong của hộp ngoài, chỉ cách một lớp khoảng đệm trong mỏng.
 - Bốn góc của hộp trong nằm ngay bên trong bốn góc của hộp ngoài.
@@ -271,10 +278,10 @@ trong một rãnh bo · ảnh trong khung có đường viền.
 
 ## `RADIUS-5` — không phải cả bốn góc đều tự do
 
-**Tình huống.** Ranh giới **bị cắt** hoặc **bị ghép**. Một hoặc nhiều cạnh của nó không kết thúc trên
+**Khi nào gặp.** Ranh giới **bị cắt** hoặc **bị ghép**. Một hoặc nhiều cạnh của nó không kết thúc trên
 màn hình, hoặc chạm khít vào một phần tử khác, nên ở phía đó không có góc nào để bo.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mặt phẳng neo vào một mép màn hình và chạy tràn ra khỏi mép đó.
 - Nhiều phần tử xếp khít, chỉ phần tử đầu và cuối chạm ra ngoài khối chung.

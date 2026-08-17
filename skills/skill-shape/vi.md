@@ -2,28 +2,35 @@
 title: Skill shape · Vietnamese
 ---
 
-# Hình dạng của một skill
+# Cấu trúc chung của skill
 
-Đầu vào là một năng lực cần chạy, và đầu ra là **một phase công việc cùng sáu bảng
-kết quả**. Mô-đun này quyết định **mọi skill phải in gì, hỏi gì và ghi lại gì** — không quyết định
-từng skill làm gì. Một skill tự bày ra định dạng báo cáo riêng thì không đối chiếu được với những
-skill khác, và một cây mà các bản ghi của nó không đồng ý với nhau về chính định dạng của mình thì
-thôi làm bằng chứng.
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Mỗi lượt chạy nhận một capability và phải trả về **một phase công việc cùng sáu bảng kết quả**.
+Mô-đun này quy định **mọi skill phải in gì, hỏi gì và ghi lại gì**; nội dung công việc của từng skill
+không nằm ở đây. Nếu mỗi skill tự đặt một kiểu báo cáo, các bản ghi sẽ không còn đối chiếu được với
+nhau. Khi chính định dạng của bằng chứng cũng không thống nhất, cả cây không thể dùng làm bằng chứng.
 
 ## Luật
 
-Skill khai **mình đang ở đâu** trước khi hành động, và **đã ghi gì** sau khi xong. Bảng `CONTEXT` đứng
-trước vì một lượt chạy không gọi được tên Source, project và biên giới ghi của nó thì chưa đủ điều
-kiện chạm vào bất cứ thứ gì; sáu bảng kết quả đứng sau vì một lượt chạy không tách được **cái nó đã
-quyết** với **cái nó đã ghi** với **cái nó còn nợ** thì chưa xong.
+Trước khi hành động, skill phải khai **mình đang ở đâu**; khi kết thúc, nó phải nói rõ **đã ghi gì**.
+`CONTEXT` đứng đầu vì một lượt chạy chưa gọi tên được Source, project và biên giới ghi thì chưa được
+chạm vào bất cứ thứ gì. Sáu bảng kết quả đứng cuối vì công việc chưa thể xem là xong nếu chưa tách bạch
+**điều đã quyết**, **thứ đã ghi** và **việc còn nợ**.
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
 ## Chín năng lực
 
-Bảy cái làm việc. Hai cái chỉ **nhìn** — `starci-stale-list` nhìn cái máy, `starci-diagnose` nhìn các skill
-khác — và đó là hai năng lực duy nhất không có stage apply. Một bản báo cáo mà sửa thứ gì thì không ai còn
-tin nó là **phép đo**: cái route nó âm thầm làm mới sẽ đọc ra như một route vốn đã ổn.
+Bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+máy, còn `starci-diagnose` lần theo một skill khác. Chỉ hai capability này không có stage apply. Một
+bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
+thể ngay từ đầu nó đã đúng.
 
 | Skill | Hành trình | Sở hữu |
 |---|---|---|

@@ -4,6 +4,13 @@ title: Padding
 
 # Padding
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a billing card with a list of invoices inside it" — and you
 return, for every element that request implies, one situation code and one className. The request
 never states an inset and you never estimate one: the inset follows from what boundary owns the

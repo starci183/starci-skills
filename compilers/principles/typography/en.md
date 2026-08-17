@@ -4,6 +4,13 @@ title: Typography
 
 # Typography
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a course page with a curriculum section listing modules" —
 and you return, for every line of text that request implies, one situation code, one element and one
 className. The request never states a size and you never estimate one: the size, the weight and the

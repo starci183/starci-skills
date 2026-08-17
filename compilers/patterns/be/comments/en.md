@@ -4,6 +4,15 @@ title: Comments
 
 # Comments
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input to this pattern is a shape already accepted: a module boundary, a capability, a contract, an
 enum, an export somebody has already decided belongs. This pattern does not re-open that decision. Its
 output is source architecture — which declaration opens with a doc block, what that block must say,
@@ -38,7 +47,7 @@ Three of the five codes have a lint rule behind them, and one of those three can
 what its code asks. The layer table below says which is which rather than implying uniform
 enforcement.
 
-What holds this law is `@starci/eslint-canon-be`.
+What holds this law is `@canon-be`.
 
 ## Situation codes
 
@@ -242,7 +251,7 @@ per-locale email content.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule in `@starci/eslint-canon-be` catches it;
+wrong value impossible to write; `enforced` means a lint rule in `@canon-be` catches it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

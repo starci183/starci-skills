@@ -4,7 +4,16 @@ title: Data-access · Vietnamese
 
 # Truy cập dữ liệu
 
-Đầu vào là một shape đã được duyệt: một thao tác, một entity hoặc một capability mà hành vi của nó đã chốt. Module này không mở lại quyết định ấy. Đầu ra của nó là kiến trúc source — constructor nhận tay cầm nào, decorator nào gọi tên tay cầm ấy, file nào nêu tên bảng, tầng nào giữ transaction, và relation được hỏi ở đâu. Shape nói hệ thống làm gì; pattern này nói đoạn code làm việc đó nằm ở đâu và phải có hình dáng nào.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một thao tác, một entity hoặc một capability mà hành vi của nó đã chốt. Module này không mở lại quyết định ấy. Nó trả về kiến trúc source — constructor nhận tay cầm nào, decorator nào gọi tên tay cầm ấy, file nào nêu tên bảng, tầng nào giữ transaction, và relation được hỏi ở đâu. Shape nói hệ thống làm gì; pattern này nói đoạn code làm việc đó nằm ở đâu và phải có hình dáng nào.
 
 ## Luật
 
@@ -40,11 +49,11 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## `DATA-1` — handle phải nói nó trỏ vào database nào
 
-**Tình huống.** Bạn viết constructor cho một service, một handler hoặc một cron để chạm vào dữ liệu. Kiểu `EntityManager` không nói gì về connection: manager của database chính và manager của một bản replica phân tích hay một sandbox là cùng một kiểu.
+**Khi nào gặp.** Bạn viết constructor cho một service, một handler hoặc một cron để chạm vào dữ liệu. Kiểu `EntityManager` không nói gì về connection: manager của database chính và manager của một bản replica phân tích hay một sandbox là cùng một kiểu.
 
-**Nó sinh ra gì trong source.** Một tham số constructor kiểu `EntityManager` mang decorator `@Inject*EntityManager()` gọi tên datasource. Wrapper của nhà chỉ dài một dòng: nó buộc injector của chính framework vào một hằng connection có tên. Ứng dụng giữ nhiều hơn một họ datasource, và chính dữ kiện đó khiến một `EntityManager` không decorator trở thành mập mờ chứ không chỉ là luộm thuộm.
+**Source phải thể hiện gì.** Một tham số constructor kiểu `EntityManager` mang decorator `@Inject*EntityManager()` gọi tên datasource. Wrapper của nhà chỉ dài một dòng: nó buộc injector của chính framework vào một hằng connection có tên. Ứng dụng giữ nhiều hơn một họ datasource, và chính dữ kiện đó khiến một `EntityManager` không decorator trở thành mập mờ chứ không chỉ là luộm thuộm.
 
-**Dấu hiệu nhận biết.** Trong constructor có một tham số kiểu `EntityManager` mà không có decorator nào đứng trước. Đọc file từ trên xuống dưới không tìm được một chữ nào nói đây là database nào. Wiring của module thì đúng, nên code chạy — cho tới hôm ai đó đổi provider mặc định.
+**Cách nhận ra.** Trong constructor có một tham số kiểu `EntityManager` mà không có decorator nào đứng trước. Đọc file từ trên xuống dưới không tìm được một chữ nào nói đây là database nào. Wiring của module thì đúng, nên code chạy — cho tới hôm ai đó đổi provider mặc định.
 
 **Ranh giới.** Không phải `DATA-2`: `DATA-1` nói handle **không khai** nó trỏ vào đâu; `DATA-2` nói handle **sai hình dáng** dù nó trỏ đúng vào đâu. Một `@InjectRepository` viết rất tử tế vẫn hỏng cả hai; một `EntityManager` trần chỉ hỏng cái thứ nhất. Cũng không phải `DATA-4`: `DATA-1` xét **chỗ tiêm**, `DATA-4` xét **chỗ dùng** — tiêm đúng vẫn có thể dùng sai bằng cách gọi manager của mình trong khi người gọi đang mở transaction.
 
@@ -52,11 +61,11 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## `DATA-2` — handle phải mang được lệnh ghi thứ hai
 
-**Tình huống.** Bạn đang chọn hình dáng của tay cầm. Repository trông tiện hơn: nó đã biết entity, gọi ngắn hơn, IDE gợi ý đẹp hơn. Nhưng nó **buộc vào một entity**, nên cái ngày thao tác này phải ghi thêm một bảng nữa, nó không đi cùng được.
+**Khi nào gặp.** Bạn đang chọn hình dáng của tay cầm. Repository trông tiện hơn: nó đã biết entity, gọi ngắn hơn, IDE gợi ý đẹp hơn. Nhưng nó **buộc vào một entity**, nên cái ngày thao tác này phải ghi thêm một bảng nữa, nó không đi cùng được.
 
-**Nó sinh ra gì trong source.** Dữ liệu được chạm qua `EntityManager`, không bao giờ qua repository — không bằng decorator `@InjectRepository`, cũng không bằng kiểu `Repository`, `TreeRepository` hay `MongoRepository` trên tham số constructor. Bắt cả kiểu chứ không chỉ decorator là điều quan trọng, vì riêng cái kiểu đã đủ buộc chặt tay cầm. Hình dáng mã này sinh ra là một `entityManager.transaction` ghi nhiều bảng qua `manager` của callback; một handler dựng bằng repository không thể viết được như vậy nếu không có mỗi bảng một tay cầm, và khi đó các bảng commit tách rời nhau.
+**Source phải thể hiện gì.** Dữ liệu được chạm qua `EntityManager`, không bao giờ qua repository — không bằng decorator `@InjectRepository`, cũng không bằng kiểu `Repository`, `TreeRepository` hay `MongoRepository` trên tham số constructor. Bắt cả kiểu chứ không chỉ decorator là điều quan trọng, vì riêng cái kiểu đã đủ buộc chặt tay cầm. Hình dáng mã này sinh ra là một `entityManager.transaction` ghi nhiều bảng qua `manager` của callback; một handler dựng bằng repository không thể viết được như vậy nếu không có mỗi bảng một tay cầm, và khi đó các bảng commit tách rời nhau.
 
-**Dấu hiệu nhận biết.** Constructor có `@InjectRepository(...)`, hoặc một tham số kiểu `Repository<T>` / `TreeRepository<T>` / `MongoRepository<T>`. Handler có hai, ba repository — mỗi cái một bảng — và các lệnh ghi nằm cạnh nhau, không có gì gói chúng lại. Trong code review, câu "cái này chưa cần transaction đâu" xuất hiện.
+**Cách nhận ra.** Constructor có `@InjectRepository(...)`, hoặc một tham số kiểu `Repository<T>` / `TreeRepository<T>` / `MongoRepository<T>`. Handler có hai, ba repository — mỗi cái một bảng — và các lệnh ghi nằm cạnh nhau, không có gì gói chúng lại. Trong code review, câu "cái này chưa cần transaction đâu" xuất hiện.
 
 **Ranh giới.** Không phải `DATA-1`: xem trên. Không phải `DATA-4`: `DATA-2` nói bạn **có** đơn vị công việc để truyền đi; `DATA-4` nói bạn **có truyền nó đi thật không**. Sửa xong `DATA-2` chưa đảm bảo `DATA-4` đúng.
 
@@ -64,11 +73,11 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## `DATA-3` — entity phải tự gọi tên cái bảng của nó
 
-**Tình huống.** Bạn khai báo một entity mới, hoặc — nguy hiểm hơn — bạn đang đổi tên một class entity cho hợp nghiệp vụ mới. Nếu tên bảng để ORM tự suy ra, nó suy ra từ tên class.
+**Khi nào gặp.** Bạn khai báo một entity mới, hoặc — nguy hiểm hơn — bạn đang đổi tên một class entity cho hợp nghiệp vụ mới. Nếu tên bảng để ORM tự suy ra, nó suy ra từ tên class.
 
-**Nó sinh ra gì trong source.** `@Entity("table_name")` đứng trên class entity, hoặc `@Entity({ name: "table_name", schema: "..." })` khi còn cần thêm schema. Tên class và tên bảng cố tình khác nhau, và đó chính là điểm mấu chốt: class có thể đổi tên mà bảng không phải chạy theo.
+**Source phải thể hiện gì.** `@Entity("table_name")` đứng trên class entity, hoặc `@Entity({ name: "table_name", schema: "..." })` khi còn cần thêm schema. Tên class và tên bảng cố tình khác nhau, và đó chính là điểm mấu chốt: class có thể đổi tên mà bảng không phải chạy theo.
 
-**Dấu hiệu nhận biết.** `@Entity()` không có tham số. Tên bảng trong migration khớp y hệt tên class, kể cả phần hậu tố kiểu `_entity`. Trong PR đổi tên class, phần diff không có file migration nào.
+**Cách nhận ra.** `@Entity()` không có tham số. Tên bảng trong migration khớp y hệt tên class, kể cả phần hậu tố kiểu `_entity`. Trong PR đổi tên class, phần diff không có file migration nào.
 
 **Ranh giới.** Không phải `DATA-5`: cả hai đều là quyết định nằm trên entity, nhưng `DATA-3` nói về **danh tính** của bảng, còn `DATA-5` nói về **chi phí** mà entity áp lên mọi câu query. Một entity đặt tên bảng rất đúng vẫn có thể bắt cả hệ thống trả giá cho relation eager.
 
@@ -76,11 +85,11 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## `DATA-4` — transaction là đơn vị công việc, và nó được truyền, không phải được ngầm hiểu
 
-**Tình huống.** Bạn đã mở một transaction. Bên trong, bạn gọi một helper của service khác để cộng điểm, ghi nhật ký, phát thông báo. Helper ấy có manager riêng của nó, được tiêm ở constructor của nó.
+**Khi nào gặp.** Bạn đã mở một transaction. Bên trong, bạn gọi một helper của service khác để cộng điểm, ghi nhật ký, phát thông báo. Helper ấy có manager riêng của nó, được tiêm ở constructor của nó.
 
-**Nó sinh ra gì trong source.** Việc phải cùng thành công hoặc cùng thất bại chạy trong một transaction, với manager transactional được truyền như tham số vào mọi thứ bên trong. Chữ ký của helper nhận phần việc dưới dạng `(manager: EntityManager) => Promise<Result>` và gọi nó bằng manager của chính session đang giữ; các private method trên service cũng nhận `manager` qua tham số y như vậy. Không có gì bên trong tự đi lấy manager tiêm sẵn.
+**Source phải thể hiện gì.** Việc phải cùng thành công hoặc cùng thất bại chạy trong một transaction, với manager transactional được truyền như tham số vào mọi thứ bên trong. Chữ ký của helper nhận phần việc dưới dạng `(manager: EntityManager) => Promise<Result>` và gọi nó bằng manager của chính session đang giữ; các private method trên service cũng nhận `manager` qua tham số y như vậy. Không có gì bên trong tự đi lấy manager tiêm sẵn.
 
-**Dấu hiệu nhận biết.** Bên trong callback của `transaction()` có một lời gọi **không** nhận `manager` làm tham số. Helper dùng `this.entityManager` trong khi người gọi đang ở giữa một transaction. Bug chỉ xuất hiện dưới tải, và luôn có hình dạng "một nửa đã ghi".
+**Cách nhận ra.** Bên trong callback của `transaction()` có một lời gọi **không** nhận `manager` làm tham số. Helper dùng `this.entityManager` trong khi người gọi đang ở giữa một transaction. Bug chỉ xuất hiện dưới tải, và luôn có hình dạng "một nửa đã ghi".
 
 **Ranh giới.** Không phải `DATA-2`: xem trên. Không phải `DATA-1`: helper vi phạm `DATA-4` thường không vi phạm `DATA-1` chút nào — manager của nó được tiêm rất đúng, chỉ là nó không nên dùng cái đó ở đây. Đây là lý do mã này không bắt được bằng cách đọc một file. **Không có lint nào giữ mã này.** Chuyện helper có được trao manager transactional của người gọi hay không là một dữ kiện về call graph, không phải về một file đơn lẻ; một luật đọc một file sẽ phải đoán, mà đoán ở đây thì báo đỏ lên code đúng — và một luật báo đỏ lên code đúng thì bị tắt.
 
@@ -88,11 +97,11 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## `DATA-5` — query nói ra cái nó cần, entity không quyết hộ
 
-**Tình huống.** Bạn đang lấy dữ liệu cho một câu trả lời cụ thể. Relation, cột và thứ tự là thuộc tính của **câu trả lời ấy**, không phải thuộc tính của entity. Người biết cần gì là call site.
+**Khi nào gặp.** Bạn đang lấy dữ liệu cho một câu trả lời cụ thể. Relation, cột và thứ tự là thuộc tính của **câu trả lời ấy**, không phải thuộc tính của entity. Người biết cần gì là call site.
 
-**Nó sinh ra gì trong source.** Relation, select và thứ tự khai ngay tại call site biết câu trả lời dùng để làm gì — một cây `relations` viết trong handler, kèm ghi chú gọi tên màn hình nào cần nhánh nào. Các relation `@ManyToOne` trên entity không mang tuỳ chọn `eager`, nên call site chỉ cần một cột thì chỉ trả giá cho một cột.
+**Source phải thể hiện gì.** Relation, select và thứ tự khai ngay tại call site biết câu trả lời dùng để làm gì — một cây `relations` viết trong handler, kèm ghi chú gọi tên màn hình nào cần nhánh nào. Các relation `@ManyToOne` trên entity không mang tuỳ chọn `eager`, nên call site chỉ cần một cột thì chỉ trả giá cho một cột.
 
-**Dấu hiệu nhận biết.** Trên entity có relation khai `eager`. Một màn hình chỉ cần một cột nhưng query trả về cả cây quan hệ. Có người "tối ưu" bằng cách thêm eager cho tiện, và số truy vấn ở chỗ khác tăng lên.
+**Cách nhận ra.** Trên entity có relation khai `eager`. Một màn hình chỉ cần một cột nhưng query trả về cả cây quan hệ. Có người "tối ưu" bằng cách thêm eager cho tiện, và số truy vấn ở chỗ khác tăng lên.
 
 **Ranh giới.** Không phải `DATA-3`: xem trên. Không phải `DATA-4`: cả hai đều là "quyết định nằm sai chỗ", nhưng `DATA-4` là quyết định về **tính nguyên tử**, còn `DATA-5` là quyết định về **chi phí**. Nhầm `DATA-4` gây mất dữ liệu; nhầm `DATA-5` gây chậm dần đều. **Không có lint nào giữ mã này.** Muốn biết một relation có nên được hỏi ở call site không thì phải biết câu trả lời dùng để làm gì, mà file entity thì không chứa dữ kiện đó.
 
@@ -100,7 +109,7 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong `@starci/eslint-canon-be` báo nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong `@canon-be` báo nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
 |---|---|---|

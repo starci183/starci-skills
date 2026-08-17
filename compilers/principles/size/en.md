@@ -4,6 +4,13 @@ title: Size
 
 # Size
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a file row with an avatar, a long file name and a Download
 button" — and you return, for every box that request implies and for each of its two axes, one
 situation code and one className. The request never states a number and you never measure one off a

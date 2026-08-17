@@ -4,8 +4,17 @@ title: CQRS · Vietnamese
 
 # CQRS
 
-Đầu vào của pattern này là một shape đã được duyệt: một thao tác backend đã được đồng ý phơi ra, một
-capability đã được chốt, một hợp đồng đã ngã ngũ. Đầu ra là kiến trúc source — thư mục nào thuộc về
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một thao tác backend đã được đồng ý phơi ra, một
+capability đã được chốt, một hợp đồng đã ngã ngũ. Kết quả là kiến trúc source — thư mục nào thuộc về
 thao tác đó, mỗi mảnh rơi vào file nào, file ấy được import gì, phải export gì, và tên nó là gì.
 Pattern này không mở lại quyết định rằng thao tác nên tồn tại; nó hạ quyết định ấy xuống thành file.
 
@@ -74,16 +83,16 @@ trượt cái kia, và đó là lý do chúng là hai mã chứ không phải m�
 
 ## `CQRS-1` — một thao tác, một thư mục
 
-**Tình huống.** Bạn đang thêm một thao tác mới, hoặc đang tìm chỗ đặt một file vừa nảy ra trong lúc
+**Khi nào gặp.** Bạn đang thêm một thao tác mới, hoặc đang tìm chỗ đặt một file vừa nảy ra trong lúc
 làm. Thư mục của thao tác chứa message, handler, service, cửa, wiring và spec — và mọi file trong đó
 đều mang tên thao tác.
 
-**Nó sinh ra gì trong source.** Một thư mục mang tên thao tác, và bên trong mọi file đều tên
+**Source phải thể hiện gì.** Một thư mục mang tên thao tác, và bên trong mọi file đều tên
 `<operation>.<role>.ts`: `.command.ts`, `.handler.ts`, `.service.ts`, `.resolver.ts`, `.module.ts`,
 `.module-definition.ts`. Không file nào trong thư mục mang tên thứ khác ngoài thao tác, và thao tác
 không bị xé qua nhiều thư mục.
 
-**Dấu hiệu nhận biết.** Biết tên thao tác là đoán ra được **mọi** tên file trong thư mục. Grep một
+**Cách nhận ra.** Biết tên thao tác là đoán ra được **mọi** tên file trong thư mục. Grep một
 tên thao tác ra nguyên cả thao tác, không phải một lát cắt của nó. Trong thư mục xuất hiện một file
 mang cái tên chung chung (`utils`, `helpers`, `mapper`) — đó là dấu hiệu có thứ dùng lại được vừa bị
 sinh ra ở chỗ không ai đi tìm. Tự hỏi: file này có mang tên thao tác không? Nếu không, nó là thứ dùng
@@ -100,13 +109,13 @@ bị nhét vào thư mục của thao tác đầu tiên cần tới nó.
 
 ## `CQRS-2` — message chỉ bê request context
 
-**Tình huống.** Command hoặc query mang đúng một field `params`, và field đó chở request, người dùng
+**Khi nào gặp.** Command hoặc query mang đúng một field `params`, và field đó chở request, người dùng
 đã xác thực, và locale. Không method, không default, không logic.
 
-**Nó sinh ra gì trong source.** Một class trần trong `<operation>.command.ts` (hoặc
+**Source phải thể hiện gì.** Một class trần trong `<operation>.command.ts` (hoặc
 `<operation>.query.ts`) mà constructor nhận đúng một `readonly params` và không khai báo gì khác.
 
-**Dấu hiệu nhận biết.** Constructor của message có đúng một tham số, tên `params`. Không có getter
+**Cách nhận ra.** Constructor của message có đúng một tham số, tên `params`. Không có getter
 nào tính ra một giá trị mới từ request. Không có giá trị mặc định nào được điền ở đây. Tự hỏi: nếu
 hai chỗ khác nhau cùng dispatch message này, chúng có thể hiểu message theo hai nghĩa khác nhau
 không? Nếu message tự tính thứ gì đó thì câu trả lời là có.
@@ -123,16 +132,16 @@ tự tính `totalAmount` từ danh sách item · message tách một chuỗi id 
 
 ## `CQRS-3` — handler cắm vào `process`, không bao giờ `execute`
 
-**Tình huống.** Base handler là một **template method**: `execute` là cửa công khai và nó gọi
+**Khi nào gặp.** Base handler là một **template method**: `execute` là cửa công khai và nó gọi
 `process` mà handler tự cài. Cái seam đó tồn tại để một mối quan tâm cắt ngang — đo thời gian, ghi
 log, mở transaction, retry — được thêm **một lần** ở base thay vì một trăm lần ở từng handler.
 
-**Nó sinh ra gì trong source.** Một class handler trong `<operation>.handler.ts` kế thừa base và khai
+**Source phải thể hiện gì.** Một class handler trong `<operation>.handler.ts` kế thừa base và khai
 báo `protected override async process(...)`. `execute` vẫn là method cụ thể của base và không được
 khai báo trên handler.
 
-**Dấu hiệu nhận biết.** Handler khai báo `protected override async process(...)`. Nếu handler khai
-báo `execute`, nó đã **tự bước ra khỏi template**: vẫn compile, vẫn chạy, và là đúng cái file mà thay
+**Cách nhận ra.** Handler khai báo `protected override async process(...)`. Nếu handler khai
+báo `execute`, nó đã **tự bước ra khỏi template**: vẫn compile, vẫn chạy, và là đúng file mà thay
 đổi cắt ngang lần sau sẽ bỏ sót trong im lặng. Tự hỏi: nếu tuần sau ai đó thêm transaction vào base,
 file này có nhận được không?
 
@@ -147,14 +156,14 @@ xuất hiện trong log.
 
 ## `CQRS-4` — service chỉ dispatch, và chỉ có thế
 
-**Tình huống.** Service nằm cạnh handler tồn tại để **cửa không phải import bus**. Nó dài một dòng,
+**Khi nào gặp.** Service nằm cạnh handler tồn tại để **cửa không phải import bus**. Nó dài một dòng,
 và nó dài một dòng có chủ đích.
 
-**Nó sinh ra gì trong source.** Một service trong `<operation>.service.ts` mà toàn bộ thân method là
+**Source phải thể hiện gì.** Một service trong `<operation>.service.ts` mà toàn bộ thân method là
 một lời gọi `commandBus.execute(new …Command(params))` rồi trả về. Nó không import repository, không
 import entity manager, không import service nghiệp vụ nào.
 
-**Dấu hiệu nhận biết.** Thân method là một lời gọi `commandBus.execute(new …Command(params))`.
+**Cách nhận ra.** Thân method là một lời gọi `commandBus.execute(new …Command(params))`.
 Service không import repository, không import entity manager, không import service nghiệp vụ nào. Nếu
 thấy một câu `if` mang tính nghiệp vụ ở đây: luật đó vừa rơi vào chỗ **không có message**, nên CLI
 cũng làm cùng việc ấy sẽ không với tới được và sẽ mọc ra bản sao của riêng nó. Tự hỏi: nếu ngày mai
@@ -171,14 +180,14 @@ tác.
 
 ## `CQRS-5` — handler sở hữu thất bại, và thất bại là một domain exception
 
-**Tình huống.** Handler không làm được việc thì **ném đúng cái exception nói vì sao**. Nó không trả
+**Khi nào gặp.** Handler không làm được việc thì **ném đúng cái exception nói vì sao**. Nó không trả
 `null`, và nó không trả một shape thành công có chứa chuỗi lỗi.
 
-**Nó sinh ra gì trong source.** Bên trong `<operation>.handler.ts`, mỗi nhánh thất bại ném một domain
+**Source phải thể hiện gì.** Bên trong `<operation>.handler.ts`, mỗi nhánh thất bại ném một domain
 exception có tên, chở theo định danh đã gây ra thất bại đó; không nhánh nào trả `null` để nói
 "không".
 
-**Dấu hiệu nhận biết.** Mỗi nhánh từ chối có một tên riêng, và cái tên ấy chở theo dữ liệu người gọi
+**Cách nhận ra.** Mỗi nhánh từ chối có một tên riêng, và cái tên ấy chở theo dữ liệu người gọi
 sẽ cần. Không có `return null` nào mang nghĩa "không được". Không có `{ ok: false, error }` nào — mỗi
 người gọi sẽ tự giải mã nó một kiểu. Tự hỏi: người gọi có đủ thông tin để phân biệt "không tồn tại",
 "đã bị xoá" và "không có quyền đọc" không? Nếu cả ba về tới nơi dưới dạng cùng một `null` thì lý do
@@ -194,14 +203,14 @@ tính.
 
 ## `CQRS-6` — event là cho việc kiểu gì cũng phải xảy ra
 
-**Tình huống.** Dispatch event khi việc phải xảy ra **dù người gọi còn đó hay không** — một email,
+**Khi nào gặp.** Dispatch event khi việc phải xảy ra **dù người gọi còn đó hay không** — một email,
 một projection, một lần đồng bộ. Còn thứ mà câu trả lời của người gọi phụ thuộc vào thì ở lại trong
 command.
 
-**Nó sinh ra gì trong source.** Một class event chở payload, và một handler đẩy việc vào hàng đợi —
+**Source phải thể hiện gì.** Một class event chở payload, và một handler đẩy việc vào hàng đợi —
 không có gì trên đường request `await` kết quả của nó. Event không trả về giá trị.
 
-**Dấu hiệu nhận biết.** Không ai `await` kết quả của event để trả lời request. Event không trả về giá
+**Cách nhận ra.** Không ai `await` kết quả của event để trả lời request. Event không trả về giá
 trị, và không ai cần nó trả về giá trị. Nếu resolver sau khi publish event lại đi **hỏi lại**
 database xem dòng đã có chưa: đó là một command bị viết thành event. Tự hỏi: người gọi có cần biết
 việc này xong chưa mới trả lời được không? Nếu có, đó là command.
@@ -214,13 +223,13 @@ liệu thứ hai · phát thông báo · ghi audit log · thêm người dùng v
 
 ## `CQRS-7` — handler có spec song sinh nằm cạnh
 
-**Tình huống.** `<operation>.handler.spec.ts`, cùng thư mục. Handler là chỗ các quyết định nằm, nên
+**Khi nào gặp.** `<operation>.handler.spec.ts`, cùng thư mục. Handler là chỗ các quyết định nằm, nên
 đó cũng là chỗ unit test nằm.
 
-**Nó sinh ra gì trong source.** Một file `<operation>.handler.spec.ts` nằm cạnh
+**Source phải thể hiện gì.** Một file `<operation>.handler.spec.ts` nằm cạnh
 `<operation>.handler.ts`, không phải trong một cây test song song.
 
-**Dấu hiệu nhận biết.** Mở thư mục thao tác là thấy ngay spec. Người sửa handler nhìn thấy spec **mà
+**Cách nhận ra.** Mở thư mục thao tác là thấy ngay spec. Người sửa handler nhìn thấy spec **mà
 không cần đi tìm**; spec nằm trong một cây test riêng thì chỉ người đi tìm test mới thấy. Tự hỏi:
 người sửa file này ngày mai có bị spec đập vào mắt không, hay phải nhớ ra là có nó?
 
@@ -233,8 +242,8 @@ handler mà spec không đổi.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được;
-`enforced` nghĩa là một rule có tên trong `@starci/eslint-canon-be` báo cáo nó; `documented` nghĩa là
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là giá trị sai không viết ra được;
+`enforced` nghĩa là một rule có tên trong `@canon-be` báo cáo nó; `documented` nghĩa là
 không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |

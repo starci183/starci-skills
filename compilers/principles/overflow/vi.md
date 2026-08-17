@@ -4,8 +4,15 @@ title: Overflow · Vietnamese
 
 # Tràn nội dung
 
-Đầu vào là một yêu cầu viết bằng lời thường — "danh sách tệp đính kèm, mỗi hàng có tên tệp và dung
-lượng" — và đầu ra là, với **mỗi hộp** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "danh sách tệp đính kèm, mỗi hàng có tên tệp và dung
+lượng" — rồi trả về là, với **mỗi hộp** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu
 cầu không bao giờ nói dữ liệu thật sẽ dài đến đâu, và không được ngồi chờ màn hình vỡ rồi mới vá: hãy
 nhìn cái hộp **trước khi có dữ liệu** và hỏi ai nhường khi giá trị thật dài nhất tới.
 
@@ -80,11 +87,11 @@ cho tới khi chiều cao tối thiểu của nó được giải phóng. Khai b
 
 ## `OVERFLOW-0` — không có gì để tràn
 
-**Tình huống.** Giá trị đến từ một **tập đóng** mà bạn kiểm soát được, hoặc là một con số có bề rộng
+**Khi nào gặp.** Giá trị đến từ một **tập đóng** mà bạn kiểm soát được, hoặc là một con số có bề rộng
 biết trước. Không tồn tại dữ liệu thật nào làm vỡ hộp này, nên khai báo tràn nội dung ở đây là nói dối
 về một rủi ro không có.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chuỗi dài nhất có thể liệt kê ra được, ngay bây giờ, bằng tay.
 - Nội dung không đến từ người dùng, không đến từ bên thứ ba, không đến từ bản dịch mở.
@@ -109,11 +116,11 @@ nút do mình viết trong một ngôn ngữ đã chốt · số ngày liên ti�
 
 ## `OVERFLOW-1` — một dòng, nhận ra từ đầu chuỗi
 
-**Tình huống.** Giá trị là **một danh tính** mà người đọc nhận ra ngay ở phần đầu: tên người, tên tệp,
+**Khi nào gặp.** Giá trị là **một danh tính** mà người đọc nhận ra ngay ở phần đầu: tên người, tên tệp,
 tiêu đề, thư điện tử. Mất phần đuôi thì mất chi tiết, **không** mất khả năng nhận ra và **không** đổi
 nghĩa.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Phần thông tin nặng nhất nằm ở đầu chuỗi.
 - Hai giá trị khác nhau gần như không bao giờ trùng nhau ở 20 ký tự đầu.
@@ -140,11 +147,11 @@ hạng · tiêu đề thẻ tab · nhãn đường dẫn phân cấp ở giữa 
 
 ## `OVERFLOW-2` — văn xuôi đọc lấy ý
 
-**Tình huống.** Đoạn văn được đọc để **nắm ý**, không để đọc hết tại chỗ. Hai đến bốn dòng đã đủ để
+**Khi nào gặp.** Đoạn văn được đọc để **nắm ý**, không để đọc hết tại chỗ. Hai đến bốn dòng đã đủ để
 người đọc quyết định có mở ra hay không, và việc giữ mọi thẻ trong lưới cùng chiều cao có giá trị
 nghiệp vụ thật: nó cho phép so sánh.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nội dung là câu, không phải một danh tính.
 - Có một nơi để đọc đủ: trang chi tiết, khung, hoặc nút mở rộng.
@@ -171,10 +178,10 @@ tả sản phẩm trong thẻ · ghi chú trong bảng · tóm tắt thay đổi
 
 ## `OVERFLOW-3` — cắt là sai, buộc phải xuống dòng
 
-**Tình huống.** Giá trị **mất nghĩa hoặc đổi nghĩa** khi bị cắt. Người đọc không có cách nào biết là
+**Khi nào gặp.** Giá trị **mất nghĩa hoặc đổi nghĩa** khi bị cắt. Người đọc không có cách nào biết là
 nó đã bị cắt, nên cái họ đọc được là một thông tin **sai**, không phải một thông tin thiếu.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Là số, mã, định danh, đường dẫn, hoặc thông báo lỗi.
 - Đuôi chuỗi mang thông tin phân biệt: đuôi mã đơn, phần cuối URL, phần cuối câu lỗi.
@@ -202,11 +209,11 @@ số điện thoại · tên tệp trong màn tải lên đang lỗi · giá tr�
 
 ## `OVERFLOW-4` — hộp tự sở hữu trần và cuộn bên trong
 
-**Tình huống.** Danh sách có thể dài **không giới hạn**, nhưng vùng nó nằm trong phải giữ nguyên hình
+**Khi nào gặp.** Danh sách có thể dài **không giới hạn**, nhưng vùng nó nằm trong phải giữ nguyên hình
 dạng để những thứ khác quanh nó vẫn dùng được: nút xác nhận của một hộp thoại phải luôn nhìn thấy, đầu
 trang phải đứng yên, khung không được đẩy dài quá màn hình.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Phần thừa **đáng giữ**: người đọc sẽ muốn xem tiếp, không phải bỏ qua.
 - Có một phần tử anh em phải luôn hiện diện: phần cuối hành động, phần đầu, thanh tổng kết.
@@ -242,10 +249,10 @@ hoạt động trong thẻ · danh sách thành viên trong hộp mời · cột
 
 ## `OVERFLOW-5` — khối rộng hơn cột, cuộn ngang trong khung riêng
 
-**Tình huống.** Nội dung có **cấu trúc theo chiều ngang** không rút gọn được: các cột của một bảng,
+**Khi nào gặp.** Nội dung có **cấu trúc theo chiều ngang** không rút gọn được: các cột của một bảng,
 các dòng của một đoạn mã, một dải thẻ. Bỏ bớt cột là bỏ dữ liệu; ép xuống dòng là phá cấu trúc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bề rộng tối thiểu của nội dung là một dữ kiện, không phải một lựa chọn.
 - Xuống dòng làm hàng lệch cột và bảng mất khả năng đọc theo cột.
@@ -275,11 +282,11 @@ mục.
 
 ## `OVERFLOW-6` — trên một hàng, ai nhường phải được khai
 
-**Tình huống.** Nhiều phần tử nằm trên **một hàng** và tổng bề rộng mong muốn của chúng lớn hơn hàng.
+**Khi nào gặp.** Nhiều phần tử nằm trên **một hàng** và tổng bề rộng mong muốn của chúng lớn hơn hàng.
 Không khai ai nhường thì trình duyệt tự xử, và cách nó xử là đẩy phần tử cuối ra khỏi hàng hoặc bóp
 méo một phần tử không được phép bóp.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hàng có một phần **co giãn được** — tên, tiêu đề, mô tả — và một phần **không được co**: nút, nhãn
   trạng thái, giá, ảnh đại diện, biểu tượng.
@@ -310,11 +317,11 @@ và số tiền · hàng bình luận có tên và thời điểm.
 
 ## `OVERFLOW-7` — nội dung sở hữu chiều cao
 
-**Tình huống.** Vùng này **được phép dài ra bao nhiêu tuỳ nội dung**. Trần duy nhất là khung nhìn, và
+**Khi nào gặp.** Vùng này **được phép dài ra bao nhiêu tuỳ nội dung**. Trần duy nhất là khung nhìn, và
 khung nhìn đã có sẵn cách cuộn của nó. Ở đây không khai gì cả — và đó là một quyết định, không phải
 một chỗ trống.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không có phần tử anh em nào cần luôn hiển thị.
 - Người đọc vào đây để đọc hết, không phải để liếc.

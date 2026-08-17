@@ -4,7 +4,14 @@ title: Icon · Vietnamese
 
 # Biểu tượng
 
-Đầu vào là mã đã viết xong — một tệp nguồn, một mẩu diff. Đầu ra là một **phán quyết**: tệp đó có nằm
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp nguồn, một mẩu diff. Kết quả là một **phán quyết**: tệp đó có nằm
 trong phạm vi hay không, luật lint nào đã nổ, nó báo cái gì và trên nút nào, mã luật tương ứng là gì,
 và cửa mở nào lẽ ra đã che đúng lỗi ấy. Mô-đun này không chọn hình nào, nhà cung cấp nào hay cỡ nào.
 Nó từ chối một cách viết, và nó phải chỉ được vào đúng chuỗi mà nó từ chối.
@@ -75,7 +82,7 @@ Cổng tệp: `context.filename`, đổi hết dấu chéo ngược thành chéo
 kết thúc bằng `/leaves/Icon/index.tsx`. Một miễn trừ duy nhất: tệp kết thúc bằng
 `/leaves/RankMark/index.tsx` **và** nguồn đúng bằng gói tranh giải.
 
-**Nó không thấy gì.** `require("lucide-react")`, `await import("lucide-react")` và một thành phần nạp
+**Điểm mù.** `require("lucide-react")`, `await import("lucide-react")` và một thành phần nạp
 trễ dựng từ import động: chỉ nút `ImportDeclaration` được duyệt.
 `export { Caret } from "lucide-react"` — xuất lại cũng mang nguồn, nhưng là một loại nút khác, nên một
 tệp trung chuyển một dòng là giặt sạch cả gói. Mọi thứ nằm ngoài một đoạn đường dẫn `/src/`: một thư
@@ -99,7 +106,7 @@ nhưng bỏ cổng chiếc lá: mọi tệp chứa `/src/` đều bị quét. M�
 bằng `@heroicons/react/24/outline` hoặc `@heroicons/react/16/solid`, hoặc khi đúng cặp
 chiếc-lá-xếp-hạng-cộng-gói-tranh-giải.
 
-**Nó không thấy gì.** Một bộ hình mà tên gói không mang sáu dấu hiệu tên nào và cũng không nằm trong
+**Điểm mù.** Một bộ hình mà tên gói không mang sáu dấu hiệu tên nào và cũng không nằm trong
 danh sách thì lọt sạch — các gói pictogram, emoji hay mark thường rơi đúng vào ô đó. Tệp `.svg` cục bộ
 và thành phần SVG viết tay cũng lọt: mọi nguồn tương đối bị loại trước khi thử, nên cả một bộ từ vựng
 hình thứ hai có thể được lắp hoàn toàn bằng tệp cục bộ. Theo chiều ngược lại,
@@ -121,7 +128,7 @@ ba.
 thức nào, hoặc xuyên qua `JSXExpressionContainer` bọc một trong hai. Thử chuỗi đó với
 `/\bsize-(?:\d+\.\d+|\[[^\]]+\])/` và chỉ báo lần trúng **đầu tiên**.
 
-**Nó không thấy gì.** Đây là luật rò nhất trên kệ. Tên luật nói "cỡ hình", nhưng phép phát hiện không
+**Điểm mù.** Đây là luật rò nhất trên kệ. Tên luật nói "cỡ hình", nhưng phép phát hiện không
 có lấy một mẩu ngữ cảnh hình nào: nó chỉ là "một tiện ích `size-` viết bằng phân số hoặc ngoặc vuông",
 nên một ảnh đại diện `size-[44px]` bị báo còn `size-9` trên một hình thì không. **Cỡ nguyên lệch thang
 lọt hết**, và đó chính là cách dễ viết hơn của cùng một sai lầm — một cỡ cao hơn vai trò lớn nhất hai
@@ -146,7 +153,7 @@ lại nghĩa mà chữ đã đóng, nhân lên trên khắp lưới.
 `node.name.name === "Icon"`. Cổng tệp **là** toàn bộ luật: đường dẫn phải kết thúc bằng
 `/composites/LabelledProgressRow/index.tsx`, không thì bộ duyệt còn chẳng được lắp.
 
-**Nó không thấy gì.** Tên tệp. Cả luật chỉ tồn tại cho một đường dẫn, nên đổi tên tệp, hoặc chuyển phần
+**Điểm mù.** Tên tệp. Cả luật chỉ tồn tại cho một đường dẫn, nên đổi tên tệp, hoặc chuyển phần
 đánh dấu sang một tệp anh em cùng thư mục, là xoá được luật mà không chạm một dòng nào vào luật. Mọi
 thẻ không đúng chữ `Icon`: bí danh lúc nhập, gọi qua thuộc tính của một object, một thành phần tile hay
 badge tự vẽ hình bên trong, hay một hình truyền xuống bằng prop. Và mọi ô dữ kiện gọn khác trong sản
@@ -168,7 +175,7 @@ mở đầu bằng tiền tố bộ sưu tập `fluent-emoji-flat:`. Cổng tệ
 `/\.test\.tsx?$/`. Tệp kết thúc bằng `/leaves/RankMark/index.tsx` đi nhánh kiểm tập đóng; mọi tệp khác
 đi nhánh "nêu ngoài chiếc lá".
 
-**Nó không thấy gì.** Định danh ghép bằng template: dựng chuỗi từ số thứ hạng làm **cả hai** nhánh biến
+**Điểm mù.** Định danh ghép bằng template: dựng chuỗi từ số thứ hạng làm **cả hai** nhánh biến
 mất cùng lúc — tập đóng và cả quyền sở hữu — mà ghép chuỗi lại đúng là cách tự nhiên nhất để viết một
 bản đồ hạng-sang-tranh. Một bộ sưu tập tranh khác: chỉ một tiền tố được nhận ra, nên một tấm huy chương
 hay một chiếc cúp lấy từ bộ sưu tập khác trong cùng catalog lọt cả trong lẫn ngoài chiếc lá. Tệp kiểm

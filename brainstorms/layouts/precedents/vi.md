@@ -4,8 +4,15 @@ title: Precedents · Vietnamese
 
 # Tiền lệ
 
-Đầu vào là một yêu cầu nghiệp vụ cùng những phương án layout đã được chấp nhận **của chính source
-này**, và đầu ra là, với mỗi phương án sắp sinh ra, một tiền lệ mà nó trích dẫn — hoặc một lời khai
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Mô-đun này nhận một yêu cầu nghiệp vụ cùng những phương án layout đã được chấp nhận **của chính source
+này**, rồi trả về, với mỗi phương án sắp sinh ra, một tiền lệ mà nó trích dẫn — hoặc một lời khai
 rằng nó **cố ý rời khỏi** mọi tiền lệ. Tiền lệ là một quyết định đã được chấp nhận trước đó, được giữ
 lại kèm lý do. Nó được **trích dẫn, noi theo và lật lại** — không bao giờ được tuân phục. Luật thì
 **ràng buộc**; tiền lệ thì **thuyết phục**. Lẫn hai thứ đó là biến mọi trang mới thành bản sao của
@@ -47,9 +54,9 @@ thẩm quyền của cây này.
 
 ## `PRECEDENT-0` — không có gì phủ được yêu cầu này
 
-**Tình huống.** Corpus không có phương án nào đã chấp nhận mà lý do nghiệp vụ khớp với yêu cầu này.
+**Khi nào gặp.** Corpus không có phương án nào đã chấp nhận mà lý do nghiệp vụ khớp với yêu cầu này.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không tiền lệ nào chung kết quả hay chung chủ thể với yêu cầu.
 - Cái gần nhất chỉ giống ở **số lượng region**.
@@ -65,10 +72,10 @@ thẩm quyền của cây này.
 
 ## `PRECEDENT-1` — một tiền lệ khớp về lý do nghiệp vụ
 
-**Tình huống.** Một phương án đã chấp nhận từng trả lời đúng lý do này cho đúng source này, và không có
+**Khi nào gặp.** Một phương án đã chấp nhận từng trả lời đúng lý do này cho đúng source này, và không có
 gì trong yêu cầu phản lại nó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Lý do đã ghi đọc được như câu trả lời cho yêu cầu này.
 - Mọi key contract nó trích đều còn tồn tại.
@@ -86,10 +93,10 @@ thừa hưởng những quyết định không ai đưa ra cho nó.
 
 ## `PRECEDENT-2` — khớp một phần, đúng một trục khác
 
-**Tình huống.** Lý do khớp, nhưng yêu cầu ép một giá trị khác lên **một** trục — cái rail thành một
+**Khi nào gặp.** Lý do khớp, nhưng yêu cầu ép một giá trị khác lên **một** trục — cái rail thành một
 route, evidence chuyển xuống dưới subject.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đúng một giá trị trục được yêu cầu nói ra và khác với tiền lệ.
 - Mọi trục còn lại giữ nguyên được.
@@ -106,9 +113,9 @@ nào của tiền lệ được giữ và phần nào bị đè.
 
 ## `PRECEDENT-3` — lời trích đã cũ
 
-**Tình huống.** Tiền lệ vẫn đúng nhưng gọi tên một key contract đã bị generic hoá hoặc đổi tên.
+**Khi nào gặp.** Tiền lệ vẫn đúng nhưng gọi tên một key contract đã bị generic hoá hoặc đổi tên.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Một key được trích không còn xuất hiện trong contract hiện tại.
 - Có một key tên rộng hơn đang phủ đúng lý do đó.
@@ -125,10 +132,10 @@ không còn tồn tại — đúng cái bịa mà corpus lẽ ra phải ngăn.
 
 ## `PRECEDENT-4` — cố ý rời đi
 
-**Tình huống.** Phương án không noi theo tiền lệ gần nhất, và đó chính là mục đích của nó: nó tồn tại để
+**Khi nào gặp.** Phương án không noi theo tiền lệ gần nhất, và đó chính là mục đích của nó: nó tồn tại để
 cả lô có một cấu trúc thật sự khác.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bộ trục của nó khác tiền lệ gần nhất ở ít nhất một trục.
 - Lý do của nó được nói bằng chính nó, không phải như một lời sửa lưng tiền lệ.
@@ -145,9 +152,9 @@ cái hình ba lần.
 
 ## `PRECEDENT-5` — tiền lệ sai
 
-**Tình huống.** Tiền lệ phạm một luật layout, hoặc lý do của nó hoá ra không đúng về sản phẩm.
+**Khi nào gặp.** Tiền lệ phạm một luật layout, hoặc lý do của nó hoá ra không đúng về sản phẩm.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Noi theo nó sẽ sinh ra một phương án mà luật từ chối.
 - Lý do đã ghi bị chính cách người ta dùng bề mặt ấy phản lại.

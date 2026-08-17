@@ -4,7 +4,14 @@ title: The-split · Vietnamese
 
 # Đường chia
 
-Đầu vào là code đã viết rồi — một file, một khúc diff. Đầu ra là một **phán quyết**: file có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận code đã viết rồi — một file, một khúc diff. Kết quả là một **phán quyết**: file có nằm trong
 phạm vi hay không, rule nào đã bắn, nó báo gì và trên nút nào, ứng với mã luật nào, và lỗ hổng mở nào
 lẽ ra đã giấu được đúng cái hỏng đó. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải chỉ được vào
 đúng lời gọi mà nó từ chối.
@@ -62,7 +69,7 @@ vi có đúng một visitor, `CallExpression`, đòi `node.callee.type === "Iden
 / `useDispatch` / `use…Store`; `useTranslations` / `useLocale` / `useFormatter`; `query<Capital>…` /
 `mutation<Capital>…`.
 
-**Nó không thấy gì.** Callee dạng biểu thức thành viên — `hooks.useTranslations()`,
+**Điểm mù.** Callee dạng biểu thức thành viên — `hooks.useTranslations()`,
 `store.useAppSelector()`, `client.queryOrder()` — vì visitor thoát ngay khi callee không phải
 `Identifier`. Một hook bọc mang tên bình thường — `useOrderData()`, `useRowsFor(id)`, `loadSummary()` —
 không khớp họ nào, và đây chính là động tác dọn dẹp tiêu chuẩn: dời đi một file là cùng một lần fetch
@@ -90,7 +97,7 @@ một specifier thoả `imported.name === local.name === twin`; song song đó n
 `JSXOpeningElement` đẩy mọi thẻ `JSXIdentifier` vào một danh sách đã render và đặt `rendersTwin` khi
 khớp chính xác. `Program:exit` lặng lẽ thoát nếu không có `readsWorld`.
 
-**Nó không thấy gì.** Giặt sạch lần đọc thế giới là tắt luôn cả phép kiểm: nếu index gọi
+**Điểm mù.** Giặt sạch lần đọc thế giới là tắt luôn cả phép kiểm: nếu index gọi
 `useOrderData()` thì `readsWorld` vẫn là false, `Program:exit` thoát, và khối đó trở nên **tàng hình**
 chứ không phải không tuân thủ — hai rule dùng chung một bộ dò, nên một lần giặt hạ cả hai. Render
 không qua JSX, `createElement(Row, props)` đặt cạnh một `<_X />`, để nguyên một cây thay thế không lọt

@@ -1,15 +1,27 @@
 ---
 name: starci-stale-list
-description: List every project in the workspace that is not in a state you can trust to work in — routes that no longer describe this machine, contract reasons no lookup can find, and checkouts whose lint rules are not the published ones — with the reason for each and the skill that clears it. Deliberately does not run lint, typecheck or build: those execute the project and belong to starci-repair. Read-only — it reports and repairs nothing. Use at the start of a session, before trusting a project you have not touched in a while, or when a run stops on a route and you want to know what else is in the same state.
+description: List every project in the workspace that is not in a state you can trust to work in — routes that no longer describe this machine, contract reasons no lookup can find, and checkouts whose lint rules are not the published ones — with the reason and owner for each. Deliberately does not run lint, typecheck or build because those execute the project. Read-only — it reports and repairs nothing. Use at the start of a session, before trusting a project you have not touched in a while, or when a run stops on a route and you want to know what else is in the same state.
 ---
 
 # starci-stale-list
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
+## LOADS
 
-Plan-only, like [`starci-diagnose`](../starci-diagnose/SKILL.md) and for the same reason: **the moment a
-report repairs something, nobody can trust it as a measurement.** A route it quietly refreshed reads as a
-route that was fine.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@export-state` | `scripts/export-console-state.mjs` | script | measure workspace, contract and lint-machine state |
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+
+## HANDS OFF TO — named, never loaded
+
+`starci-init` · `starci-repair`
+
+## Run
+
+Read `@skill-shape` first.
+
+Plan-only: **the moment a report repairs something, nobody can trust it as a measurement.** A route it
+quietly refreshed reads as a route that was fine.
 
 ## Four layers, and the cost is why they are not one
 
@@ -64,7 +76,7 @@ the reader asks for the list to be kept.
 ### 2 — Scan, with the tree's own script
 
 ```bash
-node <trust>/scripts/export-console-state.mjs --stale
+node @export-state --stale
 ```
 
 It reads every `.workspace/<project>/<role>/config.json`, verifies each against this disk and against git,
@@ -103,7 +115,7 @@ generalising it would describe two routes with one key.
 ### 5 — Report the lint machine, because it decides whether a count would mean anything
 
 One line per role: `installed`, `absent`, or `vendored` with the relative path the config imports. Anything
-but `installed` carries who clears it — `starci-repair`, the machine pass — and the reason, which is not
+but `installed` carries its owner from the layer table and the reason, which is not
 "a package is missing" but **"no count from this checkout is evidence"**: absent means nothing was checked,
 vendored means it was checked against a private copy of the law.
 
@@ -120,14 +132,13 @@ owns rules of its own.
 
 ### 7 — Stop there
 
-Say what is stale, why, and who clears it. Do not refresh a head, do not repoint a path, do not declare a
-contract — each is `starci-init`'s work behind its own approval, and doing it here would make this report
-the thing that changed the machine it was measuring.
+Say what is stale, why, and who clears it. Do not refresh a head, repoint a path or declare a contract:
+each is outside this read-only run and requires its own approval. Doing it here would make this report the
+thing that changed the machine it was measuring.
 
 ## Stops
 
-- `.workspace` does not exist → say so plainly; the Source has no routes at all, which is
-  `starci-init`'s first run rather than a stale list.
+- `.workspace` does not exist → stop; the Source has no routes at all, cleared by `starci-init` after the owner declares the project.
 - A route file is present but unparseable → report it as its own row. It is neither stale nor absent:
   it is invalid, and it fails differently.
 - The reader asks for a fix → hand over to `starci-init` with the rows already measured, so the verdict

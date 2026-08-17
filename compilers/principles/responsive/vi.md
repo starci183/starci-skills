@@ -4,8 +4,15 @@ title: Responsive · Vietnamese
 
 # Thiết kế đáp ứng
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một thanh bộ lọc đứng cạnh vùng kết quả, kết quả là các
-thẻ" — và đầu ra là, với **mỗi vùng** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một thanh bộ lọc đứng cạnh vùng kết quả, kết quả là các
+thẻ" — rồi trả về là, với **mỗi vùng** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu
 không bao giờ nói ra một điểm ngắt, và không được phép ước lượng một điểm ngắt: phép biến đổi suy ra từ
 **lỗi nội dung đã quan sát được**, còn ngưỡng chính là bề rộng mà lỗi đó được quan sát.
 
@@ -79,11 +86,11 @@ là hết dùng được. Một tiền tố chọn vì thiết bị đó đượ
 
 ## `RESPONSIVE-1` — không có gì hỏng
 
-**Tình huống.** Ở mọi bề rộng được hỗ trợ, không có va chạm, không bị cắt, không có thành phần điều
+**Khi nào gặp.** Ở mọi bề rộng được hỗ trợ, không có va chạm, không bị cắt, không có thành phần điều
 khiển nào nhỏ dưới mức bấm được, không có chữ nào bị đẩy ra ngoài ô của nó. Bố cục gốc — vốn đã viết cho
 trạng thái hẹp nhất — tự nó đã đúng. Vùng này **không sở hữu** một phép biến đổi nào.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Thu khung nhìn về bề rộng hẹp nhất được hỗ trợ mà không thấy thứ gì hỏng.
 - Nội dung vốn đã tự xuống dòng được, hoặc vốn đã là một cột.
@@ -113,11 +120,11 @@ khi không có. `RESPONSIVE-1` là mã tình huống, không phải tên class.
 
 ## `RESPONSIVE-2` — vẫn một chuỗi, chỉ cần thêm dòng
 
-**Tình huống.** Các phần tử là phần tử ngang hàng nội tuyến: chúng không có gì bắt buộc phải nằm chung
+**Khi nào gặp.** Các phần tử là phần tử ngang hàng nội tuyến: chúng không có gì bắt buộc phải nằm chung
 một dòng, số lượng có thể không biết trước, và việc phần tử cuối rơi xuống dòng dưới không làm mất nghĩa
 gì cả. Chuỗi vẫn là một chuỗi, chỉ dài ra theo chiều dọc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Số lượng phần tử do dữ liệu quyết định: thẻ, nhãn nhỏ lọc, nhãn, tác giả, kỹ năng.
 - Độ dài nhãn thay đổi theo ngôn ngữ hoặc theo dữ liệu người dùng nhập.
@@ -144,11 +151,11 @@ tên · nhóm nhãn trạng thái chứng chỉ.
 
 ## `RESPONSIVE-3` — hàng hết dùng được, xếp dọc thì vẫn đúng
 
-**Tình huống.** Hai (hoặc vài) nhóm tạo thành một quan hệ có hai vế trên một hàng. Khi hẹp, ít nhất một
+**Khi nào gặp.** Hai (hoặc vài) nhóm tạo thành một quan hệ có hai vế trên một hàng. Khi hẹp, ít nhất một
 vế tụt xuống dưới bề rộng dùng được của nó — chữ bị cắt, ô nhập liệu còn vài ký tự, nút chồng lên nhau.
 Cũng những vế đó, cũng thứ tự đó, xếp dọc thì vẫn đọc đúng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có thể gọi tên từng vế: "cụm tiêu đề" và "cụm hành động"; "ô nhập" và "nút gửi".
 - Ở trạng thái hẹp, đọc từ trên xuống vẫn ra đúng câu chuyện như đọc từ trái sang phải khi rộng.
@@ -173,11 +180,11 @@ nút theo dõi.
 
 ## `RESPONSIVE-4` — các phần tử lặp lại cần bớt rãnh
 
-**Tình huống.** Một tập phần tử cùng loại, ngang hàng, lặp lại, mỗi phần tử có một bề rộng tối thiểu ĐÃ
+**Khi nào gặp.** Một tập phần tử cùng loại, ngang hàng, lặp lại, mỗi phần tử có một bề rộng tối thiểu ĐÃ
 ĐO mà hẹp hơn thế thì hết đọc được hoặc hết dùng được. Khi vùng chứa hẹp lại, số rãnh giảm dần. Thứ tự
 các phần tử không đổi; chỉ số rãnh đổi.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các phần tử hiển thị ra từ một vòng lặp trên cùng một loại dữ liệu.
 - Mỗi phần tử có cùng cấu trúc bên trong, cùng vai trò.
@@ -202,12 +209,12 @@ sách tệp dạng tile.
 
 ## `RESPONSIVE-5` — nghĩa nằm ở chính sự sắp ngang
 
-**Tình huống.** Nội dung mà quan hệ giữa các phần chính là vị trí ngang của chúng: cột của một bảng, các
+**Khi nào gặp.** Nội dung mà quan hệ giữa các phần chính là vị trí ngang của chúng: cột của một bảng, các
 mốc trên một trục thời gian, các nút và đường nối của một sơ đồ. Xuống dòng hay xếp dọc không phải là
 sắp xếp lại, mà là xoá mất thông tin. Vì vậy vùng đó được cuộn ngang — nhưng cuộn BÊN TRONG CHỦ SỞ HỮU
 CỦA NÓ, và trang thì không bao giờ cuộn ngang.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có thể chỉ ra một câu người dùng đọc được NHỜ sự thẳng hàng: "cột này so với cột kia".
 - Bỏ một cột đi hoặc đẩy nó xuống dòng là mất một phép so sánh.
@@ -233,11 +240,11 @@ benchmark.
 
 ## `RESPONSIVE-6` — vùng thường trực đổi thành thành phần điều khiển tương đương
 
-**Tình huống.** Ở bề rộng lớn, một vùng thường trực luôn hiện (thanh dọc lọc, điều hướng mở rộng, khung
+**Khi nào gặp.** Ở bề rộng lớn, một vùng thường trực luôn hiện (thanh dọc lọc, điều hướng mở rộng, khung
 phụ). Ở bề rộng hẹp, vùng đó không còn chỗ, và nó được thay bằng MỘT thành phần điều khiển gọn dẫn tới
 đúng nội dung ấy. Đây là mã đắt nhất, vì nó là mã duy nhất khiến DOM có hai cách biểu diễn cho một việc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Vùng đó là một VÙNG BỐ CỤC có hình học riêng, không phải một cụm chữ.
 - Có thể gọi tên thành phần điều khiển thay thế — một nút mở khung, một nút trình đơn — và nó ĐÃ TỒN

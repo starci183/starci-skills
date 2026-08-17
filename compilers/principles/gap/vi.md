@@ -4,7 +4,14 @@ title: Gap · Vietnamese
 
 # Khoảng cách
 
-Đầu vào là một yêu cầu viết bằng lời thường — "form đăng nhập có 3 field" — và đầu ra là, với **mỗi
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "form đăng nhập có 3 field" — rồi trả về là, với **mỗi
 phần tử cha** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu không bao giờ nói ra
 một khoảng cách, và không được phép ước lượng một khoảng cách: khoảng cách suy ra từ **quan hệ** giữa
 những thứ nằm cạnh nhau.
@@ -63,10 +70,10 @@ phép tính.
 
 ## `GAP-0` — nhịp đã nằm trong hàng và đường phân cách
 
-**Tình huống.** Một danh sách liền mạch: mỗi hàng tự có khoảng đệm trong, và đường phân cách đã nói rõ
+**Khi nào gặp.** Một danh sách liền mạch: mỗi hàng tự có khoảng đệm trong, và đường phân cách đã nói rõ
 ranh giới giữa các hàng. Cha của các hàng **không sở hữu** khoảng cách giữa các phần tử nào cả.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mỗi hàng có thể bấm được, hoặc có khoảng đệm bên trong riêng.
 - Giữa các hàng đã có đường kẻ.
@@ -90,10 +97,10 @@ dạng hàng.
 
 ## `GAP-1` — hai dòng vẫn là một danh tính
 
-**Tình huống.** Dòng dưới chỉ bổ nghĩa hoặc nhận diện cho dòng trên. Đọc riêng dòng dưới thì nó không
+**Khi nào gặp.** Dòng dưới chỉ bổ nghĩa hoặc nhận diện cho dòng trên. Đọc riêng dòng dưới thì nó không
 còn là một đối tượng độc lập.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hai dòng cùng trả lời **một** câu hỏi: "đây là ai?", "bao nhiêu?", "giá thế nào?".
 - Vế sau mất đi thì vế trước vẫn đúng, chỉ kém rõ.
@@ -114,10 +121,10 @@ tên tệp + loại tệp.
 
 ## `GAP-2` — nhiều thành phần tạo một khối gọn
 
-**Tình huống.** Các phần tử cùng tạo thành **một** thao tác, một tài liệu, một câu, hoặc một chuỗi có
+**Khi nào gặp.** Các phần tử cùng tạo thành **một** thao tác, một tài liệu, một câu, hoặc một chuỗi có
 thứ tự. Tách một cái ra là khối đó vỡ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chúng chia nhau một ranh giới, một trạng thái hoặc một hành động.
 - Chúng được đọc thành một cụm, không phải hai việc.
@@ -138,10 +145,10 @@ thời gian có thứ tự · cụm hành động xếp dọc khi thu hẹp.
 
 ## `GAP-3` — một phần sở hữu phần kế tiếp
 
-**Tình huống.** Phần đầu gọi tên, điều khiển hoặc giải thích phần sau. Quan hệ là **sở hữu**, không
+**Khi nào gặp.** Phần đầu gọi tên, điều khiển hoặc giải thích phần sau. Quan hệ là **sở hữu**, không
 phải ngang hàng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Phần đầu ngắn, phần sau là nội dung thật.
 - Bỏ phần đầu đi thì phần sau vẫn hoạt động, chỉ mất tên.
@@ -161,10 +168,10 @@ kết quả · hộp kiểm điều khoản + nút gửi.
 
 ## `GAP-4` — hai phía đều đã là một nhóm
 
-**Tình huống.** Mỗi bên đã có khoảng cách bên trong của riêng nó. Hai bên ngang hàng, không bên nào sở
+**Khi nào gặp.** Mỗi bên đã có khoảng cách bên trong của riêng nó. Hai bên ngang hàng, không bên nào sở
 hữu bên nào.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mỗi bên tự gọi tên được như một nhóm hoàn chỉnh.
 - Bên trong mỗi bên đã dùng `GAP-1`, `GAP-2` hoặc `GAP-3`.
@@ -183,10 +190,10 @@ cụm chú giải · câu hỏi + cụm lựa chọn · tóm tắt khoá học +
 
 ## `GAP-6` — hai phần nội dung lớn của cùng một trang
 
-**Tình huống.** Mỗi phần có tiêu đề, nội dung và mục đích riêng, nhưng vẫn cùng thuộc một trang và
+**Khi nào gặp.** Mỗi phần có tiêu đề, nội dung và mục đích riêng, nhưng vẫn cùng thuộc một trang và
 chảy trong cùng một mạch nội dung.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mỗi phần có thể tự đứng thành một phần nội dung độc lập.
 - Mỗi phần có trạng thái tải riêng, có thể rỗng riêng.
@@ -210,10 +217,10 @@ giao.
 
 ## `GAP-8` — hai vùng bố cục
 
-**Tình huống.** Hai bên điều khiển cách cả vùng trang được tổ chức. Mỗi bên tự sở hữu hình học của
+**Khi nào gặp.** Hai bên điều khiển cách cả vùng trang được tổ chức. Mỗi bên tự sở hữu hình học của
 mình: chiều rộng, vị trí, hành vi khi màn hình đổi kích thước.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Một bên có thể được ghim, cuộn độc lập, hoặc biến mất trên thiết bị di động.
 - Chiều rộng của mỗi bên là một quyết định bố cục, không phải hệ quả của nội dung.

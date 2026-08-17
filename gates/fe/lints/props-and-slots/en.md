@@ -4,6 +4,15 @@ title: Props-and-slots
 
 # Props-and-slots
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe-props` | `@starci/eslint-canon-fe/props` | npm package | the published frontend prop types this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, what it reported and on which node,
 which law code that maps to, and the open hatch that would have hidden the same failure. This module
@@ -41,7 +50,7 @@ behaviour), `SLOTS-2` (a component's data is declared with a type alias, never a
 state) and `SLOTS-6` (appearance is a named variant decided inside, never `className`, `style`,
 spacing props or per-part styling hooks) have **no rule at all** here. Three of them are held
 elsewhere — `SLOTS-1`, `SLOTS-2` and `SLOTS-6` are `unrepresentable`, held by `DataValue`, by the
-`D extends ComponentData` constraint and by the three closed tier aliases in `@starci/eslint-canon-fe/props` —
+`D extends ComponentData` constraint and by the three closed tier aliases in `@canon-fe-props` —
 and `SLOTS-5` is `documented`, held by nothing at all. A green run of this module says nothing about
 any of the four, and where the type never covered the file the code is simply unenforced rather than
 covered.
@@ -394,5 +403,5 @@ hatch: the annotation is a TSTypeReference and isInlineObjectType recurses only 
 This module documents enforcement, not law. It names no product, no component library and no
 repository. Rule names, message ids, code tokens and the plugin prefix are identifiers that ship in
 build output and are reproduced verbatim; everything written around them is ordinary TSX. What the
-type holds — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — belongs to `@starci/eslint-canon-fe/props`, and what nothing
+type holds — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — belongs to `@canon-fe-props`, and what nothing
 holds — `SLOTS-5` — belongs to a reader.

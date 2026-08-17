@@ -7,6 +7,16 @@ codes: [SLOTS-1, SLOTS-2, SLOTS-3, SLOTS-4, SLOTS-5, SLOTS-6, SLOTS-7]
 
 # Props-and-slots
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+| `@canon-fe-props` | `@starci/eslint-canon-fe/props` | npm package | the published frontend prop types this record cites |
+
+
+## Record
+
 The input to this pattern is a shape that has already been accepted — a layout, a block, a capability
 or a contract that somebody has decided is right. The decision is not reopened here. The output is
 source architecture: which file the component lives in, which tier alias types its parameter, which
@@ -257,12 +267,12 @@ a notification list · a members table.
 
 Which tier actually holds each code. `unrepresentable` means a closed union or an alias that is the
 whole shape makes the wrong value impossible to write; `enforced` means a named rule in
-`@starci/eslint-canon-fe` reports it; `documented` means nothing mechanical holds it and only
+`@canon-fe` reports it; `documented` means nothing mechanical holds it and only
 a reader does.
 
 | Code | Tier | Held by | What still escapes |
 |---|---|---|---|
-| `SLOTS-1` | `unrepresentable` | `DataValue` in `@starci/eslint-canon-fe/props` — a closed union with no function member | Nothing, wherever the tier alias is used |
+| `SLOTS-1` | `unrepresentable` | `DataValue` in `@canon-fe-props` — a closed union with no function member | Nothing, wherever the tier alias is used |
 | `SLOTS-2` | `unrepresentable` | The `D extends ComponentData` constraint on every tier alias | The error lands at the slot, not at the `interface`; a data type never passed through a slot compiles |
 | `SLOTS-3` | `enforced` | `no-inline-parameter-type` | A named type that is not `XProps` for component `X` — the name is read, not checked |
 | `SLOTS-4` | `enforced` | `no-children-slot`, plus `BranchProps` for the positive half | The rule sees the markup hole; nothing sees a closed shape that grows `render` |
@@ -282,13 +292,13 @@ Each code, and real code it can be checked against.
 
 | Code | Path | What to look for |
 |---|---|---|
-| `SLOTS-1` | `@starci/eslint-canon-fe/props` | The `DataValue` union and `ComponentData`; confirm no member is a function type, then try to assign a handler to `props` |
-| `SLOTS-2` | `@starci/eslint-canon-fe/props` | `LeafProps<D extends ComponentData>`; declare a data shape with `interface` and pass it in — the constraint fails |
-| `SLOTS-3` | `@starci/eslint-canon-fe` | `isInlineObjectType`, which walks intersections and parentheses, and the invalid fixtures in `props-and-slots.test.mjs` |
-| `SLOTS-4` | `@starci/eslint-canon-fe/props` · `@starci/eslint-canon-fe` | `BranchProps` carrying `contract` + `render` and no markup hole; then `CHILDREN_SHELLS` and `isGoverned` for the exempt shells and the tiers the rule governs |
-| `SLOTS-5` | `@starci/eslint-canon-fe/props` | `BlockProps` — two slots, no `isLoading`, which anchors the RECEIVED half only. The DECIDED half has no anchor |
-| `SLOTS-6` | `@starci/eslint-canon-fe/props` | `LeafProps`, `CompositeProps`, `BranchProps`; confirm there is no appearance member and no index signature that would admit one |
-| `SLOTS-7` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe/props` | `noSurfaceListItemsSlot` — the import-source test that binds it, and the `items` attribute check; then `ContractRenderBranchProps`, where runtime data stays in `props` |
+| `SLOTS-1` | `@canon-fe-props` | The `DataValue` union and `ComponentData`; confirm no member is a function type, then try to assign a handler to `props` |
+| `SLOTS-2` | `@canon-fe-props` | `LeafProps<D extends ComponentData>`; declare a data shape with `interface` and pass it in — the constraint fails |
+| `SLOTS-3` | `@canon-fe` | `isInlineObjectType`, which walks intersections and parentheses, and the invalid fixtures in `props-and-slots.test.mjs` |
+| `SLOTS-4` | `@canon-fe-props` · `@canon-fe` | `BranchProps` carrying `contract` + `render` and no markup hole; then `CHILDREN_SHELLS` and `isGoverned` for the exempt shells and the tiers the rule governs |
+| `SLOTS-5` | `@canon-fe-props` | `BlockProps` — two slots, no `isLoading`, which anchors the RECEIVED half only. The DECIDED half has no anchor |
+| `SLOTS-6` | `@canon-fe-props` | `LeafProps`, `CompositeProps`, `BranchProps`; confirm there is no appearance member and no index signature that would admit one |
+| `SLOTS-7` | `@canon-fe` · `@canon-fe-props` | `noSurfaceListItemsSlot` — the import-source test that binds it, and the `items` attribute check; then `ContractRenderBranchProps`, where runtime data stays in `props` |
 
 An anchor is not decoration. A law that cannot be pointed at in real code is a proposal, and the one
 half-anchored row above is the honest cost of keeping `SLOTS-5`.

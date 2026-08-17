@@ -4,7 +4,14 @@ title: Data-access · Vietnamese
 
 # Truy cập dữ liệu
 
-Đầu vào là đoạn mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: quy tắc nào đã
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận đoạn mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: quy tắc nào đã
 công bố đã báo, báo tại nút nào, ứng với mã luật nào, và cửa nào còn mở có thể đã che đúng lỗi đó.
 Mô-đun này không chọn thiết kế nào cả. Nó từ chối một cách viết, và nó phải trỏ được vào đúng tham số
 hoặc đúng decorator mà nó từ chối.
@@ -76,7 +83,7 @@ mang — chính nút gốc, và khi nút gốc là `TSParameterProperty` thì c�
 lấy `expression.callee.name` với callee là `Identifier`, dạng trần lấy `expression.name`. Im lặng khi
 bất kỳ tên gom được nào khớp regex; ngược lại báo tại tham số đã bóc vỏ.
 
-**Nó không thấy gì.** `@InjectEntityManager()`, chính decorator trần của khung nền, vì `\w*` khớp cả
+**Điểm mù.** `@InjectEntityManager()`, chính decorator trần của khung nền, vì `\w*` khớp cả
 chuỗi rỗng và **đối số của decorator thì không bao giờ được đọc** — một decorator không nêu tên kết nối
 nào vẫn thoả một quy tắc mà toàn bộ thông báo của nó nói về việc nêu tên kết nối. `@InjectAnythingEntityManager()`
 cho một nguồn dữ liệu không hề tồn tại, cùng lý do: quy tắc kiểm **hình dạng của cái tên**, không bao
@@ -108,7 +115,7 @@ và đúng một hàm gom decorator với `must-inject-entity-manager`, nên hai
 việc thế nào là một tham số hàm dựng và một decorator tên là gì. Tham số kiểu tổng quát không bao giờ
 được đọc: chỉ mỗi định danh quyết định.
 
-**Nó không thấy gì.** `class UserRepository extends Repository<UserEntity>` rồi tiêm
+**Điểm mù.** `class UserRepository extends Repository<UserEntity>` rồi tiêm
 `repo: UserRepository` — thành viên chỉ gồm ba tên viết đúng, nên đúng thứ luật cấm lại không được nhận
 ra. `AbstractRepository`, `MongoEntityManager`, hay bất kỳ tên tay cầm nào khác, cùng một danh sách
 đóng ba phần tử. `@Inject(getRepositoryToken(UserEntity)) private readonly repo: unknown`, nơi tên
@@ -138,7 +145,7 @@ nhận **có chủ đích**: đó là dạng duy nhất còn mang được phầ
 người viết đi xoá lược đồ cho quy tắc hài lòng — một kết cục tệ hơn cái tên suy ra mà quy tắc sinh ra
 để chặn.
 
-**Nó không thấy gì.** `@Entity("")` — chuỗi rỗng là một `Literal` có `value` kiểu chuỗi nên lọt qua,
+**Điểm mù.** `@Entity("")` — chuỗi rỗng là một `Literal` có `value` kiểu chuỗi nên lọt qua,
 rồi bộ ánh xạ quay về suy tên từ tên lớp, đúng cái hậu quả quy tắc sinh ra để chặn, đi vào bằng chính
 nhánh chấp nhận của quy tắc. `` @Entity(`${prefix}_items`) `` và chuỗi mẫu rỗng `` @Entity(``) ``, vì
 `TemplateLiteral` được chấp nhận vô điều kiện: quy tắc công nhận **loại nút**, không công nhận **giá

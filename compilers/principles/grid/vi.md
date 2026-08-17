@@ -4,10 +4,17 @@ title: Grid · Vietnamese
 
 # Lưới
 
-Đầu vào là một yêu cầu viết bằng lời thường — "bộ lọc bên trái, kết quả bên phải" — và đầu ra là, với
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "bộ lọc bên trái, kết quả bên phải" — rồi trả về là, với
 **mỗi phần tử** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu không cho phép bịa ra
 một số cột: số cột suy ra từ lời hứa mà cả trang đã cam kết, và từ việc phần tử đang được gọi tên là
-**trường**, là **vùng chứa tạo cột**, hay là **một đứa con nằm trong rãnh**.
+**trường**, là **vùng chứa tạo cột**, hay là **một phần tử con nằm trong rãnh**.
 
 ## Luật
 
@@ -46,13 +53,13 @@ gọi tên thứ mà tình huống đó phát ra. Hai thứ này không giống 
 | `GRID-7` | Một con cố ý phá ra ngoài lề của trường | `col-span-full -mx-4 sm:-mx-6 lg:-mx-8` |
 
 Mã `GRID-0` đến `GRID-4` nói về VÙNG CHỨA hoặc về trường. Mã `GRID-5` đến `GRID-7` nói về một ĐỨA CON
-được đặt vào rãnh. Đọc trục trước — "mình đang gọi tên vùng chứa, trường, hay một đứa con?" — rồi cả
+được đặt vào rãnh. Đọc trục trước — "mình đang gọi tên vùng chứa, trường, hay một phần tử con?" — rồi cả
 tập mã trả lời chỉ trong một bước.
 
 `GRID-0` VÀ `GRID-5` LÀ HAI TÌNH HUỐNG KHÔNG PHÁT RA GÌ. Không có class `grid-cols-1` mặc định cho một
 danh sách xếp chồng, và không có `col-span-1` trên một ô bình thường. Hai mã này tồn tại vì **vắng mặt**
 một khai báo cũng là một quyết định ai đó đã ra, và một quyết định không có tên là một quyết định không
-ai chứng minh được là đã làm sai. Viết `col-span-1` là tuyên bố đứa con đã thương lượng với lưới trong
+ai chứng minh được là đã làm sai. Viết `col-span-1` là tuyên bố phần tử con đã thương lượng với lưới trong
 khi thực ra nó chỉ nhận mặc định; viết `grid grid-cols-1` là tuyên bố trường có một cột trong khi nó
 không có cột nào.
 
@@ -76,10 +83,10 @@ Một số cột nằm ngoài hàng của nó trong bảng này — `grid-cols-5
    thẻ không hẹp hơn 16rem" nói ra vùng giữ hai vai trò, vùng giữ các thẻ, và một cái thẻ.
 2. **Không bịa ra phần tử mà yêu cầu không hề nhắc.** Tiêu đề trang, hàng phân trang hay dải nổi bật
    không nằm trong yêu cầu đó. Giải cái được nói ra; phần còn lại giải khi nó xuất hiện.
-3. **Giải từ ngoài vào trong** — trường trước, rồi tới từng vùng chứa tạo cột, rồi tới từng đứa con.
+3. **Giải từ ngoài vào trong** — trường trước, rồi tới từng vùng chứa tạo cột, rồi tới từng phần tử con.
    Một phần tử không bao giờ thừa hưởng mã của cha nó, và một vùng chứa không thừa hưởng mã của con nó.
 4. **Với mỗi phần tử, đọc trục trước rồi mới hỏi câu hỏi của mã.** Mình đang gọi tên vùng chứa, trường,
-   hay một đứa con? Trong cùng một trục, mã đầu tiên có tình huống khớp chính là đáp án.
+   hay một phần tử con? Trong cùng một trục, mã đầu tiên có tình huống khớp chính là đáp án.
 5. **Nếu một phần tử đang gánh hai quyết định, phải tách trước rồi mới chọn.** Một nút DOM vừa giữ
    `mx-auto max-w-*` vừa giữ `grid-cols-*` là trường và vùng chứa bị dính làm một; tách thành hai nút
    DOM rồi giải từng cái. Nếu hai mã liền kề cùng khớp, chọn mã **đòi ít hơn**: `GRID-0` trước `GRID-1`,
@@ -87,10 +94,10 @@ Một số cột nằm ngoài hàng của nó trong bảng này — `grid-cols-5
 
 ## `GRID-0` — không có hệ cột, chảy là đủ
 
-**Tình huống.** Các phần tử lặp lại nhưng chỉ được đọc theo MỘT chiều. Không ai cần phần tử ở hàng dưới
+**Khi nào gặp.** Các phần tử lặp lại nhưng chỉ được đọc theo MỘT chiều. Không ai cần phần tử ở hàng dưới
 thẳng mép với phần tử ở hàng trên, vì "hàng" không phải là một khái niệm của khối này.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Danh sách xếp chồng, luồng tin, dòng thời gian, trình đơn điều hướng.
 - Một hàng nhãn nhỏ tự xuống dòng khi hết chỗ: có xuống hàng nhưng không có cột, vì mỗi phần tử rộng
@@ -118,10 +125,10 @@ sách bình luận · các bước của một quy trình · danh sách tệp đ
 
 ## `GRID-1` — chốt số cột
 
-**Tình huống.** Thiết kế HỨA một con số: hai-lên ở thiết bị di động, ba-lên ở máy tính. Số phần tử đã
+**Khi nào gặp.** Thiết kế HỨA một con số: hai-lên ở thiết bị di động, ba-lên ở máy tính. Số phần tử đã
 biết trước hoặc đã được cắt cho vừa con số đó, và người đọc được phép trông cậy vào nhịp ấy.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Số cột được nói ra thành lời trong yêu cầu: "ba thẻ một hàng".
 - Các phần tử đổi chỗ cho nhau được — chúng cùng loại, cùng vai trò.
@@ -147,10 +154,10 @@ thẻ thành viên nhóm · hai cột biểu mẫu (họ / tên) · lưới huy 
 
 ## `GRID-2` — số cột suy ra từ bề rộng tối thiểu
 
-**Tình huống.** Số phần tử đến từ DỮ LIỆU, và thứ duy nhất thiết kế nói được là: một phần tử hẹp hơn
+**Khi nào gặp.** Số phần tử đến từ DỮ LIỆU, và thứ duy nhất thiết kế nói được là: một phần tử hẹp hơn
 ngưỡng nào đó thì không đọc được nữa. Số cột là thứ rơi ra sau, không phải thứ chọn trước.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Số phần tử thay đổi theo tài khoản, theo bộ lọc, theo trang.
 - Yêu cầu nói bằng BỀ RỘNG, không nói bằng SỐ LƯỢNG.
@@ -177,11 +184,11 @@ viên · lưới template · kết quả lọc · thẻ thông báo · thanh cu�
 
 ## `GRID-3` — rãnh có vai trò cố định
 
-**Tình huống.** Các rãnh KHÔNG đổi chỗ cho nhau được. Một bên là thanh dọc, một bên là nội dung; một bên
+**Khi nào gặp.** Các rãnh KHÔNG đổi chỗ cho nhau được. Một bên là thanh dọc, một bên là nội dung; một bên
 là vùng vẽ, một bên là bảng kiểm tra. Bề rộng của rãnh là một quyết định bố cục, không phải một phép
 chia.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Ít nhất một rãnh có bề rộng cố định hoặc bị chặn (`16rem`, `minmax(0,1fr)`).
 - Thêm một con thứ ba vào vùng chứa này là SAI, không phải là "xuống hàng".
@@ -207,10 +214,10 @@ trình soạn thảo · biểu mẫu + khung tóm tắt đơn hàng.
 
 ## `GRID-4` — trường: lề ngoài và độ dài dòng
 
-**Tình huống.** Một phần tử quyết định NỘI DUNG ĐƯỢC PHÉP TỒN TẠI Ở ĐÂU: nó căn giữa, chặn bề rộng tối
+**Khi nào gặp.** Một phần tử quyết định NỘI DUNG ĐƯỢC PHÉP TỒN TẠI Ở ĐÂU: nó căn giữa, chặn bề rộng tối
 đa, và đặt lề ngoài. Nó không nói gì về số cột.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - `mx-auto` cộng một `max-w-*`.
 - Khoảng đệm trong ngang đổi theo điểm ngắt — chính khoảng đệm ấy là lề ngoài.
@@ -238,10 +245,10 @@ dung in ấn.
 
 ## `GRID-5` — một con, đúng một cột
 
-**Tình huống.** Một đứa con NHẬN đúng cái rãnh mà vùng chứa đưa cho nó. Nó không thương lượng gì cả. Đây
+**Khi nào gặp.** Một phần tử con NHẬN đúng cái rãnh mà vùng chứa đưa cho nó. Nó không thương lượng gì cả. Đây
 là tình huống phổ biến nhất trong toàn mô-đun, và cũng là tình huống hay bị viết thừa class nhất.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không có class cách đặt nào trên con.
 - Bề rộng của nó do vùng chứa quyết, không do nó quyết.
@@ -268,10 +275,10 @@ một cột.
 
 ## `GRID-6` — một con trải nhiều cột
 
-**Tình huống.** Một đứa con QUAN TRỌNG HƠN hoặc RỘNG HƠN phần còn lại, và nó nói điều đó bằng số cột nó
+**Khi nào gặp.** Một phần tử con QUAN TRỌNG HƠN hoặc RỘNG HƠN phần còn lại, và nó nói điều đó bằng số cột nó
 chiếm — chứ không bằng bề rộng riêng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Phần tử đầu tiên của lưới là phần tử nổi bật, các phần tử sau bình thường.
 - Một biểu đồ cần bề ngang mới đọc được, trong khi các ô cạnh nó thì không.
@@ -299,10 +306,10 @@ tổng kết cuối lưới số liệu.
 
 ## `GRID-7` — cố ý phá ra ngoài trường
 
-**Tình huống.** Một khối BUỘC phải chạm mép — hoặc mép của trường, hoặc mép khung nhìn — trong khi mọi
+**Khi nào gặp.** Một khối BUỘC phải chạm mép — hoặc mép của trường, hoặc mép khung nhìn — trong khi mọi
 thứ trước và sau nó vẫn tôn trọng lề. Đây là ngoại lệ được KHAI BÁO, không phải một lần lách.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nền có màu hoặc có ảnh, và phần nền hở ra hai bên trông như lỗi.
 - Một thanh cuộn ngang phải "chảy" ra khỏi mép để người đọc biết còn nữa ở bên phải.
@@ -364,7 +371,7 @@ vụ hai mã.
 Ngoại lệ là **một phần của luật**, không phải chỗ để lách. Mỗi ngoại lệ dưới đây đều đóng và nêu rõ mã
 nó áp dụng vào.
 
-- **Bảng.** `<table>` chạy thuật toán cột riêng của nó. Với mô-đun này, một bảng là MỘT đứa con —
+- **Bảng.** `<table>` chạy thuật toán cột riêng của nó. Với mô-đun này, một bảng là MỘT phần tử con —
   `GRID-5` hoặc `GRID-6` — và cột bên trong bảng nằm ngoài phạm vi.
 - **Độ dài dòng đọc.** Văn bản dài bị chặn bởi độ dài dòng đọc được, không bởi số cột của trường. Một độ
   dài dòng hẹp hơn lồng trong trường là một `GRID-4` thứ hai, và đó là trường lồng duy nhất được phép.
@@ -373,7 +380,7 @@ nó áp dụng vào.
 - **Số phần tử không biết trước.** Khi số lượng đến từ dữ liệu và thiết kế chỉ nói được bề rộng tối
   thiểu, tình huống là `GRID-2`, và chốt một con số ở đó là đoán.
 - **Thanh cuộn ngang.** Là `GRID-2` theo trục cuộn của nó; nếu đồng thời vươn ra ngoài lề của trường thì
-  nó cũng mang `GRID-7` với tư cách một đứa con. Hai mã, hai phần tử — không bao giờ hai mã trên cùng
+  nó cũng mang `GRID-7` với tư cách một phần tử con. Hai mã, hai phần tử — không bao giờ hai mã trên cùng
   một phần tử.
 - **Tính đồng nhất trạng thái.** Khung chờ, trạng thái rỗng và nội dung thật dùng chung một mã. Lưới
   rỗng đổi số cột là nói dối về hệ cột, và người dùng thấy bố cục nhảy đúng lúc dữ liệu về.
@@ -387,12 +394,12 @@ nó áp dụng vào.
 ## Đầu ra
 
 Mỗi phần tử một khối, từ ngoài vào trong. Khoá `child` chỉ xuất hiện khi tình huống là tình huống của
-một đứa con:
+một phần tử con:
 
 ```text
 field: <phần tử sở hữu độ dài dòng, lề ngoài, số cột của trường ở điểm ngắt này>
 container: <phần tử sở hữu rãnh>
-child: <phần tử đang được đặt, khi tình huống là của một đứa con>
+child: <phần tử đang được đặt, khi tình huống là của một phần tử con>
 situation: <GRID-0 | GRID-1 | GRID-2 | GRID-3 | GRID-4 | GRID-5 | GRID-6 | GRID-7>
 className: <không class | grid-cols-* | rãnh đặt tên | độ dài dòng | col-span-* | phá lề>
 reason: <sự thật nghiệp vụ loại trừ mã liền kề>

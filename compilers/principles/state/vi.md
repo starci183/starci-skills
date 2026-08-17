@@ -4,7 +4,14 @@ title: State · Vietnamese
 
 # Trạng thái
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một nút Lưu gọi lên máy chủ" — và đầu ra là, với **mỗi
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một nút Lưu gọi lên máy chủ" — rồi trả về là, với **mỗi
 phần tử** mà yêu cầu đó ngụ ý, tập mã tình huống nó sở hữu cùng một className. Yêu cầu không bao giờ
 liệt kê ra phần tử phải có bao nhiêu hình dạng, và không được phép tự chọn con số đó: nó **suy ra** từ
 việc phần tử làm được gì.
@@ -110,10 +117,10 @@ tiêu điểm đều phải vẽ một chỉ báo tiêu điểm nhìn thấy đ�
 
 ## `STATE-0` — không có trục trạng thái nào
 
-**Tình huống.** Không có gì tác động được vào phần tử này. Nó không nhận con trỏ, không nhận bàn phím,
+**Khi nào gặp.** Không có gì tác động được vào phần tử này. Nó không nhận con trỏ, không nhận bàn phím,
 không giữ giá trị nào để bị từ chối. Nó có **một** hình dạng và như thế là đủ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không nhấn được, không đến được bằng phím Tab, không có `tabindex`, không nằm trong `<a>` hay
   `<button>`.
@@ -141,10 +148,10 @@ tắt dưới tiêu đề · nhãn trạng thái chỉ để phân loại và kh
 
 ## `STATE-1` — trạng thái nghỉ, gốc của mọi lớp khác
 
-**Tình huống.** Phần tử thao tác được, và ngay lúc này chưa có gì đang xảy ra với nó. Đây là hình dạng
+**Khi nào gặp.** Phần tử thao tác được, và ngay lúc này chưa có gì đang xảy ra với nó. Đây là hình dạng
 nó quay về sau khi con trỏ rời đi, bàn phím chuyển chỗ và cú nhấn kết thúc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có ít nhất một lớp khác tồn tại; nếu không có lớp nào thì đây là `STATE-0`.
 - Mọi thuộc tính hình học của phần tử — chiều cao, viền, khoảng đệm trong — được quyết ở lớp này,
@@ -168,10 +175,10 @@ chưa được chọn · dòng danh sách chưa chọn · hộp kiểm chưa tí
 
 ## `STATE-2` — con trỏ đang nằm trên phần tử
 
-**Tình huống.** Con trỏ nằm trên một phần tử thao tác được, và phần tử phải **thừa nhận** điều đó
+**Khi nào gặp.** Con trỏ nằm trên một phần tử thao tác được, và phần tử phải **thừa nhận** điều đó
 trước khi người dùng bấm.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Phần tử có hàm xử lý, hoặc là `<a>`, `<button>`, `<label>`, hoặc một dòng chọn được.
 - Có một hành động sẽ xảy ra nếu người dùng bấm ngay bây giờ.
@@ -201,10 +208,10 @@ trong trình đơn · ô ngày trong lịch · thẻ lọc · nút biểu tượ
 
 ## `STATE-3` — tiêu điểm bàn phím vừa rơi vào phần tử
 
-**Tình huống.** Người dùng đang điều khiển trang bằng bàn phím, và cần biết **mình đang đứng ở đâu**.
+**Khi nào gặp.** Người dùng đang điều khiển trang bằng bàn phím, và cần biết **mình đang đứng ở đâu**.
 Đây là lớp bắt buộc vô điều kiện của mọi phần tử tiêu điểm được.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đến được bằng phím Tab: `<a href>`, `<button>`, `<input>`, `<select>`, `<textarea>`, hoặc có
   `tabindex="0"`.
@@ -234,10 +241,10 @@ trang · liên kết bỏ qua điều hướng.
 
 ## `STATE-4` — cú nhấn đang diễn ra
 
-**Tình huống.** Nút chuột đang bị giữ xuống, hoặc ngón tay đang chạm. Phần tử phải **xác nhận đã
+**Khi nào gặp.** Nút chuột đang bị giữ xuống, hoặc ngón tay đang chạm. Phần tử phải **xác nhận đã
 nhận** cú nhấn, ngay lập tức, trước khi bất cứ kết quả nào kịp về.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bấm vào sẽ cam kết một hành động, không chỉ mở một trình đơn tạm.
 - Trên mạng chậm, khoảng trống giữa "đã bấm" và "có kết quả" đủ dài để người dùng bấm lần hai.
@@ -264,10 +271,10 @@ nhận** cú nhấn, ngay lập tức, trước khi bất cứ kết quả nào 
 
 ## `STATE-5` — không dùng được trong ngữ cảnh này
 
-**Tình huống.** Phần tử tồn tại, người dùng nhìn thấy nó, nhưng **bây giờ** không dùng được: chưa đủ
+**Khi nào gặp.** Phần tử tồn tại, người dùng nhìn thấy nó, nhưng **bây giờ** không dùng được: chưa đủ
 quyền, chưa xong bước trước, hết lượt, sai ngữ cảnh.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một điều kiện nghiệp vụ quyết định phần tử này bật hay tắt.
 - Nếu bấm được thì máy chủ cũng sẽ từ chối.
@@ -300,10 +307,10 @@ trước chưa xong · nút xoá khi chưa chọn dòng nào · gửi lại mã 
 
 ## `STATE-6` — đang là cái được chọn, đang mở, đang đứng ở đây
 
-**Tình huống.** Trong một tập phần tử ngang hàng, phần tử này đang mang một điều kiện **bền**: được
+**Khi nào gặp.** Trong một tập phần tử ngang hàng, phần tử này đang mang một điều kiện **bền**: được
 chọn, đang là trang hiện tại, đã tích, đang mở. Điều kiện đó do **dữ liệu** quyết, không do con trỏ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Rời con trỏ đi, đóng trang rồi mở lại, nó vẫn còn.
 - Có một phần tử — và thường chỉ một — trong nhóm mang trạng thái này.
@@ -332,10 +339,10 @@ chuyển đang bật · bước hiện tại trong bộ bước · ngôn ngữ �
 
 ## `STATE-7` — việc của chính phần tử đang chạy dở
 
-**Tình huống.** Người dùng đã bấm, cú nhấn đã ăn, và **kết quả chưa về**. Phần tử phải nói rằng việc
+**Khi nào gặp.** Người dùng đã bấm, cú nhấn đã ăn, và **kết quả chưa về**. Phần tử phải nói rằng việc
 đang chạy, và phải chặn cú bấm thứ hai.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hành động đi qua mạng, hoặc qua một tính toán không xong trong cùng một frame.
 - Bấm hai lần sẽ tạo hai bản ghi, hai lần trừ tiền, hai email.
@@ -361,10 +368,10 @@ chỉ vẽ cho có.
 
 ## `STATE-8` — giá trị đang giữ đã bị từ chối
 
-**Tình huống.** Phần tử giữ một giá trị, và một bộ kiểm tra — ở máy khách hay máy chủ — đã **từ chối**
+**Khi nào gặp.** Phần tử giữ một giá trị, và một bộ kiểm tra — ở máy khách hay máy chủ — đã **từ chối**
 giá trị đó. Phần tử phải nói rằng lỗi nằm ở **chính nó**, và nói lỗi là gì.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một quy tắc mà giá trị này có thể vi phạm: bắt buộc, định dạng, độ dài, trùng, khoảng giá trị.
 - Có một thông báo cần được gắn vào đúng phần tử này, không phải vào cả biểu mẫu.
@@ -392,10 +399,10 @@ trống · mã giảm giá không tồn tại · số lượng vượt tồn kho
 
 ## `STATE-9` — giá trị đọc được nhưng bị đóng băng
 
-**Tình huống.** Giá trị là **thật**, cần đọc được, cần sao chép được, cần đến được bằng phím Tab —
+**Khi nào gặp.** Giá trị là **thật**, cần đọc được, cần sao chép được, cần đến được bằng phím Tab —
 nhưng không được sửa **ở đây**. Đây không phải là bị tắt; đây là một giá trị được trưng ra.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Người dùng có lý do chính đáng để chọn và sao chép giá trị này.
 - Giá trị có thể sửa được ở **chỗ khác**, hoặc do hệ thống sinh ra.

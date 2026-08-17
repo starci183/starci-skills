@@ -9,6 +9,15 @@ codes: [NAME-1, NAME-2, NAME-3, NAME-4, NAME-5, NAME-6, NAME-7]
 
 # Naming
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is a shape somebody already accepted — a capability, an operation, a contract, a helper that
 the design decided exists. This pattern does not re-open that decision. Its output is source
 architecture: which folder holds the symbol, which file it goes in, what suffix that file carries, and
@@ -278,7 +287,7 @@ reading it · a query builder that at first has one tab calling it.
 There is no application layer that owns naming and no layer that can stay ignorant of it — every layer
 declares symbols. What v2 records instead is the **tier** that actually holds each code:
 `unrepresentable` means a closed union or branded type makes the wrong value impossible to write;
-`enforced` means a lint rule in `@starci/eslint-canon-be` catches it; `documented` means nothing
+`enforced` means a lint rule in `@canon-be` catches it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

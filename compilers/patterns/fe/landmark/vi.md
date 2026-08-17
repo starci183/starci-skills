@@ -4,7 +4,16 @@ title: Landmark · Vietnamese
 
 # Landmark
 
-Đầu vào là một shape đã có người duyệt: một màn hình, một layout, một vùng chrome bao quanh trang được
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt: một màn hình, một layout, một vùng chrome bao quanh trang được
 route, một key trong registry. Việc vùng đó tồn tại và việc người đọc được phép nhảy thẳng vào nó là
 quyết định đã chốt, ở đây không mở lại. Cái module này sinh ra là kiến trúc source — file nào mở
 element landmark, file nào vĩnh viễn không được mở, file ấy được mang gì, và nó phải khai báo gì để
@@ -62,14 +71,14 @@ vẫn cố định element đúng; một branch nhận `as` vẫn không sở h�
 
 ## `LANDMARK-1` — mỗi element một branch
 
-**Tình huống.** Màn hình mới cần một `nav` hoặc một `aside` thật, không phải một `div` trông giống `nav`.
+**Khi nào gặp.** Màn hình mới cần một `nav` hoặc một `aside` thật, không phải một `div` trông giống `nav`.
 Câu hỏi đặt ra là thêm một branch nữa, hay dạy branch sẵn có nhận thêm một tham số.
 
-**Nó sinh ra gì trong source.** Mỗi element landmark một file branch, giống branch node thường ở mọi dòng
+**Source phải thể hiện gì.** Mỗi element landmark một file branch, giống branch node thường ở mọi dòng
 trừ đúng element nó mở. File của chính branch đó là nơi duy nhất element ấy được viết ra bằng tay. Thêm
 một element landmark vẫn là một thay đổi một-file.
 
-**Dấu hiệu nhận biết.** Có người vừa nói thêm một branch nữa thì lặp code quá. Đề xuất thay thế luôn là
+**Cách nhận ra.** Có người vừa nói thêm một branch nữa thì lặp code quá. Đề xuất thay thế luôn là
 một cờ, một map, hoặc một prop chọn tag. Branch mới sẽ giống branch thường ở mọi dòng trừ đúng một dòng.
 
 **Ranh giới.** Đây không phải `LANDMARK-3`: `LANDMARK-1` nói có BAO NHIÊU branch, `LANDMARK-3` nói ai
@@ -82,13 +91,13 @@ footer thành vùng đọc riêng · dựng thanh công cụ trên cùng của m
 
 ## `LANDMARK-2` — branch không sở hữu class nào
 
-**Tình huống.** Branch landmark vừa ra đời, và ngay lập tức có người muốn cho nó nhận `className`,
+**Khi nào gặp.** Branch landmark vừa ra đời, và ngay lập tức có người muốn cho nó nhận `className`,
 `padding`, hoặc "chỉ một cái `min-w-0` thôi".
 
-**Nó sinh ra gì trong source.** Một branch mà props chỉ mang element và không gì khác. Class, tập con
+**Source phải thể hiện gì.** Một branch mà props chỉ mang element và không gì khác. Class, tập con
 được nhận và lý do đều ở lại trên key trong registry, đúng chỗ chúng đã được khai báo từ trước.
 
-**Dấu hiệu nhận biết.** Branch bắt đầu mang prop mà key không có tiếng nói. Có hai chỗ trả lời được câu
+**Cách nhận ra.** Branch bắt đầu mang prop mà key không có tiếng nói. Có hai chỗ trả lời được câu
 "tại sao nút này thụt vào" — key, và branch. Không ai còn nói được sự khác nhau giữa branch landmark và
 registry.
 
@@ -102,14 +111,14 @@ site · thêm biến thể `compact` cho landmark · để branch tự quyết `
 
 ## `LANDMARK-3` — element không phải một prop
 
-**Tình huống.** Có đề xuất một branch duy nhất, nhận `as="main"` hoặc `element="nav"`. Nghe rất gọn: một
+**Khi nào gặp.** Có đề xuất một branch duy nhất, nhận `as="main"` hoặc `element="nav"`. Nghe rất gọn: một
 branch, mọi element.
 
-**Nó sinh ra gì trong source.** Một props interface đóng trên branch node — đúng key và phần nội dung —
+**Source phải thể hiện gì.** Một props interface đóng trên branch node — đúng key và phần nội dung —
 nên `as` / `element` / `tag` là thuộc tính thừa và không qua được typecheck. Element được đọc từ union
 `host` đóng của entry, còn file branch ghi lại rằng `as` đã được cân nhắc và bị từ chối.
 
-**Dấu hiệu nhận biết.** Ý nghĩa của document đứng cùng dòng với các quyết định về giao diện. Việc một
+**Cách nhận ra.** Ý nghĩa của document đứng cùng dòng với các quyết định về giao diện. Việc một
 trang có landmark hay không phụ thuộc vào việc call site có nhớ truyền prop hay không. Không có chỗ nào
 ghi LÝ DO trang này mở element ấy.
 
@@ -122,14 +131,14 @@ generic `polymorphic component` · một branch dựng cả `section` lẫn `mai
 
 ## `LANDMARK-4` — layout dựng chrome là người đánh dấu
 
-**Tình huống.** Một layout vẽ điều hướng, rồi vẽ phần trang được route bên cạnh. Chính nó là file BIẾT
+**Khi nào gặp.** Một layout vẽ điều hướng, rồi vẽ phần trang được route bên cạnh. Chính nó là file BIẾT
 điều hướng kết thúc ở đâu và trang bắt đầu ở đâu — nên chính nó phải nói ra điều đó.
 
-**Nó sinh ra gì trong source.** Một `layout.tsx` của route vừa dựng chrome vừa render `children` thì phải
+**Source phải thể hiện gì.** Một `layout.tsx` của route vừa dựng chrome vừa render `children` thì phải
 với tới một landmark: nó giao `children` được route cho frame mang key landmark của trang, còn điều hướng
 được vẽ như một sibling. Các layout route anh em lặp lại đúng hình dạng đó.
 
-**Dấu hiệu nhận biết.** File này vừa dựng chrome, vừa nhận `children` từ router. Đọc file này thấy được
+**Cách nhận ra.** File này vừa dựng chrome, vừa nhận `children` từ router. Đọc file này thấy được
 ranh giới giữa phần lặp lại ở mọi trang và phần người đọc đến để xem. Bỏ đánh dấu đi thì bàn phím và
 trình đọc màn hình phải đi lại toàn bộ navbar sau mỗi lần đổi route.
 
@@ -143,15 +152,15 @@ khu vực học tập có thanh tiến độ trên cùng · khu vực quản tr�
 
 ## `LANDMARK-5` — một `main` cho mỗi document
 
-**Tình huống.** Một key tên `dashboard-main`, `profile-main`, `explore-main`. Cái tên nói "main", và
+**Khi nào gặp.** Một key tên `dashboard-main`, `profile-main`, `explore-main`. Cái tên nói "main", và
 người đọc key tin nó là landmark. Nó không phải. Đó là CỘT ĐỌC nằm cạnh rail, bên trong một trang mà
 landmark đã được mở ở một tầng trên.
 
-**Nó sinh ra gì trong source.** Landmark ở lại với người sở hữu cả một màn hình — file route, hoặc bề mặt
+**Source phải thể hiện gì.** Landmark ở lại với người sở hữu cả một màn hình — file route, hoặc bề mặt
 trang — và vật mang quyết định là bên nào trong hai. Các key đặt tên cho cột đọc không khai `host` nào
 cả; chỉ entry khai `host: "main"` mới là một lời hứa.
 
-**Dấu hiệu nhận biết.** Trên cùng một màn hình có nhiều hơn một chỗ tự nhận là "main". Key nằm trong một
+**Cách nhận ra.** Trên cùng một màn hình có nhiều hơn một chỗ tự nhận là "main". Key nằm trong một
 block, một composite hay một leaf — tức là một PHẦN của màn hình. Bỏ node này đi thì màn hình vẫn còn
 trang; nó chỉ mất một cột.
 
@@ -192,7 +201,7 @@ vốn nằm trong chính cây tin cậy này.
 
 | Mã | Ở đâu | Tìm gì |
 |---|---|---|
-| `LANDMARK-1` | `@starci/eslint-canon-fe` | `LANDMARK_BRANCHES` — tập tên branch mở landmark, mỗi element một entry. **Chưa neo được trong ứng dụng:** ứng dụng hiện mang element trên entry, nên không còn branch landmark nào để trỏ tới |
+| `LANDMARK-1` | `@canon-fe` | `LANDMARK_BRANCHES` — tập tên branch mở landmark, mỗi element một entry. **Chưa neo được trong ứng dụng:** ứng dụng hiện mang element trên entry, nên không còn branch landmark nào để trỏ tới |
 | `LANDMARK-2` | `components/branches/Tree/index.tsx` | Props của branch node: một key và phần nội dung, không có class. Class của nó đến từ tra cứu entry. Branch landmark lẽ ra thừa hưởng hình dạng này hiện chưa tồn tại |
 | `LANDMARK-3` | `components/branches/Tree/index.tsx` | Props interface, và khối comment ghi lại rằng `as` đã được cân nhắc và bị từ chối; element được đọc từ `host` của entry |
 | `LANDMARK-4` | `app/[lang]/dashboard/layout.tsx` | Một layout vẽ điều hướng như một sibling và giao `children` được route cho frame mang key `routed-page-main`. Các layout route anh em lặp lại hình dạng đó |

@@ -7,6 +7,15 @@ codes: [NAMING-1, NAMING-2, NAMING-3]
 
 # Naming
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input to this pattern is a shape somebody already accepted — a layout, a block, a capability, a
 contract. That decision is closed here; this pattern does not reopen it. The output is source
 architecture: which file the code lands in, how the declaration is written, what the thing a reader
@@ -153,7 +162,7 @@ and static asset folders.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a rule in `@starci/eslint-canon-fe` reports it;
+wrong value impossible to write; `enforced` means a rule in `@canon-fe` reports it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | Held by | What the tier does not reach |
@@ -174,12 +183,12 @@ proposal, not a law.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `NAMING-1` | `@starci/eslint-canon-fe` | The file obeys the rule it publishes. Every declaration in it — `MODULE_LEVEL_PARENTS`, `segmentsOf`, all three rule objects — is a const, and each appears above its first use. Read it top to bottom and nothing is referenced before it exists; that property is the whole argument, and it is visible rather than asserted |
-| `NAMING-1` | `@starci/eslint-canon-fe` | The invalid triple: a named export, a bare module-level declaration, and `export default function Route()`. Beside it the valid case `export const E = () => { function inner() {…} }` — the nested declaration that is deliberately allowed, written as a test rather than as a sentence |
-| `NAMING-2` | `@starci/eslint-canon-fe` | The invalid triple is one function in three positions: a local, a JSX attribute, a field in a props type. That triple is the argument for the rule's reach. The valid cases `handled` and `handler` are the argument for its narrowness — a rule that fired on them would be noise, and noise is unread |
-| `NAMING-2` | `@starci/eslint-canon-fe` | `flag` and its `/^handle[A-Z]/` test, and the three visitors that call it. The visitor list IS the reach; anything not in it is outside the rule regardless of what it is named |
-| `NAMING-3` | `@starci/eslint-canon-fe` | `SECOND_LANGUAGE_PATH` and `ROMANISED` — two instruments for one law, because the filesystem drops diacritics. Then `segmentsOf`, and the `replace(/[()[\]]/g, "")` in the finder: route-group parentheses are punctuation around a name, not part of it |
-| `NAMING-3` | `@starci/eslint-canon-fe` | The valid cases `capacity` and `DangerBadge`. They are the reason `ROMANISED` is a list rather than a pattern, and they are the case a cleverer rule fails |
+| `NAMING-1` | `@canon-fe` | The file obeys the rule it publishes. Every declaration in it — `MODULE_LEVEL_PARENTS`, `segmentsOf`, all three rule objects — is a const, and each appears above its first use. Read it top to bottom and nothing is referenced before it exists; that property is the whole argument, and it is visible rather than asserted |
+| `NAMING-1` | `@canon-fe` | The invalid triple: a named export, a bare module-level declaration, and `export default function Route()`. Beside it the valid case `export const E = () => { function inner() {…} }` — the nested declaration that is deliberately allowed, written as a test rather than as a sentence |
+| `NAMING-2` | `@canon-fe` | The invalid triple is one function in three positions: a local, a JSX attribute, a field in a props type. That triple is the argument for the rule's reach. The valid cases `handled` and `handler` are the argument for its narrowness — a rule that fired on them would be noise, and noise is unread |
+| `NAMING-2` | `@canon-fe` | `flag` and its `/^handle[A-Z]/` test, and the three visitors that call it. The visitor list IS the reach; anything not in it is outside the rule regardless of what it is named |
+| `NAMING-3` | `@canon-fe` | `SECOND_LANGUAGE_PATH` and `ROMANISED` — two instruments for one law, because the filesystem drops diacritics. Then `segmentsOf`, and the `replace(/[()[\]]/g, "")` in the finder: route-group parentheses are punctuation around a name, not part of it |
+| `NAMING-3` | `@canon-fe` | The valid cases `capacity` and `DangerBadge`. They are the reason `ROMANISED` is a list rather than a pattern, and they are the case a cleverer rule fails |
 
 Every anchor above is lint source inside the trust tree, which is the code this repository can
 actually open. The flat law also named two files in a product repository; those are not reproduced

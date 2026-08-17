@@ -4,6 +4,15 @@ title: Exception-identity
 
 # Exception-identity
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one class, one file, one hunk of a diff. The output is a
 **verdict**: whether the node was in scope at all, which published rule fired, what it reported and on
 which node, which law code that maps to, and the open hatch that would have hidden the same failure.
@@ -26,7 +35,7 @@ on nothing.
 
 ## Published rules
 
-Three rules ship for this law, in `@starci/eslint-canon-be`, all three at `error`.
+Three rules ship for this law, in `@canon-be`, all three at `error`.
 
 | Rule | Code | What it reports |
 |---|---|---|

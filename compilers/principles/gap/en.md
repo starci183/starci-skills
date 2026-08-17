@@ -4,6 +4,13 @@ title: Gap
 
 # Gap
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a login form with three fields" — and you return, for
 every parent that request implies, one situation code and one className. The request never states a
 distance and you never estimate one: the distance follows from the relationship between the things

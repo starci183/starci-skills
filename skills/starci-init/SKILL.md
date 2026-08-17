@@ -5,7 +5,20 @@ description: Make a Source ready to be worked in — the agent bootstrap at its 
 
 # starci-init
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+
+## HANDS OFF TO — named, never loaded
+
+None.
+
+
+## Run
+
+Read `@skill-shape` first.
 
 **This skill runs more than once.** Its first job is a one-time bootstrap; the other two recur — a
 project is declared, a checkout moves, a route goes stale, a second role appears. Being called `init`
@@ -102,7 +115,7 @@ Both files carry the same content and the same link:
 # StarCi agent bootstrap
 
 Before planning, reading target source, or running a skill, read
-[`<Source>/<tree>/INDEX.md`](<tree>/INDEX.md) completely and follow its load order.
+`<Source>/<tree>/INDEX.md` completely and follow its load order.
 
 This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.

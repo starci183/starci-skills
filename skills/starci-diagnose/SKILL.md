@@ -5,13 +5,26 @@ description: Trace another skill's flow against the real machine without running
 
 # starci-diagnose
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+
+## HANDS OFF TO — named, never loaded
+
+None.
+
+
+## Run
+
+Read `@skill-shape` first.
 
 Invoked as `/starci-diagnose <skill>` with an optional scenario:
 
 ```text
-/starci-diagnose starci-fe-design-layout
-/starci-diagnose starci-fe-design-layout  render the settings page at second-app
+/starci-diagnose <skill>
+/starci-diagnose <skill>  render the settings page at second-app
 ```
 
 Without a scenario it traces what every run of that skill needs. With one, it traces that run.
@@ -100,7 +113,7 @@ settle it. `OWED` carries the trace steps that could not be evaluated at all.
 
 ## Worked example
 
-**Invocation.** `/starci-diagnose starci-fe-design-layout  render the settings page at second-app`
+**Invocation.** `/starci-diagnose <skill>  render the settings page at second-app`
 
 ### What the trace does, step by step
 
@@ -121,7 +134,7 @@ finding: no workspace route for this project
 label: blocked
 evidence: .workspace/ contains example-app; second-app absent
 first-stop: yes, at target step 2
-cleared-by: starci-init, with the project declared by the owner
+cleared-by: the route owner, with the project declared by the owner
 ```
 
 ```text

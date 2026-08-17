@@ -4,6 +4,13 @@ title: Exception identity
 
 # Exception identity
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input to this pattern is a shape already accepted: a capability, a guard, a contract or a layout
 that somebody decided the application will have. That decision is not re-opened here. The output is
 source architecture — which file the failure is declared in, which layer holds it, what its class is

@@ -4,8 +4,15 @@ title: Colour · Vietnamese
 
 # Màu sắc
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một thẻ đơn hàng có mã đơn, ngày đặt và tình trạng đã
-thanh toán" — và đầu ra là, với **mỗi phần tử** mà yêu cầu đó ngụ ý, một mã tình huống và một
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một thẻ đơn hàng có mã đơn, ngày đặt và tình trạng đã
+thanh toán" — rồi trả về là, với **mỗi phần tử** mà yêu cầu đó ngụ ý, một mã tình huống và một
 className. Yêu cầu không bao giờ nói ra một sắc độ, và không được phép tự chọn một sắc độ: màu suy ra
 từ **vai trò** mà phần tử đang đóng trong nghiệp vụ.
 
@@ -77,10 +84,10 @@ khiến người ta nói được rằng một lần dùng nó là sai.
 
 ## `COLOUR-1` — nội dung chính
 
-**Tình huống.** Đây là câu mà người dùng phải đọc để ra quyết định: tên khoá học, số tiền phải trả,
+**Khi nào gặp.** Đây là câu mà người dùng phải đọc để ra quyết định: tên khoá học, số tiền phải trả,
 nội dung câu hỏi, tên người gửi. Bỏ nó đi thì màn hình mất lý do tồn tại.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nếu chỉ được đọc **một** dòng trên màn hình này, người dùng sẽ đọc dòng đó.
 - Nó không phụ thuộc vào một dòng nào khác để có nghĩa.
@@ -103,10 +110,10 @@ dẫn bắt buộc phải làm theo · tên sản phẩm trong giỏ hàng.
 
 ## `COLOUR-2` — nội dung hỗ trợ
 
-**Tình huống.** Nội dung vẫn có ích nhưng **không dẫn nhịp đọc**: nó nói thêm về một nội dung chính
+**Khi nào gặp.** Nội dung vẫn có ích nhưng **không dẫn nhịp đọc**: nó nói thêm về một nội dung chính
 đang đứng ngay cạnh. Xoá đi thì màn hình vẫn dùng được, chỉ kém rõ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nó trả lời "khi nào", "bao nhiêu cái", "từ đâu ra", "loại gì" cho một nội dung chính.
 - Có một `COLOUR-1` rõ ràng ở gần để nó bám vào.
@@ -130,10 +137,10 @@ dung lượng tệp · số lượt xem · dòng "còn 3 chỗ" mang tính tham 
 
 ## `COLOUR-3` — tương tác và mục đang chọn
 
-**Tình huống.** Phần tử **có thể bấm hoặc đi tới**, hoặc đang là **mục hiện tại** trong một tập lựa
+**Khi nào gặp.** Phần tử **có thể bấm hoặc đi tới**, hoặc đang là **mục hiện tại** trong một tập lựa
 chọn. Màu ở đây nói "chỗ này hành động được" hoặc "bạn đang ở đây".
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có `href`, có `onClick`, hoặc có `aria-current` / `aria-selected`.
 - Bỏ màu đi thì người dùng không biết còn chỗ nào để bấm.
@@ -157,10 +164,10 @@ nhỏ bộ lọc đang bật · "Xem tất cả" cuối một phần nội dung.
 
 ## `COLOUR-4` — kết quả thành công
 
-**Tình huống.** Một việc đã **thật sự hoàn tất**, và hệ thống biết điều đó. Không phải "nội dung nghe
+**Khi nào gặp.** Một việc đã **thật sự hoàn tất**, và hệ thống biết điều đó. Không phải "nội dung nghe
 có vẻ vui".
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một sự kiện đã xảy ra: đã thanh toán, đã xuất bản, đã nộp, đã đồng bộ.
 - Có một trường trạng thái trong dữ liệu để trỏ vào.
@@ -181,10 +188,10 @@ có vẻ vui".
 
 ## `COLOUR-5` — cảnh báo còn cứu được
 
-**Tình huống.** Chưa có gì hỏng, nhưng nếu người dùng **không làm gì** thì sẽ hỏng. Luôn có một hành
+**Khi nào gặp.** Chưa có gì hỏng, nhưng nếu người dùng **không làm gì** thì sẽ hỏng. Luôn có một hành
 động phòng ngừa đi kèm.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một mốc thời gian hoặc một ngưỡng đang tiến tới.
 - Người dùng vẫn còn cách để tránh hậu quả.
@@ -205,10 +212,10 @@ hết hạn".
 
 ## `COLOUR-6` — thất bại và hành động phá huỷ
 
-**Tình huống.** Một trong ba việc: một thao tác **đã** thất bại, một dữ liệu **đang** không hợp lệ,
+**Khi nào gặp.** Một trong ba việc: một thao tác **đã** thất bại, một dữ liệu **đang** không hợp lệ,
 hoặc một hành động **sẽ** phá huỷ thứ gì đó không lấy lại được.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một lỗi thật để hiển thị, kèm lý do đọc được.
 - Hoặc trường nhập liệu đang ở trạng thái `aria-invalid` **sau khi** đã kiểm tra tính hợp lệ.
@@ -233,10 +240,10 @@ chối".
 
 ## `COLOUR-7` — tiêu điểm bàn phím
 
-**Tình huống.** Bàn phím đang đứng ở đâu. Đây là thông tin **của thiết bị nhập**, không phải của dữ
+**Khi nào gặp.** Bàn phím đang đứng ở đâu. Đây là thông tin **của thiết bị nhập**, không phải của dữ
 liệu.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chỉ xuất hiện khi điều hướng bằng bàn phím (`focus-visible`).
 - Di chuyển liên tục khi bấm Tab; không có gì được ghi nhớ.
@@ -259,10 +266,10 @@ danh sách · thẻ tab · phần tử trong lệnh trình đơn · hộp kiểm
 
 ## `COLOUR-8` — bị vô hiệu hoá
 
-**Tình huống.** Thành phần điều khiển **có mặt** nhưng **chưa dùng được**, vì một điều kiện nghiệp vụ
+**Khi nào gặp.** Thành phần điều khiển **có mặt** nhưng **chưa dùng được**, vì một điều kiện nghiệp vụ
 chưa thoả.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có thuộc tính `disabled` hoặc `aria-disabled` thật, không chỉ là màu nhạt.
 - Có một lý do nghiệp vụ nói được thành lời: chưa chọn xong, chưa đủ quyền, đang xử lý.
@@ -284,9 +291,9 @@ xong · tính năng ngoài gói cước · nút đang gửi · lựa chọn đã
 
 ## `COLOUR-9` — mặt phẳng gốc
 
-**Tình huống.** Nền của cả trang. Mọi thứ khác nằm **trên** nó.
+**Khi nào gặp.** Nền của cả trang. Mọi thứ khác nằm **trên** nó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không có bề mặt nào phía dưới nó nữa.
 - Nó là chỗ chủ đề quyết định "sáng hay tối".
@@ -303,10 +310,10 @@ xong · tính năng ngoài gói cước · nút đang gửi · lựa chọn đã
 
 ## `COLOUR-10` — bề mặt nổi
 
-**Tình huống.** Một khối **tự đứng được** nằm trên nền trang: nó gom một nhóm nội dung thành một đơn
+**Khi nào gặp.** Một khối **tự đứng được** nằm trên nền trang: nó gom một nhóm nội dung thành một đơn
 vị có ranh giới riêng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nó có ranh giới riêng (viền, bóng, bo góc).
 - Nội dung bên trong thuộc về nhau và tách khỏi phần còn lại của trang.
@@ -325,10 +332,10 @@ mục trong luồng tin có ranh giới riêng · thành phần tiện ích trê
 
 ## `COLOUR-11` — vùng nhóm nhẹ
 
-**Tình huống.** Một vùng **bên trong** một bề mặt, cần được đọc thành một nhóm phụ nhưng **không** được
+**Khi nào gặp.** Một vùng **bên trong** một bề mặt, cần được đọc thành một nhóm phụ nhưng **không** được
 nâng lên thành một khối tự đứng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nó luôn nằm trong một `COLOUR-10` hoặc một `COLOUR-9`.
 - Nó không có tiêu đề riêng ở cấp trang, không tự tồn tại nếu tách ra.
@@ -350,9 +357,9 @@ trong bảng.
 
 ## `COLOUR-12` — đường ranh trung tính
 
-**Tình huống.** Cần nói "hai bên là hai thứ khác nhau", và **không** cần nói gì thêm.
+**Khi nào gặp.** Cần nói "hai bên là hai thứ khác nhau", và **không** cần nói gì thêm.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Ranh giới không mang trạng thái nào.
 - Nó không được đọc như cảnh báo, như trạng thái chọn, hay như lỗi.
@@ -371,10 +378,10 @@ thái bình thường · viền bảng · đường ngăn giữa phần đầu v
 
 ## `COLOUR-13` — các hạng mục dữ liệu độc lập
 
-**Tình huống.** Nhiều chuỗi dữ liệu **ngang hàng**, không cái nào là thành công, cảnh báo hay nguy
+**Khi nào gặp.** Nhiều chuỗi dữ liệu **ngang hàng**, không cái nào là thành công, cảnh báo hay nguy
 hiểm. Chúng chỉ cần **phân biệt được với nhau**.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Số lượng chuỗi dữ liệu do dữ liệu quyết định, không do thiết kế.
 - Không chuỗi dữ liệu nào tốt hơn chuỗi dữ liệu nào.
@@ -396,10 +403,10 @@ sánh nhiều gói cước · nhiều đường trên một biểu đồ thời 
 
 ## `COLOUR-14` — tác phẩm đồ hoạ thương hiệu
 
-**Tình huống.** Bản thân **hình ảnh** của thương hiệu: biểu trưng, mascot, minh hoạ. Bảng màu của nó
+**Khi nào gặp.** Bản thân **hình ảnh** của thương hiệu: biểu trưng, mascot, minh hoạ. Bảng màu của nó
 do thương hiệu quyết định, không do mô-đun này quyết định.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nó là một tài sản đồ hoạ, không phải một thành phần điều khiển.
 - Nó không mang trạng thái nào và không bấm được (nếu bấm được thì vùng bấm là `COLOUR-3`).
@@ -416,9 +423,9 @@ trang lỗi · hình nền vùng nổi bật · huy hiệu đối tác.
 
 ## `COLOUR-15` — chữ trên ảnh
 
-**Tình huống.** Chữ phải đọc được trên một tấm ảnh mà ta **không biết trước** nó sáng hay tối.
+**Khi nào gặp.** Chữ phải đọc được trên một tấm ảnh mà ta **không biết trước** nó sáng hay tối.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nội dung phía sau do người dùng hoặc do dữ liệu quyết định.
 - Không có biến thiết kế nào đảm bảo được độ tương phản, vì nền không xác định.

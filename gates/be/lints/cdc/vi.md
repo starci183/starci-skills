@@ -4,7 +4,14 @@ title: CDC · Vietnamese
 
 # Bắt thay đổi dữ liệu
 
-Đầu vào là code đã viết xong — một tệp bộ lắng nghe, một khúc diff. Đầu ra là một **phán quyết**: tệp
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận code đã viết xong — một tệp bộ lắng nghe, một khúc diff. Kết quả là một **phán quyết**: tệp
 đó có thuộc phạm vi hay không, quy tắc đã công bố nào đã nổ, nó báo gì và báo tại nút nào, ứng với mã
 luật nào, và cái cửa còn mở nào lẽ ra đã che được đúng lỗi ấy. Mô-đun này không chọn giúp ai cách dựng
 một projection. Nó chỉ từ chối, và nó phải chỉ được vào đúng định danh mà nó từ chối.
@@ -89,7 +96,7 @@ sớm nào ở giữa**: (a) `!node.superClass || node.superClass.name !== "Abst
 một `Set`, mỗi tên trong bốn tên vắng mặt khỏi `Set` đó là một báo cáo `member`; (c) thành viên đầu
 tiên có tên ánh xạ ra `onModuleInit` báo `lifecycle`.
 
-**Nó không thấy gì.** Giá trị đứng sau một cái tên: `` protected readonly groupId = `projection-${randomUUID()}` ``
+**Điểm mù.** Giá trị đứng sau một cái tên: `` protected readonly groupId = `projection-${randomUUID()}` ``
 khai đủ tên rồi phát lại toàn bộ lịch sử mỗi lần khởi động, còn `protected readonly topics = []` khai
 đủ tên rồi không theo dõi gì cả. Thân hàm: một `recomputeTarget` cộng thêm lượng chênh lệch mà sự kiện
 mang theo thay vì dựng lại từ hàng nguồn, và một `deriveTargets` phát lệnh nghiệp vụ, gửi thông báo hay

@@ -8,9 +8,18 @@ codes: [E2E-1, E2E-2, E2E-3, E2E-4, E2E-5, E2E-6, E2E-7, E2E-8, E2E-9, E2E-10, E
 
 # Luồng e2e
 
-Đầu vào của pattern này là một shape đã duyệt: một câu nghiệp vụ mà người ta đã đồng ý là đáng chứng
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã duyệt: một câu nghiệp vụ mà người ta đã đồng ý là đáng chứng
 minh, kèm theo các bước, các actor và ranh giới đi vào đã chốt xong. Pattern không mở lại quyết định
-đó. Đầu ra của nó là kiến trúc source — câu ấy trở thành file nào, tầng nào giữ phần wiring, file
+đó. Nó trả về kiến trúc source — câu ấy trở thành file nào, tầng nào giữ phần wiring, file
 được import gì, phải vào bằng cửa nào, đặt tên actor ra sao, và bị cấm với tay tới đâu. Shape nói lời
 hứa là gì; pattern này nói code nằm ở đâu.
 
@@ -84,14 +93,14 @@ Mười hai mã. Module dừng ở mười hai: một tình huống mới là m�
 
 ## `E2E-1` — một file, một flow, tên file là câu nghiệp vụ
 
-**Tình huống.** Bạn sắp tạo một file trong lane flow. Câu hỏi đầu tiên không phải "test resolver nào"
+**Khi nào gặp.** Bạn sắp tạo một file trong lane flow. Câu hỏi đầu tiên không phải "test resolver nào"
 mà **câu nghiệp vụ nào đang được hứa**.
 
-**Nó sinh ra gì trong source.** Một file `*.e2e-spec.ts` mà tên đọc lên thành một câu có chủ ngữ và
+**Source phải thể hiện gì.** Một file `*.e2e-spec.ts` mà tên đọc lên thành một câu có chủ ngữ và
 động từ — *một người học mua khoá học rồi bắt đầu học được* — cùng một chuỗi `describe` nói đúng câu
 mà tên file đã nói.
 
-**Dấu hiệu nhận biết.** Tên file đọc lên thành một câu có chủ ngữ và động từ. Chuỗi trong `describe`
+**Cách nhận ra.** Tên file đọc lên thành một câu có chủ ngữ và động từ. Chuỗi trong `describe`
 nói cùng một câu với tên file. Người không viết file vẫn đoán được nó chứng minh gì trước khi mở ra.
 Tự hỏi: nếu xoá file này, lời hứa nghiệp vụ nào mất người canh?
 
@@ -104,12 +113,12 @@ tin · mở khoá thành tựu · đăng ký dùng thử · phát thông báo ·
 
 ## `E2E-2` — flow là chuỗi bước có tên, không phải một case dài
 
-**Tình huống.** Câu nghiệp vụ có nhiều chặng: đặt vào giỏ, thanh toán, mở quyền học.
+**Khi nào gặp.** Câu nghiệp vụ có nhiều chặng: đặt vào giỏ, thanh toán, mở quyền học.
 
-**Nó sinh ra gì trong source.** Mỗi chặng một `it` riêng, xếp theo thứ tự nghiệp vụ, nằm trong một
+**Source phải thể hiện gì.** Mỗi chặng một `it` riêng, xếp theo thứ tự nghiệp vụ, nằm trong một
 `describe`; state dùng chung khai ở scope `describe` và gán trong bước tạo ra nó.
 
-**Dấu hiệu nhận biết.** Mỗi `it` đọc lên là một bước nghiệp vụ, không phải một lời gọi kỹ thuật. Khi
+**Cách nhận ra.** Mỗi `it` đọc lên là một bước nghiệp vụ, không phải một lời gọi kỹ thuật. Khi
 đỏ, runner in ra tên bước, và các bước sau bị bỏ qua thay vì đỏ dây chuyền. Tự hỏi: nếu chỉ nhìn dòng
 đỏ mà không mở file, tôi có biết chặng nào vỡ không?
 
@@ -126,13 +135,13 @@ nội dung · đặt lịch rồi xác nhận · thanh toán rồi phát quyền
 
 ## `E2E-3` — không bao giờ ngủ; poll tới khi trạng thái lắng, kèm deadline
 
-**Tình huống.** Có một chặng bất đồng bộ như webhook, queue, projection hoặc socket nên hệ thống cần
+**Khi nào gặp.** Có một chặng bất đồng bộ như webhook, queue, projection hoặc socket nên hệ thống cần
 thời gian để hoàn tất.
 
-**Nó sinh ra gì trong source.** Một lần poll có chặn trên trạng thái đang chờ: một predicate cộng một
+**Source phải thể hiện gì.** Một lần poll có chặn trên trạng thái đang chờ: một predicate cộng một
 deadline, mà thông điệp khi hết hạn nêu đúng cái trạng thái đã chờ chứ không phải chữ "timeout".
 
-**Dấu hiệu nhận biết.** Có `await` một hàm tên `sleep`, `delay`, `wait`, `pause`, hoặc một `Promise`
+**Cách nhận ra.** Có `await` một hàm tên `sleep`, `delay`, `wait`, `pause`, hoặc một `Promise`
 bọc `setTimeout`. Có một con số mili-giây mà không ai giải thích được vì sao là con số đó. Lịch sử file
 cho thấy con số đó chỉ tăng, không bao giờ giảm. Tự hỏi: tôi đang chờ trạng thái nào? Nếu trả lời được,
 hãy poll đúng trạng thái đó.
@@ -152,13 +161,13 @@ bắt kịp · cache bị vô hiệu · scheduler nổ · email vào outbox.
 
 ## `E2E-4` — khẳng định hệ quả, và đọc nó ở nơi nó sống
 
-**Tình huống.** Một bước vừa gọi xong. Câu hỏi là: hệ quả nghiệp vụ của bước đó nằm ở đâu?
+**Khi nào gặp.** Một bước vừa gọi xong. Câu hỏi là: hệ quả nghiệp vụ của bước đó nằm ở đâu?
 
-**Nó sinh ra gì trong source.** Một lần đọc từ chính nơi hệ quả sống — row đọc qua entity manager thật
+**Source phải thể hiện gì.** Một lần đọc từ chính nơi hệ quả sống — row đọc qua entity manager thật
 của datasource chính, message, hoặc truy vấn kế tiếp — và assertion đặt lên lần đọc đó, không đặt lên
 envelope của transport.
 
-**Dấu hiệu nhận biết.** Bước chỉ khẳng định `statusCode`, `errors` rỗng, hoặc `data.x` trong envelope
+**Cách nhận ra.** Bước chỉ khẳng định `statusCode`, `errors` rỗng, hoặc `data.x` trong envelope
 trả về. Không có lần đọc nào từ database, message hay truy vấn kế tiếp. Nếu handler ghi sai bảng mà vẫn
 trả `200`, bước này vẫn xanh. Tự hỏi: nếu server trả lời đúng nhưng **không ghi gì**, bước này có đỏ
 không?
@@ -178,14 +187,14 @@ kinh nghiệm cộng thêm · bản ghi job hoàn tất · quyền truy cập b�
 
 ## `E2E-5` — bước realtime mở client thật, và khẳng định cái gì đã tới, không phải bao nhiêu
 
-**Tình huống.** Nghiệp vụ hứa "người trong phòng nhận được tin". Bước phải mở một client thật và chờ
+**Khi nào gặp.** Nghiệp vụ hứa "người trong phòng nhận được tin". Bước phải mở một client thật và chờ
 đúng tin đó.
 
-**Nó sinh ra gì trong source.** Một client socket thật cùng một lần chờ message KẾ TIẾP khớp predicate,
+**Source phải thể hiện gì.** Một client socket thật cùng một lần chờ message KẾ TIẾP khớp predicate,
 với assertion đặt lên nội dung và người nhận — không có assertion độ dài, không có recorder reset bằng
 tay.
 
-**Dấu hiệu nhận biết.** Có `expect(...).toBe(2)` trên độ dài một mảng message. Có một recorder toàn
+**Cách nhận ra.** Có `expect(...).toBe(2)` trên độ dài một mảng message. Có một recorder toàn
 cục, được reset bằng tay giữa các bước. Thêm một subscriber nữa vào hệ thống là bước này đỏ. Tự hỏi:
 nếu payload **sai** nhưng số người nhận **đúng**, bước này có đỏ không?
 
@@ -203,13 +212,13 @@ stream về · trạng thái phiên phỏng vấn · cập nhật bảng xếp h
 
 ## `E2E-6` — phủ định là một phần của flow
 
-**Tình huống.** Trước khi khách đăng ký, họ phải **không** nhận được gì. Trước khi thanh toán lắng,
+**Khi nào gặp.** Trước khi khách đăng ký, họ phải **không** nhận được gì. Trước khi thanh toán lắng,
 quyền học phải **đóng**.
 
-**Nó sinh ra gì trong source.** Ít nhất một bước có tên chứng minh sự vắng mặt, với một actor thứ hai
+**Source phải thể hiện gì.** Ít nhất một bước có tên chứng minh sự vắng mặt, với một actor thứ hai
 đứng ngoài, được quan sát qua một khoảng im lặng ngắn và được nêu rõ.
 
-**Dấu hiệu nhận biết.** File chỉ toàn bước "thì phải nhận được", không có bước nào "thì phải không nhận
+**Cách nhận ra.** File chỉ toàn bước "thì phải nhận được", không có bước nào "thì phải không nhận
 được". Không có actor thứ hai đứng ngoài để chứng minh không bị rò. Một hệ thống phát mọi thứ cho mọi
 người sẽ qua sạch cả file. Tự hỏi: nếu hệ thống gửi mọi thứ cho mọi người, file này có bắt được không?
 
@@ -226,13 +235,13 @@ không nhận thông báo nữa.
 
 ## `E2E-7` — không rẽ nhánh trong một bước
 
-**Tình huống.** Bước đang xét một trạng thái có thể là A hoặc B, và tác giả viết `if` để "an toàn".
+**Khi nào gặp.** Bước đang xét một trạng thái có thể là A hoặc B, và tác giả viết `if` để "an toàn".
 
-**Nó sinh ra gì trong source.** Mỗi bước đúng một assertion vô điều kiện: điều kiện bị ép xảy ra rồi
+**Source phải thể hiện gì.** Mỗi bước đúng một assertion vô điều kiện: điều kiện bị ép xảy ra rồi
 khẳng định thẳng, hoặc case đó rời khỏi file này. Không `IfStatement`, `ConditionalExpression`,
 `SwitchStatement` hay `LogicalExpression` đứng thành câu lệnh bên trong một bước.
 
-**Dấu hiệu nhận biết.** Có `if`, ternary, `switch`, hoặc `a && expect(...)` đứng thành câu lệnh, bên
+**Cách nhận ra.** Có `if`, ternary, `switch`, hoặc `a && expect(...)` đứng thành câu lệnh, bên
 trong `it`. Có `expect` nằm trong nhánh mà không phải nhánh nào cũng chạy. Chạy hai lần cho hai kết quả
 xanh khác nhau, chứng minh hai thứ khác nhau. Tự hỏi: lần chạy **bỏ qua** nhánh này thì file đang chứng
 minh cái gì?
@@ -251,14 +260,14 @@ cache có thể ấm · người dùng có thể đã có row · retry có thể
 
 ## `E2E-8` — một chỗ dựng thế giới lên
 
-**Tình huống.** Flow cần app, database, broker, socket. Wiring đó thuộc về hạ tầng test, không thuộc về
+**Khi nào gặp.** Flow cần app, database, broker, socket. Wiring đó thuộc về hạ tầng test, không thuộc về
 file flow.
 
-**Nó sinh ra gì trong source.** Các entry point trong cây hạ tầng test dựng thế giới lên, được gọi ngay
+**Source phải thể hiện gì.** Các entry point trong cây hạ tầng test dựng thế giới lên, được gọi ngay
 dòng đầu của spec; bản thân file spec không chứa wiring riêng, và một lần ghi đè theo flow khai lại
 đúng một token nó ghi đè.
 
-**Dấu hiệu nhận biết.** File flow mở đầu bằng hai trăm dòng `Test.createTestingModule`. Đổi một provider
+**Cách nhận ra.** File flow mở đầu bằng hai trăm dòng `Test.createTestingModule`. Đổi một provider
 hạ tầng phải sửa hai mươi lăm file. Hai file flow dựng thế giới hơi khác nhau, và không ai biết khác chỗ
 nào. Tự hỏi: khi wiring đổi, bao nhiêu file phải đổi theo?
 
@@ -275,13 +284,13 @@ broker · mở namespace socket · nạp seed tối thiểu.
 
 ## `E2E-9` — actor có tên, và do chính flow tạo ra
 
-**Tình huống.** Flow cần một người mua, một người khác không được thấy gì, và một tổ chức.
+**Khi nào gặp.** Flow cần một người mua, một người khác không được thấy gì, và một tổ chức.
 
-**Nó sinh ra gì trong source.** Những lời gọi tới hàm tạo actor của thế giới, nhận vào một TÊN và ghi
+**Source phải thể hiện gì.** Những lời gọi tới hàm tạo actor của thế giới, nhận vào một TÊN và ghi
 xuống một row mới cho mỗi flow; không số thứ tự nào được chấp nhận và không actor nào được chia sẻ giữa
 các flow.
 
-**Dấu hiệu nhận biết.** Có số thứ tự ma thuật: `accountNumber: 8`, `userId: 3`. Actor được lấy từ seed
+**Cách nhận ra.** Có số thứ tự ma thuật: `accountNumber: 8`, `userId: 3`. Actor được lấy từ seed
 dùng chung thay vì được tạo mới. Chạy hai file cùng lúc thì cả hai cùng đỏ một cách khó hiểu. Tự hỏi:
 nếu file này chạy **cùng lúc** với một file khác, hai bên có giẫm lên nhau không?
 
@@ -298,12 +307,12 @@ người nộp · tổ chức và thành viên · người đã rời nhóm.
 
 ## `E2E-10` — flow không log gì cả
 
-**Tình huống.** Bước đang khó hiểu, và phản xạ đầu tiên là in ra vài dòng.
+**Khi nào gặp.** Bước đang khó hiểu, và phản xạ đầu tiên là in ra vài dòng.
 
-**Nó sinh ra gì trong source.** Không sinh ra gì: tên bước và assertion là output duy nhất của một spec.
+**Source phải thể hiện gì.** Không sinh ra gì: tên bước và assertion là output duy nhất của một spec.
 Không `console.log`, `console.debug` hay logger của framework ở bất cứ đâu trong file spec.
 
-**Dấu hiệu nhận biết.** Có `console.log`, `console.debug`, hoặc một logger của framework trong file
+**Cách nhận ra.** Có `console.log`, `console.debug`, hoặc một logger của framework trong file
 spec. Output của một lần chạy xanh dài hơn danh sách tên bước. Khi đỏ, dòng assertion bị đẩy khỏi màn
 hình. Tự hỏi: khi nó đỏ, người đọc **cần** gì? Tên bước và assertion — cả hai runner đã in sẵn.
 
@@ -320,14 +329,14 @@ retry.
 
 ## `E2E-11` — chuỗi vận hành vào bằng cửa production, và mọi chặng trong đều thật
 
-**Tình huống.** Flow đang chứng minh fallback, retry, queue, scheduler, projection, vô hiệu cache hoặc
+**Khi nào gặp.** Flow đang chứng minh fallback, retry, queue, scheduler, projection, vô hiệu cache hoặc
 giao realtime.
 
-**Nó sinh ra gì trong source.** Một lần đi vào bằng GraphQL, HTTP, socket, publish vào broker thật, hoặc
+**Source phải thể hiện gì.** Một lần đi vào bằng GraphQL, HTTP, socket, publish vào broker thật, hoặc
 để scheduler thật nổ; một worker có thể được import để framework đăng ký nó, và trong file không có chỗ
 nào resolve một actor nội bộ ra để đẩy flow đi.
 
-**Dấu hiệu nhận biết.** File import một bus rồi tự `execute` để "đẩy flow đi cho nhanh". File resolve
+**Cách nhận ra.** File import một bus rồi tự `execute` để "đẩy flow đi cho nhanh". File resolve
 một `*Worker` / `*Handler` từ container rồi gọi `process` trực tiếp. Retry, ack, khoá và cạnh tranh
 consumer **không xuất hiện** ở đâu trong file. Tự hỏi: nếu serialization hoặc ack hỏng, file này có đỏ
 không?
@@ -350,14 +359,14 @@ sau khi ghi.
 
 ## `E2E-12` — ghi đè kết quả ngoài, không bao giờ ghi đè chính sách trong đã chọn ra nó
 
-**Tình huống.** Flow chạm tới một phụ thuộc ngoài: nhà cung cấp mô hình, cổng thanh toán, IdP, SMTP,
+**Khi nào gặp.** Flow chạm tới một phụ thuộc ngoài: nhà cung cấp mô hình, cổng thanh toán, IdP, SMTP,
 sandbox chấm code, bộ chuyển mã.
 
-**Nó sinh ra gì trong source.** Một kịch bản đặt lên đúng seam của client ngoài cụ thể — hàm `invoke` /
+**Source phải thể hiện gì.** Một kịch bản đặt lên đúng seam của client ngoài cụ thể — hàm `invoke` /
 `stream` của nó, hoặc lời gọi HTTP của cổng — và không đụng gì bên trong seam đó; không SDK nhà cung cấp
 nào được import trong một file spec.
 
-**Dấu hiệu nhận biết.** Có mock đặt lên một service **của mình**: bộ chọn nhà cung cấp, bộ cân bằng, bộ
+**Cách nhận ra.** Có mock đặt lên một service **của mình**: bộ chọn nhà cung cấp, bộ cân bằng, bộ
 định tuyến hành động, đường tính tiền. File import thẳng SDK của một nhà cung cấp. Fallback, quy kết,
 rollback và idempotency **không còn** cách nào đỏ được. Tự hỏi: nếu **chính sách nội bộ** chọn sai nhà
 cung cấp, sai đường hoàn tiền, sai quyền — file này có đỏ không?
@@ -379,7 +388,7 @@ cấp token IdP · SMTP từ chối rồi chấp nhận · sandbox chấm bài t
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `enforced` nghĩa là có một rule trong `@starci/eslint-canon-be` nổ vào nó,
+Mỗi mã hiện được giữ ở tầng nào. `enforced` nghĩa là có một rule trong `@canon-be` nổ vào nó,
 và rule đó được gọi tên.
 
 | Mã | Tầng | Ai giữ |
@@ -421,7 +430,7 @@ không phải luật.
 | `E2E-4` | `tests/helpers/flow-world.ts` → `FlowWorld.entityManager`, resolve qua `getEntityManagerToken(POSTGRESQL_PRIMARY)` | Flow nhận entity manager THẬT của datasource chính, nên hệ quả được đọc từ đúng row đã ghi |
 | `E2E-5` | `tests/helpers/flow-wait.ts` → `nextMessage`, dùng trong `tests/e2e/community-chat.e2e-spec.ts` | Chờ message khớp kế tiếp trên một socket thật; không có assertion đếm ở bất cứ đâu trên bề mặt helper |
 | `E2E-6` | `tests/helpers/flow-wait.ts` → `expectNoMessage`, `DEFAULT_SILENCE_MS`; dùng trong `tests/e2e/notification-delivery.e2e-spec.ts` | Một bước chứng minh socket của người lạ im lặng trong khi người nhận đúng đã được phục vụ |
-| `E2E-7` | `@starci/eslint-canon-be` → `tester.run("no-branch-in-flow-step", …)` | Các fixture hợp lệ và không hợp lệ ghim chính xác hình dạng nào tính là nhánh bên trong một bước |
+| `E2E-7` | `@canon-be` → `tester.run("no-branch-in-flow-step", …)` | Các fixture hợp lệ và không hợp lệ ghim chính xác hình dạng nào tính là nhánh bên trong một bước |
 | `E2E-8` | `tests/helpers/flow-world.ts` → `bootFlowWorld`; `tests/helpers/create-e2e-app.ts` → `createE2eApp` | Hai entry point dựng thế giới lên, để một spec mở đầu bằng đúng thứ nó đang test |
 | `E2E-9` | `tests/helpers/flow-world.ts` → `FlowWorld.mintLearner(name)` | Hàm tạo actor nhận một TÊN và ghi một row mới cho mỗi flow; không số thứ tự nào được chấp nhận |
 | `E2E-10` | `tests/e2e/` (84 file spec) | Không có call site `console` thật nào. Hai lần khớp văn bản duy nhất, ở `coding-submission.e2e-spec.ts:550` và `:646`, là chuỗi source BÊN TRONG một chương trình được nộp, không phải logging |

@@ -4,9 +4,18 @@ title: Module layering · Vietnamese
 
 # Phân tầng module
 
-Đầu vào của pattern này là một shape đã được duyệt: một capability đã tồn tại, một module đã được
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một capability đã tồn tại, một module đã được
 quyết định là sẽ đăng ký, một symbol mà file khác đã được phép dùng. Không dòng nào ở đây mở lại
-những quyết định đó. Đầu ra là **kiến trúc source**: specifier gọi tên file nào, tầng nào giữ kiến
+những quyết định đó. Kết quả là **kiến trúc source**: specifier gọi tên file nào, tầng nào giữ kiến
 thức nào, được import gì, được export gì, và cạnh giữa hai capability được nối ở đâu.
 
 ## Luật
@@ -81,13 +90,13 @@ một specifier sai là một dòng của một bên gọi, còn một barrel l�
 
 ## `LAYERING-1` — import gọi tên file, không gọi tên thư mục
 
-**Tình huống.** Một file cần một symbol nằm ở capability khác. Specifier viết ra phải đi hết đường tới
+**Khi nào gặp.** Một file cần một symbol nằm ở capability khác. Specifier viết ra phải đi hết đường tới
 file khai báo symbol đó, chứ không dừng lại ở tên capability.
 
-**Nó sinh ra gì trong source.** Một specifier bắc qua capability mà đoạn cuối là một file: khối import
+**Source phải thể hiện gì.** Một specifier bắc qua capability mà đoạn cuối là một file: khối import
 của bên gọi liệt kê đúng những phụ thuộc thật của file, và mở thẳng ra được từng cái một.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Specifier kết thúc ngay sau tên capability, không còn đoạn nào phía sau.
 - Có một file trong capability đó tồn tại chỉ để `export ... from` những file khác.
@@ -110,14 +119,14 @@ capability khác.
 
 ## `LAYERING-2` — bên trong capability thì đi đường tương đối
 
-**Tình huống.** File đang nằm trong một capability và cần một file khác cũng của capability đó. Đường
+**Khi nào gặp.** File đang nằm trong một capability và cần một file khác cũng của capability đó. Đường
 đi phải là tương đối.
 
-**Nó sinh ra gì trong source.** Mọi thứ nội bộ đi bằng specifier tương đối (`./`), còn alias công khai
+**Source phải thể hiện gì.** Mọi thứ nội bộ đi bằng specifier tương đối (`./`), còn alias công khai
 chỉ xuất hiện trên những dòng thật sự rời khỏi capability — nên đổi tên capability không đụng tới một
 import nội bộ nào của chính nó.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Alias công khai xuất hiện trên một dòng mà file đích nằm cùng capability với file nguồn.
 - Thư mục capability xuất hiện hai lần trên cùng một đường: một lần vì file đang ở đó, một lần trong
@@ -139,13 +148,13 @@ util nội bộ; type nội bộ; file định nghĩa module option; spec đứn
 
 ## `LAYERING-3` — cạnh bắc ngang được nối ở composition root
 
-**Tình huống.** Hai capability cần biết nhau. Phải có một chỗ nào đó biết cả hai, và chỗ đó là root của
+**Khi nào gặp.** Hai capability cần biết nhau. Phải có một chỗ nào đó biết cả hai, và chỗ đó là root của
 ứng dụng, nơi mà công việc của nó chính là biết ứng dụng gồm những gì.
 
-**Nó sinh ra gì trong source.** Cả hai capability được đăng ký trong danh sách module của root, và hai
+**Source phải thể hiện gì.** Cả hai capability được đăng ký trong danh sách module của root, và hai
 module capability mà không bên nào gọi tên bên kia.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Trong `imports:` của một capability `@Module` xuất hiện `@Module` của capability khác.
 - Quyết định "hai thứ này đi cùng nhau" được ghi ở một file mà chủ thể của nó không phải cả hai.
@@ -168,15 +177,15 @@ entity manager.
 
 ## `LAYERING-4` — chỉ root được biết toàn cảnh
 
-**Tình huống.** Có những dữ kiện về cả ứng dụng: có bao nhiêu capability, cái nào đăng ký global, cái
+**Khi nào gặp.** Có những dữ kiện về cả ứng dụng: có bao nhiêu capability, cái nào đăng ký global, cái
 nào phải nạp trước cái nào, capability này được cấu hình khác đi trong ứng dụng nào. Toàn bộ những dữ
 kiện đó thuộc về root.
 
-**Nó sinh ra gì trong source.** Việc đăng ký và cấu hình theo từng ứng dụng được viết ở từng root, kể
+**Source phải thể hiện gì.** Việc đăng ký và cấu hình theo từng ứng dụng được viết ở từng root, kể
 cả khi cùng một capability được hai root đăng ký với hai câu trả lời khác nhau; và kiến thức thứ tự
 khởi động nằm trong file mà chủ thể của nó chính là cái toàn cảnh.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Một capability tự tuyên bố mình `isGlobal` thay cho ứng dụng.
 - Có một comment kiểu "phải import trước X" nằm trong một file thuộc capability.
@@ -198,13 +207,13 @@ trước mọi thứ; một root ghi lại nó cố tình không kéo theo cái 
 
 ## `LAYERING-5` — bề mặt công khai là những file có ý định cho người khác import
 
-**Tình huống.** Đang quyết định cái gì của capability này là công khai. Câu trả lời là: những file mà
+**Khi nào gặp.** Đang quyết định cái gì của capability này là công khai. Câu trả lời là: những file mà
 ta có ý định để người khác import. Không có index nào re-export cả thư mục; bên gọi tự gọi tên file.
 
-**Nó sinh ra gì trong source.** Không có `index.ts` nào trong capability, và một alias mapping không có
+**Source phải thể hiện gì.** Không có `index.ts` nào trong capability, và một alias mapping không có
 barrel nào để resolve tới — nên bề mặt chỉ đọc được từ import list của những nơi gọi nó.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Có một file mà toàn bộ nội dung là `export ... from`.
 - Thêm một file vào thư mục làm bề mặt công khai rộng ra mà không ai quyết định điều đó.
@@ -224,8 +233,8 @@ nhiều hàm nhỏ.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một closed union hoặc branded type làm cho giá
-trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `@starci/eslint-canon-be`
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một closed union hoặc branded type làm cho giá
+trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `@canon-be`
 bắt được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ |

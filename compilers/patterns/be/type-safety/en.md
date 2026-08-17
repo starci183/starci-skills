@@ -4,6 +4,15 @@ title: Type-safety
 
 # Type-safety
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is a shape somebody already accepted — a capability, a contract, an operation, a stored record. This pattern does not re-open that decision. It lands it in source: which file holds the value, what type it is declared as, what stands behind that declaration, which layer owns the concern, and which lane the file is in. The accepted shape says what the system does; this pattern says what the compiler is still allowed to know after the code is written.
 
 ## Law
@@ -119,7 +128,7 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 
 ## Layer held
 
-Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the wrong value impossible to write; `enforced` means a lint rule published by `@starci/eslint-canon-be` catches it; `documented` means nothing mechanical holds it and only a reader does.
+Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the wrong value impossible to write; `enforced` means a lint rule published by `@canon-be` catches it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
 |---|---|---|
@@ -150,14 +159,14 @@ Real code each law can be checked against. A law that cannot be pointed at is a 
 | `TYPE-1` | `modules/ai/ping/utils/to-error-message.ts` → `extractResponseDetail` | The narrowing done the expensive way on purpose: each nesting level is `typeof`-checked before the next is read. This is what `TYPE-1` costs when the shape is genuinely unknown, and the cost is the point |
 | `TYPE-1` | `eslint.config.mjs` → `'@typescript-eslint/no-explicit-any': 'error'` | The rule at `error`, with the law cited on the same line. Grep `: any` across `src` and read every hit: they are all the English word inside a comment. Zero declarations is the measurement that lets the level be `error` rather than `warn` |
 | `TYPE-2` | `modules/platform/cookie/types/cookie.ts` → `CookieRequestLike` | The repair, with the reason attached: a minimal structural interface that exists so two seams do not double-cast a header bag into a full framework `Request`. Read the doc comment — it names the double cast it was written to avoid |
-| `TYPE-2` | `@starci/eslint-canon-be` → the `TYPE-2` twin test's `valid` list | The boundary of the rule stated as executable cases: a lone `as unknown` is honest widening, a lone narrowing cast is a different question, and only the pair landing back on a concrete type is the overrule |
+| `TYPE-2` | `@canon-be` → the `TYPE-2` twin test's `valid` list | The boundary of the rule stated as executable cases: a lone `as unknown` is honest widening, a lone narrowing cast is a different question, and only the pair landing back on a concrete type is the overrule |
 | `TYPE-3` | `modules/ai/types/grading-lane-validation-params.ts` → `ValidateGradingLaneParams`, consumed destructured in `modules/ai/grading-lane-validation.service.ts` | The named type and its call site in two files. The interesting part is the third reference in the service: `NonNullable<ValidateGradingLaneParams["provider"]>`. An inline type cannot be indexed like that, so this line is what `TYPE-3` bought |
 | `TYPE-3` | `modules/platform/cookie/types/cookie.ts` → `AttachHttpOnlyCookieParams`, `AttachReadableCookieParams`, `ClearCookieParams` | Three params types in one `types/` file, one per operation, each documented per field. Read them as the shape a module's `types/` folder takes when the law is followed rather than argued about |
 | `TYPE-4` | `modules/databases/postgresql/primary/enums/mock-interview-kind.ts` → `normalizeMockInterviewKind` | `Object.values(MockInterviewKind)` inside a coercion that turns a stored string back into a known member. A `const enum` has no object to call `Object.values` on, so this function could not be written at all |
 | `TYPE-4` | `modules/init/seeders/shared/extracts/coerce-md-scalar.service.ts` → `toNullableEnum`, `toRequiredEnum` | The strongest form: the enum is passed AS A VALUE, `enumObject: TEnum`, and matched by key and then by value. Every caller of this helper is a thing a `const enum` makes impossible |
 | `TYPE-4` | `tsconfig.json` → `"isolatedModules": true` | The compiler setting that turns `TYPE-4`'s last clause from an opinion into a build error. The law's claim about the isolated-modules boundary is checkable here in one line |
 | `TYPE-5` | `features/api/core/graphql/mutations/keycloak/sign-in/init/graphql-types/response.ts` → `SignInInitCommandResult` beside `SignInInitData` | Both halves of the code in one file. The internal result is a `kind`-discriminated union where a mixed challenge/session state does not compile; the transport class beside it has every field optional, because the wire format cannot carry a union. Read the pair as the exception's exact boundary, not as an inconsistency |
-| `TYPE-6` | `@starci/eslint-canon-be` → `isTestFile` | The exit itself: one predicate, one regex over the spec suffixes plus the test tree, consulted once at rule construction. Every place the exit is in force is derivable from this function, which is the property a per-line suppression destroys |
+| `TYPE-6` | `@canon-be` → `isTestFile` | The exit itself: one predicate, one regex over the spec suffixes plus the test tree, consulted once at rule construction. Every place the exit is in force is derivable from this function, which is the property a per-line suppression destroys |
 | `TYPE-6` | `features/api/core/graphql/mutations/keycloak/sign-in/init/sign-in-init.handler.spec.ts` → the `jest.Mocked<Pick<…>>` casts | The exit in use, and the reason for it: a spec builds a deliberately partial collaborator to prove the handler only touches the methods it declares. Note what is NOT here — no `eslint-disable` comment on any of those lines |
 
 Every code is anchored. None is unanchored.

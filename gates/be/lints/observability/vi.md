@@ -4,7 +4,14 @@ title: Observability · Vietnamese
 
 # Quan sát vận hành
 
-Đầu vào là đoạn mã đã được viết ra rồi — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: quy tắc
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận đoạn mã đã được viết ra rồi — một tệp, một mảnh diff. Kết quả là một **phán quyết**: quy tắc
 đã công bố nào nổ, nổ trên nút nào, khớp với chuỗi nào, ứng với mã luật nào, và cửa nào còn mở đủ để
 che đúng cái sai ấy. Mô-đun này không chọn một thiết kế ghi log nào cả. Nó từ chối, và nó phải chỉ được
 vào đúng ký tự mà nó từ chối.
@@ -90,7 +97,7 @@ sau đó duyệt `node.specifiers`, bỏ qua mọi phần tử có `type` khác 
 nhánh này **không** hỏi đường dẫn gói, và chính điều đó chặn một câu nhập đã đổi tên hoặc đã đi qua tệp
 trung gian lách được nhánh trên.
 
-**Nó không thấy gì.** `import * as common from "@nestjs/common"` rồi `new common.Logger(...)`: vòng lặp
+**Điểm mù.** `import * as common from "@nestjs/common"` rồi `new common.Logger(...)`: vòng lặp
 nhập bỏ qua mọi specifier không phải `ImportSpecifier`, mà specifier không gian tên thì không phải, còn
 callee của lời dựng là `MemberExpression` nên nhánh thứ hai từ chối. **Cả hai nhánh cùng trượt một
 dòng** — đây là lỗ rộng nhất trên trang này. Lớp anh em cùng gói, `new ConsoleLogger(...)` hoặc một lớp
@@ -125,7 +132,7 @@ trong tập đóng sáu phần tử `log`, `error`, `warn`, `info`, `debug`, `ve
 `MemberExpression` không tính toán có `property.name` đúng bằng `winstonService`, và không gì khác. Rồi
 nó đọc `node.arguments[0]`, trả về nếu vắng, và báo trên ba hình dạng kia.
 
-**Nó không thấy gì.** Một thuộc tính được tiêm đã đổi tên — `this.logger.info(…)`, `this.log.info(…)` —
+**Điểm mù.** Một thuộc tính được tiêm đã đổi tên — `this.logger.info(…)`, `this.log.info(…)` —
 với đúng dịch vụ ấy phía sau: danh tính bên nhận là **cách viết** `winstonService`, nên quy tắc là một
 quy ước đặt tên mang thông điệp nói về mã tương quan, và một lần đổi tên bình thường là hết quy tắc cho
 cả lớp đó. **Hằng số giặt sạch chữ**: `` const message = `opened ${id}` `` ở dòng trên,

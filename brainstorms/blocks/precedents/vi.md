@@ -4,8 +4,15 @@ title: Precedents · Vietnamese
 
 # Tiền lệ
 
-Đầu vào là một region đã được chấp nhận cùng những giải phẫu khối đã được chấp nhận **của chính source
-này**, và đầu ra là, với mỗi phương án khối sắp sinh ra, một tiền lệ mà nó trích dẫn — hoặc một lời khai
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Mô-đun này nhận một region đã được chấp nhận cùng những giải phẫu khối đã được chấp nhận **của chính source
+này**, rồi trả về, với mỗi phương án khối sắp sinh ra, một tiền lệ mà nó trích dẫn — hoặc một lời khai
 rằng nó **cố ý rời khỏi** mọi tiền lệ. Tiền lệ là một quyết định đã được chấp nhận trước đó, giữ lại kèm
 lý do. Nó được **trích dẫn, noi theo và lật lại** — không bao giờ được tuân phục. Luật **ràng buộc**;
 tiền lệ **thuyết phục**.
@@ -48,9 +55,9 @@ của sản phẩm khác là quyết định của người lạ đang khoác th
 
 ## `PRECEDENT-0` — không có gì phủ được region này
 
-**Tình huống.** Không giải phẫu nào đã chấp nhận trả lời được lý do nghiệp vụ của region này.
+**Khi nào gặp.** Không giải phẫu nào đã chấp nhận trả lời được lý do nghiệp vụ của region này.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Không tiền lệ nào chung kết quả hay chung chủ thể với region.
 - Cái gần nhất chỉ giống ở **số lượng phần**.
@@ -66,10 +73,10 @@ chọn cho region này.
 
 ## `PRECEDENT-1` — khớp cả lý do và bộ trạng thái
 
-**Tình huống.** Một giải phẫu đã chấp nhận từng trả lời đúng lý do này cho đúng source này, với đúng bộ
+**Khi nào gặp.** Một giải phẫu đã chấp nhận từng trả lời đúng lý do này cho đúng source này, với đúng bộ
 trạng thái đó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Lý do đã ghi đọc được như câu trả lời cho region này.
 - Bộ trạng thái giống nhau: đúng những điều kiện đó có thể xảy ra.
@@ -86,10 +93,10 @@ quyết định không ai đưa ra cho nó.
 
 ## `PRECEDENT-2` — bộ trạng thái hoặc số lần lặp khác
 
-**Tình huống.** Lý do khớp, nhưng region này **có thể rỗng** trong khi tiền lệ thì không, **có thể thất
+**Khi nào gặp.** Lý do khớp, nhưng region này **có thể rỗng** trong khi tiền lệ thì không, **có thể thất
 bại** trong khi tiền lệ thì không, hoặc nghỉ ở một số lần lặp khác.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một trạng thái tồn tại ở đây mà tiền lệ chưa từng vẽ, hoặc ngược lại.
 - Số lần nghỉ do region nói ra và nó khác.
@@ -106,10 +113,10 @@ của tiền lệ được giữ và phần nào bị đè.
 
 ## `PRECEDENT-3` — lời trích đã cũ
 
-**Tình huống.** Tiền lệ vẫn đúng nhưng gọi tên một entry, leaf hoặc composite đã bị generic hoá hoặc đổi
+**Khi nào gặp.** Tiền lệ vẫn đúng nhưng gọi tên một entry, leaf hoặc composite đã bị generic hoá hoặc đổi
 tên.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Một cái tên được trích không còn trong contract hay trong cây component.
 - Có một cái tên rộng hơn đang phủ đúng lý do đó.
@@ -125,10 +132,10 @@ tồn tại — đúng cái bịa mà corpus tồn tại để ngăn.
 
 ## `PRECEDENT-4` — cố ý rời đi
 
-**Tình huống.** Phương án không noi theo tiền lệ gần nhất, nên cả lô có một giải phẫu thật sự khác: khác
+**Khi nào gặp.** Phương án không noi theo tiền lệ gần nhất, nên cả lô có một giải phẫu thật sự khác: khác
 các phần, khác người sở hữu dữ liệu, hoặc khác trạng thái đang gánh trọng lượng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các phần của nó, hoặc quyền sở hữu dữ liệu, khác tiền lệ gần nhất.
 - Lý do của nó được nói bằng chính nó.
@@ -144,10 +151,10 @@ lần.
 
 ## `PRECEDENT-5` — tiền lệ sai
 
-**Tình huống.** Tiền lệ phạm một luật khối — một trạng thái nó chưa từng liệt kê, một field nó bịa ra,
+**Khi nào gặp.** Tiền lệ phạm một luật khối — một trạng thái nó chưa từng liệt kê, một field nó bịa ra,
 một khung nó không sở hữu — hoặc lý do của nó hoá ra không đúng về sản phẩm.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Noi theo nó sẽ sinh ra phương án mà luật từ chối.
 - Lý do đã ghi bị chính cách khối được dùng phản lại.

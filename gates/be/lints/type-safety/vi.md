@@ -4,7 +4,16 @@ title: Type-safety · Vietnamese
 
 # Máy giữ luật an toàn kiểu
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, luật máy nào đã nổ, nó báo gì và trên nút nào, mã luật tương ứng là gì, và cửa nào
 còn mở đủ rộng để che đúng thất bại đó. Mô-đun này không chọn thiết kế nào cả. Nó từ chối, và nó phải
 chỉ được vào đúng ký tự mà nó từ chối.
@@ -87,7 +96,7 @@ dấu chéo ngược thành chéo xuôi, rồi thử với
 `/\.(?:spec|test|e2e-spec|int-spec|harness-spec)\.ts$/` hoặc kiểm xem đường dẫn có chứa đoạn
 `/src/tests/` không.
 
-**Nó không thấy gì.** Tách làm hai câu lệnh: `const loose: unknown = row` rồi
+**Điểm mù.** Tách làm hai câu lệnh: `const loose: unknown = row` rồi
 `return loose as Enrollment` giặt sạch y hệt, chỉ khác là toán hạng giờ là một định danh — và đây là
 việc người ta làm khi dòng code dài quá, không phải phá hoại. Đổi cầu nối: chỉ mỗi `TSUnknownKeyword`
 được thử, nên `x as any as T`, `x as never as T`, `x as {} as T` và `x as object as T` đều lọt; riêng
@@ -119,7 +128,7 @@ chỉ một trong hai bản chép nhận được.
 `ObjectPattern`, có `typeAnnotation`, và chú thích bên trong có `typeAnnotation.type` đúng bằng
 `TSTypeLiteral`. Không có cổng tệp nào — mọi tệp mà cấu hình trỏ vào đều bị quét.
 
-**Nó không thấy gì.** Không rã cấu trúc: `(params: { userId: string; courseId: string })` là một tham
+**Điểm mù.** Không rã cấu trúc: `(params: { userId: string; courseId: string })` là một tham
 số `Identifier`, nên luật không hề nhìn tới chú thích của nó — trong khi hình dạng vẫn không tham
 chiếu được, vẫn không import được, và vẫn sẽ bị người gọi thứ hai gõ lại y hệt; mà đó lại là lối viết
 phổ biến hơn. Cho tham số một giá trị mặc định: `({ userId }: { userId: string } = { userId: "" })`
@@ -151,7 +160,7 @@ họ những việc đơn giản.
 **Nó phát hiện bằng gì.** Duyệt `TSEnumDeclaration`; thoát ra nếu cờ boolean `node.const` không bật;
 còn lại thì báo trên chính khai báo đó. Không cổng tệp, không miễn trừ, không lối ra cho kiểm thử.
 
-**Nó không thấy gì.** `declare enum`: một enum ambient không có từ khoá `const` cũng không sinh object
+**Điểm mù.** `declare enum`: một enum ambient không có từ khoá `const` cũng không sinh object
 lúc chạy, cũng không duyệt được, cũng không ánh xạ ngược được, và cũng hỏng lúc chạy theo đúng mọi
 kiểu mà thông điệp mô tả. `node.const` bằng false, nên im lặng — đúng thất bại mà luật gọi tên, đạt
 tới bằng một từ khoá mà luật máy không đọc. Tệp khai báo: const enum ambient sống ở `.d.ts`, và cấu
@@ -391,7 +400,7 @@ hatch:   not destructuring it — an Identifier parameter is never looked at, so
 ## Phạm vi
 
 Mô-đun này ghi lại ba luật do mô-đun luật của luật an toàn kiểu công bố, xuất xưởng trong
-`@starci/eslint-canon-be`. Nó không ghi bất kỳ luật nào "đáng lẽ nên có": một luật không chỉ tay vào
+`@canon-be`. Nó không ghi bất kỳ luật nào "đáng lẽ nên có": một luật không chỉ tay vào
 được thì là một đề xuất, không phải mức thực thi. Nó không xét `any` — đó là
 `@typescript-eslint/no-explicit-any` — không xét lối viết kiểu mảng, vốn là
 `@typescript-eslint/array-type`, và không xét một mớ boolean đứng chỗ của một union có nhãn phân biệt,

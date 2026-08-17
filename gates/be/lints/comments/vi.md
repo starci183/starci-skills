@@ -4,7 +4,16 @@ title: Comments · Vietnamese
 
 # Chú thích
 
-Đầu vào là mã đã viết xong — một tệp, một mảng diff. Đầu ra là một **phán quyết**: tệp rơi vào làn nào,
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảng diff. Kết quả là một **phán quyết**: tệp rơi vào làn nào,
 quy tắc đã xuất bản nào nổ, nổ trên nút cú pháp hay dòng thô nào, ứng với mã luật nào, và cửa còn mở nào
 lẽ ra đã che đi đúng lỗi ấy. Mô-đun này không chọn giúp một dòng chú thích nào và cũng không viết hộ. Nó
 chỉ từ chối, và khi từ chối thì phải chỉ được vào đúng ký tự mà nó từ chối.
@@ -24,7 +33,7 @@ mà chương trình khớp. Hai thứ không bao giờ bằng nhau, và toàn b�
 ## Luật máy đã xuất bản
 
 Ba quy tắc được xuất bản, từ bản `rules` của mô-đun, ở mức `error` trong bản `recommended`. Chúng đi kèm
-gói `@starci/eslint-canon-be` dưới tiền tố trình cắm `starci-be/`.
+gói `@canon-be` dưới tiền tố trình cắm `starci-be/`.
 
 | Quy tắc | Mã luật | Bắt gì |
 |---|---|---|
@@ -79,7 +88,7 @@ thấy: khối tài liệu **có tồn tại** hay không, chứ không phải n
 `sourceCode.getCommentsBefore(node)` và cho qua nếu **bất kỳ** chú thích trả về nào có `type === "Block"`
 và `value` bắt đầu bằng `*`.
 
-**Nó không thấy gì.** Xuất lại thì tàng hình: `export { Thing }` và `export { Thing } from "./thing"`
+**Điểm mù.** Xuất lại thì tàng hình: `export { Thing }` và `export { Thing } from "./thing"`
 không có `declaration` nên quy tắc thoát tức thì, còn `export * from "./thing"` thậm chí không có nút nào
 được thăm — một tệp gom đầu mối có thể công bố cả một bề mặt mà không một dòng tài liệu nào. Gói hàm vào
 một lời gọi là thoát: `export const run = make(1)`, `= memo(() => {})`, `= other.bind(null)`,
@@ -108,7 +117,7 @@ hay không có một khối tài liệu. Thông điệp lỗi tự nói ra giớ
 `ExportNamedDeclaration`. Với mỗi phần tử trong `node.members`, áp đúng phép thử `getCommentsBefore` /
 `Block` / mở đầu bằng `*` như quy tắc trên.
 
-**Nó không thấy gì.** Đúng cái nửa quan trọng hơn: `/** The pending state. */` — câu mà luật in ra làm ví
+**Điểm mù.** Đúng cái nửa quan trọng hơn: `/** The pending state. */` — câu mà luật in ra làm ví
 dụ phản diện — vẫn qua, vì máy đếm được khối tài liệu chứ không đọc được nó. `/** */` rỗng cũng qua. Tách
 từ khoá `export` ra là tắt hẳn quy tắc: viết `enum State { … }` rồi `export { State }` ở dòng sau thì
 `parent` là thân chương trình chứ không còn là nút xuất, và mọi yêu cầu với thành viên biến mất.
@@ -137,7 +146,7 @@ làn, cắt lần xuất hiện đầu tiên của chuỗi `Tiếng Việt`, r�
 Việt, dải biểu tượng cảm xúc (`1F300–1FAFF`, `1F000–1F0FF`, `2600–27BF`, `FE0F`, `1F1E6–1F1FF`), và một
 danh sách mười hai ký tự trang trí.
 
-**Nó không thấy gì.** Văn xuôi không dấu ở ngôn ngữ thứ hai: lớp ký tự khớp **dấu phụ**, nên một câu viết
+**Điểm mù.** Văn xuôi không dấu ở ngôn ngữ thứ hai: lớp ký tự khớp **dấu phụ**, nên một câu viết
 không dấu không mang điểm mã nào khớp cả — quy tắc nhận diện một lối viết, không nhận diện một ngôn ngữ.
 Tiếng Nga, Trung, Nhật, Hàn, Thái, Hy Lạp đều không thuộc ba lớp; luật từ chối một kho mã có hai ngôn ngữ
 trong nó, còn quy tắc từ chối đúng một bảng chữ cái. Danh sách trang trí là mười hai ký tự viết tay: `⭐`

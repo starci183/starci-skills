@@ -4,7 +4,14 @@ title: Landmark · Vietnamese
 
 # Landmark
 
-Đầu vào là mã đã viết xong — một file, một mẩu diff. Đầu ra là một **phán quyết**: file có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một file, một mẩu diff. Kết quả là một **phán quyết**: file có nằm trong
 phạm vi hay không, rule đã xuất bản nào nổ, nó báo gì và trên node nào, mã luật tương ứng là gì, và
 cửa mở nào đã có thể giấu đúng cái sai đó đi. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải chỉ
 được vào đúng phần tử mà nó từ chối.
@@ -67,7 +74,7 @@ phải `Property`; một `JSXOpeningElement` mang đúng tên nhánh khung trung
 và bất kỳ phần tử landmark nào theo một trong hai hình dạng. Báo tại `Program:exit` khi hai cái đầu
 đúng còn cái thứ ba sai.
 
-**Nó không thấy gì.** Đổi tên prop khi destructure — `function Layout({ children: content })` — biến
+**Điểm mù.** Đổi tên prop khi destructure — `function Layout({ children: content })` — biến
 `children` thành KEY của một `Property`, đúng nhánh bị bỏ qua, và trong file không còn định danh nào
 tên `children`; một lần đổi tên là rule ngừng tồn tại cho file đó. Đặt bí danh cho nhánh khung khi
 import — `import { Tree as Frame }` — hoặc gọi qua member expression như `<Branches.Tree>` khiến
@@ -102,7 +109,7 @@ khi file không phải file route và cũng không phải bề mặt trang. Bấ
 import một landmark về để bọc thứ gì đó không phải cùng một hành động với render node ngoài cùng của
 màn hình theo khoá mà bảng đã khai.
 
-**Nó không thấy gì.** Một phần tử landmark viết tay bằng chữ thường không khớp hình dạng nào — hình
+**Điểm mù.** Một phần tử landmark viết tay bằng chữ thường không khớp hình dạng nào — hình
 dạng một đòi tên nhánh viết hoa, hình dạng hai đòi một khoá contract — nên cách viết sai trực tiếp
 nhất chẳng bị báo gì. Đặt bí danh cho nhánh landmark — `import { Main as Screen }` — hỏng ở tập một
 phần tử, còn `<Branches.Main>` hỏng ngay ở phép kiểm `name.type`. Mọi phần tử landmark khác ngoài cái

@@ -4,6 +4,15 @@ title: Contract
 
 # Contract
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is a shape that has already been accepted — a layout, a block, a capability or a contract
 someone signed off on. This module does not re-open that decision. Its output is source architecture:
 which file the node is described in, which layer holds it, what it may import, what it must export,
@@ -454,7 +463,7 @@ that was never approved; a key copied into a new repository along with the whole
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write. `enforced` means a rule in `@starci/eslint-canon-fe` catches it.
+wrong value impossible to write. `enforced` means a rule in `@canon-fe` catches it.
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

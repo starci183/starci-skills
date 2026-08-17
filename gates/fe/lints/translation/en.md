@@ -4,6 +4,15 @@ title: Translation
 
 # Translation
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was inside the folder gate at all, which published rule fired, what it reported and on
 which node, which law code that maps to, and the open hatch that would have hidden the same failure.
@@ -35,7 +44,7 @@ watched folders — but `COPY-3`, `COPY-4` and `COPY-6` are unenforced law, not 
 the expensive one: a prop named `labelKey` carrying `"quest.title"` is a single lowercase token with no
 whitespace, which is exactly what neither rule looks at.
 
-Both rules ship in `@starci/eslint-canon-fe` under the prefix `starci-fe/`, both are `type: "problem"`,
+Both rules ship in `@canon-fe` under the prefix `starci-fe/`, both are `type: "problem"`,
 and both are `error` in the exported `recommended` set.
 
 ## Reading a diff

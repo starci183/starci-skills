@@ -4,7 +4,16 @@ title: Props-and-slots · Vietnamese
 
 # Props và slots
 
-Đầu vào là mã đã viết xong — một file, một hunk của diff. Đầu ra là một **phán quyết**: file có nằm
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe-props` | `@starci/eslint-canon-fe/props` | npm package | các kiểu prop frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một file, một hunk của diff. Kết quả là một **phán quyết**: file có nằm
 trong phạm vi hay không, luật máy nào đã nổ, nó báo cái gì và trên node nào, ánh xạ sang mã luật nào,
 và lối thoát đang mở nào lẽ ra đã che đúng lỗi đó. Module này không chọn hình dạng props nào cả. Nó
 từ chối một hình dạng, và nó phải chỉ được vào đúng tham số, đúng key hay đúng attribute mà nó từ
@@ -41,7 +50,7 @@ hành vi), `SLOTS-2` (dữ liệu của component khai bằng type alias, không
 `SLOTS-6` (diện mạo là một variant có tên quyết định bên trong, không phải `className`, `style`, prop
 khoảng cách hay hook style theo từng phần) **hoàn toàn không có luật máy** ở đây. Ba trong số đó được
 giữ ở nơi khác — `SLOTS-1`, `SLOTS-2` và `SLOTS-6` thuộc tầng `unrepresentable`, do `DataValue`, do
-ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `@starci/eslint-canon-fe/props` giữ — còn
+ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `@canon-fe-props` giữ — còn
 `SLOTS-5` là `documented`, tức chẳng có gì giữ cả. Một lần chạy sạch của module này không nói được gì
 về bốn mã ấy, và ở đâu type chưa từng phủ tới file thì mã đó đơn giản là chưa được cưỡng chế, chứ
 không phải đã được bao phủ.
@@ -79,7 +88,7 @@ và trên chính tham số khi không có.
 `TSTypeLiteral`, đệ quy qua `TSParenthesizedType`, và trả true khi bất kỳ thành viên nào của một
 `TSIntersectionType` hoặc `TSUnionType` trả true. Mọi thứ còn lại là false.
 
-**Nó không thấy gì.** Một tham số không có annotation: `declared` là undefined, phép duyệt trả false
+**Điểm mù.** Một tham số không có annotation: `declared` là undefined, phép duyệt trả false
 ngay, và một destructure không type là vô hình. Một shape chỉ cách một lớp bọc —
 `Readonly<{label: string}>`, `Partial<{…}>`, `{…}[]` — là `TSTypeReference` hay `TSArrayType`, mà
 walker chỉ đệ quy qua ngoặc, intersection và union, nên một utility type bình thường là đủ hạ nó. Cái
@@ -109,7 +118,7 @@ cha nó là một `ObjectPattern` và ông nó không phải `VariableDeclarator
 tham số, chính là cái slot ấy đi vào bằng cửa khác, trong khi `const {children} = props` trong thân
 hàm được cố ý thả qua.
 
-**Nó không thấy gì.** Một thành viên viết trong nháy, `"children": ReactNode`, có key là `Literal` chứ
+**Điểm mù.** Một thành viên viết trong nháy, `"children": ReactNode`, có key là `Literal` chứ
 không phải `Identifier`, và key computed cũng vậy. Một lỗ children mang tên khác — `content: ReactNode`,
 `body: ReactNode`, `trigger: ReactNode` — vì luật máy khớp một identifier và không biết gì về
 ReactNode. `PropsWithChildren<XData>`, hay bất kỳ props type nào import về mà mang sẵn thành viên đó,
@@ -135,7 +144,7 @@ mọi specifier có `imported.name` đúng bằng `SurfaceListCard`. `JSXOpening
 `node.name.type === "JSXIdentifier"`, đòi tên đó nằm trong `bindings`, rồi báo mọi attribute kiểu
 `JSXAttribute` có `name.type === "JSXIdentifier"` và `name.name` là `items`.
 
-**Nó không thấy gì.** Mọi surface dùng chung khác — `SurfaceCard`, `SurfaceAccordionCard`,
+**Điểm mù.** Mọi surface dùng chung khác — `SurfaceCard`, `SurfaceAccordionCard`,
 `SurfaceFormCard` — vì luật máy bị buộc vào đúng một đường dẫn import. Mọi cách viết khác của đường dẫn
 đó: một barrel (`@/components/branches`), một re-export, một đường dẫn tương đối có đuôi file
 (`./SurfaceListCard.tsx`), hay một default import vốn không mang `imported` name nào để so. Một thẻ có
@@ -226,7 +235,7 @@ Ngoại lệ là một phần của luật, không phải chỗ nương nhẹ. M
 phóng.
 
 - **Bảng registry.** `SLOTS-4` không áp cho chính bảng contract, nơi một ngữ pháp con có tên mô tả thứ
-  mà một key chấp nhận. Báo nó là bắt đúng cái file đã xóa bỏ lỗ vô danh phải thôi mô tả thứ đã thay
+  mà một key chấp nhận. Báo nó là bắt đúng file đã xóa bỏ lỗ vô danh phải thôi mô tả thứ đã thay
   cho lỗ đó. Ngoại lệ này nằm trong mã: `isContractTableFile` cắt ngang `isGoverned`.
 - **Ngoài các component tier.** Một routed page không bị `SLOTS-4` quản; nhận thứ framework trao là
   việc duy nhất một page được phép làm. File route của framework được nhận ReactNode, và phải đóng nó
@@ -393,5 +402,5 @@ hatch: the annotation is a TSTypeReference and isInlineObjectType recurses only 
 Module này ghi lại việc cưỡng chế, không ghi lại luật. Nó không gọi tên sản phẩm, thư viện component
 hay repository nào. Tên luật máy, message id, token mã và tiền tố plugin là những định danh xuất hiện
 trong build output nên được chép lại nguyên văn; mọi thứ viết quanh chúng là TSX bình thường. Phần do
-type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `@starci/eslint-canon-fe/props`, còn phần không gì giữ —
+type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `@canon-fe-props`, còn phần không gì giữ —
 `SLOTS-5` — thuộc về người đọc.

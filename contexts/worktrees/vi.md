@@ -4,7 +4,16 @@ title: Worktrees · Vietnamese
 
 # Cây làm việc
 
-Đầu vào là một lượt chạy sắp ghi ra cái gì đó, và đầu ra là **mỗi thứ nó ghi thì ghi vào đâu**: một
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@schema` | `contexts/worktrees/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
+
+
+## Bản ghi
+
+Mô-đun này nhận một lượt chạy sắp ghi ra cái gì đó, rồi trả về **mỗi thứ nó ghi thì ghi vào đâu**: một
 registry bền được đánh phiên bản, một dấu vết cục bộ dùng xong bỏ, hay không cần cô lập gì cả. Mô-đun này
 quyết định **state đang làm dở được ghi ở đâu**. Nó là cặp song sinh của câu hỏi workspace và nó hỏng theo
 chiều ngược lại: sai workspace thì agent **đọc** sai repository rồi trả lời rất tự tin; sai worktree thì
@@ -48,10 +57,10 @@ rác, và một cây luật có mảnh vụn của session trong đó thì thôi
 
 ## `WORKTREE-1` — state phải sống sót
 
-**Tình huống.** Lượt chạy sinh ra thứ mà sau này có người đọc và có thể không đồng ý: một registry thiết
+**Khi nào gặp.** Lượt chạy sinh ra thứ mà sau này có người đọc và có thể không đồng ý: một registry thiết
 kế, một phương án đã chấp nhận, một bản ghi quyết định.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mất nó là mất một **quyết định**, không chỉ mất thời gian.
 - Có thể có người cần xem nó đã đổi thế nào.
@@ -69,10 +78,10 @@ một quyết định biến mất ngay lần đầu thư mục đó được d�
 
 ## `WORKTREE-2` — tiến độ và gói dựng lại được
 
-**Tình huống.** Lượt chạy sinh ra dấu chân của chính nó: tiến độ dở, một chỉ mục, một bản preview, một gói
+**Khi nào gặp.** Lượt chạy sinh ra dấu chân của chính nó: tiến độ dở, một chỉ mục, một bản preview, một gói
 memory.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chạy lại đúng thứ đó là có lại nó.
 - Không ai rà soát nó.
@@ -89,10 +98,10 @@ phản lại chính cái source nó được suy ra từ.
 
 ## `WORKTREE-3` — đường dẫn bỏ qua project, hoặc trốn dưới `.claude`
 
-**Tình huống.** State sắp được ghi vào `<Source>/.worktrees/registries`, hoặc vào bất cứ đâu dưới
+**Khi nào gặp.** State sắp được ghi vào `<Source>/.worktrees/registries`, hoặc vào bất cứ đâu dưới
 `<Source>/.claude/`.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Trong đường dẫn không có phân đoạn project.
 - Đường dẫn nằm bên trong cây quy tắc.
@@ -109,10 +118,10 @@ hai, và cây quy tắc thì tích dần mảnh vụn của các lượt chạy,
 
 ## `WORKTREE-4` — registry thuộc một Git khác
 
-**Tình huống.** Một registry worktree nằm đúng đường dẫn nhưng do một Git common directory khác quản, hoặc
+**Khi nào gặp.** Một registry worktree nằm đúng đường dẫn nhưng do một Git common directory khác quản, hoặc
 nó chưa khoá, đang bẩn, hoặc đứng sai nhánh.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - `git worktree list` từ Source này không tính nó vào.
 - Nhánh không phải nhánh registry của project.
@@ -130,9 +139,9 @@ lịch sử bắt đầu nói khác nhau về cùng một registry.
 
 ## `WORKTREE-5` — nhiều agent song song sắp ghi
 
-**Tình huống.** Nhiều agent chạy cùng lúc và mỗi cái sẽ ghi file.
+**Khi nào gặp.** Nhiều agent chạy cùng lúc và mỗi cái sẽ ghi file.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đường ghi của từng agent biết trước khi nó bắt đầu.
 - Hoặc những đường đó rời nhau, hoặc có hai agent sẽ chạm cùng một file.
@@ -149,9 +158,9 @@ còn lại. Agent buộc phải dùng chung một worktree thì chạy **lần l
 
 ## `WORKTREE-6` — một worktree đã cũ
 
-**Tình huống.** Một worktree đang prunable, bị bỏ hoang, hoặc đứng chắn đúng chỗ state mới phải vào.
+**Khi nào gặp.** Một worktree đang prunable, bị bỏ hoang, hoặc đứng chắn đúng chỗ state mới phải vào.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Git báo nó prunable.
 - Nhánh của nó đã merge, đã mất, hoặc chưa từng được push.
@@ -171,7 +180,7 @@ từ một background agent, nơi không ai đang nhìn xem nó đứng trên nh
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
-| ba root | Ba đường dẫn dưới `.worktrees/<project>/`, hợp [`schema.json`](./schema.json) nằm cạnh bản ghi này |
+| ba root | Ba đường dẫn dưới `.worktrees/<project>/`, hợp `@schema` nằm cạnh bản ghi này |
 | project | Tên project do người khai, không bao giờ suy từ tên thư mục |
 | source | Repository chứa cây quy tắc |
 | đầu ra | Từng thứ lượt chạy sẽ ghi, và nó có dựng lại được không |

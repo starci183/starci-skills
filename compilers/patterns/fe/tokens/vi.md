@@ -7,8 +7,18 @@ codes: [TOKEN-1, TOKEN-2, TOKEN-3, TOKEN-4, TOKEN-5, TOKEN-6, TOKEN-7, TOKEN-8, 
 
 # Token
 
-Đầu vào của pattern này là một shape đã được duyệt — một layout, một block, một surface, một control,
-một dấu trạng thái. Quyết định đó coi như đã đóng; file này không mở lại nó. Đầu ra là kiến trúc
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+| `@canon-fe-contracts` | `@starci/eslint-canon-fe/contracts` | npm package | các kiểu contract frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một layout, một block, một surface, một control,
+một dấu trạng thái. Quyết định đó coi như đã đóng; file này không mở lại nó. Kết quả là kiến trúc
 source: chuỗi class nào được phép viết, tầng file nào được phép viết nó, thành viên mới thêm vào danh
 sách nào, stylesheet nào phải định nghĩa biến mà một cái tên đang xin, và component nào sở hữu một
 quyết định thay vì ghép nó lại từ các class. Shape nói màn hình trông ra sao. Pattern này nói phần
@@ -120,14 +130,14 @@ luật khác và từ record công việc, nên một con số là vĩnh viễn 
 
 ## `TOKEN-1` — thang là một union, nên giá trị lệch thang không gõ ra được
 
-**Tình huống.** Ai đó cần một khoảng cách mà bảng từ vựng không có, và phản xạ đầu tiên là viết đại
+**Khi nào gặp.** Ai đó cần một khoảng cách mà bảng từ vựng không có, và phản xạ đầu tiên là viết đại
 `gap-[13px]` rồi đi tiếp.
 
-**Nó sinh ra gì trong source.** Không sinh ra gì mới. Giá trị đó không được viết, vì nó không phải
+**Source phải thể hiện gì.** Không sinh ra gì mới. Giá trị đó không được viết, vì nó không phải
 thành viên của `LayoutClassName`. Entry lấy bậc gần nhất đang có, hoặc công việc chuyển sang
 `TOKEN-2`.
 
-**Dấu hiệu nhận biết.** Giá trị nằm trong một entry đã gõ kiểu, chứ không nằm trong leaf. Trình biên
+**Cách nhận ra.** Giá trị nằm trong một entry đã gõ kiểu, chứ không nằm trong leaf. Trình biên
 dịch đã đỏ trước khi có ai kịp mở review. Không có rule nào phải nói gì về chuyện này cả.
 
 **Ranh giới.** Không phải `TOKEN-4`: cùng một hình dạng giá trị, khác tầng file và khác thứ giữ nó —
@@ -140,14 +150,14 @@ sửa một seam bị chê chật · nhận một đóng góp từ người mớ
 
 ## `TOKEN-2` — thêm thành viên là sửa thang, và phải đọc ra là như vậy
 
-**Tình huống.** Bảng từ vựng thật sự thiếu một thứ. Việc đúng không phải là né union, mà là mở nó ra
+**Khi nào gặp.** Bảng từ vựng thật sự thiếu một thứ. Việc đúng không phải là né union, mà là mở nó ra
 một cách có chủ ý, trong danh sách có tên, ở chỗ mà diff nhìn thấy.
 
-**Nó sinh ra gì trong source.** Đúng một diff trong chính danh sách từ vựng — cái union các literal —
+**Source phải thể hiện gì.** Đúng một diff trong chính danh sách từ vựng — cái union các literal —
 và tôn trọng lời chú thích bên trên nó: hãy nới danh sách này một cách có chủ ý, để phần thêm vào đọc
 ra như một quyết định. Không call site nào được phép là chỗ thành viên mới ra đời.
 
-**Dấu hiệu nhận biết.** Nhu cầu lặp lại ở nhiều màn hình, không phải một chỗ. Người thêm nói được
+**Cách nhận ra.** Nhu cầu lặp lại ở nhiều màn hình, không phải một chỗ. Người thêm nói được
 **quan hệ** mà bậc mới đặt tên, không chỉ nói được số đo. Thay đổi nằm trong danh sách từ vựng, không
 nằm trong một component.
 
@@ -160,13 +170,13 @@ mới · nhận về một union song song do repo khác tự mọc ra và phả
 
 ## `TOKEN-3` — nửa bậc không nằm giữa hai bậc, nó nằm ngoài thang
 
-**Tình huống.** Một giá trị dạng `x.5` xuất hiện ở bất kỳ họ nào có đo đạc: `gap`, `p`, `m`, `space`,
+**Khi nào gặp.** Một giá trị dạng `x.5` xuất hiện ở bất kỳ họ nào có đo đạc: `gap`, `p`, `m`, `space`,
 `size`, `w`, `h`, `inset` và các cạnh của chúng.
 
-**Nó sinh ra gì trong source.** Một bậc nguyên — bậc gần nhất khi còn phân vân. Pattern `FRACTIONAL`
+**Source phải thể hiện gì.** Một bậc nguyên — bậc gần nhất khi còn phân vân. Pattern `FRACTIONAL`
 và rule `noFractionalStep` dựng từ nó giữ điều này trong source sản phẩm.
 
-**Dấu hiệu nhận biết.** Giá trị có dấu chấm thập phân. Nó được biện minh bằng "cái kia hơi chật một
+**Cách nhận ra.** Giá trị có dấu chấm thập phân. Nó được biện minh bằng "cái kia hơi chật một
 tí". Tìm cả sản phẩm không ra chỗ thứ hai dùng đúng giá trị đó.
 
 **Ranh giới.** Không phải `TOKEN-4`: `size-3.5` là nửa bậc, `size-[14px]` là giá trị tuỳ ý. Chúng vẽ
@@ -178,14 +188,14 @@ thu một control cho lọt vào một row chật · port một số đo lẻ t�
 
 ## `TOKEN-4` — giá trị tuỳ ý thoát khỏi hệ thống, dù nó bằng bao nhiêu
 
-**Tình huống.** Một độ dài trong ngoặc vuông, hoặc một mã màu thô. Được chọn một lần, bởi một người,
+**Khi nào gặp.** Một độ dài trong ngoặc vuông, hoặc một mã màu thô. Được chọn một lần, bởi một người,
 cho một màn hình.
 
-**Nó sinh ra gì trong source.** Với số đo là một thành viên của bảng từ vựng; với màu là một token
+**Source phải thể hiện gì.** Với số đo là một thành viên của bảng từ vựng; với màu là một token
 màu ngữ nghĩa. `ARBITRARY_LENGTH`, `RAW_COLOUR` và hai message id trong `noArbitraryValue` giữ điều
 này — một message cho `length`, một cho `colour`.
 
-**Dấu hiệu nhận biết.** `[...]` trong một class đo đạc, hoặc `#` trong một class màu. Nó có thể đang
+**Cách nhận ra.** `[...]` trong một class đo đạc, hoặc `#` trong một class màu. Nó có thể đang
 đúng bằng một bậc — và đó chính là cái bẫy. Không ai tìm ra nó khi tra thang, và nó không di chuyển
 khi thang di chuyển.
 
@@ -200,13 +210,13 @@ sidebar · chỉnh một shadow cho "giống bản mẫu" · vá gấp một ch�
 
 ## `TOKEN-5` — thứ bậc đến từ thang chữ, không đến từ tổ hợp ghép tay
 
-**Tình huống.** Chữ to cộng chữ đậm. Đó **là** một heading, dù nó nằm trên thẻ gì.
+**Khi nào gặp.** Chữ to cộng chữ đậm. Đó **là** một heading, dù nó nằm trên thẻ gì.
 
-**Nó sinh ra gì trong source.** Cái leaf heading, nơi `level` điều khiển thẻ và cỡ chữ như một quyết
+**Source phải thể hiện gì.** Cái leaf heading, nơi `level` điều khiển thẻ và cỡ chữ như một quyết
 định duy nhất. `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau chính là thứ `noHandRolledHeading`
 tìm.
 
-**Dấu hiệu nhận biết.** Một `span` hoặc `div` mang cả class cỡ lớn lẫn class đậm. Đọc bằng mắt thì nó
+**Cách nhận ra.** Một `span` hoặc `div` mang cả class cỡ lớn lẫn class đậm. Đọc bằng mắt thì nó
 là tiêu đề; đọc bằng outline thì nó không tồn tại. Ngày thang chữ đổi, chỗ này ở lại phía sau.
 
 **Ranh giới.** Không phải `TOKEN-4`: `TOKEN-5` không nói gì về việc giá trị có trong thang hay không
@@ -219,16 +229,16 @@ tên khoá học trên một card · tiêu đề bên trong một modal · tiêu
 
 ## `TOKEN-6` — rule tồn tại vì cái thư mục union không nhìn thấy
 
-**Tình huống.** Mọi tầng trên leaf đều lấy class từ một entry đã gõ kiểu, nên union đã giữ chúng.
+**Khi nào gặp.** Mọi tầng trên leaf đều lấy class từ một entry đã gõ kiểu, nên union đã giữ chúng.
 Leaf **tự viết class của mình** và được miễn luật entry theo chính sách — nên đó là nơi duy nhất một
 giá trị lệch thang còn gõ ra được.
 
-**Nó sinh ra gì trong source.** Một bộ đọc phủ hết thư mục đó: `isSourceFile` và nhánh
+**Source phải thể hiện gì.** Một bộ đọc phủ hết thư mục đó: `isSourceFile` và nhánh
 `VariableDeclarator` của `classTextVisitors` hiện thực nó, còn `LEAF_DIR_RELATIVE` / `isLeafFile` gọi
 tên thư mục được miễn. **Không có gì báo cáo vi phạm mã này** — không rule nào fail được khi phần phủ
 bị thiếu, nên khoảng trống ấy nhìn từ bên ngoài là vô hình.
 
-**Dấu hiệu nhận biết.** File nằm trong thư mục leaf. Class được viết trực tiếp trong markup, hoặc
+**Cách nhận ra.** File nằm trong thư mục leaf. Class được viết trực tiếp trong markup, hoặc
 được nhấc lên một hằng số module. Một rule chỉ đi qua thuộc tính JSX sẽ nhìn thẳng qua hằng số đó.
 
 **Ranh giới.** Không phải `TOKEN-3` và không phải `TOKEN-4`: hai mã kia nói **giá trị nào sai**;
@@ -243,15 +253,15 @@ một bảng `TONE_CLASSES` hay `SIZE_CLASSES` · review một PR chỉ đọc p
 
 ## `TOKEN-7` — màu ngữ nghĩa được ghép cặp theo mặt nền mang nó
 
-**Tình huống.** Có ba vai, không phải một. Dấu trần dùng `text-success`. Nền mềm ghép
+**Khi nào gặp.** Có ba vai, không phải một. Dấu trần dùng `text-success`. Nền mềm ghép
 `bg-success-soft` với `text-success-soft-foreground`. Nền đặc ghép `bg-success` với
 `text-success-foreground`. Cảnh báo và nguy hiểm theo đúng ba vai đó.
 
-**Nó sinh ra gì trong source.** Một bảng tone ghép `bg-*-soft` với `text-*-soft-foreground`, và một
+**Source phải thể hiện gì.** Một bảng tone ghép `bg-*-soft` với `text-*-soft-foreground`, và một
 dấu trần dùng `text-success` trơn. Không có gì cơ học giữ điều này: ghép cặp là một quan hệ hai class
 mà không rule nào trong file rule token đi tìm.
 
-**Dấu hiệu nhận biết.** Một token có đuôi `-soft` đang đứng ở vị trí màu chữ. Một glyph trần đang
+**Cách nhận ra.** Một token có đuôi `-soft` đang đứng ở vị trí màu chữ. Một glyph trần đang
 mượn màu vốn dành để làm nền. Trong theme này thì còn đọc được, sang theme kia thì mất tương phản.
 
 **Ranh giới.** Không phải `TOKEN-4`: `TOKEN-7` là **đúng bảng màu, sai vai**, còn `TOKEN-4` là đứng
@@ -264,16 +274,16 @@ lỗi của form.
 
 ## `TOKEN-8` — kích cỡ theo vị trí đặt, variant theo mức ưu tiên
 
-**Tình huống.** Chọn chiều cao cho một nút. Chỉ có hai token, và cả hai đều đặt tên cho một quan hệ
+**Khi nào gặp.** Chọn chiều cao cho một nút. Chỉ có hai token, và cả hai đều đặt tên cho một quan hệ
 tái lập được: `sm` là hành động nhúng trong một row, list item, toolbar gọn hay cụm card; `md` là
 hành động đứng riêng, chiếm một dòng hoặc neo cả một form.
 
-**Nó sinh ra gì trong source.** `export type ButtonSize = "sm" | "md"` cùng lời chú thích nói kích cỡ
+**Source phải thể hiện gì.** `export type ButtonSize = "sm" | "md"` cùng lời chú thích nói kích cỡ
 đi theo vị trí đặt, độc lập với mức ưu tiên thị giác. Union kích cỡ đóng tập ở hai giá trị nên chiều
 cao thứ ba là không gõ ra được — nhưng **chọn đúng cái nào trong hai** là một phán đoán về vị trí đặt
 mà không có gì kiểm.
 
-**Dấu hiệu nhận biết.** Cùng một vai trò mà đổi hình học giữa hai màn hình. Chiều cao được suy ra từ
+**Cách nhận ra.** Cùng một vai trò mà đổi hình học giữa hai màn hình. Chiều cao được suy ra từ
 "nút này quan trọng hơn". Có padding tự chế để bóp nhỏ một control.
 
 **Ranh giới.** Không phải `TOKEN-4`: padding tự chế để bóp nút thường kéo theo một nửa bậc hoặc một
@@ -288,15 +298,15 @@ toolbar.
 
 ## `TOKEN-9` — một class gọi tên token thì chưa có nghĩa gì cho tới khi theme định nghĩa nó
 
-**Tình huống.** `max-w-app-lg` **không phải** một chiều rộng. Nó là một **yêu cầu** gửi tới biến
+**Khi nào gặp.** `max-w-app-lg` **không phải** một chiều rộng. Nó là một **yêu cầu** gửi tới biến
 `--container-app-lg`. Khi biến đó không tồn tại: class vẫn được phát ra, element vẫn render, và không
 có chỗ nào đỏ.
 
-**Nó sinh ra gì trong source.** Một cái tên là thành viên union **VÀ** một stylesheet định nghĩa biến
+**Source phải thể hiện gì.** Một cái tên là thành viên union **VÀ** một stylesheet định nghĩa biến
 nó xin — phía rule là `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`, phía theme là các biến
 `--container-app-*` mà các tên `max-w-app-*` đang xin. Do `no-unresolved-token-class` giữ.
 
-**Dấu hiệu nhận biết.** Tên class đọc như một token của nhà, thuộc họ có thể suy ra tên biến. Union
+**Cách nhận ra.** Tên class đọc như một token của nhà, thuộc họ có thể suy ra tên biến. Union
 chấp nhận tên đó, nên compiler hài lòng. Trang lặng lẽ mất số đo của mình.
 
 **Ranh giới.** Không phải `TOKEN-1`: đây chính là giá trị chết duy nhất mà union không bắt được, và
@@ -339,15 +349,15 @@ trust tree này, `src/…` là một repository front-end tiêu thụ nó.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `TOKEN-1` | `@starci/eslint-canon-fe/contracts` · `components/contracts/index.ts` | `export type LayoutClassName` — một union các literal, trong đó có sáu bậc gap |
-| `TOKEN-2` | `@starci/eslint-canon-fe/contracts` | Lời chú thích bên trên union: hãy nới danh sách này có chủ ý, để phần thêm vào đọc ra như một quyết định trong diff |
-| `TOKEN-3` | `@starci/eslint-canon-fe` | Pattern `FRACTIONAL` và rule `noFractionalStep` dựng từ nó |
-| `TOKEN-4` | `@starci/eslint-canon-fe` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, và hai message id trong `noArbitraryValue` |
-| `TOKEN-5` | `@starci/eslint-canon-fe` · `components/leaves/Heading/index.tsx` | `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau; và cái leaf nơi `level` điều khiển thẻ với cỡ chữ như một quyết định |
-| `TOKEN-6` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe` | `isSourceFile`, nhánh `VariableDeclarator` của `classTextVisitors`; và `LEAF_DIR_RELATIVE` / `isLeafFile`, chỗ gọi tên thư mục được miễn |
+| `TOKEN-1` | `@canon-fe-contracts` · `components/contracts/index.ts` | `export type LayoutClassName` — một union các literal, trong đó có sáu bậc gap |
+| `TOKEN-2` | `@canon-fe-contracts` | Lời chú thích bên trên union: hãy nới danh sách này có chủ ý, để phần thêm vào đọc ra như một quyết định trong diff |
+| `TOKEN-3` | `@canon-fe` | Pattern `FRACTIONAL` và rule `noFractionalStep` dựng từ nó |
+| `TOKEN-4` | `@canon-fe` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, và hai message id trong `noArbitraryValue` |
+| `TOKEN-5` | `@canon-fe` · `components/leaves/Heading/index.tsx` | `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau; và cái leaf nơi `level` điều khiển thẻ với cỡ chữ như một quyết định |
+| `TOKEN-6` | `@canon-fe` · `@canon-fe` | `isSourceFile`, nhánh `VariableDeclarator` của `classTextVisitors`; và `LEAF_DIR_RELATIVE` / `isLeafFile`, chỗ gọi tên thư mục được miễn |
 | `TOKEN-7` | `components/leaves/IconTile/index.tsx` · `components/leaves/RankDeltaCaret/index.tsx` | Một bảng tone ghép `bg-*-soft` với `text-*-soft-foreground`; và một dấu trần dùng `text-success` trơn |
 | `TOKEN-8` | `components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` và lời chú thích nói kích cỡ đi theo vị trí đặt, độc lập với mức ưu tiên thị giác |
-| `TOKEN-9` | `@starci/eslint-canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`; và các biến `--container-app-*` mà các tên `max-w-app-*` đang xin |
+| `TOKEN-9` | `@canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`; và các biến `--container-app-*` mà các tên `max-w-app-*` đang xin |
 | inset pairing | `app/globals.css` · `components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` đứng cạnh `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — ngoại lệ ngữ nghĩa ở cùng sức mạnh |
 | joined-list rows | `components/contracts/index.ts` | Các entry mang `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 

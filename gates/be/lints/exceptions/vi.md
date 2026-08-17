@@ -4,7 +4,14 @@ title: Exceptions · Vietnamese
 
 # Ngoại lệ
 
-Đầu vào là mã đã viết xong — một tệp back end, một mẩu diff. Đầu ra là một **phán quyết**: tệp đó có
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp back end, một mẩu diff. Kết quả là một **phán quyết**: tệp đó có
 nằm trong phạm vi hay không, quy tắc đã công bố nào bắn, nó báo thông điệp gì và trên nút nào, ứng với
 mã luật nào, và cửa còn mở nào lẽ ra đã che đúng thất bại đó. Mô-đun này không chọn thiết kế nào cả.
 Nó từ chối, và nó phải chỉ được đúng ký tự mà nó từ chối.
@@ -72,7 +79,7 @@ mười bảy tên ngoại lệ framework. Hai cổng cấp tệp đọc `contex
 `/-spec\.ts$/` hoặc đường dẫn chứa `/src/tests/` tắt hẳn quy tắc;
 `/\/health(?:z)?\.controller\.ts$|\/health\//` chỉ tắt nhánh framework.
 
-**Nó không thấy gì.** `const failure = new Error("no seat left"); throw failure` — nút tại
+**Điểm mù.** `const failure = new Error("no seat left"); throw failure` — nút tại
 `ThrowStatement` là một `Identifier` chứ không phải `NewExpression`, nên trình xử lý thoát ngay dòng
 đầu. `return Promise.reject(new Error(...))`, `subscriber.error(new Error(...))` và
 `callback(new Error(...))` không sinh ra `ThrowStatement` nào cả. `throw new TypeError(...)` và
@@ -103,7 +110,7 @@ Lọc tên bằng `/Exception$/`, rồi bỏ `AbstractException` và bỏ mọi 
 đọc `arguments.length` cho `zero` và `extra`, và `arguments[0].type !== "ObjectExpression"` cho
 `notObject`. **Không có cổng chặn theo tên tệp nào.**
 
-**Nó không thấy gì.** Khe hở nặng nhất của nó chạy theo chiều ngược: `const meta = { id }` rồi
+**Điểm mù.** Khe hở nặng nhất của nó chạy theo chiều ngược: `const meta = { id }` rồi
 `throw new CourseNotFoundException(meta)` là hình dạng **đúng**, nhưng quy tắc vẫn báo lỗi, vì nó kiểm
 `arguments[0].type === "ObjectExpression"` tại chỗ gọi chứ không kiểm giá trị. Hằng số làm lẫn literal
 theo cả hai chiều. `new XException({} as SomeMeta)` là `TSAsExpression` nên bị báo dù nội dung đúng.
@@ -128,7 +135,7 @@ chỗ ném là không đủ: một lớp kế thừa lớp nền framework vẫn
 `Identifier`, hoặc khi `name` của nó đúng bằng `AbstractException`. Một cổng theo tên tệp:
 `/exceptions\/errors\/abstract\.ts$/` miễn cho chính tệp của lớp nền.
 
-**Nó không thấy gì.** `export const CourseException = class CourseException extends ConflictException {}`
+**Điểm mù.** `export const CourseException = class CourseException extends ConflictException {}`
 là `ClassExpression`, một loại nút khác, không bao giờ được thăm.
 `class CourseException extends mixin(ConflictException) {}` và `extends base.Http {}` bị từ chối báo vì
 lớp cha không phải `Identifier` — đó là im lặng, không phải cho qua.
@@ -152,7 +159,7 @@ hiện nó ngoài môi trường chạy thật.
 `context.filename` đã chuẩn hoá dấu gạch thì trả về bộ thăm rỗng. Ngược lại thăm `ClassDeclaration`,
 đòi `node.id`, đòi `/Exception$/` trên tên, và đòi `node.superClass` tồn tại ở bất kỳ hình dạng nào.
 
-**Nó không thấy gì.** Cổng khớp **cặp thư mục theo tên**, ở bất kỳ đâu trong đường dẫn: thư mục
+**Điểm mù.** Cổng khớp **cặp thư mục theo tên**, ở bất kỳ đâu trong đường dẫn: thư mục
 `exceptions/errors/` thứ hai, thứ ba và thứ hai mươi đều thoả, nên thứ được cưỡng chế là "một thư mục
 viết đúng chữ", không phải "một chỗ để tra". `class CourseException {}` không kế thừa gì, viết ngoài
 thư mục, thì quy tắc thoát theo thiết kế — một hình dạng không trang trí gì không được coi là ngoại lệ,

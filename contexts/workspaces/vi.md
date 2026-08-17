@@ -4,7 +4,16 @@ title: Workspaces · Vietnamese
 
 # Không gian làm việc
 
-Đầu vào là một yêu cầu khởi động viết bằng lời thường — "start example-app fe be" — và đầu ra là,
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@schema` | `contexts/workspaces/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
+
+
+## Bản ghi
+
+Mô-đun này nhận một yêu cầu khởi động viết bằng lời thường — "start example-app fe be" — rồi trả về,
 với **mỗi vai trò** mà yêu cầu đó gọi tên, một route đã giải và một phán quyết: đọc từ checkout này,
 hay dừng lại và trả về bước setup. Mô-đun này quyết định **sự thật được đọc từ đâu**. Sai ở đây thì
 không tầng nào bên dưới còn đúng, và cái sai đó không tự lên tiếng: agent vẫn đọc một repository thật,
@@ -48,10 +57,10 @@ thì buộc phải hỏi, cũ thì mời người ta trả lời sai một cách
 
 ## `WORKSPACE-1` — lệnh khởi động gọi tên project và vai trò
 
-**Tình huống.** Yêu cầu nêu một danh tính và một hoặc nhiều vai trò, mỗi vai trò có tệp route riêng.
+**Khi nào gặp.** Yêu cầu nêu một danh tính và một hoặc nhiều vai trò, mỗi vai trò có tệp route riêng.
 Hai vai trò là hai route, không phải một route đọc theo hai cách.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Yêu cầu gọi tên một project.
 - Mỗi vai trò là một từ đủ để dựng nên đường dẫn route.
@@ -75,14 +84,14 @@ tải một repository không ai yêu cầu rồi báo cáo về nó như thể 
 
 ## `WORKSPACE-2` — tệp route được gọi tên nhưng không tồn tại
 
-**Tình huống.** Yêu cầu gọi tên một vai trò mà máy này không có tệp route cho nó.
+**Khi nào gặp.** Yêu cầu gọi tên một vai trò mà máy này không có tệp route cho nó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đường dẫn dựng từ project và vai trò không tồn tại.
 - Một vai trò khác của cùng project vẫn giải được bình thường.
 
-**Tự hỏi.** Thứ đang thiếu là cái route, hay là repository mà route trỏ tới?
+**Tự hỏi.** Thứ đang thiếu là route, hay là repository mà route trỏ tới?
 
 **Ranh giới**
 
@@ -94,10 +103,10 @@ biểu sau đó là về vai trò sai.
 
 ## `WORKSPACE-3` — checkout là nơi đọc và ghi
 
-**Tình huống.** Route đã giải, và công việc từ đây diễn ra trong repository thật tại
+**Khi nào gặp.** Route đã giải, và công việc từ đây diễn ra trong repository thật tại
 `repository.diskPath`.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Route mang một đường dẫn đĩa, một git root, một nhánh và một head.
 - Bản thân cấu hình không chứa tệp nguồn nào của riêng nó.
@@ -113,10 +122,10 @@ trả lời mô tả một khoảnh khắc đã đóng băng trong khi repositor
 
 ## `WORKSPACE-4` — một vai trò cần hợp đồng miền của nó
 
-**Tình huống.** Vai trò frontend phải biết những thành phần và slot nào **có thật** trước khi trả lời
+**Khi nào gặp.** Vai trò frontend phải biết những thành phần và slot nào **có thật** trước khi trả lời
 bất cứ điều gì về bố cục, và đường dẫn hợp đồng là thẩm quyền duy nhất cho chuyện đó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Route gọi tên một đường dẫn hợp đồng.
 - Route cũng ghi lại đường dẫn ấy được chọn thế nào — khai báo, hay dò ra.
@@ -132,11 +141,11 @@ bất cứ điều gì về bố cục, và đường dẫn hợp đồng là th
 
 ## `WORKSPACE-5` — route đã cũ
 
-**Tình huống.** Tệp route vẫn hợp lệ và đầy đủ, và một giá trị trong nó không còn mô tả đúng máy: một
+**Khi nào gặp.** Tệp route vẫn hợp lệ và đầy đủ, và một giá trị trong nó không còn mô tả đúng máy: một
 đường dẫn đã ghi không có trên đĩa, hoặc checkout không còn tới được head đã ghi, hoặc nó đang ở một
 nhánh khác.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mọi trường đều có mặt và đúng dạng.
 - Một đường dẫn đã ghi không giải được, một head đã ghi không tới được từ checkout, hoặc nhánh đã khác.
@@ -152,10 +161,10 @@ nhánh khác.
 
 ## `WORKSPACE-6` — route mang những sự thật riêng của một máy
 
-**Tình huống.** Route giữ đường dẫn đĩa và siêu dữ liệu git công khai. Nó là cấu hình cục bộ, không
+**Khi nào gặp.** Route giữ đường dẫn đĩa và siêu dữ liệu git công khai. Nó là cấu hình cục bộ, không
 phải kiến thức dùng chung.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các giá trị khác nhau giữa máy này và máy khác.
 - Cây quy tắc sẽ **sai** trên máy người khác nếu nó chứa những giá trị đó.
@@ -175,7 +184,7 @@ workspace ngay từ đầu.
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
 | yêu cầu | Danh sách project và vai trò đúng nghĩa chữ |
-| route | `.workspace/<project>/<role>/config.json`, hợp [`schema.json`](./schema.json) nằm cạnh bản ghi này |
+| route | `.workspace/<project>/<role>/config.json`, hợp `@schema` nằm cạnh bản ghi này |
 | checkout | Thư mục tại `repository.diskPath`, có thật trên đĩa |
 | hợp đồng | Tệp tại `context.contract`, và `context.contractSource` cho xuất xứ của nó |
 | độ mới | Head và nhánh đã ghi còn mô tả đúng checkout đó |

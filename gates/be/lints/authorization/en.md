@@ -4,6 +4,13 @@ title: Authorization
 
 # Authorization
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 which published rule fired, on which node, which law code that maps to, and the open hatch that would
 have hidden the same failure. This module chooses no authorization design. It refuses one, and it must

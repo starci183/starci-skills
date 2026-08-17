@@ -4,7 +4,14 @@ title: Surface-in-surface · Vietnamese
 
 # Bề mặt trong bề mặt
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một cái thẻ có danh sách bài học bên trong" — và đầu ra
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một cái thẻ có danh sách bài học bên trong" — rồi trả về
 là, với **mỗi vùng chứa** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu không bao
 giờ nói ra một đường viền, một cái bóng hay một cái nền, và không được phép chọn chúng bằng mắt: ranh
 giới suy ra từ thứ **đã** sở hữu ranh giới bao quanh vùng chứa, và từ việc vùng chứa có sở hữu một
@@ -79,11 +86,11 @@ ca thật để đề xuất đổi luật.
 
 ## `SURFACE-IN-SURFACE-1` — một đối tượng độc lập trên nền trang
 
-**Tình huống.** Một thứ đứng thẳng trên nền trang, tự nó là **một đối tượng nghiệp vụ hoàn chỉnh**:
+**Khi nào gặp.** Một thứ đứng thẳng trên nền trang, tự nó là **một đối tượng nghiệp vụ hoàn chỉnh**:
 gọi được tên, liệt kê được thành viên, có trạng thái riêng và có kết quả riêng. Nó nhận một ranh giới
 cấp trang, và ranh giới đó là **độ nổi** — nền thẻ cộng bóng, **không** đường viền.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đặt tên cho nó bằng một danh từ nghiệp vụ được, không phải bằng vị trí ("cái khối bên phải").
 - Nó có thể tự tải, tự rỗng, tự lỗi mà phần còn lại của trang vẫn sống.
@@ -108,11 +115,11 @@ bề mặt chứa của nó có đúng là nền trang không?
 
 ## `SURFACE-IN-SURFACE-2` — một tập hàng so sánh được, ở cấp trang
 
-**Tình huống.** Nhiều hàng **cùng loại**, đọc theo cùng một cách, so sánh được với nhau. Cả tập là
+**Khi nào gặp.** Nhiều hàng **cùng loại**, đọc theo cùng một cách, so sánh được với nhau. Cả tập là
 **một** đối tượng cấp trang; từng hàng **không** phải đối tượng riêng. Một ranh giới duy nhất ôm cả
 tập, và ranh giới giữa các hàng do `divide-y` nói, không do khoảng trắng nói.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mọi hàng có cùng cấu trúc: cùng những trường, cùng thứ tự đọc.
 - Thêm hay bớt một hàng không làm đổi ý nghĩa của tập.
@@ -137,11 +144,11 @@ sách tệp đính kèm · lịch sử hoạt động.
 
 ## `SURFACE-IN-SURFACE-3` — phần nội dung chỉ gọi tên cho phần tử ngang hàng đã có ranh giới
 
-**Tình huống.** Một vùng trang có tiêu đề, nhưng **con của nó đã tự sở hữu ranh giới**. Phần nội dung
+**Khi nào gặp.** Một vùng trang có tiêu đề, nhưng **con của nó đã tự sở hữu ranh giới**. Phần nội dung
 chỉ làm một việc: gọi tên. Nếu nó vẽ thêm một ranh giới nữa thì cùng một quan hệ nhóm bị tuyên bố hai
 lần, và người đọc phải tự đoán khung nào mới là khung thật.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Con trực tiếp là các thẻ, các đối tượng đã nâng nổi, hoặc các tập liền mạch.
 - Phần nội dung không có trạng thái riêng ngoài trạng thái của tập con.
@@ -165,7 +172,7 @@ nhiều khối thống kê · "Kết quả tìm kiếm" + danh sách kết quả
 
 ## `SURFACE-IN-SURFACE-4` — trùng, tầm thường, hoặc không gọi được tên
 
-**Tình huống.** Vùng chứa nằm **bên trong** một bề mặt đã có (thẻ, nhóm có dàn ý, phần tử chồng lớp)
+**Khi nào gặp.** Vùng chứa nằm **bên trong** một bề mặt đã có (thẻ, nhóm có dàn ý, phần tử chồng lớp)
 và không sở hữu nhóm nào khác bề mặt chứa. Có ba đường dẫn tới đây, và cả ba cho cùng một kết quả:
 
 1. **Trùng** — nội dung thuộc đúng nhóm mà bề mặt chứa đã tuyên bố.
@@ -173,7 +180,7 @@ và không sở hữu nhóm nào khác bề mặt chứa. Có ba đường dẫn
 3. **Không gọi được tên** — có thể là một nhóm, nhưng chưa ai nêu được tên, thành viên, trạng thái và
    kết quả của nó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bạn không đặt được tên cho nhóm mà không lặp lại tên của bề mặt chứa.
 - Vùng chứa tồn tại vì lý do kỹ thuật: để đặt `flex-col`, để bọc một bản đồ, để nhận một ref.
@@ -202,12 +209,12 @@ thích dưới biểu đồ · khung chờ của bất kỳ nội dung nào ở 
 
 ## `SURFACE-IN-SURFACE-5` — tập liền mạch riêng nằm trong bề mặt khác
 
-**Tình huống.** Bên trong một bề mặt đã có, xuất hiện một **tập hàng so sánh được** thuộc về một quan
+**Khi nào gặp.** Bên trong một bề mặt đã có, xuất hiện một **tập hàng so sánh được** thuộc về một quan
 hệ nhóm **khác** với bề mặt chứa và **gọi được tên**. Tập đó cần một ranh giới, nhưng **không** được
 độ nổi: trong một bề mặt, độ nổi lần hai là một lời nói dối về độ sâu. Nó nhận **một** đường viền, nền
 trong suốt, không bóng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các hàng bên trong so sánh được với nhau (cùng trường, cùng thứ tự đọc).
 - Nhóm có tên riêng, khác tên của bề mặt chứa.
@@ -233,11 +240,11 @@ thẻ sự kiện · lịch sử thay đổi trong ngăn trượt chi tiết · 
 
 ## `SURFACE-IN-SURFACE-6` — một hành động thường nằm trong bề mặt
 
-**Tình huống.** Một thành phần điều khiển nằm trong một bề mặt đã có, phục vụ chính bề mặt chứa đó, và
+**Khi nào gặp.** Một thành phần điều khiển nằm trong một bề mặt đã có, phục vụ chính bề mặt chứa đó, và
 **chưa ai chứng minh** nó là kết quả chính. Nó nhận cách thể hiện thứ cấp: một đường viền, nền trong
 suốt, chữ màu tiền cảnh — đủ để bấm được, không đủ để cạnh tranh với bề mặt chứa.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bề mặt chứa của thành phần điều khiển đã là một bề mặt (thẻ, nhóm có dàn ý, phần tử chồng lớp).
 - Thành phần điều khiển làm một việc cục bộ: thử lại, xem thêm, sao chép, tải xuống, huỷ.

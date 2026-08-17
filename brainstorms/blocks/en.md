@@ -4,6 +4,16 @@ title: Blocks
 
 # Blocks
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@schema` | `brainstorms/blocks/schema.json` | file | validate the record's JSON shape |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+
+
+## Record
+
 You are given one region of an accepted layout and you return **3–4 block anatomies**, each a JSON
 structure the owner can choose between — or one refusal naming the product decision that is missing. Like
 the layout stage this is not a compiler, and for the same reason: which anatomy is right is a product
@@ -127,7 +137,7 @@ blocked: <which parts cannot be resolved without it>
 
 ## Output
 
-The output **is** JSON, and its authority is [`schema.json`](./schema.json) beside this record. `envelope`
+The output **is** JSON, and its authority is `@schema` beside this record. `envelope`
 holds what varies between runs — including the accepted `layoutHash` this region came from — and the hash
 covers an anatomy only.
 
@@ -164,7 +174,7 @@ covers an anatomy only.
 Validate before writing and before hashing:
 
 ```bash
-node <trust>/scripts/validate-artifact.mjs --schema <trust>/brainstorms/blocks/schema.json --data <batch.json> --hash
+node @validate-artifact --schema @schema --data <batch.json> --hash
 ```
 
 Beyond the shape, the validator refuses a class token anywhere in the batch, two anatomies sharing an axis

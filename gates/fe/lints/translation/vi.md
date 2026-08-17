@@ -4,7 +4,16 @@ title: Translation · Vietnamese
 
 # Chữ nghĩa
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp đó có nằm trong
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp đó có nằm trong
 cổng thư mục hay không, luật máy nào đã nổ, nó báo cái gì và trên node nào, việc đó ứng với mã luật
 nào, và cửa còn mở nào có thể đã che đúng cái lỗi ấy. Mô-đun này không chọn chữ cho ai. Nó từ chối một
 cách viết, và nó phải chỉ được ra đúng chuỗi mà nó từ chối.
@@ -35,7 +44,7 @@ dung từ điển không nằm trong bốn thư mục được canh — còn `CO
 trị `"quest.title"` chỉ là một token chữ thường không có dấu cách, đúng thứ mà cả hai luật máy đều
 không nhìn tới.
 
-Cả hai luật ship trong `@starci/eslint-canon-fe` dưới tiền tố `starci-fe/`, cả hai đều
+Cả hai luật ship trong `@canon-fe` dưới tiền tố `starci-fe/`, cả hai đều
 `type: "problem"`, và cả hai đều là `error` trong tập `recommended` được xuất ra.
 
 ## Đọc một diff
@@ -67,7 +76,7 @@ nêu tên định danh được gọi.
 trong một tệp đã qua cổng cũng bị bắt: trong thân thành phần, ở cấp mô-đun, trong một callback, trong
 một hàm phụ nằm cùng tệp.
 
-**Nó không thấy gì.** Không đọc đường dẫn import, không kiểm module specifier, không phân giải binding —
+**Điểm mù.** Không đọc đường dẫn import, không kiểm module specifier, không phân giải binding —
 luật khớp **cách viết**, không khớp **ký hiệu**. Đổi tên khi import,
 `import { useTranslations as useCopy }`, thì tên không còn khớp. Gọi dạng thuộc tính,
 `i18n.useTranslations()`, có callee là `MemberExpression` nên bị loại trước cả bước so tên. Gán rồi gọi,
@@ -93,7 +102,7 @@ một phép thử: chuỗi có khoảng trắng (`/\s/`) **và** bắt đầu b�
 thử cố tình thô, đúng như chú thích trong nguồn: một phép thử hay cãi xem thế nào mới là câu là phép thử
 không ai tin.
 
-**Nó không thấy gì.** Túi prop của nhà, `<Input props={{ placeholder: "Search courses" }} />` — thuộc
+**Điểm mù.** Túi prop của nhà, `<Input props={{ placeholder: "Search courses" }} />` — thuộc
 tính tên là `props`, và chuỗi nằm trong một `ObjectExpression` mà không visitor nào bước vào. Hằng số
 giặt sạch chuỗi, `const PLACEHOLDER = "Search courses"` rồi `placeholder={PLACEHOLDER}`. Mọi thứ không
 phải `Literal` trần trong ngoặc nhọn — template literal, phép nối chuỗi, toán tử ba ngôi, lời gọi hàm.

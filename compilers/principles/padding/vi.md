@@ -4,8 +4,15 @@ title: Padding · Vietnamese
 
 # Khoảng đệm trong
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một thẻ thanh toán, bên trong có danh sách hoá đơn" —
-và đầu ra là, với **mỗi phần tử** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một thẻ thanh toán, bên trong có danh sách hoá đơn" —
+rồi trả về là, với **mỗi phần tử** mà yêu cầu đó ngụ ý, một mã tình huống và một className. Yêu cầu
 không bao giờ nói ra một khoảng đệm, và không được phép ước lượng một khoảng đệm: khoảng đệm suy ra
 từ việc **ranh giới nào sở hữu** phần tử đó và ranh giới ấy **chịu trách nhiệm cho cái gì**.
 
@@ -87,14 +94,14 @@ quay lại quyết định thông qua phép tính. Thêm một bậc là đổi 
 
 ## `PADDING-0` — phần tử không sở hữu khoảng đệm trong nào
 
-**Tình huống.** Phần tử không sở hữu khoảng đệm trong nào của riêng nó. Đứng sau một tình huống ấy là
+**Khi nào gặp.** Phần tử không sở hữu khoảng đệm trong nào của riêng nó. Đứng sau một tình huống ấy là
 hai chuyện khác nhau. Ở thể thứ nhất, hoàn toàn không có ranh giới: lớp bọc tồn tại chỉ để xếp đặt —
 dựng cụm xếp dọc, dựng lưới, dựng một hàng — nó không vẽ nền, không vẽ viền, không mang ngữ nghĩa
 ranh giới nào, nên không có gì để đệm và phát ra không class khoảng đệm nào. Ở thể thứ hai, có ranh
 giới thật, và nó cố ý giao toàn bộ khoảng đệm cho các hàng, các ô trực tiếp, hoặc cho đúng một nội
 dung con, để đường kẻ chạm tới mép hoặc để ảnh tràn sát viền; nó phát ra `p-0`.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - *Không có ranh giới:* xoá phần tử này đi thì không có ranh giới nào biến mất, chỉ có bố cục vỡ;
   class của nó chỉ gồm `flex`, `grid`, `gap-*`, `items-*`, `justify-*`, `min-w-0`; nội dung bên trong
@@ -127,10 +134,10 @@ thông báo · khung chứa bảng cuộn ngang.
 
 ## `PADDING-2` — ô lặp lại gọn
 
-**Tình huống.** Một ô lặp lại trong một tập ô giống nhau, và nó chỉ chứa một dữ kiện ngắn hoặc một
+**Khi nào gặp.** Một ô lặp lại trong một tập ô giống nhau, và nó chỉ chứa một dữ kiện ngắn hoặc một
 hành động. Ô tồn tại để đếm được, quét mắt được, không phải để đọc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nội dung là một con số, một nhãn, một ngày, một phím tắt, một trạng thái.
 - Các ô cùng bộ đều giống nhau về cấu trúc; đọc một ô là hiểu cả bộ.
@@ -154,10 +161,10 @@ bảng quy đổi.
 
 ## `PADDING-3` — ô lặp lại có một nhóm nhỏ
 
-**Tình huống.** Vẫn là ô lặp lại hoặc ô kẻ, nhưng bên trong đã là một nhóm nội dung nhỏ: nhãn và giá
+**Khi nào gặp.** Vẫn là ô lặp lại hoặc ô kẻ, nhưng bên trong đã là một nhóm nội dung nhỏ: nhãn và giá
 trị, tiêu đề và dòng phụ, tên và trạng thái.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Bên trong ô đã cần tới `gap` để tổ chức các phần của nó.
 - Ô vẫn thuộc một bộ đồng dạng, vẫn không tự đứng một mình được.
@@ -178,11 +185,11 @@ gói dịch vụ.
 
 ## `PADDING-4` — bề mặt thông thường
 
-**Tình huống.** Một bề mặt dùng lại được: nó tự vẽ ranh giới, ôm một cụm nội dung đã cấu thành, và
+**Khi nào gặp.** Một bề mặt dùng lại được: nó tự vẽ ranh giới, ôm một cụm nội dung đã cấu thành, và
 mang đi chỗ khác vẫn đọc được nguyên nghĩa. Đây là bậc mặc định của mọi thẻ, khung và khối nhấn mạnh
 lồng bên trong.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có ranh giới thật và có nhiều loại nội dung bên trong: tiêu đề, mô tả, số liệu, hành động.
 - Bên cạnh nó có những bề mặt ngang hàng khác.
@@ -207,11 +214,11 @@ lỗi · khối biểu mẫu có viền.
 
 ## `PADDING-6` — mặt phẳng chính
 
-**Tình huống.** Tuyến trang này sinh ra để phục vụ đúng một việc, và đây là mặt phẳng chứa việc đó:
+**Khi nào gặp.** Tuyến trang này sinh ra để phục vụ đúng một việc, và đây là mặt phẳng chứa việc đó:
 một bài đọc, một luồng làm bài, một tài liệu, một biểu mẫu dài. Không có bề mặt nào ngang hàng cạnh
 tranh sự chú ý với nó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chỉ có một mặt phẳng như thế trên tuyến trang.
 - Nội dung bên trong là dòng chảy dài, cần biên nghỉ mắt để đọc liên tục.

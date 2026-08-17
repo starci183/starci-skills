@@ -4,9 +4,18 @@ title: Authorization · Vietnamese
 
 # Phân quyền
 
-Đầu vào là một shape đã được duyệt: một operation đã có người chốt — mutation, query, subscription,
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một operation đã có người chốt — mutation, query, subscription,
 job hay webhook — kèm theo chủ thể mà nó phục vụ và bản ghi mà nó với tới. Pattern này không mở lại
-quyết định đó. Đầu ra của nó là kiến trúc source: file nào mang guard, file nào mang phép so sánh
+quyết định đó. Nó trả về kiến trúc source: file nào mang guard, file nào mang phép so sánh
 quyền sở hữu, lời từ chối được gọi tên là gì, và tầng nào phải hoàn toàn không biết đến câu chuyện
 này.
 
@@ -82,15 +91,15 @@ phải con số thứ bảy thêm vào cho tiện.
 
 ## `AUTHZ-1` — handler tự sở hữu điều kiện tiên quyết của nó
 
-**Tình huống.** Handler nhận `user` trong command và tự kiểm tra `user` có tồn tại không, dù resolver
+**Khi nào gặp.** Handler nhận `user` trong command và tự kiểm tra `user` có tồn tại không, dù resolver
 đứng trước đã gắn guard. Người đọc sau có thể thấy hai lớp kiểm tra và tưởng chúng là thừa.
 
-**Nó sinh ra gì trong source.** Một lời từ chối `if (!user)` ở đầu `process` của handler, đứng trên
+**Source phải thể hiện gì.** Một lời từ chối `if (!user)` ở đầu `process` của handler, đứng trên
 phần validate rẻ tiền và trên mọi query, trong một handler mà resolver của nó đã có guard. Chính chỗ
 thừa đó là mã này. Luật phân quyền nằm trong handler, chỗ mà caller thứ hai với tới được — không nằm
 trong service cạnh handler, vì service không có message nên cửa sau sẽ mọc bản sao của riêng nó.
 
-**Dấu hiệu nhận biết.** Handler nằm sau một bus (command bus, query bus, event bus), không nằm sau
+**Cách nhận ra.** Handler nằm sau một bus (command bus, query bus, event bus), không nằm sau
 một cửa duy nhất. Cùng một command đã hoặc sẽ được gọi từ CLI, từ job, từ test harness, từ một
 transport khác. Người review đề nghị "bỏ cái `if (!user)` đi cho gọn, resolver có guard rồi".
 
@@ -105,16 +114,16 @@ gọi thẳng handler để đo một nhánh.
 
 ## `AUTHZ-2` — cửa nào đọc danh tính thì cửa đó mang guard
 
-**Tình huống.** Một resolver method (hoặc controller method) có tham số đọc user đã xác thực, nhưng
+**Khi nào gặp.** Một resolver method (hoặc controller method) có tham số đọc user đã xác thực, nhưng
 không method nào và không class nào gắn guard. Code vẫn compile, vẫn chạy, handler vẫn nhận được một
 thứ gọi là `user`.
 
-**Nó sinh ra gì trong source.** Một decorator guard trên chính method đọc danh tính, hoặc trên class
+**Source phải thể hiện gì.** Một decorator guard trên chính method đọc danh tính, hoặc trên class
 của nó: `@UseGuards(...)` đứng trên tham số đọc user. Lint rule `identity-needs-guard` (export
-`identityNeedsGuard`, trong `@starci/eslint-canon-be`) đếm ba parameter decorator là những cái
+`identityNeedsGuard`, trong `@canon-be`) đếm ba parameter decorator là những cái
 đọc danh tính — `IDENTITY_PARAM_DECORATORS` — và leo từ method lên class của nó qua `hasGuard`.
 
-**Dấu hiệu nhận biết.** Có decorator tham số đọc danh tính, không có decorator guard ở method lẫn ở
+**Cách nhận ra.** Có decorator tham số đọc danh tính, không có decorator guard ở method lẫn ở
 class. Cửa mới thêm được copy từ một cửa cũ, và dòng guard bị rơi lúc copy. Lỗi **không nhìn thấy
 được**: không exception, không log, không 401 — chỉ là một danh tính không ai chứng minh.
 
@@ -130,14 +139,14 @@ query đọc dữ liệu riêng của người gọi.
 
 ## `AUTHZ-3` — quyền sở hữu quyết định trên dòng đã load
 
-**Tình huống.** Request chỉ ra bản ghi nào, chứ không nói bản ghi đó **của ai**. `request.reviewId` là
+**Khi nào gặp.** Request chỉ ra bản ghi nào, chứ không nói bản ghi đó **của ai**. `request.reviewId` là
 bản ghi người gọi **gọi tên**, không phải bản ghi người gọi **sở hữu**.
 
-**Nó sinh ra gì trong source.** Một `findOne` theo id được yêu cầu, một not-found khi trượt, rồi một
+**Source phải thể hiện gì.** Một `findOne` theo id được yêu cầu, một not-found khi trượt, rồi một
 phép so sánh kiểu `review.userId !== user.id` — phép so sánh đọc dòng đã load, còn request chỉ cung
 cấp việc load dòng nào.
 
-**Dấu hiệu nhận biết.** Có một `userId` (hoặc `ownerId`, `tenantId`) đi trong payload của request.
+**Cách nhận ra.** Có một `userId` (hoặc `ownerId`, `tenantId`) đi trong payload của request.
 Check so sánh hai giá trị mà **cả hai** đều do người gọi cung cấp. Bỏ check đi thì không test nào đỏ,
 vì mọi test đều gửi id của chính mình.
 
@@ -151,17 +160,17 @@ chi tiết hoá đơn; đổi thiết lập của một hồ sơ; thao tác trê
 
 ## `AUTHZ-4` — từ chối kiểu nào là một quyết định
 
-**Tình huống.** "Bạn không được sửa cái này" và "cái này không tồn tại" là hai **sự thật khác nhau**,
+**Khi nào gặp.** "Bạn không được sửa cái này" và "cái này không tồn tại" là hai **sự thật khác nhau**,
 và client thường hiển thị chúng theo hai cách khác nhau. Thông thường, mỗi trường hợp nên có một
 exception riêng. Ngoại lệ nằm ở bản ghi mà người gọi **lẽ ra không thể biết là có**: ở đó, trả lời
 "forbidden" chính là xác nhận bản ghi tồn tại, mà sự tồn tại mới là bí mật.
 
-**Nó sinh ra gì trong source.** Một lời từ chối gộp kiểu `if (!plan || plan.userId !== user.id)`, trả
+**Source phải thể hiện gì.** Một lời từ chối gộp kiểu `if (!plan || plan.userId !== user.id)`, trả
 đúng một not-found cho cả "không có" lẫn "không phải của bạn", kèm một luồng e2e chứng minh kẻ đột
 nhập nhận đúng câu trả lời ấy và không có gì bị ghi. Nhật ký giữ lý do thật của việc làm mềm lời từ
 chối; người gọi thì không — nếu log cũng mất lý do thì lần điều tra sau không còn gì để đọc.
 
-**Dấu hiệu nhận biết.** Id của bản ghi đoán được hoặc duyệt được (tăng dần, hoặc lấy từ một nguồn
+**Cách nhận ra.** Id của bản ghi đoán được hoặc duyệt được (tăng dần, hoặc lấy từ một nguồn
 khác). Người gọi không có đường hợp lệ nào để biết bản ghi này có mặt trên hệ thống. Lặp id trong một
 vòng lặp và chỉ đọc mã lỗi là đã dựng được bản đồ dữ liệu.
 
@@ -175,16 +184,16 @@ liên kết chia sẻ chưa công khai; hồ sơ đã khoá; bản ghi thuộc t
 
 ## `AUTHZ-5` — entitlement là một trạng thái, không phải một dòng
 
-**Tình huống.** Ghi danh, thành viên, gói đăng ký, bản dùng thử. Một dòng cho biết người này **có quan
+**Khi nào gặp.** Ghi danh, thành viên, gói đăng ký, bản dùng thử. Một dòng cho biết người này **có quan
 hệ** với một sản phẩm; nó không cho biết **quan hệ nào**. Một dòng dùng thử và một dòng đã trả tiền
 đều là "ghi danh", và chúng cho hai quyền khác nhau.
 
-**Nó sinh ra gì trong source.** Một câu query gọi tên cột trạng thái. Bằng chứng chuẩn là một cặp
+**Source phải thể hiện gì.** Một câu query gọi tên cột trạng thái. Bằng chứng chuẩn là một cặp
 guard trên cùng một quan hệ: một cái resolve-or-create dòng dùng thử rồi luôn trả về true, cái kia đọc
 cờ đã trả tiền và từ chối — chính cặp đó chứng minh dòng dữ liệu và trạng thái là hai sự thật khác
 nhau. Đặt tên trạng thái trong câu query, đừng đặt trong comment.
 
-**Dấu hiệu nhận biết.** Check viết bằng `exists` hoặc `count > 0` trên bảng quan hệ. Bảng quan hệ có
+**Cách nhận ra.** Check viết bằng `exists` hoặc `count > 0` trên bảng quan hệ. Bảng quan hệ có
 cột trạng thái (`isEnrolled`, `status`, `plan`, `expiresAt`) mà câu query không nhắc tới. Có một đường
 nào đó **tự tạo** dòng quan hệ (trial placeholder, resolve-or-create), nghĩa là sự tồn tại của dòng
 gần như miễn phí. Đây là check dễ bị viết đúng một lần rồi copy sang chỗ khác và rơi mất đúng cái cột
@@ -198,15 +207,15 @@ cao hơn; quyền bình luận sau khi mua; hạn mức còn hiệu lực; ghế
 
 ## `AUTHZ-6` — operator là một chủ thể khác với người dùng
 
-**Tình huống.** Người vận hành nền tảng, một service token và một người dùng sản phẩm là **ba danh
+**Khi nào gặp.** Người vận hành nền tảng, một service token và một người dùng sản phẩm là **ba danh
 tính**. Gộp cả ba vào một guard có thể khiến quản trị viên của một khách hàng vận hành được nền tảng.
 
-**Nó sinh ra gì trong source.** Hai chủ thể, hai họ guard, không chung base: operator xác thực bằng
+**Source phải thể hiện gì.** Hai chủ thể, hai họ guard, không chung base: operator xác thực bằng
 một khoá mount trên header, người dùng xác thực bằng session token, và không bên nào với tới được bên
 kia. Chủ thể quyết định cả transport: một cửa phục vụ chủ thể không-phải-người-dùng thì nói ra điều
 đó, và đó là một trong số ít lý do hợp lệ để cửa ấy không phải GraphQL.
 
-**Dấu hiệu nhận biết.** Một guard nhận cả session người dùng lẫn khoá máy. Một cờ `isAdmin` trên bảng
+**Cách nhận ra.** Một guard nhận cả session người dùng lẫn khoá máy. Một cờ `isAdmin` trên bảng
 người dùng quyết định quyền vận hành. Một endpoint vận hành nằm chung class với endpoint người dùng và
 dùng chung guard ở cấp class.
 
@@ -218,8 +227,8 @@ dùng chung guard ở cấp class.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc branded type khiến giá
-trị sai không viết ra được; `enforced` nghĩa là có lint rule trong `@starci/eslint-canon-be` bắt
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hoặc branded type khiến giá
+trị sai không viết ra được; `enforced` nghĩa là có lint rule trong `@canon-be` bắt
 được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -254,7 +263,7 @@ Code thật để đối chiếu từng luật. Một luật không chỉ tay v�
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
 | `AUTHZ-1` | `features/api/core/graphql/mutations/courses/submit-course-review/submit-course-review.handler.ts` · `features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` | Một lời từ chối `if (!user)` ở đầu `process`, đứng trên phần validate rẻ tiền và trên cả hai query, trong những handler mà resolver đã có guard. Chính chỗ thừa đó là mã này |
-| `AUTHZ-2` | `@starci/eslint-canon-be` → `IDENTITY_PARAM_DECORATORS`, `hasGuard`, `identityNeedsGuard` · `features/api/core/graphql/mutations/courses/update-course-review/update-course-review.resolver.ts` | Ba parameter decorator mà rule đếm là cái đọc danh tính, đường leo từ method lên class của nó, và một cửa thật mang `@UseGuards(...)` đứng trên tham số đọc user |
+| `AUTHZ-2` | `@canon-be` → `IDENTITY_PARAM_DECORATORS`, `hasGuard`, `identityNeedsGuard` · `features/api/core/graphql/mutations/courses/update-course-review/update-course-review.resolver.ts` | Ba parameter decorator mà rule đếm là cái đọc danh tính, đường leo từ method lên class của nó, và một cửa thật mang `@UseGuards(...)` đứng trên tham số đọc user |
 | `AUTHZ-3` | `features/api/core/graphql/mutations/courses/delete-course-review/delete-course-review.handler.ts` | `findOne` theo id được yêu cầu, một not-found khi trượt, rồi `review.userId !== user.id` — phép so sánh đọc dòng đã load, còn request chỉ cung cấp việc load dòng nào |
 | `AUTHZ-4` | `features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` · `tests/e2e/installment-plan-queries.e2e-spec.ts` | `if (!plan \|\| plan.userId !== user.id)` gộp "không có" và "không phải của bạn" thành một not-found; luồng test chứng minh kẻ đột nhập nhận đúng câu đó và không có gì bị ghi |
 | `AUTHZ-5` | `modules/bussiness/guards/graphql-must-enrolled.guard.ts` · `modules/bussiness/guards/graphql-enrollment.guard.ts` · `modules/bussiness/user/user.service.ts` → `checkEnrollment`, `resolveOrCreateTrialEnrollment` | Hai guard trên cùng một quan hệ: một cái resolve-or-create dòng dùng thử và luôn trả true, cái kia đọc cờ đã trả tiền và từ chối. Cặp đó là bằng chứng dòng dữ liệu và trạng thái là hai sự thật khác nhau |

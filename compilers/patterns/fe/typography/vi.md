@@ -4,7 +4,16 @@ title: Typography · Vietnamese
 
 # Kiểu chữ
 
-Đầu vào là một shape đã được duyệt — một layout, một block, một card, một section feed mà nội dung và
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một layout, một block, một card, một section feed mà nội dung và
 cách sắp xếp đã chốt. Pattern này không mở lại quyết định đó. Nó cầm từng dòng chữ mà shape ấy render
 ra và hạ xuống source: element nào viết dòng đó, component nào sở hữu nó, prop nào mang thứ bậc của
 nó, và cuối cùng code giữ cỡ, độ đậm, tông nào. Câu hỏi lúc thiết kế là "surface này hiện cái gì". Câu
@@ -92,15 +101,15 @@ Thang mã dừng ở chín và ở nguyên chín. Một mã gọi tên một tì
 
 ## `TYPESET-1` — heading là một cấp, và cấp quyết định cả tag lẫn dáng
 
-**Tình huống.** Một dòng **đặt tên** cho trang hoặc cho một section. Cái tag mà trình đọc màn hình dùng
+**Khi nào gặp.** Một dòng **đặt tên** cho trang hoặc cho một section. Cái tag mà trình đọc màn hình dùng
 để dựng outline, và cái cỡ mà mắt người đọc thấy, là **hai sự thật của cùng một thứ**.
 
-**Nó sinh ra gì trong source.** Một lời gọi heading component kèm prop `level`. Đúng một prop đó vừa
+**Source phải thể hiện gì.** Một lời gọi heading component kèm prop `level`. Đúng một prop đó vừa
 được truyền vào tag outline **vừa** dùng để chọn tập class — một prop, hai sự thật, trong một biểu
 thức. Ở chỗ gọi không có tag `h*` nào được gõ tay, và không có cặp cỡ-cộng-độ-đậm nào được ghép lại để
 giả làm heading.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Bỏ dòng này đi thì phần bên dưới mất tên gọi, chứ không mất nội dung.
 - Nó xuất hiện trong mục lục của trang nếu trang có mục lục.
@@ -119,15 +128,15 @@ panel · tiêu đề dialog · tên nhóm trong trang cài đặt.
 
 ## `TYPESET-2` — bốn cấp, và cấp thứ năm nghĩa là trang đã lồng quá sâu
 
-**Tình huống.** Ai đó cần một heading nhỏ hơn cấp bốn, vì bên trong một section đã có section, mà bên
+**Khi nào gặp.** Ai đó cần một heading nhỏ hơn cấp bốn, vì bên trong một section đã có section, mà bên
 trong nữa lại còn một nhóm nữa.
 
-**Nó sinh ra gì trong source.** Không sinh ra gì mới. Union cấp giữ nguyên đóng ở `1 | 2 | 3 | 4`, và
+**Source phải thể hiện gì.** Không sinh ra gì mới. Union cấp giữ nguyên đóng ở `1 | 2 | 3 | 4`, và
 phần lồng nhau của shape được làm phẳng ngay trong source cho tới khi title đặt được bằng một cấp mà
 thang có. Không có bậc nhỏ hơn nào được nghĩ ra, và không có dòng body in đậm nào được viết để đóng thế
 một cấp năm.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Yêu cầu đến dưới dạng "cho mình thêm một bậc nhỏ nữa".
 - Trong cây DOM đã có ba tầng heading trước khi tới nội dung thật.
@@ -144,14 +153,14 @@ form dài chia nhóm nhiều tầng · trang khoá học có chương trong chư
 
 ## `TYPESET-3` — thứ bậc đến từ cỡ, độ đậm, tông; không bao giờ từ một cái khung
 
-**Tình huống.** Một dòng cần được chú ý, và phản xạ đầu tiên là vẽ quanh nó một cái viền, một nền màu,
+**Khi nào gặp.** Một dòng cần được chú ý, và phản xạ đầu tiên là vẽ quanh nó một cái viền, một nền màu,
 hoặc bỏ nó vào một cái chip.
 
-**Nó sinh ra gì trong source.** Chỉ có class cỡ, độ đậm và tông. Leaf chữ không vẽ viền và không vẽ nền,
+**Source phải thể hiện gì.** Chỉ có class cỡ, độ đậm và tông. Leaf chữ không vẽ viền và không vẽ nền,
 nên cái hộp luôn là element của người khác; danh sách class của dòng mang copy không có mục `border-*`
 nào và không có mục `bg-*` nào.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Cái khung không tương ứng với một trạng thái nào cả — nó chỉ ở đó để "nổi".
 - Trên cùng một surface đã có sẵn vài cái khung tương tự.
@@ -169,14 +178,14 @@ metric · chip bọc tên tác giả · box quanh một câu mô tả.
 
 ## `TYPESET-4` — thứ gì đang tranh chú ý thì hạ hàng xóm của nó xuống
 
-**Tình huống.** Hai ba thứ trên cùng một surface cùng muốn được nhìn thấy trước, và cách sửa quen tay là
+**Khi nào gặp.** Hai ba thứ trên cùng một surface cùng muốn được nhìn thấy trước, và cách sửa quen tay là
 nâng cái quan trọng nhất lên một bậc.
 
-**Nó sinh ra gì trong source.** Một diff **hạ** những dòng xung quanh xuống — về tông muted, về độ đậm
+**Source phải thể hiện gì.** Một diff **hạ** những dòng xung quanh xuống — về tông muted, về độ đậm
 nhẹ hơn hoặc về bậc nhỏ hơn — trong khi dòng đang tranh chấp giữ nguyên dáng nó vốn có. Trần thang ở
 nguyên chỗ cũ; cấp 1 là `text-xl font-semibold`, không phải `text-3xl font-bold`.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Diff chỉ tăng cỡ hoặc tăng độ đậm, không hạ thứ gì cả.
 - Trên surface đó số dòng ở tông mặc định nhiều hơn số dòng muted.
@@ -195,14 +204,14 @@ bốn dữ kiện · toolbar có ba nút đều muốn là primary · dashboard 
 
 ## `TYPESET-5` — dòng phụ luôn xếp dưới title mà nó thuộc về
 
-**Tình huống.** Một eyebrow, một con số đếm, một category, một dòng meta đứng cạnh hoặc dưới một title.
+**Khi nào gặp.** Một eyebrow, một con số đếm, một category, một dòng meta đứng cạnh hoặc dưới một title.
 Nó **nói thêm** về title, nó không phải một đối tượng ngang hàng.
 
-**Nó sinh ra gì trong source.** Hai dòng có dáng khác nhau ở cỡ hoặc ở độ đậm, với dòng phụ nằm hẳn bên
+**Source phải thể hiện gì.** Hai dòng có dáng khác nhau ở cỡ hoặc ở độ đậm, với dòng phụ nằm hẳn bên
 dưới: title giữ thứ bậc của nó trong khi các dữ kiện quanh nó ở lại bậc thấp hơn và tông muted. Nó
 không bao giờ được sinh ra cùng cỡ, cùng độ đậm với title mà chỉ đổi mỗi tông.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Đọc riêng dòng phụ thì không biết nó nói về cái gì.
 - Nó ngắn hơn title nhưng lại đang cùng cỡ với title.
@@ -221,14 +230,14 @@ dưới tiêu đề bài viết · "còn 3 ngày" cạnh tên nhiệm vụ · đ
 
 ## `TYPESET-6` — độ đậm là trục của body text; heading không nhận thêm trục nào
 
-**Tình huống.** Một heading trông chưa đủ mạnh, nên người viết thêm một class độ đậm, hoặc mong component
+**Khi nào gặp.** Một heading trông chưa đủ mạnh, nên người viết thêm một class độ đậm, hoặc mong component
 heading có prop `weight`.
 
-**Nó sinh ra gì trong source.** Một lời gọi heading với đúng hai trường, `content` và `level`. Không có
+**Source phải thể hiện gì.** Một lời gọi heading với đúng hai trường, `content` và `level`. Không có
 trường độ đậm nào để truyền và không có class `font-*` nào đứng cạnh heading; độ đậm nằm trong tập class
 của cấp.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Có một class `font-*` đứng cạnh một heading.
 - Có yêu cầu "cho heading cấp 3 đậm hơn ở màn này thôi".
@@ -246,15 +255,15 @@ tiêu đề card muốn đậm hơn tiêu đề bên cạnh.
 
 ## `TYPESET-7` — bậc 12px luôn có nghĩa là copy phụ trợ, và luôn muted
 
-**Tình huống.** Cần một dòng nhỏ. Người viết coi 12px như "phiên bản gọn của chữ chính" và bảo toàn tông
+**Khi nào gặp.** Cần một dòng nhỏ. Người viết coi 12px như "phiên bản gọn của chữ chính" và bảo toàn tông
 foreground.
 
-**Nó sinh ra gì trong source.** Nhánh union `{ size: "xs"; tone?: "muted" }` — một dòng 12px tông
+**Source phải thể hiện gì.** Nhánh union `{ size: "xs"; tone?: "muted" }` — một dòng 12px tông
 foreground là thứ không viết ra được, và component tự dẫn lại tông lúc chạy, bỏ qua tông người gọi
 truyền vào khi cỡ là `xs`. Copy mà người dùng **phải** đọc mới làm được việc thì được sinh ra ở 14px trở
 lên.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Dòng 12px đang mang thông tin mà người dùng **phải** đọc mới làm được việc.
 - Nó được chọn 12px vì chỗ đó hẹp, không phải vì nó phụ trợ.
@@ -273,14 +282,14 @@ dưới một ô nhập · dữ kiện bên phải một label 14px · ghi chú 
 
 ## `TYPESET-8` — nhãn mốc thời gian là subtitle muted, không phải heading
 
-**Tình huống.** Kết quả được chia theo ngày: "Hôm nay", "Hôm qua", "16/08/2026". Nhãn đó **định tính**
+**Khi nào gặp.** Kết quả được chia theo ngày: "Hôm nay", "Hôm qua", "16/08/2026". Nhãn đó **định tính**
 cho nhóm kết quả nằm ngay dưới nó.
 
-**Nó sinh ra gì trong source.** Một subtitle 14px muted render **ngoài** surface danh sách, và surface
+**Source phải thể hiện gì.** Một subtitle 14px muted render **ngoài** surface danh sách, và surface
 bên dưới được yêu cầu ẩn nhãn của chính nó đi — để một nhóm kết quả không bị đặt tên hai lần bằng hai
 thứ bậc khác nhau. Không có cấp heading nào, và cũng không dùng cách đặt nhãn riêng của surface ghép.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Nhãn được sinh ra từ dữ liệu, không phải từ cấu trúc trang.
 - Số lượng nhãn thay đổi theo dữ liệu; hôm nay có ba, ngày mai có một.
@@ -296,15 +305,15 @@ chia "Hôm nay / Tuần này" · nhật ký học tập · thông báo chia theo
 
 ## `TYPESET-9` — bậc của title trong body theo chủ sở hữu nội dung
 
-**Tình huống.** Phải chọn giữa 16px medium và 14px medium cho một dòng title nằm trong body, không phải
+**Khi nào gặp.** Phải chọn giữa 16px medium và 14px medium cho một dòng title nằm trong body, không phải
 heading.
 
-**Nó sinh ra gì trong source.** 16px medium cho một title **ngắn, chiếm ưu thế**, đại diện cho một object
+**Source phải thể hiện gì.** 16px medium cho một title **ngắn, chiếm ưu thế**, đại diện cho một object
 quan trọng hoặc một card lớn; 14px medium cho title gọn, lặp lại hoặc dài; 14px normal cho mô tả,
 metadata và giá trị thường của chúng. Bằng chứng cho cách chia này là tỉ lệ trên surface — một prompt
 chiếm ưu thế ở 16px medium so với khoảng ba mươi title gọn ở 14px medium.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Lý do đang định dùng là "card này có hover", "đây là con số", hoặc "chỗ này còn rộng".
 - Cùng một loại title xuất hiện lặp lại hàng chục lần trong một danh sách.
@@ -326,7 +335,7 @@ Tầng nào thật sự giữ từng mã — một kiểu đóng, một lint rul
 
 | Mã | Tầng | Cái gì giữ nó |
 |---|---|---|
-| `TYPESET-1` | `enforced` | `no-heading-tag-outside-heading-component` trong `@starci/eslint-canon-fe` báo lỗi mọi `h1`–`h6` trong một file source không phải chính heading component |
+| `TYPESET-1` | `enforced` | `no-heading-tag-outside-heading-component` trong `@canon-fe` báo lỗi mọi `h1`–`h6` trong một file source không phải chính heading component |
 | `TYPESET-2` | `unrepresentable` | Union cấp đóng `1 \| 2 \| 3 \| 4` trên kiểu dữ liệu heading; nhánh `tooDeep` của cùng lint rule là lớp chặn cho một `<h5>` gõ tay |
 | `TYPESET-3` | `documented` | Không có gì máy móc giữ. Leaf chữ không vẽ viền và không vẽ nền, nên cái hộp luôn là element của người khác |
 | `TYPESET-4` | `documented` | Không có gì máy móc giữ. Trần thang làm việc leo lên trở nên đắt, nhưng không công cụ nào thấy được tác giả đã đi theo hướng nào |
@@ -348,7 +357,7 @@ Một luật không chỉ được vào code thật thì chỉ là một đề x
 | Mã | Đường dẫn | Nhìn cái gì |
 |---|---|---|
 | `TYPESET-1` | `components/leaves/Heading/index.tsx` | `level` được truyền vào tag outline **và** dùng để chọn tập class — một prop, hai sự thật, trong một biểu thức |
-| `TYPESET-2` | `components/leaves/Heading/index.tsx` · `@starci/eslint-canon-fe` | Union cấp dừng ở `4`; hằng `DEEPEST_LEVEL` của rule cũng đúng `4` đó |
+| `TYPESET-2` | `components/leaves/Heading/index.tsx` · `@canon-fe` | Union cấp dừng ở `4`; hằng `DEEPEST_LEVEL` của rule cũng đúng `4` đó |
 | `TYPESET-3` | `components/leaves/Text/index.tsx` | Danh sách class không có mục `border-*` và không có mục `bg-*`: leaf vẽ copy không vẽ nổi cái hộp quanh chính nó |
 | `TYPESET-4` | `components/leaves/Heading/index.tsx` | Cấp 1 là `text-xl font-semibold`, không phải `text-3xl font-bold` — trần thấp, nên "to hơn nữa" phần lớn là không tồn tại |
 | `TYPESET-5` | `components/blocks/courses/CourseCatalogCard/component.tsx` | Title của card là heading cấp 2 trong khi các dữ kiện ở lại 14px muted — dòng phụ không bao giờ với tới thứ bậc của title |

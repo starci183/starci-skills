@@ -4,16 +4,25 @@ title: Vendor-boundary · Vietnamese
 
 # Ranh giới vendor
 
-Đầu vào là code đã viết xong — một file, một mảnh diff. Đầu ra là một **phán quyết**: file có nằm
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận code đã viết xong — một file, một mảnh diff. Kết quả là một **phán quyết**: file có nằm
 trong phạm vi hay không, luật máy nào đã nổ, nó báo cái gì và trên node nào, ánh xạ sang mã luật nào,
 và lối thoát đang mở nào có thể che đúng lỗi đó. Module này không chọn thiết kế. Nó từ chối, và nó
-phải chỉ ra được đúng cái import, đúng đường dẫn, đúng thẻ hay đúng literal class mà nó từ chối.
+phải chỉ ra được đúng import, đúng đường dẫn, đúng thẻ hay đúng literal class mà nó từ chối.
 
 ## Luật
 
 Quyền sở hữu vendor được giữ bằng đường dẫn, bằng import, bằng JSX anatomy và bằng literal class bắt
 buộc phải viết ra. Cổng này phơi bày các luật nghiêm ngặt được cài trong
-`@starci/eslint-canon-fe`. Nó cố ý không đo thiết kế bằng regex: contract vẫn là nguồn hình
+`@canon-fe`. Nó cố ý không đo thiết kế bằng regex: contract vẫn là nguồn hình
 dạng, còn lint chỉ chặn những đường source có thể chứng minh là sai.
 
 Hai chiều phải cùng tồn tại. Import vendor sai owner bị báo, và mechanics branch không sở hữu vendor
@@ -70,11 +79,11 @@ named mechanics branch, named SurfaceCard branch — còn vendor được quyế
 dẫn là đã đủ thành phát hiện. Nhánh branch rỗng là chiều ngược lại, một named mechanics branch mà bên
 trong không có import vendor nào.
 
-**Nó không thấy gì.** Nó đọc đường dẫn của một file và các import source của file đó. Một vendor được
+**Điểm mù.** Nó đọc đường dẫn của một file và các import source của file đó. Một vendor được
 re-export qua module cục bộ rồi import lại từ đó thì không còn là import `@heroui/react` trong file
 sai. Đổi tên thư mục owner là đổi owner mà không đổi một dòng hành vi nào. Còn một leaf được phép
 import HeroUI dùng nó tốt hay dở thì hoàn toàn không bị xét — predicate node chính xác nằm trong
-`@starci/eslint-canon-fe` và cổng này không xuất bản nó.
+`@canon-fe` và cổng này không xuất bản nó.
 
 **Ranh giới.** Luật máy này quyết ai được import vendor. Owner đó sau đó phải render cái gì là việc
 của các luật anatomy và literal bên dưới.
@@ -86,7 +95,7 @@ của các luật anatomy và literal bên dưới.
 **Nó phát hiện bằng gì.** Bằng file có tên, cộng JSX anatomy, cộng một literal class. Phạm vi là đúng
 một file `ModalBranch/index.tsx`; bên trong nó thẻ `Modal.Body` phải mang literal `p-0`.
 
-**Nó không thấy gì.** Class phải được viết ra theo đúng nghĩa đen. Một `p-0` ghép lúc chạy — qua
+**Điểm mù.** Class phải được viết ra theo đúng nghĩa đen. Một `p-0` ghép lúc chạy — qua
 helper, qua biến, qua điều kiện, qua spread props — không phải literal mà luật tìm, còn một `p-0` viết
 đúng chữ nhưng nằm trên phần tử khác vẫn thỏa mãn một phép kiểm tra dạng văn bản mà chẳng sở hữu gì.
 Một modal branch thứ hai mang tên khác nằm ngoài file có tên duy nhất này.
@@ -100,7 +109,7 @@ là `auth-overlay-owns-single-content-host`.
 
 **Nó phát hiện bằng gì.** Bằng component Field được canh, cộng variant viết trên HeroUI Input.
 
-**Nó không thấy gì.** Chỉ Field nhà mới được canh. Một Input đặt ngoài nó, hoặc một variant truyền vào
+**Điểm mù.** Chỉ Field nhà mới được canh. Một Input đặt ngoài nó, hoặc một variant truyền vào
 dưới dạng giá trị thay vì viết trên phần tử, không phải thứ luật đọc.
 
 **Ranh giới.** Luật máy này xét variant của input. Cái label bên cạnh là `field-label-is-text-only`.
@@ -111,7 +120,7 @@ dưới dạng giá trị thay vì viết trên phần tử, không phải thứ
 
 **Nó phát hiện bằng gì.** Bằng JSX anatomy: thẻ Icon lồng bên trong label của Field.
 
-**Nó không thấy gì.** Nó canh Icon nhà. Một SVG thô, một emoji, một icon của vendor hay một icon bọc
+**Điểm mù.** Nó canh Icon nhà. Một SVG thô, một emoji, một icon của vendor hay một icon bọc
 trong component khác đều không phải thẻ đó, và một thẻ có namespace không phải identifier mà phép kiểm
 tra anatomy đọc.
 
@@ -124,7 +133,7 @@ tra anatomy đọc.
 **Nó phát hiện bằng gì.** Bằng đường dẫn cộng import: file là overlay, và nó import một named
 SurfaceCard branch.
 
-**Nó không thấy gì.** Import phải đúng là cái có tên đó. Một SurfaceCard vào được overlay qua
+**Điểm mù.** Import phải đúng là cái có tên đó. Một SurfaceCard vào được overlay qua
 re-export, qua alias hay qua component bọc thì không để lại import nào luật nhận ra, còn một surface
 dựng lại bằng tay ngay trong overlay thì ngay từ đầu chẳng phải import SurfaceCard nào.
 
@@ -139,7 +148,7 @@ nó.
 **Nó phát hiện bằng gì.** Bằng import và JSX: HeroUI Link phải là phần tử được dùng, còn các bản thay
 thế tự chế — button mang hành vi link, hành vi hover viết tay — bị từ chối.
 
-**Nó không thấy gì.** Nó nhận ra đúng những hình dạng nó gọi tên. Một bản thay thế viết theo cách
+**Điểm mù.** Nó nhận ra đúng những hình dạng nó gọi tên. Một bản thay thế viết theo cách
 khác, hoặc giấu cách đó một component, không phải node nó đọc; và nó không xét Link được style thế nào
 một khi đã đúng phần tử.
 
@@ -153,7 +162,7 @@ một khi đã đúng phần tử.
 dropdown sống trong DropdownBranch, được AccountMenu tiêu thụ, được gắn vào ShellNav, và phép kiểm tra
 ép đúng chuỗi đó.
 
-**Nó không thấy gì.** Nó đọc chuỗi theo tên. Một lớp bọc trung gian, một lần đổi tên bất kỳ mắt xích
+**Điểm mù.** Nó đọc chuỗi theo tên. Một lớp bọc trung gian, một lần đổi tên bất kỳ mắt xích
 nào, hay một dropdown ráp từ mảnh vendor dưới một component khác đều để chuỗi tên nguyên vẹn trong khi
 quyền sở hữu mà chuỗi đó đại diện đã mất.
 
@@ -167,7 +176,7 @@ hay không là `vendor-boundary`.
 **Nó phát hiện bằng gì.** Bằng JSX anatomy trong auth overlay: `ContractContent` phải có mặt, và số
 host cùng số inset phải đúng bằng một.
 
-**Nó không thấy gì.** Một bản trùng không viết trong file này — một host thứ hai đến từ component con
+**Điểm mù.** Một bản trùng không viết trong file này — một host thứ hai đến từ component con
 — không nằm trong cây mà luật đếm, và một thẻ host có namespace hay bị đổi alias không phải identifier
 mà nó đếm.
 
@@ -179,7 +188,7 @@ mà nó đếm.
 
 **Nó phát hiện bằng gì.** Bằng JSX anatomy: ba phần phải lồng theo đúng thứ tự đó.
 
-**Nó không thấy gì.** Anatomy diễn đạt qua một lớp bọc — một trong ba phần do component khác render,
+**Điểm mù.** Anatomy diễn đạt qua một lớp bọc — một trong ba phần do component khác render,
 hoặc sinh ra không qua JSX — không phải cách lồng nhau mà luật đọc được, và phép kiểm tra không nói gì
 về việc compound làm gì một khi ba thẻ đã đúng thứ tự.
 
@@ -191,7 +200,7 @@ về việc compound làm gì một khi ba thẻ đã đúng thứ tự.
 
 **Nó phát hiện bằng gì.** Bằng component được canh, cộng href viết trên nó.
 
-**Nó không thấy gì.** Chỉ các component được canh mới bị theo dõi. Một href ghép lúc chạy, hoặc một
+**Điểm mù.** Chỉ các component được canh mới bị theo dõi. Một href ghép lúc chạy, hoặc một
 href đặt trong component ngoài tập được canh, đều nằm ngoài phép kiểm tra; và luật xét quyền sở hữu
 href chứ không xét đích đến có đúng hay không.
 
@@ -208,8 +217,8 @@ không là `text-link-uses-hero-link`.
 | cả hai chiều | Import vendor sai owner thì nổ, và một named mechanics branch không sở hữu vendor cũng nổ |
 | JSX anatomy | Các thẻ có tên và thứ tự lồng nhau — `Modal.Body`, `ContractContent`, Content → Control → Indicator, DropdownBranch → AccountMenu → ShellNav |
 | literal class bắt buộc | `p-0` trên `Modal.Body`, khớp đúng như đã viết |
-| phần cài đặt | Các predicate node chính xác nằm trong `@starci/eslint-canon-fe` và cổng này không nhắc lại |
-| twin test | `node --test @starci/eslint-canon-fe` |
+| phần cài đặt | Các predicate node chính xác nằm trong `@canon-fe` và cổng này không nhắc lại |
+| twin test | `node --test @canon-fe` |
 
 ## Lối thoát hợp lệ
 
@@ -265,7 +274,7 @@ bị một lần đổi tên bình thường hoặc một lớp gián tiếp hó
 6. Thiết kế không được đo bằng regex. Contract vẫn là nguồn hình dạng.
 7. Mọi luật đều được khuyến nghị ở mức `error`.
 8. Không nhận ở mức cảnh báo và không suppression nào là hợp lệ.
-9. Twin test `node --test @starci/eslint-canon-fe` là bằng chứng các luật vẫn hành xử đúng
+9. Twin test `node --test @canon-fe` là bằng chứng các luật vẫn hành xử đúng
    như đã xuất bản.
 
 ## Ngoại lệ

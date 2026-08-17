@@ -4,6 +4,13 @@ title: Exceptions
 
 # Exceptions
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is a shape already accepted: a capability whose failure branches have been agreed, a
 contract that states what may go wrong, a handler whose refusals are settled. This pattern does not
 re-open which failures exist or what they are called — `exception-identity` settles WHICH name,

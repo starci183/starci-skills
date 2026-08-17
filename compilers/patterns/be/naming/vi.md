@@ -9,8 +9,17 @@ codes: [NAME-1, NAME-2, NAME-3, NAME-4, NAME-5, NAME-6, NAME-7]
 
 # Đặt tên
 
-Đầu vào là một shape đã có người duyệt — một capability, một operation, một contract, một helper mà
-thiết kế đã chốt là có. Pattern này không mở lại quyết định đó. Đầu ra của nó là kiến trúc source:
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt — một capability, một operation, một contract, một helper mà
+thiết kế đã chốt là có. Pattern này không mở lại quyết định đó. Nó trả về kiến trúc source:
 thư mục nào giữ symbol, nó nằm ở file nào, file ấy mang hậu tố gì, và symbol được khai báo tên là gì
 khi đã nằm đúng chỗ. Tên là phần duy nhất của một symbol đến được với người đọc trước khi họ mở file,
 nên hạ một shape xuống sai chỗ không phải mất mát hình thức — đó là shape nói dối ở mọi call site.
@@ -87,15 +96,15 @@ người khác chạy rename, còn cơ chế sai **một lượt**, kéo theo m�
 
 ## `NAME-1` — path mang vai trò, file gọi tên chủ thể
 
-**Tình huống.** Symbol nằm trong một cây thư mục đã nói sẵn nó là **loại gì** và thuộc **phạm vi** nào.
+**Khi nào gặp.** Symbol nằm trong một cây thư mục đã nói sẵn nó là **loại gì** và thuộc **phạm vi** nào.
 Tên class là folder và file **đọc liền nhau**; file không lặp lại phần folder đã nói. Kèm theo đó, hậu
 tố file phải **đồng ý** với vai trò của export: `*.service.ts` khai báo một `*Service`, `*.handler.ts`
 khai báo một `*Handler`.
 
-**Nó sinh ra gì trong source.** Một folder mang vai trò và phạm vi, một file chỉ thêm chủ thể vào tên,
+**Source phải thể hiện gì.** Một folder mang vai trò và phạm vi, một file chỉ thêm chủ thể vào tên,
 một hậu tố khớp vai trò của export, và một symbol khai báo là folder cộng file đọc liền nhau.
 
-**Dấu hiệu nhận biết.** Đọc `folder/file` lên thành một cụm thì ra đúng tên class. Xoá một từ khỏi tên
+**Cách nhận ra.** Đọc `folder/file` lên thành một cụm thì ra đúng tên class. Xoá một từ khỏi tên
 file mà thông tin không mất đi — từ đó đang bị nói hai lần. Hậu tố hứa một vai trò, mở file ra thấy
 export vai trò khác.
 
@@ -114,13 +123,13 @@ producer, consumer · thư mục `errors/<phạm vi>/` chứa từng exception.
 
 ## `NAME-2` — tên nói vật, không nói đời schema
 
-**Tình huống.** Có một shape thứ hai của cùng một thứ, và người viết lấy **số đời** làm tên: `isV2`,
+**Khi nào gặp.** Có một shape thứ hai của cùng một thứ, và người viết lấy **số đời** làm tên: `isV2`,
 `IsContentV2Params`, `parseV2Body`.
 
-**Nó sinh ra gì trong source.** Một identifier gọi tên tính chất mà đời ấy mang lại — thứ thật sự đúng
+**Source phải thể hiện gì.** Một identifier gọi tên tính chất mà đời ấy mang lại — thứ thật sự đúng
 về giá trị đó — nên identifier sống sót qua chính cái đời đã gợi ra nó.
 
-**Dấu hiệu nhận biết.** Trong tên có một chữ `V` kèm số. Ngay cạnh cái tên đó, biểu thức lại đang đọc
+**Cách nhận ra.** Trong tên có một chữ `V` kèm số. Ngay cạnh cái tên đó, biểu thức lại đang đọc
 **một tính chất có thật** (`Boolean(record.verified)`). Không ai trả lời được "V2 là đời **hiện tại**
 hay đời **cũ**?" mà không mở file.
 
@@ -138,13 +147,13 @@ payload webhook đổi shape · DTO của API cũ và mới sống song song · 
 
 ## `NAME-3` — tên nói vật, không nói địa chỉ
 
-**Tình huống.** Thứ này đang đọc dữ liệu từ một thư mục, một mount, một bucket có tên, và người viết lấy
+**Khi nào gặp.** Thứ này đang đọc dữ liệu từ một thư mục, một mount, một bucket có tên, và người viết lấy
 **tên chỗ đứng** làm tên: `VolumeService`, `readVolumeDoc`.
 
-**Nó sinh ra gì trong source.** Một identifier gọi tên tài liệu, bản ghi hay chủ thể đang được đọc, còn
+**Source phải thể hiện gì.** Một identifier gọi tên tài liệu, bản ghi hay chủ thể đang được đọc, còn
 chỗ lưu trữ chỉ xuất hiện trong hằng số path mà nó giải ra — không bao giờ trong tên export.
 
-**Dấu hiệu nhận biết.** Trong tên có tên một thư mục, một mount, một bucket, một prefix hạ tầng. Đổi tên
+**Cách nhận ra.** Trong tên có tên một thư mục, một mount, một bucket, một prefix hạ tầng. Đổi tên
 chỗ lưu trữ là cái tên sai ngay, nhưng **không có test nào đỏ**. Người mới đọc tên vẫn thấy hợp lý — và
 đó chính là chỗ nguy hiểm.
 
@@ -162,13 +171,13 @@ storage · util đọc thư mục snapshot · loader đọc thư mục migration
 
 ## `NAME-4` — tên nói vật, không nói cơ chế
 
-**Tình huống.** Thứ này hiện được chọn hoặc được sinh ra bởi một cơ chế có tên — một bảng phân hạng, một
+**Khi nào gặp.** Thứ này hiện được chọn hoặc được sinh ra bởi một cơ chế có tên — một bảng phân hạng, một
 chuỗi fallback, một thuật toán định tuyến — và người viết lấy **tên cơ chế** làm tên.
 
-**Nó sinh ra gì trong source.** Một identifier gọi tên thứ được chọn, được sinh ra hoặc được đo — một
+**Source phải thể hiện gì.** Một identifier gọi tên thứ được chọn, được sinh ra hoặc được đo — một
 trọng số model, phần credit một lời gọi điển hình tiêu tốn — nên thay cơ chế cũng không làm tên sai.
 
-**Dấu hiệu nhận biết.** Tên nói về cách chọn, không nói về **thứ được chọn**. Đọc hết một cụm biến quanh
+**Cách nhận ra.** Tên nói về cách chọn, không nói về **thứ được chọn**. Đọc hết một cụm biến quanh
 đó, không cái nào nói ra được **vật** cuối cùng là gì. Bỏ cơ chế đi thì **cả cụm tên sai cùng một lúc**.
 
 **Ranh giới.** Không phải `NAME-3`: xem trên — địa chỉ so với cách sinh ra. Không phải ngoại lệ: một
@@ -184,13 +193,13 @@ chiến lược retry · thuật toán phân phối tải · cơ chế cache đ�
 
 ## `NAME-5` — hàm export là động từ kèm tân ngữ
 
-**Tình huống.** Một hàm được export ra khỏi file. Ở import list, người đọc chỉ thấy **cái tên** — không
+**Khi nào gặp.** Một hàm được export ra khỏi file. Ở import list, người đọc chỉ thấy **cái tên** — không
 thấy thân hàm, không thấy signature.
 
-**Nó sinh ra gì trong source.** Một identifier export là động từ đã gắn tân ngữ, để riêng dòng import đã
+**Source phải thể hiện gì.** Một identifier export là động từ đã gắn tân ngữ, để riêng dòng import đã
 nói được hàm làm gì mà không phải tra path.
 
-**Dấu hiệu nhận biết.** Tên là một động từ trần: `generate`, `parse`, `run`, `handle`, `build`. Đọc dòng
+**Cách nhận ra.** Tên là một động từ trần: `generate`, `parse`, `run`, `handle`, `build`. Đọc dòng
 import lên, phải nhìn sang **path** mới đoán được nó làm gì. Hai module cùng export một động từ trần thì
 import list phải đặt alias.
 
@@ -206,13 +215,13 @@ danh sách cấm, vì nó đã có tân ngữ.
 
 ## `NAME-6` — boolean là một câu hỏi về tính chất bền
 
-**Tình huống.** Giá trị trả về là `boolean`. Tên phải đọc lên thành một **câu hỏi**: `isX`, `hasX`,
+**Khi nào gặp.** Giá trị trả về là `boolean`. Tên phải đọc lên thành một **câu hỏi**: `isX`, `hasX`,
 `canX`.
 
-**Nó sinh ra gì trong source.** Một predicate mà identifier đọc lên thành câu hỏi có/không về một tính
+**Source phải thể hiện gì.** Một predicate mà identifier đọc lên thành câu hỏi có/không về một tính
 chất còn sống lâu hơn lý do nó được thêm vào.
 
-**Dấu hiệu nhận biết.** Kiểu trả về là `boolean` hoặc `Promise<boolean>`. Tên bắt đầu bằng `check` —
+**Cách nhận ra.** Kiểu trả về là `boolean` hoặc `Promise<boolean>`. Tên bắt đầu bằng `check` —
 nghe như **đi làm** việc kiểm tra chứ không phải **trả lời**. Tên kết thúc bằng `Flag` — không nói được
 nó cờ **cái gì**.
 
@@ -230,13 +239,13 @@ bật seeder chưa · kiểm tra có nội dung trong snapshot chưa · kiểm t
 
 ## `NAME-7` — tên nói capability, không nói người gọi đầu tiên
 
-**Tình huống.** Một capability dùng chung được đặt tên theo **bề mặt đầu tiên yêu cầu nó**:
+**Khi nào gặp.** Một capability dùng chung được đặt tên theo **bề mặt đầu tiên yêu cầu nó**:
 `DashboardContentService`.
 
-**Nó sinh ra gì trong source.** Một symbol mang tên capability ở tầng dùng chung — `streak`, `loyalty`,
+**Source phải thể hiện gì.** Một symbol mang tên capability ở tầng dùng chung — `streak`, `loyalty`,
 `progress`, `user` — còn chữ chỉ bề mặt chỉ xuất hiện trong đường dẫn operation theo bề mặt gọi tới nó.
 
-**Dấu hiệu nhận biết.** Trong tên một service dùng chung có tên một màn hình, một trang, một tab. Nó nằm
+**Cách nhận ra.** Trong tên một service dùng chung có tên một màn hình, một trang, một tab. Nó nằm
 ở tầng dùng chung nhưng chỉ có đúng một nơi gọi — hiện tại. Ngày có nơi gọi thứ hai, nó **vẫn chạy** và
 **vẫn nói sai**.
 
@@ -257,7 +266,7 @@ chỉ có một tab gọi.
 Không có tầng ứng dụng nào sở hữu việc đặt tên, và cũng không có tầng nào được phép không biết đến nó —
 tầng nào cũng khai báo symbol. Cái được ghi lại ở đây là **hạng** thật sự giữ từng mã:
 `unrepresentable` nghĩa là một union đóng hoặc branded type làm cho giá trị sai không viết ra được;
-`enforced` nghĩa là một lint rule trong `@starci/eslint-canon-be` bắt được; `documented` nghĩa là không có
+`enforced` nghĩa là một lint rule trong `@canon-be` bắt được; `documented` nghĩa là không có
 gì máy móc giữ nó, chỉ có người đọc.
 
 | Mã | Hạng | Cái gì giữ nó |

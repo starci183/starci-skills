@@ -1,5 +1,26 @@
 # starci-skills
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@brainstorms` | `brainstorms` | module | produce candidate shapes |
+| `@compilers` | `compilers` | module | compile accepted shapes |
+| `@contexts` | `contexts` | module | resolve read and write locations |
+| `@docs` | `docs` | module | generate and serve the documentation site |
+| `@gates` | `gates` | module | judge existing code |
+| `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
+| `@netlify` | `netlify.toml` | file | hold the hosting build contract |
+| `@patterns` | `compilers/patterns` | module | resolve files and imports |
+| `@principles` | `compilers/principles` | module | resolve classes |
+| `@publication` | `docs/publication.mjs` | file | declare the generated documentation shelves |
+| `@scripts` | `scripts` | module | hold deterministic tree utilities |
+| `@skills` | `skills` | module | hold capability triggers and reporting shape |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+
+
+## Record
+
 StarCi skills — one source of truth an agent reads so that a loose business prompt still
 lands as correct code.
 
@@ -7,12 +28,12 @@ Four species, split by **what each is allowed to return** — not by the order t
 
 | Tree | Species | Returns |
 |---|---|---|
-| `contexts/` | location | where source is read from, where state is written |
-| `brainstorms/` | creation | 3–4 candidates, the owner chooses |
-| `compilers/` | execution | exactly one answer; the law closes the choice — `principles` decide classes, `patterns` decide where the code lands |
-| `gates/` | refusal | pass, or reject with the evidence — `lints` only |
+| `@contexts` | location | where source is read from, where state is written |
+| `@brainstorms` | creation | 3–4 candidates, the owner chooses |
+| `@compilers` | execution | exactly one answer; the law closes the choice — `@principles` decide classes, `@patterns` decide where the code lands |
+| `@gates` | refusal | pass, or reject with the evidence — `lints` only |
 
-`skills/` holds the six capabilities and the reporting shape they share. `scripts/` holds the
+`@skills` holds the six capabilities and the reporting shape they share. `@scripts` holds the
 validator that makes the JSON schemas real rather than decorative.
 
 Every module is two records of the same document: `en.md` for the agent, `vi.md` for the human. They
@@ -36,13 +57,13 @@ A tree that only advises gets ignored under pressure, so the mechanisms are mach
 The site is generated from the records; nothing under `docs/content/` is hand-authored.
 
 ```bash
-cd docs
+cd @docs
 npm install
 npm run sync
 npm run dev
 ```
 
-Shelves are declared in `docs/publication.mjs`. A new shelf becomes a documented shelf by adding one
+Shelves are declared in `@publication`. A new shelf becomes a documented shelf by adding one
 entry there — no page, no route, no sidebar to write.
 
 **A build that needs the author's machine is not a build.** The site must build from a clean clone and
@@ -52,13 +73,13 @@ repository is not a portability bug to soften — it is a category error, and ma
 keeps the coupling while hiding it. The test: would this step mean anything for a **second** product
 using this tree? If not, delete it.
 
-`netlify.toml` carries `base`, `command`, `publish` and a pinned Node version, so the host's fields
+`@netlify` carries `base`, `command`, `publish` and a pinned Node version, so the host's fields
 stay empty and git can explain when they changed. `publish` resolves relative to `base`.
 
 ## Validating an artifact
 
 ```bash
-node scripts/validate-artifact.mjs \
-  --schema brainstorms/layouts/schema.json \
+node @validate-artifact \
+  --schema @layout-schema \
   --data <batch.json> --hash
 ```

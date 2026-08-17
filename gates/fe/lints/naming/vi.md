@@ -4,7 +4,14 @@ title: Naming · Vietnamese
 
 # Đặt tên
 
-Đầu vào là mã đã viết xong — một tệp, một khúc diff. Đầu ra là một **phán quyết**: tệp đó có được kiểm
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một khúc diff. Kết quả là một **phán quyết**: tệp đó có được kiểm
 hay không, quy tắc công bố nào lên tiếng, lên tiếng tại nút nào, ứng với mã luật nào, và cửa còn mở nào
 lẽ ra đã che đúng lỗi ấy. Mô-đun này không chọn tên nào cả. Nó **từ chối** một cái tên, và nó phải chỉ
 được đúng ký tự mà nó từ chối.
@@ -69,7 +76,7 @@ tên, hoặc một lệnh `export default`. Thông báo gọi đúng tên hàm v
 trị đó là `Program`, `ExportNamedDeclaration` hoặc `ExportDefaultDeclaration`. Báo lỗi tại `node.id`;
 nếu hàm không có tên thì báo tại chính nút đó, và thông báo điền `node.id.name` hoặc chữ `default`.
 
-**Nó không thấy gì.** Một khai báo `function` nằm trong thân một thành phần, trong một khối `if`, trong
+**Điểm mù.** Một khai báo `function` nằm trong thân một thành phần, trong một khối `if`, trong
 một callback của test hay trong một khối tĩnh của lớp — cha là `BlockStatement` hoặc tương tự nên rào
 chắn cấp mô-đun thoát ngay, trong khi hiện tượng hoisting, đúng cái hỏng mà luật chỉ tên, vẫn xảy ra
 nguyên vẹn trong phạm vi đó. `const load = function () { … }` là một `FunctionExpression` chứ không phải
@@ -93,7 +100,7 @@ với `handler-on-prefix`.
 `node.key.type === "Identifier"`. Ba visitor, một hàm kiểm chung. Không đọc giá trị khởi tạo, không đọc
 kiểu, không truy vết import — chỉ có chuỗi ký tự của cái tên và loại nút chứa nó.
 
-**Nó không thấy gì.** `const Row = ({ handleClick }) => …` có `id` là `ObjectPattern` trong khi điều kiện
+**Điểm mù.** `const Row = ({ handleClick }) => …` có `id` là `ObjectPattern` trong khi điều kiện
 đòi `Identifier`, mà props phá cấu trúc lại chính là đường tên hàm phản hồi **thường đến nhất**.
 `(handleClick) => …` và `function f(handleClick)` không phải một `VariableDeclarator` nào cả; không nút
 tham số nào được thăm. `function handleSubmit() {}` nằm trong thân một thành phần là một
@@ -123,7 +130,7 @@ bỏ `(`, `)`, `[` và `]` trùng khít một phần tử trong danh sách hai m
 tiên sống sót qua `.find`. Khi không đoạn nào phạm, quy tắc trả về một đối tượng visitor rỗng và tệp
 không bị duyệt lần nào; ngược lại nó báo một lần tại `Program`.
 
-**Nó không thấy gì.** Một đoạn phiên âm ngoài danh sách hai mươi phần tử — `bai-hoc`, `nguoi-dung`,
+**Điểm mù.** Một đoạn phiên âm ngoài danh sách hai mươi phần tử — `bai-hoc`, `nguoi-dung`,
 `dat-hang` — đi lọt, vì phép thuộc là trùng khít danh sách. Danh sách ấy là lựa chọn **cố ý**, không phải
 cẩu thả: đoán theo hình dạng sẽ từ chối `capacity` và `dangerous`, mà một quy tắc bắt nhầm từ của ngôn
 ngữ chung là quy tắc bị kho mã tắt đi. `dang-nhap-v2`, `auth-dang-nhap`, `dangnhap` và `dang_nhap` đều

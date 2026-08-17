@@ -7,6 +7,15 @@ codes: [TYPE-SAFETY-1, TYPE-SAFETY-2, TYPE-SAFETY-3, TYPE-SAFETY-4, TYPE-SAFETY-
 
 # Type-safety
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is a shape somebody already accepted — a layout, a block, a capability or a contract that is
 no longer being argued about. The output is source architecture: which file holds the value that comes
 in from outside, what that file may declare, what it may not assert, and what it owes in writing when
@@ -222,7 +231,7 @@ narrow type · a branded type constructed at exactly one checked place.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a rule in `@starci/eslint-canon-fe` reports it,
+wrong value impossible to write; `enforced` means a rule in `@canon-fe` reports it,
 named below; `documented` means nothing in this module's rule file holds it and only a reader does.
 
 | Code | Tier | What holds it |

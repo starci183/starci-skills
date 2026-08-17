@@ -7,9 +7,18 @@ codes: [LOCALE-1, LOCALE-2, LOCALE-3, LOCALE-4, LOCALE-5]
 
 # Ngôn ngữ được phục vụ
 
-Đầu vào của pattern này là một shape đã được duyệt: một màn hình, một capability, một hợp đồng dữ liệu
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một màn hình, một capability, một hợp đồng dữ liệu
 mà câu trả lời của nó được dịch ở phía server. Quyết định "bề mặt này phải hiện ra bằng ngôn ngữ của
-người đọc" không được mở lại ở đây. Cái pattern này sinh ra là **kiến trúc source** — file nào lắp ráp
+người đọc" không được mở lại ở đây. Pattern này trả về **kiến trúc source** — file nào lắp ráp
 chain transport, file nào suy ra locale, file nào được phép viết chuỗi header, và mỗi file đó được
 phép nhận tham số gì. Shape nói người đọc nhận đúng ngôn ngữ của mình; pattern này nói điều đó trở
 thành sự thật ở chỗ nào trong cây source.
@@ -81,15 +90,15 @@ từ các bản ghi task; đánh số lại một mã ở đây là âm thầm l
 
 ## `LOCALE-1` — chain nào cũng khai báo, và khai báo vô điều kiện
 
-**Tình huống.** Có một chỗ trong ứng dụng lắp ráp đường truyền: retry, timeout, auth, rồi link cuối
+**Khi nào gặp.** Có một chỗ trong ứng dụng lắp ráp đường truyền: retry, timeout, auth, rồi link cuối
 cùng thật sự chạm mạng. Locale phải đi cùng **ở đó**, chứ không phải trong cái hook tình cờ đang cần
 tới nó.
 
-**Nó sinh ra gì trong source.** Một link locale là phần tử thường của mảng chain, đứng trước link
+**Source phải thể hiện gì.** Một link locale là phần tử thường của mảng chain, đứng trước link
 terminal và nằm ngoài cái spread có điều kiện chèn link auth. Thêm auth thì thêm đúng một link; link
 locale có mặt ở cả hai hình dạng. File lắp ráp chain sở hữu việc này; hook không sở hữu chút nào.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - File đang dựng ra link terminal — link duy nhất nói chuyện với network.
 - Chain đã đầy đủ: có retry, có timeout, có token, và **câm về ngôn ngữ**.
@@ -113,14 +122,14 @@ thêm vào cho một tính năng mới và copy từ client cũ **trước khi**
 
 ## `LOCALE-2` — đọc từ địa chỉ, không nhận từ tham số
 
-**Tình huống.** Giá trị locale phải đến từ đâu đó. Có hai kiểu nguồn: kiểu **phải có người nhớ truyền**
+**Khi nào gặp.** Giá trị locale phải đến từ đâu đó. Có hai kiểu nguồn: kiểu **phải có người nhớ truyền**
 và kiểu **tự có sẵn ở nơi request được lắp ráp**. Luật chọn kiểu thứ hai.
 
-**Nó sinh ra gì trong source.** Một resolver không nhận tham số locale nào. Nó đọc path segment đầu
+**Source phải thể hiện gì.** Một resolver không nhận tham số locale nào. Nó đọc path segment đầu
 tiên, và nó **từ chối** một segment không phải locale đã ship thay vì chấp nhận bất cứ thứ gì phép thu
 hẹp mặc định trả về. Call site công khai không truyền gì cả.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Một hook có tham số `locale` trong signature.
 - Một query function nhận `headers` từ bên ngoài chỉ để nhét ngôn ngữ vào.
@@ -143,15 +152,15 @@ chạy trên server component · một hook mới copy từ hook cũ · một tr
 
 ## `LOCALE-3` — cookie không đi qua ranh giới origin
 
-**Tình huống.** Ứng dụng nhớ lựa chọn của người đọc trong một cookie, và server hoàn toàn có khả năng
+**Khi nào gặp.** Ứng dụng nhớ lựa chọn của người đọc trong một cookie, và server hoàn toàn có khả năng
 đọc cookie đó. Cả hai điều đều đúng, và **không điều nào** làm cho giá trị đi được sang một origin
 khác.
 
-**Nó sinh ra gì trong source.** Trong file dựng link HTTP terminal, `credentials` chỉ là `"include"`
+**Source phải thể hiện gì.** Trong file dựng link HTTP terminal, `credentials` chỉ là `"include"`
 khi người gọi chủ động bật, và mặc định là tắt — nên request ẩn danh, tức gần như mọi lượt đọc, không
 gửi cookie nào. Vì thế header là phương tiện duy nhất sống sót trên đường đó, và source phải gửi nó.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - API nằm ở domain khác với app.
 - Chain gửi request ẩn danh, và đường ẩn danh cố ý **không** bật credentials.
@@ -174,14 +183,14 @@ request từ một worker.
 
 ## `LOCALE-4` — mặc định của server là sàn, không phải fallback
 
-**Tình huống.** Server trả lời một request không khai báo bằng tiếng mặc định. Đó là server đang **cẩn
+**Khi nào gặp.** Server trả lời một request không khai báo bằng tiếng mặc định. Đó là server đang **cẩn
 thận**, không phải server đang **cho phép**.
 
-**Nó sinh ra gì trong source.** Một resolver có kiểu trả về là union locale đóng, không phải optional,
+**Source phải thể hiện gì.** Một resolver có kiểu trả về là union locale đóng, không phải optional,
 và không có nhánh nào trả về rỗng — nên không có đường nào đưa cho server một request không khai báo
 để nó phải cẩn thận. Mọi request đều khai báo.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Trang chạy, không có lỗi, nội dung đọc được — chỉ là đọc được bằng ngôn ngữ khác.
 - Có người kết luận "fallback hoạt động tốt".
@@ -201,14 +210,14 @@ ngoại lệ đóng; dựa vào nó ở nhánh có địa chỉ thì là `LOCALE
 
 ## `LOCALE-5` — một chỗ viết header, nên một chỗ kiểm được
 
-**Tình huống.** Header ngôn ngữ do link locale viết, và không do gì khác viết. Một call site tự set
+**Khi nào gặp.** Header ngôn ngữ do link locale viết, và không do gì khác viết. Một call site tự set
 thêm là **câu trả lời thứ hai** cho cùng một câu hỏi.
 
-**Nó sinh ra gì trong source.** Chuỗi header xuất hiện ở đúng một file production — file link locale —
+**Source phải thể hiện gì.** Chuỗi header xuất hiện ở đúng một file production — file link locale —
 và các lần xuất hiện khác là phần prose của chính file đó. Một lần trúng thứ hai trong production
 chính là vi phạm.
 
-**Dấu hiệu nhận biết.**
+**Cách nhận ra.**
 
 - Có một object `headers` ở tầng hook hoặc query có khoá ngôn ngữ.
 - Có một hằng số ngôn ngữ được viết cứng ngay tại chỗ gọi.
@@ -228,7 +237,7 @@ một test helper bị copy vào production · một request tới endpoint th�
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã — một kiểu đóng, một lint rule, hay chỉ một người đọc. Các dòng
-`enforced` được cài đặt ở `@starci/eslint-canon-fe`.
+`enforced` được cài đặt ở `@canon-fe`.
 
 | Mã | Tầng | Giữ bởi |
 |---|---|---|

@@ -4,6 +4,15 @@ title: Observability
 
 # Observability
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is a shape already accepted: a handler, worker, cron, decision branch, `catch` block, standalone entry point, signal path or telemetry process that somebody has agreed should exist. This module does not re-open that decision. Its output is source architecture — which service the line leaves through, which closed set the name comes from, which typed object rides beside it, which layer owns the transport and the correlation id, and which file the sanctioned exit is declared in.
 
 ## Law
@@ -157,7 +166,7 @@ The question to ask: can this signal travel through an existing process or an ap
 
 ## Layer held
 
-Which tier actually holds each code today. `unrepresentable` means a closed union or branded type makes the wrong value impossible to write; `enforced` means a rule in `@starci/eslint-canon-be` reports it, named below; `documented` means nothing mechanical holds it and only a reader does.
+Which tier actually holds each code today. `unrepresentable` means a closed union or branded type makes the wrong value impossible to write; `enforced` means a rule in `@canon-be` reports it, named below; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |
 |---|---|---|
@@ -185,7 +194,7 @@ Real code each code can be checked against. A law that cannot be pointed at is a
 | `OBSERVABILITY-3` | `modules/platform/winston/types/messages/*.ts` with `configMap` in `modules/platform/winston/config.ts` | Every event maps to a named interface (`jobId`, `queueName`, `durationMs`, `success`) reached as `(typeof configMap)[TName]["messageType"]` |
 | `OBSERVABILITY-4` | `modules/platform/winston/enums/winston-log.ts` | Members whose JSDoc states a decision — `EnrollmentAlreadyExists` "skipped create to stay idempotent", `CdnSynchronizerCourseAlreadySynced` "hash matched, upload skipped". Also look at the `*StepExecuted` family beside them, which records arrival |
 | `OBSERVABILITY-5` | `features/api/processors/ai/generate-cv/generate-cv.worker.ts` (the `JobExecutedFailed` call in the `catch`) and `JobExecutedMessage.error?: string` in `types/messages/worker.ts` | The field is filled with `error.message`. This anchor shows the law being missed, which is what an anchor is for |
-| `OBSERVABILITY-6` | `apps/cli/src/main.ts` and `apps/playground-*-agent/src/main.ts` (the `new Logger()` bootstrap) against `standaloneProgramGlobs` in `@starci/eslint-canon-be` | Four standalone entry points, and the per-line `eslint-disable` comments they currently carry instead of one scoped glob |
+| `OBSERVABILITY-6` | `apps/cli/src/main.ts` and `apps/playground-*-agent/src/main.ts` (the `new Logger()` bootstrap) against `standaloneProgramGlobs` in `@canon-be` | Four standalone entry points, and the per-line `eslint-disable` comments they currently carry instead of one scoped glob |
 | `OBSERVABILITY-7` | `modules/platform/winston/winston.providers.ts` with the per-event `loki` flag in `config.ts` | Three providers — console only, forwarding backend only, both — and one flag per event deciding which lines cross. That IS the Minimal path: no collector, no tracer, no metrics pipeline beside it |
 | `OBSERVABILITY-8` | `modules/platform/env/config.ts` under `loki` | Host, auth toggle and credentials declared as typed config for a managed backend. The lifecycle fields the code demands — owner, port, persistence, health, backup, removal condition — have no anchor, because no local telemetry process exists to carry them: not yet anchored for that half |
 

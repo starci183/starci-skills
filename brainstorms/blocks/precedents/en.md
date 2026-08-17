@@ -4,6 +4,13 @@ title: Precedents
 
 # Precedents
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given one accepted region and the block anatomies already accepted for this source, and you
 return, for each block candidate you are about to generate, either a precedent it cites or a statement
 that it deliberately departs from every precedent. A precedent is a decision that was accepted before,

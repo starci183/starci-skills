@@ -4,7 +4,14 @@ title: File-layout · Vietnamese
 
 # Bố cục file
 
-Đầu vào là mã đã viết xong — một file, một hunk trong diff. Đầu ra là một **phán quyết**: file có
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một file, một hunk trong diff. Kết quả là một **phán quyết**: file có
 thuộc phạm vi hay không, luật lint nào đã nổ, nó báo gì và trên nút nào, mã luật tương ứng là mã nào,
 và cách viết lại nào sẽ dập tắt đúng lỗi đó. Mô-đun này không chọn bố cục nào cả. Nó từ chối một bố
 cục, và nó phải chỉ được vào đúng đoạn đường dẫn hay đúng cái export mà nó từ chối.
@@ -76,7 +83,7 @@ sự thật.
 `/src/components/overlays/<category>/<Name>/<rest>`; rồi `<rest>` được so với
 `^(component|index)(\.test)?\.tsx?$`.
 
-**Nó không thấy gì.** Chuyển thành phần thứ ba vào thẳng `component.tsx` rồi export từ đó — luật đếm
+**Điểm mù.** Chuyển thành phần thứ ba vào thẳng `component.tsx` rồi export từ đó — luật đếm
 **file**, và ba thành phần trong một file vẫn là một file. Một thư mục màn hình chỉ có `index.tsx` và
 vẽ luôn bên trong: luật đọc đường dẫn nhìn thấy file đang tồn tại, không bao giờ nhìn thấy file đang
 thiếu. Lớp phủ đặt phẳng, `components/overlays/<Name>/extra.tsx`, vì biểu thức cho lớp phủ đòi một
@@ -100,7 +107,7 @@ trên `Program`.
 `<rest>` bắt đầu bằng `api/` hoặc `_`, rồi basename khớp `\.test\.(tsx?|jsx?)$`, rồi basename nằm
 trong danh sách khe của khung nền.
 
-**Nó không thấy gì.** Cây định tuyến đặt ở gốc kho, không có `src/`: biểu thức là `/src/app/`, một
+**Điểm mù.** Cây định tuyến đặt ở gốc kho, không có `src/`: biểu thức là `/src/app/`, một
 `app/` ở gốc không bao giờ khớp, và đó lại là bố cục phổ biến hơn ngoài đời. Một file route vẫn fetch
 và sắp xếp thoải mái ngay trong `page.tsx` — luật đọc **tên**, và "đang vẽ" không phải một tính chất
 mà tên file mang được; chính mã nguồn nói thẳng điều đó. Gạch dưới trên một FILE ở ngay gốc cây,
@@ -125,7 +132,7 @@ cây mà thư mục đó thuộc về. Một lần cho mỗi file, trên `Progra
 mục**; đoạn `.*/` phía trước bắt buộc phải có ít nhất một đoạn đường dẫn nằm giữa gốc cây thành phần
 và tên thư mục tiện ích.
 
-**Nó không thấy gì.** Thư mục tiện ích đặt thẳng dưới gốc cây thành phần —
+**Điểm mù.** Thư mục tiện ích đặt thẳng dưới gốc cây thành phần —
 `components/utils/format.ts` — vì biểu thức đòi ít nhất một đoạn ở giữa, nên chỗ đặt nông nhất và
 hiển nhiên nhất lại đúng là chỗ luật không nhìn thấy. `helpers/`, `lib/`, `shared/`, `util/`,
 `const/`, `models/`, `data/`: bốn cái tên là một danh sách đóng, và một từ đồng nghĩa là một thư mục
@@ -148,7 +155,7 @@ một `FunctionDeclaration`, và `exported.name` từ mọi specifier. Tới `Pr
 thu được **không rỗng** mà không thành viên nào bằng tên thư mục hoặc bắt đầu bằng tên thư mục cộng
 một chữ cái viết hoa.
 
-**Nó không thấy gì.** `export * from "./component"` — chính là dạng barrel thông dụng nhất — vì star
+**Điểm mù.** `export * from "./component"` — chính là dạng barrel thông dụng nhất — vì star
 export là một nút khác loại, không góp tên nào, và tập rỗng khiến luật thoát ra trước khi phán xét bất
 cứ điều gì. `export default Paragraph` trong thư mục `Text`: cũng một nút khác loại, cũng im lặng như
 thế. `export class Paragraph {}` hay `export enum Paragraph {}`: chỉ khai báo biến và khai báo hàm
@@ -174,7 +181,7 @@ bản dựng. Báo trên `id` của declarator.
 dạng `Identifier`. Nó báo khi có từ hai thành viên trở lên và **mọi** thành viên đều bắt đầu bằng chữ
 hoa.
 
-**Nó không thấy gì.** `export const Card = Object.assign(CardRoot, { Header, Footer })` — cách dựng
+**Điểm mù.** `export const Card = Object.assign(CardRoot, { Header, Footer })` — cách dựng
 một họ có dấu chấm phổ biến nhất — vì phần khởi tạo bắt buộc phải là object literal, còn một lời gọi
 thì vô hình. `Card.Header = CardHeader` viết sau khai báo: các biểu thức gán không được xem tới, nên
 object được lắp ráp bên ngoài đúng cái nút mà luật đang canh. `const Card = { Root, Header }` rồi
@@ -202,7 +209,7 @@ bao giờ là chuyện của luật này.
 `/apps/<name>/src/(components/)?(contracts|leaves|composites|branches|shells)/`. Phép thử phía gói
 chạy trước và thoát ngay.
 
-**Nó không thấy gì.** `packages/ui/src/components/blocks/<category>/<Name>.tsx` — phía ứng dụng chấp
+**Điểm mù.** `packages/ui/src/components/blocks/<category>/<Name>.tsx` — phía ứng dụng chấp
 nhận đoạn `components/` tuỳ chọn, phía gói thì không, nên cùng một vi phạm viết thừa một thư mục là
 không ai thấy. Một workspace đặt tên thư mục là `libs/`, `services/` hay `modules/`, vì cả hai biểu
 thức đều hard-code `packages/` và `apps/`. Một thành phần biết nghiệp vụ đặt trong

@@ -4,6 +4,13 @@ title: State
 
 # State
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a Save button that calls the server" — and you return, for
 every element that request implies, the situation codes it owns and one className. The request never
 lists the appearances an element should have and you never choose that number: it is DERIVED from

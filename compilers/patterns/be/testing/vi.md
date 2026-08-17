@@ -8,7 +8,16 @@ codes: [TESTING-1, TESTING-2, TESTING-3, TESTING-4, TESTING-5, TESTING-6, TESTIN
 
 # Kiểm thử
 
-Đầu vào là một shape đã được duyệt: một flow đã chốt, một handler đã chốt xong các nhánh, một
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một flow đã chốt, một handler đã chốt xong các nhánh, một
 capability đã chọn xong provider, một thế giới demo đã được đồng ý. Pattern này không mở lại bất kỳ
 quyết định nào trong số đó. Nó hạ chúng xuống source: file nào giữ test, file đó khai lane nào, vào
 bằng cửa nào, được phép assert cái gì, và mang tên gì.
@@ -88,13 +97,13 @@ lại đàng hoàng, không phải một con số thứ mười hai thêm vào c
 
 ## `TESTING-1` — một file e2e là một câu chuyện nghiệp vụ
 
-**Tình huống.** Bạn sắp đặt tên cho một file flow. Tên đó quyết định file sẽ chứa gì trong hai năm
+**Khi nào gặp.** Bạn sắp đặt tên cho một file flow. Tên đó quyết định file sẽ chứa gì trong hai năm
 tới, vì người sau sẽ thêm test vào file mà tên nó cho phép.
 
-**Nó sinh ra gì trong source.** Mỗi flow nghiệp vụ một file `*.e2e-spec.ts`, nằm trong thư mục e2e,
+**Source phải thể hiện gì.** Mỗi flow nghiệp vụ một file `*.e2e-spec.ts`, nằm trong thư mục e2e,
 tên file là chính flow đó viết thành một câu nghiệp vụ.
 
-**Dấu hiệu nhận biết.** Tên trung thực của file là một *câu* về nghiệp vụ: "mua khoá học", "hoàn
+**Cách nhận ra.** Tên trung thực của file là một *câu* về nghiệp vụ: "mua khoá học", "hoàn
 tiền", "đổi thưởng". Nếu tên trung thực lại là một danh ngữ chỉ một phần của API — `*-queries`,
 `*-mutations`, `*-resolvers` — thì file đang sai hình dạng, không phải sai tên. File chạy xanh mà
 không ai dám nói "nghiệp vụ chạy được" là dấu hiệu chắc chắn nhất.
@@ -109,14 +118,14 @@ thưởng; nộp bài chấm điểm; liên kết tài khoản ngoài; mở kho�
 
 ## `TESTING-2` — assert hệ quả, không assert phong bì
 
-**Tình huống.** Flow đã chạy xong. Bây giờ phải chứng minh **cái gì đó đã thay đổi trong thế giới**,
+**Khi nào gặp.** Flow đã chạy xong. Bây giờ phải chứng minh **cái gì đó đã thay đổi trong thế giới**,
 chứ không phải server còn sống.
 
-**Nó sinh ra gì trong source.** Một lần đọc lại ngay trong file flow, qua `entityManager`,
+**Source phải thể hiện gì.** Một lần đọc lại ngay trong file flow, qua `entityManager`,
 `dataSource`, `getRepository` hay `queryRunner`, gọi tên đúng hàng, số dư, quyền hay event mà flow đã
 tạo ra.
 
-**Dấu hiệu nhận biết.** Assertion cuối cùng nhìn vào `status`, `__typename`, `errors === undefined`,
+**Cách nhận ra.** Assertion cuối cùng nhìn vào `status`, `__typename`, `errors === undefined`,
 hoặc đọc lại chính cái response vừa trả về. File không hề chạm tới `entityManager`, `dataSource`,
 `getRepository` hay `queryRunner`. Nếu ai đó xoá dòng `await repository.save(...)` trong handler, file
 này vẫn xanh.
@@ -132,14 +141,14 @@ khi CDC chạy; thông báo được đẩy tới đúng người nhận.
 
 ## `TESTING-3` — test đi đúng đường mà flow đi
 
-**Tình huống.** Trên production flow vào bằng GraphQL, HTTP, socket, message broker hoặc scheduler.
+**Khi nào gặp.** Trên production flow vào bằng GraphQL, HTTP, socket, message broker hoặc scheduler.
 Test phải vào bằng đúng cửa đó.
 
-**Nó sinh ra gì trong source.** Một flow đi qua helper world dùng chung — một HTTP client thật trên
+**Source phải thể hiện gì.** Một flow đi qua helper world dùng chung — một HTTP client thật trên
 đúng transport của production — và với mỗi bước async là một lần chờ dựng từ deadline cộng predicate,
 chứ không phải một `sleep`.
 
-**Dấu hiệu nhận biết.** Test gọi `commandBus.execute(...)`, `handler.execute(...)`,
+**Cách nhận ra.** Test gọi `commandBus.execute(...)`, `handler.execute(...)`,
 `resolver.execute(...)` hay `worker.process(...)`; tất cả đều **bắt đầu sau** routing, guard,
 validation và serialization. Sau một bước bất đồng bộ, dòng ngay kế tiếp đã assert luôn. Flow một nửa
 HTTP một nửa socket, nhưng test chỉ nói HTTP.
@@ -153,12 +162,12 @@ notification qua socket; message qua broker giữa hai instance; cron gia hạn 
 
 ## `TESTING-4` — happy path là chủ thể
 
-**Tình huống.** Bạn có một nhánh thất bại và đang phân vân đưa nó vào lane nào.
+**Khi nào gặp.** Bạn có một nhánh thất bại và đang phân vân đưa nó vào lane nào.
 
-**Nó sinh ra gì trong source.** Hoặc một file e2e riêng, mang tên câu chuyện của chính nó, khi thất
+**Source phải thể hiện gì.** Hoặc một file e2e riêng, mang tên câu chuyện của chính nó, khi thất
 bại kéo theo một flow trọng yếu; hoặc một case bên trong một unit spec khi nó không kéo theo gì.
 
-**Dấu hiệu nhận biết.** Thất bại này **kéo theo** một việc khác bắt buộc phải đúng: đã capture rồi
+**Cách nhận ra.** Thất bại này **kéo theo** một việc khác bắt buộc phải đúng: đã capture rồi
 settle hỏng ⇒ phải refund; charge tới hai lần ⇒ idempotency phải giữ; hai writer đua ⇒ constraint phải
 bắt. Dấu hiệu ngược lại: thất bại này chỉ trả về một thông điệp validation, và không có gì chạy sau
 đó.
@@ -174,12 +183,12 @@ quá hạn ⇒ chuyển trạng thái và thu hồi quyền.
 
 ## `TESTING-5` — phủ nhánh quyết định, không phủ dòng
 
-**Tình huống.** Một handler có nhiều đường ra. Bạn đang viết spec cho nó.
+**Khi nào gặp.** Một handler có nhiều đường ra. Bạn đang viết spec cho nó.
 
-**Nó sinh ra gì trong source.** Một `*.spec.ts` nằm cạnh handler, chứa một bảng nhánh — thường là
+**Source phải thể hiện gì.** Một `*.spec.ts` nằm cạnh handler, chứa một bảng nhánh — thường là
 `it.each` — mỗi hàng một case đổi kết quả, chứ không phải một case nằm giữa dải.
 
-**Dấu hiệu nhận biết.** Có biên: `0`, `cap`, `cap + 1`. Có tập rỗng. Có "đã làm rồi". Có "không được
+**Cách nhận ra.** Có biên: `0`, `cap`, `cap + 1`. Có tập rỗng. Có "đã làm rồi". Có "không được
 phép". Spec hiện tại chọn **một** giá trị nằm giữa dải và tuyên bố đã phủ. Báo cáo coverage xanh trong
 khi một off-by-one ở biên vẫn ship được.
 
@@ -193,12 +202,12 @@ mốc đậu.
 
 ## `TESTING-6` — spec chỉ assert lời gọi là spec chép lại source
 
-**Tình huống.** Spec chạy handler rồi kiểm tra rằng một collaborator đã được gọi, và dừng ở đó.
+**Khi nào gặp.** Spec chạy handler rồi kiểm tra rằng một collaborator đã được gọi, và dừng ở đó.
 
-**Nó sinh ra gì trong source.** Ít nhất một assertion mỗi file về giá trị trả về hoặc trạng thái đã
+**Source phải thể hiện gì.** Ít nhất một assertion mỗi file về giá trị trả về hoặc trạng thái đã
 đổi; một call assertion được phép đứng cạnh nó, nhưng không bao giờ đứng một mình.
 
-**Dấu hiệu nhận biết.** Mọi assertion trong file đều là `toHaveBeenCalled`, `toHaveBeenCalledWith`,
+**Cách nhận ra.** Mọi assertion trong file đều là `toHaveBeenCalled`, `toHaveBeenCalledWith`,
 `toHaveBeenCalledTimes` hoặc họ hàng của chúng. Đổi tên method của collaborator ⇒ file đỏ. Đổi con số
 nghiệp vụ thành sai ⇒ file vẫn xanh. Spec đọc lên nghe **giống hệt** phần thân của handler.
 
@@ -211,12 +220,12 @@ thái đơn; mapper dựng payload; policy quyết cho phép hay từ chối.
 
 ## `TESTING-7` — lane nằm ở hậu tố, không nằm ở thư mục
 
-**Tình huống.** Bạn đặt một file test cạnh code nó kiểm, và cần lane chạy nhanh vẫn nhanh.
+**Khi nào gặp.** Bạn đặt một file test cạnh code nó kiểm, và cần lane chạy nhanh vẫn nhanh.
 
-**Nó sinh ra gì trong source.** Một tên file mang một trong bốn hậu tố — `*.spec.ts`, `*.int-spec.ts`,
+**Source phải thể hiện gì.** Một tên file mang một trong bốn hậu tố — `*.spec.ts`, `*.int-spec.ts`,
 `*.e2e-spec.ts`, `*.harness-spec.ts` — và các config lane chỉ phân biệt bằng đúng hậu tố đó.
 
-**Dấu hiệu nhận biết.** Bốn hậu tố: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`,
+**Cách nhận ra.** Bốn hậu tố: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`,
 `*.harness-spec.ts`. Config lane loại trừ nhau bằng **hậu tố**, không bằng đường dẫn. Nếu phải mở file
 ra mới biết nó thuộc lane nào thì tên file đang không làm việc của nó.
 
@@ -229,12 +238,12 @@ harness ở chung thư mục nhưng khác lane chạy; lane nhanh chạy trong p
 
 ## `TESTING-8` — lane rỗng không phải lane xanh
 
-**Tình huống.** Một lane đã được cấu hình, đã có script, đã nằm trong CI — và không có file nào khớp.
+**Khi nào gặp.** Một lane đã được cấu hình, đã có script, đã nằm trong CI — và không có file nào khớp.
 
-**Nó sinh ra gì trong source.** Hoặc những file mà `testRegex` của lane thật sự khớp, hoặc một lần xoá
+**Source phải thể hiện gì.** Hoặc những file mà `testRegex` của lane thật sự khớp, hoặc một lần xoá
 hẳn script và config của lane đó.
 
-**Dấu hiệu nhận biết.** Script mang cờ cho phép "không có test cũng coi là qua". Báo cáo CI hiện màu
+**Cách nhận ra.** Script mang cờ cho phép "không có test cũng coi là qua". Báo cáo CI hiện màu
 xanh cho một lane mà không ai nhớ lần cuối nó chạy cái gì. Xoá hết test trong lane đó đi, không có gì
 đỏ lên.
 
@@ -247,13 +256,13 @@ không match gì nữa; lane bị đổi thư mục sau một lần refactor; la
 
 ## `TESTING-9` — e2e không bao giờ gọi model
 
-**Tình huống.** Một flow đi qua model: hỏi đáp có trích dẫn, chấm bài, sinh CV, tóm tắt.
+**Khi nào gặp.** Một flow đi qua model: hỏi đáp có trích dẫn, chấm bài, sinh CV, tóm tắt.
 
-**Nó sinh ra gì trong source.** Một stub provider mặc định do helper world cài sẵn, trả về JSON đúng
+**Source phải thể hiện gì.** Một stub provider mặc định do helper world cài sẵn, trả về JSON đúng
 dạng mà parser strict của production parse được thật, và là một jest mock mà flow có thể lập trình lại
 theo từng bước — còn mọi thứ khác trong flow vẫn giữ thật.
 
-**Dấu hiệu nhận biết.** Test gọi thật tới provider ⇒ tốn tiền, chậm vài giây, và **trả lời khác nhau
+**Cách nhận ra.** Test gọi thật tới provider ⇒ tốn tiền, chậm vài giây, và **trả lời khác nhau
 mỗi lần**; cả ba tính chất đều chí mạng trong một suite flow. Assertion phải nới lỏng dần cho sống sót
 qua các cách diễn đạt khác nhau, tới lúc nó không còn bắt được gì. Stub trả về `"stubbed"`, `"ok"`,
 `"test"` ⇒ parser strict-JSON **không hề chạy**, mà parser chính là chỗ dễ vỡ nhất: đó là nơi output
@@ -268,14 +277,14 @@ tắt tiến độ; gợi ý lộ trình; phân loại nội dung.
 
 ## `TESTING-10` — harness gọi thẳng provider, và giữ mình nhỏ
 
-**Tình huống.** Bạn cần biết câu trả lời của model **có chấp nhận được không**. Đó là câu hỏi duy nhất
+**Khi nào gặp.** Bạn cần biết câu trả lời của model **có chấp nhận được không**. Đó là câu hỏi duy nhất
 lane này trả lời.
 
-**Nó sinh ra gì trong source.** Một `*.harness-spec.ts` import đúng một SDK provider đã duyệt, đọc một
+**Source phải thể hiện gì.** Một `*.harness-spec.ts` import đúng một SDK provider đã duyệt, đọc một
 credential bắt buộc chỉ nằm trong process cho mỗi authority — không fallback qua file, OAuth, key pool
 hay biến anh em — khai tên model và endpoint, và chứa một hai case mỗi capability.
 
-**Dấu hiệu nhận biết.** Mỗi lớp nằm giữa harness và provider là một lớp có thể làm harness xanh trong
+**Cách nhận ra.** Mỗi lớp nằm giữa harness và provider là một lớp có thể làm harness xanh trong
 khi production hỏng: một tier, một routing override, một wrapper nhà tự chọn model. Harness "giả"
 gateway production bằng một adapter gọi thật ⇒ nó có thể **bịa ra** metadata về provider, token và chi
 phí. Credential là OAuth của một CLI, session của một ứng dụng chat, hay một file profile ⇒ đó không
@@ -293,14 +302,14 @@ có trích dẫn; so sánh hai prompt trước khi đổi.
 
 ## `TESTING-11` — seed demo dựng một thế giới, không dựng một ảnh chụp
 
-**Tình huống.** Cần một môi trường local để người đọc **soi trạng thái sản phẩm thật qua đúng read
+**Khi nào gặp.** Cần một môi trường local để người đọc **soi trạng thái sản phẩm thật qua đúng read
 path của production**.
 
-**Nó sinh ra gì trong source.** Một script seed ghi các hàng nguồn cho một tập người dùng đa dạng, vô
+**Source phải thể hiện gì.** Một script seed ghi các hàng nguồn cho một tập người dùng đa dạng, vô
 hiệu hoá các projection dẫn xuất để read path production dựng lại chúng, và nhận tài khoản đang được
 soi làm tham số.
 
-**Dấu hiệu nhận biết.** Seed tạo đúng một tài khoản trắng, mọi số đều bằng không ⇒ không có gì chứng
+**Cách nhận ra.** Seed tạo đúng một tài khoản trắng, mọi số đều bằng không ⇒ không có gì chứng
 minh được list, đếm, xếp hạng, tiến độ hay join giữa nhiều người dùng là đúng. Seed ghi thẳng JSON
 hình dạng đúng cái màn hình cần ⇒ màn hình trông đầy đủ, nhưng **không** join hay projection nào của
 production chứng minh nó. Seed giả định một identity cứng chính là người đang đăng nhập. Chạy lần hai
@@ -316,8 +325,8 @@ người theo dõi.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hay branded type khiến giá trị
-sai không viết ra được; `enforced` nghĩa là một lint rule trong `@starci/eslint-canon-be` bắt được nó;
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hay branded type khiến giá trị
+sai không viết ra được; `enforced` nghĩa là một lint rule trong `@canon-be` bắt được nó;
 `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -352,11 +361,11 @@ xuất.
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
 | `TESTING-1` | `tests/e2e/course-purchase.e2e-spec.ts` · `tests/e2e/rewards-queries.e2e-spec.ts` | Tên thứ nhất là một câu nghiệp vụ; tên thứ hai là một nhóm resolver khoác áo test, đúng cái hình dạng mã này từ chối. Cả hai đều đang sống |
-| `TESTING-2` | `@starci/eslint-canon-be` → `STATE_READERS` · bất kỳ file nào dưới `tests/e2e/` đọc qua `entityManager` | Những identifier mà rule chấp nhận là bằng chứng state đã được đọc lại, và một flow thật sự đọc nó |
+| `TESTING-2` | `@canon-be` → `STATE_READERS` · bất kỳ file nào dưới `tests/e2e/` đọc qua `entityManager` | Những identifier mà rule chấp nhận là bằng chứng state đã được đọc lại, và một flow thật sự đọc nó |
 | `TESTING-3` | `tests/helpers/flow-world.ts` · `tests/helpers/flow-wait.ts` | World vào bằng GraphQL qua một HTTP client thật; các helper chờ thay `sleep` bằng deadline cộng predicate |
 | `TESTING-4` | `tests/e2e/course-refund.e2e-spec.ts` · `tests/e2e/community-concurrency.e2e-spec.ts` | Hai nhánh hỏng giành được một flow: một lần đảo chiều bắt buộc phải chạy, và một cuộc đua mà constraint phải bắt |
 | `TESTING-5` | `features/api/processors/ai/score-uploaded-cv/enqueue-score-uploaded-cv.service.spec.ts` | Một bảng nhánh chạy bằng `it.each`, mỗi hàng một case đổi kết quả chứ không phải một case nằm giữa dải |
-| `TESTING-6` | `@starci/eslint-canon-be` → `CALL_MATCHERS`, `matcherOf` | Chín matcher được tính là call assertion, và cú leo member-chain khiến `.not` và `.resolves` vẫn lọt qua |
+| `TESTING-6` | `@canon-be` → `CALL_MATCHERS`, `matcherOf` | Chín matcher được tính là call assertion, và cú leo member-chain khiến `.not` và `.resolves` vẫn lọt qua |
 | `TESTING-7` | `jest.config.ts` → `testPathIgnorePatterns` · `tests/e2e/jest-e2e.json` → `testRegex` · `tests/harness/jest-harness.json` → `testRegex` | Ba config chỉ phân biệt bằng hậu tố, và đó chính là thứ cho phép các lane ở chung thư mục mà lần chạy nhanh không nhặt phải |
 | `TESTING-8` | `package.json` → `test:int`, `test:ci` | Cả hai đều mang `--passWithNoTests`. Cờ đó đúng là chế độ hỏng mà mã này gọi tên, nên nó là điểm neo để người đọc đối chiếu số file của lane |
 | `TESTING-9` | `tests/helpers/flow-world.ts` → stub `AiInvokeService` mặc định | Stub do world cài, trả về JSON đúng dạng chứ không phải một chuỗi đánh dấu, và là một jest mock mà flow lập trình lại được theo từng bước |

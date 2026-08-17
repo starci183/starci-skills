@@ -7,8 +7,17 @@ codes: [TYPE-SAFETY-1, TYPE-SAFETY-2, TYPE-SAFETY-3, TYPE-SAFETY-4, TYPE-SAFETY-
 
 # An toàn kiểu
 
-Đầu vào là một shape đã có người duyệt — một layout, một block, một capability hay một contract mà
-không ai còn cãi nữa. Đầu ra là kiến trúc source: file nào giữ giá trị đi từ ngoài vào, file ấy được
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt — một layout, một block, một capability hay một contract mà
+không ai còn cãi nữa. Kết quả là kiến trúc source: file nào giữ giá trị đi từ ngoài vào, file ấy được
 khai gì, không được khẳng định gì, và nợ lại điều gì bằng chữ khi nó khẳng định. Module này không mở
 lại quyết định thiết kế. Nó hạ shape đó xuống source, đúng tại chỗ mà shape lặng lẽ được phép thôi
 không còn bị kiểm.
@@ -78,11 +87,11 @@ những ca mà checker cố tình không được giao.
 
 ## `TYPE-SAFETY-1` — cast xuyên `unknown` là xoá, không phải thu hẹp
 
-**Tình huống.** Một giá trị vừa đi từ **ngoài chương trình vào trong**: response mạng, thứ đọc từ
+**Khi nào gặp.** Một giá trị vừa đi từ **ngoài chương trình vào trong**: response mạng, thứ đọc từ
 storage, một payload người khác gửi tới, một kiểu vendor không khớp. Nó không có hình dạng mình muốn.
 Thay vì kiểm tra, người viết bảo trình biên dịch quên hết đi bằng `x as unknown as T`.
 
-**Nó sinh ra gì trong source.** Một file bị canh dưới `/src/` khai giá trị đi vào rồi thu hẹp nó bằng
+**Source phải thể hiện gì.** Một file bị canh dưới `/src/` khai giá trị đi vào rồi thu hẹp nó bằng
 một phép kiểm mà trình biên dịch theo được — một predicate, một `typeof`, một trường phân biệt. Cụm
 `as unknown as` không xuất hiện trong file ấy. Cast **một tầng** như `a as B` vẫn còn là một lời khai
 mà trình biên dịch **kiểm được một phần** — nó vẫn từ chối nếu hai kiểu không có gì chung. Chính vì
@@ -92,7 +101,7 @@ cái đáng giữ nhất: seam nơi giá trị vượt từ ngoài vào trong. B
 thường được các kiểu khác bắt lại vài dòng sau. Ở biên, không có ai bắt cả; dữ liệu sai sẽ đi tiếp cho
 tới lúc nó vỡ ở một chỗ chẳng liên quan gì.
 
-**Dấu hiệu nhận biết.** Cụm chữ `as unknown as` xuất hiện trong một file không phải test. Cast nằm ngay
+**Cách nhận ra.** Cụm chữ `as unknown as` xuất hiện trong một file không phải test. Cast nằm ngay
 sau `JSON.parse`, `response.json()`, `localStorage.getItem`, hoặc một import vendor. Lý do được nêu là
 *TypeScript kêu*, *nó không chịu nhận*, *biết chắc nó là kiểu này rồi*. Tự hỏi: nếu ngày mai server đổi
 field, dòng này có đỏ lên không? Nếu không, không ai đang kiểm cả, và cast này chính là chỗ việc kiểm
@@ -112,10 +121,10 @@ seed đưa vào một hàm đã đóng kiểu.
 
 ## `TYPE-SAFETY-2` — `any` là cùng một hành vi xoá, và nó lan
 
-**Tình huống.** Hình dạng thật sự chưa biết, nên người viết đặt `any` cho xong. Khác biệt so với
+**Khi nào gặp.** Hình dạng thật sự chưa biết, nên người viết đặt `any` cho xong. Khác biệt so với
 `TYPE-SAFETY-1` không nằm ở mức độ nghiêm trọng của một dòng, mà ở **bán kính**.
 
-**Nó sinh ra gì trong source.** Một khai báo, một tham số hay một đối generic mang kiểu `unknown`, với
+**Source phải thể hiện gì.** Một khai báo, một tham số hay một đối generic mang kiểu `unknown`, với
 bước thu hẹp nhìn thấy được ngay trong file cần nó — một predicate cục bộ, một `isRecord`, một chuỗi
 `typeof` — và không có `any` ở bất cứ đâu trong file. Một cast dừng lại ở dòng đó. `any` thì **đi
 theo**: mọi property đọc ra từ nó là `any`, mọi giá trị suy ra từ nó là `any`, và việc xoá kiểu chạm
@@ -123,7 +132,7 @@ tới cả những file chưa bao giờ nhắc tới nó. Người sau đọc m�
 không có cách nào biết rằng kiểu đó đã bị bỏ kiểm từ ba file trước. `unknown` không nói dối: nó nói
 "chưa biết", và nó **bắt** việc thu hẹp phải xảy ra ở đâu đó, giữa thanh thiên bạch nhật.
 
-**Dấu hiệu nhận biết.** `: any`, `<any>`, `as any`, `Array<any>`, `Record<string, any>`. Một hàm nhận
+**Cách nhận ra.** `: any`, `<any>`, `as any`, `Array<any>`, `Record<string, any>`. Một hàm nhận
 `any` rồi trả về thứ gì đó có kiểu, mà **không** có bước kiểm nào ở giữa. Lý do được nêu là *tạm thời*,
 *sẽ sửa sau*, *chỗ này generic quá*. Tự hỏi: nếu đổi `any` này thành `unknown`, có bao nhiêu chỗ đỏ
 lên? Mỗi chỗ đỏ là một chỗ đang tin vào một điều chưa ai kiểm.
@@ -139,17 +148,17 @@ mới dựng.
 
 ## `TYPE-SAFETY-3` — một thứ, một cách viết
 
-**Tình huống.** `Array<T>` và `T[]` **nghĩa y hệt nhau**. Đó chính xác là lý do đây là một luật chứ
+**Khi nào gặp.** `Array<T>` và `T[]` **nghĩa y hệt nhau**. Đó chính xác là lý do đây là một luật chứ
 không phải một sở thích: khi hai cách viết cùng đúng, không có thứ gì sửa cách thứ hai cả.
 
-**Nó sinh ra gì trong source.** Mọi kiểu mảng trong cây đều viết ở dạng generic — `Array<T>` và
+**Source phải thể hiện gì.** Mọi kiểu mảng trong cây đều viết ở dạng generic — `Array<T>` và
 `ReadonlyArray<T>` — kể cả khi kiểu phần tử tự nó đã generic hoặc lạ. Chọn dạng generic vì nó là dạng
 **còn đọc được khi kiểu phần tử tự nó cũng generic**. So `Array<Map<string, Set<number>>>` với
 `Map<string, Set<number>>[]`: ở dạng hậu tố, cặp ngoặc nói "đây là mảng" bị đẩy ra tận cuối, sau khi
 mắt đã phải giải xong hai tầng generic khác. File viết hôm thứ Ba đọc khác file bên cạnh, và mọi diff
 sau đó mang thêm tiếng ồn không nói gì về nghiệp vụ.
 
-**Dấu hiệu nhận biết.** `T[]` hoặc `readonly T[]` trong một file `.ts`/`.tsx`. Hai cách viết cùng tồn
+**Cách nhận ra.** `T[]` hoặc `readonly T[]` trong một file `.ts`/`.tsx`. Hai cách viết cùng tồn
 tại trong **một** file. Tự hỏi: nếu kiểu phần tử ngày mai trở thành generic, dòng này còn đọc được
 không?
 
@@ -162,18 +171,18 @@ handler · union chứa mảng lồng · kiểu readonly của contract.
 
 ## `TYPE-SAFETY-4` — test được phép dựng giá trị sai, vì đó là việc của nó
 
-**Tình huống.** Cần chứng minh rằng một API đã đóng kiểu **từ chối** đầu vào sai. Muốn chứng minh điều
+**Khi nào gặp.** Cần chứng minh rằng một API đã đóng kiểu **từ chối** đầu vào sai. Muốn chứng minh điều
 đó thì phải **dựng ra** đầu vào sai — và không có cách nào dựng một giá trị mà kiểu cấm, ngoài việc bảo
 trình biên dịch quên kiểu đi.
 
-**Nó sinh ra gì trong source.** Một file có đường dẫn kết thúc bằng `.test.ts`, `.test.tsx`, `.spec.ts`
+**Source phải thể hiện gì.** Một file có đường dẫn kết thúc bằng `.test.ts`, `.test.tsx`, `.spec.ts`
 hoặc `.spec.tsx`, giữ giá trị cố tình sai, còn file sản phẩm thì để sạch. Đây là mã duy nhất trong
 module nói **được phép**. Nó tồn tại chính để chữ **không** ở `TYPE-SAFETY-1` được tuyệt đối ở mọi nơi
 khác. **Miễn trừ này là một ĐƯỜNG DẪN, và bắt buộc phải là đường dẫn.** Một miễn trừ dựa trên phán đoán
 — "khi nào thật sự cần thì được" — sẽ bị đem ra cãi ở **từng** call site, và bên cãi luôn là bên đang
 vội. Một đường dẫn thì cãi **một lần**, ở đây.
 
-**Dấu hiệu nhận biết.** File kết thúc bằng `.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`. Giá trị
+**Cách nhận ra.** File kết thúc bằng `.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`. Giá trị
 được dựng là một fake **cố tình thiếu**: đủ để hàm dưới test chạm tới, không đủ để khớp kiểu thật. Xung
 quanh có một câu làm rõ file này đang canh điều gì. Tự hỏi: giá trị sai này có phải **chính là thứ đang
 được chứng minh** không? Nếu chỉ là dựng fixture cho nhanh thì miễn trừ không áp dụng — nó chỉ đang mượn
@@ -192,18 +201,18 @@ vendor bằng những mảnh tối thiểu · dựng một state không hợp l�
 
 ## `TYPE-SAFETY-5` — cast sống sót thì mang theo lý do
 
-**Tình huống.** Đôi khi một biên **thật sự** cần một cast: kiểu vendor khai sai, một giá trị mà runtime
+**Khi nào gặp.** Đôi khi một biên **thật sự** cần một cast: kiểu vendor khai sai, một giá trị mà runtime
 bảo đảm còn trình biên dịch thì không, một implementation rộng hơn mọi overload của chính nó. Những
 trường hợp đó có thật.
 
-**Nó sinh ra gì trong source.** Một cast một tầng, bên cạnh là một mệnh đề nêu **điều runtime bảo đảm**
+**Source phải thể hiện gì.** Một cast một tầng, bên cạnh là một mệnh đề nêu **điều runtime bảo đảm**
 hoặc **điều vendor khai sai**, và sau cast vẫn còn một bước kiểm — cast chỉ mở đủ chỗ để kiểm, không
 thay cho kiểm. Thứ tách chúng khỏi phần còn lại không phải mức độ tự tin của người viết, mà là: **lý do
 viết ra được thành một mệnh đề**. Và phép thử ấy mạnh hơn vẻ ngoài của nó. Khi ép mình viết câu đó ra,
 phần lớn cast sẽ tự hỏng: câu duy nhất viết được là "vì nếu không thì nó báo lỗi" — mà lỗi ấy chính là
 trình biên dịch đang nói một điều **đúng**.
 
-**Dấu hiệu nhận biết.** Cast một tầng, không xuyên `unknown`. Bên cạnh có một câu nêu điều runtime bảo
+**Cách nhận ra.** Cast một tầng, không xuyên `unknown`. Bên cạnh có một câu nêu điều runtime bảo
 đảm hoặc điều vendor khai sai, không phải nêu lại cast đang làm gì. Sau cast vẫn còn một bước thu hẹp.
 Tự hỏi: viết lý do ra thành một câu đi. Nếu câu ấy là "vì nó báo lỗi" thì cast này thuộc về
 `TYPE-SAFETY-1` hoặc thuộc về một sửa đổi hình dạng, không thuộc về đây.
@@ -221,8 +230,8 @@ branded type dựng ở đúng một chỗ đã kiểm.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `@starci/eslint-canon-fe` báo cáo
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
+giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `@canon-fe` báo cáo
 nó, tên rule nêu bên dưới; `documented` nghĩa là không có gì trong file rule của module này giữ nó, chỉ
 người đọc giữ.
 

@@ -5,8 +5,22 @@ description: Open or resume a hash-bound design session and produce 3–4 layout
 
 # starci-fe-design-layout
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first. There is no orchestrator: this skill opens
-the session, and `starci-fe-design-execute` refuses to run until every hash it produces is accepted.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
+| `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+
+## HANDS OFF TO — named, never loaded
+
+`starci-init`
+
+## Run
+
+Read `@skill-shape` first. There is no orchestrator, so this skill opens or resumes the session itself.
 
 **The JSON is the artifact. The HTML is a way of looking at it.** Approval binds to the canonical JSON
 hash, never to a rendered page.
@@ -44,7 +58,7 @@ are the same session; a reworded prompt is a new round, not a new session. Print
 | Input | Read |
 |---|---|
 | request | verbatim |
-| contract | **queried, not read** — one need per region through `scripts/contract-search.mjs`, which returns `key`, `why`, `host` and never a class array |
+| contract | **queried, not read** — one need per region through `@contract-search`, which returns `key`, `why`, `host` and never a class array |
 | branches | every branch and what each may contain |
 | routes | every route page and every persistent layout |
 | axes | the closed diversity set |
@@ -57,7 +71,7 @@ in under 2KB where the permitted read is 69KB, and the registry is 192KB.
 
 ### 6 — Resolve every region against the contract, one query per region
 
-    node <trust>/scripts/contract-search.mjs <project> <role> --need "<the region stated as a need>"
+    node @contract-search <project> <role> --need "<the region stated as a need>"
 
 Ask by the **reason**, never by the shape — the need sentence is what a `why` is written to match. Every
 result prints the words it matched on, and a result marked `~` matched on an incidental word rather than on
@@ -73,8 +87,8 @@ A `generalize` verdict without a measured call-site count is refused, not guesse
 
 **A query that answers nothing exits 1, and that is two facts, not one.** For this run it is a `new`
 verdict. For the tree it is a finding — a real surface stated a need and no entry could be found by it —
-and it is carried into `WARNINGS` naming the need verbatim, so [`starci-repair`](../starci-repair/SKILL.md)
-can repair the reason that failed rather than the 298 that merely look wrong in a count.
+and it is carried into `WARNINGS` naming the need verbatim. That recorded miss identifies the exact
+reason that failed instead of treating every reason that looks wrong in a count as equally urgent.
 
 ### 7 — Generate 3–4 candidates
 
@@ -93,8 +107,8 @@ A product decision the request does not state and no law can derive produces a r
 The batch is validated **before** it is written and before anything is hashed:
 
 ```bash
-node <trust>/scripts/validate-artifact.mjs \
-  --schema <trust>/brainstorms/layouts/schema.json \
+node @validate-artifact \
+  --schema @layout-schema \
   --data <batch.json> --hash
 ```
 

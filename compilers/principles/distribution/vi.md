@@ -4,8 +4,15 @@ title: Distribution · Vietnamese
 
 # Phân bố
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một hàng tệp gồm biểu tượng, tên tệp, kích thước và
-nút xoá" — và đầu ra là, với **mỗi người tham gia** mà yêu cầu đó ngụ ý, một mã tình huống và một
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một hàng tệp gồm biểu tượng, tên tệp, kích thước và
+nút xoá" — rồi trả về là, với **mỗi người tham gia** mà yêu cầu đó ngụ ý, một mã tình huống và một
 className. Yêu cầu không bao giờ nói ra một bề rộng, và không được phép ước lượng một bề rộng: bề
 rộng suy ra từ việc mỗi người tham gia làm gì khi **còn thừa** chỗ và làm gì khi **thiếu** chỗ.
 
@@ -98,11 +105,11 @@ giữa các phần tử cùng cấp là một quyết định khác. Một kho�
 
 ## `DIST-0` — không khai báo gì, và đó vẫn là một hành vi
 
-**Tình huống.** Trong hàng không có gì đủ dài để tranh chỗ: mọi phần tử con đều là nội dung ngắn,
+**Khi nào gặp.** Trong hàng không có gì đủ dài để tranh chỗ: mọi phần tử con đều là nội dung ngắn,
 đóng, và tổng bề rộng của chúng luôn nhỏ hơn hàng. Không ai cần được ưu tiên, không ai cần được bảo
 vệ.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mọi giá trị trong hàng đến từ một tập đóng: nhãn cố định, biểu tượng, số có độ dài biết trước.
 - Không có phần tử con nào cần chạm mép phải của hàng.
@@ -125,11 +132,11 @@ vị cạnh một con số.
 
 ## `DIST-1` — một phần tử con ôm cả hàng
 
-**Tình huống.** Trong hàng có đúng **một** thứ là nội dung thật, dài không biết trước, và mọi thứ còn
+**Khi nào gặp.** Trong hàng có đúng **một** thứ là nội dung thật, dài không biết trước, và mọi thứ còn
 lại là phụ kiện quanh nó: ảnh đại diện, biểu tượng, nhãn trạng thái, nút, dấu thời gian. Nội dung đó
 vừa được lấy hết chỗ thừa, vừa là thứ phải nhường khi thiếu.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có đúng một phần tử con đến từ dữ liệu người dùng hoặc dữ liệu nghiệp vụ.
 - Các phần tử con còn lại có bề rộng đoán được trước khi chạy.
@@ -158,10 +165,10 @@ bản.
 
 ## `DIST-2` — nhiều phần tử con chia đều
 
-**Tình huống.** Không ai trong hàng quan trọng hơn ai. Các phần tử con là những mục **đồng hạng**, và
+**Khi nào gặp.** Không ai trong hàng quan trọng hơn ai. Các phần tử con là những mục **đồng hạng**, và
 bề rộng bằng nhau chính là thông điệp: chúng có thể so sánh với nhau.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các phần tử con cùng loại, cùng vai trò, thường sinh ra từ cùng một mảng dữ liệu.
 - Bề rộng bằng nhau là điều người đọc **dựa vào** để so sánh, không phải hệ quả tình cờ.
@@ -188,11 +195,11 @@ Huỷ/Xác nhận trải đều toàn bề rộng trên thiết bị di động.
 
 ## `DIST-3` — cấm co, bất kể hàng phải chứa gì
 
-**Tình huống.** Có một thứ trong hàng mà **mất một phần là mất tất cả**: một biểu tượng bị bóp thành
+**Khi nào gặp.** Có một thứ trong hàng mà **mất một phần là mất tất cả**: một biểu tượng bị bóp thành
 hình oval, một nút bị nuốt mất chữ, một con số bị cắt còn nửa. Những thứ này không được phép là người
 nhường.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đọc thiếu một phần của nó thì người đọc **hiểu sai**, chứ không phải hiểu ít đi.
 - Nó vuông, tròn, hoặc có tỉ lệ phải giữ.
@@ -220,10 +227,10 @@ tượng chữ V mở rộng · ảnh thu nhỏ vuông trong một hàng danh s�
 
 ## `DIST-4` — phải được phép co, nhưng không lấy phần dư
 
-**Tình huống.** Phần tử con này **phải nhường** khi hàng hẹp, nhưng không được phép phình ra khi hàng
+**Khi nào gặp.** Phần tử con này **phải nhường** khi hàng hẹp, nhưng không được phép phình ra khi hàng
 rộng. Nó nhận đúng chỗ nó cần, và trả lại chỗ khi bị đòi.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nội dung của nó dài không đoán trước được.
 - Nếu nó giãn ra chạm mép, bố cục bị sai nghĩa: một cụm nhận diện bị kéo rời khỏi ảnh đại diện, một
@@ -251,11 +258,11 @@ một `DIST-3` khác · cột lưới `1fr` chứa văn bản dài · vùng cu�
 
 ## `DIST-5` — số đo do bố cục quyết định
 
-**Tình huống.** Bề rộng của phần tử con này là một **quyết định của bố cục**, không phải hệ quả của
+**Khi nào gặp.** Bề rộng của phần tử con này là một **quyết định của bố cục**, không phải hệ quả của
 nội dung. Thanh dọc lọc rộng 16rem vì đó là kích thước đã chọn cho thanh dọc, không phải vì nhãn dài
 nhất trong đó đo được ngần ấy.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nếu nội dung bên trong đổi, bề rộng vẫn phải giữ nguyên.
 - Bề rộng đó lặp lại giống nhau ở nhiều màn hình khác — nó là một hằng số của sản phẩm.
@@ -282,11 +289,11 @@ cột nhãn của biểu mẫu hai cột.
 
 ## `DIST-6` — phần dư rơi vào khoảng nối, không rơi vào phần tử con nào
 
-**Tình huống.** Mọi phần tử con trong hàng đều muốn giữ nguyên bề rộng của mình, nhưng hàng vẫn phải
+**Khi nào gặp.** Mọi phần tử con trong hàng đều muốn giữ nguyên bề rộng của mình, nhưng hàng vẫn phải
 trải hết bề rộng: một bên nằm sát trái, một bên nằm sát phải. Chỗ thừa phải đi đâu đó — và nó đi vào
 **khoảng giữa**.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có một mép mà một phần tử con bắt buộc phải chạm tới.
 - Không phần tử con nào nên phình ra: phình ra là làm sai nghĩa (một tiêu đề bị kéo dài ra, một nút

@@ -4,6 +4,13 @@ title: CQRS
 
 # CQRS
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, what it reported and on which node,
 which law code that maps to, and the way of writing that would have made the same rule silent. This

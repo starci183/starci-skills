@@ -7,7 +7,16 @@ kind: pattern
 
 # Chữ nghĩa trong source
 
-Đầu vào của pattern này là một shape đã được duyệt: một component, một hook, một type, một module
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một component, một hook, một type, một module
 rule, một từ điển locale, một fixture. Quyết định đó đã đóng ở đây. Thứ còn mở là chữ nghĩa đi đâu —
 export nào phải mở đầu bằng khối tài liệu, vị trí nào được phép mang ngôn ngữ thứ hai, literal nào
 phải đeo dấu, câu nào bị xoá thay vì được viết lại cho hay hơn. Pattern này nhận shape đã duyệt và
@@ -81,16 +90,16 @@ ngoại lệ không ai cãi lại được.
 
 ## `COMMENTS-1` — mọi export mở đầu bằng một khối tài liệu
 
-**Tình huống.** Một thứ được `export` là một thứ file khác phụ thuộc vào. Hợp đồng của nó bị đọc nhiều
+**Khi nào gặp.** Một thứ được `export` là một thứ file khác phụ thuộc vào. Hợp đồng của nó bị đọc nhiều
 hơn hẳn số lần bị viết, và bị đọc bởi những người sẽ không bao giờ mở phần thân ra xem. Khối tài liệu
 nói VAI TRÒ — đây là cái gì, dùng để làm gì, người nhận kết quả phải làm gì với nó — chứ không đọc lại
 chữ ký, vì chữ ký đã tự nói rồi và nó không bao giờ lạc hậu.
 
-**Nó sinh ra gì trong source.** Một khối đặt trên khai báo được export, nằm trong chính file chứa khai
+**Source phải thể hiện gì.** Một khối đặt trên khai báo được export, nằm trong chính file chứa khai
 báo ấy, gọi tên vai trò. Helper nội bộ trong cùng file không mang khối nào như vậy. Một dòng re-export
 không sinh ra gì cả: `export { X }` chỉ nói một binding, còn hợp đồng nằm ở file nơi `X` được khai báo.
 
-**Dấu hiệu nhận biết.** Có từ khoá `export` trước khai báo. Người gọi nó nằm ở file khác, thường là ở
+**Cách nhận ra.** Có từ khoá `export` trước khai báo. Người gọi nó nằm ở file khác, thường là ở
 tầng khác. Bạn đang phải mở phần thân ra mới biết trả về `null` thì nghĩa là gì.
 
 **Ranh giới.** Đây không phải `COMMENTS-5`. Một khối chỉ chép lại chữ ký (`@param name - The name`) LÀ
@@ -104,16 +113,16 @@ khai · hằng số cấu hình · hàm định dạng dữ liệu · adapter g�
 
 ## `COMMENTS-2` — source viết bằng tiếng Anh, theo chuẩn người lạ
 
-**Tình huống.** Comment, JSDoc, tên biến và câu thông báo lỗi đều là chữ nghĩa. Chuẩn không phải là
+**Khi nào gặp.** Comment, JSDoc, tên biến và câu thông báo lỗi đều là chữ nghĩa. Chuẩn không phải là
 "cả đội hiểu là được" — chuẩn là một người vào làm sau một năm, không cùng tiếng mẹ đẻ với người viết
 dòng đó. Vì sao khắt khe đến vậy: một codebase có hai ngôn ngữ thì có hai nhóm người đọc, và nhóm nhỏ
 hơn sẽ im lặng ngừng đọc đúng những phần họ không đọc được. Không ai báo cáo việc đó cả.
 
-**Nó sinh ra gì trong source.** Tiếng Anh ở mọi vị trí authoring của file: comment, JSDoc, tên biến,
+**Source phải thể hiện gì.** Tiếng Anh ở mọi vị trí authoring của file: comment, JSDoc, tên biến,
 string literal, mảnh template, chữ trong JSX, thông báo lỗi. Dời một câu từ comment sang một cái tên
 không phải là dịch nó và cũng không miễn trừ nó, nên cái tên ấy cũng là tiếng Anh.
 
-**Dấu hiệu nhận biết.** Chữ có dấu ở bất kỳ đâu trong file authoring. Một câu văn vừa bị dời từ comment
+**Cách nhận ra.** Chữ có dấu ở bất kỳ đâu trong file authoring. Một câu văn vừa bị dời từ comment
 sang tên biến, tên hàm, hoặc key của object. Một thông báo lỗi hiển thị cho người trực hệ thống, chứ
 không phải cho người viết ra nó.
 
@@ -131,19 +140,19 @@ trong JSX viết cứng · chuỗi trong template literal.
 
 ## `COMMENTS-3` — ba ngoại lệ, và mỗi ngoại lệ tự nói ra ở chỗ nó áp dụng
 
-**Tình huống.** Có đúng BA chỗ mà ngôn ngữ thứ hai không phải là lỗi. **Nội dung locale**: từ điển dịch
+**Khi nào gặp.** Có đúng BA chỗ mà ngôn ngữ thứ hai không phải là lỗi. **Nội dung locale**: từ điển dịch
 CHÍNH LÀ ngôn ngữ kia, bắt nó theo `COMMENTS-2` là làm rỗng sản phẩm. **Fixture của test**: fixture tái
 tạo một chuỗi có thật thì phải tái tạo đúng nguyên văn, nếu không nó đang test một thứ khác. **Literal
 chức năng**: một giá trị mà chương trình đang chạy khớp vào hoặc phát ra là dữ liệu chứ không phải văn
 xuôi; nó ở lại, và được đánh dấu trên chính dòng của nó kèm lý do.
 
-**Nó sinh ra gì trong source.** Hoặc là một file nằm trên đường dẫn nội dung — từ điển locale, thư mục
+**Source phải thể hiện gì.** Hoặc là một file nằm trên đường dẫn nội dung — từ điển locale, thư mục
 resources, fixture, file `.test.*` hay `.spec.*` — hoặc là một literal trong file authoring bình
 thường mang một dấu trên chính dòng của nó, và lý do đặt sau cái dấu ấy. Cái dấu chính là toàn bộ ý
 nghĩa của ngoại lệ thứ ba: một literal không đánh dấu thì không phân biệt được với một comment ai đó
 quên dịch, nên người đọc phải tự đoán, và người đọc tiếp theo đoán khác đi.
 
-**Dấu hiệu nhận biết.** File nằm trong đường dẫn nội dung. Chuỗi được so sánh bằng `===`, dùng làm key,
+**Cách nhận ra.** File nằm trong đường dẫn nội dung. Chuỗi được so sánh bằng `===`, dùng làm key,
 hoặc gửi thẳng ra ngoài hệ thống. Hãy tự hỏi: nếu dịch chuỗi này sang tiếng Anh, chương trình có chạy
 sai không? Nếu có, nó là literal chức năng. Nếu không, nó là văn xuôi, và nó phải là tiếng Anh.
 
@@ -160,15 +169,15 @@ chuỗi so khớp với hệ thống bên thứ ba.
 
 ## `COMMENTS-4` — không có pictograph Unicode trong source
 
-**Tình huống.** Không có trong tên biến, không trong comment, không trong thông báo lỗi, không trong
+**Khi nào gặp.** Không có trong tên biến, không trong comment, không trong thông báo lỗi, không trong
 chuỗi không phải nội dung. Một pictograph render khác nhau trên mọi nền tảng, sắp xếp không lường
 trước được, làm vỡ một terminal không chờ đợi nó, và mang nghĩa không giống nhau ở hai quốc gia.
 
-**Nó sinh ra gì trong source.** Ký hiệu giao diện chung lấy từ bộ từ vựng icon. Reaction của sản phẩm
+**Source phải thể hiện gì.** Ký hiệu giao diện chung lấy từ bộ từ vựng icon. Reaction của sản phẩm
 dùng artwork SVG đã check-in, có ghi nguồn, đi qua leaf chuyên trách reaction. Đường thứ hai đó là
 trường hợp hẹp hơn và là trường hợp duy nhất — nó không phải một cửa mở.
 
-**Dấu hiệu nhận biết.** Một ký tự hình vẽ nằm trong chuỗi log, chuỗi thông báo, hoặc chữ trong JSX.
+**Cách nhận ra.** Một ký tự hình vẽ nằm trong chuỗi log, chuỗi thông báo, hoặc chữ trong JSX.
 Một cặp regional-indicator (cờ) — đúng thứ mà phép thử một-pictograph bỏ sót.
 
 **Ranh giới.** Đây không phải `COMMENTS-3`. File nội dung chỉ được miễn luật NGÔN NGỮ. Luật nói
@@ -180,15 +189,15 @@ message commit sinh ra từ code · thông báo lỗi cho người dùng cuối 
 
 ## `COMMENTS-5` — comment chép lại dòng bên dưới thì xoá, không sửa
 
-**Tình huống.** `// tăng biến đếm` đứng trên một phép tăng: tốn một dòng và không dạy được gì. Nhưng nó
+**Khi nào gặp.** `// tăng biến đếm` đứng trên một phép tăng: tốn một dòng và không dạy được gì. Nhưng nó
 tệ hơn mức vô hại: một người đọc gặp ba comment loại đó sẽ thôi đọc cái thứ tư — đúng cái nói vì sao
 biến đếm được reset vào Chủ nhật.
 
-**Nó sinh ra gì trong source.** Không gì cả. Dòng đó bị bỏ đi. Viết lại một restatement thành một
+**Source phải thể hiện gì.** Không gì cả. Dòng đó bị bỏ đi. Viết lại một restatement thành một
 restatement hay hơn vẫn bảo toàn nguyên chi phí: người đọc vẫn phải đọc nó để phát hiện ra nó không
 nói gì. Chi phí nằm ở SỰ TỒN TẠI, không nằm ở chất lượng câu chữ.
 
-**Dấu hiệu nhận biết.** Xoá comment đi, không thông tin nào mất. Comment dùng đúng những từ có sẵn
+**Cách nhận ra.** Xoá comment đi, không thông tin nào mất. Comment dùng đúng những từ có sẵn
 trong tên hàm và tên biến ngay dưới nó. Comment mô tả CƠ CHẾ (`gọi API`, `lặp qua mảng`) chứ không mô
 tả NGUYÊN NHÂN.
 
@@ -203,16 +212,16 @@ có cấu trúc rõ · comment mô tả một `map` là "duyệt mảng".
 
 ## `COMMENTS-6` — comment phải tranh luận là đang tranh luận với một quyết định, và nêu tên nó
 
-**Tình huống.** Những comment đáng giữ là những comment ghi lại một lần TỪ CHỐI: đã thử gì, cái đó tốn
+**Khi nào gặp.** Những comment đáng giữ là những comment ghi lại một lần TỪ CHỐI: đã thử gì, cái đó tốn
 gì, và vì sao hình dạng hiển nhiên lại sai Ở CHỖ NÀY. Đó chính xác là những thứ mà nếu không ghi,
 người đọc tiếp theo sẽ hoàn tác. Không phải vì họ ẩu, mà vì đứng từ phía họ, code đang ở một hình dạng
 lạ và không có lý do nào giải thích — và "dọn cho gọn" là phản xạ đúng đắn của một kỹ sư tốt.
 
-**Nó sinh ra gì trong source.** Một comment đặt tại chính dòng lạ đó, mang theo bốn thứ: hình dạng
+**Source phải thể hiện gì.** Một comment đặt tại chính dòng lạ đó, mang theo bốn thứ: hình dạng
 hiển nhiên là gì; vì sao nó sai Ở ĐÂY, nói bằng một tình huống hỏng cụ thể chứ không bằng tính từ; cái
 giá đã trả để biết điều đó, nếu có; và điều gì sẽ khiến quyết định này hết hiệu lực.
 
-**Dấu hiệu nhận biết.** Có một cách viết ngắn hơn hoặc rõ hơn mà bạn cố ý không dùng. Có một
+**Cách nhận ra.** Có một cách viết ngắn hơn hoặc rõ hơn mà bạn cố ý không dùng. Có một
 workaround, một thứ tự thực thi bắt buộc, hoặc một hằng số trông tuỳ tiện. Đã có người sửa theo cách
 hiển nhiên một lần rồi phải quay lại.
 
@@ -228,8 +237,8 @@ hoá · nơi cố ý gọi tuần tự thay vì song song · một truy vấn vi
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến
-giá trị sai không viết ra được; `enforced` nghĩa là có một rule trong `@starci/eslint-canon-fe` báo
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến
+giá trị sai không viết ra được; `enforced` nghĩa là có một rule trong `@canon-fe` báo
 lỗi; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ | Tầng đó với không tới đâu |
@@ -253,12 +262,12 @@ luật.
 
 | Mã | Điểm neo | Cần nhìn gì ở đó |
 |---|---|---|
-| `COMMENTS-1` | `@starci/eslint-canon-fe` | Mọi `export const` trong file đều mở đầu bằng một khối gọi tên vai trò — `SECOND_LANGUAGE_LETTER` nói những chữ cái nào và vì sao chúng quan trọng, chứ không nói rằng nó là một regex. So với `hasBlock` bên trong `requireExportJsdoc.create`, vốn là toàn bộ những gì rule thật sự đọc |
-| `COMMENTS-2` | `@starci/eslint-canon-fe` | Ba ca invalid là cùng một câu văn ở ba vị trí: một comment, một chuỗi, một mảnh template. Bộ ba đó chính là lập luận về tầm với của rule, viết dưới dạng test |
-| `COMMENTS-3` | `@starci/eslint-canon-fe` | `CONTENT_PATHS` và `isContentFile` cho hai ngoại lệ đường dẫn, `OK_PRAGMA` và tập `marked` bên trong `noSecondLanguageInSource.create` cho ngoại lệ thứ ba. Các ca valid ở tên file `LOCALE` và `FIXTURE` trong test song sinh cho thấy từng ngoại lệ đều được chạy qua |
-| `COMMENTS-4` | `@starci/eslint-canon-fe` | `hasEmoji`, và khối giải thích vì sao nó là hai phép thử chứ không phải một lớp ký tự. Ca cặp regional-indicator trong test song sinh chính là ca mà một phép thử một-pictograph bỏ sót |
-| `COMMENTS-5` | `@starci/eslint-canon-fe` | Khối một dòng trên `normalizePath`: nó nói vì sao chọn dấu gạch chéo xuôi, chứ không nói rằng có một phép replace. Bản chép lại của chính khối ấy sẽ hợp lệ ở khắp nơi và không dạy được gì |
-| `COMMENTS-6` | `@starci/eslint-canon-fe` | Khối phía trên `const marked` bên trong `noSecondLanguageInSource.create`: nó ghi lại phần miễn trừ trước đây kiểm cái gì, vì sao không cách diễn đạt nào thoả được nó, và vì sao chính fixture valid của rule lại đi qua vì một lý do sai. Đó là một lần từ chối mà người đọc nếu không biết sẽ hoàn tác |
+| `COMMENTS-1` | `@canon-fe` | Mọi `export const` trong file đều mở đầu bằng một khối gọi tên vai trò — `SECOND_LANGUAGE_LETTER` nói những chữ cái nào và vì sao chúng quan trọng, chứ không nói rằng nó là một regex. So với `hasBlock` bên trong `requireExportJsdoc.create`, vốn là toàn bộ những gì rule thật sự đọc |
+| `COMMENTS-2` | `@canon-fe` | Ba ca invalid là cùng một câu văn ở ba vị trí: một comment, một chuỗi, một mảnh template. Bộ ba đó chính là lập luận về tầm với của rule, viết dưới dạng test |
+| `COMMENTS-3` | `@canon-fe` | `CONTENT_PATHS` và `isContentFile` cho hai ngoại lệ đường dẫn, `OK_PRAGMA` và tập `marked` bên trong `noSecondLanguageInSource.create` cho ngoại lệ thứ ba. Các ca valid ở tên file `LOCALE` và `FIXTURE` trong test song sinh cho thấy từng ngoại lệ đều được chạy qua |
+| `COMMENTS-4` | `@canon-fe` | `hasEmoji`, và khối giải thích vì sao nó là hai phép thử chứ không phải một lớp ký tự. Ca cặp regional-indicator trong test song sinh chính là ca mà một phép thử một-pictograph bỏ sót |
+| `COMMENTS-5` | `@canon-fe` | Khối một dòng trên `normalizePath`: nó nói vì sao chọn dấu gạch chéo xuôi, chứ không nói rằng có một phép replace. Bản chép lại của chính khối ấy sẽ hợp lệ ở khắp nơi và không dạy được gì |
+| `COMMENTS-6` | `@canon-fe` | Khối phía trên `const marked` bên trong `noSecondLanguageInSource.create`: nó ghi lại phần miễn trừ trước đây kiểm cái gì, vì sao không cách diễn đạt nào thoả được nó, và vì sao chính fixture valid của rule lại đi qua vì một lý do sai. Đó là một lần từ chối mà người đọc nếu không biết sẽ hoàn tác |
 
 Mọi điểm neo trên đều là source lint nằm trong trust tree, tức là phần code repository này thật sự mở
 ra được. Không điểm neo nào thuộc cây component kiểm chứng được từ đây; giới hạn ấy được ghi nhận như

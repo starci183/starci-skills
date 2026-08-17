@@ -5,13 +5,25 @@ description: Take a source that no longer builds, no longer lints clean, drifted
 
 # starci-repair
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+
+## HANDS OFF TO — named, never loaded
+
+`starci-init`
+
+## Run
+
+Read `@skill-shape` first.
 
 **Five different things are called stale, and repairing the wrong one wastes the run.**
 
 | What is stale | Symptom | Owner |
 |---|---|---|
-| the **route** | the recorded checkout, contract or head no longer holds | [`starci-init`](../starci-init/SKILL.md) |
+| the **route** | the recorded checkout, contract or head no longer holds | `starci-init` |
 | the **source** | it does not build, does not lint clean, or drifted out of format | this skill |
 | the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, last pass |
 | the **machine** | the gates cannot fire: the published lint packages are not installed, or a copy of them is vendored into the checkout | this skill, before measuring |
@@ -55,7 +67,7 @@ approval it is the exact source paths the approved boundary names.
 Read `.workspace/<project>/<role>/config.json` and verify it before reading source: the checkout exists,
 the contract path for a frontend role exists, the recorded head still belongs to that checkout.
 
-A stale route ends the run here and returns to `starci-init`. Say which field failed.
+A stale route ends the run here. Say which field failed; the owner row names the next action.
 
 **One run repairs one role of one project.** A list naming five checkouts is five runs, five baselines,
 five records — not one boundary with five repositories inside it. Repositories fail differently, their
@@ -180,14 +192,12 @@ and the reason the fan-out is worth its cost at all.
 ### 10 — The `why` pass: make the index findable again
 
 The last pass, and the only one no gate can judge. A contract entry's `why` is the **index a later lookup
-matches on** — [`starci-fe-design-layout`](../starci-fe-design-layout/SKILL.md) resolves every region by
-searching it. An entry nobody can find by need is an entry that gets written a second time, so a stale
+matches on**. An entry nobody can find by need is an entry that gets written a second time, so a stale
 index is real staleness even while every gate is green.
 
-**A recorded miss outranks a count.** [`starci-fe-design-layout`](../starci-fe-design-layout/SKILL.md)
-queries this index one need at a time, and a query that answered nothing is carried into its `WARNINGS`
-with the need written out. Those needs are this pass's **first** work: a count says 298 reasons look wrong,
-a miss says *this* reason failed a real surface on a real day. Repair what missed, then work the count.
+**A recorded miss outranks a count.** Read the recorded misses first: each carries the need a real lookup
+could not answer. Those needs are this pass's **first** work. A count says 298 reasons look wrong; a miss
+says *this* reason failed a real surface on a real day. Repair what missed, then work the count.
 
 **`why` does not describe the business. It says when you would reach for this.**
 
@@ -275,8 +285,8 @@ Close with the applied revision, the baseline commit, the tracked diff and the t
 
 - The route is stale → return to `starci-init`, naming the field that failed.
 - A gate can only pass by silencing a finding → stop; that is the one thing this skill exists to refuse.
-- A lint rule contradicts the canon it claims to enforce → stop; that is a trust-tree change, and
-  `starci-diagnose` calls it a `defect` rather than an environment problem.
+- A lint rule contradicts the canon it claims to enforce → stop; that is a trust-tree change, not a
+  product repair.
 - The tree is already dirty with unrelated work → stop; a baseline taken from mixed state proves nothing
   and the diff will not be readable.
 - A `.claude/` in a target checkout holds tracked files or real content → stop the remnant pass and return

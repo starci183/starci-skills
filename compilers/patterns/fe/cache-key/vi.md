@@ -4,7 +4,16 @@ title: Cache-key · Vietnamese
 
 # Cache key
 
-Đầu vào là một shape đã được duyệt: một surface, một block, một capability hay một contract mà nhu cầu
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một surface, một block, một capability hay một contract mà nhu cầu
 dữ liệu đã chốt. Pattern này không mở lại quyết định đó. Nó hạ quyết định đó xuống source: file hook
 nào đặt tên cho câu trả lời, biểu thức key chứa những gì, fetcher đọc tham số ra từ đâu, khi nào key
 phải là `null`, và một kết quả `null` được phép mang nghĩa gì.
@@ -81,17 +90,17 @@ và câu trả lời được phép mang nghĩa gì khi nó đã về.
 
 ## `CACHE-1` — mọi giá trị làm đổi câu trả lời đều nằm trong key
 
-**Tình huống.** Câu trả lời phụ thuộc vào một giá trị: một bộ lọc, một trang, một ngôn ngữ, một khoảng
+**Khi nào gặp.** Câu trả lời phụ thuộc vào một giá trị: một bộ lọc, một trang, một ngôn ngữ, một khoảng
 thời gian. Cache không so sánh request, nó so sánh key. Hai lần gọi cùng một key là MỘT entry, và
 người gọi thứ hai được phục vụ bằng câu trả lời của người thứ nhất, không có request nào đi ra cả.
 
-**Nó sinh ra gì trong source.** Một biểu thức key liệt kê đủ mọi mảnh mà câu trả lời đổi theo, và
+**Source phải thể hiện gì.** Một biểu thức key liệt kê đủ mọi mảnh mà câu trả lời đổi theo, và
 không có gì khác, cùng một fetcher có chữ ký destructure những mảnh ấy ra từ key rồi đưa CHÍNH CHÚNG
 vào request — không bao giờ dùng cái tham số trùng tên đang nằm ở scope ngoài. Key và closure là hai
 bản sao của một sự thật, và sau một lần re-render hai bản đó có thể lệch nhau; entry khi ấy được xếp
 dưới tên của câu hỏi này nhưng giữ câu trả lời của câu hỏi kia.
 
-**Dấu hiệu nhận biết.** Có một biến xuất hiện trong request nhưng không xuất hiện trong key. Fetcher
+**Cách nhận ra.** Có một biến xuất hiện trong request nhưng không xuất hiện trong key. Fetcher
 không nhận tham số nào từ key mà vẫn gọi được, nghĩa là nó đang đọc từ scope ngoài. Đổi bộ lọc trên
 màn hình mà dữ liệu không đổi, hoặc đổi rồi lại nhảy về giá trị cũ. Ngược lại: key chứa một giá trị mà
 server không hề dùng tới, và mỗi lần nó đổi lại thấy fetch lại. Cái hỏng ở đây không phải thỉnh thoảng
@@ -109,18 +118,18 @@ theo phạm vi (tuần/tháng) · giỏ hàng theo mã khuyến mãi đang áp.
 
 ## `CACHE-2` — câu trả lời riêng tư phải mang người đọc trong key
 
-**Tình huống.** Câu trả lời được tính ra từ chính người đang hỏi. Đó không phải dữ liệu chung tình cờ
+**Khi nào gặp.** Câu trả lời được tính ra từ chính người đang hỏi. Đó không phải dữ liệu chung tình cờ
 nằm sau lớp đăng nhập; đó là mỗi người một câu trả lời khác nhau, và một key không nhắc tới người đọc
 thì đang hứa điều ngược lại.
 
-**Nó sinh ra gì trong source.** Một mảnh người đọc nằm trong key, sinh ra bởi một hook riêng biết gấp
+**Source phải thể hiện gì.** Một mảnh người đọc nằm trong key, sinh ra bởi một hook riêng biết gấp
 phiên đăng nhập thành một fingerprint ổn định, không đảo ngược được, và trả `undefined` khi chưa ai
 đăng nhập. Credential không bao giờ rời khỏi file đó. Key được đưa cho devtools, cho mọi công cụ soi
 cache, và cho bất cứ chỗ nào log key lại khi một request thất bại; một bearer token nằm ở đó là đúng
 cái sai lầm của một bearer token nằm trong web storage. Fingerprint KHÔNG phải một biên giới bảo mật
 và không tự nhận là như vậy — nó chỉ cần khác đi khi người đọc khác đi.
 
-**Dấu hiệu nhận biết.** Tên query có chữ "của tôi", "đang theo dõi", "đã mua", "còn lại", "dành cho
+**Cách nhận ra.** Tên query có chữ "của tôi", "đang theo dõi", "đã mua", "còn lại", "dành cho
 bạn". Server đọc danh tính từ header để tính ra kết quả, chứ không chỉ để cho phép truy cập. Đăng xuất
 rồi mà màn hình vẫn còn số liệu cũ cho tới khi F5. Vừa đăng nhập xong mà vẫn thấy trạng thái "hãy đăng
 nhập". Hai kiểu hỏng nối nhau, và kiểu thứ hai nặng hơn kiểu thứ nhất: đăng nhập vào không thay đổi gì
@@ -138,16 +147,16 @@ dung trả phí.
 
 ## `CACHE-3` — hành động trên từng dòng phải mang dòng đó trong key
 
-**Tình huống.** Các hook dùng chung một key thì dùng chung TRẠNG THÁI, không chỉ dữ liệu. Với một
+**Khi nào gặp.** Các hook dùng chung một key thì dùng chung TRẠNG THÁI, không chỉ dữ liệu. Với một
 mutation, trạng thái đó bao gồm `isMutating` — đúng cái mà một nút bấm đọc để biết mình đang chạy. Nên
 một key duy nhất trải khắp một danh sách sẽ tạo ra: bấm MỘT dòng, cả cột nút cùng quay spinner, và mọi
 dòng khác bị disable vì một cú bấm mà người đọc không hề thực hiện.
 
-**Nó sinh ra gì trong source.** Một key mutation mang id của item, trên một hook mà phía gọi khởi tạo
+**Source phải thể hiện gì.** Một key mutation mang id của item, trên một hook mà phía gọi khởi tạo
 mỗi dòng một lần, để trạng thái đang chạy thuộc về đúng một dòng. Item chính là thứ làm cho cú bấm này
 khác cú bấm ở dòng bên cạnh; thiếu nó trong key thì với cache, cả danh sách chỉ có đúng một cái nút.
 
-**Dấu hiệu nhận biết.** Hook mutation được gọi trong một component render lặp lại theo `map`. Nút
+**Cách nhận ra.** Hook mutation được gọi trong một component render lặp lại theo `map`. Nút
 "Thêm", "Xoá", "Theo dõi", "Thích" nằm trên từng dòng. Bấm một cái, cả lưới cùng hiện trạng thái đang
 chạy.
 
@@ -163,11 +172,11 @@ email trong danh sách.
 
 ## `CACHE-4` — chưa đủ mảnh thì key là `null`, không phải một key có lỗ
 
-**Tình huống.** Mọi mảnh phải đã biết thì câu hỏi mới tồn tại. Trong lúc còn một mảnh là `undefined` —
+**Khi nào gặp.** Mọi mảnh phải đã biết thì câu hỏi mới tồn tại. Trong lúc còn một mảnh là `undefined` —
 người đọc trước khi phiên giải xong, một id thuộc về một placeholder đang nghỉ, một tham số của một
 surface chưa ai mở — hook truyền `null` và không fetch gì cả.
 
-**Nó sinh ra gì trong source.** Một cái cổng đặt trước biểu thức key, trả `null` khi còn bất kỳ mảnh
+**Source phải thể hiện gì.** Một cái cổng đặt trước biểu thức key, trả `null` khi còn bất kỳ mảnh
 bắt buộc nào là `undefined`, và không có `??` hay `||` nào cấp hàng thay thế cho mảnh nào. Cái thay
 thế còn tệ hơn một request lãng phí: một key dựng quanh một mảnh còn thiếu là đi hỏi một điều không ai
 muốn biết, rồi cache câu trả lời dưới một cái tên mà không người gọi nào sau này sinh ra lại được. Một
@@ -178,7 +187,7 @@ lên mình một cái key hợp lệ: chuỗi rỗng, số không, hay chữ `gu
 trả lời THẬT cho một câu hỏi người gọi không hỏi — và về sau chẳng có dấu hiệu nào để nhìn ra là nó
 hỏng.
 
-**Dấu hiệu nhận biết.** Trong key có `??`, `||`, hoặc một literal `""` / `0` / `"guest"` /
+**Cách nhận ra.** Trong key có `??`, `||`, hoặc một literal `""` / `0` / `"guest"` /
 `"anonymous"`. Có một tham số kiểu `id?: string` nhưng key vẫn được dựng vô điều kiện. Màn hình đã
 đăng xuất mà vẫn thấy skeleton chạy mãi. Devtools thấy cùng một request lặp lại theo chu kỳ giãn dần,
 đều thất bại.
@@ -194,11 +203,11 @@ một modal chưa bật · hàng trong danh sách đang ở trạng thái skelet
 
 ## `CACHE-5` — thất bại và rỗng là hai câu trả lời khác nhau
 
-**Tình huống.** "Request không tới nơi" và "thật sự không có gì" muốn hai câu chữ khác nhau trên màn
+**Khi nào gặp.** "Request không tới nơi" và "thật sự không có gì" muốn hai câu chữ khác nhau trên màn
 hình, và một fetcher gộp lỗi thành `null` đã phá huỷ sự khác biệt đó trước khi bất kỳ người gọi nào
 kịp phân biệt.
 
-**Nó sinh ra gì trong source.** Một fetcher không có `try`/`catch` nào nuốt thất bại — một thất bại
+**Source phải thể hiện gì.** Một fetcher không có `try`/`catch` nào nuốt thất bại — một thất bại
 vẫn là `error` của hook, nơi người gọi có thể quyết định thử lại, nói ra, hoặc chủ động lùi về một
 phương án khác. Nhờ vậy `null` được rảnh tay để mang đúng một nghĩa, và hook là chỗ ghi nghĩa đó
 xuống, ngay cạnh đoạn bóc kết quả sinh ra nó: một bản xem trước giá trả `null` khi không tính được mức
@@ -206,7 +215,7 @@ giá riêng cho người này, nên màn hình lấy giá niêm yết mà hiển
 không phải một lỗi bị nuốt. Người gọi không suy ra được điều đó từ kiểu dữ liệu, và không được phép
 phải đoán.
 
-**Dấu hiệu nhận biết.** Trong fetcher có `try { … } catch { return null }`. Kiểu trả về là `T | null`
+**Cách nhận ra.** Trong fetcher có `try { … } catch { return null }`. Kiểu trả về là `T | null`
 mà không có một dòng nào nói `null` nghĩa là gì. Màn hình hiện "chưa có dữ liệu" trong khi mạng đang
 hỏng. Mỗi component tự diễn giải `null` theo một cách, và chúng không giống nhau.
 
@@ -221,7 +230,7 @@ chốt.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hay một branded type làm cho
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hay một branded type làm cho
 giá trị sai không viết ra được; `enforced` nghĩa là có một lint rule bắt được và rule đó có tên;
 `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
@@ -233,13 +242,13 @@ giá trị sai không viết ra được; `enforced` nghĩa là có một lint r
 | `CACHE-4` | `documented` | không có — không rule nào nhìn được bên trong một key có gì |
 | `CACHE-5` | `documented` | không có — không rule nào nhìn được bên trong một key có gì |
 
-Không có `@starci/eslint-canon-fe`. Module này công bố **không** rule nào, nên cả năm mã đều do
+Không có `@canon-fe`. Module này công bố **không** rule nào, nên cả năm mã đều do
 review và do chính file này giữ. Đó không phải một chỗ khuyết đang chờ lấp: một ESLint rule nhìn thấy
 BIỂU THỨC key, còn thứ làm cho một key đúng lại là chuyện các giá trị trong đó có phải là những giá
 trị mà câu trả lời đổi theo hay không — một sự thật về server, không phải về cú pháp. Rule nhìn được
 rằng key là một mảng ba định danh. Nó không nhìn được rằng cái thứ ba lẽ ra phải là cái thứ tư.
 
-Hàng xóm cơ học gần nhất là `@starci/eslint-canon-fe`, với rule `presentational-purity` giữ mọi lời
+Hàng xóm cơ học gần nhất là `@canon-fe`, với rule `presentational-purity` giữ mọi lời
 gọi `useSWR` nằm ở nửa connected. Cái đó giữ CHỖ dựng key — trong file có sẵn người đọc và tham số
 route để dựng — và hoàn toàn không giữ gì về chuyện cái gì được bỏ vào trong. Đó là chuyện kề cận,
 không phải chuyện cưỡng chế, và nó không được tính vào bảng trên.

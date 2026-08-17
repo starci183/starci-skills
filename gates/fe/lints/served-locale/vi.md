@@ -4,7 +4,14 @@ title: Served-locale · Vietnamese
 
 # Ngôn ngữ được phục vụ
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp đó có thuộc
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp đó có thuộc
 phạm vi hay không, rule đã xuất bản nào nổ, nó báo gì và nổ tại nút nào, mã luật tương ứng là mã nào,
 và cửa còn mở nào lẽ ra đã che đúng cái sai đó. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải
 chỉ được đúng nút mà nó từ chối.
@@ -63,7 +70,7 @@ mục tên `links`) và `/\.(?:test|spec)\.[cm]?[jt]sx?$/`. Rồi một hàm th�
 tập ngôn ngữ `createAttachLocaleLink`, `createLocaleLink`. Tới `Program:exit`, thấy một tên cuối cùng
 mà không thấy tên ngôn ngữ nào thì báo.
 
-**Nó không thấy gì.** Xưởng cuối cùng được nhập khẩu dưới một tên khác —
+**Điểm mù.** Xưởng cuối cùng được nhập khẩu dưới một tên khác —
 `import { createHttpLink as createTransport }` rồi `createTransport({ uri })` — vì tập chỉ giữ bốn chuỗi
 và so với cách viết của bên bị gọi, còn rule thì không truy vết nhập khẩu. Một chuỗi lắp từ những mắt
 xích dựng ở nơi khác, `from([localeLink, authLink, httpLink])`, nơi không có lời gọi nào và không có
@@ -93,7 +100,7 @@ tệp mắt xích ngôn ngữ. Mỗi thuộc tính vi phạm là một báo lỗ
 cách — khoá `Identifier` **không** tính toán cho `.name`, khoá `Literal` có giá trị chuỗi cho `.value`
 dù có tính toán hay không — rồi so bằng tuyệt đối với chuỗi `"x-locale"`.
 
-**Nó không thấy gì.** `headers["x-locale"] = locale`, vì một phép gán vào biểu thức thành viên không
+**Điểm mù.** `headers["x-locale"] = locale`, vì một phép gán vào biểu thức thành viên không
 phải nút `Property` và rule chỉ đi trong đối tượng khai báo thẳng. `headers.set("x-locale", locale)`,
 nơi tên header là một ĐỐI SỐ và không gì trong rule đọc đối số của lời gọi. `const HEADER = "x-locale"`
 … `{ [HEADER]: locale }`, vì khoá tính toán dạng `Identifier` trả về `null` từ `propertyKeyOf` — nhánh

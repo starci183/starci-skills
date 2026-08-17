@@ -4,7 +4,16 @@ title: Typography · Vietnamese
 
 # Chữ và thứ bậc
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, luật máy nào đã nổ, nó báo thông điệp nào và trên nút nào, thông điệp đó ứng với mã
 luật nào, và cái lối thoát còn mở nào lẽ ra đã che đúng lỗi ấy. Mô-đun này không chọn thang chữ nào
 cả. Nó từ chối một cách viết, và nó phải chỉ tay được vào đúng cái thẻ mà nó từ chối.
@@ -78,7 +87,7 @@ chính nó, còn lại trả `null` — đây là toàn bộ phép phân biệt 
 được phải nằm trong tập `h1 h2 h3 h4 h5 h6`. Nhánh là `Number(tag.slice(1))` so với hằng `4`. Không
 thuộc tính nào được đọc, không câu nhập nào được lần theo, không kiểu nào được hỏi.
 
-**Nó không thấy gì.** Thẻ động — `const Tag = "h2"` rồi `<Tag>{title}</Tag>` — vì `"Tag"` không bằng
+**Điểm mù.** Thẻ động — `const Tag = "h2"` rồi `<Tag>{title}</Tag>` — vì `"Tag"` không bằng
 `"tag"` nên phép thử nội tại trả `null`; viết hoa là **cách duy nhất** để dùng một thẻ nội tại tính
 được trong JSX, nên thành ngữ chuẩn để đổi bậc tiêu đề theo biến rơi đúng vào điểm mù. `createElement("h2", …)`
 không sinh nút JSX nào, và mọi nhà máy hay bộ dựng nhận tên thẻ làm tham số cũng vậy. Một tiêu đề nằm
@@ -287,7 +296,7 @@ hatch:   the dynamic tag — `"Tag" !== "tag"`, so the intrinsic test returns nu
 ## Phạm vi
 
 Mô-đun này ghi lại đúng một luật mà mô-đun luật của typography công bố, xuất xưởng trong
-`@starci/eslint-canon-fe`. Nó không ghi luật nào "đáng lẽ nên có": một luật không chỉ tay được vào đâu
+`@canon-fe`. Nó không ghi luật nào "đáng lẽ nên có": một luật không chỉ tay được vào đâu
 thì chỉ là một đề xuất, không phải mức thực thi. Luật sinh đôi bắt tiêu đề lắp từ các lớp chữ thuộc về
 một mô-đun luật khác và được ghi ở kệ của mô-đun đó. Các tập đóng và cặp kiểu trên hai thành phần chữ
 là chuyện của hệ thống kiểu, không phải của mô-đun này.

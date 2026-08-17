@@ -4,6 +4,13 @@ title: Radius
 
 # Radius
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a course card with a thin edge around its cover image" —
 and you return, for every boundary that request implies, one situation code and one className. The
 request never states a corner and you never estimate one: the corner follows from what kind of

@@ -7,8 +7,18 @@ codes: [SLOTS-1, SLOTS-2, SLOTS-3, SLOTS-4, SLOTS-5, SLOTS-6, SLOTS-7]
 
 # Props và slot
 
-Đầu vào của pattern này là một shape đã được duyệt — một layout, một block, một capability hay một
-contract mà ai đó đã quyết định là đúng. Quyết định ấy không được mở lại ở đây. Đầu ra là kiến trúc
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+| `@canon-fe-props` | `@starci/eslint-canon-fe/props` | npm package | các kiểu prop frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một layout, một block, một capability hay một
+contract mà ai đó đã quyết định là đúng. Quyết định ấy không được mở lại ở đây. Kết quả là kiến trúc
 source: component nằm ở file nào, alias tầng nào định kiểu cho tham số của nó, alias đó mở ra những
 slot nào, kiểu dữ liệu tên là gì, và vì thế component bị cấm nhận những gì. Pattern này hạ một shape
 đã duyệt xuống thành code có kiểu.
@@ -83,15 +93,15 @@ là một mã đã bị rút, chứ không phải thiếu mất một mã.
 
 ## `SLOTS-1` — slot dữ liệu chỉ chứa DỮ LIỆU
 
-**Tình huống.** Có một thứ mang hành vi — một handler, một component, một factory — và chỗ tiện nhất
+**Khi nào gặp.** Có một thứ mang hành vi — một handler, một component, một factory — và chỗ tiện nhất
 để đặt nó là ngay cạnh những giá trị mà nó tác động lên. Luật nói không: dữ liệu là những gì một tài
 liệu JSON chứa được, và chỉ vậy.
 
-**Nó sinh ra gì trong source.** `props` được định kiểu bằng một alias dữ liệu mà mọi thành viên đều có
+**Source phải thể hiện gì.** `props` được định kiểu bằng một alias dữ liệu mà mọi thành viên đều có
 hình dạng JSON. Hành vi muốn đi ké được chuyển sang slot `on`, và không thứ gì mang hành vi còn với
 tới được từ `props`.
 
-**Dấu hiệu nhận biết.** Trong `props` xuất hiện một `() =>`, một tên viết hoa đầu, hoặc một biến giữ
+**Cách nhận ra.** Trong `props` xuất hiện một `() =>`, một tên viết hoa đầu, hoặc một biến giữ
 component; có người lập luận rằng "nó gắn với dữ liệu này nên để chung cho gần"; shape được truyền vào
 đang do **caller** định nghĩa chứ không phải component. Tự hỏi: nếu serialize toàn bộ `props` ra JSON
 rồi đọc lại, có mất thứ gì không? Mất — thì thứ mất đi đó không thuộc `props`.
@@ -107,16 +117,16 @@ tự vẽ badge · list truyền hàm format tiền · empty state kèm CTA riê
 
 ## `SLOTS-2` — dữ liệu khai bằng `type`, không bao giờ bằng `interface`
 
-**Tình huống.** Đang khai báo shape dữ liệu cho một component. Hai cách viết trông tương đương, và chỉ
+**Khi nào gặp.** Đang khai báo shape dữ liệu cho một component. Hai cách viết trông tương đương, và chỉ
 một cách còn giữ được hàng rào của `SLOTS-1`.
 
-**Nó sinh ra gì trong source.** `type XData = { … }` trong module sở hữu nó, thoả ràng buộc
+**Source phải thể hiện gì.** `type XData = { … }` trong module sở hữu nó, thoả ràng buộc
 `D extends ComponentData` mà mọi alias tầng đều áp. Đây **không** phải sở thích code style: TypeScript
 cấp *implicit index signature* cho type alias và **không** cấp cho interface, nên một interface **âm
 thầm** trượt ràng buộc dữ liệu — nó biên dịch được ngay tại chỗ khai báo, rồi thôi không còn thoả mãn
 ràng buộc đang giữ hàm ra khỏi `props`.
 
-**Dấu hiệu nhận biết.** Lỗi biên dịch xuất hiện ở **chỗ dùng** chứ không ở chỗ khai báo, và người đọc
+**Cách nhận ra.** Lỗi biên dịch xuất hiện ở **chỗ dùng** chứ không ở chỗ khai báo, và người đọc
 kết luận nhầm rằng alias tầng đang hỏng; có ai đó vừa "sửa" bằng cách nới ràng buộc của alias tầng
 thay vì đổi `interface` thành `type`. Tự hỏi: kiểu dữ liệu này có bao giờ được truyền qua một slot
 alias không? Có — thì nó phải là `type`.
@@ -131,15 +141,15 @@ của một item trong danh sách · kiểu dữ liệu dùng lại giữa nhi�
 
 ## `SLOTS-3` — hình dạng của tham số phải có TÊN
 
-**Tình huống.** Viết một component và gõ luôn shape vào ngay tại tham số. Nó biên dịch, nó chạy, và nó
+**Khi nào gặp.** Viết một component và gõ luôn shape vào ngay tại tham số. Nó biên dịch, nó chạy, và nó
 là một shape **không có chỗ nào để được đọc từ đó**: không import được, không tham chiếu được từ twin
 test, không tìm được bởi người đang hỏi "component này nhận gì?".
 
-**Nó sinh ra gì trong source.** Một kiểu có tên cho mỗi component, `XProps` cho component `X`, khai
+**Source phải thể hiện gì.** Một kiểu có tên cho mỗi component, `XProps` cho component `X`, khai
 trong chính module của component ấy và gọi tên **toàn bộ input** trước khi hàm bắt đầu. Tham số nhận
 đúng cái tên đó và không nhận gì khác.
 
-**Dấu hiệu nhận biết.** Dấu `{` mở ra ngay sau dấu `:` của tham số; một intersection được lắp tại chỗ,
+**Cách nhận ra.** Dấu `{` mở ra ngay sau dấu `:` của tham số; một intersection được lắp tại chỗ,
 kiểu `Frame & { signOutLabel: string }` — có tên một nửa vẫn là ẩn danh, vì nửa còn lại không ai gọi
 tên được; twin test phải chép lại shape thay vì import nó. Tự hỏi: có thứ gì khác trong repo tham
 chiếu được tới shape này không?
@@ -153,11 +163,11 @@ thêm vài chuỗi copy · component được refactor tách ra từ một file 
 
 ## `SLOTS-4` — có `contract` và `render` là ranh giới tầng
 
-**Tình huống.** Đang quyết định component này là **shape đóng** hay **container mở**. Shape đóng không
+**Khi nào gặp.** Đang quyết định component này là **shape đóng** hay **container mở**. Shape đóng không
 có cả hai slot; container mở có cả hai. Cả hai chiều đều **nhìn thấy được trong props alias**, nên một
 file đã trôi qua ranh giới sẽ lộ ra từ kiểu của nó, không cần đợi review.
 
-**Nó sinh ra gì trong source.** Một container sinh ra `contract` cùng `render` đi với nhau trong một
+**Source phải thể hiện gì.** Một container sinh ra `contract` cùng `render` đi với nhau trong một
 tham số `BranchProps`, một component có tên cho mỗi slot mà khoá đó khai báo; một shape đóng sinh ra
 tham số `LeafProps`, `CompositeProps` hoặc `BlockProps` không có cả hai slot và không có lỗ markup nào.
 Slot không tên là `children`, và cái tên không phải chuyện thẩm mỹ: một lỗ markup nhận vào thứ **đã
@@ -165,7 +175,7 @@ dựng xong** — một `.map`, một ternary, một cây con không ai đặt t
 sẽ không bao giờ phát biểu được ở đâu cả. `render` nhận **một component cho mỗi slot có tên**, và đó
 là thứ biến ranh giới thành một sự thật do compiler giữ thay vì một thói quen do reviewer giữ.
 
-**Dấu hiệu nhận biết.** Một shape đóng vừa mọc thêm slot cho caller đổ nội dung vào; một container mà
+**Cách nhận ra.** Một shape đóng vừa mọc thêm slot cho caller đổ nội dung vào; một container mà
 caller **không** đổ nội dung vào được — nó thuộc tầng dưới, dù tên gọi là gì; có người đề nghị "cho
 nhận markup một lần này thôi". Tự hỏi: caller có được quyết định phần bên trong không? Có ⇒ khai
 `contract` + `render`. Không ⇒ component này thuộc tầng đóng, và slot đang bàn không tồn tại.
@@ -179,15 +189,15 @@ section có nội dung khác nhau theo trang · wrapper layout · modal.
 
 ## `SLOTS-5` — `isLoading` được NHẬN, không được tự quyết
 
-**Tình huống.** Một component nằm dưới tầng sở hữu request được **báo cho biết** thứ nó vẽ đã về hay
+**Khi nào gặp.** Một component nằm dưới tầng sở hữu request được **báo cho biết** thứ nó vẽ đã về hay
 chưa. Nó không tự hỏi. Tầng sở hữu request ghi cờ đó **một lần** khi trao cây xuống, và bản thân tầng
 đó không bao giờ nhận cờ — vì props của nó mang một **tình huống nghiệp vụ** thay vì một cờ chờ.
 
-**Nó sinh ra gì trong source.** `isLoading` do tầng sở hữu request ghi ra rồi trao xuống; props alias
+**Source phải thể hiện gì.** `isLoading` do tầng sở hữu request ghi ra rồi trao xuống; props alias
 của chính tầng đó không mang cờ nào như vậy. Không `useState`, `useEffect` hay hook fetch nào tính
 trạng thái chờ bên trong một leaf hay một composite.
 
-**Dấu hiệu nhận biết.** Trong một leaf hoặc composite có `useState`, `useEffect` hay một hook fetch
+**Cách nhận ra.** Trong một leaf hoặc composite có `useState`, `useEffect` hay một hook fetch
 quyết định trạng thái chờ; hai component cùng một cây đang chờ **lệch nhau**, vì mỗi cái tự trả lời;
 có `isLoading` nằm trong props của tầng đang sở hữu request. Tự hỏi: ai gọi request? Nếu không phải
 file này, thì file này **không có quyền** trả lời câu hỏi "đã về chưa".
@@ -203,15 +213,15 @@ hồ sơ · số liệu tổng quan · list gợi ý tải sau nội dung chính
 
 ## `SLOTS-6` — không có slot ngoại hình
 
-**Tình huống.** Caller muốn một chỗ trông khác đi: một class, một style, một khoảng cách, một hook
+**Khi nào gặp.** Caller muốn một chỗ trông khác đi: một class, một style, một khoảng cách, một hook
 styling cho từng phần bên trong. Không slot nào trong số đó tồn tại.
 
-**Nó sinh ra gì trong source.** Một variant có tên, quyết định **ở bên trong** component; không prop
+**Source phải thể hiện gì.** Một variant có tên, quyết định **ở bên trong** component; không prop
 nào mang tên ngoại hình xuất hiện ở bất cứ đâu trong alias. Người nào chỉnh được diện mạo của một node
 thì đã trở thành **chủ sở hữu thứ hai** của nó, và component lúc đó có hai tác giả không bao giờ nói
 chuyện với nhau. Thứ caller đang cố nói ra là một **variant có tên**.
 
-**Dấu hiệu nhận biết.** Một prop có tên kết thúc bằng `ClassName`, `Style`, `Gap`, `Spacing`; một
+**Cách nhận ra.** Một prop có tên kết thúc bằng `ClassName`, `Style`, `Gap`, `Spacing`; một
 object `classNames` mở từng phần bên trong ra cho caller; cùng một component trông khác nhau ở hai màn
 hình mà không màn nào gọi tên được sự khác nhau đó. Tự hỏi: caller đang muốn nói điều gì về **nghiệp
 vụ**? Câu trả lời đó là tên của variant.
@@ -226,17 +236,17 @@ trang landing · nút nguy hiểm · row đã đọc và chưa đọc · trạng
 
 ## `SLOTS-7` — collection đi theo tên domain trong `props`, không đi qua `items`
 
-**Tình huống.** Một surface dùng chung phải hiển thị một collection: task, khoá học, hoá đơn, hay bất
+**Khi nào gặp.** Một surface dùng chung phải hiển thị một collection: task, khoá học, hoá đơn, hay bất
 cứ thứ gì thêm vào sau này. Surface đó là **nơi chứa contract**, không phải một mô hình dữ liệu. Vì
 component `render` ổn định của nó đã sở hữu shape props theo domain, collection đi dưới **tên thật của
 nó** bên trong `props`.
 
-**Nó sinh ra gì trong source.** Collection là một thành viên mang tên domain nằm trong `props`, và
+**Source phải thể hiện gì.** Collection là một thành viên mang tên domain nằm trong `props`, và
 surface dùng chung không có slot `items` ở cấp cao nhất. Một slot `items` cấp cao nhất tạo ra **làn dữ
 liệu thứ hai** chạy song song với `props`, và dạy cho surface dùng chung biết mô hình collection của
 từng caller; đến caller thứ ba thì surface đã biết ba mô hình mà đáng lẽ nó không cần biết cái nào.
 
-**Dấu hiệu nhận biết.** Cùng một call site truyền dữ liệu chạy qua hai đường, một phần trong `props`,
+**Cách nhận ra.** Cùng một call site truyền dữ liệu chạy qua hai đường, một phần trong `props`,
 một phần trong `items`; có người đang bàn xem "thứ này nên để `props` hay `items`" — câu hỏi đó chỉ
 tồn tại khi làn thứ hai đã tồn tại. Tự hỏi: nếu ngày mai có thêm một domain nữa dùng surface này,
 surface có phải học thêm gì không?
@@ -249,14 +259,14 @@ thanh toán · danh sách thông báo · bảng thành viên.
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng, hoặc một alias chính là toàn
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng, hoặc một alias chính là toàn
 bộ hình dạng, làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong
-`@starci/eslint-canon-fe` báo lỗi nó; `documented` nghĩa là không có cơ chế nào giữ nó và chỉ
+`@canon-fe` báo lỗi nó; `documented` nghĩa là không có cơ chế nào giữ nó và chỉ
 người đọc giữ.
 
 | Mã | Tầng | Ai giữ | Cái gì vẫn lọt |
 |---|---|---|---|
-| `SLOTS-1` | `unrepresentable` | `DataValue` trong `@starci/eslint-canon-fe/props` — một union đóng không có thành viên nào là hàm | Không gì cả, ở mọi chỗ dùng alias tầng |
+| `SLOTS-1` | `unrepresentable` | `DataValue` trong `@canon-fe-props` — một union đóng không có thành viên nào là hàm | Không gì cả, ở mọi chỗ dùng alias tầng |
 | `SLOTS-2` | `unrepresentable` | Ràng buộc `D extends ComponentData` trên mọi alias tầng | Lỗi rơi ở slot, không rơi ở `interface`; một kiểu dữ liệu không bao giờ đi qua slot thì vẫn biên dịch được |
 | `SLOTS-3` | `enforced` | `no-inline-parameter-type` | Một kiểu có tên nhưng không phải `XProps` cho component `X` — cái tên được đọc, không được kiểm |
 | `SLOTS-4` | `enforced` | `no-children-slot`, cộng `BranchProps` cho nửa khẳng định | Rule thấy lỗ markup; không gì thấy một shape đóng mọc thêm `render` |
@@ -276,13 +286,13 @@ Từng mã, và code thật để đối chiếu.
 
 | Mã | Đường dẫn | Nhìn cái gì |
 |---|---|---|
-| `SLOTS-1` | `@starci/eslint-canon-fe/props` | Union `DataValue` và `ComponentData`; xác nhận không thành viên nào là kiểu hàm, rồi thử gán một handler vào `props` |
-| `SLOTS-2` | `@starci/eslint-canon-fe/props` | `LeafProps<D extends ComponentData>`; khai một shape dữ liệu bằng `interface` rồi truyền vào — ràng buộc sẽ hỏng |
-| `SLOTS-3` | `@starci/eslint-canon-fe` | `isInlineObjectType`, hàm đi xuyên intersection và dấu ngoặc, cùng các fixture invalid trong `props-and-slots.test.mjs` |
-| `SLOTS-4` | `@starci/eslint-canon-fe/props` · `@starci/eslint-canon-fe` | `BranchProps` mang `contract` + `render` và không có lỗ markup; rồi `CHILDREN_SHELLS` và `isGoverned` cho các shell được miễn và các tầng rule quản |
-| `SLOTS-5` | `@starci/eslint-canon-fe/props` | `BlockProps` — hai slot, không có `isLoading`, tức chỉ neo được nửa NHẬN. Nửa TỰ QUYẾT thì chưa neo được |
-| `SLOTS-6` | `@starci/eslint-canon-fe/props` | `LeafProps`, `CompositeProps`, `BranchProps`; xác nhận không có thành viên ngoại hình và không có index signature nào cho phép một thành viên như vậy lọt vào |
-| `SLOTS-7` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe/props` | `noSurfaceListItemsSlot` — phép kiểm import source bind nó, và phép kiểm attribute `items`; rồi `ContractRenderBranchProps`, nơi dữ liệu runtime ở lại trong `props` |
+| `SLOTS-1` | `@canon-fe-props` | Union `DataValue` và `ComponentData`; xác nhận không thành viên nào là kiểu hàm, rồi thử gán một handler vào `props` |
+| `SLOTS-2` | `@canon-fe-props` | `LeafProps<D extends ComponentData>`; khai một shape dữ liệu bằng `interface` rồi truyền vào — ràng buộc sẽ hỏng |
+| `SLOTS-3` | `@canon-fe` | `isInlineObjectType`, hàm đi xuyên intersection và dấu ngoặc, cùng các fixture invalid trong `props-and-slots.test.mjs` |
+| `SLOTS-4` | `@canon-fe-props` · `@canon-fe` | `BranchProps` mang `contract` + `render` và không có lỗ markup; rồi `CHILDREN_SHELLS` và `isGoverned` cho các shell được miễn và các tầng rule quản |
+| `SLOTS-5` | `@canon-fe-props` | `BlockProps` — hai slot, không có `isLoading`, tức chỉ neo được nửa NHẬN. Nửa TỰ QUYẾT thì chưa neo được |
+| `SLOTS-6` | `@canon-fe-props` | `LeafProps`, `CompositeProps`, `BranchProps`; xác nhận không có thành viên ngoại hình và không có index signature nào cho phép một thành viên như vậy lọt vào |
+| `SLOTS-7` | `@canon-fe` · `@canon-fe-props` | `noSurfaceListItemsSlot` — phép kiểm import source bind nó, và phép kiểm attribute `items`; rồi `ContractRenderBranchProps`, nơi dữ liệu runtime ở lại trong `props` |
 
 Điểm neo không phải đồ trang trí. Một luật không chỉ ra được trong code thật thì chỉ là một đề nghị,
 và cái dòng neo được có một nửa ở trên là cái giá thành thật của việc giữ `SLOTS-5`.

@@ -4,7 +4,16 @@ title: Type-safety · Vietnamese
 
 # An toàn kiểu
 
-Đầu vào là một shape đã được duyệt — một capability, một contract, một operation, một bản ghi lưu trữ. Pattern này không mở lại quyết định đó. Nó hạ quyết định ấy xuống source: file nào giữ giá trị, giá trị được khai kiểu gì, cái gì đứng sau lời khai ấy, tầng nào sở hữu mối bận tâm này, và file nằm ở làn nào. Shape đã duyệt nói hệ thống làm gì; pattern này nói sau khi code viết xong thì trình biên dịch còn được phép biết những gì.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một capability, một contract, một operation, một bản ghi lưu trữ. Pattern này không mở lại quyết định đó. Nó hạ quyết định ấy xuống source: file nào giữ giá trị, giá trị được khai kiểu gì, cái gì đứng sau lời khai ấy, tầng nào sở hữu mối bận tâm này, và file nằm ở làn nào. Shape đã duyệt nói hệ thống làm gì; pattern này nói sau khi code viết xong thì trình biên dịch còn được phép biết những gì.
 
 ## Luật
 
@@ -47,11 +56,11 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## `TYPE-1` — dùng unknown, không dùng any
 
-**Tình huống.** Một giá trị đi vào từ chỗ mình không kiểm soát: body của một webhook, lỗi mà SDK của nhà cung cấp ném ra, một cột `jsonb` đọc lên từ database, một file cấu hình do người khác sửa. Mình không biết hình dạng của nó.
+**Khi nào gặp.** Một giá trị đi vào từ chỗ mình không kiểm soát: body của một webhook, lỗi mà SDK của nhà cung cấp ném ra, một cột `jsonb` đọc lên từ database, một file cấu hình do người khác sửa. Mình không biết hình dạng của nó.
 
-**Nó sinh ra gì trong source.** Giá trị được khai `unknown` ngay tại chỗ nó đi vào, và đúng một lần thu hẹp nhìn thấy được — `typeof`, `instanceof` hoặc một predicate — đứng giữa nó và lần đọc cụ thể đầu tiên. `any` không xuất hiện ở đâu cả: không ở tham số, giá trị trả về, field, tham số generic hay đích của cast. `any` không có nghĩa là "tôi không biết kiểu này". Nó có nghĩa là **thôi đừng kiểm tra nữa**, và cái "thôi" ấy lan ra: mọi property đọc ra từ nó, mọi giá trị dẫn xuất từ nó, mọi chỗ nó được truyền vào đều không còn được kiểm tra. Một `any` ở tầng parser có thể làm mù cả một chuỗi gọi mà không ai viết thêm chữ `any` nào nữa.
+**Source phải thể hiện gì.** Giá trị được khai `unknown` ngay tại chỗ nó đi vào, và đúng một lần thu hẹp nhìn thấy được — `typeof`, `instanceof` hoặc một predicate — đứng giữa nó và lần đọc cụ thể đầu tiên. `any` không xuất hiện ở đâu cả: không ở tham số, giá trị trả về, field, tham số generic hay đích của cast. `any` không có nghĩa là "tôi không biết kiểu này". Nó có nghĩa là **thôi đừng kiểm tra nữa**, và cái "thôi" ấy lan ra: mọi property đọc ra từ nó, mọi giá trị dẫn xuất từ nó, mọi chỗ nó được truyền vào đều không còn được kiểm tra. Một `any` ở tầng parser có thể làm mù cả một chuỗi gọi mà không ai viết thêm chữ `any` nào nữa.
 
-**Dấu hiệu nhận biết.** Giá trị đến từ mạng, từ SDK bên thứ ba, từ `JSON.parse`, từ một cột jsonb, từ `catch`. Lý do định gõ `any` là "kiểu thật dài quá" hoặc "SDK khai báo sai". Sau dòng đó, IDE ngừng gợi ý — dấu hiệu trực quan nhất của một bảo đảm vừa mất. Tự hỏi: nếu khai `unknown` ở đây, dòng nào sẽ đỏ? Mỗi dòng đỏ đó là một giả định mình vừa định giấu đi.
+**Cách nhận ra.** Giá trị đến từ mạng, từ SDK bên thứ ba, từ `JSON.parse`, từ một cột jsonb, từ `catch`. Lý do định gõ `any` là "kiểu thật dài quá" hoặc "SDK khai báo sai". Sau dòng đó, IDE ngừng gợi ý — dấu hiệu trực quan nhất của một bảo đảm vừa mất. Tự hỏi: nếu khai `unknown` ở đây, dòng nào sẽ đỏ? Mỗi dòng đỏ đó là một giả định mình vừa định giấu đi.
 
 **Ranh giới.** Không phải `TYPE-2`: `any` thú nhận rằng nó không kiểm tra gì, còn double cast nói dối rằng giá trị là `T`; `any` hỏng theo hướng lan ra, double cast hỏng theo hướng lặn xuống. Không phải `TYPE-3`: kiểu inline trên một tham số vẫn kiểm tra đầy đủ — nó không tham chiếu được chứ không phải không an toàn — và gộp hai thứ lại là mất đúng cái phân biệt ấy.
 
@@ -59,11 +68,11 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## `TYPE-2` — không double cast qua unknown
 
-**Tình huống.** Mình viết `x as T`, trình biên dịch từ chối vì hai kiểu không giao nhau, và mình trả lời lời từ chối ấy bằng cách chèn `unknown` vào giữa: `x as unknown as T`.
+**Khi nào gặp.** Mình viết `x as T`, trình biên dịch từ chối vì hai kiểu không giao nhau, và mình trả lời lời từ chối ấy bằng cách chèn `unknown` vào giữa: `x as unknown as T`.
 
-**Nó sinh ra gì trong source.** Chuỗi `as unknown as` không tồn tại trong code sản phẩm. Thay vào đó kiểu được sửa — một interface cấu trúc tối thiểu, một hàm map thật — hoặc giá trị được thu hẹp bằng một guard thật sự kiểm tra. Đây là trình biên dịch bị bác bỏ hai lần. Lần một: "hai kiểu này không liên quan". Lần hai: "kệ". Nó tệ hơn `any` ở đúng một điểm, và điểm đó quyết định. `any` nói "đừng tin tôi", nên mọi thứ phía sau đều được xét lại; double cast tạo ra một giá trị tự nhận là `T`, nên mọi thứ phía sau tin nó tuyệt đối, và lỗi nổ ra ở một dòng chẳng làm gì sai, cách chỗ gây lỗi hàng chục file.
+**Source phải thể hiện gì.** Chuỗi `as unknown as` không tồn tại trong code sản phẩm. Thay vào đó kiểu được sửa — một interface cấu trúc tối thiểu, một hàm map thật — hoặc giá trị được thu hẹp bằng một guard thật sự kiểm tra. Đây là trình biên dịch bị bác bỏ hai lần. Lần một: "hai kiểu này không liên quan". Lần hai: "kệ". Nó tệ hơn `any` ở đúng một điểm, và điểm đó quyết định. `any` nói "đừng tin tôi", nên mọi thứ phía sau đều được xét lại; double cast tạo ra một giá trị tự nhận là `T`, nên mọi thứ phía sau tin nó tuyệt đối, và lỗi nổ ra ở một dòng chẳng làm gì sai, cách chỗ gây lỗi hàng chục file.
 
-**Dấu hiệu nhận biết.** Chuỗi `as unknown as` xuất hiện trong code sản phẩm. Mình đang ép một object thiếu field thành một entity đầy đủ. Mình đang ép kết quả của một query thô thành kiểu entity mà không kiểm gì. Lý do trong đầu là "tôi biết chắc lúc chạy nó đúng mà". Tự hỏi: nếu điều mình "biết chắc" sai, ai là người phát hiện? Nếu câu trả lời là "khách hàng", thì đây là `TYPE-2`.
+**Cách nhận ra.** Chuỗi `as unknown as` xuất hiện trong code sản phẩm. Mình đang ép một object thiếu field thành một entity đầy đủ. Mình đang ép kết quả của một query thô thành kiểu entity mà không kiểm gì. Lý do trong đầu là "tôi biết chắc lúc chạy nó đúng mà". Tự hỏi: nếu điều mình "biết chắc" sai, ai là người phát hiện? Nếu câu trả lời là "khách hàng", thì đây là `TYPE-2`.
 
 **Ranh giới.** Không phải `TYPE-1`: xem trên. Không phải một cast đơn: `as unknown` một mình là nới rộng ra ngoài, và đó là hành động thật thà — nó vứt thông tin đi chứ không nhận thêm thứ gì; một cast thu hẹp một mình là câu hỏi khác, nhỏ hơn, và mã này không trả lời. Không phải `TYPE-6`: trong spec và test tree, double cast là hợp lệ và cần thiết, và đó là tính chất của làn code, không phải của dòng code.
 
@@ -71,11 +80,11 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## `TYPE-3` — tham số destructure phải có kiểu được đặt tên
 
-**Tình huống.** Một hàm nhận một object và destructure ngay tại chữ ký: `({ userId, courseId }: { userId: string, courseId: string })`.
+**Khi nào gặp.** Một hàm nhận một object và destructure ngay tại chữ ký: `({ userId, courseId }: { userId: string, courseId: string })`.
 
-**Nó sinh ra gì trong source.** Một kiểu có tên trong thư mục `types/` của module, một kiểu cho mỗi operation, tài liệu hoá theo từng field, và chữ ký tham chiếu tới nó. Kiểu viết thẳng tại chỗ thì không tham chiếu được, không import được, không extend được, không index được. Cho nên caller thứ hai gõ lại nó, và hai bản sao trôi ra xa nhau trong im lặng vì không có gì nối chúng với nhau; khi field thứ ba xuất hiện, chỉ một trong hai bản sao nhận được nó. Một kiểu có tên mang đúng lượng thông tin đó, nhưng có tay cầm.
+**Source phải thể hiện gì.** Một kiểu có tên trong thư mục `types/` của module, một kiểu cho mỗi operation, tài liệu hoá theo từng field, và chữ ký tham chiếu tới nó. Kiểu viết thẳng tại chỗ thì không tham chiếu được, không import được, không extend được, không index được. Cho nên caller thứ hai gõ lại nó, và hai bản sao trôi ra xa nhau trong im lặng vì không có gì nối chúng với nhau; khi field thứ ba xuất hiện, chỉ một trong hai bản sao nhận được nó. Một kiểu có tên mang đúng lượng thông tin đó, nhưng có tay cầm.
 
-**Dấu hiệu nhận biết.** Chữ ký hàm dài hơn thân hàm. Có hai chỗ trong repo cùng khai một object gần giống nhau. Muốn viết `Params["field"]` mà không có gì để index vào. Muốn viết một hàm bọc ngoài mà không gọi tên được kiểu tham số của hàm bên trong. Tự hỏi: nếu ngày mai có caller thứ hai, họ import cái gì? Nếu không có câu trả lời, đây là `TYPE-3`.
+**Cách nhận ra.** Chữ ký hàm dài hơn thân hàm. Có hai chỗ trong repo cùng khai một object gần giống nhau. Muốn viết `Params["field"]` mà không có gì để index vào. Muốn viết một hàm bọc ngoài mà không gọi tên được kiểu tham số của hàm bên trong. Tự hỏi: nếu ngày mai có caller thứ hai, họ import cái gì? Nếu không có câu trả lời, đây là `TYPE-3`.
 
 **Ranh giới.** Không phải `TYPE-1`: kiểu inline vẫn được kiểm tra đầy đủ; vấn đề là tái sử dụng, không phải an toàn. Không phải tham số positional: `(params: { userId: string })` không thuộc mã này. Mã này nói về dạng đã destructure, vì đó là dạng bị caller sau gõ lại; kiểu inline trên một tham số positional là vấn đề nhỏ hơn và thuốc khác.
 
@@ -83,11 +92,11 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## `TYPE-4` — enum thường, không bao giờ const enum
 
-**Tình huống.** Một tập hằng có tên: trạng thái đơn hàng, loại thông báo, nhà cung cấp model.
+**Khi nào gặp.** Một tập hằng có tên: trạng thái đơn hàng, loại thông báo, nhà cung cấp model.
 
-**Nó sinh ra gì trong source.** Một khai báo `enum` thường, sống tới lúc chạy dưới dạng một object. `const enum` được nội tuyến lúc biên dịch và không để lại object nào lúc chạy. Cái nó tiết kiệm là vài byte. Cái nó lấy đi là cả một họ việc đơn giản: không `Object.values()` được, nên không duyệt được để dựng danh sách chọn; không map ngược từ giá trị về member được, nên không hồi phục được một giá trị đã lưu trong DB; không truyền chính enum đó như một giá trị vào một hàm generic được; và không đi qua được ranh giới `isolatedModules` mà bản biên dịch này đang chạy dưới đó.
+**Source phải thể hiện gì.** Một khai báo `enum` thường, sống tới lúc chạy dưới dạng một object. `const enum` được nội tuyến lúc biên dịch và không để lại object nào lúc chạy. Cái nó tiết kiệm là vài byte. Cái nó lấy đi là cả một họ việc đơn giản: không `Object.values()` được, nên không duyệt được để dựng danh sách chọn; không map ngược từ giá trị về member được, nên không hồi phục được một giá trị đã lưu trong DB; không truyền chính enum đó như một giá trị vào một hàm generic được; và không đi qua được ranh giới `isolatedModules` mà bản biên dịch này đang chạy dưới đó.
 
-**Dấu hiệu nhận biết.** Có ai đó thêm `const` vào trước `enum` "cho nhẹ bundle" — trong một tiến trình Node. Một hàm coerce nhận `enumObject` làm tham số: đó là bằng chứng enum phải tồn tại lúc chạy. Một `registerEnumType` hoặc một cột enum trong DB: cả hai đều cần object thật. Tự hỏi: có chỗ nào duyệt, map ngược, hoặc truyền chính enum này như một giá trị không? Trong một back end, câu trả lời gần như luôn là có, kể cả khi hôm nay chưa có.
+**Cách nhận ra.** Có ai đó thêm `const` vào trước `enum` "cho nhẹ bundle" — trong một tiến trình Node. Một hàm coerce nhận `enumObject` làm tham số: đó là bằng chứng enum phải tồn tại lúc chạy. Một `registerEnumType` hoặc một cột enum trong DB: cả hai đều cần object thật. Tự hỏi: có chỗ nào duyệt, map ngược, hoặc truyền chính enum này như một giá trị không? Trong một back end, câu trả lời gần như luôn là có, kể cả khi hôm nay chưa có.
 
 **Ranh giới.** Không phải `TYPE-5`: enum là một trục giá trị, còn union phân biệt là nhiều trạng thái mà mỗi trạng thái mang dữ liệu khác nhau — nếu mỗi nhánh cần field riêng thì enum không đủ và tình huống là `TYPE-5`. Không phải `declare enum`: khai báo ambient mô tả một thứ đã tồn tại ở nơi khác và không phát sinh gì, nên nằm ngoài mã này.
 
@@ -95,11 +104,11 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## `TYPE-5` — union phân biệt thắng một túi boolean
 
-**Tình huống.** Một tình huống có vài trạng thái, được mô tả bằng mấy cái cờ: `isPending`, `isGraded`, `isFailed`, cộng thêm `score?`.
+**Khi nào gặp.** Một tình huống có vài trạng thái, được mô tả bằng mấy cái cờ: `isPending`, `isGraded`, `isFailed`, cộng thêm `score?`.
 
-**Nó sinh ra gì trong source.** Một union của những trạng thái có thật, phân biệt bằng discriminant, để một trạng thái không có thật không viết ra được. Bốn boolean cho phép mười sáu tổ hợp. Có lẽ ba trong số đó tồn tại. Mười ba tổ hợp còn lại biên dịch sạch sẽ, và một trong số chúng là thứ một caller truyền vào lúc bốn giờ sáng. `isGraded && isFailed` biên dịch. `isGraded` mà không có `score` biên dịch. Không cái nào là một trạng thái thật của nghiệp vụ, nhưng trình biên dịch không có cách nào biết — mình chưa hề nói cho nó biết. Đây là mã duy nhất trong module này không cấm điều gì cả: nó bật trình biên dịch lên mạnh hơn thay vì ngăn ai đó tắt bớt.
+**Source phải thể hiện gì.** Một union của những trạng thái có thật, phân biệt bằng discriminant, để một trạng thái không có thật không viết ra được. Bốn boolean cho phép mười sáu tổ hợp. Có lẽ ba trong số đó tồn tại. Mười ba tổ hợp còn lại biên dịch sạch sẽ, và một trong số chúng là thứ một caller truyền vào lúc bốn giờ sáng. `isGraded && isFailed` biên dịch. `isGraded` mà không có `score` biên dịch. Không cái nào là một trạng thái thật của nghiệp vụ, nhưng trình biên dịch không có cách nào biết — mình chưa hề nói cho nó biết. Đây là mã duy nhất trong module này không cấm điều gì cả: nó bật trình biên dịch lên mạnh hơn thay vì ngăn ai đó tắt bớt.
 
-**Dấu hiệu nhận biết.** Hai boolean trở lên cùng mô tả **một** thứ. Có field optional mà "chỉ có khi cờ kia bật", và điều đó chỉ được viết trong comment. Code đọc lên có `if (a && !b && c)` để tái tạo lại một trạng thái lẽ ra phải có tên. Có một comment giải thích tổ hợp nào là hợp lệ: comment đó chính là kiểu dữ liệu bị viết nhầm chỗ. Tự hỏi: liệt kê hết những trạng thái thật sự tồn tại, rồi đếm xem hình dạng hiện tại cho phép viết ra bao nhiêu trạng thái. Phần chênh lệch là bề mặt lỗi mình vừa tự tạo ra.
+**Cách nhận ra.** Hai boolean trở lên cùng mô tả **một** thứ. Có field optional mà "chỉ có khi cờ kia bật", và điều đó chỉ được viết trong comment. Code đọc lên có `if (a && !b && c)` để tái tạo lại một trạng thái lẽ ra phải có tên. Có một comment giải thích tổ hợp nào là hợp lệ: comment đó chính là kiểu dữ liệu bị viết nhầm chỗ. Tự hỏi: liệt kê hết những trạng thái thật sự tồn tại, rồi đếm xem hình dạng hiện tại cho phép viết ra bao nhiêu trạng thái. Phần chênh lệch là bề mặt lỗi mình vừa tự tạo ra.
 
 **Ranh giới.** Không phải `TYPE-4`: xem trên. Không phải nhiều boolean độc lập: mã này nói về nhiều boolean mô tả một tình huống; hai boolean trả lời hai câu hỏi độc lập thì đúng là hai boolean. Không phải kiểu transport: một class response đã đăng ký schema hoặc một cột lưu trữ không mang được union — union sống ở kết quả nội bộ, hình dạng transport mang bản phẳng, và việc map giữa hai bên xảy ra một lần, một chỗ.
 
@@ -107,11 +116,11 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## `TYPE-6` — lối thoát hợp lệ khai tại làn
 
-**Tình huống.** Có những chỗ phải được phép làm điều luật cấm. Rõ nhất: spec và test tree được phép double cast, vì dựng một giá trị sai cố ý chính là cách chứng minh một API đóng biết từ chối. Không có lối thoát này thì không viết được test cho chính cái luật kia.
+**Khi nào gặp.** Có những chỗ phải được phép làm điều luật cấm. Rõ nhất: spec và test tree được phép double cast, vì dựng một giá trị sai cố ý chính là cách chứng minh một API đóng biết từ chối. Không có lối thoát này thì không viết được test cho chính cái luật kia.
 
-**Nó sinh ra gì trong source.** Một khai báo duy nhất tại làn — một predicate trong rule, hoặc một mục trong config — được tra đúng một lần, và từ đó suy ra được mọi chỗ lối thoát đang có hiệu lực. Vấn đề chưa bao giờ là có lối thoát; vấn đề là lối thoát được khai ở đâu. Khai một lần tại làn thì lối thoát đếm được: đọc một hàm là biết hết mọi chỗ nó đang có hiệu lực. Rắc `eslint-disable` từng dòng thì lối thoát thôi hiện hữu và bắt đầu thành thói quen: không ai biết có bao nhiêu cái, không ai biết cái nào còn cần, và cái thứ năm mươi được thêm vào vì bốn mươi chín cái trước đã ở đó rồi.
+**Source phải thể hiện gì.** Một khai báo duy nhất tại làn — một predicate trong rule, hoặc một mục trong config — được tra đúng một lần, và từ đó suy ra được mọi chỗ lối thoát đang có hiệu lực. Vấn đề chưa bao giờ là có lối thoát; vấn đề là lối thoát được khai ở đâu. Khai một lần tại làn thì lối thoát đếm được: đọc một hàm là biết hết mọi chỗ nó đang có hiệu lực. Rắc `eslint-disable` từng dòng thì lối thoát thôi hiện hữu và bắt đầu thành thói quen: không ai biết có bao nhiêu cái, không ai biết cái nào còn cần, và cái thứ năm mươi được thêm vào vì bốn mươi chín cái trước đã ở đó rồi.
 
-**Dấu hiệu nhận biết.** Một `eslint-disable-next-line` trong code sản phẩm cho một luật thuộc module này. Cùng một dòng suppression xuất hiện ở ba file trở lên — đó là một làn chưa được khai báo. Một file sản phẩm cần lối thoát của test: nghĩa là file đang nằm sai làn, không phải luật sai. Tự hỏi: nếu xoá hết mọi suppression trong repo, mình còn đọc ra được những chỗ nào được phép ngoại lệ không? Nếu không, lối thoát đang ở sai chỗ.
+**Cách nhận ra.** Một `eslint-disable-next-line` trong code sản phẩm cho một luật thuộc module này. Cùng một dòng suppression xuất hiện ở ba file trở lên — đó là một làn chưa được khai báo. Một file sản phẩm cần lối thoát của test: nghĩa là file đang nằm sai làn, không phải luật sai. Tự hỏi: nếu xoá hết mọi suppression trong repo, mình còn đọc ra được những chỗ nào được phép ngoại lệ không? Nếu không, lối thoát đang ở sai chỗ.
 
 **Ranh giới.** Không phải `TYPE-2`: `TYPE-2` nói cái gì bị cấm, `TYPE-6` nói lệnh miễn trừ được viết ở đâu. Một spec double cast không phải là vi phạm `TYPE-2` rồi được tha — nó không thuộc phạm vi `TYPE-2` ngay từ đầu. Không phải một ngoại lệ nghiệp vụ: một ngoại lệ đóng đã nêu trong `Ngoại lệ` là một phần của luật, còn một suppression là một phần của sự mệt mỏi.
 
@@ -119,7 +128,7 @@ Sáu mã, và dừng ở sáu. Một tình huống thật sự không có mã l�
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến giá trị sai không viết ra được; `enforced` nghĩa là một lint rule công bố bởi `@starci/eslint-canon-be` bắt được nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc giữ.
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến giá trị sai không viết ra được; `enforced` nghĩa là một lint rule công bố bởi `@canon-be` bắt được nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
 |---|---|---|
@@ -150,14 +159,14 @@ Code thật để đối chiếu từng luật. Một luật không chỉ tay v�
 | `TYPE-1` | `modules/ai/ping/utils/to-error-message.ts` → `extractResponseDetail` | Việc thu hẹp làm theo cách tốn kém một cách cố ý: từng tầng lồng nhau đều được `typeof`-check trước khi tầng sau được đọc. Đó là cái giá của `TYPE-1` khi hình dạng thật sự chưa biết, và cái giá ấy chính là điểm chính |
 | `TYPE-1` | `eslint.config.mjs` → `'@typescript-eslint/no-explicit-any': 'error'` | Rule đặt ở mức `error`, với luật được trích dẫn ngay trên cùng dòng. Grep `: any` khắp `src` và đọc từng hit: tất cả đều là từ tiếng Anh nằm trong comment. Không có khai báo nào là phép đo cho phép mức là `error` chứ không phải `warn` |
 | `TYPE-2` | `modules/platform/cookie/types/cookie.ts` → `CookieRequestLike` | Bản sửa, kèm lý do: một interface cấu trúc tối thiểu tồn tại để hai chỗ nối không double cast một túi header thành một `Request` đầy đủ của framework. Đọc doc comment — nó nêu đích danh cặp cast mà nó được viết ra để tránh |
-| `TYPE-2` | `@starci/eslint-canon-be` → danh sách `valid` của cặp test `TYPE-2` | Ranh giới của rule phát biểu dưới dạng các case chạy được: một `as unknown` đơn độc là nới rộng thật thà, một cast thu hẹp đơn độc là câu hỏi khác, và chỉ cặp cast đáp xuống một kiểu cụ thể mới là hành vi bác bỏ |
+| `TYPE-2` | `@canon-be` → danh sách `valid` của cặp test `TYPE-2` | Ranh giới của rule phát biểu dưới dạng các case chạy được: một `as unknown` đơn độc là nới rộng thật thà, một cast thu hẹp đơn độc là câu hỏi khác, và chỉ cặp cast đáp xuống một kiểu cụ thể mới là hành vi bác bỏ |
 | `TYPE-3` | `modules/ai/types/grading-lane-validation-params.ts` → `ValidateGradingLaneParams`, được dùng ở dạng destructure trong `modules/ai/grading-lane-validation.service.ts` | Kiểu có tên và chỗ gọi nó, nằm ở hai file. Phần thú vị là tham chiếu thứ ba trong service: `NonNullable<ValidateGradingLaneParams["provider"]>`. Một kiểu inline không index được như vậy, nên dòng đó chính là thứ `TYPE-3` mua được |
 | `TYPE-3` | `modules/platform/cookie/types/cookie.ts` → `AttachHttpOnlyCookieParams`, `AttachReadableCookieParams`, `ClearCookieParams` | Ba kiểu params trong một file `types/`, mỗi operation một kiểu, tài liệu hoá theo từng field. Đọc chúng như hình dạng mà thư mục `types/` của một module mang lấy khi luật được tuân theo thay vì bị tranh cãi |
 | `TYPE-4` | `modules/databases/postgresql/primary/enums/mock-interview-kind.ts` → `normalizeMockInterviewKind` | `Object.values(MockInterviewKind)` bên trong một phép coerce biến một chuỗi đã lưu thành một member đã biết. Một `const enum` không có object nào để gọi `Object.values`, nên hàm này lẽ ra không viết ra được |
 | `TYPE-4` | `modules/init/seeders/shared/extracts/coerce-md-scalar.service.ts` → `toNullableEnum`, `toRequiredEnum` | Dạng mạnh nhất: enum được truyền NHƯ MỘT GIÁ TRỊ, `enumObject: TEnum`, rồi khớp theo key và sau đó theo value. Mọi caller của helper này là một việc mà `const enum` làm cho bất khả thi |
 | `TYPE-4` | `tsconfig.json` → `"isolatedModules": true` | Thiết lập của trình biên dịch biến mệnh đề cuối của `TYPE-4` từ một ý kiến thành một lỗi build. Điều luật khẳng định về ranh giới isolated-modules kiểm được ngay đây, trong một dòng |
 | `TYPE-5` | `features/api/core/graphql/mutations/keycloak/sign-in/init/graphql-types/response.ts` → `SignInInitCommandResult` cạnh `SignInInitData` | Cả hai nửa của mã trong cùng một file. Kết quả nội bộ là một union phân biệt bằng `kind`, nơi một trạng thái lẫn lộn challenge/session không biên dịch được; class transport bên cạnh có mọi field optional, vì định dạng đi trên dây không mang được union. Đọc cặp này như ranh giới chính xác của ngoại lệ, không phải như một chỗ thiếu nhất quán |
-| `TYPE-6` | `@starci/eslint-canon-be` → `isTestFile` | Chính cái lối thoát: một predicate, một regex trên các hậu tố spec cộng với cây test, được tra đúng một lần lúc dựng rule. Mọi chỗ lối thoát đang có hiệu lực đều suy ra được từ hàm này, và đó chính là tính chất mà suppression từng dòng phá huỷ |
+| `TYPE-6` | `@canon-be` → `isTestFile` | Chính cái lối thoát: một predicate, một regex trên các hậu tố spec cộng với cây test, được tra đúng một lần lúc dựng rule. Mọi chỗ lối thoát đang có hiệu lực đều suy ra được từ hàm này, và đó chính là tính chất mà suppression từng dòng phá huỷ |
 | `TYPE-6` | `features/api/core/graphql/mutations/keycloak/sign-in/init/sign-in-init.handler.spec.ts` → các cast `jest.Mocked<Pick<…>>` | Lối thoát lúc đang dùng, kèm lý do: một spec dựng một collaborator thiếu một cách cố ý để chứng minh handler chỉ chạm vào những method nó khai. Chú ý cái KHÔNG có ở đây — không một comment `eslint-disable` nào trên các dòng đó |
 
 Mọi mã đều đã có neo. Không mã nào chưa neo được.

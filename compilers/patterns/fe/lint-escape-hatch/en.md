@@ -4,6 +4,15 @@ title: Lint-escape-hatch
 
 # Lint-escape-hatch
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is a shape already accepted — a component, a config block, a rule that a repository has
 decided to ship. The output is source architecture: which file holds the rule, what the config that
 switches it on must also carry, where a legitimate case is written down, and what the file being
@@ -79,11 +88,11 @@ debate whether the reason beside it is sound. The real question is not there: fr
 line exists, nobody outside that file can answer whether the rule applies to it.
 
 **What it emits in source.** A single published rule, `no-inline-lint-config`, living in
-`@starci/eslint-canon-fe`. It walks every comment in a product file via a `Program()` visitor
+`@canon-fe`. It walks every comment in a product file via a `Program()` visitor
 over `getAllComments()` rather than matching source text, and reports any comment whose body begins
 with a directive. The pattern is `INLINE_DIRECTIVE`, anchored at the start of the comment body.
 `isProductSource` is the only path condition in the file. The twin test in
-`@starci/eslint-canon-fe` carries the valid cases that keep prose about a directive
+`@canon-fe` carries the valid cases that keep prose about a directive
 legal, with the comment explaining why the pattern is anchored and what the unanchored version cost.
 Product source itself emits nothing: no directive comment of any form.
 
@@ -119,16 +128,14 @@ code 2 is not a "stricter" option. It is the thing that changes the outcome from
 to *does not happen*. Both are needed: code 1 explains why it fails, code 2 guarantees the directive
 cannot gag its own guard.
 
-**What it emits in source.** `linterOptions` in `@starci/eslint-canon-fe`, frozen and
+**What it emits in source.** `linterOptions` in `@canon-fe`, frozen and
 exported beside `rules` so the two cannot be attached separately by accident, and re-exported from
-the aggregate plugin `@starci/eslint-canon-fe` so a consuming config takes them from the same import as
+the aggregate plugin `@canon-fe` so a consuming config takes them from the same import as
 the rules. The twin test's second case emits the proof: a real linter, the frozen options applied, a
 disable naming the guard itself, and the assertion that the guard still reports at severity `2`. This
 code is held at tier `documented`, not `enforced`: nothing checks that a consuming config actually
-spread the options. The check that would, `refusesInlineConfig`, belongs to the `lint-adoption`
-module and is a script — `@starci/eslint-canon-fe` and `scripts/audit-fe-lint-adoption.mjs`,
-read from the printed config. It is the only thing that measures a real repository, and it belongs to
-another module.
+spread the options. `refusesInlineConfig` can be read from the printed config, but this tree ships no
+script that measures it in a real repository. The consuming repository therefore owes that proof.
 
 **Recognition signs.** A config attaching `plugins` and `rules` with no `linterOptions` anywhere.
 `linterOptions` present in the first block and then overwritten by a later one — flat config takes
@@ -162,10 +169,10 @@ inherits it and a reviewer can see it. Debt is paid before merge, not hidden bes
 An architectural rule at `warn` is the same story told differently: new violations still merge while
 it looks governed. The weaker architecture always wins, because it is the one that blocks nobody.
 
-**What it emits in source.** `schema: []` in the rule meta of `@starci/eslint-canon-fe`,
+**What it emits in source.** `schema: []` in the rule meta of `@canon-fe`,
 which closes the rule to options so no allowlist can be configured *into* it, and `recommended`
 publishing exactly one entry at exactly one level with no path key — there is no field an exemption
-could be written into. In `@starci/eslint-canon-fe`, `recommended` is gathered from every module with no
+could be written into. In `@canon-fe`, `recommended` is gathered from every module with no
 per-module discretion over level, and a published rule is never renamed; those are the two places a
 per-path or per-name carve-out would have to live. A legitimate case emits an addition to the shared
 matcher or a closed type, with its twin test, never a per-file exemption. This code is held at tier
@@ -195,7 +202,7 @@ turning 40 files red at once · a deadline · somebody wanting to "ramp it up ge
 ## Layer held
 
 Which tier actually holds each code — `unrepresentable` (a closed union or branded type makes the
-wrong value impossible to write), `enforced` (a lint rule from `@starci/eslint-canon-fe`
+wrong value impossible to write), `enforced` (a lint rule from `@canon-fe`
 catches it, named here), or `documented` (nothing mechanical holds it; only a reader does).
 
 | Code | Tier | What actually holds it |
@@ -220,23 +227,22 @@ to look for there.
 
 | Code | Path | What to look for |
 |---|---|---|
-| `LINT-ESCAPE-1` | `@starci/eslint-canon-fe` | `INLINE_DIRECTIVE`, anchored at the start of the comment body; the `Program()` visitor walking `getAllComments()` rather than matching source text; and `isProductSource`, the only path condition in the file |
-| `LINT-ESCAPE-2` | `@starci/eslint-canon-fe` | `linterOptions`, frozen and exported beside `rules` so the two cannot be attached separately by accident. **Partial anchor** — see below |
-| `LINT-ESCAPE-3` | `@starci/eslint-canon-fe` | `schema: []` in the rule meta, and `recommended` publishing exactly one entry at exactly one level with no path key — there is no field an exemption could be written into. **Partial anchor** — see below |
+| `LINT-ESCAPE-1` | `@canon-fe` | `INLINE_DIRECTIVE`, anchored at the start of the comment body; the `Program()` visitor walking `getAllComments()` rather than matching source text; and `isProductSource`, the only path condition in the file |
+| `LINT-ESCAPE-2` | `@canon-fe` | `linterOptions`, frozen and exported beside `rules` so the two cannot be attached separately by accident. **Partial anchor** — see below |
+| `LINT-ESCAPE-3` | `@canon-fe` | `schema: []` in the rule meta, and `recommended` publishing exactly one entry at exactly one level with no path key — there is no field an exemption could be written into. **Partial anchor** — see below |
 
 Secondary evidence, useful when the primary anchor is being changed:
 
-- `LINT-ESCAPE-1` — `@starci/eslint-canon-fe`: the valid cases that keep prose about a
+- `LINT-ESCAPE-1` — `@canon-fe`: the valid cases that keep prose about a
   directive legal, with the comment explaining why the pattern is anchored and what the unanchored
   version cost.
 - `LINT-ESCAPE-2` — the same twin test's second case: a real linter, the frozen options applied, a
   disable naming the guard itself, and the assertion that the guard still reports at severity `2`.
-- `LINT-ESCAPE-2` — `@starci/eslint-canon-fe`: the options re-exported from the aggregate plugin, so a
+- `LINT-ESCAPE-2` — `@canon-fe`: the options re-exported from the aggregate plugin, so a
   consuming config takes them from the same import as the rules.
-- `LINT-ESCAPE-2` — `@starci/eslint-canon-fe` and `scripts/audit-fe-lint-adoption.mjs`:
-  `refusesInlineConfig`, read from the printed config. It is the only thing that measures a real
-  repository, and it belongs to another module.
-- `LINT-ESCAPE-3` — `@starci/eslint-canon-fe`: `recommended` gathered from every module with no
+- `LINT-ESCAPE-2` — the printed effective config: `refusesInlineConfig` is the value to retain. No
+  script in this tree currently measures it in a real repository.
+- `LINT-ESCAPE-3` — `@canon-fe`: `recommended` gathered from every module with no
   per-module discretion over level, and the refusal to rename a published rule — the two places a
   per-path or per-name carve-out would have to live.
 

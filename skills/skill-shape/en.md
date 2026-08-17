@@ -4,6 +4,13 @@ title: Skill shape
 
 # Skill shape
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a capability to run and you return one phase of work and six output tables.
 This module decides **what every skill must print, ask and record** — not what any one skill does.
 A skill that invents its own reporting shape cannot be audited against the others, and a tree whose

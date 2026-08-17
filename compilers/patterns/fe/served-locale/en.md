@@ -7,6 +7,15 @@ codes: [LOCALE-1, LOCALE-2, LOCALE-3, LOCALE-4, LOCALE-5]
 
 # Served-locale
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input to this pattern is a shape somebody already accepted: a screen, a capability, a data
 contract whose answer is translated on the server. The decision that the surface must read in the
 reader's language is not re-opened here. What this pattern produces is source architecture — which
@@ -237,7 +246,7 @@ test helper copied into production · a request to a second endpoint written by 
 ## Layer held
 
 Which tier actually holds each code — a closed type, a lint rule, or only a reader. The enforced rows
-are implemented by `@starci/eslint-canon-fe`.
+are implemented by `@canon-fe`.
 
 | Code | Tier | Held by |
 |---|---|---|

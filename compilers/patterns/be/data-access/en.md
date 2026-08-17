@@ -4,6 +4,15 @@ title: Data-access
 
 # Data-access
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is a shape already accepted: an operation, an entity or a capability whose behaviour is settled. This module does not re-open that decision. Its output is source architecture — which handle the constructor takes, which decorator names it, which file states the table name, which layer holds the transaction, and where a relation is asked for. The shape says what the system does; this pattern says where the code that does it lives and what it must look like.
 
 ## Law
@@ -100,7 +109,7 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 
 ## Layer held
 
-Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written; `enforced` means a named rule from `@starci/eslint-canon-be` reports it; `documented` means nothing mechanical holds it and only a reader does.
+Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written; `enforced` means a named rule from `@canon-be` reports it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |
 |---|---|---|

@@ -4,7 +4,17 @@ title: Blocks · Vietnamese
 
 # Blocks
 
-Đầu vào là **một region của một layout đã được chấp nhận**, và đầu ra là **3–4 giải phẫu khối**, mỗi cái
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@schema` | `brainstorms/blocks/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra và băm artifact ứng viên |
+
+
+## Bản ghi
+
+Mô-đun này nhận **một region của một layout đã được chấp nhận**, rồi trả về **3–4 giải phẫu khối**, mỗi cái
 là một cấu trúc JSON để thầy chọn giữa chúng — hoặc một lời từ chối nêu tên quyết định sản phẩm còn
 thiếu. Cũng như tầng layout, đây không phải compiler, và vì đúng lý do đó: giải phẫu nào là đúng là một
 **quyết định sản phẩm**, và trả về một đáp án là giả vờ rằng quyết định ấy đã được đưa ra.
@@ -126,7 +136,7 @@ blocked: <những phần không giải được nếu thiếu nó>
 
 ## Đầu ra
 
-Đầu ra **chính là** JSON, và thẩm quyền của nó là [`schema.json`](./schema.json) nằm cạnh bản ghi này.
+Đầu ra **chính là** JSON, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này.
 `envelope` giữ những thứ đổi theo lượt — kể cả `layoutHash` đã được chấp nhận mà region này đến từ — và
 hash chỉ phủ **một giải phẫu**.
 
@@ -163,7 +173,7 @@ hash chỉ phủ **một giải phẫu**.
 Validate trước khi ghi và trước khi hash:
 
 ```bash
-node <trust>/scripts/validate-artifact.mjs --schema <trust>/brainstorms/blocks/schema.json --data <batch.json> --hash
+node @validate-artifact --schema @schema --data <batch.json> --hash
 ```
 
 Ngoài hình dạng, validator còn từ chối class token ở bất cứ đâu trong lô, hai giải phẫu trùng bộ trục, một

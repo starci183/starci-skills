@@ -4,6 +4,29 @@ title: Docs
 
 # StarCi skills
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@brainstorms` | `brainstorms` | module | produce candidates before a shape is accepted |
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+| `@compilers` | `compilers` | module | compile an accepted shape into one answer |
+| `@contexts` | `contexts` | module | resolve where reads and writes occur |
+| `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
+| `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
+| `@gates` | `gates` | module | judge existing code with evidence |
+| `@patterns` | `compilers/patterns` | module | resolve files and import boundaries |
+| `@principles` | `compilers/principles` | module | resolve classes from accepted situations |
+| `@skill-shape` | `skills/skill-shape` | module | load the shared reporting contract when a skill runs |
+| `@skills` | `skills` | module | locate the capability registry |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+| `@workspaces` | `contexts/workspaces` | module | resolve and verify role routes |
+| `@worktrees` | `contexts/worktrees` | module | resolve durable write roots |
+
+
+## Record
+
 Read this before planning, before reading target source, and before running a skill.
 
 The tree is split by **what a stage is allowed to return**. That is the only classification here;
@@ -11,10 +34,10 @@ order follows from it rather than defining it.
 
 | Tree | Returns | Read it when |
 |---|---|---|
-| [`contexts/`](./contexts) | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
-| [`brainstorms/`](./brainstorms) | 3–4 candidates for the owner to choose | a surface or a block is not yet decided |
-| [`compilers/`](./compilers) | exactly one answer, no candidates | a shape is accepted and code is about to be written — [`principles`](./compilers/principles) decide the classes, [`patterns`](./compilers/patterns) decide which file holds it and what it may import |
-| [`gates/`](./gates) | pass, or reject with evidence | code exists and must be judged — [`lints`](./gates) point at the character they refuse on |
+| `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
+| `@brainstorms` | 3–4 candidates for the owner to choose | a surface or a block is not yet decided |
+| `@compilers` | exactly one answer, no candidates | a shape is accepted and code is about to be written — `@principles` decide the classes, `@patterns` decide which file holds it and what it may import |
+| `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
 ## Load order
 
@@ -24,19 +47,19 @@ loading a stage the skill did not ask for is paying for a tree you are not using
 
 **If nothing is driving — plain coding, no skill —** this order is yours:
 
-1. [`contexts/workspaces`](./contexts/workspaces) — resolve the project's role routes and **verify**
+1. `@workspaces` — resolve the project's role routes and **verify**
    them. A stale route stops the work; it is not approximated.
-2. [`contexts/worktrees`](./contexts/worktrees) — only if the work writes state that must survive.
-3. [`compilers/`](./compilers) — **before the first line**: [`principles`](./compilers/principles) for
-   every class, [`patterns`](./compilers/patterns) for which file holds the code and what it may import.
+2. `@worktrees` — only if the work writes state that must survive.
+3. `@compilers` — **before the first line**: `@principles` for
+   every class, `@patterns` for which file holds the code and what it may import.
    Both answer a shape already accepted, so reading them afterwards leaves only one move — moving code
    that is already written.
-4. [`gates/`](./gates) — last, on code that exists.
+4. `@gates` — last, on code that exists.
 
-[`brainstorms/`](./brainstorms) is deliberately absent from that list: if the shape is not decided,
+`@brainstorms` is deliberately absent from that list: if the shape is not decided,
 coding has not started, and deciding it belongs to a skill — layout, then block.
 
-Read [`skills/skill-shape`](./skills/skill-shape) when you are about to run a skill or write one, not
+Read `@skill-shape` when you are about to run a skill or write one, not
 before every task.
 
 A request that cannot resolve its project, its role targets or its write boundary is stuck before any
@@ -44,7 +67,7 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Nine. `skills/starci-*` holds them; `skills/skill-shape` holds what they must all print, ask and
+Nine. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. Seven do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
@@ -65,15 +88,15 @@ The rules here are written to be **machine-refusable**, because a rule that only
 under pressure:
 
 - a layout candidate is class-free, enforced by
-  [`scripts/contract-search.mjs`](./scripts/contract-search.mjs), which returns a contract entry's `key`,
+  `@contract-search`, which returns a contract entry's `key`,
   `why` and `host` and never extracts its classes — a stage that cannot see a class cannot write one, and
   the value not arriving is what holds that, not a rule asking a reader to skip a field;
 - every schema sets `additionalProperties: false`, so a stray `className` is invalid rather than
   arguable;
-- [`scripts/validate-artifact.mjs`](./scripts/validate-artifact.mjs) refuses a batch whose candidates
+- `@validate-artifact` refuses a batch whose candidates
   share an axis set, or where none departs from precedent;
-- the lint machines are real ESLint plugins, published from `starci183/starci-eslint` as
-  `@starci/eslint-canon-fe` and `@starci/eslint-canon-be`, each rule shipped with the test that fires it.
+- the lint machines are real ESLint plugins, published from `@eslint-repo` as
+  `@canon-fe` and `@canon-be`, each rule shipped with the test that fires it.
   **This tree is the law; that repository is the machine.** A rule there with no law here is
   unaccountable; a law here with no rule there only advises;
 - an approval binds to the hash of canonical JSON with the envelope outside it, so re-running the same
@@ -114,7 +137,7 @@ The exception is a rule describing **its own machine**: when a lint gates on a f
 `/src/tests/`, that string is the mechanism, not a layout claim, and it is quoted exactly.
 
 **A law names a rule, never a rule's file.** The published rule name is the only identifier —
-`@starci/eslint-canon-fe` and `@starci/eslint-canon-be` are where the implementations live, and how they
+`@canon-fe` and `@canon-be` are where the implementations live, and how they
 are arranged into files is the machine's business, not the law's.
 
 Rules live in the tree. This file routes; it never restates a rule, and neither does the Source

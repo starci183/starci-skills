@@ -4,6 +4,15 @@ title: Comments
 
 # Comments
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, what it reported and on which node,
 which law code that maps to, and the open hatch that would have hidden the same failure. This module
@@ -19,7 +28,7 @@ This module documents something narrower and more useful: **what a machine can s
 law is a standard a reader is held to. A rule is a string match, an AST node type and a filename
 regex. The two are never the same size, and the gap between them is the subject of this file.
 
-The law states **six codes. Three rules ship**, in the plugin package `@starci/eslint-canon-fe`,
+The law states **six codes. Three rules ship**, in the plugin package `@canon-fe`,
 under the prefix `starci-fe/`. That arithmetic is the first fact a reader needs, and it is stated
 here rather than smoothed over.
 

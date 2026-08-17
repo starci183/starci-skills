@@ -4,7 +4,14 @@ title: Testing · Vietnamese
 
 # Kiểm thử
 
-Đầu vào là mã đã viết xong — một tệp spec, một khoảnh diff. Đầu ra là một **phán quyết**: tệp rơi vào
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp spec, một khoảnh diff. Kết quả là một **phán quyết**: tệp rơi vào
 làn nào, quy tắc đã công bố nào nổ, nó báo cái gì và trên nút nào, mã luật tương ứng là mã nào, và cửa
 nào còn mở đủ sức che chính thất bại ấy. Mô-đun này không chọn giúp ai cách thiết kế một bài kiểm thử.
 Nó từ chối một hình dạng, và nó phải chỉ được ra đúng cái tên hay cái nút mà nó từ chối.
@@ -79,7 +86,7 @@ của cha, rồi lấy tên thuộc tính CUỐI CÙNG làm matcher — nhờ v�
 cả tệp, và cộng bộ đếm thứ hai khi matcher nằm trong tập chín tên. Tại `Program:exit` nó chỉ báo khi
 hai bộ đếm bằng nhau và khác không.
 
-**Nó không thấy gì.** Một khẳng định ngoại phạm là đủ gỡ ngòi cả tệp: ba mươi ca call-only cộng một
+**Điểm mù.** Một khẳng định ngoại phạm là đủ gỡ ngòi cả tệp: ba mươi ca call-only cộng một
 `expect(result).toBeDefined()` ở bất kỳ đâu là im lặng, vì bộ đếm tính theo tệp và quy tắc không có
 khái niệm một ca kiểm thử. Một tên matcher chưa từng được gọi vẫn được đếm — `expect(result).toEqual`
 quên cặp ngoặc thì lúc chạy không khẳng định gì mà vẫn làm cả tệp im. Một khẳng định lời gọi viết theo
@@ -105,7 +112,7 @@ là bài kiểm thử chỉ khẳng định trên phản hồi và luồng có t
 nguồn dữ liệu, cả hai dạng viết hoa kiểu tên lớp, hàm lấy repository và bộ chạy truy vấn. Thấy một cái
 là bật cờ. Tại `Program:exit` nó báo khi cờ chưa từng bật.
 
-**Nó không thấy gì.** Dòng nhập khẩu là đủ thoả mãn: `import { DataSource } from "typeorm"` ở đầu một
+**Điểm mù.** Dòng nhập khẩu là đủ thoả mãn: `import { DataSource } from "typeorm"` ở đầu một
 luồng chỉ khẳng định mã trạng thái vẫn được coi là có đọc trạng thái, vì định danh trong nhập khẩu cũng
 là `Identifier` — chú thích kiểu, mã thông báo tiêm phụ thuộc và dòng đóng kết nối trong dọn dẹp cũng
 vậy. Đọc mà không khẳng định thì qua: `const rows = await entityManager.find(Order)` rồi không `expect`
@@ -129,7 +136,7 @@ so với hai biểu thức chính quy: một danh sách tiền tố gói nhà cu
 mô hình nội bộ, cố ý không neo đầu để một đường dẫn tương đối `../helpers/models.service` vẫn được
 thấy.
 
-**Nó không thấy gì.** Mọi thứ không phải nhập khẩu tĩnh: `await import("openai")`, `require("openai")`,
+**Điểm mù.** Mọi thứ không phải nhập khẩu tĩnh: `await import("openai")`, `require("openai")`,
 hoặc một lời gọi `fetch` thẳng tới điểm cuối HTTPS của nhà cung cấp — chỉ `ImportDeclaration` được
 duyệt, một nhập khẩu động là nút khác và một lời gọi mạng thì không phải nhập khẩu. Nhà cung cấp không
 có trong danh sách, kể cả bản SDK mới hơn của cùng một hãng có bản cũ đang nằm trong danh sách, cộng
@@ -156,7 +163,7 @@ tập ba tên — tên phía gói, không phải bí danh cục bộ. `CallExpre
 `MemberExpression` không tính toán rồi so tên thuộc tính với một tập hai tên, hoàn toàn không kiểm tra
 đối tượng là gì.
 
-**Nó không thấy gì.** Một lời gọi qua thuộc tính tính toán, `bus["execute"](command)` hay
+**Điểm mù.** Một lời gọi qua thuộc tính tính toán, `bus["execute"](command)` hay
 `bus[method](command)`, vì phép kiểm callee thoát ngay khi `computed` là đúng. Mọi lối vào ứng dụng
 khác: `eventBus.publish(event)`, `handler.handle(command)`, `resolver.findThing(args)`,
 `service.enroll(...)`, `worker.run()` — đẩy thẳng một sự kiện lên bus là vào đúng chỗ luật cấm mà không
@@ -192,7 +199,7 @@ nhận lớp đó làm đối số đầu. Tại `Program:exit` nó đi hết d�
 `sourceCode.getTokens(sourceCode.ast)` để tìm chuỗi ba token `Pick` `<` `AiInvokeService`, rồi báo nếu
 cờ nhà cung cấp chưa từng bật.
 
-**Nó không thấy gì.** Một dòng nhập khẩu không dùng cũng thoả mãn yêu cầu nhà cung cấp:
+**Điểm mù.** Một dòng nhập khẩu không dùng cũng thoả mãn yêu cầu nhà cung cấp:
 `import "openai"` ở đầu tệp, rồi cả harness chạy qua một bộ khách nội bộ đặt tên khác — cờ bật vì có
 dòng nhập khẩu, còn SDK có được gọi hay không thì không ai kiểm. Chứng thư đọc theo cách thông thường
 thì vô hình: `process.env.CLAUDE_CODE_OAUTH_TOKEN` là một thuộc tính thành viên, chỉ dạng ngoặc vuông

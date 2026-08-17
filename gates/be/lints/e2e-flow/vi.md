@@ -4,7 +4,16 @@ title: E2e-flow · Vietnamese
 
 # Luồng e2e
 
-Đầu vào là mã đã viết xong — một tệp luồng, một khúc diff. Đầu ra là một **phán quyết**: tệp có vào
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp luồng, một khúc diff. Kết quả là một **phán quyết**: tệp có vào
 phạm vi hay không, luật máy nào đã nổ, nó báo cái gì và tại nút nào, điều đó ứng với mã luật nào, và
 cửa mở nào lẽ ra đã che đúng lỗi ấy. Mô-đun này không chọn cách viết một luồng. Nó từ chối, và nó phải
 chỉ được vào đúng câu nhập, đúng lời gọi hay đúng nhánh mà nó từ chối.
@@ -74,7 +83,7 @@ specifier.imported.value` và báo `busImport` khi tên đó là `CommandBus`, `
 `callee.object` qua `TSAsExpression`, `TSTypeAssertion` và `ChainExpression`, và báo `actor` khi thứ
 còn lại là một `Identifier` khớp `/(?:Worker|Handler)$/`.
 
-**Nó không thấy gì.** Một bên nhận không phải định danh trần: `app.get(OrderWorker).handle()`,
+**Điểm mù.** Một bên nhận không phải định danh trần: `app.get(OrderWorker).handle()`,
 `workers.order.handle()` và `this.orderWorker.handle()` đưa ra một `CallExpression`,
 `MemberExpression` hay `ThisExpression`, mà chỉ `Identifier` mới được thử. Một bên nhận đặt tên khác —
 phép thử là phép so **đuôi** có phân biệt hoa thường, nên `const worker`, `const consumer`,
@@ -102,7 +111,7 @@ là chạm phải luật này. Hai luật kéo ngược nhau trên cùng một d
 `/^(?:entityManager|dataSource|EntityManager|DataSource|getRepository|queryRunner)$/`, bật một cờ
 phạm vi tệp. Tới `"Program:exit"`, nếu cờ vẫn tắt thì báo `state` tại nút `Program`.
 
-**Nó không thấy gì.** Luật này kiểm **sự xuất hiện của một cái tên**, không kiểm một phép khẳng định.
+**Điểm mù.** Luật này kiểm **sự xuất hiện của một cái tên**, không kiểm một phép khẳng định.
 Cờ được bật bởi bất kỳ `Identifier` nào mang một trong sáu tên, ở bất kỳ đâu: một câu nhập không dùng
 tới, một chú kiểu, một tham số, một biến khai rồi không đọc. Một dòng gọi tên `DataSource` ở đầu một
 tệp mà về sau chỉ khẳng định vào phong bì phản hồi — đúng cái khiếm khuyết `E2E-4` sinh ra để chặn —
@@ -128,13 +137,13 @@ không đọc gì mà có thêm chữ `queryRunner` thì không.
 nhánh là tiền tố neo đầu có dấu chéo, hai nhánh so bằng đúng (`openai`, `ollama`), và hai nhánh —
 `@google/generative-ai`, `cohere-ai` — là tiền tố mở.
 
-**Nó không thấy gì.** Nó phát hiện một phép nhập, không phải một lời gọi. Mọi phép nhập không phải
+**Điểm mù.** Nó phát hiện một phép nhập, không phải một lời gọi. Mọi phép nhập không phải
 `ImportDeclaration` — `require("openai")`, `await import("openai")`, `export * from "openai"` — đều
 lọt. Mọi nhà cung cấp ngoài sáu mẫu: các biến thể chạy trên nền tảng đám mây, các cổng tổng hợp, các
 bản chạy tại chỗ, tên gói kế nhiệm mà chính nhà cung cấp công bố sau một lần đổi tên, và những cái tên
 suýt trúng như `openai-edge` — cái này trượt cả nhánh so bằng lẫn nhánh có dấu chéo. Danh sách là thứ
 phải được nuôi. Hai lỗ lớn nhất thì không dính gì tới danh sách. **Chạm tới nhà cung cấp mà không qua
-SDK**: `fetch("https://api.…/v1/chat/completions", …)`, hay chính lời gọi ấy qua khách hàng HTTP của
+SDK**: `fetch(<provider-completion-endpoint>, …)`, hay chính lời gọi ấy qua HTTP client của
 kho, không nhập thứ gì luật nhìn tới trong khi làm đúng cái việc luật mang tên để cấm. Và **để nguyên
 khách hàng thật**: bài kiểm thử không kịch bản hoá gì, chính sách của ứng dụng tự phân giải nhà cung
 cấp đã cấu hình, và một lời gọi trả tiền thật, không tất định, xảy ra bên trong một lần chạy xanh.
@@ -154,7 +163,7 @@ Nếu không thì báo `sleep`. Ở `NewExpression`: bắt buộc `node.callee.n
 bản nguồn thô** của nút bằng `context.sourceCode.getText(node)` và báo `timer` khi văn bản đó khớp
 `/setTimeout/`.
 
-**Nó không thấy gì.** Ngủ qua thành viên: `timers.setTimeout(500)`, `world.sleep(500)` và
+**Điểm mù.** Ngủ qua thành viên: `timers.setTimeout(500)`, `world.sleep(500)` và
 `clock.wait(500)` không phải định danh trần — mà bộ hẹn giờ dạng promise hiện đại lại thường được viết
 đúng như vậy, nên cách viết mới nhất của thói quen bị cấm chính là cách đi lọt. Đổi tên:
 `import { sleep as settle } from "./util"`, hay `const nap = sleep`, đưa callee ra ngoài tập năm tên.
@@ -178,7 +187,7 @@ thái nào.
 qua `insideStep`: đi ngược chuỗi `node.parent` và trả về đúng ở `CallExpression` đầu tiên mà
 `callee.name` — hoặc, nếu không có, `callee.object.name` — là `it` hay `test`.
 
-**Nó không thấy gì.** Một nhánh nằm trong hàm phụ trợ: `insideStep` là phép đi ngược **theo văn bản**,
+**Điểm mù.** Một nhánh nằm trong hàm phụ trợ: `insideStep` là phép đi ngược **theo văn bản**,
 nên một điều kiện nằm trong một hàm mà bước gọi ra thì ở ngoài mọi luật ở đây, kể cả khi hàm đó khai
 báo ngay trong cùng tệp. Một nhánh trong `beforeAll`, `beforeEach`, `afterEach` hay trong thân
 `describe` — bài kiểm thử đi kèm luật tuyên bố ca này là hợp lệ có chủ ý, vì ngoài một bước thì điều
@@ -423,7 +432,7 @@ Trên dòng đó chẳng có gì bị đi tắt. Hai luật mâu thuẫn nhau, v
 ## Phạm vi
 
 Mô-đun này ghi lại năm luật máy do mô-đun luật của luật luồng công bố, xuất xưởng trong
-`@starci/eslint-canon-be`. Nó không ghi luật nào *đáng lẽ* phải có: một luật không chỉ được vào đâu thì
+`@canon-be`. Nó không ghi luật nào *đáng lẽ* phải có: một luật không chỉ được vào đâu thì
 là một đề xuất, mà ở đây ghi phán quyết chứ không ghi đề xuất.
 
 Nó không xét mười hai mã của luật — luật sở hữu chúng, và bảy mã trong đó không có máy nào ở bất kỳ

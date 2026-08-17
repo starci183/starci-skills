@@ -7,6 +7,16 @@ codes: [TOKEN-1, TOKEN-2, TOKEN-3, TOKEN-4, TOKEN-5, TOKEN-6, TOKEN-7, TOKEN-8, 
 
 # Tokens
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+| `@canon-fe-contracts` | `@starci/eslint-canon-fe/contracts` | npm package | the published frontend contract types this record cites |
+
+
+## Record
+
 The input to this pattern is a shape somebody already accepted — a layout, a block, a surface, a
 control, a status mark. That decision is closed here; this file does not reopen it. The output is
 source architecture: which class string may be written, which file tier may write it, which list a
@@ -339,15 +349,15 @@ this trust tree, `src/…` is a consuming front-end repository.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `TOKEN-1` | `@starci/eslint-canon-fe/contracts` · `components/contracts/index.ts` | `export type LayoutClassName` — a union of literals with the six gap rungs among them |
-| `TOKEN-2` | `@starci/eslint-canon-fe/contracts` | The comment above the union: grow this list deliberately, so the addition reads as a decision in the diff |
-| `TOKEN-3` | `@starci/eslint-canon-fe` | The `FRACTIONAL` pattern and the `noFractionalStep` rule built from it |
-| `TOKEN-4` | `@starci/eslint-canon-fe` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, and the two message ids in `noArbitraryValue` |
-| `TOKEN-5` | `@starci/eslint-canon-fe` · `components/leaves/Heading/index.tsx` | `LARGE_TEXT` and `HEAVY_WEIGHT` tested together; and the leaf where `level` drives tag and metrics as one decision |
-| `TOKEN-6` | `@starci/eslint-canon-fe` · `@starci/eslint-canon-fe` | `isSourceFile`, the `VariableDeclarator` branch of `classTextVisitors`; and `LEAF_DIR_RELATIVE` / `isLeafFile`, which name the exempt folder |
+| `TOKEN-1` | `@canon-fe-contracts` · `components/contracts/index.ts` | `export type LayoutClassName` — a union of literals with the six gap rungs among them |
+| `TOKEN-2` | `@canon-fe-contracts` | The comment above the union: grow this list deliberately, so the addition reads as a decision in the diff |
+| `TOKEN-3` | `@canon-fe` | The `FRACTIONAL` pattern and the `noFractionalStep` rule built from it |
+| `TOKEN-4` | `@canon-fe` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, and the two message ids in `noArbitraryValue` |
+| `TOKEN-5` | `@canon-fe` · `components/leaves/Heading/index.tsx` | `LARGE_TEXT` and `HEAVY_WEIGHT` tested together; and the leaf where `level` drives tag and metrics as one decision |
+| `TOKEN-6` | `@canon-fe` · `@canon-fe` | `isSourceFile`, the `VariableDeclarator` branch of `classTextVisitors`; and `LEAF_DIR_RELATIVE` / `isLeafFile`, which name the exempt folder |
 | `TOKEN-7` | `components/leaves/IconTile/index.tsx` · `components/leaves/RankDeltaCaret/index.tsx` | A tone table pairing `bg-*-soft` with `text-*-soft-foreground`; and a bare mark using plain `text-success` |
 | `TOKEN-8` | `components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` and the comment stating size follows placement, independently of visual priority |
-| `TOKEN-9` | `@starci/eslint-canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
+| `TOKEN-9` | `@canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
 | inset pairing | `app/globals.css` · `components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` beside `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — the equal-strength semantic exception |
 | joined-list rows | `components/contracts/index.ts` | Entries carrying `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 

@@ -4,6 +4,13 @@ title: Distribution
 
 # Distribution
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a file row with an icon, the file name, the size and a
 delete button" — and you return, for every participant that request implies, one situation code and
 one className. The request never states a width and you never estimate one: the width follows from

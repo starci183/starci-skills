@@ -4,7 +4,14 @@ title: Lint-escape-hatch · Vietnamese
 
 # Cấm tự tắt lint
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, luật máy nào đã nổ, nó báo cái gì và trên node nào, ánh xạ vào mã luật nào, và cửa
 hở nào lẽ ra đã che được đúng cái sai đó. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải chỉ được
 đúng dòng chú thích mà nó từ chối.
@@ -67,7 +74,7 @@ thì `create` trả về `{}`. Điểm móc: đúng một handler `Program`. Ngu
 `context.sourceCode.getAllComments()`. Phép so: `comment.value` khớp với
 `/^\s*eslint-(?:disable(?:-next-line|-line)?|enable)\b/`. Tuỳ chọn: `schema: []`.
 
-**Nó không thấy gì.** Chú thích cấu hình trần `/* eslint some-rule: "off" */` — mẫu chỉ biết họ
+**Điểm mù.** Chú thích cấu hình trần `/* eslint some-rule: "off" */` — mẫu chỉ biết họ
 `disable`/`enable`, nên đúng cái dạng đổi cấu hình lint tại chỗ ở nghĩa đen nhất lại không khớp, và
 tên rule hứa rộng hơn phần bắt. `/* eslint-env node */` và `/* globals FLAG */` rơi qua cùng lỗ hổng họ
 hàng. Mọi tệp không có đoạn `/src/` trong đường dẫn, và cũng chính tệp ấy khi đưa vào bộ lint dưới tên

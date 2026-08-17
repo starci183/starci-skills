@@ -4,14 +4,21 @@ title: Alignment · Vietnamese
 
 # Căn chỉnh
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một hàng cài đặt có nhãn và một công tắc" — và đầu ra
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một hàng cài đặt có nhãn và một công tắc" — rồi trả về
 là, với **mỗi vùng chứa** mà yêu cầu đó ngụ ý, một mã tình huống cho mỗi trục và một className. Yêu
 cầu không bao giờ nói ra một cách căn chỉnh, và không được phép ước lượng: căn chỉnh suy ra từ **bản
 chất của các con**, không bao giờ từ chỗ ta muốn chúng trông như đang đứng.
 
 ## Luật
 
-Những đứa con có chiều đo khác nhau thì luôn phải treo vào một cái gì đó. Căn chỉnh nói ra CÁI GÌ —
+Những phần tử con có chiều đo khác nhau thì luôn phải treo vào một cái gì đó. Căn chỉnh nói ra CÁI GÌ —
 một chiều đo trục chéo dùng chung, một điểm giữa, một mép đầu, một mép cuối, hay một dòng viết — và
 nó được chọn từ bản chất của các con, không bao giờ từ chỗ ta muốn chúng trông như đang đứng.
 
@@ -19,7 +26,7 @@ Một vùng chứa trả lời hai câu hỏi độc lập với nhau. Vuông g�
 định các con treo vào đâu. Dọc theo hướng chảy, **trục chính** quyết định cả cụm nằm ở đâu và chỗ
 trống mà không ai đòi sẽ thuộc về ai. Không câu trả lời nào suy ra câu kia, và không câu nào được
 phép bỏ trống: một vùng chứa không tuyên bố gì là một vùng chứa đã trả lời cả hai câu bằng mặc định,
-mà mặc định là những quyết định có hậu quả — kéo dãn khiến một đứa con có viền mọc ra một ranh giới
+mà mặc định là những quyết định có hậu quả — kéo dãn khiến một phần tử con có viền mọc ra một ranh giới
 nó không kiếm được, còn dồn về đầu thì đem toàn bộ chỗ thừa giao cho mép cuối.
 
 **Đây là luật bắt buộc.** Mọi vùng chứa `flex` và `grid` đều rơi vào đúng một mã trục chéo và đúng
@@ -70,10 +77,10 @@ mà nó phải biện minh.
 `items-stretch` hay `justify-start` nào để viết ra, và thêm chúng vào cũng không phát biểu điều gì mà
 mặc định chưa phát biểu. Hai mã này tồn tại vì một mặc định không ai gọi tên là một mặc định không ai
 chứng minh được là đã chọn sai — và kéo dãn là mặc định có hậu quả nặng nhất trong cả mô-đun, bởi nó
-âm thầm đổi kích thước những đứa con có nền, có viền hoặc có mảng màu.
+âm thầm đổi kích thước các phần tử con có nền, có viền hoặc có mảng màu.
 
-`ALIGN-5` là mã duy nhất do một đứa con mang, chứ không do vùng chứa mang. Nó tồn tại để một sự đi
-chệch được đọc ra đúng là đi chệch: vùng chứa vẫn giữ luật đã tuyên bố, và đúng một đứa con nói to
+`ALIGN-5` là mã duy nhất do một phần tử con mang, chứ không do vùng chứa mang. Nó tồn tại để một sự đi
+chệch được đọc ra đúng là đi chệch: vùng chứa vẫn giữ luật đã tuyên bố, và đúng một phần tử con nói to
 lên rằng nó không bị luật ấy ràng buộc.
 
 ## Đọc một yêu cầu
@@ -101,10 +108,10 @@ lên rằng nó không bị luật ấy ràng buộc.
 
 ## `ALIGN-0` — dùng chung một chiều đo, không khai báo
 
-**Tình huống.** Các con KHÔNG có chiều đo riêng theo trục chéo, hoặc phải cùng nhận chiều đo của con
+**Khi nào gặp.** Các con KHÔNG có chiều đo riêng theo trục chéo, hoặc phải cùng nhận chiều đo của con
 dài nhất. Đây là mặc định của flex và lưới, và tuyệt đại đa số vùng chứa đúng ở đây.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mỗi con là một VÙNG cần cao bằng nhau: hai cột thẻ cạnh nhau, hai ô trong một lưới.
 - Có con cần một nền, một viền hoặc một vùng bấm chạy hết chiều cao của hàng.
@@ -129,10 +136,10 @@ hình chia đôi.
 
 ## `ALIGN-1` — cao thấp khác nhau nhưng đọc thành một dòng
 
-**Tình huống.** Các con có chiều đo riêng theo trục chéo và KHÔNG thứ nào nên bị kéo. Chúng cùng tạo
+**Khi nào gặp.** Các con có chiều đo riêng theo trục chéo và KHÔNG thứ nào nên bị kéo. Chúng cùng tạo
 thành MỘT DÒNG mà mắt đọc một lượt.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có ít nhất một con là HÌNH hoặc HỘP CỐ ĐỊNH: biểu tượng, ảnh đại diện, nhãn trạng thái, hộp kiểm,
   công tắc, biểu tượng đang tải.
@@ -157,10 +164,10 @@ tiêu đề và một nút · một ô vuông chỉ chứa chữ cái viết t�
 
 ## `ALIGN-2` — mỗi con có chiều dài riêng, bắt đầu cùng nhau
 
-**Tình huống.** Ít nhất một con có thể DÀI RA theo trục chéo, và phần đầu của các con mới là chỗ mắt
+**Khi nào gặp.** Ít nhất một con có thể DÀI RA theo trục chéo, và phần đầu của các con mới là chỗ mắt
 neo vào. Treo vào giữa sẽ khiến những con cố định TRÔI mỗi khi con dài kia đổi độ dài.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Trong một hàng: có đoạn chữ có thể xuống dòng thứ hai, thứ ba.
 - Một con là hình cố định (ảnh đại diện, biểu tượng) cần đứng ngang DÒNG ĐẦU TIÊN của con kia.
@@ -184,10 +191,10 @@ dung phải cùng bắt đầu ở mép trên · một cột chứa nhãn và m�
 
 ## `ALIGN-3` — mỗi con có chiều dài riêng, kết thúc cùng nhau
 
-**Tình huống.** Mép CUỐI mới là chỗ có nghĩa. Trong một CỘT, đây là cách một cụm dạt về phía cuối theo
+**Khi nào gặp.** Mép CUỐI mới là chỗ có nghĩa. Trong một CỘT, đây là cách một cụm dạt về phía cuối theo
 hướng đọc. Trong một HÀNG, đây là các con cùng đứng trên một sàn chung.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Cột: cụm giá, cụm thời gian, cụm hành động ở ô cuối của một tài liệu.
 - Hàng: các cột của một biểu đồ cùng mọc lên từ một sàn.
@@ -210,10 +217,10 @@ một thẻ.
 
 ## `ALIGN-4` — chữ khác cỡ đứng trên một dòng viết
 
-**Tình huống.** Hai hay nhiều mẩu chữ KHÁC CỠ phải được đọc thành MỘT GIÁ TRỊ hoặc MỘT CÂU. Đây là mã
+**Khi nào gặp.** Hai hay nhiều mẩu chữ KHÁC CỠ phải được đọc thành MỘT GIÁ TRỊ hoặc MỘT CÂU. Đây là mã
 làm cho một con số và đơn vị của nó đọc thành một thứ chứ không phải hai.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mọi con đều là chữ, không con nào là hình.
 - Cỡ chữ giữa các con lệch nhau rõ rệt: một số lớn cạnh một nhãn nhỏ.
@@ -240,10 +247,10 @@ danh từ đếm · giá hiện tại + giá gạch + mức giảm · tên + nh�
 
 ## `ALIGN-5` — một con đi chệch khỏi luật của cha
 
-**Tình huống.** Cha đã tuyên bố một luật đúng cho HẦU HẾT các con, và ĐÚNG MỘT con có lý do nghiệp vụ
+**Khi nào gặp.** Cha đã tuyên bố một luật đúng cho HẦU HẾT các con, và ĐÚNG MỘT con có lý do nghiệp vụ
 riêng để không theo.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Cha là `ALIGN-2` cho phần chữ dài, nhưng một nút hành động phải nằm giữa hàng.
 - Cha là `ALIGN-0` cho các cột cao bằng nhau, nhưng một ô chỉ chứa một biểu tượng và không được kéo.
@@ -265,10 +272,10 @@ neo mép trên · một nhãn trạng thái treo giữa trong cụm chữ nhiề
 
 ## `ALIGN-6` — cụm bắt đầu ở mép nội dung, không khai báo
 
-**Tình huống.** Nội dung thuộc về MÉP ĐẦU của luồng đọc, và chỗ trống thừa rơi về phía sau. Đây là mặc
+**Khi nào gặp.** Nội dung thuộc về MÉP ĐẦU của luồng đọc, và chỗ trống thừa rơi về phía sau. Đây là mặc
 định và là câu trả lời đúng cho tuyệt đại đa số hàng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các con nối tiếp nhau theo thứ tự đọc, không con nào "thuộc về" mép cuối.
 - Vùng chứa không rộng hơn nội dung, hoặc chỗ thừa không mang nghĩa gì.
@@ -288,10 +295,10 @@ thẻ phân loại · hàng nút trong một thanh công cụ · mọi hàng n�
 
 ## `ALIGN-7` — cả cụm thuộc về mép cuối
 
-**Tình huống.** TOÀN BỘ nội dung của vùng chứa thuộc về mép cuối theo hướng chảy. Không phải một con
+**Khi nào gặp.** TOÀN BỘ nội dung của vùng chứa thuộc về mép cuối theo hướng chảy. Không phải một con
 bị đẩy đi — mà cả cụm vốn dĩ ở đó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Vùng chứa chỉ chứa MỘT LOẠI thứ: một nhóm nút, một cụm meta.
 - Thêm một con nữa thì con mới cũng thuộc về mép cuối, đứng cạnh những con đang có.
@@ -314,10 +321,10 @@ tách ra mép đối diện?
 
 ## `ALIGN-8` — cụm không thuộc về mép nào
 
-**Tình huống.** Nội dung là một thông báo VỀ CHÍNH vùng chứa nó: nó không tiếp nối luồng đọc từ mép
+**Khi nào gặp.** Nội dung là một thông báo VỀ CHÍNH vùng chứa nó: nó không tiếp nối luồng đọc từ mép
 nào cả, nên đứng giữa chỗ trống.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Vùng chứa rộng hơn hẳn nội dung, và chỗ trống hai bên là CỐ Ý.
 - Nội dung nói về CẢ VÙNG: trạng thái rỗng, trạng thái đang tải, lỗi của cả khối.
@@ -339,10 +346,10 @@ giữa · một lời kêu gọi hành động đơn độc giữa một dải.
 
 ## `ALIGN-9` — chỗ thừa thuộc về khoảng giữa
 
-**Tình huống.** Hai đầu của vùng chứa có TUYÊN BỐ ĐỐI NGHỊCH lên hai mép, hoặc mọi con NGANG QUYỀN
+**Khi nào gặp.** Hai đầu của vùng chứa có TUYÊN BỐ ĐỐI NGHỊCH lên hai mép, hoặc mọi con NGANG QUYỀN
 chia nhau cả chiều dài. Chỗ trống thừa không thuộc về phía nào cả, nên nó nằm GIỮA.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đầu này là "cái này là gì", đầu kia là "làm gì với nó".
 - Hai vai trò KHÔNG đổi chỗ được cho nhau mà nghĩa vẫn giữ nguyên.
@@ -374,10 +381,10 @@ trượt.
 
 ## `ALIGN-10` — các dòng treo vào đâu
 
-**Tình huống.** Vùng chứa cho phép xuống dòng, thực tế đã có NHIỀU DÒNG, và vùng chứa SỞ HỮU một chiều
+**Khi nào gặp.** Vùng chứa cho phép xuống dòng, thực tế đã có NHIỀU DÒNG, và vùng chứa SỞ HỮU một chiều
 đo trục chéo lớn hơn tổng các dòng. Lúc đó phải nói các dòng treo vào đâu trong chỗ thừa ấy.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Vùng chứa có `flex-wrap` VÀ một chiều cao (hoặc chiều cao tối thiểu) do nó tự đặt.
 - Số dòng thay đổi theo dữ liệu, còn chiều cao thì không.

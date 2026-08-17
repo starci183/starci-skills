@@ -4,7 +4,14 @@ title: Contract · Vietnamese
 
 # Hợp đồng
 
-Đầu vào là code đã viết rồi — một file, một khúc diff. Đầu ra là một **phán quyết**: rule nào đã bắn,
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận code đã viết rồi — một file, một khúc diff. Kết quả là một **phán quyết**: rule nào đã bắn,
 nó thi hành mã luật nào, cơ chế nào làm nó bắn, nó tìm thấy gì, và khi có thì thêm cả cách viết lẽ ra
 đã né được báo cáo. Mô-đun này không chọn gì cả. Nó từ chối, và nó phải chỉ được vào đúng nút mà nó từ
 chối.
@@ -82,7 +89,7 @@ position — và một regex tiền tố phủ `flex-`, `grid-cols-`, `gap-`, `i
 `row-`, `space-x-`, `divide-`, `overflow-`, `inset-`, `top-`, `z-`, `basis-`, `shrink`, `grow` cùng
 nhiều cái khác.
 
-**Nó không thấy gì.** Chuỗi được gom vào một cấu trúc: `const CLASSES = {root: "flex gap-4"}` rồi
+**Điểm mù.** Chuỗi được gom vào một cấu trúc: `const CLASSES = {root: "flex gap-4"}` rồi
 `className={CLASSES.root}` — giá trị khởi tạo là `ObjectExpression` nên không visitor nào thấy chuỗi.
 Một mảng ghép lúc dùng, `["flex", "gap-4"].join(" ")`. Một trường của lớp hay một tham số mặc định,
 `static root = "flex gap-4"`, `({cls = "flex"})` — đó là `PropertyDefinition` và `AssignmentPattern`,
@@ -101,7 +108,7 @@ class dựng bằng template hoặc bằng `+`.
 về gì. Cộng thêm thuộc tính class có biểu thức là template có lỗ, hoặc `BinaryExpression` với toán tử
 `+`.
 
-**Nó không thấy gì.** `utils.cn(base, extra)`, hoặc `import {cn as classes}` rồi gọi `classes(...)`:
+**Điểm mù.** `utils.cn(base, extra)`, hoặc `import {cn as classes}` rồi gọi `classes(...)`:
 callee bắt buộc là định danh trần trong tập, nên gọi qua thành viên và import đổi tên đều tàng hình —
 ngược hẳn với cách `only-the-frame-wears-a-node` xử lý lời gọi qua thành viên, nên hai rule mâu thuẫn
 nhau về cùng một mánh né. Gộp bằng phương thức mảng, `[base, dense && "gap-2"].filter(Boolean).join(" ")`.
@@ -119,7 +126,7 @@ rule này **và** `no-literal-structural-class`: cái đầu cần chuỗi tĩnh
 `MemberExpression` không tính toán mà thuộc tính là chính định danh đó. Không xét gì về đối số, về đối
 tượng nhận, hay về kết quả.
 
-**Nó không thấy gì.** Bản thân hành vi, nó chỉ thấy cái tên: `CONTRACTS["key"].classes.join(" ")` trải
+**Điểm mù.** Bản thân hành vi, nó chỉ thấy cái tên: `CONTRACTS["key"].classes.join(" ")` trải
 vào một phần tử của vendor, hay `contractNodeProps` truyền theo tham chiếu vào `map`, đều với tới đúng
 đám class đó mà vẫn tàng hình.
 
@@ -136,7 +143,7 @@ literal. Dưới mười hai từ thì bắn `tooShort`; ngược lại mỗi t�
 rồi kiểm xem có nằm trong các từ tách theo dấu gạch của khoá sở hữu hay không, khoá này đọc từ
 `node.parent.parent`.
 
-**Nó không thấy gì.** Một lý do viết bằng template literal — đúng một dấu backtick là tắt cả rule, kể
+**Điểm mù.** Một lý do viết bằng template literal — đúng một dấu backtick là tắt cả rule, kể
 cả sàn độ dài. Mười hai từ nước ốc vẫn qua được cái sàn duy nhất đang có. Còn `restates` đòi **mọi** từ
 đều đến từ khoá, điều gần như không thể đạt khi tối thiểu đã là mười hai từ, nên trên thực tế thông
 điệp thứ hai không bao giờ bắn.
@@ -154,7 +161,7 @@ trung tính bảy phần tử — `div`, `section`, `main`, `header`, `footer`, 
 kiện. Tập ngữ nghĩa bốn phần tử — `ul`, `ol`, `li`, `form` — chỉ bị báo khi có một thuộc tính là
 `JSXAttribute` tên `className` hoặc `class`.
 
-**Nó không thấy gì.** Mười một tên thẻ được liệt kê; `<span className="flex gap-2">`, `<article>`,
+**Điểm mù.** Mười một tên thẻ được liệt kê; `<span className="flex gap-2">`, `<article>`,
 `<figure>`, `<label>`, `<table>` và `<dl>` là những phần tử chứa mà rule này không có ý kiến gì. Một
 phép trải mang class, `<ul {...listProps}>`, là `JSXSpreadAttribute` nên trượt phép kiểm thuộc tính.
 Và host tính toán — `const Tag = "div"` rồi `<Tag>`, hay `createElement("div", props)` — không bao giờ
@@ -170,7 +177,7 @@ class thì thôi làm lớp bọc và bị báo.
 **Nó phát hiện bằng gì.** Một `JSXAttribute` có nút tên là `JSXIdentifier` đọc ra `data-node` hoặc
 `data-why`.
 
-**Nó không thấy gì.** Mọi cách gián tiếp: `<div {...{"data-node": key}} />`,
+**Điểm mù.** Mọi cách gián tiếp: `<div {...{"data-node": key}} />`,
 `element.setAttribute("data-node", key)`, hoặc cặp đó truyền qua một đối tượng props thường. Và một
 marker thứ ba mà frame bắt đầu vẽ vào ngày mai — tập này giữ hai chuỗi, thêm marker cho frame không có
 nghĩa là thêm vào đây.
@@ -188,7 +195,7 @@ slot có tên — `contract`, `composite` hay `leaf`, các phương án đã s�
 `optional` và `repeats`. Tên khoá, `why`, `restingCount` và `props` của slot bị loại trừ **có chủ ý**.
 Chuỗi bằng nhau thì đụng nhau trong một `Map`.
 
-**Nó không thấy gì.** Mục nào không đọc tĩnh được thì bị bỏ qua chứ không bị báo, nên
+**Điểm mù.** Mục nào không đọc tĩnh được thì bị bỏ qua chứ không bị báo, nên
 `{...shared, classes: [...]}`, `classes: STACK` hay một khoá tính toán giấu được một bản sao vĩnh
 viễn. Và mỗi lời gọi dựng bản đồ riêng, nên hai mục giống hệt nhau ở hai lời gọi `buildContracts` hay
 hai file bảng không bao giờ gặp nhau.
@@ -206,7 +213,7 @@ Danh sách khoá được đọc từ đĩa dưới dạng **chữ**: thư mục
 ba đường dẫn tương đối, lời gọi `buildContracts({` đã chọn được cắt theo ngoặc cân bằng, rồi khoá được
 khớp bằng `/^\s{4}"([a-z][a-z-]*)":\s*\{/gm`.
 
-**Nó không thấy gì.** Bốn trong năm dạng mà nơi khác tính là một tham chiếu —
+**Điểm mù.** Bốn trong năm dạng mà nơi khác tính là một tham chiếu —
 `defineContractComponent("typo-key")`, `defineContractProjection("typo-key")`, `CONTRACTS["typo-key"]`,
 `contract: "typo-key"` trong một đối tượng — hoàn toàn không được kiểm ở đây, nên một lỗi gõ ở ba
 trong số đó vừa không bị kiểm vừa đủ để giữ một khoá thật khỏi bị coi là chết. Render động hay đổi tên
@@ -230,7 +237,7 @@ họ tương tác (`cursor-`, `group`, `hover:`, `active:`, `focus:`, `focus-vis
 nổi (`bg-surface`, `shadow`). Một nền được tha khi chính mảng đó còn giữ một `w-full` cùng một
 `border-b` hoặc `border-t`.
 
-**Nó không thấy gì.** Bất kỳ biến thể nào cũng dắt thẳng một class bị cấm vào bảng:
+**Điểm mù.** Bất kỳ biến thể nào cũng dắt thẳng một class bị cấm vào bảng:
 `md:cursor-pointer`, `lg:bg-surface`, `dark:shadow-md`, `!bg-surface`, `group-hover:opacity-80` — vì
 ba regex này không bóc biến thể, khác với `no-literal-structural-class` vốn có bóc. Mọi cách viết khác
 của một nền, một độ nổi hay một màu đều hợp lệ: `bg-white`, `bg-card`, `bg-neutral-50`,
@@ -253,7 +260,7 @@ file nào có chứa từ `ContractKey`, mọi literal chữ thường có gạc
 tham chiếu. Khoá được gọi tên bởi slot `children.*.contract` của mục khác thì gom riêng. Phần còn lại
 bị báo.
 
-**Nó không thấy gì.** Một khoá chỉ được gọi tên trong `.md`, `.mdx`, `.json` hay bất kỳ đuôi nào ngoài
+**Điểm mù.** Một khoá chỉ được gọi tên trong `.md`, `.mdx`, `.json` hay bất kỳ đuôi nào ngoài
 sáu đuôi được duyệt sẽ bị báo là chết trong khi một tài liệu đang render nó — và phát hiện đó tới tay
 người đọc dưới dạng một lệnh xoá. Render động, `` contract={`row-${size}`} `` hay `CONTRACTS[key]` trong
 một file không hề nhắc `ContractKey`, cũng bị báo chết trong khi nó vẽ ở mọi lần tải. Chiều ngược lại

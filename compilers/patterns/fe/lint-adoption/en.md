@@ -4,6 +4,15 @@ title: Lint-adoption
 
 # Lint-adoption
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is a shape already accepted: a repository has been agreed to run under the canonical front-end rule set, and nobody is re-opening whether it should. The output is source architecture — which file carries the attachment, which layer holds the proof, what leaves canon as one versioned unit, what the resolved configuration must print, and which pass is allowed to write product source at all. This pattern does not argue for the rule set; it lands it in files.
 
 ## Law
@@ -42,7 +51,7 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 **Situation.** A repository consuming canon must receive three things at once: the plugin, the recommendation (rule names with their levels), and the linter options. Those three leave canon as one versioned unit. A repository that hand-writes any part of the three has created a second canon — not on the day it was written, but on the day one of the two lists changes.
 
-**What it emits in source.** The consuming config spreads the received attachment block. The attachment factory in [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) emits the globs, the linter options, the plugin and the rules in ONE block, and throws on an empty recommendation instead of returning a block with no rules. No local plugin folder is kept beside the mirror, and no second copy of the same rule set lives anywhere in the repository.
+**What it emits in source.** The consuming config spreads the received attachment block. The attachment factory in `@canon-fe` emits the globs, the linter options, the plugin and the rules in ONE block, and throws on an empty recommendation instead of returning a block with no rules. No local plugin folder is kept beside the mirror, and no second copy of the same rule set lives anywhere in the repository.
 
 **Recognition signs.** `eslint.config.mjs` lists rule names inside `rules: {}` instead of spreading what it received. A repository-maintained plugin folder sits beside the mirror. A second copy of the same rule set lives somewhere else in the repository. Somebody answers "the plugin is imported" when asked how many rules govern the repository. The test: if canon adds a rule tomorrow, does this repository receive it with nobody editing by hand? If a hand edit is required, this is a copy, not a unit.
 
@@ -54,7 +63,11 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 **Situation.** Loading the plugin only proves the rule exists. It does not prove ESLint switches that rule on for any file. The only evidence worth anything is the resolved config for a real shipping file, printed by the target repository's own ESLint rather than read by eye from the config file.
 
-**What it emits in source.** A run of [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) where `--probe` is required and the config being judged is spawned out of the target's own ESLint rather than read off its config file. The probe path names a production source file inside the governed globs — not a test, not a config, not a script. Candidate source from a preview pass sits inside those globs deliberately.
+**What it emits in source.** A reproducible audit invocation where `--probe` is required and the config
+being judged is spawned out of the target's own ESLint rather than read off its config file. The probe
+path names a production source file inside the governed globs — not a test, not a config, not a script.
+Candidate source from a preview pass sits inside those globs deliberately. This tree currently ships no
+wrapper for that invocation, so the command and its printed result are evidence the run must retain.
 
 **Recognition signs.** The adoption conclusion is drawn by opening `eslint.config.mjs` and reading it. Nobody can run the audit command, or it runs with `--probe` pointing at a test file, a config file or a script. The repository is "green" but nobody can say how many rules it is green under. The globs do not cover the file chosen as probe, and nobody notices because the output still prints normally. The test: is the file used as probe genuinely part of the set that ships? If it is a test or configuration file, something nobody deploys was measured.
 
@@ -66,7 +79,7 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 **Situation.** Once the rules have arrived they must all be at `error`, without exception. A warning-level set, or a hand-written plugin running in parallel, creates a second and weaker architecture — and the weaker one wins, because it is the one that does not block a merge.
 
-**What it emits in source.** The printed config resolves every canonical rule to `error`. `severityOf` in [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) collapses every spelling of a severity to a number, and the `nonError` list collects everything not equal to `2`; both `missing` and `nonError` come back empty. `recommended` in [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) is gathered from every module, with every level `error` and no per-module discretion. No later config block overrides a level for a "temporary" glob.
+**What it emits in source.** The printed config resolves every canonical rule to `error`. `severityOf` in `@canon-fe` collapses every spelling of a severity to a number, and the `nonError` list collects everything not equal to `2`; both `missing` and `nonError` come back empty. `recommended` in `@canon-fe` is gathered from every module, with every level `error` and no per-module discretion. No later config block overrides a level for a "temporary" glob.
 
 **Recognition signs.** In the audit output, `nonError` is non-empty: a rule is present but at `warn` or `off`. In the audit output, `missing` is non-empty: the rule does not exist in the resolved config. A later config block overrides the level of a few rules for a "temporary" glob. Somebody describes `warn` as a "rollout phase". The test: if a fresh violation of this rule were written today, would it block? If it only prints a yellow line and merges, the rule has not been adopted, only mentioned.
 
@@ -78,7 +91,7 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 **Situation.** `noInlineConfig` is not an extra strictness option. It is what makes a directive inside a file *have no effect*, rather than merely being considered wrong. Without it, the author of a violation is also the person deciding whether it is a violation.
 
-**What it emits in source.** `refusesInlineConfig`, read from the PRINTED `linterOptions.noInlineConfig` in [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) and required by `ok` alongside the rule comparison, comes back `true`. The consuming config applies the frozen linter options published by [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) beside the rule that reports the directive. Product source carries no `eslint-disable`, `eslint-disable-next-line` or `eslint-enable`.
+**What it emits in source.** `refusesInlineConfig`, read from the PRINTED `linterOptions.noInlineConfig` in `@canon-fe` and required by `ok` alongside the rule comparison, comes back `true`. The consuming config applies the frozen linter options published by `@canon-fe` beside the rule that reports the directive. Product source carries no `eslint-disable`, `eslint-disable-next-line` or `eslint-enable`.
 
 **Recognition signs.** `refusesInlineConfig: false` in the audit output even though the rule list is complete. The config attaches rules but forgets to spread the linter options. A later config block overrides `linterOptions` and nobody notices, because flat config takes the later block. Product source contains `eslint-disable`, `eslint-disable-next-line` or `eslint-enable`. The test: can a comment placed in the right spot switch off the rule reporting that very line? If it can, what is standing there is not a fence.
 
@@ -90,7 +103,10 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 **Situation.** Code written under an incomplete fence can be locally legal and still violate canon. It is not red, so nobody knows. It goes red on exactly the day the wiring is repaired — and by then the debt carries somebody else's name.
 
-**What it emits in source.** No product source changes while `ok` is false. [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) exits non-zero when `ok` is false, and that non-zero exit is the signal a pass is required to halt on rather than annotate. Wiring diffs and product diffs stay in separate commits, so it can be read which caused which.
+**What it emits in source.** No product source changes while the comparison result is `ok: false`.
+The runner must turn that result into a non-zero exit; this tree currently has no script that does so,
+therefore the halt is documented rather than mechanically held here. Wiring diffs and product diffs stay
+in separate commits, so it can be read which caused which.
 
 **Recognition signs.** An Apply or fidelity pass starts editing `.tsx` while the audit has never run, or ran and returned `ok: false`. Somebody says "fix lint later, the feature comes first". The product diff and the wiring diff sit in one commit, so nobody can read which caused which. A measuring pass — a duplicate survey, a parity comparison — runs on a repository with broken adoption and reports its results as real. The test: if the wiring were repaired right after this commit, would this diff still be green? If that is uncertain, this diff is being graded by a different rule set than the one that will grade it tomorrow.
 
@@ -100,14 +116,14 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 ## Layer held
 
-Which tier actually holds each code — `unrepresentable` (a closed union or branded type makes the wrong value impossible to write), `enforced` (a lint rule from [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) catches it, named here), or `documented` (nothing mechanical holds it; only a reader does).
+Which tier actually holds each code — `unrepresentable` (a closed union or branded type makes the wrong value impossible to write), `enforced` (a lint rule from `@canon-fe` catches it, named here), or `documented` (nothing mechanical holds it; only a reader does).
 
 | Code | Tier | What actually holds it |
 |---|---|---|
-| `LINT-ADOPTION-1` | `documented` | [`scripts/sync-fe-lint.mjs`](../../../../scripts/sync-fe-lint.mjs) reports a hand-kept plugin folder and a drifted mirror — but it is a script somebody chooses to run, not a rule a build fails on |
-| `LINT-ADOPTION-2` | `documented` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) performs the audit; nothing can require that it was performed |
+| `LINT-ADOPTION-1` | `documented` | no machine in this tree reports a hand-kept plugin folder or a drifted mirror; the repository must be inspected and the absence recorded |
+| `LINT-ADOPTION-2` | `documented` | no machine in this tree performs the effective-config audit; nothing can require that it was performed |
 | `LINT-ADOPTION-3` | `documented` | `audits["effective-config"]` returns `nonError`, and returns it only when invoked |
-| `LINT-ADOPTION-4` | `documented` | the same audit returns `refusesInlineConfig`; the value it looks for is published by [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe), which is a different module's rule |
+| `LINT-ADOPTION-4` | `documented` | the same audit returns `refusesInlineConfig`; the value it looks for is published by `@canon-fe`, which is a different module's rule |
 | `LINT-ADOPTION-5` | `documented` | a reader, or a skill that stops |
 
 All five read `documented`, and the artifact that holds this law publishes `rules = {}` on purpose rather than by neglect. An ESLint rule sees a syntax tree inside a file, under a configuration that has already been resolved. This law's entire subject is that resolution: whether a rule is present, what severity it ended at, whether directives are honoured. A rule asked to judge those facts would be judging the config that decided whether the rule runs at all — and the failure mode is silent, because a rule switched off reports nothing and a repository governed by nothing lints clean. That is why the holder here is a repository audit over `eslint --print-config` rather than a rule, and why this table shows five `documented` rows instead of pretending otherwise. The layer that owns this concern is the repository's resolved configuration and the audit over it; every product layer — components, blocks, pages — stays ignorant of it and must never carry a local opinion about which rules govern it.
@@ -118,17 +134,18 @@ A law that cannot be pointed at in real code is a proposal. One row per code, wi
 
 | Code | Path | What to look for |
 |---|---|---|
-| `LINT-ADOPTION-1` | [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) | The exported attachment factory: the globs, the linter options, the plugin and the rules leave in ONE block, and an empty recommendation throws instead of returning a block with no rules |
-| `LINT-ADOPTION-2` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) | `--probe` is required, and the config being judged is spawned out of the target's own ESLint rather than read off its config file |
-| `LINT-ADOPTION-3` | [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) | `severityOf`, which collapses every spelling of a severity to a number, and the `nonError` list that collects everything not equal to `2` |
-| `LINT-ADOPTION-4` | [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe) | `refusesInlineConfig`, read from the PRINTED `linterOptions.noInlineConfig`, and required by `ok` alongside the rule comparison |
-| `LINT-ADOPTION-5` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) | The non-zero exit when `ok` is false — the signal a pass is required to halt on rather than annotate. **Partial anchor** — see below |
+| `LINT-ADOPTION-1` | `@canon-fe` | The exported attachment factory: the globs, the linter options, the plugin and the rules leave in ONE block, and an empty recommendation throws instead of returning a block with no rules |
+| `LINT-ADOPTION-2` | no resolvable anchor in this tree | The retained command requires `--probe`, and the config being judged is spawned out of the target's own ESLint rather than read off its config file |
+| `LINT-ADOPTION-3` | `@canon-fe` | `severityOf`, which collapses every spelling of a severity to a number, and the `nonError` list that collects everything not equal to `2` |
+| `LINT-ADOPTION-4` | `@canon-fe` | `refusesInlineConfig`, read from the PRINTED `linterOptions.noInlineConfig`, and required by `ok` alongside the rule comparison |
+| `LINT-ADOPTION-5` | no resolvable anchor in this tree | The runner still owes the non-zero exit when `ok` is false — the signal a pass is required to halt on rather than annotate |
 
 Secondary evidence, useful when the primary anchor is being changed:
 
-- `LINT-ADOPTION-1` — [`scripts/sync-fe-lint.mjs`](../../../../scripts/sync-fe-lint.mjs): the content digest over the mirror, and the finding raised when a hand-maintained plugin folder still exists beside it.
-- `LINT-ADOPTION-3` — [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe): `recommended`, gathered from every module, with every level `error` and no per-module discretion.
-- `LINT-ADOPTION-4` — [`@starci/eslint-canon-fe`](../../../../@starci/eslint-canon-fe): the frozen linter options a consuming config applies, published beside the rule that reports the directive.
+- `LINT-ADOPTION-1` — the repository diff and manifest: together they expose a hand-maintained plugin
+  folder or a mirror that no declared package owns.
+- `LINT-ADOPTION-3` — `@canon-fe`: `recommended`, gathered from every module, with every level `error` and no per-module discretion.
+- `LINT-ADOPTION-4` — `@canon-fe`: the frozen linter options a consuming config applies, published beside the rule that reports the directive.
 - `LINT-ADOPTION-5` — the lint-sync Apply skill states the close condition that only `ok: true` satisfies, and the consolidation Plan skill routes away rather than measuring a repository whose adoption is failing.
 
 `LINT-ADOPTION-5` is anchored for lint-sync work and **not yet anchored** for design and fidelity Apply: no file in those skills reads this audit, so the halt they owe exists in prose and nowhere else. It is recorded as an open risk.

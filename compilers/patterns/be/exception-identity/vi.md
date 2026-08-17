@@ -4,8 +4,15 @@ title: Exception identity · Vietnamese
 
 # Danh tính của exception
 
-Đầu vào của pattern này là một shape đã được duyệt: một capability, một guard, một hợp đồng hay một
-layout mà ai đó đã quyết định rằng ứng dụng sẽ có. Quyết định đó không được mở lại ở đây. Đầu ra là
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một capability, một guard, một hợp đồng hay một
+layout mà ai đó đã quyết định rằng ứng dụng sẽ có. Quyết định đó không được mở lại ở đây. Kết quả là
 kiến trúc source — lỗi được khai báo trong file nào, tầng nào giữ nó, class tên là gì, `super()` nhận
 literal nào, tham số constructor mang kiểu gì, và có set status hay không. Câu hỏi thiết kế là "chỗ
 này có thể hỏng". Câu hỏi ở đây là "cái hỏng đó nằm ở đâu trong source, và nó tên là gì".
@@ -83,17 +90,17 @@ không set `httpStatus` là đã thoả nó; một khai báo có set thì phải
 
 ## `IDENTITY-1` — tên class kết thúc bằng `Exception`
 
-**Tình huống.** Bạn đang đặt tên cho một class extends `AbstractException`. Đây là chỗ ai cũng nghĩ là
+**Khi nào gặp.** Bạn đang đặt tên cho một class extends `AbstractException`. Đây là chỗ ai cũng nghĩ là
 chuyện thẩm mỹ, và nó không phải.
 
-**Nó sinh ra gì trong source.** Một khai báo class trong cây errors, tên kết thúc bằng `Exception`.
+**Source phải thể hiện gì.** Một khai báo class trong cây errors, tên kết thúc bằng `Exception`.
 Hậu tố là thứ duy nhất mọi rule khác nhìn thấy: rule bắt tham số object, rule bắt extends đúng house
 base, rule bắt nằm trong thư mục errors — tất cả đều khớp theo hậu tố đó, còn rule ở throw site thì
 chỉ nhận diện `Error` và các tên của framework. Cho nên một class tên `SomethingError` nằm đúng thư
 mục, extends đúng house base, được throw ở call site thật — và **không rule nào kiểm nó**. Gate im
 lặng, và im lặng thì đọc như đồng ý.
 
-**Dấu hiệu nhận biết.** Tên kết thúc bằng `Error`, hoặc là một danh từ trần (`InvalidToken`,
+**Cách nhận ra.** Tên kết thúc bằng `Error`, hoặc là một danh từ trần (`InvalidToken`,
 `QuotaExceeded`). Class extends `AbstractException` nhưng lint không hề báo gì về nó — kể cả khi bạn
 cố tình viết sai một thứ khác trong cùng file. Grep tên class trong report của lint không ra dòng nào.
 Tự hỏi: nếu tôi cố tình phá một rule exception khác ngay trong class này, gate có đỏ lên không? Nếu
@@ -112,10 +119,10 @@ theo quán tính) · lỗi validate ngắn (`SlugTaken`) · lỗi hạ tầng (`
 
 ## `IDENTITY-2` — code là tên class, viết SCREAMING_SNAKE
 
-**Tình huống.** Bạn đang viết đối số thứ hai của `super()`. Code này là thứ client khớp, cho nên nó là
+**Khi nào gặp.** Bạn đang viết đối số thứ hai của `super()`. Code này là thứ client khớp, cho nên nó là
 hợp đồng ra ngoài. Nó được **suy ra** từ tên class, không được **chọn** cạnh tên class.
 
-**Nó sinh ra gì trong source.** Một string literal tại chỗ khai báo, đúng những chữ cái của tên class,
+**Source phải thể hiện gì.** Một string literal tại chỗ khai báo, đúng những chữ cái của tên class,
 viết SCREAMING_SNAKE. Việc suy ra có hai hệ quả, và cả hai đều là mục đích. Thứ nhất, không ai phải
 tra cứu: người có tên class biết code, người có code tìm được class bằng một lần grep. Một code chọn
 tay là **cái tên thứ hai** của cùng một lỗi — và cái tên thứ hai chính là cái nằm trong client, trong
@@ -126,7 +133,7 @@ challenge khoá học cùng báo một code, nên client khớp code không phâ
 "thiếu bước đăng nhập" — đúng là khuyết tật mà `EXCEPTION-1` từ chối exception của framework để tránh,
 chỉ khác là lần này nó xảy ra bên trong vốn từ của nhà.
 
-**Dấu hiệu nhận biết.** Code ngắn hơn tên class rõ rệt (`REVIEW_FORBIDDEN` cho
+**Cách nhận ra.** Code ngắn hơn tên class rõ rệt (`REVIEW_FORBIDDEN` cho
 `DocumentNotOwnedException`). Code là một danh từ chung mà nhiều lỗi đều dùng được (`NOT_FOUND`,
 `FORBIDDEN`, `INVALID_INPUT`). Code được ghép bằng template string, hằng số, hoặc `${prefix}_NOT_FOUND`.
 Hai file cạnh nhau trong cùng thư mục có cùng một code. Tự hỏi: nếu tôi grep chính xác chuỗi code này
@@ -146,10 +153,10 @@ theo provider · code rút gọn cho ngắn dòng.
 
 ## `IDENTITY-3` — đổi tên class là đổi hợp đồng trên dây
 
-**Tình huống.** Class đã tồn tại, đã có client, và bạn muốn đổi tên nó cho đúng hơn. Vì code được suy
+**Khi nào gặp.** Class đã tồn tại, đã có client, và bạn muốn đổi tên nó cho đúng hơn. Vì code được suy
 ra từ tên class, việc đổi tên **không phải một refactor** — nó là một thay đổi client nhìn thấy được.
 
-**Nó sinh ra gì trong source.** Hai cú sửa trong cùng một revision — tên class và literal trong
+**Source phải thể hiện gì.** Hai cú sửa trong cùng một revision — tên class và literal trong
 `super()` dời cùng nhau — kèm một migration cho những ai đang khớp code cũ. Đó là hệ quả trung thực,
 và cũng là lý do phải giữ nó. Lựa chọn thay thế là một class mang code bảo lưu một cái tên nó không
 còn nữa; chuyện này cũng đã xảy ra thật: một lỗi tra cứu đường dẫn vẫn báo code của lần tra cứu thư
@@ -158,7 +165,7 @@ mục ngày xưa, và không người đọc nào của một trong hai cái tê
 buộc phải ở lại trên dây vì một client đã phát hành, thì **class giữ nguyên tên cũ** cho đến khi
 client đó được gỡ. Thứ bị từ chối là nửa-đổi-tên im lặng, để hai cái tên bất đồng mãi mãi.
 
-**Dấu hiệu nhận biết.** Diff có đổi tên class mà không đổi dòng `super(...)`. Diff có đổi code mà
+**Cách nhận ra.** Diff có đổi tên class mà không đổi dòng `super(...)`. Diff có đổi code mà
 không đổi tên class. Commit message ghi "rename", "cleanup", "chore" cho một file trong thư mục
 errors. Có e2e spec assert đúng chuỗi code đó, và spec không nằm trong diff. Tự hỏi: ai đang khớp code
 này ngay lúc này — client nào, alert nào, spec nào? Nếu tôi không trả lời được, tôi chưa đủ điều kiện
@@ -175,9 +182,9 @@ tả trong tên class · đổi tên khi tách service · rename hàng loạt b�
 
 ## `IDENTITY-4` — type metadata mang tên chính exception của nó
 
-**Tình huống.** Bạn đang khai báo kiểu cho tham số destructure của constructor.
+**Khi nào gặp.** Bạn đang khai báo kiểu cho tham số destructure của constructor.
 
-**Nó sinh ra gì trong source.** Một type tên `<Class>Metadata`, extends `AbstractExceptionMetadata` —
+**Source phải thể hiện gì.** Một type tên `<Class>Metadata`, extends `AbstractExceptionMetadata` —
 **kể cả khi nó không thêm trường nào**, lúc đó là một alias rỗng:
 `export type XExceptionMetadata = AbstractExceptionMetadata`. Alias rỗng không phải nghi thức, cùng lý
 do mà object rỗng của `EXCEPTION-2` không phải nghi thức: **nó là chỗ trường đầu tiên sẽ rơi vào.**
@@ -187,7 +194,7 @@ nên trường mới không thể thêm ở đó, và khai báo phải bị đ�
 type theo exception còn có nghĩa: người đọc cầm tên lỗi tìm được payload của nó **mà không cần mở
 file**.
 
-**Dấu hiệu nhận biết.** Tham số gõ thẳng `AbstractExceptionMetadata`. Tham số không có annotation nào
+**Cách nhận ra.** Tham số gõ thẳng `AbstractExceptionMetadata`. Tham số không có annotation nào
 (destructure trần) — nhận mọi object, kể cả object thiếu đúng cái id mà lỗi này sinh ra để mang. Type
 tên theo entity chứ không theo exception (`ReviewMetadata` cho `DocumentNotOwnedException`). Một type
 metadata được dùng lại cho hai exception khác nhau. Tự hỏi: ngày mai lỗi này cần nói **cái nào** bị từ
@@ -204,9 +211,9 @@ type của một lỗi anh em · lỗi sinh bằng snippet có sẵn · lỗi wr
 
 ## `IDENTITY-5` — HTTP status không phải danh tính
 
-**Tình huống.** Bạn đang cân nhắc `httpStatus`.
+**Khi nào gặp.** Bạn đang cân nhắc `httpStatus`.
 
-**Nó sinh ra gì trong source.** Thường là không sinh ra gì cả — khai báo không có `httpStatus`. Base
+**Source phải thể hiện gì.** Thường là không sinh ra gì cả — khai báo không có `httpStatus`. Base
 nhận nó như một tham số **tuỳ chọn**, phần lớn lỗi bỏ qua và rơi về mặc định 500 ở biên. Nó là một
 nhượng bộ cho tầng vận chuyển, dành cho các trường hợp mà **status chính là hợp đồng**: một guard trả
 401, một upload bị từ chối vì 413, một cấu hình thiếu thật sự là 500. Status **không bao giờ** là cách
@@ -215,7 +222,7 @@ exception có set status vẫn phải thoả đủ mọi mã ở trên, và là 
 "client khớp cái gì?" — câu đó đang hỏi về code. Một khai báo với tay lấy status **để trở nên phân
 biệt được** là một khai báo đã trả lời sai câu hỏi.
 
-**Dấu hiệu nhận biết.** Hai lỗi cạnh nhau có code chung chung như nhau và được phân biệt bằng 403 với
+**Cách nhận ra.** Hai lỗi cạnh nhau có code chung chung như nhau và được phân biệt bằng 403 với
 404. Code là tên của một status (`FORBIDDEN_EXCEPTION`, `BAD_REQUEST_EXCEPTION`). Lý do đưa ra cho
 status là "để phía kia biết đây là lỗi khác", không phải "endpoint này cam kết trả status đó". Set
 status trên một lỗi chỉ chạy trong background job, nơi không có transport nào đọc nó. Tự hỏi: có

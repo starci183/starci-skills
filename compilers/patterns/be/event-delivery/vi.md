@@ -4,9 +4,18 @@ title: Event-delivery · Vietnamese
 
 # Giao phát sự kiện
 
-Đầu vào của pattern này là một shape đã duyệt: một quyết định đã chốt, phát biểu thành một sự thật mà
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã duyệt: một quyết định đã chốt, phát biểu thành một sự thật mà
 đâu đó có code phải phản ứng. Câu hỏi thiết kế — sự thật này có đáng không, ai quan tâm tới nó, nó
-nghĩa là gì — đã đóng lại trước khi pattern này được đọc. Đầu ra là kiến trúc source: file nào dựng
+nghĩa là gì — đã đóng lại trước khi pattern này được đọc. Kết quả là kiến trúc source: file nào dựng
 envelope, file nào khai transport, file nào bỏ bản sao của chính mình và giành digest, file test nào
 chứng minh, và các câu lệnh bên trong những file đó phải đứng theo thứ tự nào.
 
@@ -75,15 +84,15 @@ phải con số thứ bảy thêm vào cho tiện.
 
 ## `DELIVERY-1` — envelope phải tự khai người phát và bản sao
 
-**Tình huống.** Một sự thật đã quyết xong sắp rời khỏi process. Đến đầu bên kia, người nhận phải trả
+**Khi nào gặp.** Một sự thật đã quyết xong sắp rời khỏi process. Đến đầu bên kia, người nhận phải trả
 lời được hai câu mà payload không trả lời được: *ai phát ra cái này?* và *tôi đã xử lý đúng nội dung
 này chưa?* Hai câu đó là việc của envelope.
 
-**Nó sinh ra gì trong source.** Một envelope factory dựng message với `id` lấy từ instance service và
+**Source phải thể hiện gì.** Một envelope factory dựng message với `id` lấy từ instance service và
 `digest` băm từ payload, không bao giờ từ subject; kèm một kiểu envelope khai đúng nghĩa vụ đó, nơi
 việc `digest` là tuỳ chọn nhìn thấy được ngay trong interface.
 
-**Dấu hiệu nhận biết.** Có code muốn suy ra người phát từ **subject**, từ connection, hoặc từ thứ tự
+**Cách nhận ra.** Có code muốn suy ra người phát từ **subject**, từ connection, hoặc từ thứ tự
 nhận. Payload không có trường nào ổn định để làm khoá chống trùng. Có người nói "broker đảm bảo đúng
 một lần" mà không chỉ ra được cấu hình nào nói thế.
 
@@ -98,15 +107,15 @@ tiến độ một bài nộp · snapshot sức khoẻ của một nhà cung c�
 
 ## `DELIVERY-2` — transport là một phần của hợp đồng event
 
-**Tình huống.** Cùng một sự thật nhưng hai nhu cầu khác nhau: có sự thật chỉ cần code trong **chính
+**Khi nào gặp.** Cùng một sự thật nhưng hai nhu cầu khác nhau: có sự thật chỉ cần code trong **chính
 process này** phản ứng; có sự thật cần tới các socket đang cắm vào **pod khác**. Quyết định đó thuộc
 về định nghĩa của event, không thuộc về nơi gọi.
 
-**Nó sinh ra gì trong source.** Một config event chung, trong đó mọi entry đều khai cả `useLocal` lẫn
+**Source phải thể hiện gì.** Một config event chung, trong đó mọi entry đều khai cả `useLocal` lẫn
 `useNats`, vài entry kèm comment nêu rõ vì sao một cờ vẫn còn `false`; và một emitter đọc đúng hai cờ
 đó để chọn nhánh, nên config là hợp đồng chứ không phải gợi ý.
 
-**Dấu hiệu nhận biết.** Nơi gọi truyền option transport để "lần này thì gửi qua broker". Một entry
+**Cách nhận ra.** Nơi gọi truyền option transport để "lần này thì gửi qua broker". Một entry
 trong config thiếu một trong hai cờ và người đọc phải đoán. Một event realtime chỉ chạy đúng khi hệ
 thống có đúng một instance, và không chỗ nào ghi lại điều đó.
 
@@ -120,16 +129,16 @@ kiện lật cờ · snapshot health mà mỗi pod tự phát lại cho client c
 
 ## `DELIVERY-3` — bỏ envelope của chính mình trước khi emit
 
-**Tình huống.** Pod A phát một event vừa local vừa qua broker. Broker giao lại cho **mọi** subscriber,
+**Khi nào gặp.** Pod A phát một event vừa local vừa qua broker. Broker giao lại cho **mọi** subscriber,
 kể cả A. Nếu A không nhận ra envelope đó là của mình, A emit local lần thứ hai và hậu quả xảy ra hai
 lần trên đúng cái pod đã tạo ra nó.
 
-**Nó sinh ra gì trong source.** Một guard trong bridge, đặt trên nhánh ping, so `parsed.id` của
+**Source phải thể hiện gì.** Một guard trong bridge, đặt trên nhánh ping, so `parsed.id` của
 envelope đã parse với id instance rồi return khi trùng — nằm trước lời gọi emit, và mang theo comment
 ghi lại con bug mà phép so với subject đã gây ra. Rule kiểm tra rằng phép so có tồn tại *và* đứng
 trước emit; thứ tự chính là toàn bộ nội dung của mã này.
 
-**Dấu hiệu nhận biết.** Bug chỉ xuất hiện ở người dùng đang cắm vào **chính pod vừa ghi dữ liệu**. Có
+**Cách nhận ra.** Bug chỉ xuất hiện ở người dùng đang cắm vào **chính pod vừa ghi dữ liệu**. Có
 so sánh giữa `subject` và id instance — phép so này **không bao giờ** khớp, nên nó im lặng và trông
 như đang hoạt động. Guard tồn tại nhưng nằm **sau** lời gọi emit.
 
@@ -143,15 +152,15 @@ cho người cắm vào pod ghi · progress bar nhảy hai nấc trên đúng po
 
 ## `DELIVERY-4` — giành digest trước khi emit
 
-**Tình huống.** Broker giao lại. Mạng chớp, consumer nối lại, cùng một envelope đến lần thứ hai. Nếu
+**Khi nào gặp.** Broker giao lại. Mạng chớp, consumer nối lại, cùng một envelope đến lần thứ hai. Nếu
 digest chỉ được ghi **sau** khi emit, hai bản sao chạy song song đều đọc thấy "chưa có" và **cả hai**
 đều đi qua ranh giới nghiệp vụ.
 
-**Nó sinh ra gì trong source.** Một cặp get/set digest trong bridge: đọc digest, ghi digest, rồi mới
+**Source phải thể hiện gì.** Một cặp get/set digest trong bridge: đọc digest, ghi digest, rồi mới
 emit — ba câu lệnh mà thứ tự chính là bất biến, và cũng là thứ tự mà message thứ hai của rule nhắm
 vào.
 
-**Dấu hiệu nhận biết.** Thứ tự trong code là emit rồi mới `set` digest. Việc chống trùng nằm trong
+**Cách nhận ra.** Thứ tự trong code là emit rồi mới `set` digest. Việc chống trùng nằm trong
 listener chứ không nằm ở bridge. Có câu "thực tế nó không giao lại đâu" thay cho một cấu hình chứng
 minh điều đó.
 
@@ -163,15 +172,15 @@ một queue group · redeliver do ack trễ · event phát lại khi worker kh�
 
 ## `DELIVERY-5` — khẳng định người nhận và nội dung, không đếm listener
 
-**Tình huống.** Đang cần chứng minh một chuyện realtime là **đúng**. Đúng ở đây là: **đúng người**
+**Khi nào gặp.** Đang cần chứng minh một chuyện realtime là **đúng**. Đúng ở đây là: **đúng người**
 nhận được **đúng sự thật**, và người không liên quan **không** nhận được gì. Số listener không nói
 được điều nào trong ba điều đó.
 
-**Nó sinh ra gì trong source.** Một consumer e2e test mà assertion gọi tên đúng dòng người nhận và
+**Source phải thể hiện gì.** Một consumer e2e test mà assertion gọi tên đúng dòng người nhận và
 đúng loại payload, và tiêu đề của chính test khẳng định mệnh đề phủ định: sự thật đó không rò sang
 socket khác. Không có assertion nào ở bất kỳ đâu đếm listener.
 
-**Dấu hiệu nhận biết.** Assertion là một con số: bao nhiêu listener, bao nhiêu message, bao nhiêu
+**Cách nhận ra.** Assertion là một con số: bao nhiêu listener, bao nhiêu message, bao nhiêu
 socket. Test đỏ lên khi thêm một pod hoặc thêm một subscriber, dù nghiệp vụ không đổi. Test xanh
 trong khi sự thật được giao cho **nhầm người**, vì con số vẫn đúng.
 
@@ -183,15 +192,15 @@ trên bao nhiêu instance**. Một test có thể đúng mã này mà vẫn sai 
 
 ## `DELIVERY-6` — chứng minh bằng hai instance thật
 
-**Tình huống.** Hợp đồng cần chứng minh là: phát **một** lần ở A thì B nhận **đúng một** lần, và A
+**Khi nào gặp.** Hợp đồng cần chứng minh là: phát **một** lần ở A thì B nhận **đúng một** lần, và A
 **không** tự vọng lại. Không có mệnh đề nào trong câu đó tồn tại bên trong một process duy nhất.
 
-**Nó sinh ra gì trong source.** Một e2e test xuyên instance cùng helper dựng thế giới cho nó, boot
+**Source phải thể hiện gì.** Một e2e test xuyên instance cùng helper dựng thế giới cho nó, boot
 hai instance độc lập trên cùng một broker thật, trong đó helper đếm message ở broker để chuyện "đúng
 một lần giao" ở nơi phát được chứng minh sau khi tiếng vọng đã tới, chứ không phải trước khi nó kịp
 tới.
 
-**Dấu hiệu nhận biết.** Test gọi thẳng event emitter local rồi kết luận về fan-out. Broker bị mock,
+**Cách nhận ra.** Test gọi thẳng event emitter local rồi kết luận về fan-out. Broker bị mock,
 nên self-echo không bao giờ xảy ra và guard chưa từng bị thử. Chỉ có một app được boot, và "instance
 thứ hai" là một biến.
 
@@ -205,7 +214,7 @@ thái job do worker ở pod khác cập nhật · snapshot health phát lại tr
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc branded type khiến giá
-trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `@starci/eslint-canon-be`
+trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `@canon-be`
 bắt được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -247,8 +256,8 @@ Code thật để đối chiếu từng luật. Một luật không chỉ tay v�
 |---|---|---|
 | `DELIVERY-1` | `modules/platform/event/nats/nats-message-factory.service.ts` → `createMessage` · `modules/platform/event/nats/types.ts` → `NatsMessage` | Envelope được dựng với `id` lấy từ instance service và `digest` băm từ payload, không bao giờ từ subject. Interface là nơi khai nghĩa vụ của envelope, và là nơi nhìn thấy `digest` đang là tuỳ chọn |
 | `DELIVERY-2` | `modules/platform/event/config.ts` → `configMap` · `modules/platform/event/event-emitter.service.ts` → `emit` | Mọi entry đều khai cả hai cờ, và vài entry kèm comment nêu vì sao một cờ vẫn còn `false`. Emitter đọc đúng hai cờ đó để chọn nhánh, nên config là hợp đồng chứ không phải gợi ý |
-| `DELIVERY-3` | `modules/platform/event/nats/nats-bridge.service.ts` → guard nằm trên nhánh ping · `@starci/eslint-canon-be` → `originIndex > emitIndex` | Guard so `parsed.id` với id instance, và mang comment ghi lại con bug mà phép so với subject đã gây ra. Rule kiểm tra phép so có tồn tại *và* đứng trước emit — thứ tự chính là toàn bộ nội dung của mã |
-| `DELIVERY-4` | `modules/platform/event/nats/nats-bridge.service.ts` → cặp get/set digest · `@starci/eslint-canon-be` → `digestIndex > emitIndex` | Đọc digest, ghi digest, rồi mới emit — ba câu lệnh mà thứ tự là bất biến. Message thứ hai của rule nhắm đúng vào thứ tự đó |
+| `DELIVERY-3` | `modules/platform/event/nats/nats-bridge.service.ts` → guard nằm trên nhánh ping · `@canon-be` → `originIndex > emitIndex` | Guard so `parsed.id` với id instance, và mang comment ghi lại con bug mà phép so với subject đã gây ra. Rule kiểm tra phép so có tồn tại *và* đứng trước emit — thứ tự chính là toàn bộ nội dung của mã |
+| `DELIVERY-4` | `modules/platform/event/nats/nats-bridge.service.ts` → cặp get/set digest · `@canon-be` → `digestIndex > emitIndex` | Đọc digest, ghi digest, rồi mới emit — ba câu lệnh mà thứ tự là bất biến. Message thứ hai của rule nhắm đúng vào thứ tự đó |
 | `DELIVERY-5` | `tests/e2e/notification-delivery.e2e-spec.ts` | Assertion gọi tên đúng dòng người nhận và đúng loại payload, và tiêu đề của chính test khẳng định mệnh đề phủ định: sự thật không rò sang socket khác. Không assertion nào ở đâu đếm listener |
 | `DELIVERY-6` | `tests/e2e/cross-instance-event-routing.e2e-spec.ts` · `tests/helpers/nats-cross-instance-world.ts` | Hai instance boot độc lập dùng chung một broker thật; helper đếm message ở broker để "đúng một lần giao" ở nơi phát được chứng minh sau khi tiếng vọng đã tới, chứ không phải trước khi nó kịp tới |
 

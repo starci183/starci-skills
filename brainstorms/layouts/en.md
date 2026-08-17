@@ -4,6 +4,17 @@ title: Layouts
 
 # Layouts
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
+| `@schema` | `brainstorms/layouts/schema.json` | file | validate the record's JSON shape |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+
+
+## Record
+
 You are given a business request in prose and you return **3–4 layout candidates**, each a JSON
 structure the owner can choose between — or one refusal naming the product decision that is missing.
 This is not a compiler: a compiler returns one answer because its law closes the choice. Here the
@@ -34,7 +45,7 @@ Six, and no more. Each is here because something specific breaks without it.
 | 6 | Precedents accepted for THIS project, the one the workspace route declared | every request is answered as if it were the first |
 
 **Input 2 is queried, not read, and the class arrays are never extracted.** One need per region through
-`scripts/contract-search.mjs`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
+`@contract-search`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
 cannot see a class cannot write one into its output, so "no class in a candidate" holds because the value
 never arrives — not because a reader was asked to skip a field. Measured on one 299-entry registry: 192KB
 on disk, 69KB permitted, under 2KB actually answered.
@@ -147,7 +158,7 @@ blocked: <which regions cannot be resolved without it>
 
 ## Output
 
-The output **is** JSON, and its authority is [`schema.json`](./schema.json) beside this record — not this
+The output **is** JSON, and its authority is `@schema` beside this record — not this
 excerpt. `envelope` holds what varies between runs; the hash covers a candidate only, so the same
 decision re-run in a later round produces the same hash.
 
@@ -187,7 +198,7 @@ Every object in the schema sets `additionalProperties: false`, so a `className` 
 argue about — it is invalid. Validate before writing and before hashing:
 
 ```bash
-node <trust>/scripts/validate-artifact.mjs --schema <trust>/brainstorms/layouts/schema.json --data <batch.json> --hash
+node @validate-artifact --schema @schema --data <batch.json> --hash
 ```
 
 The validator also enforces the three batch laws no schema can state: no class token anywhere in the

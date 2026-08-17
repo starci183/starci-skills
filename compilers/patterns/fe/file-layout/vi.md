@@ -8,9 +8,18 @@ codes: [FILE-1, FILE-2, FILE-3, FILE-4, FILE-5, FILE-6]
 
 # Bố cục file
 
-Đầu vào của pattern này là một shape đã có người duyệt — một màn hình, một câu nói nghiệp vụ, một
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã có người duyệt — một màn hình, một câu nói nghiệp vụ, một
 container, một fetch, một hàm thuần, một mẩu chữ nghĩa. Chuyện nó có nên tồn tại hay không đã khép
-lại, và pattern này không mở lại. Đầu ra là kiến trúc source: file nào giữ nó, tier nào sở hữu file
+lại, và pattern này không mở lại. Kết quả là kiến trúc source: file nào giữ nó, tier nào sở hữu file
 đó, thư mục tên gì, `index.tsx` export ra gì, và cái gì không được ngồi cạnh nó.
 
 ## Luật
@@ -144,17 +153,17 @@ mà các file luật khác cùng các hồ sơ task cũ đã trích dẫn.
 
 ## `FILE-1` — một thư mục, một component, tên khớp thứ nó export
 
-**Tình huống.** Người đọc biết tên component thì phải suy ra được đường dẫn, và người đứng ở đường dẫn
+**Khi nào gặp.** Người đọc biết tên component thì phải suy ra được đường dẫn, và người đứng ở đường dẫn
 thì phải suy ra được cái tên. Grep một cái tên phải ra một chỗ, không phải ba chỗ và cũng không phải
 không chỗ nào.
 
-**Nó sinh ra gì trong source.** Một thư mục cho mỗi component, viết PascalCase, đặt tên theo thứ nó
+**Source phải thể hiện gì.** Một thư mục cho mỗi component, viết PascalCase, đặt tên theo thứ nó
 export, với `index.tsx` mang một named export trực tiếp bằng đúng tên thư mục — hoặc bắt đầu bằng tên
 đó rồi nối tiếp bằng một chữ hoa. Các biến thể có kiểu riêng của cùng một component được ở chung thư
 mục vì mọi tên đều thuộc họ của thư mục: `Card`, `CardRoot`, `CardHeader`. Thứ không được ở chung là
 hành khách đi nhờ: một component khác họ, khác tên, ngồi đó vì tiện.
 
-**Dấu hiệu nhận biết.** Tên thư mục là PascalCase nhưng `index.tsx` không export cái tên đó. Hai
+**Cách nhận ra.** Tên thư mục là PascalCase nhưng `index.tsx` không export cái tên đó. Hai
 component không họ hàng ở chung một thư mục, một cái "tiện tay để đây". Phải mở file lên mới biết
 trong thư mục có gì.
 
@@ -170,16 +179,16 @@ rồi để lại tên cũ · thư mục `Card/` export `Panel` vì "trước n�
 
 ## `FILE-2` — thư mục màn hình giữ đúng hai nửa
 
-**Tình huống.** Một `page`, một `layout` hoặc một `overlay` là một màn hình, và một màn hình có đúng
+**Khi nào gặp.** Một `page`, một `layout` hoặc một `overlay` là một màn hình, và một màn hình có đúng
 hai nửa: `index.tsx` là phần đấu dây — request, tình huống, chữ nghĩa — còn `component.tsx` là hình
 dạng. Cộng thêm bài test sinh đôi của mỗi nửa. Hết.
 
-**Nó sinh ra gì trong source.** Đúng `index.tsx` và `component.tsx` trong thư mục màn hình, kèm
+**Source phải thể hiện gì.** Đúng `index.tsx` và `component.tsx` trong thư mục màn hình, kèm
 `component.test.tsx` và `index.test.tsx` ở nơi có test. Mọi thứ khác mà shape sinh ra thì đi về tier
 của nó: một row nghiệp vụ về `blocks/<category>/<Name>/`, một hàm format về `modules/utils/`, một shape
 của response về `modules/types/`, một cấu hình cột về `resources/`.
 
-**Dấu hiệu nhận biết.** Trong thư mục page xuất hiện một file `.tsx` có tên riêng. Xuất hiện
+**Cách nhận ra.** Trong thư mục page xuất hiện một file `.tsx` có tên riêng. Xuất hiện
 `constants/`, `utils/`, `types/` hoặc một file `shapes.ts` chép tay. Ai đó vừa nói câu "chỉ mỗi page
 này dùng thôi".
 
@@ -198,15 +207,15 @@ hàm format tiền tệ nằm cạnh page · type của response chép tay · m�
 
 ## `FILE-3` — thứ không phải component code không nằm trong cây component
 
-**Tình huống.** `constants/`, `utils/`, `types/` và `hooks/` không phải thư mục component. Mỗi thứ đó
+**Khi nào gặp.** `constants/`, `utils/`, `types/` và `hooks/` không phải thư mục component. Mỗi thứ đó
 đã có một cái nhà thật, và cái nhà đó mới là điểm chính.
 
-**Nó sinh ra gì trong source.** Đích đến do bản chất quyết định, tạo ra khi dùng lần đầu: fetch →
+**Source phải thể hiện gì.** Đích đến do bản chất quyết định, tạo ra khi dùng lần đầu: fetch →
 `hooks/`; hàm thuần → `modules/utils/`; shape dùng chung → `modules/types/`; chữ nghĩa hoặc config map
 → `resources/`. Thư mục đích chưa tồn tại không phải lý do để bỏ file lại trong cây component — nó được
 tạo, không đi vòng.
 
-**Dấu hiệu nhận biết.** Có một thư mục tên đúng bằng một trong bốn từ đó nằm đâu đó dưới `components/`.
+**Cách nhận ra.** Có một thư mục tên đúng bằng một trong bốn từ đó nằm đâu đó dưới `components/`.
 Có một hàm thuần không nhận props, không render gì, nằm trong cây component. Người thứ hai vừa viết lại
 đúng hàm đó ở chỗ khác.
 
@@ -223,14 +232,14 @@ hai đều "đúng" trong phạm vi của mình.
 
 ## `FILE-4` — family export ra từng thành viên
 
-**Tình huống.** `export const Card = { Root, Header }` gói cả họ thành một đơn vị lúc build. Call site
+**Khi nào gặp.** `export const Card = { Root, Header }` gói cả họ thành một đơn vị lúc build. Call site
 chỉ import cái header cũng kéo cả họ vào, và không mảnh nào rơi ra được khỏi bundle.
 
-**Nó sinh ra gì trong source.** Mỗi thành viên trong họ là một câu lệnh export riêng từ `index.tsx`,
+**Source phải thể hiện gì.** Mỗi thành viên trong họ là một câu lệnh export riêng từ `index.tsx`,
 mỗi tên đều thuộc họ của thư mục. Không có `export const <Capital> = { … }` chỉ chứa các thành viên
 viết hoa.
 
-**Dấu hiệu nhận biết.** Một `export const` viết hoa, giá trị là object literal, các key đều viết hoa.
+**Cách nhận ra.** Một `export const` viết hoa, giá trị là object literal, các key đều viết hoa.
 Call site viết `Card.Header`. Bundle to lên mà không ai giải thích được vì sao.
 
 **Ranh giới.** Đây không phải `FILE-1`: một namespace object vẫn khớp tên thư mục, nên `FILE-1` không
@@ -243,15 +252,15 @@ Call site có dấu chấm là một tiện nghi, và bundler là bên trả ti�
 
 ## `FILE-5` — package dùng chung dừng lại ngay dưới block
 
-**Tình huống.** Trong một workspace nhiều app, đường ranh giới đi qua đúng một chỗ: giữa block và mọi
+**Khi nào gặp.** Trong một workspace nhiều app, đường ranh giới đi qua đúng một chỗ: giữa block và mọi
 thứ dưới nó.
 
-**Nó sinh ra gì trong source.** `contracts/`, `leaves/`, `composites/` và `branches/` nằm dưới
+**Source phải thể hiện gì.** `contracts/`, `leaves/`, `composites/` và `branches/` nằm dưới
 `packages/<name>/src/`; `blocks/`, `overlays/`, `layouts/` và `pages/` nằm dưới `apps/<app>/src/`,
 trong đúng app sở hữu feature. Không có tier biết feature nằm trong package dùng chung, không có tier
 từ vựng nằm trong một app, và không có tier wrapper song song nào được bịa ra để cưỡi lên đường ranh.
 
-**Dấu hiệu nhận biết.** `packages/*/src/` có `blocks/`, `overlays/`, `layouts/` hoặc `pages/`.
+**Cách nhận ra.** `packages/*/src/` có `blocks/`, `overlays/`, `layouts/` hoặc `pages/`.
 `apps/*/src/` có `contracts/`, `leaves/`, `composites/` hoặc `branches/`. Header của package tự nói
 "block thuộc về app", còn cây thư mục thì nói ngược lại.
 
@@ -269,17 +278,17 @@ page vào đó.
 
 ## `FILE-6` — route chỉ mount, và `app/` chỉ chứa route
 
-**Tình huống.** File dưới `app/` nói URL nào render page nào. Không fetch, không sắp đặt, không contract
+**Khi nào gặp.** File dưới `app/` nói URL nào render page nào. Không fetch, không sắp đặt, không contract
 key. Và ngược lại: `app/` không chứa thứ gì khác ngoài slot của chính framework.
 
-**Nó sinh ra gì trong source.** Một file slot của framework trong segment — `page`, `layout`,
+**Source phải thể hiện gì.** Một file slot của framework trong segment — `page`, `layout`,
 `template`, `loading`, `error`, `not-found`, `default`, `route` và anh em của chúng — mount một màn hình
 sống ở `components/pages/<Name>/`. Cộng thêm `providers` và `globals.css`, hai thứ được root layout
 mount và không có chỗ nào khác để đi. `app/api/**` là server code, `_folder` là cửa thoát của chính
 framework, và file `.test.` được miễn vì test không ship trong bundle nào và không route nào render nó.
 **Mọi file khác ở đó là một component nằm trong thư mục không ai grep.**
 
-**Dấu hiệu nhận biết.** Route file gọi hook, đọc session, dựng cây layout. Trong `app/` có một file tên
+**Cách nhận ra.** Route file gọi hook, đọc session, dựng cây layout. Trong `app/` có một file tên
 riêng kiểu `fleet-page.tsx`. Không tìm thấy screen ở `components/pages/` dù màn đó rõ ràng đang chạy.
 
 **Ranh giới.** Đây không phải `FILE-2`: `FILE-6` không nhìn được vào BÊN TRONG `page.tsx`. Một
@@ -295,14 +304,14 @@ component đặt tạm trong `app/` "cho gần route" · một file `helpers.ts`
 
 ## `FILE-7` — dấu hiệu trong source là bằng chứng, không phải một cách phân loại thứ hai
 
-**Tình huống.** Một file component tự khai tầng của nó trong source — `meta.shape`, hay bất cứ tên gì
+**Khi nào gặp.** Một file component tự khai tầng của nó trong source — `meta.shape`, hay bất cứ tên gì
 repository đó đặt — trong khi đường dẫn của nó đã khai một tầng rồi. Hai câu nói về cùng một sự thật.
 
-**Nó sinh ra gì trong source.** Không gì mới. Mã này không thêm dấu hiệu nào và cũng không đòi phải có:
+**Source phải thể hiện gì.** Không gì mới. Mã này không thêm dấu hiệu nào và cũng không đòi phải có:
 một repository không khai dấu hiệu ở đâu cả thì không hỏng mã này, nó đơn giản là không có gì cho mã này
 đọc. Thứ mã này chi phối là trường hợp dấu hiệu **có** tồn tại.
 
-**Dấu hiệu nhận biết.** Một file trong `blocks/` nói mình là leaf. Một thư mục được chuyển tầng mà dấu
+**Cách nhận ra.** Một file trong `blocks/` nói mình là leaf. Một thư mục được chuyển tầng mà dấu
 hiệu bị bỏ lại. Một dấu hiệu đi theo một file được sao chép từ tầng khác.
 
 **Ranh giới.** Không phải `FILE-1`: mã đó so thư mục với **tên** export. Mã này so thư mục với một lời
@@ -319,13 +328,13 @@ copy ra để bắt đầu file mới · một tầng bị đổi tên cả thư
 
 ## `FILE-8` — không có tầng shell
 
-**Tình huống.** Một component phải bọc nội dung đã kiểm vào một cơ chế do người khác viết — dialog,
+**Khi nào gặp.** Một component phải bọc nội dung đã kiểm vào một cơ chế do người khác viết — dialog,
 drawer, thân card của vendor — và phản xạ đầu tiên là dựng một tầng để chứa những thứ như vậy.
 
-**Nó sinh ra gì trong source.** Một **branch có tên**, giữ cơ chế đóng kín bên trong và nhận nội dung hợp
+**Source phải thể hiện gì.** Một **branch có tên**, giữ cơ chế đóng kín bên trong và nhận nội dung hợp
 đồng có kiểu đi qua biên của nó. Không gì khác đổi; từ vựng có thêm một cái tên, không phải một tầng.
 
-**Dấu hiệu nhận biết.** Một thư mục `shells/`. Một tầng mà các thành viên không chung hình dạng nào, chỉ
+**Cách nhận ra.** Một thư mục `shells/`. Một tầng mà các thành viên không chung hình dạng nào, chỉ
 chung ở chỗ mỗi cái bọc một thứ gì đó. Một cái tên kết thúc bằng `Shell` cho thứ không phải một trong hai
 cái mà từ vựng có.
 
@@ -345,7 +354,7 @@ thư viện component · bất cứ thứ gì được với tới khi một cơ
 Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay — chính xác thứ mà cơ chế không nhìn thấy
 được. Cột cuối là phần trung thực của bảng này.
 
-| Mã | Tier | Rule trong `@starci/eslint-canon-fe` | Thứ rule không nhìn thấy |
+| Mã | Tier | Rule trong `@canon-fe` | Thứ rule không nhìn thấy |
 |---|---|---|---|
 | `FILE-1` | `enforced` | `export-matches-folder` | Thư mục có giữ MỘT component hay không. Rule chấp nhận một thư mục ngay khi MỘT export thuộc họ, nên một hành khách đi nhờ ngồi cạnh một export khớp tên vẫn qua. |
 | `FILE-2` | `enforced` | `surface-folder-two-files-only` | Bên trong hai file đó. Một `component.tsx` đã phình ra bốn component trong một file thì không phải file thứ ba, nên nó qua. |
@@ -368,7 +377,7 @@ cây thư mục là điểm neo phụ vì đó là nơi luật thật sự đư�
 
 | Mã | Điểm neo | Cần nhìn gì |
 |---|---|---|
-| `FILE-1` | `@starci/eslint-canon-fe`, case `FILE-1: the path predicts the name` · `components/*/**/<Name>/index.tsx` | Một named export trực tiếp bằng đúng tên thư mục, hoặc bắt đầu bằng tên đó rồi nối tiếp bằng một chữ hoa |
+| `FILE-1` | `@canon-fe`, case `FILE-1: the path predicts the name` · `components/*/**/<Name>/index.tsx` | Một named export trực tiếp bằng đúng tên thư mục, hoặc bắt đầu bằng tên đó rồi nối tiếp bằng một chữ hoa |
 | `FILE-2` | Cùng file, case `FILE-2: a surface folder holds its two halves and their twins` · `components/pages/*/` và `components/overlays/*/*/` | Mỗi thư mục liệt kê đúng `component.tsx` và `index.tsx`, cộng bản sinh đôi `.test.tsx` ở nơi có |
 | `FILE-3` | Cùng file, case `FILE-3: a helper folder under components has a real home elsewhere` · `hooks/`, `modules/utils/` | Các đích đến tồn tại và có nội dung, và tìm đệ quy các thư mục `constants`, `utils`, `types` hoặc `hooks` dưới `components/` thì không ra gì |
 | `FILE-4` | Cùng file, case `FILE-4: a family is exported as members, not as one object` · mọi `index.tsx` dưới `components/` | Thành viên của họ được export mỗi câu lệnh một cái; không có `export const <Capital> = { … }` chỉ chứa các thành viên viết hoa |

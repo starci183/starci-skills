@@ -4,6 +4,13 @@ title: Responsive
 
 # Responsive
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a filter rail beside the results, and the results are
 cards" — and you return, for every region that request implies, one situation code and one className.
 The request never states a breakpoint and you never estimate one: the transformation follows from the

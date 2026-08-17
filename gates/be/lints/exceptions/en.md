@@ -4,6 +4,13 @@ title: Exceptions
 
 # Exceptions
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input is code that is already written — one back-end file, one hunk of a diff. The output is a
 **verdict**: whether the file was in scope at all, which published rule fired, what it reported and on
 which node, which law code that maps to, and the open hatch that would have hidden the same failure.

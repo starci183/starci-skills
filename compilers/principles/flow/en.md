@@ -4,6 +4,13 @@ title: Flow
 
 # Flow
 
+## LOADS
+
+None.
+
+
+## Record
+
 You are given a plain request in prose — "a filter sidebar on the left and course cards on the
 right" — and you return, for every container that request implies, one situation code and one
 className. The request never states an axis and you never guess one: the axis follows from what the

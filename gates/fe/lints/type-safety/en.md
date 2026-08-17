@@ -4,6 +4,15 @@ title: Type-safety
 
 # Type-safety
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, what it reported and on which node,
 which law code that maps to, and the open hatch that would have hidden the same failure. This module
@@ -284,7 +293,7 @@ hatch:   the erasure split across two statements — no double cast exists, the 
 ## Scope
 
 This module documents the one rule published by the type-safety law's rule module, shipped in
-`@starci/eslint-canon-fe`. It documents no rule that ought to exist: a rule that cannot be pointed at
+`@canon-fe`. It documents no rule that ought to exist: a rule that cannot be pointed at
 is a proposal, not enforcement. It does not judge the shorthand erasure or the array spelling — those
 belong to the TypeScript plugin's own no-explicit-any rule and its array-type rule with the generic
 default — and it does not judge whether a surviving cast carries its reason, which no module owns.

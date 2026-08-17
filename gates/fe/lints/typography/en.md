@@ -4,6 +4,15 @@ title: Typography
 
 # Typography
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, which message it reported and on
 which node, which law code that maps to, and the open hatch that would have hidden the same failure.
@@ -291,7 +300,7 @@ hatch:   the dynamic tag — `"Tag" !== "tag"`, so the intrinsic test returns nu
 ## Scope
 
 This module documents the one rule published by the typography law's rule module, shipped in
-`@starci/eslint-canon-fe`. It documents no rule that ought to exist: a rule that cannot be pointed at
+`@canon-fe`. It documents no rule that ought to exist: a rule that cannot be pointed at
 is a proposal, not enforcement. The twin that catches a heading assembled out of type classes belongs
 to a different rule module and is documented on that module's shelf. The closed unions and the typed
 pairing on the two type components are the type system's business, not this module's.

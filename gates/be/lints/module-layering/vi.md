@@ -4,7 +4,14 @@ title: Module-layering · Vietnamese
 
 # Phân tầng mô-đun
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, quy tắc đã xuất bản nào nổ, nổ trên specifier nào, ứng với mã luật nào, và cửa nào
 còn mở đủ để giấu đúng cái lỗi ấy. Mô-đun này không chọn bố cục nào cả. Nó từ chối một bố cục, và nó
 phải chỉ được ra đúng specifier mà nó từ chối.
@@ -78,7 +85,7 @@ tách phần còn lại theo `/` và so `parts.length` với `barrelDepth` bằn
 là `metaAware` (chỉ `@modules/`) **và** `parts[0]` nằm trong `Set` ba tên `META_ROOTS`: `platform`,
 `lib`, `integrations`. `parts.length <= barrelDepth` thì báo. Nó không bao giờ đọc `context.filename`.
 
-**Nó không thấy gì.** Nó đếm **số đoạn**, không bao giờ đếm cái mà đoạn cuối trỏ tới. `@modules/ai/index`
+**Điểm mù.** Nó đếm **số đoạn**, không bao giờ đếm cái mà đoạn cuối trỏ tới. `@modules/ai/index`
 là hai đoạn nên đi lọt — gọi thẳng tên tệp barrel là đường đi lọt sạch sẽ nhất qua chính quy tắc sinh
 ra để cấm barrel. `@modules/ai/services` khi `services/` có `index.ts` cũng là khe hở đó và là dạng
 hay gặp hơn nhiều: với một quy tắc không bao giờ phân giải gì, một thư mục barrel lồng bên trong không
@@ -107,7 +114,7 @@ khi alias là `metaAware`, `parts[0]` là một thư mục nhóm và còn ít nh
 thì trả về **bộ thăm rỗng**. Còn lại thì thăm cùng ba loại nút, đòi specifier `startsWith` đúng tiền
 tố alias đó, và báo khi phần còn lại `=== key` hoặc `startsWith(key + "/")` với bất kỳ khoá nào.
 
-**Nó không thấy gì.** `@modules//ai/x` và `@modules/./ai/x` để lại phần còn lại là `"/ai/x"` và
+**Điểm mù.** `@modules//ai/x` và `@modules/./ai/x` để lại phần còn lại là `"/ai/x"` và
 `"./ai/x"`, không khớp `key` cũng không khớp `key + "/"`. Với **vào** một năng lực khác bằng đường
 tương đối — `../../billing/billing.service` từ trong `modules/ai/` — là một lần vượt ranh giới không
 có alias nào để báo, mà quy tắc chỉ soi những specifier có tiền tố alias. Một cây năng lực đặt ở

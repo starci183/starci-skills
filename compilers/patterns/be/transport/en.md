@@ -4,6 +4,15 @@ title: Transport
 
 # Transport
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input to this pattern is a shape somebody already accepted — a capability, a contract, an
 operation the product agreed to expose. The decision that it should exist is closed and this pattern
 does not reopen it. The output is source architecture: which transport the door speaks, which file
@@ -165,7 +174,7 @@ socket gateway, a topic consumer, a controller serving static files, an operatio
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written;
-`enforced` means a named rule from `@starci/eslint-canon-be` reports it; `documented` means nothing
+`enforced` means a named rule from `@canon-be` reports it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |

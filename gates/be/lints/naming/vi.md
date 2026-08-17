@@ -4,7 +4,14 @@ title: Naming · Vietnamese
 
 # Đặt tên
 
-Đầu vào là mã đã viết xong — một tệp, một mảnh diff. Đầu ra là một **phán quyết**: quy tắc nào đã bắn,
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mảnh diff. Kết quả là một **phán quyết**: quy tắc nào đã bắn,
 nó phát ra thông điệp gì, tại nút nào, ứng với mã luật nào, và cửa nào còn mở đủ rộng để che đúng cái
 sai đó. Mô-đun này không chọn tên. Nó từ chối một cái tên, và nó phải chỉ được vào đúng định danh mà nó
 từ chối.
@@ -81,7 +88,7 @@ thức chính quy, `/(?:^|[a-z])V[0-9]+(?:$|[A-Z_])|_V[0-9]+/`, rồi báo tại
 đòi chữ `V` **hoa** đứng ở đầu tên hoặc ngay sau một chữ cái **thường**, rồi sau dãy số phải là hết tên,
 một chữ **hoa**, hoặc một dấu gạch dưới. Nhánh hai đòi một dấu gạch dưới ngay trước chữ `V` hoa.
 
-**Nó không thấy gì.** Nó **không thăm bất kỳ khai báo biến nào**, nên `export const parseV2Body = (body)
+**Điểm mù.** Nó **không thăm bất kỳ khai báo biến nào**, nên `export const parseV2Body = (body)
 => { … }` — kiểu viết phổ biến nhất cho một hàm phụ trợ — là vô hình; quy tắc anh em nằm cùng tệp có đi
 bộ qua danh sách declarator để làm đúng việc đó, nên không thể nói tác giả không biết hình dạng này tồn
 tại. `TSPropertySignature` không được thăm, nên `interface ContentParams { isV2: boolean }` sống yên
@@ -118,7 +125,7 @@ tồn tại. Nếu `declaration` là `FunctionDeclaration` có `id` thì lấy t
 `FunctionExpression` và `id.type` là `Identifier`. Phép kiểm là **tra thành viên trong một `Set`** viết
 tay, đúng chuỗi, phân biệt hoa thường. Báo tại chính nút định danh. **Không có cổng chặn theo tên tệp.**
 
-**Nó không thấy gì.** Vì nó đọc `node.declaration` rồi thoát khi nút đó vắng mặt, một danh sách specifier
+**Điểm mù.** Vì nó đọc `node.declaration` rồi thoát khi nút đó vắng mặt, một danh sách specifier
 — `function generate() { … }` ở trên rồi `export { generate }` ở dưới, và mọi tệp barrel — làm quy tắc
 biến mất hoàn toàn. `export { askModel as generate } from "./models"` tạo ra động từ trơ ở đúng cái nút
 mà quy tắc từ chối đọc. `export * from "./content"` là `ExportAllDeclaration`;

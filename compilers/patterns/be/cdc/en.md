@@ -4,6 +4,13 @@ title: CDC
 
 # CDC
 
+## LOADS
+
+None.
+
+
+## Record
+
 The input to this pattern is a shape that is already accepted: a read model somebody agreed to show, a projection whose numbers a screen depends on, a source table whose changes must reach that screen. This pattern does not re-open that decision. Its output is source architecture — which file the code goes in, which layer owns the connection and which layers stay ignorant of it, what the class extends, what it declares, what it exports, and what a query is allowed to say.
 
 ## Law

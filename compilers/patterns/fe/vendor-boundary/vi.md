@@ -4,8 +4,17 @@ title: Vendor boundary · Vietnamese
 
 # Ranh giới vendor
 
-Đầu vào của pattern này là một shape đã được duyệt — một overlay, một field, một block điều hướng, một
-liên kết, một thẻ. Chuyện nó trông ra sao đã chốt xong, pattern không mở lại. Đầu ra là kiến trúc
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-fe` | `@starci/eslint-canon-fe` | npm package | bộ máy frontend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một overlay, một field, một block điều hướng, một
+liên kết, một thẻ. Chuyện nó trông ra sao đã chốt xong, pattern không mở lại. Kết quả là kiến trúc
 source: file nào giữ import HeroUI, file nào giữ class nhìn thấy, file đó phải export cái gì, và nó
 không bao giờ được nhận cái gì. HeroUI sở hữu cơ chế tương tác; contract của StarCi sở hữu hình dạng
 nhìn thấy. Một import vendor chỉ hợp lệ ở nơi quyền sở hữu ấy gọi được tên và test được.
@@ -51,13 +60,13 @@ Module này công bố mười một mã. Các số `VENDOR-3`, `VENDOR-4` và `
 
 ## `VENDOR-1` — Chủ sở hữu vendor ở tầng component
 
-**Tình huống.** Một file tầng component trong shape đã duyệt cần đến HeroUI.
+**Khi nào gặp.** Một file tầng component trong shape đã duyệt cần đến HeroUI.
 
-**Nó sinh ra gì trong source.** Import HeroUI đáp xuống một leaf, một mechanics branch có tên, hoặc họ
+**Source phải thể hiện gì.** Import HeroUI đáp xuống một leaf, một mechanics branch có tên, hoặc họ
 SurfaceCard có tên — không chỗ nào khác. Mọi file còn lại trong shape nhận kết quả từ những chủ sở hữu
 đó, chứ không nhận giải phẫu vendor.
 
-**Dấu hiệu nhận biết.** Một import `@heroui/react` nằm trong block, layout, overlay, page, composite,
+**Cách nhận ra.** Một import `@heroui/react` nằm trong block, layout, overlay, page, composite,
 hoặc một branch không phải chủ sở hữu cơ chế có tên.
 
 **Ranh giới.** Đây không phải `VENDOR-2`. `VENDOR-1` hỏi import vendor được phép sống ở đâu;
@@ -68,14 +77,14 @@ của HeroUI để dựng phần tóm tắt; một feature branch import Chip ve
 
 ## `VENDOR-2` — Các mechanics branch có tên
 
-**Tình huống.** Shape mở ra, đóng lại, portal hoặc đặt vị trí một thứ gì đó, hoặc có người đề xuất một
+**Khi nào gặp.** Shape mở ra, đóng lại, portal hoặc đặt vị trí một thứ gì đó, hoặc có người đề xuất một
 tầng wrapper chung cho nó.
 
-**Nó sinh ra gì trong source.** `ModalBranch`, `DrawerBranch` và `DropdownBranch`, mỗi cái bọc đúng
+**Source phải thể hiện gì.** `ModalBranch`, `DrawerBranch` và `DropdownBranch`, mỗi cái bọc đúng
 primitive tương tác vendor của nó. Không có mechanics branch rỗng, và không có thư mục
 `components/shells` — mọi thư mục như vậy đều là drift và đã bị xóa.
 
-**Dấu hiệu nhận biết.** Một branch đứng ở vị trí cơ chế nhưng không import vendor; một thư mục mới lập
+**Cách nhận ra.** Một branch đứng ở vị trí cơ chế nhưng không import vendor; một thư mục mới lập
 ra để chứa "wrapper"; một đường dẫn `components/shells` xuất hiện lại.
 
 **Ranh giới.** Đây không phải `VENDOR-1`. `VENDOR-1` soi những file import vendor mà không có quyền;
@@ -86,12 +95,12 @@ ngữ; một đợt refactor đề xuất tầng wrapper dùng chung "cho các o
 
 ## `VENDOR-6` — Một modal body duy nhất, không inset
 
-**Tình huống.** Overlay đã duyệt có phần ruột cuộn được.
+**Khi nào gặp.** Overlay đã duyệt có phần ruột cuộn được.
 
-**Nó sinh ra gì trong source.** `ModalBranch` giữ đúng một `Modal.Body` và body đó không mang inset;
+**Source phải thể hiện gì.** `ModalBranch` giữ đúng một `Modal.Body` và body đó không mang inset;
 padding ở lại trong contract. Thiếu body cũng sai, mà chồng padding giữa body và contract cũng sai.
 
-**Dấu hiệu nhận biết.** Hai vùng cuộn trong một overlay; `className="p-4"` trên `Modal.Body`; nội dung
+**Cách nhận ra.** Hai vùng cuộn trong một overlay; `className="p-4"` trên `Modal.Body`; nội dung
 đặt thẳng vào `Modal` mà không có body.
 
 **Ranh giới.** Đây không phải `VENDOR-12`. `VENDOR-6` ràng buộc body và inset trong file cơ chế;
@@ -102,12 +111,12 @@ footer phải đứng yên; một overlay biểu mẫu mà khoảng cách của 
 
 ## `VENDOR-7` — Bề mặt field của nhà
 
-**Tình huống.** Shape có một ô nhập văn bản.
+**Khi nào gặp.** Shape có một ô nhập văn bản.
 
-**Nó sinh ra gì trong source.** `Field` của nhà, dùng HeroUI Input `variant="secondary"`. Không dựng
+**Source phải thể hiện gì.** `Field` của nhà, dùng HeroUI Input `variant="secondary"`. Không dựng
 thêm một bề mặt input mặc định cạnh tranh bên cạnh nó.
 
-**Dấu hiệu nhận biết.** Một component input thứ hai với bề mặt mặc định riêng; một HeroUI Input dùng ở
+**Cách nhận ra.** Một component input thứ hai với bề mặt mặc định riêng; một HeroUI Input dùng ở
 variant khác để lấy một vẻ ngoài khác.
 
 **Ranh giới.** Đây không phải `VENDOR-9`. `VENDOR-7` ràng buộc bề mặt input; `VENDOR-9` ràng buộc thứ
@@ -118,12 +127,12 @@ riêng cho khớp bản mock; một Input vendor thả thẳng vào một block.
 
 ## `VENDOR-8` — Nội dung overlay vốn đã được đóng khung
 
-**Tình huống.** Overlay đã duyệt chứa nội dung trông như một thẻ.
+**Khi nào gặp.** Overlay đã duyệt chứa nội dung trông như một thẻ.
 
-**Nó sinh ra gì trong source.** Overlay dùng thẳng heading, hàng, khoảng cách và control. Không đặt một
+**Source phải thể hiện gì.** Overlay dùng thẳng heading, hàng, khoảng cách và control. Không đặt một
 SurfaceCard branch có tên thứ hai vào bên trong một overlay vốn đã được đóng khung.
 
-**Dấu hiệu nhận biết.** Một `SurfaceCard` render bên trong modal hay drawer; một viền nhìn thấy nằm
+**Cách nhận ra.** Một `SurfaceCard` render bên trong modal hay drawer; một viền nhìn thấy nằm
 trong một bề mặt vốn đã có viền.
 
 **Ranh giới.** Đây không phải `VENDOR-1`. `VENDOR-1` cho phép họ SurfaceCard import vendor; `VENDOR-8`
@@ -134,11 +143,11 @@ mục được cho một thẻ riêng; một bản mock vẽ thẻ vì phần kh
 
 ## `VENDOR-9` — Nhãn field thuần chữ
 
-**Tình huống.** Một field muốn ra hiệu nó nhận loại giá trị gì.
+**Khi nào gặp.** Một field muốn ra hiệu nó nhận loại giá trị gì.
 
-**Nó sinh ra gì trong source.** Nhãn vẫn thuần chữ. Không suy ra icon trang trí từ kiểu input.
+**Source phải thể hiện gì.** Nhãn vẫn thuần chữ. Không suy ra icon trang trí từ kiểu input.
 
-**Dấu hiệu nhận biết.** Một hình phong thư cạnh field email; một hình ổ khóa cạnh field mật khẩu, thêm
+**Cách nhận ra.** Một hình phong thư cạnh field email; một hình ổ khóa cạnh field mật khẩu, thêm
 vào vì kiểu input chứ không vì ý nghĩa.
 
 **Ranh giới.** Đây không phải `VENDOR-7`. `VENDOR-7` ràng buộc chính bề mặt input; `VENDOR-9` ràng buộc
@@ -149,12 +158,12 @@ mà mỗi field được gán một hình tương ứng; một design system nh�
 
 ## `VENDOR-10` — Liên kết đi qua TextLink
 
-**Tình huống.** Shape có một liên kết.
+**Khi nào gặp.** Shape có một liên kết.
 
-**Nó sinh ra gì trong source.** `TextLink`, bọc `Link` của HeroUI. Không có hành vi liên kết kiểu
+**Source phải thể hiện gì.** `TextLink`, bọc `Link` của HeroUI. Không có hành vi liên kết kiểu
 raw-button và không dựng lại hover hay underline tại chỗ.
 
-**Dấu hiệu nhận biết.** Một button được style cho giống liên kết; một `hover:underline` cục bộ trên
+**Cách nhận ra.** Một button được style cho giống liên kết; một `hover:underline` cục bộ trên
 thẻ neo; một thẻ neo tự làm lại phần trạng thái đã thăm và hover.
 
 **Ranh giới.** Đây không phải `VENDOR-14`. `VENDOR-10` ràng buộc liên kết được làm bằng gì;
@@ -165,13 +174,13 @@ ghost button; một liên kết nội dòng trong đoạn văn dựng lại bằ
 
 ## `VENDOR-11` — Cách ghép menu tài khoản
 
-**Tình huống.** Điều hướng mang theo một menu tài khoản.
+**Khi nào gặp.** Điều hướng mang theo một menu tài khoản.
 
-**Nó sinh ra gì trong source.** Ba file với ba việc: `DropdownBranch` sở hữu cơ chế Dropdown,
+**Source phải thể hiện gì.** Ba file với ba việc: `DropdownBranch` sở hữu cơ chế Dropdown,
 `AccountMenu` sở hữu các lựa chọn, `ShellNav` ghép block. Giải phẫu vendor không rò vào block, và điều
 hướng không tự thực hiện hành động tài khoản nào.
 
-**Dấu hiệu nhận biết.** Giải phẫu item của Dropdown viết bên trong `ShellNav`; một lệnh đăng xuất gọi
+**Cách nhận ra.** Giải phẫu item của Dropdown viết bên trong `ShellNav`; một lệnh đăng xuất gọi
 thẳng từ layout điều hướng.
 
 **Ranh giới.** Đây không phải `VENDOR-2`. `VENDOR-2` chỉ đòi `DropdownBranch` phải sở hữu một cơ chế;
@@ -182,12 +191,12 @@ avatar sang một thiết kế điều hướng mới.
 
 ## `VENDOR-12` — Projection của overlay auth
 
-**Tình huống.** Một overlay auth đã duyệt cần chỗ chứa nội dung.
+**Khi nào gặp.** Một overlay auth đã duyệt cần chỗ chứa nội dung.
 
-**Nó sinh ra gì trong source.** Đúng một content contract có tên, được chiếu vào cơ chế `ModalBranch`
+**Source phải thể hiện gì.** Đúng một content contract có tên, được chiếu vào cơ chế `ModalBranch`
 không inset. Không trùng lặp Tree hay content host, và không có inset dọc thứ hai.
 
-**Dấu hiệu nhận biết.** Hai content host trong một overlay auth; một `div` bọc thêm padding dọc chồng
+**Cách nhận ra.** Hai content host trong một overlay auth; một `div` bọc thêm padding dọc chồng
 lên phần padding vốn có của contract.
 
 **Ranh giới.** Đây không phải `VENDOR-6`. `VENDOR-6` ràng buộc body và inset trong file cơ chế;
@@ -198,12 +207,12 @@ trong cùng modal; bước OTP được cho một host riêng nằm cạnh host 
 
 ## `VENDOR-13` — Nhãn checkbox nằm trong vùng bấm
 
-**Tình huống.** Một checkbox có nhãn.
+**Khi nào gặp.** Một checkbox có nhãn.
 
-**Nó sinh ra gì trong source.** Control và Indicator của Checkbox nằm bên trong Checkbox Content. Nhãn
+**Source phải thể hiện gì.** Control và Indicator của Checkbox nằm bên trong Checkbox Content. Nhãn
 nhìn thấy không bao giờ đặt ngoài vùng bấm của checkbox.
 
-**Dấu hiệu nhận biết.** Một nhãn render như phần tử anh em của checkbox; một hàng mà chỉ mỗi ô vuông
+**Cách nhận ra.** Một nhãn render như phần tử anh em của checkbox; một hàng mà chỉ mỗi ô vuông
 nhỏ phản hồi khi bấm.
 
 **Ranh giới.** Đây không phải `VENDOR-9`. `VENDOR-9` nói về thứ mà nhãn của field được phép hiện;
@@ -214,12 +223,12 @@ xếp thành lưới; một danh sách công tắc cài đặt dựng lại từ
 
 ## `VENDOR-14` — Điều hướng nội bộ là một action
 
-**Tình huống.** Shape điều hướng tới một chỗ nào đó bên trong StarCi.
+**Khi nào gặp.** Shape điều hướng tới một chỗ nào đó bên trong StarCi.
 
-**Nó sinh ra gì trong source.** Component báo một action lên code routing đã nối. Giá trị `href` nội bộ
+**Source phải thể hiện gì.** Component báo một action lên code routing đã nối. Giá trị `href` nội bộ
 StarCi không xuất hiện trong leaf hay component.
 
-**Dấu hiệu nhận biết.** Một đường dẫn nội bộ viết cứng trong leaf; một component import router để tự
+**Cách nhận ra.** Một đường dẫn nội bộ viết cứng trong leaf; một component import router để tự
 dựng chuỗi URL nội bộ.
 
 **Ranh giới.** Đây không phải `VENDOR-10`. `VENDOR-10` nói liên kết được làm bằng gì; `VENDOR-14` nói
@@ -238,8 +247,8 @@ phải giấy miễn trừ cho bất kỳ luật ownership nào.
 
 ## Điểm neo
 
-Rule nằm ở `@starci/eslint-canon-fe` cùng test song sinh ở
-`@starci/eslint-canon-fe`. Điểm neo sản phẩm là `components/branches/ModalBranch`,
+Rule nằm ở `@canon-fe` cùng test song sinh ở
+`@canon-fe`. Điểm neo sản phẩm là `components/branches/ModalBranch`,
 `DrawerBranch`, `DropdownBranch`, họ SurfaceCard, `components/leaves/Field`, `TextLink`,
 `Checkbox`, `components/blocks/auth/AccountMenu` và `components/layouts/ShellNav`.
 
@@ -250,7 +259,7 @@ Rule nằm ở `@starci/eslint-canon-fe` cùng test song sinh ở
 | Shape đã duyệt | Nó là bề mặt nào, chứa những gì, và mở, đóng hay điều hướng ra sao |
 | Vị trí trong tầng component | File là leaf, mechanics branch có tên, thành viên họ SurfaceCard, hay block/layout/overlay/page/composite |
 | Điểm neo sản phẩm sẵn có | Đường dẫn dưới `components/…` đang sở hữu mối quan tâm này, lấy từ danh sách Điểm neo |
-| Nguồn rule | `@starci/eslint-canon-fe` và test song sinh `@starci/eslint-canon-fe` |
+| Nguồn rule | `@canon-fe` và test song sinh `@canon-fe` |
 | Nguồn gốc route, nếu có | Giá trị có đến từ route của framework và có được đóng thành một projection contract có tên trước khi vào tầng component hay không |
 
 ## Quy tắc
@@ -300,7 +309,7 @@ owns: HeroUI Modal lifecycle, focus, portal, dismiss, placement; exactly one zer
 imports: @heroui/react
 exports: ModalBranch
 forbidden: children passthrough; padding on Modal.Body; any components/shells directory
-anchor: @starci/eslint-canon-fe
+anchor: @canon-fe
 ```
 
 ```text
@@ -311,7 +320,7 @@ owns: the single named content contract projected into ModalBranch; all visible 
 imports: none from @heroui/react
 exports: <authOverlayContract>
 forbidden: duplicate Tree/content hosts; a second vertical inset; a named SurfaceCard branch inside the overlay
-anchor: @starci/eslint-canon-fe
+anchor: @canon-fe
 ```
 
 ## Ví dụ đã giải

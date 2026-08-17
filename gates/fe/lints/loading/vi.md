@@ -4,7 +4,14 @@ title: Loading · Vietnamese
 
 # Trạng thái chờ
 
-Đầu vào là mã đã viết xong — một tệp, một mẩu diff. Đầu ra là một **phán quyết**: tệp có nằm trong
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Gate này nhận mã đã viết xong — một tệp, một mẩu diff. Kết quả là một **phán quyết**: tệp có nằm trong
 phạm vi hay không, quy tắc đã xuất bản nào đã nổ, nó báo gì và trên nút nào, mã luật tương ứng là gì,
 và cửa còn mở nào lẽ ra đã che đúng lỗi đó. Mô-đun này không chọn hình dạng lúc chờ. Nó từ chối một
 hình dạng, và phải chỉ được đúng tên tệp, đúng thuộc tính hoặc đúng biểu thức ba ngôi mà nó từ chối.
@@ -70,7 +77,7 @@ phải một dòng nào bên trong.
 `/\/([A-Za-z0-9]*Skeleton)\.tsx?$/`; đoạn bắt được đem thử lại với `^[A-Za-z0-9]*Skeleton$`. Trúng thì
 nó đăng ký một bộ thăm `Program` và báo trên chính nút mà trình phân tích trao cho.
 
-**Nó không thấy gì.** Bất kỳ bao nhiêu bản sao **khai báo bên trong một tệp có tên hợp lệ**:
+**Điểm mù.** Bất kỳ bao nhiêu bản sao **khai báo bên trong một tệp có tên hợp lệ**:
 `export const AvatarSkeleton = () => …` nằm trong `Avatar/index.tsx` — quy tắc không bao giờ soi khai
 báo, nó là một quy tắc theo tên tệp khoác áo bộ thăm AST. Cũng vậy với bản sao mang bất kỳ chữ nào
 khác: `AvatarPlaceholder`, `AvatarLoading`, `AvatarShimmer`, `AvatarResting`, `avatar-skeleton.tsx`,
@@ -98,7 +105,7 @@ một loại container, hai loại biểu thức — không xét gì thêm. Nử
 Từng `local.name` của specifier được thử với `^[A-Za-z0-9]*Skeleton$`, trừ đúng chuỗi `Skeleton` ra, vì
 đó là nguyên thuỷ mà một thành phần **nghỉ bằng**, không phải bản sao của một thành phần.
 
-**Nó không thấy gì.** Phần tử được gom vào một cái tên trước: `const resting = <AvatarBar/>` rồi
+**Điểm mù.** Phần tử được gom vào một cái tên trước: `const resting = <AvatarBar/>` rồi
 `skeleton={resting}`. Tương tự `skeleton={SHAPES.avatar}`, `skeleton={renderResting()}`,
 `skeleton={<AvatarBar/> as ReactNode}`, `fallback={isWide ? <A/> : <B/>}` — phép kiểm tra đặt trên
 `expression.type`, mà một `Identifier`, `MemberExpression`, `CallExpression`, `TSAsExpression` hay
@@ -130,7 +137,7 @@ hoặc `object.property` với `JSXMemberExpression`), một `JSXFragment` thàn
 `null`. Nó chỉ báo khi cả hai chuỗi đều tồn tại **và khác nhau**. Chính phép rút gọn đó là chi tiết chịu
 lực của cả mô-đun này: quy tắc so **tên phần tử gốc**, không so cây.
 
-**Nó không thấy gì.** **Cùng một thẻ gốc ở cả hai nhánh**:
+**Điểm mù.** **Cùng một thẻ gốc ở cả hai nhánh**:
 `isLoading ? <div className="h-4 animate-pulse"/> : <div><Avatar/><Text/></div>` — hai nhánh đều rút về
 `div`, hai chuỗi bằng nhau, và quy tắc trả về; hai cây hoàn toàn khác nhau đi qua như một. Bọc chung một
 vỏ cũng vậy: `isLoading ? <Row><Bar/></Row> : <Row><Avatar/><Text/></Row>`. Đọc trạng thái ngay tại chỗ,

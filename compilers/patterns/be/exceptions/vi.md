@@ -4,7 +4,14 @@ title: Exceptions · Vietnamese
 
 # Ngoại lệ
 
-Đầu vào là một shape đã được duyệt: một capability đã chốt các nhánh thất bại, một contract đã nói rõ
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt: một capability đã chốt các nhánh thất bại, một contract đã nói rõ
 cái gì có thể hỏng, một handler đã chốt những lần từ chối của nó. Pattern này không mở lại câu hỏi có
 những thất bại nào hay chúng tên là gì — **tên nào**, viết bằng ba bảng chữ nào, là việc của module
 `exception-identity` bên cạnh. Nó chỉ hạ shape đã duyệt xuống source: class nào được khai báo, thư mục
@@ -83,17 +90,17 @@ cho những thất bại thật.
 
 ## `EXCEPTION-1` — throw một class có tên, không phải một câu
 
-**Tình huống.** Bạn đang ở giữa một handler, một service, một guard, và một điều kiện vừa sai. Câu
+**Khi nào gặp.** Bạn đang ở giữa một handler, một service, một guard, và một điều kiện vừa sai. Câu
 lệnh tiếp theo bạn viết quyết định mọi người phía sau còn làm được gì với thất bại này.
 
-**Nó sinh ra gì trong source.** Một `throw new <tên>Exception({ ... })` với class là subclass của
+**Source phải thể hiện gì.** Một `throw new <tên>Exception({ ... })` với class là subclass của
 `AbstractException`. Không phải `throw new Error("...")` — thứ mang một câu và không mang code, nên
 không có gì group, khớp hay retry được nếu không parse tiếng Anh. Cũng không phải exception của
 framework — thứ mang một status và không mang danh tính: hai thất bại chẳng liên quan gì nhau tới
 client trông y hệt nhau, và thứ duy nhất phân biệt chúng là message, đúng cái phần sẽ bị sửa lại chữ
 ở lần refactor sau.
 
-**Dấu hiệu nhận biết.** Trong `throw` có một chuỗi tiếng Anh mô tả chuyện gì vừa xảy ra; client phải
+**Cách nhận ra.** Trong `throw` có một chuỗi tiếng Anh mô tả chuyện gì vừa xảy ra; client phải
 đọc `message` mới biết đã trúng nhánh nào; alert group theo status code nên một alert 400 gom chung
 sáu thất bại khác nhau; có người vừa hỏi "lỗi này retry được không" và không ai trả lời được nếu không
 mở source ra đọc.
@@ -111,14 +118,14 @@ biến môi trường bắt buộc không được set · upload sai định d�
 
 ## `EXCEPTION-2` — đúng một object, kể cả khi rỗng
 
-**Tình huống.** Bạn đã có class đúng. Giờ là câu hỏi truyền gì vào constructor — và đây là chỗ hai
+**Khi nào gặp.** Bạn đã có class đúng. Giờ là câu hỏi truyền gì vào constructor — và đây là chỗ hai
 thói quen khác nhau lẻn vào cùng một codebase.
 
-**Nó sinh ra gì trong source.** Đúng một object literal ở mọi chỗ throw — `new XException({})` khi
+**Source phải thể hiện gì.** Đúng một object literal ở mọi chỗ throw — `new XException({})` khi
 thất bại không có gì của riêng nó để kể, `new XException({ tier })` khi có. Không phải
 `new XException()`, không phải `new XException("id")`, không phải `new XException(a, b)`.
 
-**Dấu hiệu nhận biết.** Trong cùng một file có cả `new XException()` và `new YException({...})`;
+**Cách nhận ra.** Trong cùng một file có cả `new XException()` và `new YException({...})`;
 constructor nhận `(id: string, status: string)` thay vì một object; một chỗ throw truyền hai tham số
 vì "thêm cho đủ thông tin"; ai đó vừa phải grep cả repo để sửa thứ tự tham số sau khi thêm một trường.
 
@@ -134,17 +141,17 @@ một id · lỗi hạn mức mang giá trị hiện tại và ngưỡng · lỗ
 
 ## `EXCEPTION-3` — class extends base của nhà, không phải của framework
 
-**Tình huống.** Bạn đang khai báo một class lỗi mới, và trong tầm mắt có một base rất tiện: base của
+**Khi nào gặp.** Bạn đang khai báo một class lỗi mới, và trong tầm mắt có một base rất tiện: base của
 framework, sẵn status, sẵn serialize, sẵn mọi thứ. Đây là chỗ cái bẫy nguy hiểm nhất của cả module này
 nằm.
 
-**Nó sinh ra gì trong source.** Một dòng `extends AbstractException` trên chính dòng khai báo, đọc từ
+**Source phải thể hiện gì.** Một dòng `extends AbstractException` trên chính dòng khai báo, đọc từ
 file khai báo chứ không suy ra từ bất cứ chỗ throw nào. Class đó được throw **bằng chính tên của nó**,
 nên ở mọi chỗ throw dòng code đọc lên đúng như một exception của nhà, và rule canh chỗ throw không
 thấy gì sai cả. Đó không phải giả thuyết: đúng một class như vậy đã sống trong cây code, được throw từ
 bốn call site, trong khi gate vẫn xanh.
 
-**Dấu hiệu nhận biết.** Chỗ throw trông hoàn toàn bình thường, nhưng client nhận về một status "sạch"
+**Cách nhận ra.** Chỗ throw trông hoàn toàn bình thường, nhưng client nhận về một status "sạch"
 mà không có code; class nằm đúng thư mục errors, đặt tên đúng hậu tố, chỉ có dòng `extends` là khác;
 filter bắt `AbstractException` mà thất bại này không bao giờ rơi vào đó.
 
@@ -161,15 +168,15 @@ trong lúc migration và không ai review lại dòng `extends`.
 
 ## `EXCEPTION-4` — mọi lỗi khai báo trong một thư mục
 
-**Tình huống.** File khai báo lỗi mới sắp được tạo, và chỗ tiện nhất là ngay cạnh service throw nó.
+**Khi nào gặp.** File khai báo lỗi mới sắp được tạo, và chỗ tiện nhất là ngay cạnh service throw nó.
 Đây là quyết định trông vô hại nhất trong cả module.
 
-**Nó sinh ra gì trong source.** Một file khai báo nằm dưới thư mục `exceptions/errors/`, một thư mục
+**Source phải thể hiện gì.** Một file khai báo nằm dưới thư mục `exceptions/errors/`, một thư mục
 như vậy cho mỗi ứng dụng, để câu hỏi "ứng dụng này có thể throw ra những gì?" có **một** chỗ để nhìn,
 và để một reviewer **thấy một failure mode mới đi vào** trong diff. Một exception khai báo cạnh code
 throw nó thì vô hình cho tới khi có thứ gì đó throw nó trên production.
 
-**Dấu hiệu nhận biết.** Một `class ...Exception` nằm cuối một file service, sau khi đã đọc hết logic;
+**Cách nhận ra.** Một `class ...Exception` nằm cuối một file service, sau khi đã đọc hết logic;
 có hai lỗi gần trùng nhau ở hai module vì người viết cái thứ hai không biết cái thứ nhất tồn tại;
 không ai trả lời được "danh sách lỗi của ứng dụng" mà không grep.
 
@@ -184,16 +191,16 @@ helper rồi bị import ngược vào product code.
 
 ## `EXCEPTION-5` — metadata mang thứ người đọc sẽ cần
 
-**Tình huống.** Class đúng, hình dạng đúng, chỗ đặt đúng. Còn lại một câu hỏi mà không rule nào trả
+**Khi nào gặp.** Class đúng, hình dạng đúng, chỗ đặt đúng. Còn lại một câu hỏi mà không rule nào trả
 lời hộ được: **object đó chứa gì.**
 
-**Nó sinh ra gì trong source.** Những trường trên object metadata mà người đọc tiếp theo hành động
+**Source phải thể hiện gì.** Những trường trên object metadata mà người đọc tiếp theo hành động
 được — id của bản ghi không tìm thấy, trạng thái đã làm cho thao tác thành bất khả, cái ngưỡng vừa bị
 vượt. Message dành cho **một con người đang đọc log**; metadata dành cho **mọi thứ còn lại**: client
 quyết định hiển thị gì, retry policy quyết định có thử lại không, alert group theo code và cần biết
 đây là tenant nào. Không phải một câu đã render sẵn.
 
-**Dấu hiệu nhận biết.** Metadata có đúng một trường và trường đó tên là `message`, `detail`, `reason`
+**Cách nhận ra.** Metadata có đúng một trường và trường đó tên là `message`, `detail`, `reason`
 hoặc `description`; message đã ghép sẵn id vào bằng template string còn metadata thì rỗng; có người
 đang viết regex trên message trong dashboard log; client hiển thị được lỗi nhưng không link được tới
 bản ghi gây lỗi.
@@ -213,17 +220,17 @@ biến môi trường bị thiếu · `originalError` khi bọc lỗi của thư
 
 ## `EXCEPTION-6` — assertion của test runner không phải lỗi nghiệp vụ
 
-**Tình huống.** Một spec đang chạy và fixture không seed được. Test không thể đi tiếp. Bạn viết
+**Khi nào gặp.** Một spec đang chạy và fixture không seed được. Test không thể đi tiếp. Bạn viết
 `throw new Error("fixture did not seed")` — và đó là **đúng**.
 
-**Nó sinh ra gì trong source.** Một `throw new Error(...)` nằm lại trong họ file spec và cây test, nơi
+**Source phải thể hiện gì.** Một `throw new Error(...)` nằm lại trong họ file spec và cây test, nơi
 nó nghĩa là "runner bỏ cuộc" chứ không đặt tên cho một thất bại mà sản phẩm có thể sinh ra. Một lane
 bị cấm tự làm hỏng setup của chính nó sẽ phải bịa ra một domain exception cho việc "thiếu fixture" —
 tức là đưa một thất bại **của bài test** vào đúng bộ từ vựng mà sản phẩm dùng cho những thất bại thật,
 và thêm vào danh sách lỗi của ứng dụng một dòng mà người dùng không bao giờ chạm tới được. Lối ra này
 được cấp phép ở nơi nó áp dụng, và không ở đâu khác.
 
-**Dấu hiệu nhận biết.** Dòng `throw new Error` nằm trong file spec hoặc trong cây test, và mô tả một
+**Cách nhận ra.** Dòng `throw new Error` nằm trong file spec hoặc trong cây test, và mô tả một
 điều kiện của môi trường test chứ không của nghiệp vụ; ngược lại, một domain exception được khai báo
 mà chỉ có spec throw nó; một helper của test bị import vào product code, mang theo lối ra này.
 

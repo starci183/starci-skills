@@ -4,6 +4,15 @@ title: CQRS
 
 # CQRS
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input to this pattern is a shape that has already been accepted: an operation the backend has
 agreed to expose, a capability someone signed off, a contract already settled. The output is source
 architecture — which folder the operation owns, which file each piece lands in, what that file may
@@ -236,7 +245,7 @@ branch added to the handler with the spec unchanged.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written;
-`enforced` means a named rule from `@starci/eslint-canon-be` reports it; `documented` means nothing
+`enforced` means a named rule from `@canon-be` reports it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |

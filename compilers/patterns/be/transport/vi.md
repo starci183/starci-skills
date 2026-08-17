@@ -4,7 +4,16 @@ title: Transport · Vietnamese
 
 # Cửa vào hệ thống
 
-Đầu vào của pattern này là một shape đã được duyệt — một năng lực, một hợp đồng, một thao tác mà sản
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | bộ máy backend đã phát hành mà bản ghi này viện dẫn |
+
+
+## Bản ghi
+
+Pattern này nhận một shape đã được duyệt — một năng lực, một hợp đồng, một thao tác mà sản
 phẩm đã đồng ý mở ra. Việc nó nên tồn tại là chuyện đã khép lại và pattern này không mở lại. Đầu ra
 là kiến trúc source: cửa ấy nói giao thức nào, file nào giữ nó, file ấy nằm dưới thư mục nào, và
 token nào trong chính file chứng minh lựa chọn đó.
@@ -75,13 +84,13 @@ phải trả lời được khi ứng dụng đang hỏng, thậm chí trước 
 
 ## `TRANSPORT-1` — cửa mặc định là GraphQL
 
-**Tình huống.** Một thao tác nhận vào các field và trả lời bằng các field. Nó là một mutation hoặc
+**Khi nào gặp.** Một thao tác nhận vào các field và trả lời bằng các field. Nó là một mutation hoặc
 một query. Không có câu hỏi thứ hai để hỏi.
 
-**Nó sinh ra gì trong source.** Một `@Resolver` nằm dưới `features/`, khai báo một mutation hoặc một
+**Source phải thể hiện gì.** Một `@Resolver` nằm dưới `features/`, khai báo một mutation hoặc một
 query trong schema code-first. Không controller, không endpoint thứ hai, không route song song.
 
-**Dấu hiệu nhận biết.** Payload vào là JSON có cấu trúc; payload ra là JSON có cấu trúc. Người gọi là
+**Cách nhận ra.** Payload vào là JSON có cấu trúc; payload ra là JSON có cấu trúc. Người gọi là
 client sản phẩm — thứ đã cầm sẵn schema và bộ type sinh ra. Danh tính đi kèm request là một phiên
 người dùng bình thường. Không có byte nào, không có máy nào, không có ai posting tới URL ta phát ra.
 
@@ -99,10 +108,10 @@ bản nháp · huỷ đăng ký · đổi mật khẩu qua phiên hiện tại �
 
 ## `TRANSPORT-2` — cửa REST chỉ ở chỗ GraphQL không tới được
 
-**Tình huống.** GraphQL **không làm nổi** việc, và file phải tự nói ra nó thuộc ca nào. Bốn ca, không
+**Khi nào gặp.** GraphQL **không làm nổi** việc, và file phải tự nói ra nó thuộc ca nào. Bốn ca, không
 có ca thứ năm.
 
-**Nó sinh ra gì trong source.** Một `@Controller` nằm dưới `features/`, mang ngay trong file cái
+**Source phải thể hiện gì.** Một `@Controller` nằm dưới `features/`, mang ngay trong file cái
 token chỉ ra lối ra của nó:
 
 | Ca | Nhìn thấy gì trong file | Vì sao GraphQL không tới được |
@@ -112,7 +121,7 @@ token chỉ ra lối ra của nó:
 | **một cỗ máy tự đăng ký** | route bắt đầu bằng `pods/`, `internal/`, `agents/` | một pod gọi về lúc khởi động không mang theo phiên người dùng nào cả |
 | **một danh tính không phải phiên người dùng** | route bắt đầu bằng `api/ops`, hoặc file dùng guard operator / service token | một operator nền tảng hay một service token là **chủ thể khác** với người dùng của sản phẩm; treo nó lên cùng một guard là mở đường cho quản trị viên của một tenant vận hành cả nền tảng |
 
-**Dấu hiệu nhận biết.** Bằng chứng đọc được **ngay trong file**, không phải trong một tài liệu nào
+**Cách nhận ra.** Bằng chứng đọc được **ngay trong file**, không phải trong một tài liệu nào
 khác. Bỏ dòng bằng chứng ấy đi thì không còn ai biết vì sao cửa này không phải GraphQL. Hỏi thẳng:
 nếu người đọc tiếp theo chỉ mở đúng file này, họ có thấy được lý do không? Nếu phải hỏi người khác thì
 lý do chưa nằm trong file, và luật coi như chưa có lý do. Bằng chứng đọc từ file, không đọc từ sổ đăng
@@ -133,14 +142,14 @@ bảng điều khiển vận hành nội bộ · probe cho load balancer.
 
 ## `TRANSPORT-3` — cửa nào cũng nằm dưới `features/`
 
-**Tình huống.** `modules/` giữ **năng lực** — những thứ mà cửa gọi tới. `features/` giữ **cửa**. Giao
+**Khi nào gặp.** `modules/` giữ **năng lực** — những thứ mà cửa gọi tới. `features/` giữ **cửa**. Giao
 thức chưa bao giờ là thứ quyết định địa chỉ; **việc là một cửa** mới quyết định.
 
-**Nó sinh ra gì trong source.** File nằm dưới `features/`, bất kể nó mang gì: `@Controller`,
+**Source phải thể hiện gì.** File nằm dưới `features/`, bất kể nó mang gì: `@Controller`,
 `@Resolver`, `@WebSocketGateway` hay một handler nhận message từ broker. Không cửa nào được viết dưới
 `modules/**`.
 
-**Dấu hiệu nhận biết.** File có `@Controller`, `@Resolver`, `@WebSocketGateway` hoặc một handler nhận
+**Cách nhận ra.** File có `@Controller`, `@Resolver`, `@WebSocketGateway` hoặc một handler nhận
 message từ broker. Nó là điểm **bắt đầu** của một request, không phải chỗ được ai đó gọi vào. Hỏi
 thẳng: có thứ gì ngoài tiến trình này chạm được vào file này không? Nếu có thì nó là cửa, và cửa thì
 nằm dưới `features/`. Một cửa nằm nhầm trong `modules/` rất đắt vì nó **đọc như một năng lực** rồi
@@ -158,8 +167,8 @@ socket · consumer đọc topic · controller phục vụ file tĩnh · controll
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là không thể viết ra giá trị sai;
-`enforced` nghĩa là một rule có tên trong `@starci/eslint-canon-be` báo lỗi; `documented` nghĩa là
+Mỗi mã hiện được giữ ở tầng nào. `unrepresentable` nghĩa là không thể viết ra giá trị sai;
+`enforced` nghĩa là một rule có tên trong `@canon-be` báo lỗi; `documented` nghĩa là
 không có cơ chế nào giữ, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
@@ -172,7 +181,7 @@ Một dòng ghi `documented`, và đó là trạng thái thật thà chứ khôn
 `TRANSPORT-1` là mã duy nhất ở đây mà vi phạm của nó là một **sự vắng mặt** — một thao tác không bao
 giờ được viết vào schema vì người ta đã viết một route thay cho nó. Parser thấy những token có tồn
 tại; nó không thấy được một mutation mà ai đó chọn không khai. Thứ giữ `TRANSPORT-1` trên thực tế là
-rule của `TRANSPORT-2` tấn công cùng một quyết định từ đầu bên kia: cái route thay chỗ cho mutation
+rule của `TRANSPORT-2` tấn công cùng một quyết định từ đầu bên kia: route thay chỗ cho mutation
 vẫn phải tự biện minh, và phần lớn thì không biện minh nổi.
 
 Tầng sở hữu mối quan tâm này là tầng cửa dưới `features/`; mọi tầng dưới `modules/` — service,

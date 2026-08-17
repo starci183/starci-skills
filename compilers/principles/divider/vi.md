@@ -4,8 +4,15 @@ title: Divider · Vietnamese
 
 # Đường phân cách
 
-Đầu vào là một yêu cầu viết bằng lời thường — "một hộp thoại có phần đầu, một danh sách lời mời và
-phần cuối" — và đầu ra là, với **mỗi chỗ tiếp giáp** mà yêu cầu đó ngụ ý, một mã tình huống và một
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "một hộp thoại có phần đầu, một danh sách lời mời và
+phần cuối" — rồi trả về là, với **mỗi chỗ tiếp giáp** mà yêu cầu đó ngụ ý, một mã tình huống và một
 className. Yêu cầu không bao giờ đòi một đường kẻ, và không được thêm đường kẻ cho một vùng "trông rõ
 ràng hơn": việc có hay không có đường kẻ suy ra từ chỗ hai bên có dính sát nhau không và từ chỗ
 khoảng trống đã nói ranh giới đó chưa.
@@ -92,10 +99,10 @@ chứ không phải để nó bị lẳng lặng xử lý như một đường p
 
 ## `DIVIDER-0` — khoảng trống đã nói rồi
 
-**Tình huống.** Hai thứ đứng cạnh nhau và giữa chúng đã có khoảng trống do phần tử cha đặt. Ranh giới
+**Khi nào gặp.** Hai thứ đứng cạnh nhau và giữa chúng đã có khoảng trống do phần tử cha đặt. Ranh giới
 đã được phát biểu. Thêm một đường kẻ là nói lại lần thứ hai cùng một câu.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Phần tử cha đang giữ một `gap` chạy ngang qua đúng đường nối này.
 - Hai bên đã tự có mặt nền, có bóng, hoặc có viền bao riêng — chúng đã tách nhau rồi.
@@ -124,11 +131,11 @@ khoảng.
 
 ## `DIVIDER-1` — một tập thành viên cùng loại, kẻ lặp lại
 
-**Tình huống.** Nhiều mục **cùng loại** nằm liền nhau trên một mặt duy nhất: mỗi mục có khoảng đệm bên
+**Khi nào gặp.** Nhiều mục **cùng loại** nằm liền nhau trên một mặt duy nhất: mỗi mục có khoảng đệm bên
 trong riêng, không có khoảng trống giữa chúng. Ranh giới giữa mục này và mục kế chỉ còn đường kẻ để
 nói.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Các mục là **những phiên bản của cùng một thứ** — cùng vai trò, cùng cách đọc, cùng loại hành động.
 - Chúng dính sát nhau; toàn bộ khoảng đệm nằm **bên trong** mỗi mục.
@@ -157,11 +164,11 @@ thời gian hoạt động · danh sách tệp đính kèm · các dòng trong t
 
 ## `DIVIDER-2` — một dải tự đóng cạnh của nó
 
-**Tình huống.** Một dải **gọi tên hoặc điều khiển** phần phía sau nó — phần đầu, thanh công cụ, thanh
+**Khi nào gặp.** Một dải **gọi tên hoặc điều khiển** phần phía sau nó — phần đầu, thanh công cụ, thanh
 thẻ tab, phần cuối hành động — và nội dung chạy **sát** vào dải đó. Đường kẻ nói: dải này ở **trên**
 nội dung, không nằm **trong** nội dung.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Dải ngắn, phần sau là nội dung thật.
 - Nội dung có thể trượt, đổi, rỗng hoặc dài vô hạn, còn dải thì đứng yên.
@@ -191,11 +198,11 @@ dẫn phân cấp sát nội dung · thanh bộ lọc ghim trên vùng kết qu�
 
 ## `DIVIDER-3` — hai vùng ngang hàng chung một đường nối
 
-**Tình huống.** Hai vùng **khác loại**, không bên nào sở hữu bên kia, nằm dính nhau vì chúng chia nhau
+**Khi nào gặp.** Hai vùng **khác loại**, không bên nào sở hữu bên kia, nằm dính nhau vì chúng chia nhau
 một mặt liền hoặc vì bố cục không cho phép khoảng trống. Chỉ có **một** đường nối, và nó được khai báo
 **một lần**.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Mỗi bên tự gọi tên được, mỗi bên có nội dung riêng.
 - Không bên nào là "phiên bản" của bên kia — chúng không cùng một loại.
@@ -223,11 +230,11 @@ một thẻ.
 
 ## `DIVIDER-4` — đường kẻ bao quanh chứ không ngăn cách
 
-**Tình huống.** Đường kẻ chạy **hết một vòng** quanh một đối tượng. Nó không nói "bên này khác bên
+**Khi nào gặp.** Đường kẻ chạy **hết một vòng** quanh một đối tượng. Nó không nói "bên này khác bên
 kia"; nó nói "những thứ bên trong tôi là **một nhóm gọi được tên**, và nhóm đó khác với nhóm bao
 quanh".
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đường kẻ khép kín, thường kèm bo góc.
 - Bỏ nó đi thì không có đường nối nào bị mất — chỉ có một nhóm bị mất tên.
@@ -253,10 +260,10 @@ sách · khung ảnh · thẻ tóm tắt thanh toán · khung mã nguồn · vi�
 
 ## `DIVIDER-5` — ma trận ô, so sánh trên hai trục
 
-**Tình huống.** Các ô so sánh được **theo hàng** và cũng so sánh được **theo cột**. Một ô có nghĩa nhờ
+**Khi nào gặp.** Các ô so sánh được **theo hàng** và cũng so sánh được **theo cột**. Một ô có nghĩa nhờ
 vị trí của nó trên cả hai trục, nên cả hai trục đều cần được nói.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đọc dọc một cột là so sánh được; đọc ngang một hàng cũng so sánh được.
 - Các ô dính nhau, khoảng đệm nằm bên trong ô.
@@ -282,11 +289,11 @@ học theo ngày.
 
 ## `DIVIDER-6` — đường kẻ tự nó là một phần tử
 
-**Tình huống.** Đường kẻ **không phải cạnh của ai cả**. Nó tự đứng trong dòng chảy như một phần tử, vì
+**Khi nào gặp.** Đường kẻ **không phải cạnh của ai cả**. Nó tự đứng trong dòng chảy như một phần tử, vì
 hai bên nó là những khối tuỳ ý mà không bên nào có tư cách sở hữu đường nối — hoặc vì đường kẻ còn
 phải **mang một nhãn**.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Hai bên là nội dung dạng dòng chảy tự do: đoạn văn, khối nội dung sinh ra từ dữ liệu, các phần không
   đoán trước được.

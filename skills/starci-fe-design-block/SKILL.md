@@ -5,8 +5,22 @@ description: Produce 3–4 block anatomy JSON candidates for each region of an a
 
 # starci-fe-design-block
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first. This skill runs inside the session
-`starci-fe-design-layout` opened; it never opens its own.
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@block-schema` | `brainstorms/blocks/schema.json` | file | validate block anatomy JSON |
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+
+## HANDS OFF TO — named, never loaded
+
+None.
+
+
+## Run
+
+Read `@skill-shape` first. This skill requires an existing hash-bound session; it never opens its own.
 
 **The JSON is the artifact. The HTML is a way of looking at it.** Approval binds to the canonical JSON
 hash, never to a rendered page.
@@ -74,8 +88,8 @@ does not say — these are product decisions. A refusal block ships with the can
 Validate before writing and before hashing:
 
 ```bash
-node <trust>/scripts/validate-artifact.mjs \
-  --schema <trust>/brainstorms/blocks/schema.json \
+node @validate-artifact \
+  --schema @block-schema \
   --data <batch.json> --hash
 ```
 
@@ -100,8 +114,7 @@ append it, and record `REJECTED` with the actual anatomy, its replacement and th
 
 ### 11 — Close the phase
 
-Print the six tables. `OWED` names regions still without an accepted anatomy,
-because those are what `starci-fe-design-execute` will stop on.
+Print the six tables. `OWED` names regions still without an accepted anatomy.
 
 ## Stops
 

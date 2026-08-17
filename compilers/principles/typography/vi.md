@@ -4,8 +4,15 @@ title: Typography · Vietnamese
 
 # Kiểu chữ
 
-Đầu vào là một yêu cầu viết bằng lời thường — "trang khoá học có phần nội dung khoá học liệt kê các
-mô-đun" — và đầu ra là, với **mỗi dòng chữ** mà yêu cầu đó ngụ ý, một mã tình huống, một phần tử và
+## LOADS
+
+None.
+
+
+## Bản ghi
+
+Nguyên tắc này nhận một yêu cầu viết bằng lời thường — "trang khoá học có phần nội dung khoá học liệt kê các
+mô-đun" — rồi trả về là, với **mỗi dòng chữ** mà yêu cầu đó ngụ ý, một mã tình huống, một phần tử và
 một className. Yêu cầu không bao giờ nói ra một cỡ chữ, và không được phép ước lượng một cỡ chữ: cỡ
 chữ, độ đậm và tông màu suy ra từ **thứ dòng chữ đó sở hữu**.
 
@@ -87,10 +94,10 @@ con mắt quay lại quyết định thông qua phép tính.
 
 ## `TYPOGRAPHY-1` — tên gốc của trang
 
-**Tình huống.** Dòng này trả lời câu "tôi đang ở đâu?". Nó là gốc của dàn ý tài liệu và mỗi tuyến
+**Khi nào gặp.** Dòng này trả lời câu "tôi đang ở đâu?". Nó là gốc của dàn ý tài liệu và mỗi tuyến
 trang chỉ có **một** dòng như vậy.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nếu xoá dòng này, người dùng không còn biết trang đang nói về cái gì.
 - Nó thường trùng hoặc gần trùng với đường dẫn phân cấp cuối, với thẻ tab tiêu đề, với tên tuyến
@@ -114,10 +121,10 @@ trang đơn hàng · tên bài viết trên tuyến trang bài viết · tiêu �
 
 ## `TYPOGRAPHY-2` — bậc dàn ý đầu tiên dưới trang
 
-**Tình huống.** Một phần của trang có mục đích riêng, có nội dung riêng, và **phải xuất hiện trong dàn
+**Khi nào gặp.** Một phần của trang có mục đích riêng, có nội dung riêng, và **phải xuất hiện trong dàn
 ý** để người dùng trình đọc màn hình nhảy tới được.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Người ta gọi nó bằng tên khi nói chuyện: "phần đánh giá", "phần hoạt động gần đây".
 - Nó có thể rỗng riêng, lỗi riêng, tải riêng.
@@ -139,10 +146,10 @@ viên · Thanh toán · Bảo mật · Thành viên nhóm · Tệp đính kèm �
 
 ## `TYPOGRAPHY-3` — phần con cục bộ
 
-**Tình huống.** Một nhóm nhỏ **bên trong** một phần nội dung, đủ độc lập để cần một cái tên, nhưng
+**Khi nào gặp.** Một nhóm nhỏ **bên trong** một phần nội dung, đủ độc lập để cần một cái tên, nhưng
 không đủ lớn để là một mục cấp một của trang.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Luôn có một `h2` ở trên nó trong cùng cây.
 - Nó gom vài dòng lại thành một chủ đề nhỏ.
@@ -165,10 +172,10 @@ dung thanh toán · Điều kiện tiên quyết trong một phần nội dung g
 
 ## `TYPOGRAPHY-4` — bậc dàn ý cuối cùng
 
-**Tình huống.** Bậc dàn ý thứ tư, và là bậc cuối. Ở độ sâu này cái tên đã gần như một cái nhãn: nó vẫn
+**Khi nào gặp.** Bậc dàn ý thứ tư, và là bậc cuối. Ở độ sâu này cái tên đã gần như một cái nhãn: nó vẫn
 phải có mặt trong dàn ý, nhưng nó không được giành lấy sự chú ý của mắt nữa.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có đủ một chuỗi `h1 → h2 → h3` ở trên nó.
 - Nó đặt tên cho một tiêu chí, một mục con của mục con.
@@ -191,11 +198,11 @@ khoản.
 
 ## `TYPOGRAPHY-5` — đối tượng trội duy nhất
 
-**Tình huống.** Một vùng lớn tồn tại để nói về **một** đối tượng, và đối tượng đó có một cái tên
+**Khi nào gặp.** Một vùng lớn tồn tại để nói về **một** đối tượng, và đối tượng đó có một cái tên
 **ngắn**. Cái tên ấy dẫn dắt cả vùng nhưng **không** vào dàn ý tài liệu, vì nó là dữ liệu chứ không
 phải cấu trúc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Trong vùng đó chỉ có **một** tiêu đề như vậy, không có cái thứ hai ngang hàng.
 - Chuỗi ngắn, và ngắn một cách ổn định — không phải "hiện tại đang ngắn".
@@ -217,10 +224,10 @@ tiết · tên chiến dịch trong một khối tóm tắt.
 
 ## `TYPOGRAPHY-6` — tiêu đề của phần tử ngang hàng
 
-**Tình huống.** Cái tên của một đối tượng nằm **giữa nhiều đối tượng cùng loại**, hoặc một cái tên có
+**Khi nào gặp.** Cái tên của một đối tượng nằm **giữa nhiều đối tượng cùng loại**, hoặc một cái tên có
 thể dài ra. Nhịp quét mắt phải đều nhau giữa các dòng, nên không dòng nào được to hơn dòng nào.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Nó đến từ một vòng lặp, hoặc sẽ đến từ một vòng lặp trong tương lai gần.
 - Có thể dài, có thể xuống dòng, có thể dài thêm sau khi dịch.
@@ -242,10 +249,10 @@ trong lưới mô-đun · tiêu đề thông báo trong danh sách thông báo �
 
 ## `TYPOGRAPHY-7` — chữ giao diện thường
 
-**Tình huống.** Một dòng **phát biểu một dữ kiện**: mô tả ngắn, siêu dữ liệu, một giá trị, một trạng
+**Khi nào gặp.** Một dòng **phát biểu một dữ kiện**: mô tả ngắn, siêu dữ liệu, một giá trị, một trạng
 thái bằng chữ. Người dùng **quét** nó chứ không **đọc** nó.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Đứng một mình nó vẫn có nghĩa — nó không cần một dòng khác ở trên để tồn tại.
 - Nó là dữ liệu hoặc mô tả dữ liệu, không phải tên của dữ liệu.
@@ -268,10 +275,10 @@ trong một dòng tóm tắt giỏ hàng · tên người tạo trong một dòn
 
 ## `TYPOGRAPHY-8` — văn bản để đọc liên tục
 
-**Tình huống.** Nhiều câu, nhiều đoạn, và công việc của người dùng là **đọc từ đầu đến cuối**. Chữ lớn
+**Khi nào gặp.** Nhiều câu, nhiều đoạn, và công việc của người dùng là **đọc từ đầu đến cuối**. Chữ lớn
 hơn và dòng thưa hơn không phải vì đoạn văn quan trọng hơn, mà vì mắt phải chạy hết từng dòng.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Có từ vài đoạn trở lên, hoặc là nội dung bài viết / tài liệu / giải thích dài.
 - Người dùng dừng lại ở đây, không lướt qua.
@@ -290,10 +297,10 @@ niệm nhiều đoạn · điều khoản dịch vụ · changelog viết thành
 
 ## `TYPOGRAPHY-9` — chữ chỉ bổ nghĩa
 
-**Tình huống.** Dòng này **chỉ tồn tại nhờ** một dòng khác hoặc một bề mặt khác. Tách nó ra khỏi dòng
+**Khi nào gặp.** Dòng này **chỉ tồn tại nhờ** một dòng khác hoặc một bề mặt khác. Tách nó ra khỏi dòng
 chính thì nó không còn nói được gì.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Luôn có một dòng chính ở ngay trên hoặc ngay cạnh.
 - Đọc riêng nó thì câu hỏi "cái gì?" không có câu trả lời.
@@ -318,11 +325,11 @@ một trích dẫn · chú thích dưới một biểu đồ · dòng gợi ý d
 
 ## `TYPOGRAPHY-10` — dấu chia luồng kết quả
 
-**Tình huống.** Một luồng kết quả liên tục cần mốc để quét — `Hôm nay`, `Hôm qua`, `Tháng 8` — nhưng
+**Khi nào gặp.** Một luồng kết quả liên tục cần mốc để quét — `Hôm nay`, `Hôm qua`, `Tháng 8` — nhưng
 những mốc đó **không** tạo thêm phần nội dung trong tài liệu. Chúng chia thời gian, không chia cấu
 trúc.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Sinh ra từ **dữ liệu**, không từ thiết kế trang: có bao nhiêu ngày thì có bấy nhiêu dấu.
 - Không có mục lục nào nên liệt kê chúng.
@@ -343,11 +350,11 @@ nhãn nhóm trong một danh sách kết quả tìm kiếm đã gom.
 
 ## `TYPOGRAPHY-11` — chữ mà thành phần điều khiển đã sở hữu
 
-**Tình huống.** Chuỗi nằm **bên trong** một thành phần điều khiển: nhãn nút, chữ trong nhãn nhỏ trạng
+**Khi nào gặp.** Chuỗi nằm **bên trong** một thành phần điều khiển: nhãn nút, chữ trong nhãn nhỏ trạng
 thái, chữ của liên kết, văn bản gợi ý của trường nhập liệu, chữ trong nhãn trạng thái. Thành phần điều
 khiển đó đã quyết định kiểu chữ của chính nó rồi.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Chuỗi nằm trong `button`, `a`, `input`, hoặc một phần tử có vai trò điều khiển / trạng thái.
 - Đổi chữ đó thì hành vi đổi, không chỉ nội dung đổi.
@@ -372,11 +379,11 @@ trong trình đơn.
 
 ## `TYPOGRAPHY-12` — chưa nêu chủ sở hữu
 
-**Tình huống.** Yêu cầu thật sự **không** nêu cấp độ dàn ý và **không** nêu chủ sở hữu nội dung, và
+**Khi nào gặp.** Yêu cầu thật sự **không** nêu cấp độ dàn ý và **không** nêu chủ sở hữu nội dung, và
 cũng không có ngữ nghĩa tiêu đề hay nội dung hỗ trợ nào suy ra được. Cần một câu trả lời đọc được thay
 vì một lời từ chối.
 
-**Dấu hiệu nhận biết**
+**Cách nhận ra**
 
 - Yêu cầu chỉ nói về hình thức: "cho nó nổi hơn", "chỗ này to lên chút".
 - Không xác định được dòng này thuộc về ai, và cũng không có dòng nào quanh nó để so.

@@ -1,11 +1,24 @@
 ---
 name: starci-be-approve
-description: Challenge a backend plan against real schema and sibling code, loop until the owner explicitly approves one exact revision and file boundary, then implement exactly that and prove it. Holds a hard stop before the first production write. Use after starci-be-plan.
+description: Challenge a backend plan against real schema and sibling code, loop until the owner explicitly approves one exact revision and file boundary, then implement exactly that and prove it. Holds a hard stop before the first production write. Use when a backend brief is ready for approval and implementation.
 ---
 
 # starci-be-approve
 
-Read [`../skill-shape/en.md`](../skill-shape/en.md) first. This skill contains both the approval loop and
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+
+## HANDS OFF TO — named, never loaded
+
+None.
+
+
+## Run
+
+Read `@skill-shape` first. This skill contains both the approval loop and
 the implementation, with a hard stop between them. The stop is the whole point: everything before it is
 reversible, everything after it is in the product.
 

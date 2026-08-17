@@ -4,6 +4,15 @@ title: Type-safety
 
 # Type-safety
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
+
+
+## Record
+
 The input is code that is already written — one file, one hunk of a diff. The output is a **verdict**:
 whether the file was in scope at all, which published rule fired, what it reported and on which node,
 which law code that maps to, and the open hatch that would have hidden the same failure. This module
@@ -394,7 +403,7 @@ hatch:   not destructuring it — an Identifier parameter is never looked at, so
 ## Scope
 
 This module documents the three rules published by the type-safety law's rule module, shipped in
-`@starci/eslint-canon-be`. It documents no rule that ought to exist: a rule that cannot be pointed at
+`@canon-be`. It documents no rule that ought to exist: a rule that cannot be pointed at
 is a proposal, not enforcement. It does not judge `any` — that is
 `@typescript-eslint/no-explicit-any` — it does not judge array spelling, which is
 `@typescript-eslint/array-type`, and it does not judge a bag of booleans standing in for a
