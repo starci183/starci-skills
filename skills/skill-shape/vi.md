@@ -77,6 +77,13 @@ Một đường tool thất bại không làm lượt chạy bị chặn: thử 
 duyệt **đã biết tại thời điểm đó** được gộp thành **một** lượt hỏi, không hỏi lắt nhắt. Sau phản hồi,
 vẫn phase đó tiếp tục, ghi thêm bản sửa, rồi trình lại brief đã sửa.
 
+**Gộp là gộp lúc HỎI, không phải lúc TRẢ LỜI.** Một lượt hỏi giúp người đọc khỏi bị ngắt năm lần; nó không
+nhập năm quyết định thành một chữ "ừ". Một câu trả lời bao trùm — "làm hết đi" — duyệt đúng những dòng đã
+được viết ra, và **không duyệt bất cứ thứ gì chưa từng được viết thành một dòng**: không duyệt một biên giới
+mà chính skill tự đề ra trong lúc người đọc đang trả lời chuyện khác, và không duyệt một thao tác ghi nằm
+ngoài biên giới mà các dòng đó gọi tên. Một lượt chạy đọc một chữ thành thẩm quyền cho việc không ai liệt
+kê là đã thôi hỏi và bắt đầu tự cho.
+
 ## Các phase
 
 **Các lượt design** chính là mặt để rà soát. Mỗi lượt ghi đúng prompt, các phương án, phản hồi và phán
@@ -136,7 +143,7 @@ thêm**.
 
 1. `CONTEXT` in trước khi hành động, và nó gọi tên `Touching` trước mọi lần ghi.
 2. Phát hiện không phải là được phép.
-3. Việc cần duyệt thì gộp lại, không nhỏ giọt.
+3. Việc cần duyệt thì gộp lúc hỏi, không bao giờ nhập lại lúc trả lời.
 4. Một session, một bản ghi. Không skill nào mở bản ghi song song cho cùng một việc.
 5. Sự chấp nhận buộc theo hash; lượt đã chấp nhận không bao giờ bị sửa tại chỗ.
 6. Execute chỉ chạy khi mọi hash đạt tới được đã được chấp nhận.

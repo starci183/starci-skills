@@ -76,6 +76,12 @@ One failed tool path is not a stuck run: try the safe fallback first. All approv
 moment are batched into one round rather than asked one at a time. After feedback, the same phase
 continues, appends its revision, and shows the revised brief again.
 
+**Batching is about asking, not about answering.** One round spares the reader five interruptions; it does
+not merge five decisions into one yes. A blanket answer — "do it all" — approves the rows as written and
+**nothing that was not written as a row**: not a boundary the skill proposed to itself while the reader
+was answering something else, and not a write outside the boundary those rows named. A run that reads one
+word as authority over work nobody listed has stopped asking and started assuming.
+
 ## Phases
 
 **Design rounds** are the review surface. Each round records the exact prompt, the candidates, the
@@ -135,7 +141,7 @@ appended.
 
 1. `CONTEXT` is printed before acting, and it names `Touching` before any write.
 2. Detection is not permission.
-3. Approvals are batched, not drip-fed.
+3. Approvals are batched when asked, never merged when answered.
 4. One session, one record. No skill opens a parallel task record for the same work.
 5. Acceptance is hash-bound; an accepted round is never edited in place.
 6. Execute runs only when every reachable hash is accepted.

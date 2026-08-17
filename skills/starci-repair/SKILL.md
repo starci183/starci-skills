@@ -57,6 +57,12 @@ the contract path for a frontend role exists, the recorded head still belongs to
 
 A stale route ends the run here and returns to `starci-init`. Say which field failed.
 
+**One run repairs one role of one project.** A list naming five checkouts is five runs, five baselines,
+five records — not one boundary with five repositories inside it. Repositories fail differently, their
+gates take different times, and one review that covers all of them cannot be answered: the reader would
+have to approve the one they meant along with four they have not seen. A run handed several either takes
+the first and says so, or asks which one.
+
 ### 3 — Read the manifest before running anything
 
 The gates are whatever this repository declares — not a remembered list. Read `package.json` and find
@@ -115,6 +121,11 @@ A `decision` misfiled as a `defect` is how a rule gets bent to match the code. A
 
 Present the before-counts, every class with how many findings it holds, the exact file list, and
 what the run will **not** touch. Batch every approval into one round.
+
+The skill shape decides what a blanket answer approves. What is specific here is the cost of getting it
+wrong: this skill's rows authorise **writes into a product repository**, so a row this run never wrote —
+another checkout, another role — is not covered by any answer to these. When a blanket answer arrives, the
+run names the rows it is **not** taking before it starts.
 
 Where a `decision` blocks a whole file, say so: it is better to hand back a file with a named question
 than to return a repository that is green because one file was rewritten to somebody else's taste.
@@ -268,6 +279,7 @@ tables.
   it; one of those is somebody's committed configuration and the other may be a Source.
 - A gate is measured against a rule copied into the checkout → stop measuring; the machine pass comes first,
   and a count taken against a private copy of the law is not evidence.
+- A run is handed more than one project or role → stop; take one and name the others, or ask which.
 - A repository declares no gates at all → stop; there is nothing to measure, and inventing commands
   measures somebody else's project.
 
