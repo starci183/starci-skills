@@ -14,10 +14,10 @@ Shelf `fe/design/` đã tách làm ba, và hai shelf mới được dựng.
 
 | Shelf | Module | File | Mã | Trạng thái |
 |---|---|---|---|---|
-| `fe/principles/` | 26 | 130 | 195 | xong, `2.00` |
-| `fe/patterns/` | 18 | 90 | 128 | xong, `2.00` |
+| `gates/principles/` | 26 | 130 | 195 | xong, `2.00` |
+| `gates/patterns/` | 18 | 90 | 128 | xong, `2.00` |
 | `be/patterns/` | 15 | 75 | 99 | xong, `2.00` |
-| `fe/lints/` | 16 | 80 | — | xong, `2.00` |
+| `gates/lints/` | 16 | 80 | — | xong, `2.00` |
 | `be/lints/` | 15 | 75 | — | xong, `2.00` |
 | `fe/senses/` | 5 | 27 | — | **còn `1.02–1.03`** |
 | `fe/governance/` | 2 | 10 | — | **còn `1.02–1.03`** |
@@ -143,7 +143,7 @@ ra. Không có gate, chuyện đó sẽ lặp lại.
 ### 4.6 Hai module `lints` thiếu ví dụ
 
 `be/lints/cdc/example.md` (15) và `be/lints/event-delivery/example.md` (16) — dưới ngưỡng 20. Mọi
-module khác ≥ 20, cao nhất `fe/lints/contract` 85.
+module khác ≥ 20, cao nhất `gates/lints/contract` 85.
 
 ### 4.7 Nâng `senses` và `governance` lên `2.00`
 
@@ -163,8 +163,8 @@ Thêm `## PROCESS` vào `starci-be-audit-apply/SKILL.md`, và thêm bộ ba vào
 | Mã | Hai chủ | Xử lý |
 |---|---|---|
 | `TYPE-2` | `fe/typography` *"bốn cấp heading"* vs `be/type-safety` *"no double cast"* | FE → `TYPESET-*` |
-| `LAYOUT-1…6` | `fe/patterns/file-layout` vs `fe/canon/uxui/layers/layout` | `file-layout` → `FILE-*` |
-| `FLOW-1` | `be/e2e-flow` vs `fe/principles/flow` | BE → `E2E-*` |
+| `LAYOUT-1…6` | `gates/patterns/file-layout` vs `fe/canon/uxui/layers/layout` | `file-layout` → `FILE-*` |
+| `FLOW-1` | `be/e2e-flow` vs `gates/principles/flow` | BE → `E2E-*` |
 
 Lần `TYPOGRAPHY` là **lỗi tự gây**: gạt va chạm với BE sang thì đâm vào `principles`. Đổi mã mà
 không kiểm không gian tên đích chỉ là **dời va chạm**.
@@ -185,7 +185,7 @@ thành link chết. Nó đúng một cách tình cờ khi cây chưa có mấy c
 dụ thì nó báo động giả hàng loạt. Đã sửa để strip fenced block và inline span trước khi tìm link.
 
 **Đừng chạy hai workflow nặng song song** trừ khi cái đang chạy sắp xong. Và **đừng sửa file trong
-thư mục một agent đang ghi** — đó là lý do `fe/lints/file-layout/` phải đổi mã ở lượt sau.
+thư mục một agent đang ghi** — đó là lý do `gates/lints/file-layout/` phải đổi mã ở lượt sau.
 
 ---
 

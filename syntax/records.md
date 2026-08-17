@@ -27,7 +27,7 @@ Every record opens with it. Two shapes, and the difference is easy to get wrong.
 ---
 id: fe-principles-gap-index
 title: INDEX.md
-slug: /fe/principles/gap
+slug: /gates/principles/gap
 sidebar_label: gap
 sidebar_position: 0
 description: Binding rules for choosing a gap className from the relationship between direct siblings.
@@ -41,7 +41,7 @@ template: principles
 ---
 id: fe-principles-gap-vi
 title: vi.md
-slug: /fe/principles/gap/vi
+slug: /gates/principles/gap/vi
 sidebar_label: vi.md
 sidebar_position: 1
 description: Từng tình huống GAP-N, nhận diện bằng nghiệp vụ chứ không bằng mắt.

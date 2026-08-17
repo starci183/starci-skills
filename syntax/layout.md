@@ -49,7 +49,7 @@ second loose `.md` has a module it has not admitted yet.
 A shelf holding two kinds of module may sort them one level down, and `blocks` does:
 
 ```
-fe/blocks/
+gates/blocks/
 ├── archetypes/<module>/   which shapes exist
 └── laws/<module>/         which constraints apply to any of them
 ```
@@ -77,11 +77,11 @@ checking where it was moving to, and the second was caused by the fix for the fi
 
 | Path | Holds | Never holds |
 |---|---|---|
-| `fe/layouts/` | composition: which regions, what each holds | spacing values, element choices |
-| `fe/blocks/` | anatomy: which block, its parts, its states | page composition, class strings |
-| `fe/principles/` | classes and host per node | file structure, business rules |
-| `fe/patterns/` | files, tiers, props, the split | visual decisions |
-| `fe/lints/` | what a machine refuses, and the escape hatches | law a machine cannot see |
+| `gates/layouts/` | composition: which regions, what each holds | spacing values, element choices |
+| `gates/blocks/` | anatomy: which block, its parts, its states | page composition, class strings |
+| `gates/principles/` | classes and host per node | file structure, business rules |
+| `gates/patterns/` | files, tiers, props, the split | visual decisions |
+| `gates/lints/` | what a machine refuses, and the escape hatches | law a machine cannot see |
 | `be/patterns/`, `be/lints/` | the same two questions, backend side | frontend anything |
 | `sources/` | the artifact that HOLDS a law — a rule module and its twin test | prose |
 | `skills/` | one folder per phase, each a `SKILL.md` | law; a skill cites law, it does not restate it |
