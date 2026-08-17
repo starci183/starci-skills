@@ -121,7 +121,7 @@ finding: no workspace route for this project
 label: blocked
 evidence: .workspace/ contains nivo, starci-academy; mia-mia absent
 first-stop: yes, at target step 2
-cleared-by: starci-setup-workspaces-and-worktrees, with the project declared by the owner
+cleared-by: starci-init, with the project declared by the owner
 ```
 
 ```text

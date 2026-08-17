@@ -44,14 +44,13 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Eight. `skills/starci-*` holds them; `skills/skill-shape` holds what they must all print, ask and
-record. Seven do the work; the eighth only looks at the other seven.
+Seven. `skills/starci-*` holds them; `skills/skill-shape` holds what they must all print, ask and
+record. Six do the work; the seventh only looks at the other six.
 
 | Skill | Owns |
 |---|---|
-| `starci-init` | the Source bootstrap: `AGENTS.md` and `CLAUDE.md` |
+| `starci-init` | making a Source ready: the bootstrap, `.workspace/<project>/`, `.worktrees/<project>/` — three roots, approved separately |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
-| `starci-setup-workspaces-and-worktrees` | `.workspace/<project>/` and `.worktrees/<project>/` |
 | `starci-fe-design-layout` | layout candidates, hash-bound |
 | `starci-fe-design-block` | block anatomies, hash-bound |
 | `starci-fe-design-execute` | frontend source, only after every hash is accepted |

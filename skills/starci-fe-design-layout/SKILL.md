@@ -121,7 +121,7 @@ Append the workflow and print the six tables. `OWED` names the block rounds that
 
 ## Stops
 
-- Route absent or stale → return to `starci-setup-workspaces-and-worktrees`.
+- Route absent or stale → return to `starci-init`.
 - Registry unlocked, dirty, or owned by another Git → stop; do not write.
 - A required class does not exist in the contract's closed set → this is a **contract change**, not a
   layout choice, and it returns to the owner.

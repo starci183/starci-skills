@@ -19,21 +19,20 @@ quyết** với **cái nó đã ghi** với **cái nó còn nợ** thì chưa xo
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
-## Tám năng lực
+## Bảy năng lực
 
-Bảy cái làm việc. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
+Sáu cái làm việc. `starci-diagnose` thì không: nó **lần theo** một trong bảy cái kia và không ghi bất cứ
 thứ gì mà skill đó sẽ ghi — vì vậy nó là năng lực duy nhất không có stage apply.
 
 | Skill | Hành trình | Sở hữu |
 |---|---|---|
-| `starci-init` | plan → review → apply, nội bộ | bootstrap của Source: `AGENTS.md` và `CLAUDE.md` |
+| `starci-init` | plan → review → apply, nội bộ | làm một Source sẵn sàng: bootstrap, route workspace, state worktree — ba root, mỗi root một lần duyệt |
 | `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-fe-design-layout` | mở hoặc tiếp session, rồi các lượt layout | 3–4 phương án layout mỗi bề mặt, buộc theo hash |
 | `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region, buộc theo hash |
 | `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
 | `starci-be-plan` | plan | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | duyệt, rồi apply | sự chấp thuận, rồi source backend |
-| `starci-setup-workspaces-and-worktrees` | plan → review → apply, nội bộ | `.workspace/<project>/` và `.worktrees/<project>/`, **tách nhau** |
 
 **Không có orchestrator.** Hai việc mà orchestrator từng giữ vì thế được giao rõ: **Layout mở
 session**, và **Execute từ chối chạy** khi còn bất cứ hash layout hay block đạt tới được nào chưa được
@@ -143,9 +142,10 @@ thêm**.
 
 ## Ngoại lệ
 
-- **Setup sở hữu hai root.** `.workspace/<project>/` và `.worktrees/<project>/` hỏng theo hai chiều
-  ngược nhau — một cái làm lượt chạy **đọc** sai repository, cái kia làm nó **ghi** vào chỗ bị cấm ghi.
-  Một lần duyệt **không bao giờ** phủ cả hai; mỗi root được duyệt như biên giới riêng của nó.
+- **Init sở hữu ba root.** Bootstrap của Source, `.workspace/<project>/` và `.worktrees/<project>/` hỏng
+  theo ba chiều khác nhau — bootstrap chết thì agent không được định tuyến, route sai thì lượt chạy
+  **đọc** sai repository, worktree sai thì nó **ghi** vào chỗ bị cấm ghi. Một lần duyệt **không bao giờ**
+  phủ hơn một root, và một lượt chạy được phép chỉ chạm đúng một root.
 - **Năng lực chỉ đọc.** Apply của nó chốt một phán quyết và chuyển việc sửa về cho chủ. Nó không bao
   giờ biến việc đo thành một lần sửa source chưa khai báo.
 - **Session được tiếp tục.** Layout được phép **tiếp** thay vì **mở**. Session id và mọi hash đã chấp

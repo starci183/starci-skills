@@ -61,7 +61,7 @@ wrong; `OWED` carries the approval itself, cleared by `starci-be-approve`.
 
 ## Stops
 
-- Route absent or stale → return to `starci-setup-workspaces-and-worktrees`.
+- Route absent or stale → return to `starci-init`.
 - The schema cannot be read → stop; a plan written against a remembered schema is fiction.
 - No sibling of this kind exists → say so explicitly and propose the shape as a **new family**, with the
   reason, so approval knows it is setting a precedent rather than following one.

@@ -18,21 +18,20 @@ from what it still owes has not finished.
 
 Detection is not permission. Finding that something must change is never authority to change it.
 
-## The eight capabilities
+## The seven capabilities
 
-Seven do work. `starci-diagnose` does not: it traces one of the seven and writes nothing that skill
+Six do work. `starci-diagnose` does not: it traces one of the seven and writes nothing that skill
 would write, which is why it is the only capability with no apply stage.
 
 | Skill | Journey | Owns |
 |---|---|---|
-| `starci-init` | plan → review → apply, internal | the Source bootstrap: `AGENTS.md` and `CLAUDE.md` |
+| `starci-init` | plan → review → apply, internal | making a Source ready: the bootstrap, the workspace routes, the worktree state — three roots, one approval each |
 | `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-fe-design-layout` | opens or resumes the session, then layout rounds | 3–4 layout candidates per surface, hash-bound |
 | `starci-fe-design-block` | block rounds | 3–4 anatomies per region, hash-bound |
 | `starci-fe-design-execute` | execution | frontend source, only after every reachable hash is accepted |
 | `starci-be-plan` | plan | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approve, then apply | approval, then backend source |
-| `starci-setup-workspaces-and-worktrees` | plan → review → apply, internal | `.workspace/<project>/` and `.worktrees/<project>/`, separately |
 
 There is no orchestrator. Two jobs an orchestrator used to hold are therefore assigned explicitly:
 **Layout opens the session**, and **Execute refuses to run** while any reachable layout or block hash
@@ -142,9 +141,10 @@ appended.
 
 ## Exceptions
 
-- **Setup owns two roots.** `.workspace/<project>/` and `.worktrees/<project>/` fail in opposite
-  directions — one makes a run read the wrong repository, the other makes it write where writing was
-  forbidden. One approval never covers both; each root is approved as its own boundary.
+- **Init owns three roots.** The Source bootstrap, `.workspace/<project>/` and `.worktrees/<project>/`
+  fail in three directions — a dead bootstrap leaves an agent unrouted, a wrong route makes a run read
+  the wrong repository, a wrong worktree makes it write where writing was forbidden. One approval never
+  covers more than one root, and a run may touch only one of them.
 - **A read-only capability.** Its Apply finalises a verdict and routes repairs to their owner. It never
   turns measurement into an undeclared source edit.
 - **A resumed session.** Layout may resume rather than open. The session id and every accepted hash
