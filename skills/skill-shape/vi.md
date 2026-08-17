@@ -19,12 +19,11 @@ quyết** với **cái nó đã ghi** với **cái nó còn nợ** thì chưa xo
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
-## Tám năng lực
+## Bảy năng lực
 
 | Skill | Hành trình | Sở hữu |
 |---|---|---|
 | `starci-init` | plan → review → apply, nội bộ | bootstrap của Source: `AGENTS.md` và `CLAUDE.md` |
-| `starci-docs-publish` | plan → review → apply, nội bộ | cấu hình build của site docs và host của nó |
 | `starci-fe-design-layout` | mở hoặc tiếp session, rồi các lượt layout | 3–4 phương án layout mỗi bề mặt, buộc theo hash |
 | `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region, buộc theo hash |
 | `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |

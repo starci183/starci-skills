@@ -29,13 +29,12 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Eight, and no more. `skills/starci-*` holds them; `skills/skill-shape` holds what they must all print,
+Seven, and no more. `skills/starci-*` holds them; `skills/skill-shape` holds what they must all print,
 ask and record.
 
 | Skill | Owns |
 |---|---|
 | `starci-init` | the Source bootstrap: `AGENTS.md` and `CLAUDE.md` |
-| `starci-docs-publish` | the docs site's build config and its host |
 | `starci-setup-workspaces-and-worktrees` | `.workspace/<project>/` and `.worktrees/<project>/` |
 | `starci-fe-design-layout` | layout candidates, hash-bound |
 | `starci-fe-design-block` | block anatomies, hash-bound |

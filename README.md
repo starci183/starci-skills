@@ -45,6 +45,16 @@ npm run dev
 Shelves are declared in `docs/publication.mjs`. A new shelf becomes a documented shelf by adding one
 entry there — no page, no route, no sidebar to write.
 
+**A build that needs the author's machine is not a build.** The site must build from a clean clone and
+nothing else: no sibling checkout, no absolute path, no workspace route, no generated directory
+expected to already exist. This tree is shared across sources, so a dependency on one product's
+repository is not a portability bug to soften — it is a category error, and making it fail quietly
+keeps the coupling while hiding it. The test: would this step mean anything for a **second** product
+using this tree? If not, delete it.
+
+`netlify.toml` carries `base`, `command`, `publish` and a pinned Node version, so the host's fields
+stay empty and git can explain when they changed. `publish` resolves relative to `base`.
+
 ## Validating an artifact
 
 ```bash
