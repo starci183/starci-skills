@@ -11,7 +11,7 @@ Invoked as `/starci-diagnose <skill>` with an optional scenario:
 
 ```text
 /starci-diagnose starci-fe-design-layout
-/starci-diagnose starci-fe-design-layout  render the vocabulary game page at mia-mia
+/starci-diagnose starci-fe-design-layout  render the settings page at second-app
 ```
 
 Without a scenario it traces what every run of that skill needs. With one, it traces that run.
@@ -100,17 +100,17 @@ settle it. `OWED` carries the trace steps that could not be evaluated at all.
 
 ## Worked example
 
-**Invocation.** `/starci-diagnose starci-fe-design-layout  render the vocabulary game page at mia-mia`
+**Invocation.** `/starci-diagnose starci-fe-design-layout  render the settings page at second-app`
 
 ### What the trace does, step by step
 
 | Target step | What it reads | What is there | Verdict |
 |---|---|---|---|
 | 1 print CONTEXT | — | — | `pass` |
-| 2 resolve + verify the `fe` route | `.workspace/mia-mia/fe/config.json` | `.workspace/` holds `nivo` and `starci-academy` only; no `mia-mia` | **`would-stop`** — `WORKSPACE-2` |
-| 3 worktree roots | `.worktrees/mia-mia/{registries,sessions,cache}` | absent, as expected without a route | `blocked` behind step 2 |
+| 2 resolve + verify the `fe` route | `.workspace/second-app/fe/config.json` | `.workspace/` holds `example-app` only; no `second-app` | **`would-stop`** — `WORKSPACE-2` |
+| 3 worktree roots | `.worktrees/second-app/{registries,sessions,cache}` | absent, as expected without a route | `blocked` behind step 2 |
 | 4 open or resume the session | the registry | unreachable | `blocked` behind step 3 |
-| 5 read the six inputs | the contract at `context.contract` | **the Mia Mia checkout has no `components/contracts` directory** | `defect` in the *environment*, not the skill |
+| 5 read the six inputs | the contract at `context.contract` | **that checkout has no `components/contracts` directory** | `defect` in the *environment*, not the skill |
 | 6 per-region verdicts | contract keys by `why` | no contract to search, so every region would resolve `new` | `blocked` by step 5 |
 | 7–11 | — | not reached | `cannot-tell` |
 
@@ -119,7 +119,7 @@ settle it. `OWED` carries the trace steps that could not be evaluated at all.
 ```text
 finding: no workspace route for this project
 label: blocked
-evidence: .workspace/ contains nivo, starci-academy; mia-mia absent
+evidence: .workspace/ contains example-app; second-app absent
 first-stop: yes, at target step 2
 cleared-by: starci-init, with the project declared by the owner
 ```

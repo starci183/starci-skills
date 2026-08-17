@@ -156,7 +156,7 @@ decision re-run in a later round produces the same hash.
   "envelope": {
     "session": "course-catalogue/2026-08-18",
     "round": 1,
-    "project": "starci-academy",
+    "project": "example-app",
     "surface": "course-catalogue",
     "prompt": "the request, verbatim",
     "contractAt": "the contract state this was resolved against"
@@ -205,7 +205,7 @@ courses, so that is not assumed.
   "envelope": {
     "session": "course-catalogue/2026-08-18",
     "round": 1,
-    "project": "starci-academy",
+    "project": "example-app",
     "surface": "course-catalogue",
     "prompt": "A course catalogue: filters and the results, on one page.",
     "contractAt": "5eb4ac6a2463"

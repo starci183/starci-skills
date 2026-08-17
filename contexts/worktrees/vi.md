@@ -232,7 +232,7 @@ reason: đường ghi của từng agent biết trước và không có hai agen
 ```text
 output: bản ghi phương án đã chấp nhận
 durability: durable
-path: .worktrees/starci-academy/registries
+path: .worktrees/example-app/registries
 isolation: required nếu một lượt chạy thứ hai ghi nó cùng lúc
 ownership: đã khoá, sạch, đúng nhánh registry của project, thuộc git của Source này
 situation: WORKTREE-1

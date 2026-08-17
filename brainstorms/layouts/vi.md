@@ -155,7 +155,7 @@ không phải cái trích đoạn dưới đây. `envelope` giữ những thứ 
   "envelope": {
     "session": "course-catalogue/2026-08-18",
     "round": 1,
-    "project": "starci-academy",
+    "project": "example-app",
     "surface": "course-catalogue",
     "prompt": "yêu cầu, đúng nguyên văn",
     "contractAt": "trạng thái contract lúc giải"
@@ -204,7 +204,7 @@ quay ra hay không, nên chuyện đó không được giả định.
   "envelope": {
     "session": "course-catalogue/2026-08-18",
     "round": 1,
-    "project": "starci-academy",
+    "project": "example-app",
     "surface": "course-catalogue",
     "prompt": "A course catalogue: filters and the results, on one page.",
     "contractAt": "5eb4ac6a2463"

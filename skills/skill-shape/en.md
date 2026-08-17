@@ -161,9 +161,9 @@ appended.
 ```text
 ### CONTEXT
 Phase: layout
-Project: starci-academy
-Role targets: fe -> <disk>\starci-academy-fe (verified: contract present)
-Touching: .workflows/designs/starci-academy/coding-drill-result.md
+Project: example-app
+Role targets: fe -> <disk>\example-app-fe (verified: contract present)
+Touching: .workflows/designs/example-app/coding-drill-result.md
 Purpose: settle 3-4 layout candidates for one new surface
 Read: contract keys + why + host (74KB of 192KB), branch inventory, route table
 Missing: None

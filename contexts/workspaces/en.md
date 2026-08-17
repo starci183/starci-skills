@@ -4,7 +4,7 @@ title: Workspaces
 
 # Workspaces
 
-You are given a plain start request — "start starci-academy fe be" — and you return, for every role
+You are given a plain start request — "start example-app fe be" — and you return, for every role
 it names, one resolved route and one verdict: read from this checkout, or stop and return to setup.
 This module decides **where the truth is read from**. Nothing downstream is correct if this is wrong,
 and a wrong answer here does not announce itself: the agent reads a real repository, just not the
@@ -217,16 +217,16 @@ reason: <the fact that decided it>
 
 ## Worked example
 
-**Request.** "start starci-academy fe be"
+**Request.** "start example-app fe be"
 
 The request names one project and two roles, so it resolves two route files and nothing else. It
 names no path, no branch and no contract, so none of those are assumed.
 
 ```text
-project: starci-academy
+project: example-app
 role: fe
-route: .workspace/starci-academy/fe/config.json
-repository: <disk>\starci-academy-fe
+route: .workspace/example-app/fe/config.json
+repository: <disk>\example-app-fe
 verified: checkout exists; context.contract present at src/components/contracts/index.ts
 situation: WORKSPACE-3
 verdict: read
@@ -234,9 +234,9 @@ reason: the route resolved and its contract claim survived a check against disk,
 ```
 
 ```text
-project: starci-academy
+project: example-app
 role: be
-route: .workspace/starci-academy/be/config.json
+route: .workspace/example-app/be/config.json
 repository: <not resolved>
 verified: route file absent
 situation: WORKSPACE-2

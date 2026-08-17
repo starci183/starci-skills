@@ -162,9 +162,9 @@ thêm**.
 ```text
 ### CONTEXT
 Phase: layout
-Project: starci-academy
-Role targets: fe -> <disk>\starci-academy-fe (đã xác minh: contract có mặt)
-Touching: .workflows/designs/starci-academy/coding-drill-result.md
+Project: example-app
+Role targets: fe -> <disk>\example-app-fe (đã xác minh: contract có mặt)
+Touching: .workflows/designs/example-app/coding-drill-result.md
 Purpose: chốt 3-4 phương án layout cho một bề mặt mới
 Read: contract key + why + host (74KB trên 192KB), danh sách branch, bảng route
 Missing: None

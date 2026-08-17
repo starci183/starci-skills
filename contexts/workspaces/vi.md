@@ -4,7 +4,7 @@ title: Workspaces · Vietnamese
 
 # Không gian làm việc
 
-Đầu vào là một yêu cầu khởi động viết bằng lời thường — "start starci-academy fe be" — và đầu ra là,
+Đầu vào là một yêu cầu khởi động viết bằng lời thường — "start example-app fe be" — và đầu ra là,
 với **mỗi vai trò** mà yêu cầu đó gọi tên, một route đã giải và một phán quyết: đọc từ checkout này,
 hay dừng lại và trả về bước setup. Mô-đun này quyết định **sự thật được đọc từ đâu**. Sai ở đây thì
 không tầng nào bên dưới còn đúng, và cái sai đó không tự lên tiếng: agent vẫn đọc một repository thật,
@@ -217,16 +217,16 @@ reason: <sự thật đã quyết định điều đó>
 
 ## Ví dụ đã giải
 
-**Yêu cầu.** "start starci-academy fe be"
+**Yêu cầu.** "start example-app fe be"
 
 Yêu cầu gọi tên một project và hai vai trò, nên nó giải đúng hai tệp route và không gì khác. Nó không
 gọi tên đường dẫn nào, nhánh nào, hợp đồng nào, nên không thứ nào trong số đó được giả định.
 
 ```text
-project: starci-academy
+project: example-app
 role: fe
-route: .workspace/starci-academy/fe/config.json
-repository: <disk>\starci-academy-fe
+route: .workspace/example-app/fe/config.json
+repository: <disk>\example-app-fe
 verified: checkout tồn tại; context.contract có thật tại src/components/contracts/index.ts
 situation: WORKSPACE-3
 verdict: read
@@ -234,9 +234,9 @@ reason: route giải được và lời khai về hợp đồng của nó sống
 ```
 
 ```text
-project: starci-academy
+project: example-app
 role: be
-route: .workspace/starci-academy/be/config.json
+route: .workspace/example-app/be/config.json
 repository: <chưa giải>
 verified: tệp route không tồn tại
 situation: WORKSPACE-2

@@ -136,7 +136,7 @@ hash chỉ phủ **một giải phẫu**.
   "envelope": {
     "session": "coding-drill-result/2026-08-18",
     "round": 1,
-    "project": "starci-academy",
+    "project": "example-app",
     "region": "criteria",
     "layoutHash": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
   },

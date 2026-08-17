@@ -233,7 +233,7 @@ reason: every agent's output path is known in advance and no two agents touch on
 ```text
 output: the accepted-candidate record
 durability: durable
-path: .worktrees/starci-academy/registries
+path: .worktrees/example-app/registries
 isolation: required if a second run writes it at the same time
 ownership: locked, clean, on the project registry branch, owned by this Source's git
 situation: WORKTREE-1
