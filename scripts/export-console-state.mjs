@@ -223,13 +223,14 @@ const projects = dirs(join(source, ".worktrees")).map((project) => {
 
 const workspaces = readWorkspaces();
 
-// Two lists that should agree and often do not: a project with a route but no worktree cannot record a
-// decision, and a project with a worktree but no route cannot read any source.
+// Both roots are folders of this one Source, one per project, so the two lists should agree and often do
+// not. Say the path, or a missing folder reads as a missing second tree; say the condition, or a folder
+// nobody needs yet reads as a fault.
 for (const project of new Set(workspaces.map((w) => w.project))) {
-  if (!projects.some((p) => p.project === project)) warnings.push(`${project}: has a workspace route but no worktree root — nothing can be recorded`);
+  if (!projects.some((p) => p.project === project)) warnings.push(`${project}: no .worktrees/${project}/ in this Source — needed only once a skill records a decision for it`);
 }
 for (const {project} of projects) {
-  if (!workspaces.some((w) => w.project === project)) warnings.push(`${project}: has a worktree root but no workspace route — nothing can be read`);
+  if (!workspaces.some((w) => w.project === project)) warnings.push(`${project}: .worktrees/${project}/ exists in this Source but .workspace/${project}/ does not — no source to read`);
 }
 if (!existsSync(join(source, ".workflows"))) warnings.push("the workflow root is absent, so no skill can append its phase");
 
