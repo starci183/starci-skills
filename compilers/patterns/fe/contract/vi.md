@@ -451,7 +451,7 @@ nó. `documented` nghĩa là không có gì cơ học giữ, chỉ có người 
 | `CONTRACT-8` | `enforced` | `no-hand-written-contract-attrs` |
 | `CONTRACT-9` | `enforced` | `no-unknown-contract-key` cho key không tồn tại, `no-duplicate-entry-shape` cho key không nên tồn tại |
 | `CONTRACT-10` | `documented` | không gì trực tiếp. Các rule chỉ MIỄN cho các surface branch có tên; không rule nào kiểm rằng thứ chúng sở hữu vẫn còn là cơ chế wrapper |
-| `CONTRACT-11` | `unrepresentable` | kiểu record slot, các branded component type, và cặp `repeats`/`restingCount` |
+| `CONTRACT-11` | `unrepresentable` + `enforced` | kiểu record slot, các branded component type, và cặp `repeats`/`restingCount` — cộng `contract-children-are-typed`, rule đọc thẳng chính bảng, vì các kiểu chỉ chi phối component **tiêu thụ** một entry, trong khi entry được viết dưới dạng object literal mà chưa gì gán kiểu cho. Một entry không có `children` nào, hay một slot không nêu danh tính chủ, vẫn là cú pháp object hợp lệ và phía component không với tới được |
 | `CONTRACT-12` | `enforced` | `no-interaction-class-in-entry` — họ tương tác, họ sơn và họ vật thể nổi |
 | `CONTRACT-13` | `enforced` | `no-dead-contract-key`, chạy trên một lượt duyệt tham chiếu toàn repository |
 

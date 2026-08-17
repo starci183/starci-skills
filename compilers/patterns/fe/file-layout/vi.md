@@ -108,6 +108,7 @@ tuyên bố.
 | `FILE-4` | Một component và các thành viên trong họ của nó đang được export | Family export ra từng thành viên một. Cấm: `export const X = { A, B }` — một object runtime đứng thay cho một namespace |
 | `FILE-5` | Workspace có một package dùng chung và một hoặc nhiều app, và một tier phải rơi về một phía | Package dùng chung giữ `contracts/`, `leaves/`, `composites/`, `branches/`; `blocks/`, `overlays/`, `layouts/`, `pages/` thuộc về app sở hữu feature. Cấm: tier biết feature nằm trong package dùng chung; tier từ vựng nằm trong một app; một tier wrapper song song |
 | `FILE-6` | Shape cần một URL, nên có thứ gì đó đang được viết dưới `app/` | File dưới `app/` nói page nào render ở URL nào, và là một trong các slot của chính framework. Cấm: fetch, sắp đặt hay contract key trong route file; bất kỳ file component có tên riêng nào dưới `app/` |
+| `FILE-7` | Một file tự khai nó thuộc tầng nào, trong source, ngay cạnh đường dẫn vốn đã khai điều đó | Một dấu hiệu trong source phải khớp với thư mục sở hữu nó. Cấm: một file nằm dưới tầng này lại tự khai mình là tầng khác |
 
 `FILE-2` VÀ `FILE-3` KHÔNG PHẢI CÙNG MỘT LỜI TỪ CHỐI. `FILE-2` đếm file trong một thư mục màn hình và
 không quan tâm chúng là gì; `FILE-3` gọi tên bốn thư mục sai ở mọi chỗ dưới `components/`, kể cả cạnh
@@ -291,6 +292,30 @@ còn cái này thì chỉ là văn xuôi.
 **Tình huống nghiệp vụ hay gặp.** Route tự gọi `useSession` · route dựng shell rồi mới mount page · một
 component đặt tạm trong `app/` "cho gần route" · một file `helpers.ts` trong segment.
 
+## `FILE-7` — dấu hiệu trong source là bằng chứng, không phải một cách phân loại thứ hai
+
+**Tình huống.** Một file component tự khai tầng của nó trong source — `meta.shape`, hay bất cứ tên gì
+repository đó đặt — trong khi đường dẫn của nó đã khai một tầng rồi. Hai câu nói về cùng một sự thật.
+
+**Nó sinh ra gì trong source.** Không gì mới. Mã này không thêm dấu hiệu nào và cũng không đòi phải có:
+một repository không khai dấu hiệu ở đâu cả thì không hỏng mã này, nó đơn giản là không có gì cho mã này
+đọc. Thứ mã này chi phối là trường hợp dấu hiệu **có** tồn tại.
+
+**Dấu hiệu nhận biết.** Một file trong `blocks/` nói mình là leaf. Một thư mục được chuyển tầng mà dấu
+hiệu bị bỏ lại. Một dấu hiệu đi theo một file được sao chép từ tầng khác.
+
+**Ranh giới.** Không phải `FILE-1`: mã đó so thư mục với **tên** export. Mã này so thư mục với một lời
+khẳng định mà source đưa ra về tầng — một câu khác, ở một chỗ khác.
+
+**Vì sao một sự thật bị nói hai lần còn tệ hơn không nói.** Đường dẫn và dấu hiệu không thể bất đồng một
+cách có ích. Mọi người đọc phía sau — một rule, một script, một con người — buộc phải chọn một trong hai,
+và mỗi bên chọn trong im lặng, nên cùng một file là block với người này và leaf với người kia. Dấu hiệu
+chỉ đáng tồn tại chừng nào nó lặp lại đúng đường dẫn; khoảnh khắc nó không còn lặp lại, nó thành cách
+phân loại thứ hai mà không ai bỏ phiếu cho.
+
+**Tình huống nghiệp vụ thường gặp.** Một component được nâng từ composite lên branch · một file được
+copy ra để bắt đầu file mới · một tầng bị đổi tên cả thư mục mà một file còn giữ chữ cũ.
+
 ## Tầng giữ
 
 Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay — chính xác thứ mà cơ chế không nhìn thấy
@@ -304,6 +329,7 @@ Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay —
 | `FILE-4` | `enforced` | `no-runtime-namespace` | Một namespace mang tên viết thường, một object chỉ một thành viên, hoặc các thành viên được ráp bên ngoài một `export const`. Rule đòi chữ cái đầu viết hoa và ít nhất hai thành viên viết hoa. |
 | `FILE-5` | `enforced` | `monorepo-tier-belongs-to-its-side` | Mọi thứ trong một cây một app. Cả hai regex đều đòi một đoạn `packages/<name>/src/` hoặc `apps/<name>/src/`, nên trong một checkout một app thì rule bất hoạt ngay từ cấu tạo. |
 | `FILE-6` | `enforced` | `route-tree-holds-routes-only` | Việc vẽ. "Fetch và sắp đặt" không phải thuộc tính một rule đường dẫn đo được: một route mount một component và một route sắp đặt sáu thứ đều trả về JSX. Một `page.tsx` tự vẽ vẫn qua. |
+| `FILE-7` | `enforced` | `source-tier-marker-matches-folder` | Một repository không khai dấu hiệu nào. Rule đọc dấu hiệu nếu gặp; nó không bao giờ đòi phải có, nên một cây không dùng quy ước này thì im lặng chứ không đỏ — inert theo cấu tạo, giống `FILE-5` trong checkout single-app. |
 
 Cả sáu mã đều được một rule có tên giữ, nên không dòng nào ghi `documented`. Đó là tin tốt, và cũng là
 toàn bộ cái bẫy của bảng này: một mã có thể `enforced` mà vẫn gần như không được giữ, vì rule đọc ĐƯỜNG

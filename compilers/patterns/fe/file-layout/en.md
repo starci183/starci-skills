@@ -108,6 +108,7 @@ holds less than the code claims.
 | `FILE-4` | A component and its family members are being exported | A component family exported member by member. Forbidden: `export const X = { A, B }` — one runtime object standing in for a namespace |
 | `FILE-5` | The workspace has a shared package and one or more apps, and a tier must land on one side | The shared package holds `contracts/`, `leaves/`, `composites/`, `branches/`; `blocks/`, `overlays/`, `layouts/`, `pages/` belong to the app that owns the feature. Forbidden: a feature tier inside the shared package; a vocabulary tier inside one app; a parallel wrapper tier |
 | `FILE-6` | The shape needs a URL, so something is being written under `app/` | A file under `app/` names which page renders at which URL, and is one of the framework's own slots. Forbidden: fetching, arrangement or a contract key in a route file; any named component file under `app/` |
+| `FILE-7` | A file states which tier it belongs to, in source, beside the path that already states it | A source marker agrees with the folder that owns it. Forbidden: a file under one tier declaring itself another |
 
 `FILE-2` AND `FILE-3` ARE NOT THE SAME REFUSAL. `FILE-2` counts files in one surface folder and
 does not care what they are; `FILE-3` names four folders that are wrong anywhere under
@@ -297,6 +298,29 @@ green** — because every gate was reading a rule, and this one was only prose.
 before mounting the page · a component parked in `app/` "to keep it near the route" · a `helpers.ts`
 inside a segment.
 
+## `FILE-7` — a source marker is evidence, never a second classification
+
+**Situation.** A component file declares its own tier in source — a `meta.shape`, or whatever a
+repository calls it — while its path already declares one. Two statements about the same fact.
+
+**What it emits in source.** Nothing new. This code adds no marker and requires none: a repository that
+declares no marker anywhere is not failing this code, it has nothing for the code to read. What it
+governs is the case where a marker exists.
+
+**Recognition signs.** A file in `blocks/` saying it is a leaf. A folder moved between tiers with the
+marker left behind. A marker copied along with a file that was duplicated from another tier.
+
+**Boundary.** Not `FILE-1`: that code compares a folder with its export NAME. This one compares a folder
+with a claim the source makes about the tier, which is a different sentence in a different place.
+
+**Why a duplicate fact is worse than no fact.** A path and a marker cannot disagree usefully. Every
+reader downstream — a rule, a script, a person — must pick one, and each picks silently, so the same
+file is a block to one and a leaf to another. The marker earns its place only while it repeats the path
+exactly; the moment it does not, it is a second classification nobody voted for.
+
+**Common business situations.** A component promoted from composite to branch · a file copied to start
+a new one · a tier renamed across a folder while one file kept the old word.
+
 ## Layer held
 
 Which tier actually holds each code, and — where the tier over-promises — exactly what the mechanism
@@ -310,6 +334,7 @@ cannot see. The last column is the honest part of this table.
 | `FILE-4` | `enforced` | `no-runtime-namespace` | A namespace under a lowercase name, a one-member object, or members assembled outside an `export const`. The rule requires an initial capital and at least two capitalised members. |
 | `FILE-5` | `enforced` | `monorepo-tier-belongs-to-its-side` | Anything in a single-app tree. Both regexes require a `packages/<name>/src/` or `apps/<name>/src/` segment, so in a single-app checkout the rule is inert by construction. |
 | `FILE-6` | `enforced` | `route-tree-holds-routes-only` | Drawing. "Fetches and arranges" is not a property a path rule can measure: a route that mounts one component and a route that arranges six both return JSX. A `page.tsx` that draws still passes. |
+| `FILE-7` | `enforced` | `source-tier-marker-matches-folder` | A repository that declares no marker. The rule reads a marker it finds; it never asks for one, so a tree without the convention is silent rather than red — inert by construction, like `FILE-5` in a single-app checkout. |
 
 All six codes are held by a named rule, so no row reads `documented`. That is the good news and it is
 also the whole trap of this table: a code can be `enforced` and still be mostly unheld, because the

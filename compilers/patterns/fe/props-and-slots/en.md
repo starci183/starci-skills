@@ -267,7 +267,7 @@ a reader does.
 | `SLOTS-3` | `enforced` | `no-inline-parameter-type` | A named type that is not `XProps` for component `X` — the name is read, not checked |
 | `SLOTS-4` | `enforced` | `no-children-slot`, plus `BranchProps` for the positive half | The rule sees the markup hole; nothing sees a closed shape that grows `render` |
 | `SLOTS-5` | `documented` | Nothing. `BlockProps` proves a block never RECEIVES the flag; nothing proves a leaf never DECIDES it | Any local waiting state a component computes for itself |
-| `SLOTS-6` | `unrepresentable` | The three closed tier aliases carry no appearance member, and JSX refuses an unknown attribute | A hand-written props type that never used a tier alias |
+| `SLOTS-6` | `unrepresentable` + `enforced` | The three closed tier aliases carry no appearance member, and JSX refuses an unknown attribute. The hole the aliases leave — a props type written by hand — is closed by four rules: `no-public-classname-prop` at the declaration and at the call site, `no-per-part-classname-prop` for `<part>ClassName`, `no-public-frame-css-props` for CSS-shaped frame props above the leaf tier, and `no-css-door-type-laundering` for a door hidden behind `Omit`/`Pick`/`Exclude` | A door under a name none of the four recognise — the rules read prop names, so an appearance decision travelling as `tone` or `density` is a naming question, not a slot the type system can see |
 | `SLOTS-7` | `enforced` | `no-surface-list-items-slot` | Any other shared surface — the rule is bound to one import path |
 
 Four codes are held by a type and three by a rule, which is the arrangement this law wants and not a

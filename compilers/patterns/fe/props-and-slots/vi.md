@@ -261,7 +261,7 @@ người đọc giữ.
 | `SLOTS-3` | `enforced` | `no-inline-parameter-type` | Một kiểu có tên nhưng không phải `XProps` cho component `X` — cái tên được đọc, không được kiểm |
 | `SLOTS-4` | `enforced` | `no-children-slot`, cộng `BranchProps` cho nửa khẳng định | Rule thấy lỗ markup; không gì thấy một shape đóng mọc thêm `render` |
 | `SLOTS-5` | `documented` | Không gì cả. `BlockProps` chứng minh một block không bao giờ NHẬN cờ; không gì chứng minh một leaf không bao giờ TỰ QUYẾT | Bất kỳ trạng thái chờ cục bộ nào một component tự tính cho mình |
-| `SLOTS-6` | `unrepresentable` | Ba alias tầng đóng không mang thành viên ngoại hình nào, và JSX từ chối một attribute lạ | Một kiểu props viết tay chưa từng dùng alias tầng |
+| `SLOTS-6` | `unrepresentable` + `enforced` | Ba alias tầng đóng không mang thành viên ngoại hình nào, và JSX từ chối một attribute lạ. Cái lỗ mà alias để lại — một kiểu props viết tay — được bốn rule bịt: `no-public-classname-prop` ở chỗ khai báo và ở chỗ gọi, `no-per-part-classname-prop` cho `<part>ClassName`, `no-public-frame-css-props` cho các prop hình dạng CSS ở trên tầng leaf, và `no-css-door-type-laundering` cho một cánh cửa giấu sau `Omit`/`Pick`/`Exclude` | Một cánh cửa mang cái tên mà không rule nào trong bốn cái nhận ra — chúng đọc **tên** prop, nên một quyết định ngoại hình đi dưới tên `tone` hay `density` là câu chuyện đặt tên, không phải cái slot mà hệ kiểu nhìn thấy được |
 | `SLOTS-7` | `enforced` | `no-surface-list-items-slot` | Mọi surface dùng chung khác — rule chỉ bind vào đúng một import path |
 
 Bốn mã do một type giữ và ba mã do một rule giữ, và đó là bố cục luật này muốn chứ không phải trùng

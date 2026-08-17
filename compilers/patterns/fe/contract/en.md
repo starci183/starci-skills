@@ -469,7 +469,7 @@ wrong value impossible to write. `enforced` means a rule in `@starci/eslint-cano
 | `CONTRACT-8` | `enforced` | `no-hand-written-contract-attrs` |
 | `CONTRACT-9` | `enforced` | `no-unknown-contract-key` for a key that does not exist, `no-duplicate-entry-shape` for a key that should not |
 | `CONTRACT-10` | `documented` | nothing directly. The rules only EXEMPT the named surface branches; no rule checks that what they own stayed wrapper mechanics |
-| `CONTRACT-11` | `unrepresentable` | the slot record type, the branded component types, and the `repeats`/`restingCount` pairing |
+| `CONTRACT-11` | `unrepresentable` + `enforced` | the slot record type, the branded component types, and the `repeats`/`restingCount` pairing — and `contract-children-are-typed`, which reads the table itself, because the types govern a component that *consumes* an entry while the entry is written as a plain object literal nothing has typed yet. An entry with no `children` at all, or a slot naming no owner identity, is legal object syntax and unreachable from the component side |
 | `CONTRACT-12` | `enforced` | `no-interaction-class-in-entry` — interaction, paint and raised-object families |
 | `CONTRACT-13` | `enforced` | `no-dead-contract-key`, over a repository-wide reference walk |
 
