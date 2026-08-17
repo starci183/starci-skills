@@ -92,13 +92,18 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "verdict", "from", "to", "callSites"],
+          "required": ["kind", "verdict", "from", "to", "callSites", "why"],
           "properties": {
             "kind": {"enum": ["entry", "leaf", "composite", "block"]},
             "verdict": {"const": "generalize"},
             "from": {"$ref": "#/$defs/name"},
             "to": {"$ref": "#/$defs/name"},
-            "callSites": {"type": "integer", "minimum": 0}
+            "callSites": {"type": "integer", "minimum": 0},
+            "why": {
+              "type": "string",
+              "minLength": 12,
+              "description": "The rewritten reason at the new width, written as the need it answers rather than the feature it came from. A widened name whose `why` still names the old feature is not findable by anyone who did not already know it."
+            }
           }
         },
         {

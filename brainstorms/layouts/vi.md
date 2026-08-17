@@ -75,7 +75,7 @@ Mỗi region ra đúng một trong ba, và cái thứ ba là ngoại lệ:
 | Phán quyết | Khi nào | Bằng chứng phải nợ |
 |---|---|---|
 | `reuse <key>` | `why` của một entry đã trả lời đúng lý do của region này | không |
-| `generalize <key> -> <key>` | entry trả lời được nhưng tên nó đang buộc vào một nghiệp vụ khác | số call site của key cũ |
+| `generalize <key> -> <key>` | entry trả lời được nhưng tên nó đang buộc vào một nghiệp vụ khác | số call site của key cũ, **và câu `why` viết lại** |
 | `new <key>` | không entry nào trả lời lý do này | câu `why` mà entry mới sẽ mang |
 
 `generalize` mà không có **số call site đo được** thì bị từ chối. Đổi tên là rẻ khi chỉ một file trích
@@ -85,6 +85,12 @@ trường hợp đó.
 Tên đã generic hoá vẫn phải **cố định children**. Nới `flashcard-result-fact-row` thành `fact-row` thì
 vẫn giữ một nhãn và một giá trị trên cùng baseline; nới tiếp thành `row` là gọi tên chẳng ràng buộc gì
 nữa.
+
+**Đổi tên mà không viết lại `why` thì tệ hơn không đổi.** `why` chính là thứ một lượt tra khớp vào, nên
+một cái tên đã nới rộng mà vẫn mang lý do hẹp cũ là **hứa một sự tổng quát mà chỉ mục không giao** —
+người sau tra theo lý do, không thấy gì, rồi bịa ra entry thứ ba. Viết lý do mới thành **cái nhu cầu nó
+trả lời** — "nếu cần một hàng so một cái tên với một giá trị đã lưu trên cùng baseline" — chứ không phải
+thành cái nghiệp vụ nó xuất phát từ đó.
 
 ## Luật cho phương án
 
@@ -231,7 +237,7 @@ quay ra hay không, nên chuyện đó không được giả định.
       "regions": [
         {
           "name": "scopes",
-          "entry": {"verdict": "generalize", "from": "flashcard-mode-tabs", "to": "mode-tabs", "callSites": 2},
+          "entry": {"verdict": "generalize", "from": "flashcard-mode-tabs", "to": "mode-tabs", "callSites": 2, "why": "if you need to switch between a small closed set of scopes rather than filter by them"},
           "assembler": "SurfaceCard",
           "mount": "mounts-once",
           "whyMatch": "a small closed set of scopes is switched between, not filtered by"

@@ -69,7 +69,7 @@ Mỗi phần ra đúng một trong ba, đối chiếu với contract và từ v�
 | Phán quyết | Khi nào | Bằng chứng phải nợ |
 |---|---|---|
 | `reuse <key>` | `why` của một cái tên đã trả lời đúng lý do của phần này | không |
-| `generalize <key> -> <key>` | nó trả lời được nhưng dưới một cái tên buộc vào nghiệp vụ | số call site của tên cũ |
+| `generalize <key> -> <key>` | nó trả lời được nhưng dưới một cái tên buộc vào nghiệp vụ | số call site của tên cũ, **và câu `why` viết lại** |
 | `new <key>` | không cái tên nào trả lời lý do này | câu `why` mà tên mới sẽ mang |
 
 Một lời trích không kiểm được với từ vựng là **một cái tên bịa ra**, phán quyết của nó ghi gì cũng vậy.
@@ -150,7 +150,7 @@ hash chỉ phủ **một giải phẫu**.
       "parts": [
         {
           "name": "criterion-row",
-          "cites": {"kind": "entry", "verdict": "generalize", "from": "flashcard-result-fact-row", "to": "fact-row", "callSites": 1},
+          "cites": {"kind": "entry", "verdict": "generalize", "from": "flashcard-result-fact-row", "to": "fact-row", "callSites": 1, "why": "if you need a row comparing a name with one stored value on a shared baseline"},
           "whyMatch": "a name read against one stored value, repeated as rows on a shared baseline"
         }
       ],

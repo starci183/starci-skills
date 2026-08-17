@@ -70,7 +70,7 @@ Every part resolves to exactly one of three, against the contract and the vocabu
 | Verdict | When | Evidence owed |
 |---|---|---|
 | `reuse <key>` | a name's `why` already answers this part's reason | none |
-| `generalize <key> -> <key>` | it answers it under a feature-bound name | the call-site count of the old name |
+| `generalize <key> -> <key>` | it answers it under a feature-bound name | the call-site count of the old name, **and the rewritten `why`** |
 | `new <key>` | nothing answers this reason | the `why` the new name will carry |
 
 A citation that cannot be checked against the vocabulary is an invented name, whatever its verdict says.
@@ -151,7 +151,7 @@ covers an anatomy only.
       "parts": [
         {
           "name": "criterion-row",
-          "cites": {"kind": "entry", "verdict": "generalize", "from": "flashcard-result-fact-row", "to": "fact-row", "callSites": 1},
+          "cites": {"kind": "entry", "verdict": "generalize", "from": "flashcard-result-fact-row", "to": "fact-row", "callSites": 1, "why": "if you need a row comparing a name with one stored value on a shared baseline"},
           "whyMatch": "a name read against one stored value, repeated as rows on a shared baseline"
         }
       ],

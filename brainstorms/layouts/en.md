@@ -77,7 +77,7 @@ Every region resolves to exactly one of three, and the third is the exception:
 | Verdict | When | Evidence owed |
 |---|---|---|
 | `reuse <key>` | an entry's `why` already answers this region's reason | none |
-| `generalize <key> -> <key>` | an entry answers it but its name is bound to another feature | the call-site count of the old key |
+| `generalize <key> -> <key>` | an entry answers it but its name is bound to another feature | the call-site count of the old key, **and the rewritten `why`** |
 | `new <key>` | no entry answers this reason | the `why` sentence the new entry will carry |
 
 `generalize` without a measured call-site count is refused. A rename is cheap when one file cites the
@@ -86,6 +86,12 @@ key and product-wide when a shared branch does, and nothing in the contract dist
 A generalized name must still fix its children. Widening `flashcard-result-fact-row` to `fact-row`
 keeps a label and a value on one baseline; widening it to `row` names nothing and stops constraining
 anything.
+
+**A rename without a rewritten `why` is worse than no rename.** `why` is what a lookup matches on, so a
+widened name carrying its old narrow reason promises a generality the index does not deliver: the next
+reader searches by reason, finds nothing, and invents a third entry. Write the new reason as **the need
+it answers** — "if you need a row comparing a name with one stored value on a shared baseline" — rather
+than the feature it came from.
 
 ## Candidate laws
 
@@ -232,7 +238,7 @@ courses, so that is not assumed.
       "regions": [
         {
           "name": "scopes",
-          "entry": {"verdict": "generalize", "from": "flashcard-mode-tabs", "to": "mode-tabs", "callSites": 2},
+          "entry": {"verdict": "generalize", "from": "flashcard-mode-tabs", "to": "mode-tabs", "callSites": 2, "why": "if you need to switch between a small closed set of scopes rather than filter by them"},
           "assembler": "SurfaceCard",
           "mount": "mounts-once",
           "whyMatch": "a small closed set of scopes is switched between, not filtered by"

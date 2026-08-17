@@ -88,12 +88,17 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["verdict", "from", "to", "callSites"],
+          "required": ["verdict", "from", "to", "callSites", "why"],
           "properties": {
             "verdict": {"const": "generalize"},
             "from": {"$ref": "#/$defs/slug"},
             "to": {"$ref": "#/$defs/slug"},
-            "callSites": {"type": "integer", "minimum": 0, "description": "Measured, not estimated. A shared branch among them makes this a product-wide change."}
+            "callSites": {"type": "integer", "minimum": 0, "description": "Measured, not estimated. A shared branch among them makes this a product-wide change."},
+            "why": {
+              "type": "string",
+              "minLength": 12,
+              "description": "The REWRITTEN reason, at the new width. A widened name with its old narrow `why` is worse than no rename: `why` is what a lookup matches on, so the name promises generality the index does not deliver and the next reader invents a third entry. Write it as the need it answers — \"if you need a row comparing a name with one stored value on a shared baseline\" — not as the feature it came from."
+            }
           }
         },
         {
