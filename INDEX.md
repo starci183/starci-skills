@@ -81,10 +81,21 @@ Every module is one document in two records: `en.md` for the agent, `vi.md` for 
 section for section and neither refers to the other. A shelf may carry its own `en.md`, which becomes
 that shelf's page.
 
-**A path in a rule is relative to the role's source root, and the tree never writes that root.** A
-pattern says `components/leaves/<Name>/index.tsx`, not `src/components/...`: one product keeps its
-components at `src/components`, another at `packages/ui/src`, and the workspace route is what knows
-which. A rule that hardcodes the root is a rule that is false for the second product to read it.
+**One tier, two layouts.** A frontend is either **single-app**, keeping the component tree at
+`src/components/*`, or a **monorepo**, keeping the same tree under the same tier names in a shared
+package at `packages/ui/src/*`. The tier names never change; only the prefix does, and the prefix is a
+closed list the machine holds — `src/components`, `packages/ui/src`, `src`.
+
+So a rule writes the tier and not the prefix: `components/leaves/<Name>/index.tsx`. A rule that writes
+the prefix by hand works in one repository and is **blind in the other** — and blind here is not noisy,
+it is silently wrong in both directions at once: an unrecognised leaf gets reported for writing the
+classes a leaf is supposed to write, while every rule guarding the leaf tier quietly stops guarding
+anything. Measured once, pointed at a monorepo: 46 errors across 28 correct files, and the repository
+owed none of them.
+
+A monorepo also carries one law a single-app tree cannot have — `FILE-5`: a tier that knows a feature
+belongs to the app that owns the feature, a tier that knows none belongs to the shared package. In a
+single-app checkout that rule is inert by construction, not disabled.
 
 The exception is a rule describing **its own machine**: when a lint gates on a filename containing
 `/src/tests/`, that string is the mechanism, not a layout claim, and it is quoted exactly.
