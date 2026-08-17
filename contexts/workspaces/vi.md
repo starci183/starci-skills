@@ -142,6 +142,12 @@ chỗ, tệp hợp đồng đã đổi tên, head đã ghi thuộc một nhánh 
 
 **Tự hỏi.** Mình đã **xác minh** route, hay chỉ **đọc cú pháp** của nó?
 
+**Một head mà checkout chỉ đơn giản đã đi qua thì không thuộc mã này.** Route vẫn mô tả đúng repository,
+đúng nhánh, đúng dòng lịch sử; chỉ có commit mới nhất là mới hơn. Thứ hỏng ở đây là một head đã ghi mà
+checkout **không còn tới được** — bị viết lại hoặc đã mất — hoặc một nhánh không còn khớp. Báo tiến độ
+bình thường thành stale thì mất nhiều hơn được: cứ commit một cái là báo động, và một bản báo cáo kêu mọi
+lúc là bản báo cáo không ai đọc vào đúng ngày nó nói thật.
+
 **Ranh giới**
 
 - `WORKSPACE-2`: thiếu là không có tệp; cũ là có tệp nhưng tệp đó nói sai.

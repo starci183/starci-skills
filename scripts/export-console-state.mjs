@@ -35,6 +35,12 @@ const git = (cwd, ...rest) => {
   }
 };
 
+// Can the checkout still reach this commit? Two different failures answer no — the object is gone, or it
+// sits on a history this branch no longer contains — and both mean the route names a commit that is not
+// there any more. A commit the checkout has simply moved past is reachable, and that is not a failure.
+const reachable = (cwd, commit) =>
+  git(cwd, "cat-file", "-e", `${commit}^{commit}`) !== null && git(cwd, "merge-base", "--is-ancestor", commit, "HEAD") !== null;
+
 const dirs = (path) => (existsSync(path) ? readdirSync(path, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name) : []);
 const countFiles = (path) => (existsSync(path) ? readdirSync(path).filter((n) => n.endsWith(".json")).length : 0);
 
@@ -74,6 +80,8 @@ function readWorkspaces() {
       const contractExists = Boolean(contract && existsSync(contract));
       const recordedHead = config.repository?.head ?? null;
       const liveHead = diskPathExists ? git(diskPath, "rev-parse", "--short=12", "HEAD") : null;
+      const branch = config.repository?.branch ?? null;
+      const liveBranch = diskPathExists ? git(diskPath, "branch", "--show-current") : null;
 
       // Parsing is not verifying: a route whose fields are all well formed and whose paths no longer
       // resolve is stale, and stale is a different verdict from absent.
@@ -85,9 +93,15 @@ function readWorkspaces() {
       } else if (contract && !contractExists) {
         verdict = "stale";
         reason = "recorded contract path no longer exists";
-      } else if (recordedHead && liveHead && recordedHead !== liveHead) {
+      } else if (recordedHead && liveHead && recordedHead !== liveHead && !reachable(diskPath, recordedHead)) {
+        // A moved head is not staleness — the route still describes this repository, and calling every
+        // commit stale is how a report trains its reader to skip it. What is stale is a recorded head the
+        // checkout can no longer reach: the branch was rewritten, so the route names a commit that is gone.
         verdict = "stale";
-        reason = "recorded head is behind the checkout";
+        reason = "recorded head is not reachable from the checkout — the branch was rewritten under it";
+      } else if (branch && liveBranch && branch !== liveBranch) {
+        verdict = "stale";
+        reason = `route records branch ${branch}; the checkout is on ${liveBranch}`;
       } else if (!contract && role === "fe") {
         verdict = "stale";
         reason = "frontend role with no contract recorded — look for the registry before trusting this";

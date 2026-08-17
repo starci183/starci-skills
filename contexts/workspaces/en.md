@@ -143,6 +143,12 @@ rewritten.
 
 **Ask yourself.** Did I verify the route, or only parse it?
 
+**A head the checkout has merely moved past is not this code.** The route still describes the repository,
+the branch and the history; only the newest commit is newer. What fails here is a recorded head the
+checkout **cannot reach** — rewritten or gone — or a branch that no longer matches. Reporting ordinary
+progress as staleness costs more than it catches: it makes every commit raise the alarm, and a report that
+cries every time is a report nobody reads on the day it is right.
+
 **Boundary**
 
 - `WORKSPACE-2`: absence is a missing file; staleness is a present file that lies.
