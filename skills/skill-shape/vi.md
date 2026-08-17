@@ -4,7 +4,7 @@ title: Skill shape · Vietnamese
 
 # Hình dạng của một skill
 
-Đầu vào là một năng lực cần chạy, và đầu ra là **một phase được ghi thêm vào workflow cùng sáu bảng
+Đầu vào là một năng lực cần chạy, và đầu ra là **một phase công việc cùng sáu bảng
 kết quả**. Mô-đun này quyết định **mọi skill phải in gì, hỏi gì và ghi lại gì** — không quyết định
 từng skill làm gì. Một skill tự bày ra định dạng báo cáo riêng thì không đối chiếu được với những
 skill khác, và một cây mà các bản ghi của nó không đồng ý với nhau về chính định dạng của mình thì
@@ -55,15 +55,15 @@ của nó.
 | Role targets | các repository giải ra từ `.workspace/<project>/<role>/config.json` |
 | Trust | cây quy tắc tuyệt đối |
 | Purpose | một câu nói phase này phải chốt được điều gì |
-| Workflow | `<Source>/.workflows/<kind>/<app>/<name>.md` |
+| Record | bằng chứng của phase này đọng ở đâu — một session dưới `<Source>/.worktrees/<project>/sessions/` với lượt design, chính các commit của lượt chạy với repair, `None` với lượt không ghi gì |
 | Phase | `layout`, `block`, `execute`, `plan`, `approve` hoặc `apply` |
 | Touching | những đường dẫn chính xác phase này được ghi |
 | Read | contract, source, schema hay runtime đã đọc, kèm trạng thái của nó |
 | Missing | bằng chứng bắt buộc còn thiếu và nó chặn gì — hoặc `None` |
 
 `Project` và các route vai trò của nó giải qua mô-đun workspace, và một route phải được **xác minh
-trước khi đọc**. Phase nào không giải được Workdir, Source, Project, các repository vai trò, Trust hay
-Workflow thì đã bị chặn trước cả khi bắt đầu việc riêng của mục tiêu.
+trước khi đọc**. Phase nào không giải được Workdir, Source, Project, các repository vai trò hay Trust
+thì đã bị chặn trước cả khi bắt đầu việc riêng của mục tiêu.
 
 ## Các trạng thái tiến trình
 
@@ -71,7 +71,7 @@ Workflow thì đã bị chặn trước cả khi bắt đầu việc riêng củ
 |---|---|---|
 | working | còn bằng chứng hoặc còn việc an toàn để làm | tiếp tục, không hỏi |
 | needs approval | một quyết định, lời hứa, giá hay biên giới ghi có thể sai | gộp vào `NEED APPROVALS` |
-| phase complete | điều kiện kết thúc đã đạt | ghi thêm workflow, gọi phase sau |
+| phase complete | điều kiện kết thúc đã đạt | ghi vào đúng chỗ phase đã khai, gọi phase sau |
 
 Một đường tool thất bại không làm lượt chạy bị chặn: thử đường an toàn thay thế trước. Mọi thứ cần
 duyệt **đã biết tại thời điểm đó** được gộp thành **một** lượt hỏi, không hỏi lắt nhắt. Sau phản hồi,
@@ -117,26 +117,23 @@ ngoài `Touching` được trả về cho chủ của nó, không được lặn
 `OWED`, `WARNINGS` và `NEED APPROVALS` là **ba lời khai khác nhau** — việc còn dở, rủi ro, và một cái
 chặn cần người dùng. Gộp chúng lại chính là cách một lượt chạy chưa xong đọc ra như đã xong.
 
-## File workflow
+## Bản ghi
 
-Một bản ghi chỉ-ghi-thêm tại `<Source>/.workflows/<kind>/<app>/<name>.md`:
+**Không có tệp bản ghi riêng.** Bằng chứng của một phase chính là sáu bảng nó in ra, và chỗ nào cần sống
+lâu hơn phiên làm việc thì nó đọng vào đúng cái kho vốn đã sở hữu loại việc đó: lượt design đọng trong
+session của nó dưới `<Source>/.worktrees/<project>/sessions/`, gắn với hash; lượt repair đọng trong chính
+các commit của nó, mà baseline và cách tách từng pass đã là dấu vết. Một chỗ thứ ba, viết tay và không ai
+đọc, là thêm một cái nhà nữa cho một sự thật vốn đã có nhà — và là loại nhà cũ đi mà không gì phát hiện
+được, chính vì không ai đọc nó.
 
-| kind | năng lực |
-|---|---|
-| `designs` | bề mặt, layout, block và overlay của frontend |
-| `feature` | năng lực backend |
-| `setup` | route workspace và state worktree |
-| `repair` | một source được đưa về xanh |
-
-Mỗi phase ghi thêm tiêu đề của nó, đúng bảng `CONTEXT` đã in cho lượt đó, các bảng bằng chứng của nó,
-rồi sáu bảng kết quả theo thứ tự. Phase được duyệt ghi `Approved revision: <identity>`, và Apply trích
-đúng identity đó cùng baseline commit của nó, để bản ghi **chứng minh được cái gì đã đổi sau khi Apply
-bắt đầu**.
+Một phase được duyệt gọi tên `Approved revision: <identity>` của nó, và Apply trích đúng identity đó cùng
+baseline commit. Chính cặp đó chứng minh cái gì đã đổi sau khi Apply bắt đầu, và nó sống sót ở bất cứ nơi
+nào phase ghi lại — nó là một **câu**, không phải một tệp.
 
 Phần tường thuật, bằng chứng và giá trị trong bảng viết bằng tiếng Việt. Tiêu đề, nhãn schema, đường
 dẫn, câu lệnh và tên định danh trong code giữ nguyên, vì dịch chúng là làm hỏng bộ kiểm.
 
-Phase cũ không bị viết lại cho khớp định dạng mới. Bản ghi lịch sử là bằng chứng; muốn sửa thì **ghi
+Bằng chứng cũ không bị viết lại cho khớp định dạng mới. Bản ghi lịch sử là bằng chứng; muốn sửa thì **ghi
 thêm**.
 
 ## Quy tắc
@@ -171,7 +168,7 @@ thêm**.
 Phase: layout
 Project: example-app
 Role targets: fe -> <disk>\example-app-fe (đã xác minh: contract có mặt)
-Touching: .workflows/designs/example-app/coding-drill-result.md
+Touching: .worktrees/example-app/sessions/<session>/
 Purpose: chốt 3-4 phương án layout cho một bề mặt mới
 Read: contract key + why + host (74KB trên 192KB), danh sách branch, bảng route
 Missing: None

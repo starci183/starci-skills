@@ -44,18 +44,25 @@ are the same session; a reworded prompt is a new round, not a new session. Print
 | Input | Read |
 |---|---|
 | request | verbatim |
-| contract | key, `why`, `host`, children names — **not** the class arrays |
+| contract | **queried, not read** — one need per region through `scripts/contract-search.mjs`, which returns `key`, `why`, `host` and never a class array |
 | branches | every branch and what each may contain |
 | routes | every route page and every persistent layout |
 | axes | the closed diversity set |
 | precedents | accepted candidates for this project, with their rejections |
 
 Reading the class arrays is a defect, not an optimisation: a stage that cannot see a class cannot write
-one into a candidate.
+one into a candidate. The query is how that ceiling stops being a promise: the script never extracts a
+class, so the value does not arrive and cannot be copied. Measured on a 299-entry registry: a query answers
+in under 2KB where the permitted read is 69KB, and the registry is 192KB.
 
-### 6 — Resolve every region against the contract
+### 6 — Resolve every region against the contract, one query per region
 
-Search by `why` — by the reason, never by the shape. Each region gets exactly one verdict:
+    node <trust>/scripts/contract-search.mjs <project> <role> --need "<the region stated as a need>"
+
+Ask by the **reason**, never by the shape — the need sentence is what a `why` is written to match. Every
+result prints the words it matched on, and a result marked `~` matched on an incidental word rather than on
+the need: it is not an answer, and treating it as one is exactly the "close enough" this step exists to
+refuse. Each region gets exactly one verdict:
 
 - `reuse <key>` — an entry's reason already answers this region;
 - `generalize <key> -> <key>` — it answers it under a feature-bound name; **measure the call-site count
@@ -63,6 +70,11 @@ Search by `why` — by the reason, never by the shape. Each region gets exactly 
 - `new <key>` — nothing answers this reason; state the `why` the new entry will carry.
 
 A `generalize` verdict without a measured call-site count is refused, not guessed.
+
+**A query that answers nothing exits 1, and that is two facts, not one.** For this run it is a `new`
+verdict. For the tree it is a finding — a real surface stated a need and no entry could be found by it —
+and it is carried into `WARNINGS` naming the need verbatim, so [`starci-repair`](../starci-repair/SKILL.md)
+can repair the reason that failed rather than the 298 that merely look wrong in a count.
 
 ### 7 — Generate 3–4 candidates
 

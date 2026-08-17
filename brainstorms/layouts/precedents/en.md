@@ -197,8 +197,8 @@ cited-entries: <the contract keys each region cited>
 contract-at: <the contract state it was accepted against>
 ```
 
-**The contract is read at 38%, and the class arrays are not read at all.** The full file is 192KB;
-keys, `why`, `host` and children names are 74KB of it. The cut is not economy. A stage that cannot see
+**The contract is queried, and the class arrays are never extracted.** Measured on one registry: 192KB on
+disk, 69KB permitted, under 2KB answered by a query. The cut is not economy. A stage that cannot see
 a class cannot carry one forward, so a precedent can never teach the next candidate a class — the rule
 is enforced by what is not read, not by a reminder. Matching is done on `why` for the same reason: two
 entries can share every class and answer different reasons, and it is the reason a precedent is

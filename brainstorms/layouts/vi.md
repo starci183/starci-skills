@@ -32,10 +32,12 @@ Sáu, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuyệ
 | 5 | Bộ trục khác biệt đóng | 3–4 phương án khác nhau bằng trang trí, tức là **một** phương án bốn lần |
 | 6 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
 
-**Đầu vào số 2 cố ý loại mảng class.** Contract 192KB rút còn 74KB — đúng **38%** — khi chỉ lấy key,
-`why`, `host` và tên children. Cắt vậy không phải để tiết kiệm. Một tầng **không thấy** class thì không
-thể ghi class vào đầu ra của nó, nên "JSON không có class" được ép bằng **thứ mình không đọc**, chứ không
-bằng một lời nhắc phải tuân theo.
+**Đầu vào số 2 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
+truy vấn qua `scripts/contract-search.mjs`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
+để tiết kiệm. Một tầng **không thấy** class thì không thể ghi class vào đầu ra của nó, nên "JSON không có
+class" đứng vững vì **giá trị đó không bao giờ tới nơi**, chứ không vì một lời nhắc phải tuân theo. Đo
+trên một registry 299 entry: 192KB nằm trên đĩa, 69KB là mức được phép, và một truy vấn trả lời trong
+dưới 2KB.
 
 Không đọc ở tầng này: mảng class, biến theme, cài đặt của leaf và composite, dữ liệu và query, chữ theo
 locale, lint. Tất cả thuộc những tầng đến sau.

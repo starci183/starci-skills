@@ -64,8 +64,10 @@ record. Seven do the work; two only look — one at the machine, one at the othe
 The rules here are written to be **machine-refusable**, because a rule that only advises gets skipped
 under pressure:
 
-- a layout candidate is class-free, enforced by reading 38% of the contract — a stage that cannot see a
-  class cannot write one;
+- a layout candidate is class-free, enforced by
+  [`scripts/contract-search.mjs`](./scripts/contract-search.mjs), which returns a contract entry's `key`,
+  `why` and `host` and never extracts its classes — a stage that cannot see a class cannot write one, and
+  the value not arriving is what holds that, not a rule asking a reader to skip a field;
 - every schema sets `additionalProperties: false`, so a stray `className` is invalid rather than
   arguable;
 - [`scripts/validate-artifact.mjs`](./scripts/validate-artifact.mjs) refuses a batch whose candidates

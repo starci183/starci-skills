@@ -196,10 +196,11 @@ cited-entries: <những key contract mà mỗi region đã trích>
 contract-at: <trạng thái contract lúc nó được chấp nhận>
 ```
 
-**Contract được đọc ở mức 38%, và mảng class thì không đọc chút nào.** Cả tệp là 192KB; phần key,
-`why`, `host` và tên children chiếm 74KB. Cắt vậy không phải để tiết kiệm. Một tầng **không thấy** class
-thì không thể mang class đi tiếp, nên một tiền lệ không bao giờ dạy được cho phương án sau một cái class
-— luật được ép bằng thứ mình không đọc, không bằng một lời nhắc. Khớp nhau cũng khớp ở `why` vì đúng lý
+**Contract được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Cắt vậy không phải
+để tiết kiệm. Một tầng **không thấy** class thì không thể mang class đi tiếp, nên một tiền lệ không bao
+giờ dạy được cho phương án sau một cái class — luật đứng vững vì giá trị đó không tới nơi, không vì một
+lời nhắc. Đo trên một registry: 192KB nằm trên đĩa, 69KB là mức được phép, và một truy vấn trả lời trong
+dưới 2KB. Khớp nhau cũng khớp ở `why` vì đúng lý
 do đó: hai entry có thể trùng từng class mà trả lời hai lý do khác nhau, và **lý do** mới là thứ tiền lệ
 được đánh chỉ mục theo.
 

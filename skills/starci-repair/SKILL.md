@@ -184,6 +184,11 @@ matches on** — [`starci-fe-design-layout`](../starci-fe-design-layout/SKILL.md
 searching it. An entry nobody can find by need is an entry that gets written a second time, so a stale
 index is real staleness even while every gate is green.
 
+**A recorded miss outranks a count.** [`starci-fe-design-layout`](../starci-fe-design-layout/SKILL.md)
+queries this index one need at a time, and a query that answered nothing is carried into its `WARNINGS`
+with the need written out. Those needs are this pass's **first** work: a count says 298 reasons look wrong,
+a miss says *this* reason failed a real surface on a real day. Repair what missed, then work the count.
+
 **`why` does not describe the business. It says when you would reach for this.**
 
 | Wrong — describes | Right — states the need |

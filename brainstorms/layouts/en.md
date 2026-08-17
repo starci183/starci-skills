@@ -33,10 +33,11 @@ Six, and no more. Each is here because something specific breaks without it.
 | 5 | The closed list of diversity axes | the 3–4 candidates differ by decoration, which is the same candidate four times |
 | 6 | Precedents accepted for THIS project, the one the workspace route declared | every request is answered as if it were the first |
 
-**Input 2 excludes the class arrays deliberately.** A contract of 192KB is 74KB — 38% — once reduced
-to keys, `why`, `host` and children names. The cut is not economy. A stage that cannot see a class
-cannot write one into its output, so "no class in a candidate" is enforced by what is not read rather
-than by a reminder that has to be obeyed.
+**Input 2 is queried, not read, and the class arrays are never extracted.** One need per region through
+`scripts/contract-search.mjs`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
+cannot see a class cannot write one into its output, so "no class in a candidate" holds because the value
+never arrives — not because a reader was asked to skip a field. Measured on one 299-entry registry: 192KB
+on disk, 69KB permitted, under 2KB actually answered.
 
 Not read at this stage: class arrays, theme variables, leaf and composite implementations, data and
 queries, locale copy, lints. Those belong to the stages that come after.

@@ -4,7 +4,7 @@ title: Skill shape
 
 # Skill shape
 
-You are given a capability to run and you return one appended workflow phase and six output tables.
+You are given a capability to run and you return one phase of work and six output tables.
 This module decides **what every skill must print, ask and record** — not what any one skill does.
 A skill that invents its own reporting shape cannot be audited against the others, and a tree whose
 records disagree about their own format stops being evidence.
@@ -54,14 +54,14 @@ by its heading.
 | Role targets | the repositories resolved from `.workspace/<project>/<role>/config.json` |
 | Trust | absolute trust tree |
 | Purpose | one sentence saying what this phase must settle |
-| Workflow | `<Source>/.workflows/<kind>/<app>/<name>.md` |
+| Record | where this phase's evidence lands — a session under `<Source>/.worktrees/<project>/sessions/` for a design run, the run's own commits for a repair, `None` for a run that writes nothing |
 | Phase | `layout`, `block`, `execute`, `plan`, `approve` or `apply` |
 | Touching | the exact paths this phase may write |
 | Read | the exact contract, source, schema or runtime evidence read, with its state |
 | Missing | required evidence that is absent, and what it blocks — or `None` |
 
 `Project` and its role routes resolve through the workspace module, and a route is verified before it
-is read. A phase that cannot resolve Workdir, Source, Project, its role targets, Trust or Workflow is
+is read. A phase that cannot resolve Workdir, Source, Project, its role targets or Trust is
 stuck before any target-specific work.
 
 ## Process states
@@ -70,7 +70,7 @@ stuck before any target-specific work.
 |---|---|---|
 | working | evidence or safe work remains | continue without asking |
 | needs approval | a decision, promise, price or write boundary could be wrong | batch it into `NEED APPROVALS` |
-| phase complete | the exit condition is met | append the workflow, invoke the next phase |
+| phase complete | the exit condition is met | record where the phase said it would, invoke the next phase |
 
 One failed tool path is not a stuck run: try the safe fallback first. All approvals known at that
 moment are batched into one round rather than asked one at a time. After feedback, the same phase
@@ -115,26 +115,23 @@ Exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS
 `OWED`, `WARNINGS` and `NEED APPROVALS` are three different claims — unfinished work, risk, and a
 blocker needing the user. Collapsing them is how an unfinished run reads as a finished one.
 
-## The workflow file
+## The record
 
-One append-only record at `<Source>/.workflows/<kind>/<app>/<name>.md`:
+**There is no separate record file.** A phase's evidence is the six tables it prints, and where those tables
+have to survive the session they land in the store that already owns that kind of work: a design run in its
+session under `<Source>/.worktrees/<project>/sessions/`, hash-bound; a repair in its own commits, whose
+baseline and per-pass split are the trail. A third location, written by hand and read by nobody, was one
+more home for a fact that already had one — and the only kind of home that goes stale without anything
+noticing, because nothing reads it.
 
-| kind | capability |
-|---|---|
-| `designs` | frontend surfaces, layouts, blocks and overlays |
-| `feature` | backend capability |
-| `setup` | workspace routes and worktree state |
-| `repair` | a source returned to green |
-
-Each phase appends its heading, the exact `CONTEXT` table printed for that run, its evidence tables,
-then the six output tables in order. An approved phase writes `Approved revision: <identity>`, and
-Apply cites that same identity plus its baseline commit, so the record proves what changed after Apply
-began.
+An approved phase names its `Approved revision: <identity>`, and Apply cites that same identity plus its
+baseline commit. That pairing is what proves what changed after Apply began, and it survives wherever the
+phase records — it is a sentence, not a file.
 
 Narrative, evidence and table values are written in Vietnamese. Headings, schema labels, paths,
 commands and code identifiers stay unchanged, because translating them breaks validation.
 
-Old phases are not rewritten to match a newer format. A historical record is evidence; a correction is
+Old evidence is not rewritten to match a newer format. A historical record is evidence; a correction is
 appended.
 
 ## Rules
@@ -169,7 +166,7 @@ appended.
 Phase: layout
 Project: example-app
 Role targets: fe -> <disk>\example-app-fe (verified: contract present)
-Touching: .workflows/designs/example-app/coding-drill-result.md
+Touching: .worktrees/example-app/sessions/<session>/
 Purpose: settle 3-4 layout candidates for one new surface
 Read: contract keys + why + host (74KB of 192KB), branch inventory, route table
 Missing: None

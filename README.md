@@ -22,8 +22,8 @@ match section for section and neither refers to the other.
 
 A tree that only advises gets ignored under pressure, so the mechanisms are machine-refusable:
 
-- a layout candidate is **class-free**, enforced by reading 38% of the contract — a stage that cannot
-  see a class cannot write one;
+- a layout candidate is **class-free**, enforced by a query that never extracts a class — a stage that
+  cannot see one cannot write one;
 - `additionalProperties: false` at every level of every schema makes a stray `className` invalid
   rather than debatable;
 - the validator refuses a batch whose candidates share an axis set, or where none departs from

@@ -295,7 +295,6 @@ for (const project of new Set(workspaces.map((w) => w.project))) {
 for (const {project} of projects) {
   if (!workspaces.some((w) => w.project === project)) warnings.push(`${project}: .worktrees/${project}/ exists in this Source but .workspace/${project}/ does not — no source to read`);
 }
-if (!existsSync(join(source, ".workflows"))) warnings.push("the workflow root is absent, so no skill can append its phase");
 
 const state = {
   scannedAt: statSync(fileURLToPath(import.meta.url)).mtime.toISOString(),

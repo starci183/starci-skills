@@ -151,7 +151,7 @@ cleared-by: a trust-tree change — write the script, or stop naming it
 ```text
 finding: the workflow root is absent, so no phase can be appended anywhere
 label: blocked
-evidence: <Source>/.workflows does not exist
+evidence: no session store under <Source>/.worktrees/<project>/sessions/
 cleared-by: restoring it, or declaring a new root; every skill's Touching names a path under it
 ```
 
