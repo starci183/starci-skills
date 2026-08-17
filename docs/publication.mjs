@@ -63,4 +63,6 @@ export const groups = [
 
 // Site index. Published from this record under `.claude-v3/` when it exists; until then the sync
 // generates a placeholder index so the site still builds on an empty tree.
-export const indexSource = "docs.md";
+// One entry, two readers: the agent follows it to route, and the site publishes it as its home page.
+// Two entry documents would drift, and the one nobody reads would be the one that stays wrong.
+export const indexSource = "INDEX.md";

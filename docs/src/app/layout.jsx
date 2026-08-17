@@ -2,7 +2,6 @@ import {Footer, Layout, Navbar} from "nextra-theme-docs";
 import {Head, Search} from "nextra/components";
 import {getPageMap} from "nextra/page-map";
 import "nextra-theme-docs/style.css";
-import "../../.academy-src/app/globals.css";
 import "./styles.css";
 
 export const metadata = {

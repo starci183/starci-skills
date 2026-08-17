@@ -2,12 +2,10 @@
   "name": "starci-skills-v3-nextra",
   "version": "0.0.0",
   "private": true,
-  "description": "Nextra site for the v3 StarCi trust tree: rules, guides, critiques, and live HeroUI previews.",
+  "description": "Nextra site generated from the StarCi v3 trust records. Builds from a clean clone: no source repository, no machine path, no workspace route.",
   "scripts": {
-    "sync:academy": "node scripts/sync-academy-source.mjs",
-    "sync:heroui": "node scripts/sync-heroui-styles.mjs",
     "sync:content": "node scripts/sync-content.mjs",
-    "sync": "npm run sync:content && npm run sync:academy && npm run sync:heroui",
+    "sync": "npm run sync:content",
     "predev": "npm run sync",
     "dev": "next dev -p 3032",
     "prestart": "npm run sync",
@@ -19,10 +17,6 @@
     "clear": "node scripts/clear-generated.mjs"
   },
   "dependencies": {
-    "@heroicons/react": "^2.2.0",
-    "@heroui/react": "^3.2.4",
-    "@heroui/styles": "^3.2.4",
-    "@iconify/react": "^6.0.2",
     "next": "^16.3.1",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
@@ -30,12 +24,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
-    "serve": "^14.2.5",
-    "tailwindcss": "^4.3.3"
-  },
-  "overrides": {
-    "zod": "4.3.6"
+    "serve": "^14.2.5"
   },
   "engines": {
     "node": ">=20.9.0"

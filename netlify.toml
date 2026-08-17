@@ -1,0 +1,12 @@
+# The docs site is generated from the records in this repository and nothing else. Keeping these
+# values here rather than in the host's fields means the next person can read them, and git can
+# explain when they changed.
+[build]
+  base    = "docs"
+  command = "npm run build"
+  publish = "docs/out"
+
+[build.environment]
+  # Next 16 needs >= 20.9. Pinned because a site that builds on the author's Node and not on the
+  # host's default is the same defect wearing a different costume.
+  NODE_VERSION = "22"
