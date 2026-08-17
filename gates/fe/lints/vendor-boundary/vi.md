@@ -13,7 +13,7 @@ phải chỉ ra được đúng cái import, đúng đường dẫn, đúng th�
 
 Quyền sở hữu vendor được giữ bằng đường dẫn, bằng import, bằng JSX anatomy và bằng literal class bắt
 buộc phải viết ra. Cổng này phơi bày các luật nghiêm ngặt được cài trong
-`sources/fe/vendor-boundary.mjs`. Nó cố ý không đo thiết kế bằng regex: contract vẫn là nguồn hình
+`starci-eslint/packages/fe/vendor-boundary.mjs`. Nó cố ý không đo thiết kế bằng regex: contract vẫn là nguồn hình
 dạng, còn lint chỉ chặn những đường source có thể chứng minh là sai.
 
 Hai chiều phải cùng tồn tại. Import vendor sai owner bị báo, và mechanics branch không sở hữu vendor
@@ -74,7 +74,7 @@ trong không có import vendor nào.
 re-export qua module cục bộ rồi import lại từ đó thì không còn là import `@heroui/react` trong file
 sai. Đổi tên thư mục owner là đổi owner mà không đổi một dòng hành vi nào. Còn một leaf được phép
 import HeroUI dùng nó tốt hay dở thì hoàn toàn không bị xét — predicate node chính xác nằm trong
-`sources/fe/vendor-boundary.mjs` và cổng này không xuất bản nó.
+`starci-eslint/packages/fe/vendor-boundary.mjs` và cổng này không xuất bản nó.
 
 **Ranh giới.** Luật máy này quyết ai được import vendor. Owner đó sau đó phải render cái gì là việc
 của các luật anatomy và literal bên dưới.
@@ -208,8 +208,8 @@ không là `text-link-uses-hero-link`.
 | cả hai chiều | Import vendor sai owner thì nổ, và một named mechanics branch không sở hữu vendor cũng nổ |
 | JSX anatomy | Các thẻ có tên và thứ tự lồng nhau — `Modal.Body`, `ContractContent`, Content → Control → Indicator, DropdownBranch → AccountMenu → ShellNav |
 | literal class bắt buộc | `p-0` trên `Modal.Body`, khớp đúng như đã viết |
-| phần cài đặt | Các predicate node chính xác nằm trong `sources/fe/vendor-boundary.mjs` và cổng này không nhắc lại |
-| twin test | `node --test sources/fe/vendor-boundary.test.mjs` |
+| phần cài đặt | Các predicate node chính xác nằm trong `starci-eslint/packages/fe/vendor-boundary.mjs` và cổng này không nhắc lại |
+| twin test | `node --test starci-eslint/packages/fe/vendor-boundary.test.mjs` |
 
 ## Lối thoát hợp lệ
 
@@ -265,7 +265,7 @@ bị một lần đổi tên bình thường hoặc một lớp gián tiếp hó
 6. Thiết kế không được đo bằng regex. Contract vẫn là nguồn hình dạng.
 7. Mọi luật đều được khuyến nghị ở mức `error`.
 8. Không nhận ở mức cảnh báo và không suppression nào là hợp lệ.
-9. Twin test `node --test sources/fe/vendor-boundary.test.mjs` là bằng chứng các luật vẫn hành xử đúng
+9. Twin test `node --test starci-eslint/packages/fe/vendor-boundary.test.mjs` là bằng chứng các luật vẫn hành xử đúng
    như đã xuất bản.
 
 ## Ngoại lệ

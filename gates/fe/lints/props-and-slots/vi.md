@@ -41,7 +41,7 @@ hành vi), `SLOTS-2` (dữ liệu của component khai bằng type alias, không
 `SLOTS-6` (diện mạo là một variant có tên quyết định bên trong, không phải `className`, `style`, prop
 khoảng cách hay hook style theo từng phần) **hoàn toàn không có luật máy** ở đây. Ba trong số đó được
 giữ ở nơi khác — `SLOTS-1`, `SLOTS-2` và `SLOTS-6` thuộc tầng `unrepresentable`, do `DataValue`, do
-ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `sources/fe/props.ts` giữ — còn
+ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `starci-eslint/packages/fe/props.ts` giữ — còn
 `SLOTS-5` là `documented`, tức chẳng có gì giữ cả. Một lần chạy sạch của module này không nói được gì
 về bốn mã ấy, và ở đâu type chưa từng phủ tới file thì mã đó đơn giản là chưa được cưỡng chế, chứ
 không phải đã được bao phủ.
@@ -393,5 +393,5 @@ hatch: the annotation is a TSTypeReference and isInlineObjectType recurses only 
 Module này ghi lại việc cưỡng chế, không ghi lại luật. Nó không gọi tên sản phẩm, thư viện component
 hay repository nào. Tên luật máy, message id, token mã và tiền tố plugin là những định danh xuất hiện
 trong build output nên được chép lại nguyên văn; mọi thứ viết quanh chúng là TSX bình thường. Phần do
-type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `sources/fe/props.ts`, còn phần không gì giữ —
+type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `starci-eslint/packages/fe/props.ts`, còn phần không gì giữ —
 `SLOTS-5` — thuộc về người đọc.

@@ -229,7 +229,7 @@ hoá · nơi cố ý gọi tuần tự thay vì song song · một truy vấn vi
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type khiến
-giá trị sai không viết ra được; `enforced` nghĩa là có một rule trong `sources/fe/comments.mjs` báo
+giá trị sai không viết ra được; `enforced` nghĩa là có một rule trong `starci-eslint/packages/fe/comments.mjs` báo
 lỗi; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ | Tầng đó với không tới đâu |
@@ -253,12 +253,12 @@ luật.
 
 | Mã | Điểm neo | Cần nhìn gì ở đó |
 |---|---|---|
-| `COMMENTS-1` | `sources/fe/comments.mjs` | Mọi `export const` trong file đều mở đầu bằng một khối gọi tên vai trò — `SECOND_LANGUAGE_LETTER` nói những chữ cái nào và vì sao chúng quan trọng, chứ không nói rằng nó là một regex. So với `hasBlock` bên trong `requireExportJsdoc.create`, vốn là toàn bộ những gì rule thật sự đọc |
-| `COMMENTS-2` | `sources/fe/comments.test.mjs` | Ba ca invalid là cùng một câu văn ở ba vị trí: một comment, một chuỗi, một mảnh template. Bộ ba đó chính là lập luận về tầm với của rule, viết dưới dạng test |
-| `COMMENTS-3` | `sources/fe/comments.mjs` | `CONTENT_PATHS` và `isContentFile` cho hai ngoại lệ đường dẫn, `OK_PRAGMA` và tập `marked` bên trong `noSecondLanguageInSource.create` cho ngoại lệ thứ ba. Các ca valid ở tên file `LOCALE` và `FIXTURE` trong test song sinh cho thấy từng ngoại lệ đều được chạy qua |
-| `COMMENTS-4` | `sources/fe/comments.mjs` | `hasEmoji`, và khối giải thích vì sao nó là hai phép thử chứ không phải một lớp ký tự. Ca cặp regional-indicator trong test song sinh chính là ca mà một phép thử một-pictograph bỏ sót |
-| `COMMENTS-5` | `sources/fe/comments.mjs` | Khối một dòng trên `normalizePath`: nó nói vì sao chọn dấu gạch chéo xuôi, chứ không nói rằng có một phép replace. Bản chép lại của chính khối ấy sẽ hợp lệ ở khắp nơi và không dạy được gì |
-| `COMMENTS-6` | `sources/fe/comments.mjs` | Khối phía trên `const marked` bên trong `noSecondLanguageInSource.create`: nó ghi lại phần miễn trừ trước đây kiểm cái gì, vì sao không cách diễn đạt nào thoả được nó, và vì sao chính fixture valid của rule lại đi qua vì một lý do sai. Đó là một lần từ chối mà người đọc nếu không biết sẽ hoàn tác |
+| `COMMENTS-1` | `starci-eslint/packages/fe/comments.mjs` | Mọi `export const` trong file đều mở đầu bằng một khối gọi tên vai trò — `SECOND_LANGUAGE_LETTER` nói những chữ cái nào và vì sao chúng quan trọng, chứ không nói rằng nó là một regex. So với `hasBlock` bên trong `requireExportJsdoc.create`, vốn là toàn bộ những gì rule thật sự đọc |
+| `COMMENTS-2` | `starci-eslint/packages/fe/comments.test.mjs` | Ba ca invalid là cùng một câu văn ở ba vị trí: một comment, một chuỗi, một mảnh template. Bộ ba đó chính là lập luận về tầm với của rule, viết dưới dạng test |
+| `COMMENTS-3` | `starci-eslint/packages/fe/comments.mjs` | `CONTENT_PATHS` và `isContentFile` cho hai ngoại lệ đường dẫn, `OK_PRAGMA` và tập `marked` bên trong `noSecondLanguageInSource.create` cho ngoại lệ thứ ba. Các ca valid ở tên file `LOCALE` và `FIXTURE` trong test song sinh cho thấy từng ngoại lệ đều được chạy qua |
+| `COMMENTS-4` | `starci-eslint/packages/fe/comments.mjs` | `hasEmoji`, và khối giải thích vì sao nó là hai phép thử chứ không phải một lớp ký tự. Ca cặp regional-indicator trong test song sinh chính là ca mà một phép thử một-pictograph bỏ sót |
+| `COMMENTS-5` | `starci-eslint/packages/fe/comments.mjs` | Khối một dòng trên `normalizePath`: nó nói vì sao chọn dấu gạch chéo xuôi, chứ không nói rằng có một phép replace. Bản chép lại của chính khối ấy sẽ hợp lệ ở khắp nơi và không dạy được gì |
+| `COMMENTS-6` | `starci-eslint/packages/fe/comments.mjs` | Khối phía trên `const marked` bên trong `noSecondLanguageInSource.create`: nó ghi lại phần miễn trừ trước đây kiểm cái gì, vì sao không cách diễn đạt nào thoả được nó, và vì sao chính fixture valid của rule lại đi qua vì một lý do sai. Đó là một lần từ chối mà người đọc nếu không biết sẽ hoàn tác |
 
 Mọi điểm neo trên đều là source lint nằm trong trust tree, tức là phần code repository này thật sự mở
 ra được. Không điểm neo nào thuộc cây component kiểm chứng được từ đây; giới hạn ấy được ghi nhận như

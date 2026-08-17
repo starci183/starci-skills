@@ -302,7 +302,7 @@ inside a segment.
 Which tier actually holds each code, and — where the tier over-promises — exactly what the mechanism
 cannot see. The last column is the honest part of this table.
 
-| Code | Tier | Rule in `sources/fe/file-layout.mjs` | What the rule cannot see |
+| Code | Tier | Rule in `starci-eslint/packages/fe/file-layout.mjs` | What the rule cannot see |
 |---|---|---|---|
 | `FILE-1` | `enforced` | `export-matches-folder` | Whether the folder holds ONE component. The rule accepts a folder as soon as ONE export belongs to the family, so an unrelated passenger riding beside a matching export passes. |
 | `FILE-2` | `enforced` | `surface-folder-two-files-only` | Nothing inside the two files. A `component.tsx` that has grown four components in one file is not a third file, so it passes. |
@@ -323,7 +323,7 @@ codes directly; the tree glob is the secondary anchor because it is where the la
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `FILE-1` | `sources/fe/file-layout.test.mjs`, case `FILE-1: the path predicts the name` · `src/components/*/**/<Name>/index.tsx` | A direct named export equal to the folder name, or starting with it and continuing with a capital |
+| `FILE-1` | `starci-eslint/packages/fe/file-layout.test.mjs`, case `FILE-1: the path predicts the name` · `src/components/*/**/<Name>/index.tsx` | A direct named export equal to the folder name, or starting with it and continuing with a capital |
 | `FILE-2` | Same file, case `FILE-2: a surface folder holds its two halves and their twins` · `src/components/pages/*/` and `src/components/overlays/*/*/` | Each folder listing exactly `component.tsx` and `index.tsx`, plus `.test.tsx` twins where they exist |
 | `FILE-3` | Same file, case `FILE-3: a helper folder under components has a real home elsewhere` · `src/hooks/`, `src/modules/utils/` | The destinations exist and are populated, and a recursive search for `constants`, `utils`, `types` or `hooks` directories under `src/components/` returns nothing |
 | `FILE-4` | Same file, case `FILE-4: a family is exported as members, not as one object` · every `index.tsx` under `src/components/` | Family members exported one per statement; no `export const <Capital> = { … }` holding only capitalised members |

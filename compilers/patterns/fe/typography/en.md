@@ -324,7 +324,7 @@ Which tier actually holds each code — a closed type, a lint rule, or only a re
 
 | Code | Tier | What holds it |
 |---|---|---|
-| `TYPESET-1` | `enforced` | `no-heading-tag-outside-heading-component` in `.claude/sources/fe/typography.mjs` reports any `h1`–`h6` in a source file that is not the heading component itself |
+| `TYPESET-1` | `enforced` | `no-heading-tag-outside-heading-component` in `.claude/starci-eslint/packages/fe/typography.mjs` reports any `h1`–`h6` in a source file that is not the heading component itself |
 | `TYPESET-2` | `unrepresentable` | The closed level union `1 \| 2 \| 3 \| 4` on the heading data type; the same lint rule's `tooDeep` branch is the backstop for a hand-written `<h5>` |
 | `TYPESET-3` | `documented` | Nothing mechanical. The text leaf draws no border and no background, so the box is always somebody else's element |
 | `TYPESET-4` | `documented` | Nothing mechanical. The scale's ceiling makes climbing expensive, but no tool sees which direction an author moved |
@@ -345,7 +345,7 @@ A law that cannot be pointed at in real code is a proposal. Paths are repository
 | Code | Path | What to look for |
 |---|---|---|
 | `TYPESET-1` | `src/components/leaves/Heading/index.tsx` | `level` is passed to the outline tag AND used to select the class set — one prop, two facts, in one expression |
-| `TYPESET-2` | `src/components/leaves/Heading/index.tsx` · `.claude/sources/fe/typography.mjs` | The level union stops at `4`; the rule's `DEEPEST_LEVEL` constant is the same `4` |
+| `TYPESET-2` | `src/components/leaves/Heading/index.tsx` · `.claude/starci-eslint/packages/fe/typography.mjs` | The level union stops at `4`; the rule's `DEEPEST_LEVEL` constant is the same `4` |
 | `TYPESET-3` | `src/components/leaves/Text/index.tsx` | The class list has no `border-*` and no `bg-*` entry: the leaf that draws copy cannot draw a box around it |
 | `TYPESET-4` | `src/components/leaves/Heading/index.tsx` | Level 1 is `text-xl font-semibold`, not `text-3xl font-bold` — the ceiling is low, so "louder" mostly does not exist |
 | `TYPESET-5` | `src/components/blocks/courses/CourseCatalogCard/component.tsx` | The card's title is a heading at level 2 while its facts stay 14px muted — the secondary lines never reach the title's rank |

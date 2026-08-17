@@ -165,7 +165,7 @@ socket gateway, a topic consumer, a controller serving static files, an operatio
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written;
-`enforced` means a named rule from `sources/be/transport.mjs` reports it; `documented` means nothing
+`enforced` means a named rule from `starci-eslint/packages/be/transport.mjs` reports it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |

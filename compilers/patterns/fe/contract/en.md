@@ -454,7 +454,7 @@ that was never approved; a key copied into a new repository along with the whole
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write. `enforced` means a rule in `sources/fe/contract.mjs` catches it.
+wrong value impossible to write. `enforced` means a rule in `starci-eslint/packages/fe/contract.mjs` catches it.
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

@@ -233,7 +233,7 @@ path; a util folder with many small functions.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes
-the wrong value impossible to write; `enforced` means a lint rule in `sources/be/module-layering.mjs`
+the wrong value impossible to write; `enforced` means a lint rule in `starci-eslint/packages/be/module-layering.mjs`
 catches it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

@@ -269,7 +269,7 @@ container holding the selected tab; a wrapper opening an overlay; a layout that 
 
 ## Layer held
 
-Which tier actually holds each code. `enforced` names the rule from `sources/fe/the-split.mjs` that
+Which tier actually holds each code. `enforced` names the rule from `starci-eslint/packages/fe/the-split.mjs` that
 catches it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |
@@ -296,7 +296,7 @@ product's folder, is what is being pointed at.
 | `SPLIT-2` | `src/components/**/index.tsx` that import `./component` | No `className`, no spacing value, no element choice anywhere in the connected file. Grepping `className` across every connected index and getting zero hits is the check; a `variant`-shaped prop naming an appearance is the part this anchor cannot see |
 | `SPLIT-3` | `src/components/**/component.tsx` | The exported props type is a union of members discriminated by a literal `state`. Counter-check the same files for `readonly isLoading?: boolean` and similar incoming flags — every hit is a line that crossed as a flag |
 | `SPLIT-4` | The boundary props declared in `component.tsx`, and the JSX that fills them in `index.tsx` | Copy-carrying props are typed `string` and hold sentences. No prop named `*Key`, no dotted namespace literal passed down. A `selectedKey`-shaped identity prop is not copy and is not a hit |
-| `SPLIT-5` | `src/components/**/index.tsx` and `sources/fe/the-split.mjs` | `import { _X } from "./component"` where `X` is the folder name, and `_X` is the only JSX identifier the file renders. The rule's `connectedBlock` matcher fixes `X` from the folder, so the twin name is not a convention a file can restate differently |
+| `SPLIT-5` | `src/components/**/index.tsx` and `starci-eslint/packages/fe/the-split.mjs` | `import { _X } from "./component"` where `X` is the folder name, and `_X` is the only JSX identifier the file renders. The rule's `connectedBlock` matcher fixes `X` from the folder, so the twin name is not a convention a file can restate differently |
 | `SPLIT-6` | Folders holding `index.tsx` and no `component.tsx` | The index makes no world call: it composes other connected surfaces, or holds only local UI state such as which overlay is open. The absence of `component.tsx` is correct only while the absence of a request is |
 
 A code with no anchor is a proposal, not a law. All six are anchored; none is unanchored.

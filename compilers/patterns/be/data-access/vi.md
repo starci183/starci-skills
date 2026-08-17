@@ -100,7 +100,7 @@ Mọi tình huống module này quản đều mang một mã, `DATA-<n>`. Số h
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong `sources/be/data-access.mjs` báo nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
+Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được; `enforced` nghĩa là một rule có tên trong `starci-eslint/packages/be/data-access.mjs` báo nó; `documented` nghĩa là không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |
 |---|---|---|

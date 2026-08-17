@@ -236,7 +236,7 @@ branch added to the handler with the spec unchanged.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written;
-`enforced` means a named rule from `sources/be/cqrs.mjs` reports it; `documented` means nothing
+`enforced` means a named rule from `starci-eslint/packages/be/cqrs.mjs` reports it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |

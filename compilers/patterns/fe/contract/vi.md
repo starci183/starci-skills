@@ -436,7 +436,7 @@ chưa được duyệt; key copy sang repository mới cùng cả bảng.
 ## Tầng giữ
 
 Tầng nào thật sự giữ mỗi mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được. `enforced` nghĩa là một rule trong `sources/fe/contract.mjs` bắt được
+giá trị sai không viết ra được. `enforced` nghĩa là một rule trong `starci-eslint/packages/fe/contract.mjs` bắt được
 nó. `documented` nghĩa là không có gì cơ học giữ, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |

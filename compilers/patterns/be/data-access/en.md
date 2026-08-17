@@ -100,7 +100,7 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 
 ## Layer held
 
-Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written; `enforced` means a named rule from `sources/be/data-access.mjs` reports it; `documented` means nothing mechanical holds it and only a reader does.
+Which tier actually holds each code. `unrepresentable` means the wrong value cannot be written; `enforced` means a named rule from `starci-eslint/packages/be/data-access.mjs` reports it; `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | Held by |
 |---|---|---|

@@ -201,7 +201,7 @@ root, except the lint, which lives in this trust tree.
 
 | Code | Where | What to look for |
 |---|---|---|
-| `LANDMARK-1` | `.claude/sources/fe/landmark.mjs` | `LANDMARK_BRANCHES` — the set of branch names that open a landmark, one entry per element. **Not yet anchored in the application:** the application now carries the element on the entry instead, so no landmark branch remains to point at |
+| `LANDMARK-1` | `.claude/starci-eslint/packages/fe/landmark.mjs` | `LANDMARK_BRANCHES` — the set of branch names that open a landmark, one entry per element. **Not yet anchored in the application:** the application now carries the element on the entry instead, so no landmark branch remains to point at |
 | `LANDMARK-2` | `src/components/branches/Tree/index.tsx` | The node branch's props: a key and its content, no class. Its classes arrive from the entry lookup. The landmark branch that would inherit this shape does not currently exist |
 | `LANDMARK-3` | `src/components/branches/Tree/index.tsx` | The props interface, and the comment block recording that `as` was considered and refused; the element is read from the entry's `host` |
 | `LANDMARK-4` | `src/app/[lang]/dashboard/layout.tsx` | A layout that draws navigation as a sibling and hands the routed `children` to the frame keyed `routed-page-main`. Its sibling route layouts repeat the shape |

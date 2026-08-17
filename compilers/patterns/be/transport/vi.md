@@ -159,7 +159,7 @@ socket · consumer đọc topic · controller phục vụ file tĩnh · controll
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là không thể viết ra giá trị sai;
-`enforced` nghĩa là một rule có tên trong `sources/be/transport.mjs` báo lỗi; `documented` nghĩa là
+`enforced` nghĩa là một rule có tên trong `starci-eslint/packages/be/transport.mjs` báo lỗi; `documented` nghĩa là
 không có cơ chế nào giữ, chỉ có người đọc giữ.
 
 | Mã | Tầng | Ai giữ |

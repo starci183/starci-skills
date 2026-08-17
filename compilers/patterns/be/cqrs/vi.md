@@ -234,7 +234,7 @@ handler mà spec không đổi.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là giá trị sai không viết ra được;
-`enforced` nghĩa là một rule có tên trong `sources/be/cqrs.mjs` báo cáo nó; `documented` nghĩa là
+`enforced` nghĩa là một rule có tên trong `starci-eslint/packages/be/cqrs.mjs` báo cáo nó; `documented` nghĩa là
 không có gì máy móc giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Ai giữ |

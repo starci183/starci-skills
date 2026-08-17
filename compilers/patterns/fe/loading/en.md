@@ -255,7 +255,7 @@ weekly challenge list · community feed · search results · shopping cart.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule from `sources/fe/loading.mjs` reports it;
+wrong value impossible to write; `enforced` means a lint rule from `starci-eslint/packages/fe/loading.mjs` reports it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

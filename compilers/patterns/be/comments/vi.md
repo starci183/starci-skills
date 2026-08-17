@@ -38,7 +38,7 @@ Ba trong năm mã có một lint rule đứng sau, và một trong ba cái đó 
 đòi. Bảng tầng giữ bên dưới nói rõ cái nào là cái nào, thay vì để người đọc tưởng cả năm mã được canh
 đều nhau.
 
-Thứ giữ luật này là `sources/be/comments.mjs`.
+Thứ giữ luật này là `starci-eslint/packages/be/comments.mjs`.
 
 ## Mã tình huống
 
@@ -235,7 +235,7 @@ trong prompt template · fixture hội thoại trong spec · nội dung email th
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho giá
-trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `sources/be/comments.mjs` bắt được;
+trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `starci-eslint/packages/be/comments.mjs` bắt được;
 `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Thứ giữ nó |

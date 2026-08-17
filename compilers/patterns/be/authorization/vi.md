@@ -111,7 +111,7 @@ thứ gọi là `user`.
 
 **Nó sinh ra gì trong source.** Một decorator guard trên chính method đọc danh tính, hoặc trên class
 của nó: `@UseGuards(...)` đứng trên tham số đọc user. Lint rule `identity-needs-guard` (export
-`identityNeedsGuard`, trong `sources/be/authorization.mjs`) đếm ba parameter decorator là những cái
+`identityNeedsGuard`, trong `starci-eslint/packages/be/authorization.mjs`) đếm ba parameter decorator là những cái
 đọc danh tính — `IDENTITY_PARAM_DECORATORS` — và leo từ method lên class của nó qua `hasGuard`.
 
 **Dấu hiệu nhận biết.** Có decorator tham số đọc danh tính, không có decorator guard ở method lẫn ở
@@ -219,7 +219,7 @@ dùng chung guard ở cấp class.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc branded type khiến giá
-trị sai không viết ra được; `enforced` nghĩa là có lint rule trong `sources/be/authorization.mjs` bắt
+trị sai không viết ra được; `enforced` nghĩa là có lint rule trong `starci-eslint/packages/be/authorization.mjs` bắt
 được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
@@ -254,7 +254,7 @@ Code thật để đối chiếu từng luật. Một luật không chỉ tay v�
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
 | `AUTHZ-1` | `src/features/api/core/graphql/mutations/courses/submit-course-review/submit-course-review.handler.ts` · `src/features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` | Một lời từ chối `if (!user)` ở đầu `process`, đứng trên phần validate rẻ tiền và trên cả hai query, trong những handler mà resolver đã có guard. Chính chỗ thừa đó là mã này |
-| `AUTHZ-2` | `sources/be/authorization.mjs` → `IDENTITY_PARAM_DECORATORS`, `hasGuard`, `identityNeedsGuard` · `src/features/api/core/graphql/mutations/courses/update-course-review/update-course-review.resolver.ts` | Ba parameter decorator mà rule đếm là cái đọc danh tính, đường leo từ method lên class của nó, và một cửa thật mang `@UseGuards(...)` đứng trên tham số đọc user |
+| `AUTHZ-2` | `starci-eslint/packages/be/authorization.mjs` → `IDENTITY_PARAM_DECORATORS`, `hasGuard`, `identityNeedsGuard` · `src/features/api/core/graphql/mutations/courses/update-course-review/update-course-review.resolver.ts` | Ba parameter decorator mà rule đếm là cái đọc danh tính, đường leo từ method lên class của nó, và một cửa thật mang `@UseGuards(...)` đứng trên tham số đọc user |
 | `AUTHZ-3` | `src/features/api/core/graphql/mutations/courses/delete-course-review/delete-course-review.handler.ts` | `findOne` theo id được yêu cầu, một not-found khi trượt, rồi `review.userId !== user.id` — phép so sánh đọc dòng đã load, còn request chỉ cung cấp việc load dòng nào |
 | `AUTHZ-4` | `src/features/api/core/graphql/mutations/installment-plans/pay-next-installment/pay-next-installment.handler.ts` · `src/tests/e2e/installment-plan-queries.e2e-spec.ts` | `if (!plan \|\| plan.userId !== user.id)` gộp "không có" và "không phải của bạn" thành một not-found; luồng test chứng minh kẻ đột nhập nhận đúng câu đó và không có gì bị ghi |
 | `AUTHZ-5` | `src/modules/bussiness/guards/graphql-must-enrolled.guard.ts` · `src/modules/bussiness/guards/graphql-enrollment.guard.ts` · `src/modules/bussiness/user/user.service.ts` → `checkEnrollment`, `resolveOrCreateTrialEnrollment` | Hai guard trên cùng một quan hệ: một cái resolve-or-create dòng dùng thử và luôn trả true, cái kia đọc cờ đã trả tiền và từ chối. Cặp đó là bằng chứng dòng dữ liệu và trạng thái là hai sự thật khác nhau |

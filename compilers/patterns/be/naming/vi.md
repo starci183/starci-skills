@@ -257,7 +257,7 @@ chỉ có một tab gọi.
 Không có tầng ứng dụng nào sở hữu việc đặt tên, và cũng không có tầng nào được phép không biết đến nó —
 tầng nào cũng khai báo symbol. Cái được ghi lại ở đây là **hạng** thật sự giữ từng mã:
 `unrepresentable` nghĩa là một union đóng hoặc branded type làm cho giá trị sai không viết ra được;
-`enforced` nghĩa là một lint rule trong `sources/be/naming.mjs` bắt được; `documented` nghĩa là không có
+`enforced` nghĩa là một lint rule trong `starci-eslint/packages/be/naming.mjs` bắt được; `documented` nghĩa là không có
 gì máy móc giữ nó, chỉ có người đọc.
 
 | Mã | Hạng | Cái gì giữ nó |

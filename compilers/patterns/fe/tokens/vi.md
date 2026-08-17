@@ -334,20 +334,20 @@ cùng config đứng ngoài toàn bộ chuyện này vì chúng không render g�
 
 ## Điểm neo
 
-Chỗ có thể đối chiếu từng mã với code thật. Đường dẫn tính theo repository: `sources/fe/…` là chính
+Chỗ có thể đối chiếu từng mã với code thật. Đường dẫn tính theo repository: `starci-eslint/packages/fe/…` là chính
 trust tree này, `src/…` là một repository front-end tiêu thụ nó.
 
 | Mã | Điểm neo | Nhìn cái gì |
 |---|---|---|
-| `TOKEN-1` | `sources/fe/contracts.ts` · `src/components/contracts/index.ts` | `export type LayoutClassName` — một union các literal, trong đó có sáu bậc gap |
-| `TOKEN-2` | `sources/fe/contracts.ts` | Lời chú thích bên trên union: hãy nới danh sách này có chủ ý, để phần thêm vào đọc ra như một quyết định trong diff |
-| `TOKEN-3` | `sources/fe/tokens.mjs` | Pattern `FRACTIONAL` và rule `noFractionalStep` dựng từ nó |
-| `TOKEN-4` | `sources/fe/tokens.mjs` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, và hai message id trong `noArbitraryValue` |
-| `TOKEN-5` | `sources/fe/tokens.mjs` · `src/components/leaves/Heading/index.tsx` | `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau; và cái leaf nơi `level` điều khiển thẻ với cỡ chữ như một quyết định |
-| `TOKEN-6` | `sources/fe/tokens.mjs` · `sources/fe/contract.mjs` | `isSourceFile`, nhánh `VariableDeclarator` của `classTextVisitors`; và `LEAF_DIR_RELATIVE` / `isLeafFile`, chỗ gọi tên thư mục được miễn |
+| `TOKEN-1` | `starci-eslint/packages/fe/contracts.ts` · `src/components/contracts/index.ts` | `export type LayoutClassName` — một union các literal, trong đó có sáu bậc gap |
+| `TOKEN-2` | `starci-eslint/packages/fe/contracts.ts` | Lời chú thích bên trên union: hãy nới danh sách này có chủ ý, để phần thêm vào đọc ra như một quyết định trong diff |
+| `TOKEN-3` | `starci-eslint/packages/fe/tokens.mjs` | Pattern `FRACTIONAL` và rule `noFractionalStep` dựng từ nó |
+| `TOKEN-4` | `starci-eslint/packages/fe/tokens.mjs` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, và hai message id trong `noArbitraryValue` |
+| `TOKEN-5` | `starci-eslint/packages/fe/tokens.mjs` · `src/components/leaves/Heading/index.tsx` | `LARGE_TEXT` và `HEAVY_WEIGHT` được kiểm cùng nhau; và cái leaf nơi `level` điều khiển thẻ với cỡ chữ như một quyết định |
+| `TOKEN-6` | `starci-eslint/packages/fe/tokens.mjs` · `starci-eslint/packages/fe/contract.mjs` | `isSourceFile`, nhánh `VariableDeclarator` của `classTextVisitors`; và `LEAF_DIR_RELATIVE` / `isLeafFile`, chỗ gọi tên thư mục được miễn |
 | `TOKEN-7` | `src/components/leaves/IconTile/index.tsx` · `src/components/leaves/RankDeltaCaret/index.tsx` | Một bảng tone ghép `bg-*-soft` với `text-*-soft-foreground`; và một dấu trần dùng `text-success` trơn |
 | `TOKEN-8` | `src/components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` và lời chú thích nói kích cỡ đi theo vị trí đặt, độc lập với mức ưu tiên thị giác |
-| `TOKEN-9` | `sources/fe/tokens.mjs` · `src/app/globals.css` | `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`; và các biến `--container-app-*` mà các tên `max-w-app-*` đang xin |
+| `TOKEN-9` | `starci-eslint/packages/fe/tokens.mjs` · `src/app/globals.css` | `TOKEN_CLASS_FAMILIES` và `TAILWIND_OWN_NAMES`; và các biến `--container-app-*` mà các tên `max-w-app-*` đang xin |
 | inset pairing | `src/app/globals.css` · `src/components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` đứng cạnh `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — ngoại lệ ngữ nghĩa ở cùng sức mạnh |
 | joined-list rows | `src/components/contracts/index.ts` | Các entry mang `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 

@@ -68,6 +68,10 @@ under pressure:
   arguable;
 - [`scripts/validate-artifact.mjs`](./scripts/validate-artifact.mjs) refuses a batch whose candidates
   share an axis set, or where none departs from precedent;
+- the lint machines are real ESLint plugins, published from `starci183/starci-eslint` as
+  `@starci/eslint-canon-fe` and `@starci/eslint-canon-be`, each rule shipped with the test that fires it.
+  **This tree is the law; that repository is the machine.** A rule there with no law here is
+  unaccountable; a law here with no rule there only advises;
 - an approval binds to the hash of canonical JSON with the envelope outside it, so re-running the same
   decision yields the same hash.
 

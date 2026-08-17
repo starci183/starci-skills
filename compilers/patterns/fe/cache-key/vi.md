@@ -233,13 +233,13 @@ giá trị sai không viết ra được; `enforced` nghĩa là có một lint r
 | `CACHE-4` | `documented` | không có — không rule nào nhìn được bên trong một key có gì |
 | `CACHE-5` | `documented` | không có — không rule nào nhìn được bên trong một key có gì |
 
-Không có `sources/fe/cache-key.mjs`. Module này công bố **không** rule nào, nên cả năm mã đều do
+Không có `starci-eslint/packages/fe/cache-key.mjs`. Module này công bố **không** rule nào, nên cả năm mã đều do
 review và do chính file này giữ. Đó không phải một chỗ khuyết đang chờ lấp: một ESLint rule nhìn thấy
 BIỂU THỨC key, còn thứ làm cho một key đúng lại là chuyện các giá trị trong đó có phải là những giá
 trị mà câu trả lời đổi theo hay không — một sự thật về server, không phải về cú pháp. Rule nhìn được
 rằng key là một mảng ba định danh. Nó không nhìn được rằng cái thứ ba lẽ ra phải là cái thứ tư.
 
-Hàng xóm cơ học gần nhất là `sources/fe/the-split.mjs`, với rule `presentational-purity` giữ mọi lời
+Hàng xóm cơ học gần nhất là `starci-eslint/packages/fe/the-split.mjs`, với rule `presentational-purity` giữ mọi lời
 gọi `useSWR` nằm ở nửa connected. Cái đó giữ CHỖ dựng key — trong file có sẵn người đọc và tham số
 route để dựng — và hoàn toàn không giữ gì về chuyện cái gì được bỏ vào trong. Đó là chuyện kề cận,
 không phải chuyện cưỡng chế, và nó không được tính vào bảng trên.

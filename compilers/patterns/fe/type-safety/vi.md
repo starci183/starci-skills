@@ -222,7 +222,7 @@ branded type dựng ở đúng một chỗ đã kiểm.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `sources/fe/type-safety.mjs` báo cáo
+giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `starci-eslint/packages/fe/type-safety.mjs` báo cáo
 nó, tên rule nêu bên dưới; `documented` nghĩa là không có gì trong file rule của module này giữ nó, chỉ
 người đọc giữ.
 

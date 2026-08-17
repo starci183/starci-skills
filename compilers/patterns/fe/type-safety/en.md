@@ -222,7 +222,7 @@ narrow type · a branded type constructed at exactly one checked place.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a rule in `sources/fe/type-safety.mjs` reports it,
+wrong value impossible to write; `enforced` means a rule in `starci-eslint/packages/fe/type-safety.mjs` reports it,
 named below; `documented` means nothing in this module's rule file holds it and only a reader does.
 
 | Code | Tier | What holds it |

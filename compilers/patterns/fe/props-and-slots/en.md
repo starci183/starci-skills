@@ -257,12 +257,12 @@ a notification list · a members table.
 
 Which tier actually holds each code. `unrepresentable` means a closed union or an alias that is the
 whole shape makes the wrong value impossible to write; `enforced` means a named rule in
-`sources/fe/props-and-slots.mjs` reports it; `documented` means nothing mechanical holds it and only
+`starci-eslint/packages/fe/props-and-slots.mjs` reports it; `documented` means nothing mechanical holds it and only
 a reader does.
 
 | Code | Tier | Held by | What still escapes |
 |---|---|---|---|
-| `SLOTS-1` | `unrepresentable` | `DataValue` in `sources/fe/props.ts` — a closed union with no function member | Nothing, wherever the tier alias is used |
+| `SLOTS-1` | `unrepresentable` | `DataValue` in `starci-eslint/packages/fe/props.ts` — a closed union with no function member | Nothing, wherever the tier alias is used |
 | `SLOTS-2` | `unrepresentable` | The `D extends ComponentData` constraint on every tier alias | The error lands at the slot, not at the `interface`; a data type never passed through a slot compiles |
 | `SLOTS-3` | `enforced` | `no-inline-parameter-type` | A named type that is not `XProps` for component `X` — the name is read, not checked |
 | `SLOTS-4` | `enforced` | `no-children-slot`, plus `BranchProps` for the positive half | The rule sees the markup hole; nothing sees a closed shape that grows `render` |
@@ -282,13 +282,13 @@ Each code, and real code it can be checked against.
 
 | Code | Path | What to look for |
 |---|---|---|
-| `SLOTS-1` | `sources/fe/props.ts` | The `DataValue` union and `ComponentData`; confirm no member is a function type, then try to assign a handler to `props` |
-| `SLOTS-2` | `sources/fe/props.ts` | `LeafProps<D extends ComponentData>`; declare a data shape with `interface` and pass it in — the constraint fails |
-| `SLOTS-3` | `sources/fe/props-and-slots.mjs` | `isInlineObjectType`, which walks intersections and parentheses, and the invalid fixtures in `props-and-slots.test.mjs` |
-| `SLOTS-4` | `sources/fe/props.ts` · `sources/fe/props-and-slots.mjs` | `BranchProps` carrying `contract` + `render` and no markup hole; then `CHILDREN_SHELLS` and `isGoverned` for the exempt shells and the tiers the rule governs |
-| `SLOTS-5` | `sources/fe/props.ts` | `BlockProps` — two slots, no `isLoading`, which anchors the RECEIVED half only. The DECIDED half has no anchor |
-| `SLOTS-6` | `sources/fe/props.ts` | `LeafProps`, `CompositeProps`, `BranchProps`; confirm there is no appearance member and no index signature that would admit one |
-| `SLOTS-7` | `sources/fe/props-and-slots.mjs` · `sources/fe/props.ts` | `noSurfaceListItemsSlot` — the import-source test that binds it, and the `items` attribute check; then `ContractRenderBranchProps`, where runtime data stays in `props` |
+| `SLOTS-1` | `starci-eslint/packages/fe/props.ts` | The `DataValue` union and `ComponentData`; confirm no member is a function type, then try to assign a handler to `props` |
+| `SLOTS-2` | `starci-eslint/packages/fe/props.ts` | `LeafProps<D extends ComponentData>`; declare a data shape with `interface` and pass it in — the constraint fails |
+| `SLOTS-3` | `starci-eslint/packages/fe/props-and-slots.mjs` | `isInlineObjectType`, which walks intersections and parentheses, and the invalid fixtures in `props-and-slots.test.mjs` |
+| `SLOTS-4` | `starci-eslint/packages/fe/props.ts` · `starci-eslint/packages/fe/props-and-slots.mjs` | `BranchProps` carrying `contract` + `render` and no markup hole; then `CHILDREN_SHELLS` and `isGoverned` for the exempt shells and the tiers the rule governs |
+| `SLOTS-5` | `starci-eslint/packages/fe/props.ts` | `BlockProps` — two slots, no `isLoading`, which anchors the RECEIVED half only. The DECIDED half has no anchor |
+| `SLOTS-6` | `starci-eslint/packages/fe/props.ts` | `LeafProps`, `CompositeProps`, `BranchProps`; confirm there is no appearance member and no index signature that would admit one |
+| `SLOTS-7` | `starci-eslint/packages/fe/props-and-slots.mjs` · `starci-eslint/packages/fe/props.ts` | `noSurfaceListItemsSlot` — the import-source test that binds it, and the `items` attribute check; then `ContractRenderBranchProps`, where runtime data stays in `props` |
 
 An anchor is not decoration. A law that cannot be pointed at in real code is a proposal, and the one
 half-anchored row above is the honest cost of keeping `SLOTS-5`.

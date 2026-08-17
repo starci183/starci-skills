@@ -222,7 +222,7 @@ name.
 ## Layer held
 
 Which tier actually holds each code — a closed type, a lint rule, or only a reader. The enforced rows
-are implemented by `sources/fe/translation.mjs`.
+are implemented by `starci-eslint/packages/fe/translation.mjs`.
 
 | Code | Tier | Held by |
 |---|---|---|
@@ -237,7 +237,7 @@ Four of six rows read `documented`, and the table exists to say so out loud rath
 enforced rows imply the module is covered.
 
 Two of those four have mechanical support that belongs to a NEIGHBOURING law and is therefore not
-counted here: `starci-fe/no-second-language-in-source`, published by `.claude/sources/fe/comments.mjs`,
+counted here: `starci-fe/no-second-language-in-source`, published by `.claude/starci-eslint/packages/fe/comments.mjs`,
 exempts the locale dictionaries by path (`COPY-5`) and reads the `vn-ok:` pragma on a marked line
 (`COPY-6`). Counting a neighbour's rule as this module's enforcement would make the module look held
 where it is not: that rule fires on a LANGUAGE, so it never sees an English key crossing a boundary,
@@ -259,7 +259,7 @@ the shape of the tree, not the name of any product, is what makes them checkable
 | `COPY-2` | `src/components/{leaves,composites,branches,shells}/**` | No `aria-label`, `placeholder`, `title` or `alt` carrying prose, and no JSX text that reads as a sentence |
 | `COPY-3` | props types in `src/components/blocks/**/component.tsx` | Word-bearing props are typed as the resolved value (`label: string`). Any `*Key` prop names a selected row, never a dictionary entry |
 | `COPY-4` | `src/components/blocks/**/component.test.tsx` | The twin renders from plain fixture strings with no translation provider mounted — the test passing is the proof the word arrived as a value |
-| `COPY-5` | `src/messages/<locale>.json`, and `CONTENT_PATHS` in `.claude/sources/fe/comments.mjs` | The exemption is a path list, so no file argues its own case |
+| `COPY-5` | `src/messages/<locale>.json`, and `CONTENT_PATHS` in `.claude/starci-eslint/packages/fe/comments.mjs` | The exemption is a path list, so no file argues its own case |
 | `COPY-6` | `chưa neo được` — not yet anchored | Lines marked `// vn-ok: <reason>` exist, but the marked literals found are copy rather than values the program matches on. The code's own situation has no anchor |
 
 ## Inputs

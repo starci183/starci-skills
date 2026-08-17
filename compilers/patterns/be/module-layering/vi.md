@@ -225,7 +225,7 @@ nhiều hàm nhỏ.
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã. `unrepresentable` nghĩa là một closed union hoặc branded type làm cho giá
-trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `sources/be/module-layering.mjs`
+trị sai không viết ra được; `enforced` nghĩa là có một lint rule trong `starci-eslint/packages/be/module-layering.mjs`
 bắt được; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ |

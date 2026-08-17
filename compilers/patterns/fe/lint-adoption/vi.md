@@ -42,7 +42,7 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 **Tình huống.** Một repo tiêu thụ canon phải nhận ba thứ cùng lúc: plugin, recommendation (tên rule kèm mức), và linter options. Ba thứ đó rời canon như một khối có version. Repo viết tay lại một phần bất kỳ trong ba thứ đó là đã tạo ra canon thứ hai — không phải vào ngày viết, mà vào ngày một trong hai danh sách thay đổi.
 
-**Nó sinh ra gì trong source.** Config của repo tiêu thụ spread khối gắn đã nhận. Attachment factory trong [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs) cho glob, linter options, plugin và rule rời đi trong MỘT khối, và ném lỗi khi recommendation rỗng thay vì trả về một khối không có rule nào. Không giữ thư mục plugin tự nuôi bên cạnh bản mirror, và không có bản sao thứ hai của cùng bộ rule ở bất kỳ đâu trong repo.
+**Nó sinh ra gì trong source.** Config của repo tiêu thụ spread khối gắn đã nhận. Attachment factory trong [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs) cho glob, linter options, plugin và rule rời đi trong MỘT khối, và ném lỗi khi recommendation rỗng thay vì trả về một khối không có rule nào. Không giữ thư mục plugin tự nuôi bên cạnh bản mirror, và không có bản sao thứ hai của cùng bộ rule ở bất kỳ đâu trong repo.
 
 **Dấu hiệu nhận biết.** `eslint.config.mjs` tự liệt kê tên rule trong `rules: {}` thay vì spread cái đã nhận. Có một thư mục plugin do repo tự nuôi nằm cạnh bản mirror. Có nơi trong repo giữ thêm một bản sao thứ hai của cùng bộ rule. Ai đó nói "đã import plugin rồi" khi được hỏi repo đang bị cai trị bởi bao nhiêu rule. Phép thử: ngày mai canon thêm một rule, repo này có nhận được nó mà không ai phải sửa tay không? Nếu phải sửa tay, đây là một bản sao chứ không phải một khối.
 
@@ -66,7 +66,7 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 **Tình huống.** Rule đã tới nơi rồi thì phải ở mức `error`, tất cả, không trừ cái nào. Một bộ warning-level, hoặc một plugin viết tay chạy song song, tạo ra kiến trúc thứ hai yếu hơn — và kiến trúc yếu hơn là cái thắng, vì nó là cái không chặn merge.
 
-**Nó sinh ra gì trong source.** Config in ra resolve mọi rule canon thành `error`. `severityOf` trong [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs) thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2`; cả `missing` lẫn `nonError` trả về rỗng. `recommended` trong [`sources/fe/index.mjs`](../../../../sources/fe/index.mjs) được gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết. Không có block config đứng sau ghi đè mức của rule cho một glob tạm thời.
+**Nó sinh ra gì trong source.** Config in ra resolve mọi rule canon thành `error`. `severityOf` trong [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs) thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2`; cả `missing` lẫn `nonError` trả về rỗng. `recommended` trong [`starci-eslint/packages/fe/index.mjs`](../../../../starci-eslint/packages/fe/index.mjs) được gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết. Không có block config đứng sau ghi đè mức của rule cho một glob tạm thời.
 
 **Dấu hiệu nhận biết.** Trong output audit, `nonError` không rỗng: rule có mặt nhưng ở `warn` hoặc `off`. Trong output audit, `missing` không rỗng: rule không tồn tại trong config đã resolve. Có block config đứng sau ghi đè mức của một vài rule cho một glob tạm thời. Có người mô tả `warn` là giai đoạn rollout. Phép thử: nếu một violation mới của rule này được viết hôm nay, nó có chặn được không? Nếu chỉ in ra một dòng vàng rồi merge thì rule đó chưa được adopt, chỉ được nhắc tới.
 
@@ -78,7 +78,7 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 **Tình huống.** `noInlineConfig` không phải là một tuỳ chọn khắt khe thêm. Nó là thứ khiến một directive trong file không có tác dụng, thay vì chỉ bị coi là sai. Thiếu nó, tác giả của vi phạm đồng thời là người quyết định đó có phải vi phạm hay không.
 
-**Nó sinh ra gì trong source.** `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, trong [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs), và được `ok` đòi hỏi song song với phép so danh sách rule, trả về `true`. Config của repo tiêu thụ áp bộ linter options đã đóng băng do [`sources/fe/lint-escape-hatch.mjs`](../../../../sources/fe/lint-escape-hatch.mjs) công bố bên cạnh rule báo cáo directive. Source sản phẩm không mang `eslint-disable`, `eslint-disable-next-line` hay `eslint-enable`.
+**Nó sinh ra gì trong source.** `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, trong [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs), và được `ok` đòi hỏi song song với phép so danh sách rule, trả về `true`. Config của repo tiêu thụ áp bộ linter options đã đóng băng do [`starci-eslint/packages/fe/lint-escape-hatch.mjs`](../../../../starci-eslint/packages/fe/lint-escape-hatch.mjs) công bố bên cạnh rule báo cáo directive. Source sản phẩm không mang `eslint-disable`, `eslint-disable-next-line` hay `eslint-enable`.
 
 **Dấu hiệu nhận biết.** `refusesInlineConfig: false` trong output audit, dù danh sách rule đã đủ. Config gắn rule nhưng quên spread linter options. Một block config đứng sau ghi đè `linterOptions` và không ai để ý, vì flat config lấy block sau. Source sản phẩm có `eslint-disable`, `eslint-disable-next-line`, hoặc `eslint-enable`. Phép thử: một dòng comment đặt đúng chỗ có tắt được rule đang báo lỗi chính dòng đó không? Nếu có thì cái đang đứng đó không phải hàng rào.
 
@@ -100,14 +100,14 @@ Cách đánh số là cố định và được trích dẫn từ ngoài module 
 
 ## Tầng giữ
 
-Tầng nào thật sự giữ từng mã — `unrepresentable` (một union đóng hoặc branded type khiến giá trị sai không viết ra được), `enforced` (một lint rule từ [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs) bắt được, nêu tên ở đây), hay `documented` (không có gì cơ học giữ nó; chỉ có người đọc).
+Tầng nào thật sự giữ từng mã — `unrepresentable` (một union đóng hoặc branded type khiến giá trị sai không viết ra được), `enforced` (một lint rule từ [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs) bắt được, nêu tên ở đây), hay `documented` (không có gì cơ học giữ nó; chỉ có người đọc).
 
 | Mã | Tầng | Cái gì thật sự giữ nó |
 |---|---|---|
 | `LINT-ADOPTION-1` | `documented` | [`scripts/sync-fe-lint.mjs`](../../../../scripts/sync-fe-lint.mjs) báo cáo một thư mục plugin tự nuôi và một bản mirror đã lệch — nhưng đó là một script ai đó chọn chạy, không phải một rule mà build sẽ đỏ vì nó |
 | `LINT-ADOPTION-2` | `documented` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) thực hiện audit; không có gì bắt buộc được rằng audit đã được thực hiện |
 | `LINT-ADOPTION-3` | `documented` | `audits["effective-config"]` trả về `nonError`, và chỉ trả về khi được gọi |
-| `LINT-ADOPTION-4` | `documented` | cũng chính audit đó trả về `refusesInlineConfig`; giá trị nó tìm do [`sources/fe/lint-escape-hatch.mjs`](../../../../sources/fe/lint-escape-hatch.mjs) công bố, và đó là rule của một module khác |
+| `LINT-ADOPTION-4` | `documented` | cũng chính audit đó trả về `refusesInlineConfig`; giá trị nó tìm do [`starci-eslint/packages/fe/lint-escape-hatch.mjs`](../../../../starci-eslint/packages/fe/lint-escape-hatch.mjs) công bố, và đó là rule của một module khác |
 | `LINT-ADOPTION-5` | `documented` | một người đọc, hoặc một skill biết dừng |
 
 Cả năm đều là `documented`, và artifact giữ luật này công bố `rules = {}` một cách có chủ đích chứ không phải do bỏ bê. Một ESLint rule nhìn thấy cây cú pháp bên trong một file, dưới một configuration đã được resolve xong. Toàn bộ đề tài của luật này chính là cái resolve đó: rule có mặt hay không, nó kết thúc ở mức severity nào, directive có được tôn trọng hay không. Một rule bị bắt phán xử những dữ kiện ấy sẽ đang phán xử chính cái config đã quyết định rule đó có chạy hay không — và kiểu hỏng ở đây là im lặng, vì một rule bị tắt thì không báo gì và một repo không bị cai trị bởi gì cả thì lint sạch trơn. Vì thế thứ giữ luật này là một audit ở tầm repo trên `eslint --print-config` chứ không phải một rule, và vì thế bảng này hiện năm dòng `documented` thay vì giả vờ khác đi. Tầng sở hữu mối quan tâm này là config đã resolve của repo cùng audit chạy trên nó; mọi tầng sản phẩm — component, block, page — phải ngu ngơ về nó và không bao giờ được mang một ý kiến cục bộ về việc rule nào cai trị mình.
@@ -118,17 +118,17 @@ Một luật không chỉ tay được vào code thật chỉ là một đề xu
 
 | Mã | Đường dẫn | Tìm gì ở đó |
 |---|---|---|
-| `LINT-ADOPTION-1` | [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs) | Attachment factory được export: glob, linter options, plugin và rule rời đi trong MỘT khối, và một recommendation rỗng thì ném lỗi thay vì trả về một khối không có rule nào |
+| `LINT-ADOPTION-1` | [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs) | Attachment factory được export: glob, linter options, plugin và rule rời đi trong MỘT khối, và một recommendation rỗng thì ném lỗi thay vì trả về một khối không có rule nào |
 | `LINT-ADOPTION-2` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) | `--probe` là bắt buộc, và config bị đem ra xét được spawn ra từ chính ESLint của repo đích chứ không đọc từ file config của nó |
-| `LINT-ADOPTION-3` | [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs) | `severityOf`, thứ thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2` |
-| `LINT-ADOPTION-4` | [`sources/fe/lint-adoption.mjs`](../../../../sources/fe/lint-adoption.mjs) | `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, và được `ok` đòi hỏi song song với phép so danh sách rule |
+| `LINT-ADOPTION-3` | [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs) | `severityOf`, thứ thu mọi cách viết của một mức severity về một con số, và danh sách `nonError` gom mọi thứ khác `2` |
+| `LINT-ADOPTION-4` | [`starci-eslint/packages/fe/lint-adoption.mjs`](../../../../starci-eslint/packages/fe/lint-adoption.mjs) | `refusesInlineConfig`, đọc từ `linterOptions.noInlineConfig` ĐÃ IN RA, và được `ok` đòi hỏi song song với phép so danh sách rule |
 | `LINT-ADOPTION-5` | [`scripts/audit-fe-lint-adoption.mjs`](../../../../scripts/audit-fe-lint-adoption.mjs) | Cái exit khác không khi `ok` là false — tín hiệu mà một pass buộc phải dừng lại, chứ không phải ghi chú thêm vào. **Neo một phần** — xem bên dưới |
 
 Bằng chứng thứ cấp, hữu ích khi chính điểm neo chính đang bị thay đổi:
 
 - `LINT-ADOPTION-1` — [`scripts/sync-fe-lint.mjs`](../../../../scripts/sync-fe-lint.mjs): digest nội dung của bản mirror, và phát hiện được nêu khi một thư mục plugin tự nuôi vẫn còn tồn tại bên cạnh nó.
-- `LINT-ADOPTION-3` — [`sources/fe/index.mjs`](../../../../sources/fe/index.mjs): `recommended`, gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết.
-- `LINT-ADOPTION-4` — [`sources/fe/lint-escape-hatch.mjs`](../../../../sources/fe/lint-escape-hatch.mjs): bộ linter options đã đóng băng mà một config tiêu thụ sẽ áp, công bố ngay bên cạnh rule báo cáo directive.
+- `LINT-ADOPTION-3` — [`starci-eslint/packages/fe/index.mjs`](../../../../starci-eslint/packages/fe/index.mjs): `recommended`, gom từ mọi module, mọi mức đều `error` và không module nào có quyền tự quyết.
+- `LINT-ADOPTION-4` — [`starci-eslint/packages/fe/lint-escape-hatch.mjs`](../../../../starci-eslint/packages/fe/lint-escape-hatch.mjs): bộ linter options đã đóng băng mà một config tiêu thụ sẽ áp, công bố ngay bên cạnh rule báo cáo directive.
 - `LINT-ADOPTION-5` — skill Apply của lint-sync nêu điều kiện đóng mà chỉ `ok: true` mới thoả, còn skill Plan của consolidation thì rẽ đi chỗ khác thay vì đo một repo đang hỏng adoption.
 
 `LINT-ADOPTION-5` có neo cho việc lint-sync và **chưa neo được** cho Apply của design và fidelity: không file nào trong các skill đó đọc audit này, nên cái điểm dừng mà chúng nợ chỉ tồn tại trong lời văn và không ở đâu khác. Nó được ghi lại như một rủi ro còn mở.

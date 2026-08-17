@@ -233,13 +233,13 @@ the wrong value impossible to write; `enforced` means a lint rule catches it and
 | `CACHE-4` | `documented` | none — no rule can see what a key contains |
 | `CACHE-5` | `documented` | none — no rule can see what a key contains |
 
-There is no `sources/fe/cache-key.mjs`. This module publishes **zero** rules, so all five codes are
+There is no `starci-eslint/packages/fe/cache-key.mjs`. This module publishes **zero** rules, so all five codes are
 held by review and by this file alone. That is not an omission waiting to be filled: an ESLint rule
 sees a key EXPRESSION, and what makes a key correct is whether the values in it are the ones the
 answer varies by — a fact about the server, not about the syntax. A rule can see that a key is an
 array of three identifiers. It cannot see that the third one should have been a fourth.
 
-The nearest mechanical neighbour is `sources/fe/the-split.mjs`, whose `presentational-purity` rule
+The nearest mechanical neighbour is `starci-eslint/packages/fe/the-split.mjs`, whose `presentational-purity` rule
 keeps every `useSWR` call in the connected half. That holds WHERE a key is built — in the file that
 has the viewer and the route parameters to build it from — and nothing at all about what goes into
 it. It is adjacency, not enforcement, and it is not counted above.

@@ -278,7 +278,7 @@ reading it · a query builder that at first has one tab calling it.
 There is no application layer that owns naming and no layer that can stay ignorant of it — every layer
 declares symbols. What v2 records instead is the **tier** that actually holds each code:
 `unrepresentable` means a closed union or branded type makes the wrong value impossible to write;
-`enforced` means a lint rule in `sources/be/naming.mjs` catches it; `documented` means nothing
+`enforced` means a lint rule in `starci-eslint/packages/be/naming.mjs` catches it; `documented` means nothing
 mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

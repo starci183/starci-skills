@@ -177,7 +177,7 @@ straight from the glyph package right there.
 
 **What it emits in source.** `starci-fe/no-vendor-icon-outside-icon-leaf` — glyph packages matched as a
 prefix, so a subpath cannot walk around the check — plus the single allowed module path in
-[`sources/fe/icon.mjs`](../../../../sources/fe/icon.mjs).
+[`starci-eslint/packages/fe/icon.mjs`](../../../../starci-eslint/packages/fe/icon.mjs).
 
 **Recognition signs.** A screen file contains `import { XxxIcon } from "..."`. A "helper" file next to
 the icon leaf imports the package too, "for convenience". The same concept is drawn with two different
@@ -330,7 +330,7 @@ count summary · a reaction picker.
 The icon leaf owns vendor, family, drawing and size; every caller layer must stay ignorant of all four.
 Which tier actually holds each code today: `unrepresentable` means a closed union or prop shape makes
 the wrong value impossible to write; `enforced` means a rule in
-[`sources/fe/icon.mjs`](../../../../sources/fe/icon.mjs) reports it, named here; `documented` means only
+[`starci-eslint/packages/fe/icon.mjs`](../../../../starci-eslint/packages/fe/icon.mjs) reports it, named here; `documented` means only
 a reader holds it.
 
 | Code | Tier | What holds it |
@@ -358,7 +358,7 @@ meaning.
 ## Anchor
 
 Where each code can be checked against real code. Paths under `src/` are front-end product source;
-paths under `sources/fe/` are the rules in this trust tree.
+paths under `starci-eslint/packages/fe/` are the rules in this trust tree.
 
 | Code | Path | What to look for |
 |---|---|---|
@@ -367,11 +367,11 @@ paths under `sources/fe/` are the rules in this trust tree.
 | `ICON-3` | `src/components/leaves/Icon/index.tsx` | The `leading` entry reading `size-5 shrink-0`, selected from the same outline import block as `heading` |
 | `ICON-4` | `src/components/leaves/Icon/index.tsx` | The separate 16 solid import block, aliased per meaning, and the `chip` entry reading `size-4 shrink-0` |
 | `ICON-5` | `src/components/leaves/Icon/index.tsx` · `src/components/leaves/Icon/brands.tsx` | `stroke="currentColor"` on the locally drawn glyphs; in the brand file, one mark keeping four authored hex fills while the monochrome mark uses `currentColor` — the exception and the rule side by side |
-| `ICON-6` | `sources/fe/icon.mjs` | `noVendorIconOutsideIconLeaf`; the single allowed module path; the package list matched by prefix |
-| `ICON-7` | `sources/fe/icon.mjs` | `heroiconsIsTheGlyphVendor`; the two-package allow set; the rank exemption threaded through both vendor rules |
+| `ICON-6` | `starci-eslint/packages/fe/icon.mjs` | `noVendorIconOutsideIconLeaf`; the single allowed module path; the package list matched by prefix |
+| `ICON-7` | `starci-eslint/packages/fe/icon.mjs` | `heroiconsIsTheGlyphVendor`; the two-package allow set; the rank exemption threaded through both vendor rules |
 | `ICON-8` | `src/components/leaves/Icon/index.tsx` | Every one of the three role strings ending in `shrink-0` — including `chip`, the one most often assumed too small to matter |
 | `ICON-9` | `src/components/leaves/Icon/icon.md` · `src/components/leaves/Icon/index.tsx` | The feature table beside the meaning union and the glyph map, in one folder. The parity test named by the law: not anchored |
-| `ICON-10` | `sources/fe/icon.mjs` · `src/components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` and the path it is bound to; that composite rendering a label, a figure and a bar with no glyph |
+| `ICON-10` | `starci-eslint/packages/fe/icon.mjs` · `src/components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` and the path it is bound to; that composite rendering a label, a figure and a bar with no glyph |
 | `ICON-11` | `src/components/leaves/IconTile/index.tsx` | Two plate steps in the size map, and one line below it passing `role: "leading"` unconditionally |
 | `ICON-12` | `src/components/composites/IconLabelFactRow/index.tsx` | Three recipes; the peer recipe is the code's positive case. The label-led recipe already renders its trailing fact small and muted **and still draws a glyph** — the half of the code source does not yet keep |
 | `ICON-13` | `src/components/leaves/ReactionPicker/index.tsx` · `public/reactions/` | The closed identity list in the leaf; the six checked-in artwork files and the attribution travelling with them |

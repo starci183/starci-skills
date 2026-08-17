@@ -237,7 +237,7 @@ test helper copied into production · a request to a second endpoint written by 
 ## Layer held
 
 Which tier actually holds each code — a closed type, a lint rule, or only a reader. The enforced rows
-are implemented by `sources/fe/served-locale.mjs`.
+are implemented by `starci-eslint/packages/fe/served-locale.mjs`.
 
 | Code | Tier | Held by |
 |---|---|---|

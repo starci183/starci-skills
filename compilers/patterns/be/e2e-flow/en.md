@@ -389,7 +389,7 @@ failing.
 
 ## Layer held
 
-Which tier actually holds each code. `enforced` means a rule in `sources/be/e2e-flow.mjs` fires on it,
+Which tier actually holds each code. `enforced` means a rule in `starci-eslint/packages/be/e2e-flow.mjs` fires on it,
 and the rule is named.
 
 | Code | Tier | Held by |
@@ -431,7 +431,7 @@ code is a proposal, not a law.
 | `E2E-4` | `src/tests/helpers/flow-world.ts` → `FlowWorld.entityManager`, resolved via `getEntityManagerToken(POSTGRESQL_PRIMARY)` | A flow gets the REAL entity manager of the primary datasource, so a consequence is read from the row it was written to |
 | `E2E-5` | `src/tests/helpers/flow-wait.ts` → `nextMessage`, used in `src/tests/e2e/community-chat.e2e-spec.ts` | Awaiting the next matching message on a real socket; no count assertion anywhere in the helper's surface |
 | `E2E-6` | `src/tests/helpers/flow-wait.ts` → `expectNoMessage`, `DEFAULT_SILENCE_MS`; used in `src/tests/e2e/notification-delivery.e2e-spec.ts` | A step that proves a stranger's socket stayed silent while the intended recipient was served |
-| `E2E-7` | `.claude/sources/be/e2e-flow.test.mjs` → `tester.run("no-branch-in-flow-step", …)` | The valid and invalid fixtures that pin exactly which shapes count as a branch inside a step |
+| `E2E-7` | `.claude/starci-eslint/packages/be/e2e-flow.test.mjs` → `tester.run("no-branch-in-flow-step", …)` | The valid and invalid fixtures that pin exactly which shapes count as a branch inside a step |
 | `E2E-8` | `src/tests/helpers/flow-world.ts` → `bootFlowWorld`; `src/tests/helpers/create-e2e-app.ts` → `createE2eApp` | Two entry points that stand the world up, so a spec opens with what it is testing |
 | `E2E-9` | `src/tests/helpers/flow-world.ts` → `FlowWorld.mintLearner(name)` | The actor factory takes a NAME and persists a fresh row per flow; no ordinal is accepted |
 | `E2E-10` | `src/tests/e2e/` (84 spec files) | Zero real `console` call sites. The only two textual matches, at `coding-submission.e2e-spec.ts:550` and `:646`, are source strings INSIDE a submitted program, not logging |

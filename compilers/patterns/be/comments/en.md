@@ -38,7 +38,7 @@ Three of the five codes have a lint rule behind them, and one of those three can
 what its code asks. The layer table below says which is which rather than implying uniform
 enforcement.
 
-What holds this law is `sources/be/comments.mjs`.
+What holds this law is `starci-eslint/packages/be/comments.mjs`.
 
 ## Situation codes
 
@@ -242,7 +242,7 @@ per-locale email content.
 ## Layer held
 
 Which tier actually holds each code. `unrepresentable` means a closed union or branded type makes the
-wrong value impossible to write; `enforced` means a lint rule in `sources/be/comments.mjs` catches it;
+wrong value impossible to write; `enforced` means a lint rule in `starci-eslint/packages/be/comments.mjs` catches it;
 `documented` means nothing mechanical holds it and only a reader does.
 
 | Code | Tier | What holds it |

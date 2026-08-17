@@ -238,8 +238,8 @@ phải giấy miễn trừ cho bất kỳ luật ownership nào.
 
 ## Điểm neo
 
-Rule nằm ở `sources/fe/vendor-boundary.mjs` cùng test song sinh ở
-`sources/fe/vendor-boundary.test.mjs`. Điểm neo sản phẩm là `src/components/branches/ModalBranch`,
+Rule nằm ở `starci-eslint/packages/fe/vendor-boundary.mjs` cùng test song sinh ở
+`starci-eslint/packages/fe/vendor-boundary.test.mjs`. Điểm neo sản phẩm là `src/components/branches/ModalBranch`,
 `DrawerBranch`, `DropdownBranch`, họ SurfaceCard, `src/components/leaves/Field`, `TextLink`,
 `Checkbox`, `src/components/blocks/auth/AccountMenu` và `src/components/layouts/ShellNav`.
 
@@ -250,7 +250,7 @@ Rule nằm ở `sources/fe/vendor-boundary.mjs` cùng test song sinh ở
 | Shape đã duyệt | Nó là bề mặt nào, chứa những gì, và mở, đóng hay điều hướng ra sao |
 | Vị trí trong tầng component | File là leaf, mechanics branch có tên, thành viên họ SurfaceCard, hay block/layout/overlay/page/composite |
 | Điểm neo sản phẩm sẵn có | Đường dẫn dưới `src/components/…` đang sở hữu mối quan tâm này, lấy từ danh sách Điểm neo |
-| Nguồn rule | `sources/fe/vendor-boundary.mjs` và test song sinh `sources/fe/vendor-boundary.test.mjs` |
+| Nguồn rule | `starci-eslint/packages/fe/vendor-boundary.mjs` và test song sinh `starci-eslint/packages/fe/vendor-boundary.test.mjs` |
 | Nguồn gốc route, nếu có | Giá trị có đến từ route của framework và có được đóng thành một projection contract có tên trước khi vào tầng component hay không |
 
 ## Quy tắc
@@ -300,7 +300,7 @@ owns: HeroUI Modal lifecycle, focus, portal, dismiss, placement; exactly one zer
 imports: @heroui/react
 exports: ModalBranch
 forbidden: children passthrough; padding on Modal.Body; any components/shells directory
-anchor: sources/fe/vendor-boundary.mjs
+anchor: starci-eslint/packages/fe/vendor-boundary.mjs
 ```
 
 ```text
@@ -311,7 +311,7 @@ owns: the single named content contract projected into ModalBranch; all visible 
 imports: none from @heroui/react
 exports: <authOverlayContract>
 forbidden: duplicate Tree/content hosts; a second vertical inset; a named SurfaceCard branch inside the overlay
-anchor: sources/fe/vendor-boundary.mjs
+anchor: starci-eslint/packages/fe/vendor-boundary.mjs
 ```
 
 ## Ví dụ đã giải

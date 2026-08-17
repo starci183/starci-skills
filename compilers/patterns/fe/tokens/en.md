@@ -334,20 +334,20 @@ under `src/`, and tooling and configuration stay ignorant of all of it because t
 
 ## Anchor
 
-Where each code can be checked against real code. Paths are repository-relative: `sources/fe/…` is
+Where each code can be checked against real code. Paths are repository-relative: `starci-eslint/packages/fe/…` is
 this trust tree, `src/…` is a consuming front-end repository.
 
 | Code | Anchor | What to look for |
 |---|---|---|
-| `TOKEN-1` | `sources/fe/contracts.ts` · `src/components/contracts/index.ts` | `export type LayoutClassName` — a union of literals with the six gap rungs among them |
-| `TOKEN-2` | `sources/fe/contracts.ts` | The comment above the union: grow this list deliberately, so the addition reads as a decision in the diff |
-| `TOKEN-3` | `sources/fe/tokens.mjs` | The `FRACTIONAL` pattern and the `noFractionalStep` rule built from it |
-| `TOKEN-4` | `sources/fe/tokens.mjs` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, and the two message ids in `noArbitraryValue` |
-| `TOKEN-5` | `sources/fe/tokens.mjs` · `src/components/leaves/Heading/index.tsx` | `LARGE_TEXT` and `HEAVY_WEIGHT` tested together; and the leaf where `level` drives tag and metrics as one decision |
-| `TOKEN-6` | `sources/fe/tokens.mjs` · `sources/fe/contract.mjs` | `isSourceFile`, the `VariableDeclarator` branch of `classTextVisitors`; and `LEAF_DIR_RELATIVE` / `isLeafFile`, which name the exempt folder |
+| `TOKEN-1` | `starci-eslint/packages/fe/contracts.ts` · `src/components/contracts/index.ts` | `export type LayoutClassName` — a union of literals with the six gap rungs among them |
+| `TOKEN-2` | `starci-eslint/packages/fe/contracts.ts` | The comment above the union: grow this list deliberately, so the addition reads as a decision in the diff |
+| `TOKEN-3` | `starci-eslint/packages/fe/tokens.mjs` | The `FRACTIONAL` pattern and the `noFractionalStep` rule built from it |
+| `TOKEN-4` | `starci-eslint/packages/fe/tokens.mjs` | `ARBITRARY_LENGTH`, `RAW_COLOUR`, and the two message ids in `noArbitraryValue` |
+| `TOKEN-5` | `starci-eslint/packages/fe/tokens.mjs` · `src/components/leaves/Heading/index.tsx` | `LARGE_TEXT` and `HEAVY_WEIGHT` tested together; and the leaf where `level` drives tag and metrics as one decision |
+| `TOKEN-6` | `starci-eslint/packages/fe/tokens.mjs` · `starci-eslint/packages/fe/contract.mjs` | `isSourceFile`, the `VariableDeclarator` branch of `classTextVisitors`; and `LEAF_DIR_RELATIVE` / `isLeafFile`, which name the exempt folder |
 | `TOKEN-7` | `src/components/leaves/IconTile/index.tsx` · `src/components/leaves/RankDeltaCaret/index.tsx` | A tone table pairing `bg-*-soft` with `text-*-soft-foreground`; and a bare mark using plain `text-success` |
 | `TOKEN-8` | `src/components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` and the comment stating size follows placement, independently of visual priority |
-| `TOKEN-9` | `sources/fe/tokens.mjs` · `src/app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
+| `TOKEN-9` | `starci-eslint/packages/fe/tokens.mjs` · `src/app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
 | inset pairing | `src/app/globals.css` · `src/components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` beside `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — the equal-strength semantic exception |
 | joined-list rows | `src/components/contracts/index.ts` | Entries carrying `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 

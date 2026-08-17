@@ -228,7 +228,7 @@ một test helper bị copy vào production · một request tới endpoint th�
 ## Tầng giữ
 
 Tầng nào thật sự giữ từng mã — một kiểu đóng, một lint rule, hay chỉ một người đọc. Các dòng
-`enforced` được cài đặt ở `sources/fe/served-locale.mjs`.
+`enforced` được cài đặt ở `starci-eslint/packages/fe/served-locale.mjs`.
 
 | Mã | Tầng | Giữ bởi |
 |---|---|---|

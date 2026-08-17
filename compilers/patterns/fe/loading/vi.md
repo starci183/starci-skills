@@ -250,7 +250,7 @@ thử thách tuần · feed cộng đồng · kết quả tìm kiếm · giỏ h
 ## Tầng giữ
 
 Tầng nào thực sự giữ từng mã. `unrepresentable` nghĩa là một union đóng hoặc một branded type làm cho
-giá trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `sources/fe/loading.mjs` báo
+giá trị sai không viết ra được; `enforced` nghĩa là một lint rule trong `starci-eslint/packages/fe/loading.mjs` báo
 nó; `documented` nghĩa là không có gì cơ học giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |

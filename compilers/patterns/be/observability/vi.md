@@ -157,7 +157,7 @@ Câu tự hỏi: tín hiệu này có đi được qua tiến trình đã có ho
 
 ## Tầng giữ
 
-Tầng nào thực sự giữ từng mã ở thời điểm này. `unrepresentable` nghĩa là một union đóng hoặc kiểu branded làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `sources/be/observability.mjs` báo lỗi, tên nêu bên dưới; `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc giữ.
+Tầng nào thực sự giữ từng mã ở thời điểm này. `unrepresentable` nghĩa là một union đóng hoặc kiểu branded làm cho giá trị sai không viết ra được; `enforced` nghĩa là một rule trong `starci-eslint/packages/be/observability.mjs` báo lỗi, tên nêu bên dưới; `documented` nghĩa là không có gì máy móc giữ nó, chỉ có người đọc giữ.
 
 | Mã | Tầng | Cái gì giữ nó |
 |---|---|---|
@@ -185,7 +185,7 @@ Code thật để đối chiếu từng mã. Một luật không chỉ tay vào 
 | `OBSERVABILITY-3` | `src/modules/platform/winston/types/messages/*.ts` cùng `configMap` trong `src/modules/platform/winston/config.ts` | Mỗi sự kiện ánh xạ tới một interface có tên (`jobId`, `queueName`, `durationMs`, `success`), truy tới qua `(typeof configMap)[TName]["messageType"]` |
 | `OBSERVABILITY-4` | `src/modules/platform/winston/enums/winston-log.ts` | Những thành viên có JSDoc nêu một quyết định — `EnrollmentAlreadyExists` "skipped create to stay idempotent", `CdnSynchronizerCourseAlreadySynced` "hash matched, upload skipped". Đồng thời nhìn họ `*StepExecuted` nằm ngay bên cạnh, vốn chỉ ghi việc đi ngang qua |
 | `OBSERVABILITY-5` | `src/features/api/processors/ai/generate-cv/generate-cv.worker.ts` (lời gọi `JobExecutedFailed` trong `catch`) và `JobExecutedMessage.error?: string` trong `types/messages/worker.ts` | Trường đó đang được điền bằng `error.message`. Điểm neo này cho thấy luật đang bị bỏ lỡ, và đó chính là việc của một điểm neo |
-| `OBSERVABILITY-6` | `apps/cli/src/main.ts` và `apps/playground-*-agent/src/main.ts` (đoạn bootstrap `new Logger()`) đối chiếu `standaloneProgramGlobs` trong `sources/be/observability.mjs` | Bốn entry point đứng một mình, và những comment `eslint-disable` theo từng dòng chúng đang mang thay vì một glob khai một lần |
+| `OBSERVABILITY-6` | `apps/cli/src/main.ts` và `apps/playground-*-agent/src/main.ts` (đoạn bootstrap `new Logger()`) đối chiếu `standaloneProgramGlobs` trong `starci-eslint/packages/be/observability.mjs` | Bốn entry point đứng một mình, và những comment `eslint-disable` theo từng dòng chúng đang mang thay vì một glob khai một lần |
 | `OBSERVABILITY-7` | `src/modules/platform/winston/winston.providers.ts` cùng cờ `loki` theo từng sự kiện trong `config.ts` | Ba provider — chỉ console, chỉ backend chuyển tiếp, cả hai — và một cờ cho mỗi sự kiện quyết định dòng nào được vượt sang. Đó CHÍNH LÀ con đường Minimal: không collector, không tracer, không pipeline metric nào bên cạnh |
 | `OBSERVABILITY-8` | `src/modules/platform/env/config.ts` phần `loki` | Host, cờ bật auth và credential khai thành config có kiểu cho một backend được quản lý. Những trường vòng đời mà mã này đòi — chủ sở hữu, cổng, lưu trữ, health, backup, điều kiện gỡ — không có điểm neo, vì chưa có tiến trình telemetry tại chỗ nào để mang chúng: nửa đó **chưa neo được** |
 
