@@ -1,19 +1,20 @@
 ---
 name: starci-repair
-description: Take a source that no longer builds, no longer lints clean, drifted out of format, or whose contract reasons nobody can find by need, or which still carries a `.claude/` left behind by an older tree, and return it green — measured before and after with the repository's own gates, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, when lint debt has piled up, or before trusting a repository nobody has run in a while. Writes product source, after approval.
+description: Take a source that no longer builds, no longer lints clean, drifted out of format, or whose contract reasons nobody can find by need, or which measures itself against a copy of the lint rules instead of the published packages, or which still carries a `.claude/` left behind by an older tree, and return it green — measured before and after with the repository's own gates, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, when lint debt has piled up, or before trusting a repository nobody has run in a while. Writes product source, after approval.
 ---
 
 # starci-repair
 
 Read [`../skill-shape/en.md`](../skill-shape/en.md) first.
 
-**Four different things are called stale, and repairing the wrong one wastes the run.**
+**Five different things are called stale, and repairing the wrong one wastes the run.**
 
 | What is stale | Symptom | Owner |
 |---|---|---|
 | the **route** | the recorded checkout, contract or head no longer holds | [`starci-init`](../starci-init/SKILL.md) |
 | the **source** | it does not build, does not lint clean, or drifted out of format | this skill |
 | the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, last pass |
+| the **machine** | the gates cannot fire: the published lint packages are not installed, or a copy of them is vendored into the checkout | this skill, before measuring |
 | a **remnant** | a target checkout still carries a `.claude/` left from an older tree | this skill, after the index |
 
 So this skill resolves the route first and **stops** if the route is the stale thing. Repairing source
@@ -31,6 +32,12 @@ reformatted lines is a fix nobody can see. Format runs alone, in its own pass, w
 
 **Measure with the repository's own gates.** Read the manifest and run the scripts that repository
 actually declares. A count from a command the project does not use proves nothing about the project.
+
+**The machine is installed, never authored.** The rules a gate fires are a published dependency. This skill
+installs that dependency; it never writes a rule into a target repository and never repairs one that is
+already there. A rule authored or copied into a checkout is a second home for a law: it enforces whatever
+it was on the day it landed, it drifts the moment the law changes, and nothing in that repository can tell
+that it has. Green measured against a private copy is green against a rule nobody else has.
 
 ## PROCESS
 
@@ -54,7 +61,30 @@ failing a typecheck; it has none, and that is a finding for the plan rather than
 
 **Do not run end-to-end suites** unless the request asked for them by name.
 
-### 4 — Measure, and write the numbers down
+### 4 — Check the machine before trusting a single count
+
+The same manifest answers this: does the checkout **install** the published lint packages, and does its
+ESLint configuration import them **by package name**? Three answers, three different runs:
+
+| Answer | What the counts mean | What this skill does |
+|---|---|---|
+| installed, imported by name | the counts are real | measure and repair as normal |
+| the packages are absent | zero lint errors means nothing was checked | install them, in its own commit, then measure |
+| a copy is vendored in the checkout, imported by a relative path | the counts are against a private snapshot of the law | install the packages, delete the copy, re-point the config to the package name — one commit, no rule rewritten |
+
+The repository still owns its **configuration**: which globs each rule applies to is a local decision and
+this skill does not touch it. What it refuses is a local *rule*.
+
+Install with the lockfile-respecting command the repository declares. An install that fails stops the run
+and is reported: a broken lock is a finding for its owner, not something to route around.
+
+An install writes a manifest and a lockfile, so it is the run's **first change** — which means the baseline
+commit of step 8 is taken here, before it, not later. A baseline taken after the install cannot show what
+the install did.
+
+**A green count taken before this check is not evidence.** So it is taken after, never before.
+
+### 5 — Measure, and write the numbers down
 
 Run each gate that exists, in the cheapest order — format check, lint, typecheck, build, unit tests —
 and record the exact counts before touching anything: errors, warnings, failing suites, and the files
@@ -62,7 +92,7 @@ they land in.
 
 This is the number the run will be judged against. A repair with no before-count is a claim.
 
-### 5 — Classify every finding, because they do not have one fix
+### 6 — Classify every finding, because they do not have one fix
 
 | Class | What it is | How it is repaired |
 |---|---|---|
@@ -70,24 +100,26 @@ This is the number the run will be judged against. A repair with no before-count
 | `mechanical` | a fix the tool can make safely and the reader can verify by eye | autofix, then read the diff |
 | `defect` | real broken behaviour, a wrong type, a dead import, a missing case | repaired by hand, one at a time |
 | `index` | a contract `why` that describes something instead of stating when you would need it, so no lookup can find it | rewritten in its own pass, reasons only |
-| `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in 7d |
+| `machine` | the published lint packages are absent, or a copy of them is vendored into the checkout | installed from the registry, in its own commit — never authored |
+| `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in step 11 |
 | `decision` | the code is deliberate and the rule refuses it, or the rule and canon disagree | **returned to the owner** — the fix is a decision, not an edit |
 
 A `decision` misfiled as a `defect` is how a rule gets bent to match the code. A `defect` misfiled as a
 `decision` is how real breakage gets waved through as a matter of taste.
 
-### 6 — Review: the counts, the classification, the boundary
+### 7 — Review: the counts, the classification, the boundary
 
-Present the before-counts, the four classes with how many findings each holds, the exact file list, and
+Present the before-counts, every class with how many findings it holds, the exact file list, and
 what the run will **not** touch. Batch every approval into one round.
 
 Where a `decision` blocks a whole file, say so: it is better to hand back a file with a named question
 than to return a repository that is green because one file was rewritten to somebody else's taste.
 
-### 7 — Baseline, then repair in separated passes
+### 8 — Baseline, then repair in separated passes
 
 Commit the current state and record `Baseline commit: <sha>` — before the first change, never from a
-half-edited tree.
+half-edited tree. If step 4 installed the machine, that baseline was already taken there and is the same
+one cited here; a run has one baseline, not one per pass.
 
 Then, in this order, each pass its own commit:
 
@@ -103,7 +135,7 @@ Then, in this order, each pass its own commit:
 A pass that would need to weaken a gate stops and returns the boundary. Unrelated work in the tree is
 preserved: this skill repairs what the gates named and nothing adjacent that caught the eye.
 
-### 7b — Fan out the defect pass, and only that pass
+### 9 — Fan out the defect pass, and only that pass
 
 Ten agents, and the assignment is **by file, never by rule**. Two agents holding one file will overwrite
 each other's repair and the second one wins silently; two agents holding one rule across many files are
@@ -130,7 +162,7 @@ That table is the owner's standing choice, not a benchmark result. A repair pass
 independent edits against a gate that answers yes or no, which is the shape a mid-tier model does well
 and the reason the fan-out is worth its cost at all.
 
-### 7c — The `why` pass: make the index findable again
+### 10 — The `why` pass: make the index findable again
 
 The last pass, and the only one no gate can judge. A contract entry's `why` is the **index a later lookup
 matches on** — [`starci-fe-design-layout`](../starci-fe-design-layout/SKILL.md) resolves every region by
@@ -173,7 +205,7 @@ and builds, and the classification counts are printed before and after. A reason
 than a narrow one — it will match lookups it should not — so an entry whose need cannot be read off what
 it actually fixes is **asked about, not guessed**.
 
-### 7d — The remnant pass: one Source, so a second `.claude` is a corpse or a question
+### 11 — The remnant pass: one Source, so a second `.claude` is a corpse or a question
 
 **There is one Source and one trust tree. A project is a folder inside it —
 `<Source>/.worktrees/<project>/`, `<Source>/.workspace/<project>/` — never a tree of its own.** So a
@@ -206,16 +238,16 @@ Measured once, on two checkouts carrying the same leftover: one had it ignored, 
 the other had the same editor configuration **committed**. Identical directories, opposite verdicts — which
 is why the test is "untracked", not "looks empty".
 
-### 8 — Prove it with the same commands
+### 12 — Prove it with the same commands
 
-Re-run the exact gates from step 4 and print before-and-after side by side. Zero errors means zero — not
+Re-run the exact gates from step 5 and print before-and-after side by side. Zero errors means zero — not
 zero after a disable, not zero because a rule was dropped, not zero because a test was skipped.
 
 If a gate cannot pass without a decision the owner has not made, the run reports it as `OWED` with the
 count that remains. **A partly repaired repository honestly reported is worth more than a green one that
 lies.**
 
-### 9 — Close the phase
+### 13 — Close the phase
 
 Append the workflow with the applied revision, the baseline commit, the tracked diff and the two count
 tables.
@@ -230,6 +262,8 @@ tables.
   and the diff will not be readable.
 - A `.claude/` in a target checkout holds tracked files or real content → stop the remnant pass and return
   it; one of those is somebody's committed configuration and the other may be a Source.
+- A gate is measured against a rule copied into the checkout → stop measuring; the machine pass comes first,
+  and a count taken against a private copy of the law is not evidence.
 - A repository declares no gates at all → stop; there is nothing to measure, and inventing commands
   measures somebody else's project.
 

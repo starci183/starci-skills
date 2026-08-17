@@ -41,6 +41,34 @@ const git = (cwd, ...rest) => {
 const reachable = (cwd, commit) =>
   git(cwd, "cat-file", "-e", `${commit}^{commit}`) !== null && git(cwd, "merge-base", "--is-ancestor", commit, "HEAD") !== null;
 
+// The lint machines are a published dependency, so a checkout enforces the laws only if it installs them.
+// A copy vendored into the repository is worse than none: it is a second home for a law, it drifts the day
+// the tree changes, and nothing in the repository can tell it has drifted.
+const CANON_PACKAGES = /eslint-canon-(fe|be)$/;
+const ESLINT_CONFIGS = ["eslint.config.mjs", "eslint.config.js", "eslint.config.cjs", ".eslintrc.json", ".eslintrc.js"];
+
+function readMachine(diskPath) {
+  const manifest = join(diskPath, "package.json");
+  if (!existsSync(manifest)) return null;
+  let deps = {};
+  try {
+    const json = JSON.parse(readFileSync(manifest, "utf8"));
+    deps = {...json.dependencies, ...json.devDependencies};
+  } catch {
+    return {installed: [], vendored: null, verdict: "unreadable manifest"};
+  }
+  const installed = Object.keys(deps).filter((name) => CANON_PACKAGES.test(name));
+  const config = ESLINT_CONFIGS.map((name) => join(diskPath, name)).find(existsSync) ?? null;
+  let vendored = null;
+  if (config) {
+    const text = readFileSync(config, "utf8");
+    const local = text.match(/from\s+"(\.[^"]*eslint-canon[^"]*)"/) ?? text.match(/require\("(\.[^"]*eslint-canon[^"]*)"\)/);
+    if (local) vendored = local[1];
+  }
+  const verdict = vendored ? "vendored" : installed.length ? "installed" : config ? "absent" : "no eslint config";
+  return {installed, vendored, config, verdict};
+}
+
 const dirs = (path) => (existsSync(path) ? readdirSync(path, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name) : []);
 const countFiles = (path) => (existsSync(path) ? readdirSync(path).filter((n) => n.endsWith(".json")).length : 0);
 
@@ -113,7 +141,9 @@ function readWorkspaces() {
         warnings.push(`${project}/${role}: ${remnant.path} is a leftover tree — ${remnant.files} file(s), ${remnant.tracked} tracked → starci-repair, the remnant pass${remnant.tracked > 0 ? " (tracked files return to the owner)" : ""}`);
       }
 
-      rows.push({project, role, route, diskPath, diskPathExists, contract, contractExists, contractSource: config.context?.contractSource ?? null, branch: config.repository?.branch ?? null, recordedHead, liveHead, verdict, reason, remnant});
+      const machine = diskPathExists ? readMachine(diskPath) : null;
+
+      rows.push({project, role, route, diskPath, diskPathExists, contract, contractExists, contractSource: config.context?.contractSource ?? null, branch: config.repository?.branch ?? null, recordedHead, liveHead, verdict, reason, remnant, machine});
     }
   }
   return rows;
@@ -354,6 +384,26 @@ if (staleOnly) {
     console.log("");
   }
 
+  // The machine layer. A gate is only law where the machine that fires it is installed; a mirrored copy
+  // enforces whatever it was on the day it was copied.
+  let machineDebt = 0;
+  const machines = workspaces.filter((row) => row.machine && row.machine.verdict !== "no eslint config");
+  if (machines.length > 0) {
+    console.log("lint machine:");
+    for (const row of machines) {
+      const {verdict, installed, vendored} = row.machine;
+      const detail = verdict === "installed" ? installed.join(", ")
+        : verdict === "vendored" ? `config imports ${vendored} — a copy of the law lives in the repository`
+        : "no eslint-canon package in the manifest, so no law here is enforced";
+      console.log(`  ${row.project}/${row.role}  ${verdict}  ${detail}`);
+      if (verdict !== "installed") {
+        machineDebt += 1;
+        console.log(`  ${" ".repeat((row.project + "/" + row.role).length)}  → starci-repair — install the published package; a rule is never authored into a target`);
+      }
+    }
+    console.log("");
+  }
+
   if (warnings.length > 0) {
     console.log(`${warnings.length} warning(s) that are not a route:`);
     for (const warning of warnings) console.log(`  - ${warning}`);
@@ -362,11 +412,11 @@ if (staleOnly) {
 
   // Say which layers ran. A list that silently skipped the expensive one reads as "nothing else is
   // wrong", which is the one thing a report must never imply.
-  console.log("layers measured: route (filesystem + git) · contract index (parsed)");
+  console.log("layers measured: route (filesystem + git) · contract index (parsed) · lint machine (manifest + config)");
   console.log("layers NOT measured: lint, typecheck, build, tests — they belong to starci-repair, which");
   console.log("  runs the repository's own gates and writes build output while doing it.");
 
-  process.exit(byProject.size > 0 || indexDebt > 0 ? 1 : 0);
+  process.exit(byProject.size > 0 || indexDebt > 0 || machineDebt > 0 ? 1 : 0);
 }
 
 await mkdir(dirname(resolve(out)), {recursive: true});
