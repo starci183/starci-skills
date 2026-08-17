@@ -18,16 +18,26 @@ order follows from it rather than defining it.
 
 ## Load order
 
-1. [`contexts/workspaces`](./contexts/workspaces) — resolve the project's role routes and **verify**
-   them. A stale route stops the run; it is not approximated.
-2. [`contexts/worktrees`](./contexts/worktrees) — decide where this run may write before it writes.
-3. [`skills/skill-shape`](./skills/skill-shape) — the reporting shape every capability shares.
-4. The stage the request actually needs, from the table above.
+**A skill owns its own reading list.** Its numbered steps name what to read and when. If a skill is
+driving, follow the skill and stop reading here — this file has done its job by getting you to it, and
+loading a stage the skill did not ask for is paying for a tree you are not using.
 
-**Writing code reads `compilers/` before the first line, not after.** Principles decide every class and
-patterns decide which file the code lands in, what it exports and what it may import — both are answers
-to a shape already accepted, so consulting them afterwards means rewriting rather than deciding.
-`gates/` runs last, on code that exists.
+**If nothing is driving — plain coding, no skill —** this order is yours:
+
+1. [`contexts/workspaces`](./contexts/workspaces) — resolve the project's role routes and **verify**
+   them. A stale route stops the work; it is not approximated.
+2. [`contexts/worktrees`](./contexts/worktrees) — only if the work writes state that must survive.
+3. [`compilers/`](./compilers) — **before the first line**: [`principles`](./compilers/principles) for
+   every class, [`patterns`](./compilers/patterns) for which file holds the code and what it may import.
+   Both answer a shape already accepted, so reading them afterwards leaves only one move — moving code
+   that is already written.
+4. [`gates/`](./gates) — last, on code that exists.
+
+[`brainstorms/`](./brainstorms) is deliberately absent from that list: if the shape is not decided,
+coding has not started, and deciding it belongs to a skill — layout, then block.
+
+Read [`skills/skill-shape`](./skills/skill-shape) when you are about to run a skill or write one, not
+before every task.
 
 A request that cannot resolve its project, its role targets or its write boundary is stuck before any
 target-specific work. Say so; do not proceed on a guess.
