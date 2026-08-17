@@ -237,7 +237,7 @@ Bốn trên sáu dòng ghi `documented`, và bảng này tồn tại để nói 
 `enforced` khiến người ta tưởng cả module đã được giữ.
 
 Hai trong bốn dòng đó có hỗ trợ máy móc, nhưng hỗ trợ ấy thuộc về một luật LÁNG GIỀNG nên không được
-tính ở đây: `starci-fe/no-second-language-in-source`, do `.claude/@starci/eslint-canon-fe` công bố,
+tính ở đây: `starci-fe/no-second-language-in-source`, do `@starci/eslint-canon-fe` công bố,
 miễn các từ điển locale theo đường dẫn (`COPY-5`) và đọc pragma `vn-ok:` trên dòng được đánh dấu
 (`COPY-6`). Tính luật của láng giềng thành enforcement của module này sẽ làm module trông như được giữ
 ở chỗ nó không được giữ: luật đó bắn theo NGÔN NGỮ, nên nó không bao giờ thấy một key tiếng Anh đang
@@ -259,7 +259,7 @@ với repository; chính hình dạng của cây, chứ không phải tên sản
 | `COPY-2` | `components/{leaves,composites,branches,shells}/**` | Không `aria-label`, `placeholder`, `title` hay `alt` nào mang prose, và không đoạn text JSX nào đọc lên như một câu |
 | `COPY-3` | kiểu của props trong `components/blocks/**/component.tsx` | Prop mang chữ được khai kiểu bằng chính giá trị đã resolve (`label: string`). Mọi prop `*Key` đều gọi tên một hàng đang được chọn, không bao giờ là một mục từ điển |
 | `COPY-4` | `components/blocks/**/component.test.tsx` | File sinh đôi render từ những chuỗi fixture trần, không mount provider dịch nào — test chạy qua chính là bằng chứng chữ đã đến bằng đường value |
-| `COPY-5` | `messages/<locale>.json`, và `CONTENT_PATHS` trong `.claude/@starci/eslint-canon-fe` | Miễn trừ là một danh sách đường dẫn, nên không file nào tự biện hộ cho mình |
+| `COPY-5` | `messages/<locale>.json`, và `CONTENT_PATHS` trong `@starci/eslint-canon-fe` | Miễn trừ là một danh sách đường dẫn, nên không file nào tự biện hộ cho mình |
 | `COPY-6` | `chưa neo được` | Có tồn tại những dòng đánh dấu `// vn-ok: <reason>`, nhưng các literal được đánh dấu tìm thấy lại là copy chứ không phải giá trị chương trình so khớp. Chính tình huống của mã này thì chưa có điểm neo |
 
 ## Đầu vào

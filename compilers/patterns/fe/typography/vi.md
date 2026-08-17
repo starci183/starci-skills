@@ -326,7 +326,7 @@ Tầng nào thật sự giữ từng mã — một kiểu đóng, một lint rul
 
 | Mã | Tầng | Cái gì giữ nó |
 |---|---|---|
-| `TYPESET-1` | `enforced` | `no-heading-tag-outside-heading-component` trong `.claude/@starci/eslint-canon-fe` báo lỗi mọi `h1`–`h6` trong một file source không phải chính heading component |
+| `TYPESET-1` | `enforced` | `no-heading-tag-outside-heading-component` trong `@starci/eslint-canon-fe` báo lỗi mọi `h1`–`h6` trong một file source không phải chính heading component |
 | `TYPESET-2` | `unrepresentable` | Union cấp đóng `1 \| 2 \| 3 \| 4` trên kiểu dữ liệu heading; nhánh `tooDeep` của cùng lint rule là lớp chặn cho một `<h5>` gõ tay |
 | `TYPESET-3` | `documented` | Không có gì máy móc giữ. Leaf chữ không vẽ viền và không vẽ nền, nên cái hộp luôn là element của người khác |
 | `TYPESET-4` | `documented` | Không có gì máy móc giữ. Trần thang làm việc leo lên trở nên đắt, nhưng không công cụ nào thấy được tác giả đã đi theo hướng nào |
@@ -348,7 +348,7 @@ Một luật không chỉ được vào code thật thì chỉ là một đề x
 | Mã | Đường dẫn | Nhìn cái gì |
 |---|---|---|
 | `TYPESET-1` | `components/leaves/Heading/index.tsx` | `level` được truyền vào tag outline **và** dùng để chọn tập class — một prop, hai sự thật, trong một biểu thức |
-| `TYPESET-2` | `components/leaves/Heading/index.tsx` · `.claude/@starci/eslint-canon-fe` | Union cấp dừng ở `4`; hằng `DEEPEST_LEVEL` của rule cũng đúng `4` đó |
+| `TYPESET-2` | `components/leaves/Heading/index.tsx` · `@starci/eslint-canon-fe` | Union cấp dừng ở `4`; hằng `DEEPEST_LEVEL` của rule cũng đúng `4` đó |
 | `TYPESET-3` | `components/leaves/Text/index.tsx` | Danh sách class không có mục `border-*` và không có mục `bg-*`: leaf vẽ copy không vẽ nổi cái hộp quanh chính nó |
 | `TYPESET-4` | `components/leaves/Heading/index.tsx` | Cấp 1 là `text-xl font-semibold`, không phải `text-3xl font-bold` — trần thấp, nên "to hơn nữa" phần lớn là không tồn tại |
 | `TYPESET-5` | `components/blocks/courses/CourseCatalogCard/component.tsx` | Title của card là heading cấp 2 trong khi các dữ kiện ở lại 14px muted — dòng phụ không bao giờ với tới thứ bậc của title |

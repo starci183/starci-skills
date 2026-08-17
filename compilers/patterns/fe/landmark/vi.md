@@ -192,7 +192,7 @@ vốn nằm trong chính cây tin cậy này.
 
 | Mã | Ở đâu | Tìm gì |
 |---|---|---|
-| `LANDMARK-1` | `.claude/@starci/eslint-canon-fe` | `LANDMARK_BRANCHES` — tập tên branch mở landmark, mỗi element một entry. **Chưa neo được trong ứng dụng:** ứng dụng hiện mang element trên entry, nên không còn branch landmark nào để trỏ tới |
+| `LANDMARK-1` | `@starci/eslint-canon-fe` | `LANDMARK_BRANCHES` — tập tên branch mở landmark, mỗi element một entry. **Chưa neo được trong ứng dụng:** ứng dụng hiện mang element trên entry, nên không còn branch landmark nào để trỏ tới |
 | `LANDMARK-2` | `components/branches/Tree/index.tsx` | Props của branch node: một key và phần nội dung, không có class. Class của nó đến từ tra cứu entry. Branch landmark lẽ ra thừa hưởng hình dạng này hiện chưa tồn tại |
 | `LANDMARK-3` | `components/branches/Tree/index.tsx` | Props interface, và khối comment ghi lại rằng `as` đã được cân nhắc và bị từ chối; element được đọc từ `host` của entry |
 | `LANDMARK-4` | `app/[lang]/dashboard/layout.tsx` | Một layout vẽ điều hướng như một sibling và giao `children` được route cho frame mang key `routed-page-main`. Các layout route anh em lặp lại hình dạng đó |

@@ -421,7 +421,7 @@ không phải luật.
 | `E2E-4` | `tests/helpers/flow-world.ts` → `FlowWorld.entityManager`, resolve qua `getEntityManagerToken(POSTGRESQL_PRIMARY)` | Flow nhận entity manager THẬT của datasource chính, nên hệ quả được đọc từ đúng row đã ghi |
 | `E2E-5` | `tests/helpers/flow-wait.ts` → `nextMessage`, dùng trong `tests/e2e/community-chat.e2e-spec.ts` | Chờ message khớp kế tiếp trên một socket thật; không có assertion đếm ở bất cứ đâu trên bề mặt helper |
 | `E2E-6` | `tests/helpers/flow-wait.ts` → `expectNoMessage`, `DEFAULT_SILENCE_MS`; dùng trong `tests/e2e/notification-delivery.e2e-spec.ts` | Một bước chứng minh socket của người lạ im lặng trong khi người nhận đúng đã được phục vụ |
-| `E2E-7` | `.claude/@starci/eslint-canon-be` → `tester.run("no-branch-in-flow-step", …)` | Các fixture hợp lệ và không hợp lệ ghim chính xác hình dạng nào tính là nhánh bên trong một bước |
+| `E2E-7` | `@starci/eslint-canon-be` → `tester.run("no-branch-in-flow-step", …)` | Các fixture hợp lệ và không hợp lệ ghim chính xác hình dạng nào tính là nhánh bên trong một bước |
 | `E2E-8` | `tests/helpers/flow-world.ts` → `bootFlowWorld`; `tests/helpers/create-e2e-app.ts` → `createE2eApp` | Hai entry point dựng thế giới lên, để một spec mở đầu bằng đúng thứ nó đang test |
 | `E2E-9` | `tests/helpers/flow-world.ts` → `FlowWorld.mintLearner(name)` | Hàm tạo actor nhận một TÊN và ghi một row mới cho mỗi flow; không số thứ tự nào được chấp nhận |
 | `E2E-10` | `tests/e2e/` (84 file spec) | Không có call site `console` thật nào. Hai lần khớp văn bản duy nhất, ở `coding-submission.e2e-spec.ts:550` và `:646`, là chuỗi source BÊN TRONG một chương trình được nộp, không phải logging |

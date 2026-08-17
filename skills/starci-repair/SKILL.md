@@ -33,10 +33,14 @@ reformatted lines is a fix nobody can see. Format runs alone, in its own pass, w
 **Measure with the repository's own gates.** Read the manifest and run the scripts that repository
 actually declares. A count from a command the project does not use proves nothing about the project.
 
-**The machine is installed, never authored.** The rules a gate fires are a published dependency. This skill
-installs that dependency; it never writes a rule into a target repository and never repairs one that is
-already there. A rule authored or copied into a checkout is a second home for a law: it enforces whatever
-it was on the day it landed, it drifts the moment the law changes, and nothing in that repository can tell
+**The machine is installed, never authored.** The rules a gate fires are a published dependency, and
+**every repository that runs the gates installs it — the checkout under repair, and only that one.** The
+trust tree installs nothing: it is the law, not a runtime. So this run's install lands in the same
+repository whose counts it is about to take, as a manifest and lockfile change like any other dependency.
+
+What it never writes into that repository is a **rule**, and it never repairs one that is already there.
+A rule authored or copied into a checkout is a second home for a law: it enforces whatever it was on the
+day it landed, it drifts the moment the law changes, and nothing in that repository can tell
 that it has. Green measured against a private copy is green against a rule nobody else has.
 
 ## PROCESS
