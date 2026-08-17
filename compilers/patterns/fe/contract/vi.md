@@ -520,8 +520,11 @@ Ngoại lệ là một phần của luật, không phải chỗ để lách. M�
 
 - **Tầng leaf sở hữu ruột của chính nó.** `CONTRACT-1` và `CONTRACT-7`. Leaf bọc MỘT primitive vendor
   và viết đúng phần keo giữ một dòng lại với nhau, nên hai mã đó không với tới nó. Ngoại lệ này là một
-  THƯ MỤC, nên nó là ranh giới chính sách chứ không phải một type: ai nộp file vào đó cũng thoát. Thứ
-  giữ một vùng ở ngoài là câu hỏi do người hỏi — file này có sắp xếp hai nội dung không?
+  THƯ MỤC, nên nó là ranh giới chính sách chứ không phải một type: ai nộp file vào đó cũng thoát theo
+  đường ấy. Còn câu hỏi giữ một vùng ở ngoài — file này có sắp xếp hai nội dung không? — thì
+  `no-structural-arrangement-in-leaf` hỏi, bằng cách đọc chính JSX mà leaf mở ra. Thứ nó không đọc được
+  là một leaf sắp xếp thông qua một helper hay một prop của vendor, nên thư mục vẫn nhận vào những gì
+  không trông có vẻ cấu trúc trong source.
 - **Surface branch có tên sở hữu wrapper vendor cố định của nó.** `CONTRACT-10`. Seam đó không biến
   đổi theo caller, không nhận con, và không bao giờ nhận marker contract.
 - **Element ngữ nghĩa mở ra vì NGHĨA và không mang class thì không phải node.** `CONTRACT-7`. `form`

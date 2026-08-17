@@ -109,6 +109,7 @@ tuyên bố.
 | `FILE-5` | Workspace có một package dùng chung và một hoặc nhiều app, và một tier phải rơi về một phía | Package dùng chung giữ `contracts/`, `leaves/`, `composites/`, `branches/`; `blocks/`, `overlays/`, `layouts/`, `pages/` thuộc về app sở hữu feature. Cấm: tier biết feature nằm trong package dùng chung; tier từ vựng nằm trong một app; một tier wrapper song song |
 | `FILE-6` | Shape cần một URL, nên có thứ gì đó đang được viết dưới `app/` | File dưới `app/` nói page nào render ở URL nào, và là một trong các slot của chính framework. Cấm: fetch, sắp đặt hay contract key trong route file; bất kỳ file component có tên riêng nào dưới `app/` |
 | `FILE-7` | Một file tự khai nó thuộc tầng nào, trong source, ngay cạnh đường dẫn vốn đã khai điều đó | Một dấu hiệu trong source phải khớp với thư mục sở hữu nó. Cấm: một file nằm dưới tầng này lại tự khai mình là tầng khác |
+| `FILE-8` | Một component cần một cơ chế của vendor hoặc của nền tảng bọc quanh nội dung đã được kiểm | Chủ của nó là một **branch có tên**, giữ cơ chế đóng kín bên trong. Cấm: một tầng `shells/`, và mọi tầng đóng thế vai trò đó |
 
 `FILE-2` VÀ `FILE-3` KHÔNG PHẢI CÙNG MỘT LỜI TỪ CHỐI. `FILE-2` đếm file trong một thư mục màn hình và
 không quan tâm chúng là gì; `FILE-3` gọi tên bốn thư mục sai ở mọi chỗ dưới `components/`, kể cả cạnh
@@ -316,6 +317,29 @@ phân loại thứ hai mà không ai bỏ phiếu cho.
 **Tình huống nghiệp vụ thường gặp.** Một component được nâng từ composite lên branch · một file được
 copy ra để bắt đầu file mới · một tầng bị đổi tên cả thư mục mà một file còn giữ chữ cũ.
 
+## `FILE-8` — không có tầng shell
+
+**Tình huống.** Một component phải bọc nội dung đã kiểm vào một cơ chế do người khác viết — dialog,
+drawer, thân card của vendor — và phản xạ đầu tiên là dựng một tầng để chứa những thứ như vậy.
+
+**Nó sinh ra gì trong source.** Một **branch có tên**, giữ cơ chế đóng kín bên trong và nhận nội dung hợp
+đồng có kiểu đi qua biên của nó. Không gì khác đổi; từ vựng có thêm một cái tên, không phải một tầng.
+
+**Dấu hiệu nhận biết.** Một thư mục `shells/`. Một tầng mà các thành viên không chung hình dạng nào, chỉ
+chung ở chỗ mỗi cái bọc một thứ gì đó. Một cái tên kết thúc bằng `Shell` cho thứ không phải một trong hai
+cái mà từ vựng có.
+
+**Ranh giới.** Không phải `FILE-5`: mã đó quyết định một tầng đứng về **phía** nào. Mã này nói tầng đó
+không tồn tại để mà xếp.
+
+**Vì sao ở đây phải là một cái tên chứ không phải một tầng.** Mọi tầng khác trả lời *cái này hình dạng
+gì*. Một tầng shell trả lời *markup của ai nằm bên trong* — một câu hỏi khác — nên các thành viên của nó
+không có gì chung để kiểm và không có gì để từ chối. Nó thành cái thư mục mà thứ gì cũng vào được: một
+ngoại lệ không kiểu với một cái tên gọn gàng, và là chỗ duy nhất hợp đồng thôi chi phối.
+
+**Tình huống nghiệp vụ thường gặp.** Một dialog của vendor · một drawer bọc quanh form · thân card từ một
+thư viện component · bất cứ thứ gì được với tới khi một cơ chế có vẻ quá nhỏ để đáng một branch riêng.
+
 ## Tầng giữ
 
 Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay — chính xác thứ mà cơ chế không nhìn thấy
@@ -330,6 +354,7 @@ Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay —
 | `FILE-5` | `enforced` | `monorepo-tier-belongs-to-its-side` | Mọi thứ trong một cây một app. Cả hai regex đều đòi một đoạn `packages/<name>/src/` hoặc `apps/<name>/src/`, nên trong một checkout một app thì rule bất hoạt ngay từ cấu tạo. |
 | `FILE-6` | `enforced` | `route-tree-holds-routes-only` | Việc vẽ. "Fetch và sắp đặt" không phải thuộc tính một rule đường dẫn đo được: một route mount một component và một route sắp đặt sáu thứ đều trả về JSX. Một `page.tsx` tự vẽ vẫn qua. |
 | `FILE-7` | `enforced` | `source-tier-marker-matches-folder` | Một repository không khai dấu hiệu nào. Rule đọc dấu hiệu nếu gặp; nó không bao giờ đòi phải có, nên một cây không dùng quy ước này thì im lặng chứ không đỏ — inert theo cấu tạo, giống `FILE-5` trong checkout single-app. |
+| `FILE-8` | `enforced` | `no-shell-tier` | Một branch mà mọi thứ đều là shell trừ cái thư mục của nó. Rule đọc đường dẫn, nên một cơ chế đậu trong `branches/` dưới một cái tên mơ hồ vẫn qua — đặt tên là câu hỏi của `FILE-1`. |
 
 Cả sáu mã đều được một rule có tên giữ, nên không dòng nào ghi `documented`. Đó là tin tốt, và cũng là
 toàn bộ cái bẫy của bảng này: một mã có thể `enforced` mà vẫn gần như không được giữ, vì rule đọc ĐƯỜNG
@@ -406,7 +431,7 @@ Mỗi file mà shape sinh ra là một khối.
 ```text
 file: <path being placed>
 identity: <what it is, independent of who calls it>
-tier: <contracts | leaves | composites | branches | shells | blocks | overlays | layouts | pages | route | hooks | modules | resources>
+tier: <contracts | leaves | composites | branches | blocks | overlays | layouts | pages | route | hooks | modules | resources>
 situation: <FILE-1 | FILE-2 | FILE-3 | FILE-4 | FILE-5 | FILE-6>
 destination: <the path it belongs at>
 reason: <the fact about the file that excludes the adjacent code>

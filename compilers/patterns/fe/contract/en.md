@@ -540,7 +540,10 @@ Exceptions are part of the rule, not relief from it. Each is closed and cites th
 - **The leaf tier owns its own interior.** `CONTRACT-1` and `CONTRACT-7`. A leaf wraps ONE vendor
   primitive and writes the glue that holds one line together, so those two codes do not reach it. The
   exemption is a FOLDER, which makes it a policy boundary rather than a type: anything filed there
-  escapes. What keeps a region out is a question a person asks — does this file arrange two contents?
+  escapes that way. The question that keeps a region out — does this file arrange two contents? — is
+  asked by `no-structural-arrangement-in-leaf`, which reads the JSX a leaf actually opens. What it
+  cannot read is a leaf that arranges through a helper or a vendor prop, so the folder still admits
+  what does not look structural in source.
 - **A named surface branch owns its fixed vendor wrapper.** `CONTRACT-10`. The seam cannot vary by
   caller, cannot admit children and never receives contract markers.
 - **A semantic element opened for MEANING, carrying no class, is not a node.** `CONTRACT-7`. A `form`

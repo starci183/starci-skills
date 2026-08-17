@@ -109,6 +109,7 @@ holds less than the code claims.
 | `FILE-5` | The workspace has a shared package and one or more apps, and a tier must land on one side | The shared package holds `contracts/`, `leaves/`, `composites/`, `branches/`; `blocks/`, `overlays/`, `layouts/`, `pages/` belong to the app that owns the feature. Forbidden: a feature tier inside the shared package; a vocabulary tier inside one app; a parallel wrapper tier |
 | `FILE-6` | The shape needs a URL, so something is being written under `app/` | A file under `app/` names which page renders at which URL, and is one of the framework's own slots. Forbidden: fetching, arrangement or a contract key in a route file; any named component file under `app/` |
 | `FILE-7` | A file states which tier it belongs to, in source, beside the path that already states it | A source marker agrees with the folder that owns it. Forbidden: a file under one tier declaring itself another |
+| `FILE-8` | A component needs a fixed vendor or native mechanic around checked content | The owner is a **named branch** that keeps the mechanic closed inside it. Forbidden: a `shells/` tier, and any tier standing in for one |
 
 `FILE-2` AND `FILE-3` ARE NOT THE SAME REFUSAL. `FILE-2` counts files in one surface folder and
 does not care what they are; `FILE-3` names four folders that are wrong anywhere under
@@ -321,6 +322,28 @@ exactly; the moment it does not, it is a second classification nobody voted for.
 **Common business situations.** A component promoted from composite to branch · a file copied to start
 a new one · a tier renamed across a folder while one file kept the old word.
 
+## `FILE-8` — there is no shell tier
+
+**Situation.** A component must wrap checked content in a mechanic somebody else wrote — a dialog, a
+drawer, a vendor card body — and the reflex is a tier to park such things in.
+
+**What it emits in source.** A **named branch**, holding the mechanic closed inside it and taking typed
+contract content across its boundary. Nothing else changes; the vocabulary gains a name, not a tier.
+
+**Recognition signs.** A `shells/` folder. A tier whose members share no shape, only the fact that each
+wraps something. A name ending in `Shell` for a thing that is not one of the two the vocabulary has.
+
+**Boundary.** Not `FILE-5`: that code decides which SIDE a tier lands on. This one says the tier does not
+exist to be placed.
+
+**Why a tier here and not a name.** Every other tier answers *what shape is this*. A shell tier answers
+*whose markup is inside*, which is a different question, so its members have nothing in common to check
+and nothing to refuse. It becomes the folder anything can enter — an untyped exemption with a tidy name,
+and the one place the contract stops governing.
+
+**Common business situations.** A vendor dialog · a drawer around a form · a card body from a component
+library · anything reached for when a mechanic feels too small for its own branch.
+
 ## Layer held
 
 Which tier actually holds each code, and — where the tier over-promises — exactly what the mechanism
@@ -335,6 +358,7 @@ cannot see. The last column is the honest part of this table.
 | `FILE-5` | `enforced` | `monorepo-tier-belongs-to-its-side` | Anything in a single-app tree. Both regexes require a `packages/<name>/src/` or `apps/<name>/src/` segment, so in a single-app checkout the rule is inert by construction. |
 | `FILE-6` | `enforced` | `route-tree-holds-routes-only` | Drawing. "Fetches and arranges" is not a property a path rule can measure: a route that mounts one component and a route that arranges six both return JSX. A `page.tsx` that draws still passes. |
 | `FILE-7` | `enforced` | `source-tier-marker-matches-folder` | A repository that declares no marker. The rule reads a marker it finds; it never asks for one, so a tree without the convention is silent rather than red — inert by construction, like `FILE-5` in a single-app checkout. |
+| `FILE-8` | `enforced` | `no-shell-tier` | A branch that is a shell in everything but its folder. The rule reads the path, so a mechanic parked inside `branches/` under a vague name passes — naming is `FILE-1`'s question. |
 
 All six codes are held by a named rule, so no row reads `documented`. That is the good news and it is
 also the whole trap of this table: a code can be `enforced` and still be mostly unheld, because the
@@ -411,7 +435,7 @@ One block per file the shape produces.
 ```text
 file: <path being placed>
 identity: <what it is, independent of who calls it>
-tier: <contracts | leaves | composites | branches | shells | blocks | overlays | layouts | pages | route | hooks | modules | resources>
+tier: <contracts | leaves | composites | branches | blocks | overlays | layouts | pages | route | hooks | modules | resources>
 situation: <FILE-1 | FILE-2 | FILE-3 | FILE-4 | FILE-5 | FILE-6>
 destination: <the path it belongs at>
 reason: <the fact about the file that excludes the adjacent code>
