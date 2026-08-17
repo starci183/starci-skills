@@ -9,8 +9,8 @@ Four species, split by **what each is allowed to return** — not by the order t
 |---|---|---|
 | `contexts/` | location | where source is read from, where state is written |
 | `brainstorms/` | creation | 3–4 candidates, the owner chooses |
-| `compilers/` | execution | exactly one answer; the law closes the choice |
-| `gates/` | refusal | pass, or reject with the evidence |
+| `compilers/` | execution | exactly one answer; the law closes the choice — `principles` decide classes, `patterns` decide where the code lands |
+| `gates/` | refusal | pass, or reject with the evidence — `lints` only |
 
 `skills/` holds the six capabilities and the reporting shape they share. `scripts/` holds the
 validator that makes the JSON schemas real rather than decorative.

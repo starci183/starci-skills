@@ -13,8 +13,8 @@ order follows from it rather than defining it.
 |---|---|---|
 | [`contexts/`](./contexts) | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
 | [`brainstorms/`](./brainstorms) | 3–4 candidates for the owner to choose | a surface or a block is not yet decided |
-| [`compilers/`](./compilers) | exactly one answer, no candidates | a shape is accepted and needs classes |
-| [`gates/`](./gates) | pass, or reject with evidence | code exists and must be judged |
+| [`compilers/`](./compilers) | exactly one answer, no candidates | a shape is accepted and code is about to be written — [`principles`](./compilers/principles) decide the classes, [`patterns`](./compilers/patterns) decide which file holds it and what it may import |
+| [`gates/`](./gates) | pass, or reject with evidence | code exists and must be judged — [`lints`](./gates) point at the character they refuse on |
 
 ## Load order
 
@@ -23,6 +23,11 @@ order follows from it rather than defining it.
 2. [`contexts/worktrees`](./contexts/worktrees) — decide where this run may write before it writes.
 3. [`skills/skill-shape`](./skills/skill-shape) — the reporting shape every capability shares.
 4. The stage the request actually needs, from the table above.
+
+**Writing code reads `compilers/` before the first line, not after.** Principles decide every class and
+patterns decide which file the code lands in, what it exports and what it may import — both are answers
+to a shape already accepted, so consulting them afterwards means rewriting rather than deciding.
+`gates/` runs last, on code that exists.
 
 A request that cannot resolve its project, its role targets or its write boundary is stuck before any
 target-specific work. Say so; do not proceed on a guess.

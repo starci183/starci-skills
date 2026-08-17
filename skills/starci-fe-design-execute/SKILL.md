@@ -45,8 +45,10 @@ A resolution that requires taste means a principle is incomplete. Record it; do 
 
 ### 5 — Land the files through the patterns
 
-Where a file lives, what it exports, what it may import and what it is named are decided by the
-frontend patterns, not by convenience. The entry's node is **rendered**, not imitated: copying an
+Where a file lives, what it exports, what it may import and what it is named are decided by
+`compilers/patterns/fe`, not by convenience. Patterns are compilers, not gates: they answer a shape
+already accepted, so they are read **before** the first line rather than consulted after it, when the
+only remaining option is to move code that is already written. The entry's node is **rendered**, not imitated: copying an
 entry's classes onto a vendor element drops what that element cannot carry — the `host` — and the
 result claims the contract is honoured while the accessibility tree is wrong.
 
@@ -55,7 +57,7 @@ Every `reuse`, `generalize` and `new` verdict in the accepted JSON is carried ou
 
 ### 6 — Prove it against the gates
 
-Run the frontend lints and the pattern checks. A finding is repaired, not suppressed: no rule is
+Run the frontend lints from `gates/fe/lints`. A finding is repaired, not suppressed: no rule is
 weakened, disabled or hatched to make a run pass. Then prove the surface renders — the evidence the
 approval named, not a substitute that is easier to produce.
 

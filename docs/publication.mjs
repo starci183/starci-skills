@@ -45,7 +45,7 @@ export const groups = [
     description: "Machine-rejectable frontend violations: what a checker refuses, and the exact evidence it refuses on.",
   },
   {
-    source: "gates/fe/patterns",
+    source: "compilers/patterns/fe",
     title: "FE patterns",
     description: "From an accepted shape to frontend source architecture: where a file lives and what it is allowed to import.",
   },
@@ -55,7 +55,7 @@ export const groups = [
     description: "Machine-rejectable backend violations: what a checker refuses, and the exact evidence it refuses on.",
   },
   {
-    source: "gates/be/patterns",
+    source: "compilers/patterns/be",
     title: "BE patterns",
     description: "From an accepted capability to backend source architecture: module layering, transport, data access and failure.",
   },
