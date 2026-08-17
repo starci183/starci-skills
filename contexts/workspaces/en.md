@@ -59,6 +59,11 @@ file. Two roles are two routes, not one route with two readings.
 
 **Ask yourself.** Can every named role be turned into an existing file path without guessing?
 
+**A project names a family of checkouts, not necessarily a product.** Tooling gets a project like anything
+else — same shape, same verification, no privileges. Every project name must be **distinguishable from
+every other on this machine**: one that is a prefix or substring of another leaves a rollup line, a warning
+and a glob each able to mean two projects, and nothing downstream can recover which was meant.
+
 **Boundary**
 
 - `WORKSPACE-2`: if a named file is absent, this code is not reached. Resolution is all-or-stop, not

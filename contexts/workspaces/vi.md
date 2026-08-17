@@ -59,6 +59,12 @@ Hai vai trò là hai route, không phải một route đọc theo hai cách.
 
 **Tự hỏi.** Mọi vai trò được gọi tên có biến thành một đường dẫn tồn tại thật mà không cần đoán không?
 
+**Một project gọi tên một họ checkout, không nhất thiết là một sản phẩm.** Bộ công cụ cũng được một
+project như mọi thứ khác — cùng hình dạng, cùng cách xác minh, không đặc quyền nào. Mọi tên project phải
+**phân biệt được với mọi tên khác trên máy này**: một tên là tiền tố hay chuỗi con của tên khác thì một
+dòng tổng, một cảnh báo và một glob đều có thể mang nghĩa hai project, và không gì phía sau lấy lại được
+ý đã định.
+
 **Ranh giới**
 
 - `WORKSPACE-2`: nếu một tệp được gọi tên mà không có, mã này không đạt tới. Giải route là **được hết

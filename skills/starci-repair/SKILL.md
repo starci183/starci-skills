@@ -202,9 +202,9 @@ Proof is the count before, the approval, and the count after. The removal is its
 names what the directory held, and `CHANGES` says `removed` rather than `repaired` — a deletion recorded
 as a repair is a deletion nobody can review.
 
-Measured once: `nivo-fe/.claude` held `launch.json`, **tracked**, and `sources/` with **0 files**. So the
-verdict was split, and splitting it was the point — the empty directory is removable, the tracked file
-goes back to its owner with the reason.
+Measured once, on two checkouts carrying the same leftover: one had it ignored, so nothing was tracked;
+the other had the same editor configuration **committed**. Identical directories, opposite verdicts — which
+is why the test is "untracked", not "looks empty".
 
 ### 8 — Prove it with the same commands
 

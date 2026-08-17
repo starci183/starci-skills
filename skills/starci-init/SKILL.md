@@ -121,22 +121,15 @@ Refresh route configuration only. Never clone, link, copy, mount or edit a **tar
 route **describes** a checkout, it never mirrors one. Route values stay machine-local — never committed
 into the trust tree — and runtime secrets, environment values and tokens are never route values at all.
 
-**One narrow exception, and it is not a loosening of that rule.** A repository the tree itself owns — its
-console, its lint machines — may be **cloned when its route names it and the checkout is absent**, and
-pulled when it is present. The guarantee that matters is untouched: nothing clones, mirrors or edits a
-product target, because a product's history is the product team's and a setup run has no business in it.
-The tree's own tooling has no such owner to answer to; it is this tree's.
+**There is no exempt repository.** Not a product's, not a tool's, not one whoever adopted this tree wrote
+themselves. A checkout arrives on the disk because a person put it there, and this step then describes
+where it is. An exception carved for a repository "the tree owns" is an exception that only reads as
+narrow to the org that wrote it: to everybody else it is a skill that clones a stranger's repository
+during setup.
 
-These live under the project `starci`, one role per repository:
-
-```text
-.workspace/starci/console/config.json    the read-only console over this machine's state
-.workspace/starci/eslint/config.json     the lint machines the gates cite
-```
-
-A tooling route carries `contract: null` — it has no domain contract, and that absence is not a stale
-route. Print what happened per repository, `cloned` or `pulled` or `reused`, because a clone is the one
-thing here that puts a new directory on the disk.
+A role whose repository has no domain contract carries `contract: null` — that absence is not a stale
+route, and it is why the field is nullable rather than absent. Print what happened per route, `written` or
+`refreshed` or `reused`.
 
 ### 9 — Apply: worktree state
 
