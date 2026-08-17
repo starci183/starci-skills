@@ -44,8 +44,10 @@ locale, lint. Tất cả thuộc những tầng đến sau.
 
 1. **Liệt kê những bề mặt mà yêu cầu nói ra.** Yêu cầu gọi tên một trang thì có một bề mặt; gọi tên một
    luồng thì có nhiều, và mỗi bề mặt một lô riêng.
-2. **Tra trước khi thiết kế.** Với mỗi region, tra contract theo `why` — theo **lý do**, không theo hình.
-   Hai entry cùng class mà khác lý do là hai entry khác nhau.
+2. **Tra trước khi thiết kế.** Với mỗi region, tra contract theo `why`, và đọc `why` đúng bản chất của
+   nó: **không phải một lời mô tả nghiệp vụ, mà là lời khai khi nào bạn cần tới entry này.** Hai entry
+   cùng class mà khác nhu cầu là hai entry khác nhau; hai entry khác class mà trả lời cùng một nhu cầu
+   là **một** entry đã bị viết hai lần.
 3. **Chọn những trục mà các phương án sẽ khác nhau ở đó**, lấy từ đầu vào số 5. Hai phương án trùng mọi
    giá trị trục là **một** phương án.
 4. **Gán người ghép cho từng region** từ danh sách branch. Region có entry mà không có branch là **chưa

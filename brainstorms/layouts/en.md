@@ -45,8 +45,10 @@ queries, locale copy, lints. Those belong to the stages that come after.
 
 1. **List the surfaces the request states.** A request naming one page states one surface; a request
    naming a flow states several, and each gets its own batch.
-2. **Look up before designing.** For every region, search the contract by `why` — by the reason, not
-   by the shape. Two entries with the same classes and different reasons are different entries.
+2. **Look up before designing.** For every region, search the contract by `why`, and read `why` for what
+   it is: **not a description of the business, but a statement of when you would reach for this entry.**
+   Two entries with the same classes and different needs are different entries; two with different
+   classes answering the same need are one entry that got written twice.
 3. **Choose the axes each candidate will differ on**, from input 5. Two candidates sharing every axis
    value are one candidate.
 4. **Assign an assembler per region** from the branch inventory. A region with an entry and no branch
