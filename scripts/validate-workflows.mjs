@@ -71,7 +71,7 @@ const markdownFiles = (directory) =>
   })
 
 const phaseSections = (text) => {
-  const matches = [...text.matchAll(/^## (plan|review|apply|start|feedback|end|finality)(?:\s+.*)?$/gim)]
+  const matches = [...text.matchAll(/^## (plan|review|apply|layout|block|execute|complete|start|feedback|end|finality)(?:\s+.*)?$/gim)]
   return matches.map((match, index) => ({
     phase: match[1].toLowerCase(),
     text: text.slice(match.index, matches[index + 1]?.index ?? text.length),
@@ -163,7 +163,9 @@ export const validateWorkflow = (relativePath, text) => {
     for (const header of OUTPUT_HEADERS) {
       if (!section.text.includes(header)) errors.push(`${section.phase}[${index}]: missing table ${header}`)
     }
-    if (segments[0] === "designs" && section.phase === "plan") {
+    // Historical tabbed-preview records remain valid evidence. New design journeys declare a
+    // registry Session id and are validated by the gate/session schemas instead.
+    if (segments[0] === "designs" && section.phase === "plan" && !/Session id\s*:/i.test(section.text)) {
       if (!section.text.includes(DESIGN_PREVIEW_HEADER)) {
         errors.push(`plan[${index}]: missing tracked tabbed HTML preview`)
       } else {

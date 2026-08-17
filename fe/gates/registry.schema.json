@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.academy/schema/fe/gates/registry.schema.json",
+  "title": "StarCi FE content-addressed design registry",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "hashAlgorithm", "canonicalization", "head", "lastSequence"],
+  "properties": {
+    "schemaVersion": { "const": 1 }, "hashAlgorithm": { "const": "sha256" }, "canonicalization": { "const": "RFC8785-JCS" },
+    "head": { "$ref": "#/$defs/Hash" }, "lastSequence": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "Hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "Artifact": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "schema", "payload"],
+      "properties": {
+        "kind": { "enum": ["prompt", "response", "layout-candidate", "block-candidate", "verdict", "decision", "rejection", "event", "memory-pack"] },
+        "schema": { "type": "string", "minLength": 3 }, "payload": {}
+      }
+    },
+    "StatusRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unitId", "objectHash", "status", "sessionId", "roundId", "updatedAt"],
+      "properties": {
+        "unitId": { "$ref": "#/$defs/Id" }, "objectHash": { "$ref": "#/$defs/Hash" }, "status": { "enum": ["queued", "rejected", "approved"] },
+        "sessionId": { "$ref": "#/$defs/Id" }, "roundId": { "$ref": "#/$defs/Id" }, "basedOnHash": { "$ref": "#/$defs/Hash" },
+        "decisionHash": { "$ref": "#/$defs/Hash" }, "reasonHash": { "$ref": "#/$defs/Hash" },
+        "tags": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Edge": {
+      "type": "object", "additionalProperties": false, "required": ["from", "to", "kind"],
+      "properties": { "from": { "$ref": "#/$defs/Id" }, "to": { "$ref": "#/$defs/Id" }, "kind": { "enum": ["extends", "contains-block", "uses-contract", "derived-from"] } }
+    },
+    "Transaction": {
+      "type": "object", "additionalProperties": false, "required": ["objects", "events", "refs", "maps", "expectedHead"],
+      "properties": {
+        "objects": { "type": "array", "items": { "$ref": "#/$defs/Hash" } }, "events": { "type": "array", "items": { "$ref": "#/$defs/Hash" } },
+        "refs": { "type": "array", "items": { "$ref": "#/$defs/StatusRef" } }, "maps": { "type": "array", "items": { "$ref": "#/$defs/Hash" } },
+        "expectedHead": { "$ref": "#/$defs/Hash" }
+      }
+    }
+  }
+}

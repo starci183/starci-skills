@@ -1,87 +1,36 @@
 ---
 name: starci-fe-design-plan
-description: Research, render and serve one tabbed HTML preview containing two to four implementation-feasible directions for net-new or undecided StarCi frontend work, then record the user's choice. Use when hierarchy, CTA, interaction or disclosure still needs a product choice. Writes workflow evidence and one disposable index.html only; never production source. Not for a bounded fix with a known reference; use starci-fe-fidelity-start instead.
+description: Start or resume one StarCi frontend design journey from business input through layout and block JSON choices, then execute only accepted hashes. Use for new pages, layouts, modals, drawers, overlays or material FE redesign. This is the sole orchestrator; it creates no HTML preview lifecycle.
 ---
 
 # StarCi FE Design Plan
 
-Read [`../../skill-shape.md`](../../skill-shape.md) first and use
-`<Source>/.workflows/designs/<app>/<id>.md`.
-
-Then read the Plan decision owners in
-[`../../fe/creativity/`](../../fe/creativity/INDEX.md):
-[`mode.md`](../../fe/creativity/mode.md),
-[`best-belief-source.md`](../../fe/creativity/best-belief-source.md),
-[`research.md`](../../fe/creativity/research.md),
-[`brief.md`](../../fe/creativity/brief.md) and
-[`divergence.md`](../../fe/creativity/divergence.md).
-
-Plan exists for a product choice. If a named reference, contract or test already settles the answer,
-route the bounded correction to `$starci-fe-fidelity-start`.
+Read [`../../skill-shape.md`](../../skill-shape.md), [`../../fe/gates/`](../../fe/gates/INDEX.md) and
+[`../../fe/intent/`](../../fe/intent/INDEX.md). Require a user-declared `Project` or explicit `Frontend` and `Backend`.
+Use one workflow record and one registry session; never infer a target from Source.
 
 ## CONTEXT
 
-Present the phase table under the exact heading `### CONTEXT`.
-
-Require a user-declared `Project` or explicit `Frontend` and `Backend`, then resolve `Frontend` for this phase; never infer it from `Source` or `App`.
-
-`Touching` is the workflow file plus
-`<Source>/.workflows/.previews/designs/<app>/<id>/<revision>/`. Plan writes no production source. Name
-the app and database when the screen depends on backend behavior.
+Print the canonical `### CONTEXT` table with Source, Project, Frontend, Backend, Trust, workflow,
+branches, session id, registry branch and exact `Touching` boundary.
 
 ## PROCESS
 
-Read the live GraphQL contracts, target components, governing `.claude` canon and named legacy
-references before proposing anything. A screen must not promise data the backend cannot serve or
-anatomy the target cannot own.
+1. Open or resume the session by its stable id and verify current object/ref hashes.
+2. Convert one or more requested surfaces into Gate 1 inputs and invoke
+   `$starci-fe-design-layout` until the reachable surface graph is accepted.
+3. Invoke `$starci-fe-design-block` for every block in every accepted layout until all required
+   block hashes are accepted.
+4. Display queued/rejected/approved heads and unresolved decisions after every founder prompt.
+5. Invoke `$starci-fe-design-execute` only when graph traversal proves the layout and block
+   whitelist complete.
 
-For every user-visible interaction proposed by a direction, research the canonical
-`### INTERACTION CONSEQUENCE` row from `research.md`. Trace product ownership and behavior before
-using the interaction in preview HTML. `N/A` requires source evidence; a painted control is not
-proof of request, route, failure, navigation or persistence behavior.
-
-Brief two to four directions that differ in product decisions: reading order, CTA priority,
-disclosure, density or composition. Do not manufacture variants that differ only in colour or
-spacing. A migration or parity request includes a parity-first direction.
-
-Create one `index.html` with two to four tabs that make those product decisions visible. Every tab
-contains one implementation-feasible direction and enough responsive states for comparison. Tabs
-must switch client-side without changing URL or reloading another HTML file. This HTML is disposable
-Plan evidence, not production JSX/CSS and not an Apply baseline.
-
-Serve the proposal directory on the first free port from `8080` upward:
-
-```powershell
-python <trust-root>/skills/starci-fe-design-plan/scripts/serve_proposals.py <proposal-directory> --start-port 8080
-```
-
-Keep the server running while approval is pending. If the process stops, restart it and append the
-new PID/port/URLs instead of leaving stale links.
-
-Before proposing a new contract entry, composite or row, inventory existing keys and classify the
-result as REUSE, EXTEND or NEW because the relationship cannot be expressed by an existing owner.
-
-Before asking the user to choose, append these tracking tables in Vietnamese prose:
-
-| Preview | URL | HTML | SHA-256 | Status |
-|---|---|---|---|---|
-| one preview identity | one live localhost URL | absolute `index.html` path | content digest | `đang chờ` or `đã chốt` |
-
-| Direction | Tab | Status |
-|---|---|---|
-| stable direction ID | visible tab label or selector | `đang chờ`, `đã chọn` or `đã từ chối` |
-
-Record the preview root, PID and selected port. After the user chooses a tab, append the selected
-direction, reason, acceptance states and rejections. Then invite `$starci-fe-design-review` to
-challenge and approve that brief before source changes begin.
+No tabbed HTML preview, separate Design Review or separate Design Apply exists. The JSON candidates,
+their rendered explanation, exact prompt/response objects and founder acceptance events are the
+review surface. Layout/Block feedback always opens a new immutable round.
 
 ## OUTPUT
 
 Use exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED`
-and `### OWED`.
-
-Print `OUTPUTS`, `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED` in that order.
-
-`OUTPUTS` names the brief and direction concepts. `CHANGES` details only the workflow and one
-`index.html`. Put the tab choice and single live URL in `NEED APPROVALS` until the user selects one.
-Write workflow prose and values in Vietnamese.
+and `### OWED`. Report session id, current unit, candidate/ref hashes, registry receipt and next
+worker. Never claim completion while a reachable required unit remains queued.

@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi FE Fidelity Finality"
-  short_description: "Finalize and close a fidelity session"
-  default_prompt: "Use $starci-fe-fidelity-finality to verify the End record and close the fidelity session."

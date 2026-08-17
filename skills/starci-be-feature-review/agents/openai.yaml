@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi BE Feature Review"
-  short_description: "Review a StarCi backend feature brief"
-  default_prompt: "Use $starci-be-feature-review to revise and approve a backend feature brief."

@@ -33,7 +33,7 @@ Only `ok: true`, strict canonical severities and no inline directives close Appl
 visible repair returns to Review.
 
 If an approved lint repair changes visible product source or runtime behavior, follow
-[`../starci-fe-design-review/references/live-flow-proof.md`](../starci-fe-design-review/references/live-flow-proof.md).
+[`../../fe/references/live-flow-proof.md`](../../fe/references/live-flow-proof.md).
 Use the declared app's authorized test account, run every affected flow, inspect UI, Network,
 Console and frontend/backend terminal output, and append `### LIVE FLOW PROOF`. Never record
 credentials or tokens. Config-only adoption with no product runtime delta records `not-applicable`

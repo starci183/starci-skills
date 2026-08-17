@@ -17,8 +17,8 @@ Print `CONTEXT` and read the approved drift Review. Confirm the record `Touching
 
 Append the approved verdicts, current evidence identities and routing to the drift workflow. If an
 approved verdict says a historical record needs annotation, append a dated migration note; never
-rewrite its original claim. Route fidelity drift to `$starci-fe-fidelity-start`, undecided product
-change to `$starci-fe-design-plan`, backend capability drift to `$starci-be-feature-plan`, and rule
+rewrite its original claim. Route frontend drift to `$starci-fe-design-plan`, backend capability
+drift to `$starci-be-feature-plan`, and rule
 failure to `$starci-fe-upgrade-plan`.
 
 Do not edit production source here.

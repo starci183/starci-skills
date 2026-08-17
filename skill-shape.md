@@ -1,26 +1,23 @@
 # skill shape
 
-Every capability is three skills, in this order:
+Lifecycles are explicit per capability; suffixes do not create a universal lifecycle.
 
 ```text
-Plan -> Review -> Apply
+FE design: Design Plan -> Layout rounds -> Block rounds -> Execute
+BE feature: Feature Plan -> Feature Approve
+Governance/data capabilities: their declared Plan -> Review -> Apply
 ```
 
-Plan researches and briefs. Review challenges the brief and revises it until approval. Apply first
-commits the current target state as its baseline, then writes the approved change and tracks the
-resulting diff. Every phase reads and appends the same workflow file; no phase creates a second record
-for the same task.
+Every worker reads and appends the same workflow/session; no worker creates a parallel task record.
+FE JSON rounds are the review surface: founder acceptance is hash-bound, and Execute begins only
+after all reachable layout/block units are accepted. Backend Approve contains a hard approval stop
+before its first production write. Existing governance/data trios retain their normal phase rules.
 
-Fidelity is the named exception. A bounded frontend repair uses one continuous session:
-
-```text
-Start -> Feedback* -> End -> Finality
-```
-
-Start opens the record and performs authorized in-boundary corrections as feedback arrives. End
-summarizes proof and scans related bugs but leaves the session open. Finality alone closes it. The
-three fidelity skills are `starci-fe-fidelity-start`, `starci-fe-fidelity-end` and
-`starci-fe-fidelity-finality`; old Plan/Review/Apply fidelity records remain historical evidence.
+Workspace setup is the second named exception. It is one skill, `starci-workspace-setup`, with
+internal Plan → Review → Apply stages in one continuous run. It writes only Source's ignored local
+`.workspace/` routing and its workflow record; it never edits a target repository. Missing identity,
+ambiguous paths, collisions or an expanded write boundary still stop at Review for one batched
+approval.
 
 ## CONTEXT — print before doing anything
 
@@ -45,9 +42,8 @@ is invalid because the workflow validator cannot identify its section.
 | Phase | `plan`, `review` or `apply` |
 | Touching | exact paths this phase may write |
 
-For fidelity session records, `Phase` is `start`, `feedback`, `end` or `finality`. Every event keeps
-the same `Session id`; `start`, `feedback` and `end` use `Session status: open`, while `finality`
-uses `Session status: finalized`.
+For FE design session records, `Phase` is `layout`, `block`, `execute` or `complete`. Every event
+keeps the same `Session id` and immutable object hashes.
 
 `Source` is the current Codex project context that owns `AGENTS.md`, `.claude` and `.workflows`; it is
 not automatically a target repository. Resolve `Trust`, `Skills` and `Workflow root` from `Source`;
@@ -78,28 +74,15 @@ Read the governing canon, contracts, live source and named references before pro
 Produce a brief: objective, evidence, boundaries, decisions, alternatives and acceptance evidence.
 Do not write production code.
 
-For FE Design with an undecided product choice, build one implementation-feasible `index.html` with
-two to four proposal tabs. Put it under
-`<Source>/.workflows/.previews/designs/<app>/<name>/<revision>/` and serve that directory on the first
-free localhost port starting at `8080`. A parity request includes a parity-first tab. Work with no
-real choice does not manufacture alternatives. This preview is inspectable Plan evidence, not
-production source or an Apply baseline.
-
-Track the single preview by URL, HTML path and SHA-256, then track each tab by direction ID and status.
-Plan completes only after the user can open the preview and switch every tab, the brief is written to
-the workflow, and Review has enough evidence to challenge every decision before Apply.
+For FE Design, Plan opens/resumes one hash-bound registry session and routes target surfaces to
+Layout. It does not create HTML previews. Layout and Block JSON rounds are the review surface; each
+round keeps exact prompt, response, candidates, feedback and founder verdict.
 
 ### Review
 
-Challenge the brief against the real contracts, components, fixtures and runtime boundaries. Resolve
-every decision that can make Apply diverge. FE Design Review creates no HTML, JSX, CSS, parallel
-design tree or production edit.
-
-FE Design Review must freeze two source-backed tables before approval: `COMPONENT DELTA` names every
-route, page, layout, overlay, block, composite, branch, leaf and shell as `REUSE`, `ADD`, `MODIFY`,
-`MOVE` or `REMOVE`; `PROPS DELTA` names every public prop/API action and all producers or call sites.
-No row may defer discovery to Apply. `REUSE` predicts no edit, while every other row predicts an
-exact baseline-to-worktree change.
+Challenge the brief against real contracts, components, fixtures and runtime boundaries. This
+generic Review phase applies only to capabilities that still declare Plan → Review → Apply; FE
+Design and Backend Feature use their explicit journeys above.
 
 Run the feedback loop until the user explicitly approves:
 
@@ -117,13 +100,8 @@ source, commit the current target state and record `Baseline commit: <sha>`. Thi
 the start of Apply: it captures the state before the approved change. Do not create a baseline from a
 partly edited implementation.
 
-Then implement the approved revision directly in target source. For FE Design, source is the only
-implementation: no design-code directory, detached HTML proposal or disposable component copy.
-Track `git diff <baseline>` throughout Apply. A required path outside `Touching` returns to Review as
-a finding; it never arrives quietly in the diff.
-
-For FE Design, reconcile that diff with every approved `COMPONENT DELTA` and `PROPS DELTA` row.
-Discovering a new owner, tier, path, prop or action returns to Review; Apply does not invent it.
+Then implement the approved revision directly in target source and track `git diff <baseline>`.
+A required path outside `Touching` returns to its decision owner; it never arrives quietly in the diff.
 
 Prove the result at the production boundary. Tests, renders and live calls prove different claims;
 run the ones the approved acceptance evidence names. Append the exact results to the workflow.
@@ -246,12 +224,11 @@ real `REJECTED` rows, deduplicates identical witnesses by workflow and phase, an
 
 ## Phase routing
 
-- Plan invites its sibling Review.
-- Review loops until explicit approval, then invites its sibling Apply.
-- Apply closes the capability or routes a newly discovered concern to that concern's Plan.
-- Fidelity repairs deviation from approved evidence; it does not redesign.
-- Fidelity Start fixes authorized feedback immediately inside the open session; End records proof
-  and scans related bugs; Finality closes the session.
+- FE Design Plan routes Layout rounds, Block rounds and then Execute; no preview/review/apply sibling exists.
+- Backend Feature Plan invites Feature Approve; Approve loops until explicit approval before coding.
+- Other declared Plan/Review/Apply capabilities keep their existing routing.
+- Workspace Setup completes its internal Plan, Review and Apply stages without routing to sibling
+  skills.
 - Upgrade changes future rules only after repeated workflow evidence passes Upgrade Review.
 
-No phase skips its sibling because the requested change looks small.
+No capability skips a declared decision boundary because the requested change looks small.

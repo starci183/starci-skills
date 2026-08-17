@@ -8,6 +8,49 @@ description: Bảng điểm phép thử giữ kín đáp án cho ba trang founde
 
 # Proofs — layouts
 
+## Net-new golden cases
+
+These cases test the new business-to-layout contract rather than reconstruction of a shipped screen.
+Each record preserves a raw prompt and contains three complete, schema-shaped candidates whose plans
+have exactly `business`, `main`, and `extends`.
+
+| Case | Prompt | Candidate axes |
+|---|---|---|
+| [Gift shop](./gift-shop.md) | Create a StarCi gift shop | discovery-first · balance-first · mission-first |
+| [Mentor booking](./mentor-booking.md) | Create mentor booking | mentor-first · availability-first · goal-first |
+| [Community events](./community-events.md) | Create community events | calendar-first · discovery-first · community-first |
+| [Team learning dashboard](./team-learning-dashboard.md) | Create a team learning dashboard | risk-first · progress-first · action-first |
+
+Validation target: `gate.schema.json#/$defs/LayoutPlanSet`. These are golden shape/decision proofs;
+they do not claim that proposed business blocks already exist in frontend source.
+
+### Runtime handoff shapes
+
+`recommendation.json` is advice and `decision.json` is the founder's authorization. Both bind to the
+reviewed candidate bytes by SHA-256:
+
+```json
+{
+  "recommendation.json": {
+    "decisionId": "gift-shop",
+    "recommendedCandidateId": "01",
+    "candidateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "reason": {
+      "why": "Discovery-first answers the unqualified shop prompt with the fewest extra assumptions.",
+      "anchorKind": "business-input",
+      "anchor": "input.json#/raw"
+    }
+  },
+  "decision.json": {
+    "decisionId": "gift-shop",
+    "chosenCandidateId": "01",
+    "candidateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "decidedBy": "founder",
+    "why": "Use discovery-first for the first materialization pass."
+  }
+}
+```
+
 > Gate: layouts · Ngày: 2026-08-16 · Phép thử: một agent đọc code ghi cấu trúc thật, một agent khác chỉ nhận yêu cầu nghiệp vụ cộng gate và dựng lại từ đầu.
 
 Trang này giữ hai lần chấm:

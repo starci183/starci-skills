@@ -1,0 +1,9 @@
+{
+  "case": "page-discovers-modal",
+  "layoutSets": [
+    { "surfaceId": "gift-shop", "origin": "root", "candidateIds": ["catalog-first", "balance-first", "mission-first"], "accepted": "catalog-first", "extends": ["redeem-confirmation"] },
+    { "surfaceId": "redeem-confirmation", "origin": "discovered", "kind": "modal", "candidateIds": ["summary-confirm", "two-step-confirm", "balance-impact-confirm"] }
+  ],
+  "surfaceGraph": { "nodes": ["gift-shop", "redeem-confirmation"], "edges": [{ "from": "gift-shop", "to": "redeem-confirmation", "kind": "extends", "trigger": "redeem-gift", "mount": "app-overlay-root" }] },
+  "expected": "accepting the page queues and fully designs the modal"
+}

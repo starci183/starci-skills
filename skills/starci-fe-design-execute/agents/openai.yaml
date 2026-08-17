@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Execute"
+  short_description: "Materialize accepted JSON through principles, patterns, lints and proof."
+  default_prompt: "Use $starci-fe-design-execute to implement the complete accepted design without new variants."

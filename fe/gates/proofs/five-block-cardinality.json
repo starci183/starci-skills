@@ -1,0 +1,14 @@
+{
+  "case": "five-block-cardinality",
+  "sourceLayout": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "blockSets": [
+    { "blockId": "welcome", "candidateIds": ["compact", "guided", "evidence-led"] },
+    { "blockId": "learning-progress", "candidateIds": ["timeline", "milestones", "next-action", "course-grid"] },
+    { "blockId": "daily-quest", "candidateIds": ["single-focus", "streak", "reward-led"] },
+    { "blockId": "mentor-access", "candidateIds": ["availability", "mentor-card", "goal-match", "calendar"] },
+    { "blockId": "community-events", "candidateIds": ["agenda", "featured-event", "topic-groups"] }
+  ],
+  "accepted": ["welcome:guided", "daily-quest:single-focus"],
+  "queued": ["learning-progress", "mentor-access", "community-events"],
+  "expected": "five independent sets totaling seventeen candidates; accepted blocks remain stable"
+}

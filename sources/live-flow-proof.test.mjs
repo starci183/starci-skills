@@ -5,9 +5,9 @@ import test from "node:test"
 import { fileURLToPath } from "node:url"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
-const REFERENCE = join(ROOT, "skills", "starci-fe-design-review", "references", "live-flow-proof.md")
+const REFERENCE = join(ROOT, "fe", "references", "live-flow-proof.md")
 const APPLY_SKILLS = [
-  "starci-fe-design-apply",
+  "starci-fe-design-execute",
   "starci-fe-consolidate-apply",
   "starci-fe-lint-sync-apply",
 ]

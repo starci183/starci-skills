@@ -83,6 +83,29 @@ test("a v2 Plan with context and six outputs is valid", () => {
   assert.deepEqual(validateWorkflow("designs/starci-academy/page.md", text), { legacy: false, errors: [] })
 })
 
+test("new FE design journey uses JSON session rounds without an HTML preview", () => {
+  const layoutContext = context.replace("| Phase | plan |", "| Phase | layout |")
+  const text = `<!-- starci-workflow: v2 -->
+
+# page
+
+## plan
+
+${context}
+Session id: design-1
+Registry branch: codex/fe-design-registry
+${outputs}
+
+## layout
+
+${layoutContext}
+Session id: design-1
+Layout round: page-a-round-1
+Candidate hashes: aaa, bbb, ccc
+${outputs}`
+  assert.deepEqual(validateWorkflow("designs/starci-academy/page.md", text), { legacy: false, errors: [] })
+})
+
 test("Design Plan allows one preview URL only", () => {
   const duplicatedPreview = proposals.replace(
     "| learn-r1 | http://127.0.0.1:8080/ | /preview/index.html | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | đang chờ |",

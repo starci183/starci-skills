@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.academy/schema/fe/gates/session.schema.json",
+  "title": "StarCi FE iterative design session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sessionId", "project", "status", "roots", "activeUnit", "events", "checkpoint"],
+  "properties": {
+    "sessionId": { "$ref": "#/$defs/Id" },
+    "project": { "$ref": "#/$defs/Id" },
+    "status": { "enum": ["layout", "block", "execute", "complete"] },
+    "roots": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } },
+    "activeUnit": { "$ref": "#/$defs/UnitRef" },
+    "events": { "type": "array", "items": { "$ref": "#/$defs/Event" } },
+    "checkpoint": { "$ref": "#/$defs/Checkpoint" },
+    "registryReceipt": { "$ref": "#/$defs/RegistryReceipt" }
+  },
+  "$defs": {
+    "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "Hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "Timestamp": { "type": "string", "format": "date-time" },
+    "UnitRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gate", "surfaceId", "unitId"],
+      "properties": {
+        "gate": { "enum": ["layouts", "blocks", "principles", "patterns", "lints"] },
+        "surfaceId": { "$ref": "#/$defs/Id" }, "blockId": { "$ref": "#/$defs/Id" }, "unitId": { "$ref": "#/$defs/Id" }
+      }
+    },
+    "Round": {
+      "type": "object", "additionalProperties": false,
+      "required": ["roundId", "unit", "promptHash", "responseHash", "candidateHashes", "createdAt"],
+      "properties": {
+        "roundId": { "$ref": "#/$defs/Id" }, "unit": { "$ref": "#/$defs/UnitRef" },
+        "promptHash": { "$ref": "#/$defs/Hash" }, "responseHash": { "$ref": "#/$defs/Hash" },
+        "basedOnHash": { "$ref": "#/$defs/Hash" }, "deltaHash": { "$ref": "#/$defs/Hash" },
+        "candidateHashes": { "type": "array", "minItems": 3, "maxItems": 4, "uniqueItems": true, "items": { "$ref": "#/$defs/Hash" } },
+        "verdict": { "enum": ["pending", "approved", "rejected", "alter"] },
+        "decisionHash": { "$ref": "#/$defs/Hash" }, "rejectionHashes": { "type": "array", "items": { "$ref": "#/$defs/Hash" } },
+        "createdAt": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "WhitelistRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unit", "objectHash", "decisionHash", "acceptedBy", "acceptedAt"],
+      "properties": {
+        "unit": { "$ref": "#/$defs/UnitRef" }, "objectHash": { "$ref": "#/$defs/Hash" }, "decisionHash": { "$ref": "#/$defs/Hash" },
+        "acceptedBy": { "const": "founder" }, "acceptedAt": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "Event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "type", "unit", "objectHash", "at"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "type": { "enum": ["prompted", "candidates-created", "feedback-received", "approved", "rejected", "reopened", "returned-to-owner"] },
+        "unit": { "$ref": "#/$defs/UnitRef" }, "objectHash": { "$ref": "#/$defs/Hash" },
+        "basedOnHash": { "$ref": "#/$defs/Hash" }, "at": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "Checkpoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lastSequence", "openUnits", "headHashes"],
+      "properties": {
+        "lastSequence": { "type": "integer", "minimum": 0 }, "openUnits": { "type": "array", "items": { "$ref": "#/$defs/UnitRef" } },
+        "headHashes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/Hash" } }
+      }
+    },
+    "RegistryReceipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["commit", "manifestHash", "lastSequence"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" }, "manifestHash": { "$ref": "#/$defs/Hash" },
+        "lastSequence": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ReturnToOwner": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "ownerGate", "targetId", "reason", "inputHashes"],
+      "properties": {
+        "status": { "const": "returned-to-owner" }, "ownerGate": { "enum": ["layouts", "blocks"] },
+        "targetId": { "$ref": "#/$defs/Id" }, "blockId": { "$ref": "#/$defs/Id" }, "reason": { "type": "string", "minLength": 8 },
+        "inputHashes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Hash" } }
+      }
+    }
+  }
+}

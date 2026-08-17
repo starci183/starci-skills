@@ -77,4 +77,5 @@ a handler default: a guess in a handler is a decision nobody made and nobody can
 Print the six canonical tables. `OUTPUTS` names the capability brief and architecture concept;
 `CHANGES` details the workflow path only. Put every product rule that can be wrong in
 `NEED APPROVALS`, never in a handler default. Append `## plan` with the CONTEXT, proposed file tree,
-test matrix, assumptions and exclusions. Then invite `$starci-be-feature-review`.
+test matrix, assumptions and exclusions. Then invite `$starci-be-feature-approve`, which performs
+the explicit approval loop before any production write.

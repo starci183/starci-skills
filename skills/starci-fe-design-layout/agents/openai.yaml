@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Layout"
+  short_description: "Generate 3–4 complete JSON layouts per surface and iterate to acceptance."
+  default_prompt: "Use $starci-fe-design-layout for the active surface round."

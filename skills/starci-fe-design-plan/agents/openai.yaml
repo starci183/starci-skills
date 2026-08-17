@@ -1,4 +1,4 @@
 interface:
-  display_name: "StarCi FE Design Plan"
-  short_description: "Render one tabbed FE preview"
-  default_prompt: "Use $starci-fe-design-plan to research and serve one trackable HTML preview with direction tabs for user selection."
+  display_name: "StarCi FE Design Journey"
+  short_description: "Orchestrate layout, block and exact execution from immutable JSON decisions."
+  default_prompt: "Use $starci-fe-design-plan to start or resume the hash-bound FE design journey."

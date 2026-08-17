@@ -70,7 +70,7 @@ group of unlike parts is `SURFACE-IN-SURFACE-4` until repeated real cases justif
 | `action-priority` | `ordinary-local` · `separately-proven-primary` · `unknown` |
 
 `host`, `child` and `membership` decide the boundary. `action-priority` is consulted only for
-`SURFACE-IN-SURFACE-6`, and only the [action sense](../../../senses/call-to-action/INDEX.md) may raise
+`SURFACE-IN-SURFACE-6`, and only the [call-to-action intent](../../../intent/call-to-action/INDEX.md) may raise
 it. No gap, padding, margin or inset value is an input or an output of this module.
 
 A membership is **nameable** when you can state its name, its members, its own state and its own
@@ -88,7 +88,7 @@ no members and no outcome.
 - A section whose children already own boundaries claims none of its own.
 - An overlay already owns its task boundary; its ordinary content is flat.
 - A single control is never wrapped in a surface. A control is not a group.
-- An ordinary nested action stays secondary; only the action sense may promote it.
+- An ordinary nested action stays secondary; only call-to-action intent may promote it.
 - Ready, loading, empty, error and responsive states preserve boundary ownership. The object count a
   skeleton draws equals the object count the settled content draws.
 - One container makes at most one boundary claim; two claims about one membership need nesting, not
@@ -109,7 +109,7 @@ applies to.
 - **An ordinary action inside a surface.** `SURFACE-IN-SURFACE-6`, even when it is the only control
   present and even when it sits bottom-right.
 - **Primary promotion requested.** Keep `SURFACE-IN-SURFACE-6` until the
-  [action sense](../../../senses/call-to-action/INDEX.md) proves one host-level primary outcome.
+  [call-to-action intent](../../../intent/call-to-action/INDEX.md) proves one host-level primary outcome.
 - **Two bordered objects touch.** Keep the boundaries separate. Adjacency is not membership; only row
   comparability turns them into `SURFACE-IN-SURFACE-2`.
 - **State change.** Loading, empty and error renders keep the code the settled render has. A skeleton

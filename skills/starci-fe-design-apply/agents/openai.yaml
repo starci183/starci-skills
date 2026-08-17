@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi FE Design Apply"
-  short_description: "Apply and live-test the approved FE delta"
-  default_prompt: "Use $starci-fe-design-apply to commit the baseline, implement only the approved component and props delta, then log in with the declared test persona and prove UI, Network, Console and terminal evidence for every affected flow."

@@ -614,7 +614,7 @@ nâng cấp: vị trí dưới-phải không phải bằng chứng.
 - **Là thành phần điều khiển duy nhất cũng không tự lên chính.** Duy nhất là một dữ kiện về số lượng, không phải
   một dữ kiện về ưu tiên.
 - **Không tự đổi sang cách thể hiện nổi hơn.** Nâng cấp phải do
-  [cảm nhận về hành động](../../../senses/call-to-action/INDEX.md) chứng minh; nếu chưa có chứng minh, giữ mã `6`
+  [ý định CTA](../../../intent/call-to-action/INDEX.md) chứng minh; nếu chưa có chứng minh, giữ mã `6`
   và ghi lại yêu cầu.
 - **Trạng thái `disabled` hay `loading` không đổi mã.** Ranh giới không đổi khi nút đang chờ.
 
@@ -750,7 +750,7 @@ dừng. Câu trả lời phải là một chuỗi class CSS hoặc một câu h�
 | "Nội dung thường bên trong hộp thoại." | Phần tử chồng lớp đã sở hữu ranh giới tác vụ | `SURFACE-IN-SURFACE-4` | `bg-transparent shadow-none` |
 
 Ở hai dòng cuối, thứ bị từ chối không phải yêu cầu mà là **thiếu bằng chứng**: nâng cấp cần
-[cảm nhận về hành động](../../../senses/call-to-action/INDEX.md), và ranh giới cần một quan hệ nhóm gọi được tên.
+[ý định CTA](../../../intent/call-to-action/INDEX.md), và ranh giới cần một quan hệ nhóm gọi được tên.
 
 ## Bảng phân định ranh giới
 

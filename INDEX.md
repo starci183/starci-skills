@@ -1,13 +1,18 @@
 # The canon, v2
 
+Before using this index, read [`common/config/INDEX.md`](common/config/INDEX.md). The trust tree has
+exactly three rules registries: [`common/`](common/config/registry.md), [`fe/`](fe/) and [`be/`](be/).
+Skills, sources and scripts execute those rules; they are not parallel registries.
+
 The rules this codebase is written by, one file per concept, filed on an axis.
 
 Read [`HOW-TO-WRITE.md`](HOW-TO-WRITE.md) before adding or changing anything here. It states the
 shape every file takes and, more importantly, what a file must never carry.
 
-Before running any skill, read [`skill-shape.md`](skill-shape.md). Capabilities follow
-**Plan -> Review -> Apply**, except fidelity's continuous **Start -> Feedback* -> End -> Finality**
-session. Every phase or fidelity event prints `CONTEXT` first, then closes with `OUTPUTS`,
+Before running any skill, read [`skill-shape.md`](skill-shape.md). Lifecycles are capability-specific:
+FE design is a JSON decision journey, backend feature work is Plan -> Approve, and existing
+governance/data capabilities retain their declared phases. Every phase or event prints `CONTEXT`
+first, then closes with `OUTPUTS`,
 `CHANGES`, `NEED APPROVALS`, `WARNINGS`, `REJECTED` and `OWED`. `OUTPUTS` carries concepts;
 `CHANGES` carries the detailed code tree. One task is one append-only file at
 `<Source>/.workflows/<kind>/<app>/<id>.md`. `Source` is the current backend AGENTS/project context;
@@ -19,19 +24,28 @@ before the first write; whether an old task still matches the source is asked af
 is a deliberate trade: preventing drift cost a hash per file and phases that refused to finish, and
 finding it costs one skill run.
 
-## The capability trios
+## Capability journeys
 
-| Capability | Plan | Review | Apply |
+| Capability | Entry | Decision worker | Executor |
 |---|---|---|---|
-| Backend feature | [`starci-be-feature-plan`](skills/starci-be-feature-plan/SKILL.md) | [`starci-be-feature-review`](skills/starci-be-feature-review/SKILL.md) | [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md) |
+| Backend feature | [`starci-be-feature-plan`](skills/starci-be-feature-plan/SKILL.md) | — | [`starci-be-feature-approve`](skills/starci-be-feature-approve/SKILL.md) |
 | Data backup | [`starci-data-backup-plan`](skills/starci-data-backup-plan/SKILL.md) | [`starci-data-backup-review`](skills/starci-data-backup-review/SKILL.md) | [`starci-data-backup-apply`](skills/starci-data-backup-apply/SKILL.md) |
 | Data restore | [`starci-data-restore-plan`](skills/starci-data-restore-plan/SKILL.md) | [`starci-data-restore-review`](skills/starci-data-restore-review/SKILL.md) | [`starci-data-restore-apply`](skills/starci-data-restore-apply/SKILL.md) |
 | FE consolidation | [`starci-fe-consolidate-plan`](skills/starci-fe-consolidate-plan/SKILL.md) | [`starci-fe-consolidate-review`](skills/starci-fe-consolidate-review/SKILL.md) | [`starci-fe-consolidate-apply`](skills/starci-fe-consolidate-apply/SKILL.md) |
-| FE design | [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) | [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) | [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) |
-| FE fidelity | [`starci-fe-fidelity-start`](skills/starci-fe-fidelity-start/SKILL.md) | [`starci-fe-fidelity-end`](skills/starci-fe-fidelity-end/SKILL.md) | [`starci-fe-fidelity-finality`](skills/starci-fe-fidelity-finality/SKILL.md) |
+| FE design | [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) | [`layout`](skills/starci-fe-design-layout/SKILL.md) → [`block`](skills/starci-fe-design-block/SKILL.md) | [`execute`](skills/starci-fe-design-execute/SKILL.md) |
 | FE lint sync | [`starci-fe-lint-sync-plan`](skills/starci-fe-lint-sync-plan/SKILL.md) | [`starci-fe-lint-sync-review`](skills/starci-fe-lint-sync-review/SKILL.md) | [`starci-fe-lint-sync-apply`](skills/starci-fe-lint-sync-apply/SKILL.md) |
 | Trust upgrade | [`starci-fe-upgrade-plan`](skills/starci-fe-upgrade-plan/SKILL.md) | [`starci-fe-upgrade-review`](skills/starci-fe-upgrade-review/SKILL.md) | [`starci-fe-upgrade-apply`](skills/starci-fe-upgrade-apply/SKILL.md) |
 | Workflow drift | [`starci-workflow-drift-plan`](skills/starci-workflow-drift-plan/SKILL.md) | [`starci-workflow-drift-review`](skills/starci-workflow-drift-review/SKILL.md) | [`starci-workflow-drift-apply`](skills/starci-workflow-drift-apply/SKILL.md) |
+
+Workspace routing uses the single continuous
+[`starci-workspace-setup`](skills/starci-workspace-setup/SKILL.md) skill; its Plan, Review and Apply
+stages stay inside one run.
+
+[`common/config/workspace.md`](common/config/workspace.md) defines how
+`start <project> <role...>` resolves ignored, per-machine
+`.workspace/<project>/<role>/config.json` routes. The trust tree carries only the path-free loading
+protocol and schema; real paths remain in the parent Source repository's ignored `.workspace/`
+tree.
 
 ## The axes
 
@@ -50,7 +64,7 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 | **principles** | Which primitive facts must implementation never violate? The binding construction rules — closed, non-subjective outputs such as spacing, colour, type, position, responsive behavior and surface ownership. | `fe/gates/principles/` |
 | **senses** | What does the reader PERCEIVE, and which contextual product judgement selects among otherwise legal choices? Actions, hierarchy, input behavior, affordance and restraint. | `fe/senses/` |
 | **governance** | How are exceptions and observable parity recorded without becoming visual law? | `fe/governance/` |
-| **creativity** | How are researched alternatives generated, challenged and selected without escaping canon? | `fe/creativity/` |
+| **intent** | Which honest user outcome, evidence and friction should guide legal layout/block choices? | `fe/intent/` |
 | **baselines** | What does ONE screen already promise its users? Named product behaviour a parity request must preserve. Names its product, unlike every shelf above. | `fe/baselines/` |
 | **references** | What does the outside world say? Vendor docs, platform behaviour, prior art. Cited, never paraphrased into law. | `fe/references/` |
 
@@ -120,14 +134,12 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 Still owed, each with the evidence that says so: `migrations`, `pagination`, `concurrency`,
 `throttling`.
 
-Backend capability work follows **Plan -> Review -> Apply**, for the same reason the frontend does: a
-folder architecture is arguable in a sentence and the same decisions embedded in thirty written
-files are arguable only by whoever reads all thirty.
+Backend capability work follows **Plan -> Approve**. A folder architecture is settled while it is
+still a brief; Approve challenges it and obtains explicit owner approval before writing code.
 [`starci-be-feature-plan`](skills/starci-be-feature-plan/SKILL.md) reads the law, dumps the
 schema unfiltered, mirrors the sibling family and stops with every file named and every test case
-enumerated. [`starci-be-feature-review`](skills/starci-be-feature-review/SKILL.md) challenges and
-revises that brief until one exact tree is approved. [`starci-be-feature-apply`](skills/starci-be-feature-apply/SKILL.md)
-writes those files and no others.
+enumerated. [`starci-be-feature-approve`](skills/starci-be-feature-approve/SKILL.md) challenges and
+revises that brief, obtains approval, then writes those files and no others.
 
 Three shelves stand where `design/` used to. One folder was answering three different kinds of
 question, and a path that says `design` tells a reader nothing about which kind they are holding.
@@ -169,23 +181,17 @@ states a contextual reason rather than a primitive fact stays in `senses/`.
 Reading principles and senses without canon leaves a reader with taste and no spelling; reading canon
 without them leaves them able to type a legal value for the wrong reason.
 
-`fe/creativity/` is the operating workflow for page and flow invention. Start at
-[`creativity/INDEX.md`](fe/creativity/INDEX.md). It uses canon as fixed grammar, principles and
-senses as judgement,
-backend behavior as business truth and the contract `why` plus existing components as reuse
-evidence. It is not another canon shelf. Net-new UI and work that still needs a product or
-composition choice follow **Plan -> Review revisions -> Apply**. Three task procedures execute it
-across four explicit scopes (`page`, `layout`, `block`, `overlay`) without blurring their owners:
+Frontend invention follows the five-gate journey in [`fe/gates/`](fe/gates/INDEX.md), informed by
+[`fe/intent/`](fe/intent/INDEX.md) and bounded by contracts/backend truth:
 
-- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) reads live contracts, shipped
-  components and named references, then renders one disposable `index.html` with two to four
-  direction tabs, serves one URL on the first free port from 8080 and tracks its path/hash.
-- [`starci-fe-design-review`](skills/starci-fe-design-review/SKILL.md) challenges the selected brief,
-  then freezes every component-tree action and public-prop migration with source/call-site evidence
-  before one exact revision is approved. It writes no production source.
-- [`starci-fe-design-apply`](skills/starci-fe-design-apply/SKILL.md) commits the current target state
-  as the before-state, writes only the approved component/props delta directly in final source paths,
-  and closes by matching every row to the baseline diff, rendered states and tests.
+- [`starci-fe-design-plan`](skills/starci-fe-design-plan/SKILL.md) opens/resumes the session and routes
+  the current unit; it creates no disposable HTML preview lifecycle.
+- [`starci-fe-design-layout`](skills/starci-fe-design-layout/SKILL.md) produces 3–4 JSON layouts for
+  every root or discovered surface until hashes are accepted.
+- [`starci-fe-design-block`](skills/starci-fe-design-block/SKILL.md) produces 3–4 detailed JSON
+  render candidates independently per block until hashes are accepted.
+- [`starci-fe-design-execute`](skills/starci-fe-design-execute/SKILL.md) runs principles, patterns and
+  lints, then implements exactly the accepted design without new variants.
 
 Duplication is the other thing a build leaves behind, and it is not a defect list: two files holding
 one shape say the vocabulary had no word for it. It is a second pair, split for the same reason as
@@ -207,14 +213,8 @@ Merging two shapes that merely look alike is worse than the duplication: it prod
 a flag per call site. Two blocks over different domain entities that render identically are not one
 block — the shape is a composite and the meaning stays where it is.
 
-A bounded parity, interaction or runtime defect uses one continuous session.
-[`starci-fe-fidelity-start`](skills/starci-fe-fidelity-start/SKILL.md) records binding evidence and
-comparison identity immediately, then corrects in-boundary feedback as it arrives.
-[`starci-fe-fidelity-end`](skills/starci-fe-fidelity-end/SKILL.md) reruns proof, writes the session
-summary and scans related bugs without closing the session.
-[`starci-fe-fidelity-finality`](skills/starci-fe-fidelity-finality/SKILL.md) verifies the End record
-and closes it. If ownership, CTA, behavior or reusable vocabulary becomes undecided, the open
-session routes that finding to Design Plan without losing its context.
+A bounded FE change also enters Design Plan with an already-settled target; it may reuse accepted
+layout/block hashes and proceed to Execute. There is no separate fidelity lifecycle.
 
 ## What holds a law
 

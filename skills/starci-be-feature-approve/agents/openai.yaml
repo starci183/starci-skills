@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi BE Feature Approve"
+  short_description: "Approve, implement and prove one planned backend feature."
+  default_prompt: "Use $starci-be-feature-approve to challenge the backend plan, obtain approval, then implement and prove only that boundary."

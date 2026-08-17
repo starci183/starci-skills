@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi FE Block"
+  short_description: "Generate 3–4 detailed JSON renders independently per block."
+  default_prompt: "Use $starci-fe-design-block for the active accepted layout."

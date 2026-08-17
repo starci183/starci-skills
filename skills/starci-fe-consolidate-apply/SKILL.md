@@ -48,7 +48,7 @@ for the thing that now has one word, and the next survey will find it and rank i
 **Prove nothing moved.** Render every measured call site before and after in the same state — same
 route, viewport, locale, theme, persona and fixture. Then typecheck, lint, focused tests and build.
 When the browser refuses to composite, take the fallback in
-[`../starci-fe-design-review/references/state-coverage.md`](../starci-fe-design-review/references/state-coverage.md)
+[`../../fe/references/state-coverage.md`](../../fe/references/state-coverage.md)
 before recording a call site as unproven: parity here is proved by images, so the camera failing is
 the one failure this half must not accept on the first try.
 
@@ -56,7 +56,7 @@ Green tests are not the proof, and saying so is the point of the half: no unit t
 screen looked like yesterday, so a merge that quietly restyles one caller passes all of them.
 
 When a measured call site is authenticated or runtime-backed, follow
-[`../starci-fe-design-review/references/live-flow-proof.md`](../starci-fe-design-review/references/live-flow-proof.md).
+[`../../fe/references/live-flow-proof.md`](../../fe/references/live-flow-proof.md).
 Use the declared app's authorized test account, run the real affected flow, inspect UI, Network,
 Console and frontend/backend terminal output, and append `### LIVE FLOW PROOF`. Never record a
 credential or token. An unexplained failed request, console error or terminal error breaks parity

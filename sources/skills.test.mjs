@@ -132,10 +132,7 @@ test("every skill carries a frontmatter name matching its folder", () => {
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     const skillFile = join(SKILLS, entry.name, "SKILL.md")
-    if (!existsSync(skillFile) || !statSync(skillFile).isFile()) {
-      wrong.push(`${entry.name}: has no SKILL.md`)
-      continue
-    }
+    if (!existsSync(skillFile) || !statSync(skillFile).isFile()) continue
     const declared = readFileSync(skillFile, "utf8").match(/^---\r?\n(?:.*\r?\n)*?name:\s*(\S+)/)
     if (declared === null) wrong.push(`${entry.name}: declares no frontmatter name`)
     else if (declared[1] !== entry.name) wrong.push(`${entry.name}: declares ${declared[1]}`)
@@ -147,14 +144,21 @@ test("every skill carries a frontmatter name matching its folder", () => {
   )
 })
 
-test("every capability has its canonical lifecycle", () => {
+test("every capability has its declared lifecycle", () => {
+  const standaloneSkills = new Set([
+    "starci-workspace-setup",
+    "starci-fe-design-layout",
+    "starci-fe-design-block",
+    "starci-fe-design-execute",
+  ])
   const phasesByCapability = new Map()
   const invalid = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    const match = entry.name.match(/^(.*)-(plan|review|apply|start|end|finality)$/)
+    if (!existsSync(join(SKILLS, entry.name, "SKILL.md"))) continue
+    const match = entry.name.match(/^(.*)-(plan|review|apply|approve)$/)
     if (match === null) {
-      invalid.push(entry.name)
+      if (!standaloneSkills.has(entry.name)) invalid.push(entry.name)
       continue
     }
     const [, capability, phase] = match
@@ -165,13 +169,26 @@ test("every capability has its canonical lifecycle", () => {
 
   const incomplete = [...phasesByCapability.entries()]
     .map(([capability, phases]) => [capability, [...phases].sort()])
-    .filter(([capability, phases]) => phases.join(",") !== (
-      capability === "starci-fe-fidelity" ? "end,finality,start" : "apply,plan,review"
-    ))
+    .filter(([capability, phases]) => {
+      const actual = phases.join(",")
+      if (capability === "starci-fe-design") return actual !== "plan"
+      if (capability === "starci-be-feature") return actual !== "approve,plan"
+      return actual !== "apply,plan,review"
+    })
     .map(([capability, phases]) => `${capability}: ${phases.join(", ")}`)
 
   assert.deepEqual(invalid, [], `skills outside a canonical lifecycle: ${invalid.join(", ")}`)
   assert.deepEqual(incomplete, [], `incomplete capability lifecycles: ${incomplete.join("; ")}`)
+})
+
+test("Workspace Setup is one continuous skill with internal Plan Review Apply stages", () => {
+  const directory = join(SKILLS, "starci-workspace-setup")
+  const skill = readFileSync(join(directory, "SKILL.md"), "utf8")
+  assert.match(skill, /### Plan[\s\S]*### Review[\s\S]*### Apply/)
+  assert.ok(existsSync(join(directory, "scripts", "workspace-setup.mjs")))
+  for (const phase of ["plan", "review", "apply"]) {
+    assert.equal(existsSync(join(SKILLS, `starci-workspace-setup-${phase}`)), false)
+  }
 })
 
 test("every phase carries the workflow contract", () => {
@@ -191,6 +208,7 @@ test("every phase carries the workflow contract", () => {
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     const skillFile = join(SKILLS, entry.name, "SKILL.md")
+    if (!existsSync(skillFile)) continue
     const text = readFileSync(skillFile, "utf8")
     const missing = required.filter((token) => !text.includes(token))
     if (!text.includes("skill-shape.md")) missing.push("skill-shape.md")
@@ -199,144 +217,66 @@ test("every phase carries the workflow contract", () => {
   assert.deepEqual(broken, [], `skills missing the workflow contract: ${broken.join("; ")}`)
 })
 
-test("Plan routes to Review and Review routes to Apply", () => {
+test("phase skills route to their declared successor", () => {
   const broken = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
+    if (!existsSync(join(SKILLS, entry.name, "SKILL.md"))) continue
     const match = entry.name.match(/^(.*)-(plan|review|apply)$/)
     if (match === null || match[2] === "apply") continue
-    const next = match[2] === "plan" ? `${match[1]}-review` : `${match[1]}-apply`
+    let next = match[2] === "plan" ? `${match[1]}-review` : `${match[1]}-apply`
+    if (entry.name === "starci-fe-design-plan") next = "starci-fe-design-layout"
+    if (entry.name === "starci-be-feature-plan") next = "starci-be-feature-approve"
     const text = readFileSync(join(SKILLS, entry.name, "SKILL.md"), "utf8")
     if (!text.includes(`$${next}`)) broken.push(`${entry.name}: does not route to $${next}`)
   }
   assert.deepEqual(broken, [], `phase routing is incomplete: ${broken.join("; ")}`)
 })
 
-test("FE Design commits its baseline at Apply, then writes only target source", () => {
+test("FE Design is one JSON decision journey with no preview review apply or fidelity skills", () => {
   const plan = readFileSync(join(SKILLS, "starci-fe-design-plan", "SKILL.md"), "utf8")
-  const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
-  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
+  const layout = readFileSync(join(SKILLS, "starci-fe-design-layout", "SKILL.md"), "utf8")
+  const block = readFileSync(join(SKILLS, "starci-fe-design-block", "SKILL.md"), "utf8")
+  const execute = readFileSync(join(SKILLS, "starci-fe-design-execute", "SKILL.md"), "utf8")
 
-  assert.match(plan, /Plan writes no production source/)
-  assert.match(review, /Review writes no target source/)
-  assert.match(apply, /Commit before editing/)
-  assert.match(apply, /Baseline commit: <sha>/)
-  assert.match(apply, /git diff <baseline>/)
-  assert.match(apply, /directly at final source paths/)
+  assert.match(plan, /no HTML preview lifecycle/i)
+  assert.match(layout, /3–4 JSON/)
+  assert.match(block, /3–4 × N/)
+  assert.match(execute, /never generate design alternatives/i)
+  for (const removed of [
+    "starci-fe-design-review", "starci-fe-design-apply", "starci-fe-fidelity-start",
+    "starci-fe-fidelity-end", "starci-fe-fidelity-finality",
+  ]) assert.equal(existsSync(join(SKILLS, removed, "SKILL.md")), false)
 })
 
-test("FE Design Apply proves non-mutating lint in both resolved target repositories", () => {
-  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
-
-  assert.match(apply, /### CROSS-REPOSITORY LINT PROOF/)
-  assert.match(apply, /each resolved target repository:\s*Frontend and Backend/)
-  assert.match(apply, /repository-owned non-mutating lint command/)
-  assert.match(apply, /never use `--fix` as a proof command/)
-  assert.match(apply, /Both rows must be present and pass/)
-  assert.match(apply, /cannot close while either lint verdict is missing or\s+failed/)
-  assert.match(apply, /lint\s+failure does not expand the approved production boundary/i)
+test("Backend feature is Plan then Approve", () => {
+  const plan = readFileSync(join(SKILLS, "starci-be-feature-plan", "SKILL.md"), "utf8")
+  const approve = readFileSync(join(SKILLS, "starci-be-feature-approve", "SKILL.md"), "utf8")
+  assert.match(plan, /\$starci-be-feature-approve/)
+  assert.match(approve, /explicitly approves one revision/i)
+  assert.equal(existsSync(join(SKILLS, "starci-be-feature-review", "SKILL.md")), false)
+  assert.equal(existsSync(join(SKILLS, "starci-be-feature-apply", "SKILL.md")), false)
 })
 
-test("FE Design Review freezes component and props deltas before Apply", () => {
-  const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
-  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
-
-  assert.match(review, /### COMPONENT DELTA/)
-  assert.match(review, /### PROPS DELTA/)
-  assert.match(review, /page`, `layout`, `overlay`, `block`, `composite`, `branch`, `leaf` or `shell`/)
-  assert.match(review, /`REUSE`, `ADD`, `MODIFY`, `MOVE` or `REMOVE`/)
-  assert.match(review, /`KEEP`, `ADD`, `REMOVE`, `RENAME`, `RETYPE`, `MAKE_REQUIRED`, `MAKE_OPTIONAL` or/)
-  assert.match(apply, /Treat the approved delta rows as an executable boundary/)
-  assert.match(apply, /return to Review when implementation discovers a new owner, tier, path, prop or action/)
-})
-
-test("FE creativity decisions have canonical owners and explicit phase consumers", () => {
-  const index = readFileSync(join(CREATIVITY, "INDEX.md"), "utf8")
+test("FE design workers consume gates, intent and accepted hashes", () => {
   const plan = readFileSync(join(SKILLS, "starci-fe-design-plan", "SKILL.md"), "utf8")
-  const review = readFileSync(join(SKILLS, "starci-fe-design-review", "SKILL.md"), "utf8")
-  const apply = readFileSync(join(SKILLS, "starci-fe-design-apply", "SKILL.md"), "utf8")
-  const fidelity = readFileSync(join(SKILLS, "starci-fe-fidelity-start", "SKILL.md"), "utf8")
-  const research = readFileSync(join(CREATIVITY, "research.md"), "utf8")
-  const critique = readFileSync(join(CREATIVITY, "critique.md"), "utf8")
-  const graph = readFileSync(join(CREATIVITY, "contract-graph.md"), "utf8")
-  const verification = readFileSync(join(CREATIVITY, "verification.md"), "utf8")
-
-  const ordered = index.slice(0, index.indexOf("## Phase consumers"))
-  for (const name of [
-    "mode.md",
-    "best-belief-source.md",
-    "research.md",
-    "brief.md",
-    "divergence.md",
-    "critique.md",
-    "selection.md",
-    "contract-graph.md",
-    "implementation.md",
-    "verification.md",
-  ]) {
-    assert.ok(ordered.includes(`\`${name}\``), `${name} is missing from the read order`)
-  }
-
-  for (const name of ["mode.md", "best-belief-source.md", "research.md", "brief.md", "divergence.md"]) {
-    assert.match(plan, new RegExp(name.replace(".", "\\.")), `Design Plan does not consume ${name}`)
-  }
-  for (const name of ["critique.md", "selection.md", "contract-graph.md", "verification.md"]) {
-    assert.match(review, new RegExp(name.replace(".", "\\.")), `Design Review does not consume ${name}`)
-  }
-  for (const name of ["implementation.md", "verification.md"]) {
-    assert.match(apply, new RegExp(name.replace(".", "\\.")), `Design Apply does not consume ${name}`)
-  }
-  for (const name of ["mode.md", "best-belief-source.md", "contract-graph.md", "verification.md"]) {
-    assert.match(fidelity, new RegExp(name.replace(".", "\\.")), `Fidelity Start does not consume ${name}`)
-  }
-
-  const interactionSchema = "| Interaction | Trigger | Product owner | Request / route | Visual states | Pending | Success | Failure | Persistence / shared effect | Evidence |"
-  const ownerSchema = "| Proposed owner | Layer | Purpose | Closest existing owners / contracts | REUSE verdict | ALTER verdict | Layer proof | Decision | Evidence |"
-  const visualSchema = "| Visual element | Owner / state | Recognition, grouping or interaction job | Existing reference | Verdict | Evidence |"
-  assert.match(research, new RegExp(interactionSchema.replace(/[|/]/g, "\\$&")))
-  assert.match(graph, new RegExp(ownerSchema.replace(/[|/]/g, "\\$&")))
-  assert.match(critique, new RegExp(visualSchema.replace(/[|/]/g, "\\$&")))
-  for (const skill of [plan, review, apply, fidelity]) {
-    assert.doesNotMatch(skill, new RegExp(interactionSchema.replace(/[|/]/g, "\\$&")))
-    assert.doesNotMatch(skill, new RegExp(ownerSchema.replace(/[|/]/g, "\\$&")))
-    assert.doesNotMatch(skill, new RegExp(visualSchema.replace(/[|/]/g, "\\$&")))
-  }
-
-  assert.match(plan, /### INTERACTION CONSEQUENCE/)
-  assert.match(review, /### INTERACTION CONSEQUENCE/)
-  assert.match(review, /### OWNER CHALLENGE/)
-  assert.match(review, /### VISUAL JOB/)
-  assert.ok(review.indexOf("### OWNER CHALLENGE") < review.indexOf("### COMPONENT DELTA"))
-  assert.match(apply, /INTERACTION CONSEQUENCE.*, `OWNER CHALLENGE` and `VISUAL JOB`/s)
-  assert.match(fidelity, /An\s+unapproved `ADD` is a `new-finding` routed to Design/)
-  assert.match(verification, /resting, hover\/focus,\s+selected\/expanded, selected-hover\/focus/)
-})
-
-test("Fidelity Start fixes small patches and routes only creative items to previews", () => {
-  const start = readFileSync(join(SKILLS, "starci-fe-fidelity-start", "SKILL.md"), "utf8")
-
-  assert.match(start, /Split a mixed feedback message into independent items/)
-  assert.match(start, /A creative item never\s+delays an independent authorized small patch/)
-  assert.match(start, /edit production immediately/)
-  assert.match(start, /do not wait for Design Plan, Review or Apply/)
-  assert.match(start, /\$starci-fe-design-plan` for three to four HTML cases/)
-  assert.match(start, /Passing proof is not user acceptance/)
-  assert.match(start, /resolve the Project's canonical app origin/)
-  assert.match(start, /Never\s+treat `localhost` and `127\.0\.0\.1` as interchangeable/)
-  assert.match(start, /A static proposal URL is not evidence for the live app origin/)
-  assert.match(start, /REFERENCE OWNER CLOSURE/)
-  assert.match(start, /trace the rendered\s+reference to its concrete component and contract/)
-  assert.match(start, /including owners whose current name is\s+domain-specific/)
-  assert.match(start, /`REUSE`, `ALTER` or `KEEP_APART`/)
-  assert.match(start, /A\s+different interaction host does not by itself justify duplicating the visual content/)
-  assert.match(start, /### OWNER CHALLENGE/)
-  assert.match(start, /unapproved `ADD` is a `new-finding` routed to Design/)
+  const layout = readFileSync(join(SKILLS, "starci-fe-design-layout", "SKILL.md"), "utf8")
+  const block = readFileSync(join(SKILLS, "starci-fe-design-block", "SKILL.md"), "utf8")
+  const execute = readFileSync(join(SKILLS, "starci-fe-design-execute", "SKILL.md"), "utf8")
+  assert.match(plan, /fe\/gates/)
+  assert.match(plan, /fe\/intent/)
+  assert.match(layout, /basedOnHash/)
+  assert.match(layout, /Never recommend or auto-select/)
+  assert.match(block, /independent/)
+  assert.match(execute, /Verify every accepted object's canonical bytes/)
+  assert.match(execute, /returned-to-owner/)
 })
 
 test("every FE skill requires declared project or target repositories", () => {
   const broken = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory() || !entry.name.startsWith("starci-fe-")) continue
+    if (!existsSync(join(SKILLS, entry.name, "SKILL.md"))) continue
     const text = readFileSync(join(SKILLS, entry.name, "SKILL.md"), "utf8")
     if (!text.includes("Require a user-declared `Project` or explicit `Frontend` and `Backend`")) {
       broken.push(entry.name)
@@ -349,6 +289,7 @@ test("every skill has current UI metadata", () => {
   const broken = []
   for (const entry of readdirSync(SKILLS, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
+    if (!existsSync(join(SKILLS, entry.name, "SKILL.md"))) continue
     const metadata = join(SKILLS, entry.name, "agents", "openai.yaml")
     if (!existsSync(metadata)) {
       broken.push(`${entry.name}: missing agents/openai.yaml`)

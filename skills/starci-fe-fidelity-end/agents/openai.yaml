@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi FE Fidelity End"
-  short_description: "Prove and summarize an open fidelity session"
-  default_prompt: "Use $starci-fe-fidelity-end to run closing proof, write the session summary and scan related bugs without closing the session."

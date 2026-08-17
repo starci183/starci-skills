@@ -229,7 +229,7 @@ minh** nó là kết quả chính. Nó nhận cách thể hiện thứ cấp: m�
 
 - `SURFACE-IN-SURFACE-4`: một thành phần điều khiển **không phải** một nhóm, nên nó không sinh ra lớp bọc bề mặt.
   Bọc một cái nút bằng một cái khung là tuyên bố một quan hệ nhóm chỉ có một thành viên.
-- nâng cấp: chỉ [cảm nhận về hành động](../../../senses/call-to-action/INDEX.md) mới được nâng nó lên chính.
+- nâng cấp: chỉ [ý định CTA](../../../intent/call-to-action/INDEX.md) mới được nâng nó lên chính.
   Vị trí dưới-phải, chữ to, hay việc nó là thành phần điều khiển duy nhất **đều không** phải bằng chứng.
 
 **Tình huống nghiệp vụ hay gặp.** Nút "Thử lại" trong thẻ lỗi · "Xem tất cả" ở chân thẻ danh sách ·
@@ -269,7 +269,7 @@ mã nó áp dụng vào.
 - **Hành động thường trong bề mặt.** `SURFACE-IN-SURFACE-6`, kể cả khi nó là thành phần điều khiển duy nhất, kể cả
   khi nó nằm ở góc dưới bên phải.
 - **Có yêu cầu nâng cấp lên chính.** Giữ `SURFACE-IN-SURFACE-6` cho tới khi
-  [cảm nhận về hành động](../../../senses/call-to-action/INDEX.md) chứng minh được một kết quả chính ở cấp bề mặt chứa.
+  [ý định CTA](../../../intent/call-to-action/INDEX.md) chứng minh được một kết quả chính ở cấp bề mặt chứa.
 - **Hai đối tượng có đường viền chạm nhau.** Giữ hai ranh giới tách rời. Nằm cạnh nhau **không** phải
   quan hệ nhóm; chỉ tính so sánh được của hàng mới biến chúng thành `SURFACE-IN-SURFACE-2`.
 - **Đổi trạng thái.** Đang tải, rỗng, lỗi giữ nguyên mã của trạng thái đã settle. Khung chờ làm phẳng

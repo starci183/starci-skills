@@ -1,0 +1,7 @@
+{
+  "case": "one-page-layout",
+  "inputTargets": [{ "surfaceId": "gift-shop", "kind": "page" }],
+  "layoutSets": [{ "surfaceId": "gift-shop", "origin": "root", "candidateIds": ["catalog-first", "balance-first", "mission-first"] }],
+  "whitelistBeforeDecision": [],
+  "expected": "exactly one independent set of three candidates"
+}

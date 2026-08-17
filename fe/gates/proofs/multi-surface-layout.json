@@ -1,0 +1,9 @@
+{
+  "case": "multi-surface-layout",
+  "inputTargets": [{ "surfaceId": "dashboard", "kind": "page" }, { "surfaceId": "mentor-booking", "kind": "page" }],
+  "layoutSets": [
+    { "surfaceId": "dashboard", "origin": "root", "candidateIds": ["progress-first", "action-first", "community-first", "focus-first"] },
+    { "surfaceId": "mentor-booking", "origin": "root", "candidateIds": ["mentor-first", "time-first", "goal-first"] }
+  ],
+  "expected": "two independent sets totaling seven candidates, never application-wide combinations"
+}
