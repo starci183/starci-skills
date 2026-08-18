@@ -11,14 +11,15 @@ if (relative(siteRoot, contentRoot) !== "content") {
   throw new Error(`Refusing to replace unexpected path: ${contentRoot}`);
 }
 
-// A module leads with `en.md`, or with the required `SKILL.md` in a skill directory, and publishes
-// whichever human records sit beside it, in sidebar order.
+// The public site exposes human publications only for paired modules. Compact context.md records stay
+// in the trust tree for agent runtime and are deliberately absent from Nextra routes and navigation.
+// Skills additionally expose their binding SKILL.md as an explicit agent page.
 const RECORDS = ["vi"];
 const RECORD_LABELS = {
-  vi: "Human (VI)",
+  vi: "VI",
 };
 
-const SKILL_RUNTIME_NOTICE = `> **Agent runtime — English only.** This \`SKILL.md\` is the binding entry. When this skill loads a paired module, read \`en.md\`. **Never load \`vi.md\` during a skill run**; it is a human translation published for review, not runtime instructions.\n`;
+const SKILL_RUNTIME_NOTICE = `> **Agent runtime — English only.** This \`SKILL.md\` is the binding entry. When this skill loads a paired module, read \`context.md\`. The complete \`en.md\` and \`vi.md\` records are human publications, not runtime instructions.\n`;
 
 // Segments that are acronyms, not words. Capitalising only the first letter turns them into
 // something nobody in the repository says out loud.
@@ -103,7 +104,19 @@ async function discoverModules(root, prefix = "") {
     const names = new Set(await readdir(here));
     const binding = names.has("en.md") ? "en.md" : names.has("SKILL.md") ? "SKILL.md" : null;
     if (binding) {
-      found.push({id, binding, records: RECORDS.filter((record) => names.has(`${record}.md`))});
+      const isSkill = names.has("SKILL.md");
+      const records = RECORDS
+        .filter((record) => names.has(`${record}.md`))
+        .map((record) => ({route: record, source: `${record}.md`, label: RECORD_LABELS[record]}));
+      if (isSkill && binding === "en.md") {
+        records.push({route: "agent", source: "SKILL.md", label: "Agent (EN)"});
+      }
+      found.push({
+        id,
+        binding,
+        indexLabel: binding === "en.md" ? "EN" : "Agent (EN)",
+        records,
+      });
       continue;
     }
     if (!prefix) found.push(...(await discoverModules(here, entry.name)));
@@ -123,7 +136,12 @@ async function discoverGroup(group) {
   const names = new Set(await readdir(shelf));
   // The route mirrors the source path, so a reader who sees `compilers/principles/gap` in the site
   // can open exactly that directory in the tree. A published page is never at an invented address.
-  return {...group, route: group.source, modules: found, own: {en: names.has("en.md"), vi: names.has("vi.md")}};
+  return {
+    ...group,
+    route: group.source,
+    modules: found,
+    own: {en: names.has("en.md"), vi: names.has("vi.md")},
+  };
 }
 
 function groupNavigation(group) {
@@ -196,7 +214,7 @@ await Promise.all(
     ...group.modules.flatMap((module) => [
       publish(`${group.source}/${module.id}/${module.binding}`, `${group.route}/${module.id}/index.mdx`),
       ...module.records.map((record) =>
-        publish(`${group.source}/${module.id}/${record}.md`, `${group.route}/${module.id}/${record}.mdx`)
+        publish(`${group.source}/${module.id}/${record.source}`, `${group.route}/${module.id}/${record.route}.mdx`)
       ),
     ]),
   ])
@@ -224,7 +242,7 @@ await Promise.all([
   ),
   ...publishedGroups.flatMap((group) => [
     writeMeta(`${group.route}/_meta.js`, {
-      index: group.own.en ? "Agent (EN)" : "Overview",
+      index: group.own.en ? "EN" : "Overview",
       ...(group.own.vi ? {vi: RECORD_LABELS.vi} : {}),
       ...Object.fromEntries(groupNavigation(group).directModules.map((module) => [module.id, label(module.id)])),
       ...Object.fromEntries([...groupNavigation(group).families.keys()].map((family) => [family, label(family)])),
@@ -237,8 +255,8 @@ await Promise.all([
     ),
     ...group.modules.map((module) =>
       writeMeta(`${group.route}/${module.id}/_meta.js`, {
-        index: "Agent (EN)",
-        ...Object.fromEntries(module.records.map((record) => [record, RECORD_LABELS[record]])),
+        index: module.indexLabel,
+        ...Object.fromEntries(module.records.map((record) => [record.route, record.label])),
       })
     ),
   ]),

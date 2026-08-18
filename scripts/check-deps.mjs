@@ -307,7 +307,7 @@ const parsed = new Map();
 for (const file of files) {
   const text = readFileSync(file, "utf8");
   const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const isSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/](?:SKILL|vi)\.md$/.test(file);
+  const isSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/](?:SKILL|en|vi)\.md$/.test(file);
   const isBindingSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/]SKILL\.md$/.test(file);
   const isRuntimeModule = file.endsWith(`${sep}context.md`);
   const lane = laneFor(file);
@@ -357,7 +357,7 @@ for (const [file, en] of parsed) {
     }
   }
   const runtime = checkContextFile(file);
-  if (!runtime.ok) report(runtime.contextPath, 1, runtime.reason);
+  if (!existsSync(join(dirname(file), "SKILL.md")) && !runtime.ok) report(runtime.contextPath, 1, runtime.reason);
 }
 
 for (const [file, skill] of parsed) {
@@ -377,6 +377,18 @@ for (const [file, skill] of parsed) {
   const codes = (lines) => [...new Set(lines.join("\n").match(/\b[A-Z][A-Z0-9-]*-[0-9]+\b/g) ?? [])].sort();
   if (JSON.stringify(codes(skill.lines)) !== JSON.stringify(codes(vi.lines))) {
     report(viPath, 1, "situation codes differ from SKILL.md");
+  }
+  const enPath = join(dirname(file), "en.md");
+  const en = parsed.get(enPath);
+  if (!en) {
+    report(file, 1, "missing English skill publication");
+    continue;
+  }
+  if (JSON.stringify(aliasesFor(skill.loads.rows)) !== JSON.stringify(aliasesFor(en.loads.rows))) {
+    report(enPath, Math.max(en.loads.start + 1, 1), "LOADS logical dependencies differ from SKILL.md");
+  }
+  if (JSON.stringify(outline(skill.lines)) !== JSON.stringify(outline(en.lines))) {
+    report(enPath, 1, "section count or order differs from SKILL.md");
   }
 }
 

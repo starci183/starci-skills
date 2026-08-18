@@ -202,6 +202,8 @@ all three without allowing one lane to cross-load another.
 ## Documentation site
 
 The site is generated from the records; files under `docs/content/` are generated, not hand-authored.
+Module navigation publishes only `EN` and `VI`; compact `context.md` files remain runtime-only and do
+not become Nextra pages. Skill navigation additionally publishes `SKILL.md` as `Agent (EN)`.
 
 ```bash
 cd docs

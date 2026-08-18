@@ -122,8 +122,9 @@ agent loads. The human records match section for section and neither is an alter
 shelf may carry the same three records, with its `context.md` acting as the runtime router.
 
 Every capability follows the same publication rule without changing the runtime contract: `SKILL.md`
-remains the binding agent entry, while `vi.md` beside it is the complete Vietnamese record for a human
-reader. Both publish under the capability's own route.
+remains the binding agent entry, while `en.md` and `vi.md` beside it are the complete English and
+Vietnamese records for human readers. All three publish under the capability's own route; agents still
+load only `SKILL.md`.
 
 **A running skill loads runtime records only:** its binding `SKILL.md`, then `context.md` for every
 paired module it needs. It never loads `en.md` or `vi.md`; both are human-facing publication, not

@@ -2,14 +2,16 @@
 
 The site is generated from the tree; nothing under `content/` is hand-authored.
 
-A module is a directory holding `en.md` — the binding rules an agent reads, and the module's own
-page — with `vi.md` beside it as the human guide:
+A paired module keeps three separate source records:
 
 ```text
 compilers/principles/gap/
-├─ en.md   # binding rules, English, for the agent
-└─ vi.md   # Vietnamese guide: the business situation behind each code
+├─ en.md       # EN — published in Nextra
+├─ vi.md       # VI — published in Nextra
+└─ context.md  # agent runtime only — not published in Nextra
 ```
+
+A skill directory publishes `en.md` as EN, `vi.md` as VI, and its binding `SKILL.md` as Agent (EN).
 
 Which shelves are public is decided in one place, [`publication.mjs`](publication.mjs). A new shelf
 becomes a documented shelf by adding one entry there — no page, no route, no sidebar to write.

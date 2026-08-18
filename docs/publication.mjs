@@ -10,8 +10,9 @@
 //   description one line under the shelf heading
 //
 // A module is any directory holding `en.md`, or a skill directory holding its required `SKILL.md`.
-// That file is the binding record and the module's own page. `vi.md` beside it is published as the
-// human guide; a module without one simply has no second page. One level of family nesting is
+// Paired modules publish `en.md` as EN and `vi.md` as VI. Their compact `context.md` remains an agent
+// runtime record in the trust tree and is not published into Nextra navigation. Skills additionally
+// publish their binding `SKILL.md` as Agent (EN). One level of family nesting is
 // allowed, so `laws/b1-one-surface-owner` publishes with `laws` as its own sidebar group.
 export const groups = [
   {

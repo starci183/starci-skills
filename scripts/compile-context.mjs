@@ -160,6 +160,7 @@ function discoverSources(target) {
   if (!existsSync(absolute)) throw new Error(`target does not exist: ${target}`);
   if (statSync(absolute).isFile()) {
     if (basename(absolute) !== "en.md") throw new Error(`source file must be named en.md: ${target}`);
+    if (existsSync(join(dirname(absolute), "SKILL.md"))) return [];
     return [absolute];
   }
   const sources = [];
@@ -167,7 +168,7 @@ function discoverSources(target) {
     if (entry.name === ".git" || entry.name === "docs") continue;
     const path = join(absolute, entry.name);
     if (entry.isDirectory()) sources.push(...discoverSources(path));
-    else if (entry.isFile() && entry.name === "en.md") sources.push(path);
+    else if (entry.isFile() && entry.name === "en.md" && !existsSync(join(absolute, "SKILL.md"))) sources.push(path);
   }
   return sources;
 }
