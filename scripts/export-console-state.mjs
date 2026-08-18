@@ -327,7 +327,10 @@ function readContractHealth(row) {
   const featured = keys.filter((k) => !k.endsWith("-page") && /^(flashcard|profile|course|learn|playground|personal|coding|billing|auth|weekly|mock|fleet)-/.test(k));
   // A `why` that starts by describing states a shape; one that starts with a condition states a need,
   // which is the only form a later lookup can match.
-  const needShaped = whys.filter((w) => /^(if |when |a reader |the reader )/i.test(w)).length;
+  // "if you need X" is the canonical phrasing, but "Use when you need X" and "Reach for this when
+  // you need X" carry the same need-condition one clause later — a reader who only matched sentences
+  // that OPEN with the trigger word missed the two phrasings real authors actually use.
+  const needShaped = whys.filter((w) => /^(if |when |a reader |the reader |use (this |it )?when you need|reach for (this|it) (when|if) you need)/i.test(w)).length;
   return {
     entries: keys.length,
     pages: pages.length,
