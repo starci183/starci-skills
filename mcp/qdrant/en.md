@@ -32,7 +32,7 @@ The command prints names and paths only, never the key.
 Compose runs Qdrant, one-shot deterministic indexers and one official-server-derived MCP container. The
 only extension is the Ollama embedding provider required to use the owner's 8B model. The server uses
 streamable HTTP and `QDRANT_READ_ONLY=true`. The client JSON contains the canonical
-`https://mcp.<zone>/mcp` URL and no credential; localhost port 8011 remains a local diagnostic surface.
+`https://mcp.<zone>/mcp/` URL and no credential; localhost port 8011 remains a local diagnostic surface.
 
 ## Stop and recover
 

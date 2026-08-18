@@ -27,8 +27,8 @@ route vẫn quyết định vị trí source; Git vẫn quyết định nội du
 - MCP source-context chạy read-only. Chỉ indexer deterministic được refresh dữ liệu.
 - Credential được đọc từ file plaintext đã gitignore của backend route sau `npm run sync`; không sao chép giá
   trị vào MCP JSON, argument, output hay file tracked.
-- Dùng `https://mcp.<zone>/mcp` làm endpoint chuẩn cho client của zone đã chọn. Chỉ giữ
-  `http://localhost:8011/mcp` để health check và phục hồi trên chính máy chạy stack.
+- Dùng `https://mcp.<zone>/mcp/` làm endpoint chuẩn cho client của zone đã chọn. Chỉ giữ
+  `http://localhost:8011/mcp/` để health check và phục hồi trên chính máy chạy stack.
 - Chỉ publish cổng HTTP của MCP qua tunnel Cloudflare remotely managed dùng chung
   `starci-local-services`. Cổng Qdrant và Ollama API luôn private.
 - Cloudflare API token và tunnel run token chỉ thuộc các SOPS ciphertext trong
@@ -44,7 +44,7 @@ node .claude/scripts/qdrant-source-context.mjs plan   --project <project> --role
 node .claude/scripts/qdrant-source-context.mjs setup  --project <project> --roles be,fe
 ```
 
-Client record sinh ra dùng `https://mcp.<zone>/mcp` đã cấu hình. Trước khi publish, operator kiểm tra endpoint
+Client record sinh ra dùng `https://mcp.<zone>/mcp/` đã cấu hình. Trước khi publish, operator kiểm tra endpoint
 local; sau đó reconcile hostname đó tới `http://host.docker.internal:8011` qua tunnel dùng chung. Với Source
 này, `<zone>` là `starci.org`.
 

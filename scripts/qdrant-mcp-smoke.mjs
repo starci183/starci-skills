@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const url = process.argv[2] ?? "http://localhost:8011/mcp";
+const url = process.argv[2] ?? "http://localhost:8011/mcp/";
 const headers = {
   accept: "application/json, text/event-stream",
   "content-type": "application/json",

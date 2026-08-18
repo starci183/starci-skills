@@ -27,8 +27,8 @@ Vector dùng tên `ollama-qwen3-embedding-8b`. Cả lúc index lẫn lúc MCP qu
 
 ## Biên publish
 
-Pattern endpoint remote chuẩn là `https://mcp.<zone>/mcp`; endpoint chẩn đoán local là
-`http://localhost:8011/mcp`. Cloudflare đưa hostname qua tunnel remotely managed dùng chung
+Pattern endpoint remote chuẩn là `https://mcp.<zone>/mcp/`; endpoint chẩn đoán local là
+`http://localhost:8011/mcp/`. Cloudflare đưa hostname qua tunnel remotely managed dùng chung
 `starci-local-services` tới `http://host.docker.internal:8011`. Chỉ MCP được publish: Qdrant REST, Qdrant
 gRPC và Ollama không bao giờ là tunnel origin.
 
@@ -42,7 +42,7 @@ không được thay thế service khác trên tunnel dùng chung.
 
 - `plan` resolve route, chủ stack, collection và prerequisite mà không ghi.
 - `config` ghi Compose, environment và client JSON cục bộ vào `.worktrees/source-context/cache/mcp/`; truyền
-  `--public-url https://mcp.<zone>/mcp` khi Source không dùng StarCi zone mặc định.
+  `--public-url https://mcp.<zone>/mcp/` khi Source không dùng StarCi zone mặc định.
 - `index` chạy indexer bằng container, tải embedding model nếu máy chưa có, dựng các projection và ghi manifest không chứa giá trị bên
   cạnh client JSON.
 - `setup` chạy config, khởi động Qdrant, index rồi khởi động MCP đúng thứ tự; `down` chỉ dừng stack này.
@@ -51,13 +51,13 @@ Cấu hình client Codex/OpenAI:
 
 ```toml
 [mcp_servers.starci-source-context]
-url = "https://mcp.<zone>/mcp"
+url = "https://mcp.<zone>/mcp/"
 ```
 
 Cài cấu hình user scope cho Claude Code bằng:
 
 ```text
-claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp
+claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp/
 ```
 
 Không chạy `index` lên alias thiếu prefix `starci-context-`. Không bật MCP store tool cho source collection.

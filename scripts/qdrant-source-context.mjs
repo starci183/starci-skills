@@ -16,7 +16,7 @@ const COLLECTION = "starci-context-v1";
 const MODEL = "qwen3-embedding:8b";
 const DIMENSIONS = 4096;
 const OLLAMA_URL = "http://host.docker.internal:11434";
-const DEFAULT_PUBLIC_MCP_URL = "https://mcp.starci.org/mcp";
+const DEFAULT_PUBLIC_MCP_URL = "https://mcp.starci.org/mcp/";
 
 const fail = (message) => {
   console.error(`qdrant-source-context: ${message}`);
@@ -33,14 +33,14 @@ if (!project || !/^[a-z0-9][a-z0-9-]*$/.test(project)) fail("--project must be a
 if (roles.length === 0 || roles.some((role) => !/^[a-z][a-z0-9-]*$/.test(role))) fail("--roles must contain workspace roles");
 try {
   const parsedPublicUrl = new URL(publicMcpUrl);
-  if (parsedPublicUrl.protocol !== "https:" || parsedPublicUrl.pathname !== "/mcp" || parsedPublicUrl.search || parsedPublicUrl.hash || parsedPublicUrl.username || parsedPublicUrl.password) {
-    fail("--public-url must be an HTTPS origin ending at /mcp without credentials, query or fragment");
+  if (parsedPublicUrl.protocol !== "https:" || parsedPublicUrl.pathname !== "/mcp/" || parsedPublicUrl.search || parsedPublicUrl.hash || parsedPublicUrl.username || parsedPublicUrl.password) {
+    fail("--public-url must be an HTTPS origin ending at /mcp/ without credentials, query or fragment");
   }
 } catch {
   fail("--public-url must be a valid HTTPS MCP URL");
 }
 if (!["plan", "config", "index", "up", "down", "setup"].includes(action)) {
-  fail("usage: qdrant-source-context.mjs <plan|config|index|up|down|setup> --project <name> --roles <be,fe> [--public-url https://mcp.<zone>/mcp]");
+  fail("usage: qdrant-source-context.mjs <plan|config|index|up|down|setup> --project <name> --roles <be,fe> [--public-url https://mcp.<zone>/mcp/]");
 }
 
 const readJson = (path, label) => {
@@ -193,7 +193,7 @@ if (action === "plan") {
   console.log(`project partitions: ${roles.map((role) => `/${role}/${project}`).join(", ")}`);
   console.log(`shared collection: ${COLLECTION}`);
   console.log(`dedicated qdrant: http://localhost:${restPort} (gRPC ${grpcPort})`);
-  console.log(`MCP local diagnostic: http://localhost:${mcpPort}/mcp`);
+  console.log(`MCP local diagnostic: http://localhost:${mcpPort}/mcp/`);
   console.log(`MCP canonical: ${publicMcpUrl}`);
   console.log(`encrypted key: ${encryptedKey} (${existsSync(encryptedKey) ? "ready" : "will mint"})`);
   for (const route of routes) console.log(`/${route.role}/${project}: ${route.diskPath}`);

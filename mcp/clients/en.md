@@ -7,7 +7,7 @@ title: MCP client setup
 ## Shared rule
 
 Configure both supported clients after the public MCP smoke passes. Use the same server name
-`starci-source-context` and the same `https://mcp.<zone>/mcp` endpoint. The localhost URL is only a diagnostic
+`starci-source-context` and the same `https://mcp.<zone>/mcp/` endpoint. The localhost URL is only a diagnostic
 fallback on the Docker host. Do not write Cloudflare, Qdrant or Ollama credentials into either client config.
 
 ## Codex and OpenAI desktop clients
@@ -17,7 +17,7 @@ extension share it. Merge this table without replacing unrelated user settings:
 
 ```toml
 [mcp_servers.starci-source-context]
-url = "https://mcp.<zone>/mcp"
+url = "https://mcp.<zone>/mcp/"
 required = true
 enabled_tools = ["qdrant-find"]
 ```
@@ -32,7 +32,7 @@ client-install step.
 Install the same remote Streamable HTTP server at user scope so it is available across the owner's projects:
 
 ```text
-claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp
+claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp/
 claude mcp get starci-source-context
 claude mcp list
 ```
@@ -48,3 +48,9 @@ Read existing entries before adding. When the same name already targets the acce
 it differs, report the old and new non-secret URLs before replacement. Completion requires both clients to
 connect, list only the read tool, and return a routed `/<role>/<project>/` semantic result. A browser GET is
 not an MCP health test; Streamable HTTP expects MCP protocol requests and may reject ordinary navigation.
+
+Use the idempotent installer after DNS is live:
+
+```text
+node .claude/scripts/mcp-client-setup.mjs --url https://mcp.<zone>/mcp/
+```

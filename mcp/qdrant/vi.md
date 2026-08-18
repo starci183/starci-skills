@@ -31,7 +31,7 @@ in tên và đường dẫn, không in key.
 
 Compose chạy Qdrant, các indexer deterministic one-shot và một MCP container dẫn xuất từ server chính thức. Phần
 mở rộng duy nhất là Ollama embedding provider để dùng model 8B của chủ máy. Server dùng streamable HTTP và
-`QDRANT_READ_ONLY=true`. Client JSON chứa URL chuẩn `https://mcp.<zone>/mcp` và không chứa credential;
+`QDRANT_READ_ONLY=true`. Client JSON chứa URL chuẩn `https://mcp.<zone>/mcp/` và không chứa credential;
 cổng localhost 8011 chỉ là bề mặt chẩn đoán cục bộ.
 
 ## Dừng và phục hồi

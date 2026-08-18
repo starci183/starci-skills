@@ -7,7 +7,7 @@ title: Cài MCP vào client
 ## Luật dùng chung
 
 Cấu hình cả hai client sau khi public MCP smoke pass. Dùng cùng server name `starci-source-context` và cùng
-endpoint `https://mcp.<zone>/mcp`. URL localhost chỉ là fallback chẩn đoán trên máy chạy Docker. Không ghi
+endpoint `https://mcp.<zone>/mcp/`. URL localhost chỉ là fallback chẩn đoán trên máy chạy Docker. Không ghi
 Cloudflare, Qdrant hoặc Ollama credential vào config của bất kỳ client nào.
 
 ## Codex và client desktop OpenAI
@@ -17,7 +17,7 @@ file này. Merge table sau mà không thay setting khác của user:
 
 ```toml
 [mcp_servers.starci-source-context]
-url = "https://mcp.<zone>/mcp"
+url = "https://mcp.<zone>/mcp/"
 required = true
 enabled_tools = ["qdrant-find"]
 ```
@@ -31,7 +31,7 @@ này trong hosted ChatGPT phải publish plugin riêng, nằm ngoài bước cà
 Cài cùng remote Streamable HTTP server ở user scope để dùng được trong mọi project của chủ máy:
 
 ```text
-claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp
+claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp/
 claude mcp get starci-source-context
 claude mcp list
 ```
@@ -46,3 +46,9 @@ không sửa tay hoặc thay cả file khi CLI dùng được. Chỉ dùng proje
 báo URL cũ và mới không chứa secret trước khi thay. Chỉ hoàn tất khi cả hai client connect, chỉ list read tool
 và trả semantic result có route `/<role>/<project>/`. Browser GET không phải MCP health test; Streamable HTTP
 chờ MCP protocol request và có thể từ chối navigation bình thường.
+
+Sau khi DNS hoạt động, dùng installer idempotent:
+
+```text
+node .claude/scripts/mcp-client-setup.mjs --url https://mcp.<zone>/mcp/
+```

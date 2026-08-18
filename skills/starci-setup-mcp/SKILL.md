@@ -15,6 +15,7 @@ description: Set up the Source-wide read-only StarCi source-context MCP from ver
 | `@embedding` | `mcp/embedding` | module | hardware-based Ollama installation and model selection |
 | `@clients` | `mcp/clients` | module | Codex/OpenAI and Claude Code client installation |
 | `@source-context` | `scripts/qdrant-source-context.mjs` | script | deterministic Docker setup and partition refresh |
+| `@client-setup` | `scripts/mcp-client-setup.mjs` | script | idempotent public smoke plus both client installations |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | value-safe tunnel and DNS reconciliation |
 
 ## NESTED SKILLS
@@ -52,10 +53,10 @@ only; Qdrant REST/gRPC and Ollama stay private.
 
 ## Clients
 
-After the public smoke test passes, read `@clients` and configure both Codex/OpenAI and Claude Code with the
-same canonical endpoint. Merge `~/.codex/config.toml` for Codex and use `claude mcp add --transport http
---scope user` for Claude Code. Keep localhost only for health checks. Do not switch either client before an
-MCP initialize and `tools/list` request succeed publicly.
+After the public route exists, read `@clients` and run `@client-setup --url https://mcp.<zone>/mcp/`. The
+helper protocol-smokes the endpoint, merges `~/.codex/config.toml` for Codex/OpenAI, installs Claude Code at
+user scope, and verifies the Claude connection. Keep localhost only for health checks. Do not switch either
+client before an MCP initialize and `tools/list` request succeed publicly.
 
 ## Proof
 

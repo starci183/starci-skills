@@ -27,8 +27,8 @@ the source-location authority; Git remains the source-content authority; Qdrant 
 - Launch source-context MCP read-only. Refresh happens only through the deterministic indexer.
 - Read credentials from the routed backend stack's ignored plaintext file after `npm run sync`; never copy a
   value into MCP JSON, arguments, output or a tracked file.
-- Treat `https://mcp.<zone>/mcp` as the canonical client endpoint for the selected zone. Keep
-  `http://localhost:8011/mcp` only for machine-local health checks and recovery.
+- Treat `https://mcp.<zone>/mcp/` as the canonical client endpoint for the selected zone. Keep
+  `http://localhost:8011/mcp/` only for machine-local health checks and recovery.
 - Publish only the MCP HTTP port through the Source-wide, remotely managed
   `starci-local-services` Cloudflare tunnel. Qdrant ports and the Ollama API remain private.
 - Own Cloudflare API and tunnel run tokens only as SOPS ciphertext under `.workspace/credentials/`.
@@ -44,7 +44,7 @@ node .claude/scripts/qdrant-source-context.mjs plan   --project <project> --role
 node .claude/scripts/qdrant-source-context.mjs setup  --project <project> --roles be,fe
 ```
 
-The generated client record uses the configured `https://mcp.<zone>/mcp`. Operators may test the local
+The generated client record uses the configured `https://mcp.<zone>/mcp/`. Operators may test the local
 endpoint before publishing, then reconcile that hostname to `http://host.docker.internal:8011` through the
 shared tunnel. For this Source, `<zone>` is `starci.org`.
 

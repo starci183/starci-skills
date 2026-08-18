@@ -14,6 +14,7 @@ title: starci-setup-mcp
 | `@embedding` | `mcp/embedding` | module | cài Ollama và chọn model theo phần cứng |
 | `@clients` | `mcp/clients` | module | cài client Codex/OpenAI và Claude Code |
 | `@source-context` | `scripts/qdrant-source-context.mjs` | script | setup Docker và refresh partition deterministic |
+| `@client-setup` | `scripts/mcp-client-setup.mjs` | script | public smoke và cài cả hai client theo cách idempotent |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | reconcile tunnel và DNS mà không lộ value |
 
 ## NESTED SKILLS
@@ -51,10 +52,10 @@ REST/gRPC và Ollama luôn private.
 
 ## Các client
 
-Sau khi public smoke test pass, đọc `@clients` và cấu hình cả Codex/OpenAI lẫn Claude Code bằng cùng endpoint
-chuẩn. Merge `~/.codex/config.toml` cho Codex và dùng `claude mcp add --transport http --scope user` cho
-Claude Code. Endpoint localhost chỉ dùng cho health check. Không chuyển client nào sang URL public trước khi
-MCP initialize và `tools/list` chạy thành công tại đó.
+Sau khi public route tồn tại, đọc `@clients` và chạy `@client-setup --url https://mcp.<zone>/mcp/`. Helper
+protocol-smoke endpoint, merge `~/.codex/config.toml` cho Codex/OpenAI, cài Claude Code ở user scope và xác
+minh Claude connected. Endpoint localhost chỉ dùng cho health check. Không chuyển client nào sang URL public
+trước khi MCP initialize và `tools/list` chạy thành công tại đó.
 
 ## Proof
 

@@ -27,8 +27,8 @@ a narrow `EmbeddingProvider` adapter supplies Ollama because upstream currently 
 
 ## Publication boundary
 
-The canonical remote pattern is `https://mcp.<zone>/mcp`; the local diagnostic endpoint is
-`http://localhost:8011/mcp`. Cloudflare routes the hostname through the shared remotely managed
+The canonical remote pattern is `https://mcp.<zone>/mcp/`; the local diagnostic endpoint is
+`http://localhost:8011/mcp/`. Cloudflare routes the hostname through the shared remotely managed
 `starci-local-services` tunnel to `http://host.docker.internal:8011`. This publishes MCP only: Qdrant REST,
 Qdrant gRPC and Ollama are never tunnel origins.
 
@@ -42,7 +42,7 @@ it must not replace other services on the shared tunnel.
 
 - `plan` resolves routes, stack ownership, collections and prerequisites without writing.
 - `config` writes machine-local Compose, environment and client JSON under `.worktrees/source-context/cache/mcp/`;
-  pass `--public-url https://mcp.<zone>/mcp` when the Source does not use the default StarCi zone.
+  pass `--public-url https://mcp.<zone>/mcp/` when the Source does not use the default StarCi zone.
 - `index` runs the containerized indexer, downloads the declared embedding model when absent, builds both projections and writes value-free
   manifests beside the client JSON.
 - `setup` runs config, Qdrant start, index and MCP start in dependency order; `down` stops only this stack.
@@ -51,13 +51,13 @@ Codex/OpenAI client configuration is:
 
 ```toml
 [mcp_servers.starci-source-context]
-url = "https://mcp.<zone>/mcp"
+url = "https://mcp.<zone>/mcp/"
 ```
 
 Claude Code user-scope configuration is installed with:
 
 ```text
-claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp
+claude mcp add --transport http --scope user starci-source-context https://mcp.<zone>/mcp/
 ```
 
 Never run `index` against an alias not prefixed `starci-context-`. Never enable the MCP store tool for a
