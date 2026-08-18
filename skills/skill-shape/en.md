@@ -54,9 +54,9 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | Skill | Journey | Owns |
 |---|---|---|
 | `starci-init` | plan → review → apply, internal | making a Source ready: the bootstrap, the workspace routes, the worktree state — three roots, one approval each |
-| `starci-stale-list` | plan only | which projects' routes no longer describe this machine, and who clears each |
+| `starci-stale-list` | plan only | every workspace staleness category measurable without executing a project, including backend assurance wiring, and who clears each |
 | `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
-| `starci-repair` | plan → review → apply | a red source returned green: format, autofix and defect passes kept apart, and the defect pass fanned out |
+| `starci-repair` | plan → review → apply | a red or incompletely assured source returned green: repair passes kept apart and the complete backend delivery fence installed after gates pass |
 | `starci-fe-design-layout` | opens or resumes the session, direction choice, then layout rounds | 3–4 direction choices with no separate hash, then 3–4 layout candidates per surface, hash-bound |
 | `starci-fe-design-block` | block rounds | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
 | `starci-fe-design-execute` | execution | frontend source, only after every reachable hash is accepted |

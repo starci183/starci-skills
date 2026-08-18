@@ -1,6 +1,6 @@
 ---
 name: starci-repair
-description: Take a source that no longer builds, no longer lints clean, drifted out of format, still carries Prettier in strict-fix mode, retains a retired component tier such as `components/shells`, has contract reasons nobody can find by need, measures itself against copied lint rules, or retains a `.claude/` from an older tree, and return it green — measured before and after, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, structurally stale, or untrusted. Writes product source after approval.
+description: Take a source that is red, structurally stale, untrusted, or missing the complete backend delivery-assurance machine, and return it green — measured before and after, repaired in separated passes, never made green by silencing a finding, and never publishing a plaintext credential. Use for failed gates, lint/formatter drift, stale contracts or structure, missing Husky/CI/Codecov/SonarQube enforcement, insecure secret wiring, or old trust-tree remnants. Writes product and external enforcement state only after approval.
 ---
 
 # starci-repair
@@ -9,6 +9,7 @@ description: Take a source that no longer builds, no longer lints clean, drifted
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | supplies the complete backend hook, CI, coverage, analysis, secret and deploy pattern |
 | `@file-layout` | `compilers/patterns/fe/file-layout` | module | supplies the accepted frontend tier vocabulary for structural repair |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
@@ -20,15 +21,16 @@ None. This skill reports a stale route and ends; it never starts setup.
 
 Read `@skill-shape` first.
 
-**Seven different things are called stale, and repairing the wrong one wastes the run.**
+**Eight different things are called stale, and repairing the wrong one wastes the run.**
 
 | What is stale | Symptom | Owner |
 |---|---|---|
 | the **route** | the recorded checkout, contract or head no longer holds | `starci-init` |
 | the **source** | it does not build, does not lint clean, or drifted out of format | this skill |
-| the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, last pass |
+| the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, the `why` pass |
 | the **machine** | the gates cannot fire: the published lint packages are not installed, or a copy of them is vendored into the checkout | this skill, before measuring |
 | the **formatter** | strict-fix mode finds Prettier beside an ESLint canon that owns formatting | this skill, the strict-fix pass |
+| the **assurance machine** | a backend lacks any `ASSURANCE-*` part: pre-push, PR CI, LCOV/Codecov, SonarQube gate, stack custody, required checks or deploy dependency | this skill, the assurance pass |
 | the **structure** | an accepted tier vocabulary removed a path that still exists, including an empty path no file-based gate can see | this skill, the retired-structure pass |
 | a **remnant** | a target checkout still carries a `.claude/` left from an older tree | this skill, after the index |
 
@@ -71,6 +73,18 @@ A rule authored or copied into a checkout is a second home for a law: it enforce
 day it landed, it drifts the moment the law changes, and nothing in that repository can tell
 that it has. Green measured against a private copy is green against a rule nobody else has.
 
+**Assurance is complete or stale.** For a backend route, read `@assurance-be` and adopt every reached
+`ASSURANCE-*` situation. Husky is the fast local refusal, not the authority; active CI and required
+checks are the merge fence. Codecov and SonarQube consume one LCOV report. A deploy cannot race
+verification. Installing only the available pieces does not close the pass.
+
+**Secrets never cross the review surface.** Codecov and SonarQube tokens are stored through the
+repository's hidden-input stack-secret entrypoint as encrypted
+`.stacks/dev/runtime/files/codecov-token.key.enc` and `sonarqube-token.key.enc`. GitHub Actions receives
+named secret projections because it does not hold the SOPS identity. Never ask for a value in chat,
+print one, commit plaintext, or place one in command-line arguments. Missing secure access is a genuine
+`NEED APPROVALS` item, not permission to weaken the assurance pattern.
+
 ## PROCESS
 
 ### 1 — Establish the context lock
@@ -100,6 +114,11 @@ dependencies matching `prettier`, `eslint-plugin-prettier`, `eslint-config-prett
 `prettier-plugin-*`; `.prettierignore`, `.prettierrc*` and `prettier.config.*`; manifest scripts,
 lint-staged, hooks, CI workflows and editor settings that invoke or select Prettier. This exact inventory
 is the removal boundary and the proof target.
+
+For a backend route, read `@assurance-be` and inventory the manifest and lockfile, `.husky/`, CI and
+deploy workflows, coverage configuration, Codecov/SonarQube configuration, encrypted stack record names,
+symbolic workflow secret references, and externally required checks. Do not read secret values. Record
+external facts as unmeasured until an authorized GitHub or Sonar/Codecov API supplies evidence.
 
 **Do not run end-to-end suites** unless the request asked for them by name.
 
@@ -153,6 +172,7 @@ import or export that reaches it. The installed `no-shell-tier` rule proves file
 | `index` | a contract `why` that describes something instead of stating when you would need it, so no lookup can find it | rewritten in its own pass, reasons only |
 | `machine` | the published lint packages are absent, or a copy of them is vendored into the checkout | installed from the registry, in its own commit — never authored |
 | `strict-fix` | Prettier is directly installed or selected anywhere in first-party repository configuration | remove the full integration and make ESLint the sole formatter, in one mechanical pass |
+| `assurance` | any reached `ASSURANCE-*` situation is absent or cannot block | install and wire the complete pattern after source gates are green; external settings remain approval-bound |
 | `retired-structure` | a directory, file, import or export still uses a tier the accepted layout vocabulary removed | empty paths are removed; live code is migrated to its accepted tier with references updated |
 | `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in step 12 |
 | `decision` | the code is deliberate and the rule refuses it, or the rule and canon disagree | **returned to the owner** — the fix is a decision, not an edit |
@@ -169,6 +189,12 @@ For strict fix, the displayed boundary includes every inventoried Prettier integ
 and lockfile. It also states whether each affected format script is repointed to ESLint or removed as a
 duplicate. A later Prettier reference outside that displayed set is a boundary expansion, not a reason to
 leave a partial removal behind.
+
+For assurance, display repository paths separately from external mutations. The repository boundary may
+include manifest and lockfile, `.husky/pre-push`, CI/deploy workflows, coverage/Codecov/SonarQube config,
+stack-secret tooling and encrypted `.enc` records. The external boundary names project creation, GitHub
+Secrets/Variables and required checks without ever displaying values. `OK` authorizes only the exact
+services, repository and secret names shown; an unavailable credential remains missing access.
 
 `OK` approves every displayed default and the exact shown boundary; take the baseline and begin Apply
 immediately. It does not cover another checkout or role that was never shown, and the run must not ask the
@@ -195,7 +221,9 @@ Then, in this order, each pass its own commit:
 6. **retired structure** — remove empty forbidden tiers; migrate their live files without deleting behaviour.
 7. **`why`** — the contract index, because it is a pass no gate can judge and it must not be mistaken for
    one of the three above.
-8. **remnant** — last. Alone in its commit, so a
+8. **assurance**, for backend routes — only after source gates are green, install and wire every reached
+   `ASSURANCE-*` situation; keep repository and external mutations auditable separately.
+9. **remnant** — last. Alone in its commit, so a
    deletion is never read as part of a fix.
 
 A pass that would need to weaken a gate stops and returns the boundary. Unrelated work in the tree is
@@ -207,7 +235,7 @@ Ten agents, and the assignment is **by file, never by rule**. Two agents holding
 each other's repair and the second one wins silently; two agents holding one rule across many files are
 the same collision spread thinner.
 
-**Four passes are never fanned out.** Machine adoption, strict fix, formatting and autofix are single
+**Five passes are never fanned out.** Machine adoption, strict fix, formatting, autofix and assurance are single
 whole-repository changes — running them concurrently produces writers on the same manifest, lockfile and
 file set. Only the `defect` pass, where each finding is a separate hand repair in a separate file, is
 worth ten agents.
@@ -234,7 +262,7 @@ and the reason the fan-out is worth its cost at all.
 
 ### 10 — The `why` pass: make the index findable again
 
-The last pass, and the only one no gate can judge. A contract entry's `why` is the **index a later lookup
+The only source pass no gate can judge. A contract entry's `why` is the **index a later lookup
 matches on**. An entry nobody can find by need is an entry that gets written a second time, so a stale
 index is real staleness even while every gate is green.
 
@@ -301,7 +329,34 @@ published canon and removes the mirror; this pass never patches a consumer's pri
 Proof is a recursive directory search returning no `components/shells`, a source search returning no
 imports through `/shells/`, the installed `no-shell-tier` gate, and the repository's original gates.
 
-### 12 — The remnant pass: one Source, so a second `.claude` is a corpse or a question
+### 12 — The assurance pass: install the whole backend delivery fence
+
+Run only after lint, typecheck/build and unit tests are green. Apply `@assurance-be` as one graph:
+
+1. Install Husky with the repository's package manager, preserve the lockfile, keep `pre-commit`
+   responsibilities, and add `pre-push` calling check-only `lint:check` plus `test:ci` or `test:unit`.
+2. Activate PR CI and run check-only lint, typecheck/build and one unit coverage command that emits
+   `coverage/lcov.info`. Never run an autofix command in a hook or CI.
+3. Feed that one LCOV report to Codecov and SonarQube. Codecov patch/project status and the SonarQube
+   quality gate must be blocking checks; scan success alone is not the gate.
+4. Store provider tokens through the hidden-input stack-secret entrypoint at the two fixed encrypted
+   paths. If the checkout lacks the standard stack mechanism, its adoption paths, SOPS policy and
+   package entrypoints are part of the displayed boundary. Never copy plaintext or solicit it in chat.
+5. Project credentials to named GitHub Secrets and set `SONAR_HOST_URL` as a repository variable unless
+   the installation requires it secret. This is an external mutation and needs the displayed approval
+   plus authenticated access. CI never decrypts `.stacks`.
+6. Require CI, Codecov and SonarQube checks through branch protection/rulesets, bound to the expected
+   apps where supported. If external evidence cannot be read, the pass remains incomplete rather than
+   claiming the workflow file proves enforcement.
+7. Make every existing deploy depend on successful verification. A backend with no deploy workflow does
+   not invent one.
+
+Proof is the local hook failing on a controlled non-zero stub or equivalent isolated test, the exact CI
+workflow commands, one LCOV file consumed twice, encrypted stack filenames with no plaintext twin, API
+evidence for external secrets by name and required checks, and the deploy dependency graph. Never expose
+a credential to prove it exists.
+
+### 13 — The remnant pass: one Source, so a second `.claude` is a corpse or a question
 
 **There is one Source and one trust tree. A project is a folder inside it —
 `<Source>/.worktrees/<project>/`, `<Source>/.workspace/<project>/` — never a tree of its own.** So a
@@ -334,7 +389,7 @@ Measured once, on two checkouts carrying the same leftover: one had it ignored, 
 the other had the same editor configuration **committed**. Identical directories, opposite verdicts — which
 is why the test is "untracked", not "looks empty".
 
-### 13 — Prove it with the same commands
+### 14 — Prove it with the same commands
 
 Re-run the exact gates from step 5 and print before-and-after side by side. Zero errors means zero — not
 zero after a disable, not zero because a rule was dropped, not zero because a test was skipped.
@@ -345,10 +400,14 @@ every retained format command resolves to ESLint and passes. Search the tracked 
 then inspect any surviving lockfile-only match with the package manager's dependency-path command. A
 transitive match is reported; a first-party match reopens the strict-fix pass.
 
+Backend assurance adds the seven `ASSURANCE-*` proofs from `@assurance-be`. Repository proof and external
+proof are printed separately. A locally complete workflow with unverified branch protection or missing
+secret publication is still incomplete.
+
 If a gate cannot pass without a decision the owner has not made, ask once under `### NEED APPROVALS` with
 the remaining count, evidence-backed default and exact scope. Never weaken the gate.
 
-### 14 — Close the phase
+### 15 — Close the phase
 
 Close with the applied revision, baseline commit, tracked diff and before/after counts in concise prose.
 
@@ -366,6 +425,10 @@ Close with the applied revision, baseline commit, tracked diff and before/after 
   and a count taken against a private copy of the law is not evidence.
 - Strict fix still has a first-party Prettier reference → do not close; the pass is incomplete even when
   lint, typecheck and build are green.
+- Any reached `ASSURANCE-*` situation is missing → do not close the assurance pass. Missing service access
+  is reported under `NEED APPROVALS`; it never turns Codecov, SonarQube or required checks optional.
+- A provider token is available only through chat, stdout, a command-line argument or a plaintext tracked
+  file → stop credential handling and return the secure-input boundary.
 - A run is handed more than one project or role → create one record per declared target and coordinate
   them; ask only for an undisclosed boundary, never for ordering.
 - A repository declares no gates at all → stop; there is nothing to measure, and inventing commands
@@ -373,6 +436,7 @@ Close with the applied revision, baseline commit, tracked diff and before/after 
 
 ## OUTPUT
 
-State before/after counts, material paths by pass and proof in concise prose. Before another batch, name
-remaining findings as work owed and repair them in the same turn. The turn may end only with `own = 0`
-or while waiting under `### NEED APPROVALS` for a genuine decision or boundary expansion.
+State before/after counts, material paths by pass, backend assurance proof and external enforcement
+evidence in concise prose. Never include secret values. Before another batch, name remaining findings as
+work owed and repair them in the same turn. The turn may end only with `own = 0` or while waiting under
+`### NEED APPROVALS` for a genuine decision, missing secure access or boundary expansion.

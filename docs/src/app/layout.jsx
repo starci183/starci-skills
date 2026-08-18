@@ -5,12 +5,17 @@ import "nextra-theme-docs/style.css";
 import "./styles.css";
 
 export const metadata = {
-  title: {default: "StarCi · Trust v3", template: "%s | StarCi · Trust v3"},
-  description: "The StarCi v3 trust tree: binding rules, human guides and live HeroUI previews."
+  title: {default: "StarCi Skills", template: "%s"},
+  description: "StarCi skills: binding rules, human guides and live interface previews.",
+  icons: {icon: "/brand/favicon.png"}
 };
 
-const navbar = <Navbar logo={<strong>StarCi · Trust v3</strong>} />;
-const footer = <Footer>StarCi trust v3 · Nextra + HeroUI</Footer>;
+const navbar = (
+  <Navbar
+    logo={<img src="/brand/starci-logo.png" alt="StarCi" width="40" height="40" />}
+  />
+);
+const footer = <Footer>StarCi Skills</Footer>;
 const search = (
   <Search
     placeholder="Search documentation…"
@@ -23,10 +28,7 @@ const search = (
 export default async function RootLayout({children}) {
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
-      <Head
-        color={{hue: 145, saturation: 52, lightness: {light: 38, dark: 66}}}
-        faviconGlyph="✦"
-      >
+      <Head color={{hue: 145, saturation: 52, lightness: {light: 38, dark: 66}}}>
       </Head>
       <body>
         <Layout

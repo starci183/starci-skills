@@ -8,6 +8,7 @@ title: Docs
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
 | `@brainstorms` | `brainstorms` | module | produce candidates before a shape is accepted |
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
@@ -73,9 +74,9 @@ record. Seven do the work; two only look — one at the machine, one at the othe
 | Skill | Owns |
 |---|---|
 | `starci-init` | making a Source ready: the bootstrap, `.workspace/<project>/`, `.worktrees/<project>/` — three roots, approved separately |
-| `starci-stale-list` | which projects' routes no longer describe this machine, why, and who clears each |
+| `starci-stale-list` | every read-only stale fact across routes, gates, contracts, lint/formatter adoption, backend assurance, structure and remnants, with who clears each |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
-| `starci-repair` | a red source returned green — measured, in separated passes, never by silencing a finding |
+| `starci-repair` | a red or incompletely assured source returned green — separated passes, complete backend delivery fence, never suppression or plaintext secrets |
 | `starci-fe-design-layout` | 3–4 direction choices with no separate hash, then layout candidates that embed the selection and are hash-bound |
 | `starci-fe-design-block` | block anatomies under the direction embedded in their accepted layout, hash-bound independently |
 | `starci-fe-design-execute` | frontend source, only after every hash is accepted |

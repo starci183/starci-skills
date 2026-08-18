@@ -31,9 +31,9 @@ state they were made against, and execution stops when that evidence is stale or
 | Skill | Use it for | Writes |
 |---|---|---|
 | [`starci-init`](./skills/starci-init) | Prepare the Source bootstrap, workspace routes, or worktree state | only the separately approved setup root |
-| [`starci-stale-list`](./skills/starci-stale-list) | Find projects whose routes, contracts, or lint adoption cannot be trusted | nothing |
+| [`starci-stale-list`](./skills/starci-stale-list) | Find every read-only workspace staleness category, including backend assurance, and name its owner | nothing |
 | [`starci-diagnose`](./skills/starci-diagnose) | Trace another skill against the real machine and identify its first correct stop | nothing |
-| [`starci-repair`](./skills/starci-repair) | Return a red checkout to its own clean gates without suppressing findings | approved product paths |
+| [`starci-repair`](./skills/starci-repair) | Return a red or incompletely assured checkout to clean gates and a complete backend delivery fence | approved repository and external enforcement paths |
 
 ### Frontend design
 

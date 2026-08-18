@@ -55,9 +55,9 @@ thể ngay từ đầu nó đã đúng.
 | Skill | Hành trình | Sở hữu |
 |---|---|---|
 | `starci-init` | plan → review → apply, nội bộ | làm một Source sẵn sàng: bootstrap, route workspace, state worktree — ba root, mỗi root một lần duyệt |
-| `starci-stale-list` | chỉ plan | project nào có route không còn mô tả đúng máy này, và ai dọn từng cái |
+| `starci-stale-list` | chỉ plan | mọi stale category có thể đo mà không thực thi project, gồm backend assurance wiring, và ai dọn từng loại |
 | `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
-| `starci-repair` | plan → review → apply | một source đỏ trở lại xanh: pass format, autofix và defect giữ tách nhau, và pass defect được chia cho nhiều agent |
+| `starci-repair` | plan → review → apply | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và backend delivery fence được cài trọn sau khi gate pass |
 | `starci-fe-design-layout` | mở hoặc tiếp session, chọn direction, rồi các lượt layout | 3–4 lựa chọn direction không có hash riêng, rồi 3–4 phương án layout mỗi bề mặt, buộc theo hash |
 | `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
 | `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |

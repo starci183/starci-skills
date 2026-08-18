@@ -1,90 +1,223 @@
-# starci-skills
+<p align="center">
+  <img src="./docs/public/brand/starci-skills-wallpaper.png" alt="StarCi Skills wallpaper" width="100%" />
+</p>
 
-## LOADS
+<p align="center">
+  <img src="./docs/public/brand/starci-logo.png" alt="StarCi logo" width="112" />
+</p>
 
-| Alias | Target | Kind | Why |
-|---|---|---|---|
-| `@brainstorms` | `brainstorms` | module | produce candidate shapes |
-| `@compilers` | `compilers` | module | compile accepted shapes |
-| `@contexts` | `contexts` | module | resolve read and write locations |
-| `@docs` | `docs` | module | generate and serve the documentation site |
-| `@gates` | `gates` | module | judge existing code |
-| `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
-| `@netlify` | `netlify.toml` | file | hold the hosting build contract |
-| `@patterns` | `compilers/patterns` | module | resolve files and imports |
-| `@principles` | `compilers/principles` | module | resolve classes |
-| `@publication` | `docs/publication.mjs` | file | declare the generated documentation shelves |
-| `@scripts` | `scripts` | module | hold deterministic tree utilities |
-| `@skills` | `skills` | module | hold capability triggers and reporting shape |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+<h1 align="center">StarCi Skills</h1>
 
+<p align="center">
+  One source of truth that turns a loose product request into reviewed decisions,
+  bounded source changes, and machine-checkable proof.
+</p>
 
-## Record
+## Install
 
-StarCi skills — one source of truth an agent reads so that a loose business prompt still
-lands as correct code.
-
-Four species, split by **what each is allowed to return** — not by the order they run in:
-
-| Tree | Species | Returns |
-|---|---|---|
-| `@contexts` | location | where source is read from, where state is written |
-| `@brainstorms` | creation | 3–4 candidates, the owner chooses |
-| `@compilers` | execution | exactly one answer; the law closes the choice — `@principles` decide classes, `@patterns` decide where the code lands |
-| `@gates` | refusal | pass, or reject with the evidence — `lints` only |
-
-`@skills` holds the nine capabilities and the reporting shape they share. `@scripts` holds the
-validator that makes the JSON schemas real rather than decorative.
-
-Every module is two records of the same document: `en.md` for the agent, `vi.md` for the human. They
-match section for section and neither refers to the other.
-
-Each capability keeps `SKILL.md` as its binding runtime entry and publishes `vi.md` beside it for a human
-reader. The two records keep the same sections, dependencies, situation codes and stops.
-
-## Why it refuses
-
-A tree that only advises gets ignored under pressure, so the mechanisms are machine-refusable:
-
-- a layout candidate is **class-free**, enforced by a query that never extracts a class — a stage that
-  cannot see one cannot write one;
-- a direction round offers 3–4 vocabulary-backed visual choices without inventing a second approval
-  hash; the selected object is embedded into each layout candidate;
-- `additionalProperties: false` at every level of every schema makes a stray `className` invalid
-  rather than debatable;
-- the validator refuses a batch whose candidates share an axis set, or where none departs from
-  precedent — a fake choice is not a choice;
-- an approval binds to the hash of canonical JSON, with the envelope outside it, so the same decision
-  re-run produces the same hash.
-
-## Docs site
-
-The site is generated from the records; nothing under `docs/content/` is hand-authored.
+Clone the complete trust tree into the Source's `.claude` directory:
 
 ```bash
-cd @docs
+cd <Source>
+git clone https://github.com/starci183/starci-skills.git .claude
+```
+
+The installation is intentionally kept together:
+
+```text
+<Source>/
+  .claude/
+    INDEX.md
+    contexts/
+    brainstorms/
+    compilers/
+    gates/
+    scripts/
+    skills/
+```
+
+Do not copy individual skills into a second directory. A skill can depend on schemas, scripts,
+compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
+that can drift from its dependencies.
+
+## Use with Codex and Claude
+
+Keep `AGENTS.md` and `CLAUDE.md` at the Source root as thin bootstraps. Both files should contain only:
+
+```markdown
+# StarCi agent bootstrap
+
+Before planning, reading target source, or running a skill, read
+[`<Source>/.claude/INDEX.md`](.claude/INDEX.md) completely and follow its load order.
+
+This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
+the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
+```
+
+- **Codex** reads `AGENTS.md`. Ask it to read the exact
+  `.claude/skills/<skill>/SKILL.md` entry when invoking a StarCi skill.
+- **Claude Code** reads `CLAUDE.md` and discovers project skills under `.claude/skills`; invoke them by
+  name, for example `/starci-init` or `/starci-stale-list`.
+
+StarCi deliberately keeps the authoritative implementation in `.claude`. There is no duplicate
+`.agents/skills` tree: `AGENTS.md` routes Codex into the same entry that Claude uses.
+
+## Initialize a Source
+
+After installing the tree, run `starci-init` and explicitly name the project and roles. Project
+identity is never inferred from a folder name.
+
+With Codex:
+
+```text
+Read .claude/skills/starci-init/SKILL.md and run it for this Source.
+Project: academy. Roles: fe and be.
+Prepare the bootstrap, workspace routes, and worktree state.
+```
+
+With Claude Code:
+
+```text
+/starci-init setup this Source for project academy with roles fe and be
+```
+
+The skill presents three independent write boundaries for approval:
+
+1. `AGENTS.md` and `CLAUDE.md` — entry into the trust tree.
+2. `.workspace/` — machine-local routes to each target checkout.
+3. `.worktrees/<project>/` — rebuildable registries, sessions, and cache.
+
+Review the exact paths shown by the skill and approve only the boundaries you want initialized.
+
+## Multiple projects and roles
+
+One Source can manage many projects, and each project can expose several roles. Every
+`(project, role)` pair has one verified route:
+
+```text
+<Source>/
+  .workspace/
+    config.json
+    academy/
+      fe/config.json
+      be/config.json
+    payments/
+      fe/config.json
+      be/config.json
+  .worktrees/
+    academy/
+      registries/
+      sessions/
+      cache/
+    payments/
+      registries/
+      sessions/
+      cache/
+```
+
+`.workspace/config.json` holds only Source-wide defaults:
+
+```json
+{
+  "$schema": "../.claude/contexts/workspaces/config.schema.json",
+  "version": 1,
+  "defaultLang": "vi"
+}
+```
+
+Each `.workspace/<project>/<role>/config.json` describes an existing checkout: its declared identity,
+absolute paths, Git root, remote, branch, observed head, required instructions, manifests, and any
+role-specific contract. Routes describe checkouts; they do not clone or copy them.
+
+Because these records contain machine-local paths and Git state, keep `.workspace/` out of shared
+repository history. Run `starci-init` again when adding a role or project, or when a checkout, branch,
+or recorded head changes. Do not duplicate the nearest config by hand.
+
+## Multiple Sources
+
+Give every Source its own authority and runtime state:
+
+```text
+Sources/
+  product-source/
+    AGENTS.md
+    CLAUDE.md
+    .claude/
+    .workspace/
+    .worktrees/
+  platform-source/
+    AGENTS.md
+    CLAUDE.md
+    .claude/
+    .workspace/
+    .worktrees/
+```
+
+A Source may route to target repositories anywhere on the machine. Start Codex or Claude from the
+intended Source root so its bootstrap, routes, and decision state remain unambiguous.
+
+## Verify the setup
+
+Before trusting a Source that is new or has not been used recently:
+
+```text
+# Codex
+Read .claude/skills/starci-stale-list/SKILL.md and list stale projects in this Source.
+
+# Claude Code
+/starci-stale-list
+```
+
+Use `starci-init` to repair a missing or stale route. Use `starci-diagnose` when a skill stops and it
+is unclear whether the environment is incomplete or the skill itself is defective.
+
+## How the tree works
+
+StarCi separates capabilities by what each stage may return:
+
+| Tree | Species | Returns |
+| --- | --- | --- |
+| `contexts` | location | verified read and write locations |
+| `brainstorms` | creation | 3–4 candidates for the owner to choose from |
+| `compilers` | execution | one deterministic answer from an accepted shape |
+| `gates` | refusal | pass, or reject with exact evidence |
+
+`skills` contains the capability bindings and their common reporting shape. `scripts` contains the
+deterministic utilities that make schemas and approval hashes enforceable rather than decorative.
+
+Agent runtime is English-only. Each paired module exposes `en.md` for the agent and `vi.md` for human
+review. A skill starts at its binding `SKILL.md`; it must never load `vi.md` as runtime instructions.
+
+## Documentation site
+
+The site is generated from the records; files under `docs/content/` are generated, not hand-authored.
+
+```bash
+cd docs
 npm install
 npm run sync
 npm run dev
 ```
 
-Shelves are declared in `@publication`. A new shelf becomes a documented shelf by adding one
-entry there — no page, no route, no sidebar to write.
-
-**A build that needs the author's machine is not a build.** The site must build from a clean clone and
-nothing else: no sibling checkout, no absolute path, no workspace route, no generated directory
-expected to already exist. This tree is shared across sources, so a dependency on one product's
-repository is not a portability bug to soften — it is a category error, and making it fail quietly
-keeps the coupling while hiding it. The test: would this step mean anything for a **second** product
-using this tree? If not, delete it.
-
-`@netlify` carries `base`, `command`, `publish` and a pinned Node version, so the host's fields
-stay empty and git can explain when they changed. `publish` resolves relative to `base`.
-
-## Validating an artifact
+Open [http://localhost:3000](http://localhost:3000). For a production check:
 
 ```bash
-node @validate-artifact \
-  --schema @layout-schema \
+npm run build
+```
+
+Documentation shelves are declared in `docs/publication.mjs`. The hosting contract lives in
+`netlify.toml`, including the docs base, build command, publish directory, and pinned Node version.
+
+## Validate an artifact
+
+```bash
+node scripts/validate-artifact.mjs \
+  --schema brainstorms/layouts/schema.json \
   --data <batch.json> --hash
 ```
+
+## Brand assets
+
+The text-free logo, favicon, and README wallpaper live in
+[`docs/public/brand`](./docs/public/brand). Their checked-in relative paths let GitHub and the generated
+documentation render the same StarCi identity without depending on a temporary local file.
