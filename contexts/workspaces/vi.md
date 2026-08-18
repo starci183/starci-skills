@@ -147,6 +147,12 @@ bất cứ điều gì về bố cục, và đường dẫn hợp đồng là th
 **Nó hỏng bằng đường nào.** Hợp đồng bị đoán theo quy ước thư mục thay vì đọc, nên những thành phần đã
 đổi tên hoặc đã bỏ vẫn được đem ra đề xuất.
 
+**Một vai trò frontend có thể thật sự không có registry nào.** Một trang landing hay marketing có thể
+cài máy lint mà chưa bao giờ theo vốn từ contract. `contract: null` vẫn báo là một phát hiện theo mặc
+định — phần lớn vì chưa ai tìm, và một monorepo giấu registry khỏi quy ước one-app. `contractSource:
+"discovered:none"` là cách phân biệt một lần tìm đã xong mà không thấy gì, với một lần chưa từng chạy:
+nó gọi tên sự vắng mặt là đã xác minh, không phải bị bỏ qua.
+
 ## `WORKSPACE-5` — route đã cũ
 
 **Khi nào gặp.** Tệp route vẫn hợp lệ và đầy đủ, và một giá trị trong nó không còn mô tả đúng máy: một

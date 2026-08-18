@@ -147,6 +147,12 @@ scan?
 **How it fails.** The contract is assumed from a folder convention rather than read, so components
 that were renamed or removed are still proposed.
 
+**A frontend role can genuinely have no registry.** A landing page or marketing site may install the
+lint machine without ever adopting the contract vocabulary. `contract: null` still reports as a finding
+by default — most of the time it means nobody has searched, and a monorepo hides the registry from a
+one-app convention. `contractSource: "discovered:none"` is how a completed search that found nothing
+differs from a search that never ran: it names the absence as verified, not skipped.
+
 ## `WORKSPACE-5` — the route is stale
 
 **Situation.** The route file is valid and complete, and a value in it no longer describes the machine:

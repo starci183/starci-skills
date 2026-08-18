@@ -129,7 +129,13 @@ function readWorkspaces() {
       } else if (branch && liveBranch && branch !== liveBranch) {
         verdict = "stale";
         reason = `route records branch ${branch}; the checkout is on ${liveBranch}`;
-      } else if (!contract && role === "fe") {
+      } else if (!contract && role === "fe" && !/^discovered:none\b/.test(config.context?.contractSource ?? "")) {
+        // A null contract on a frontend role is a finding by default — most of the time it means
+        // nobody has looked yet, and a monorepo hides the registry from a one-app convention. But a
+        // search that genuinely found nothing is a different fact from a search that never ran, and
+        // this route has no way to say which unless contractSource records it. `discovered:none` is
+        // that record: it names the search as done, not skipped, so this project stops being flagged
+        // every scan while a registry that doesn't exist keeps not existing.
         verdict = "stale";
         reason = "frontend role with no contract recorded — look for the registry before trusting this";
       }
