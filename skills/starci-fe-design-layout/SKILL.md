@@ -71,7 +71,9 @@ in under 2KB where the permitted read is 69KB, and the registry is 192KB.
 
 ### 6 — Resolve every region against the contract, one query per region
 
-    node @contract-search <project> <role> --need "<the region stated as a need>"
+```bash
+node @contract-search <project> <role> --need "<the region stated as a need>"
+```
 
 Ask by the **reason**, never by the shape — the need sentence is what a `why` is written to match. Every
 result prints the words it matched on, and a result marked `~` matched on an incidental word rather than on

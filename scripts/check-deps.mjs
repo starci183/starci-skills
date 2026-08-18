@@ -206,7 +206,7 @@ function validateSkillNames(file, lines, hands) {
       const name = match[0];
       if (name === own || (index >= hands.start && index < hands.end)) continue;
       seen.add(name);
-      const stop = section === "## Stops" && /^\s*- /.test(lines[index]);
+      const stop = (section === "## Stops" || section === "## Điểm dừng") && /^\s*- /.test(lines[index]);
       const owner = tableAllowsSkill(lines, index, name);
       if (!stop && !owner) report(file, index + 1, `copied law: ${name} is outside a Stop row or owner cell`);
       if (!hands.names.includes(name)) report(file, index + 1, `${name} is missing from HANDS OFF TO`);
@@ -264,7 +264,7 @@ for (const file of files) {
   const text = readFileSync(file, "utf8");
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const loads = parseLoads(file, lines);
-  const isSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/]SKILL\.md$/.test(file);
+  const isSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/](?:SKILL|vi)\.md$/.test(file);
   const hands = parseHands(file, lines, loads, isSkill);
   parsed.set(file, { lines, loads, hands, isSkill });
 }
@@ -310,6 +310,26 @@ for (const [file, en] of parsed) {
     if (/^### (?:KẾT QUẢ|CẢNH BÁO|THAY ĐỔI)\b/.test(vi.lines[index])) {
       report(viPath, index + 1, "translated fixed output heading");
     }
+  }
+}
+
+for (const [file, skill] of parsed) {
+  if (!/[\\/]skills[\\/]starci-[^\\/]+[\\/]SKILL\.md$/.test(file)) continue;
+  const viPath = join(dirname(file), "vi.md");
+  const vi = parsed.get(viPath);
+  if (!vi) {
+    report(file, 1, "missing Vietnamese skill record");
+    continue;
+  }
+  if (JSON.stringify(aliasesFor(skill.loads.rows)) !== JSON.stringify(aliasesFor(vi.loads.rows))) {
+    report(viPath, vi.loads.start + 1, "LOADS aliases, targets or kinds differ from SKILL.md");
+  }
+  if (JSON.stringify(outline(skill.lines)) !== JSON.stringify(outline(vi.lines))) {
+    report(viPath, 1, "section count or order differs from SKILL.md");
+  }
+  const codes = (lines) => [...new Set(lines.join("\n").match(/\b[A-Z][A-Z0-9-]*-[0-9]+\b/g) ?? [])].sort();
+  if (JSON.stringify(codes(skill.lines)) !== JSON.stringify(codes(vi.lines))) {
+    report(viPath, 1, "situation codes differ from SKILL.md");
   }
 }
 

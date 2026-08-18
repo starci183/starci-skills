@@ -108,6 +108,10 @@ Every module is one document in two records: `en.md` for the agent, `vi.md` for 
 section for section and neither refers to the other. A shelf may carry its own `en.md`, which becomes
 that shelf's page.
 
+Every capability follows the same publication rule without changing the runtime contract: `SKILL.md`
+remains the binding agent entry, while `vi.md` beside it is the complete Vietnamese record for a human
+reader. Both publish under the capability's own route.
+
 **One tier, two layouts.** A frontend is either **single-app**, keeping the component tree at
 `src/components/*`, or a **monorepo**, keeping the same tree under the same tier names in a shared
 package at `packages/ui/src/*`. The tier names never change; only the prefix does, and the prefix is a
