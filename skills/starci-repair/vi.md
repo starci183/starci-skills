@@ -19,7 +19,7 @@ Không có. Skill báo route stale rồi kết thúc; nó không tự chạy set
 
 Đọc `@skill-shape` trước.
 
-Sáu thứ khác nhau đều thường bị gọi là stale:
+Bảy thứ khác nhau đều thường bị gọi là stale:
 
 | Thứ bị stale | Triệu chứng | Owner |
 |---|---|---|
@@ -27,6 +27,7 @@ Sáu thứ khác nhau đều thường bị gọi là stale:
 | **source** | build/lint fail hoặc format drift | skill này |
 | **index** | gate xanh nhưng không tìm được contract `why` theo need | skill này, pass cuối |
 | **machine** | lint package chưa cài hoặc checkout dùng bản vendored | skill này, trước khi đo |
+| **formatter** | strict fix còn Prettier nằm cạnh ESLint canon đang sở hữu formatting | skill này, pass strict-fix |
 | **structure** | vocabulary đã bỏ một tier nhưng path vẫn còn, kể cả path rỗng mà gate theo file không thấy | skill này, pass retired-structure |
 | **remnant** | target checkout còn `.claude/` từ tree cũ | skill này, sau index |
 
@@ -41,6 +42,12 @@ không ai yêu cầu.
 Formatting không phải repair. Behavioural fix bị chôn trong hàng nghìn dòng format sẽ không review được,
 vì vậy đo, phân loại và sửa theo pass tách biệt. Approval khóa chính xác role, repository và boundary;
 detection không cấp quyền ghi.
+
+**Strict fix chỉ có một formatter: ESLint.** Khi request gọi strict fix, phải bỏ toàn bộ package trực tiếp,
+plugin, shared config, config file, ignore file, script, hook, lint-staged, CI và editor integration của
+Prettier. Entrypoint format còn cần dùng phải chuyển sang ESLint canon đã cài; lockfile được regenerate bằng
+package manager, không sửa tay. Prettier chỉ còn do dependency không liên quan kéo gián tiếp thì báo đúng
+dependency path, không tự xóa package ngoài boundary.
 
 Gate xanh không chứng minh directory tree sạch. ESLint nhìn file và Git track file; directory cấm nhưng
 rỗng thì cả hai đều không thấy. Repair phải inventory directory trực tiếp. `components/shells` vi phạm
@@ -63,6 +70,10 @@ source. Mỗi lượt chỉ sửa một role của một project. Route stale k�
 Tìm package manager, scripts thật, Node/runtime requirement và gate repository công bố. Không tự bịa lệnh
 chuẩn từ framework; chính manifest định nghĩa cách project đo mình.
 
+Trong strict-fix mode, inventory package họ Prettier, `.prettierignore`, `.prettierrc*`,
+`prettier.config.*`, manifest script, lint-staged, hook, CI và editor setting gọi hoặc chọn Prettier.
+Inventory này là removal boundary và proof target.
+
 ### 4 — Kiểm tra machine trước khi tin count
 
 Đọc manifest và lint config. Published lint packages phải được cài và config phải import chúng; folder
@@ -74,13 +85,17 @@ riêng, rồi mới lấy baseline.
 Chạy format-check, lint, typecheck, build và test đúng như repository khai. Ghi command, exit code và số
 finding. Gate không chạy được phải thử hết fallback an toàn; không được coi là zero.
 
+Format command dùng Prettier được đo một lần làm legacy evidence. Sau strict-fix pass, cùng script name
+phải dùng ESLint hoặc bị bỏ nếu chỉ lặp lint gate; không giữ Prettier chỉ để chạy lại proof cũ.
+
 Với frontend, đọc `@file-layout`, inventory mọi component root kể cả directory rỗng, rồi ghi path retired
 tier, file count, tracked-file count và mọi import/export đi qua nó. Rule `no-shell-tier` giữ trường hợp có
 file; inventory directory giữ trường hợp rỗng.
 
 ### 6 — Phân loại từng finding
 
-Mỗi finding thuộc một nhóm: machine, format, mechanical, defect, index, retired-structure hoặc remnant. Một dòng có thể cần
+Mỗi finding thuộc một nhóm: machine, strict-fix, format, mechanical, defect, index, retired-structure hoặc remnant. `strict-fix`
+là mọi Prettier integration first-party và được sửa bằng cách bỏ trọn integration rồi để ESLint làm formatter duy nhất. Một dòng có thể cần
 nhiều pass nhưng phải có một nguyên nhân gốc; không gom mọi thứ thành “lint debt”.
 
 ### 7 — Review count, classification và boundary
@@ -89,15 +104,19 @@ nhiều pass nhưng phải có một nguyên nhân gốc; không gom mọi thứ
 boundary chính xác đã hiển thị; sau đó lấy baseline và bắt đầu Apply ngay. Nếu boundary phải rộng hơn,
 quay lại review trước khi sửa.
 
+Boundary strict fix gồm toàn bộ Prettier inventory, manifest và lockfile, đồng thời nêu format script nào
+chuyển sang ESLint và script nào bị bỏ vì trùng. Reference phát hiện sau đó ở ngoài boundary phải quay lại
+review, không được để removal dở dang.
+
 ### 8 — Lấy baseline rồi sửa theo các pass tách biệt
 
-Commit state trước thay đổi. Sửa machine trước; tiếp theo format-only, mechanical, defect,
-retired-structure, `why`, rồi remnant. Mỗi pass có diff đọc được và gate liên quan chạy lại. Directory rỗng
+Commit state trước thay đổi. Sửa machine trước; strict fix bỏ Prettier và regenerate lockfile; tiếp theo
+format-only bằng ESLint, mechanical, defect, retired-structure, `why`, rồi remnant. Mỗi pass có diff đọc được và gate liên quan chạy lại. Directory rỗng
 không có Git diff vẫn phải ghi path cùng before/after count trong kết quả.
 
 ### 9 — Fan out chỉ defect pass
 
-Chỉ chia defect pass khi các file độc lập và boundary không overlap. Machine, format, retired-structure và index cần một sự
+Chỉ chia defect pass khi các file độc lập và boundary không overlap. Machine, strict-fix, format, retired-structure và index cần một sự
 thật chung nên không fan out. Mỗi nhánh nhận file chính xác, finding chính xác và evidence phải trả về.
 
 ### 10 — Pass `why`: làm index tìm lại được
@@ -132,6 +151,11 @@ một trust tree đang sống vì tên thư mục trông cũ.
 Chạy lại chính các command baseline, cùng working directory và options. Báo before/after từng gate. Một
 command khác rẻ hơn không chứng minh finding cũ đã hết.
 
+Strict fix còn phải chứng minh: không còn tracked config/ignore của Prettier; không còn direct package họ
+Prettier; không còn script, hook, lint-staged, CI hay editor setting first-party gọi/chọn Prettier; mọi
+format command còn giữ đều resolve sang ESLint và pass. Search tracked tree không phân biệt hoa thường;
+match chỉ còn trong lockfile phải được giải bằng dependency-path command. Match first-party mở lại pass.
+
 ### 14 — Đóng phase
 
 Ghi applied revision, baseline commit, tracked diff và before/after bằng văn xuôi. Diff phải bằng đúng
@@ -145,6 +169,7 @@ production tree trong `git diff <baseline>`; proof chạy được là `own` và
   canon chưa xác định behavior.
 - Tree dirty bởi việc không liên quan → dừng; mixed baseline không chứng minh gì.
 - `.claude/` trong target có tracked file hoặc nội dung thật → dừng remnant pass và trả inventory.
+- Strict fix còn reference Prettier first-party → chưa được đóng phase dù lint, typecheck và build xanh.
 - Boundary cần mở rộng → quay lại owner, không tự thêm path.
 
 ## ĐẦU RA

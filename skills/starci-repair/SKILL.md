@@ -1,6 +1,6 @@
 ---
 name: starci-repair
-description: Take a source that no longer builds, no longer lints clean, drifted out of format, still carries a retired component tier such as `components/shells`, has contract reasons nobody can find by need, measures itself against copied lint rules, or retains a `.claude/` from an older tree, and return it green — measured before and after, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, structurally stale, or untrusted. Writes product source after approval.
+description: Take a source that no longer builds, no longer lints clean, drifted out of format, still carries Prettier in strict-fix mode, retains a retired component tier such as `components/shells`, has contract reasons nobody can find by need, measures itself against copied lint rules, or retains a `.claude/` from an older tree, and return it green — measured before and after, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, structurally stale, or untrusted. Writes product source after approval.
 ---
 
 # starci-repair
@@ -20,7 +20,7 @@ None. This skill reports a stale route and ends; it never starts setup.
 
 Read `@skill-shape` first.
 
-**Six different things are called stale, and repairing the wrong one wastes the run.**
+**Seven different things are called stale, and repairing the wrong one wastes the run.**
 
 | What is stale | Symptom | Owner |
 |---|---|---|
@@ -28,6 +28,7 @@ Read `@skill-shape` first.
 | the **source** | it does not build, does not lint clean, or drifted out of format | this skill |
 | the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, last pass |
 | the **machine** | the gates cannot fire: the published lint packages are not installed, or a copy of them is vendored into the checkout | this skill, before measuring |
+| the **formatter** | strict-fix mode finds Prettier beside an ESLint canon that owns formatting | this skill, the strict-fix pass |
 | the **structure** | an accepted tier vocabulary removed a path that still exists, including an empty path no file-based gate can see | this skill, the retired-structure pass |
 | a **remnant** | a target checkout still carries a `.claude/` left from an older tree | this skill, after the index |
 
@@ -43,6 +44,14 @@ place — and the next reader has no way to know it was ever there.
 
 **Formatting is not repair, and mixing the two destroys review.** A behavioural fix inside four thousand
 reformatted lines is a fix nobody can see. Format runs alone, in its own pass, with its own commit.
+
+**Strict fix has one formatter: ESLint.** When the request names strict fix, Prettier is not retained as
+a second opinion or a compatibility fallback. Remove its direct packages, plugins, shared configs,
+configuration files, ignore files, scripts, hooks, lint-staged entries, CI steps and editor integration.
+Any format entrypoint the repository still needs is repointed to the installed ESLint canon. Regenerate
+the lockfile through the package manager; never hand-edit it. A transitive lockfile entry required by an
+otherwise unrelated package is reported with its dependency path, not used as permission to delete that
+package outside the approved boundary.
 
 **Measure with the repository's own gates.** Read the manifest and run the scripts that repository
 actually declares. A count from a command the project does not use proves nothing about the project.
@@ -86,6 +95,12 @@ The gates are whatever this repository declares — not a remembered list. Read 
 the scripts that exist: lint, typecheck, build, test. A repository with no `typecheck` script is not
 failing a typecheck; it has none, and that is a finding for the plan rather than a command to invent.
 
+In strict-fix mode, inventory every first-party Prettier integration before running it: direct
+dependencies matching `prettier`, `eslint-plugin-prettier`, `eslint-config-prettier` or
+`prettier-plugin-*`; `.prettierignore`, `.prettierrc*` and `prettier.config.*`; manifest scripts,
+lint-staged, hooks, CI workflows and editor settings that invoke or select Prettier. This exact inventory
+is the removal boundary and the proof target.
+
 **Do not run end-to-end suites** unless the request asked for them by name.
 
 ### 4 — Check the machine before trusting a single count
@@ -117,6 +132,10 @@ Run each gate that exists, in the cheapest order — format check, lint, typeche
 and record the exact counts before touching anything: errors, warnings, failing suites, and the files
 they land in.
 
+In strict-fix mode, a Prettier-backed format command is measured once as legacy evidence. After the
+strict-fix pass, the same script name must either invoke ESLint or be removed when it duplicated the lint
+gate; it is never kept merely so the final proof can rerun Prettier.
+
 This is the number the run will be judged against. A repair with no before-count is a claim.
 
 For a frontend run, read `@file-layout` and inventory every component root in the resolved checkout,
@@ -133,6 +152,7 @@ import or export that reaches it. The installed `no-shell-tier` rule proves file
 | `defect` | real broken behaviour, a wrong type, a dead import, a missing case | repaired by hand, one at a time |
 | `index` | a contract `why` that describes something instead of stating when you would need it, so no lookup can find it | rewritten in its own pass, reasons only |
 | `machine` | the published lint packages are absent, or a copy of them is vendored into the checkout | installed from the registry, in its own commit — never authored |
+| `strict-fix` | Prettier is directly installed or selected anywhere in first-party repository configuration | remove the full integration and make ESLint the sole formatter, in one mechanical pass |
 | `retired-structure` | a directory, file, import or export still uses a tier the accepted layout vocabulary removed | empty paths are removed; live code is migrated to its accepted tier with references updated |
 | `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in step 12 |
 | `decision` | the code is deliberate and the rule refuses it, or the rule and canon disagree | **returned to the owner** — the fix is a decision, not an edit |
@@ -144,6 +164,11 @@ A `decision` misfiled as a `defect` is how a rule gets bent to match the code. A
 
 Present the before-counts, every class with how many findings it holds, the exact file list, and
 what the run will **not** touch. Batch every approval into one round.
+
+For strict fix, the displayed boundary includes every inventoried Prettier integration plus the manifest
+and lockfile. It also states whether each affected format script is repointed to ESLint or removed as a
+duplicate. A later Prettier reference outside that displayed set is a boundary expansion, not a reason to
+leave a partial removal behind.
 
 `OK` approves every displayed default and the exact shown boundary; take the baseline and begin Apply
 immediately. It does not cover another checkout or role that was never shown, and the run must not ask the
@@ -160,14 +185,17 @@ one cited here; a run has one baseline, not one per pass.
 
 Then, in this order, each pass its own commit:
 
-1. **format** — the formatter, alone. Nothing else in the commit.
-2. **mechanical** — autofix, then read every hunk. An autofix that changed behaviour is a defect the
+1. **machine** — install the published canon and remove any vendored rule copy before trusting counts.
+2. **strict fix**, when requested — remove every first-party Prettier integration, repoint retained format
+   entrypoints to ESLint, regenerate the lockfile, and prove the inventory is empty.
+3. **format** — ESLint's formatting fixes, alone. Nothing else in the commit.
+4. **mechanical** — autofix, then read every hunk. An autofix that changed behaviour is a defect the
    tool introduced, and it is caught here or not at all.
-3. **defects** — by hand, smallest first, re-running the gate that reported each one.
-4. **retired structure** — remove empty forbidden tiers; migrate their live files without deleting behaviour.
-5. **`why`** — the contract index, because it is a pass no gate can judge and it must not be mistaken for
+5. **defects** — by hand, smallest first, re-running the gate that reported each one.
+6. **retired structure** — remove empty forbidden tiers; migrate their live files without deleting behaviour.
+7. **`why`** — the contract index, because it is a pass no gate can judge and it must not be mistaken for
    one of the three above.
-6. **remnant** — last. Alone in its commit, so a
+8. **remnant** — last. Alone in its commit, so a
    deletion is never read as part of a fix.
 
 A pass that would need to weaken a gate stops and returns the boundary. Unrelated work in the tree is
@@ -179,9 +207,10 @@ Ten agents, and the assignment is **by file, never by rule**. Two agents holding
 each other's repair and the second one wins silently; two agents holding one rule across many files are
 the same collision spread thinner.
 
-**Three passes are never fanned out.** The formatter and the autofix are single whole-repository commands —
-running them ten times concurrently produces ten writers on one file set. Only the `defect` pass, where
-each finding is a separate hand repair in a separate file, is worth ten agents.
+**Four passes are never fanned out.** Machine adoption, strict fix, formatting and autofix are single
+whole-repository changes — running them concurrently produces writers on the same manifest, lockfile and
+file set. Only the `defect` pass, where each finding is a separate hand repair in a separate file, is
+worth ten agents.
 
 Retired-structure migration is also single-writer: moving a component changes its folder, export and all
 imports as one graph. Splitting those writes creates a half-moved component no gate result can explain.
@@ -310,6 +339,12 @@ is why the test is "untracked", not "looks empty".
 Re-run the exact gates from step 5 and print before-and-after side by side. Zero errors means zero — not
 zero after a disable, not zero because a rule was dropped, not zero because a test was skipped.
 
+Strict fix adds four proofs: no tracked Prettier config or ignore file; no direct Prettier-family package;
+no first-party script, hook, lint-staged entry, CI step or editor setting invokes or selects Prettier; and
+every retained format command resolves to ESLint and passes. Search the tracked tree case-insensitively,
+then inspect any surviving lockfile-only match with the package manager's dependency-path command. A
+transitive match is reported; a first-party match reopens the strict-fix pass.
+
 If a gate cannot pass without a decision the owner has not made, ask once under `### NEED APPROVALS` with
 the remaining count, evidence-backed default and exact scope. Never weaken the gate.
 
@@ -329,6 +364,8 @@ Close with the applied revision, baseline commit, tracked diff and before/after 
   it; one of those is somebody's committed configuration and the other may be a Source.
 - A gate is measured against a rule copied into the checkout → stop measuring; the machine pass comes first,
   and a count taken against a private copy of the law is not evidence.
+- Strict fix still has a first-party Prettier reference → do not close; the pass is incomplete even when
+  lint, typecheck and build are green.
 - A run is handed more than one project or role → create one record per declared target and coordinate
   them; ask only for an undisclosed boundary, never for ordering.
 - A repository declares no gates at all → stop; there is nothing to measure, and inventing commands
