@@ -30,9 +30,14 @@ export const groups = [
     description: "Location facts: where source is read from, and where in-progress state is written.",
   },
   {
+    source: "brainstorms/directions",
+    title: "Directions",
+    description: "From live product tokens and brand evidence to 3–4 visual directions; the selected object is embedded in the layout rather than approved under a second hash.",
+  },
+  {
     source: "brainstorms/layouts",
     title: "Layouts",
-    description: "From a business request to 3–4 layout JSON candidates the owner chooses between — never one answer, never a class.",
+    description: "From one selected direction and a business request to 3–4 structural layout JSON candidates — one layout hash binds both.",
   },
   {
     source: "brainstorms/blocks",

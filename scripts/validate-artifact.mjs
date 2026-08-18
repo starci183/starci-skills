@@ -1,6 +1,6 @@
 // Validate a brainstorm artifact against its schema, then against the laws a schema cannot express.
 //
-//   node scripts/validate-artifact.mjs --schema <schema.json> --data <artifact.json> [--hash]
+//   node scripts/validate-artifact.mjs --schema <schema.json> --data <artifact.json> [--vocabulary <inventory.json>] [--hash]
 //
 // Exits non-zero on the first failing category. A schema nobody runs is prose, so this is the thing
 // that turns "no class in a candidate" and "one candidate must depart" into machine refusals.
@@ -17,6 +17,7 @@ const flag = (name) => {
 
 const schemaPath = flag("schema");
 const dataPath = flag("data");
+const vocabularyPath = flag("vocabulary");
 const wantHash = args.includes("--hash");
 
 if (!schemaPath || !dataPath) {
@@ -141,7 +142,7 @@ function walkStrings(value, at, visit) {
 
 function laws(data) {
   const found = [];
-  const members = data.candidates ?? data.anatomies;
+  const members = data.candidates ?? data.anatomies ?? data.directions;
   if (!Array.isArray(members)) return found;
 
   walkStrings(members, "members", (text, at) => {
@@ -168,6 +169,66 @@ function laws(data) {
   return found;
 }
 
+function directionLaws(data, vocabulary) {
+  const found = [];
+  const selected = Array.isArray(data.directions)
+    ? data.directions.map((direction, index) => ({direction, at: `directions[${index}]`}))
+    : Array.isArray(data.candidates)
+      ? data.candidates.flatMap((candidate, index) => candidate.direction ? [{direction: candidate.direction, at: `candidates[${index}].direction`}] : [])
+      : [];
+  if (!selected.length) return found;
+  if (!vocabulary) return ["direction evidence: --vocabulary is required so token verdicts are evidence-backed"];
+
+  const known = new Set((vocabulary.tokens ?? []).map((token) => token.name));
+  const RAW_VALUE = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|hsl|oklch|lab|lch)\s*\()/i;
+  for (const {direction, at: directionAt} of selected) {
+    if (Array.isArray(data.directions) && direction.vocabularyAt !== data.envelope?.vocabularyAt) {
+      found.push(`${directionAt}.vocabularyAt: must equal the inventory state declared by the direction batch`);
+    }
+    const personalities = direction.personality ?? [];
+    if (new Set(personalities).size !== personalities.length) {
+      found.push(`${directionAt}.personality: duplicate words do not make a stronger direction`);
+    }
+    const rejections = direction.rejects ?? [];
+    if (new Set(rejections).size !== rejections.length) {
+      found.push(`${directionAt}.rejects: duplicate boundaries do not make a second refusal`);
+    }
+    for (const [role, decision] of Object.entries(direction.roles ?? {})) {
+      if (decision?.verdict === "reuse" && !known.has(decision.token)) {
+        found.push(`${directionAt}.roles.${role}: reuses ${decision.token}, absent from the visual vocabulary`);
+      }
+      if (decision?.verdict === "new" && known.has(decision.token)) {
+        found.push(`${directionAt}.roles.${role}: declares ${decision.token} new, but it already exists`);
+      }
+    }
+    walkStrings(direction, directionAt, (text, at) => {
+      const match = text.match(RAW_VALUE);
+      if (match && !/\.roles\.[^.]+\.value$/.test(at)) {
+        found.push(`${at}: carries raw visual value ${match[0]}; only a new token's value may carry one`);
+      }
+    });
+
+    const {axes = {}, roles = {}} = direction;
+    if (axes.shape !== "square" && roles.radius?.verdict === "none") {
+      found.push(`${directionAt}.roles.radius: ${axes.shape} shape requires a token decision`);
+    }
+    if (axes.depth !== "flat" && roles.elevation?.verdict === "none") {
+      found.push(`${directionAt}.roles.elevation: ${axes.depth} depth requires a token decision`);
+    }
+    if (axes.motion !== "still" && (roles.duration?.verdict === "none" || roles.easing?.verdict === "none")) {
+      found.push(`${directionAt}.roles: ${axes.motion} motion requires both duration and easing token decisions`);
+    }
+  }
+
+  if (Array.isArray(data.candidates) && selected.length > 1) {
+    const first = canonical(selected[0].direction);
+    for (const {direction, at} of selected.slice(1)) {
+      if (canonical(direction) !== first) found.push(`${at}: layout candidates must share the one direction the owner selected first`);
+    }
+  }
+  return found;
+}
+
 // Canonical form: keys sorted at every depth, envelope excluded. Two runs of the same decision must
 // produce the same hash, so nothing that varies per run may sit inside the hashed object.
 function canonical(value) {
@@ -180,10 +241,23 @@ function canonical(value) {
 
 const schema = await load(schemaPath);
 const data = await load(dataPath);
+const vocabulary = vocabularyPath ? await load(vocabularyPath) : undefined;
 const errors = [];
 await check(schema, data, "$", {doc: schema, dir: dirname(resolve(schemaPath))}, errors);
 
-const broken = laws(data);
+if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((candidate) => candidate.direction))) {
+  const vocabularySchemaPath = resolve(
+    dirname(resolve(schemaPath)),
+    Array.isArray(data.directions) ? "vocabulary.schema.json" : "../directions/vocabulary.schema.json",
+  );
+  const vocabularySchema = await load(vocabularySchemaPath);
+  await check(vocabularySchema, vocabulary, "$vocabulary", {doc: vocabularySchema, dir: dirname(vocabularySchemaPath)}, errors);
+}
+
+const broken = [...laws(data), ...directionLaws(data, vocabulary)];
+if (wantHash && Array.isArray(data.directions)) {
+  broken.push("directions: selection has no approval hash; embed the chosen object in a layout candidate and hash that layout");
+}
 
 if (errors.length) {
   console.error(`SCHEMA (${errors.length})`);
@@ -194,11 +268,11 @@ if (broken.length) {
   for (const error of broken) console.error(`  ${error}`);
 }
 
-if (wantHash && !errors.length) {
-  for (const member of data.candidates ?? data.anatomies ?? []) {
+if (wantHash && !errors.length && !broken.length) {
+  for (const member of data.candidates ?? data.anatomies ?? data.directions ?? []) {
     console.log(`${createHash("sha256").update(canonical(member)).digest("hex")}  ${member.id}`);
   }
 }
 
 if (errors.length || broken.length) process.exit(1);
-console.log(`ok  ${(data.candidates ?? data.anatomies ?? []).length} members validated against ${schema.title}`);
+console.log(`ok  ${(data.candidates ?? data.anatomies ?? data.directions ?? []).length} members validated against ${schema.title}`);

@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-execute
-description: Implement an accepted frontend design in the real frontend source — resolving every class through the principles, landing files through the patterns, and proving the result against the lints. Use only when every reachable layout and block hash in the session is accepted. Refuses to start on a proposed hash.
+description: Implement an accepted frontend design in the real frontend source — applying the visual direction embedded in its layout, resolving every class through the principles, landing files through the patterns, and proving the result against the lints. Use only when every reachable layout and block hash in the session is accepted. Refuses to start on a proposed hash.
 ---
 
 # starci-fe-design-execute
@@ -46,7 +46,17 @@ Verify the `fe` route (`WORKSPACE-5`). Then commit the current target state and 
 `Baseline commit: <sha>` — taken **before** the first change, never from a half-edited tree, so
 `git diff <baseline>` is the honest account of what this run did.
 
-### 4 — Resolve every class through the principles
+### 4 — Apply the direction embedded in the layout
+
+Read the exact `direction` object carried by each accepted layout. Reused token decisions must still
+resolve in the frontend vocabulary. New token decisions apply only the name and value embedded in the
+accepted layout; preview CSS is never copied into product source.
+
+When two accepted layouts in the same implementation scope assign one shared semantic role
+incompatibly, stop and return the conflict. There is no separate direction hash to choose between: the
+layout hash is the approval that binds the direction it contains.
+
+### 5 — Resolve every class through the principles
 
 The accepted JSON carries no class; that was its law. Each node's classes are now resolved
 deterministically:
@@ -58,7 +68,7 @@ deterministically:
 
 A resolution that requires taste means a principle is incomplete. Record it; do not decide it here.
 
-### 5 — Land the files through the patterns
+### 6 — Land the files through the patterns
 
 Where a file lives, what it exports, what it may import and what it is named are decided by
 `@patterns-fe`, not by convenience. Patterns are compilers, not gates: they answer a shape
@@ -70,13 +80,13 @@ result claims the contract is honoured while the accessibility tree is wrong.
 Every `reuse`, `generalize` and `new` verdict in the accepted JSON is carried out as recorded. A
 `generalize` verdict updates every measured call site; a rename that leaves one behind is not done.
 
-### 6 — Prove it against the gates
+### 7 — Prove it against the gates
 
 Run the frontend lints from `@lints-fe`. A finding is repaired, not suppressed: no rule is
 weakened, disabled or hatched to make a run pass. Then prove the surface renders — the evidence the
 approval named, not a substitute that is easier to produce.
 
-### 7 — Close the phase
+### 8 — Close the phase
 
 Close with the applied revision, the baseline commit and the tracked diff. `CHANGES` lists
 every production path in that diff and it must match the approved boundary; a path outside `Touching`
@@ -85,6 +95,8 @@ returns to its owner instead of arriving quietly.
 ## Stops
 
 - Any reachable hash unaccepted → stop, name it.
+- An accepted layout's direction references a missing reused token → stop; the visual evidence is stale.
+- Accepted layouts assign one shared role incompatibly in the same implementation scope → stop; return the product decision.
 - A required class is outside the contract's closed union → contract change, return to owner.
 - A principle cannot resolve without preference → record the gap, stop that node.
 - A lint finding that cannot be repaired inside `Touching` → return the boundary, do not suppress.

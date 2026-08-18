@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-block
-description: Produce 3–4 block anatomy JSON candidates for each region of an accepted layout — parts, repeats, states and data ownership — previewed as HTML at localhost:8080 and queued for the owner's approval. Use after a layout hash is accepted. Writes JSON to the project registry, never frontend source.
+description: Produce 3–4 block anatomy JSON candidates for each region under an accepted visual direction and layout — parts, repeats, states and data ownership — previewed as HTML at localhost:8080 and queued for the owner's approval. Use to design or revise one block without reopening the page layout. Writes JSON to the project registry, never frontend source.
 ---
 
 # starci-fe-design-block
@@ -31,13 +31,14 @@ hash, never to a rendered page.
 
 `Phase` is `block`. `Touching` names the project registry only.
 
-### 2 — Require an accepted layout
+### 2 — Require an accepted layout and resolve its direction
 
 Read the session. A region may enter block rounds only if the layout candidate that contains it carries
-an **accepted** hash. A proposed layout is not a starting point: block anatomies built on it would be
-discarded with it.
+an **accepted** hash. Resolve the visual direction through that layout candidate; do not accept a second
+direction hash from the caller. A proposed layout is not a starting point.
 
-Stop if no layout hash is accepted, and say which one is pending.
+Stop if the layout hash is unaccepted. A later revision of one block reuses the same accepted layout
+hash — and therefore the same bound direction — and opens a new round for that region only.
 
 ### 3 — Verify route and roots
 
@@ -45,11 +46,12 @@ Same as layout: verify the `fe` route before reading (`WORKSPACE-5`), then the r
 cleanliness and ownership (`WORKTREE-1`, `WORKTREE-4`). Preview into `cache/preview`
 (`WORKTREE-2`), never below `.claude` (`WORKTREE-3`).
 
-### 4 — Read the seven inputs
+### 4 — Read the eight inputs
 
 | Input | Read |
 |---|---|
 | region | the accepted region and its business reason |
+| direction | selected object resolved from the accepted layout: axes and role-to-token decisions |
 | contract | key, `why`, `host`, children names, `repeats`, `optional` — **not** the class arrays |
 | vocabulary | the leaf names the contract cites, the composite names, the blocks that exist |
 | axes | the closed anatomy set: data owner, repetition, weight, composition |
@@ -104,8 +106,9 @@ serve it:
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
 
-The preview's CSS is documentation chrome and never a product class. A preview that shows only the
-populated state hides the exact decision this stage exists to make.
+The preview resolves only the accepted direction's semantic roles. Its fixed documentation markup is
+never a source of product classes. Every anatomy in a batch uses the same direction, copy and data; a
+preview that changes any of those or shows only the populated state invalidates the comparison.
 
 ### 10 — Queue for approval and record the verdict
 
@@ -118,7 +121,8 @@ Print the six tables. `OWED` names regions still without an accepted anatomy.
 
 ## Stops
 
-- No accepted layout hash → stop; name the pending one.
+- No accepted layout hash, or its bound direction cannot be resolved → stop; name the broken dependency.
+- Direction vocabulary no longer matches the source state it was approved against → stop; mark the visual evidence stale.
 - A part cites a leaf or composite that does not exist → stop; the vocabulary is the authority.
 - A state cannot be determined from source → refusal, not a guess.
 - Registry unlocked, dirty or foreign-owned → stop; do not write.

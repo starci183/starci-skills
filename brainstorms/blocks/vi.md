@@ -14,7 +14,8 @@ title: Blocks · Vietnamese
 
 ## Bản ghi
 
-Mô-đun này nhận **một region của một layout đã được chấp nhận**, rồi trả về **3–4 giải phẫu khối**, mỗi cái
+Mô-đun này nhận **một region của một layout đã được chấp nhận** cùng direction đã chọn trong layout đó,
+rồi trả về **3–4 giải phẫu khối**, mỗi cái
 là một cấu trúc JSON để thầy chọn giữa chúng — hoặc một lời từ chối nêu tên quyết định sản phẩm còn
 thiếu. Cũng như tầng layout, đây không phải compiler, và vì đúng lý do đó: giải phẫu nào là đúng là một
 **quyết định sản phẩm**, và trả về một đáp án là giả vờ rằng quyết định ấy đã được đưa ra.
@@ -30,27 +31,28 @@ có dữ liệu thì lúc trường hợp rỗng xuất hiện là phải **thi�
 
 ## Đầu vào
 
-Bảy, không hơn.
+Tám, không hơn.
 
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
 | 1 | Region đã chấp nhận và lý do nghiệp vụ của nó | không có chủ thể, chỉ có một cái hình |
-| 2 | Hash layout **đã được chấp nhận** mà region này đến từ | giải phẫu bị dựng trên một layout có thể bị bỏ |
-| 3 | Contract: **key**, `why`, `host`, **tên** children, `repeats`, `optional` — không lấy mảng class | phần bị bịa ra thay vì được tra |
-| 4 | Từ vựng: tên leaf mà contract gọi, tên composite, những block đang có | một phần trích một thành phần không tồn tại |
-| 5 | Dữ liệu của region **thật sự hỏng thế nào**, đọc từ source của page và block | `optional` bị hiểu lầm là đủ bộ trạng thái |
-| 6 | Bộ trục giải phẫu đóng | 3–4 giải phẫu khác nhau bằng trang trí |
-| 7 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi region bị trả lời như thể nó là region đầu tiên |
+| 2 | Hash layout **đã được chấp nhận** mà region này đến từ, vốn đã buộc direction | giải phẫu bị dựng trên layout hay direction có thể bị bỏ |
+| 3 | Direction giải ra qua layout đó | giải phẫu được vẽ bằng lựa chọn thị giác chưa ai duyệt |
+| 4 | Contract: **key**, `why`, `host`, **tên** children, `repeats`, `optional` — không lấy mảng class | phần bị bịa ra thay vì được tra |
+| 5 | Từ vựng: tên leaf mà contract gọi, tên composite, những block đang có | một phần trích một thành phần không tồn tại |
+| 6 | Dữ liệu của region **thật sự hỏng thế nào**, đọc từ source của page và block | `optional` bị hiểu lầm là đủ bộ trạng thái |
+| 7 | Bộ trục giải phẫu đóng | 3–4 giải phẫu khác nhau bằng trang trí |
+| 8 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi region bị trả lời như thể nó là region đầu tiên |
 
-**Đầu vào số 5 tồn tại vì contract không trả lời được nó.** `optional: true` khai **sự hiện diện** và
+**Đầu vào số 6 tồn tại vì contract không trả lời được nó.** `optional: true` khai **sự hiện diện** và
 không gì hơn: đang tải, thất bại và rỗng đều rơi vào cùng một cờ đó. Tách chúng ra thì phải đọc từ source
 của page và block, không bao giờ được suy từ registry.
 
-Không đọc ở tầng này: mảng class, biến theme, chữ theo locale, lint.
+Không đọc ở tầng này: mảng class, lựa chọn theme chưa duyệt, chữ theo locale, lint.
 
 ## Đọc một region đã chấp nhận
 
-1. **Đòi một hash layout đã được chấp nhận.** Layout đang ở trạng thái đề xuất không phải điểm bắt đầu.
+1. **Đòi hash layout đã chấp nhận và giải direction của nó.** Layout đang đề xuất không phải điểm bắt đầu, và direction đã buộc trong nó không được chép thành hash thứ hai ở đây.
 2. **Liệt kê trạng thái trước.** Có dữ liệu, rỗng, đang tải, thất bại, một phần, bị chặn quyền — region
    này **thật sự** vào được những cái nào? Đọc từ source; không suy từ `optional`.
 3. **Tra các phần theo `why`**, không theo hình, và kiểm mọi tên leaf và composite với từ vựng.
@@ -137,8 +139,8 @@ blocked: <những phần không giải được nếu thiếu nó>
 ## Đầu ra
 
 Đầu ra **chính là** JSON, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này.
-`envelope` giữ những thứ đổi theo lượt — kể cả `layoutHash` đã được chấp nhận mà region này đến từ — và
-hash chỉ phủ **một giải phẫu**.
+`envelope` giữ những thứ đổi theo lượt — kể cả `layoutHash` đã được chấp nhận mà region này đến từ.
+Layout đó đã buộc direction, nên block không mang hash phụ thuộc thứ hai — và hash chỉ phủ **một giải phẫu**.
 
 ```json
 {

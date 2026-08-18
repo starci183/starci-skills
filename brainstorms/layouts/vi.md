@@ -32,25 +32,26 @@ một entry mới và vì sao. Region không trích gì cả là một thành ph
 
 ## Đầu vào
 
-Sáu, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuyện cụ thể.
+Bảy, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuyện cụ thể.
 
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
 | 1 | Yêu cầu nghiệp vụ, đúng nguyên văn | không có ý định nào, chỉ có một cái hình |
-| 2 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
-| 3 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
-| 4 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
-| 5 | Bộ trục khác biệt đóng | 3–4 phương án khác nhau bằng trang trí, tức là **một** phương án bốn lần |
-| 6 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
+| 2 | Một object direction được chọn từ vòng direction | các sườn bị so dưới những ý định thị giác khác nhau |
+| 3 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
+| 4 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
+| 5 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
+| 6 | Bộ trục khác biệt đóng | 3–4 phương án khác nhau bằng trang trí, tức là **một** phương án bốn lần |
+| 7 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
 
-**Đầu vào số 2 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
+**Đầu vào số 3 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
 truy vấn qua `@contract-search`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
 để tiết kiệm. Một tầng **không thấy** class thì không thể ghi class vào đầu ra của nó, nên "JSON không có
 class" đứng vững vì **giá trị đó không bao giờ tới nơi**, chứ không vì một lời nhắc phải tuân theo. Đo
 trên một registry 299 entry: 192KB nằm trên đĩa, 69KB là mức được phép, và một truy vấn trả lời trong
 dưới 2KB.
 
-Không đọc ở tầng này: mảng class, biến theme, cài đặt của leaf và composite, dữ liệu và query, chữ theo
+Không đọc ở tầng này: mảng class, lựa chọn theme chưa được chọn, cài đặt của leaf và composite, dữ liệu và query, chữ theo
 locale, lint. Tất cả thuộc những tầng đến sau.
 
 ## Đọc một yêu cầu
@@ -129,7 +130,7 @@ Mười hai luật mà **mọi** phương án phải thoả. Phương án phạm
 
 ## Quy tắc
 
-1. Phương án không mang class, không mang token, không mang màu.
+1. Phương án không mang class. Token hay giá trị thị giác duy nhất của nó nằm trong cùng object `direction` đã chọn ở mọi phương án.
 2. Mọi region trích một entry key, hoặc khai một entry mới kèm `why` của nó.
 3. Mọi region gọi tên branch ghép nó.
 4. Phương án khai bộ giá trị trục, và không hai phương án nào trong một lô trùng cả bộ.
@@ -176,6 +177,7 @@ không phải cái trích đoạn dưới đây. `envelope` giữ những thứ 
   "candidates": [
     {
       "id": "a",
+      "direction": {"id": "quiet-precision", "vocabularyAt": "abc123", "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "flat", "motion": "still"}, "citesPrecedent": "none", "personality": ["calm", "precise", "restrained"], "roles": {"ground": {"verdict": "reuse", "token": "--background"}, "surface": {"verdict": "reuse", "token": "--card"}, "content": {"verdict": "reuse", "token": "--foreground"}, "mutedContent": {"verdict": "reuse", "token": "--muted-foreground"}, "accent": {"verdict": "reuse", "token": "--primary"}, "separator": {"verdict": "reuse", "token": "--border"}, "display": {"verdict": "reuse", "token": "--font-sans"}, "body": {"verdict": "reuse", "token": "--font-sans"}, "label": {"verdict": "reuse", "token": "--font-sans"}, "radius": {"verdict": "reuse", "token": "--radius"}, "elevation": {"verdict": "none", "why": "flat surfaces carry no elevation"}, "duration": {"verdict": "none", "why": "this direction stays still"}, "easing": {"verdict": "none", "why": "this direction stays still"}}, "rejects": ["decorative gradients", "floating surfaces"], "reason": "quiet hierarchy keeps comparison faster than decoration"},
       "axes": {"navigation": "navbar", "evidence": "beside", "secondary": "panel", "chrome": "sticky"},
       "citesPrecedent": "none",
       "regions": [
@@ -198,7 +200,7 @@ Mọi object trong schema đều đặt `additionalProperties: false`, nên mộ
 hiện để tranh luận — nó **không hợp lệ**. Validate trước khi ghi và trước khi hash:
 
 ```bash
-node @validate-artifact --schema @schema --data <batch.json> --hash
+node @validate-artifact --schema @schema --data <batch.json> --vocabulary <visual-vocabulary.json> --hash
 ```
 
 Validator còn ép ba luật cấp-lô mà schema không nói được: không class token ở bất cứ đâu trong lô, không
@@ -225,6 +227,7 @@ quay ra hay không, nên chuyện đó không được giả định.
   "candidates": [
     {
       "id": "a",
+      "direction": {"id": "quiet-precision", "vocabularyAt": "abc123", "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "flat", "motion": "still"}, "citesPrecedent": "none", "personality": ["calm", "precise", "restrained"], "roles": {"ground": {"verdict": "reuse", "token": "--background"}, "surface": {"verdict": "reuse", "token": "--card"}, "content": {"verdict": "reuse", "token": "--foreground"}, "mutedContent": {"verdict": "reuse", "token": "--muted-foreground"}, "accent": {"verdict": "reuse", "token": "--primary"}, "separator": {"verdict": "reuse", "token": "--border"}, "display": {"verdict": "reuse", "token": "--font-sans"}, "body": {"verdict": "reuse", "token": "--font-sans"}, "label": {"verdict": "reuse", "token": "--font-sans"}, "radius": {"verdict": "reuse", "token": "--radius"}, "elevation": {"verdict": "none", "why": "flat surfaces carry no elevation"}, "duration": {"verdict": "none", "why": "this direction stays still"}, "easing": {"verdict": "none", "why": "this direction stays still"}}, "rejects": ["decorative gradients", "floating surfaces"], "reason": "quiet hierarchy keeps comparison faster than decoration"},
       "axes": {"navigation": "navbar", "evidence": "beside", "secondary": "panel", "chrome": "sticky"},
       "citesPrecedent": "none",
       "regions": [
@@ -247,6 +250,7 @@ quay ra hay không, nên chuyện đó không được giả định.
     },
     {
       "id": "b",
+      "direction": {"id": "quiet-precision", "vocabularyAt": "abc123", "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "flat", "motion": "still"}, "citesPrecedent": "none", "personality": ["calm", "precise", "restrained"], "roles": {"ground": {"verdict": "reuse", "token": "--background"}, "surface": {"verdict": "reuse", "token": "--card"}, "content": {"verdict": "reuse", "token": "--foreground"}, "mutedContent": {"verdict": "reuse", "token": "--muted-foreground"}, "accent": {"verdict": "reuse", "token": "--primary"}, "separator": {"verdict": "reuse", "token": "--border"}, "display": {"verdict": "reuse", "token": "--font-sans"}, "body": {"verdict": "reuse", "token": "--font-sans"}, "label": {"verdict": "reuse", "token": "--font-sans"}, "radius": {"verdict": "reuse", "token": "--radius"}, "elevation": {"verdict": "none", "why": "flat surfaces carry no elevation"}, "duration": {"verdict": "none", "why": "this direction stays still"}, "easing": {"verdict": "none", "why": "this direction stays still"}}, "rejects": ["decorative gradients", "floating surfaces"], "reason": "quiet hierarchy keeps comparison faster than decoration"},
       "axes": {"navigation": "rail", "evidence": "below", "secondary": "route", "chrome": "scrolls"},
       "citesPrecedent": "none",
       "regions": [

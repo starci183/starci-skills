@@ -33,24 +33,25 @@ structure.
 
 ## Inputs
 
-Six, and no more. Each is here because something specific breaks without it.
+Seven, and no more. Each is here because something specific breaks without it.
 
 | # | Input | Without it |
 |---|---|---|
 | 1 | The business request, verbatim | there is no intent, only a shape |
-| 2 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
-| 3 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
-| 4 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
-| 5 | The closed list of diversity axes | the 3–4 candidates differ by decoration, which is the same candidate four times |
-| 6 | Precedents accepted for THIS project, the one the workspace route declared | every request is answered as if it were the first |
+| 2 | The one direction object selected from the direction round | skeletons are compared under different visual intent |
+| 3 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
+| 4 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
+| 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
+| 6 | The closed list of diversity axes | the 3–4 candidates differ by decoration, which is the same candidate four times |
+| 7 | Precedents accepted for THIS project, the one the workspace route declared | every request is answered as if it were the first |
 
-**Input 2 is queried, not read, and the class arrays are never extracted.** One need per region through
+**Input 3 is queried, not read, and the class arrays are never extracted.** One need per region through
 `@contract-search`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
 cannot see a class cannot write one into its output, so "no class in a candidate" holds because the value
 never arrives — not because a reader was asked to skip a field. Measured on one 299-entry registry: 192KB
 on disk, 69KB permitted, under 2KB actually answered.
 
-Not read at this stage: class arrays, theme variables, leaf and composite implementations, data and
+Not read at this stage: class arrays, unselected theme choices, leaf and composite implementations, data and
 queries, locale copy, lints. Those belong to the stages that come after.
 
 ## Reading a request
@@ -129,7 +130,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 
 ## Rules
 
-1. A candidate carries no class, no token, no colour.
+1. A candidate carries no class. Its only tokens or visual values are inside the same selected `direction` object in every candidate.
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.
@@ -176,6 +177,7 @@ decision re-run in a later round produces the same hash.
   "candidates": [
     {
       "id": "a",
+      "direction": {"id": "quiet-precision", "vocabularyAt": "abc123", "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "flat", "motion": "still"}, "citesPrecedent": "none", "personality": ["calm", "precise", "restrained"], "roles": {"ground": {"verdict": "reuse", "token": "--background"}, "surface": {"verdict": "reuse", "token": "--card"}, "content": {"verdict": "reuse", "token": "--foreground"}, "mutedContent": {"verdict": "reuse", "token": "--muted-foreground"}, "accent": {"verdict": "reuse", "token": "--primary"}, "separator": {"verdict": "reuse", "token": "--border"}, "display": {"verdict": "reuse", "token": "--font-sans"}, "body": {"verdict": "reuse", "token": "--font-sans"}, "label": {"verdict": "reuse", "token": "--font-sans"}, "radius": {"verdict": "reuse", "token": "--radius"}, "elevation": {"verdict": "none", "why": "flat surfaces carry no elevation"}, "duration": {"verdict": "none", "why": "this direction stays still"}, "easing": {"verdict": "none", "why": "this direction stays still"}}, "rejects": ["decorative gradients", "floating surfaces"], "reason": "quiet hierarchy keeps comparison faster than decoration"},
       "axes": {"navigation": "navbar", "evidence": "beside", "secondary": "panel", "chrome": "sticky"},
       "citesPrecedent": "none",
       "regions": [
@@ -198,7 +200,7 @@ Every object in the schema sets `additionalProperties: false`, so a `className` 
 argue about — it is invalid. Validate before writing and before hashing:
 
 ```bash
-node @validate-artifact --schema @schema --data <batch.json> --hash
+node @validate-artifact --schema @schema --data <batch.json> --vocabulary <visual-vocabulary.json> --hash
 ```
 
 The validator also enforces the three batch laws no schema can state: no class token anywhere in the
@@ -225,6 +227,7 @@ courses, so that is not assumed.
   "candidates": [
     {
       "id": "a",
+      "direction": {"id": "quiet-precision", "vocabularyAt": "abc123", "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "flat", "motion": "still"}, "citesPrecedent": "none", "personality": ["calm", "precise", "restrained"], "roles": {"ground": {"verdict": "reuse", "token": "--background"}, "surface": {"verdict": "reuse", "token": "--card"}, "content": {"verdict": "reuse", "token": "--foreground"}, "mutedContent": {"verdict": "reuse", "token": "--muted-foreground"}, "accent": {"verdict": "reuse", "token": "--primary"}, "separator": {"verdict": "reuse", "token": "--border"}, "display": {"verdict": "reuse", "token": "--font-sans"}, "body": {"verdict": "reuse", "token": "--font-sans"}, "label": {"verdict": "reuse", "token": "--font-sans"}, "radius": {"verdict": "reuse", "token": "--radius"}, "elevation": {"verdict": "none", "why": "flat surfaces carry no elevation"}, "duration": {"verdict": "none", "why": "this direction stays still"}, "easing": {"verdict": "none", "why": "this direction stays still"}}, "rejects": ["decorative gradients", "floating surfaces"], "reason": "quiet hierarchy keeps comparison faster than decoration"},
       "axes": {"navigation": "navbar", "evidence": "beside", "secondary": "panel", "chrome": "sticky"},
       "citesPrecedent": "none",
       "regions": [
@@ -247,6 +250,7 @@ courses, so that is not assumed.
     },
     {
       "id": "b",
+      "direction": {"id": "quiet-precision", "vocabularyAt": "abc123", "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "flat", "motion": "still"}, "citesPrecedent": "none", "personality": ["calm", "precise", "restrained"], "roles": {"ground": {"verdict": "reuse", "token": "--background"}, "surface": {"verdict": "reuse", "token": "--card"}, "content": {"verdict": "reuse", "token": "--foreground"}, "mutedContent": {"verdict": "reuse", "token": "--muted-foreground"}, "accent": {"verdict": "reuse", "token": "--primary"}, "separator": {"verdict": "reuse", "token": "--border"}, "display": {"verdict": "reuse", "token": "--font-sans"}, "body": {"verdict": "reuse", "token": "--font-sans"}, "label": {"verdict": "reuse", "token": "--font-sans"}, "radius": {"verdict": "reuse", "token": "--radius"}, "elevation": {"verdict": "none", "why": "flat surfaces carry no elevation"}, "duration": {"verdict": "none", "why": "this direction stays still"}, "easing": {"verdict": "none", "why": "this direction stays still"}}, "rejects": ["decorative gradients", "floating surfaces"], "reason": "quiet hierarchy keeps comparison faster than decoration"},
       "axes": {"navigation": "rail", "evidence": "below", "secondary": "route", "chrome": "scrolls"},
       "citesPrecedent": "none",
       "regions": [

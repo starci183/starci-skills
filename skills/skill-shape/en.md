@@ -37,8 +37,8 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-stale-list` | plan only | which projects' routes no longer describe this machine, and who clears each |
 | `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | plan → review → apply | a red source returned green: format, autofix and defect passes kept apart, and the defect pass fanned out |
-| `starci-fe-design-layout` | opens or resumes the session, then layout rounds | 3–4 layout candidates per surface, hash-bound |
-| `starci-fe-design-block` | block rounds | 3–4 anatomies per region, hash-bound |
+| `starci-fe-design-layout` | opens or resumes the session, direction choice, then layout rounds | 3–4 direction choices with no separate hash, then 3–4 layout candidates per surface, hash-bound |
+| `starci-fe-design-block` | block rounds | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
 | `starci-fe-design-execute` | execution | frontend source, only after every reachable hash is accepted |
 | `starci-be-plan` | plan | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approve, then apply | approval, then backend source |
@@ -91,7 +91,8 @@ word as authority over work nobody listed has stopped asking and started assumin
 
 ## Phases
 
-**Design rounds** are the review surface. Each round records the exact prompt, the candidates, the
+**Design rounds** are the review surface. Direction choices support a layout round and have no approval
+hash of their own; the selected object is embedded in the layout candidate. Each recorded round keeps the exact prompt, the candidates, the
 feedback and the owner's verdict, and acceptance is bound to a hash. Feedback opens a new round; it
 never edits an accepted round.
 

@@ -1,0 +1,137 @@
+---
+title: Directions · Vietnamese
+---
+
+# Hướng thị giác
+
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@direction-schema` | `brainstorms/directions/schema.json` | file | Defines the only direction artifact this module may return. |
+| `@visual-vocabulary-schema` | `brainstorms/directions/vocabulary.schema.json` | file | Defines the live token inventory used to judge reuse and new verdicts. |
+| `@artifact-validator` | `scripts/validate-artifact.mjs` | script | Enforces batch diversity and token provenance before selection. |
+
+Đầu vào là yêu cầu sản phẩm cùng vốn thị giác đang sống của frontend, và đầu ra là **3–4 hướng thị
+giác** để người chủ chọn. Một hướng quyết định quan hệ dự kiến giữa vai trò ngữ nghĩa và token. Nó
+không quyết định layout, giải phẫu block hay class.
+
+## Luật
+
+Gu thị giác là một quyết định sản phẩm. Máy có thể từ chối token bịa, phương án trùng hay lựa chọn
+không truy được về bằng chứng; máy không thể tuyên bố một phương án hợp lệ là đẹp. Người chủ chấp
+chọn đúng một object direction trước khi thiết kế cấu trúc bắt đầu. Object đó chỉ trở thành bền vững
+khi nằm trong candidate layout về sau cùng một layout hash duy nhất.
+
+Kho style bên ngoài chỉ là nguồn đề xuất. Một đề xuất chỉ thành candidate sau khi được phát biểu bằng
+vốn của project này, hoặc gọi tên mọi token mới mà nó sẽ cần.
+
+## Đầu vào
+
+| # | Đầu vào | Thiếu nó thì |
+|---|---|---|
+| 1 | Yêu cầu, đối tượng, tác vụ và cảm giác mong muốn | trang trí thay chỗ cho ý định sản phẩm |
+| 2 | Bản kiểm kê CSS custom property được sinh từ source | candidate gọi tên giá trị sản phẩm không biểu đạt được |
+| 3 | Màn hình đã duyệt và bằng chứng thương hiệu của project này | lịch sử thị giác của chính sản phẩm bị bỏ qua |
+| 4 | Hướng dẫn design system vendor mà frontend đang dùng | ngữ nghĩa component và ý định thị giác mâu thuẫn |
+| 5 | Bộ trục direction đóng | bốn cái tên che một lựa chọn thị giác |
+| 6 | Tiền lệ direction đã chấp nhận cùng những cái bị từ chối | gu đã bị từ chối quay lại dưới tên mới |
+
+Kho công khai, tên style, palette và cặp font có thể mở rộng vùng tìm kiếm. Chúng không bao giờ đứng
+trên sáu đầu vào và không được chép vào cây làm canon.
+
+## Đọc bằng chứng
+
+1. Nói đối tượng, tác vụ và cảm giác dự kiến, mỗi thứ một câu. Từ chối khi yêu cầu không cho cơ sở để
+   nói bất cứ thứ nào.
+2. Kiểm kê vốn đang sống và ghi trạng thái source của nó thành `vocabularyAt` trong mọi direction.
+   Token `reuse` phải có trong kiểm kê; token `new` phải chưa có.
+3. Đọc màn hình đã duyệt như bằng chứng, không như lệnh lặp lại. Ghi cái đã được chấp nhận và nhu cầu
+   của bề mặt mới khác nó ở đâu.
+4. Chọn bộ trục trước khi đặt tên hướng. Hai bộ giống nhau là một hướng.
+5. Ánh xạ mọi vai trò ngữ nghĩa vào một quyết định token. Token mới mang lý do vốn hiện tại không trả
+   lời được.
+6. Gọi tên điều mỗi hướng từ chối. Một hướng không có ranh giới chỉ là tính từ, chưa phải quyết định.
+
+## Trục direction
+
+| Trục | Giá trị |
+|---|---|
+| tương phản | mềm / cân bằng / mạnh |
+| mật độ | gọn / cân bằng / thoáng |
+| hình | vuông / mềm / tròn |
+| độ sâu | phẳng / phân lớp / nổi |
+| chuyển động | tĩnh / tiết chế / biểu cảm |
+
+Các giá trị dùng để so sánh, không phải CSS. Cách biểu đạt chính xác nằm trong ánh xạ vai trò sang
+token bên cạnh chúng.
+
+## Vai trò ngữ nghĩa
+
+Mọi direction giải cùng mười ba vai trò: `ground`, `surface`, `content`, `mutedContent`, `accent`,
+`separator`, `display`, `body`, `label`, `radius`, `elevation`, `duration`, và `easing`.
+
+Một vai trò có đúng một phán quyết:
+
+| Phán quyết | Nghĩa | Bằng chứng phải nợ |
+|---|---|---|
+| `reuse` | custom property được gọi tên có trong kiểm kê | chỗ xuất hiện trong kiểm kê |
+| `new` | chưa property nào trả lời vai trò này | property đề xuất, giá trị CSS chính xác và lý do nó cần thiết |
+| `none` | một vai trò radius, elevation hay motion tuỳ chọn được chủ ý bỏ | vì sao sự vắng mặt thuộc direction |
+
+Tên token dùng lại được neo vào trạng thái source trong `vocabularyAt`. Token mới mang giá trị CSS chính
+xác vì preview và layout hash về sau phải buộc vào cùng một quyết định. Utility class, font tải về và biến vendor sao
+chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt riêng.
+
+## Quy tắc
+
+1. Direction không mang class. Raw visual value chỉ xuất hiện bên trong quyết định token `new`.
+2. Mọi direction mang `vocabularyAt` của lô; mọi token `reuse` có ở đó và mọi token `new` vắng mặt.
+3. Mọi direction ánh xạ đủ mười ba vai trò; `none` chỉ hợp lệ với radius, elevation, duration và easing.
+4. Mọi direction gọi tên ba đến năm từ tính cách và một đến năm điều từ chối rõ ràng.
+5. Không hai direction nào trong một lô trùng cả bộ trục.
+6. Có ít nhất một direction rời tiền lệ gần nhất khi tiền lệ tồn tại.
+7. Chỉ trả ít hơn ba khi bằng chứng chỉ cho phép ít hơn, và nói lý do; không bao giờ nhồi cho đủ.
+8. Feedback mở một lượt mới. Direction đã chấp nhận không bao giờ bị sửa tại chỗ.
+
+## Preview
+
+Render mọi candidate trên **cùng một bề mặt tham chiếu và cùng nội dung**: navigation, heading, body
+text, action, form control, hàng lặp, bề mặt có biên, overlay và lỗi đã ngã ngũ. Preview được giải token
+từ kiểm kê, nhưng không được đưa vào giá trị vắng mặt trong quyết định JSON.
+
+Cùng nội dung là mẫu đối chứng. Đổi layout hay copy giữa các candidate khiến người chủ so hai sản phẩm
+thay vì hai direction. HTML là bằng chứng có thể dựng lại; lời duyệt gắn vào JSON.
+
+## Từ chối
+
+Từ chối khi thiếu đối tượng hay cảm giác dự kiến, bằng chứng thương hiệu mâu thuẫn mà chưa có phán quyết
+của người chủ, không kiểm kê được vốn đang sống, hoặc một giá trị thị giác bắt buộc chưa có token và
+chưa ai cho phép tạo token mới. Trả về quyết định còn thiếu cùng những vai trò nó chặn.
+
+## Đầu ra
+
+Đầu ra là JSON được kiểm bởi `@direction-schema`. Kiểm nó với cả schema lẫn vốn được sinh
+trước khi trình để chọn:
+
+```bash
+node @artifact-validator \
+  --schema @direction-schema \
+  --data <batch.json> --vocabulary <visual-vocabulary.json>
+```
+
+Vòng direction không có approval hash. Object direction được chọn được chép nguyên vào mọi candidate
+layout ở vòng kế tiếp, nơi một layout hash duy nhất buộc ý định thị giác với sườn. Snapshot vốn khớp
+`@visual-vocabulary-schema`.
+
+## Ví dụ đã giải
+
+Với catalogue khoá học cho người cần so sánh nhanh, một candidate có thể là `quiet-precision`: tương
+phản cân bằng, mật độ gọn, hình mềm, độ sâu phẳng và chuyển động tiết chế. Nó dùng lại token nền, bề mặt
+và chữ của project, từ chối gradient trang trí cùng bề mặt nổi, và không đề xuất vốn mới. Candidate
+khác phải lệch trên một bộ trục thật, không chỉ gọi cùng lựa chọn đó là `editorial`.
+
+## Phạm vi
+
+Tầng này quyết định ý định thị giác và vốn token ngữ nghĩa của nó. Nó không đặt region, thiết kế trạng
+thái block, chọn utility class, gán raw value cho token hay viết source frontend.

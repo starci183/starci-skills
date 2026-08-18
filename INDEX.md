@@ -57,7 +57,7 @@ loading a stage the skill did not ask for is paying for a tree you are not using
 4. `@gates` — last, on code that exists.
 
 `@brainstorms` is deliberately absent from that list: if the shape is not decided,
-coding has not started, and deciding it belongs to a skill — layout, then block.
+coding has not started, and deciding it belongs to a skill — direction inside layout, then block.
 
 Read `@skill-shape` when you are about to run a skill or write one, not
 before every task.
@@ -76,8 +76,8 @@ record. Seven do the work; two only look — one at the machine, one at the othe
 | `starci-stale-list` | which projects' routes no longer describe this machine, why, and who clears each |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red source returned green — measured, in separated passes, never by silencing a finding |
-| `starci-fe-design-layout` | layout candidates, hash-bound |
-| `starci-fe-design-block` | block anatomies, hash-bound |
+| `starci-fe-design-layout` | 3–4 direction choices with no separate hash, then layout candidates that embed the selection and are hash-bound |
+| `starci-fe-design-block` | block anatomies under the direction embedded in their accepted layout, hash-bound independently |
 | `starci-fe-design-execute` | frontend source, only after every hash is accepted |
 | `starci-be-plan` | the backend brief |
 | `starci-be-approve` | approval, then backend source |
@@ -91,6 +91,8 @@ under pressure:
   `@contract-search`, which returns a contract entry's `key`,
   `why` and `host` and never extracts its classes — a stage that cannot see a class cannot write one, and
   the value not arriving is what holds that, not a rule asking a reader to skip a field;
+- a direction batch is vocabulary-bound but not separately hash-bound; the selected object becomes
+  durable only inside the layout candidate whose one hash covers both visual intent and skeleton;
 - every schema sets `additionalProperties: false`, so a stray `className` is invalid rather than
   arguable;
 - `@validate-artifact` refuses a batch whose candidates
