@@ -10,9 +10,9 @@ title: Backend plan · Vietnamese
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-`starci-init` · `starci-be-approve`
+Không có. Plan kết thúc bằng brief; nó không tự chạy setup hay approval.
 
 ## Cách chạy
 
@@ -68,7 +68,7 @@ In đủ sáu bảng. `NEED APPROVALS` giữ những quyết định có thể s
 
 ## Điểm dừng
 
-- Route không có hoặc stale → trả về `starci-init`.
+- Route không có hoặc stale → báo bằng chứng route đã fail rồi kết thúc lượt chạy.
 - Không đọc được schema → dừng; kế hoạch dựa trên schema nhớ lại chỉ là tưởng tượng.
 - Không có sibling cùng loại → nói rõ đây là **family mới**, kèm lý do, để người duyệt biết họ đang đặt
   tiền lệ chứ không phải theo tiền lệ.
@@ -80,3 +80,5 @@ Sáu bảng của skill shape, đúng thứ tự. `CHANGES` là `None` vì phase
 | Output | Owner |
 |---|---|
 | brief đã sẵn sàng phê duyệt cùng ranh giới file chính xác | `starci-be-approve` |
+
+Owner có thể dùng brief đó trong một lượt approval được yêu cầu riêng. Skill này không tự khởi chạy nó.

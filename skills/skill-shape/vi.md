@@ -25,6 +25,10 @@ chạm vào bất cứ thứ gì. Sáu bảng kết quả đứng cuối vì cô
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
+Skill không bao giờ tự gọi skill khác. Một điểm dừng kết thúc lượt chạy hiện tại: báo bằng chứng đang chặn
+rồi kết thúc. Tên capability chỉ được dùng để nói ai sở hữu một request tương lai, không phải instruction
+điều phối runtime. Chỉ owner mới mở request riêng đó.
+
 ## Ngôn ngữ runtime
 
 Instruction runtime chỉ dùng tiếng Anh. Skill đọc `SKILL.md` binding của chính nó, sau đó đọc bản `en.md`
@@ -89,7 +93,7 @@ thì đã bị chặn trước cả khi bắt đầu việc riêng của mục t
 |---|---|---|
 | working | còn bằng chứng hoặc còn việc an toàn để làm | tiếp tục, không hỏi |
 | needs approval | một quyết định, lời hứa, giá hay biên giới ghi có thể sai | gộp vào `NEED APPROVALS` |
-| phase complete | điều kiện kết thúc đã đạt | ghi vào đúng chỗ phase đã khai, gọi phase sau |
+| phase complete | điều kiện kết thúc đã đạt | ghi vào đúng chỗ phase đã khai; chỉ tiếp tục bên trong quy trình của chính skill này |
 
 Một đường tool thất bại không làm lượt chạy bị chặn: thử đường an toàn thay thế trước. Mọi thứ cần
 duyệt **đã biết tại thời điểm đó** được gộp thành **một** lượt hỏi, không hỏi lắt nhắt. Sau phản hồi,
@@ -167,6 +171,7 @@ thêm**.
 7. Baseline commit lấy **trước** lần ghi sản phẩm đầu tiên, không lấy từ một cây đã sửa nửa vời.
 8. Đường dẫn ngoài `Touching` được trả về cho chủ của nó.
 9. Mọi phase kết thúc bằng đủ sáu bảng, kể cả bảng chỉ có `None`.
+10. Không skill nào tự gọi, load hay tự động route sang skill khác.
 
 ## Ngoại lệ
 
@@ -174,7 +179,7 @@ thêm**.
   theo ba chiều khác nhau — bootstrap chết thì agent không được định tuyến, route sai thì lượt chạy
   **đọc** sai repository, worktree sai thì nó **ghi** vào chỗ bị cấm ghi. Một lần duyệt **không bao giờ**
   phủ hơn một root, và một lượt chạy được phép chỉ chạm đúng một root.
-- **Năng lực chỉ đọc.** Apply của nó chốt một phán quyết và chuyển việc sửa về cho chủ. Nó không bao
+- **Năng lực chỉ đọc.** Apply của nó chốt một phán quyết và báo ai sở hữu một request sửa riêng. Nó không bao
   giờ biến việc đo thành một lần sửa source chưa khai báo.
 - **Session được tiếp tục.** Layout được phép **tiếp** thay vì **mở**. Session id và mọi hash đã chấp
   nhận sống sót qua lần tiếp đó, không đổi.

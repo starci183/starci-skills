@@ -11,9 +11,9 @@ title: Stale project list · Vietnamese
 | `@export-state` | `scripts/export-console-state.mjs` | script | đo workspace, contract và trạng thái lint machine |
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-`starci-init` · `starci-repair`
+Không có. Skill chỉ báo ownership; nó không tự gọi capability được nêu tên.
 
 ## Cách chạy
 
@@ -77,9 +77,10 @@ nếu làm vậy báo cáo sẽ trở thành thứ thay đổi machine nó vừa
 
 ## Điểm dừng
 
-- `.workspace` không tồn tại → dừng; Source chưa có route, cleared by `starci-init` sau khi owner khai project.
+- `.workspace` không tồn tại → dừng; báo Source chưa có route rồi kết thúc lượt chạy.
 - Route có nhưng parse lỗi → báo một hàng `invalid`; không gọi nó stale hay absent.
-- Người đọc yêu cầu sửa → chuyển các hàng đã đo cho `starci-init`; không sửa trong lượt báo cáo.
+- Người đọc yêu cầu sửa → hoàn tất báo cáo. Việc sửa cần request và lượt chạy riêng của owner; skill này
+  không tự khởi chạy nó.
 
 ## ĐẦU RA
 

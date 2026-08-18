@@ -20,11 +20,9 @@ description: Open or resume a hash-bound frontend design session, generate 3–4
 | `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-| Condition | Owner |
-|---|---|
-| The workspace route is absent or stale. | `starci-init` |
+None. A stop ends this run. This skill never invokes another skill as recovery.
 
 ## Run
 
@@ -147,12 +145,15 @@ six tables. `OWED` names the block rounds not yet designed.
 
 ## Stops
 
-- Route absent or stale → stop; `starci-init` owns the route repair.
-- Registry unlocked, dirty or foreign-owned → stop; do not write.
+- Route absent or stale → stop; report the exact failed route evidence and end this run.
+- Registry unlocked, dirty or foreign-owned → stop; report the failed ownership evidence and do not write.
 - Visual inventory empty or unreadable → stop; do not infer tokens from screenshots.
 - No exact direction selected → keep the direction choice open; do not generate layouts.
 - A required class is outside the contract's closed set → return the contract change to the owner.
 - Duplicate layout axis sets remain → regenerate rather than ship a fake choice.
+
+No stop invokes another skill. If the owner wants recovery, that is a separate request and a separate
+run.
 
 ## OUTPUT
 

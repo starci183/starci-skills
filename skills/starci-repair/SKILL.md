@@ -11,9 +11,9 @@ description: Take a source that no longer builds, no longer lints clean, drifted
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-`starci-init`
+None. This skill reports a stale route and ends; it never starts setup.
 
 ## Run
 
@@ -283,7 +283,7 @@ Close with the applied revision, the baseline commit, the tracked diff and the t
 
 ## Stops
 
-- The route is stale → return to `starci-init`, naming the field that failed.
+- The route is stale → name the field that failed and end this run.
 - A gate can only pass by silencing a finding → stop; that is the one thing this skill exists to refuse.
 - A lint rule contradicts the canon it claims to enforce → stop; that is a trust-tree change, not a
   product repair.

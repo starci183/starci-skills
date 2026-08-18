@@ -17,9 +17,9 @@ description: Produce 3–4 block anatomy JSON candidates for each region under a
 | `@worktrees` | `contexts/worktrees` | module | verify registry ownership and preview roots |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-None.
+None. This skill never invokes another skill.
 
 
 ## Run

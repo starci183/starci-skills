@@ -25,6 +25,10 @@ from what it still owes has not finished.
 
 Detection is not permission. Finding that something must change is never authority to change it.
 
+Skills never invoke other skills. A stop is terminal for the current run: report the blocking evidence
+and end. Capability names may identify ownership for a future request, but they are never runtime routing
+instructions. Only the owner starts that separate request.
+
 ## Runtime language
 
 Runtime instructions are English-only. A skill loads its binding `SKILL.md`, then the `en.md` record of
@@ -88,7 +92,7 @@ stuck before any target-specific work.
 |---|---|---|
 | working | evidence or safe work remains | continue without asking |
 | needs approval | a decision, promise, price or write boundary could be wrong | batch it into `NEED APPROVALS` |
-| phase complete | the exit condition is met | record where the phase said it would, invoke the next phase |
+| phase complete | the exit condition is met | record where the phase said it would; continue only inside this skill's own process |
 
 One failed tool path is not a stuck run: try the safe fallback first. All approvals known at that
 moment are batched into one round rather than asked one at a time. After feedback, the same phase
@@ -165,6 +169,7 @@ appended.
 7. A baseline commit is taken before the first production write, not from a half-edited tree.
 8. A path outside `Touching` returns to its owner.
 9. Every phase ends with all six tables, `None` included.
+10. No skill invokes, loads or automatically routes into another skill.
 
 ## Exceptions
 
@@ -172,7 +177,7 @@ appended.
   fail in three directions — a dead bootstrap leaves an agent unrouted, a wrong route makes a run read
   the wrong repository, a wrong worktree makes it write where writing was forbidden. One approval never
   covers more than one root, and a run may touch only one of them.
-- **A read-only capability.** Its Apply finalises a verdict and routes repairs to their owner. It never
+- **A read-only capability.** Its Apply finalises a verdict and reports who owns a separate repair. It never
   turns measurement into an undeclared source edit.
 - **A resumed session.** Layout may resume rather than open. The session id and every accepted hash
   survive the resume unchanged.

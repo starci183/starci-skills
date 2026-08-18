@@ -35,7 +35,7 @@ if (!project || !role || !need) {
 const source = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const route = join(source, ".workspace", project, role, "config.json");
 if (!existsSync(route)) {
-  console.error(`no route at .workspace/${project}/${role}/config.json — WORKSPACE-2, return to starci-init`);
+  console.error(`no route at .workspace/${project}/${role}/config.json — WORKSPACE-2; stop this run`);
   process.exit(2);
 }
 
@@ -48,13 +48,13 @@ try {
 }
 
 // Parsing is not verifying: a route naming a contract that is no longer there is stale, and stale is
-// answered by starci-init rather than by searching whatever else is on the disk.
+// a terminal stop for this run rather than permission to search whatever else is on the disk.
 if (!contract) {
   console.error(`${project}/${role} records no contract — WORKSPACE-4, and for a frontend role that is stale`);
   process.exit(2);
 }
 if (!existsSync(contract)) {
-  console.error(`recorded contract path no longer exists — WORKSPACE-5, return to starci-init`);
+  console.error(`recorded contract path no longer exists — WORKSPACE-5; stop this run`);
   process.exit(2);
 }
 
@@ -128,7 +128,7 @@ if (asJson) {
 }
 
 if (answered.length === 0) {
-  console.error("\n→ verdict `new`, and record the miss: starci-repair, the `why` pass, needs the need that");
-  console.error("  no entry answered. An index that cannot answer a real surface is stale while every gate is green.");
+  console.error("\n→ verdict `new`, and record the miss for the owner: no entry answered this need.");
+  console.error("  An index that cannot answer a real surface is stale while every gate is green.");
   process.exit(1);
 }

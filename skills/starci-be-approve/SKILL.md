@@ -11,9 +11,9 @@ description: Challenge a backend plan against real schema and sibling code, loop
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-None.
+None. This skill never invokes another skill.
 
 
 ## Run

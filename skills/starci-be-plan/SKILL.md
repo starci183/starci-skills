@@ -11,9 +11,9 @@ description: Name every file a backend capability will need before any of them e
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-`starci-init` · `starci-be-approve`
+None. Planning ends with a brief; it never starts setup or approval.
 
 ## Run
 
@@ -73,7 +73,7 @@ wrong; `OWED` carries explicit approval of the exact brief and boundary.
 
 ## Stops
 
-- Route absent or stale → return to `starci-init`.
+- Route absent or stale → report the failed route evidence and end this run.
 - The schema cannot be read → stop; a plan written against a remembered schema is fiction.
 - No sibling of this kind exists → say so explicitly and propose the shape as a **new family**, with the
   reason, so approval knows it is setting a precedent rather than following one.
@@ -85,3 +85,5 @@ The six tables from the skill shape, in order. `CHANGES` is `None`: a plan write
 | Output | Owner |
 |---|---|
 | approval-ready brief and exact file boundary | `starci-be-approve` |
+
+The owner may use that brief in a separately requested approval run. This skill does not start it.

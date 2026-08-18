@@ -16,9 +16,9 @@ title: Frontend design execute · Vietnamese
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session graph trước production write |
 | `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-None.
+Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 

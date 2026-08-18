@@ -19,11 +19,9 @@ title: Frontend design layout · Vietnamese
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng design session |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact, session và sinh hash |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-| Condition | Owner |
-|---|---|
-| Workspace route không có hoặc stale. | `starci-init` |
+Không có. Một điểm dừng kết thúc lượt chạy này. Skill không tự gọi skill khác để phục hồi.
 
 ## Cách chạy
 
@@ -145,10 +143,14 @@ Queue hash trong registry. Khi replacement accepted, đánh dấu layout accepte
 
 ## Điểm dừng
 
-- Route không có hoặc stale → trả về `starci-init`.
-- Registry không lock, dirty hoặc thuộc Git khác → dừng, không ghi.
+- Route không có hoặc stale → dừng; báo đúng bằng chứng route đã fail rồi kết thúc lượt chạy.
+- Registry không lock, dirty hoặc thuộc Git khác → dừng; báo đúng bằng chứng ownership đã fail và không ghi.
+- Visual inventory rỗng hoặc không đọc được → dừng; không suy token từ screenshot.
+- Chưa chọn đúng một direction → giữ lựa chọn direction mở; chưa sinh layout.
 - Class cần dùng không nằm trong closed set của contract → đây là **contract change**, trả owner.
 - Hai candidate còn trùng axis set → chúng là một; sinh lại thay vì đưa ra lựa chọn giả.
+
+Không điểm dừng nào tự gọi skill khác. Nếu owner muốn phục hồi, đó là request riêng và lượt chạy riêng.
 
 ## ĐẦU RA
 
