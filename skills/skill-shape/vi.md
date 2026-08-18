@@ -25,6 +25,17 @@ chạm vào bất cứ thứ gì. Sáu bảng kết quả đứng cuối vì cô
 
 Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
 
+## Ngôn ngữ runtime
+
+Instruction runtime chỉ dùng tiếng Anh. Skill đọc `SKILL.md` binding của chính nó, sau đó đọc bản `en.md`
+của mọi module ghép cặp trong `LOADS`. Nó không bao giờ đọc `vi.md`, không dịch instruction từ đó và không
+trộn hai bản ghi. `vi.md` chỉ dành cho người đọc; đưa nó vào runtime sẽ làm một luật có hai cách diễn đạt và
+khiến contract được thực thi phụ thuộc vào lựa chọn ngôn ngữ.
+
+Điều này không đổi ngôn ngữ báo cáo: phần tường thuật, bằng chứng và giá trị bảng do lượt chạy sinh ra vẫn
+viết bằng tiếng Việt như quy định bên dưới. Tiếng Anh sở hữu instruction; tiếng Việt sở hữu run record cho
+người đọc.
+
 ## Chín năng lực
 
 Bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái

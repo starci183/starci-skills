@@ -114,6 +114,10 @@ Every capability follows the same publication rule without changing the runtime 
 remains the binding agent entry, while `vi.md` beside it is the complete Vietnamese record for a human
 reader. Both publish under the capability's own route.
 
+**A running skill loads English only:** its binding `SKILL.md`, then `en.md` for every paired module it
+needs. It never loads `vi.md`; that record is human-facing publication, not an alternate instruction
+source.
+
 **One tier, two layouts.** A frontend is either **single-app**, keeping the component tree at
 `src/components/*`, or a **monorepo**, keeping the same tree under the same tier names in a shared
 package at `packages/ui/src/*`. The tier names never change; only the prefix does, and the prefix is a

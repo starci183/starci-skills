@@ -25,6 +25,17 @@ from what it still owes has not finished.
 
 Detection is not permission. Finding that something must change is never authority to change it.
 
+## Runtime language
+
+Runtime instructions are English-only. A skill loads its binding `SKILL.md`, then the `en.md` record of
+every paired module in its `LOADS`. It never loads `vi.md`, never translates instructions from it, and
+never combines the two records. `vi.md` exists only for a human reader; allowing it into runtime would
+give one law two possible wordings and make the executed contract depend on language selection.
+
+This does not change the reporting language: narrative, evidence and table values produced by a run
+remain Vietnamese as specified below. English owns the instructions; Vietnamese owns the human-facing
+run record.
+
 ## The nine capabilities
 
 Seven do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills — and
