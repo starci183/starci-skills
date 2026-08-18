@@ -1,10 +1,3 @@
----
-title: Frontend lint router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Frontend lint router
 
 ## LOADS

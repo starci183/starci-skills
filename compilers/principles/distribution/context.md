@@ -1,11 +1,3 @@
----
-title: Distribution
-runtime: true
-source: en.md
-sourceHash: 71d156f45e61994d251f68ae22868b4a304f382270c70983fc4d2f7f3565a326
-contextVersion: 1
----
-
 # Distribution
 
 ## LOADS

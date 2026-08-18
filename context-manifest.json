@@ -1,0 +1,751 @@
+{
+  "version": 1,
+  "records": {
+    "brainstorms/blocks/context.md": {
+      "kind": "module",
+      "source": "brainstorms/blocks/en.md",
+      "sourceHash": "3c208a1e625c6f71012e9aed95f813ac0dcf2f991992e62b468ffb1b3aeb39bb",
+      "contextVersion": 1
+    },
+    "brainstorms/blocks/precedents/context.md": {
+      "kind": "module",
+      "source": "brainstorms/blocks/precedents/en.md",
+      "sourceHash": "e455df3a63d672ad8b49e1f39b441f062c6f93b02a4044567586e0146046f5ed",
+      "contextVersion": 1
+    },
+    "brainstorms/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "brainstorms/directions/context.md": {
+      "kind": "module",
+      "source": "brainstorms/directions/en.md",
+      "sourceHash": "4cb1aa8b25cca0ae4d6526ecc40bebaa5927b3ddc5813a0c1367749b0150b3fd",
+      "contextVersion": 1
+    },
+    "brainstorms/directions/precedents/context.md": {
+      "kind": "module",
+      "source": "brainstorms/directions/precedents/en.md",
+      "sourceHash": "2b43b8b9454cfaa5cc248a60466a42e9e54b65ee1a67fbdad1bbc23d7f42a2f3",
+      "contextVersion": 1
+    },
+    "brainstorms/layouts/context.md": {
+      "kind": "module",
+      "source": "brainstorms/layouts/en.md",
+      "sourceHash": "b9eb852a4f7d121a449c212b28154ca02808cf26762af66821216b2e47e80ed4",
+      "contextVersion": 1
+    },
+    "brainstorms/layouts/precedents/context.md": {
+      "kind": "module",
+      "source": "brainstorms/layouts/precedents/en.md",
+      "sourceHash": "1ca99c0c32fd22965640c88031982b025cf3276d84f6e6d3a8867f14b2ecfb61",
+      "contextVersion": 1
+    },
+    "compilers/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/authorization/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/authorization/en.md",
+      "sourceHash": "d79a1224283891c166a7c6b730dc3a4a19ecdc452c931cff25c096440177794f",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/cdc/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/cdc/en.md",
+      "sourceHash": "4d3c2f85cac4a4d490b4dce11d2aaa900a3008e2e99beb378bb0074c966f50d2",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/comments/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/comments/en.md",
+      "sourceHash": "e35f5ec7d85ff00508f45c7429172d36cbe98a0a788165d03b1b1bc7a50fb2e8",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/cqrs/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/cqrs/en.md",
+      "sourceHash": "37bf7b08281c6f5edd2c39e8a4501656058eeab0888337749f8917573d7920ca",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/data-access/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/data-access/en.md",
+      "sourceHash": "6e81636690f58e64c6d669f4fef70d3885da0ab2e349fbb3d9863a2283ec741c",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/delivery-assurance/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/delivery-assurance/en.md",
+      "sourceHash": "b790c153072dd71b2b06206bb58fe32aa478444b38c308ca3c15a899e0c3a490",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/e2e-flow/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/e2e-flow/en.md",
+      "sourceHash": "2b6aaaf96f8acfdd7bc8756ca4ba94540e53b14706f4f20dad195429380aaae4",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/event-delivery/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/event-delivery/en.md",
+      "sourceHash": "6d0c628d7ef233bbae53dd925f61e099bfc4d46c175a0f8e3ee94a803c593952",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/exception-identity/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/exception-identity/en.md",
+      "sourceHash": "0656de0edee5ec895460f3e8e83c2304e9faa44ffb1355be4a04ca70dc10f15f",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/exceptions/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/exceptions/en.md",
+      "sourceHash": "02f111039a289b190788667fc1a9128a4d8a12ae93d693d7fa8ae1a60cb228a1",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/module-layering/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/module-layering/en.md",
+      "sourceHash": "6406ff630e5e004b7e8891ccb83e5386b260fb27edeb53bec035d4ef0e5c29ff",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/naming/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/naming/en.md",
+      "sourceHash": "6e7baf69a2fc700059a2f16ebc05abe9efe1d7ba698b696310449b9f9d2bbafa",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/observability/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/observability/en.md",
+      "sourceHash": "99f1c798a03c845d9d0c3e1fc7838434ec68d27d75ae1e4345fc966784c154cb",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/testing/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/testing/en.md",
+      "sourceHash": "76494ff7e3de591ea474c6b18cc89e1fc67619e3870c6d15e4dadbb8bd1cc30d",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/transport/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/transport/en.md",
+      "sourceHash": "6c30064f8e74556ca0409f0a576b346d61e91656cfaf55680afb66606bdb1054",
+      "contextVersion": 1
+    },
+    "compilers/patterns/be/type-safety/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/type-safety/en.md",
+      "sourceHash": "50fdc591150bc4f1d7285001d43e6374d348a89e8125b58bc0d3f2290127e9c9",
+      "contextVersion": 1
+    },
+    "compilers/patterns/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/cache-key/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/cache-key/en.md",
+      "sourceHash": "23f0669c359a8f93e82e55e4d4cbcca83ce6616cfb061cb9eb0e83cfacc0f53f",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/comments/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/comments/en.md",
+      "sourceHash": "89c029e9753f901c9c652c740e5b0d9086e5d75fcd8e93c57b5eddff4d711fb3",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/contract/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/contract/en.md",
+      "sourceHash": "75ebc46e2735179308b4658364637e2eda357d73e4332e83c84b6eb6331fc042",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/delivery-assurance/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/delivery-assurance/en.md",
+      "sourceHash": "2676522080e1ded2f027fda87f8a9c30ef7823d70dc244ac1eec42dabc2feb65",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/file-layout/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/file-layout/en.md",
+      "sourceHash": "53b70b54084ccc6f48c91b2d66aa154875334c267a7d643ba26d9cfb7f3d8034",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/icon/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/icon/en.md",
+      "sourceHash": "aee8b6112164cf0647f9950def09e3cf5b85fb8b25f59bc2c5eb843b9e11a240",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/landmark/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/landmark/en.md",
+      "sourceHash": "c4c5ab02d045ee2cfeb9cf7499d9ec3c46c4cbf727ef791828d1928e891808cf",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/lint-adoption/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/lint-adoption/en.md",
+      "sourceHash": "7d5806d24c14627d0935cd91f2e8029659af13836167de97de1e0349a72325a1",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/lint-escape-hatch/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/lint-escape-hatch/en.md",
+      "sourceHash": "7a7754d472d75b0f8bdded82ba28ba1df0423c8ccdaddac435a05ed749242893",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/loading/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/loading/en.md",
+      "sourceHash": "2e1f3af6c43a1240b396e6d6944221ca4d116c96c8d00491d113ee3819e95821",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/naming/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/naming/en.md",
+      "sourceHash": "27c8dd324d99251a21dc5f42a7789bbdc91b46fd2d9ed0dab7b02b64e5aa789b",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/props-and-slots/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/props-and-slots/en.md",
+      "sourceHash": "a38fad170b9c890189d1a7b0a8c76015729dfb094eae0b85092798147504ce93",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/served-locale/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/served-locale/en.md",
+      "sourceHash": "f5153db5a7c2d24f8d750add9ea6143ae9d02f7a5ad35c7ce7ab32229ccee39a",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/the-split/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/the-split/en.md",
+      "sourceHash": "ffb7a7879f45a902a84136ed34456c9dccdfeb3331b8b1099f4c13cc4befbe8f",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/tokens/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/tokens/en.md",
+      "sourceHash": "0f3d86006b3a2101b64e1162e8077ce916a8ed653323e88aff23be8870ff2520",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/translation/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/translation/en.md",
+      "sourceHash": "477235095be403d908fb0e5c92205ea4b669d18642b48b77bd38a76c1e5aa064",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/type-safety/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/type-safety/en.md",
+      "sourceHash": "7253ac079eb6768dc486ee28866ad5f4dd7de31e39e8a56da3d906c959d35659",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/typography/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/typography/en.md",
+      "sourceHash": "960b219c4381deabf993b475344f14a276169e0f2fc365c57487dfab136b80c4",
+      "contextVersion": 1
+    },
+    "compilers/patterns/fe/vendor-boundary/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/fe/vendor-boundary/en.md",
+      "sourceHash": "478b2bf6f17e8bfa251f747537699e268cacccb6363b06b99c2c004a9ebb24fe",
+      "contextVersion": 1
+    },
+    "compilers/principles/alignment/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/alignment/en.md",
+      "sourceHash": "f82c8740cd6afddaba36031e60bb29cf4a2690347cad5620711783dcaba5bc2d",
+      "contextVersion": 1
+    },
+    "compilers/principles/colour/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/colour/en.md",
+      "sourceHash": "3e466e9039d1c7761f1158efa0e76b8b26f3f43c0b307346e3e422bc23af020a",
+      "contextVersion": 1
+    },
+    "compilers/principles/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "compilers/principles/distribution/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/distribution/en.md",
+      "sourceHash": "71d156f45e61994d251f68ae22868b4a304f382270c70983fc4d2f7f3565a326",
+      "contextVersion": 1
+    },
+    "compilers/principles/divider/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/divider/en.md",
+      "sourceHash": "7f7ea50f5ae234e0f0023bc218152a1955e0812892da92d629aa3b48d48415bc",
+      "contextVersion": 1
+    },
+    "compilers/principles/flow/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/flow/en.md",
+      "sourceHash": "37886de74e22a307bab5359fb48c1d2f602006f6a69aef9e0dd80b637ff5f94a",
+      "contextVersion": 1
+    },
+    "compilers/principles/gap/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/gap/en.md",
+      "sourceHash": "b118c2820f506be29342b2ad6874110b788d5246bb02129b8ea3f873748c9ec9",
+      "contextVersion": 1
+    },
+    "compilers/principles/grid/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/grid/en.md",
+      "sourceHash": "95acbbaddfd1a0b554134d68df02bab64368fc9df9f84253bc6614454a5fb53e",
+      "contextVersion": 1
+    },
+    "compilers/principles/overflow/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/overflow/en.md",
+      "sourceHash": "ab5ce89ef9a9f0193a8c74f4a5d976e31f4d162cb671ab8cae924f17a8072cfe",
+      "contextVersion": 1
+    },
+    "compilers/principles/padding/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/padding/en.md",
+      "sourceHash": "e2e579cf8607299b1cb561ed7408725583c73827866f91f2e8040d7b1ad68259",
+      "contextVersion": 1
+    },
+    "compilers/principles/radius/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/radius/en.md",
+      "sourceHash": "bfd39356aa4f09384ac1992252d19987a0b765e30955e950d83041c32cad60c9",
+      "contextVersion": 1
+    },
+    "compilers/principles/responsive/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/responsive/en.md",
+      "sourceHash": "64efcbb831e99f72efe4d28cbfad64c7ee9b9ccf6b9b744970f607e9bd08b7d5",
+      "contextVersion": 1
+    },
+    "compilers/principles/size/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/size/en.md",
+      "sourceHash": "db82bfaabc82811fa5b2540e2180bc7ccb652e1b11cefc8b4fee9514c71bba46",
+      "contextVersion": 1
+    },
+    "compilers/principles/state/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/state/en.md",
+      "sourceHash": "7d52f7ebaa84a4055ee88775e3e4d9eb9b134f3fa3f8445b3ff20ae6e356d7ba",
+      "contextVersion": 1
+    },
+    "compilers/principles/surface-in-surface/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/surface-in-surface/en.md",
+      "sourceHash": "4caa008452619b6ef2eec0c9cbfe5868e333e8aafdaa338e7f8b65d437d83698",
+      "contextVersion": 1
+    },
+    "compilers/principles/typography/context.md": {
+      "kind": "module",
+      "source": "compilers/principles/typography/en.md",
+      "sourceHash": "3facef03a385bc963023f6c8bc600ae6000630159a738ed0cbb5a05e5a4f9c46",
+      "contextVersion": 1
+    },
+    "contexts/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "contexts/workspaces/context.md": {
+      "kind": "module",
+      "source": "contexts/workspaces/en.md",
+      "sourceHash": "3a350d8684664fcb870de3e002585e2cce270d869d2da40a01869a2cca9351b1",
+      "contextVersion": 1
+    },
+    "contexts/worktrees/context.md": {
+      "kind": "module",
+      "source": "contexts/worktrees/en.md",
+      "sourceHash": "35c8c47d0da221d311e06b4951c2850d21bc9a9dea75f37d58d2f43a1098b7ac",
+      "contextVersion": 1
+    },
+    "deployment/context.md": {
+      "kind": "module",
+      "source": "deployment/en.md",
+      "sourceHash": "4c3484dcd30073e992c7352f4b111939cc4d8266e8b2e49b9942ed07ac08e234",
+      "contextVersion": 1
+    },
+    "gates/be/lints/authorization/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/authorization/en.md",
+      "sourceHash": "048beb94c163adf660569e052d9b859c096b2c4e68875633b467aef3e4eefdec",
+      "contextVersion": 1
+    },
+    "gates/be/lints/cdc/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/cdc/en.md",
+      "sourceHash": "62a3bf93c3146a3279930c9940fe9bade70db18575f6c411dfea0e34265994a5",
+      "contextVersion": 1
+    },
+    "gates/be/lints/comments/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/comments/en.md",
+      "sourceHash": "c2f2ca02ca8ea5e96b4fd791dd3d0c7ab52b585f569f16893ea2da7f3bf53029",
+      "contextVersion": 1
+    },
+    "gates/be/lints/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "gates/be/lints/cqrs/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/cqrs/en.md",
+      "sourceHash": "f41cb92c31cbd0ae139a1edb0bebb7e76fd94dafc8e1d478a77222b5dfd2855e",
+      "contextVersion": 1
+    },
+    "gates/be/lints/data-access/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/data-access/en.md",
+      "sourceHash": "21c7996550a4976fbf36fd810bd853fc87652fcd4e944982db96b215b58ec242",
+      "contextVersion": 1
+    },
+    "gates/be/lints/e2e-flow/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/e2e-flow/en.md",
+      "sourceHash": "5e9750ec22bc35e6eaabafbebb999de96a5df274d20d6e587caad2d92f4d9a6e",
+      "contextVersion": 1
+    },
+    "gates/be/lints/event-delivery/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/event-delivery/en.md",
+      "sourceHash": "4442b1d725c6d265336ad464d9c55ce6d53458fc0d68f89f002a5669dcdf7d85",
+      "contextVersion": 1
+    },
+    "gates/be/lints/exception-identity/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/exception-identity/en.md",
+      "sourceHash": "d138c7887afcb849714f320a37df8ef0b829e95dd035ea5b858a6702cdb0299b",
+      "contextVersion": 1
+    },
+    "gates/be/lints/exceptions/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/exceptions/en.md",
+      "sourceHash": "73a955d03939e5eddefc3fac365d3435d33349ab994ac31eec40b2841f0323a9",
+      "contextVersion": 1
+    },
+    "gates/be/lints/module-layering/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/module-layering/en.md",
+      "sourceHash": "9f0a28679defa02a87935bd80281dd04166217d819e74c13dcd2f6954ad87bae",
+      "contextVersion": 1
+    },
+    "gates/be/lints/naming/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/naming/en.md",
+      "sourceHash": "3f5fe06112d23374f13a59c5a1819c386c79ba0dd39ff65e0551cd86efcd9ee7",
+      "contextVersion": 1
+    },
+    "gates/be/lints/observability/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/observability/en.md",
+      "sourceHash": "8aa9b0e6feb082c9358aa3745f529d573a205b1445f8e72eb0c5290b14aa1ac0",
+      "contextVersion": 1
+    },
+    "gates/be/lints/testing/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/testing/en.md",
+      "sourceHash": "d64f61fe771c0c5223cf7733f1f0b0143b0d645c0d8b0f034ceae75578870b81",
+      "contextVersion": 1
+    },
+    "gates/be/lints/transport/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/transport/en.md",
+      "sourceHash": "15466a1c0f768f352290f4c0e28bf895b8995f3e3f3cd1b89b26967bdfc13a20",
+      "contextVersion": 1
+    },
+    "gates/be/lints/type-safety/context.md": {
+      "kind": "module",
+      "source": "gates/be/lints/type-safety/en.md",
+      "sourceHash": "f7f3ebc759d21d9c334851bf53efbc640194418970f108d514f224f1d4ffa217",
+      "contextVersion": 1
+    },
+    "gates/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/comments/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/comments/en.md",
+      "sourceHash": "f8c59b99655eb4b6e260baf98ba2a41583a9eda18ea099b9eb21801ae2d72f7d",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/contract/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/contract/en.md",
+      "sourceHash": "8c4cd7197ae1b56cda6178b3481ed37a5f90bfa87bfd4026327c77c004656766",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/file-layout/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/file-layout/en.md",
+      "sourceHash": "a2685c972843057d9f63f0287505a6085c5ac389eb8ba6a4dd663ab6b69f852b",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/icon/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/icon/en.md",
+      "sourceHash": "cc7e67dfe6a9fabed1edc9e3a87bbb0ffbabbfff65d0a89910425f3c8c63bef8",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/landmark/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/landmark/en.md",
+      "sourceHash": "354250277e7072df43422279f8cdf04baab5e9f2e49ba70293f0c82a15964d59",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/lint-escape-hatch/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/lint-escape-hatch/en.md",
+      "sourceHash": "464770b80afc7208f9febec158ca8c7c42db80fad468f6f7639f42519885ef8e",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/loading/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/loading/en.md",
+      "sourceHash": "ea3840a665423975af9b83bfc1c8863dc6a67433dd6c210bb9eeccc2d1233174",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/naming/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/naming/en.md",
+      "sourceHash": "cfe5d575240d74faa047dc6ce79dcc1332bf30de79c1b12e32115868cbb40197",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/props-and-slots/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/props-and-slots/en.md",
+      "sourceHash": "f933648957a803e89d65ecc83176809bf506f0d2477e57751f1528eae885ad33",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/served-locale/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/served-locale/en.md",
+      "sourceHash": "57fce059b8956a65ab16781a125f2687882814cb2ef4db0ecaf0259647181806",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/the-split/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/the-split/en.md",
+      "sourceHash": "dd25aa81c3a0235aa195232acd7e9d86906e5660b246bc44d93ccc23277a6bed",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/tokens/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/tokens/en.md",
+      "sourceHash": "e38fb05ffcd68d3f7360c60391a53e3e9c2eb91d174c16cd892e1c053ae6317a",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/translation/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/translation/en.md",
+      "sourceHash": "3a1e213c637f4e11adb464395d035ca49d26560caabf0d1a7036339af019c1d8",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/type-safety/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/type-safety/en.md",
+      "sourceHash": "e7860947c6e14cf5e0651a86508181fce8b0410907331fb05af653e28d75f1de",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/typography/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/typography/en.md",
+      "sourceHash": "fa3909c57065c7c3a0a3dd697166db1ca9cac6361e54ccb150a45cb34b6da620",
+      "contextVersion": 1
+    },
+    "gates/fe/lints/vendor-boundary/context.md": {
+      "kind": "module",
+      "source": "gates/fe/lints/vendor-boundary/en.md",
+      "sourceHash": "0213b22749e61b95da21e41407dd5f74d0d728055dd3fc101f682be7edfa8d4f",
+      "contextVersion": 1
+    },
+    "mcp/clients/context.md": {
+      "kind": "module",
+      "source": "mcp/clients/en.md",
+      "sourceHash": "96ee572b5eccaba6a902a1891b806c65a4d0d46be2f090a5c784e9f523a6db64",
+      "contextVersion": 1
+    },
+    "mcp/context.md": {
+      "kind": "module",
+      "source": "mcp/en.md",
+      "sourceHash": "d23fc3ecaf43e71a2e8bb51c55c2d346fd15fa3c9882bdb14550e4cb000512e1",
+      "contextVersion": 1
+    },
+    "mcp/embedding/context.md": {
+      "kind": "module",
+      "source": "mcp/embedding/en.md",
+      "sourceHash": "6740c54fd9913460468ba5417269c344b66bbc0ea14f34c310d97a0181fb907d",
+      "contextVersion": 1
+    },
+    "mcp/qdrant/context.md": {
+      "kind": "module",
+      "source": "mcp/qdrant/en.md",
+      "sourceHash": "0dc324b1e525963ef07fbf152519f428c45d9f87541f309d710112df06d541b6",
+      "contextVersion": 1
+    },
+    "mcp/source-context/context.md": {
+      "kind": "module",
+      "source": "mcp/source-context/en.md",
+      "sourceHash": "0eb3695559b971524e140771e136df311346630795ada982e9dd9a6f163d5129",
+      "contextVersion": 1
+    },
+    "readiness/initialization/bootstrap/context.md": {
+      "kind": "module",
+      "source": "readiness/initialization/bootstrap/en.md",
+      "sourceHash": "3fa1c75a8228c09fb3121ef238f5ae7dc9d3797186585bb4e59172801a4857af",
+      "contextVersion": 1
+    },
+    "readiness/initialization/context.md": {
+      "kind": "module",
+      "source": "readiness/initialization/en.md",
+      "sourceHash": "d34c458d39181b942d30265cecf4d168ad3022ad9643291536eeec05ff408d17",
+      "contextVersion": 1
+    },
+    "readiness/initialization/identity/context.md": {
+      "kind": "module",
+      "source": "readiness/initialization/identity/en.md",
+      "sourceHash": "ff5086c36e08e2e92338489775d3aef747bf0ddb483ae367833564c968e0585c",
+      "contextVersion": 1
+    },
+    "readiness/initialization/workspaces/context.md": {
+      "kind": "module",
+      "source": "readiness/initialization/workspaces/en.md",
+      "sourceHash": "fef30ddbe0a38f8c56cd18ad2b168eef8340942698974aad0a638c6c1f29ef82",
+      "contextVersion": 1
+    },
+    "readiness/initialization/worktrees/context.md": {
+      "kind": "module",
+      "source": "readiness/initialization/worktrees/en.md",
+      "sourceHash": "a0e2a0ea0878cc64f5a1bfb046fb89cb880fe9188bec0df8c5f75b3a330dd878",
+      "contextVersion": 1
+    },
+    "readiness/staleness/assurance/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/assurance/en.md",
+      "sourceHash": "9c512a3af9b8c50143deb8eb316c328d5548942605899adc959fc5f676f3be08",
+      "contextVersion": 1
+    },
+    "readiness/staleness/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/en.md",
+      "sourceHash": "4ea76668261141444b56ea6bc61d570cc34ae520a8da43fc6510693062028aad",
+      "contextVersion": 1
+    },
+    "readiness/staleness/lint-machine/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/lint-machine/en.md",
+      "sourceHash": "7d93461cfdf8bbab93fca83b9d996c9ad939f10b47e9aa921495865e87125436",
+      "contextVersion": 1
+    },
+    "readiness/staleness/port-offset/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/port-offset/en.md",
+      "sourceHash": "0e63c93234c05d6cbe0e0b213de4d59aee7569f0a66e7d8792cd3756fe7de875",
+      "contextVersion": 1
+    },
+    "readiness/staleness/remnant/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/remnant/en.md",
+      "sourceHash": "feda1b40364faed7a8873065604d5a54c7a9669b3e74c952784c70b535b2a456",
+      "contextVersion": 1
+    },
+    "readiness/staleness/retired-structure/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/retired-structure/en.md",
+      "sourceHash": "f7bfe713c66bf72f63d4a6cbb5f2fb3bf7d1b7857638e70a62f2982f5eb05235",
+      "contextVersion": 1
+    },
+    "readiness/staleness/source-gates/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/source-gates/en.md",
+      "sourceHash": "0f0ab50c4c708bdadc02e80f9d1e495dd19c6d7e42c096e7d55118c7048624d6",
+      "contextVersion": 1
+    },
+    "readiness/staleness/strict-fix/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/strict-fix/en.md",
+      "sourceHash": "00455806d4f4e55dceba40bb38d72efc4055c7b4f988a873009fa37588baf25d",
+      "contextVersion": 1
+    },
+    "readiness/staleness/why/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/why/en.md",
+      "sourceHash": "9a0bae7387e85c759380830ef2a130593ba915ee94a7574b7d51af5703973714",
+      "contextVersion": 1
+    },
+    "runbooks/context.md": {
+      "kind": "module",
+      "source": "runbooks/en.md",
+      "sourceHash": "ec998c51b678fe6d8bd14e55aa991a4cd27300e8abebf642a7a8c06bb9148354",
+      "contextVersion": 1
+    },
+    "runbooks/delivery-assurance-cloud/context.md": {
+      "kind": "module",
+      "source": "runbooks/delivery-assurance-cloud/en.md",
+      "sourceHash": "393f5059e49f1c102075ff8a0e1b5cdf0b8410f86dfb7a1f5be3afcf128d4b71",
+      "contextVersion": 1
+    },
+    "runbooks/external-integrations/context.md": {
+      "kind": "module",
+      "source": "runbooks/external-integrations/en.md",
+      "sourceHash": "388ed1b84c952a9457a16c1f5ce3a47cc5f7cd5940c0f8345d7f4e26a5860991",
+      "contextVersion": 1
+    },
+    "runbooks/local-stack/context.md": {
+      "kind": "module",
+      "source": "runbooks/local-stack/en.md",
+      "sourceHash": "41d50ebd06775b5277d020276722f0bbc9c1b68438dd026dce726d6f72f5f5ed",
+      "contextVersion": 1
+    },
+    "runbooks/oauth/context.md": {
+      "kind": "module",
+      "source": "runbooks/oauth/en.md",
+      "sourceHash": "03e116cf7aca8ddb364bfc8ed2dec3a2df6a93327043e0ab99ee8bcf35161b22",
+      "contextVersion": 1
+    },
+    "runbooks/observability/context.md": {
+      "kind": "module",
+      "source": "runbooks/observability/en.md",
+      "sourceHash": "d85e37538d749a49a956e31b0229b0658c3c78aa21240f3f0fee3c695f7dac54",
+      "contextVersion": 1
+    },
+    "runbooks/secrets/context.md": {
+      "kind": "module",
+      "source": "runbooks/secrets/en.md",
+      "sourceHash": "d39d07d1366a0a52bad317a146a40842cc562f5b2a28fc6f0adb414a1da21928",
+      "contextVersion": 1
+    },
+    "skills/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "skills/skill-shape/context.md": {
+      "kind": "module",
+      "source": "skills/skill-shape/en.md",
+      "sourceHash": "cf14a0045bdb111a505fc1abd3a3ceaa4f778618bdc35c1a46f4aa4b2ad30b51",
+      "contextVersion": 1
+    }
+  }
+}

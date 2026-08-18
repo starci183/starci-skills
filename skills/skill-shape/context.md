@@ -1,11 +1,3 @@
----
-title: Skill shape
-runtime: true
-source: en.md
-sourceHash: b271029cae89edeb712d9421846a99813407265ae3dcd4f5f0e96d0057ca7e6a
-contextVersion: 1
----
-
 # Skill shape
 
 ## LOADS
@@ -38,13 +30,14 @@ Runtime instructions come only from runtime records. A skill loads its binding `
 derived `context.md` record of every paired module in its `LOADS`. It never loads `en.md` or `vi.md`
 as instructions and never combines either human record with runtime. `en.md` is the complete English
 reference, `vi.md` is the complete Vietnamese reference, and `context.md` is the compact binding record
-derived from `en.md` with its source hash.
+derived from `en.md`. Runtime records carry no metadata; `context-manifest.json` holds source hashes and
+schema versions out of band.
 
 The compiler writes a safe baseline that retains dependencies, Record and Law, routing and situation
 tables, boundaries, operational procedures, Rules, Exceptions, Output, Stops and Proof. A maintainer may
 curate teaching-only Worked examples, Anchors, Scope, common-business-example prose and historical
-rhetoric where the distinction is safe. A stale source hash or missing binding section is invalid;
-refresh metadata after intentional curation and run the context contract check.
+rhetoric where the distinction is safe. A stale manifest source hash or missing binding section is
+invalid; refresh the manifest after intentional curation and run the context contract check.
 
 The dependency graph is language-bound: runtime records load `context.md`, English publication loads
 `en.md`, and Vietnamese publication loads `vi.md`. Validate those graphs independently; matching

@@ -1,11 +1,3 @@
----
-title: Local stack
-runtime: true
-source: en.md
-sourceHash: 41d50ebd06775b5277d020276722f0bbc9c1b68438dd026dce726d6f72f5f5ed
-contextVersion: 1
----
-
 # Local stack
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Workspaces
-runtime: true
-source: en.md
-sourceHash: 3a350d8684664fcb870de3e002585e2cce270d869d2da40a01869a2cca9351b1
-contextVersion: 1
----
-
 # Workspaces
 
 ## LOADS

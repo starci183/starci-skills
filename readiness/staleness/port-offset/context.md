@@ -1,11 +1,3 @@
----
-title: Staleness · port offset
-runtime: true
-source: en.md
-sourceHash: 0e63c93234c05d6cbe0e0b213de4d59aee7569f0a66e7d8792cd3756fe7de875
-contextVersion: 1
----
-
 # Port offset
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Exception-identity
-runtime: true
-source: en.md
-sourceHash: d138c7887afcb849714f320a37df8ef0b829e95dd035ea5b858a6702cdb0299b
-contextVersion: 1
----
-
 # Exception-identity
 
 ## LOADS

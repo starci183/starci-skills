@@ -1,11 +1,3 @@
----
-title: Event-delivery
-runtime: true
-source: en.md
-sourceHash: 6d0c628d7ef233bbae53dd925f61e099bfc4d46c175a0f8e3ee94a803c593952
-contextVersion: 1
----
-
 # Event-delivery
 
 ## LOADS

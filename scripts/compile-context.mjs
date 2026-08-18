@@ -6,7 +6,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const trustRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const GENERATED_BY = "scripts/compile-context.mjs";
+const manifestPath = join(trustRoot, "context-manifest.json");
 
 const omittedSections = new Set([
   "anchor",
@@ -27,17 +27,35 @@ export function sourceHash(text) {
   return createHash("sha256").update(normalize(text)).digest("hex");
 }
 
+function recordKey(path) {
+  return relative(trustRoot, path).split(sep).join("/");
+}
+
+function readManifest() {
+  if (!existsSync(manifestPath)) return {version: 1, records: {}};
+  const parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
+  return {version: 1, records: parsed.records ?? {}};
+}
+
+function writeManifest(manifest) {
+  const records = Object.fromEntries(Object.entries(manifest.records).sort(([a], [b]) => a.localeCompare(b)));
+  writeFileSync(manifestPath, `${JSON.stringify({version: 1, records}, null, 2)}\n`, "utf8");
+}
+
+export function contextManifestEntry(sourcePath) {
+  return {
+    kind: "module",
+    source: recordKey(sourcePath),
+    sourceHash: sourceHash(readFileSync(sourcePath, "utf8")),
+    contextVersion: 1,
+  };
+}
+
 function splitFrontmatter(text) {
   const normalized = normalize(text);
   const match = normalized.match(/^---\n([\s\S]*?)\n---\n/);
   if (!match) return { frontmatter: "", body: normalized };
   return { frontmatter: match[1], body: normalized.slice(match[0].length) };
-}
-
-function titleFrom(frontmatter, body) {
-  const title = frontmatter.match(/^title:\s*(.+)$/m)?.[1]?.trim();
-  if (title) return title;
-  return body.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? "Runtime context";
 }
 
 function topLevelSections(body) {
@@ -123,8 +141,7 @@ function canonicalLoads(section) {
 
 export function compileContext(sourceText, sourcePath = "en.md") {
   const normalized = normalize(sourceText);
-  const { frontmatter, body } = splitFrontmatter(normalized);
-  const title = titleFrom(frontmatter, body);
+  const { body } = splitFrontmatter(normalized);
   const family = familyFor(resolve(sourcePath));
   const { prefix, sections } = topLevelSections(body);
   const loads = sections.find((section) => headingKey(section.heading) === "loads");
@@ -141,18 +158,7 @@ export function compileContext(sourceText, sourcePath = "en.md") {
     .join("\n\n")
     .replace(/\n{3,}/g, "\n\n");
 
-  return normalize([
-    "---",
-    `title: ${title}`,
-    "runtime: true",
-    "source: en.md",
-    `sourceHash: ${sourceHash(normalized)}`,
-    "contextVersion: 1",
-    `generatedBy: ${GENERATED_BY}`,
-    "---",
-    "",
-    compiledBody,
-  ].join("\n"));
+  return normalize(compiledBody);
 }
 
 function discoverSources(target) {
@@ -173,6 +179,20 @@ function discoverSources(target) {
   return sources;
 }
 
+function discoverContexts(target) {
+  const absolute = resolve(target);
+  if (!existsSync(absolute)) return [];
+  if (statSync(absolute).isFile()) return basename(absolute) === "context.md" ? [absolute] : [];
+  const contexts = [];
+  for (const entry of readdirSync(absolute, {withFileTypes: true}).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === ".git" || entry.name === "docs") continue;
+    const path = join(absolute, entry.name);
+    if (entry.isDirectory()) contexts.push(...discoverContexts(path));
+    else if (entry.isFile() && entry.name === "context.md") contexts.push(path);
+  }
+  return contexts;
+}
+
 function headings(body) {
   return [...body.matchAll(/^##\s+(.+)$/gm)].map((match) => match[1].trim());
 }
@@ -187,25 +207,23 @@ function loadAliases(section) {
   return [...section.matchAll(/^\| `(@[a-z][a-z0-9-]*)` \|/gm)].map((match) => match[1]);
 }
 
-export function checkContextFile(sourcePath) {
+export function checkContextFile(sourcePath, declaredEntry) {
   const contextPath = join(dirname(sourcePath), "context.md");
   if (!existsSync(contextPath)) return { ok: false, contextPath, reason: "missing context.md" };
   const sourceText = normalize(readFileSync(sourcePath, "utf8"));
   const actual = normalize(readFileSync(contextPath, "utf8"));
-  const { frontmatter, body } = splitFrontmatter(actual);
+  const entry = declaredEntry ?? readManifest().records[recordKey(contextPath)];
+  const body = actual;
   const failures = [];
-  const metadata = new Map(
-    frontmatter.split("\n").flatMap((line) => {
-      const match = line.match(/^([A-Za-z][A-Za-z0-9]*):\s*(.*?)\s*$/);
-      return match ? [[match[1], match[2]]] : [];
-    }),
-  );
-  if (metadata.get("runtime") !== "true") failures.push("metadata runtime must be true");
-  if (metadata.get("source") !== "en.md") failures.push("metadata source must be en.md");
-  if (metadata.get("contextVersion") !== "1") failures.push("metadata contextVersion must be 1");
-  const declaredHash = metadata.get("sourceHash") ?? "";
-  if (!/^[a-f0-9]{64}$/.test(declaredHash)) failures.push("metadata sourceHash must be 64 lowercase hex characters");
-  else if (declaredHash !== sourceHash(sourceText)) failures.push("sourceHash does not match en.md");
+  if (actual.startsWith("---\n")) failures.push("context.md must not carry frontmatter");
+  if (!entry) failures.push("missing context manifest entry");
+  else {
+    if (entry.kind !== "module") failures.push("context manifest kind must be module");
+    if (entry.contextVersion !== 1) failures.push("context manifest version must be 1");
+    if (entry.source !== recordKey(sourcePath)) failures.push("context manifest source does not match en.md");
+    if (!/^[a-f0-9]{64}$/.test(entry.sourceHash ?? "")) failures.push("manifest sourceHash must be 64 lowercase hex characters");
+    else if (entry.sourceHash !== sourceHash(sourceText)) failures.push("manifest sourceHash does not match en.md");
+  }
 
   const sourceBody = splitFrontmatter(sourceText).body;
   const sourceHeadings = headings(sourceBody);
@@ -239,28 +257,11 @@ export function checkContextFile(sourcePath) {
     : { ok: true, contextPath };
 }
 
-export function refreshContextMetadata(sourcePath) {
+export function refreshContextMetadata(sourcePath, manifest = readManifest()) {
   const contextPath = join(dirname(sourcePath), "context.md");
   if (!existsSync(contextPath)) return { ok: false, contextPath, reason: "missing context.md" };
-  const sourceText = readFileSync(sourcePath, "utf8");
-  const contextText = readFileSync(contextPath, "utf8");
-  const { frontmatter, body } = splitFrontmatter(contextText);
-  const retained = frontmatter
-    .split("\n")
-    .filter((line) => !/^(runtime|source|sourceHash|contextVersion|generatedBy):/.test(line));
-  const refreshed = normalize([
-    "---",
-    ...retained,
-    "runtime: true",
-    "source: en.md",
-    `sourceHash: ${sourceHash(sourceText)}`,
-    "contextVersion: 1",
-    "---",
-    "",
-    body.trim(),
-  ].join("\n"));
-  writeFileSync(contextPath, refreshed, "utf8");
-  return { ok: true, contextPath };
+  manifest.records[recordKey(contextPath)] = contextManifestEntry(sourcePath);
+  return {ok: true, contextPath, manifest};
 }
 
 function usage() {
@@ -274,28 +275,46 @@ function main(argv) {
     return 2;
   }
   const sources = [...new Set(targets.flatMap(discoverSources))].sort();
+  const contexts = [...new Set(targets.flatMap(discoverContexts))].sort();
+  const manifest = readManifest();
   const failures = [];
   for (const sourcePath of sources) {
     const contextPath = join(dirname(sourcePath), "context.md");
     if (mode === "--write") {
       writeFileSync(contextPath, compileContext(readFileSync(sourcePath, "utf8"), sourcePath), "utf8");
+      manifest.records[recordKey(contextPath)] = contextManifestEntry(sourcePath);
       console.log(`wrote ${relative(trustRoot, contextPath).split(sep).join("/")}`);
       continue;
     }
     if (mode === "--refresh") {
-      const result = refreshContextMetadata(sourcePath);
+      const result = refreshContextMetadata(sourcePath, manifest);
       if (!result.ok) failures.push(`${relative(trustRoot, result.contextPath).split(sep).join("/")}: ${result.reason}`);
       else console.log(`refreshed ${relative(trustRoot, result.contextPath).split(sep).join("/")}`);
       continue;
     }
-    const result = checkContextFile(sourcePath);
+    const result = checkContextFile(sourcePath, manifest.records[recordKey(contextPath)]);
     if (!result.ok) failures.push(`${relative(trustRoot, result.contextPath).split(sep).join("/")}: ${result.reason}`);
   }
+
+  const pairedContexts = new Set(sources.map((sourcePath) => join(dirname(sourcePath), "context.md")));
+  const routers = contexts.filter((contextPath) => !pairedContexts.has(contextPath));
+  for (const contextPath of routers) {
+    const key = recordKey(contextPath);
+    if (mode === "--write" || mode === "--refresh") {
+      manifest.records[key] = {kind: "router", contextVersion: 1};
+      continue;
+    }
+    const actual = normalize(readFileSync(contextPath, "utf8"));
+    const entry = manifest.records[key];
+    if (actual.startsWith("---\n")) failures.push(`${key}: router context must not carry frontmatter`);
+    if (entry?.kind !== "router" || entry?.contextVersion !== 1) failures.push(`${key}: missing router manifest entry`);
+  }
+  if (mode === "--write" || mode === "--refresh") writeManifest(manifest);
   if (failures.length) {
     console.error(failures.join("\n"));
     return 1;
   }
-  console.log(`Context contract holds for ${sources.length} module(s).`);
+  console.log(`Context contract holds for ${sources.length} module(s) and ${routers.length} router(s).`);
   return 0;
 }
 

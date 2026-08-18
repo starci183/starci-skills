@@ -1,11 +1,3 @@
----
-title: State
-runtime: true
-source: en.md
-sourceHash: 7d52f7ebaa84a4055ee88775e3e4d9eb9b134f3fa3f8445b3ff20ae6e356d7ba
-contextVersion: 1
----
-
 # State
 
 ## LOADS

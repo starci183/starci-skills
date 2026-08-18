@@ -1,11 +1,3 @@
----
-title: Qdrant MCP setup
-runtime: true
-source: en.md
-sourceHash: 0dc324b1e525963ef07fbf152519f428c45d9f87541f309d710112df06d541b6
-contextVersion: 1
----
-
 # Qdrant MCP setup
 
 ## LOADS

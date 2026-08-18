@@ -1,16 +1,3 @@
----
-title: Naming
-description: Where an accepted shape lands in source, and what each declared name must say once it lands.
-module: naming
-kind: pattern
-stack: be
-codes: [NAME-1, NAME-2, NAME-3, NAME-4, NAME-5, NAME-6, NAME-7]
-runtime: true
-source: en.md
-sourceHash: 6e7baf69a2fc700059a2f16ebc05abe9efe1d7ba698b696310449b9f9d2bbafa
-contextVersion: 1
----
-
 # Naming
 
 ## LOADS

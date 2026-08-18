@@ -1,11 +1,3 @@
----
-title: Routed source context
-runtime: true
-source: en.md
-sourceHash: 0eb3695559b971524e140771e136df311346630795ada982e9dd9a6f163d5129
-contextVersion: 1
----
-
 # Routed source context
 
 ## LOADS

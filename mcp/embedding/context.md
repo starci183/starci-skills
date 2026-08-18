@@ -1,11 +1,3 @@
----
-title: Ollama embedding setup
-runtime: true
-source: en.md
-sourceHash: 6740c54fd9913460468ba5417269c344b66bbc0ea14f34c310d97a0181fb907d
-contextVersion: 1
----
-
 # Ollama embedding setup
 
 ## LOADS

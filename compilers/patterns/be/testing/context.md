@@ -1,15 +1,3 @@
----
-title: Testing
-module: testing
-kind: pattern
-stack: be
-codes: [TESTING-1, TESTING-2, TESTING-3, TESTING-4, TESTING-5, TESTING-6, TESTING-7, TESTING-8, TESTING-9, TESTING-10, TESTING-11]
-runtime: true
-source: en.md
-sourceHash: 76494ff7e3de591ea474c6b18cc89e1fc67619e3870c6d15e4dadbb8bd1cc30d
-contextVersion: 1
----
-
 # Testing
 
 ## LOADS

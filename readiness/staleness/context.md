@@ -1,11 +1,3 @@
----
-title: Stale registry
-runtime: true
-source: en.md
-sourceHash: 4ea76668261141444b56ea6bc61d570cc34ae520a8da43fc6510693062028aad
-contextVersion: 1
----
-
 # Stale registry
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Direction precedents
-runtime: true
-source: en.md
-sourceHash: 2b43b8b9454cfaa5cc248a60466a42e9e54b65ee1a67fbdad1bbc23d7f42a2f3
-contextVersion: 1
----
-
 # Direction precedents
 
 ## LOADS

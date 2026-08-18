@@ -1,11 +1,3 @@
----
-title: Authorization
-runtime: true
-source: en.md
-sourceHash: 048beb94c163adf660569e052d9b859c096b2c4e68875633b467aef3e4eefdec
-contextVersion: 1
----
-
 # Authorization
 
 ## LOADS

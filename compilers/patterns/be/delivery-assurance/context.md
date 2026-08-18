@@ -1,15 +1,3 @@
----
-title: Delivery assurance
-module: delivery-assurance
-kind: pattern
-stack: be
-codes: [ASSURANCE-1, ASSURANCE-2, ASSURANCE-3, ASSURANCE-4, ASSURANCE-5, ASSURANCE-6, ASSURANCE-7]
-runtime: true
-source: en.md
-sourceHash: b790c153072dd71b2b06206bb58fe32aa478444b38c308ca3c15a899e0c3a490
-contextVersion: 1
----
-
 # Delivery assurance
 
 ## LOADS

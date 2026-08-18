@@ -1,11 +1,3 @@
----
-title: MCP client setup
-runtime: true
-source: en.md
-sourceHash: 96ee572b5eccaba6a902a1891b806c65a4d0d46be2f090a5c784e9f523a6db64
-contextVersion: 1
----
-
 # MCP client setup
 
 ## LOADS

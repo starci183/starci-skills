@@ -1,10 +1,3 @@
----
-title: Backend pattern context router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Backend pattern context router
 
 ## LOADS

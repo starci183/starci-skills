@@ -1,11 +1,3 @@
----
-title: Lint machine
-runtime: true
-source: en.md
-sourceHash: 7d93461cfdf8bbab93fca83b9d996c9ad939f10b47e9aa921495865e87125436
-contextVersion: 1
----
-
 # Lint machine
 
 ## LOADS

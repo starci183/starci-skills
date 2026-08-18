@@ -1,11 +1,3 @@
----
-title: The-split
-runtime: true
-source: en.md
-sourceHash: ffb7a7879f45a902a84136ed34456c9dccdfeb3331b8b1099f4c13cc4befbe8f
-contextVersion: 1
----
-
 # The-split
 
 ## LOADS

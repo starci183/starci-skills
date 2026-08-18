@@ -1,11 +1,3 @@
----
-title: Precedents
-runtime: true
-source: en.md
-sourceHash: e455df3a63d672ad8b49e1f39b441f062c6f93b02a4044567586e0146046f5ed
-contextVersion: 1
----
-
 # Precedents
 
 ## LOADS

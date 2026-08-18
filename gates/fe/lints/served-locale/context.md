@@ -1,11 +1,3 @@
----
-title: Served-locale
-runtime: true
-source: en.md
-sourceHash: 57fce059b8956a65ab16781a125f2687882814cb2ef4db0ecaf0259647181806
-contextVersion: 1
----
-
 # Served-locale
 
 ## LOADS

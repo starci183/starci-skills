@@ -1,11 +1,3 @@
----
-title: Alignment
-runtime: true
-source: en.md
-sourceHash: f82c8740cd6afddaba36031e60bb29cf4a2690347cad5620711783dcaba5bc2d
-contextVersion: 1
----
-
 # Alignment
 
 ## LOADS

@@ -128,9 +128,10 @@ load only `SKILL.md`.
 
 **A running skill loads runtime records only:** its binding `SKILL.md`, then `context.md` for every
 paired module it needs. It never loads `en.md` or `vi.md`; both are human-facing publication, not
-alternate instruction sources. `context.md` is derived from `en.md`, carries its source hash, and may
-be curated for compactness as long as binding sections and situation identities remain covered. Use
-the compiler to write a safe baseline, refresh metadata after an intentional curation, and check the
+alternate instruction sources. `context.md` is derived from `en.md` and contains runtime law only;
+source hashes and schema versions live out of band in `context-manifest.json`. It may be curated for
+compactness as long as binding sections and situation identities remain covered. Use the compiler to
+write a safe baseline, refresh the manifest after an intentional curation, and check the
 contract whenever either record changes.
 
 Dependency validation is three separate graphs. Runtime `context.md`, binding `SKILL.md`, and this

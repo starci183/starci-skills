@@ -1,11 +1,3 @@
----
-title: Lint-adoption
-runtime: true
-source: en.md
-sourceHash: 7d5806d24c14627d0935cd91f2e8029659af13836167de97de1e0349a72325a1
-contextVersion: 1
----
-
 # Lint-adoption
 
 ## LOADS

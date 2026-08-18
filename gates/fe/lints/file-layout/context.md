@@ -1,11 +1,3 @@
----
-title: File-layout
-runtime: true
-source: en.md
-sourceHash: a2685c972843057d9f63f0287505a6085c5ac389eb8ba6a4dd663ab6b69f852b
-contextVersion: 1
----
-
 # File-layout
 
 ## LOADS

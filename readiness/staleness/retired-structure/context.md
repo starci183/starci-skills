@@ -1,11 +1,3 @@
----
-title: Retired structure
-runtime: true
-source: en.md
-sourceHash: f7bfe713c66bf72f63d4a6cbb5f2fb3bf7d1b7857638e70a62f2982f5eb05235
-contextVersion: 1
----
-
 # Retired structure
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Runbooks
-runtime: true
-source: en.md
-sourceHash: ec998c51b678fe6d8bd14e55aa991a4cd27300e8abebf642a7a8c06bb9148354
-contextVersion: 1
----
-
 # StarCi runbooks
 
 ## LOADS

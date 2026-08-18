@@ -1,11 +1,3 @@
----
-title: Typography
-runtime: true
-source: en.md
-sourceHash: 960b219c4381deabf993b475344f14a276169e0f2fc365c57487dfab136b80c4
-contextVersion: 1
----
-
 # Typography
 
 ## LOADS

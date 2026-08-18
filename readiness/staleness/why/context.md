@@ -1,11 +1,3 @@
----
-title: Why index
-runtime: true
-source: en.md
-sourceHash: 9a0bae7387e85c759380830ef2a130593ba915ee94a7574b7d51af5703973714
-contextVersion: 1
----
-
 # Why index
 
 ## LOADS

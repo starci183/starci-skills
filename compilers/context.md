@@ -1,10 +1,3 @@
----
-title: Compiler runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Compiler runtime router
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Delivery assurance cloud
-runtime: true
-source: en.md
-sourceHash: 393f5059e49f1c102075ff8a0e1b5cdf0b8410f86dfb7a1f5be3afcf128d4b71
-contextVersion: 1
----
-
 # Delivery assurance: Codecov and the shared SonarQube service
 
 ## LOADS

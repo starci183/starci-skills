@@ -1,11 +1,3 @@
----
-title: Worktrees
-runtime: true
-source: en.md
-sourceHash: 35c8c47d0da221d311e06b4951c2850d21bc9a9dea75f37d58d2f43a1098b7ac
-contextVersion: 1
----
-
 # Worktrees
 
 ## LOADS

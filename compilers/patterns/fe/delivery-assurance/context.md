@@ -1,11 +1,3 @@
----
-title: Frontend delivery assurance
-runtime: true
-source: en.md
-sourceHash: 2676522080e1ded2f027fda87f8a9c30ef7823d70dc244ac1eec42dabc2feb65
-contextVersion: 1
----
-
 # Frontend delivery assurance
 
 ## LOADS

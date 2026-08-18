@@ -35,13 +35,14 @@ Instruction runtime chỉ đến từ runtime record. Skill đọc `SKILL.md` bi
 `context.md` dẫn xuất của mọi module ghép cặp trong `LOADS`. Nó không bao giờ đọc `en.md` hoặc `vi.md`
 làm instruction và không trộn human record vào runtime. `en.md` là bản tham chiếu tiếng Anh đầy đủ,
 `vi.md` là bản tham chiếu tiếng Việt đầy đủ, còn `context.md` là binding record gọn được dẫn xuất từ
-`en.md` cùng source hash của nó.
+`en.md`. Runtime record không chứa metadata; `context-manifest.json` giữ source hash và schema version
+riêng, ngoài context được agent nạp.
 
 Compiler tạo baseline an toàn, giữ dependencies, Bản ghi và Luật, bảng routing và situation, boundary,
 quy trình vận hành, Quy tắc, Ngoại lệ, Đầu ra, Điểm dừng và Proof. Maintainer có thể lược các Ví dụ đã
 giải, Anchor, Phạm vi, prose ví dụ business phổ biến và diễn giải lịch sử ở nơi phân biệt đó an toàn.
-Source hash stale hoặc thiếu binding section là không hợp lệ; sau khi curate có chủ ý phải refresh
-metadata và chạy context contract check.
+Source hash trong manifest bị stale hoặc thiếu binding section là không hợp lệ; sau khi curate có chủ ý
+phải refresh manifest và chạy context contract check.
 
 Dependency graph bị ràng buộc theo ngôn ngữ: runtime record đọc `context.md`, publication tiếng Anh đọc
 `en.md`, còn publication tiếng Việt đọc `vi.md`. Kiểm tra ba graph độc lập; alias giống nhau mô tả cùng

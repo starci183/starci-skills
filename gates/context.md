@@ -1,10 +1,3 @@
----
-title: Gate runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Gate runtime router
 
 ## LOADS

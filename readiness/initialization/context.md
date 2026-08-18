@@ -1,11 +1,3 @@
----
-title: Initialization readiness
-runtime: true
-source: en.md
-sourceHash: d34c458d39181b942d30265cecf4d168ad3022ad9643291536eeec05ff408d17
-contextVersion: 1
----
-
 # Initialization registry
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Naming
-runtime: true
-source: en.md
-sourceHash: cfe5d575240d74faa047dc6ce79dcc1332bf30de79c1b12e32115868cbb40197
-contextVersion: 1
----
-
 # Naming
 
 ## LOADS

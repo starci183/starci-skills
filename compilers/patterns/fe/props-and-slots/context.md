@@ -1,11 +1,3 @@
----
-title: Props-and-slots
-runtime: true
-source: en.md
-sourceHash: a38fad170b9c890189d1a7b0a8c76015729dfb094eae0b85092798147504ce93
-contextVersion: 1
----
-
 # Props-and-slots
 
 ## LOADS

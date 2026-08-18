@@ -1,10 +1,3 @@
----
-title: Backend lint router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Backend lint router
 
 ## LOADS

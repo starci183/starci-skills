@@ -1,10 +1,3 @@
----
-title: Brainstorm runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Brainstorm runtime router
 
 ## LOADS

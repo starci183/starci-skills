@@ -1,10 +1,3 @@
----
-title: Principles runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Principles runtime router
 
 ## LOADS

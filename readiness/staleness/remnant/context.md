@@ -1,11 +1,3 @@
----
-title: Trust-tree remnant
-runtime: true
-source: en.md
-sourceHash: feda1b40364faed7a8873065604d5a54c7a9669b3e74c952784c70b535b2a456
-contextVersion: 1
----
-
 # Trust-tree remnant
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Size
-runtime: true
-source: en.md
-sourceHash: db82bfaabc82811fa5b2540e2180bc7ccb652e1b11cefc8b4fee9514c71bba46
-contextVersion: 1
----
-
 # Size
 
 ## LOADS

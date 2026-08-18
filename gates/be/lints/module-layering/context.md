@@ -1,11 +1,3 @@
----
-title: Module-layering
-runtime: true
-source: en.md
-sourceHash: 9f0a28679defa02a87935bd80281dd04166217d819e74c13dcd2f6954ad87bae
-contextVersion: 1
----
-
 # Module-layering
 
 ## LOADS

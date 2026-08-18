@@ -1,11 +1,3 @@
----
-title: Colour
-runtime: true
-source: en.md
-sourceHash: 3e466e9039d1c7761f1158efa0e76b8b26f3f43c0b307346e3e422bc23af020a
-contextVersion: 1
----
-
 # Colour
 
 ## LOADS

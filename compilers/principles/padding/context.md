@@ -1,11 +1,3 @@
----
-title: Padding
-runtime: true
-source: en.md
-sourceHash: e2e579cf8607299b1cb561ed7408725583c73827866f91f2e8040d7b1ad68259
-contextVersion: 1
----
-
 # Padding
 
 ## LOADS

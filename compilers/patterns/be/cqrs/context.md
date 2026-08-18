@@ -1,11 +1,3 @@
----
-title: CQRS
-runtime: true
-source: en.md
-sourceHash: 37bf7b08281c6f5edd2c39e8a4501656058eeab0888337749f8917573d7920ca
-contextVersion: 1
----
-
 # CQRS
 
 ## LOADS

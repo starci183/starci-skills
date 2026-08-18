@@ -1,11 +1,3 @@
----
-title: Data-access
-runtime: true
-source: en.md
-sourceHash: 6e81636690f58e64c6d669f4fef70d3885da0ab2e349fbb3d9863a2283ec741c
-contextVersion: 1
----
-
 # Data-access
 
 ## LOADS

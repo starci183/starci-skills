@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { checkContextFile, compileContext, refreshContextMetadata, sourceHash } from "./compile-context.mjs";
+import { checkContextFile, compileContext, contextManifestEntry, refreshContextMetadata, sourceHash } from "./compile-context.mjs";
 
 const scratch = mkdtempSync(join(tmpdir(), "starci-context-"));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -55,7 +55,7 @@ Remove this scope.
 
 test("compiler retains runtime law and removes optional teaching prose", () => {
   const result = compileContext(source, join(scratch, "compilers", "patterns", "fe", "contract", "en.md"));
-  assert.match(result, /sourceHash: [a-f0-9]{64}/);
+  assert.doesNotMatch(result, /^---|sourceHash:|contextVersion:|runtime:/m);
   assert.match(result, /## Situation codes/);
   assert.match(result, /\*\*Boundary\.\*\* Not CONTRACT-2\./);
   assert.match(result, /## Rules/);
@@ -66,17 +66,17 @@ test("source hash is line-ending stable", () => {
   assert.equal(sourceHash(source), sourceHash(source.replaceAll("\n", "\r\n")));
 });
 
-test("checker validates metadata, source hash and binding sections", () => {
+test("checker validates manifest source hash and binding sections", () => {
   const directory = join(scratch, "hash-check");
   mkdirSync(directory);
   const sourcePath = join(directory, "en.md");
   const contextPath = join(directory, "context.md");
   writeFileSync(sourcePath, source, "utf8");
   writeFileSync(contextPath, compileContext(source, sourcePath), "utf8");
-  const valid = checkContextFile(sourcePath);
+  const entry = contextManifestEntry(sourcePath);
+  const valid = checkContextFile(sourcePath, entry);
   assert.equal(valid.ok, true, valid.reason);
-  writeFileSync(contextPath, readFileSync(contextPath, "utf8").replace(/sourceHash: [a-f0-9]{64}/, `sourceHash: ${"0".repeat(64)}`), "utf8");
-  assert.match(checkContextFile(sourcePath).reason, /sourceHash does not match en\.md/);
+  assert.match(checkContextFile(sourcePath, {...entry, sourceHash: "0".repeat(64)}).reason, /manifest sourceHash does not match en\.md/);
 });
 
 test("checker accepts curated wording but rejects removed codes and teaching sections", () => {
@@ -87,26 +87,28 @@ test("checker accepts curated wording but rejects removed codes and teaching sec
   writeFileSync(sourcePath, source, "utf8");
   const generated = compileContext(source, sourcePath).replace("Keep the record.", "A shorter binding record.");
   writeFileSync(contextPath, generated, "utf8");
-  const valid = checkContextFile(sourcePath);
+  const entry = contextManifestEntry(sourcePath);
+  const valid = checkContextFile(sourcePath, entry);
   assert.equal(valid.ok, true, valid.reason);
   writeFileSync(contextPath, generated.replace("## `CONTRACT-1` — structure", "## Worked example"), "utf8");
-  const reason = checkContextFile(sourcePath).reason;
+  const reason = checkContextFile(sourcePath, entry).reason;
   assert.match(reason, /missing binding section: `CONTRACT-1` — structure/);
   assert.match(reason, /forbidden teaching section: Worked example/);
 });
 
-test("metadata refresh preserves curated context body", () => {
+test("manifest refresh preserves curated context body", () => {
   const fixture = mkdtempSync(join(tmpdir(), "starci-context-refresh-"));
   try {
     const sourcePath = join(fixture, "en.md");
     const contextPath = join(fixture, "context.md");
     writeFileSync(sourcePath, source, "utf8");
     const curated = compileContext(source, sourcePath).replace("Keep the record.", "Curated binding sentence.");
-    writeFileSync(contextPath, curated.replace(/sourceHash: [a-f0-9]{64}/, "sourceHash: " + "0".repeat(64)), "utf8");
-    assert.equal(refreshContextMetadata(sourcePath).ok, true);
+    writeFileSync(contextPath, curated, "utf8");
+    const manifest = {version: 1, records: {}};
+    assert.equal(refreshContextMetadata(sourcePath, manifest).ok, true);
     const refreshed = readFileSync(contextPath, "utf8");
     assert.match(refreshed, /Curated binding sentence\./);
-    assert.match(refreshed, new RegExp("sourceHash: " + sourceHash(source)));
+    assert.equal(Object.values(manifest.records)[0].sourceHash, sourceHash(source));
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

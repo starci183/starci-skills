@@ -1,11 +1,3 @@
----
-title: Source gates
-runtime: true
-source: en.md
-sourceHash: 0f0ab50c4c708bdadc02e80f9d1e495dd19c6d7e42c096e7d55118c7048624d6
-contextVersion: 1
----
-
 # Source gates
 
 ## LOADS

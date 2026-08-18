@@ -1,12 +1,3 @@
----
-title: Delivery assurance
-runtime: true
-source: en.md
-sourceHash: 9c512a3af9b8c50143deb8eb316c328d5548942605899adc959fc5f676f3be08
-contextVersion: 1
-generatedBy: scripts/compile-context.mjs
----
-
 # Delivery assurance
 
 ## LOADS

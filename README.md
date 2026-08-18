@@ -192,8 +192,9 @@ Each paired module has three records with separate audiences:
 - `vi.md` is the complete Vietnamese record for a human reader.
 
 A skill starts at its binding `SKILL.md`, then loads only the reached modules' `context.md` records.
-It never combines `en.md` or `vi.md` with runtime instructions. Every `context.md` cites the hash of
-its `en.md`; run `node scripts/compile-context.mjs --check .` after changing a paired module.
+It never combines `en.md` or `vi.md` with runtime instructions. Runtime records contain no publication
+metadata; `context-manifest.json` tracks their source hashes and schema versions out of band. Run
+`node scripts/compile-context.mjs --check .` after changing a paired module.
 
 Dependency checks are lane-specific: `node scripts/check-deps.mjs --context` validates runtime,
 `--en` validates English publication, and `--vi` validates Vietnamese publication. Use `--all` to run

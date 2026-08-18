@@ -1,11 +1,3 @@
----
-title: Type-safety
-runtime: true
-source: en.md
-sourceHash: f7f3ebc759d21d9c334851bf53efbc640194418970f108d514f224f1d4ffa217
-contextVersion: 1
----
-
 # Type-safety
 
 ## LOADS

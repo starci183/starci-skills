@@ -1,11 +1,3 @@
----
-title: Layouts
-runtime: true
-source: en.md
-sourceHash: b9eb852a4f7d121a449c212b28154ca02808cf26762af66821216b2e47e80ed4
-contextVersion: 1
----
-
 # Layouts
 
 ## LOADS

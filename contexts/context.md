@@ -1,10 +1,3 @@
----
-title: Context runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Context runtime router
 
 ## LOADS

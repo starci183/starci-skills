@@ -1,11 +1,3 @@
----
-title: CDC
-runtime: true
-source: en.md
-sourceHash: 62a3bf93c3146a3279930c9940fe9bade70db18575f6c411dfea0e34265994a5
-contextVersion: 1
----
-
 # CDC
 
 ## LOADS

@@ -1,10 +1,3 @@
----
-title: Pattern runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Pattern runtime router
 
 ## LOADS

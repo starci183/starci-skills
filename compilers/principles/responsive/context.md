@@ -1,11 +1,3 @@
----
-title: Responsive
-runtime: true
-source: en.md
-sourceHash: 64efcbb831e99f72efe4d28cbfad64c7ee9b9ccf6b9b744970f607e9bd08b7d5
-contextVersion: 1
----
-
 # Responsive
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Icon
-runtime: true
-source: en.md
-sourceHash: aee8b6112164cf0647f9950def09e3cf5b85fb8b25f59bc2c5eb843b9e11a240
-contextVersion: 1
----
-
 # Icon
 
 ## LOADS

@@ -1,11 +1,3 @@
----
-title: Observability
-runtime: true
-source: en.md
-sourceHash: d85e37538d749a49a956e31b0229b0658c3c78aa21240f3f0fee3c695f7dac54
-contextVersion: 1
----
-
 # Observability: cAdvisor, Prometheus and Grafana Cloud
 
 ## LOADS

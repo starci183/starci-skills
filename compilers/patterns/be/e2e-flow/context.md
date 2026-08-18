@@ -1,15 +1,3 @@
----
-title: E2e-flow
-module: e2e-flow
-kind: pattern
-stack: be
-codes: [E2E-1, E2E-2, E2E-3, E2E-4, E2E-5, E2E-6, E2E-7, E2E-8, E2E-9, E2E-10, E2E-11, E2E-12]
-runtime: true
-source: en.md
-sourceHash: 2b6aaaf96f8acfdd7bc8756ca4ba94540e53b14706f4f20dad195429380aaae4
-contextVersion: 1
----
-
 # E2e-flow
 
 ## LOADS

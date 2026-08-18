@@ -1,11 +1,3 @@
----
-title: Lint-escape-hatch
-runtime: true
-source: en.md
-sourceHash: 464770b80afc7208f9febec158ca8c7c42db80fad468f6f7639f42519885ef8e
-contextVersion: 1
----
-
 # Lint-escape-hatch
 
 ## LOADS

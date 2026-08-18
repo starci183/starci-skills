@@ -1,10 +1,3 @@
----
-title: Skill runtime router
-runtime: true
-router: true
-contextVersion: 1
----
-
 # Skill runtime router
 
 ## LOADS

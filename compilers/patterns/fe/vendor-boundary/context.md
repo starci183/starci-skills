@@ -1,11 +1,3 @@
----
-title: Vendor boundary
-runtime: true
-source: en.md
-sourceHash: 478b2bf6f17e8bfa251f747537699e268cacccb6363b06b99c2c004a9ebb24fe
-contextVersion: 1
----
-
 # Vendor boundary
 
 ## LOADS

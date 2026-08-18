@@ -1,11 +1,3 @@
----
-title: OAuth
-runtime: true
-source: en.md
-sourceHash: 03e116cf7aca8ddb364bfc8ed2dec3a2df6a93327043e0ab99ee8bcf35161b22
-contextVersion: 1
----
-
 # OAuth: Keycloak, Google and GitHub
 
 ## LOADS
