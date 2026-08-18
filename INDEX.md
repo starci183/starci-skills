@@ -21,6 +21,7 @@ title: Docs
 | `@principles` | `compilers/principles` | module | resolve classes from accepted situations |
 | `@skill-shape` | `skills/skill-shape` | module | load the shared reporting contract when a skill runs |
 | `@skills` | `skills` | module | locate the capability registry |
+| `@stale` | `stale` | registry | share one stale taxonomy and category modules between inventory and repair |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 | `@workspaces` | `contexts/workspaces` | module | resolve Source-wide defaults and verify role routes |
 | `@worktrees` | `contexts/worktrees` | module | resolve durable write roots |

@@ -1,6 +1,6 @@
 ---
 name: starci-stale-list
-description: List every kind of staleness starci-repair distinguishes across the workspace — route, source-gate surface, contract index, lint machine, formatter, backend delivery assurance, retired structure and remnant — with current evidence and the owner that clears each. Reads declared gates but deliberately does not execute lint, typecheck, build or tests. Read-only — it reports and repairs nothing. Use before trusting one or more projects or when a repair needs a workspace-wide stale inventory.
+description: Read the shared stale registry and inventory every routed workspace role without executing project gates or changing state. Reports route, source surface, why index, lint machine, formatter, backend assurance, retired structure and remnant evidence with the owner that clears each. Read-only.
 ---
 
 # starci-stale-list
@@ -9,176 +9,69 @@ description: List every kind of staleness starci-repair distinguishes across the
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | defines the complete backend hook, CI, coverage, analysis, secret and deploy machine |
-| `@export-state` | `scripts/export-console-state.mjs` | script | measure all read-only stale facts and declared gate surfaces |
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@skill-shape` | `skills/skill-shape` | module | shared output and authority contract |
+| `@stale-registry` | `stale` | registry | the one taxonomy and router shared with repair |
+| `@export-state` | `scripts/export-console-state.mjs` | script | deterministic read-only workspace measurement |
 
 ## NESTED SKILLS
 
-None. This skill reports ownership; it never invokes the named capability.
+None. This skill names owners and never invokes them.
 
 ## Run
 
-Read `@skill-shape` first.
+Read `@skill-shape`, `@stale-registry`, then every module routed by the registry. Use only each module's
+`List evidence`; never apply its inventory, apply or proof steps.
 
-Plan-only: **the moment a report repairs something, nobody can trust it as a measurement.** A route it
-quietly refreshed reads as a route that was fine.
-
-## The eight stale things, without turning the list into repair
-
-Use the same taxonomy as `starci-repair`; a list with a smaller vocabulary hides work during handoff:
-
-| What is stale | What this skill can measure | Cleared by |
-|---|---|---|
-| **route** | checkout, contract, branch and recorded head against filesystem and git | `starci-init` |
-| **source** | which gate entrypoints the manifest declares; pass/fail remains explicitly unmeasured | `starci-repair`, after approval |
-| **index** | contract `why` reasons that describe a shape instead of stating a need | `starci-repair`, the `why` pass |
-| **machine** | published canon installed by package name, absent, or vendored | `starci-repair`, the machine pass |
-| **formatter** | direct Prettier packages and first-party config, script, hook, CI or editor integration | `starci-repair`, the strict-fix pass |
-| **assurance** | the tracked applicability declaration, then every local `ASSURANCE-*` fact for required backend routes; required GitHub checks and secret values remain explicitly external | `starci-repair`, the assurance pass |
-| **structure** | a `shells` tier under an accepted production component root, including an empty directory | `starci-repair`, the retired-structure pass |
-| **remnant** | a nested `.claude/` in a routed checkout, with recursive and tracked-file counts | `starci-repair`, the remnant pass; tracked content returns to the owner |
-
-**This skill measures seven and names the source boundary honestly.** It reads gate declarations but never
-runs them. A typecheck writes its incremental file, a build writes `dist`, and ten projects scanned that
-way is a report that changed every machine it measured. Lint alone would be safe to run, but a list that
-reports lint and not typecheck implies the rest was checked, so the line is drawn at "nothing that
-executes the project".
-
-**The report says which layers ran.** A list that silently skipped the expensive layer reads as *nothing
-else is wrong*, which is the one thing a report must never imply.
-
-The machine layer is cheap and it decides whether the expensive layer would mean anything: a checkout that
-does not install the rule packages reports zero lint errors because nothing was checked, and a checkout
-importing a vendored copy reports against whatever the law was on the day it was copied. Either way a green
-count is not evidence, so the machine is reported before any count is believed.
-
-## The law this skill exists to protect
-
-**Stale is not broken, and the difference is who fixes it.** A stale route is a machine fact — a checkout
-moved, a head advanced, a contract was never declared. Nothing in the source is wrong, and repairing
-source through it would repair a repository nobody asked about.
-
-**Every reason carries its owner.** A list of problems with no owner is a list nobody acts on, and
-guessing the owner is how a route problem gets sent to a repair run. Each row names the skill that clears
-it and what it will do there.
-
-**Absent and stale are different verdicts.** A route that does not exist forces a question; a route that
-exists and lies invites a confident wrong answer. They are reported apart because they are fixed apart.
+Plan-only: the moment a report repairs something, nobody can trust it as a measurement.
 
 ## PROCESS
 
-### 1 — Establish the context lock
+### 1 — Establish the read-only boundary
 
-`Phase` is `plan`. `Touching` is nothing — this skill writes no file at all unless
-the reader asks for the list to be kept.
+`Phase` is `plan`; `Touching` is nothing. Read `.workspace/config.json` and every declared role. If the
+workspace root is absent, report that fact and stop.
 
-### 2 — Scan, with the tree's own script
+### 2 — Run the shared scanner
 
 ```bash
 node @export-state --stale
 ```
 
-It reads every `.workspace/<project>/<role>/config.json`, verifies each against this disk and against git,
-reads backend assurance against `@assurance-be`, and exits `1` when anything is stale — so the same
-command works from a shell that checks rather than reads.
+The script measures routes, contracts, manifests, lint adoption, first-party formatter integration, local
+assurance wiring, retired structure and remnants. It exits non-zero when stale; that exit is a verdict,
+not a reason to reimplement the scan in conversation.
 
-Do not re-implement the scan in conversation. The script is the measurement; a second reading of the same
-files is a second answer nobody reconciles.
+### 3 — Report registry verdicts
 
-### 3 — Report by project, not by role
+Group by project, with roles underneath. Use category and verdict names from `@stale-registry`. For every
+module, emit its `List evidence`, current count/fact and clearing owner. Report clean and `not required`
+explicitly where silence would imply an omitted scan.
 
-A reader asks "which projects can I work in today", so the rollup is per project with its failing roles
-underneath. A project with one stale role is not a healthy project — it is a project with a hole in a
-known place.
+### 4 — Keep project gates unmeasured
 
-Three verdicts appear, and they are not the same news:
+For `@stale-source-gates`, list declared format/lint/typecheck/build/unit entrypoints only. Never execute
+them. A typecheck/build/test can write state; running lint alone would make the report look broader than it is.
 
-| Verdict | What happened | Cleared by |
-|---|---|---|
-| `stale` | the route is well formed and no longer true — a moved checkout, an advanced head, an undeclared contract | `starci-init`, per role |
-| `absent` | the role has no route on this machine | `starci-init`, and the project must be declared first |
-| `valid` | checkout, contract and head all still hold | nothing |
+### 5 — Keep external assurance honest
 
-### 4 — Name the source gate surface without claiming a result
+For `@stale-assurance`, read names and local wiring only. Never decrypt a record or read provider values.
+Required checks, expected-app binding and secret existence/value remain `unmeasured external` unless an
+authorized API supplies evidence.
 
-Read each routed checkout's manifest and list only the primary gate entrypoints it declares: format,
-lint, typecheck, build and tests. `declared` is not `green`. A repository declaring no gate surface is a
-finding owned by `starci-repair`; a repository omitting one particular command merely has no such command
-and this skill does not invent it.
+### 6 — Stop without repair
 
-### 5 — Report the contract index beside the routes
-
-For every role whose route names a contract, the scan parses it and reports four numbers: entries, page
-keys, feature-prefixed keys, and how many reasons state a need rather than describe a shape.
-
-None of that is a route problem, and refreshing a route fixes none of it. It is reported here because it
-answers the same question a reader is actually asking — *can I design against this project today* — and
-because the cost of finding out is a file read.
-
-A page key is excluded from the feature-prefixed count on purpose: it is route-scoped by design and
-generalising it would describe two routes with one key.
-
-### 6 — Report the lint machine, because it decides whether a count would mean anything
-
-One line per role: `installed`, `absent`, or `vendored` with the relative path the config imports. Anything
-but `installed` carries its owner from the layer table and the reason, which is not
-"a package is missing" but **"no count from this checkout is evidence"**: absent means nothing was checked,
-vendored means it was checked against a private copy of the law.
-
-### 7 — Resolve applicability, then measure backend delivery assurance as one indivisible machine
-
-For every backend route, read `starci.deliveryAssurance` from the tracked `package.json` first. Missing
-declaration means `required`. Exact `required: false` with a non-empty `reason` means `not required`:
-report that reason and do not scan, count or assign repair ownership for any assurance component. A false
-declaration without a reason is invalid policy, not an exemption, and assurance remains required.
-
-For every required backend route, report every missing `ASSURANCE-*` fact: Husky and its check-only pre-push,
-active PR CI, one LCOV-producing unit run, Codecov upload, SonarQube scan plus quality gate, encrypted
-stack token records, symbolic workflow secret references and deploy dependency. Partial adoption is
-stale; do not call one installed vendor a smaller profile.
-
-Read only names and wiring. Never decrypt a stack record or print a provider value. Required GitHub
-checks, expected-app binding and actual GitHub secret values are external facts; report them as
-`unmeasured external` unless an authorized API supplies evidence.
-
-### 8 — Measure formatter, retired structure and remnant directly
-
-For formatter staleness, inspect only first-party integration points. A prose mention or a transitive
-lockfile entry is not formatter ownership. For retired structure, inspect accepted production component
-roots directly rather than searching tracked files: an empty `shells/` is stale and Git cannot see it.
-Candidate and artifact trees are not production component roots.
-
-For each nested `.claude/`, count files recursively and count tracked files separately. Never describe a
-tracked remnant as safe to delete; `starci-repair` returns that decision to the owner.
-
-### 9 — Separate the warnings that are not stale source
-
-Two lists that should agree often do not: a project with a route and no worktree root can read source but
-record nothing; a project with a worktree root and no route can record nothing about any source. Neither
-is a stale route, and neither is repaired by refreshing one — they are reported under their own heading so
-the fix is not confused with the route fix.
-
-Every warning still names its owner. A missing worktree root is conditional setup, not source staleness;
-an invalid route is not squeezed into `stale` or `absent`.
-
-### 10 — Stop there
-
-Say what is stale, why, and who clears it. Do not refresh a head, repoint a path or declare a contract:
-each is outside this read-only run and requires its own approval. Doing it here would make this report the
-thing that changed the machine it was measuring.
+Return every category, evidence and owner. Do not refresh a route, edit a reason, install a package, remove
+Prettier, create assurance state, move a component or delete a remnant. A later fix is a separate
+`starci-repair` or `starci-init` request with its own approval.
 
 ## Stops
 
-- `.workspace` does not exist → stop; report that the Source has no routes and end this run.
-- A route file is present but unparseable → report it as its own row. It is neither stale nor absent:
-  it is invalid, and it fails differently.
-- The reader asks for a fix → finish this report. A fix requires a separate owner request and run; do not
-  start it from this skill.
+- `.workspace` absent → report no routes and end.
+- Route JSON invalid → report `invalid`, not `absent` or `stale`.
+- A category cannot be read safely → report it `unmeasured` with reason; do not guess.
+- Reader asks for repair → finish the inventory; another capability owns the write.
 
 ## OUTPUT
 
-Return every stale category, evidence and owner in concise prose, including clean, `not required`, or unmeasured wording
-where silence would imply a check ran. For assurance, return secret names and encrypted-record presence,
-never values. Scan every readable category before closing; ask only for a genuine authority boundary under
-`### NEED APPROVALS`. No status tables.
+Concise prose by project and category; no status table. Include clean, `not required` and `unmeasured`
+wording where needed. Never include credential values.

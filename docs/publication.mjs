@@ -15,6 +15,11 @@
 // allowed, so `laws/b1-one-surface-owner` publishes with `laws` as its own sidebar group.
 export const groups = [
   {
+    source: "stale",
+    title: "Stale registry",
+    description: "One shared taxonomy and category modules: stale-list reads evidence, while repair applies the same module's inventory, action and proof.",
+  },
+  {
     source: "runbooks",
     title: "Runbooks",
     description: "Executable operator guides for every StarCi service and external integration: provision, start, verify, rotate, stop and recover without exposing credentials.",

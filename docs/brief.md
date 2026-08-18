@@ -96,3 +96,10 @@ PostgreSQL, Redis, Elasticsearch, Qdrant, Kafka, MinIO, NATS, Keycloak, Google/G
 Prometheus, Grafana Cloud, Codecov, SonarQube Cloud, payments, mail, AI pools, S3 and GCP. Each page names
 the real repository command, encrypted owner, verification signal, safe stop, rotation boundary and
 provider documentation; no credential value is published.
+
+## Stale registry
+
+[`Stale registry`](./stale) is the single category source shared by `starci-stale-list` and
+`starci-repair`. Each module owns both its read-only evidence and approved inventory/apply/proof contract,
+so the two skills cannot drift into separate definitions of `why`, assurance, formatter, lint-machine,
+retired-structure or remnant staleness.

@@ -1,130 +1,75 @@
 ---
-title: Stale project list · Vietnamese
+title: starci-stale-list
 ---
 
 # starci-stale-list
 
 ## LOADS
 
-| Alias | Target | Kind | Why |
+| Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | định nghĩa trọn backend machine cho hook, CI, coverage, analysis, secret và deploy |
-| `@export-state` | `scripts/export-console-state.mjs` | script | đo mọi stale fact chỉ-đọc và gate surface đã khai báo |
-| `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@skill-shape` | `skills/skill-shape` | module | output và authority contract chung |
+| `@stale-registry` | `stale` | registry | taxonomy/router duy nhất dùng chung với repair |
+| `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
 
 ## NESTED SKILLS
 
-Không có. Skill chỉ báo ownership; nó không tự gọi capability được nêu tên.
+Không có. Skill này gọi tên owner và không invoke họ.
 
-## Cách chạy
+## Chạy
 
-Đọc `@skill-shape` trước. Đây là lượt chỉ lập báo cáo: vừa sửa thứ đang đo thì kết quả không còn đáng tin.
+Đọc `@skill-shape`, `@stale-registry`, rồi mọi module registry route tới. Chỉ dùng `Evidence cho stale list`
+của từng module; không apply inventory, apply hay proof step.
 
-## Tám thứ stale, nhưng danh sách không biến thành repair
+Plan-only: report vừa repair thì không còn ai tin measurement của nó.
 
-Danh sách dùng đúng taxonomy của `starci-repair` để handoff không giấu việc:
+## PROCESS
 
-| Thứ stale | Skill này đo được gì | Cleared by |
-|---|---|---|
-| **route** | checkout, contract, branch và recorded head so với filesystem/git | `starci-init` |
-| **source** | gate entrypoint manifest khai báo; pass/fail luôn ghi rõ là chưa đo | `starci-repair`, sau approval |
-| **index** | contract `why` đang tả shape thay vì nói need | `starci-repair`, pass `why` |
-| **machine** | canon package đã cài theo package name, absent hay vendored | `starci-repair`, machine pass |
-| **formatter** | package Prettier trực tiếp và config/script/hook/CI/editor integration first-party | `starci-repair`, strict-fix pass |
-| **assurance** | declaration applicability đã track, rồi mọi local `ASSURANCE-*` fact cho backend route bắt buộc; required GitHub check và secret value luôn ghi rõ là external | `starci-repair`, assurance pass |
-| **structure** | tier `shells` dưới production component root được chấp nhận, kể cả directory rỗng | `starci-repair`, retired-structure pass |
-| **remnant** | `.claude/` lồng trong routed checkout, kèm recursive/tracked counts | `starci-repair`, remnant pass; content tracked trả về owner |
+### 1 — Lập boundary read-only
 
-Skill đo bảy loại và nói thẳng boundary của source: đọc gate declaration nhưng không chạy gate. Typecheck
-và build ghi state; một báo cáo làm đổi machine nó đo không còn là measurement. Chỉ chạy lint cũng gây
-hiểu lầm rằng các gate còn lại đã được đo.
+`Phase` là `plan`; `Touching` không có gì. Đọc `.workspace/config.json` và mọi declared role. Nếu workspace
+root absent, report fact đó và dừng.
 
-## Luật skill này bảo vệ
-
-Danh sách phải đọc được theo project, chỉ ra lý do và owner, nhưng không thực thi project. `stale`,
-`absent`, `invalid` và warning phải tách biệt vì chúng cần hành động khác nhau.
-
-## QUY TRÌNH
-
-### 1 — Lập context lock
-
-`Phase` là `plan`, `Touching` là `None`. Ghi Source và thời điểm đo. Skill không ghi file nào, kể
-cả record riêng; chỉ khi người đọc yêu cầu giữ lại danh sách thì nơi lưu mới được khai rõ.
-
-### 2 — Scan bằng script của tree
+### 2 — Chạy shared scanner
 
 ```bash
 node @export-state --stale
 ```
 
-Script đọc route config, kiểm tra filesystem/git, parse contract index, đọc lint wiring và đo backend
-assurance theo `@assurance-be`; nó không chạy lint, typecheck, build hay test.
+Script đo route, contract, manifest, lint adoption, first-party formatter integration, local assurance
+wiring, retired structure và remnant. Nó exit non-zero khi stale; exit đó là verdict, không phải lý do
+reimplement scan trong conversation.
 
-### 3 — Báo theo project, không theo role
+### 3 — Report verdict từ registry
 
-Gom role của cùng project vào một hàng nhưng giữ verdict từng role. Route `stale` khi cấu trúc hợp lệ mà
-sự thật đã đổi; `absent` khi role chưa có route; unparseable là `invalid`, không ép vào hai loại kia.
+Group theo project, role nằm dưới. Dùng category/verdict name từ `@stale-registry`. Với mỗi module, emit
+`Evidence cho stale list`, current count/fact và clearing owner. Report clean và `not required` rõ ràng khi
+silence sẽ giống scan bị bỏ.
 
-### 4 — Nêu source gate surface mà không tuyên bố kết quả
+### 4 — Giữ project gate unmeasured
 
-Đọc manifest của mỗi routed checkout và liệt kê primary entrypoint đã khai báo: format, lint, typecheck,
-build, tests. `declared` không có nghĩa `green`. Repository không khai báo gate nào là finding của
-`starci-repair`; thiếu riêng một command chỉ có nghĩa repository không có command đó, skill không tự tạo.
+Với `@stale-source-gates`, chỉ list declared format/lint/typecheck/build/unit entrypoint. Không chạy chúng.
+Typecheck/build/test có thể ghi state; chỉ chạy lint sẽ làm report trông rộng hơn thực tế.
 
-### 5 — Đặt contract index cạnh route
+### 5 — Giữ external assurance trung thực
 
-Báo số reason không thể tìm theo need và evidence cụ thể. Một count chỉ là tín hiệu; recorded miss từ
-lookup thật có ưu tiên cao hơn.
+Với `@stale-assurance`, chỉ đọc tên và local wiring. Không decrypt record hoặc đọc provider value. Required
+check, expected-app binding và secret existence/value giữ `unmeasured external` trừ khi authorized API cho evidence.
 
-### 6 — Báo lint machine vì nó quyết định count có nghĩa không
+### 6 — Dừng mà không repair
 
-Mỗi role nhận `installed`, `absent` hoặc `vendored` cùng relative path. Khi machine không `installed`, mọi
-lint count đều không phải evidence: absent nghĩa không kiểm gì, vendored nghĩa đo bằng bản sao riêng.
+Trả mọi category, evidence và owner. Không refresh route, edit reason, install package, bỏ Prettier, tạo
+assurance state, move component hoặc delete remnant. Fix sau đó là request `starci-repair`/`starci-init`
+riêng với approval riêng.
 
-### 7 — Resolve applicability rồi đo backend delivery assurance như một machine không thể cắt nhỏ
+## Stops
 
-Với mỗi backend route, đọc `starci.deliveryAssurance` trong `package.json` đã track trước. Thiếu declaration
-nghĩa là `required`. Đúng `required: false` kèm `reason` không rỗng nghĩa là `not required`: báo reason và
-không scan, đếm hay giao ownership repair cho bất kỳ assurance component nào. Declaration false không có
-reason là policy không hợp lệ, không phải exemption; assurance vẫn bắt buộc.
+- `.workspace` absent → report không có route và kết thúc.
+- Route JSON invalid → report `invalid`, không phải `absent` hay `stale`.
+- Category không đọc an toàn được → report `unmeasured` kèm reason; không guess.
+- Reader hỏi repair → finish inventory; capability khác sở hữu write.
 
-Với mỗi backend route bắt buộc, báo mọi `ASSURANCE-*` fact còn thiếu: Husky và pre-push check-only, active PR CI,
-một unit run sinh LCOV, Codecov upload, SonarQube scan cộng quality gate, encrypted stack token record,
-symbolic workflow secret reference và deploy dependency. Cài một phần vẫn là stale.
+## OUTPUT
 
-Chỉ đọc tên và wiring. Không decrypt stack record hay in provider value. Required GitHub check,
-expected-app binding và GitHub secret value là external fact; nếu không có authorized API evidence thì
-ghi `unmeasured external`.
-
-### 8 — Đo trực tiếp formatter, retired structure và remnant
-
-Formatter chỉ xét integration point first-party; nhắc đến Prettier trong prose hoặc transitive lockfile
-không phải formatter ownership. Retired structure được inventory trực tiếp trong production component
-root vì Git không thấy directory `shells/` rỗng; candidate/artifact tree không phải production root.
-
-Với mỗi `.claude/` lồng, đếm file recursively và file tracked riêng. Content tracked không bao giờ được
-mô tả là an toàn để xóa; `starci-repair` trả quyết định đó về owner.
-
-### 9 — Tách warning không phải stale source
-
-Mỗi warning vẫn phải có owner. Thiếu worktree root là setup có điều kiện, không phải source stale; route
-invalid không bị ép thành `stale` hay `absent`.
-
-### 10 — Dừng tại đó
-
-Nói cái gì stale, vì sao và ai xử lý. Không refresh head, repoint path, declare contract hay sửa source;
-nếu làm vậy báo cáo sẽ trở thành thứ thay đổi machine nó vừa đo.
-
-## Điểm dừng
-
-- `.workspace` không tồn tại → dừng; báo Source chưa có route rồi kết thúc lượt chạy.
-- Route có nhưng parse lỗi → báo một hàng `invalid`; không gọi nó stale hay absent.
-- Người đọc yêu cầu sửa → hoàn tất báo cáo. Việc sửa cần request và lượt chạy riêng của owner; skill này
-  không tự khởi chạy nó.
-
-## ĐẦU RA
-
-Trả đủ từng stale category, evidence và owner bằng văn xuôi ngắn; ghi clean, `not required` hoặc unmeasured ở nơi im lặng
-sẽ khiến người đọc tưởng đã kiểm. Với assurance, chỉ trả secret name và encrypted-record presence, không
-bao giờ trả value. Scan hết mọi category chỉ-đọc trước khi đóng. Chỉ hỏi boundary thẩm quyền thật dưới
-`### NEED APPROVALS`. Không dùng status table.
+Prose gọn theo project/category; không status table. Bao gồm clean, `not required`, `unmeasured` khi cần.
+Không bao gồm credential value.
