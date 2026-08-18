@@ -31,7 +31,7 @@ Danh sách dùng đúng taxonomy của `starci-repair` để handoff không gi�
 | **index** | contract `why` đang tả shape thay vì nói need | `starci-repair`, pass `why` |
 | **machine** | canon package đã cài theo package name, absent hay vendored | `starci-repair`, machine pass |
 | **formatter** | package Prettier trực tiếp và config/script/hook/CI/editor integration first-party | `starci-repair`, strict-fix pass |
-| **assurance** | mọi local `ASSURANCE-*` fact cho backend route; required GitHub check và secret value luôn ghi rõ là external | `starci-repair`, assurance pass |
+| **assurance** | declaration applicability đã track, rồi mọi local `ASSURANCE-*` fact cho backend route bắt buộc; required GitHub check và secret value luôn ghi rõ là external | `starci-repair`, assurance pass |
 | **structure** | tier `shells` dưới production component root được chấp nhận, kể cả directory rỗng | `starci-repair`, retired-structure pass |
 | **remnant** | `.claude/` lồng trong routed checkout, kèm recursive/tracked counts | `starci-repair`, remnant pass; content tracked trả về owner |
 
@@ -81,9 +81,14 @@ lookup thật có ưu tiên cao hơn.
 Mỗi role nhận `installed`, `absent` hoặc `vendored` cùng relative path. Khi machine không `installed`, mọi
 lint count đều không phải evidence: absent nghĩa không kiểm gì, vendored nghĩa đo bằng bản sao riêng.
 
-### 7 — Đo backend delivery assurance như một machine không thể cắt nhỏ
+### 7 — Resolve applicability rồi đo backend delivery assurance như một machine không thể cắt nhỏ
 
-Với mỗi backend route, báo mọi `ASSURANCE-*` fact còn thiếu: Husky và pre-push check-only, active PR CI,
+Với mỗi backend route, đọc `starci.deliveryAssurance` trong `package.json` đã track trước. Thiếu declaration
+nghĩa là `required`. Đúng `required: false` kèm `reason` không rỗng nghĩa là `not required`: báo reason và
+không scan, đếm hay giao ownership repair cho bất kỳ assurance component nào. Declaration false không có
+reason là policy không hợp lệ, không phải exemption; assurance vẫn bắt buộc.
+
+Với mỗi backend route bắt buộc, báo mọi `ASSURANCE-*` fact còn thiếu: Husky và pre-push check-only, active PR CI,
 một unit run sinh LCOV, Codecov upload, SonarQube scan cộng quality gate, encrypted stack token record,
 symbolic workflow secret reference và deploy dependency. Cài một phần vẫn là stale.
 
@@ -119,7 +124,7 @@ nếu làm vậy báo cáo sẽ trở thành thứ thay đổi machine nó vừa
 
 ## ĐẦU RA
 
-Trả đủ từng stale category, evidence và owner bằng văn xuôi ngắn; ghi clean hoặc unmeasured ở nơi im lặng
+Trả đủ từng stale category, evidence và owner bằng văn xuôi ngắn; ghi clean, `not required` hoặc unmeasured ở nơi im lặng
 sẽ khiến người đọc tưởng đã kiểm. Với assurance, chỉ trả secret name và encrypted-record presence, không
 bao giờ trả value. Scan hết mọi category chỉ-đọc trước khi đóng. Chỉ hỏi boundary thẩm quyền thật dưới
 `### NEED APPROVALS`. Không dùng status table.

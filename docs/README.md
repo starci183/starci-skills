@@ -14,6 +14,9 @@ compilers/principles/gap/
 Which shelves are public is decided in one place, [`publication.mjs`](publication.mjs). A new shelf
 becomes a documented shelf by adding one entry there — no page, no route, no sidebar to write.
 
+Operator procedures live under `../runbooks/` as paired `en.md`/`vi.md` records and publish as the
+`Runbooks` shelf. They reference repository wrappers and encrypted record names, never runtime values.
+
 ```bash
 npm install
 npm run sync

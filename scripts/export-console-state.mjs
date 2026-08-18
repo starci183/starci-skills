@@ -137,6 +137,19 @@ function readAssurance(diskPath, role) {
   } catch {
     return {verdict: "stale", missing: ["readable package manifest"], external: ["branch protection not measured"]};
   }
+  const declaration = manifest.starci?.deliveryAssurance;
+  const declarationIssues = [];
+  if (declaration !== undefined) {
+    if (!declaration || typeof declaration !== "object" || typeof declaration.required !== "boolean") {
+      declarationIssues.push("manifest policy starci.deliveryAssurance must declare boolean required");
+    } else if (declaration.required === false) {
+      const reason = typeof declaration.reason === "string" ? declaration.reason.trim() : "";
+      const manifestIsTracked = git(diskPath, "ls-files", "--error-unmatch", "package.json") !== null;
+      if (reason && manifestIsTracked) return {verdict: "not required", reason, missing: [], external: []};
+      if (!manifestIsTracked) declarationIssues.push("manifest policy exemption must live in tracked package.json");
+      if (!reason) declarationIssues.push("manifest policy starci.deliveryAssurance.required=false needs a non-empty reason");
+    }
+  }
   const scripts = manifest.scripts ?? {};
   const deps = {...manifest.dependencies, ...manifest.devDependencies};
   const prePushPath = join(diskPath, ".husky", "pre-push");
@@ -171,15 +184,15 @@ function readAssurance(diskPath, role) {
     "ASSURANCE-4 SonarQube scans the checkout": /SonarSource\/sonarqube-scan-action@/i.test(prWorkflows),
     "ASSURANCE-4 SonarQube consumes coverage/lcov.info": /sonar\.(javascript|typescript)\.lcov\.reportPaths\s*=\s*coverage\/lcov\.info/i.test(`${sonarConfig}\n${prWorkflows}`),
     "ASSURANCE-4 SonarQube quality gate blocks": /SonarSource\/sonarqube-quality-gate-action@|sonar\.qualitygate\.wait\s*=\s*true/i.test(prWorkflows),
-    "ASSURANCE-7 deployment waits for verification": deployWorkflows.length === 0 || deployWorkflows.every((text) => /needs:\s*(\[[^\]]*verify[^\]]*\]|verify\b)|workflow_(run|call)\s*:/i.test(text)),
     "ASSURANCE-5 workflow references CODECOV_TOKEN": /secrets\.CODECOV_TOKEN/.test(prWorkflows),
     "ASSURANCE-5 workflow references SONAR_TOKEN": /secrets\.SONAR_TOKEN/.test(prWorkflows),
     "ASSURANCE-5 workflow references SONAR_HOST_URL": /(vars|secrets)\.SONAR_HOST_URL/.test(prWorkflows),
     "ASSURANCE-5 stack-secret entrypoint exists": /stack-secret\.mjs\s+set/.test(String(scripts["secret:set"] ?? "")),
     "ASSURANCE-5 Codecov token is encrypted in stacks": existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "codecov-token.key.enc")),
     "ASSURANCE-5 SonarQube token is encrypted in stacks": existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "sonarqube-token.key.enc")),
+    "ASSURANCE-7 deployment waits for verification": deployWorkflows.length === 0 || deployWorkflows.every((text) => /needs:\s*(\[[^\]]*verify[^\]]*\]|verify\b)|workflow_(run|call)\s*:/i.test(text)),
   };
-  const missing = Object.entries(checks).filter(([, present]) => !present).map(([name]) => name);
+  const missing = declarationIssues.concat(Object.entries(checks).filter(([, present]) => !present).map(([name]) => name));
   return {
     verdict: missing.length > 0 ? "stale" : "installed",
     missing,
@@ -594,8 +607,8 @@ if (staleOnly) {
   if (assurances.length > 0) {
     console.log("delivery assurance:");
     for (const row of assurances) {
-      const {verdict, missing, external} = row.assurance;
-      console.log(`  ${row.project}/${row.role}  ${verdict}`);
+      const {verdict, reason, missing, external} = row.assurance;
+      console.log(`  ${row.project}/${row.role}  ${verdict}${reason ? ` — ${reason}` : ""}`);
       if (missing.length > 0) {
         assuranceDebt += 1;
         for (const item of missing) console.log(`  ${" ".repeat((row.project + "/" + row.role).length)}  - missing: ${item}`);

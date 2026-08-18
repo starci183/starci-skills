@@ -29,7 +29,7 @@ Tám thứ khác nhau đều thường bị gọi là stale:
 | **index** | gate xanh nhưng không tìm được contract `why` theo need | skill này, pass `why` |
 | **machine** | lint package chưa cài hoặc checkout dùng bản vendored | skill này, trước khi đo |
 | **formatter** | strict fix còn Prettier nằm cạnh ESLint canon đang sở hữu formatting | skill này, pass strict-fix |
-| **assurance machine** | backend thiếu bất kỳ `ASSURANCE-*` phần nào: pre-push, PR CI, LCOV/Codecov, SonarQube gate, stack custody, required checks hay deploy dependency | skill này, assurance pass |
+| **assurance machine** | backend bắt buộc assurance nhưng thiếu bất kỳ `ASSURANCE-*` phần nào: pre-push, PR CI, LCOV/Codecov, SonarQube gate, stack custody, required checks hay deploy dependency | skill này, assurance pass |
 | **structure** | vocabulary đã bỏ một tier nhưng path vẫn còn, kể cả path rỗng mà gate theo file không thấy | skill này, pass retired-structure |
 | **remnant** | target checkout còn `.claude/` từ tree cũ | skill này, sau index |
 
@@ -55,14 +55,21 @@ Gate xanh không chứng minh directory tree sạch. ESLint nhìn file và Git t
 rỗng thì cả hai đều không thấy. Repair phải inventory directory trực tiếp. `components/shells` vi phạm
 `FILE-8` dù chứa bốn file hay không chứa file nào.
 
-Backend assurance là complete hoặc stale. Đọc `@assurance-be` và cài đủ mọi situation đã chạm. Husky chỉ
+Backend assurance mặc định là bắt buộc, và khi bắt buộc thì chỉ complete hoặc stale. Đọc declaration
+`starci.deliveryAssurance` đã track trước khi inventory. Đúng `required: false` kèm reason không rỗng làm
+pass thành `not required`; không cài phần nào, không hỏi provider access và không tạo external state. Thiếu
+declaration nghĩa là required; false không có reason là policy không hợp lệ, không phải exemption. Với
+backend bắt buộc, đọc `@assurance-be` và cài đủ mọi situation đã chạm. Husky chỉ
 là local refusal; active CI và required checks mới là merge fence. Codecov và SonarQube dùng chung một
 LCOV report, deploy không được chạy đua với verification.
 
 Token Codecov/SonarQube đi qua hidden-input stack-secret entrypoint thành
 `.stacks/dev/runtime/files/codecov-token.key.enc` và `sonarqube-token.key.enc`; GitHub Actions nhận named
 secret projection vì CI không giữ SOPS identity. Không hỏi value trong chat, không in, không commit
-plaintext và không đặt value vào command-line argument.
+plaintext và không đặt value vào command-line argument. Với publication đã duyệt, chạy helper của Source
+`scripts/publish-secret.mjs --plan`, trình các target không có value, rồi chạy lại không có `--plan`.
+Helper nhận process environment variable theo tên hoặc hidden input, pipe sang stack encryption cùng GitHub,
+rồi xóa bản sao trong process.
 
 ## QUY TRÌNH
 
@@ -85,7 +92,9 @@ Trong strict-fix mode, inventory package họ Prettier, `.prettierignore`, `.pre
 `prettier.config.*`, manifest script, lint-staged, hook, CI và editor setting gọi hoặc chọn Prettier.
 Inventory này là removal boundary và proof target.
 
-Với backend, đọc `@assurance-be` rồi inventory manifest/lockfile, `.husky/`, CI/deploy workflow, coverage,
+Với backend, resolve `starci.deliveryAssurance` trong manifest đã track trước. Declaration `required: false`
+hợp lệ kết thúc assurance inventory ở `not required` cùng reason. Nếu không, đọc `@assurance-be` rồi
+inventory manifest/lockfile, `.husky/`, CI/deploy workflow, coverage,
 Codecov/SonarQube config, tên encrypted stack record, symbolic secret reference và required checks bên
 ngoài. Không đọc secret value; external fact chưa có authorized API evidence phải ghi unmeasured.
 
@@ -109,7 +118,7 @@ file; inventory directory giữ trường hợp rỗng.
 
 ### 6 — Phân loại từng finding
 
-Mỗi finding thuộc một nhóm: machine, strict-fix, format, mechanical, defect, index, assurance, retired-structure hoặc remnant. `strict-fix`
+Mỗi finding thuộc một nhóm: machine, strict-fix, format, mechanical, defect, index, assurance, retired-structure hoặc remnant. `assurance` chỉ tồn tại khi assurance bắt buộc mà thiếu một situation đã chạm. `strict-fix`
 là mọi Prettier integration first-party và được sửa bằng cách bỏ trọn integration rồi để ESLint làm formatter duy nhất. Một dòng có thể cần
 nhiều pass nhưng phải có một nguyên nhân gốc; không gom mọi thứ thành “lint debt”.
 
@@ -131,7 +140,7 @@ hiện value. `OK` chỉ duyệt đúng service, repository và secret name đã
 ### 8 — Lấy baseline rồi sửa theo các pass tách biệt
 
 Commit state trước thay đổi. Sửa machine trước; strict fix bỏ Prettier và regenerate lockfile; tiếp theo
-format-only bằng ESLint, mechanical, defect, retired-structure, `why`, assurance cho backend, rồi remnant. Mỗi pass có diff đọc được và gate liên quan chạy lại. Directory rỗng
+format-only bằng ESLint, mechanical, defect, retired-structure, `why`, assurance cho backend bắt buộc, rồi remnant. Mỗi pass có diff đọc được và gate liên quan chạy lại. Directory rỗng
 không có Git diff vẫn phải ghi path cùng before/after count trong kết quả.
 
 ### 9 — Fan out chỉ defect pass
@@ -162,10 +171,13 @@ từ package đã cài và toàn bộ gate ban đầu.
 
 ### 12 — Assurance pass: cài trọn backend delivery fence
 
-Chỉ chạy sau khi lint, typecheck/build và unit xanh. Cài Husky pre-push gọi `lint:check` cộng
+Chỉ chạy khi manifest đã track nói assurance là bắt buộc, tường minh hoặc do không khai báo, và sau khi
+lint, typecheck/build cùng unit xanh. Declaration `required: false` hợp lệ trả pass là `not required` cùng
+reason và không ghi assurance. Nếu bắt buộc, cài Husky pre-push gọi `lint:check` cộng
 `test:ci`/`test:unit`; bật PR CI check-only; sinh một `coverage/lcov.info` rồi đưa cùng report cho Codecov
 và SonarQube; quality/status checks phải blocking. Đưa hai token qua hidden-input stack-secret vào fixed
-encrypted path, project sang GitHub Secrets mà không in value, và đặt `SONAR_HOST_URL` bằng repository
+encrypted path bằng helper `scripts/publish-secret.mjs` để một hidden/process-env value được pipe đến cả
+stack owner lẫn GitHub mà không xuất hiện trong argument/output; project sang GitHub Secrets và đặt `SONAR_HOST_URL` bằng repository
 variable trừ khi installation yêu cầu secret. CI không decrypt `.stacks`.
 
 Required CI/Codecov/SonarQube checks và expected apps được cấu hình qua branch protection/ruleset sau
@@ -188,7 +200,8 @@ Prettier; không còn script, hook, lint-staged, CI hay editor setting first-par
 format command còn giữ đều resolve sang ESLint và pass. Search tracked tree không phân biệt hoa thường;
 match chỉ còn trong lockfile phải được giải bằng dependency-path command. Match first-party mở lại pass.
 
-Backend assurance còn phải chứng minh đủ bảy `ASSURANCE-*` fact, tách repository proof khỏi external proof.
+Backend assurance bắt buộc còn phải chứng minh đủ bảy `ASSURANCE-*` fact; backend `not required` thay vào đó
+chứng minh exact declaration đã track cùng reason. Tách repository proof khỏi external proof.
 Workflow local complete nhưng branch protection hoặc secret projection chưa được verify vẫn là incomplete.
 
 ### 15 — Đóng phase
@@ -205,10 +218,13 @@ production tree trong `git diff <baseline>`; proof chạy được là `own` và
 - Tree dirty bởi việc không liên quan → dừng; mixed baseline không chứng minh gì.
 - `.claude/` trong target có tracked file hoặc nội dung thật → dừng remnant pass và trả inventory.
 - Strict fix còn reference Prettier first-party → chưa được đóng phase dù lint, typecheck và build xanh.
-- Còn thiếu `ASSURANCE-*` fact → chưa được đóng assurance pass; thiếu access được trả dưới
+- Chỉ trả `not required` khi manifest đã track có đúng `required: false` và reason không rỗng; không suy
+  diễn từ service thiếu, project nhỏ hay partial adoption.
+- Backend bắt buộc còn thiếu `ASSURANCE-*` fact → chưa được đóng assurance pass; thiếu access được trả dưới
   `NEED APPROVALS`, không biến Codecov/SonarQube/required checks thành optional.
 - Token chỉ đến được qua chat, stdout, command-line argument hoặc plaintext tracked file → dừng secret
-  handling và trả secure-input boundary.
+  handling, rồi trả secure-input boundary kèm command `scripts/publish-secret.mjs --plan` không chứa value
+  để owner chạy qua hidden input hoặc process env sẵn có.
 - Boundary cần mở rộng → quay lại owner, không tự thêm path.
 
 ## ĐẦU RA

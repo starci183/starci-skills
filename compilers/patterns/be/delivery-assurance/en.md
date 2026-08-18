@@ -26,14 +26,47 @@ custody, merge enforcement and a deploy that cannot outrun verification.
 bypassed. CI reruns the repository's own check-only commands. Required checks make those results a merge
 condition. Deployment begins only after that condition has passed.
 
-Every backend repository adopts the complete machine. Partial adoption is stale, not a smaller profile:
+Backend repositories require the complete machine by default. Partial adoption is stale, not a smaller profile:
 Codecov without coverage uploads nothing useful; SonarQube without a quality gate only comments; a CI job
 without branch protection advises; a deploy that races CI can publish red source.
+
+A project may explicitly declare that delivery assurance is not required. The declaration lives in the
+tracked manifest, never in a machine-local workspace route, so every reader sees the same owner decision.
+Only `starci.deliveryAssurance.required: false` with a non-empty `reason` is an exemption. Absence, a typo,
+or `false` without a reason means assurance is still required; a repository cannot become exempt merely by
+being incomplete.
 
 Third-party credentials have two homes with different consumers. The encrypted source record lives under
 `.stacks/dev/runtime/files/`; GitHub Actions receives an external secret projection because CI deliberately
 does not hold the SOPS master identity. Neither home licenses plaintext in source, workflow arguments,
 terminal output or chat.
+
+The Source helper `scripts/publish-secret.mjs` is the standard bridge between those homes. It prints a
+value-free plan, reads an existing process environment variable by name or opens a hidden prompt, feeds the
+value to the repository `secret:set` entrypoint and `gh secret set` over stdin, then clears its process
+environment copy. A repository-scoped provider token targets one repository; batching repositories requires
+a provider credential whose scope actually covers every named repository.
+
+## Applicability
+
+Read `package.json` before evaluating any `ASSURANCE-*` situation:
+
+```json
+{
+  "starci": {
+    "deliveryAssurance": {
+      "required": false,
+      "reason": "Owner-approved reason this project does not require delivery assurance."
+    }
+  }
+}
+```
+
+- No declaration, or `required: true` → `required`; evaluate all reached situations.
+- Exact `required: false` plus a non-empty `reason` → `not required`; report the reason and do not install,
+  measure or request any assurance service.
+- `required: false` without a non-empty reason → invalid exemption; report it as stale manifest policy and
+  keep assurance required.
 
 ## Situation codes
 
@@ -112,7 +145,7 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 
 ## Rules
 
-1. Every backend repository adopts all seven situations; missing service access is unresolved work, not an exemption.
+1. Backend assurance is required by default; only the tracked manifest declaration in Applicability can exempt it.
 2. Hooks and CI invoke check-only commands and never mutate source.
 3. Local pre-push stays at lint plus unit; expensive and remote gates stay in CI.
 4. Codecov and SonarQube consume the same LCOV report from the same successful unit run.
@@ -122,6 +155,8 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 
 ## Exceptions
 
+- A valid `starci.deliveryAssurance.required: false` declaration makes the whole assurance pattern not
+  required for that project. It is not partial adoption, and `starci-repair` must not install any part.
 - A backend repository with no deploy workflow does not reach `ASSURANCE-7`; it does not create a dummy deploy.
 - A temporary provider outage may leave a required check unavailable, but it never removes or marks the check optional.
 - A provider supporting approved tokenless identity may replace the corresponding GitHub secret projection; the encrypted owner record remains unless the owner explicitly retires that credential.
@@ -138,7 +173,8 @@ secrets: <encrypted stack record names and symbolic CI references>
 merge: <required checks evidence | unmeasured external>
 deploy: <verification dependency | not applicable>
 situations: <ASSURANCE-1 ... ASSURANCE-7 reached by this repository>
-verdict: <complete | stale | needs external authority>
+verdict: <complete | stale | needs external authority | not required>
+reason: <required only when verdict is not required>
 ```
 
 ## Scope

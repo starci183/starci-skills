@@ -23,12 +23,19 @@ const SKILL_RUNTIME_NOTICE = `> **Agent runtime — English only.** This \`SKILL
 // Segments that are acronyms, not words. Capitalising only the first letter turns them into
 // something nobody in the repository says out loud.
 const ACRONYMS = new Set(["fe", "be", "cdc", "cqrs"]);
+const SEGMENT_LABELS = new Map([
+  ["oauth", "OAuth"],
+  ["s3", "S3"],
+  ["ai", "AI"],
+  ["ci", "CI"],
+]);
 
 // Routes stay lowercase because they mirror directory names; what a reader sees does not.
 function label(name) {
   return name
     .split("/")
-    .map((part) => (ACRONYMS.has(part) ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
+    .map((part) => SEGMENT_LABELS.get(part)
+      ?? (ACRONYMS.has(part) ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
     .join("/");
 }
 
@@ -46,6 +53,7 @@ function normalizeDocument(source) {
     // A shelf record links DOWN into its own modules as `child/en.md`. Without this the link keeps
     // the `.md` and resolves to nothing once published.
     .replace(/\]\((?:\.\/)?([a-z0-9-]+)\/en\.md(#[^)]+)?\)/g, "](./$1$2)")
+    .replace(new RegExp(`\\]\\((?:\\./)?([a-z0-9-]+)/(${RECORDS.join("|")})\\.md(#[^)]+)?\\)`, "g"), "](./$1/$2$3)")
     .replace(new RegExp(`\\]\\((?:\\./)?(${RECORDS.join("|")})\\.md(#[^)]+)?\\)`, "g"), "](./$1$2)")
     .replace(/\]\(\.\.\/([^/)]+)\/en\.md(#[^)]+)?\)/g, "](../$1$2)")
     .replace(new RegExp(`\\]\\(\\.\\./([^/)]+)/(${RECORDS.join("|")})\\.md(#[^)]+)?\\)`, "g"), "](../$1/$2$3)");

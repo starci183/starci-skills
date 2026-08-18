@@ -35,7 +35,7 @@ Use the same taxonomy as `starci-repair`; a list with a smaller vocabulary hides
 | **index** | contract `why` reasons that describe a shape instead of stating a need | `starci-repair`, the `why` pass |
 | **machine** | published canon installed by package name, absent, or vendored | `starci-repair`, the machine pass |
 | **formatter** | direct Prettier packages and first-party config, script, hook, CI or editor integration | `starci-repair`, the strict-fix pass |
-| **assurance** | every local `ASSURANCE-*` fact for backend routes; required GitHub checks and secret values remain explicitly external | `starci-repair`, the assurance pass |
+| **assurance** | the tracked applicability declaration, then every local `ASSURANCE-*` fact for required backend routes; required GitHub checks and secret values remain explicitly external | `starci-repair`, the assurance pass |
 | **structure** | a `shells` tier under an accepted production component root, including an empty directory | `starci-repair`, the retired-structure pass |
 | **remnant** | a nested `.claude/` in a routed checkout, with recursive and tracked-file counts | `starci-repair`, the remnant pass; tracked content returns to the owner |
 
@@ -126,9 +126,14 @@ but `installed` carries its owner from the layer table and the reason, which is 
 "a package is missing" but **"no count from this checkout is evidence"**: absent means nothing was checked,
 vendored means it was checked against a private copy of the law.
 
-### 7 — Measure backend delivery assurance as one indivisible machine
+### 7 — Resolve applicability, then measure backend delivery assurance as one indivisible machine
 
-For every backend route, report every missing `ASSURANCE-*` fact: Husky and its check-only pre-push,
+For every backend route, read `starci.deliveryAssurance` from the tracked `package.json` first. Missing
+declaration means `required`. Exact `required: false` with a non-empty `reason` means `not required`:
+report that reason and do not scan, count or assign repair ownership for any assurance component. A false
+declaration without a reason is invalid policy, not an exemption, and assurance remains required.
+
+For every required backend route, report every missing `ASSURANCE-*` fact: Husky and its check-only pre-push,
 active PR CI, one LCOV-producing unit run, Codecov upload, SonarQube scan plus quality gate, encrypted
 stack token records, symbolic workflow secret references and deploy dependency. Partial adoption is
 stale; do not call one installed vendor a smaller profile.
@@ -173,7 +178,7 @@ thing that changed the machine it was measuring.
 
 ## OUTPUT
 
-Return every stale category, evidence and owner in concise prose, including clean or unmeasured wording
+Return every stale category, evidence and owner in concise prose, including clean, `not required`, or unmeasured wording
 where silence would imply a check ran. For assurance, return secret names and encrypted-record presence,
 never values. Scan every readable category before closing; ask only for a genuine authority boundary under
 `### NEED APPROVALS`. No status tables.

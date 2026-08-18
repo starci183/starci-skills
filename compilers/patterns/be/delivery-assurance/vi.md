@@ -26,13 +26,45 @@ và deploy không thể chạy trước verification.
 nhưng có thể bypass. CI chạy lại command check-only của repository. Required checks biến kết quả đó thành
 điều kiện merge. Deploy chỉ bắt đầu sau khi điều kiện ấy pass.
 
-Mọi backend repository phải cài đủ machine. Cài một phần là stale, không phải profile nhỏ hơn: Codecov
+Backend repository mặc định phải cài đủ machine. Cài một phần là stale, không phải profile nhỏ hơn: Codecov
 không có coverage thì không có evidence; SonarQube không có quality gate chỉ để bình luận; CI không có
 branch protection chỉ khuyên; deploy chạy song song CI có thể phát hành source đỏ.
+
+Project có thể khai báo rõ delivery assurance là không bắt buộc. Declaration nằm trong manifest được
+track, không nằm trong workspace route cục bộ theo máy, để mọi reader thấy cùng một quyết định của owner.
+Chỉ `starci.deliveryAssurance.required: false` kèm `reason` không rỗng mới là exemption. Thiếu declaration,
+gõ sai hoặc `false` không có lý do vẫn có nghĩa assurance bắt buộc; repository không tự được miễn chỉ vì
+đang thiếu machine.
 
 Credential bên thứ ba có hai nơi cho hai consumer khác nhau. Source record mã hóa nằm dưới
 `.stacks/dev/runtime/files/`; GitHub Actions nhận external secret projection vì CI cố ý không giữ SOPS
 master identity. Không nơi nào cho phép plaintext vào source, workflow argument, terminal output hay chat.
+
+Helper chuẩn của Source `scripts/publish-secret.mjs` là cầu nối giữa hai nơi. Nó in plan không có value,
+đọc process environment variable theo tên hoặc mở hidden prompt, đưa value vào entrypoint `secret:set` và
+`gh secret set` qua stdin, rồi xóa bản sao khỏi process environment. Provider token scoped theo repository
+chỉ target một repository; batch nhiều repository đòi credential có scope thật sự phủ mọi repository đã nêu.
+
+## Applicability
+
+Đọc `package.json` trước khi đánh giá bất kỳ situation `ASSURANCE-*` nào:
+
+```json
+{
+  "starci": {
+    "deliveryAssurance": {
+      "required": false,
+      "reason": "Lý do đã được owner duyệt cho việc project này không cần delivery assurance."
+    }
+  }
+}
+```
+
+- Không có declaration hoặc `required: true` → `required`; đánh giá mọi situation đã chạm.
+- Đúng `required: false` kèm `reason` không rỗng → `not required`; báo reason và không cài, đo hay yêu cầu
+  bất kỳ assurance service nào.
+- `required: false` nhưng thiếu reason không rỗng → exemption không hợp lệ; báo manifest policy stale và
+  vẫn xem assurance là bắt buộc.
 
 ## Situation codes
 
@@ -108,7 +140,7 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 
 ## Rules
 
-1. Mọi backend repository cài đủ bảy tình huống; thiếu service access là việc chưa xong, không phải exemption.
+1. Backend assurance mặc định là bắt buộc; chỉ declaration trong manifest ở Applicability mới có thể miễn.
 2. Hook và CI gọi command check-only, không sửa source.
 3. Local pre-push chỉ có lint cộng unit; gate đắt và remote ở CI.
 4. Codecov và SonarQube dùng cùng LCOV report từ cùng một unit run thành công.
@@ -118,6 +150,8 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 
 ## Ngoại lệ
 
+- Declaration `starci.deliveryAssurance.required: false` hợp lệ làm cả assurance pattern thành `not required`
+  cho project đó. Đây không phải partial adoption, và `starci-repair` không được cài bất kỳ phần nào.
 - Backend repository không có deploy workflow không chạm `ASSURANCE-7`; nó không tạo dummy deploy.
 - Provider outage tạm thời có thể làm required check unavailable, nhưng không bao giờ gỡ hoặc đổi check thành optional.
 - Provider có tokenless identity đã được duyệt có thể thay GitHub secret projection tương ứng; encrypted owner record vẫn còn trừ khi owner quyết định retire credential.
@@ -134,7 +168,8 @@ secrets: <encrypted stack record names and symbolic CI references>
 merge: <required checks evidence | unmeasured external>
 deploy: <verification dependency | not applicable>
 situations: <ASSURANCE-1 ... ASSURANCE-7 reached by this repository>
-verdict: <complete | stale | needs external authority>
+verdict: <complete | stale | needs external authority | not required>
+reason: <bắt buộc khi verdict là not required>
 ```
 
 ## Scope

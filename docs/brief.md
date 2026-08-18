@@ -87,3 +87,12 @@ The English record is authoritative for agents:
 
 Browse the detailed modules from the sidebar when you need the underlying laws, schemas, compilers, or
 gates. The landing page stays brief; the binding details remain in their owning records.
+
+## Operator runbooks
+
+[`Runbooks`](./runbooks) are the executable operations shelf for the platform around those skills. They
+cover the complete local stack and the external providers StarCi already references: secrets/SOPS,
+PostgreSQL, Redis, Elasticsearch, Qdrant, Kafka, MinIO, NATS, Keycloak, Google/GitHub OAuth, cAdvisor,
+Prometheus, Grafana Cloud, Codecov, SonarQube Cloud, payments, mail, AI pools, S3 and GCP. Each page names
+the real repository command, encrypted owner, verification signal, safe stop, rotation boundary and
+provider documentation; no credential value is published.
