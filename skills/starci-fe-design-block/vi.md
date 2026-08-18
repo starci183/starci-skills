@@ -101,9 +101,11 @@ Render mỗi anatomy thành một trang HTML trong `cache/preview`, gồm **mọ
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
 
-Cổng đó là mặc định, không phải điều kiện. Nếu nó đã bị chiếm, phục vụ ở cổng trống kế tiếp và **in ra URL
-thật sự đang phục vụ** — một lượt chạy hỏng vì dev server của người khác giữ cổng là hỏng ở chỗ chẳng ai
-hỏi tới, còn in ra một URL không ai mở được thì tệ hơn là không in.
+**8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
+khi bind được, rồi **in ra URL thật sự đang phục vụ**. Một lượt chạy chết vì dev server của người khác đang
+giữ 8080 là chết ở chỗ chẳng ai hỏi tới, còn in ra một URL không ai mở được thì tệ hơn là không in. Chặn số
+lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có lỗi — và nếu không cổng nào bind được thì nói
+ra, đừng lặng lẽ phục vụ vào hư không.
 
 
 CSS của preview chỉ là documentation chrome, không phải product class. Preview chỉ có populated state

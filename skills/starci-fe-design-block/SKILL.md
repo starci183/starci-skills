@@ -108,9 +108,11 @@ serve it:
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
 
-The port is the default, not a requirement. If it is taken, serve on the next free one and **print the URL
-actually served** — a run that fails because somebody else's dev server holds a port has failed at nothing
-the owner asked about, and a run that prints a URL nobody can open is worse than one that prints none.
+**8080 is where the search starts, not where it stops.** Bind it; if it is taken, try 8081, 8082, and keep
+going until one binds, then **print the URL actually served**. A run that dies because somebody's dev server
+holds 8080 has failed at nothing the owner asked about, and a run that prints a URL nobody can open is worse
+than one that prints none. Bound the search — twenty ports is a busy machine, two hundred is a bug — and if
+nothing binds, say so instead of serving nowhere quietly.
 
 
 The preview's CSS is documentation chrome and never a product class. A preview that shows only the
