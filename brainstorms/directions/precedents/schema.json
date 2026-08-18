@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v3/brainstorms/directions/precedents/schema.json",
+  "title": "Visual direction precedent record",
+  "description": "One accepted direction kept with the alternatives it beat. The direction shape is referenced, never copied.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "project", "prompt", "chosen", "rejected", "vocabularyAt", "status"],
+  "properties": {
+    "schema": {"const": 1},
+    "id": {"$ref": "#/$defs/id"},
+    "project": {"$ref": "#/$defs/slug"},
+    "prompt": {"type": "string", "minLength": 1},
+    "chosen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layoutHash", "direction"],
+      "properties": {
+        "layoutHash": {"$ref": "#/$defs/hash", "description": "The accepted layout that made this selected direction durable."},
+        "direction": {"$ref": "../schema.json#/$defs/direction"}
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "axes", "why"],
+        "properties": {
+          "id": {"$ref": "#/$defs/slug"},
+          "axes": {"$ref": "../schema.json#/$defs/axes"},
+          "why": {"type": "string", "minLength": 12}
+        }
+      }
+    },
+    "vocabularyAt": {"$ref": "#/$defs/hash"},
+    "status": {"enum": ["active", "stale", "retired", "overruled", "non-general"]},
+    "supersededBy": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?$"}
+  }
+}

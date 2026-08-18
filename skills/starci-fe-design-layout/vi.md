@@ -8,15 +8,22 @@ title: Frontend design layout · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@contract-search` | `scripts/contract-search.mjs` | script | tìm contract entry theo nhu cầu đã phát biểu |
-| `@layout-schema` | `brainstorms/layouts/schema.json` | file | kiểm tra JSON layout candidate |
-| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
-| `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
+| `@skill-shape` | `skills/skill-shape` | module | cung cấp CONTEXT và hợp đồng sáu bảng |
+| `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
+| `@worktrees` | `contexts/worktrees` | module | tách record bền khỏi preview dùng xong bỏ |
+| `@directions` | `brainstorms/directions` | module | sinh lựa chọn thị giác được nhúng vào layout |
+| `@layouts` | `brainstorms/layouts` | module | định nghĩa region, axis và contract verdict của layout |
+| `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo reason mà không trả class array |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | sinh kiểm kê token sống cho direction |
+| `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate JSON layout candidate |
+| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng design session |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact, session và sinh hash |
 
 ## HANDS OFF TO — named, never loaded
 
-`starci-init`
+| Condition | Owner |
+|---|---|
+| Workspace route không có hoặc stale. | `starci-init` |
 
 ## Cách chạy
 
@@ -34,13 +41,13 @@ session, không gồm file nào trong frontend repository.
 
 ### 2 — Resolve và kiểm tra workspace route
 
-Đọc `.workspace/<project>/<role>/config.json` của role `fe`. Trước khi đọc source, kiểm tra checkout tồn
+Đọc `@workspaces` và resolve role `fe`. Trước khi đọc source, kiểm tra checkout tồn
 tại và `context.contract` vẫn là file thật. Route stale phải **dừng lượt chạy** (`WORKSPACE-5`); không chọn
 checkout gần nhất rồi tiếp tục với contract của sản phẩm khác.
 
 ### 3 — Resolve worktree roots
 
-Registry ở `<Source>/.worktrees/<project>/registries` phải lock, sạch, đúng project branch và thuộc Git
+Đọc `@worktrees`. Registry ở `<Source>/.worktrees/<project>/registries` phải lock, sạch, đúng project branch và thuộc Git
 của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 `<Source>/.worktrees/<project>/cache/preview` (`WORKTREE-2`), không bao giờ dưới `.claude`
 (`WORKTREE-3`).
@@ -55,21 +62,26 @@ một mảng round trần không bao giờ phát hiện được.
 page vẫn là một session; prompt viết lại chỉ mở round mới. In `resumed <id>` hoặc `opened <id>` và giữ mọi
 accepted hash khi resume.
 
-### 5 — Đọc sáu input đúng mức reduction đã khai
+### 5 — Sinh các direction choice
 
-| Input | Nội dung đọc |
-|---|---|
-| request | nguyên văn |
-| contract | **query, không đọc cả file** — mỗi region một need qua `@contract-search`; chỉ nhận `key`, `why`, `host`, không nhận class array |
-| branches | mọi branch và nội dung mỗi branch được phép chứa |
-| routes | mọi route page và persistent layout |
-| axes | closed diversity set |
-| precedents | candidate accepted của project cùng các lần bị bác |
+Chạy `@inventory-visual-language`; dùng digest sinh ra làm `vocabularyAt`. Đọc `@directions`, sinh 3–4
+direction từ request, audience, feeling, token sống, màn đã duyệt, brand, vendor guidance, closed axes và
+precedent. Validate bằng `@validate-artifact` với vocabulary, không dùng `--hash`; mọi preview dùng cùng
+content và reference skeleton.
 
-Đọc class array là defect, không phải tối ưu. Stage không nhìn thấy class thì không thể chép class vào
-candidate; script giữ trần này bằng cách không trả class về.
+### 6 — Yêu cầu owner chọn một direction
 
-### 6 — Resolve từng region theo contract, mỗi region một query
+Hiện preview, evidence reuse/new, rejection và trade-off. Owner chọn exact object hoặc feedback; không sinh
+`directionHash`. Ghi nguyên candidates cùng selection hoặc lời feedback vào `directionReview` của layout
+round, rồi validate session bằng `@validate-artifact` và `@session`. Chưa chọn thì chưa sinh layout.
+
+### 7 — Đọc structural input
+
+Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
+persistent layout, closed axes và accepted precedent. Layout chỉ quyết region, geometry ownership, lifetime
+và route relationship; không quyết block internals.
+
+### 8 — Resolve từng region theo contract
 
 ```bash
 node @contract-search <project> <role> --need "<the region stated as a need>"
@@ -87,23 +99,22 @@ Không có call-site count thì từ chối `generalize`, không đoán.
 Query không có kết quả exit 1 và cho hai dữ kiện: với lượt này là verdict `new`; với tree là finding rằng
 một surface thật không tìm được entry theo need. Đưa nguyên need vào `WARNINGS` để chỉ đúng reason đã fail.
 
-### 7 — Sinh 3–4 candidate
+### 9 — Sinh 3–4 layout skeleton
 
-Mỗi candidate khai axis values. Trùng toàn bộ axis set nghĩa là cùng một candidate. Ít nhất một candidate
-phải khác nearest precedent. Nếu request thật sự chỉ cho phép một cấu trúc, trả một và nói lý do; không
-độn batch cho đủ ba.
+Nhúng cùng direction object vào mọi candidate, chỉ thay closed layout axes. Trùng axis set là một
+candidate; ít nhất một phải rời nearest precedent. Chỉ trả một khi thật sự chỉ có một skeleton hợp lệ.
 
-### 8 — Từ chối quyết định chỉ owner mới được đưa ra
+### 10 — Từ chối product decision bằng chứng không giải được
 
 Product decision mà request không nói và luật không suy ra được phải tạo refusal block. Refusal đi cùng
 candidates để phần còn lại của batch vẫn đọc được.
 
-### 9 — Validate, hash, ghi JSON, rồi render preview
+### 11 — Validate, hash và render skeleton
 
 ```bash
 node @validate-artifact \
   --schema @layout-schema \
-  --data <batch.json> --hash
+  --data <batch.json> --vocabulary <visual-vocabulary.json> --hash
 ```
 
 Schema dùng `additionalProperties: false` để class trở thành unrepresentable. Validator còn từ chối class
@@ -123,18 +134,14 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-CSS preview chỉ là documentation chrome: vẽ region, tên, axis, entry và branch. Nó không mang product
-class và không được trở thành nguồn class cho phase sau.
+CSS preview chỉ là documentation chrome: vẽ region, tên, axis, entry và branch dưới direction đã chọn;
+không vẽ block internals hay mang product class.
 
-### 10 — Đưa vào hàng phê duyệt và ghi verdict
+### 12 — Queue approval và đóng
 
-Queue nằm trong `registries` vì pending decision phải bền; `sessions` có thể bỏ. Accepted thì bind hash.
-Feedback thì mở **round mới**, không sửa round accepted; append và ghi `REJECTED` với candidate thật,
-phương án thay và lời owner.
-
-### 11 — Đóng phase
-
-In sáu bảng. `OWED` gọi tên block round chưa diễn ra.
+Queue hash trong registry. Khi replacement accepted, đánh dấu layout accepted cũ là `superseded` và đặt
+`supersededBy`. Feedback mở sealed round mới. Validate session bằng `@validate-artifact`, rồi in sáu bảng;
+`OWED` gọi tên block round chưa diễn ra.
 
 ## Điểm dừng
 

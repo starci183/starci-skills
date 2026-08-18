@@ -48,6 +48,8 @@ A tree that only advises gets ignored under pressure, so the mechanisms are mach
 
 - a layout candidate is **class-free**, enforced by a query that never extracts a class — a stage that
   cannot see one cannot write one;
+- a direction round offers 3–4 vocabulary-backed visual choices without inventing a second approval
+  hash; the selected object is embedded into each layout candidate;
 - `additionalProperties: false` at every level of every schema makes a stray `className` invalid
   rather than debatable;
 - the validator refuses a batch whose candidates share an axis set, or where none departs from

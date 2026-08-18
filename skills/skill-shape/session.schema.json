@@ -102,9 +102,18 @@
           "$ref": "#/$defs/slug",
           "description": "Present for block rounds."
         },
+        "layoutHash": {
+          "$ref": "#/$defs/hash",
+          "description": "Present for block rounds: the accepted parent layout. This is a dependency edge, not part of the independently hashed anatomy."
+        },
+        "directionReview": {
+          "$ref": "#/$defs/directionReview",
+          "description": "Present on a layout round while the owner compares no-hash direction choices."
+        },
         "produced": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
+          "description": "Empty only while a direction review is still open; layout and block candidates are stored by hash once produced.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -177,6 +186,44 @@
         }
       }
     },
+    "directionReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vocabularyAt",
+        "candidates",
+        "state"
+      ],
+      "properties": {
+        "vocabularyAt": {
+          "$ref": "#/$defs/hash"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "../../brainstorms/directions/schema.json#/$defs/direction"
+          },
+          "description": "The exact transient choices shown to the owner. They carry no approval hash."
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "selected",
+            "feedback"
+          ]
+        },
+        "selectedId": {
+          "$ref": "#/$defs/slug"
+        },
+        "feedback": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The owner's words when feedback opens the next direction review."
+        }
+      }
+    },
     "queued": {
       "type": "object",
       "additionalProperties": false,
@@ -198,13 +245,22 @@
         "region": {
           "$ref": "#/$defs/slug"
         },
+        "layoutHash": {
+          "$ref": "#/$defs/hash",
+          "description": "Required for block decisions: the accepted layout that makes this block reachable."
+        },
         "state": {
           "enum": [
             "queued",
             "accepted",
-            "rejected"
+            "rejected",
+            "superseded"
           ],
           "description": "Also the directory the reference sits in."
+        },
+        "supersededBy": {
+          "$ref": "#/$defs/hash",
+          "description": "The accepted replacement; required when state is superseded."
         }
       },
       "description": "One pending or settled decision. Its `state` is also its place on disk: a reference file under `layouts/<state>/<hash>.ref` or `blocks/<state>/<hash>.ref`, so the directory listing and this array cannot disagree without one of them being wrong out loud."

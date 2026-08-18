@@ -38,8 +38,8 @@ thể ngay từ đầu nó đã đúng.
 | `starci-stale-list` | chỉ plan | project nào có route không còn mô tả đúng máy này, và ai dọn từng cái |
 | `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-repair` | plan → review → apply | một source đỏ trở lại xanh: pass format, autofix và defect giữ tách nhau, và pass defect được chia cho nhiều agent |
-| `starci-fe-design-layout` | mở hoặc tiếp session, rồi các lượt layout | 3–4 phương án layout mỗi bề mặt, buộc theo hash |
-| `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region, buộc theo hash |
+| `starci-fe-design-layout` | mở hoặc tiếp session, chọn direction, rồi các lượt layout | 3–4 lựa chọn direction không có hash riêng, rồi 3–4 phương án layout mỗi bề mặt, buộc theo hash |
+| `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
 | `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
 | `starci-be-plan` | plan | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | duyệt, rồi apply | sự chấp thuận, rồi source backend |
@@ -93,7 +93,9 @@ kê là đã thôi hỏi và bắt đầu tự cho.
 
 ## Các phase
 
-**Các lượt design** chính là mặt để rà soát. Mỗi lượt ghi đúng prompt, các phương án, phản hồi và phán
+**Các lượt design** chính là mặt để rà soát. Lựa chọn direction hỗ trợ một lượt layout và không có
+approval hash riêng; candidate chính xác, lựa chọn hoặc phản hồi của nó nằm trong `directionReview` của
+lượt layout, còn object được chọn nằm trong candidate layout. Mỗi lượt được ghi giữ đúng prompt, các phương án, phản hồi và phán
 quyết của người chủ, và sự chấp nhận **buộc theo hash**. Phản hồi mở một lượt mới; nó không bao giờ sửa
 một lượt đã được chấp nhận.
 

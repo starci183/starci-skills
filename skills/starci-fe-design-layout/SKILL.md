@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Open or resume a hash-bound design session and produce 3–4 layout JSON candidates for each requested frontend surface, previewed as HTML at localhost:8080 and queued for the owner's approval. Use when a new page, layout, overlay or redesign is requested. Writes JSON to the project registry, never frontend source.
+description: Open or resume a hash-bound frontend design session, generate 3–4 visual directions for the owner to select, then produce 3–4 structural layout JSON candidates that embed the selected direction. Use for a new page, layout, overlay or redesign. Writes design records, never frontend source or block internals.
 ---
 
 # starci-fe-design-layout
@@ -9,44 +9,51 @@ description: Open or resume a hash-bound design session and produce 3–4 layout
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
+| `@skill-shape` | `skills/skill-shape` | module | Supplies the CONTEXT and six-table reporting contract. |
+| `@workspaces` | `contexts/workspaces` | module | Resolves and verifies the frontend checkout this run reads. |
+| `@worktrees` | `contexts/worktrees` | module | Separates durable decision records from disposable preview work. |
+| `@directions` | `brainstorms/directions` | module | Generates the visual choice that every layout candidate embeds. |
+| `@layouts` | `brainstorms/layouts` | module | Defines structural regions, axes, contract verdicts and output. |
+| `@contract-search` | `scripts/contract-search.mjs` | script | Queries contract reasons without exposing class arrays. |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | Produces the live token inventory used by direction candidates. |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
 | `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
 ## HANDS OFF TO — named, never loaded
 
-`starci-init`
+| Condition | Owner |
+|---|---|
+| The workspace route is absent or stale. | `starci-init` |
 
 ## Run
 
-Read `@skill-shape` first. There is no orchestrator, so this skill opens or resumes the session itself.
+Read `@skill-shape` first. This skill owns the page skeleton. Direction supports that decision; it has
+no approval hash of its own. The selected direction is embedded into each layout candidate, so one
+`layoutHash` binds visual intent and skeleton together.
 
-**The JSON is the artifact. The HTML is a way of looking at it.** Approval binds to the canonical JSON
-hash, never to a rendered page.
+**JSON is the artifact. HTML is a way of looking at it.** Approval binds to canonical layout JSON,
+never to a rendered page.
 
 ## PROCESS
 
 ### 1 — Print CONTEXT
 
-Print `### CONTEXT` before touching anything. `Phase` is `layout`. `Touching` names the project registry
-and its session, and nothing in the frontend repository.
+Print `### CONTEXT` before touching anything. `Phase` is `layout`. `Touching` names the project registry,
+session and disposable cache, and no frontend source path.
 
 ### 2 — Resolve and verify the workspace route
 
-Read `.workspace/<project>/<role>/config.json` for the `fe` role. Verify before reading anything from
-it: the checkout exists, and `context.contract` is still a real file.
+Read `@workspaces`. Resolve the user-declared project and `fe` role. Verify the checkout, branch,
+recorded head and contract path before reading product evidence. A stale route stops the run
+(`WORKSPACE-5`).
 
-A stale route **stops the run** (`WORKSPACE-5`). Do not continue with the nearest checkout that
-resolves — every candidate would then cite a contract that is not the product's.
+### 3 — Resolve the state roots
 
-### 3 — Resolve the worktree roots
-
-Registry at `<Source>/.worktrees/<project>/registries`: locked, clean, on the project branch, owned by
-this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview output goes to
-`<Source>/.worktrees/<project>/cache/preview` (`WORKTREE-2`). Never below `.claude`
-(`WORKTREE-3`).
+Read `@worktrees`. Accepted layout candidates, no-hash direction reviews and verdicts go to the project
+registry; generated previews stay in cache. Before a registry write, verify that it is locked, clean
+and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache/preview`
+(`WORKTREE-2`) and never a path below `.claude` (`WORKTREE-3`).
 
 ### 4 — Resume or open the session
 
@@ -58,119 +65,98 @@ its own can never notice.
 are the same session; a reworded prompt is a new round, not a new session. Print which happened —
 `resumed <id>` or `opened <id>` — and keep every accepted hash across a resume.
 
-### 5 — Read the six inputs, at their declared reduction
+### 5 — Generate the direction choices
 
-| Input | Read |
-|---|---|
-| request | verbatim |
-| contract | **queried, not read** — one need per region through `@contract-search`, which returns `key`, `why`, `host` and never a class array |
-| branches | every branch and what each may contain |
-| routes | every route page and every persistent layout |
-| axes | the closed diversity set |
-| precedents | accepted candidates for this project, with their rejections |
+Run `@inventory-visual-language` against the verified checkout and record its generated digest as
+`vocabularyAt`. Read `@directions`, then generate 3–4 choices from the request, audience, intended
+feeling, live tokens, approved screens, brand evidence, installed vendor guidance, closed axes and this
+project's precedents with their rejections.
 
-Reading the class arrays is a defect, not an optimisation: a stage that cannot see a class cannot write
-one into a candidate. The query is how that ceiling stops being a promise: the script never extracts a
-class, so the value does not arrive and cannot be copied. Measured on a 299-entry registry: a query answers
-in under 2KB where the permitted read is 69KB, and the registry is 192KB.
+Validate the batch with `@validate-artifact` and the generated vocabulary **without `--hash`**. Render
+every direction over the same content and reference skeleton. External style catalogues may broaden the
+search, but remain recommendations.
 
-### 6 — Resolve every region against the contract, one query per region
+### 6 — Ask the owner to select one direction
+
+Show all valid directions with previews, token reuse/new evidence, explicit rejections and tradeoffs.
+The owner selects one or gives feedback. Feedback regenerates the direction choices. Selection is not a
+separate approval artifact and produces no `directionHash`.
+
+Append the exact candidates and the owner's selection or words to this layout round's `directionReview`.
+Validate the session with `@validate-artifact` and `@session`; a no-hash review is durable evidence, not
+a second approval artifact.
+
+Do not start structural candidates until one exact direction object is selected. Preserve that object
+unchanged for the layout candidates in this round.
+
+### 7 — Read the structural inputs
+
+Read `@layouts`: request verbatim; contract queried one need per region through `@contract-search`;
+every branch and what it may contain; every route page and persistent layout; closed layout axes; and
+this project's accepted layout precedents with their rejections.
+
+Layout remains a skeleton. It names regions, geometry ownership, mount lifetime and route relationship.
+It never decides a block's internal parts, states or data ownership. That separation is what lets one
+block be redesigned later without reopening the page layout.
+
+### 8 — Resolve every region against the contract
+
+Query by business reason, never by shape. Each region receives one verdict: `reuse <key>`,
+`generalize <key> -> <key>` with a measured call-site count and rewritten `why`, or `new <key>` with the
+reason it will carry. An empty query is a `new` verdict for this run and a warning that the contract
+reason index did not answer the need.
 
 ```bash
 node @contract-search <project> <role> --need "<the region stated as a need>"
 ```
 
-Ask by the **reason**, never by the shape — the need sentence is what a `why` is written to match. Every
-result prints the words it matched on, and a result marked `~` matched on an incidental word rather than on
-the need: it is not an answer, and treating it as one is exactly the "close enough" this step exists to
-refuse. Each region gets exactly one verdict:
+### 9 — Generate 3–4 layout skeletons
 
-- `reuse <key>` — an entry's reason already answers this region;
-- `generalize <key> -> <key>` — it answers it under a feature-bound name; **measure the call-site count
-  first**, and keep the new name fixing its children;
-- `new <key>` — nothing answers this reason; state the `why` the new entry will carry.
+Embed the **same selected direction object** in every candidate, then vary only the closed layout axes.
+Drop candidates whose entire structural axis sets match. At least one candidate departs from the nearest
+layout precedent. Return one only when the request admits one valid skeleton, with the reason; never pad.
 
-A `generalize` verdict without a measured call-site count is refused, not guessed.
+### 10 — Refuse product decisions that evidence cannot settle
 
-**A query that answers nothing exits 1, and that is two facts, not one.** For this run it is a `new`
-verdict. For the tree it is a finding — a real surface stated a need and no entry could be found by it —
-and it is carried into `WARNINGS` naming the need verbatim. That recorded miss identifies the exact
-reason that failed instead of treating every reason that looks wrong in a count as equally urgent.
+Return unresolved ownership, route or mounting decisions to the owner. Ship the refusal with whatever
+resolved; never guess merely to complete a batch.
 
-### 7 — Generate 3–4 candidates
+### 11 — Validate, hash and render the skeletons
 
-Each declares its axis values. Drop any candidate whose whole axis set matches another — that is one
-candidate, not two. At least one candidate must not follow the nearest precedent.
+Run `@validate-artifact` with `@layout-schema`, the same visual vocabulary and `--hash`. It refuses an
+invalid embedded direction, candidates embedding different directions, class tokens, duplicate layout
+axis sets and a missing departure. The printed hash is the one and only `layoutHash` for that candidate.
 
-If the request admits only one structure, return one and say why. Never pad a batch to three.
+Render region boxes, names, axes, branches and contract citations under the selected direction. Do not
+draw block internals. Preview CSS is disposable evidence and never a source of product classes.
 
-### 8 — Refuse what only the owner can decide
-
-A product decision the request does not state and no law can derive produces a refusal block. It ships
-**with** the candidates; the rest of the batch stays readable.
-
-### 9 — Validate, hash, write JSON, then render the preview
-
-The batch is validated **before** it is written and before anything is hashed:
-
-```bash
-node @validate-artifact \
-  --schema @layout-schema \
-  --data <batch.json> --hash
-```
-
-The schema refuses a class the way the contract's closed union does — by making it unrepresentable:
-every object sets `additionalProperties: false`, so a `className` is an error rather than a finding. The
-validator additionally enforces what a schema cannot say — no class token anywhere in the batch, no two
-candidates sharing an axis set, at least one candidate citing `none` — and prints the hash of each
-candidate.
-
-The hash covers the candidate only, never the envelope. The same decision re-run in a later round with a
-reworded prompt produces the same hash; if it did not, an approval would point at nothing.
-
-Then generate one HTML page per candidate into `cache/preview` and serve it:
+Generate one HTML page per candidate in `cache/preview`, then serve it. Start at 8080; if occupied, try
+the next port, bounded to twenty attempts, and print the URL that actually bound:
 
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
 
-**8080 is where the search starts, not where it stops.** Bind it; if it is taken, try 8081, 8082, and keep
-going until one binds, then **print the URL actually served**. A run that dies because somebody's dev server
-holds 8080 has failed at nothing the owner asked about, and a run that prints a URL nobody can open is worse
-than one that prints none. Bound the search — twenty ports is a busy machine, two hundred is a bug — and if
-nothing binds, say so instead of serving nowhere quietly.
+### 12 — Queue approval and close
 
-
-The preview's own CSS is documentation chrome. It draws region boxes, region names, axis values and the
-entry and branch each region cites. It **never** carries a product class, and nothing in it is a source
-of classes for later stages. A preview that starts to look like the product is a preview that has begun
-deciding what principles decide.
-
-### 10 — Queue for approval and record the verdict
-
-The queue lives in `registries` because a pending decision is durable; `sessions` is disposable and
-would lose it.
-
-On acceptance, bind the hash. On feedback, open a **new round** — never edit an accepted round — append
-it to the session, and record `REJECTED` with the actual candidate, its replacement and the owner's own
-words.
-
-### 11 — Close the phase
-
-Print the six tables. `OWED` names the block rounds that have not happened.
+Queue layout hashes in the durable registry. Feedback opens a new layout round; an accepted candidate
+is never edited. When a replacement layout is accepted, mark the previous accepted layout
+`superseded` and point `supersededBy` at the replacement. Validate the updated session with
+`@validate-artifact`; append feedback as a new sealed round and record the owner's words. Close with the
+six tables. `OWED` names the block rounds not yet designed.
 
 ## Stops
 
-- Route absent or stale → return to `starci-init`.
-- Registry unlocked, dirty, or owned by another Git → stop; do not write.
-- A required class does not exist in the contract's closed set → this is a **contract change**, not a
-  layout choice, and it returns to the owner.
-- Two candidates left with identical axis sets → they are one candidate; regenerate rather than ship a
-  fake choice.
+- Route absent or stale → stop; `starci-init` owns the route repair.
+- Registry unlocked, dirty or foreign-owned → stop; do not write.
+- Visual inventory empty or unreadable → stop; do not infer tokens from screenshots.
+- No exact direction selected → keep the direction choice open; do not generate layouts.
+- A required class is outside the contract's closed set → return the contract change to the owner.
+- Duplicate layout axis sets remain → regenerate rather than ship a fake choice.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `OUTPUTS` names the session, the candidates and their
-hashes at concept level; `CHANGES` names the registry paths written; `NEED APPROVALS`
-carries the accept-or-feedback decision and any refusal; `WARNINGS` carries stale-reference risk;
-`REJECTED` carries the owner's words; `OWED` carries the block rounds.
+The six tables from `@skill-shape`, in order. `OUTPUTS` names the selected direction, layout candidates
+and hashes at concept level; `CHANGES` names registry/session/cache paths; `NEED APPROVALS` carries the
+current selection or accept-or-feedback decision; `REJECTED` keeps the owner's words; `OWED` carries
+the block rounds.

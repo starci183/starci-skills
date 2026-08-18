@@ -14,7 +14,7 @@ title: Blocks
 
 ## Record
 
-You are given one region of an accepted layout and you return **3–4 block anatomies**, each a JSON
+You are given one region of an accepted layout and its accepted visual direction, and you return **3–4 block anatomies**, each a JSON
 structure the owner can choose between — or one refusal naming the product decision that is missing. Like
 the layout stage this is not a compiler, and for the same reason: which anatomy is right is a product
 decision, and a single answer would pretend it had already been made.
@@ -30,27 +30,28 @@ be redesigned rather than extended when the empty case arrives.
 
 ## Inputs
 
-Seven, and no more.
+Eight, and no more.
 
 | # | Input | Without it |
 |---|---|---|
 | 1 | The accepted region and its business reason | there is no subject, only a shape |
-| 2 | The **accepted** layout hash the region came from | anatomies get built on a layout that may be discarded |
-| 3 | Contract: **key**, `why`, `host`, children **names**, `repeats`, `optional` — not the class arrays | parts get invented instead of looked up |
-| 4 | Vocabulary: leaf names the contract cites, composite names, blocks that exist | a part cites a component that does not exist |
-| 5 | How the region's data actually fails, read from page and block source | `optional` gets mistaken for a full state set |
-| 6 | The closed list of anatomy axes | the 3–4 anatomies differ by decoration |
-| 7 | Precedents accepted for THIS project, the one the workspace route declared | every region is answered as if it were the first |
+| 2 | The **accepted** layout hash the region came from, which binds its direction | anatomies get built on a layout or direction that may be discarded |
+| 3 | The direction resolved through that layout | an anatomy is drawn with visual choices nobody approved |
+| 4 | Contract: **key**, `why`, `host`, children **names**, `repeats`, `optional` — not the class arrays | parts get invented instead of looked up |
+| 5 | Vocabulary: leaf names the contract cites, composite names, blocks that exist | a part cites a component that does not exist |
+| 6 | How the region's data actually fails, read from page and block source | `optional` gets mistaken for a full state set |
+| 7 | The closed list of anatomy axes | the 3–4 anatomies differ by decoration |
+| 8 | Precedents accepted for THIS project, the one the workspace route declared | every region is answered as if it were the first |
 
-**Input 5 exists because the contract cannot answer it.** `optional: true` states presence and nothing
+**Input 6 exists because the contract cannot answer it.** `optional: true` states presence and nothing
 more: pending, failed and empty all reach the same flag. Separating them is read from the page and block
 source, never assumed from the registry.
 
-Not read at this stage: class arrays, theme variables, locale copy, lints.
+Not read at this stage: class arrays, unaccepted theme choices, locale copy, lints.
 
 ## Reading an accepted region
 
-1. **Require an accepted layout hash.** A proposed layout is not a starting point.
+1. **Require an accepted layout hash and resolve its direction.** A proposed layout is not a starting point, and its bound direction is not restated as a second hash here.
 2. **Enumerate the states first.** Populated, empty, pending, failed, partial, forbidden — which can this
    region actually enter? Read it from source; do not infer it from `optional`.
 3. **Look up the parts by `why`**, not by shape, and check every leaf and composite name against the
@@ -138,7 +139,8 @@ blocked: <which parts cannot be resolved without it>
 ## Output
 
 The output **is** JSON, and its authority is `@schema` beside this record. `envelope`
-holds what varies between runs — including the accepted `layoutHash` this region came from — and the hash
+holds what varies between runs — including the accepted `layoutHash` this region came from. That layout
+already binds its direction, so the block never carries a second dependency hash — and the anatomy hash
 covers an anatomy only.
 
 ```json

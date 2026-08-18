@@ -9,8 +9,11 @@ title: Frontend design block · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | kiểm tra JSON mô tả anatomy của block |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token đã bind trong layout |
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
+| `@worktrees` | `contexts/worktrees` | module | kiểm tra registry và preview root |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
 
 ## HANDS OFF TO — named, never loaded
@@ -30,27 +33,31 @@ vào trang render.
 
 `Phase` là `block`. `Touching` chỉ gọi tên project registry.
 
-### 2 — Yêu cầu layout đã accepted
+### 2 — Yêu cầu layout accepted và resolve direction
 
 Hash đã chấp nhận đọc từ bản ghi session mà `@session` mô tả; một round block được ghi thêm vào **chính**
 session đó, không mở session mới.
 
-Đọc session. Một region chỉ được đi vào block round khi layout candidate chứa nó có hash **accepted**.
-Proposed layout không phải điểm bắt đầu vì mọi anatomy dựng trên đó sẽ bị bỏ cùng layout.
+Đọc session. Một region chỉ vào block round khi layout candidate chứa nó có hash **accepted**. Resolve
+direction qua layout đó, không nhận direction hash thứ hai. Proposed layout không phải điểm bắt đầu.
 
-Không có layout hash accepted thì dừng và gọi tên hash đang chờ.
+Block revision dùng lại accepted `layoutHash` và mở round mới cho riêng region.
 
 ### 3 — Kiểm tra route và các root
 
-Kiểm tra route `fe` trước khi đọc (`WORKSPACE-5`), rồi kiểm tra lock, độ sạch và owner của registry
+Đọc `@workspaces` và kiểm tra route `fe` trước khi đọc (`WORKSPACE-5`), rồi đọc `@worktrees` để kiểm tra lock, độ sạch và owner của registry
 (`WORKTREE-1`, `WORKTREE-4`). Preview phải nằm trong `cache/preview` (`WORKTREE-2`), không bao giờ nằm dưới
 `.claude` (`WORKTREE-3`).
 
-### 4 — Đọc bảy input
+Chạy `@inventory-visual-language`; digest mới phải bằng `direction.vocabularyAt`. Khác digest thì dừng
+trước khi một preview stale sinh ra quyết định block mới.
+
+### 4 — Đọc tám input
 
 | Input | Nội dung đọc |
 |---|---|
 | region | region đã accepted và lý do nghiệp vụ |
+| direction | object đã chọn được resolve từ accepted layout |
 | contract | key, `why`, `host`, tên children, `repeats`, `optional` — không đọc class array |
 | vocabulary | leaf, composite và block đã tồn tại mà contract viện dẫn |
 | axes | tập anatomy đóng: data owner, repetition, weight, composition |
@@ -108,13 +115,14 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-CSS của preview chỉ là documentation chrome, không phải product class. Preview chỉ có populated state
-đang che giấu đúng quyết định mà phase này phải làm lộ ra.
+Preview chỉ resolve semantic role của accepted direction. CSS của preview là documentation chrome, không
+phải product class. Mọi anatomy dùng cùng direction, copy và data; chỉ hiện populated state là invalid.
 
 ### 10 — Đưa vào hàng phê duyệt và ghi verdict
 
-Queue nằm trong `registries`, không nằm trong `sessions`. Accepted thì bind hash. Có feedback thì mở
-**round mới**, append và ghi `REJECTED` với anatomy thật, phương án thay thế và lời owner.
+Queue nằm trong registry và ghi parent `layoutHash` cạnh block hash độc lập. Khi replacement accepted,
+đánh dấu block cũ của cùng `(layoutHash, region)` là `superseded` và đặt `supersededBy`. Feedback mở round
+mới. Validate session bằng `@validate-artifact` và `@session`.
 
 ### 11 — Đóng phase
 
@@ -122,7 +130,8 @@ In sáu bảng. `OWED` gọi tên region chưa có anatomy accepted.
 
 ## Điểm dừng
 
-- Không có layout hash accepted → dừng và gọi tên hash đang chờ.
+- Không có accepted layout hoặc không resolve được direction → dừng.
+- Digest vocabulary không còn khớp → dừng vì visual evidence stale.
 - Part viện dẫn leaf/composite không tồn tại → dừng; vocabulary là thẩm quyền.
 - Không xác định được state từ source → refusal, không đoán.
 - Registry không lock, dirty hoặc thuộc Git khác → dừng, không ghi.

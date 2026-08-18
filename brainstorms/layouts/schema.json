@@ -36,9 +36,10 @@
       "description": "Hashed. Canonical JSON, keys sorted, no timestamps, no per-run ids.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "axes", "regions", "reason"],
+      "required": ["id", "direction", "axes", "regions", "reason"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
+        "direction": {"$ref": "../directions/schema.json#/$defs/direction", "description": "The owner's selected direction, embedded so the one layout hash binds both visual intent and skeleton."},
         "axes": {"$ref": "#/$defs/axes"},
         "citesPrecedent": {
           "type": "string",
