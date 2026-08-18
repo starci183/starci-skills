@@ -24,16 +24,19 @@ StarCi separates work by what each stage may return:
 The result is not merely a suggested design or plan. Accepted decisions remain traceable to the source
 state they were made against, and execution stops when that evidence is stale or incomplete.
 
-## The nine skills
+## The twelve skills
 
 ### Environment and trust
 
 | Skill | Use it for | Writes |
 |---|---|---|
-| [`starci-init`](./skills/starci-init) | Prepare the Source bootstrap, workspace routes, or worktree state | only the separately approved setup root |
-| [`starci-stale-list`](./skills/starci-stale-list) | Find every read-only workspace staleness category, including backend assurance, and name its owner | nothing |
+| [`starci-init`](./skills/starci-init) | Establish the SOPS+age identity, then prepare Source bootstrap, workspace routes, or worktree state | bounded Source-local readiness state |
+| [`starci-cloudflare-tunnel-set`](./skills/starci-cloudflare-tunnel-set) | Reuse or capture the encrypted Source-wide multi-project Cloudflare credential and reconcile one declared HTTP(S) tunnel/DNS route | encrypted control-plane custody plus Cloudflare state |
+| [`starci-setup-mcp`](./skills/starci-setup-mcp) | Build one routed, read-only source-context MCP and publish `mcp.<zone>` for users | generated cache, shared MCP runtime and Cloudflare state |
+| [`starci-setup-sonar`](./skills/starci-setup-sonar) | Build one shared Docker SonarQube under Compose project `starci`, onboard projects and publish `sonar.<zone>` | shared `starci` runtime and Cloudflare state |
+| [`starci-stale-list`](./skills/starci-stale-list) | Measure every workspace staleness category, including local gates and frontend or backend assurance, and name its owner | ignored local check output only; no tracked or external mutation |
 | [`starci-diagnose`](./skills/starci-diagnose) | Trace another skill against the real machine and identify its first correct stop | nothing |
-| [`starci-repair`](./skills/starci-repair) | Return a red or incompletely assured checkout to clean gates and a complete backend delivery fence | approved repository and external enforcement paths |
+| [`starci-repair`](./skills/starci-repair) | Return a red or incompletely assured checkout to clean gates and a complete frontend or backend delivery fence | approved repository and external enforcement paths |
 
 ### Frontend design
 
@@ -97,9 +100,17 @@ Prometheus, Grafana Cloud, Codecov, SonarQube Cloud, payments, mail, AI pools, S
 the real repository command, encrypted owner, verification signal, safe stop, rotation boundary and
 provider documentation; no credential value is published.
 
-## Stale registry
+## Readiness registries
 
-[`Stale registry`](./stale) is the single category source shared by `starci-stale-list` and
+[`Initialization`](./readiness/initialization) owns identity, bootstrap, workspace and worktree setup.
+[`Staleness`](./readiness/staleness) is the single category source shared by `starci-stale-list` and
 `starci-repair`. Each module owns both its read-only evidence and approved inventory/apply/proof contract,
 so the two skills cannot drift into separate definitions of `why`, assurance, formatter, lint-machine,
 retired-structure or remnant staleness.
+
+## MCP context
+
+[`MCP context`](./mcp) turns verified workspace routes into optional semantic source context. Each role is
+indexed below `/<role>/<project>/` in one Source-wide Qdrant collection and exposed by the official Qdrant
+MCP core in read-only mode. Tracked records contain no machine path or credential; generated client
+configuration and index manifests stay under `.worktrees/source-context/cache/mcp/`.

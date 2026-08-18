@@ -9,15 +9,15 @@ title: starci-repair
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | contract chung về phase, approval và output |
-| `@stale-registry` | `stale` | registry | taxonomy và router duy nhất cho mọi repair module |
+| `@staleness` | `readiness/staleness` | module | taxonomy và router duy nhất cho mọi repair module |
 
 ## NESTED SKILLS
 
-Không có. Stale route được trả về `starci-init`; skill này không tự chạy setup.
+Không có. Stale route được trả về initialization owner; skill này không tự chạy setup.
 
 ## Chạy
 
-Đọc `@skill-shape`, rồi `@stale-registry`. Không restate law của category ở đây. Registry sở hữu stale
+Đọc `@skill-shape`, rồi `@staleness`. Không restate law của category ở đây. Registry sở hữu stale
 taxonomy và route sang module sở hữu list evidence, inventory, apply cùng proof.
 
 ## Chọn module
@@ -27,7 +27,7 @@ Chỉ đọc module đã chạm trong repair:
 - luôn đọc `@stale-source-gates` và `@stale-lint-machine` sau khi route verify;
 - đọc `@stale-strict-fix` khi request strict-fix hoặc first-party surface của nó hiện diện;
 - đọc `@stale-why` khi route có contract;
-- đọc `@stale-assurance` cho backend rồi tuân tracked applicability declaration;
+- đọc `@stale-assurance` cho backend hoặc frontend rồi tuân tracked applicability declaration;
 - đọc `@stale-retired-structure` cho frontend component tree;
 - chỉ đọc `@stale-remnant` cho `.claude/` nested trong resolved target.
 
@@ -48,7 +48,7 @@ diff riêng trong một approval batch. Whole-repository gate chạy một lần
 
 Đọc `.workspace/<project>/<role>/config.json`. Verify checkout, git root, branch/head, manifest và frontend
 contract khi declared. Dừng trước target-source read nếu route absent, invalid hoặc stale;
-`@stale-registry` giao finding đó cho `starci-init`.
+`@staleness` giao finding đó cho initialization owner.
 
 ### 2 — Đọc manifest và chọn module
 
@@ -62,7 +62,7 @@ tin lint count, rồi theo `@stale-source-gates` để có exact before-count. I
 
 ### 4 — Classify và review
 
-Mọi finding dùng category từ `@stale-registry`. Trình count, exact path, apply action theo module, phần không
+Mọi finding dùng category từ `@staleness`. Trình count, exact path, apply action theo module, phần không
 đụng và mọi external mutation. Batch approval một lần. Với assurance, tách repository path khỏi provider/
 GitHub state và hiện invocation `scripts/publish-secret.mjs --plan` không có value.
 
@@ -105,7 +105,7 @@ thiếu. Tiếp tục khi còn executable action trong scope.
 
 ## Stops
 
-- Route absent/invalid/stale → trả evidence và owner `starci-init`.
+- Route absent/invalid/stale → trả evidence và initialization owner.
 - Target dirty không giải thích → dừng; mixed baseline không chứng minh gì.
 - Gate chỉ pass bằng suppression → trả finding.
 - Module boundary phải mở rộng → trả một `### NEED APPROVALS` batch.

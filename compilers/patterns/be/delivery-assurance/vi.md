@@ -72,8 +72,8 @@ chỉ target một repository; batch nhiều repository đòi credential có sco
 |---|---|---|
 | `ASSURANCE-1` | Developer sắp push | Husky đã cài; `pre-push` chạy full lint check-only và fast unit lane, fail một cái là dừng |
 | `ASSURANCE-2` | Pull request được mở hoặc cập nhật | PR workflow active, install từ lockfile rồi chạy lint check-only, typecheck/build và unit; CI không sửa source |
-| `ASSURANCE-3` | Unit test chạy trong CI | Run sinh LCOV, upload qua Codecov và có patch/project coverage status để block |
-| `ASSURANCE-4` | Cùng revision cần quality/security analysis | SonarQube scan bằng LCOV đó và trả blocking quality gate |
+| `ASSURANCE-3` | Unit test chạy trong CI | Run sinh LCOV, upload qua Codecov, có patch/project coverage status để block và README link badge Codecov token-free, reachable |
+| `ASSURANCE-4` | Cùng revision cần quality/security analysis | SonarQube scan bằng LCOV đó, trả blocking quality gate và README link badge token-free, reachable cho quality gate, coverage, bugs, vulnerabilities, code smells, maintainability, reliability, security |
 | `ASSURANCE-5` | Codecov hoặc SonarQube cần credential | Có `codecov-token.key.enc` và `sonarqube-token.key.enc` dưới `.stacks/dev/runtime/files/`; workflow chỉ gọi tên GitHub secret, không decrypt stacks |
 | `ASSURANCE-6` | Pull request sẵn sàng merge | GitHub branch protection hoặc ruleset bắt CI, Codecov và SonarQube check từ đúng app phải pass |
 | `ASSURANCE-7` | Có deploy workflow | Deploy phụ thuộc verification thành công qua `needs`, reusable workflow hoặc successful workflow-run trigger |
@@ -99,11 +99,13 @@ hoặc `test:unit` từ manifest. `--no-verify` là lý do code 6 vẫn tồn t�
 scripts. Trigger bị comment hoặc workflow manual-only chưa phải CI adoption.
 
 `ASSURANCE-3` sở hữu coverage movement. Unit CI sinh `coverage/lcov.info`; Codecov upload đúng file đó và
-patch/project status được dùng để block. Coverage percentage thuộc service policy, không thuộc một Jest run
-thứ hai.
+patch/project status được dùng để block. README expose badge Codecov thật của repository; image URL phải
+reachable và không chứa credential. Coverage percentage thuộc service policy, không thuộc Jest run thứ hai.
 
 `ASSURANCE-4` sở hữu analysis. SonarQube dùng cùng revision và LCOV report. Scan success và quality-gate
-success là hai fact khác nhau; workflow phải chờ hoặc nhận kết quả gate.
+success là hai fact khác nhau; workflow phải chờ hoặc nhận kết quả gate. README expose badge reachable cho
+quality gate, coverage, bugs, vulnerabilities, code smells, maintainability, reliability và security của
+cùng project key mà không nhúng token.
 
 `ASSURANCE-5` sở hữu custody. Stack giữ provider token mã hóa bằng tên cố định. GitHub Secrets là projection
 cho CI; `SONAR_HOST_URL` là repository variable trừ khi installation xem nó là secret; workflow không giải
@@ -134,7 +136,7 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 | manifest | package manager, check-only lint, unit, typecheck/build và coverage scripts |
 | hooks | nội dung Husky hook tracked |
 | CI | active workflow trigger, command và dependency graph |
-| coverage | một LCOV path được Codecov và SonarQube dùng chung |
+| coverage | một LCOV path được Codecov và SonarQube dùng chung; README badge token-free, reachable cho cả hai |
 | secrets | tên encrypted stack file và symbolic workflow reference, không bao giờ là value |
 | external enforcement | GitHub API/UI evidence cho required checks và expected apps |
 
@@ -143,7 +145,8 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 1. Backend assurance mặc định là bắt buộc; chỉ declaration trong manifest ở Applicability mới có thể miễn.
 2. Hook và CI gọi command check-only, không sửa source.
 3. Local pre-push chỉ có lint cộng unit; gate đắt và remote ở CI.
-4. Codecov và SonarQube dùng cùng LCOV report từ cùng một unit run thành công.
+4. Codecov và SonarQube dùng cùng LCOV report từ cùng một unit run thành công; README expose badge token-free,
+   reachable cho kết quả của cả hai provider.
 5. Provider token được mã hóa trong stacks rồi project sang GitHub Secrets mà không đi plaintext qua source hay chat.
 6. Local scan không tuyên bố branch protection đã cấu hình nếu chưa có external evidence.
 7. Deploy không thể bắt đầu trước khi verification pass.

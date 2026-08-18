@@ -1,6 +1,6 @@
 ---
 name: starci-repair
-description: Take a routed source that is red, structurally stale, untrusted, or missing required backend delivery assurance and return it green through measured, separated passes. Uses the shared stale registry for every finding and never silences a gate or publishes plaintext credentials. Writes product and external enforcement state only after approval.
+description: Take a routed source that is red, structurally stale, untrusted, or missing required frontend or backend delivery assurance and return it green through measured, separated passes. Uses the shared stale registry for every finding and never silences a gate or publishes plaintext credentials. Writes product and external enforcement state only after approval.
 ---
 
 # starci-repair
@@ -10,15 +10,15 @@ description: Take a routed source that is red, structurally stale, untrusted, or
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | shared phase, approval and output contract |
-| `@stale-registry` | `stale` | registry | the one taxonomy and router for every repair module |
+| `@staleness` | `readiness/staleness` | module | the one taxonomy and router for every repair module |
 
 ## NESTED SKILLS
 
-None. A stale route is returned to `starci-init`; this skill never starts setup.
+None. A stale route is returned to the initialization owner; this skill never starts setup.
 
 ## Run
 
-Read `@skill-shape`, then `@stale-registry`. Do not restate a category's law here. The registry owns what
+Read `@skill-shape`, then `@staleness`. Do not restate a category's law here. The registry owns what
 is stale and routes to the module that owns list evidence, inventory, apply and proof.
 
 ## Module selection
@@ -28,7 +28,7 @@ Read only reached modules during repair:
 - always read `@stale-source-gates` and `@stale-lint-machine` after the route verifies;
 - read `@stale-strict-fix` when strict-fix was requested or its first-party surface is present;
 - read `@stale-why` when the route has a contract;
-- read `@stale-assurance` for a backend, then obey its tracked applicability declaration;
+- read `@stale-assurance` for a backend or frontend, then obey its tracked applicability declaration;
 - read `@stale-retired-structure` for a frontend component tree;
 - read `@stale-remnant` only for nested `.claude/` inside the resolved target.
 
@@ -49,7 +49,7 @@ baselines and diffs under one approval batch. Whole-repository gates run once pe
 
 Read `.workspace/<project>/<role>/config.json`. Verify checkout, git root, branch/head, manifests and the
 frontend contract when declared. Stop before target-source reads if the route is absent, invalid or stale;
-`@stale-registry` assigns that finding to `starci-init`.
+`@staleness` assigns that finding to the initialization owner.
 
 ### 2 — Read manifest and select modules
 
@@ -65,7 +65,7 @@ selected module without writing.
 
 ### 4 — Classify and review
 
-Every finding uses a category from `@stale-registry`. Present counts, exact paths, per-module apply action,
+Every finding uses a category from `@staleness`. Present counts, exact paths, per-module apply action,
 what stays untouched and every external mutation. Batch approval once. For assurance, separate repository
 paths from provider/GitHub state and show value-free `scripts/publish-secret.mjs --plan` invocations.
 
@@ -109,7 +109,7 @@ external authority. Continue while any in-scope executable action remains.
 
 ## Stops
 
-- Route absent/invalid/stale → return its evidence and `starci-init` owner.
+- Route absent/invalid/stale → return its evidence and initialization owner.
 - Unexplained dirty target → stop; a mixed baseline proves nothing.
 - Gate can pass only through suppression → return the finding.
 - Module boundary must expand → return one batched `### NEED APPROVALS` item.

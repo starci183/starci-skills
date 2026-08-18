@@ -9,7 +9,7 @@ title: starci-stale-list
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | output và authority contract chung |
-| `@stale-registry` | `stale` | registry | taxonomy/router duy nhất dùng chung với repair |
+| `@staleness` | `readiness/staleness` | module | taxonomy/router duy nhất dùng chung với repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
 
 ## NESTED SKILLS
@@ -18,17 +18,18 @@ Không có. Skill này gọi tên owner và không invoke họ.
 
 ## Chạy
 
-Đọc `@skill-shape`, `@stale-registry`, rồi mọi module registry route tới. Chỉ dùng `Evidence cho stale list`
+Đọc `@skill-shape`, `@staleness`, rồi mọi module registry route tới. Chỉ dùng `Evidence cho stale list`
 của từng module; không apply inventory, apply hay proof step.
 
-Plan-only: report vừa repair thì không còn ai tin measurement của nó.
+Measurement-only: local check command có thể sinh cache/build output ignored, nhưng report vừa repair
+tracked source hoặc external state thì không còn ai tin measurement của nó.
 
 ## PROCESS
 
 ### 1 — Lập boundary read-only
 
-`Phase` là `plan`; `Touching` không có gì. Đọc `.workspace/config.json` và mọi declared role. Nếu workspace
-root absent, report fact đó và dừng.
+`Touching` không có gì. Đọc `.workspace/config.json` và mọi declared role. Nếu workspace root absent,
+report fact đó và dừng.
 
 ### 2 — Chạy shared scanner
 
@@ -42,25 +43,26 @@ reimplement scan trong conversation.
 
 ### 3 — Report verdict từ registry
 
-Group theo project, role nằm dưới. Dùng category/verdict name từ `@stale-registry`. Với mỗi module, emit
+Group theo project, role nằm dưới. Dùng category/verdict name từ `@staleness`. Với mỗi module, emit
 `Evidence cho stale list`, current count/fact và clearing owner. Report clean và `not required` rõ ràng khi
 silence sẽ giống scan bị bỏ.
 
-### 4 — Giữ project gate unmeasured
+### 4 — Đo local readiness gate
 
-Với `@stale-source-gates`, chỉ list declared format/lint/typecheck/build/unit entrypoint. Không chạy chúng.
-Typecheck/build/test có thể ghi state; chỉ chạy lint sẽ làm report trông rộng hơn thực tế.
+Với module source-gates, chạy mọi entrypoint check-only format/lint/typecheck/build/unit đã khai báo theo
+thứ tự registry. Ghi exact command và exit status. State ignored được phép sinh; tracked source thay đổi thì
+dừng report. Thiếu prerequisite là `unmeasured`; project còn gate unmeasured hoặc fail không được gọi ready.
 
 ### 5 — Giữ external assurance trung thực
 
-Với `@stale-assurance`, chỉ đọc tên và local wiring. Không decrypt record hoặc đọc provider value. Required
+Với module assurance, chỉ đọc tên và local wiring. Không decrypt record hoặc đọc provider value. Required
 check, expected-app binding và secret existence/value giữ `unmeasured external` trừ khi authorized API cho evidence.
 
 ### 6 — Dừng mà không repair
 
 Trả mọi category, evidence và owner. Không refresh route, edit reason, install package, bỏ Prettier, tạo
-assurance state, move component hoặc delete remnant. Fix sau đó là request `starci-repair`/`starci-init`
-riêng với approval riêng.
+assurance state, move component hoặc delete remnant. Fix sau đó là repair/initialization request riêng với
+authority riêng.
 
 ## Stops
 

@@ -15,8 +15,18 @@
 // allowed, so `laws/b1-one-surface-owner` publishes with `laws` as its own sidebar group.
 export const groups = [
   {
-    source: "stale",
-    title: "Stale registry",
+    source: "mcp",
+    title: "MCP context",
+    description: "Qdrant-backed additional context for routed StarCi sources: deterministic indexing, isolated role collections and read-only MCP launchers.",
+  },
+  {
+    source: "readiness/initialization",
+    title: "Initialization readiness",
+    description: "One identity-first registry for Source bootstrap, workspace routes and worktree state.",
+  },
+  {
+    source: "readiness/staleness",
+    title: "Staleness readiness",
     description: "One shared taxonomy and category modules: stale-list reads evidence, while repair applies the same module's inventory, action and proof.",
   },
   {
@@ -32,7 +42,7 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all nine capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all twelve capabilities share.",
   },
   {
     source: "contexts",

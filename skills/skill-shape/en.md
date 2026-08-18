@@ -20,13 +20,13 @@ operate the workflow.
 ## Law
 
 The agent owns execution. Interrupt the owner only for a decision the agent has no authority to make.
-Investigation, implementation judgement inside scope, safe fallback, delegation, phase transitions,
+Investigation, implementation judgement inside scope, safe fallback, delegation,
 validation, ordinary repair and unfinished work all continue without a question.
 
 Detection is not permission, but `OK` on the displayed approval boundary is permission. Never ask the
 owner to repeat it.
 
-Skills do not invoke other skills. `OK` resumes the current skill through its own Apply stage; a separate
+Skills do not invoke other skills. `OK` authorizes only the exact displayed boundary; a separate
 capability remains a separate owner request.
 
 ## Runtime language
@@ -45,26 +45,29 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The nine capabilities
+## The twelve capabilities
 
-Seven do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills — and
-they are the two with no apply stage. The moment a report repairs something, nobody can trust it as a
+Ten do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
-| Skill | Journey | Owns |
-|---|---|---|
-| `starci-init` | plan → review → apply, internal | making a Source ready: the bootstrap, the workspace routes, the worktree state — three roots, one approval each |
-| `starci-stale-list` | plan only | every workspace staleness category measurable without executing a project, including backend assurance wiring, and who clears each |
-| `starci-diagnose` | plan only | a read-only trace: where a skill would stop, and whether that stop is correct |
-| `starci-repair` | plan → review → apply | a red or incompletely assured source returned green: repair passes kept apart and the complete backend delivery fence installed after gates pass |
-| `starci-fe-design-layout` | opens or resumes the session, direction choice, then layout rounds | 3–4 direction choices with no separate hash, then 3–4 layout candidates per surface, hash-bound |
-| `starci-fe-design-block` | block rounds | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
-| `starci-fe-design-execute` | execution | frontend source, only after every reachable hash is accepted |
-| `starci-be-plan` | plan | the backend brief: files, boundary, test cases |
-| `starci-be-approve` | approve, then apply | approval, then backend source |
+| Skill | Owns |
+|---|---|
+| `starci-init` | making a Source ready: SOPS+age identity, bootstrap, workspace routes and worktree state — four independently approved roots |
+| `starci-cloudflare-tunnel-set` | encrypted Cloudflare credential custody and one approved HTTP(S) tunnel/DNS route |
+| `starci-setup-mcp` | one read-only Source-wide MCP, routed source partitions and approved `mcp.<zone>` publication |
+| `starci-setup-sonar` | one shared Docker SonarQube, project onboarding and approved `sonar.<zone>` publication |
+| `starci-stale-list` | every workspace staleness category, including executed local gates and frontend or backend assurance wiring, and who clears each |
+| `starci-diagnose` | a read-only trace: where a skill would stop, and whether that stop is correct |
+| `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
+| `starci-fe-design-layout` | 3–4 direction choices with no separate hash, then 3–4 layout candidates per surface, hash-bound |
+| `starci-fe-design-block` | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
+| `starci-fe-design-execute` | frontend source, only after every reachable hash is accepted |
+| `starci-be-plan` | the backend brief: files, boundary, test cases |
+| `starci-be-approve` | approval, then backend source |
 
-Layout opens the session. Execute still refuses to write while any reachable hash is unaccepted. Inside a
-skill, `OK` resumes its own next phase immediately; no skill assumes another capability was requested.
+Layout opens the session. Execute still refuses to write while any reachable hash is unaccepted. `OK`
+authorizes the displayed boundary only; no skill assumes another capability was requested.
 
 ## Context lock
 
@@ -73,14 +76,14 @@ record location, exact write boundary, evidence read and missing prerequisites. 
 durable record when the capability has one.
 
 Never print a context table. Tell the user in one friendly sentence where the agent is working, which
-project and role are resolved, and what boundary the current phase may touch. A run is blocked only when
+project and role are resolved, and what boundary the current action may touch. A run is blocked only when
 a required context value cannot be recovered from the request, workspace routes or live evidence.
 
 ## Process states
 
 `own` is every executable action inside the declared scope: investigation, reversible edits, safe tool
 fallback, delegation, candidate generation, implementation judgement, baseline after approval, gates,
-in-scope repairs, proof and phase transitions inside the current skill. Continue until `own = 0`.
+in-scope repairs and proof inside the current skill. Continue until `own = 0`.
 
 `need approval` is limited to a product decision with no evidence-backed default, material destructive
 loss, an external publication or commitment, missing access, or expansion to an undisclosed project,
@@ -91,7 +94,7 @@ When the user replies `OK`, approve every displayed default and exact displayed 
 identity or hash, take the baseline if required, and continue immediately. `OK` never covers undisclosed
 scope. Silence and every word other than `OK` are not approval signals.
 
-## Phases
+## Decisions and execution
 
 **Design rounds** are the review surface. Direction choices support a layout round and have no approval
 hash of their own; their exact candidates, selection or feedback live in that layout round's
@@ -99,15 +102,13 @@ hash of their own; their exact candidates, selection or feedback live in that la
 feedback and the owner's verdict, and acceptance is bound to a hash. Feedback opens a new round; it
 never edits an accepted round.
 
-**Plan** reads canon, contracts and live source, then produces a brief: objective, evidence,
-boundaries, decisions, alternatives, acceptance evidence. It writes no product code.
+Before writing, read canon, contracts and live source, then name the objective, evidence, exact boundary,
+decision and acceptance evidence. When owner authority is required, wait for `OK` before the first
+production write and preserve rejected alternatives with the owner's reason.
 
-**Approve** loops until the user replies `OK`, and holds a hard stop before the first
-production write. Every rejection is recorded with its replacement and the user's reason.
-
-**Apply** confirms the write boundary, records a baseline commit taken **before** the change, then
-implements the approved revision and proves it at the production boundary with the evidence the
-approval named. A path outside `Touching` returns to its owner instead of arriving quietly in a diff.
+After authorization, confirm the write boundary, record a baseline commit taken **before** the change,
+implement the approved revision and prove it at the production boundary. A path outside `Touching`
+returns to its owner instead of arriving quietly in a diff.
 
 ## User-facing output
 
@@ -126,9 +127,9 @@ There is no separate report file. Durable evidence stays in the store that owns 
 its session under `<Source>/.worktrees/<project>/sessions/`, hash-bound; a repair in its own commits and
 diffs; a read-only run in no file unless explicitly requested.
 
-An approved phase names its `Approved revision: <identity>`, and Apply cites that same identity plus its
-baseline commit. That pairing is what proves what changed after Apply began, and it survives wherever the
-phase records — it is a sentence, not a file.
+An approved boundary names its `Approved revision: <identity>` and cites that same identity plus its
+baseline commit. That pairing proves what changed after authorization and survives wherever the work
+records — it is a sentence, not a file.
 
 Narrative and evidence shown to the user are written in the resolved `defaultLang`, unless the current
 request explicitly selected another language. Headings, schema labels, paths, commands and code
@@ -154,8 +155,6 @@ appended.
 
 ## Exceptions
 
-- **Init owns three roots.** Each remains a separate displayed boundary and verdict. One `OK` approves
-  every displayed default, never an undisclosed root, then Init applies them without another pause.
 - **A read-only capability.** It never turns measurement into repair; it reports the evidence and owner of
   the separate repair request.
 - **A resumed session.** Layout may resume rather than open. The session id and every accepted hash
@@ -165,7 +164,7 @@ appended.
 
 **Run.** "Design the coding drill result page."
 
-The run says: `I am designing example-app against the verified frontend route; this phase writes only
+The run says: `I am designing example-app against the verified frontend route; this action writes only
 the design session.` It presents 3–4 direction-backed layouts and one default under `NEED APPROVALS`.
 After `OK`, it binds the hash and finishes every `own` item in Layout without asking again. Block remains
 a separate capability request.

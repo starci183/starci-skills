@@ -17,11 +17,13 @@ title: Docs
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates` | module | judge existing code with evidence |
+| `@initialization` | `readiness/initialization` | module | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
+| `@mcp` | `mcp` | module | build and expose routed source context through isolated read-only MCP services |
 | `@patterns` | `compilers/patterns` | module | resolve files and import boundaries |
 | `@principles` | `compilers/principles` | module | resolve classes from accepted situations |
 | `@skill-shape` | `skills/skill-shape` | module | load the shared reporting contract when a skill runs |
 | `@skills` | `skills` | module | locate the capability registry |
-| `@stale` | `stale` | registry | share one stale taxonomy and category modules between inventory and repair |
+| `@staleness` | `readiness/staleness` | module | share one stale taxonomy and category modules between inventory and repair |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 | `@workspaces` | `contexts/workspaces` | module | resolve Source-wide defaults and verify role routes |
 | `@worktrees` | `contexts/worktrees` | module | resolve durable write roots |
@@ -69,15 +71,18 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Nine. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. Seven do the work; two only look — one at the machine, one at the other skills.
+Twelve. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+record. Ten do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
 |---|---|
-| `starci-init` | making a Source ready: the bootstrap, `.workspace/<project>/`, `.worktrees/<project>/` — three roots, approved separately |
-| `starci-stale-list` | every read-only stale fact across routes, gates, contracts, lint/formatter adoption, backend assurance, structure and remnants, with who clears each |
+| `starci-init` | making a Source ready: SOPS+age identity, bootstrap, `.workspace/<project>/`, and `.worktrees/<project>/` |
+| `starci-cloudflare-tunnel-set` | the Source-wide multi-project Cloudflare control plane: API custody in `.workspace/credentials` and declared HTTP(S) tunnel/DNS routes |
+| `starci-setup-mcp` | one Source-wide read-only source-context MCP, routed project partitions, and approved `mcp.<zone>` publication |
+| `starci-setup-sonar` | one shared Docker SonarQube service, project onboarding, and approved `sonar.<zone>` publication |
+| `starci-stale-list` | every read-only stale fact across routes, gates, contracts, lint/formatter adoption, delivery assurance, structure and remnants, with who clears each |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
-| `starci-repair` | a red or incompletely assured source returned green — separated passes, complete backend delivery fence, never suppression or plaintext secrets |
+| `starci-repair` | a red or incompletely assured source returned green — separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-fe-design-layout` | 3–4 direction choices with no separate hash, then layout candidates that embed the selection and are hash-bound |
 | `starci-fe-design-block` | block anatomies under the direction embedded in their accepted layout, hash-bound independently |
 | `starci-fe-design-execute` | frontend source, only after every hash is accepted |

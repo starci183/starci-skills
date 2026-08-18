@@ -1,6 +1,6 @@
 ---
 name: starci-init
-description: Make a Source ready to be worked in — the agent bootstrap at its root, the workspace routes that say where each role's source is read from, and the worktree state that says where a run may write. Three separate write roots, approved separately, and any subset may be run alone. Use for a new Source, a newly declared project or role, a checkout that moved, a route that went stale, or registry state sitting at a rejected path. Never edits a target repository.
+description: "Make a Source ready through four identity-first boundaries: machine decrypt identity, agent bootstrap, workspace read routes, and project worktree state. Use for a new Source, machine, project or role, or when one of those records moved or went stale. Never edits a target repository."
 ---
 
 # starci-init
@@ -10,194 +10,47 @@ description: Make a Source ready to be worked in — the agent bootstrap at its 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@initialization` | `readiness/initialization` | module | the identity-first boundaries and the owner of each init verdict |
 
 ## NESTED SKILLS
 
 None. This skill never invokes another skill.
 
-
 ## Run
 
-Read `@skill-shape` first.
+Read `@skill-shape`, then `@initialization`. From it, load the four English modules in registry order:
+`identity`, `bootstrap`, `workspaces`, `worktrees`. Never load the Vietnamese publication records while
+running.
 
-**This skill runs more than once.** Its first job is a one-time bootstrap; the other two recur — a
-project is declared, a checkout moves, a route goes stale, a second role appears. Being called `init`
-does not make a second run suspicious.
+Project and roles are user-declared; a run that needs either stops rather than inferring them. Resolve
+each relevant module as **evidence → action → proof**. Measure identity before any later boundary because
+credential-backed setup is not safe until identity is proven. A boundary already ready is `reuse` and
+adds no write. Execute requested local actions in registry order:
 
-Three roots, and they fail in three different directions:
+1. **Identity** — run `node .claude/scripts/init-identity.mjs --source <Source> --plan`. Show whether the
+   machine is `ready`, needs the original identity imported, may generate its first identity, or is
+   blocked. Never display private material. Installing `~/.starci/master.identity` is a separate write.
+2. **Bootstrap** — prove the trust entry exists; classify and display complete before/after content for
+   `AGENTS.md` and `CLAUDE.md`.
+3. **Workspaces** — verify the Source-wide language and every declared project/role read route against
+   the real checkout.
+4. **Worktrees** — verify the project registry, sessions and cache roots against Git's own worktree
+   account and path policy.
 
-| Root | Decides | Wrong means |
-|---|---|---|
-| `<Source>/AGENTS.md`, `<Source>/CLAUDE.md` | which tree an agent routes into at all | an agent follows a dead link, then invents its own order |
-| `<Source>/.workspace/` | the shared reply language and where each project's source is **read** from | silent — inconsistent language or confident answers about another repository |
-| `<Source>/.worktrees/<project>/` | where state is **written** | loud — writes land where writing was forbidden |
+State the evidence and exact action per boundary before changing it. A direct init instruction naming
+the needed Source and Project authorises these bounded local writes; do not add a generic approval stop.
+Ask only if completion requires an external or destructive action not already granted. The request does
+not authorise target, secret publication, network, or external-service writes.
 
-Each root remains a separate displayed boundary and verdict. One `OK` approves all displayed recommended
-defaults at once; it never covers a root that was not shown. Apply every approved
-root immediately without asking again.
-
-The three are separate capabilities kept in one skill because they answer one question — *is this
-Source ready?* — not because they are one write.
-
-## PROCESS
-
-### 1 — Establish the context lock
-
-`Phase` is `plan`, then `review`, then `apply`. `Touching` names only the roots this run will write. `Project` is **user-declared** — never inferred from Source, from a sibling
-checkout name, or from what the last session used. A bootstrap-only run has no project, and says so
-rather than inventing one.
-
-### 2 — Bootstrap: prove the tree entry exists
-
-Read the tree's entry, `INDEX.md` at the tree root, and confirm it is there.
-
-**If the entry does not exist, stop.** A bootstrap pointing at a missing file is worse than no
-bootstrap: the agent follows the link, finds nothing, and proceeds on its own judgement while believing
-it was routed.
-
-### 3 — Bootstrap: read what is already there
-
-Never write over a bootstrap unseen. Classify each of the two files:
-
-| Situation | Verdict |
-|---|---|
-| absent | `create` |
-| present, routes to this tree's entry, no rules inside | `reuse` — nothing to do, say so |
-| present, routes to a path that moved | `repoint` — change the link, keep the rest |
-| present, carries rules, tables or law text | `slim` — the rules stay in the tree; propose exactly what is removed |
-| present, project-specific content unrelated to routing | **stop** — this is somebody's file, not a slot |
-
-`slim` needs the owner's eyes: content is being deleted from a file at the repository root, and the only
-argument for it is that the content lives in the tree already. Show which rule each removed line
-duplicates, and where it lives now.
-
-### 4 — Workspace: measure every declared role
-
-Read `.workspace/config.json` and verify its Source-wide `defaultLang` before measuring project routes.
-The default belongs once at the workspace root, never once per project or role.
-
-For each role, does `.workspace/<project>/<role>/config.json` exist, and does it still describe this
-machine? Check the checkout directory, the contract path for a frontend role, the manifests it names,
-and whether the recorded branch and head still belong to that checkout.
-
-**Parsing is not verifying.** A route whose fields are all well formed and whose paths no longer resolve
-is stale, and stale is a different verdict from absent with a different fix.
-
-A monorepo hides its contract from a one-app convention: look where the registry actually is before
-recording `null`, because a route that says a project has no contract when it has one leaves every
-later stage designing against nothing.
-
-### 5 — Worktrees: measure the project root
-
-Read Git's own account — `git worktree list` — then check the three paths, the registry's lock,
-cleanliness, branch and owning Git directory, and whether `sessions` and `cache` are ignored by Source.
-
-Look for state at rejected paths: `.worktrees/registries` without the project segment, or anything under
-the trust tree itself. Count it rather than describing it.
-
-Classify each root as `create`, `reuse` or `migrate-legacy`. Write nothing yet.
-
-### 6 — Review each boundary separately
-
-Present one boundary per root, each with its own decision and default. The owner may approve any subset,
-and `OK` approves all displayed defaults:
-
-- the two bootstrap files, shown in full before and after — they are short by design, so there is no
-  reason to summarise a diff of them;
-- the Source-wide workspace config and the routes to be written or refreshed, per role;
-- the worktree paths to create, reuse or migrate, with the registry branch named.
-
-Stop for a collision, a foreign Git owner, a dirty legacy registry, a branch mismatch, or any write
-outside the exact roots. A direct instruction naming Source and Project authorises this bounded local
-setup — it does not authorise widening a root.
-
-### 7 — Apply: bootstrap
-
-Both files carry the same content and the same link:
-
-```markdown
-# StarCi agent bootstrap
-
-Before planning, reading target source, or running a skill, read
-`<Source>/<tree>/INDEX.md` completely and follow its load order.
-
-This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
-the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
-```
-
-They are two files because two runtimes look for two filenames, not because there are two sets of
-rules — a runtime that cannot find its name gets no bootstrap at all. Nobody may deduplicate them.
-
-**Relative paths only.** An absolute path makes the bootstrap true on one machine, which is the
-`WORKSPACE-6` failure at the repository root.
-
-### 8 — Apply: workspace routes
-
-Write or refresh `.workspace/config.json` with `version: 1` and one `defaultLang`. Preserve a valid
-existing value unless the owner explicitly requested another; for a new config, use the language of the
-owner's setup request as the recommended default. This config applies to every project and role in the
-Source, so never duplicate it into route files.
-
-Refresh route configuration only. Never clone, link, copy, mount or edit a **target** repository: the
-route **describes** a checkout, it never mirrors one. Route values stay machine-local — never committed
-into the trust tree — and runtime secrets, environment values and tokens are never route values at all.
-
-**There is no exempt repository.** Not a product's, not a tool's, not one whoever adopted this tree wrote
-themselves. A checkout arrives on the disk because a person put it there, and this step then describes
-where it is. An exception carved for a repository "the tree owns" is an exception that only reads as
-narrow to the org that wrote it: to everybody else it is a skill that clones a stranger's repository
-during setup.
-
-A role whose repository has no domain contract carries `contract: null` — that absence is not a stale
-route, and it is why the field is nullable rather than absent. Print what happened per route, `written` or
-`refreshed` or `reused`.
-
-### 9 — Apply: worktree state
-
-Install or reuse `<Source>/.worktrees/<project>/{registries,sessions,cache}`. The registry is a locked
-linked worktree on the project's own branch; `sessions` and `cache` are ignored local state.
-
-Migrate legacy state behind `<project>` only after verifying it is clean — a dirty legacy registry stops
-the migration instead of being copied over.
-
-Stale worktrees are pruned **through Git**, never by deleting a directory: a hand-deleted directory
-leaves an administrative record of a worktree that is not there, and the next run inherits an error
-nobody caused. Never run destructive Git from a background agent.
-
-### 10 — Verify, read-only
-
-Re-measure and prove each claim of each root that was written:
-
-- follow the bootstrap's link from the repository root exactly as an agent would, and confirm it lands
-  on the entry, and that the entry names the load order and the capabilities;
-- the shared workspace config resolves one valid `defaultLang`;
-- every declared role resolves, and its contract path exists;
-- the registry is locked, clean, on the project branch, owned by this Source's Git;
-- `sessions` and `cache` are ignored, and no state remains at a rejected path.
-
-A branch that was never pushed is reported as local-only, not as missing.
-
-### 11 — Close the phase
-
-State the resolved roots and changes in friendly prose. Never report the trust tree as a runtime storage
-root, and never close while an approved `own` apply or verification step remains.
+After each action, run that module's proof before moving on. A local-only branch is reported as such, not
+missing. Close with the exact resolved roots and effects in concise prose; do not close while a requested
+action or its proof remains.
 
 ## Stops
 
-- The tree entry does not exist → stop; the tree needs an entry before it can be pointed at.
-- A bootstrap file holds unrelated project content → stop; propose a location for the routing lines
-  rather than overwriting somebody's file.
-- The link would have to be absolute to resolve → stop; the tree is not where the bootstrap can reach
-  it, which is a layout problem rather than a wording problem.
-- `Project` not declared by the user, on a run that touches a project root → stop; inferring identity is
-  how two projects come to share one root.
-- A route resolves but its checkout or contract path is gone → report stale; do not repoint it silently.
-- A registry worktree owned by another Git common directory → refuse; it is not this Source's state.
-- A dirty legacy registry → stop the migration.
-- A rule can only be removed from a bootstrap by rewriting it elsewhere → that is a trust-tree change,
-  not an init.
-
-## OUTPUT
-
-Describe each root and its exact effect in concise prose. Put only genuine boundary grants under
-`### NEED APPROVALS`; `OK` approves every displayed default and Apply continues immediately.
+- Missing trust entry, unrelated bootstrap content, or an absolute-only bootstrap link.
+- Existing ciphertext with no original identity available, or an identity that cannot decrypt its sample.
+- A project/role required by the requested boundary was not declared by the owner.
+- A stale route is never silently repointed; show the replacement.
+- Foreign Git ownership, a dirty legacy registry, or a registry branch collision.
+- Any requested product-repository edit; init describes targets and owns Source-local state only.

@@ -20,14 +20,14 @@ workflow thay agent.
 ## Luật
 
 Agent sở hữu phần thi hành. Chỉ ngắt owner khi có một quyết định agent thật sự không có thẩm quyền đưa
-ra. Điều tra, phán đoán triển khai trong scope, fallback an toàn, chia agent, chuyển phase, kiểm chứng,
+ra. Điều tra, phán đoán triển khai trong scope, fallback an toàn, chia agent, kiểm chứng,
 sửa thông thường và việc còn nợ đều tiếp tục mà không hỏi.
 
 Phát hiện không phải là được phép, nhưng `OK` trên boundary approval đang hiển thị chính là quyền làm.
 Không bao giờ bắt owner lặp lại nó.
 
-Skill không tự gọi skill khác. `OK` resume skill hiện tại qua Apply của chính nó; capability khác vẫn là
-request riêng của owner.
+Skill không tự gọi skill khác. `OK` chỉ cấp quyền cho boundary chính xác đã hiển thị; capability khác vẫn
+là request riêng của owner.
 
 ## Ngôn ngữ runtime
 
@@ -45,27 +45,30 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Chín năng lực
+## Mười hai năng lực
 
-Bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
-máy, còn `starci-diagnose` lần theo một skill khác. Chỉ hai capability này không có stage apply. Một
+Mười capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
 
-| Skill | Hành trình | Sở hữu |
-|---|---|---|
-| `starci-init` | plan → review → apply, nội bộ | làm một Source sẵn sàng: bootstrap, route workspace, state worktree — ba root, mỗi root một lần duyệt |
-| `starci-stale-list` | chỉ plan | mọi stale category có thể đo mà không thực thi project, gồm backend assurance wiring, và ai dọn từng loại |
-| `starci-diagnose` | chỉ plan | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
-| `starci-repair` | plan → review → apply | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và backend delivery fence được cài trọn sau khi gate pass |
-| `starci-fe-design-layout` | mở hoặc tiếp session, chọn direction, rồi các lượt layout | 3–4 lựa chọn direction không có hash riêng, rồi 3–4 phương án layout mỗi bề mặt, buộc theo hash |
-| `starci-fe-design-block` | các lượt block | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
-| `starci-fe-design-execute` | thi hành | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
-| `starci-be-plan` | plan | brief backend: file nào, biên giới nào, ca kiểm thử nào |
-| `starci-be-approve` | duyệt, rồi apply | sự chấp thuận, rồi source backend |
+| Skill | Sở hữu |
+|---|---|
+| `starci-init` | làm Source sẵn sàng: identity SOPS+age, bootstrap, route workspace và state worktree — bốn root được duyệt độc lập |
+| `starci-cloudflare-tunnel-set` | custody Cloudflare credential đã mã hóa và áp dụng một HTTP(S) tunnel/DNS route đã duyệt |
+| `starci-setup-mcp` | một MCP read-only toàn Source, các source partition theo route và publication `mcp.<zone>` đã duyệt |
+| `starci-setup-sonar` | một Docker SonarQube dùng chung, onboarding project và publication `sonar.<zone>` đã duyệt |
+| `starci-stale-list` | mọi stale category, gồm local gate được chạy và frontend hoặc backend assurance wiring, cùng ai dọn từng loại |
+| `starci-diagnose` | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
+| `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
+| `starci-fe-design-layout` | 3–4 lựa chọn direction không có hash riêng, rồi 3–4 phương án layout mỗi bề mặt, buộc theo hash |
+| `starci-fe-design-block` | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
+| `starci-fe-design-execute` | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
+| `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
+| `starci-be-approve` | sự chấp thuận, rồi source backend |
 
-Layout mở session. Execute vẫn từ chối ghi khi còn hash reachable chưa accepted. Bên trong một skill,
-`OK` resume phase kế tiếp của chính nó ngay; không skill nào tự cho rằng capability khác đã được yêu cầu.
+Layout mở session. Execute vẫn từ chối ghi khi còn hash reachable chưa accepted. `OK` chỉ cấp quyền cho
+boundary đã hiển thị; không skill nào tự cho rằng capability khác đã được yêu cầu.
 
 ## Khóa ngữ cảnh
 
@@ -74,14 +77,14 @@ nơi giữ record, write boundary chính xác, evidence đã đọc và tiền �
 giữ đầy đủ lock trong đó.
 
 Không bao giờ in bảng context. Nói một câu thân thiện cho người dùng biết agent đang làm ở đâu, project
-và role nào đã resolve, phase hiện tại được chạm boundary nào. Chỉ bị chặn khi giá trị context bắt buộc
+và role nào đã resolve, hành động hiện tại được chạm boundary nào. Chỉ bị chặn khi giá trị context bắt buộc
 không thể tìm từ yêu cầu, workspace route hoặc live evidence.
 
 ## Các trạng thái tiến trình
 
 `own` là mọi hành động có thể thi hành trong scope đã khai: điều tra, edit đảo được, fallback tool an toàn,
 chia agent, sinh candidate, phán đoán triển khai, baseline sau approval, gate, sửa trong scope, proof và
-chuyển phase trong skill hiện tại. Tiếp tục tới khi `own = 0`.
+proof trong skill hiện tại. Tiếp tục tới khi `own = 0`.
 
 `need approval` chỉ gồm quyết định sản phẩm không có default dựa trên evidence, destructive loss đáng kể,
 publish hay cam kết ra ngoài, thiếu access, hoặc mở rộng sang project, role, repository hay write boundary
@@ -91,7 +94,7 @@ Khi user trả lời `OK`, duyệt mọi default và boundary chính xác đang 
 baseline nếu cần rồi tiếp tục ngay. `OK` không phủ scope chưa trình. Im lặng và mọi từ khác `OK` đều không
 phải tín hiệu approval.
 
-## Các phase
+## Quyết định và thi hành
 
 **Các lượt design** chính là mặt để rà soát. Lựa chọn direction hỗ trợ một lượt layout và không có
 approval hash riêng; candidate chính xác, lựa chọn hoặc phản hồi của nó nằm trong `directionReview` của
@@ -99,15 +102,13 @@ lượt layout, còn object được chọn nằm trong candidate layout. Mỗi 
 quyết của người chủ, và sự chấp nhận **buộc theo hash**. Phản hồi mở một lượt mới; nó không bao giờ sửa
 một lượt đã được chấp nhận.
 
-**Plan** đọc canon, hợp đồng và source sống, rồi ra một brief: mục tiêu, bằng chứng, biên giới, quyết
-định, phương án thay thế, bằng chứng nghiệm thu. Nó không viết code sản phẩm.
+Trước khi ghi, đọc canon, hợp đồng và source sống rồi nêu mục tiêu, bằng chứng, boundary chính xác,
+quyết định và bằng chứng nghiệm thu. Khi cần quyền owner, chờ `OK` trước lần ghi sản phẩm đầu tiên và giữ
+lại phương án bị từ chối cùng lý do của owner.
 
-**Approve** lặp cho tới khi người dùng trả lời `OK`, và giữ một điểm dừng cứng **trước**
-lần ghi sản phẩm đầu tiên. Mọi lần từ chối được ghi kèm cái thay thế và lý do của người dùng.
-
-**Apply** xác nhận biên giới ghi, ghi một baseline commit lấy **trước** khi sửa, rồi thi hành đúng bản
-đã duyệt và chứng minh tại biên sản phẩm bằng đúng bằng chứng mà lần duyệt đã nêu tên. Một đường dẫn
-ngoài `Touching` được trả về cho chủ của nó, không được lặng lẽ xuất hiện trong diff.
+Sau khi được cấp quyền, xác nhận boundary ghi, lấy baseline commit **trước** khi sửa, thi hành revision
+đã duyệt và chứng minh tại biên sản phẩm. Một đường dẫn ngoài `Touching` được trả về cho chủ của nó,
+không được lặng lẽ xuất hiện trong diff.
 
 ## Đầu ra cho người dùng
 
@@ -125,9 +126,9 @@ Không có report file riêng. Evidence bền nằm trong kho vốn sở hữu c
 `<Source>/.worktrees/<project>/sessions/`, bind theo hash; repair ở commit và diff; lượt chỉ đọc không ghi
 file trừ khi được yêu cầu rõ.
 
-Một phase được duyệt gọi tên `Approved revision: <identity>` của nó, và Apply trích đúng identity đó cùng
-baseline commit. Chính cặp đó chứng minh cái gì đã đổi sau khi Apply bắt đầu, và nó sống sót ở bất cứ nơi
-nào phase ghi lại — nó là một **câu**, không phải một tệp.
+Một boundary được duyệt gọi tên `Approved revision: <identity>` và trích đúng identity đó cùng baseline
+commit. Chính cặp đó chứng minh cái gì đã đổi sau khi được cấp quyền, và nó sống sót ở bất cứ nơi nào
+công việc ghi lại — nó là một **câu**, không phải một tệp.
 
 Phần tường thuật và bằng chứng cho người dùng viết bằng `defaultLang` đã resolve, trừ khi request hiện tại
 chỉ định rõ ngôn ngữ khác. Tiêu đề, nhãn schema, đường dẫn, câu lệnh và tên định danh trong code giữ nguyên,
@@ -153,8 +154,6 @@ thêm**.
 
 ## Ngoại lệ
 
-- **Init sở hữu ba root.** Mỗi root vẫn là một boundary và verdict riêng. Một `OK` duyệt mọi default đã
-  hiển thị, không phủ root chưa trình, rồi Init apply hết mà không dừng lần nữa.
 - **Năng lực chỉ đọc.** Nó không biến measurement thành repair; nó báo evidence và owner của repair
   request riêng.
 - **Session được tiếp tục.** Layout được phép **tiếp** thay vì **mở**. Session id và mọi hash đã chấp
@@ -164,7 +163,7 @@ thêm**.
 
 **Lượt chạy.** "Thiết kế trang kết quả bài luyện coding."
 
-Lượt chạy nói: `Em đang thiết kế example-app trên route frontend đã verify; phase này chỉ ghi design
+Lượt chạy nói: `Em đang thiết kế example-app trên route frontend đã verify; hành động này chỉ ghi design
 session.` Nó trình 3–4 layout có direction cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
 và làm hết mọi mục `own` của Layout mà không hỏi lại. Block vẫn là capability request riêng.
 
