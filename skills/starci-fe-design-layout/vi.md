@@ -10,6 +10,7 @@ title: Frontend design layout · Vietnamese
 |---|---|---|---|
 | `@contract-search` | `scripts/contract-search.mjs` | script | tìm contract entry theo nhu cầu đã phát biểu |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | kiểm tra JSON layout candidate |
+| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
 
@@ -45,6 +46,10 @@ của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 (`WORKTREE-3`).
 
 ### 4 — Resume hoặc mở session
+
+Bản ghi viết theo đúng hình dạng `@session` khai, tại `registries/decisions/<surface>.json`. Nó mang một
+chuỗi băm, nên ghi thêm một round là niêm phong round đó: sửa lén một round cũ thì nó thôi khớp — điều mà
+một mảng round trần không bao giờ phát hiện được.
 
 **Surface quyết định identity của session**, không phải cách viết prompt. Hai request khác lời cho cùng
 page vẫn là một session; prompt viết lại chỉ mở round mới. In `resumed <id>` hoặc `opened <id>` và giữ mọi
@@ -110,6 +115,11 @@ Render mỗi candidate thành một trang HTML trong `cache/preview`, rồi serv
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
+
+Cổng đó là mặc định, không phải điều kiện. Nếu nó đã bị chiếm, phục vụ ở cổng trống kế tiếp và **in ra URL
+thật sự đang phục vụ** — một lượt chạy hỏng vì dev server của người khác giữ cổng là hỏng ở chỗ chẳng ai
+hỏi tới, còn in ra một URL không ai mở được thì tệ hơn là không in.
+
 
 CSS preview chỉ là documentation chrome: vẽ region, tên, axis, entry và branch. Nó không mang product
 class và không được trở thành nguồn class cho phase sau.

@@ -10,6 +10,7 @@ description: Produce 3–4 block anatomy JSON candidates for each region of an a
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | validate block anatomy JSON |
+| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
@@ -32,6 +33,9 @@ hash, never to a rendered page.
 `Phase` is `block`. `Touching` names the project registry only.
 
 ### 2 — Require an accepted layout
+
+The accepted hash is read from the session record `@session` describes; a block round is appended to that
+same session, never to a new one.
 
 Read the session. A region may enter block rounds only if the layout candidate that contains it carries
 an **accepted** hash. A proposed layout is not a starting point: block anatomies built on it would be
@@ -103,6 +107,11 @@ serve it:
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
+
+The port is the default, not a requirement. If it is taken, serve on the next free one and **print the URL
+actually served** — a run that fails because somebody else's dev server holds a port has failed at nothing
+the owner asked about, and a run that prints a URL nobody can open is worse than one that prints none.
+
 
 The preview's CSS is documentation chrome and never a product class. A preview that shows only the
 populated state hides the exact decision this stage exists to make.

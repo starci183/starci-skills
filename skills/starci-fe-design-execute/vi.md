@@ -10,6 +10,7 @@ title: Frontend design execute · Vietnamese
 |---|---|---|---|
 | `@lints-fe` | `gates/fe/lints` | module | chứng minh source frontend bằng gate thật của nó |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve file, export và ranh giới import |
+| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 
 ## HANDS OFF TO — named, never loaded
@@ -29,6 +30,9 @@ nó phải chặt nhất.
 xác nhận trước write đầu tiên. Phát hiện một path không đồng nghĩa được phép sửa nó.
 
 ### 2 — Từ chối nếu còn hash reachable chưa accepted
+
+Với tới được nghĩa là: mọi round trong bản ghi session mà `@session` mô tả, và mọi mục trong hàng đợi của
+nó. Một mục còn ở trạng thái `queued` là một quyết định chưa ai trả lời, nên nó từ chối.
 
 Duyệt toàn bộ session. Với các surface trong scope, mọi layout hash và block hash reachable đều phải ở
 trạng thái **accepted**, không phải proposed.

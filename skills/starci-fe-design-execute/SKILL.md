@@ -11,6 +11,7 @@ description: Implement an accepted frontend design in the real frontend source â
 |---|---|---|---|
 | `@lints-fe` | `gates/fe/lints` | module | prove the frontend source at its real gate |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve files, exports and import boundaries |
+| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
 ## HANDS OFF TO â€” named, never loaded
@@ -34,6 +35,9 @@ with the owner before the first write. Detection is not permission.
 
 Walk the session. For the surfaces in scope, every layout hash and every block hash reachable from them
 must be **accepted**, not proposed.
+
+Reachable means what `@session` makes reachable: every round in the record, and every entry in its queue.
+An entry still `queued` is a decision nobody answered, so it refuses.
 
 If any is unaccepted, **stop and name it**. There is no orchestrator to have checked this earlier, and
 nothing else in the tree makes a proposed hash acceptable. A partial start is the failure mode this

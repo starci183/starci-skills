@@ -9,6 +9,7 @@ title: Frontend design block · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | kiểm tra JSON mô tả anatomy của block |
+| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
 
@@ -30,6 +31,9 @@ vào trang render.
 `Phase` là `block`. `Touching` chỉ gọi tên project registry.
 
 ### 2 — Yêu cầu layout đã accepted
+
+Hash đã chấp nhận đọc từ bản ghi session mà `@session` mô tả; một round block được ghi thêm vào **chính**
+session đó, không mở session mới.
 
 Đọc session. Một region chỉ được đi vào block round khi layout candidate chứa nó có hash **accepted**.
 Proposed layout không phải điểm bắt đầu vì mọi anatomy dựng trên đó sẽ bị bỏ cùng layout.
@@ -96,6 +100,11 @@ Render mỗi anatomy thành một trang HTML trong `cache/preview`, gồm **mọ
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
+
+Cổng đó là mặc định, không phải điều kiện. Nếu nó đã bị chiếm, phục vụ ở cổng trống kế tiếp và **in ra URL
+thật sự đang phục vụ** — một lượt chạy hỏng vì dev server của người khác giữ cổng là hỏng ở chỗ chẳng ai
+hỏi tới, còn in ra một URL không ai mở được thì tệ hơn là không in.
+
 
 CSS của preview chỉ là documentation chrome, không phải product class. Preview chỉ có populated state
 đang che giấu đúng quyết định mà phase này phải làm lộ ra.

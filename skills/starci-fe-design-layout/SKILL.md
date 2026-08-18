@@ -11,6 +11,7 @@ description: Open or resume a hash-bound design session and produce 3–4 layout
 |---|---|---|---|
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
+| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
@@ -48,6 +49,10 @@ this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview output goes to
 (`WORKTREE-3`).
 
 ### 4 — Resume or open the session
+
+The record is written in the shape `@session` declares, at `registries/decisions/<surface>.json`. It carries
+a chain, so appending a round seals it: a round edited in place stops matching, which an array of rounds on
+its own can never notice.
 
 **Session identity is the surface**, not the prompt. Two differently worded requests for the same page
 are the same session; a reworded prompt is a new round, not a new session. Print which happened —
@@ -128,6 +133,11 @@ Then generate one HTML page per candidate into `cache/preview` and serve it:
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 ```
+
+The port is the default, not a requirement. If it is taken, serve on the next free one and **print the URL
+actually served** — a run that fails because somebody else's dev server holds a port has failed at nothing
+the owner asked about, and a run that prints a URL nobody can open is worse than one that prints none.
+
 
 The preview's own CSS is documentation chrome. It draws region boxes, region names, axis values and the
 entry and branch each region cites. It **never** carries a product class, and nothing in it is a source
