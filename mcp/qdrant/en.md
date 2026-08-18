@@ -34,6 +34,20 @@ only extension is the Ollama embedding provider required to use the owner's 8B m
 streamable HTTP and `QDRANT_READ_ONLY=true`. The client JSON contains the canonical
 `https://mcp.<zone>/mcp/` URL and no credential; localhost port 8011 remains a local diagnostic surface.
 
+## Public showcase
+
+The generated stack also runs a separate Nginx showcase proxy on localhost port 8012. Its canonical route is
+`https://qdrant.<zone>/dashboard`, derived from the selected `https://mcp.<zone>/mcp/` endpoint unless an
+explicit showcase URL is supplied. The shared Cloudflare tunnel points at the proxy,
+never at Qdrant REST/gRPC ports. The proxy injects the dedicated key only on its private upstream hop,
+admits GET inspection plus the dashboard's explicit read-only vector query endpoints, and rejects every
+write method and endpoint. The key never reaches browser configuration, HTML, JavaScript, URLs or logs.
+
+The showcase is presentation evidence, not an administration surface. Operators continue to use
+`http://localhost:<dedicated-rest-port>/dashboard` for private administration. Adding a new collection or
+read operation to the public allowlist requires a reviewed proxy change; never widen it to the raw Qdrant
+origin for convenience.
+
 ## Stop and recover
 
 Stop the dedicated stack with `node .claude/scripts/qdrant-source-context.mjs down --project <project>

@@ -42,7 +42,9 @@ it must not replace other services on the shared tunnel.
 
 - `plan` resolves routes, stack ownership, collections and prerequisites without writing.
 - `config` writes machine-local Compose, environment and client JSON under `.worktrees/source-context/cache/mcp/`;
-  pass `--public-url https://mcp.<zone>/mcp/` when the Source does not use the default StarCi zone.
+  pass `--public-url https://mcp.<zone>/mcp/` when the Source does not use the default StarCi zone. The
+  showcase URL defaults to `https://qdrant.<zone>/dashboard`; pass `--showcase-url` only when that hostname
+  intentionally differs.
 - `index` runs the containerized indexer, downloads the declared embedding model when absent, builds both projections and writes value-free
   manifests beside the client JSON.
 - `setup` runs config, Qdrant start, index and MCP start in dependency order; `down` stops only this stack.

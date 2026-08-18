@@ -42,7 +42,8 @@ không được thay thế service khác trên tunnel dùng chung.
 
 - `plan` resolve route, chủ stack, collection và prerequisite mà không ghi.
 - `config` ghi Compose, environment và client JSON cục bộ vào `.worktrees/source-context/cache/mcp/`; truyền
-  `--public-url https://mcp.<zone>/mcp/` khi Source không dùng StarCi zone mặc định.
+  `--public-url https://mcp.<zone>/mcp/` khi Source không dùng StarCi zone mặc định. URL showcase mặc định là
+  `https://qdrant.<zone>/dashboard`; chỉ truyền `--showcase-url` khi hostname đó chủ ý khác đi.
 - `index` chạy indexer bằng container, tải embedding model nếu máy chưa có, dựng các projection và ghi manifest không chứa giá trị bên
   cạnh client JSON.
 - `setup` chạy config, khởi động Qdrant, index rồi khởi động MCP đúng thứ tự; `down` chỉ dừng stack này.

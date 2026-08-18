@@ -29,18 +29,29 @@ const valueFor = (flag) => {
 const project = valueFor("--project");
 const roles = (valueFor("--roles") ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 const publicMcpUrl = valueFor("--public-url") ?? DEFAULT_PUBLIC_MCP_URL;
+let parsedPublicMcpUrl;
 if (!project || !/^[a-z0-9][a-z0-9-]*$/.test(project)) fail("--project must be a lowercase workspace project name");
 if (roles.length === 0 || roles.some((role) => !/^[a-z][a-z0-9-]*$/.test(role))) fail("--roles must contain workspace roles");
 try {
-  const parsedPublicUrl = new URL(publicMcpUrl);
-  if (parsedPublicUrl.protocol !== "https:" || parsedPublicUrl.pathname !== "/mcp/" || parsedPublicUrl.search || parsedPublicUrl.hash || parsedPublicUrl.username || parsedPublicUrl.password) {
+  parsedPublicMcpUrl = new URL(publicMcpUrl);
+  if (parsedPublicMcpUrl.protocol !== "https:" || parsedPublicMcpUrl.pathname !== "/mcp/" || parsedPublicMcpUrl.search || parsedPublicMcpUrl.hash || parsedPublicMcpUrl.username || parsedPublicMcpUrl.password) {
     fail("--public-url must be an HTTPS origin ending at /mcp/ without credentials, query or fragment");
   }
 } catch {
   fail("--public-url must be a valid HTTPS MCP URL");
 }
+if (!parsedPublicMcpUrl.hostname.startsWith("mcp.")) fail("--public-url hostname must use mcp.<zone>");
+const publicShowcaseUrl = valueFor("--showcase-url") ?? `https://qdrant.${parsedPublicMcpUrl.hostname.slice(4)}/dashboard`;
+try {
+  const parsedShowcaseUrl = new URL(publicShowcaseUrl);
+  if (parsedShowcaseUrl.protocol !== "https:" || parsedShowcaseUrl.pathname !== "/dashboard" || parsedShowcaseUrl.search || parsedShowcaseUrl.hash || parsedShowcaseUrl.username || parsedShowcaseUrl.password) {
+    fail("--showcase-url must be an HTTPS origin ending at /dashboard without credentials, query or fragment");
+  }
+} catch {
+  fail("--showcase-url must be a valid HTTPS Qdrant showcase URL");
+}
 if (!["plan", "config", "index", "up", "down", "setup"].includes(action)) {
-  fail("usage: qdrant-source-context.mjs <plan|config|index|up|down|setup> --project <name> --roles <be,fe> [--public-url https://mcp.<zone>/mcp/]");
+  fail("usage: qdrant-source-context.mjs <plan|config|index|up|down|setup> --project <name> --roles <be,fe> [--public-url https://mcp.<zone>/mcp/] [--showcase-url https://qdrant.<zone>/dashboard]");
 }
 
 const readJson = (path, label) => {
@@ -62,6 +73,7 @@ if (!Number.isInteger(appQdrantPort)) fail("Source metadata has no numeric ports
 const restPort = appQdrantPort + 2;
 const grpcPort = restPort + 1;
 const mcpPort = 8011;
+const showcasePort = 8012;
 const cacheDir = join(sourceRoot, ".worktrees", "source-context", "cache", "mcp");
 const composeFile = join(cacheDir, "compose.yaml");
 const envFile = join(cacheDir, ".env");
@@ -72,6 +84,7 @@ const keyFile = join(sourceRoot, ".stacks", secretRecord);
 const docker = process.platform === "win32" ? "docker.exe" : "docker";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const yamlPath = (path) => path.replaceAll("\\", "/").replaceAll("'", "''");
+const showcaseTemplate = join(trustRoot, "mcp", "docker", "qdrant-showcase.conf.template");
 
 const run = (command, commandArgs, options = {}) => {
   const result = spawnSync(command, commandArgs, {
@@ -145,6 +158,19 @@ const writeConfig = () => {
     depends_on:
       qdrant-context:
         condition: service_healthy
+    restart: unless-stopped`, `  qdrant-showcase:
+    image: nginx:1.29-alpine
+    container_name: starci-source-context-showcase
+    environment:
+      QDRANT_MCP_API_KEY: \${QDRANT_MCP_API_KEY}
+      NGINX_ENVSUBST_FILTER: ^QDRANT_MCP_API_KEY$
+    ports:
+      - "${showcasePort}:8080"
+    volumes:
+      - '${yamlPath(showcaseTemplate)}:/etc/nginx/templates/default.conf.template:ro'
+    depends_on:
+      qdrant-context:
+        condition: service_healthy
     restart: unless-stopped`];
   for (const route of routes) {
     services.push(`  index-${route.role}-${project}:
@@ -186,7 +212,7 @@ const index = () => {
 };
 const up = () => {
   requireConfig();
-  compose("up", "-d", "--build", "qdrant-context", "mcp-context");
+  compose("up", "-d", "--build", "qdrant-context", "mcp-context", "qdrant-showcase");
 };
 
 if (action === "plan") {
@@ -195,6 +221,8 @@ if (action === "plan") {
   console.log(`dedicated qdrant: http://localhost:${restPort} (gRPC ${grpcPort})`);
   console.log(`MCP local diagnostic: http://localhost:${mcpPort}/mcp/`);
   console.log(`MCP canonical: ${publicMcpUrl}`);
+  console.log(`Qdrant dashboard local: http://localhost:${showcasePort}/dashboard`);
+  console.log(`Qdrant showcase canonical: ${publicShowcaseUrl}`);
   console.log(`encrypted key: ${encryptedKey} (${existsSync(encryptedKey) ? "ready" : "will mint"})`);
   for (const route of routes) console.log(`/${route.role}/${project}: ${route.diskPath}`);
   console.log(`generated state: ${cacheDir}`);

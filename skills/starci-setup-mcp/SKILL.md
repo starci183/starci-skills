@@ -51,6 +51,11 @@ External tunnel/DNS mutation is a `### NEED APPROVALS` boundary; only `OK` on th
 reconciliation. Merge ingress and preserve other hostnames plus the terminal 404. Publish the MCP HTTP origin
 only; Qdrant REST/gRPC and Ollama stay private.
 
+When the owner explicitly approves the public Qdrant showcase, publish `qdrant.<zone>` only through the
+generated read-only proxy on localhost port 8012. Never route the hostname to Qdrant REST/gRPC itself. Prove
+that the dashboard loads without a browser credential, permitted inspection works, write requests are
+rejected, and the API key is absent from browser-visible responses and logs.
+
 ## Clients
 
 After the public route exists, read `@clients` and run `@client-setup --url https://mcp.<zone>/mcp/`. The
@@ -62,5 +67,6 @@ client before an MCP initialize and `tools/list` request succeed publicly.
 
 Prove route freshness, Docker health, exact point counts per partition, read-only tool exposure, semantic
 search returning `/<role>/<project>/` paths, public HTTPS MCP smoke, both Codex and Claude Code connected,
-encrypted credential presence and absence of plaintext twins. Report names and verdicts only; never report
-credential values.
+encrypted credential presence and absence of plaintext twins. When showcase publication was approved, also
+prove its HTTPS dashboard, read-only allowlist and rejected writes. Report names and verdicts only; never
+report credential values.

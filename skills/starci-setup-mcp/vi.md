@@ -46,6 +46,11 @@ SOPS ciphertext sau qua machine identity đã khởi tạo; không in hoặc sao
 - `cloudflare-<tunnel>-tunnel-token.key.enc` — run token của connector cho named tunnel dùng chung.
 
 Hostname mặc định là `mcp.<zone>`. Dùng `@tunnel-set` để plan chính xác hostname, tunnel và HTTP origin.
+
+Khi owner duyệt rõ showcase Qdrant public, chỉ publish `qdrant.<zone>` qua proxy chỉ-đọc được sinh ở cổng
+localhost 8012. Không bao giờ route hostname vào chính REST/gRPC của Qdrant. Phải chứng minh dashboard tải
+không cần browser credential, thao tác đọc được phép hoạt động, request ghi bị từ chối và API key không có
+trong response hay log mà browser nhìn thấy.
 Mutation tunnel/DNS bên ngoài là biên `### NEED APPROVALS`; chỉ `OK` trên plan đã hiển thị mới cho phép
 reconcile. Ingress phải merge, giữ hostname khác và terminal 404. Chỉ publish MCP HTTP origin; Qdrant
 REST/gRPC và Ollama luôn private.
