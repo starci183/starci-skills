@@ -1,6 +1,6 @@
 ---
 name: starci-repair
-description: Take a source that no longer builds, no longer lints clean, drifted out of format, or whose contract reasons nobody can find by need, or which measures itself against a copy of the lint rules instead of the published packages, or which still carries a `.claude/` left behind by an older tree, and return it green — measured before and after with the repository's own gates, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, when lint debt has piled up, or before trusting a repository nobody has run in a while. Writes product source, after approval.
+description: Take a source that no longer builds, no longer lints clean, drifted out of format, still carries a retired component tier such as `components/shells`, has contract reasons nobody can find by need, measures itself against copied lint rules, or retains a `.claude/` from an older tree, and return it green — measured before and after, repaired in separated passes, and never made green by silencing a finding. Use when a checkout is red, structurally stale, or untrusted. Writes product source after approval.
 ---
 
 # starci-repair
@@ -9,6 +9,7 @@ description: Take a source that no longer builds, no longer lints clean, drifted
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@file-layout` | `compilers/patterns/fe/file-layout` | module | supplies the accepted frontend tier vocabulary for structural repair |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
 ## NESTED SKILLS
@@ -19,7 +20,7 @@ None. This skill reports a stale route and ends; it never starts setup.
 
 Read `@skill-shape` first.
 
-**Five different things are called stale, and repairing the wrong one wastes the run.**
+**Six different things are called stale, and repairing the wrong one wastes the run.**
 
 | What is stale | Symptom | Owner |
 |---|---|---|
@@ -27,6 +28,7 @@ Read `@skill-shape` first.
 | the **source** | it does not build, does not lint clean, or drifted out of format | this skill |
 | the **index** | every gate is green, but no contract `why` can be found by need, so entries get written twice | this skill, last pass |
 | the **machine** | the gates cannot fire: the published lint packages are not installed, or a copy of them is vendored into the checkout | this skill, before measuring |
+| the **structure** | an accepted tier vocabulary removed a path that still exists, including an empty path no file-based gate can see | this skill, the retired-structure pass |
 | a **remnant** | a target checkout still carries a `.claude/` left from an older tree | this skill, after the index |
 
 So this skill resolves the route first and **stops** if the route is the stale thing. Repairing source
@@ -44,6 +46,11 @@ reformatted lines is a fix nobody can see. Format runs alone, in its own pass, w
 
 **Measure with the repository's own gates.** Read the manifest and run the scripts that repository
 actually declares. A count from a command the project does not use proves nothing about the project.
+
+**Green gates do not prove the directory tree is clean.** ESLint visits files and Git tracks files; an
+empty forbidden directory is invisible to both. Structural repair therefore inventories directories
+directly and compares them with the accepted tier vocabulary. `components/shells` is forbidden by
+`FILE-8` whether it contains four files or none.
 
 **The machine is installed, never authored.** The rules a gate fires are a published dependency, and
 **every repository that runs the gates installs it — the checkout under repair, and only that one.** The
@@ -114,6 +121,11 @@ they land in.
 
 This is the number the run will be judged against. A repair with no before-count is a claim.
 
+For a frontend run, read `@file-layout` and inventory every component root in the resolved checkout,
+including empty directories. Record each retired tier path, file count, tracked-file count and every
+import or export that reaches it. The installed `no-shell-tier` rule proves files under
+`components/shells` are rejected; this directory inventory covers the empty case the rule cannot see.
+
 ### 6 — Classify every finding, because they do not have one fix
 
 | Class | What it is | How it is repaired |
@@ -123,7 +135,8 @@ This is the number the run will be judged against. A repair with no before-count
 | `defect` | real broken behaviour, a wrong type, a dead import, a missing case | repaired by hand, one at a time |
 | `index` | a contract `why` that describes something instead of stating when you would need it, so no lookup can find it | rewritten in its own pass, reasons only |
 | `machine` | the published lint packages are absent, or a copy of them is vendored into the checkout | installed from the registry, in its own commit — never authored |
-| `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in step 11 |
+| `retired-structure` | a directory, file, import or export still uses a tier the accepted layout vocabulary removed | empty paths are removed; live code is migrated to its accepted tier with references updated |
+| `remnant` | a `.claude/` inside a target checkout holding nothing but leftovers from an older tree | removed in its own pass, after approval — or returned, by the test in step 12 |
 | `decision` | the code is deliberate and the rule refuses it, or the rule and canon disagree | **returned to the owner** — the fix is a decision, not an edit |
 
 A `decision` misfiled as a `defect` is how a rule gets bent to match the code. A `defect` misfiled as a
@@ -154,9 +167,10 @@ Then, in this order, each pass its own commit:
 2. **mechanical** — autofix, then read every hunk. An autofix that changed behaviour is a defect the
    tool introduced, and it is caught here or not at all.
 3. **defects** — by hand, smallest first, re-running the gate that reported each one.
-4. **`why`** — the contract index, because it is a pass no gate can judge and it must not be mistaken for
+4. **retired structure** — remove empty forbidden tiers; migrate their live files without deleting behaviour.
+5. **`why`** — the contract index, because it is a pass no gate can judge and it must not be mistaken for
    one of the three above.
-5. **remnant** — last, and the only pass that removes rather than repairs. Alone in its commit, so a
+6. **remnant** — last. Alone in its commit, so a
    deletion is never read as part of a fix.
 
 A pass that would need to weaken a gate stops and returns the boundary. Unrelated work in the tree is
@@ -168,9 +182,12 @@ Ten agents, and the assignment is **by file, never by rule**. Two agents holding
 each other's repair and the second one wins silently; two agents holding one rule across many files are
 the same collision spread thinner.
 
-**Two passes are never fanned out.** The formatter and the autofix are single whole-repository commands —
+**Three passes are never fanned out.** The formatter and the autofix are single whole-repository commands —
 running them ten times concurrently produces ten writers on one file set. Only the `defect` pass, where
 each finding is a separate hand repair in a separate file, is worth ten agents.
+
+Retired-structure migration is also single-writer: moving a component changes its folder, export and all
+imports as one graph. Splitting those writes creates a half-moved component no gate result can explain.
 
 **Whole-repository gates run once, by the coordinator, never per agent.** Build output is shared state:
 ten concurrent typechecks or builds in one checkout write the same `dist`, the same cache, the same
@@ -235,7 +252,30 @@ and builds, and the classification counts are printed before and after. A reason
 than a narrow one — it will match lookups it should not — so an entry whose need cannot be read off what
 it actually fixes is **asked about, not guessed**.
 
-### 11 — The remnant pass: one Source, so a second `.claude` is a corpse or a question
+### 11 — The retired-structure pass: remove `shells` as a tier
+
+Run this pass from the accepted vocabulary, not from whether lint happened to emit a finding. For every
+`components/shells` directory under an in-scope component root:
+
+1. Count files recursively and ask Git which are tracked.
+2. If the count is zero, remove the empty directory tree and record the absolute path plus before/after
+   counts. `git diff` is correctly empty because Git never owned the directory; `CHANGES` still records
+   the filesystem removal.
+3. If files exist, preserve their behaviour and history. Resolve each component's actual identity from
+   its exports, mechanic and call sites, then move it to the tier `@file-layout` requires. A fixed vendor
+   mechanic becomes a named branch; update the folder/export name, imports, barrel exports, tests and
+   contract references together.
+4. Do not delete a live component to make the tier disappear. If evidence cannot settle its destination
+   or semantic name, return that component as a `decision`; continue with the paths whose destination is
+   settled and leave the unresolved path in `OWED`.
+
+The machine pass comes first. A consumer using a vendored mirror or missing `no-shell-tier` installs the
+published canon and removes the mirror; this pass never patches a consumer's private lint-rule copy.
+
+Proof is a recursive directory search returning no `components/shells`, a source search returning no
+imports through `/shells/`, the installed `no-shell-tier` gate, and the repository's original gates.
+
+### 12 — The remnant pass: one Source, so a second `.claude` is a corpse or a question
 
 **There is one Source and one trust tree. A project is a folder inside it —
 `<Source>/.worktrees/<project>/`, `<Source>/.workspace/<project>/` — never a tree of its own.** So a
@@ -268,7 +308,7 @@ Measured once, on two checkouts carrying the same leftover: one had it ignored, 
 the other had the same editor configuration **committed**. Identical directories, opposite verdicts — which
 is why the test is "untracked", not "looks empty".
 
-### 12 — Prove it with the same commands
+### 13 — Prove it with the same commands
 
 Re-run the exact gates from step 5 and print before-and-after side by side. Zero errors means zero — not
 zero after a disable, not zero because a rule was dropped, not zero because a test was skipped.
@@ -277,7 +317,7 @@ If a gate cannot pass without a decision the owner has not made, the run reports
 count that remains. **A partly repaired repository honestly reported is worth more than a green one that
 lies.**
 
-### 13 — Close the phase
+### 14 — Close the phase
 
 Close with the applied revision, the baseline commit, the tracked diff and the two count tables.
 
@@ -285,8 +325,8 @@ Close with the applied revision, the baseline commit, the tracked diff and the t
 
 - The route is stale → name the field that failed and end this run.
 - A gate can only pass by silencing a finding → stop; that is the one thing this skill exists to refuse.
-- A lint rule contradicts the canon it claims to enforce → stop; that is a trust-tree change, not a
-  product repair.
+- A lint rule contradicts an explicit accepted canon → classify the machine as stale and repair its
+  adoption; stop only when the canon itself does not settle the behaviour.
 - The tree is already dirty with unrelated work → stop; a baseline taken from mixed state proves nothing
   and the diff will not be readable.
 - A `.claude/` in a target checkout holds tracked files or real content → stop the remnant pass and return
@@ -301,7 +341,8 @@ Close with the applied revision, the baseline commit, the tracked diff and the t
 
 The six tables from the skill shape, in order. `OUTPUTS` carries the before-and-after counts per gate;
 `CHANGES` names every path in each pass, and says which pass each belongs to, marking a remnant path
-`removed` rather than `repaired`; `NEED APPROVALS` carries one row per `decision`, including each
+`removed` rather than `repaired`; it also records empty retired directories removed outside Git and every
+migration from `shells` to its accepted tier. `NEED APPROVALS` carries one row per `decision`, including each
 remnant proposed for removal with its recursive file count; `WARNINGS` carries every autofix hunk that changed more than formatting;
 `REJECTED` carries the owner's words on any repair they refused; `OWED` carries the findings still
 standing and the exact command that reproduces them.
