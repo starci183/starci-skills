@@ -2,15 +2,37 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkContextFile } from "./compile-context.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const findings = [];
+const mode = process.argv[2] ?? "--all";
+const modeLanes = new Map([
+  ["--all", ["context", "en", "vi"]],
+  ["--context", ["context"]],
+  ["--en", ["en"]],
+  ["--vi", ["vi"]],
+]);
+if (!modeLanes.has(mode) || process.argv.length > 3) {
+  console.error("Usage: node scripts/check-deps.mjs [--all|--context|--en|--vi]");
+  process.exit(2);
+}
+const selectedLanes = new Set(modeLanes.get(mode));
+const findings = { context: [], en: [], vi: [] };
 const packageCache = new Map();
 
+function laneFor(file) {
+  if (file.endsWith(`${sep}context.md`) || file.endsWith(`${sep}SKILL.md`) || file === join(root, "INDEX.md")) return "context";
+  if (file.endsWith(`${sep}en.md`)) return "en";
+  if (file.endsWith(`${sep}vi.md`)) return "vi";
+  return null;
+}
+
 function report(file, line, message) {
-  findings.push(`${relative(root, file).split(sep).join("/")}:${line}: ${message}`);
+  const lane = laneFor(file);
+  if (!lane || !selectedLanes.has(lane)) return;
+  findings[lane].push(`${relative(root, file).split(sep).join("/")}:${line}: ${message}`);
 }
 
 function markdownFiles(directory) {
@@ -35,7 +57,8 @@ function sectionEnd(lines, start) {
   return lines.length;
 }
 
-function parseLoads(file, lines) {
+function parseLoads(file, lines, lane) {
+  const runtime = lane === "context";
   const h1 = lines.findIndex((line) => /^# (?!#)/.test(line));
   if (h1 < 0) {
     report(file, 1, "missing document title");
@@ -44,8 +67,9 @@ function parseLoads(file, lines) {
 
   let first = h1 + 1;
   while (first < lines.length && lines[first].trim() === "") first += 1;
-  if (lines[first] !== "## LOADS") {
-    report(file, first + 1, "LOADS must be the first section after the title");
+  if (!runtime) first = lines.findIndex((line) => line === "## LOADS");
+  if (first < 0 || lines[first] !== "## LOADS") {
+    if (runtime) report(file, Math.max(first + 1, 1), "LOADS must be the first section after the title");
     return { rows: [], start: -1, end: -1 };
   }
 
@@ -58,7 +82,7 @@ function parseLoads(file, lines) {
   const rows = [];
   const aliases = new Set();
   const targets = new Set();
-  const rowPattern = /^\| `(@[a-z][a-z0-9-]*)` \| `([^`]+)` \| (module|script|file|npm package|URL) \| ([^|]+) \|$/;
+  const rowPattern = /^\| `(@[a-z][a-z0-9-]*)` \| `([^`]+)` \| (module|context|en|vi|script|file|npm package|URL) \| ([^|]+) \|$/;
   for (let index = first + 1; index < end; index += 1) {
     const line = lines[index];
     if (!line.startsWith("| `@")) continue;
@@ -76,7 +100,7 @@ function parseLoads(file, lines) {
     rows.push({ alias, target, kind, line: index + 1 });
   }
 
-  const hasNone = lines.slice(first + 1, end).some((line) => line.trim() === "None.");
+  const hasNone = lines.slice(first + 1, end).some((line) => /^(?:None|Không có)\./.test(line.trim()));
   if (rows.length === 0 && !hasNone) report(file, first + 1, "empty LOADS must say None.");
   if (rows.length > 0 && hasNone) report(file, first + 1, "LOADS cannot contain rows and None.");
   return { rows, start: first, end };
@@ -87,19 +111,39 @@ function npmBase(target) {
   return target.split("/")[0];
 }
 
-function resolveTarget(file, row) {
+function resolveTarget(file, row, lane) {
   const { alias, target, kind, line } = row;
-  if (kind === "module" || kind === "file" || kind === "script") {
+  if (kind === "module") {
+    if (lane === "context") {
+      report(file, line, `runtime graph cannot load a directory module: ${target}`);
+      return;
+    }
+    const path = resolve(root, target);
+    if (!existsSync(path) || !statSync(path).isDirectory()) {
+      report(file, line, `dead publication module for ${alias}: ${target}`);
+      return;
+    }
+    const publicationName = `${lane}.md`;
+    const hasPublication = readdirSync(path, { recursive: true, withFileTypes: true })
+      .some((entry) => entry.isFile() && entry.name === publicationName);
+    if (!hasPublication) report(file, line, `${lane} publication module has no ${publicationName}: ${target}`);
+    return;
+  }
+  if (kind === "context" || kind === "en" || kind === "vi" || kind === "file" || kind === "script") {
     const path = resolve(root, target);
     if (!existsSync(path)) {
       report(file, line, `dead target for ${alias}: ${target}`);
       return;
     }
-    if (kind === "module" && !statSync(path).isDirectory()) {
-      report(file, line, `module target is not a directory: ${target}`);
-    }
-    if ((kind === "file" || kind === "script") && !statSync(path).isFile()) {
+    if (!statSync(path).isFile()) {
       report(file, line, `${kind} target is not a file: ${target}`);
+    }
+    const expectedKind = lane === "context" ? "context" : lane;
+    if (["context", "en", "vi"].includes(kind) && kind !== expectedKind) {
+      report(file, line, `${lane} graph cannot load ${kind} target: ${target}`);
+    }
+    if (["context", "en", "vi"].includes(kind) && !target.endsWith(`/${kind}.md`)) {
+      report(file, line, `${kind} target must end in /${kind}.md: ${target}`);
     }
     if (kind === "script" && !target.endsWith(".mjs")) {
       report(file, line, `script target must be an .mjs file: ${target}`);
@@ -216,31 +260,31 @@ function validateSkillNames(file, lines, nested) {
   }
 }
 
-function validateBody(file, lines, loads, nested, knownAliases) {
+function validateBody(file, lines, loads, nested, lane) {
   const body = withoutSections(lines, [loads, nested].filter(({ start }) => start >= 0));
-  for (const row of loads.rows) {
-    const pattern = new RegExp(`(^|[^a-z0-9-])${row.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9-]|/)`, "g");
-    const matches = [...body.matchAll(pattern)];
-    if (matches.length === 0) report(file, row.line, `dead LOADS row: ${row.alias}`);
-  }
-
-  const declared = new Set(loads.rows.map(({ alias }) => alias));
-  for (const match of body.matchAll(/(^|[^\w/])(@[a-z][a-z0-9-]*)(?![a-z0-9-]|\/)/gm)) {
-    const alias = match[2];
-    if (knownAliases.has(alias) && !declared.has(alias)) {
-      report(file, lineAt(body, match.index), `smuggled alias: ${alias}`);
+  const expectedName = lane === "context" ? "context.md" : `${lane}.md`;
+  for (const match of body.matchAll(/\[[^\]]+\]\(([^)]+\.md)(?:#[^)]+)?\)/g)) {
+    const target = match[1].replace(/^<|>$/g, "");
+    if (/^https?:\/\//.test(target)) continue;
+    const targetPath = resolve(dirname(file), target);
+    if (!existsSync(targetPath)) report(file, lineAt(body, match.index), `dead ${lane} Markdown link: ${target}`);
+    else if (basename(targetPath) !== expectedName) {
+      report(file, lineAt(body, match.index), `${lane} graph crosses into ${basename(targetPath)}: ${target}`);
     }
   }
-
-  const forbidden = [
-    { pattern: /(?<!\!)\[[^\]]+\]\((?:\.{1,2}\/|https?:\/\/|<tree>\/)[^)]+\)/g, label: "outside Markdown link" },
-    { pattern: /@starci\/eslint-canon-(?:fe|be)(?:\/[a-z-]+)?/g, label: "undeclared npm package" },
-    { pattern: /<trust>\/scripts\/[a-z0-9.-]+\.mjs/g, label: "undeclared script" },
-    { pattern: /(?:contexts|brainstorms|compilers|gates|skills)\/[a-z0-9*<>._/-]+/g, label: "undeclared tree module" },
-    { pattern: /https?:\/\/[^\s)`]+/g, label: "undeclared URL" },
-  ];
-  for (const { pattern, label } of forbidden) {
-    for (const match of body.matchAll(pattern)) report(file, lineAt(body, match.index), `${label}: ${match[0].trim()}`);
+  for (const match of body.matchAll(/`([^`\n]*\/(context|en|vi)\.md)`/g)) {
+    const [, target, targetLane] = match;
+    if (target.includes("<")) continue;
+    const expectedLane = lane === "context" ? "context" : lane;
+    if (targetLane !== expectedLane) {
+      report(file, lineAt(body, match.index), `${lane} graph crosses into ${targetLane}.md: ${target}`);
+      continue;
+    }
+    const rootPath = resolve(root, target);
+    const relativePath = resolve(dirname(file), target);
+    if (!existsSync(rootPath) && !existsSync(relativePath)) {
+      report(file, lineAt(body, match.index), `dead ${lane} record path: ${target}`);
+    }
   }
 }
 
@@ -251,27 +295,32 @@ function outline(lines) {
 }
 
 function aliasesFor(rows) {
-  return rows.map(({ alias, target, kind }) => `${alias}\0${target}\0${kind}`);
+  return rows.map(({ alias, target, kind }) => {
+    const logicalTarget = target.replace(/\/(?:context|en|vi)\.md$/, "");
+    const logicalKind = ["module", "context", "en", "vi"].includes(kind) ? "record" : kind;
+    return `${alias}\0${logicalTarget}\0${logicalKind}`;
+  });
 }
 
-const files = markdownFiles(root);
+const files = markdownFiles(root).filter((file) => laneFor(file));
 const parsed = new Map();
 for (const file of files) {
   const text = readFileSync(file, "utf8");
   const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const loads = parseLoads(file, lines);
   const isSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/](?:SKILL|vi)\.md$/.test(file);
+  const isBindingSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/]SKILL\.md$/.test(file);
+  const isRuntimeModule = file.endsWith(`${sep}context.md`);
+  const lane = laneFor(file);
+  const loads = parseLoads(file, lines, lane);
   const nested = parseNested(file, lines, loads, isSkill);
-  parsed.set(file, { lines, loads, nested, isSkill });
+  parsed.set(file, { lines, loads, nested, lane, isSkill, isBindingSkill, isRuntimeModule });
 }
 
-const knownAliases = new Set(
-  [...parsed.values()].flatMap(({ loads }) => loads.rows.map(({ alias }) => alias)),
-);
 for (const [file, record] of parsed) {
-  const { lines, loads, nested, isSkill } = record;
-  loads.rows.forEach((row) => resolveTarget(file, row));
-  validateBody(file, lines, loads, nested, knownAliases);
+  const { lines, loads, nested, lane, isSkill } = record;
+  if (!selectedLanes.has(lane)) continue;
+  loads.rows.forEach((row) => resolveTarget(file, row, lane));
+  validateBody(file, lines, loads, nested, lane);
   if (isSkill) validateSkillNames(file, lines, nested);
   for (let index = 0; index < lines.length; index += 1) {
     if (/^### [0-9]+[a-z] —/.test(lines[index])) report(file, index + 1, "patched step label");
@@ -287,7 +336,7 @@ for (const [file, en] of parsed) {
     continue;
   }
   if (JSON.stringify(aliasesFor(en.loads.rows)) !== JSON.stringify(aliasesFor(vi.loads.rows))) {
-    report(viPath, vi.loads.start + 1, "LOADS aliases, targets or kinds differ from en.md");
+    report(viPath, Math.max(vi.loads.start + 1, 1), "LOADS logical dependencies differ from en.md");
   }
   if (JSON.stringify(outline(en.lines)) !== JSON.stringify(outline(vi.lines))) {
     report(viPath, 1, "section count or order differs from en.md");
@@ -307,6 +356,8 @@ for (const [file, en] of parsed) {
       report(viPath, index + 1, "translated fixed output heading");
     }
   }
+  const runtime = checkContextFile(file);
+  if (!runtime.ok) report(runtime.contextPath, 1, runtime.reason);
 }
 
 for (const [file, skill] of parsed) {
@@ -318,7 +369,7 @@ for (const [file, skill] of parsed) {
     continue;
   }
   if (JSON.stringify(aliasesFor(skill.loads.rows)) !== JSON.stringify(aliasesFor(vi.loads.rows))) {
-    report(viPath, vi.loads.start + 1, "LOADS aliases, targets or kinds differ from SKILL.md");
+    report(viPath, Math.max(vi.loads.start + 1, 1), "LOADS logical dependencies differ from SKILL.md");
   }
   if (JSON.stringify(outline(skill.lines)) !== JSON.stringify(outline(vi.lines))) {
     report(viPath, 1, "section count or order differs from SKILL.md");
@@ -329,10 +380,15 @@ for (const [file, skill] of parsed) {
   }
 }
 
-if (findings.length) {
-  console.error(findings.join("\n"));
-  console.error(`\n${findings.length} finding(s)`);
+const selectedFindings = [...selectedLanes].flatMap((lane) => findings[lane]);
+if (selectedFindings.length) {
+  console.error(selectedFindings.join("\n"));
+  console.error(`\n${selectedFindings.length} finding(s)`);
   process.exit(1);
 }
 
-console.log(`Dependency contract holds for ${files.length} Markdown files.`);
+const labels = { context: "Runtime context", en: "English publication", vi: "Vietnamese publication" };
+for (const lane of selectedLanes) {
+  const count = [...parsed.values()].filter((record) => record.lane === lane).length;
+  console.log(`${labels[lane]} dependency graph holds for ${count} record(s).`);
+}

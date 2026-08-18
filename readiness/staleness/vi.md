@@ -8,14 +8,14 @@ title: Stale registry
 
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@stale-source-gates` | `readiness/staleness/source-gates` | module | declared project gate và source finding |
-| `@stale-port-offset` | `readiness/staleness/port-offset` | module | family offset, application slot và collision proof do Source sở hữu |
-| `@stale-lint-machine` | `readiness/staleness/lint-machine` | module | canon adoption và vendored-rule detection |
-| `@stale-strict-fix` | `readiness/staleness/strict-fix` | module | first-party Prettier integration |
-| `@stale-why` | `readiness/staleness/why` | module | contract index findability |
-| `@stale-assurance` | `readiness/staleness/assurance` | module | applicability và delivery fence của frontend lẫn backend |
-| `@stale-retired-structure` | `readiness/staleness/retired-structure` | module | component tier đã bỏ, kể cả path rỗng |
-| `@stale-remnant` | `readiness/staleness/remnant` | module | legacy `.claude/` tree nested |
+| `@stale-source-gates` | `readiness/staleness/source-gates/vi.md` | vi | declared project gate và source finding |
+| `@stale-port-offset` | `readiness/staleness/port-offset/vi.md` | vi | family offset, application slot và collision proof do Source sở hữu |
+| `@stale-lint-machine` | `readiness/staleness/lint-machine/vi.md` | vi | canon adoption và vendored-rule detection |
+| `@stale-strict-fix` | `readiness/staleness/strict-fix/vi.md` | vi | first-party Prettier integration |
+| `@stale-why` | `readiness/staleness/why/vi.md` | vi | contract index findability |
+| `@stale-assurance` | `readiness/staleness/assurance/vi.md` | vi | applicability và delivery fence của frontend lẫn backend |
+| `@stale-retired-structure` | `readiness/staleness/retired-structure/vi.md` | vi | component tier đã bỏ, kể cả path rỗng |
+| `@stale-remnant` | `readiness/staleness/remnant/vi.md` | vi | legacy `.claude/` tree nested |
 
 ## Mục đích
 

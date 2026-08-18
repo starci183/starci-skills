@@ -12,9 +12,9 @@ title: Frontend design execute · Vietnamese
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token được duyệt trong layout |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve file, export và ranh giới import |
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
-| `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session graph trước production write |
-| `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 
 ## NESTED SKILLS
 

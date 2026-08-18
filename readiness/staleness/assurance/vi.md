@@ -8,8 +8,8 @@ title: Delivery assurance
 
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | backend fence bảy phần có thẩm quyền |
-| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance` | module | frontend fence bảy phần có thẩm quyền |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/vi.md` | vi | backend fence bảy phần có thẩm quyền |
+| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/vi.md` | vi | frontend fence bảy phần có thẩm quyền |
 
 ## Dấu hiệu stale
 

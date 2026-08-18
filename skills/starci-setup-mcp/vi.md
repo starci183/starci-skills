@@ -8,11 +8,11 @@ title: starci-setup-mcp
 
 | Alias | Đích | Loại | Lý do |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | contract approval và output dùng chung |
-| `@workspaces` | `contexts/workspaces` | module | resolve và xác minh mọi project/role được yêu cầu |
-| `@mcp` | `mcp` | module | contract Qdrant, index và publication toàn Source |
-| `@embedding` | `mcp/embedding` | module | cài Ollama và chọn model theo phần cứng |
-| `@clients` | `mcp/clients` | module | cài client Codex/OpenAI và Claude Code |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract approval và output dùng chung |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và xác minh mọi project/role được yêu cầu |
+| `@mcp` | `mcp/vi.md` | vi | contract Qdrant, index và publication toàn Source |
+| `@embedding` | `mcp/embedding/vi.md` | vi | cài Ollama và chọn model theo phần cứng |
+| `@clients` | `mcp/clients/vi.md` | vi | cài client Codex/OpenAI và Claude Code |
 | `@source-context` | `scripts/qdrant-source-context.mjs` | script | setup Docker và refresh partition deterministic |
 | `@client-setup` | `scripts/mcp-client-setup.mjs` | script | public smoke và cài cả hai client theo cách idempotent |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | reconcile tunnel và DNS mà không lộ value |

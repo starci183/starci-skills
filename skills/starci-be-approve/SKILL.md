@@ -9,7 +9,7 @@ description: Challenge a backend plan against real schema and sibling code, loop
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
 
 ## NESTED SKILLS
 

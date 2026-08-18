@@ -1,0 +1,99 @@
+---
+title: Runbooks
+runtime: true
+source: en.md
+sourceHash: ec998c51b678fe6d8bd14e55aa991a4cd27300e8abebf642a7a8c06bb9148354
+contextVersion: 1
+---
+
+# StarCi runbooks
+
+## LOADS
+
+None.
+
+Runbooks turn an operational need into a repeatable command sequence grounded in the repository that
+owns it. They are not architecture laws and they never carry runtime values. A runbook names the
+provider surface, repository command, encrypted owner, verification signal, safe stop and rotation
+boundary so the next operator does not have to reconstruct the system from source.
+
+## Operator contract
+
+Every runbook follows the same order:
+
+1. **Use when** — the situation that selects the page.
+2. **Before** — access, tools and source state that must already exist.
+3. **Secrets** — names and encrypted owners only; never values.
+4. **Run** — commands copied from the repository's real wrappers.
+5. **Verify** — an observable result, not “the command returned zero” alone.
+6. **Stop or rollback** — the safe inverse and what data it preserves.
+7. **Rotate** — which external and local records must change together.
+8. **Troubleshoot** — exact first checks for known failure shapes.
+9. **Upstream** — the provider's primary documentation when its UI or API may change.
+
+Commands run from `D:\Repositories\starci-academy-backend` unless a page says otherwise. Never call
+`docker compose` directly for the development stack: `npm run compose` renders the port and credential
+bridge from `metadata.json` and the stack records first.
+
+## Start here
+
+| Need | Runbook |
+|---|---|
+| Install tools, create encrypted records, sync, rotate or recover a credential | `secrets/context.md` |
+| Start/stop the complete local platform or diagnose one backing service | `local-stack/context.md` |
+| Configure Keycloak, Google login or GitHub login | `oauth/context.md` |
+| Configure cAdvisor, Prometheus and Grafana Cloud remote write | `observability/context.md` |
+| Configure Husky, GitHub CI, Codecov Cloud and SonarQube Cloud | `delivery-assurance-cloud/context.md` |
+| Configure payments, email, AI pools, remote S3, GCP or GitHub/data tokens | `external-integrations/context.md` |
+
+## Complete component registry
+
+| Component | Owner on disk | Runbook |
+|---|---|---|
+| PostgreSQL | `.stacks/dev/infra/compose/postgres.yaml` | Local stack |
+| Redis cache/BullMQ/throttler/socket adapter | `.stacks/dev/infra/compose/redis.yaml` | Local stack |
+| Elasticsearch | `.stacks/dev/infra/compose/elasticsearch.yaml` | Local stack |
+| Qdrant | `.stacks/dev/infra/compose/qdrant.yaml` | Local stack |
+| Kafka KRaft | `.stacks/dev/infra/compose/kafka.yaml` | Local stack |
+| MinIO/S3 development bucket | `.stacks/dev/infra/compose/minio.yaml` | Local stack |
+| NATS JetStream | `.stacks/dev/infra/compose/nats.yaml` | Local stack |
+| Keycloak | `.stacks/dev/infra/compose/keycloak.yaml` | OAuth + Local stack |
+| cAdvisor | `.stacks/dev/infra/compose/cadvisor.yaml` | Observability |
+| Prometheus | `.stacks/dev/infra/compose/prometheus.yaml` | Observability |
+| Grafana Cloud Metrics | `.stacks/dev/infra/compose/prometheus/prometheus.yml` | Observability |
+| Google OAuth via Keycloak | Keycloak IdP + app callback config | OAuth |
+| GitHub OAuth/broker | GitHub OAuth App + Keycloak IdP | OAuth |
+| Husky/GitHub Actions | `.husky/`, `.github/workflows/` | Delivery assurance cloud |
+| Codecov Cloud | `codecov.yml` | Delivery assurance cloud |
+| SonarQube Cloud | `sonar-project.properties` | Delivery assurance cloud |
+| PayOS, SePay, Stripe, PayPal, NOWPayments | `scripts/credentials.mjs` | External integrations |
+| Brevo SMTP | `scripts/credentials.mjs` | External integrations |
+| OpenAI, Gemini, OpenRouter, Anthropic, local Qwen | `scripts/credentials.mjs` | External integrations |
+| DigitalOcean/S3 and Google service account | `scripts/credentials.mjs` | External integrations |
+| GitHub/data repository tokens, Judge0 and admin API | `scripts/credentials.mjs` | External integrations |
+
+## Fast path
+
+For a fresh development machine after the SOPS identity has been restored:
+
+```powershell
+npm ci
+npm run secret:gen -- dev
+npm run sync
+npm run compose
+npm run start:dev
+```
+
+The first command installs Husky. `secret:gen` creates only repository-owned infrastructure
+credentials; it cannot invent third-party provider keys. `sync` decrypts approved records into ignored
+runtime paths and writes the generated env bridge. `compose` refuses to start if a required credential
+file is absent.
+
+## Rules
+
+1. A token value is entered only through a hidden prompt or provider UI; never as a command argument.
+2. Only `*.enc` credential twins are committed. Plaintext siblings are a failed run, not an artifact.
+3. A provider token and its GitHub/stack projections rotate in one change.
+4. `down -v` is destructive and is never a routine restart command.
+5. A third-party credential is imported or replaced, never generated by `secret:gen`.
+6. A runbook link to upstream documentation is rechecked before a provider-side mutation.

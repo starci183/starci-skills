@@ -9,8 +9,8 @@ description: "Make a Source ready through four identity-first boundaries: machin
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
-| `@initialization` | `readiness/initialization` | module | the identity-first boundaries and the owner of each init verdict |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
+| `@initialization` | `readiness/initialization/context.md` | context | the identity-first boundaries and the owner of each init verdict |
 
 ## NESTED SKILLS
 
@@ -18,7 +18,7 @@ None. This skill never invokes another skill.
 
 ## Run
 
-Read `@skill-shape`, then `@initialization`. From it, load the four English modules in registry order:
+Read `@skill-shape`, then `@initialization`. From it, load the four runtime context modules in registry order:
 `identity`, `bootstrap`, `workspaces`, `worktrees`. Never load the Vietnamese publication records while
 running.
 

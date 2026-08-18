@@ -9,11 +9,11 @@ description: Open or resume a hash-bound frontend design session, generate 3–4
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | Supplies the shared interaction and approval contract. |
-| `@workspaces` | `contexts/workspaces` | module | Resolves and verifies the frontend checkout this run reads. |
-| `@worktrees` | `contexts/worktrees` | module | Separates durable decision records from disposable preview work. |
-| `@directions` | `brainstorms/directions` | module | Generates the visual choice that every layout candidate embeds. |
-| `@layouts` | `brainstorms/layouts` | module | Defines structural regions, axes, contract verdicts and output. |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | Supplies the shared interaction and approval contract. |
+| `@workspaces` | `contexts/workspaces/context.md` | context | Resolves and verifies the frontend checkout this run reads. |
+| `@worktrees` | `contexts/worktrees/context.md` | context | Separates durable decision records from disposable preview work. |
+| `@directions` | `brainstorms/directions/context.md` | context | Generates the visual choice that every layout candidate embeds. |
+| `@layouts` | `brainstorms/layouts/context.md` | context | Defines structural regions, axes, contract verdicts and output. |
 | `@contract-search` | `scripts/contract-search.mjs` | script | Queries contract reasons without exposing class arrays. |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | Produces the live token inventory used by direction candidates. |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |

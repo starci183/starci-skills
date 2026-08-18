@@ -8,8 +8,8 @@ title: starci-repair
 
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | contract chung về phase, approval và output |
-| `@staleness` | `readiness/staleness` | module | taxonomy và router duy nhất cho mọi repair module |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract chung về phase, approval và output |
+| `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy và router duy nhất cho mọi repair module |
 
 ## NESTED SKILLS
 
@@ -55,7 +55,7 @@ contract khi declared. Dừng trước target-source read nếu route absent, in
 
 ### 2 — Đọc manifest và chọn module
 
-Đọc repository manifest và gate script hiện có. Chọn module theo rule trên, rồi đọc trọn English record của
+Đọc repository manifest và gate script hiện có. Chọn module theo rule trên, rồi đọc trọn runtime context record của
 từng module trước inventory. Không chạy end-to-end suite trừ khi request gọi tên.
 
 ### 3 — Lập baseline state

@@ -8,27 +8,27 @@ title: Docs
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
-| `@brainstorms` | `brainstorms` | module | produce candidates before a shape is accepted |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
+| `@brainstorms` | `brainstorms/context.md` | context | produce candidates before a shape is accepted |
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
-| `@compilers` | `compilers` | module | compile an accepted shape into one answer |
-| `@contexts` | `contexts` | module | resolve where reads and writes occur |
-| `@deployment` | `deployment` | module | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
+| `@compilers` | `compilers/context.md` | context | compile an accepted shape into one answer |
+| `@contexts` | `contexts/context.md` | context | resolve where reads and writes occur |
+| `@deployment` | `deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
-| `@gates` | `gates` | module | judge existing code with evidence |
-| `@initialization` | `readiness/initialization` | module | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
-| `@mcp` | `mcp` | module | build and expose routed source context through isolated read-only MCP services |
-| `@patterns` | `compilers/patterns` | module | resolve files and import boundaries |
+| `@gates` | `gates/context.md` | context | judge existing code with evidence |
+| `@initialization` | `readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
+| `@mcp` | `mcp/context.md` | context | build and expose routed source context through isolated read-only MCP services |
+| `@patterns` | `compilers/patterns/context.md` | context | resolve files and import boundaries |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | prove Source family offsets, application slots, projections and local listener uniqueness |
-| `@principles` | `compilers/principles` | module | resolve classes from accepted situations |
-| `@skill-shape` | `skills/skill-shape` | module | load the shared reporting contract when a skill runs |
-| `@skills` | `skills` | module | locate the capability registry |
-| `@staleness` | `readiness/staleness` | module | share one stale taxonomy and category modules between inventory and repair |
+| `@principles` | `compilers/principles/context.md` | context | resolve classes from accepted situations |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | load the shared reporting contract when a skill runs |
+| `@skills` | `skills/context.md` | context | locate the capability registry |
+| `@staleness` | `readiness/staleness/context.md` | context | share one stale taxonomy and category modules between inventory and repair |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
-| `@workspaces` | `contexts/workspaces` | module | resolve Source-wide defaults and verify role routes |
-| `@worktrees` | `contexts/worktrees` | module | resolve durable write roots |
+| `@workspaces` | `contexts/workspaces/context.md` | context | resolve Source-wide defaults and verify role routes |
+| `@worktrees` | `contexts/worktrees/context.md` | context | resolve durable write roots |
 
 
 ## Record
@@ -116,17 +116,27 @@ under pressure:
 
 ## Authoring
 
-Every module is one document in two records: `en.md` for the agent, `vi.md` for the human. They match
-section for section and neither refers to the other. A shelf may carry its own `en.md`, which becomes
-that shelf's page.
+Every module has two human records and one runtime record. `en.md` is the complete English reference,
+`vi.md` is the complete Vietnamese reference, and derived `context.md` is the sole module record an
+agent loads. The human records match section for section and neither is an alternate runtime law. A
+shelf may carry the same three records, with its `context.md` acting as the runtime router.
 
 Every capability follows the same publication rule without changing the runtime contract: `SKILL.md`
 remains the binding agent entry, while `vi.md` beside it is the complete Vietnamese record for a human
 reader. Both publish under the capability's own route.
 
-**A running skill loads English only:** its binding `SKILL.md`, then `en.md` for every paired module it
-needs. It never loads `vi.md`; that record is human-facing publication, not an alternate instruction
-source.
+**A running skill loads runtime records only:** its binding `SKILL.md`, then `context.md` for every
+paired module it needs. It never loads `en.md` or `vi.md`; both are human-facing publication, not
+alternate instruction sources. `context.md` is derived from `en.md`, carries its source hash, and may
+be curated for compactness as long as binding sections and situation identities remain covered. Use
+the compiler to write a safe baseline, refresh metadata after an intentional curation, and check the
+contract whenever either record changes.
+
+Dependency validation is three separate graphs. Runtime `context.md`, binding `SKILL.md`, and this
+index may load internal `context` targets only. English publication records load `en` targets;
+Vietnamese publication records load `vi` targets. A human publication shelf may use `module` only
+when it has no shelf record and the selected language exists below it. Run `check-deps.mjs --context`,
+`--en`, and `--vi` independently, or `--all` for the three verdicts together.
 
 **One tier, two layouts.** A frontend is either **single-app**, keeping the component tree at
 `src/components/*`, or a **monorepo**, keeping the same tree under the same tier names in a shared

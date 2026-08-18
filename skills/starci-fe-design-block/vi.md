@@ -11,9 +11,9 @@ title: Frontend design block · Vietnamese
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | kiểm tra JSON mô tả anatomy của block |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token đã bind trong layout |
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
-| `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
-| `@worktrees` | `contexts/worktrees` | module | kiểm tra registry và preview root |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra registry và preview root |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
 
 ## NESTED SKILLS

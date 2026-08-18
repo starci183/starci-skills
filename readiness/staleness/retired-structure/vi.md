@@ -8,7 +8,7 @@ title: Retired structure
 
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@file-layout` | `compilers/patterns/fe/file-layout` | module | component-tier vocabulary đã accept |
+| `@file-layout` | `compilers/patterns/fe/file-layout/vi.md` | vi | component-tier vocabulary đã accept |
 
 ## Dấu hiệu stale
 

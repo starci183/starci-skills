@@ -8,10 +8,10 @@ title: Initialization readiness
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@initialization-identity` | `readiness/initialization/identity` | module | machine decrypt readiness |
-| `@initialization-bootstrap` | `readiness/initialization/bootstrap` | module | agent entry routing |
-| `@initialization-workspaces` | `readiness/initialization/workspaces` | module | Source language and read routes |
-| `@initialization-worktrees` | `readiness/initialization/worktrees` | module | project write roots |
+| `@initialization-identity` | `readiness/initialization/identity/en.md` | en | machine decrypt readiness |
+| `@initialization-bootstrap` | `readiness/initialization/bootstrap/en.md` | en | agent entry routing |
+| `@initialization-workspaces` | `readiness/initialization/workspaces/en.md` | en | Source language and read routes |
+| `@initialization-worktrees` | `readiness/initialization/worktrees/en.md` | en | project write roots |
 
 ## Registry
 

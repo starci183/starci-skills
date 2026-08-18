@@ -8,8 +8,8 @@ title: starci-stale-list
 
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | output và authority contract chung |
-| `@staleness` | `readiness/staleness` | module | taxonomy/router duy nhất dùng chung với repair |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | output và authority contract chung |
+| `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy/router duy nhất dùng chung với repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | Source allocation và collision measurement deterministic |
 

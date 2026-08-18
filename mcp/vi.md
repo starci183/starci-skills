@@ -6,12 +6,12 @@ title: Ngữ cảnh MCP
 
 ## LOADS
 
-| Alias | Đích | Dùng khi |
-|---|---|---|
-| `@mcp-qdrant` | `mcp/qdrant` | chuẩn bị hoặc kiểm tra dịch vụ vector cục bộ và runtime MCP |
-| `@mcp-embedding` | `mcp/embedding` | đo phần cứng, cài Ollama và chọn một embedding profile đã khóa dimension |
-| `@mcp-source-context` | `mcp/source-context` | lập chỉ mục một hay nhiều role workspace đã xác minh và sinh cấu hình client |
-| `@mcp-clients` | `mcp/clients` | cài endpoint remote đã xác minh vào cả Codex/OpenAI và Claude Code |
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@mcp-qdrant` | `mcp/qdrant/vi.md` | vi | chuẩn bị hoặc kiểm tra dịch vụ vector cục bộ và runtime MCP |
+| `@mcp-embedding` | `mcp/embedding/vi.md` | vi | đo phần cứng, cài Ollama và chọn một embedding profile đã khóa dimension |
+| `@mcp-source-context` | `mcp/source-context/vi.md` | vi | lập chỉ mục một hay nhiều role workspace đã xác minh và sinh cấu hình client |
+| `@mcp-clients` | `mcp/clients/vi.md` | vi | cài endpoint remote đã xác minh vào cả Codex/OpenAI và Claude Code |
 
 ## Mục đích
 

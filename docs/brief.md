@@ -6,9 +6,9 @@ title: StarCi Skills
 
 Turn a loose product request into reviewed decisions, bounded source changes, and machine-checkable proof.
 
-> **Agent runtime is English-only.** A skill starts from its binding `SKILL.md`. Whenever that skill
-> loads a paired module, it must load `en.md`. **Never load `vi.md` during a skill run.** Vietnamese
-> records are published only for human review and never supply runtime instructions.
+> **Agent runtime loads compact context records.** A skill starts from its binding `SKILL.md`. Whenever
+> that skill reaches a paired module, it loads `context.md`. The complete `en.md` and `vi.md` records
+> are published for human review and never supply runtime instructions.
 
 ## What this tree does
 
@@ -81,13 +81,13 @@ the page layout; the session records which accepted layout makes that block reac
 
 ## Runtime reading rule
 
-The English record is authoritative for agents:
+The compact context record is authoritative for agents:
 
 1. Load the selected skill's `SKILL.md` completely.
 2. Follow its `LOADS` table and numbered steps.
-3. For every paired module, load `en.md` only.
-4. Do not load `vi.md`, translate from it, or combine it with English instructions.
-5. Treat `vi.md` only as a published human-readable record.
+3. For every reached paired module, load `context.md` only.
+4. Do not combine `en.md` or `vi.md` with runtime instructions.
+5. Treat `en.md` and `vi.md` as complete published records for human readers.
 
 Browse the detailed modules from the sidebar when you need the underlying laws, schemas, compilers, or
 gates. The landing page stays brief; the binding details remain in their owning records.

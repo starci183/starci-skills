@@ -9,9 +9,9 @@ description: Set up the shared Docker SonarQube service for routed StarCi projec
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | shared approval and output contract |
-| `@workspaces` | `contexts/workspaces` | module | resolve the backend owner and target projects |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | scanner, token, coverage and quality-gate contract |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and output contract |
+| `@workspaces` | `contexts/workspaces/context.md` | context | resolve the backend owner and target projects |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | scanner, token, coverage and quality-gate contract |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | value-safe tunnel and DNS reconciliation |
 
 ## NESTED SKILLS

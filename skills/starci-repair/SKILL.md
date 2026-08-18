@@ -9,8 +9,8 @@ description: Take a routed source that is red, structurally stale, port-conflict
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | shared phase, approval and output contract |
-| `@staleness` | `readiness/staleness` | module | the one taxonomy and router for every repair module |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | shared phase, approval and output contract |
+| `@staleness` | `readiness/staleness/context.md` | context | the one taxonomy and router for every repair module |
 
 ## NESTED SKILLS
 
@@ -57,7 +57,7 @@ frontend contract when declared. Stop before target-source reads if the route is
 ### 2 — Read manifest and select modules
 
 Read the repository manifest and existing gate scripts. Select modules using the rules above, then read
-each selected English record completely before inventory. Do not run end-to-end suites unless the request
+each selected runtime context record completely before inventory. Do not run end-to-end suites unless the request
 names them.
 
 ### 3 — Establish the baseline state

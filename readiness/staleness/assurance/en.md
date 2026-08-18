@@ -8,8 +8,8 @@ title: Delivery assurance
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | authoritative seven-part backend fence |
-| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance` | module | authoritative seven-part frontend fence |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/en.md` | en | authoritative seven-part backend fence |
+| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/en.md` | en | authoritative seven-part frontend fence |
 
 ## Stale signature
 

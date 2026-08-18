@@ -12,9 +12,9 @@ description: Produce 3–4 block anatomy JSON candidates for each region under a
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | validate block anatomy JSON |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest bound by the accepted layout |
 | `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
-| `@workspaces` | `contexts/workspaces` | module | resolve and verify the frontend checkout |
-| `@worktrees` | `contexts/worktrees` | module | verify registry ownership and preview roots |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
+| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
+| `@worktrees` | `contexts/worktrees/context.md` | context | verify registry ownership and preview roots |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
 ## NESTED SKILLS

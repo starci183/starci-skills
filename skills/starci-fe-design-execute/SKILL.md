@@ -9,13 +9,13 @@ description: Implement an accepted frontend design in the real frontend source â
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@lints-fe` | `gates/fe/lints` | module | prove the frontend source at its real gate |
+| `@lints-fe` | `gates/fe/lints/context.md` | context | prove the frontend source at its real gate |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest approved inside each layout |
-| `@patterns-fe` | `compilers/patterns/fe` | module | resolve files, exports and import boundaries |
+| `@patterns-fe` | `compilers/patterns/fe/context.md` | context | resolve files, exports and import boundaries |
 | `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the session graph before production work |
-| `@workspaces` | `contexts/workspaces` | module | resolve and verify the frontend checkout |
+| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
 
 ## NESTED SKILLS
 

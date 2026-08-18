@@ -10,8 +10,8 @@ title: Deployment
 |---|---|---|---|
 | `@schema` | `deployment/schema.json` | file | validate one environment's durable deployment intent |
 | `@deployment-plan` | `scripts/deployment-plan.mjs` | script | resolve routed roles and materialize a value-free ignored execution root |
-| `@workspaces` | `contexts/workspaces` | module | prove every repository named by the deployment |
-| `@worktrees` | `contexts/worktrees` | module | keep durable intent separate from rebuildable execution state |
+| `@workspaces` | `contexts/workspaces/en.md` | en | prove every repository named by the deployment |
+| `@worktrees` | `contexts/worktrees/en.md` | en | keep durable intent separate from rebuildable execution state |
 
 ## Record
 

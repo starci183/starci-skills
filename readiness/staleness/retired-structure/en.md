@@ -8,7 +8,7 @@ title: Retired structure
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@file-layout` | `compilers/patterns/fe/file-layout` | module | accepted component-tier vocabulary |
+| `@file-layout` | `compilers/patterns/fe/file-layout/en.md` | en | accepted component-tier vocabulary |
 
 ## Stale signature
 

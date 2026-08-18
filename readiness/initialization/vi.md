@@ -8,10 +8,10 @@ title: Trạng thái sẵn sàng khởi tạo
 
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
-| `@initialization-identity` | `readiness/initialization/identity` | module | machine decrypt readiness |
-| `@initialization-bootstrap` | `readiness/initialization/bootstrap` | module | route agent entry |
-| `@initialization-workspaces` | `readiness/initialization/workspaces` | module | ngôn ngữ Source và read route |
-| `@initialization-worktrees` | `readiness/initialization/worktrees` | module | write root của project |
+| `@initialization-identity` | `readiness/initialization/identity/vi.md` | vi | machine decrypt readiness |
+| `@initialization-bootstrap` | `readiness/initialization/bootstrap/vi.md` | vi | route agent entry |
+| `@initialization-workspaces` | `readiness/initialization/workspaces/vi.md` | vi | ngôn ngữ Source và read route |
+| `@initialization-worktrees` | `readiness/initialization/worktrees/vi.md` | vi | write root của project |
 
 ## Registry
 

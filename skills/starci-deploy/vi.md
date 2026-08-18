@@ -8,9 +8,9 @@ title: StarCi deploy
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | contract approval, persistence và output dùng chung |
-| `@initialization` | `readiness/initialization` | module | readiness identity, bootstrap, routed workspace và worktree |
-| `@deployment` | `deployment` | module | luật manifest, `.infra`, setup, domain, deploy và monitor |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract approval, persistence và output dùng chung |
+| `@initialization` | `readiness/initialization/vi.md` | vi | readiness identity, bootstrap, routed workspace và worktree |
+| `@deployment` | `deployment/vi.md` | vi | luật manifest, `.infra`, setup, domain, deploy và monitor |
 
 ## NESTED SKILLS
 

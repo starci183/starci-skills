@@ -31,10 +31,21 @@ là request riêng của owner.
 
 ## Ngôn ngữ runtime
 
-Instruction runtime chỉ dùng tiếng Anh. Skill đọc `SKILL.md` binding của chính nó, sau đó đọc bản `en.md`
-của mọi module ghép cặp trong `LOADS`. Nó không bao giờ đọc `vi.md`, không dịch instruction từ đó và không
-trộn hai bản ghi. `vi.md` chỉ dành cho người đọc; đưa nó vào runtime sẽ làm một luật có hai cách diễn đạt và
-khiến contract được thực thi phụ thuộc vào lựa chọn ngôn ngữ.
+Instruction runtime chỉ đến từ runtime record. Skill đọc `SKILL.md` binding của chính nó, sau đó đọc
+`context.md` dẫn xuất của mọi module ghép cặp trong `LOADS`. Nó không bao giờ đọc `en.md` hoặc `vi.md`
+làm instruction và không trộn human record vào runtime. `en.md` là bản tham chiếu tiếng Anh đầy đủ,
+`vi.md` là bản tham chiếu tiếng Việt đầy đủ, còn `context.md` là binding record gọn được dẫn xuất từ
+`en.md` cùng source hash của nó.
+
+Compiler tạo baseline an toàn, giữ dependencies, Bản ghi và Luật, bảng routing và situation, boundary,
+quy trình vận hành, Quy tắc, Ngoại lệ, Đầu ra, Điểm dừng và Proof. Maintainer có thể lược các Ví dụ đã
+giải, Anchor, Phạm vi, prose ví dụ business phổ biến và diễn giải lịch sử ở nơi phân biệt đó an toàn.
+Source hash stale hoặc thiếu binding section là không hợp lệ; sau khi curate có chủ ý phải refresh
+metadata và chạy context contract check.
+
+Dependency graph bị ràng buộc theo ngôn ngữ: runtime record đọc `context.md`, publication tiếng Anh đọc
+`en.md`, còn publication tiếng Việt đọc `vi.md`. Kiểm tra ba graph độc lập; alias giống nhau mô tả cùng
+một dependency logic nhưng không dùng chung physical target record.
 
 Sau khi resolve Source và trước phản hồi đầu tiên cho người dùng, chạy `@workspace-language --source
 <Source>`. Giá trị `defaultLang` của nó quyết định ngôn ngữ cho mọi phần tường thuật và bằng chứng trong

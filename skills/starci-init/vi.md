@@ -8,8 +8,8 @@ title: Initialize Source · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@initialization` | `readiness/initialization` | module | các boundary identity-first và owner của từng init verdict |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@initialization` | `readiness/initialization/vi.md` | vi | các boundary identity-first và owner của từng init verdict |
 
 ## NESTED SKILLS
 
@@ -17,8 +17,8 @@ Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 
-Đọc `@skill-shape`, rồi `@initialization`. Từ đó, load bốn module tiếng Anh theo đúng thứ tự
-registry: `identity`, `bootstrap`, `workspaces`, `worktrees`; không load bản tiếng Việt dành cho publish.
+Đọc `@skill-shape`, rồi `@initialization`. Từ đó, load bốn runtime context module theo đúng thứ tự
+registry: `identity`, `bootstrap`, `workspaces`, `worktrees`; không load `en.md` hoặc `vi.md` dành cho người đọc.
 
 Project và role phải do user khai; boundary cần chúng sẽ dừng thay vì suy ra. Resolve từng module liên
 quan theo **evidence → action → proof**. Đo identity trước mọi boundary phía sau vì setup dùng credential

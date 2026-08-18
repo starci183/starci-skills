@@ -8,11 +8,11 @@ title: Frontend design layout · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | cung cấp interaction và approval contract chung |
-| `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
-| `@worktrees` | `contexts/worktrees` | module | tách record bền khỏi preview dùng xong bỏ |
-| `@directions` | `brainstorms/directions` | module | sinh lựa chọn thị giác được nhúng vào layout |
-| `@layouts` | `brainstorms/layouts` | module | định nghĩa region, axis và contract verdict của layout |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | cung cấp interaction và approval contract chung |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | tách record bền khỏi preview dùng xong bỏ |
+| `@directions` | `brainstorms/directions/vi.md` | vi | sinh lựa chọn thị giác được nhúng vào layout |
+| `@layouts` | `brainstorms/layouts/vi.md` | vi | định nghĩa region, axis và contract verdict của layout |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo reason mà không trả class array |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | sinh kiểm kê token sống cho direction |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate JSON layout candidate |

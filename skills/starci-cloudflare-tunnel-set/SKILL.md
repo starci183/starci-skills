@@ -9,8 +9,8 @@ description: Manage the multi-project Source Cloudflare control plane by encrypt
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | shared approval and output contract |
-| `@initialization` | `readiness/initialization` | module | owns Source identity and routed workspace readiness |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and output contract |
+| `@initialization` | `readiness/initialization/context.md` | context | owns Source identity and routed workspace readiness |
 
 ## NESTED SKILLS
 

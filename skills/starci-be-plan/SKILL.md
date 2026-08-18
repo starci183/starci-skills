@@ -9,7 +9,7 @@ description: Name every file a backend capability will need before any of them e
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
 
 ## NESTED SKILLS
 

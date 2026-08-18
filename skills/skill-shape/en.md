@@ -31,10 +31,21 @@ capability remains a separate owner request.
 
 ## Runtime language
 
-Runtime instructions are English-only. A skill loads its binding `SKILL.md`, then the `en.md` record of
-every paired module in its `LOADS`. It never loads `vi.md`, never translates instructions from it, and
-never combines the two records. `vi.md` exists only for a human reader; allowing it into runtime would
-give one law two possible wordings and make the executed contract depend on language selection.
+Runtime instructions come only from runtime records. A skill loads its binding `SKILL.md`, then the
+derived `context.md` record of every paired module in its `LOADS`. It never loads `en.md` or `vi.md`
+as instructions and never combines either human record with runtime. `en.md` is the complete English
+reference, `vi.md` is the complete Vietnamese reference, and `context.md` is the compact binding record
+derived from `en.md` with its source hash.
+
+The compiler writes a safe baseline that retains dependencies, Record and Law, routing and situation
+tables, boundaries, operational procedures, Rules, Exceptions, Output, Stops and Proof. A maintainer may
+curate teaching-only Worked examples, Anchors, Scope, common-business-example prose and historical
+rhetoric where the distinction is safe. A stale source hash or missing binding section is invalid;
+refresh metadata after intentional curation and run the context contract check.
+
+The dependency graph is language-bound: runtime records load `context.md`, English publication loads
+`en.md`, and Vietnamese publication loads `vi.md`. Validate those graphs independently; matching
+aliases describe the same logical dependency without sharing the same physical target record.
 
 After resolving Source and before the first user-facing reply, run `@workspace-language --source
 <Source>`. Its `defaultLang` value owns all narrative and evidence produced by the run. An explicit

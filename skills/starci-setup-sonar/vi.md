@@ -8,9 +8,9 @@ title: starci-setup-sonar
 
 | Alias | Đích | Loại | Lý do |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | contract approval và output dùng chung |
-| `@workspaces` | `contexts/workspaces` | module | resolve backend sở hữu stack và project đích |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance` | module | contract scanner, token, coverage và quality gate |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract approval và output dùng chung |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve backend sở hữu stack và project đích |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/vi.md` | vi | contract scanner, token, coverage và quality gate |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | reconcile tunnel và DNS mà không lộ value |
 
 ## NESTED SKILLS

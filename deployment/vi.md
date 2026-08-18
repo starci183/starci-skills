@@ -10,8 +10,8 @@ title: Triển khai
 |---|---|---|---|
 | `@schema` | `deployment/schema.json` | file | validate deployment intent bền vững của một environment |
 | `@deployment-plan` | `scripts/deployment-plan.mjs` | script | resolve các role đã route và materialize execution root ignored, không có value |
-| `@workspaces` | `contexts/workspaces` | module | chứng minh mọi repository deployment gọi tên |
-| `@worktrees` | `contexts/worktrees` | module | tách intent bền vững khỏi execution state có thể dựng lại |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | chứng minh mọi repository deployment gọi tên |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | tách intent bền vững khỏi execution state có thể dựng lại |
 
 ## Record
 

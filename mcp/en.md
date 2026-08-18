@@ -6,12 +6,12 @@ title: MCP context
 
 ## LOADS
 
-| Alias | Target | Use when |
-|---|---|---|
-| `@mcp-qdrant` | `mcp/qdrant` | provision or verify the local vector service and MCP runtime |
-| `@mcp-embedding` | `mcp/embedding` | inspect hardware, install Ollama and choose one dimension-locked embedding profile |
-| `@mcp-source-context` | `mcp/source-context` | index one or more verified workspace roles and generate client configuration |
-| `@mcp-clients` | `mcp/clients` | install the verified remote endpoint into both Codex/OpenAI and Claude Code |
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@mcp-qdrant` | `mcp/qdrant/en.md` | en | provision or verify the local vector service and MCP runtime |
+| `@mcp-embedding` | `mcp/embedding/en.md` | en | inspect hardware, install Ollama and choose one dimension-locked embedding profile |
+| `@mcp-source-context` | `mcp/source-context/en.md` | en | index one or more verified workspace roles and generate client configuration |
+| `@mcp-clients` | `mcp/clients/en.md` | en | install the verified remote endpoint into both Codex/OpenAI and Claude Code |
 
 ## Purpose
 

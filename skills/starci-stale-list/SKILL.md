@@ -9,8 +9,8 @@ description: Read the shared stale registry, inventory every routed workspace ro
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | shared output and authority contract |
-| `@staleness` | `readiness/staleness` | module | the one taxonomy and router shared with repair |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | shared output and authority contract |
+| `@staleness` | `readiness/staleness/context.md` | context | the one taxonomy and router shared with repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | deterministic read-only workspace measurement |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | deterministic Source allocation and collision measurement |
 
