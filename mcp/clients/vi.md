@@ -40,6 +40,14 @@ Chạy `/mcp` trong Claude Code và yêu cầu server hiện connected. User sco
 không sửa tay hoặc thay cả file khi CLI dùng được. Chỉ dùng project scope khi team chủ động muốn root
 `.mcp.json` được version-control; server project scope cần workspace trust và interactive approval.
 
+## Connector tài khoản Claude
+
+Claude Web, Cowork và Claude Desktop không đọc entry user-scope của Claude Code. Thêm endpoint public thành
+custom connector trong `Customize > Connectors`, không điền OAuth khi MCP đã duyệt là public và chỉ-đọc.
+Claude có thể chuẩn hóa `https://mcp.<zone>/mcp/` thành `https://mcp.<zone>/mcp`; MCP gateway được sinh phục
+vụ trực tiếp cả hai path và không được trả redirect ra ngoài cho dạng không có slash. Bật connector trong
+từng conversation sau khi nó báo connected.
+
 ## Idempotency và proof
 
 Đọc entry hiện có trước khi thêm. Nếu cùng name đã trỏ đúng endpoint được duyệt thì giữ nguyên. Nếu khác,
@@ -47,7 +55,8 @@ báo URL cũ và mới không chứa secret trước khi thay. Chỉ hoàn tất
 và trả semantic result có route `/<role>/<project>/`. Browser GET không phải MCP health test; Streamable HTTP
 chờ MCP protocol request và có thể từ chối navigation bình thường.
 
-Sau khi DNS hoạt động, dùng installer idempotent:
+Sau khi DNS hoạt động, dùng installer idempotent. Nó protocol-smoke cả endpoint chuẩn có slash cuối và dạng
+không có slash mà Claude chuẩn hóa trước khi đổi client local:
 
 ```text
 node .claude/scripts/mcp-client-setup.mjs --url https://mcp.<zone>/mcp/

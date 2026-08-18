@@ -76,7 +76,10 @@ console.log(`Claude Code: user scope through claude mcp`);
 console.log(`tools: qdrant-find only`);
 if (plan) process.exit(0);
 
-run(process.execPath, [smokeScript, url], {label: "public MCP smoke"});
+run(process.execPath, [smokeScript, url], {label: "public MCP canonical smoke"});
+const noSlashUrl = new URL(url);
+noSlashUrl.pathname = "/mcp";
+run(process.execPath, [smokeScript, noSlashUrl.href], {label: "public MCP Claude connector smoke"});
 if (!existsSync(codexConfig)) fail(`Codex config is absent: ${codexConfig}`);
 const currentCodex = readFileSync(codexConfig, "utf8");
 const nextCodex = mergeCodex(currentCodex);

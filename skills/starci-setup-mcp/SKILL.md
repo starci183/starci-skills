@@ -63,6 +63,10 @@ helper protocol-smokes the endpoint, merges `~/.codex/config.toml` for Codex/Ope
 user scope, and verifies the Claude connection. Keep localhost only for health checks. Do not switch either
 client before an MCP initialize and `tools/list` request succeed publicly.
 
+The generated MCP gateway must serve both `/mcp/` and Claude account connectors' normalized `/mcp` form
+without an external redirect. Protocol-smoke both paths. Claude Web/Desktop account connectors are added
+under `Customize > Connectors`; they are separate from Claude Code's user-scope CLI configuration.
+
 ## Proof
 
 Prove route freshness, Docker health, exact point counts per partition, read-only tool exposure, semantic

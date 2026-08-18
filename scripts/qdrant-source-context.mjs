@@ -84,6 +84,7 @@ const keyFile = join(sourceRoot, ".stacks", secretRecord);
 const docker = process.platform === "win32" ? "docker.exe" : "docker";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const yamlPath = (path) => path.replaceAll("\\", "/").replaceAll("'", "''");
+const mcpGatewayTemplate = join(trustRoot, "mcp", "docker", "mcp-gateway.conf.template");
 const showcaseTemplate = join(trustRoot, "mcp", "docker", "qdrant-showcase.conf.template");
 
 const run = (command, commandArgs, options = {}) => {
@@ -151,13 +152,27 @@ const writeConfig = () => {
       QDRANT_READ_ONLY: "true"
       QDRANT_SEARCH_LIMIT: "10"
       TOOL_FIND_DESCRIPTION: Search routed source catalogs under /fe/<project> and /be/<project>; open authoritative files before writing.
-    ports:
-      - "${mcpPort}:8000"
+    expose:
+      - "8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       qdrant-context:
         condition: service_healthy
+    restart: unless-stopped`, `  mcp-gateway:
+    image: nginx:1.29-alpine
+    container_name: starci-source-context-mcp-gateway
+    ports:
+      - "${mcpPort}:8080"
+    volumes:
+      - '${yamlPath(mcpGatewayTemplate)}:/etc/nginx/conf.d/default.conf:ro'
+    depends_on:
+      - mcp-context
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
     restart: unless-stopped`, `  qdrant-showcase:
     image: nginx:1.29-alpine
     container_name: starci-source-context-showcase
@@ -212,7 +227,7 @@ const index = () => {
 };
 const up = () => {
   requireConfig();
-  compose("up", "-d", "--build", "qdrant-context", "mcp-context", "qdrant-showcase");
+  compose("up", "-d", "--build", "qdrant-context", "mcp-context", "mcp-gateway", "qdrant-showcase");
 };
 
 if (action === "plan") {

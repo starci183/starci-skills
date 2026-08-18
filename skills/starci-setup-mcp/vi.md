@@ -62,6 +62,10 @@ protocol-smoke endpoint, merge `~/.codex/config.toml` cho Codex/OpenAI, cài Cla
 minh Claude connected. Endpoint localhost chỉ dùng cho health check. Không chuyển client nào sang URL public
 trước khi MCP initialize và `tools/list` chạy thành công tại đó.
 
+MCP gateway được sinh phải phục vụ trực tiếp cả `/mcp/` và dạng `/mcp` mà connector tài khoản Claude chuẩn
+hóa, không redirect ra ngoài. Protocol-smoke cả hai path. Connector tài khoản Claude Web/Desktop được thêm
+trong `Customize > Connectors`; nó tách biệt với cấu hình CLI user-scope của Claude Code.
+
 ## Proof
 
 Chứng minh route còn fresh, Docker healthy, đúng point count từng partition, chỉ có tool read-only, semantic
