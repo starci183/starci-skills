@@ -45,9 +45,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười hai năng lực
+## Mười ba năng lực
 
-Mười capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười một capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -56,6 +56,7 @@ thể ngay từ đầu nó đã đúng.
 |---|---|
 | `starci-init` | làm Source sẵn sàng: identity SOPS+age, bootstrap, route workspace và state worktree — bốn root được duyệt độc lập |
 | `starci-cloudflare-tunnel-set` | custody Cloudflare credential đã mã hóa và áp dụng một HTTP(S) tunnel/DNS route đã duyệt |
+| `starci-deploy` | tiếp nhận stack đã route, setup host, release immutable, reconcile domain đã khai và monitor steady state qua execution state `.infra` bị ignore |
 | `starci-setup-mcp` | một MCP read-only toàn Source, các source partition theo route và publication `mcp.<zone>` đã duyệt |
 | `starci-setup-sonar` | một Docker SonarQube dùng chung, onboarding project và publication `sonar.<zone>` đã duyệt |
 | `starci-stale-list` | mọi stale category, gồm local gate được chạy và frontend hoặc backend assurance wiring, cùng ai dọn từng loại |

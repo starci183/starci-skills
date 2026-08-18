@@ -69,6 +69,47 @@ Secrets come from process env by name or hidden input through `scripts/publish-s
 stdout, command arguments or plaintext tracked files. Repository tokens target one repository unless the
 provider actually issued wider scope.
 
+## Local analysis order
+
+Provider CI is trusted only after local analysis of this exact checkout has waited for and passed the
+quality gate. Three facts decide whether that happened:
+
+- **A scan is not a gate.** A run that ends at "analysis uploaded" has proved only that the server
+  received a report. `unmeasured` and `scan uploaded` are the same verdict, and neither is `ready`. A
+  quality gate reported as `NONE` means the project was never analysed — unmeasured, not clean.
+- **A red gate is a source finding.** It is repaired in source and rescanned until green; deferring it to
+  CI hides it rather than handling it.
+- **Coverage readiness is four independent numbers.** Statements, branches, functions and lines each
+  carry the threshold on their own. One blended percentage conceals the metric that is actually failing,
+  which in practice is branches.
+
+**A framework's required emit may carry its own branch threshold.** Where a dependency-injection
+framework compels metadata the runtime needs, the compiler emits guards no test can reach — under
+`emitDecoratorMetadata`, every constructor parameter typed by a value import emits a
+`typeof X !== "undefined" && X ? _a : Object` whose `Object` arm is dead while the module is loadable.
+Statements, functions and lines are unaffected; only branches are polluted, and the per-file ceiling
+`(total − deps)/total` punishes a small service with several dependencies hardest.
+
+That permits exactly one accommodation, and it is narrow:
+
+- the branch threshold is set **once, project-wide, at the analysis layer**, where the artifact is
+  diluted across the whole source surface and a real shortfall still fails;
+- it is **never** a per-file ignore, an `istanbul ignore`, a coverage-path exclusion, or a relaxed
+  statement/function/line bar;
+- the gap between the branch bar and the other three is **recorded with its measured cause**, so a
+  reader can tell a framework artifact from untested code;
+- the bar is **evidence-set against the measured ceiling**, not rounded down to whatever currently
+  passes. A threshold chosen to accommodate untested branches is a bent gate.
+
+Disabling the metadata emit is not an option: it is the same metadata the container reads to resolve
+constructor dependencies, so removing it to improve a number breaks injection. Verify a proposed lever
+by measuring it, not by reasoning about it — `importHelpers` and a v8 coverage provider both look like
+fixes and both move the number not at all.
+
+Parallel scanner lanes must not share one binary cache; give each source its own `SONAR_BINARY_CACHE` or
+scan sequentially. A shared cache is never deleted to clear a symptom unless an exact corrupt path is
+proven first.
+
 ## Proof
 
 Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, a current-checkout

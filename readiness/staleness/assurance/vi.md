@@ -69,6 +69,46 @@ Secret đến từ process env theo tên hoặc hidden input qua `scripts/publis
 stdout, command argument hay plaintext tracked file. Repository token chỉ target một repository trừ khi
 provider thật sự cấp scope rộng hơn.
 
+## Thứ tự analysis local
+
+Chỉ tin provider CI sau khi analysis local trên đúng checkout này đã đợi và pass quality gate. Ba sự kiện
+quyết định điều đó có thật sự xảy ra hay không:
+
+- **Scan không phải là gate.** Một run dừng ở "analysis uploaded" mới chỉ chứng minh server đã nhận
+  report. `unmeasured` và `scan uploaded` là cùng một verdict, và không cái nào là `ready`. Quality gate
+  báo `NONE` nghĩa là project chưa từng được analyse — chưa đo, không phải sạch.
+- **Gate đỏ là source finding.** Phải sửa ở source rồi rescan cho tới khi xanh; đẩy sang CI là giấu nó
+  đi chứ không phải xử lý nó.
+- **Coverage sẵn sàng là bốn con số độc lập.** Statements, branches, functions và lines mỗi cái tự giữ
+  ngưỡng. Một phần trăm gộp che đúng cái metric đang fail, mà thực tế là branches.
+
+**Emit bắt buộc của framework có thể mang ngưỡng branch riêng.** Khi một framework dependency injection
+buộc phải có metadata mà runtime cần, compiler sinh ra guard không test nào chạm tới được — dưới
+`emitDecoratorMetadata`, mỗi constructor parameter có kiểu đến từ value import sẽ emit
+`typeof X !== "undefined" && X ? _a : Object`, và nhánh `Object` chết chừng nào module còn load được.
+Statements, functions và lines không bị ảnh hưởng; chỉ branches bị nhiễm, và trần per-file
+`(total − deps)/total` phạt nặng nhất service nhỏ có nhiều dependency.
+
+Điều đó chỉ cho phép đúng một nhân nhượng, và nó rất hẹp:
+
+- ngưỡng branch được đặt **một lần, ở phạm vi toàn project, tại tầng analysis**, nơi artifact bị pha
+  loãng trên toàn bộ bề mặt source và một thiếu hụt thật vẫn fail;
+- nó **không bao giờ** là ignore per-file, `istanbul ignore`, coverage-path exclusion, hay hạ ngưỡng
+  statement/function/line;
+- khoảng cách giữa bar branch và ba metric kia phải được **ghi lại kèm nguyên nhân đã đo**, để người
+  đọc phân biệt được artifact của framework với code chưa test;
+- bar được **đặt theo bằng chứng, so với trần đã đo**, không phải làm tròn xuống cho vừa cái đang pass.
+  Một ngưỡng chọn để chứa code chưa test là một gate bị bẻ.
+
+Tắt metadata emit không phải lựa chọn: đó chính là metadata container đọc để resolve constructor
+dependency, nên bỏ nó đi để làm đẹp con số là làm hỏng injection. Kiểm chứng một đòn bẩy bằng cách đo,
+không phải bằng suy luận — `importHelpers` và coverage provider v8 đều trông như cách sửa, và cả hai đều
+không làm con số nhúc nhích.
+
+Các lane scanner song song không được dùng chung một binary cache; mỗi source một `SONAR_BINARY_CACHE`
+riêng hoặc scan tuần tự. Không bao giờ xóa cache dùng chung để chữa triệu chứng trừ khi đã chứng minh
+chính xác đường dẫn cache hỏng trước.
+
 ## Proof
 
 Prove hook refuse controlled failure, exact CI graph, một LCOV dùng hai lần, local Sonar analysis từ checkout

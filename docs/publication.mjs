@@ -20,6 +20,11 @@ export const groups = [
     description: "Qdrant-backed additional context for routed StarCi sources: deterministic indexing, isolated role collections and read-only MCP launchers.",
   },
   {
+    source: "deployment",
+    title: "Deployment",
+    description: "Portable .stacks intent, ignored .infra execution state, SSH host setup, declared domain drivers, immutable release and steady-state monitoring.",
+  },
+  {
     source: "readiness/initialization",
     title: "Initialization readiness",
     description: "One identity-first registry for Source bootstrap, workspace routes and worktree state.",
@@ -42,7 +47,7 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all twelve capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all thirteen capabilities share.",
   },
   {
     source: "contexts",

@@ -24,7 +24,7 @@ StarCi separates work by what each stage may return:
 The result is not merely a suggested design or plan. Accepted decisions remain traceable to the source
 state they were made against, and execution stops when that evidence is stale or incomplete.
 
-## The twelve skills
+## The thirteen skills
 
 ### Environment and trust
 
@@ -32,6 +32,7 @@ state they were made against, and execution stops when that evidence is stale or
 |---|---|---|
 | [`starci-init`](./skills/starci-init) | Establish the SOPS+age identity, then prepare Source bootstrap, workspace routes, or worktree state | bounded Source-local readiness state |
 | [`starci-cloudflare-tunnel-set`](./skills/starci-cloudflare-tunnel-set) | Reuse or capture the encrypted Source-wide multi-project Cloudflare credential and reconcile one declared HTTP(S) tunnel/DNS route | encrypted control-plane custody plus Cloudflare state |
+| [`starci-deploy`](./skills/starci-deploy) | Adopt, set up, deploy, monitor, recover or roll back a routed product from its declared `.stacks` contract | approved product/provider state plus ignored `.infra` execution evidence |
 | [`starci-setup-mcp`](./skills/starci-setup-mcp) | Build one routed, read-only source-context MCP and publish `mcp.<zone>` for users | generated cache, shared MCP runtime and Cloudflare state |
 | [`starci-setup-sonar`](./skills/starci-setup-sonar) | Build one shared Docker SonarQube under Compose project `starci`, onboard projects and publish `sonar.<zone>` | shared `starci` runtime and Cloudflare state |
 | [`starci-stale-list`](./skills/starci-stale-list) | Measure every workspace staleness category, including local gates and frontend or backend assurance, and name its owner | ignored local check output only; no tracked or external mutation |

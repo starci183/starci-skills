@@ -10,6 +10,7 @@ settings.json
 /sessions/
 /cache/
 _canon_tmp/
+scheduled_tasks.lock
 **/__pycache__/
 *.pyc
 
