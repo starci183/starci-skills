@@ -60,7 +60,8 @@ và required check. Hiện command `scripts/publish-secret.mjs --plan` không c�
 
 Áp assurance pattern đã route thành một graph: local pre-push lint+unit; active PR CI có check-only lint,
 typecheck/build và đúng một coverage run; một `coverage/lcov.info` cho Codecov lẫn Sonar; Codecov
-project/patch cùng Sonar quality gate blocking; encrypted stack custody và GitHub projection; README badge
+project/patch cùng Sonar quality gate blocking; scanner có xác thực phải chạy từ checkout local hiện tại,
+đợi và pass Sonar quality gate trước khi tin provider CI; encrypted stack custody và GitHub projection; README badge
 token-free và reachable cho Codecov cùng full SonarQube quality metric set; required check; mọi deploy hiện có phụ thuộc
 verification. Repository không có deploy thì không invent.
 
@@ -70,6 +71,7 @@ provider thật sự cấp scope rộng hơn.
 
 ## Proof
 
-Prove hook refuse controlled failure, exact CI graph, một LCOV dùng hai lần, encrypted filename không có
+Prove hook refuse controlled failure, exact CI graph, một LCOV dùng hai lần, local Sonar analysis từ checkout
+hiện tại có waited quality gate xanh sau mọi source repair, encrypted filename không có
 plaintext twin, mọi badge image endpoint bắt buộc trả image mà URL không có credential, external secret name/required
 check qua API và deploy dependency. External enforcement hoặc badge endpoint chưa đo làm module chưa complete.

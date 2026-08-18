@@ -60,7 +60,8 @@ GitHub Secrets/Variables and required checks. Show `scripts/publish-secret.mjs -
 
 Apply the routed assurance pattern as one graph: local pre-push lint+unit; active PR CI with check-only lint,
 typecheck/build and exactly one coverage run; one `coverage/lcov.info` consumed by Codecov and Sonar;
-blocking Codecov project/patch plus Sonar quality gate; encrypted stack custody and GitHub projections;
+an authenticated scanner run from the current local checkout that waits for and passes the Sonar quality
+gate before provider CI is trusted; blocking Codecov project/patch plus Sonar quality gate; encrypted stack custody and GitHub projections;
 reachable token-free README badges for Codecov and the full SonarQube quality metric set; required checks; every existing deploy
 dependent on verification. A repository with no deploy invents none.
 
@@ -70,7 +71,8 @@ provider actually issued wider scope.
 
 ## Proof
 
-Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, encrypted filenames
+Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, a current-checkout
+local Sonar analysis whose waited quality gate is green after any source repair, encrypted filenames
 without plaintext twins, every required badge image endpoint returns an image without a credential in the URL,
 external secret names and required checks through APIs, and deploy dependency. Unmeasured external
 enforcement or an unmeasured badge endpoint leaves the module incomplete.

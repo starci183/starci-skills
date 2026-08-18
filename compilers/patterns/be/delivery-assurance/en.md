@@ -75,7 +75,7 @@ Read `package.json` before evaluating any `ASSURANCE-*` situation:
 | `ASSURANCE-1` | A developer is about to push | Husky is installed; `pre-push` runs full check-only lint and the fast unit lane, and exits on either failure |
 | `ASSURANCE-2` | A pull request is opened or updated | An active PR workflow installs from the lockfile and runs check-only lint, typecheck/build and unit tests; no CI command fixes source |
 | `ASSURANCE-3` | Unit tests ran in CI | The run emits LCOV, uploads it through Codecov, exposes blocking patch/project coverage statuses, and README links a reachable token-free Codecov badge |
-| `ASSURANCE-4` | The same revision needs quality and security analysis | SonarQube scans with the LCOV report, returns a blocking quality gate, and README links reachable token-free badges for quality gate, coverage, bugs, vulnerabilities, code smells, maintainability, reliability and security |
+| `ASSURANCE-4` | The same revision needs quality and security analysis | A local authenticated scan of the current checkout consumes the LCOV and waits for a green gate before CI; SonarQube CI repeats that blocking gate and README exposes the full token-free metric set |
 | `ASSURANCE-5` | Codecov or SonarQube needs a credential | `codecov-token.key.enc` and `sonarqube-token.key.enc` exist under `.stacks/dev/runtime/files/`; workflows reference named GitHub secrets and never decrypt stacks |
 | `ASSURANCE-6` | A pull request is ready to merge | GitHub branch protection or a ruleset requires CI, Codecov and SonarQube checks from their expected apps |
 | `ASSURANCE-7` | A deploy workflow exists | Deployment depends on successful verification through `needs`, a reusable workflow, or a successful workflow-run trigger |
@@ -84,8 +84,8 @@ Read `package.json` before evaluating any `ASSURANCE-*` situation:
 
 1. Read the manifest and preserve the repository's package manager and gate names. Add a missing
    check-only alias; never point a hook or CI at an autofix command.
-2. Keep the local lane intentionally fast: full lint plus unit tests. Typecheck/build, coverage upload and
-   remote analysis belong to CI.
+2. Keep pre-push intentionally fast: full lint plus unit tests. Typecheck/build stay in CI; repair also runs
+   coverage and authenticated local analysis before CI is trusted.
 3. Generate one LCOV report and feed the same evidence to Codecov and SonarQube. Two test executions for
    two dashboards are drift, not stronger assurance.
 4. Treat service creation, GitHub secrets, repository variables and branch rules as external mutations.
@@ -108,8 +108,9 @@ and its patch/project statuses are intended to block. README exposes the reposit
 the image URL is reachable and contains no credential. Coverage percentage belongs to the service policy,
 not a second Jest invocation.
 
-`ASSURANCE-4` owns analysis. SonarQube consumes the same revision and LCOV report. Scan success and quality
-gate success are different facts; the workflow must wait for or receive the gate result. README exposes
+`ASSURANCE-4` owns analysis. Repair first scans the current local checkout with
+`sonar.qualitygate.wait=true`; a red gate is repaired in source and scanned again before CI. SonarQube CI
+consumes the same revision and LCOV report. Scan success and quality gate success are different facts; the workflow must wait for or receive the gate result. README exposes
 reachable badges for quality gate, coverage, bugs, vulnerabilities, code smells, maintainability,
 reliability and security for the same project key without embedding a token.
 
@@ -150,11 +151,11 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 
 1. Backend assurance is required by default; only the tracked manifest declaration in Applicability can exempt it.
 2. Hooks and CI invoke check-only commands and never mutate source.
-3. Local pre-push stays at lint plus unit; expensive and remote gates stay in CI.
+3. Local pre-push stays at lint plus unit; repair runs local coverage and waited Sonar analysis separately.
 4. Codecov and SonarQube consume the same LCOV report from the same successful unit run, and README exposes
    reachable token-free badges for both provider results.
 5. Provider tokens are encrypted in stacks and projected to GitHub Secrets without plaintext transit through source or chat.
-6. A local scan never claims branch protection is configured without external evidence.
+6. A green local Sonar scan never claims branch protection is configured without external evidence.
 7. A deploy cannot begin before verification passes.
 
 ## Exceptions
