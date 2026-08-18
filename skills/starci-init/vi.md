@@ -19,8 +19,8 @@ Không có. Skill này không tự gọi skill khác.
 Đọc `@skill-shape` trước. Skill này có thể chạy nhiều lần: bootstrap thường chỉ làm một lần, còn workspace
 route và worktree state phải cập nhật khi project, role hoặc checkout thay đổi.
 
-Ba root độc lập: bootstrap quyết định agent đi vào tree nào; `.workspace/<project>/` quyết định source
-được **đọc** ở đâu; `.worktrees/<project>/` quyết định state được **ghi** ở đâu. Mỗi root vẫn có boundary
+Ba root độc lập: bootstrap quyết định agent đi vào tree nào; `.workspace/` quyết định ngôn ngữ phản hồi
+chung và source của từng project được **đọc** ở đâu; `.worktrees/<project>/` quyết định state được **ghi** ở đâu. Mỗi root vẫn có boundary
 và verdict riêng, nhưng `OK` accept mọi recommended default đã hiển thị; nó không phủ root
 chưa từng được trình.
 
@@ -45,6 +45,9 @@ của owner. Không overwrite nội dung thật bằng bootstrap chuẩn nếu c
 
 ### 4 — Workspace: đo mọi role đã khai
 
+Đọc `.workspace/config.json` và verify `defaultLang` chung của Source trước khi đo route project. Default
+này nằm một lần ở workspace root, không lặp theo project hay role.
+
 Với từng `.workspace/<project>/<role>/config.json`, kiểm tra checkout, branch/head và contract path theo
 schema route. Role chưa khai là `absent`; route từng đúng nhưng không còn đúng là `stale`. Không biến hai
 trạng thái này thành một.
@@ -56,7 +59,7 @@ Kiểm tra registry và cache root, Git ownership, lock và path policy. Write r
 
 ### 6 — Review từng boundary riêng
 
-Trình bootstrap, workspace và worktree thành ba quyết định độc lập. Mỗi quyết định nêu diff chính xác,
+Trình bootstrap, workspace config cùng các route, và worktree thành ba quyết định độc lập. Mỗi quyết định nêu diff chính xác,
 điều sẽ không chạm và cách verify. Owner có thể duyệt tập con; `OK` accept mọi default đã trình.
 
 ### 7 — Apply: bootstrap
@@ -66,6 +69,10 @@ hay gate vào Source; copied rule sẽ có hai home. Entry phải trỏ tới
 `<Source>/<tree>/INDEX.md` và yêu cầu đọc trọn file theo load order.
 
 ### 8 — Apply: workspace routes
+
+Ghi hoặc refresh `.workspace/config.json` với `version: 1` và một `defaultLang`. Giữ giá trị hợp lệ đang
+có trừ khi owner yêu cầu đổi; config mới dùng ngôn ngữ trong request setup của owner làm recommended
+default. Config áp dụng cho mọi project và role trong Source nên không copy nó vào route.
 
 Chỉ ghi role đã duyệt. Route phải dùng path thật trên machine này và contract thật; ghi recorded head theo
 schema. Không chỉnh target repository.
@@ -77,7 +84,8 @@ Tạo hoặc sửa đúng project root đã duyệt, giữ registry durable và 
 
 ### 10 — Verify, chỉ đọc
 
-Đọc lại ba root, parse config và resolve mọi path. Verify không được tạo file phụ. Nếu schema yêu cầu
+Đọc lại ba root, verify workspace config resolve đúng một `defaultLang`, parse route config và resolve mọi
+path. Verify không được tạo file phụ. Nếu schema yêu cầu
 `WORKSPACE-6`, kiểm tra đúng evidence đó thay vì suy diễn từ path tồn tại.
 
 ### 11 — Đóng phase

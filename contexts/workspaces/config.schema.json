@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v3/contexts/workspaces/config.schema.json",
+  "title": "Workspace defaults",
+  "description": "Source-wide defaults shared by every project and role on this machine.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaultLang"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional pointer to this schema. Validation does not depend on the pointer."
+    },
+    "version": {"const": 1},
+    "defaultLang": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+      "description": "BCP 47-style language tag used for user-facing replies unless the current request explicitly selects another language."
+    }
+  }
+}

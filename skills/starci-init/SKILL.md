@@ -29,7 +29,7 @@ Three roots, and they fail in three different directions:
 | Root | Decides | Wrong means |
 |---|---|---|
 | `<Source>/AGENTS.md`, `<Source>/CLAUDE.md` | which tree an agent routes into at all | an agent follows a dead link, then invents its own order |
-| `<Source>/.workspace/<project>/` | where source is **read** from | silent — confident answers about another repository |
+| `<Source>/.workspace/` | the shared reply language and where each project's source is **read** from | silent — inconsistent language or confident answers about another repository |
 | `<Source>/.worktrees/<project>/` | where state is **written** | loud — writes land where writing was forbidden |
 
 Each root remains a separate displayed boundary and verdict. One `OK` approves all displayed recommended
@@ -73,6 +73,9 @@ duplicates, and where it lives now.
 
 ### 4 — Workspace: measure every declared role
 
+Read `.workspace/config.json` and verify its Source-wide `defaultLang` before measuring project routes.
+The default belongs once at the workspace root, never once per project or role.
+
 For each role, does `.workspace/<project>/<role>/config.json` exist, and does it still describe this
 machine? Check the checkout directory, the contract path for a frontend role, the manifests it names,
 and whether the recorded branch and head still belong to that checkout.
@@ -101,7 +104,7 @@ and `OK` approves all displayed defaults:
 
 - the two bootstrap files, shown in full before and after — they are short by design, so there is no
   reason to summarise a diff of them;
-- the workspace routes to be written or refreshed, per role;
+- the Source-wide workspace config and the routes to be written or refreshed, per role;
 - the worktree paths to create, reuse or migrate, with the registry branch named.
 
 Stop for a collision, a foreign Git owner, a dirty legacy registry, a branch mismatch, or any write
@@ -129,6 +132,11 @@ rules — a runtime that cannot find its name gets no bootstrap at all. Nobody m
 `WORKSPACE-6` failure at the repository root.
 
 ### 8 — Apply: workspace routes
+
+Write or refresh `.workspace/config.json` with `version: 1` and one `defaultLang`. Preserve a valid
+existing value unless the owner explicitly requested another; for a new config, use the language of the
+owner's setup request as the recommended default. This config applies to every project and role in the
+Source, so never duplicate it into route files.
 
 Refresh route configuration only. Never clone, link, copy, mount or edit a **target** repository: the
 route **describes** a checkout, it never mirrors one. Route values stay machine-local — never committed
@@ -162,6 +170,7 @@ Re-measure and prove each claim of each root that was written:
 
 - follow the bootstrap's link from the repository root exactly as an agent would, and confirm it lands
   on the entry, and that the entry names the load order and the capabilities;
+- the shared workspace config resolves one valid `defaultLang`;
 - every declared role resolves, and its contract path exists;
 - the registry is locked, clean, on the project branch, owned by this Source's Git;
 - `sessions` and `cache` are ignored, and no state remains at a rejected path.

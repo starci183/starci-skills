@@ -8,6 +8,7 @@ title: Workspaces · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@config-schema` | `contexts/workspaces/config.schema.json` | file | kiểm tra default chung của Source cho mọi project và role |
 | `@schema` | `contexts/workspaces/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
 
 
@@ -20,6 +21,10 @@ không tầng nào bên dưới còn đúng, và cái sai đó không tự lên 
 chỉ không phải repository mà yêu cầu muốn nói.
 
 ## Luật
+
+Default chung của Source được resolve trước từ `.workspace/config.json`, hợp lệ theo `@config-schema`.
+`defaultLang` đặt ngôn ngữ phản hồi cho mọi project và role, trừ khi request hiện tại chỉ định rõ ngôn
+ngữ khác. Giá trị này được đọc một lần, không copy vào từng route của role.
 
 Route được giải ra từ **một tệp đã khai báo**, không bao giờ bằng suy diễn. `project` và `role` là toàn
 bộ danh tính tra cứu; tên một checkout nằm cạnh, một thư mục đang mở, hay thứ mà session trước dùng
@@ -39,19 +44,22 @@ thì buộc phải hỏi, cũ thì mời người ta trả lời sai một cách
 | `WORKSPACE-4` | Một vai trò cần hợp đồng miền của nó | đọc `context.contract`, kèm `contractSource` là xuất xứ |
 | `WORKSPACE-5` | Route ghi một đường dẫn hoặc head không còn đúng | dừng; route đã cũ, không phải xấp xỉ |
 | `WORKSPACE-6` | Route mang đường dẫn máy, khoá hoặc thông tin đăng nhập | route ở lại trong máy; không bao giờ chép vào cây quy tắc |
+| `WORKSPACE-7` | Config workspace chung của Source resolve được | áp dụng `defaultLang` cho mọi phản hồi tới người dùng |
 
 ## Đọc một lệnh khởi động
 
-1. **Hiểu yêu cầu đúng nghĩa chữ.** `start <project> <roles...>` gọi tên chính xác những vai trò cần
+1. **Resolve default chung.** Đọc `.workspace/config.json`, validate theo `@config-schema`, rồi giữ
+   `defaultLang` cho mọi phản hồi tới người dùng — `WORKSPACE-7`.
+2. **Hiểu yêu cầu đúng nghĩa chữ.** `start <project> <roles...>` gọi tên chính xác những vai trò cần
    tải. Không thêm một vai trò vì repository trông như có nó, và không bỏ một vai trò vì session trước
    không dùng.
-2. **Giải một tệp cho mỗi vai trò**: `.workspace/<project>/<role>/config.json`. Mọi tệp được gọi tên
+3. **Giải một tệp cho mỗi vai trò**: `.workspace/<project>/<role>/config.json`. Mọi tệp được gọi tên
    đều phải tồn tại — `WORKSPACE-1`.
-3. **Xác minh trước khi đọc.** Với từng route, thư mục checkout phải tồn tại và phải còn chứa đúng
+4. **Xác minh trước khi đọc.** Với từng route, thư mục checkout phải tồn tại và phải còn chứa đúng
    bằng chứng mà route khai: đường dẫn hợp đồng với vai trò frontend, các manifest nó gọi tên. Hỏng ở
    bước này là `WORKSPACE-5` và nó **dừng** cả lượt chạy.
-4. **Đọc chính checkout, không đọc bản sao.** Cấu hình chỉ để định tuyến — `WORKSPACE-3`.
-5. **Không bao giờ nới route ra.** Route thiếu hoặc cũ thì trả về setup — `WORKSPACE-2`,
+5. **Đọc chính checkout, không đọc bản sao.** Cấu hình chỉ để định tuyến — `WORKSPACE-3`.
+6. **Không bao giờ nới route ra.** Route thiếu hoặc cũ thì trả về setup — `WORKSPACE-2`,
    `WORKSPACE-5` — và setup chỉ làm mới cấu hình; nó không clone, không link, không copy, không sửa
    repository đích.
 
@@ -179,11 +187,32 @@ phải kiến thức dùng chung.
 thầm chỉ còn đúng trên một máy. Khoá bí mật, biến môi trường và token thì không bao giờ là context của
 workspace ngay từ đầu.
 
+## `WORKSPACE-7` — default chung áp dụng cho mọi phản hồi
+
+**Khi nào gặp.** `.workspace/config.json` hợp lệ và `defaultLang` của nó áp dụng cho mọi project và role
+trong Source này.
+
+**Cách nhận ra**
+
+- Config nằm trực tiếp dưới `.workspace`, ngoài mọi thư mục project.
+- Giá trị là language tag kiểu BCP 47 như `vi` hoặc `en-US`.
+
+**Tự hỏi.** Lượt chạy đã resolve default chung trước khi sinh văn xuôi cho người dùng chưa?
+
+**Ranh giới**
+
+- Chỉ dẫn ngôn ngữ rõ ràng trong request hiện tại override default cho đúng lượt đó; nó không viết lại
+  config.
+
+**Nó hỏng bằng đường nào.** Mỗi skill tự chọn ngôn ngữ báo cáo, nên một lượt trả lời tiếng Việt còn lượt
+sau âm thầm quay về tiếng Anh dù cả hai dùng cùng Source.
+
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
 | yêu cầu | Danh sách project và vai trò đúng nghĩa chữ |
+| config workspace | `.workspace/config.json`, hợp `@config-schema` nằm cạnh bản ghi này |
 | route | `.workspace/<project>/<role>/config.json`, hợp `@schema` nằm cạnh bản ghi này |
 | checkout | Thư mục tại `repository.diskPath`, có thật trên đĩa |
 | hợp đồng | Tệp tại `context.contract`, và `context.contractSource` cho xuất xứ của nó |
@@ -199,6 +228,7 @@ workspace ngay từ đầu.
 6. Giá trị trong route ở lại trong máy. Chúng không bao giờ được commit vào cây quy tắc, và khoá bí mật
    thì ngay từ đầu đã không phải giá trị của route.
 7. Mỗi lệnh khởi động ra đúng một phán quyết cho mỗi vai trò: đọc, hoặc dừng.
+8. `defaultLang` được resolve một lần từ `.workspace/config.json` và áp dụng xuyên mọi project, role.
 
 ## Ngoại lệ
 

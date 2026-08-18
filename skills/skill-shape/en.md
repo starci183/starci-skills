@@ -6,7 +6,9 @@ title: Skill shape
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve the Source-wide language for every user-facing reply |
 
 
 ## Record
@@ -34,9 +36,14 @@ every paired module in its `LOADS`. It never loads `vi.md`, never translates ins
 never combines the two records. `vi.md` exists only for a human reader; allowing it into runtime would
 give one law two possible wordings and make the executed contract depend on language selection.
 
-This does not change the reporting language: narrative, evidence and table values produced by a run
-remain Vietnamese as specified below. English owns the instructions; Vietnamese owns the human-facing
-run record.
+After resolving Source and before the first user-facing reply, run `@workspace-language --source
+<Source>`. Its `defaultLang` value owns all narrative and evidence produced by the run. An explicit
+language instruction in the current request overrides that default for this run only. Headings, schema
+labels, paths, commands and code identifiers stay unchanged because translating them breaks validation.
+
+If the shared config is absent or invalid, do not silently fall back to English. Use the language of the
+current request to identify the exact config failure; the missing default remains workspace setup work.
+English owns runtime instructions, while workspace config owns the default human-facing language.
 
 ## The nine capabilities
 
@@ -123,8 +130,9 @@ An approved phase names its `Approved revision: <identity>`, and Apply cites tha
 baseline commit. That pairing is what proves what changed after Apply began, and it survives wherever the
 phase records — it is a sentence, not a file.
 
-Narrative and evidence shown to the user are written in Vietnamese. Headings, schema labels, paths,
-commands and code identifiers stay unchanged, because translating them breaks validation.
+Narrative and evidence shown to the user are written in the resolved `defaultLang`, unless the current
+request explicitly selected another language. Headings, schema labels, paths, commands and code
+identifiers stay unchanged, because translating them breaks validation.
 
 Old evidence is not rewritten to match a newer format. A historical record is evidence; a correction is
 appended.
@@ -142,6 +150,7 @@ appended.
 9. For safely partitionable work, target ten non-overlapping agent assignments; one coordinator owns
    shared-state gates. Fill and backfill every available runtime slot when fewer than ten are concurrent.
 10. User-facing output contains no status tables.
+11. Resolve `defaultLang` from the Source-wide workspace config before the first user-facing reply.
 
 ## Exceptions
 

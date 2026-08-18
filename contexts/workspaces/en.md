@@ -8,6 +8,7 @@ title: Workspaces
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@config-schema` | `contexts/workspaces/config.schema.json` | file | validate Source-wide defaults shared by every project and role |
 | `@schema` | `contexts/workspaces/schema.json` | file | validate the record's JSON shape |
 
 
@@ -20,6 +21,10 @@ and a wrong answer here does not announce itself: the agent reads a real reposit
 one the request meant.
 
 ## Law
+
+A Source-wide default is resolved first from `.workspace/config.json`, valid against `@config-schema`.
+`defaultLang` sets the language of user-facing replies for every project and role unless the current
+request explicitly selects another language. It is read once, not copied into every role route.
 
 A route is resolved from a declared file, never inferred. `project` and `role` are the whole lookup
 identity; a sibling checkout name, a directory that happens to be open, and what a previous session
@@ -39,19 +44,22 @@ missing forces a question, stale invites a confident wrong answer.
 | `WORKSPACE-4` | A role needs its domain contract | read `context.contract`, with `contractSource` as its provenance |
 | `WORKSPACE-5` | The route records a path or head that no longer holds | stop; the route is stale, not approximate |
 | `WORKSPACE-6` | The route carries local paths, secrets or credentials | route stays machine-local; never copied into the trust tree |
+| `WORKSPACE-7` | The Source-wide workspace config resolves | apply `defaultLang` to every user-facing reply |
 
 ## Reading a start request
 
-1. **Take the request literally.** `start <project> <roles...>` names exactly the roles to load. Do
+1. **Resolve shared defaults.** Read `.workspace/config.json`, validate it against `@config-schema`,
+   and retain `defaultLang` for every user-facing reply — `WORKSPACE-7`.
+2. **Take the request literally.** `start <project> <roles...>` names exactly the roles to load. Do
    not add a role because the repository looks like it has one, and do not drop a role because the
    last session did not use it.
-2. **Resolve one file per role**: `.workspace/<project>/<role>/config.json`. Every named file must
+3. **Resolve one file per role**: `.workspace/<project>/<role>/config.json`. Every named file must
    exist — `WORKSPACE-1`.
-3. **Verify before reading.** For each route, the checkout directory must exist and must still hold
+4. **Verify before reading.** For each route, the checkout directory must exist and must still hold
    the evidence the route claims: the contract path for a frontend role, the manifests it names.
    A failure here is `WORKSPACE-5` and it stops the run.
-4. **Read the checkout, not a copy.** The configuration is routing only — `WORKSPACE-3`.
-5. **Never widen the route.** A missing or stale route returns to setup — `WORKSPACE-2`,
+5. **Read the checkout, not a copy.** The configuration is routing only — `WORKSPACE-3`.
+6. **Never widen the route.** A missing or stale route returns to setup — `WORKSPACE-2`,
    `WORKSPACE-5` — and setup refreshes configuration only; it never clones, links, copies or edits a
    target repository.
 
@@ -178,11 +186,32 @@ shared knowledge.
 **How it fails.** A path or a token is copied into a rule, and the rule silently becomes true on one
 machine only. Runtime secrets, environment values and tokens are never workspace context at all.
 
+## `WORKSPACE-7` — shared defaults apply to every reply
+
+**Situation.** `.workspace/config.json` is valid and its `defaultLang` applies to every project and role
+in this Source.
+
+**Recognition signs**
+
+- The config sits directly under `.workspace`, outside every project directory.
+- The value is a BCP 47-style language tag such as `vi` or `en-US`.
+
+**Ask yourself.** Did the run resolve the shared default before producing user-facing prose?
+
+**Boundary**
+
+- An explicit language instruction in the current request overrides the default for that run only; it
+  does not rewrite the config.
+
+**How it fails.** Each skill chooses its own reporting language, so one run replies in Vietnamese and
+the next silently returns to English even though both use the same Source.
+
 ## Inputs
 
 | Input | Evidence required |
 |---|---|
 | request | The literal project and role list |
+| workspace config | `.workspace/config.json`, valid against `@config-schema` beside this record |
 | route | `.workspace/<project>/<role>/config.json`, valid against `@schema` beside this record |
 | checkout | The directory at `repository.diskPath`, present on disk |
 | contract | The file at `context.contract`, and `context.contractSource` for its provenance |
@@ -198,6 +227,7 @@ machine only. Runtime secrets, environment values and tokens are never workspace
 6. Route values stay machine-local. They are never committed into the trust tree, and secrets are
    never route values in the first place.
 7. Every start request resolves to exactly one verdict per role: read, or stop.
+8. `defaultLang` is resolved once from `.workspace/config.json` and applies across every project and role.
 
 ## Exceptions
 

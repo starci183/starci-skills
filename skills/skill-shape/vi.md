@@ -6,7 +6,9 @@ title: Skill shape · Vietnamese
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve ngôn ngữ chung của Source cho mọi phản hồi tới người dùng |
 
 
 ## Bản ghi
@@ -34,9 +36,14 @@ của mọi module ghép cặp trong `LOADS`. Nó không bao giờ đọc `vi.md
 trộn hai bản ghi. `vi.md` chỉ dành cho người đọc; đưa nó vào runtime sẽ làm một luật có hai cách diễn đạt và
 khiến contract được thực thi phụ thuộc vào lựa chọn ngôn ngữ.
 
-Điều này không đổi ngôn ngữ báo cáo: phần tường thuật, bằng chứng và giá trị bảng do lượt chạy sinh ra vẫn
-viết bằng tiếng Việt như quy định bên dưới. Tiếng Anh sở hữu instruction; tiếng Việt sở hữu run record cho
-người đọc.
+Sau khi resolve Source và trước phản hồi đầu tiên cho người dùng, chạy `@workspace-language --source
+<Source>`. Giá trị `defaultLang` của nó quyết định ngôn ngữ cho mọi phần tường thuật và bằng chứng trong
+lượt chạy. Nếu request hiện tại chỉ định rõ một ngôn ngữ khác thì chỉ lượt đó được override. Tiêu đề, nhãn
+schema, path, command và identifier trong code giữ nguyên vì dịch chúng sẽ làm hỏng validation.
+
+Nếu config chung bị thiếu hoặc không hợp lệ, không được âm thầm fallback sang tiếng Anh. Dùng ngôn ngữ của
+request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
+instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
 ## Chín năng lực
 
@@ -122,8 +129,9 @@ Một phase được duyệt gọi tên `Approved revision: <identity>` của n�
 baseline commit. Chính cặp đó chứng minh cái gì đã đổi sau khi Apply bắt đầu, và nó sống sót ở bất cứ nơi
 nào phase ghi lại — nó là một **câu**, không phải một tệp.
 
-Phần tường thuật và bằng chứng cho người dùng viết bằng tiếng Việt. Tiêu đề, nhãn schema, đường
-dẫn, câu lệnh và tên định danh trong code giữ nguyên, vì dịch chúng là làm hỏng bộ kiểm.
+Phần tường thuật và bằng chứng cho người dùng viết bằng `defaultLang` đã resolve, trừ khi request hiện tại
+chỉ định rõ ngôn ngữ khác. Tiêu đề, nhãn schema, đường dẫn, câu lệnh và tên định danh trong code giữ nguyên,
+vì dịch chúng là làm hỏng bộ kiểm.
 
 Bằng chứng cũ không bị viết lại cho khớp định dạng mới. Bản ghi lịch sử là bằng chứng; muốn sửa thì **ghi
 thêm**.
@@ -141,6 +149,7 @@ thêm**.
 9. Việc chia an toàn được thì nhắm mười assignment không chồng lấn; một coordinator giữ gate shared-state.
    Runtime dưới mười slot thì lấp đầy và backfill mọi slot khả dụng.
 10. Đầu ra cho người dùng không có bảng trạng thái.
+11. Resolve `defaultLang` từ workspace config chung của Source trước phản hồi đầu tiên cho người dùng.
 
 ## Ngoại lệ
 
