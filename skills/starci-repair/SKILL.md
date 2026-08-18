@@ -1,6 +1,6 @@
 ---
 name: starci-repair
-description: Take a routed source that is red, structurally stale, untrusted, or missing required frontend or backend delivery assurance and return it green through measured, separated passes. Uses the shared stale registry for every finding and never silences a gate or publishes plaintext credentials. Writes product and external enforcement state only after approval.
+description: Take a routed source that is red, structurally stale, port-conflicted, untrusted, or missing required frontend or backend delivery assurance and return it green through measured, separated passes. Uses the shared stale registry for every finding and never silences a gate or publishes plaintext credentials. Writes product and external enforcement state only after approval.
 ---
 
 # starci-repair
@@ -26,6 +26,8 @@ is stale and routes to the module that owns list evidence, inventory, apply and 
 Read only reached modules during repair:
 
 - always read `@stale-source-gates` and `@stale-lint-machine` after the route verifies;
+- always read `@stale-port-offset` after the route verifies; its family pass may coordinate both routed
+  roles because Source allocation and paired consumers cannot migrate independently;
 - read `@stale-strict-fix` when strict-fix was requested or its first-party surface is present;
 - read `@stale-why` when the route has a contract;
 - read `@stale-assurance` for a backend or frontend, then obey its tracked applicability declaration;
@@ -40,7 +42,8 @@ Green is earned, never bought. No `eslint-disable`, weakened severity, removed r
 added to end a finding. A decision is returned. Formatting is isolated from behavior. The consumer installs
 published lint rules and never authors or repairs a private copy.
 
-One repair record covers one role of one project. A multi-project request coordinates separate records,
+One repair record covers one role of one project, except a port-offset pass records the family and every
+reached role together. A multi-project request coordinates separate records,
 baselines and diffs under one approval batch. Whole-repository gates run once per checkout by the coordinator.
 
 ## PROCESS
@@ -77,22 +80,23 @@ the baseline precedes it.
 
 Apply only selected modules, in this order, each as a readable pass and commit:
 
-1. lint machine;
-2. strict fix;
-3. source format;
-4. source mechanical fixes;
-5. source defects;
-6. retired structure;
-7. why index;
-8. delivery assurance;
-9. remnant removal.
+1. port offset;
+2. lint machine;
+3. strict fix;
+4. source format;
+5. source mechanical fixes;
+6. source defects;
+7. retired structure;
+8. why index;
+9. delivery assurance;
+10. remnant removal.
 
 Skip an unselected or clean pass. An empty-directory removal can have no Git diff but still records its
 absolute path and before/after count. An unavailable external credential/check leaves assurance incomplete.
 
 ### 6 — Parallel defect repairs
 
-Only source defects may fan out, partitioned by file so two agents never edit the same file. Machine,
+Only source defects may fan out, partitioned by file so two agents never edit the same file. Port allocation, machine,
 strict-fix, formatting, autofix, structure, why, assurance and remnant are single-writer passes. Agents may
 run file-scoped lint only; the coordinator owns shared-state gates and remeasurement.
 

@@ -1,6 +1,6 @@
 ---
 name: starci-stale-list
-description: Read the shared stale registry, inventory every routed workspace role, and execute its declared local check-only readiness gates without repairing tracked source or external state. Reports route, measured source gates, why index, lint machine, formatter, frontend or backend delivery assurance, retired structure and remnant evidence with the owner that clears each.
+description: Read the shared stale registry, inventory every routed workspace role, and execute its declared local check-only readiness gates without repairing tracked source or external state. Reports route, port allocation, measured source gates, why index, lint machine, formatter, frontend or backend delivery assurance, retired structure and remnant evidence with the owner that clears each.
 ---
 
 # starci-stale-list
@@ -12,6 +12,7 @@ description: Read the shared stale registry, inventory every routed workspace ro
 | `@skill-shape` | `skills/skill-shape` | module | shared output and authority contract |
 | `@staleness` | `readiness/staleness` | module | the one taxonomy and router shared with repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | deterministic read-only workspace measurement |
+| `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | deterministic Source allocation and collision measurement |
 
 ## NESTED SKILLS
 
@@ -41,6 +42,9 @@ node @export-state --stale
 The script measures routes, contracts, manifests, lint adoption, first-party formatter integration, local
 assurance wiring, retired structure and remnants. It exits non-zero when stale; that exit is a verdict,
 not a reason to reimplement the scan in conversation.
+
+Then run `node @port-offset-check`. Its non-zero exit is the `port-offset` verdict. Name every deliberate
+project exclusion explicitly; do not make an excluded family disappear from the report.
 
 ### 3 — Report registry verdicts
 

@@ -9,6 +9,7 @@ title: Stale registry
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@stale-source-gates` | `readiness/staleness/source-gates` | module | declared project gates and source findings |
+| `@stale-port-offset` | `readiness/staleness/port-offset` | module | Source-owned family offsets, application slots and collision proof |
 | `@stale-lint-machine` | `readiness/staleness/lint-machine` | module | canon adoption and vendored-rule detection |
 | `@stale-strict-fix` | `readiness/staleness/strict-fix` | module | first-party Prettier integration |
 | `@stale-why` | `readiness/staleness/why` | module | contract index findability |
@@ -18,7 +19,7 @@ title: Stale registry
 
 ## Purpose
 
-The registry routes through `@stale-source-gates`, `@stale-lint-machine`, `@stale-strict-fix`,
+The registry routes through `@stale-source-gates`, `@stale-port-offset`, `@stale-lint-machine`, `@stale-strict-fix`,
 `@stale-why`, `@stale-assurance`, `@stale-retired-structure` and `@stale-remnant`.
 
 Give `starci-repair` and `starci-stale-list` one vocabulary. The list measures these categories; repair
@@ -33,6 +34,7 @@ and proof. Route staleness has no repair module here because its owner is `starc
 | Category | Stale when | Cleared by |
 |---|---|---|
 | `route` | checkout, contract, branch or recorded head no longer describes this machine | `starci-init` |
+| `port-offset` | Source allocation is absent/invalid, product owns an offset, projection drifts, or local listeners collide | `starci-repair`, port-offset pass |
 | `source` | declared format/lint/type/build/unit gates fail, or no meaningful gate surface exists | `starci-repair`, source-gates pass |
 | `index` | a contract `why` describes a shape instead of the need that finds it | `starci-repair`, why pass |
 | `machine` | published lint canon is absent or a vendored rule copy is imported | `starci-repair`, lint-machine pass |

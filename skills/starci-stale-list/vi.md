@@ -11,6 +11,7 @@ title: starci-stale-list
 | `@skill-shape` | `skills/skill-shape` | module | output và authority contract chung |
 | `@staleness` | `readiness/staleness` | module | taxonomy/router duy nhất dùng chung với repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
+| `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | Source allocation và collision measurement deterministic |
 
 ## NESTED SKILLS
 
@@ -40,6 +41,9 @@ node @export-state --stale
 Script đo route, contract, manifest, lint adoption, first-party formatter integration, local assurance
 wiring, retired structure và remnant. Nó exit non-zero khi stale; exit đó là verdict, không phải lý do
 reimplement scan trong conversation.
+
+Sau đó chạy `node @port-offset-check`. Exit non-zero của nó là verdict `port-offset`. Gọi tên rõ mọi project
+được exclude có chủ ý; không làm family bị exclude biến mất khỏi report.
 
 ### 3 — Report verdict từ registry
 

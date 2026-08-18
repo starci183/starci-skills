@@ -29,7 +29,9 @@ local action đã yêu cầu theo thứ tự registry:
    import identity gốc, có thể generate identity đầu tiên, hay `blocked`. Không hiển thị private material.
 2. **Bootstrap** — chứng minh trust entry tồn tại; phân loại và trình toàn bộ before/after của `AGENTS.md`
    cùng `CLAUDE.md`.
-3. **Workspaces** — verify ngôn ngữ chung và mọi read route project/role đã khai với checkout thật.
+3. **Workspaces** — verify ngôn ngữ chung, family offset/application slot bền và mọi read route
+   project/role đã khai với checkout thật. Allocation chỉ ở `.workspace/ports.json`; init không copy
+   nó vào product.
 4. **Worktrees** — verify registry, sessions và cache root của project bằng account worktree của Git và
    path policy.
 

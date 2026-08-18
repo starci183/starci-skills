@@ -25,6 +25,8 @@ taxonomy và route sang module sở hữu list evidence, inventory, apply cùng 
 Chỉ đọc module đã chạm trong repair:
 
 - luôn đọc `@stale-source-gates` và `@stale-lint-machine` sau khi route verify;
+- luôn đọc `@stale-port-offset` sau khi route verify; family pass của nó được coordinate cả hai routed role
+  vì Source allocation và paired consumer không thể migrate độc lập;
 - đọc `@stale-strict-fix` khi request strict-fix hoặc first-party surface của nó hiện diện;
 - đọc `@stale-why` khi route có contract;
 - đọc `@stale-assurance` cho backend hoặc frontend rồi tuân tracked applicability declaration;
@@ -39,7 +41,8 @@ Green phải kiếm được, không mua. Không `eslint-disable`, hạ severity
 để kết thúc finding. Decision được trả về. Formatting tách behavior. Consumer cài published lint rule và
 không author/repair private copy.
 
-Một repair record chỉ phủ một role của một project. Multi-project request coordinate record, baseline và
+Một repair record chỉ phủ một role của một project, trừ port-offset pass ghi family và mọi role đã chạm
+cùng nhau. Multi-project request coordinate record, baseline và
 diff riêng trong một approval batch. Whole-repository gate chạy một lần mỗi checkout bởi coordinator.
 
 ## PROCESS
@@ -73,22 +76,23 @@ approval và trước write đầu tiên; nếu lint-machine installation là wr
 
 Chỉ apply module đã chọn, theo thứ tự này, mỗi pass/commit đọc được:
 
-1. lint machine;
-2. strict fix;
-3. source format;
-4. source mechanical fix;
-5. source defect;
-6. retired structure;
-7. why index;
-8. delivery assurance;
-9. remnant removal.
+1. port offset;
+2. lint machine;
+3. strict fix;
+4. source format;
+5. source mechanical fix;
+6. source defect;
+7. retired structure;
+8. why index;
+9. delivery assurance;
+10. remnant removal.
 
 Skip pass không chọn hoặc clean. Empty-directory removal có thể không có Git diff nhưng vẫn ghi absolute
 path và before/after count. External credential/check unavailable làm assurance incomplete.
 
 ### 6 — Parallel defect repair
 
-Chỉ source defect được fan out, partition theo file để hai agent không edit cùng file. Machine, strict-fix,
+Chỉ source defect được fan out, partition theo file để hai agent không edit cùng file. Port allocation, machine, strict-fix,
 formatting, autofix, structure, why, assurance và remnant là single-writer. Agent chỉ chạy file-scoped lint;
 coordinator sở hữu shared-state gate và remeasurement.
 

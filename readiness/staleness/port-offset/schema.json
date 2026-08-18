@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v3/readiness/staleness/port-offset/schema.json",
+  "title": "Source port allocation registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "slotStep", "families"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "version": {"const": 1},
+    "slotStep": {"type": "integer", "minimum": 1},
+    "families": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["offset", "applications"],
+        "properties": {
+          "offset": {"type": "integer", "minimum": 0},
+          "applications": {
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    }
+  }
+}

@@ -9,6 +9,7 @@ title: Stale registry
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
 | `@stale-source-gates` | `readiness/staleness/source-gates` | module | declared project gate và source finding |
+| `@stale-port-offset` | `readiness/staleness/port-offset` | module | family offset, application slot và collision proof do Source sở hữu |
 | `@stale-lint-machine` | `readiness/staleness/lint-machine` | module | canon adoption và vendored-rule detection |
 | `@stale-strict-fix` | `readiness/staleness/strict-fix` | module | first-party Prettier integration |
 | `@stale-why` | `readiness/staleness/why` | module | contract index findability |
@@ -18,7 +19,7 @@ title: Stale registry
 
 ## Mục đích
 
-Registry route qua `@stale-source-gates`, `@stale-lint-machine`, `@stale-strict-fix`, `@stale-why`,
+Registry route qua `@stale-source-gates`, `@stale-port-offset`, `@stale-lint-machine`, `@stale-strict-fix`, `@stale-why`,
 `@stale-assurance`, `@stale-retired-structure` và `@stale-remnant`.
 
 Cho `starci-repair` và `starci-stale-list` dùng một vocabulary. Stale list đo các category này; repair áp
@@ -33,6 +34,7 @@ Route staleness không có repair module ở đây vì owner của nó là `star
 | Category | Stale khi | Được clear bởi |
 |---|---|---|
 | `route` | checkout, contract, branch hoặc recorded head không còn mô tả đúng máy này | `starci-init` |
+| `port-offset` | Source allocation absent/invalid, product sở hữu offset, projection lệch hoặc local listener collision | `starci-repair`, port-offset pass |
 | `source` | gate format/lint/type/build/unit đã khai báo fail, hoặc không có gate surface có nghĩa | `starci-repair`, source-gates pass |
 | `index` | contract `why` mô tả shape thay vì need dùng để tìm nó | `starci-repair`, why pass |
 | `machine` | thiếu published lint canon hoặc config import vendored rule copy | `starci-repair`, lint-machine pass |

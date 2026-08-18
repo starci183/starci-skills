@@ -32,8 +32,9 @@ adds no write. Execute requested local actions in registry order:
    blocked. Never display private material. Installing `~/.starci/master.identity` is a separate write.
 2. **Bootstrap** — prove the trust entry exists; classify and display complete before/after content for
    `AGENTS.md` and `CLAUDE.md`.
-3. **Workspaces** — verify the Source-wide language and every declared project/role read route against
-   the real checkout.
+3. **Workspaces** — verify the Source-wide language, persistent family offsets/application slots, and
+   every declared project/role read route against the real checkout. Allocation stays in
+   `.workspace/ports.json`; init never copies it into a product.
 4. **Worktrees** — verify the project registry, sessions and cache roots against Git's own worktree
    account and path policy.
 
