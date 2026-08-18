@@ -160,29 +160,29 @@ function withoutSections(lines, sections) {
     .join("\n");
 }
 
-function parseHands(file, lines, loads, isSkill) {
-  const heading = "## HANDS OFF TO — named, never loaded";
+function parseNested(file, lines, loads, isSkill) {
+  const heading = "## NESTED SKILLS";
   const positions = lines
     .map((line, index) => (line === heading ? index : -1))
     .filter((index) => index >= 0);
   if (!isSkill) {
-    if (positions.length) report(file, positions[0] + 1, "only skills may declare HANDS OFF TO");
-    return { names: [], start: -1, end: -1 };
+    if (positions.length) report(file, positions[0] + 1, "only skills may declare NESTED SKILLS");
+    return { start: -1, end: -1 };
   }
   if (positions.length !== 1) {
-    report(file, loads.end + 1, "skills must declare HANDS OFF TO exactly once");
-    return { names: [], start: -1, end: -1 };
+    report(file, loads.end + 1, "skills must declare NESTED SKILLS exactly once");
+    return { start: -1, end: -1 };
   }
   const start = positions[0];
-  if (start !== loads.end) report(file, start + 1, "HANDS OFF TO must immediately follow LOADS");
+  if (start !== loads.end) report(file, start + 1, "NESTED SKILLS must immediately follow LOADS");
   const end = sectionEnd(lines, start);
   const content = lines.slice(start + 1, end).join("\n");
   const names = [...content.matchAll(/`(starci-[a-z-]+)`/g)].map((match) => match[1]);
-  if (new Set(names).size !== names.length) report(file, start + 1, "duplicate HANDS OFF TO name");
-  if (names.length === 0 && !lines.slice(start + 1, end).some((line) => line.trim() === "None.")) {
-    report(file, start + 1, "empty HANDS OFF TO must say None.");
+  if (names.length) report(file, start + 1, "NESTED SKILLS must be None; skills never invoke skills");
+  if (!lines.slice(start + 1, end).some((line) => /^(?:None|Không có)\./.test(line.trim()))) {
+    report(file, start + 1, "NESTED SKILLS must explicitly say None.");
   }
-  return { names, start, end };
+  return { start, end };
 }
 
 function tableAllowsSkill(lines, index, skill) {
@@ -196,7 +196,7 @@ function tableAllowsSkill(lines, index, skill) {
   );
 }
 
-function validateSkillNames(file, lines, hands) {
+function validateSkillNames(file, lines, nested) {
   const own = dirname(file).split(sep).at(-1);
   let section = "";
   const seen = new Set();
@@ -204,24 +204,20 @@ function validateSkillNames(file, lines, hands) {
     if (/^## /.test(lines[index])) section = lines[index];
     for (const match of lines[index].matchAll(/starci-[a-z-]+/g)) {
       const name = match[0];
-      if (name === own || (index >= hands.start && index < hands.end)) continue;
+      if (name === own || (index >= nested.start && index < nested.end)) continue;
       seen.add(name);
       const stop = (section === "## Stops" || section === "## Điểm dừng") && /^\s*- /.test(lines[index]);
       const owner = tableAllowsSkill(lines, index, name);
       if (!stop && !owner) report(file, index + 1, `copied law: ${name} is outside a Stop row or owner cell`);
-      if (!hands.names.includes(name)) report(file, index + 1, `${name} is missing from HANDS OFF TO`);
-      if (/\b(?:read|load|open|invoke|run)\b/i.test(lines[index])) {
-        report(file, index + 1, `level violation: HANDS OFF TO target ${name} is described as loaded`);
+      if (!owner && /\b(?:read|load|open|invoke|run|start|call|route|handover)\b|\bhand\s+over\b|\breturn\s+to\b|\b(?:gọi|chạy|chuyển|route|trả về)\b/iu.test(lines[index])) {
+        report(file, index + 1, `nested skill invocation: ${name}`);
       }
     }
   }
-  for (const name of hands.names) {
-    if (!seen.has(name)) report(file, hands.start + 1, `dead HANDS OFF TO name: ${name}`);
-  }
 }
 
-function validateBody(file, lines, loads, hands, knownAliases) {
-  const body = withoutSections(lines, [loads, hands].filter(({ start }) => start >= 0));
+function validateBody(file, lines, loads, nested, knownAliases) {
+  const body = withoutSections(lines, [loads, nested].filter(({ start }) => start >= 0));
   for (const row of loads.rows) {
     const pattern = new RegExp(`(^|[^a-z0-9-])${row.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9-]|/)`, "g");
     const matches = [...body.matchAll(pattern)];
@@ -265,18 +261,18 @@ for (const file of files) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const loads = parseLoads(file, lines);
   const isSkill = /[\\/]skills[\\/]starci-[^\\/]+[\\/](?:SKILL|vi)\.md$/.test(file);
-  const hands = parseHands(file, lines, loads, isSkill);
-  parsed.set(file, { lines, loads, hands, isSkill });
+  const nested = parseNested(file, lines, loads, isSkill);
+  parsed.set(file, { lines, loads, nested, isSkill });
 }
 
 const knownAliases = new Set(
   [...parsed.values()].flatMap(({ loads }) => loads.rows.map(({ alias }) => alias)),
 );
 for (const [file, record] of parsed) {
-  const { lines, loads, hands, isSkill } = record;
+  const { lines, loads, nested, isSkill } = record;
   loads.rows.forEach((row) => resolveTarget(file, row));
-  validateBody(file, lines, loads, hands, knownAliases);
-  if (isSkill) validateSkillNames(file, lines, hands);
+  validateBody(file, lines, loads, nested, knownAliases);
+  if (isSkill) validateSkillNames(file, lines, nested);
   for (let index = 0; index < lines.length; index += 1) {
     if (/^### [0-9]+[a-z] —/.test(lines[index])) report(file, index + 1, "patched step label");
   }

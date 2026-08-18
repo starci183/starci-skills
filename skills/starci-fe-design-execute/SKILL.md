@@ -17,9 +17,9 @@ description: Implement an accepted frontend design in the real frontend source â
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the session graph before production work |
 | `@workspaces` | `contexts/workspaces` | module | resolve and verify the frontend checkout |
 
-## HANDS OFF TO â€” named, never loaded
+## NESTED SKILLS
 
-None.
+None. This skill never invokes another skill.
 
 
 ## Run

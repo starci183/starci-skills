@@ -10,9 +10,9 @@ title: Initialize Source · Vietnamese
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-None.
+Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 

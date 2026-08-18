@@ -11,9 +11,9 @@ description: Trace another skill's flow against the real machine without running
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-None.
+None. This skill never invokes another skill.
 
 
 ## Run

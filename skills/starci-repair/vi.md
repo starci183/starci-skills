@@ -10,9 +10,9 @@ title: Repair source · Vietnamese
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape` | module | hợp đồng báo cáo chung mà mọi skill đều đọc |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-`starci-init`
+Không có. Skill báo route stale rồi kết thúc; nó không tự chạy setup.
 
 ## Cách chạy
 
@@ -112,7 +112,7 @@ tree trong `git diff <baseline>`; mọi proof chưa chạy nằm trong `OWED` c�
 
 ## Điểm dừng
 
-- Route stale → trả về `starci-init` và gọi tên field sai.
+- Route stale → gọi tên field sai rồi kết thúc lượt chạy.
 - Gate chỉ pass khi suppression → dừng; đây là điều skill tồn tại để từ chối.
 - Lint rule mâu thuẫn canon → dừng; đó là thay đổi trust tree, không phải product repair.
 - Tree dirty bởi việc không liên quan → dừng; mixed baseline không chứng minh gì.

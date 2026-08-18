@@ -16,9 +16,9 @@ title: Frontend design block · Vietnamese
 | `@worktrees` | `contexts/worktrees` | module | kiểm tra registry và preview root |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-None.
+Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 

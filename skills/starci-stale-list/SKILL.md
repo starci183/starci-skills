@@ -12,9 +12,9 @@ description: List every project in the workspace that is not in a state you can 
 | `@export-state` | `scripts/export-console-state.mjs` | script | measure workspace, contract and lint-machine state |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
 
-## HANDS OFF TO — named, never loaded
+## NESTED SKILLS
 
-`starci-init` · `starci-repair`
+None. This skill reports ownership; it never invokes the named capability.
 
 ## Run
 
@@ -138,17 +138,17 @@ thing that changed the machine it was measuring.
 
 ## Stops
 
-- `.workspace` does not exist → stop; the Source has no routes at all, cleared by `starci-init` after the owner declares the project.
+- `.workspace` does not exist → stop; report that the Source has no routes and end this run.
 - A route file is present but unparseable → report it as its own row. It is neither stale nor absent:
   it is invalid, and it fails differently.
-- The reader asks for a fix → hand over to `starci-init` with the rows already measured, so the verdict
-  arrives cheap.
+- The reader asks for a fix → finish this report. A fix requires a separate owner request and run; do not
+  start it from this skill.
 
 ## OUTPUT
 
 The six tables from the skill shape, in order. `OUTPUTS` carries the rollup — projects, their stale roles,
 and the count of clean routes; `CHANGES` is `None`, always, and a run where it is not is a failed run;
-`NEED APPROVALS` is `None` unless the reader asked for a repair, in which case it is the handover;
+`NEED APPROVALS` is `None`; a repair request is a separate run rather than a handover;
 `WARNINGS` carries the non-route findings, and every checkout whose lint rules are not the published
 packages belongs there rather than in `OWED` — nothing is owed by this run, the finding is that a later
 count would not be evidence; `OWED` carries any route the scan could not verify and the reason it could not.
