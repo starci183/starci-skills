@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { delimiter, dirname, join, resolve } from "node:path"
 import { createInterface } from "node:readline"
 
 const fail = (message) => {
@@ -78,6 +78,26 @@ const runWithSecret = ({ command, args, cwd, secret, label }) => {
     console.log(`ok: ${label}`)
 }
 
+// On Windows, spawning the `npm.cmd` shim with piped stdin can fail with EINVAL before the child
+// starts. Invoke npm's JavaScript CLI through the current Node executable instead. The first
+// candidate covers the standard Node installer; the PATH scan covers version managers and portable
+// installations. Resolve this before asking for a secret so an invalid machine never makes the
+// operator type the value twice.
+const resolveNpm = () => {
+    if (process.platform !== "win32") return { command: "npm", args: [] }
+
+    const candidates = [
+        join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+        ...(process.env.PATH ?? "")
+            .split(delimiter)
+            .filter(Boolean)
+            .map((entry) => join(entry, "node_modules", "npm", "bin", "npm-cli.js")),
+    ]
+    const npmCli = candidates.find(existsSync)
+    if (!npmCli) fail("npm CLI was not found beside node.exe or on PATH")
+    return { command: process.execPath, args: [npmCli] }
+}
+
 const main = async () => {
     const args = process.argv.slice(2)
     const name = valueFor(args, "--name")
@@ -101,6 +121,8 @@ const main = async () => {
         }
     }
 
+    const npm = stacks.length > 0 ? resolveNpm() : null
+
     console.log(`secret name: ${name}`)
     console.log(`source: process env ${envName}, otherwise hidden interactive input`)
     for (const { project, record } of stacks) console.log(`stack: ${project} -> .stacks/${record}.enc`)
@@ -115,11 +137,10 @@ const main = async () => {
 
     process.env[envName] = secret
     try {
-        const npm = process.platform === "win32" ? "npm.cmd" : "npm"
         for (const { project, record } of stacks) {
             runWithSecret({
-                command: npm,
-                args: ["run", "secret:set", "--", record],
+                command: npm.command,
+                args: [...npm.args, "run", "secret:set", "--", record],
                 cwd: project,
                 secret,
                 label: `.stacks/${record}.enc in ${project}`,
