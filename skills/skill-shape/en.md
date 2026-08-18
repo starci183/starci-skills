@@ -92,7 +92,8 @@ word as authority over work nobody listed has stopped asking and started assumin
 ## Phases
 
 **Design rounds** are the review surface. Direction choices support a layout round and have no approval
-hash of their own; the selected object is embedded in the layout candidate. Each recorded round keeps the exact prompt, the candidates, the
+hash of their own; their exact candidates, selection or feedback live in that layout round's
+`directionReview`, and the selected object is embedded in the layout candidate. Each recorded round keeps the exact prompt, the candidates, the
 feedback and the owner's verdict, and acceptance is bound to a hash. Feedback opens a new round; it
 never edits an accepted round.
 

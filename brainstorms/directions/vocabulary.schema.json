@@ -4,10 +4,11 @@
   "title": "Visual vocabulary inventory",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "root", "sources", "tokens"],
+  "required": ["schema", "root", "digest", "sources", "tokens"],
   "properties": {
     "schema": {"const": 1},
     "root": {"type": "string", "minLength": 1},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the ordered source paths and exact token declarations."},
     "sources": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "tokens": {
       "type": "array",
@@ -16,7 +17,7 @@
         "additionalProperties": false,
         "required": ["name", "declarations"],
         "properties": {
-          "name": {"type": "string", "pattern": "^--[a-z0-9]+(-[a-z0-9]+)*$"},
+          "name": {"type": "string", "pattern": "^--[A-Za-z_][A-Za-z0-9_-]*$"},
           "declarations": {
             "type": "array",
             "minItems": 1,

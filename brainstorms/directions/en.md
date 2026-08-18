@@ -44,11 +44,12 @@ the six inputs and are never copied into the tree as canon.
 
 1. State the audience, task and intended feeling in one sentence each. Refuse when the request gives
    no basis for any of them.
-2. Inventory the live vocabulary and record its source state as `vocabularyAt` inside every direction.
+2. Inventory the live vocabulary and record its content digest as `vocabularyAt` inside every direction.
    A `reuse` token must occur in that inventory; a `new` token must not.
 3. Read accepted screens as evidence, not as a command to repeat them. Record what was accepted and
    what the new surface needs differently.
-4. Choose axis sets before naming directions. Two identical sets are one direction.
+4. Choose axis sets before naming directions. Two identical sets are one direction; two different axis
+   labels backed by identical role-to-token decisions are also one direction because they render alike.
 5. Map every semantic role to one token decision. A new token carries the reason the current vocabulary
    cannot answer.
 6. Name what each direction rejects. A direction with no boundary is an adjective, not a decision.
@@ -86,10 +87,10 @@ approval.
 ## Rules
 
 1. A direction carries no class. A raw visual value appears only inside a `new` token decision.
-2. Every direction carries the batch's `vocabularyAt`; every `reuse` token exists there and every `new` token is absent.
+2. Every direction carries the inventory digest as `vocabularyAt`; every `reuse` token exists there and every `new` token is absent.
 3. Every direction maps all thirteen roles; `none` is legal only for radius, elevation, duration and easing.
 4. Every direction names three to five personality words and one to five explicit rejections.
-5. No two directions in a batch share their whole axis set.
+5. No two directions in a batch share their whole axis set or their whole role-to-token mapping.
 6. At least one direction departs from the nearest precedent when a precedent exists.
 7. Return fewer than three only when the evidence permits fewer, and state why; never pad a batch.
 8. Feedback opens a new round. An accepted direction is never edited in place.

@@ -9,6 +9,7 @@
 
 import {existsSync, readdirSync, readFileSync, statSync} from "node:fs";
 import {mkdir, writeFile} from "node:fs/promises";
+import {createHash} from "node:crypto";
 import {dirname, relative, resolve, sep} from "node:path";
 
 const args = process.argv.slice(2);
@@ -53,8 +54,8 @@ const declarations = new Map();
 for (const file of files) {
   const source = relative(root, file).split(sep).join("/");
   const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const match of css.matchAll(/(^|[;{\s])(--[a-z0-9]+(?:-[a-z0-9]+)*)\s*:\s*([^;{}]+);/gim)) {
-    const name = match[2].toLowerCase();
+  for (const match of css.matchAll(/(^|[;{\s])(--[A-Za-z_][A-Za-z0-9_-]*)\s*:\s*([^;{}]+);/gm)) {
+    const name = match[2];
     const value = match[3].trim().replace(/\s+/g, " ");
     if (!value) continue;
     const rows = declarations.get(name) ?? [];
@@ -63,14 +64,18 @@ for (const file of files) {
   }
 }
 
+const sources = files.map((file) => relative(root, file).split(sep).join("/"));
+const tokens = [...declarations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, rows]) => ({
+    name,
+    declarations: rows,
+  }));
+const digest = createHash("sha256").update(JSON.stringify({sources, tokens})).digest("hex");
 const inventory = {
   schema: 1,
   root,
-  sources: files.map((file) => relative(root, file).split(sep).join("/")),
-  tokens: [...declarations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, rows]) => ({
-    name,
-    declarations: rows,
-  })),
+  digest,
+  sources,
+  tokens,
 };
 
 await mkdir(dirname(out), {recursive: true});

@@ -10,7 +10,11 @@ description: Produce 3–4 block anatomy JSON candidates for each region under a
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | validate block anatomy JSON |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest bound by the accepted layout |
+| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@workspaces` | `contexts/workspaces` | module | resolve and verify the frontend checkout |
+| `@worktrees` | `contexts/worktrees` | module | verify registry ownership and preview roots |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
 ## HANDS OFF TO — named, never loaded
@@ -33,6 +37,9 @@ hash, never to a rendered page.
 
 ### 2 — Require an accepted layout and resolve its direction
 
+The accepted hash is read from the session record `@session` describes; a block round is appended to that
+same session, never to a new one.
+
 Read the session. A region may enter block rounds only if the layout candidate that contains it carries
 an **accepted** hash. Resolve the visual direction through that layout candidate; do not accept a second
 direction hash from the caller. A proposed layout is not a starting point.
@@ -42,9 +49,12 @@ hash — and therefore the same bound direction — and opens a new round for th
 
 ### 3 — Verify route and roots
 
-Same as layout: verify the `fe` route before reading (`WORKSPACE-5`), then the registry's lock,
-cleanliness and ownership (`WORKTREE-1`, `WORKTREE-4`). Preview into `cache/preview`
-(`WORKTREE-2`), never below `.claude` (`WORKTREE-3`).
+Read `@workspaces` and verify the `fe` route before reading (`WORKSPACE-5`), then read `@worktrees` and
+verify the registry's lock, cleanliness and ownership (`WORKTREE-1`, `WORKTREE-4`). Preview into
+`cache/preview` (`WORKTREE-2`), never below `.claude` (`WORKTREE-3`).
+
+Run `@inventory-visual-language` again. Its digest must equal the accepted direction's `vocabularyAt`;
+a mismatch stops here, before a stale preview can produce a new block decision.
 
 ### 4 — Read the eight inputs
 
@@ -110,10 +120,20 @@ The preview resolves only the accepted direction's semantic roles. Its fixed doc
 never a source of product classes. Every anatomy in a batch uses the same direction, copy and data; a
 preview that changes any of those or shows only the populated state invalidates the comparison.
 
+**8080 is where the search starts, not where it stops.** Bind it; if it is taken, try 8081, 8082, and keep
+going until one binds, then **print the URL actually served**. A run that dies because somebody's dev server
+holds 8080 has failed at nothing the owner asked about, and a run that prints a URL nobody can open is worse
+than one that prints none. Bound the search — twenty ports is a busy machine, two hundred is a bug — and if
+nothing binds, say so instead of serving nowhere quietly.
+
+
 ### 10 — Queue for approval and record the verdict
 
-Queue in `registries`, not `sessions`. On acceptance, bind the hash. On feedback, open a **new round**,
-append it, and record `REJECTED` with the actual anatomy, its replacement and the owner's words.
+Queue in `registries`, not `sessions`, and record the accepted parent `layoutHash` beside the independent
+block hash. On acceptance, mark the previous accepted block for that `(layoutHash, region)`
+`superseded` and point `supersededBy` at the replacement. On feedback, open a **new round**, append it,
+and record `REJECTED` with the actual anatomy, its replacement and the owner's words. Validate the
+updated session with `@validate-artifact` and `@session` before closing.
 
 ### 11 — Close the phase
 

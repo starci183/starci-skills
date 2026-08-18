@@ -33,11 +33,14 @@ Four species, split by **what each is allowed to return** — not by the order t
 | `@compilers` | execution | exactly one answer; the law closes the choice — `@principles` decide classes, `@patterns` decide where the code lands |
 | `@gates` | refusal | pass, or reject with the evidence — `lints` only |
 
-`@skills` holds the six capabilities and the reporting shape they share. `@scripts` holds the
+`@skills` holds the nine capabilities and the reporting shape they share. `@scripts` holds the
 validator that makes the JSON schemas real rather than decorative.
 
 Every module is two records of the same document: `en.md` for the agent, `vi.md` for the human. They
 match section for section and neither refers to the other.
+
+Each capability keeps `SKILL.md` as its binding runtime entry and publishes `vi.md` beside it for a human
+reader. The two records keep the same sections, dependencies, situation codes and stops.
 
 ## Why it refuses
 

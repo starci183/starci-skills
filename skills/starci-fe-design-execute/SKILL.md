@@ -10,8 +10,12 @@ description: Implement an accepted frontend design in the real frontend source �
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@lints-fe` | `gates/fe/lints` | module | prove the frontend source at its real gate |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest approved inside each layout |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve files, exports and import boundaries |
+| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
 | `@skill-shape` | `skills/skill-shape` | module | the shared reporting contract every skill reads |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the session graph before production work |
+| `@workspaces` | `contexts/workspaces` | module | resolve and verify the frontend checkout |
 
 ## HANDS OFF TO — named, never loaded
 
@@ -32,8 +36,10 @@ with the owner before the first write. Detection is not permission.
 
 ### 2 — Refuse unless every reachable hash is accepted
 
-Walk the session. For the surfaces in scope, every layout hash and every block hash reachable from them
-must be **accepted**, not proposed.
+Validate the session with `@validate-artifact` and `@session`. Reachable means the one queue entry whose
+layout state is currently `accepted`, plus block entries whose `layoutHash` equals it. Historical
+`rejected` and `superseded` entries remain evidence but are not implementation inputs. For each reachable
+region, exactly one block may be current; an entry still `queued` is unanswered and refuses.
 
 If any is unaccepted, **stop and name it**. There is no orchestrator to have checked this earlier, and
 nothing else in the tree makes a proposed hash acceptable. A partial start is the failure mode this
@@ -42,7 +48,8 @@ cheaply.
 
 ### 3 — Verify the route, then take the baseline
 
-Verify the `fe` route (`WORKSPACE-5`). Then commit the current target state and record
+Read `@workspaces` and verify the `fe` route (`WORKSPACE-5`). Run `@inventory-visual-language`; its digest
+must equal every reachable `direction.vocabularyAt`. Only then commit the current target state and record
 `Baseline commit: <sha>` — taken **before** the first change, never from a half-edited tree, so
 `git diff <baseline>` is the honest account of what this run did.
 

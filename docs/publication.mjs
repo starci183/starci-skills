@@ -9,10 +9,10 @@
 //   title       sidebar and heading label
 //   description one line under the shelf heading
 //
-// A module is any directory holding `en.md` — the binding rules for an agent, and the module's own
-// page. `vi.md` beside it is published as the human guide; a module without one simply has no
-// second page. One level of family nesting is allowed, so `laws/b1-one-surface-owner` publishes
-// with `laws` as its own sidebar group.
+// A module is any directory holding `en.md`, or a skill directory holding its required `SKILL.md`.
+// That file is the binding record and the module's own page. `vi.md` beside it is published as the
+// human guide; a module without one simply has no second page. One level of family nesting is
+// allowed, so `laws/b1-one-surface-owner` publishes with `laws` as its own sidebar group.
 export const groups = [
   {
     source: "compilers/principles",
@@ -22,7 +22,7 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all six capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all nine capabilities share.",
   },
   {
     source: "contexts",

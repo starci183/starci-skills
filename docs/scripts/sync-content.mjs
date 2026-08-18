@@ -11,8 +11,8 @@ if (relative(siteRoot, contentRoot) !== "content") {
   throw new Error(`Refusing to replace unexpected path: ${contentRoot}`);
 }
 
-// A module leads with `en.md` — the binding rules an agent reads — and publishes whichever of these
-// records sit beside it, in sidebar order.
+// A module leads with `en.md`, or with the required `SKILL.md` in a skill directory, and publishes
+// whichever human records sit beside it, in sidebar order.
 const RECORDS = ["vi"];
 const RECORD_LABELS = {
   vi: "vi",
@@ -87,8 +87,9 @@ async function discoverModules(root, prefix = "") {
     const here = resolve(root, entry.name);
     const id = prefix ? `${prefix}/${entry.name}` : entry.name;
     const names = new Set(await readdir(here));
-    if (names.has("en.md")) {
-      found.push({id, records: RECORDS.filter((record) => names.has(`${record}.md`))});
+    const binding = names.has("en.md") ? "en.md" : names.has("SKILL.md") ? "SKILL.md" : null;
+    if (binding) {
+      found.push({id, binding, records: RECORDS.filter((record) => names.has(`${record}.md`))});
       continue;
     }
     if (!prefix) found.push(...(await discoverModules(here, entry.name)));
@@ -179,7 +180,7 @@ await Promise.all(
       )
     ),
     ...group.modules.flatMap((module) => [
-      publish(`${group.source}/${module.id}/en.md`, `${group.route}/${module.id}/index.mdx`),
+      publish(`${group.source}/${module.id}/${module.binding}`, `${group.route}/${module.id}/index.mdx`),
       ...module.records.map((record) =>
         publish(`${group.source}/${module.id}/${record}.md`, `${group.route}/${module.id}/${record}.mdx`)
       ),

@@ -2,89 +2,280 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/skills/skill-shape/session.schema.json",
   "title": "Design session",
-  "description": "The append-only record a design session keeps. Rounds are appended, never edited: an accepted round is evidence, and feedback opens the next round instead of rewriting the last.",
+  "description": "The append-only record a design session keeps, stored inside the registry worktree at `<Source>/.worktrees/<project>/registries/decisions/<surface>.json`. Rounds are appended, never edited: an accepted round is evidence, and feedback opens the next round instead of rewriting the last. A candidate body is written once to `objects/sha256/<hash>.json` and referenced by hash from then on, so a round can cite a proposal without copying it — and two rounds proposing the same thing cite one object.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "id", "project", "surface", "phase", "rounds", "queue"],
+  "required": [
+    "schema",
+    "id",
+    "project",
+    "surface",
+    "phase",
+    "chain",
+    "rounds",
+    "queue"
+  ],
   "properties": {
-    "schema": {"const": 1},
-    "id": {"$ref": "#/$defs/id"},
-    "project": {"$ref": "#/$defs/slug", "description": "Declared by the user and resolved through the workspace route, never inferred from a folder."},
-    "surface": {"$ref": "#/$defs/slug", "description": "Session identity IS the surface. A reworded prompt is a new round, not a new session."},
-    "phase": {"enum": ["layout", "block", "execute", "complete"]},
+    "schema": {
+      "const": 1
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "project": {
+      "$ref": "#/$defs/slug",
+      "description": "Declared by the user and resolved through the workspace route, never inferred from a folder."
+    },
+    "surface": {
+      "$ref": "#/$defs/slug",
+      "description": "Session identity IS the surface. A reworded prompt is a new round, not a new session."
+    },
+    "phase": {
+      "enum": [
+        "layout",
+        "block",
+        "execute",
+        "complete"
+      ]
+    },
     "rounds": {
       "type": "array",
       "minItems": 1,
-      "items": {"$ref": "#/$defs/round"}
+      "items": {
+        "$ref": "#/$defs/round"
+      }
     },
     "queue": {
       "description": "Pending decisions. Durable, which is why it lives in `registries` and not in the disposable `sessions` root.",
       "type": "array",
-      "items": {"$ref": "#/$defs/queued"}
+      "items": {
+        "$ref": "#/$defs/queued"
+      }
+    },
+    "chain": {
+      "description": "Seals the rounds. `head` is the hash of the last sealed round and `sequence` counts them, so a round edited in place stops matching the chain — the property the round array alone cannot have. Mirrors `registry.json` at the registry root, which seals every session in the project the same way.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "head",
+        "sequence"
+      ],
+      "properties": {
+        "head": {
+          "$ref": "#/$defs/hash"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   },
   "$defs": {
     "round": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["number", "phase", "prompt", "produced", "verdict"],
+      "required": [
+        "number",
+        "phase",
+        "prompt",
+        "produced",
+        "verdict"
+      ],
       "properties": {
-        "number": {"type": "integer", "minimum": 1},
-        "phase": {"enum": ["layout", "block"]},
-        "prompt": {"type": "string", "minLength": 1, "description": "The exact request or feedback that opened this round."},
-        "region": {"$ref": "#/$defs/slug", "description": "Present for block rounds."},
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "phase": {
+          "enum": [
+            "layout",
+            "block"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The exact request or feedback that opened this round."
+        },
+        "region": {
+          "$ref": "#/$defs/slug",
+          "description": "Present for block rounds."
+        },
+        "layoutHash": {
+          "$ref": "#/$defs/hash",
+          "description": "Present for block rounds: the accepted parent layout. This is a dependency edge, not part of the independently hashed anatomy."
+        },
+        "directionReview": {
+          "$ref": "#/$defs/directionReview",
+          "description": "Present on a layout round while the owner compares no-hash direction choices."
+        },
         "produced": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
+          "description": "Empty only while a direction review is still open; layout and block candidates are stored by hash once produced.",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "hash"],
+            "required": [
+              "id",
+              "hash"
+            ],
             "properties": {
-              "id": {"$ref": "#/$defs/slug"},
-              "hash": {"$ref": "#/$defs/hash", "description": "Of the canonical candidate or anatomy. Never of a rendered page."}
+              "id": {
+                "$ref": "#/$defs/slug"
+              },
+              "hash": {
+                "$ref": "#/$defs/hash",
+                "description": "Of the canonical candidate, never of a rendered page. The body lives at `objects/sha256/<hash>.json`; this is the reference to it."
+              }
             }
           }
         },
-        "refusal": {"type": "string", "minLength": 12, "description": "The product decision this round could not make."},
+        "refusal": {
+          "type": "string",
+          "minLength": 12,
+          "description": "The product decision this round could not make."
+        },
         "verdict": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["state"],
+          "required": [
+            "state"
+          ],
           "properties": {
-            "state": {"enum": ["pending", "accepted", "feedback"]},
-            "acceptedHash": {"$ref": "#/$defs/hash"},
+            "state": {
+              "enum": [
+                "pending",
+                "accepted",
+                "feedback"
+              ]
+            },
+            "acceptedHash": {
+              "$ref": "#/$defs/hash"
+            },
             "rejected": {
               "description": "The actual proposal refused, its replacement, and the owner's reason in their words. Never reconstructed from memory.",
               "type": "array",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["hash", "reason"],
+                "required": [
+                  "hash",
+                  "reason"
+                ],
                 "properties": {
-                  "hash": {"$ref": "#/$defs/hash"},
-                  "instead": {"$ref": "#/$defs/slug"},
-                  "reason": {"type": "string", "minLength": 1}
+                  "hash": {
+                    "$ref": "#/$defs/hash"
+                  },
+                  "instead": {
+                    "$ref": "#/$defs/slug"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 }
               }
             }
           }
+        },
+        "sealed": {
+          "$ref": "#/$defs/hash",
+          "description": "The chain value after this round was appended. Absent on the round still open."
+        }
+      }
+    },
+    "directionReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vocabularyAt",
+        "candidates",
+        "state"
+      ],
+      "properties": {
+        "vocabularyAt": {
+          "$ref": "#/$defs/hash"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "../../brainstorms/directions/schema.json#/$defs/direction"
+          },
+          "description": "The exact transient choices shown to the owner. They carry no approval hash."
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "selected",
+            "feedback"
+          ]
+        },
+        "selectedId": {
+          "$ref": "#/$defs/slug"
+        },
+        "feedback": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The owner's words when feedback opens the next direction review."
         }
       }
     },
     "queued": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["hash", "phase", "state"],
+      "required": [
+        "hash",
+        "phase",
+        "state"
+      ],
       "properties": {
-        "hash": {"$ref": "#/$defs/hash"},
-        "phase": {"enum": ["layout", "block"]},
-        "region": {"$ref": "#/$defs/slug"},
-        "state": {"enum": ["queued", "accepted", "rejected"]}
-      }
+        "hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "phase": {
+          "enum": [
+            "layout",
+            "block"
+          ]
+        },
+        "region": {
+          "$ref": "#/$defs/slug"
+        },
+        "layoutHash": {
+          "$ref": "#/$defs/hash",
+          "description": "Required for block decisions: the accepted layout that makes this block reachable."
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "accepted",
+            "rejected",
+            "superseded"
+          ],
+          "description": "Also the directory the reference sits in."
+        },
+        "supersededBy": {
+          "$ref": "#/$defs/hash",
+          "description": "The accepted replacement; required when state is superseded."
+        }
+      },
+      "description": "One pending or settled decision. Its `state` is also its place on disk: a reference file under `layouts/<state>/<hash>.ref` or `blocks/<state>/<hash>.ref`, so the directory listing and this array cannot disagree without one of them being wrong out loud."
     },
-    "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
-    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?$"}
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?$"
+    }
   }
 }

@@ -11,6 +11,8 @@ const validator = join(root, "scripts", "validate-artifact.mjs");
 const inventoryScript = join(root, "scripts", "inventory-visual-language.mjs");
 const temp = mkdtempSync(join(tmpdir(), "starci-direction-"));
 const hash = "a".repeat(64);
+const vocabularyAt = "b".repeat(64);
+const blockHash = "c".repeat(64);
 
 const write = (name, value) => {
   const path = join(temp, name);
@@ -29,19 +31,20 @@ const mustFail = (...args) => {
 };
 
 const tokenNames = [
-  "--background", "--card", "--foreground", "--muted-foreground", "--primary", "--border", "--font-sans", "--radius",
+  "--background", "--card", "--foreground", "--muted-foreground", "--primary", "--secondary", "--border", "--font-sans", "--radius",
 ];
 const vocabulary = write("vocabulary.json", {
   schema: 1,
   root: temp,
+  digest: vocabularyAt,
   sources: ["app.css"],
   tokens: tokenNames.map((name) => ({name, declarations: [{source: "app.css", value: "initial"}]})),
 });
 
 const decision = (token) => ({verdict: "reuse", token});
-const direction = (id, axes) => ({
+const direction = (id, axes, accent = "--primary") => ({
   id,
-  vocabularyAt: "abc123",
+  vocabularyAt,
   axes,
   citesPrecedent: id === "quiet-precision" ? "none" : "catalogue/2026-08-18",
   personality: ["calm", "precise", "restrained"],
@@ -50,7 +53,7 @@ const direction = (id, axes) => ({
     surface: decision("--card"),
     content: decision("--foreground"),
     mutedContent: decision("--muted-foreground"),
-    accent: decision("--primary"),
+    accent: decision(accent),
     separator: decision("--border"),
     display: decision("--font-sans"),
     body: decision("--font-sans"),
@@ -65,11 +68,17 @@ const direction = (id, axes) => ({
 });
 
 const quiet = direction("quiet-precision", {contrast: "balanced", density: "compact", shape: "soft", depth: "flat", motion: "still"});
-const editorial = direction("editorial-clarity", {contrast: "strong", density: "spacious", shape: "square", depth: "flat", motion: "still"});
+const editorial = direction("editorial-clarity", {contrast: "strong", density: "spacious", shape: "square", depth: "flat", motion: "still"}, "--secondary");
+const fakeEditorial = direction("fake-editorial", {contrast: "strong", density: "spacious", shape: "square", depth: "flat", motion: "still"});
 const directionBatch = write("directions.json", {
   schema: 1,
-  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt: "abc123"},
+  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
   directions: [quiet, editorial],
+});
+const fakeDirections = write("fake-directions.json", {
+  schema: 1,
+  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  directions: [quiet, fakeEditorial],
 });
 
 const region = {
@@ -118,18 +127,73 @@ const blocks = write("blocks.json", {
     reason: "rows preserve comparison while every settled state keeps one owner",
   }],
 });
+const session = write("session.json", {
+  schema: 1,
+  id: "course-catalogue/2026-08-18",
+  project: "example-app",
+  surface: "course-catalogue",
+  phase: "block",
+  chain: {head: hash, sequence: 2},
+  rounds: [
+    {
+      number: 1,
+      phase: "layout",
+      prompt: "compare courses quickly",
+      directionReview: {vocabularyAt, candidates: [quiet, editorial], state: "selected", selectedId: quiet.id},
+      produced: [{id: "a", hash}],
+      verdict: {state: "accepted", acceptedHash: hash},
+      sealed: hash,
+    },
+    {
+      number: 2,
+      phase: "block",
+      prompt: "design the result rows",
+      region: "results",
+      layoutHash: hash,
+      produced: [{id: "a", hash: blockHash}],
+      verdict: {state: "accepted", acceptedHash: blockHash},
+      sealed: blockHash,
+    },
+  ],
+  queue: [
+    {hash, phase: "layout", state: "accepted"},
+    {hash: blockHash, phase: "block", region: "results", layoutHash: hash, state: "accepted"},
+  ],
+});
+const brokenSession = write("broken-session.json", {
+  ...JSON.parse(readFileSync(session, "utf8")),
+  queue: [{hash, phase: "layout", state: "accepted"}, {hash: blockHash, phase: "block", region: "results", state: "accepted"}],
+});
+const worktreeRoots = write("worktree-roots.json", {
+  schema: 1,
+  project: "example-app",
+  source: root,
+  roots: {
+    registries: {
+      path: ".worktrees/example-app/registries",
+      durability: "durable",
+      ignored: false,
+      ownership: {locked: true, clean: true, branch: "registry/example-app", owningGit: root},
+    },
+    sessions: {path: ".worktrees/example-app/sessions", durability: "rebuildable", ignored: true},
+    cache: {path: ".worktrees/example-app/cache", durability: "rebuildable", ignored: true},
+  },
+});
 
 try {
   const frontend = join(temp, "frontend");
   mkdirSync(frontend);
-  writeFileSync(join(frontend, "app.css"), ":root { --background: white; --foreground: black; }\n.dark { --background: black; }\n", "utf8");
+  writeFileSync(join(frontend, "app.css"), ":root { --background: white; --foreground: black; --BrandAccent: red; }\n.dark { --background: black; }\n", "utf8");
   const generatedInventory = join(temp, "generated-vocabulary.json");
   execFileSync(process.execPath, [inventoryScript, "--root", frontend, "--out", generatedInventory], {encoding: "utf8"});
   const generated = JSON.parse(readFileSync(generatedInventory, "utf8"));
-  if (generated.tokens.length !== 2 || generated.tokens.find((token) => token.name === "--background")?.declarations.length !== 2) {
-    throw new Error("visual inventory did not retain both mode declarations");
+  if (!/^[0-9a-f]{64}$/.test(generated.digest) || generated.tokens.length !== 3 || !generated.tokens.some((token) => token.name === "--BrandAccent") || generated.tokens.find((token) => token.name === "--background")?.declarations.length !== 2) {
+    throw new Error("visual inventory did not preserve case or retain both mode declarations");
   }
   run("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary);
+  if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", fakeDirections, "--vocabulary", vocabulary).includes("same render-affecting token decisions")) {
+    throw new Error("fake direction choices failed for the wrong reason");
+  }
   if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary, "--hash").includes("selection has no approval hash")) {
     throw new Error("direction --hash failed for the wrong reason");
   }
@@ -138,7 +202,12 @@ try {
     throw new Error("split layout directions failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", blocks, "--hash");
-  console.log("ok  direction selection, one layout hash, and independent block hash hold");
+  run("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", session);
+  if (!mustFail("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", brokenSession).includes("must name its parent layout")) {
+    throw new Error("missing block-to-layout edge failed for the wrong reason");
+  }
+  run("--schema", join(root, "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
+  console.log("ok  direction selection, one layout hash, independent block hash, and dependency edge hold");
 } finally {
   rmSync(temp, {recursive: true, force: true});
 }

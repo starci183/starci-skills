@@ -94,7 +94,8 @@ kê là đã thôi hỏi và bắt đầu tự cho.
 ## Các phase
 
 **Các lượt design** chính là mặt để rà soát. Lựa chọn direction hỗ trợ một lượt layout và không có
-approval hash riêng; object được chọn nằm trong candidate layout. Mỗi lượt được ghi giữ đúng prompt, các phương án, phản hồi và phán
+approval hash riêng; candidate chính xác, lựa chọn hoặc phản hồi của nó nằm trong `directionReview` của
+lượt layout, còn object được chọn nằm trong candidate layout. Mỗi lượt được ghi giữ đúng prompt, các phương án, phản hồi và phán
 quyết của người chủ, và sự chấp nhận **buộc theo hash**. Phản hồi mở một lượt mới; nó không bao giờ sửa
 một lượt đã được chấp nhận.
 

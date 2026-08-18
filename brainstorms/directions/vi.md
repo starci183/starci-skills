@@ -44,11 +44,12 @@ trên sáu đầu vào và không được chép vào cây làm canon.
 
 1. Nói đối tượng, tác vụ và cảm giác dự kiến, mỗi thứ một câu. Từ chối khi yêu cầu không cho cơ sở để
    nói bất cứ thứ nào.
-2. Kiểm kê vốn đang sống và ghi trạng thái source của nó thành `vocabularyAt` trong mọi direction.
+2. Kiểm kê vốn đang sống và ghi digest nội dung của nó thành `vocabularyAt` trong mọi direction.
    Token `reuse` phải có trong kiểm kê; token `new` phải chưa có.
 3. Đọc màn hình đã duyệt như bằng chứng, không như lệnh lặp lại. Ghi cái đã được chấp nhận và nhu cầu
    của bề mặt mới khác nó ở đâu.
-4. Chọn bộ trục trước khi đặt tên hướng. Hai bộ giống nhau là một hướng.
+4. Chọn bộ trục trước khi đặt tên hướng. Hai bộ giống nhau là một hướng; hai nhãn trục khác nhau nhưng
+   có cùng toàn bộ ánh xạ vai trò sang token cũng chỉ là một hướng vì chúng render giống nhau.
 5. Ánh xạ mọi vai trò ngữ nghĩa vào một quyết định token. Token mới mang lý do vốn hiện tại không trả
    lời được.
 6. Gọi tên điều mỗi hướng từ chối. Một hướng không có ranh giới chỉ là tính từ, chưa phải quyết định.
@@ -86,10 +87,10 @@ chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt ri�
 ## Quy tắc
 
 1. Direction không mang class. Raw visual value chỉ xuất hiện bên trong quyết định token `new`.
-2. Mọi direction mang `vocabularyAt` của lô; mọi token `reuse` có ở đó và mọi token `new` vắng mặt.
+2. Mọi direction mang digest kiểm kê trong `vocabularyAt`; mọi token `reuse` có ở đó và mọi token `new` vắng mặt.
 3. Mọi direction ánh xạ đủ mười ba vai trò; `none` chỉ hợp lệ với radius, elevation, duration và easing.
 4. Mọi direction gọi tên ba đến năm từ tính cách và một đến năm điều từ chối rõ ràng.
-5. Không hai direction nào trong một lô trùng cả bộ trục.
+5. Không hai direction nào trong một lô trùng cả bộ trục hoặc toàn bộ ánh xạ vai trò sang token.
 6. Có ít nhất một direction rời tiền lệ gần nhất khi tiền lệ tồn tại.
 7. Chỉ trả ít hơn ba khi bằng chứng chỉ cho phép ít hơn, và nói lý do; không bao giờ nhồi cho đủ.
 8. Feedback mở một lượt mới. Direction đã chấp nhận không bao giờ bị sửa tại chỗ.
