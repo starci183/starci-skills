@@ -15,8 +15,10 @@ if (relative(siteRoot, contentRoot) !== "content") {
 // whichever human records sit beside it, in sidebar order.
 const RECORDS = ["vi"];
 const RECORD_LABELS = {
-  vi: "vi",
+  vi: "Human (VI)",
 };
+
+const SKILL_RUNTIME_NOTICE = `> **Agent runtime — English only.** This \`SKILL.md\` is the binding entry. When this skill loads a paired module, read \`en.md\`. **Never load \`vi.md\` during a skill run**; it is a human translation published for review, not runtime instructions.\n`;
 
 // Segments that are acronyms, not words. Capitalising only the first letter turns them into
 // something nobody in the repository says out loud.
@@ -62,7 +64,11 @@ async function publish(sourcePath, destinationPath) {
   const source = await readFile(resolve(trustRoot, sourcePath), "utf8");
   const destination = resolve(contentRoot, destinationPath);
   await mkdir(dirname(destination), {recursive: true});
-  await writeFile(destination, normalizeDocument(source), "utf8");
+  const normalized = normalizeDocument(source);
+  const published = sourcePath.endsWith("/SKILL.md")
+    ? normalized.replace(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)/, `$1\n${SKILL_RUNTIME_NOTICE}\n`)
+    : normalized;
+  await writeFile(destination, published, "utf8");
 }
 
 async function writeMeta(path, value) {
@@ -204,14 +210,14 @@ await Promise.all(
 await Promise.all([
   ...[...branches.entries()].map(([path, children]) =>
     writeMeta(path === "" ? "_meta.js" : `${path}/_meta.js`, {
-      index: path === "" ? "Docs" : "Overview",
+      index: "Overview",
       ...Object.fromEntries([...children.entries()]),
     })
   ),
   ...publishedGroups.flatMap((group) => [
     writeMeta(`${group.route}/_meta.js`, {
-      index: group.own.en ? "en" : "Overview",
-      ...(group.own.vi ? {vi: "vi"} : {}),
+      index: group.own.en ? "Agent (EN)" : "Overview",
+      ...(group.own.vi ? {vi: RECORD_LABELS.vi} : {}),
       ...Object.fromEntries(groupNavigation(group).directModules.map((module) => [module.id, label(module.id)])),
       ...Object.fromEntries([...groupNavigation(group).families.keys()].map((family) => [family, label(family)])),
     }),
@@ -223,7 +229,7 @@ await Promise.all([
     ),
     ...group.modules.map((module) =>
       writeMeta(`${group.route}/${module.id}/_meta.js`, {
-        index: "en",
+        index: "Agent (EN)",
         ...Object.fromEntries(module.records.map((record) => [record, RECORD_LABELS[record]])),
       })
     ),
