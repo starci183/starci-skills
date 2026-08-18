@@ -11,23 +11,21 @@ None.
 
 ## Record
 
-You are given a capability to run and you return one phase of work and six output tables.
-This module decides **what every skill must print, ask and record** — not what any one skill does.
-A skill that invents its own reporting shape cannot be audited against the others, and a tree whose
-records disagree about their own format stops being evidence.
+This module decides what every skill may ask, how approval is consumed, how work is delegated, and what
+the user sees. Keep enough internal evidence to audit the boundary and result; do not make the user
+operate the workflow.
 
 ## Law
 
-A skill states where it is before it acts, and what it wrote after. The `CONTEXT` table comes first
-because a run that cannot name its Source, project and write boundary is not ready to touch anything;
-the six output tables come last because a run that cannot separate what it decided from what it wrote
-from what it still owes has not finished.
+The agent owns execution. Interrupt the owner only for a decision the agent has no authority to make.
+Investigation, implementation judgement inside scope, safe fallback, delegation, phase transitions,
+validation, ordinary repair and unfinished work all continue without a question.
 
-Detection is not permission. Finding that something must change is never authority to change it.
+Detection is not permission, but `OK` on the displayed approval boundary is permission. Never ask the
+owner to repeat it.
 
-Skills never invoke other skills. A stop is terminal for the current run: report the blocking evidence
-and end. Capability names may identify ownership for a future request, but they are never runtime routing
-instructions. Only the owner starts that separate request.
+Skills do not invoke other skills. `OK` resumes the current skill through its own Apply stage; a separate
+capability remains a separate owner request.
 
 ## Runtime language
 
@@ -58,51 +56,33 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-be-plan` | plan | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approve, then apply | approval, then backend source |
 
-There is no orchestrator. Two jobs an orchestrator used to hold are therefore assigned explicitly:
-**Layout opens the session**, and **Execute refuses to run** while any reachable layout or block hash
-is unaccepted. A skill that cannot find its precondition stops; it never proceeds on the assumption
-that someone approved something.
+Layout opens the session. Execute still refuses to write while any reachable hash is unaccepted. Inside a
+skill, `OK` resumes its own next phase immediately; no skill assumes another capability was requested.
 
-## CONTEXT — printed before anything else
+## Context lock
 
-Under the exact heading `### CONTEXT`. A plain label is invalid: the validator identifies the section
-by its heading.
+Before acting, resolve Workdir, Source, the user-declared Project, verified role targets, Trust, purpose,
+record location, exact write boundary, evidence read and missing prerequisites. Keep the full lock in the
+durable record when the capability has one.
 
-| Field | Value |
-|---|---|
-| Workdir | absolute working directory |
-| Source | absolute repository holding `AGENTS.md` and the trust tree |
-| Project | the user-declared project, never inferred from a folder |
-| Role targets | the repositories resolved from `.workspace/<project>/<role>/config.json` |
-| Trust | absolute trust tree |
-| Purpose | one sentence saying what this phase must settle |
-| Record | where this phase's evidence lands — a session under `<Source>/.worktrees/<project>/sessions/` for a design run, the run's own commits for a repair, `None` for a run that writes nothing |
-| Phase | `layout`, `block`, `execute`, `plan`, `approve` or `apply` |
-| Touching | the exact paths this phase may write |
-| Read | the exact contract, source, schema or runtime evidence read, with its state |
-| Missing | required evidence that is absent, and what it blocks — or `None` |
-
-`Project` and its role routes resolve through the workspace module, and a route is verified before it
-is read. A phase that cannot resolve Workdir, Source, Project, its role targets or Trust is
-stuck before any target-specific work.
+Never print a context table. Tell the user in one friendly sentence where the agent is working, which
+project and role are resolved, and what boundary the current phase may touch. A run is blocked only when
+a required context value cannot be recovered from the request, workspace routes or live evidence.
 
 ## Process states
 
-| State | Meaning | Next action |
-|---|---|---|
-| working | evidence or safe work remains | continue without asking |
-| needs approval | a decision, promise, price or write boundary could be wrong | batch it into `NEED APPROVALS` |
-| phase complete | the exit condition is met | record where the phase said it would; continue only inside this skill's own process |
+`own` is every executable action inside the declared scope: investigation, reversible edits, safe tool
+fallback, delegation, candidate generation, implementation judgement, baseline after approval, gates,
+in-scope repairs, proof and phase transitions inside the current skill. Continue until `own = 0`.
 
-One failed tool path is not a stuck run: try the safe fallback first. All approvals known at that
-moment are batched into one round rather than asked one at a time. After feedback, the same phase
-continues, appends its revision, and shows the revised brief again.
+`need approval` is limited to a product decision with no evidence-backed default, material destructive
+loss, an external publication or commitment, missing access, or expansion to an undisclosed project,
+role, repository or write boundary. Batch all currently known items under `### NEED APPROVALS`, with one
+recommended/default answer each.
 
-**Batching is about asking, not about answering.** One round spares the reader five interruptions; it does
-not merge five decisions into one yes. A blanket answer — "do it all" — approves the rows as written and
-**nothing that was not written as a row**: not a boundary the skill proposed to itself while the reader
-was answering something else, and not a write outside the boundary those rows named. A run that reads one
-word as authority over work nobody listed has stopped asking and started assuming.
+When the user replies `OK`, approve every displayed default and exact displayed boundary. Record the
+identity or hash, take the baseline if required, and continue immediately. `OK` never covers undisclosed
+scope. Silence and every word other than `OK` are not approval signals.
 
 ## Phases
 
@@ -115,44 +95,35 @@ never edits an accepted round.
 **Plan** reads canon, contracts and live source, then produces a brief: objective, evidence,
 boundaries, decisions, alternatives, acceptance evidence. It writes no product code.
 
-**Approve** loops until the user explicitly approves, and holds a hard stop before the first
+**Approve** loops until the user replies `OK`, and holds a hard stop before the first
 production write. Every rejection is recorded with its replacement and the user's reason.
 
 **Apply** confirms the write boundary, records a baseline commit taken **before** the change, then
 implements the approved revision and proves it at the production boundary with the evidence the
 approval named. A path outside `Touching` returns to its owner instead of arriving quietly in a diff.
 
-## Output — six tables, in this order
+## User-facing output
 
-Exact headings `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED`,
-`### OWED`. An empty table still carries one row saying `None`.
+Do not print status tables, empty sections, `None` rows, internal context or agent assignment matrices.
+Before the next meaningful batch, state outstanding work in friendly prose: `Before I continue, I still
+owe: ...`, then pay it in the same run. A turn may end only when `own = 0`, or while waiting on a genuine
+`### NEED APPROVALS` item.
 
-| Table | Holds | Never holds |
-|---|---|---|
-| OUTPUTS | what was decided or proved, at concept level | file paths |
-| CHANGES | every written path and what happened to it | concepts |
-| NEED APPROVALS | one decision that could be wrong, evidence-backed default first | ordinary implementation judgement |
-| WARNINGS | an assumption, conflict, stale reference or irreversible risk | anything that blocks progress — that is an approval |
-| REJECTED | the actual proposal refused, its replacement, the user's reason | a rejection reconstructed from memory |
-| OWED | work or proof that did not happen | risk, which is a warning |
-
-`OWED`, `WARNINGS` and `NEED APPROVALS` are three different claims — unfinished work, risk, and a
-blocker needing the user. Collapsing them is how an unfinished run reads as a finished one.
+On completion, state the outcome, material paths changed and proof run in compact prose or a short list.
+When blocked on owner authority, `### NEED APPROVALS` explains what is missing, why the agent cannot own
+it, the recommended/default answer and the exact scope `OK` authorises.
 
 ## The record
 
-**There is no separate record file.** A phase's evidence is the six tables it prints, and where those tables
-have to survive the session they land in the store that already owns that kind of work: a design run in its
-session under `<Source>/.worktrees/<project>/sessions/`, hash-bound; a repair in its own commits, whose
-baseline and per-pass split are the trail. A third location, written by hand and read by nobody, was one
-more home for a fact that already had one — and the only kind of home that goes stale without anything
-noticing, because nothing reads it.
+There is no separate report file. Durable evidence stays in the store that owns the work: a design run in
+its session under `<Source>/.worktrees/<project>/sessions/`, hash-bound; a repair in its own commits and
+diffs; a read-only run in no file unless explicitly requested.
 
 An approved phase names its `Approved revision: <identity>`, and Apply cites that same identity plus its
 baseline commit. That pairing is what proves what changed after Apply began, and it survives wherever the
 phase records — it is a sentence, not a file.
 
-Narrative, evidence and table values are written in Vietnamese. Headings, schema labels, paths,
+Narrative and evidence shown to the user are written in Vietnamese. Headings, schema labels, paths,
 commands and code identifiers stay unchanged, because translating them breaks validation.
 
 Old evidence is not rewritten to match a newer format. A historical record is evidence; a correction is
@@ -160,25 +131,24 @@ appended.
 
 ## Rules
 
-1. `CONTEXT` is printed before acting, and it names `Touching` before any write.
-2. Detection is not permission.
-3. Approvals are batched when asked, never merged when answered.
-4. One session, one record. No skill opens a parallel task record for the same work.
-5. Acceptance is hash-bound; an accepted round is never edited in place.
+1. Resolve the context lock and `Touching` before writing; present them as friendly prose.
+2. Continue every `own` action without asking; a turn cannot end while `own > 0`.
+3. Ask only for genuine `need approval`, with one displayed default.
+4. Only `OK` consumes displayed approvals and resumes work immediately.
+5. One session has one append-only record; accepted hashes are never edited in place.
 6. Execute runs only when every reachable hash is accepted.
-7. A baseline commit is taken before the first production write, not from a half-edited tree.
-8. A path outside `Touching` returns to its owner.
-9. Every phase ends with all six tables, `None` included.
-10. No skill invokes, loads or automatically routes into another skill.
+7. A baseline is taken after `OK` and before the first production write.
+8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
+9. For safely partitionable work, target ten non-overlapping agent assignments; one coordinator owns
+   shared-state gates. Fill and backfill every available runtime slot when fewer than ten are concurrent.
+10. User-facing output contains no status tables.
 
 ## Exceptions
 
-- **Init owns three roots.** The Source bootstrap, `.workspace/<project>/` and `.worktrees/<project>/`
-  fail in three directions — a dead bootstrap leaves an agent unrouted, a wrong route makes a run read
-  the wrong repository, a wrong worktree makes it write where writing was forbidden. One approval never
-  covers more than one root, and a run may touch only one of them.
-- **A read-only capability.** Its Apply finalises a verdict and reports who owns a separate repair. It never
-  turns measurement into an undeclared source edit.
+- **Init owns three roots.** Each remains a separate displayed boundary and verdict. One `OK` approves
+  every displayed default, never an undisclosed root, then Init applies them without another pause.
+- **A read-only capability.** It never turns measurement into repair; it reports the evidence and owner of
+  the separate repair request.
 - **A resumed session.** Layout may resume rather than open. The session id and every accepted hash
   survive the resume unchanged.
 
@@ -186,23 +156,10 @@ appended.
 
 **Run.** "Design the coding drill result page."
 
-```text
-### CONTEXT
-Phase: layout
-Project: example-app
-Role targets: fe -> <disk>\example-app-fe (verified: contract present)
-Touching: .worktrees/example-app/sessions/<session>/
-Purpose: settle 3-4 layout candidates for one new surface
-Read: contract keys + why + host (74KB of 192KB), branch inventory, route table
-Missing: None
-```
-
-Layout opens the session because no orchestrator exists, runs one round, and ends with six tables —
-`NEED APPROVALS` carrying the one product decision the request did not state, `OWED` carrying the block
-rounds that have not happened yet.
-
-If `starci-fe-design-execute` were invoked at this point it would stop, not start: the layout hash is
-proposed, not accepted, and nothing else in the tree makes it acceptable.
+The run says: `I am designing example-app against the verified frontend route; this phase writes only
+the design session.` It presents 3–4 direction-backed layouts and one default under `NEED APPROVALS`.
+After `OK`, it binds the hash and finishes every `own` item in Layout without asking again. Block remains
+a separate capability request.
 
 ## Scope
 

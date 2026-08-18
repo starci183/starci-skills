@@ -27,7 +27,7 @@ nó phải chặt nhất.
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
 `Phase` là `execute`. `Touching` gọi đúng tên các path frontend lượt chạy được phép ghi và phải được owner
 xác nhận trước write đầu tiên. Phát hiện một path không đồng nghĩa được phép sửa nó.
@@ -83,8 +83,8 @@ làm hơn.
 
 ### 8 — Đóng phase
 
-Ghi applied revision, baseline commit và tracked diff. `CHANGES` liệt kê mọi production path trong diff
-và phải khớp ranh giới đã duyệt; path ngoài `Touching` phải quay lại owner.
+Ghi applied revision, baseline commit và tracked diff. Diff liệt kê mọi production path và phải khớp
+ranh giới đã duyệt; path ngoài `Touching` phải quay lại owner.
 
 ## Điểm dừng
 
@@ -98,5 +98,5 @@ và phải khớp ranh giới đã duyệt; path ngoài `Touching` phải quay l
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. `CHANGES` là toàn bộ production tree từ
-`git diff <baseline>`; `WARNINGS` giữ bằng chứng yếu hơn đường approval đã nêu; `OWED` giữ proof chưa chạy.
+Nói applied revision, path chính và proof bằng văn xuôi ngắn. Proof chạy được là `own` và phải chạy trước
+khi hết lượt; chỉ quyết định thẩm quyền thật mới nằm dưới `### NEED APPROVALS`.

@@ -32,16 +32,16 @@ Three roots, and they fail in three different directions:
 | `<Source>/.workspace/<project>/` | where source is **read** from | silent — confident answers about another repository |
 | `<Source>/.worktrees/<project>/` | where state is **written** | loud — writes land where writing was forbidden |
 
-**One approval never covers more than one root.** Approving "the setup" is how the quiet failure gets
-waved through beside the noisy one. Each root is presented, approved and written as its own boundary,
-and a run may legitimately touch only one of them.
+Each root remains a separate displayed boundary and verdict. One `OK` approves all displayed recommended
+defaults at once; it never covers a root that was not shown. Apply every approved
+root immediately without asking again.
 
 The three are separate capabilities kept in one skill because they answer one question — *is this
 Source ready?* — not because they are one write.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `plan`, then `review`, then `apply`. `Touching` names only the roots this run will write. `Project` is **user-declared** — never inferred from Source, from a sibling
 checkout name, or from what the last session used. A bootstrap-only run has no project, and says so
@@ -96,7 +96,8 @@ Classify each root as `create`, `reuse` or `migrate-legacy`. Write nothing yet.
 
 ### 6 — Review each boundary separately
 
-Present one boundary per root, each with its own decision and its own approval:
+Present one boundary per root, each with its own decision and default. The owner may approve any subset,
+and `OK` approves all displayed defaults:
 
 - the two bootstrap files, shown in full before and after — they are short by design, so there is no
   reason to summarise a diff of them;
@@ -169,7 +170,8 @@ A branch that was never pushed is reported as local-only, not as missing.
 
 ### 11 — Close the phase
 
-Print the six tables. Never report the trust tree as a runtime storage root.
+State the resolved roots and changes in friendly prose. Never report the trust tree as a runtime storage
+root, and never close while an approved `own` apply or verification step remains.
 
 ## Stops
 
@@ -188,7 +190,5 @@ Print the six tables. Never report the trust tree as a runtime storage root.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `CHANGES` names each written path under each root and
-what happened to it; `NEED APPROVALS` carries one row per root, never one row for "the setup";
-`WARNINGS` carries local-only branches and any legacy state left in place; `REJECTED` carries any line
-the owner kept that this skill proposed removing, with their reason.
+Describe each root and its exact effect in concise prose. Put only genuine boundary grants under
+`### NEED APPROVALS`; `OK` approves every displayed default and Apply continues immediately.

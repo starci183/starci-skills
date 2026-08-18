@@ -22,7 +22,7 @@ It ends with an approval-ready boundary; it never writes backend source.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `plan`. `Touching` is `None`. A plan that writes product code has already
 skipped its own approval.
@@ -68,8 +68,8 @@ lost, and exactly what evidence will prove it works — which test, which query,
 
 ### 8 — Close the phase
 
-Print the six tables. `NEED APPROVALS` carries the decisions that could be
-wrong; `OWED` carries explicit approval of the exact brief and boundary.
+State the brief and exact boundary in friendly prose. Do not end while any planning work remains under
+`own`; the exact brief and boundary are the only `NEED APPROVALS` item.
 
 ## Stops
 
@@ -80,7 +80,7 @@ wrong; `OWED` carries explicit approval of the exact brief and boundary.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `CHANGES` is `None`: a plan writes no path.
+Return the approval-ready brief and exact file boundary in concise prose. No status tables.
 
 | Output | Owner |
 |---|---|

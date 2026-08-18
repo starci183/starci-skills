@@ -29,7 +29,7 @@ product source, and it is the one that must be hardest to start.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `execute`. `Touching` names the exact frontend paths this run may write, and it is confirmed
 with the owner before the first write. Detection is not permission.
@@ -95,8 +95,8 @@ approval named, not a substitute that is easier to produce.
 
 ### 8 — Close the phase
 
-Close with the applied revision, the baseline commit and the tracked diff. `CHANGES` lists
-every production path in that diff and it must match the approved boundary; a path outside `Touching`
+Close with the applied revision, the baseline commit and the tracked diff. The diff lists every
+production path and must match the approved boundary; a path outside `Touching`
 returns to its owner instead of arriving quietly.
 
 ## Stops
@@ -112,6 +112,5 @@ returns to its owner instead of arriving quietly.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `CHANGES` is the full production tree from
-`git diff <baseline>`; `WARNINGS` carries anything proved by a weaker path than the approval named;
-`OWED` carries proofs that did not run.
+State the applied revision, material paths and proof in concise prose. A proof that can run is `own` and
+must run before the turn ends; only a genuine authority decision may appear under `### NEED APPROVALS`.

@@ -8,7 +8,7 @@ title: Frontend design layout · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | cung cấp CONTEXT và hợp đồng sáu bảng |
+| `@skill-shape` | `skills/skill-shape` | module | cung cấp interaction và approval contract chung |
 | `@workspaces` | `contexts/workspaces` | module | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees` | module | tách record bền khỏi preview dùng xong bỏ |
 | `@directions` | `brainstorms/directions` | module | sinh lựa chọn thị giác được nhúng vào layout |
@@ -32,10 +32,10 @@ vào trang render.
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
-In `### CONTEXT` trước khi chạm bất cứ thứ gì. `Phase` là `layout`. `Touching` chỉ gồm project registry và
-session, không gồm file nào trong frontend repository.
+Resolve `Phase: layout`; `Touching` chỉ gồm project registry, session và cache, không gồm frontend source.
+Nói vị trí đó bằng một câu thân thiện; không in context thành bảng.
 
 ### 2 — Resolve và kiểm tra workspace route
 
@@ -138,8 +138,9 @@ không vẽ block internals hay mang product class.
 ### 12 — Queue approval và đóng
 
 Queue hash trong registry. Khi replacement accepted, đánh dấu layout accepted cũ là `superseded` và đặt
-`supersededBy`. Feedback mở sealed round mới. Validate session bằng `@validate-artifact`, rồi in sáu bảng;
-`OWED` gọi tên block round chưa diễn ra.
+`supersededBy`. Feedback mở sealed round mới. Validate session bằng `@validate-artifact`. Đánh dấu một
+layout có bằng chứng làm default. `OK` accept hash đó ngay; không bắt owner nhận diện lại. Chỉ đóng sau
+khi mọi record và validation thuộc Layout đã hoàn tất.
 
 ## Điểm dừng
 
@@ -154,6 +155,5 @@ Không điểm dừng nào tự gọi skill khác. Nếu owner muốn phục h�
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. `OUTPUTS` gọi tên session, candidate và hash; `CHANGES` gọi tên
-registry path đã ghi; `NEED APPROVALS` giữ accept/feedback và refusal; `WARNINGS` giữ stale-reference risk;
-`REJECTED` giữ lời owner; `OWED` giữ block round.
+Trình direction đã chọn, layout candidate, recommended default, hash và preview URL bằng văn xuôi ngắn.
+Chỉ dùng `### NEED APPROVALS` cho selection hiện tại hoặc quyết định accept/feedback. Không in bảng.

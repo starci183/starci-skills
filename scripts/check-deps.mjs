@@ -296,7 +296,7 @@ for (const [file, en] of parsed) {
   if (JSON.stringify(codes(en.lines)) !== JSON.stringify(codes(vi.lines))) {
     report(viPath, 1, "situation codes differ from en.md");
   }
-  const fixed = ["### CONTEXT", "### OUTPUTS", "### CHANGES", "### NEED APPROVALS", "### WARNINGS", "### REJECTED", "### OWED"];
+  const fixed = ["### NEED APPROVALS"];
   for (const heading of fixed) {
     const enHas = en.lines.includes(heading);
     const viHas = vi.lines.includes(heading);

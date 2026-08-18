@@ -11,23 +11,21 @@ None.
 
 ## Bản ghi
 
-Mỗi lượt chạy nhận một capability và phải trả về **một phase công việc cùng sáu bảng kết quả**.
-Mô-đun này quy định **mọi skill phải in gì, hỏi gì và ghi lại gì**; nội dung công việc của từng skill
-không nằm ở đây. Nếu mỗi skill tự đặt một kiểu báo cáo, các bản ghi sẽ không còn đối chiếu được với
-nhau. Khi chính định dạng của bằng chứng cũng không thống nhất, cả cây không thể dùng làm bằng chứng.
+Mô-đun này quyết định mọi skill được hỏi gì, dùng approval ra sao, chia việc thế nào và cho người dùng
+thấy gì. Vẫn giữ đủ evidence nội bộ để audit boundary và kết quả, nhưng không bắt người dùng vận hành
+workflow thay agent.
 
 ## Luật
 
-Trước khi hành động, skill phải khai **mình đang ở đâu**; khi kết thúc, nó phải nói rõ **đã ghi gì**.
-`CONTEXT` đứng đầu vì một lượt chạy chưa gọi tên được Source, project và biên giới ghi thì chưa được
-chạm vào bất cứ thứ gì. Sáu bảng kết quả đứng cuối vì công việc chưa thể xem là xong nếu chưa tách bạch
-**điều đã quyết**, **thứ đã ghi** và **việc còn nợ**.
+Agent sở hữu phần thi hành. Chỉ ngắt owner khi có một quyết định agent thật sự không có thẩm quyền đưa
+ra. Điều tra, phán đoán triển khai trong scope, fallback an toàn, chia agent, chuyển phase, kiểm chứng,
+sửa thông thường và việc còn nợ đều tiếp tục mà không hỏi.
 
-Phát hiện không phải là được phép. Thấy một thứ cần sửa không bao giờ là thẩm quyền để sửa nó.
+Phát hiện không phải là được phép, nhưng `OK` trên boundary approval đang hiển thị chính là quyền làm.
+Không bao giờ bắt owner lặp lại nó.
 
-Skill không bao giờ tự gọi skill khác. Một điểm dừng kết thúc lượt chạy hiện tại: báo bằng chứng đang chặn
-rồi kết thúc. Tên capability chỉ được dùng để nói ai sở hữu một request tương lai, không phải instruction
-điều phối runtime. Chỉ owner mới mở request riêng đó.
+Skill không tự gọi skill khác. `OK` resume skill hiện tại qua Apply của chính nó; capability khác vẫn là
+request riêng của owner.
 
 ## Ngôn ngữ runtime
 
@@ -59,52 +57,32 @@ thể ngay từ đầu nó đã đúng.
 | `starci-be-plan` | plan | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | duyệt, rồi apply | sự chấp thuận, rồi source backend |
 
-**Không có orchestrator.** Hai việc mà orchestrator từng giữ vì thế được giao rõ: **Layout mở
-session**, và **Execute từ chối chạy** khi còn bất cứ hash layout hay block đạt tới được nào chưa được
-chấp nhận. Skill nào không tìm được tiền đề của mình thì **dừng**; nó không bao giờ chạy tiếp dựa trên
-giả định rằng ai đó đã duyệt cái gì.
+Layout mở session. Execute vẫn từ chối ghi khi còn hash reachable chưa accepted. Bên trong một skill,
+`OK` resume phase kế tiếp của chính nó ngay; không skill nào tự cho rằng capability khác đã được yêu cầu.
 
-## CONTEXT — in trước mọi thứ khác
+## Khóa ngữ cảnh
 
-Dưới đúng tiêu đề `### CONTEXT`. Một nhãn trơn là không hợp lệ: bộ kiểm nhận diện mục này bằng tiêu đề
-của nó.
+Trước khi làm, resolve Workdir, Source, Project do người dùng khai, role target đã verify, Trust, mục đích,
+nơi giữ record, write boundary chính xác, evidence đã đọc và tiền đề còn thiếu. Capability có kho bền thì
+giữ đầy đủ lock trong đó.
 
-| Trường | Giá trị |
-|---|---|
-| Workdir | thư mục làm việc tuyệt đối |
-| Source | repository tuyệt đối chứa `AGENTS.md` và cây quy tắc |
-| Project | project do người khai, không bao giờ suy từ tên thư mục |
-| Role targets | các repository giải ra từ `.workspace/<project>/<role>/config.json` |
-| Trust | cây quy tắc tuyệt đối |
-| Purpose | một câu nói phase này phải chốt được điều gì |
-| Record | bằng chứng của phase này đọng ở đâu — một session dưới `<Source>/.worktrees/<project>/sessions/` với lượt design, chính các commit của lượt chạy với repair, `None` với lượt không ghi gì |
-| Phase | `layout`, `block`, `execute`, `plan`, `approve` hoặc `apply` |
-| Touching | những đường dẫn chính xác phase này được ghi |
-| Read | contract, source, schema hay runtime đã đọc, kèm trạng thái của nó |
-| Missing | bằng chứng bắt buộc còn thiếu và nó chặn gì — hoặc `None` |
-
-`Project` và các route vai trò của nó giải qua mô-đun workspace, và một route phải được **xác minh
-trước khi đọc**. Phase nào không giải được Workdir, Source, Project, các repository vai trò hay Trust
-thì đã bị chặn trước cả khi bắt đầu việc riêng của mục tiêu.
+Không bao giờ in bảng context. Nói một câu thân thiện cho người dùng biết agent đang làm ở đâu, project
+và role nào đã resolve, phase hiện tại được chạm boundary nào. Chỉ bị chặn khi giá trị context bắt buộc
+không thể tìm từ yêu cầu, workspace route hoặc live evidence.
 
 ## Các trạng thái tiến trình
 
-| Trạng thái | Nghĩa | Việc kế tiếp |
-|---|---|---|
-| working | còn bằng chứng hoặc còn việc an toàn để làm | tiếp tục, không hỏi |
-| needs approval | một quyết định, lời hứa, giá hay biên giới ghi có thể sai | gộp vào `NEED APPROVALS` |
-| phase complete | điều kiện kết thúc đã đạt | ghi vào đúng chỗ phase đã khai; chỉ tiếp tục bên trong quy trình của chính skill này |
+`own` là mọi hành động có thể thi hành trong scope đã khai: điều tra, edit đảo được, fallback tool an toàn,
+chia agent, sinh candidate, phán đoán triển khai, baseline sau approval, gate, sửa trong scope, proof và
+chuyển phase trong skill hiện tại. Tiếp tục tới khi `own = 0`.
 
-Một đường tool thất bại không làm lượt chạy bị chặn: thử đường an toàn thay thế trước. Mọi thứ cần
-duyệt **đã biết tại thời điểm đó** được gộp thành **một** lượt hỏi, không hỏi lắt nhắt. Sau phản hồi,
-vẫn phase đó tiếp tục, ghi thêm bản sửa, rồi trình lại brief đã sửa.
+`need approval` chỉ gồm quyết định sản phẩm không có default dựa trên evidence, destructive loss đáng kể,
+publish hay cam kết ra ngoài, thiếu access, hoặc mở rộng sang project, role, repository hay write boundary
+chưa được trình. Gộp mọi mục hiện biết dưới `### NEED APPROVALS`, mỗi mục có một recommended/default.
 
-**Gộp là gộp lúc HỎI, không phải lúc TRẢ LỜI.** Một lượt hỏi giúp người đọc khỏi bị ngắt năm lần; nó không
-nhập năm quyết định thành một chữ "ừ". Một câu trả lời bao trùm — "làm hết đi" — duyệt đúng những dòng đã
-được viết ra, và **không duyệt bất cứ thứ gì chưa từng được viết thành một dòng**: không duyệt một biên giới
-mà chính skill tự đề ra trong lúc người đọc đang trả lời chuyện khác, và không duyệt một thao tác ghi nằm
-ngoài biên giới mà các dòng đó gọi tên. Một lượt chạy đọc một chữ thành thẩm quyền cho việc không ai liệt
-kê là đã thôi hỏi và bắt đầu tự cho.
+Khi user trả lời `OK`, duyệt mọi default và boundary chính xác đang hiển thị. Ghi identity hoặc hash, lấy
+baseline nếu cần rồi tiếp tục ngay. `OK` không phủ scope chưa trình. Im lặng và mọi từ khác `OK` đều không
+phải tín hiệu approval.
 
 ## Các phase
 
@@ -117,44 +95,34 @@ một lượt đã được chấp nhận.
 **Plan** đọc canon, hợp đồng và source sống, rồi ra một brief: mục tiêu, bằng chứng, biên giới, quyết
 định, phương án thay thế, bằng chứng nghiệm thu. Nó không viết code sản phẩm.
 
-**Approve** lặp cho tới khi người dùng chấp thuận **tường minh**, và giữ một điểm dừng cứng **trước**
+**Approve** lặp cho tới khi người dùng trả lời `OK`, và giữ một điểm dừng cứng **trước**
 lần ghi sản phẩm đầu tiên. Mọi lần từ chối được ghi kèm cái thay thế và lý do của người dùng.
 
 **Apply** xác nhận biên giới ghi, ghi một baseline commit lấy **trước** khi sửa, rồi thi hành đúng bản
 đã duyệt và chứng minh tại biên sản phẩm bằng đúng bằng chứng mà lần duyệt đã nêu tên. Một đường dẫn
 ngoài `Touching` được trả về cho chủ của nó, không được lặng lẽ xuất hiện trong diff.
 
-## Đầu ra — sáu bảng, đúng thứ tự này
+## Đầu ra cho người dùng
 
-Đúng tiêu đề `### OUTPUTS`, `### CHANGES`, `### NEED APPROVALS`, `### WARNINGS`, `### REJECTED`,
-`### OWED`. Bảng rỗng vẫn phải có một dòng ghi `None`.
+Không in bảng trạng thái, section rỗng, dòng `None`, context nội bộ hay ma trận chia agent. Trước batch
+đáng kể kế tiếp, nói thân thiện: `Trước khi làm tiếp, em còn nợ: ...`, rồi trả trong cùng lượt. Một lượt
+chỉ kết thúc khi `own = 0`, hoặc đang chờ một mục `### NEED APPROVALS` thật.
 
-| Bảng | Chứa | Không bao giờ chứa |
-|---|---|---|
-| OUTPUTS | cái đã quyết hoặc đã chứng minh, ở mức khái niệm | đường dẫn file |
-| CHANGES | mọi đường dẫn đã ghi và chuyện gì xảy ra với nó | khái niệm |
-| NEED APPROVALS | một quyết định có thể sai, mặc định có bằng chứng đứng trước | phán đoán thi hành thông thường |
-| WARNINGS | một giả định, xung đột, tham chiếu cũ hay rủi ro không đảo được | thứ đang chặn tiến độ — cái đó là approval |
-| REJECTED | đề xuất **thật** đã bị từ chối, cái thay thế, lý do của người dùng | một lần từ chối dựng lại từ ký ức |
-| OWED | việc hoặc bằng chứng đã **không** xảy ra | rủi ro, vì rủi ro là warning |
-
-`OWED`, `WARNINGS` và `NEED APPROVALS` là **ba lời khai khác nhau** — việc còn dở, rủi ro, và một cái
-chặn cần người dùng. Gộp chúng lại chính là cách một lượt chạy chưa xong đọc ra như đã xong.
+Khi hoàn tất, nói gọn kết quả, path chính và proof bằng văn xuôi hoặc danh sách ngắn. Khi bị chặn bởi thẩm
+quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agent không thể tự sở hữu, default được
+đề xuất và scope chính xác mà `OK` cấp phép.
 
 ## Bản ghi
 
-**Không có tệp bản ghi riêng.** Bằng chứng của một phase chính là sáu bảng nó in ra, và chỗ nào cần sống
-lâu hơn phiên làm việc thì nó đọng vào đúng cái kho vốn đã sở hữu loại việc đó: lượt design đọng trong
-session của nó dưới `<Source>/.worktrees/<project>/sessions/`, gắn với hash; lượt repair đọng trong chính
-các commit của nó, mà baseline và cách tách từng pass đã là dấu vết. Một chỗ thứ ba, viết tay và không ai
-đọc, là thêm một cái nhà nữa cho một sự thật vốn đã có nhà — và là loại nhà cũ đi mà không gì phát hiện
-được, chính vì không ai đọc nó.
+Không có report file riêng. Evidence bền nằm trong kho vốn sở hữu công việc: design run ở session dưới
+`<Source>/.worktrees/<project>/sessions/`, bind theo hash; repair ở commit và diff; lượt chỉ đọc không ghi
+file trừ khi được yêu cầu rõ.
 
 Một phase được duyệt gọi tên `Approved revision: <identity>` của nó, và Apply trích đúng identity đó cùng
 baseline commit. Chính cặp đó chứng minh cái gì đã đổi sau khi Apply bắt đầu, và nó sống sót ở bất cứ nơi
 nào phase ghi lại — nó là một **câu**, không phải một tệp.
 
-Phần tường thuật, bằng chứng và giá trị trong bảng viết bằng tiếng Việt. Tiêu đề, nhãn schema, đường
+Phần tường thuật và bằng chứng cho người dùng viết bằng tiếng Việt. Tiêu đề, nhãn schema, đường
 dẫn, câu lệnh và tên định danh trong code giữ nguyên, vì dịch chúng là làm hỏng bộ kiểm.
 
 Bằng chứng cũ không bị viết lại cho khớp định dạng mới. Bản ghi lịch sử là bằng chứng; muốn sửa thì **ghi
@@ -162,25 +130,24 @@ thêm**.
 
 ## Quy tắc
 
-1. `CONTEXT` in trước khi hành động, và nó gọi tên `Touching` trước mọi lần ghi.
-2. Phát hiện không phải là được phép.
-3. Việc cần duyệt thì gộp lúc hỏi, không bao giờ nhập lại lúc trả lời.
-4. Một session, một bản ghi. Không skill nào mở bản ghi song song cho cùng một việc.
-5. Sự chấp nhận buộc theo hash; lượt đã chấp nhận không bao giờ bị sửa tại chỗ.
-6. Execute chỉ chạy khi mọi hash đạt tới được đã được chấp nhận.
-7. Baseline commit lấy **trước** lần ghi sản phẩm đầu tiên, không lấy từ một cây đã sửa nửa vời.
-8. Đường dẫn ngoài `Touching` được trả về cho chủ của nó.
-9. Mọi phase kết thúc bằng đủ sáu bảng, kể cả bảng chỉ có `None`.
-10. Không skill nào tự gọi, load hay tự động route sang skill khác.
+1. Resolve context lock và `Touching` trước khi ghi; trình chúng bằng câu thân thiện.
+2. Mọi hành động `own` tiếp tục không hỏi; không được kết thúc khi `own > 0`.
+3. Chỉ hỏi `need approval` thật, với một default đang hiển thị.
+4. Chỉ `OK` consume approval đang hiển thị và resume ngay.
+5. Một session có một record append-only; hash accepted không sửa tại chỗ.
+6. Execute chỉ chạy khi mọi hash reachable đã accepted.
+7. Baseline lấy sau `OK` và trước production write đầu tiên.
+8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
+9. Việc chia an toàn được thì nhắm mười assignment không chồng lấn; một coordinator giữ gate shared-state.
+   Runtime dưới mười slot thì lấp đầy và backfill mọi slot khả dụng.
+10. Đầu ra cho người dùng không có bảng trạng thái.
 
 ## Ngoại lệ
 
-- **Init sở hữu ba root.** Bootstrap của Source, `.workspace/<project>/` và `.worktrees/<project>/` hỏng
-  theo ba chiều khác nhau — bootstrap chết thì agent không được định tuyến, route sai thì lượt chạy
-  **đọc** sai repository, worktree sai thì nó **ghi** vào chỗ bị cấm ghi. Một lần duyệt **không bao giờ**
-  phủ hơn một root, và một lượt chạy được phép chỉ chạm đúng một root.
-- **Năng lực chỉ đọc.** Apply của nó chốt một phán quyết và báo ai sở hữu một request sửa riêng. Nó không bao
-  giờ biến việc đo thành một lần sửa source chưa khai báo.
+- **Init sở hữu ba root.** Mỗi root vẫn là một boundary và verdict riêng. Một `OK` duyệt mọi default đã
+  hiển thị, không phủ root chưa trình, rồi Init apply hết mà không dừng lần nữa.
+- **Năng lực chỉ đọc.** Nó không biến measurement thành repair; nó báo evidence và owner của repair
+  request riêng.
 - **Session được tiếp tục.** Layout được phép **tiếp** thay vì **mở**. Session id và mọi hash đã chấp
   nhận sống sót qua lần tiếp đó, không đổi.
 
@@ -188,23 +155,9 @@ thêm**.
 
 **Lượt chạy.** "Thiết kế trang kết quả bài luyện coding."
 
-```text
-### CONTEXT
-Phase: layout
-Project: example-app
-Role targets: fe -> <disk>\example-app-fe (đã xác minh: contract có mặt)
-Touching: .worktrees/example-app/sessions/<session>/
-Purpose: chốt 3-4 phương án layout cho một bề mặt mới
-Read: contract key + why + host (74KB trên 192KB), danh sách branch, bảng route
-Missing: None
-```
-
-Layout **mở** session vì không có orchestrator, chạy một lượt, rồi kết thúc bằng sáu bảng — `NEED
-APPROVALS` mang đúng một quyết định sản phẩm mà yêu cầu không nói ra, `OWED` mang các lượt block chưa
-xảy ra.
-
-Nếu gọi `starci-fe-design-execute` ở đúng thời điểm này thì nó **dừng**, không chạy: hash layout đang ở
-trạng thái đề xuất, chưa được chấp nhận, và không có gì khác trong cây làm cho nó thành được chấp nhận.
+Lượt chạy nói: `Em đang thiết kế example-app trên route frontend đã verify; phase này chỉ ghi design
+session.` Nó trình 3–4 layout có direction cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
+và làm hết mọi mục `own` của Layout mà không hỏi lại. Block vẫn là capability request riêng.
 
 ## Phạm vi
 

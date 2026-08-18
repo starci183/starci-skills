@@ -29,7 +29,7 @@ vào trang render.
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
 `Phase` là `block`. `Touching` chỉ gọi tên project registry.
 
@@ -122,11 +122,13 @@ phải product class. Mọi anatomy dùng cùng direction, copy và data; chỉ 
 
 Queue nằm trong registry và ghi parent `layoutHash` cạnh block hash độc lập. Khi replacement accepted,
 đánh dấu block cũ của cùng `(layoutHash, region)` là `superseded` và đặt `supersededBy`. Feedback mở round
-mới. Validate session bằng `@validate-artifact` và `@session`.
+mới. Đánh dấu một candidate có bằng chứng làm default cho mỗi region. `OK` accept mọi default đã hiển thị
+và bind hash ngay; không hỏi lại cùng approval. Validate session bằng `@validate-artifact` và `@session`.
 
 ### 11 — Đóng phase
 
-In sáu bảng. `OWED` gọi tên region chưa có anatomy accepted.
+Trước khi làm tiếp, nói thân thiện các region còn nợ rồi hoàn tất mọi region thuộc quyền skill. Chỉ đóng
+khi `own = 0` hoặc một mục `NEED APPROVALS` thật đang chặn region.
 
 ## Điểm dừng
 
@@ -138,4 +140,4 @@ In sáu bảng. `OWED` gọi tên region chưa có anatomy accepted.
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự.
+Theo output văn xuôi của skill shape. Không in bảng trạng thái.

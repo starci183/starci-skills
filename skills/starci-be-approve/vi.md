@@ -21,7 +21,7 @@ stop. Trước ranh giới ấy mọi thứ còn đảo ngược được; sau n
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
 `Phase` là `approve`. Trước khi được duyệt, `Touching` là `None`; sau đó nó chỉ gồm đúng các path backend
 trong ranh giới đã duyệt.
@@ -44,8 +44,8 @@ brief -> feedback -> revision -> brief
 ```
 
 Gom mọi câu hỏi đã biết vào một lượt, không hỏi nhỏ giọt. Ghi mỗi phương án bị bác cùng phương án thay thế
-và lý do nguyên văn của owner. Vòng lặp chỉ kết thúc khi owner duyệt **một revision chính xác** và **một
-ranh giới file chính xác** — không phải “ổn rồi”, im lặng hay approval dành cho revision cũ.
+và lý do nguyên văn của owner. Vòng lặp kết thúc khi owner chọn revision cùng boundary, hoặc trả lời `OK`
+cho recommended revision và boundary chính xác đang hiển thị. Im lặng hay approval cho revision cũ không tính.
 
 In `Approved revision: <identity>`. Không có dòng này thì không bước nào bên dưới được chạy.
 
@@ -66,25 +66,27 @@ triển khai hợp lệ.
 ### 6 — Chứng minh bằng đúng evidence đã duyệt
 
 Chạy các case đã liệt kê, không thay bằng phép thử rẻ hơn. Sau đó chạy gate thật của repository — lint,
-typecheck, build, tests — cùng runtime proof đã nêu như live query hoặc boot probe. Gate fail thì sửa;
-gate không chạy được phải ghi vào `OWED`, không được báo pass.
+typecheck, build, tests — cùng runtime proof đã nêu như live query hoặc boot probe. Gate fail thì sửa.
+Gate không chạy được phải thử hết fallback an toàn; nếu cần quyền owner thì dùng `### NEED APPROVALS`,
+nếu không thì nói external blocker và không được báo pass.
 
 Không chạy end-to-end suite nếu approval không yêu cầu.
 
 ### 7 — Đóng phase
 
-Ghi `Applied revision: <same identity>`, baseline commit và tracked diff. `CHANGES` phải liệt kê đủ các
-production path trong diff và khớp tuyệt đối với ranh giới đã duyệt.
+Ghi `Applied revision: <same identity>`, baseline commit và tracked diff. Diff phải liệt kê đủ các
+production path và khớp tuyệt đối với ranh giới đã duyệt.
 
 ## Điểm dừng
 
 - Chưa có `Approved revision` → không bắt đầu triển khai.
-- Approval mơ hồ hoặc gắn với revision cũ → tiếp tục vòng lặp; mơ hồ không phải đồng ý.
+- Approval gắn với revision cũ, hoặc không có default nên `OK` không nhận diện được phương án → hỏi một
+  lần; `OK` cho default đang hiển thị không mơ hồ.
 - Tree đã dirty bởi công việc không liên quan → dừng; baseline trộn nhiều việc không chứng minh được gì.
 - Cần path ngoài ranh giới → quay lại owner, không tự mở rộng.
 - Gate chỉ pass nếu bị làm yếu → dừng; luật không uốn theo code.
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. `REJECTED` giữ lời của owner; `CHANGES` là toàn bộ production tree
-từ `git diff <baseline>`; `OWED` giữ bằng chứng chưa chạy và câu lệnh chính xác để hoàn tất nó.
+Theo contract văn xuôi thân thiện của skill shape. Chỉ đóng khi mọi mục `own` đã triển khai và chứng minh
+xong. Chỉ hỏi dưới `### NEED APPROVALS`; có `OK` thì apply, không lặp lại câu hỏi.

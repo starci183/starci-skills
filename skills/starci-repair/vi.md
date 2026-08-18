@@ -48,7 +48,7 @@ rỗng thì cả hai đều không thấy. Repair phải inventory directory tr�
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
 `Phase` là `repair`. `Touching` ban đầu là boundary được đề nghị; chưa approval thì không ghi product source.
 
@@ -72,7 +72,7 @@ riêng, rồi mới lấy baseline.
 ### 5 — Đo và ghi lại con số
 
 Chạy format-check, lint, typecheck, build và test đúng như repository khai. Ghi command, exit code và số
-finding. Gate không chạy được là `OWED`, không phải zero.
+finding. Gate không chạy được phải thử hết fallback an toàn; không được coi là zero.
 
 Với frontend, đọc `@file-layout`, inventory mọi component root kể cả directory rỗng, rồi ghi path retired
 tier, file count, tracked-file count và mọi import/export đi qua nó. Rule `no-shell-tier` giữ trường hợp có
@@ -85,14 +85,15 @@ nhiều pass nhưng phải có một nguyên nhân gốc; không gom mọi thứ
 
 ### 7 — Review count, classification và boundary
 
-Đưa baseline, nhóm finding, file dự kiến chạm và thứ tự pass cho owner. Chỉ approval rõ mới mở production
-write. Nếu boundary phải rộng hơn, quay lại review trước khi sửa.
+Đưa baseline, nhóm finding, file dự kiến chạm và thứ tự pass cho owner. `OK` duyệt mọi default cùng
+boundary chính xác đã hiển thị; sau đó lấy baseline và bắt đầu Apply ngay. Nếu boundary phải rộng hơn,
+quay lại review trước khi sửa.
 
 ### 8 — Lấy baseline rồi sửa theo các pass tách biệt
 
 Commit state trước thay đổi. Sửa machine trước; tiếp theo format-only, mechanical, defect,
 retired-structure, `why`, rồi remnant. Mỗi pass có diff đọc được và gate liên quan chạy lại. Directory rỗng
-không có Git diff vẫn phải ghi path cùng before/after count trong `CHANGES`.
+không có Git diff vẫn phải ghi path cùng before/after count trong kết quả.
 
 ### 9 — Fan out chỉ defect pass
 
@@ -113,7 +114,8 @@ call site để chuyển sang tier `@file-layout` yêu cầu; fixed vendor mecha
 folder/export, import, barrel, test và contract reference cùng một lượt.
 
 Không xóa component thật chỉ để path biến mất. Identity hoặc semantic name chưa đủ bằng chứng thì trả đúng
-component đó thành `decision`, tiếp tục phần đã giải được và giữ phần chưa giải trong `OWED`. Machine pass
+component đó thành `decision`, tiếp tục phần đã giải được và đưa phần chưa giải vào `NEED APPROVALS`.
+Machine pass
 phải chạy trước; consumer dùng mirror thì cài canon package và bỏ mirror, không sửa private rule copy.
 
 Proof gồm search không còn `components/shells`, search không còn import `/shells/`, gate `no-shell-tier`
@@ -132,21 +134,21 @@ command khác rẻ hơn không chứng minh finding cũ đã hết.
 
 ### 14 — Đóng phase
 
-Ghi applied revision, baseline commit, tracked diff và before/after. `CHANGES` phải bằng đúng production
-tree trong `git diff <baseline>`; mọi proof chưa chạy nằm trong `OWED` cùng command hoàn tất.
+Ghi applied revision, baseline commit, tracked diff và before/after bằng văn xuôi. Diff phải bằng đúng
+production tree trong `git diff <baseline>`; proof chạy được là `own` và phải hoàn tất trong lượt.
 
 ## Điểm dừng
 
 - Route stale → gọi tên field sai rồi kết thúc lượt chạy.
 - Gate chỉ pass khi suppression → dừng; đây là điều skill tồn tại để từ chối.
 - Lint rule mâu thuẫn canon đã chấp nhận rõ → machine stale và được repair adoption; chỉ dừng khi chính
-  canon chưa chốt behavior.
+  canon chưa xác định behavior.
 - Tree dirty bởi việc không liên quan → dừng; mixed baseline không chứng minh gì.
 - `.claude/` trong target có tracked file hoặc nội dung thật → dừng remnant pass và trả inventory.
 - Boundary cần mở rộng → quay lại owner, không tự thêm path.
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. `OUTPUTS` giữ before/after; `CHANGES` gồm tracked diff, directory
-rỗng bị xóa ngoài Git và mọi migration khỏi `shells`;
-`REJECTED` giữ suppression và boundary bị bác; `OWED` giữ gate chưa chạy.
+Nói before/after, path chính theo pass và proof bằng văn xuôi ngắn. Trước batch kế tiếp, kể finding còn
+nợ rồi sửa trong cùng lượt. Chỉ kết thúc khi `own = 0` hoặc đang chờ quyết định hay boundary expansion
+thật dưới `### NEED APPROVALS`.

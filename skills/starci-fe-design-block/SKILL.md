@@ -31,7 +31,7 @@ hash, never to a rendered page.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `block`. `Touching` names the project registry only.
 
@@ -132,12 +132,15 @@ nothing binds, say so instead of serving nowhere quietly.
 Queue in `registries`, not `sessions`, and record the accepted parent `layoutHash` beside the independent
 block hash. On acceptance, mark the previous accepted block for that `(layoutHash, region)`
 `superseded` and point `supersededBy` at the replacement. On feedback, open a **new round**, append it,
-and record `REJECTED` with the actual anatomy, its replacement and the owner's words. Validate the
-updated session with `@validate-artifact` and `@session` before closing.
+and record `REJECTED` with the actual anatomy, its replacement and the owner's words. Mark one
+evidence-backed candidate as the default for each region. `OK` accepts every displayed default and binds
+the hashes immediately; never ask the same approval twice. Validate the updated session with
+`@validate-artifact` and `@session` before closing.
 
 ### 11 — Close the phase
 
-Print the six tables. `OWED` names regions still without an accepted anatomy.
+Before continuing, name regions still owed in friendly prose and finish every region owned by this
+skill. Close only when `own = 0` or a genuine `NEED APPROVALS` item blocks a region.
 
 ## Stops
 
@@ -149,4 +152,4 @@ Print the six tables. `OWED` names regions still without an accepted anatomy.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order.
+Follow the skill shape's prose output. No status tables.

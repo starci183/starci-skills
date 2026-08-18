@@ -54,7 +54,7 @@ because it retires a doubt that was still true.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `plan`. `Touching` is `None`. A diagnosis that writes anywhere else has
 broken its own law.
@@ -101,15 +101,15 @@ not contain is a `defect`, however sensible the sentence around it reads.
 
 ### 7 — Close the phase
 
-Print the six tables. `WARNINGS` carries every `cannot-tell` with what would
-settle it. `OWED` carries the trace steps that could not be evaluated at all.
+Summarise the first stop and every `cannot-tell` in friendly prose. Exhaust every readable trace step
+before closing; do not turn incomplete diagnosis work into an owed list.
 
 ## Stops
 
 - The named skill does not exist → stop; list the skills that do rather than guessing which was meant.
 - The trace cannot proceed without writing → stop at that step and mark it `cannot-tell`.
-- The session store is missing, so a report that must survive has nowhere to land → say so, print the tables to
-  the conversation, and mark the record as `OWED`.
+- The decision registry is missing, so a hash-bound design record has nowhere to land → say so in prose
+  and record the step as not evaluated.
 
 ## Worked example
 
@@ -119,7 +119,7 @@ settle it. `OWED` carries the trace steps that could not be evaluated at all.
 
 | Target step | What it reads | What is there | Verdict |
 |---|---|---|---|
-| 1 print CONTEXT | — | — | `pass` |
+| 1 establish context lock | — | — | `pass` |
 | 2 resolve + verify the `fe` route | `.workspace/second-app/fe/config.json` | `.workspace/` holds `example-app` only; no `second-app` | **`would-stop`** — `WORKSPACE-2` |
 | 3 worktree roots | `.worktrees/second-app/{registries,sessions,cache}` | absent, as expected without a route | `blocked` behind step 2 |
 | 4 open or resume the session | the registry | unreachable | `blocked` behind step 3 |
@@ -154,18 +154,11 @@ settled-by: the owner naming which app or package holds it, or confirming it doe
 ```
 
 ```text
-finding: skill-shape names a validator this tree does not contain
-label: defect
-evidence: the shape names a validator; scripts/ holds
-  validate-artifact.mjs and nothing else
-cleared-by: a trust-tree change — write the script, or stop naming it
-```
-
-```text
-finding: no session store for this project, so nothing hash-bound can be recorded
+finding: no decision registry for this project, so nothing hash-bound can be recorded
 label: blocked
-evidence: no session store under <Source>/.worktrees/<project>/sessions/
-cleared-by: restoring it, or declaring a new root; every skill's Touching names a path under it
+evidence: no registry under <Source>/.worktrees/<project>/registries/decisions/
+cleared-by: restoring the declared registry root; the design record is
+  registries/decisions/<surface>.json
 ```
 
 ### What the trace does NOT do
@@ -178,11 +171,10 @@ while we are here" is exactly how a diagnosis becomes an unapproved run.
 
 The run would stop at **step 2**, and that stop is the tree working, not failing. But clearing it is not
 enough: **the deeper blocker is that this project has no contract**, and that is a decision rather than a
-setup command. One real defect came out of the trace — a script named but never written — and it belongs
-to the tree, not to the project.
+setup command. The trace proves environment blockers; it does not invent a trust-tree defect where the
+named validator exists.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `OUTPUTS` states the first stop and each finding's label
-at concept level; `CHANGES` is `None`, because a trace writes nothing
-else; `NEED APPROVALS` carries any decision the trace surfaced that only the owner can make.
+Return the first stop, evidence and verdicts in concise prose. Ask only when the trace exposes a genuine
+owner decision, under `### NEED APPROVALS`; this read-only skill never writes a repair itself.

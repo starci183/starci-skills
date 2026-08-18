@@ -68,7 +68,7 @@ exists and lies invites a confident wrong answer. They are reported apart becaus
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `plan`. `Touching` is nothing — this skill writes no file at all unless
 the reader asks for the list to be kept.
@@ -98,7 +98,7 @@ Three verdicts appear, and they are not the same news:
 |---|---|---|
 | `stale` | the route is well formed and no longer true — a moved checkout, an advanced head, an undeclared contract | `starci-init`, per role |
 | `absent` | the role has no route on this machine | `starci-init`, and the project must be declared first |
-| `ok` | checkout, contract and head all still hold | nothing |
+| `valid` | checkout, contract and head all still hold | nothing |
 
 ### 4 — Report the contract index beside the routes
 
@@ -146,9 +146,5 @@ thing that changed the machine it was measuring.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `OUTPUTS` carries the rollup — projects, their stale roles,
-and the count of clean routes; `CHANGES` is `None`, always, and a run where it is not is a failed run;
-`NEED APPROVALS` is `None`; a repair request is a separate run rather than a handover;
-`WARNINGS` carries the non-route findings, and every checkout whose lint rules are not the published
-packages belongs there rather than in `OWED` — nothing is owed by this run, the finding is that a later
-count would not be evidence; `OWED` carries any route the scan could not verify and the reason it could not.
+Return the project rollup, stale roles, evidence and owner in concise prose. Scan every readable layer
+before closing; ask only for a genuine authority boundary under `### NEED APPROVALS`. No status tables.

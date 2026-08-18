@@ -24,7 +24,7 @@ reversible, everything after it is in the product.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `approve`. `Touching` is `None` until approval; after approval it becomes the
 exact backend paths the approved boundary names, and nothing else.
@@ -47,8 +47,9 @@ brief -> feedback -> revision -> brief
 ```
 
 Batch every known question into one round; do not drip-feed. Record every rejection with its replacement
-and the owner's reason in their words. The loop ends only when the owner approves **one exact revision**
-and **one exact file boundary** — not "looks good", not silence, not an approval of an earlier revision.
+and the owner's reason in their words. The loop ends when the owner selects a revision and boundary, or
+replies `OK` to the currently displayed recommended revision and exact boundary. Silence and approval
+attached to an older revision do not count.
 
 State `Approved revision: <identity>` in the phase output. Nothing below this line runs without it.
 
@@ -71,25 +72,26 @@ implementation choices available here.
 
 Run the enumerated cases, not a cheaper substitute. Then the repository's real gates — lint, typecheck,
 build, tests — and the runtime proof the acceptance evidence named, such as a live query or a boot probe.
-A gate that fails is repaired; a gate that is unreachable is reported as `OWED`, never as passing.
+A gate that fails is repaired. For an unreachable gate, exhaust safe fallbacks; if owner authority is
+required, use `### NEED APPROVALS`, otherwise state the external blocker without claiming a pass.
 
 Do not run end-to-end suites unless the approval asked for them.
 
 ### 7 — Close the phase
 
-Append `Applied revision: <same identity>`, the baseline commit and the tracked diff. `CHANGES` lists
-every production path in that diff and must match the approved boundary exactly.
+Append `Applied revision: <same identity>`, the baseline commit and the tracked diff. The diff must list
+every production path and match the approved boundary exactly.
 
 ## Stops
 
 - No `Approved revision` recorded → the implementation does not begin, whatever the plan says.
-- Approval is ambiguous or attached to an older revision → keep looping; ambiguity is not consent.
+- Approval is attached to an older revision, or no default exists and `OK` cannot identify one → ask
+  once; `OK` for the displayed default is not ambiguous.
 - The tree is already dirty with unrelated work → stop; a baseline from mixed state proves nothing.
 - A required path is outside the boundary → return to the owner rather than widening it silently.
 - A gate cannot pass without weakening it → stop; the rule does not bend to the code.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `REJECTED` carries the owner's words from the loop;
-`CHANGES` is the full production tree from `git diff <baseline>`; `OWED` carries any proof that did not
-run and the exact command that clears it.
+Follow the skill shape's friendly prose contract. Close only after every `own` item is implemented and
+proved. Ask only under `### NEED APPROVALS`; after `OK`, apply without repeating the question.

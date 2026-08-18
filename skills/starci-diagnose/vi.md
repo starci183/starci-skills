@@ -31,9 +31,10 @@ defect khi đã nhìn sâu hơn điểm dừng một bước.
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
-`Phase` là `diagnose`, `Touching` là `None`. In target skill, scenario và machine đang được đo.
+`Phase` là `plan`, `Touching` là `None`. In target skill, scenario và machine đang được đo. Diagnosis ghi
+ở nơi khác là đã phá luật read-only của chính nó.
 
 ### 2 — Đọc target skill và hiểu literal từng bước
 
@@ -62,38 +63,81 @@ repoint tên hỏng sang thứ có vẻ gần giống.
 
 ### 7 — Đóng phase
 
-In sáu bảng. `OUTPUTS` là trace theo bước; `WARNINGS` giữ assumption; `OWED` chỉ giữ evidence chưa thể đọc,
-không biến evidence thiếu thành pass.
+Tóm tắt first stop và mọi `cannot-tell` bằng văn xuôi thân thiện. Đánh giá hết mọi trace step còn đọc được
+trước khi đóng; không biến diagnosis chưa làm thành danh sách nợ.
 
 ## Điểm dừng
 
 - Không đọc được target skill → dừng; không có flow để trace.
 - Scenario không xác định project/role mà flow cần → ghi assumption còn thiếu, không tự chọn.
 - Một check sẽ ghi hoặc thực thi target → dừng check đó; diagnosis phải giữ read-only.
+- Decision registry bị thiếu khiến design record gắn với hash không có chỗ ghi → nói rõ bằng văn xuôi và
+  ghi step là chưa đánh giá được.
 
 ## Ví dụ đã làm
 
-Invocation: `/starci-diagnose <skill> render the settings page at second-app`.
+Invocation: `/starci-diagnose <skill>  render the settings page at second-app`.
 
 ### Trace đi từng bước thế nào
 
-Đọc target, resolve route `fe`, kiểm tra checkout và contract, rồi mô phỏng từng precondition bằng phép
-đọc. Không mở session và không render page.
+| Bước target | Nó đọc gì | Thực tế có gì | Verdict |
+|---|---|---|---|
+| 1 lập context lock | — | — | `pass` |
+| 2 resolve + xác minh route `fe` | `.workspace/second-app/fe/config.json` | `.workspace/` chỉ có `example-app`; không có `second-app` | **`would-stop`** — `WORKSPACE-2` |
+| 3 các root worktree | `.worktrees/second-app/{registries,sessions,cache}` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
+| 4 mở hoặc tiếp session | registry | không thể đi tới | `blocked` sau bước 3 |
+| 5 đọc sáu input | contract tại `context.contract` | **checkout đó không có thư mục `components/contracts`** | `defect` trong *environment*, không phải skill |
+| 6 verdict theo từng region | contract key theo `why` | không có contract để search, nên mọi region sẽ resolve thành `new` | `blocked` bởi bước 5 |
+| 7–11 | — | chưa đi tới | `cannot-tell` |
 
 ### Findings được gắn nhãn
 
-Route trỏ tới checkout không tồn tại là `environment`. Script mà target bắt buộc gọi nhưng tree không có
-là `defect`. Contract không chứa need đang hỏi có thể là stop hợp lệ nếu skill đã phát biểu refusal đó.
+```text
+finding: project không có workspace route
+label: blocked
+evidence: .workspace/ có example-app; không có second-app
+first-stop: yes, tại target step 2
+cleared-by: owner của route, với project do owner khai
+```
+
+```text
+finding: project không có contract registry
+label: blocked
+evidence: checkout có trên disk, nhưng không có apps/app/src/components/contracts
+after-the-obvious-fix: vẫn blocked — input 2 của step 5 là contract, và khi không có nó thì mọi
+region resolve thành `new`, chính là lỗi invented-entry mà luật layout gọi tên
+cleared-by: một quyết định kiến trúc của owner, không phải một bước setup
+```
+
+```text
+finding: surface được yêu cầu không có source trong app đã search
+label: cannot-tell
+evidence: search apps/app/src cho *vocab* và *defense* không trả về gì
+settled-by: owner gọi tên app hay package chứa nó, hoặc xác nhận nó chưa tồn tại
+```
+
+```text
+finding: project không có decision registry, nên không thể ghi thứ gì gắn với hash
+label: blocked
+evidence: không có registry dưới <Source>/.worktrees/<project>/registries/decisions/
+cleared-by: khôi phục registry root đã khai; design record là
+  registries/decisions/<surface>.json
+```
 
 ### Trace không làm gì
 
-Không refresh head, không tạo route, không viết candidate, không chạy target skill và không sửa defect.
+Không tạo route, không mở session, không ghi registry và không sinh một candidate nào — dù cách sửa bước 2
+chỉ cách một skill, chính cám dỗ “tiện thể setup luôn” là thứ biến diagnosis thành một lượt chạy chưa được
+duyệt.
 
 ### Owner học được gì
 
-Owner biết chính xác lượt chạy sẽ dừng ở đâu, evidence nào thiếu, và cần sửa machine hay sửa skill; không
-chỉ nhận một kết luận chung chung rằng “không chạy được”.
+Lượt chạy sẽ dừng ở **bước 2**, và điểm dừng đó là cây đang hoạt động đúng, không phải thất bại. Nhưng dọn
+nó vẫn chưa đủ: **blocker sâu hơn là project này không có contract**, và đó là một quyết định chứ không
+phải lệnh setup. Trace chứng minh các blocker của environment; nó không bịa ra defect của trust tree khi
+validator được gọi tên thực sự tồn tại.
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. Không có production path trong `CHANGES`.
+Trả first stop, evidence và verdict bằng văn xuôi ngắn. Chỉ hỏi khi trace lộ ra quyết định thật của owner,
+dưới `### NEED APPROVALS`; skill chỉ đọc này không tự ghi repair.

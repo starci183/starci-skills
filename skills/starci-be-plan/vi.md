@@ -21,7 +21,7 @@ không ghi source backend.
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
 `Phase` là `plan`, `Touching` là `None`. Một bản kế hoạch đã ghi product code tức là đã vượt qua bước
 phê duyệt của chính nó.
@@ -56,15 +56,15 @@ Viết test case khi các branch gợi ý chúng còn chưa tồn tại. Gọi t
 không có row, viewer không đủ quyền, concurrent write, delivery trùng, projection rỗng. Mọi exception mà
 capability có thể raise phải kế thừa abstract exception; một bare throw là defect, không phải test case.
 
-### 7 — Chốt ranh giới, phương án khác và bằng chứng chấp nhận
+### 7 — Xác định ranh giới, phương án khác và bằng chứng chấp nhận
 
 Cuối brief phải nêu capability không làm gì, những phương án đã cân nhắc và lý do loại, cùng bằng chứng
 chính xác sẽ chứng minh nó chạy đúng: test nào, query nào, runtime call nào.
 
 ### 8 — Đóng phase
 
-In đủ sáu bảng. `NEED APPROVALS` giữ những quyết định có thể sai; `OWED` giữ việc phê duyệt rõ ràng cho
-đúng brief và đúng ranh giới file.
+Nói brief và boundary chính xác bằng văn xuôi thân thiện. Không kết thúc khi vẫn còn việc plan thuộc
+`own`; brief cùng boundary chính xác là mục `NEED APPROVALS` duy nhất.
 
 ## Điểm dừng
 
@@ -75,7 +75,7 @@ In đủ sáu bảng. `NEED APPROVALS` giữ những quyết định có thể s
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. `CHANGES` là `None` vì phase này không ghi path nào.
+Trả brief sẵn sàng duyệt cùng file boundary chính xác bằng văn xuôi ngắn. Không in bảng trạng thái.
 
 | Output | Owner |
 |---|---|

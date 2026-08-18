@@ -9,7 +9,7 @@ description: Open or resume a hash-bound frontend design session, generate 3–4
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape` | module | Supplies the CONTEXT and six-table reporting contract. |
+| `@skill-shape` | `skills/skill-shape` | module | Supplies the shared interaction and approval contract. |
 | `@workspaces` | `contexts/workspaces` | module | Resolves and verifies the frontend checkout this run reads. |
 | `@worktrees` | `contexts/worktrees` | module | Separates durable decision records from disposable preview work. |
 | `@directions` | `brainstorms/directions` | module | Generates the visual choice that every layout candidate embeds. |
@@ -35,10 +35,10 @@ never to a rendered page.
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
-Print `### CONTEXT` before touching anything. `Phase` is `layout`. `Touching` names the project registry,
-session and disposable cache, and no frontend source path.
+Resolve `Phase: layout`; `Touching` names the project registry, session and disposable cache, and no
+frontend source path. Tell the user that location in one friendly sentence; do not print a context table.
 
 ### 2 — Resolve and verify the workspace route
 
@@ -140,8 +140,9 @@ npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 Queue layout hashes in the durable registry. Feedback opens a new layout round; an accepted candidate
 is never edited. When a replacement layout is accepted, mark the previous accepted layout
 `superseded` and point `supersededBy` at the replacement. Validate the updated session with
-`@validate-artifact`; append feedback as a new sealed round and record the owner's words. Close with the
-six tables. `OWED` names the block rounds not yet designed.
+`@validate-artifact`; append feedback as a new sealed round and record the owner's words. Mark one
+evidence-backed layout as the default. `OK` accepts that hash immediately; do not ask the owner to identify
+it again. Close only after every Layout-owned record and validation step is complete.
 
 ## Stops
 
@@ -157,7 +158,6 @@ run.
 
 ## OUTPUT
 
-The six tables from `@skill-shape`, in order. `OUTPUTS` names the selected direction, layout candidates
-and hashes at concept level; `CHANGES` names registry/session/cache paths; `NEED APPROVALS` carries the
-current selection or accept-or-feedback decision; `REJECTED` keeps the owner's words; `OWED` carries
-the block rounds.
+Present the selected direction, layout candidates, recommended default, hashes and preview URL in concise
+prose. Use `### NEED APPROVALS` only for the current selection or accept-or-feedback decision. No status
+tables.

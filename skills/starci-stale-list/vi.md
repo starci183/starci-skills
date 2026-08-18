@@ -38,9 +38,10 @@ Danh sách phải đọc được theo project, chỉ ra lý do và owner, nhưn
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
-`Phase` là `stale-list`, `Touching` là `None`. Ghi Source và thời điểm đo.
+`Phase` là `plan`, `Touching` là `None`. Ghi Source và thời điểm đo. Skill không ghi file nào, kể
+cả record riêng; chỉ khi người đọc yêu cầu giữ lại danh sách thì nơi lưu mới được khai rõ.
 
 ### 2 — Scan bằng script của tree
 
@@ -70,6 +71,10 @@ lint count đều không phải evidence: absent nghĩa không kiểm gì, vendo
 
 Contract miss và lint-machine drift không biến route thành stale. Báo riêng để owner đúng nhận đúng việc.
 
+Checkout còn `.claude/` từ một tree cũ cũng nằm trong nhóm warning này: không gate nào của repository báo
+nó, nó không phải lỗi route, và điều nó phá là niềm tin của người đọc sau rằng project sở hữu một bộ luật
+riêng. Không được sửa nó bằng cách refresh route.
+
 ### 7 — Dừng tại đó
 
 Nói cái gì stale, vì sao và ai xử lý. Không refresh head, repoint path, declare contract hay sửa source;
@@ -84,5 +89,6 @@ nếu làm vậy báo cáo sẽ trở thành thứ thay đổi machine nó vừa
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự. `CHANGES` luôn là `None`; mỗi finding có project, role, verdict,
-evidence và owner.
+Trả project rollup, stale role, evidence và owner bằng văn xuôi ngắn. Scan hết mọi layer thuộc `own`
+trước khi đóng. Nếu yêu cầu đã gồm repair thì handoff và tiếp tục; chỉ hỏi boundary thẩm quyền thật dưới
+`### NEED APPROVALS`.

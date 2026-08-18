@@ -64,7 +64,7 @@ that it has. Green measured against a private copy is green against a rule nobod
 
 ## PROCESS
 
-### 1 — Print CONTEXT
+### 1 — Establish the context lock
 
 `Phase` is `plan`, then `review`, then `apply`. `Touching` is `None` until approval; after
 approval it is the exact source paths the approved boundary names.
@@ -76,11 +76,9 @@ the contract path for a frontend role exists, the recorded head still belongs to
 
 A stale route ends the run here. Say which field failed; the owner row names the next action.
 
-**One run repairs one role of one project.** A list naming five checkouts is five runs, five baselines,
-five records — not one boundary with five repositories inside it. Repositories fail differently, their
-gates take different times, and one review that covers all of them cannot be answered: the reader would
-have to approve the one they meant along with four they have not seen. A run handed several either takes
-the first and says so, or asks which one.
+**One repair record covers one role of one project.** A request naming five checkouts becomes five
+separate records and baselines coordinated in the same user task. Measure them, display every required
+boundary default in one approval batch, then process all approved records without asking which comes first.
 
 ### 3 — Read the manifest before running anything
 
@@ -147,10 +145,9 @@ A `decision` misfiled as a `defect` is how a rule gets bent to match the code. A
 Present the before-counts, every class with how many findings it holds, the exact file list, and
 what the run will **not** touch. Batch every approval into one round.
 
-The skill shape decides what a blanket answer approves. What is specific here is the cost of getting it
-wrong: this skill's rows authorise **writes into a product repository**, so a row this run never wrote —
-another checkout, another role — is not covered by any answer to these. When a blanket answer arrives, the
-run names the rows it is **not** taking before it starts.
+`OK` approves every displayed default and the exact shown boundary; take the baseline and begin Apply
+immediately. It does not cover another checkout or role that was never shown, and the run must not ask the
+owner to repeat `OK`.
 
 Where a `decision` blocks a whole file, say so: it is better to hand back a file with a named question
 than to return a repository that is green because one file was rewritten to somebody else's taste.
@@ -259,7 +256,7 @@ Run this pass from the accepted vocabulary, not from whether lint happened to em
 
 1. Count files recursively and ask Git which are tracked.
 2. If the count is zero, remove the empty directory tree and record the absolute path plus before/after
-   counts. `git diff` is correctly empty because Git never owned the directory; `CHANGES` still records
+   counts. `git diff` is correctly empty because Git never owned the directory; the result still records
    the filesystem removal.
 3. If files exist, preserve their behaviour and history. Resolve each component's actual identity from
    its exports, mechanic and call sites, then move it to the tier `@file-layout` requires. A fixed vendor
@@ -267,7 +264,7 @@ Run this pass from the accepted vocabulary, not from whether lint happened to em
    contract references together.
 4. Do not delete a live component to make the tier disappear. If evidence cannot settle its destination
    or semantic name, return that component as a `decision`; continue with the paths whose destination is
-   settled and leave the unresolved path in `OWED`.
+   settled and put the unresolved path under `NEED APPROVALS` with a default if evidence supports one.
 
 The machine pass comes first. A consumer using a vendored mirror or missing `no-shell-tier` installs the
 published canon and removes the mirror; this pass never patches a consumer's private lint-rule copy.
@@ -301,7 +298,7 @@ committed files to tidy a name.
 shallow is a directory this pass must refuse. Count files recursively and print the number.
 
 Proof is the count before, the approval, and the count after. The removal is its own commit, its message
-names what the directory held, and `CHANGES` says `removed` rather than `repaired` — a deletion recorded
+names what the directory held, and the result says `removed` rather than `repaired` — a deletion recorded
 as a repair is a deletion nobody can review.
 
 Measured once, on two checkouts carrying the same leftover: one had it ignored, so nothing was tracked;
@@ -313,13 +310,12 @@ is why the test is "untracked", not "looks empty".
 Re-run the exact gates from step 5 and print before-and-after side by side. Zero errors means zero — not
 zero after a disable, not zero because a rule was dropped, not zero because a test was skipped.
 
-If a gate cannot pass without a decision the owner has not made, the run reports it as `OWED` with the
-count that remains. **A partly repaired repository honestly reported is worth more than a green one that
-lies.**
+If a gate cannot pass without a decision the owner has not made, ask once under `### NEED APPROVALS` with
+the remaining count, evidence-backed default and exact scope. Never weaken the gate.
 
 ### 14 — Close the phase
 
-Close with the applied revision, the baseline commit, the tracked diff and the two count tables.
+Close with the applied revision, baseline commit, tracked diff and before/after counts in concise prose.
 
 ## Stops
 
@@ -333,16 +329,13 @@ Close with the applied revision, the baseline commit, the tracked diff and the t
   it; one of those is somebody's committed configuration and the other may be a Source.
 - A gate is measured against a rule copied into the checkout → stop measuring; the machine pass comes first,
   and a count taken against a private copy of the law is not evidence.
-- A run is handed more than one project or role → stop; take one and name the others, or ask which.
+- A run is handed more than one project or role → create one record per declared target and coordinate
+  them; ask only for an undisclosed boundary, never for ordering.
 - A repository declares no gates at all → stop; there is nothing to measure, and inventing commands
   measures somebody else's project.
 
 ## OUTPUT
 
-The six tables from the skill shape, in order. `OUTPUTS` carries the before-and-after counts per gate;
-`CHANGES` names every path in each pass, and says which pass each belongs to, marking a remnant path
-`removed` rather than `repaired`; it also records empty retired directories removed outside Git and every
-migration from `shells` to its accepted tier. `NEED APPROVALS` carries one row per `decision`, including each
-remnant proposed for removal with its recursive file count; `WARNINGS` carries every autofix hunk that changed more than formatting;
-`REJECTED` carries the owner's words on any repair they refused; `OWED` carries the findings still
-standing and the exact command that reproduces them.
+State before/after counts, material paths by pass and proof in concise prose. Before another batch, name
+remaining findings as work owed and repair them in the same turn. The turn may end only with `own = 0`
+or while waiting under `### NEED APPROVALS` for a genuine decision or boundary expansion.

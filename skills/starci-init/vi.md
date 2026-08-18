@@ -20,14 +20,18 @@ Không có. Skill này không tự gọi skill khác.
 route và worktree state phải cập nhật khi project, role hoặc checkout thay đổi.
 
 Ba root độc lập: bootstrap quyết định agent đi vào tree nào; `.workspace/<project>/` quyết định source
-được **đọc** ở đâu; `.worktrees/<project>/` quyết định state được **ghi** ở đâu. Mỗi root có boundary và
-approval riêng. Một approval chung cho “setup” không bao phủ cả ba.
+được **đọc** ở đâu; `.worktrees/<project>/` quyết định state được **ghi** ở đâu. Mỗi root vẫn có boundary
+và verdict riêng, nhưng `OK` accept mọi recommended default đã hiển thị; nó không phủ root
+chưa từng được trình.
 
 ## QUY TRÌNH
 
-### 1 — In CONTEXT
+### 1 — Lập context lock
 
-In Source, project, role và ba boundary. `Touching` chỉ chứa boundary đang được đề nghị, không gom cả ba.
+`Phase` lần lượt là `plan`, `review`, rồi `apply`. In Source, project, role và ba boundary. `Touching` chỉ
+chứa boundary đang được đề nghị, không gom cả ba.
+`Project` phải do owner khai; không bao giờ suy ra nó từ Source, tên checkout sibling hay session gần nhất.
+Lượt chỉ bootstrap không có project thì phải nói rõ, không được tự bịa một project.
 
 ### 2 — Bootstrap: chứng minh tree entry tồn tại
 
@@ -53,12 +57,13 @@ Kiểm tra registry và cache root, Git ownership, lock và path policy. Write r
 ### 6 — Review từng boundary riêng
 
 Trình bootstrap, workspace và worktree thành ba quyết định độc lập. Mỗi quyết định nêu diff chính xác,
-điều sẽ không chạm và cách verify. Owner có thể duyệt bất kỳ tập con nào.
+điều sẽ không chạm và cách verify. Owner có thể duyệt tập con; `OK` accept mọi default đã trình.
 
 ### 7 — Apply: bootstrap
 
 Chỉ sau approval của boundary bootstrap, ghi entry tối thiểu để route vào tree. Không copy luật, compiler
-hay gate vào Source; copied rule sẽ có hai home.
+hay gate vào Source; copied rule sẽ có hai home. Entry phải trỏ tới
+`<Source>/<tree>/INDEX.md` và yêu cầu đọc trọn file theo load order.
 
 ### 8 — Apply: workspace routes
 
@@ -77,8 +82,8 @@ Tạo hoặc sửa đúng project root đã duyệt, giữ registry durable và 
 
 ### 11 — Đóng phase
 
-In sáu bảng; `CHANGES` tách rõ bootstrap, workspace và worktree. Boundary không được duyệt phải xuất hiện
-trong `REJECTED` hoặc `OWED`, không được lặng lẽ áp dụng.
+Nói các root đã resolve và thay đổi bằng văn xuôi thân thiện. Không đóng khi vẫn còn bước apply hay verify
+thuộc `own` đã được duyệt.
 
 ## Điểm dừng
 
@@ -90,4 +95,5 @@ trong `REJECTED` hoặc `OWED`, không được lặng lẽ áp dụng.
 
 ## ĐẦU RA
 
-Sáu bảng của skill shape, đúng thứ tự, với từng boundary được báo cáo riêng.
+Mô tả từng root và tác động chính xác bằng văn xuôi ngắn. Chỉ grant boundary thật nằm dưới
+`### NEED APPROVALS`; `OK` accept mọi default đã hiển thị rồi Apply tiếp ngay.
