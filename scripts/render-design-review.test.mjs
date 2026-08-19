@@ -127,6 +127,43 @@ test("block review adds proposed children without replacing the accepted block r
   }
 });
 
+test("draft index overlays block candidates and block-specific content in one project graph", () => {
+  const f = fixture();
+  try {
+    const drafts = join(f.root, "drafts");
+    mkdirSync(drafts);
+    const artifact = "summary.json";
+    const content = "summary.content.json";
+    writeFileSync(join(drafts, artifact), JSON.stringify({
+      schema: 1,
+      envelope: {round: 1, project: "sample", region: "summary", layoutHash: f.layoutHash},
+      anatomies: [{...f.anatomy, id: "summary-review", reason: "A reviewed summary stays bound to the exact parent."}]
+    }));
+    writeFileSync(join(drafts, content), JSON.stringify({
+      eyebrow: "Summary",
+      title: "Exact block content",
+      description: "Content belongs to this block review only.",
+      primaryAction: "Continue",
+      rows: [{title: "Score", description: "78 percent"}]
+    }));
+    writeFileSync(join(drafts, "index.json"), JSON.stringify([{
+      layoutId: "sample-layout",
+      blockId: "summary",
+      artifact,
+      content,
+      recommendedId: "summary-review"
+    }]));
+    const manifest = buildManifest({draftIndex: join(drafts, "index.json"), project: "sample", registry: f.registry, vocabulary: f.vocabularyPath});
+    const child = manifest.layouts[0].candidates[0].regions[0].block;
+    assert.equal(child.recommendedId, "summary-review");
+    assert.equal(child.renderedId, "summary-stack");
+    assert.equal(child.content.title, "Exact block content");
+    assert.match(manifest.entryRoute, /\/blocks\/summary$/);
+  } finally {
+    rmSync(f.root, {recursive: true, force: true});
+  }
+});
+
 test("a replacement layout marks old child heads stale and falls back to rough content", () => {
   const f = fixture();
   try {

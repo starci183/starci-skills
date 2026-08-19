@@ -42,6 +42,7 @@ export type ChildBlockReview = {
   readonly currentHead?: string
   readonly recommendedId?: string
   readonly renderedId?: string
+  readonly content?: ReviewContent
   readonly candidates: ReadonlyArray<BlockCandidate>
 }
 

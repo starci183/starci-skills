@@ -99,6 +99,7 @@
         "currentHead": {"$ref": "#/$defs/hash"},
         "recommendedId": {"$ref": "#/$defs/slug"},
         "renderedId": {"$ref": "#/$defs/slug"},
+        "content": {"$ref": "#/$defs/content"},
         "candidates": {"type": "array", "items": {"$ref": "#/$defs/blockCandidate"}}
       }
     },

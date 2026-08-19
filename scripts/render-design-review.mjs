@@ -210,6 +210,7 @@ function overlayBlockReview(layouts, options, registryRoot, registry) {
   region.block = {
     ...region.block,
     recommendedId,
+    ...(options.content ? {content: optional(options.content)} : {}),
     candidates: [...proposed, ...existing]
   };
   return `#/layouts/${layoutId}/${layoutHash}/blocks/${blockId}`;
@@ -247,7 +248,23 @@ export function buildManifest(options) {
   if (!layouts.length) throw new Error("design registry has no accepted layout heads");
 
   let entryRoute;
-  if (options.phase === "layout") {
+  if (options.draftIndex) {
+    const indexPath = resolve(options.draftIndex);
+    const drafts = load(indexPath, "block draft index");
+    if (!Array.isArray(drafts) || !drafts.length) throw new Error("block draft index must contain at least one entry");
+    const root = dirname(indexPath);
+    for (const draft of drafts) {
+      const draftOptions = {
+        ...options,
+        phase: "block",
+        ...draft,
+        artifact: resolve(root, draft.artifact),
+        ...(draft.content ? {content: resolve(root, draft.content)} : {})
+      };
+      const route = overlayBlockReview(layouts, draftOptions, registryRoot, registry);
+      entryRoute ??= route;
+    }
+  } else if (options.phase === "layout") {
     entryRoute = overlayLayoutReview(layouts, options, registryRoot, registry, vocabulary, contentInput, shellInput);
   } else if (options.phase === "block") {
     entryRoute = overlayBlockReview(layouts, options, registryRoot, registry);
@@ -267,7 +284,8 @@ export function buildManifest(options) {
     evidence: [
       {label: "registry", value: join(registryRoot, "design-registry-v2.json")},
       {label: "vocabularyAt", value: vocabulary.digest},
-      ...(options.artifact ? [{label: "reviewArtifact", value: options.artifact}] : [])
+      ...(options.artifact ? [{label: "reviewArtifact", value: options.artifact}] : []),
+      ...(options.draftIndex ? [{label: "draftIndex", value: options.draftIndex}] : [])
     ]
   };
 }
