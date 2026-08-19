@@ -22,7 +22,9 @@ and resolved runtime projections without changing a clean effective port.
 
 Shared services resolve as `basePort + family.offset`. Application services resolve as
 `basePort + family.offset + application.slot * slotStep`. The frontend and backend of one application
-use the same slot, so they move together. Tool and external ports are explicit exceptions with reasons.
+use the same slot, so they move together. The canonical application pair uses frontend base `3000` and
+backend base `3001`; therefore the resolved backend port is always the resolved frontend port plus one.
+Tool and external ports are explicit exceptions with reasons.
 
 ## Situation codes
 
@@ -38,7 +40,8 @@ use the same slot, so they move together. Tool and external ports are explicit e
 
 1. Resolve the Source, project family, routed roles and application identities.
 2. Inventory each local listener and classify it as `shared`, `application`, `tool` or `external`.
-3. Preserve clean effective ports; introduce a new allocation only for an absent family/application or a measured collision.
+3. Use canonical application bases `3000` for frontend and `3001` for backend; preserve clean effective
+   ports through the family offset rather than shifting either base.
 4. Emit the Source allocation once, backend service declarations once, then update every reached projection consumer.
 5. Reject partial migration: a frontend/backend pair with different slots is not an intermediate valid state.
 
@@ -67,7 +70,8 @@ Container-internal ports that are never published are outside this declaration.
 **Situation.** A frontend and backend form one routed application and both bind or consume local ports.
 
 **What it emits in source.** Application declarations naming the same application key, with scripts,
-env examples, defaults and tests reading the matching resolved projections.
+env examples, defaults and tests reading the matching resolved projections. The frontend declares base
+`3000`, the backend base `3001`, and both add the same family offset and slot term.
 
 **Boundary.** A shared datastore has no application slot and remains `PORT-OFFSET-2` with `shared` scope.
 
@@ -116,9 +120,10 @@ reached consumers, followed by checker and concurrent runtime evidence.
 2. Shared and application services use their respective formulas exactly.
 3. Each application slot is a distinct non-negative integer.
 4. Frontend and backend consumers for one application migrate together.
-5. Tool and external exceptions carry explicit ports and reasons.
-6. No clean effective port is renumbered without a measured collision or accepted allocation change.
-7. Collision proof covers every routed local listener.
+5. A canonical frontend/backend pair uses base ports `3000` and `3001`, preserving `BE = FE + 1`.
+6. Tool and external exceptions carry explicit ports and reasons.
+7. No clean effective port is renumbered without a measured collision or accepted allocation change.
+8. Collision proof covers every routed local listener.
 
 ## Exceptions
 

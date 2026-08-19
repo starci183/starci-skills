@@ -22,7 +22,9 @@ resolve cho consumer. Product không giữ `portOffset`, slot number hoặc allo
 
 Shared service resolve theo `basePort + family.offset`. Application service resolve theo
 `basePort + family.offset + application.slot * slotStep`. Frontend và backend của cùng application
-dùng chung slot nên phải di chuyển cùng nhau. Tool và external port là ngoại lệ explicit có reason.
+dùng chung slot nên phải di chuyển cùng nhau. Cặp application canonical dùng frontend base `3000` và
+backend base `3001`; vì vậy backend port đã resolve luôn bằng frontend port cộng một. Tool và external
+port là ngoại lệ explicit có reason.
 
 ## Situation codes
 
@@ -38,7 +40,8 @@ dùng chung slot nên phải di chuyển cùng nhau. Tool và external port là 
 
 1. Resolve Source, project family, routed roles và application identity.
 2. Inventory từng local listener và phân loại `shared`, `application`, `tool` hoặc `external`.
-3. Giữ effective port đang sạch; chỉ cấp allocation mới khi family/application thiếu hoặc có collision đã đo.
+3. Dùng application base canonical `3000` cho frontend và `3001` cho backend; giữ effective port sạch
+   bằng family offset thay vì dịch một trong hai base.
 4. Emit Source allocation một lần, backend service declaration một lần, rồi cập nhật mọi projection consumer đạt tới.
 5. Từ chối partial migration: cặp frontend/backend khác slot không phải trạng thái trung gian hợp lệ.
 
@@ -67,7 +70,8 @@ Container-internal port không publish ra host nằm ngoài declaration này.
 **Situation.** Frontend và backend tạo thành một routed application, cùng bind hoặc consume local port.
 
 **What it emits in source.** Application declaration dùng cùng application key; script, env example,
-default và test đọc projection tương ứng.
+default và test đọc projection tương ứng. Frontend khai base `3000`, backend khai base `3001`, và cả
+hai cộng cùng family offset cùng slot term.
 
 **Boundary.** Shared datastore không có application slot và vẫn là `PORT-OFFSET-2` với scope `shared`.
 
@@ -114,9 +118,10 @@ sau đó chạy checker và concurrent runtime evidence.
 2. Shared và application service dùng chính xác formula tương ứng.
 3. Mỗi application slot là số nguyên không âm riêng biệt.
 4. Frontend và backend consumer của cùng application migrate cùng nhau.
-5. Tool và external exception có explicit port cùng reason.
-6. Không renumber effective port sạch khi chưa có measured collision hoặc accepted allocation change.
-7. Collision proof phủ mọi routed local listener.
+5. Cặp frontend/backend canonical dùng base port `3000` và `3001`, giữ `BE = FE + 1`.
+6. Tool và external exception có explicit port cùng reason.
+7. Không renumber effective port sạch khi chưa có measured collision hoặc accepted allocation change.
+8. Collision proof phủ mọi routed local listener.
 
 ## Exceptions
 

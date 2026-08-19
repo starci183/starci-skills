@@ -17,7 +17,8 @@ declares service identity and base ports in `portServices`, and may carry resolv
 consumers. A product never stores an offset, slot, or second allocation table.
 
 Shared services resolve as `basePort + family.offset`. Application services add
-`application.slot * slotStep`. A paired frontend and backend use the same application slot.
+`application.slot * slotStep`. A paired frontend and backend use the same application slot and canonical
+bases `3000`/`3001`, so the resolved backend port is always the resolved frontend port plus one.
 
 ## Situation codes
 
@@ -33,7 +34,7 @@ Shared services resolve as `basePort + family.offset`. Application services add
 
 1. Resolve Source, family, routed roles and application identities.
 2. Classify every listener as `shared`, `application`, `tool` or `external`.
-3. Preserve clean effective ports; allocate only for absence or measured collision.
+3. Use canonical frontend/backend bases `3000`/`3001`; preserve effective ports through family allocation.
 4. Emit allocation once, declarations once, then update every reached consumer.
 5. Reject partial frontend/backend migration.
 
@@ -61,7 +62,8 @@ resolved number at `metadata.json.ports.<name>`.
 **Situation.** A frontend and backend form one routed application and consume local ports.
 
 **What it emits in source.** Both declarations name one application key; scripts, defaults, examples
-and tests consume matching projections.
+and tests consume matching projections. Frontend base is `3000`, backend base is `3001`, and both add
+the same family offset and slot term.
 
 **Boundary.** Shared datastores have no application slot and remain `PORT-OFFSET-2`.
 
@@ -108,9 +110,10 @@ consumer, followed by checker and concurrent runtime evidence.
 2. Shared and application services use their formulas exactly.
 3. Application slots are distinct non-negative integers.
 4. Paired frontend/backend consumers migrate together.
-5. Tool and external exceptions carry explicit ports and reasons.
-6. A clean effective port changes only for a measured collision or accepted allocation change.
-7. Collision proof covers every routed local listener.
+5. A canonical frontend/backend pair uses bases `3000` and `3001`, preserving `BE = FE + 1`.
+6. Tool and external exceptions carry explicit ports and reasons.
+7. A clean effective port changes only for a measured collision or accepted allocation change.
+8. Collision proof covers every routed local listener.
 
 ## Exceptions
 

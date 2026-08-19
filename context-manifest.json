@@ -130,7 +130,7 @@
     "compilers/patterns/be/port-offset/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/port-offset/en.md",
-      "sourceHash": "6c2b6f9c3e366aa1c991049764f432b030f6d0a2c3ac3772d51c90999ebb7e3e",
+      "sourceHash": "4c3008af208d83c1302431cb1050feb382f9e81ac23c67a6cceaa9075861c256",
       "contextVersion": 1
     },
     "compilers/patterns/be/testing/context.md": {
