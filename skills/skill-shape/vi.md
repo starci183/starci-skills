@@ -70,9 +70,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười bốn năng lực
+## Mười lăm năng lực
 
-Mười hai capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười ba capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -91,6 +91,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-fe-design-block` | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
 | `starci-fe-design-execute` | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
 | `starci-fe-minor-fix` | một correction nhỏ giữ nguyên contract trong một folder block, composite hoặc leaf hiện hữu và sạch; machine reject khi scope lớn lên |
+| `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | sự chấp thuận, rồi source backend |
 

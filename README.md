@@ -150,6 +150,23 @@ Because these records contain machine-local paths and Git state, keep `.workspac
 repository history. Run `starci-init` again when adding a role or project, or when a checkout, branch,
 or recorded head changes. Do not duplicate the nearest config by hand.
 
+Conversation provenance is project-scoped and provider-neutral:
+
+```text
+.worktrees/<project>/
+  registries/conversations/
+    conversation-registry-v1.json
+    objects/sha256/
+  cache/conversations/
+    transcripts/
+    search.sqlite
+    vectors/
+```
+
+Use `starci-conversation-record` to bind an OpenAI/ChatGPT/Codex or Anthropic/Claude exchange to exact
+frontend/backend artifact hashes. Registries contain only redacted metadata and immutable references;
+raw transcript content stays provider-held, cache-only, or encrypted in approved external storage.
+
 ## Multiple Sources
 
 Give every Source its own authority and runtime state:

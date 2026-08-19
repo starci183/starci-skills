@@ -449,6 +449,12 @@
       "kind": "router",
       "contextVersion": 1
     },
+    "contexts/conversations/context.md": {
+      "kind": "module",
+      "source": "contexts/conversations/en.md",
+      "sourceHash": "09587f8eb2e22b4d7780f3215acb5f21be530b776337d474e44a43c462ec9e74",
+      "contextVersion": 1
+    },
     "contexts/workspaces/context.md": {
       "kind": "module",
       "source": "contexts/workspaces/en.md",
@@ -880,7 +886,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "9ecda58ab156f1fc1b77bc76cf91c025509fb3190eb75bd1ece8ace629c3f6ad",
+      "sourceHash": "994772ea08c2b0aa99762220c1f52eeb0b5b593470ee8b893ba6f3f36ee9db3f",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {
@@ -926,6 +932,10 @@
       "contextVersion": 1
     },
     "workflows/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "workflows/conversations/context.md": {
       "kind": "router",
       "contextVersion": 1
     },

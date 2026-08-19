@@ -13,6 +13,7 @@ title: Docs
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
 | `@compilers` | `compilers/context.md` | context | compile an accepted shape into one answer |
+| `@conversations` | `contexts/conversations/context.md` | context | bind provider-neutral chat provenance to exact FE/BE artifact hashes without storing raw transcripts in Git |
 | `@contexts` | `contexts/context.md` | context | resolve where reads and writes occur |
 | `@deployment` | `deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
@@ -101,7 +102,7 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Fourteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Fifteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. Eleven do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
@@ -118,6 +119,7 @@ record. Eleven do the work; two only look — one at the machine, one at the oth
 | `starci-fe-design-block` | one stable `(layoutId, blockId)` head, independently hash-versioned under its current accepted layout |
 | `starci-fe-design-execute` | frontend source, only from one layout head whose every declared region has a current accepted block head |
 | `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
+| `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |
 | `starci-be-plan` | the backend brief |
 | `starci-be-approve` | approval, then backend source |
 

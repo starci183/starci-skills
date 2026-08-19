@@ -18,3 +18,4 @@ Workflows route user intent into existing discoverable skills. `SKILL.md` remain
 | Frontend direction, layout, block and execution | `workflows/frontend/context.md` |
 | Quality, lint, coverage, Sonar and assurance | `workflows/quality/context.md` |
 | Cloudflare, MCP, Sonar service and deployment | `workflows/operations/context.md` |
+| Conversation provenance capture and query | `workflows/conversations/context.md` |
