@@ -164,6 +164,29 @@ test("draft index overlays block candidates and block-specific content in one pr
   }
 });
 
+test("settled draft index keeps only the accepted candidate in the current graph", () => {
+  const f = fixture();
+  try {
+    const drafts = join(f.root, "drafts");
+    mkdirSync(drafts);
+    writeFileSync(join(drafts, "summary.json"), JSON.stringify({
+      schema: 1,
+      envelope: {round: 1, project: "sample", region: "summary", layoutHash: f.layoutHash},
+      anatomies: [f.anatomy, {...f.anatomy, id: "rejected-summary", reason: "A rejected alternative uses another presentation."}]
+    }));
+    writeFileSync(join(drafts, "index.json"), JSON.stringify([{
+      layoutId: "sample-layout", blockId: "summary", artifact: "summary.json", recommendedId: "rejected-summary"
+    }]));
+    const manifest = buildManifest({draftIndex: join(drafts, "index.json"), project: "sample", registry: f.registry, vocabulary: f.vocabularyPath});
+    const child = manifest.layouts[0].candidates[0].regions[0].block;
+    assert.equal(child.recommendedId, "summary-stack");
+    assert.equal(child.candidates.length, 1);
+    assert.equal(child.candidates[0].hash, f.blockHash);
+  } finally {
+    rmSync(f.root, {recursive: true, force: true});
+  }
+});
+
 test("a replacement layout marks old child heads stale and falls back to rough content", () => {
   const f = fixture();
   try {

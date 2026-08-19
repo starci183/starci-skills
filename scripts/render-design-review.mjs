@@ -203,15 +203,17 @@ function overlayBlockReview(layouts, options, registryRoot, registry) {
   if (!layout || !candidate || !region) throw new Error("blockId is not declared by the accepted parent layout");
 
   const currentHead = registry.blockHeads?.[`${layoutId}/${blockId}`]?.head;
-  const proposed = artifact.anatomies.map((anatomy) => publicationBlockCandidate(anatomy, currentHead));
-  const existing = region.block.candidates.filter((item) => !proposed.some((candidate) => candidate.hash === item.hash));
-  const recommendedId = options.recommendedId ?? proposed[0]?.id;
-  if (!proposed.some((candidate) => candidate.id === recommendedId)) throw new Error("recommended block candidate is absent");
+  const drafted = artifact.anatomies.map((anatomy) => publicationBlockCandidate(anatomy, currentHead));
+  const acceptedDraft = currentHead ? drafted.find((candidate) => candidate.hash === currentHead) : undefined;
+  const offered = acceptedDraft ? [acceptedDraft] : drafted;
+  const existing = region.block.candidates.filter((item) => !offered.some((candidate) => candidate.hash === item.hash));
+  const recommendedId = acceptedDraft?.id ?? options.recommendedId ?? offered[0]?.id;
+  if (!offered.some((candidate) => candidate.id === recommendedId)) throw new Error("recommended block candidate is absent");
   region.block = {
     ...region.block,
     recommendedId,
     ...(options.content ? {content: optional(options.content)} : {}),
-    candidates: [...proposed, ...existing]
+    candidates: [...offered, ...existing]
   };
   return `#/layouts/${layoutId}/${layoutHash}/blocks/${blockId}`;
 }
