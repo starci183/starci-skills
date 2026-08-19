@@ -136,6 +136,18 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
    is what the owner's approval attaches to.
 8. Feedback opens a new round. An accepted candidate is never edited in place.
 
+## Preview
+
+The HTML view is a responsive web prototype with realistic representative content and illustration evidence,
+not empty placeholder rectangles. Every layout region stays enclosed by a dashed boundary whose visible label
+names the region, contract entry, assembler and mount lifetime. Preview-only interactions may demonstrate
+navigation ownership, sticky behavior and responsive collapse; they do not become product behavior.
+
+Content inside a region communicates density and reading order only. It cannot settle a block's parts, states,
+data owner or final copy. Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
+when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated
+polished mockup are both invalid previews.
+
 ## Refusal
 
 Refusal is an output, not a failure. It is used when:

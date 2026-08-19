@@ -141,6 +141,18 @@ Mười hai luật mà **mọi** phương án phải thoả. Phương án phạm
    **hash của nó** là thứ lời chấp thuận gắn vào.
 8. Feedback mở một lượt mới. Phương án đã chấp nhận không bao giờ bị sửa tại chỗ.
 
+## Preview
+
+HTML phải là web prototype responsive với content đại diện đủ thật và illustration có evidence, không phải
+những rectangle placeholder rỗng. Mỗi layout region luôn nằm trong dashed border; label nhìn thấy được phải ghi
+region, contract entry, assembler và mount lifetime. Interaction preview-only có thể minh họa navigation
+ownership, sticky behavior và responsive collapse, nhưng không trở thành product behavior.
+
+Content trong region chỉ truyền đạt mật độ và reading order. Nó không được chốt parts, states, data owner hay
+final copy của block. Ưu tiên hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
+SVG bỏ đi được có thể làm hình minh họa, nhưng không bao giờ được đưa thành source hay JSON. Blank-box page và
+mockup bóng bẩy không có annotation đều là preview không hợp lệ.
+
 ## Từ chối
 
 Từ chối là một **đầu ra**, không phải một thất bại. Dùng nó khi:

@@ -138,8 +138,17 @@ Run `@validate-artifact` with `@layout-schema`, the same visual vocabulary and `
 invalid embedded direction, candidates embedding different directions, class tokens, duplicate layout
 axis sets and a missing departure. The printed hash is the one and only `layoutHash` for that candidate.
 
-Render region boxes, names, axes, branches and contract citations under the recommended direction. Do not
-draw block internals. Preview CSS is disposable evidence and never a source of product classes.
+Render each candidate as a responsive web prototype, not a diagram of empty rectangles. Use realistic
+representative content, existing or legacy-backed illustration evidence, and enough preview-only interaction
+to make navigation ownership, reading order, sticky regions and responsive collapse perceptible. Every
+layout-owned region is permanently outlined with a dashed boundary and a visible label naming its region,
+entry citation, assembler and mount lifetime. The prototype may depict neutral content density inside a
+region, but it must not settle block parts, states, data ownership or final copy. Inline preview SVG is legal
+only as disposable illustration evidence; it is never a product asset or a design-registry field.
+
+A blank-box preview is invalid. So is a polished mockup with no dashed region overlay: one cannot be judged
+as a page and the other cannot be audited as a layout. Preview CSS and JavaScript are disposable evidence
+and never a source of product classes or behavior.
 
 Generate one HTML page per candidate in `cache/preview`, then serve it. Start at 8080; if occupied, try
 the next port, bounded to twenty attempts, and print the URL that actually bound:

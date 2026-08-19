@@ -134,6 +134,18 @@ Schema dùng `additionalProperties: false` để class trở thành unrepresenta
 token, candidate trùng axis set và batch không candidate nào viện dẫn `none`. Hash chỉ phủ candidate,
 không phủ envelope; cùng quyết định phải sinh cùng hash ở round sau.
 
+Render mỗi candidate thành một web prototype responsive, không phải sơ đồ rectangle rỗng. Dùng content mẫu
+đủ thật, illustration có evidence từ source hiện hành hoặc legacy, cùng interaction preview-only vừa đủ để
+nhìn ra navigation ownership, reading order, sticky region và responsive collapse. Mọi region do layout sở
+hữu phải luôn được khoanh bằng dashed border và có label nhìn thấy được, ghi region, entry citation, assembler
+và mount lifetime. Prototype được phép mô tả mật độ nội dung trung tính bên trong region, nhưng không được
+chốt parts, states, data ownership hay final copy của block. Inline SVG chỉ là illustration evidence dùng cho
+preview; nó không phải product asset hay field trong design registry.
+
+Preview toàn blank box là không hợp lệ. Mockup bóng bẩy nhưng không có dashed-region overlay cũng không hợp
+lệ: cái đầu không đánh giá được như một trang, cái sau không audit được như một layout. CSS và JavaScript
+preview chỉ là evidence bỏ đi được, không phải nguồn product class hay behavior.
+
 Render mỗi candidate thành một trang HTML trong `cache/preview`, rồi serve:
 
 ```bash
@@ -147,8 +159,8 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-CSS preview chỉ là documentation chrome: vẽ region, tên, axis, entry và branch dưới direction được đề xuất;
-không vẽ block internals hay mang product class.
+Dashed overlay là documentation chrome; content và illustration bên dưới giúp prototype đọc được như một
+page thật nhưng không biến thành block anatomy hay mang product class.
 
 ### 12 — Queue approval và đóng
 
