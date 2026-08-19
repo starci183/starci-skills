@@ -23,7 +23,8 @@ test("idempotent execution performs no condition mutations and uses form encodin
             return { ok: true, json: async () => ({ conditions: metrics.map((metric, index) => ({ id: String(index), metric, ...CONDITIONS[metric] })) }) }
         }
         if (String(url).includes("project_status")) return { ok: true, json: async () => ({ status: "OK" }) }
-        if (String(url).includes("measures/component")) return { ok: true, json: async () => ({ component: { measures: proofMetrics.map((metric) => ({ metric, value: ["coverage", "new_coverage"].includes(metric) ? "90" : metric.includes("rating") ? "1" : metric.includes("duplicated") ? "1" : metric.includes("hotspots") ? "100" : "0" })) } }) }
+        if (String(url).includes("measures/component")) return { ok: true, json: async () => ({ component: { measures: proofMetrics.filter((metric) => !metric.includes("hotspots")).map((metric) => ({ metric, ...(metric.startsWith("new_") ? { period: { value: ["new_coverage"].includes(metric) ? "90" : metric.includes("rating") ? "1" : metric.includes("duplicated") ? "1" : "0" } } : { value: ["coverage"].includes(metric) ? "90" : metric.includes("rating") ? "1" : metric.includes("duplicated") ? "1" : "0" }) })) } }) }
+        if (String(url).includes("hotspots/search")) return { ok: true, json: async () => ({ paging: { total: 0 } }) }
         if (String(url).includes("project_analyses/search")) return { ok: true, json: async () => ({ analyses: [{ revision: "sha" }] }) }
         return { ok: true, json: async () => ({}) }
     }
@@ -31,6 +32,7 @@ test("idempotent execution performs no condition mutations and uses form encodin
     assert.equal(result.result.ok, true); assert.equal(result.reconciliation.created, false); assert.equal(calls.filter((call) => /create_condition|update_condition|delete_condition/.test(call.url)).length, 0)
     assert(calls.some((call) => call.url.includes("/api/measures/component") && call.url.includes("metricKeys=bugs,vulnerabilities")))
     assert(calls.some((call) => call.url.includes("/api/project_analyses/search") && call.url.includes("ps=1")))
+    assert(calls.some((call) => call.url.includes("/api/hotspots/search") && call.url.includes("projectKey=be")))
     const association = calls.find((call) => call.url.includes("/select")); assert.match(association.options.headers["content-type"], /form-urlencoded/); assert.match(association.options.body, /projectKey=be/); assert.doesNotMatch(JSON.stringify(result), /operator-secret/)
 })
 

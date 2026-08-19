@@ -61,7 +61,12 @@ export async function reconcileQualityGate({ baseUrl, projectKey, analysisSha, e
     const measuresResponse = await sonarRequest({ baseUrl, path: `/api/measures/component?component=${encodeURIComponent(projectKey)}&metricKeys=${metricKeys.join(",")}`, token: adminToken, fetchImpl })
     const analyses = await sonarRequest({ baseUrl, path: `/api/project_analyses/search?project=${encodeURIComponent(projectKey)}&ps=1`, token: adminToken, fetchImpl })
     const latest = analyses.analyses?.[0]
-    const measures = Object.fromEntries((measuresResponse.component?.measures ?? []).map((item) => [item.metric, item.value ?? item.periods?.[0]?.value]))
+    const measures = Object.fromEntries((measuresResponse.component?.measures ?? []).map((item) => [item.metric, item.value ?? item.period?.value ?? item.periods?.[0]?.value]))
+    const missingHotspotMeasures = ["security_hotspots_reviewed", "new_security_hotspots_reviewed"].filter((metric) => measures[metric] === undefined)
+    if (missingHotspotMeasures.length > 0) {
+        const hotspots = await sonarRequest({ baseUrl, path: `/api/hotspots/search?projectKey=${encodeURIComponent(projectKey)}&ps=1`, token: adminToken, fetchImpl })
+        if (Number(hotspots.paging?.total) === 0) for (const metric of missingHotspotMeasures) measures[metric] = "100"
+    }
     const gate = { status: status.status ?? status.projectStatus?.status, analysis: { sha: latest?.revision ?? latest?.sha }, measures }
     return { mode: "execute", projectKey, reconciliation, result: evaluateQualityGate(gate, { analysisSha }) }
 }
