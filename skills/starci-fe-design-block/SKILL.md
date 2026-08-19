@@ -11,7 +11,7 @@ description: Given a stable layoutId and blockId, produce 3–4 block anatomy JS
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | validate block anatomy JSON |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric layout and block heads |
-| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | verify legacy projections and identity heads agree before block work |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate current layout/block identities without consulting legacy maps |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest bound by the accepted layout |
 | `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
@@ -42,7 +42,7 @@ hash, never to a rendered page.
 
 ### 2 — Resolve the accepted layout head and declared block identity
 
-Run `@design-registry-migrate --check`, then read `@design-registry-schema` and
+Run `@design-registry-check`, then read `@design-registry-schema` and
 `registries/design-registry-v2.json`; resolve `layoutHeads[layoutId].head` through immutable
 `objects.byHash`. The head is the accepted layout and the only lookup authority; a session or review cannot
 select a different layout. Require `blockId` to be an exact member of that accepted head's `regions` list.

@@ -19,6 +19,7 @@ description: Design or revise the immutable candidate behind a stable layoutId, 
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate the identity-centric registry and its current heads |
 | `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps non-destructively and verify identity heads are current |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects and by-id projections |
 | `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
@@ -62,7 +63,7 @@ and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache
 
 ### 4 — Resolve the stable layout identity and current head
 
-Run `@design-registry-migrate --check`, then read `@design-registry-schema` and
+If v2 is absent, run `@design-registry-migrate --apply`; then run `@design-registry-check`, read `@design-registry-schema` and
 `registries/design-registry-v2.json`. Require the caller's stable `layoutId`; do not derive
 it from the prompt, a surface label or a session id. Resolve `layoutHeads[layoutId]`, then resolve its
 `head` through the immutable `objects.byHash` map when one exists. The head is the accepted layout and the

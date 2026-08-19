@@ -18,6 +18,7 @@ title: Frontend design layout · Vietnamese
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate JSON layout candidate |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra registry identity-centric và các current head |
 | `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps không phá huỷ và verify identity heads current |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects và by-id projections |
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact, session và sinh hash |
 
@@ -56,7 +57,7 @@ của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 
 ### 4 — Resolve identity layout ổn định và current head
 
-Chạy `@design-registry-migrate --check`, rồi đọc `@design-registry-schema` và
+Nếu v2 chưa có, chạy `@design-registry-migrate --apply`; sau đó chạy `@design-registry-check`, đọc `@design-registry-schema` và
 `registries/design-registry-v2.json`. Bắt buộc caller cung cấp `layoutId` ổn định; không suy ra
 identity từ prompt, surface label hay session id. Resolve `layoutHeads[layoutId]`, rồi resolve `head` qua
 map `objects.byHash` immutable nếu head đã tồn tại. Head là layout accepted và là kết quả lookup hiện tại

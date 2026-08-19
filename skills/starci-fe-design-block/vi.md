@@ -10,7 +10,7 @@ title: Frontend design block · Vietnamese
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | kiểm tra JSON mô tả anatomy của block |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra layout head và block head identity-centric |
-| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | verify legacy projections và identity heads đồng ý trước block work |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate current layout/block identities mà không đọc legacy maps |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token đã bind trong layout |
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
@@ -39,7 +39,7 @@ vào trang render.
 
 ### 2 — Resolve layout head accepted và block identity đã khai báo
 
-Chạy `@design-registry-migrate --check`, rồi đọc `@design-registry-schema` và
+Chạy `@design-registry-check`, rồi đọc `@design-registry-schema` và
 `registries/design-registry-v2.json`; resolve `layoutHeads[layoutId].head` qua `objects.byHash` immutable. Head là
 layout accepted và lookup authority duy nhất; session/review không được chọn layout khác. `blockId` phải là
 member chính xác trong danh sách `regions` của head accepted. BlockId tùy ý, layout head

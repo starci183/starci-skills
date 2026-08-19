@@ -12,7 +12,7 @@ title: starci-fe-design-execute · English
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest approved inside each layout |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve files, exports and import boundaries |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric heads and immutable object references |
-| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | require registry v2 projections to be current before source execution |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | require registry v2 heads and projections to be current before source execution |
 | `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the session graph before production work |
@@ -39,7 +39,7 @@ with the owner before the first write. Detection is not permission.
 
 ### 2 — Refuse unless the layout head and every current region block head are accepted
 
-Run `@design-registry-migrate --check`. Read `@design-registry-schema` and validate
+Run `@design-registry-check`. Read `@design-registry-schema` and validate
 `registries/design-registry-v2.json`. Resolve the caller's `layoutId` through
 `layoutHeads[layoutId].head`, then resolve that immutable layout object through `objects.byHash`. The head
 is the accepted layout; do not inspect a session or review to choose another hash. Enumerate every declared
