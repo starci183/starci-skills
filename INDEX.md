@@ -16,6 +16,7 @@ title: Docs
 | `@contexts` | `contexts/context.md` | context | resolve where reads and writes occur |
 | `@deployment` | `deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
+| `@design-review` | `publication/design-review-preview/context.md` | context | render layout and block artifacts through one project-neutral Vite review application |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates/context.md` | context | judge existing code with evidence |
 | `@initialization` | `readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |

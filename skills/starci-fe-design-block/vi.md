@@ -17,6 +17,8 @@ title: Frontend design block · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra registry và preview root |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
+| `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa Vite review manifest, typed modals và authority boundary dùng chung |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | build review app dùng chung từ block JSON đã validate thay vì HTML riêng |
 
 ## NESTED SKILLS
 
@@ -28,8 +30,8 @@ Không có. Skill này không tự gọi skill khác.
 hay chọn identity. Accepted layout và current block head trong design registry là authority; session/review chỉ
 là audit history tùy chọn.
 
-**JSON mới là artifact; HTML chỉ là cách quan sát.** Approval bind vào hash của canonical JSON, không bind
-vào trang render.
+**JSON mới là artifact; Vite review dùng chung chỉ là cách quan sát.** Approval bind vào hash của canonical
+JSON, không bind vào manifest hay application đã render.
 
 ## QUY TRÌNH
 
@@ -107,10 +109,30 @@ node @validate-artifact \
 Validator từ chối class token, hai anatomy trùng axis set, anatomy `repeats` thiếu `restingCount`, hoặc
 batch không có anatomy nào viện dẫn `none`. Hash chỉ phủ anatomy, không phủ envelope.
 
-Render mỗi anatomy thành một trang HTML trong `cache/preview`, gồm **mọi state đã liệt kê**, rồi serve:
+Đọc `@design-review`, ghi representative-content data tùy chọn vào project cache, rồi build một universal
+review application cho anatomy batch:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
+node @render-design-review \
+  --phase block --project <project> \
+  --layout-id <layoutId> --block-id <blockId> \
+  --artifact <block-batch.json> \
+  --registry .worktrees/<project>/registries \
+  --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
+  --content <representative-content.json> \
+  --recommended-id <candidateId> \
+  --out .worktrees/<project>/cache/preview/<layoutId>/<blockId>
+```
+
+Renderer chỉ resolve direction của parent accepted. Candidate và state controls thuộc shared application;
+mọi state đã liệt kê phải mở được. Click part mở typed inspector modal cùng citation, optionality và ownership
+evidence. Mọi anatomy dùng cùng direction, copy và representative data; đổi các dữ kiện đó giữa candidates
+hoặc chỉ hiện populated state làm comparison invalid. Không tự viết HTML, CSS hay JavaScript riêng cho candidate.
+
+Serve thư mục đã build:
+
+```bash
+npx -y http-server .worktrees/<project>/cache/preview/<layoutId>/<blockId> -p 8080 -c-1 --silent
 ```
 
 **8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
@@ -120,8 +142,7 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-Preview chỉ resolve semantic role của accepted direction. CSS của preview là documentation chrome, không
-phải product class. Mọi anatomy dùng cùng direction, copy và data; chỉ hiện populated state là invalid.
+Shared Vite UI và inspector modals là documentation chrome, không phải product class hay behavior.
 
 ### 10 — Đưa vào hàng phê duyệt và ghi verdict
 

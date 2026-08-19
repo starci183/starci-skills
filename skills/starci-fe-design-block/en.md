@@ -17,6 +17,8 @@ title: starci-fe-design-block · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | verify registry ownership and preview roots |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+| `@design-review` | `publication/design-review-preview/en.md` | en | defines the universal Vite review manifest, typed modals and authority boundary |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated block JSON instead of bespoke HTML |
 
 ## NESTED SKILLS
 
@@ -29,8 +31,8 @@ Read `@skill-shape` first. This skill requires caller-supplied stable `layoutId`
 opens a session or chooses an identity. The accepted layout and current block heads in the design registry
 are authoritative; session/review records are optional audit history only.
 
-**The JSON is the artifact. The HTML is a way of looking at it.** Approval binds to the canonical JSON
-hash, never to a rendered page.
+**The JSON is the artifact. The shared Vite review is a way of looking at it.** Approval binds to the
+canonical JSON hash, never to the manifest or rendered application.
 
 ## PROCESS
 
@@ -114,16 +116,32 @@ Beyond the shape, the validator refuses a class token anywhere in the batch, two
 axis set, a `repeats` anatomy with no `restingCount`, and a batch where no anatomy cites `none`. The hash
 covers the anatomy only, never the envelope.
 
-Then render one HTML page per anatomy into `cache/preview`, including **every enumerated state**, and
-serve it:
+Read `@design-review`, write optional representative-content data into the project cache, then build one
+universal review application for the anatomy batch:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
+node @render-design-review \
+  --phase block --project <project> \
+  --layout-id <layoutId> --block-id <blockId> \
+  --artifact <block-batch.json> \
+  --registry .worktrees/<project>/registries \
+  --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
+  --content <representative-content.json> \
+  --recommended-id <candidateId> \
+  --out .worktrees/<project>/cache/preview/<layoutId>/<blockId>
 ```
 
-The preview resolves only the accepted direction's semantic roles. Its fixed documentation markup is
-never a source of product classes. Every anatomy in a batch uses the same direction, copy and data; a
-preview that changes any of those or shows only the populated state invalidates the comparison.
+The renderer resolves only the accepted parent direction. Candidate and state controls belong to the
+shared application; every enumerated state must be reachable. Clicking a part opens its typed inspector
+modal with citation, optionality and ownership evidence. Every anatomy uses the same direction, copy and
+representative data; changing those between candidates or showing only the populated state invalidates the
+comparison. Do not author candidate-specific HTML, CSS or JavaScript.
+
+Serve the generated directory:
+
+```bash
+npx -y http-server .worktrees/<project>/cache/preview/<layoutId>/<blockId> -p 8080 -c-1 --silent
+```
 
 **8080 is where the search starts, not where it stops.** Bind it; if it is taken, try 8081, 8082, and keep
 going until one binds, then **print the URL actually served**. A run that dies because somebody's dev server

@@ -21,6 +21,8 @@ title: Frontend design layout · Vietnamese
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects và by-id projections |
 | `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact, session và sinh hash |
+| `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa manifest, interaction và authority boundary của Vite review dùng chung |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | build review app dùng chung từ layout JSON đã validate thay vì HTML riêng |
 
 ## NESTED SKILLS
 
@@ -31,8 +33,8 @@ Không có. Một điểm dừng kết thúc lượt chạy này. Skill không t
 Đọc `@skill-shape` trước. Skill này nhận `layoutId` ổn định và sở hữu page skeleton; session chỉ là audit
 history tùy chọn.
 
-**JSON mới là artifact; HTML chỉ là cách quan sát.** Approval bind vào hash của canonical JSON, không bind
-vào trang render. `registries/design-registry-v2.json` là authority: `layoutHeads[layoutId].head` trỏ tới layout object
+**JSON mới là artifact; Vite review dùng chung chỉ là cách quan sát.** Approval bind vào hash của canonical
+JSON, không bind vào manifest hay application đã render. `registries/design-registry-v2.json` là authority: `layoutHeads[layoutId].head` trỏ tới layout object
 immutable đã accepted; session hoặc review không bao giờ quyết định lookup hiện tại.
 
 ## QUY TRÌNH
@@ -134,22 +136,31 @@ Schema dùng `additionalProperties: false` để class trở thành unrepresenta
 token, candidate trùng axis set và batch không candidate nào viện dẫn `none`. Hash chỉ phủ candidate,
 không phủ envelope; cùng quyết định phải sinh cùng hash ở round sau.
 
-Render mỗi candidate thành một web prototype responsive, không phải sơ đồ rectangle rỗng. Dùng content mẫu
-đủ thật, illustration có evidence từ source hiện hành hoặc legacy, cùng interaction preview-only vừa đủ để
-nhìn ra navigation ownership, reading order, sticky region và responsive collapse. Mọi region do layout sở
-hữu phải luôn được khoanh bằng dashed border và có label nhìn thấy được, ghi region, entry citation, assembler
-và mount lifetime. Prototype được phép mô tả mật độ nội dung trung tính bên trong region, nhưng không được
-chốt parts, states, data ownership hay final copy của block. Inline SVG chỉ là illustration evidence dùng cho
-preview; nó không phải product asset hay field trong design registry.
-
-Preview toàn blank box là không hợp lệ. Mockup bóng bẩy nhưng không có dashed-region overlay cũng không hợp
-lệ: cái đầu không đánh giá được như một trang, cái sau không audit được như một layout. CSS và JavaScript
-preview chỉ là evidence bỏ đi được, không phải nguồn product class hay behavior.
-
-Render mỗi candidate thành một trang HTML trong `cache/preview`, rồi serve:
+Đọc `@design-review`. Ghi shell descriptor và representative-content descriptor tùy chọn vào project cache,
+rồi build một universal review application cho cả batch:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
+node @render-design-review \
+  --phase layout --project <project> --layout-id <layoutId> \
+  --artifact <layout-batch.json> --directions <direction-batch.json> \
+  --registry .worktrees/<project>/registries \
+  --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
+  --content <representative-content.json> --shell <shell-descriptor.json> \
+  --recommended-id <candidateId> \
+  --out .worktrees/<project>/cache/preview/<layoutId>
+```
+
+Renderer dùng chung sở hữu candidate, direction và viewport switching. Nó luôn khoanh mọi layout-owned
+region, ghi entry citation, assembler và mount lifetime; click region mở typed inspector modal cùng trạng
+thái block head hiện tại. Content đại diện và imagery có evidence làm reading order và density nhìn thấy
+được, nhưng manifest không được chốt block parts, states, data ownership hay final copy. Canvas rỗng hoặc
+layout không có region overlay là invalid.
+
+Không tự viết HTML, CSS hay JavaScript riêng cho candidate. Project shell và content là manifest data;
+Vite application trung lập với project và interaction của nó không mutate registry. Serve thư mục đã build:
+
+```bash
+npx -y http-server .worktrees/<project>/cache/preview/<layoutId> -p 8080 -c-1 --silent
 ```
 
 **8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
@@ -159,8 +170,8 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-Dashed overlay là documentation chrome; content và illustration bên dưới giúp prototype đọc được như một
-page thật nhưng không biến thành block anatomy hay mang product class.
+Dashed overlay và inspector modals là documentation chrome; chúng giúp prototype đọc được như một page thật
+nhưng không biến thành block anatomy hay mang product class.
 
 ### 12 — Queue approval và đóng
 

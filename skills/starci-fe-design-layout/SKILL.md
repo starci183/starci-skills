@@ -22,6 +22,8 @@ description: Design or revise the immutable candidate behind a stable layoutId, 
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects and by-id projections |
 | `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+| `@design-review` | `publication/design-review-preview/context.md` | context | defines the universal Vite review manifest, interactions and authority boundary |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated layout JSON instead of bespoke HTML |
 
 ## NESTED SKILLS
 
@@ -38,8 +40,8 @@ The caller supplies a stable `layoutId`. `registries/design-registry-v2.json` is
 may explain how a head was reached, but it is optional audit history and is never used to discover the
 current layout.
 
-**JSON is the artifact. HTML is a way of looking at it.** Approval binds to canonical layout JSON,
-never to a rendered page.
+**JSON is the artifact. The shared Vite review is a way of looking at it.** Approval binds to canonical
+layout JSON, never to the manifest or rendered application.
 
 ## PROCESS
 
@@ -138,23 +140,33 @@ Run `@validate-artifact` with `@layout-schema`, the same visual vocabulary and `
 invalid embedded direction, candidates embedding different directions, class tokens, duplicate layout
 axis sets and a missing departure. The printed hash is the one and only `layoutHash` for that candidate.
 
-Render each candidate as a responsive web prototype, not a diagram of empty rectangles. Use realistic
-representative content, existing or legacy-backed illustration evidence, and enough preview-only interaction
-to make navigation ownership, reading order, sticky regions and responsive collapse perceptible. Every
-layout-owned region is permanently outlined with a dashed boundary and a visible label naming its region,
-entry citation, assembler and mount lifetime. The prototype may depict neutral content density inside a
-region, but it must not settle block parts, states, data ownership or final copy. Inline preview SVG is legal
-only as disposable illustration evidence; it is never a product asset or a design-registry field.
-
-A blank-box preview is invalid. So is a polished mockup with no dashed region overlay: one cannot be judged
-as a page and the other cannot be audited as a layout. Preview CSS and JavaScript are disposable evidence
-and never a source of product classes or behavior.
-
-Generate one HTML page per candidate in `cache/preview`, then serve it. Start at 8080; if occupied, try
-the next port, bounded to twenty attempts, and print the URL that actually bound:
+Read `@design-review`. Write optional shell and representative-content descriptors into the project cache,
+then build one universal review application for the whole batch:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
+node @render-design-review \
+  --phase layout --project <project> --layout-id <layoutId> \
+  --artifact <layout-batch.json> --directions <direction-batch.json> \
+  --registry .worktrees/<project>/registries \
+  --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
+  --content <representative-content.json> --shell <shell-descriptor.json> \
+  --recommended-id <candidateId> \
+  --out .worktrees/<project>/cache/preview/<layoutId>
+```
+
+The shared renderer supplies candidate, direction and viewport switching. It permanently outlines every
+layout-owned region with its entry citation, assembler and mount lifetime; clicking a region opens its
+typed inspector modal with current block-head status. Representative content and legacy-backed imagery
+make reading order and density perceptible, but the manifest must not settle block parts, states, data
+ownership or final copy. A blank canvas or a layout with no region overlay is invalid.
+
+Do not author candidate-specific HTML, CSS or JavaScript. Project shell and content are manifest data;
+the Vite application is project-neutral and its interactions never mutate the registry. Serve the generated
+directory. Start at 8080; if occupied, try the next port, bounded to twenty attempts, and print the URL that
+actually bound:
+
+```bash
+npx -y http-server .worktrees/<project>/cache/preview/<layoutId> -p 8080 -c-1 --silent
 ```
 
 ### 12 — Queue approval and close
