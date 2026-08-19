@@ -18,6 +18,8 @@ Unit coverage phải báo statements/lines (S/L), functions (F) và branches: S/
 mỗi metric của patch/new code ≥90%. E2E phải có entrypoint đã khai báo và tồn tại, có test thật, mọi test
 đều pass. `skip`, `todo`, `only`, `passWithNoTests`, run zero-test hoặc focused/check substitute đều bị reject. Sonar là
 gate cuối và phải pass cho mọi routed role. Không gate nào được weaken hoặc đổi thứ tự.
+Patch/new-code chỉ `not applicable` khi diff từ base SHA chứng minh không có authored production code
+thay đổi; working-tree diff rỗng, thiếu base SHA hoặc thiếu coverage entry không phải N/A.
 
 ## Evidence cho stale list
 

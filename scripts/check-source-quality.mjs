@@ -71,11 +71,16 @@ function readLcov(file) {
   }
   return {statements: NaN, ...Object.fromEntries(Object.entries(totals).map(([key, [hit, found]]) => [key, found ? hit / found * 100 : NaN]))};
 }
-function oneCoverage(dir, names, thresholds, summaries = []) {
+function oneCoverage(dir, names, thresholds, summaries = [], {allowNotApplicable = false} = {}) {
   const candidates = summaries.map((name) => join(dir, name));
   for (const file of candidates) {
     const data = readJson(file);
     if (!data) continue;
+    if (data.notApplicable === true) {
+      return allowNotApplicable
+        ? {file, notApplicable: true, reason: String(data.reason || "no changed production code"), pass: true}
+        : {file, notApplicable: true, reason: String(data.reason || "missing coverage surface"), pass: false};
+    }
     const total = data.total ?? data;
     const metric = (key) => Number(total[key]?.pct ?? total[key] ?? NaN);
     const values = {statements: metric("statements"), lines: metric("lines"), functions: metric("functions"), branches: metric("branches")};
@@ -86,7 +91,7 @@ function oneCoverage(dir, names, thresholds, summaries = []) {
 }
 function coverage(dir) {
   const project = oneCoverage(dir, ["coverage/lcov.info"], PROJECT_THRESHOLDS, ["coverage/coverage-summary.json", "coverage-summary.json"]);
-  const change = oneCoverage(dir, ["coverage/patch.lcov.info", "coverage/new.lcov.info"], NEW_THRESHOLDS, ["coverage/patch-summary.json", "coverage/new-summary.json", "coverage/patch.json", "coverage/new.json"]);
+  const change = oneCoverage(dir, ["coverage/patch.lcov.info", "coverage/new.lcov.info"], NEW_THRESHOLDS, ["coverage/patch-summary.json", "coverage/new-summary.json", "coverage/patch.json", "coverage/new.json"], {allowNotApplicable: true});
   return {project, change, pass: project.pass && change.pass};
 }
 

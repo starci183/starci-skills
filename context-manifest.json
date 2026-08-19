@@ -810,7 +810,7 @@
     "readiness/staleness/source-gates/context.md": {
       "kind": "module",
       "source": "readiness/staleness/source-gates/en.md",
-      "sourceHash": "572e7e33e63be6563d97f5c42252f8bfe65bc85ca58dcddbd32818947f1e1c06",
+      "sourceHash": "c07cc737444f67d3d7416d3851fe6c436dbb68bab41f0e18815cefc84ff35993",
       "contextVersion": 1
     },
     "readiness/staleness/strict-fix/context.md": {

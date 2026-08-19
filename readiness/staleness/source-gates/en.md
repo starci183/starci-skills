@@ -19,6 +19,8 @@ Unit coverage must report statements/lines (S/L), functions (F) and branches: S/
 and every patch/new-code metric ≥90%. E2E must name a declared entrypoint that exists, contain real tests,
 and pass all tests. `skip`, `todo`, `only`, `passWithNoTests`, zero-test runs, or a focused/check substitute are rejects.
 Sonar is the final gate and must pass for every routed role. No gate may be weakened or reordered.
+Patch/new-code is explicitly `not applicable` only when a base-SHA diff proves there is no changed
+authored production code; an empty working-tree diff, missing base SHA or missing coverage entry is not N/A.
 
 ## List evidence
 

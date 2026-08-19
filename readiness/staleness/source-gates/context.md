@@ -11,6 +11,8 @@ format → lint → typecheck → build → unit coverage → E2E → Sonar. Lin
 Unit requires S/L/F ≥80%, branches ≥75%, and patch/new metrics ≥90%. E2E requires an existing declared
 entrypoint, real tests, and all tests passing; skip/todo/only/passWithNoTests/zero-test/focused-check substitutes reject.
 Sonar is the final required pass. No gate may be weakened or reordered; undeclared commands are absent.
+Patch/new is N/A only when an explicit base-SHA diff proves no authored production change; empty
+working-tree evidence or a missing coverage entry is not N/A.
 
 ## List evidence
 

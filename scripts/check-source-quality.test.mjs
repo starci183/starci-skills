@@ -41,6 +41,14 @@ test("requires patch and new-code branches to reach the full 90 percent", async 
   assert.equal(result.coverage.change.pass, false);
 });
 
+test("accepts explicit change coverage not-applicable only when the producer records no changed production", async () => {
+  const row = fixture();
+  writeFileSync(join(row.diskPath, "coverage", "patch-summary.json"), JSON.stringify({notApplicable: true, reason: "no changed production files"}));
+  const result = await checkRepository(row, {execute: true, sonarEvidence: {status: "pass"}});
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.coverage.change.notApplicable, true);
+});
+
 test("fails nonzero lint and E2E even when a summary exists", async () => {
   const result = await checkRepository(fixture({lint: "node -e console.error('1 warning'); process.exit(1)", e2e: "node -e process.exit(1)"}), {execute: true, sonarEvidence: {status: "pass"}});
   assert.equal(result.verdict, "fail");
