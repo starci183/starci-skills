@@ -24,7 +24,7 @@ StarCi separates work by what each stage may return:
 The result is not merely a suggested design or plan. Accepted decisions remain traceable to the source
 state they were made against, and execution stops when that evidence is stale or incomplete.
 
-## The thirteen skills
+## The fourteen skills
 
 ### Environment and trust
 
@@ -39,13 +39,14 @@ state they were made against, and execution stops when that evidence is stale or
 | [`starci-diagnose`](./skills/starci-diagnose) | Trace another skill against the real machine and identify its first correct stop | nothing |
 | [`starci-repair`](./skills/starci-repair) | Return a red or incompletely assured checkout to clean gates and a complete frontend or backend delivery fence | approved repository and external enforcement paths |
 
-### Frontend design
+### Frontend design and maintenance
 
 | Skill | Use it for | Approval boundary |
 |---|---|---|
 | [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Recommend one of 3–4 visual directions, then generate structural layouts without pausing | one `layoutHash` approval binds the recommended direction and skeleton |
 | [`starci-fe-design-block`](./skills/starci-fe-design-block) | Design or revise one region's anatomy, states, repetition, and data ownership | an independent `blockHash`, linked to its accepted `layoutHash` |
 | [`starci-fe-design-execute`](./skills/starci-fe-design-execute) | Implement the accepted design in real frontend source | starts only when every currently reachable hash is accepted |
+| [`starci-fe-minor-fix`](./skills/starci-fe-minor-fix) | Correct one existing block, composite, or leaf without changing its contract, ownership, or public shape | one clean component folder, at most two production files, two tests, and 40 production changed lines |
 
 Frontend design keeps the page skeleton and block detail separate:
 

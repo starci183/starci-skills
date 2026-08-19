@@ -100,7 +100,7 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Thirteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Fourteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. Eleven do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
@@ -116,6 +116,7 @@ record. Eleven do the work; two only look — one at the machine, one at the oth
 | `starci-fe-design-layout` | one stable `layoutId` whose accepted head binds an evidence-backed direction and layout skeleton |
 | `starci-fe-design-block` | one stable `(layoutId, blockId)` head, independently hash-versioned under its current accepted layout |
 | `starci-fe-design-execute` | frontend source, only from one layout head whose every declared region has a current accepted block head |
+| `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
 | `starci-be-plan` | the backend brief |
 | `starci-be-approve` | approval, then backend source |
 
