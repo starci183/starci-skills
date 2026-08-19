@@ -692,7 +692,7 @@
     "machines/sonar-assurance/context.md": {
       "kind": "module",
       "source": "machines/sonar-assurance/en.md",
-      "sourceHash": "170fd0f7a3dddd159cb36b1e538d4cd2aab4d3f5d1ceaa39794cde2cf8252df8",
+      "sourceHash": "2964cbbed3a6d91409578c3834ee1a7ec85d2ce706348f1436f0ae294caf2746",
       "contextVersion": 1
     },
     "machines/suppression/context.md": {
@@ -864,7 +864,7 @@
     "runbooks/secrets/context.md": {
       "kind": "module",
       "source": "runbooks/secrets/en.md",
-      "sourceHash": "d39d07d1366a0a52bad317a146a40842cc562f5b2a28fc6f0adb414a1da21928",
+      "sourceHash": "ecbb19ffb10e84411e3f78a3c64396cec0852d92f3fae309f555b63a03fbd7fc",
       "contextVersion": 1
     },
     "skills/context.md": {
@@ -874,7 +874,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "4f6b0ed29ec5f13b08755e145e18dd0d5a0d317b46528b78b2d86f5988c08ce0",
+      "sourceHash": "f67124bcdeda2ae9bf6f2acc6e2f74b991f902dfdb473c60fe92b22514b0c4e1",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

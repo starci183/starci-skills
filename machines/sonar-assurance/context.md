@@ -16,6 +16,12 @@ console row. It evaluates only structured evidence and never needs a live provid
 - Quality gates require OK; bugs, vulnerabilities and code smells are zero overall and new where the
   provider supports those measures; ratings are A; reviewed hotspots are 100%; duplicated density is
   at most 3 overall and new; native coverage is at least 80% overall and 90% new.
+- On current SonarQube, `starci-strict` uses supported new-code conditions: zero new violations, three
+  new-code A ratings, 100% new hotspots reviewed, new duplication at most 3% and new coverage at least
+  90%. Authenticated proof remains separately blocking for every required overall/new measure; server
+  condition limitations never erase overall coverage, findings, ratings, hotspots or duplication.
+- Every routed project has one distinct project-analysis token. Admin/user tokens never scan source and
+  one route never reuses another route's analysis identity.
 - Every metric in the strict profile is required. An installation that cannot expose one is incomplete,
   never silently exempt.
 - `SONAR_TOKEN` and `SONAR_ADMIN_TOKEN` are separate authorities. Tokens may enter only via

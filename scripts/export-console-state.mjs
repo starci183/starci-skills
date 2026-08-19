@@ -11,6 +11,7 @@ import {existsSync, readdirSync, readFileSync, statSync} from "node:fs";
 import {mkdir, writeFile} from "node:fs/promises";
 import {dirname, join, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
+import {detectHostOs} from "./check-host-os.mjs";
 
 const args = process.argv.slice(2);
 const out = args[args.indexOf("--out") + 1];
@@ -573,6 +574,8 @@ if (staleOnly) {
 
   const clean = workspaces.filter((w) => w.verdict === "ok").length;
   console.log(`${workspaces.length} route(s) across ${new Set(workspaces.map((w) => w.project)).size} project(s) — ${clean} ok, ${workspaces.length - clean} stale\n`);
+  const hostOs = detectHostOs();
+  console.log(`host OS: ${hostOs.platform}/${hostOs.arch} — ${hostOs.ok ? hostOs.family : "unsupported"}; credential runner: ${hostOs.credentialRunner ?? "none"}\n`);
 
   if (byProject.size === 0) {
     console.log("routes: all recorded routes are valid");
@@ -711,7 +714,7 @@ if (staleOnly) {
 
   // Say which layers ran. A list that silently skipped the expensive one reads as "nothing else is
   // wrong", which is the one thing a report must never imply.
-  console.log("staleness measured: route · index · machine · formatter · assurance · retired structure · remnant");
+  console.log("staleness measured: host-os · route · index · machine · formatter · assurance · retired structure · remnant");
   console.log("source gate surfaces read from manifests; gate results NOT measured: lint, typecheck, build, tests");
   console.log("those results belong to starci-repair, which");
   console.log("  runs the repository's own gates and writes build output while doing it.");

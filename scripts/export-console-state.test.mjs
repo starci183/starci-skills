@@ -19,7 +19,8 @@ function staleOutput() {
 
 test("scanner ignores workspace cache folders and measures frontend assurance", () => {
     const output = staleOutput()
-    assert.match(output, /^9 route\(s\) across 5 project\(s\)/)
+    assert.match(output, /^8 route\(s\) across 4 project\(s\)/)
+    assert.match(output, /host OS: win32\/[^\s]+ — windows; credential runner: powershell/)
     assert.doesNotMatch(output, /^cache\//m)
     assert.match(output, /delivery assurance:[\s\S]*miamia\/fe\s+stale/)
 })

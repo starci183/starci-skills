@@ -9,6 +9,8 @@ title: Skill shape · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve ngôn ngữ chung của Source cho mọi phản hồi tới người dùng |
+| `@credential-intake` | `runbooks/secrets/vi.md` | vi | nhận credential operator còn thiếu ngay qua intake ẩn và được mã hóa |
+| `@host-os` | `scripts/check-host-os.mjs` | script | chỉ chọn credential/setup entrypoint được host hiện tại hỗ trợ |
 
 
 ## Bản ghi
@@ -28,6 +30,17 @@ Không bao giờ bắt owner lặp lại nó.
 
 Skill không tự gọi skill khác. `OK` chỉ cấp quyền cho boundary chính xác đã hiển thị; capability khác vẫn
 là request riêng của owner.
+
+## Tiếp nhận credential
+
+Credential còn thiếu là việc đã phát hiện, không phải chú thích proof để cuối lượt mới báo. Ngay tại
+dependency đầu tiên cần credential, phải nêu provider, scope quyền, encrypted owner chuẩn, consumer và
+proof không chứa secret, rồi xin owner cung cấp ngay qua `@credential-intake`. Không bao giờ xin value
+trong chat. Trên Windows, trình đúng plan không chứa value của `scripts/set-credential.ps1` và chỉ dùng
+hidden prompt sau khi owner cho phép execute. Setup riêng của provider còn phải tạo service identity hoặc
+token ít quyền nhất, publish đủ projection đã khai, validate mà không in value và định nghĩa rotation.
+Chạy `@host-os` trước khi chọn script riêng theo hệ điều hành. Wrapper PowerShell chỉ dành cho Windows;
+host POSIX dùng Node hoặc shell entrypoint đã khai, còn host không hỗ trợ dừng trước khi nhận credential.
 
 ## Ngôn ngữ runtime
 
@@ -105,6 +118,10 @@ proof trong skill hiện tại. Tiếp tục tới khi `own = 0`.
 publish hay cam kết ra ngoài, thiếu access, hoặc mở rộng sang project, role, repository hay write boundary
 chưa được trình. Gộp mọi mục hiện biết dưới `### NEED APPROVALS`, mỗi mục có một recommended/default.
 
+Thiếu credential authority phải được đưa ra ngay khi plan read-only đầu tiên chứng minh nó cần thiết.
+Không tiếp tục execute provider rồi đợi tới lúc close mới báo; phần local an toàn vẫn chạy song song trong
+khi owner hoàn thành hidden intake.
+
 Khi user trả lời `OK`, duyệt mọi default và boundary chính xác đang hiển thị. Ghi identity hoặc hash, lấy
 baseline nếu cần rồi tiếp tục ngay. `OK` không phủ scope chưa trình. Im lặng và mọi từ khác `OK` đều không
 phải tín hiệu approval.
@@ -168,6 +185,9 @@ thêm**.
    Runtime dưới mười slot thì lấp đầy và backfill mọi slot khả dụng.
 10. Đầu ra cho người dùng không có bảng trạng thái.
 11. Resolve `defaultLang` từ workspace config chung của Source trước phản hồi đầu tiên cho người dùng.
+12. Credential còn thiếu kích hoạt intake owner ngay và không chứa value; value không bao giờ đi qua chat,
+    argument, generated command hoặc log.
+13. Đo host OS trước khi chọn setup script; không bao giờ thử extension không tương thích.
 
 ## Ngoại lệ
 

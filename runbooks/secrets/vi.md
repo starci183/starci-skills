@@ -4,6 +4,13 @@ title: Secrets
 
 # Secrets
 
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@credential-set` | `scripts/publish-secret.mjs` | script | custody mã hóa và projection không chứa value phía sau wrapper hidden-prompt Windows |
+| `@host-os` | `scripts/check-host-os.mjs` | script | chọn intake entrypoint tương thích host trước khi xin value |
+
 ## Dùng khi
 
 Dùng trang này trên máy mới, khi provider cấp token mới, khi thiếu stack record, hoặc khi phải rotate
@@ -12,6 +19,7 @@ credential mà không để value lọt vào source, shell history hay terminal 
 ## Trước khi chạy
 
 ```powershell
+node .claude/scripts/check-host-os.mjs
 sops --version
 age --version
 Test-Path "$env:USERPROFILE\.starci\master.identity"
@@ -20,6 +28,8 @@ git status --short
 
 Identity check phải trả `True`; restore đúng identity đang có từ password manager, không tạo identity
 mới. Dừng nếu worktree đã có plaintext credential không giải thích được.
+OS check là bắt buộc: chỉ dùng `.ps1` khi kết quả là `windows`; Linux/macOS dùng Node hoặc shell entrypoint
+đã khai.
 
 ## Secrets
 
@@ -28,6 +38,28 @@ Map có thẩm quyền là `scripts/credentials.mjs`:
 - `CREDENTIALS` là value hạ tầng repository được phép tự mint.
 - `DERIVED_CREDENTIALS` được dựng lại từ value đã mint.
 - `APP_CREDENTIALS` do bên thứ ba cấp và operator phải cung cấp.
+
+## Policy tiếp nhận từ operator
+
+Khi capability đang chạy lần đầu chứng minh cần credential mà chưa có authority hợp lệ trong encrypted
+record hoặc environment, phải xin owner ngay. Request nêu provider, tên credential, scope tối thiểu,
+service identity, encrypted owner record, consumer, quy tắc rotation và lệnh proof, nhưng không bao giờ
+xin owner dán value vào chat. Việc local an toàn vẫn chạy song song; provider execute không tiếp tục bằng
+authority đoán, tái dùng sai hoặc rộng quyền quá mức.
+
+Trên Windows, hiện plan không chứa value trước, rồi để owner nhập bằng hidden prompt:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/set-credential.ps1 `
+  -Name <SECRET_NAME> -Stack ".::<record-under-.stacks>" -Repo <owner/repository>
+
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/set-credential.ps1 `
+  -Name <SECRET_NAME> -Stack ".::<record-under-.stacks>" -Repo <owner/repository> -Execute
+```
+
+Intake chung chỉ sở hữu việc nhận ẩn, mã hóa và publish projection đã khai. Setup riêng của provider sở
+hữu tạo account/project, gán quyền tối thiểu và issue token. Khi cần các hành động đó, nó phải có
+PowerShell entrypoint riêng; publisher chung không tự bịa provider account.
 
 ## Chạy
 

@@ -7,9 +7,9 @@ export const REQUIRED_ROLES = ["backend", "frontend", "console"]
 export const ROLE_ALIASES = Object.freeze({ be: "backend", backend: "backend", fe: "frontend", frontend: "frontend", console: "console" })
 export const QUALITY_POLICY = Object.freeze({
     zero: ["bugs", "vulnerabilities", "code_smells", "new_bugs", "new_vulnerabilities", "new_code_smells"],
-    ratings: ["reliability_rating", "security_rating", "sqale_rating"],
-    maximums: { security_hotspots_reviewed: 100, duplicated_lines_density: 3, new_duplicated_lines_density: 3 },
-    minimums: { security_hotspots_reviewed: 100, coverage: 80, new_coverage: 90 },
+    ratings: ["reliability_rating", "security_rating", "sqale_rating", "new_reliability_rating", "new_security_rating", "new_maintainability_rating"],
+    maximums: { duplicated_lines_density: 3, new_duplicated_lines_density: 3 },
+    minimums: { security_hotspots_reviewed: 100, new_security_hotspots_reviewed: 100, coverage: 80, new_coverage: 90 },
 })
 
 export function checkRoutedSources(routes, roles = REQUIRED_ROLES) {
@@ -38,7 +38,6 @@ export function evaluateQualityGate(gate, options = {}) {
     for (const key of policy.ratings ?? []) { const current = requireMetric(key, "A"); if (current !== undefined && !isRatingA(current)) failures.push({ metric: key, expected: "A", actual: current }) }
     for (const [key, maximum] of Object.entries(policy.maximums ?? {})) { const current = requireMetric(key, `<=${maximum}`); if (current !== undefined && (!Number.isFinite(Number(current)) || Number(current) > maximum)) failures.push({ metric: key, expected: `<=${maximum}`, actual: current }) }
     for (const [key, minimum] of Object.entries(policy.minimums ?? {})) { const current = requireMetric(key, `>=${minimum}`); if (current !== undefined && (!Number.isFinite(Number(current)) || Number(current) < minimum)) failures.push({ metric: key, expected: `>=${minimum}`, actual: current }) }
-    for (const key of policy.ratings ?? []) { const newKey = `new_${key}`; if (measures[newKey] !== undefined) { const current = metricValue(measures, newKey); if (!isRatingA(current)) failures.push({ metric: newKey, expected: "A", actual: current }) } }
     const analysisSha = options.analysisSha ?? gate?.analysisSha
     const returnedSha = gate?.analysis?.sha ?? gate?.sha
     if (!analysisSha || analysisSha !== returnedSha) failures.push({ metric: "analysis_sha", expected: analysisSha ?? "provided", actual: returnedSha ?? null })

@@ -2,7 +2,10 @@
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@credential-set` | `scripts/publish-secret.mjs` | script | encrypted custody and value-free projection behind the Windows hidden-prompt wrapper |
+| `@host-os` | `scripts/check-host-os.mjs` | script | select the host-compatible intake entrypoint before asking for a value |
 
 ## Use when
 
@@ -12,6 +15,7 @@ or when a credential must rotate without appearing in source, shell history or t
 ## Before
 
 ```powershell
+node .claude/scripts/check-host-os.mjs
 sops --version
 age --version
 Test-Path "$env:USERPROFILE\.starci\master.identity"
@@ -20,6 +24,8 @@ git status --short
 
 The identity check must return `True`; restore the existing identity from the password manager rather
 than generating a new one. Stop if the worktree already contains an unexplained plaintext credential.
+The OS check is mandatory: use `.ps1` only when it returns `windows`; Linux/macOS use the declared Node
+or shell entrypoint instead.
 
 ## Secrets
 
@@ -28,6 +34,28 @@ The authoritative map is `scripts/credentials.mjs`:
 - `CREDENTIALS` are infrastructure values the repository may mint.
 - `DERIVED_CREDENTIALS` are rebuilt from minted values.
 - `APP_CREDENTIALS` are issued by third parties and must be supplied by an operator.
+
+## Operator intake policy
+
+When a running capability first proves a credential is required and no valid encrypted/environment
+authority exists, ask the owner immediately. The request names the provider, credential name, minimum
+scope, service identity, encrypted owner record, consumers, rotation rule and proof command, but never
+asks the owner to paste the value into chat. Safe local work may continue in parallel; provider execution
+does not continue with guessed, reused or over-scoped authority.
+
+On Windows, show the value-free plan first, then let the owner enter the value through the hidden prompt:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/set-credential.ps1 `
+  -Name <SECRET_NAME> -Stack ".::<record-under-.stacks>" -Repo <owner/repository>
+
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/set-credential.ps1 `
+  -Name <SECRET_NAME> -Stack ".::<record-under-.stacks>" -Repo <owner/repository> -Execute
+```
+
+The generic intake owns only hidden acquisition, encryption and declared projections. Provider-specific
+setup owns account/project creation, least-privilege assignment and token issuance. It must expose its own
+PowerShell entrypoint when those actions are required; a generic publisher never invents provider accounts.
 
 ## Run
 

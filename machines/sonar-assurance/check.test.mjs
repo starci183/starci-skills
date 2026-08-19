@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { checkRoutedSources, evaluateQualityGate, rejectSecretArguments, scannerToken } from "./check.mjs"
 
-const measures = { bugs: 0, vulnerabilities: 0, code_smells: 0, new_bugs: 0, new_vulnerabilities: 0, new_code_smells: 0, reliability_rating: 1, security_rating: "A", sqale_rating: 1, security_hotspots_reviewed: 100, duplicated_lines_density: 2, new_duplicated_lines_density: 1, coverage: 88, new_coverage: 95 }
+const measures = { bugs: 0, vulnerabilities: 0, code_smells: 0, new_bugs: 0, new_vulnerabilities: 0, new_code_smells: 0, reliability_rating: 1, security_rating: "A", sqale_rating: 1, new_reliability_rating: 1, new_security_rating: 1, new_maintainability_rating: 1, security_hotspots_reviewed: 100, new_security_hotspots_reviewed: 100, duplicated_lines_density: 2, new_duplicated_lines_density: 1, coverage: 88, new_coverage: 95 }
 
 test("normalizes be/fe aliases and validates every routed row", () => {
     assert.equal(checkRoutedSources([{ role: "be" }, { role: "fe" }, { role: "console" }]).ok, true)

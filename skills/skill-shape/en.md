@@ -9,6 +9,8 @@ title: Skill shape
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve the Source-wide language for every user-facing reply |
+| `@credential-intake` | `runbooks/secrets/en.md` | en | acquire missing operator credentials immediately through hidden, encrypted intake |
+| `@host-os` | `scripts/check-host-os.mjs` | script | select only credential and setup entrypoints supported by this host |
 
 
 ## Record
@@ -28,6 +30,17 @@ owner to repeat it.
 
 Skills do not invoke other skills. `OK` authorizes only the exact displayed boundary; a separate
 capability remains a separate owner request.
+
+## Credential intake
+
+A missing credential is discovered work, not a late proof footnote. At the first dependency that needs
+one, identify the provider, authority scope, canonical encrypted owner, consumers and non-secret proof,
+then ask the owner immediately to supply it through `@credential-intake`. Never ask for the value in chat.
+On Windows, present the exact value-free `scripts/set-credential.ps1` plan and use its hidden prompt after
+the owner authorizes execution. A provider-specific setup must also create the least-privileged service
+identity or token, publish every declared projection, validate it without printing it, and define rotation.
+Run `@host-os` before selecting any operating-system-specific script. PowerShell wrappers are Windows-only;
+POSIX hosts use the declared Node or shell entrypoint, and an unsupported host stops before credential input.
 
 ## Runtime language
 
@@ -105,6 +118,10 @@ loss, an external publication or commitment, missing access, or expansion to an 
 role, repository or write boundary. Batch all currently known items under `### NEED APPROVALS`, with one
 recommended/default answer each.
 
+Missing credential authority is raised as soon as the first read-only plan proves it is needed. Do not
+continue provider execution and report it only at close; finish safe local work in parallel while the
+owner completes hidden intake.
+
 When the user replies `OK`, approve every displayed default and exact displayed boundary. Record the
 identity or hash, take the baseline if required, and continue immediately. `OK` never covers undisclosed
 scope. Silence and every word other than `OK` are not approval signals.
@@ -170,6 +187,9 @@ appended.
    shared-state gates. Fill and backfill every available runtime slot when fewer than ten are concurrent.
 10. User-facing output contains no status tables.
 11. Resolve `defaultLang` from the Source-wide workspace config before the first user-facing reply.
+12. Missing credentials trigger immediate value-free owner intake; values never enter chat, arguments,
+    generated commands or logs.
+13. Host OS is measured before selecting a setup script; an incompatible extension is never attempted.
 
 ## Exceptions
 

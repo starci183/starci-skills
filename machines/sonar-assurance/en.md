@@ -16,6 +16,14 @@ Evidence must identify the exact analysis SHA and return quality-gate status OK.
 security and maintainability ratings are A; security hotspots reviewed is 100%; duplicated lines density
 is no more than 3 overall and new; native coverage is at least 80% overall and 90% new.
 
+On current SonarQube, `starci-strict` uses supported new-code conditions: zero new violations, three
+new-code A ratings, 100% new hotspots reviewed, new duplication at most 3% and new coverage at least
+90%. Authenticated proof remains separately blocking for every required overall/new measure; server
+condition limitations never erase overall coverage, findings, ratings, hotspots or duplication.
+
+Every routed project has one distinct project-analysis token. Admin/user tokens never scan source and
+one route never reuses another route's analysis identity.
+
 Scanner tokens are distinct from admin/operator authority. Analysis tokens use `SONAR_TOKEN` or
 stdin; execute authority uses `SONAR_ADMIN_TOKEN`. Missing status, SHA or any required measure
 fails. Tokens are never read from arguments or logs. Plan and dry-run modes do not contact the provider.
