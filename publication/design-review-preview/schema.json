@@ -1,87 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v1/publication/design-review-preview/schema.json",
-  "title": "Universal design review manifest",
+  "$id": "starci-v2/publication/design-review-preview/schema.json",
+  "title": "Universal parent-child design review manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "phase", "project", "identity", "artifact", "theme", "candidates", "shell", "content", "evidence"],
+  "required": ["schemaVersion", "project", "entryRoute", "layouts", "evidence"],
   "properties": {
-    "schemaVersion": {"const": 1},
-    "phase": {"enum": ["layout", "block"]},
+    "schemaVersion": {"const": 2},
     "project": {"$ref": "#/$defs/slug"},
-    "identity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["layoutId"],
-      "properties": {
-        "layoutId": {"$ref": "#/$defs/slug"},
-        "blockId": {"$ref": "#/$defs/slug"},
-        "parentLayoutHash": {"$ref": "#/$defs/hash"}
-      }
-    },
-    "artifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["source", "recommendedId"],
-      "properties": {
-        "source": {"type": "string", "minLength": 1},
-        "currentHead": {"$ref": "#/$defs/hash"},
-        "recommendedId": {"$ref": "#/$defs/slug"}
-      }
-    },
-    "theme": {"type": "object", "additionalProperties": {"$ref": "#/$defs/themeRole"}},
-    "candidates": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 4,
-      "items": {"$ref": "#/$defs/candidate"}
-    },
-    "visualDirections": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "object"}},
-    "visualDirectionRecommendation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "reason"],
-      "properties": {"id": {"$ref": "#/$defs/slug"}, "reason": {"type": "string", "minLength": 1}}
-    },
-    "shell": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["product", "navigation"],
-      "properties": {
-        "product": {"type": "string", "minLength": 1},
-        "activeItem": {"type": "string"},
-        "navigation": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "label"],
-            "properties": {"id": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}
-          }
-        }
-      }
-    },
-    "content": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["eyebrow", "title", "description", "primaryAction", "rows"],
-      "properties": {
-        "eyebrow": {"type": "string"},
-        "title": {"type": "string", "minLength": 1},
-        "description": {"type": "string", "minLength": 1},
-        "primaryAction": {"type": "string", "minLength": 1},
-        "rows": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["title", "description"],
-            "properties": {"title": {"type": "string"}, "description": {"type": "string"}, "meta": {"type": "string"}}
-          }
-        }
-      }
-    },
+    "entryRoute": {"type": "string", "pattern": "^#/layouts/[a-z0-9-]+/[0-9a-f]{64}(?:/blocks/[a-z0-9-]+)?$"},
+    "layouts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/layoutReview"}},
     "evidence": {
       "type": "array",
       "items": {
@@ -105,19 +33,121 @@
         "value": {"type": ["string", "null"]}
       }
     },
-    "candidate": {
+    "content": {
       "type": "object",
-      "required": ["id", "hash", "status", "reason", "axes"],
+      "additionalProperties": false,
+      "required": ["eyebrow", "title", "description", "primaryAction", "rows"],
+      "properties": {
+        "eyebrow": {"type": "string"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "primaryAction": {"type": "string", "minLength": 1},
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "description"],
+            "properties": {"title": {"type": "string"}, "description": {"type": "string"}, "meta": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "shell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product", "navigation"],
+      "properties": {
+        "product": {"type": "string", "minLength": 1},
+        "activeItem": {"type": "string"},
+        "navigation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label"],
+            "properties": {"id": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}
+          }
+        }
+      }
+    },
+    "blockCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hash", "status", "reason", "axes", "states", "parts"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
         "hash": {"$ref": "#/$defs/hash"},
         "status": {"enum": ["accepted", "proposed", "superseded"]},
         "reason": {"type": "string"},
         "axes": {"type": "object", "additionalProperties": {"type": "string"}},
-        "regions": {"type": "array", "items": {"type": "object"}},
         "states": {"type": "array", "items": {"type": "string"}},
         "parts": {"type": "array", "items": {"type": "object"}},
         "restingCount": {"type": "integer", "minimum": 1}
+      }
+    },
+    "childBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layoutId", "layoutHash", "blockId", "status", "candidates"],
+      "properties": {
+        "layoutId": {"$ref": "#/$defs/slug"},
+        "layoutHash": {"$ref": "#/$defs/hash"},
+        "blockId": {"$ref": "#/$defs/slug"},
+        "status": {"enum": ["accepted", "missing", "stale"]},
+        "currentHead": {"$ref": "#/$defs/hash"},
+        "recommendedId": {"$ref": "#/$defs/slug"},
+        "renderedId": {"$ref": "#/$defs/slug"},
+        "candidates": {"type": "array", "items": {"$ref": "#/$defs/blockCandidate"}}
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "entry", "assembler", "mount", "whyMatch", "block"],
+      "properties": {
+        "name": {"$ref": "#/$defs/slug"},
+        "entry": {"type": "object"},
+        "assembler": {"type": "string", "minLength": 1},
+        "mount": {"type": "string", "minLength": 1},
+        "whyMatch": {"type": "string", "minLength": 1},
+        "block": {"$ref": "#/$defs/childBlock"}
+      }
+    },
+    "layoutCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hash", "status", "reason", "axes", "regions"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "hash": {"$ref": "#/$defs/hash"},
+        "status": {"enum": ["accepted", "proposed", "superseded"]},
+        "reason": {"type": "string"},
+        "axes": {"type": "object", "additionalProperties": {"type": "string"}},
+        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}}
+      }
+    },
+    "layoutReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layoutId", "recommendedId", "theme", "candidates", "shell", "content"],
+      "properties": {
+        "layoutId": {"$ref": "#/$defs/slug"},
+        "routePattern": {"type": "string"},
+        "currentHead": {"$ref": "#/$defs/hash"},
+        "recommendedId": {"$ref": "#/$defs/slug"},
+        "theme": {"type": "object", "additionalProperties": {"$ref": "#/$defs/themeRole"}},
+        "candidates": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/layoutCandidate"}},
+        "visualDirections": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "object"}},
+        "visualDirectionRecommendation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "reason"],
+          "properties": {"id": {"$ref": "#/$defs/slug"}, "reason": {"type": "string"}}
+        },
+        "shell": {"$ref": "#/$defs/shell"},
+        "content": {"$ref": "#/$defs/content"}
       }
     }
   }

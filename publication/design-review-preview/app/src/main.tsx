@@ -16,7 +16,7 @@ const load = async (): Promise<ReviewManifest> => {
   const response = await fetch(manifestUrl, {cache: "no-store"})
   if (!response.ok) throw new Error(`Review manifest returned HTTP ${response.status}`)
   const manifest = await response.json() as ReviewManifest
-  if (manifest.schemaVersion !== 1) throw new Error("Unsupported review manifest schema")
+  if (manifest.schemaVersion !== 2) throw new Error("Unsupported review manifest schema")
   return manifest
 }
 

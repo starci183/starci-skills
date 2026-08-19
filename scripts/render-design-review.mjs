@@ -37,11 +37,11 @@ function defaultContent(project, identity) {
   return {
     eyebrow: project,
     title: humanize(identity),
-    description: "Representative content keeps density and reading order comparable without becoming product copy.",
+    description: "Representative content makes layout density visible before child block design is accepted.",
     primaryAction: "Primary action",
     rows: [
-      {title: "Primary evidence", description: "Representative supporting information for the selected candidate."},
-      {title: "Secondary evidence", description: "A repeated row used consistently across candidate comparisons."},
+      {title: "Primary evidence", description: "Rough layout content preserves measure without deciding block anatomy."},
+      {title: "Secondary evidence", description: "Accepted child parts replace this representation after block approval."},
       {title: "Settled outcome", description: "A stable destination or result at the end of the reading order."}
     ]
   };
@@ -83,52 +83,142 @@ function candidateStatus(candidateHash, currentHead) {
   return candidateHash === currentHead ? "accepted" : "proposed";
 }
 
-function layoutCandidates(batch, registry, layoutId) {
-  const currentHead = registry.layoutHeads?.[layoutId]?.head;
-  return batch.candidates.map((candidate) => {
-    const candidateHash = hash(candidate);
-    const regions = candidate.regions.map((region) => {
-      const block = registry.blockHeads?.[`${layoutId}/${region.name}`];
-      return {
-        ...region,
-        blockStatus: !block ? "missing" : block.layoutHash === candidateHash ? "accepted" : "stale",
-        ...(block?.head ? {blockHead: block.head} : {})
-      };
-    });
+function publicationBlockCandidate(anatomy, currentHead) {
+  const anatomyHash = hash(anatomy);
+  return {
+    id: anatomy.id,
+    hash: anatomyHash,
+    status: candidateStatus(anatomyHash, currentHead),
+    reason: anatomy.reason,
+    axes: anatomy.axes,
+    states: anatomy.states,
+    parts: anatomy.parts,
+    ...(anatomy.restingCount ? {restingCount: anatomy.restingCount} : {})
+  };
+}
+
+function currentChild(registryRoot, registry, layoutId, layoutHash, blockId) {
+  const head = registry.blockHeads?.[`${layoutId}/${blockId}`];
+  if (!head) return {layoutId, layoutHash, blockId, status: "missing", candidates: []};
+  const anatomy = registryObject(registryRoot, registry, head.head);
+  const candidate = publicationBlockCandidate(anatomy, head.head);
+  if (head.layoutHash !== layoutHash) {
     return {
-      id: candidate.id,
-      hash: candidateHash,
-      status: candidateStatus(candidateHash, currentHead),
-      reason: candidate.reason,
-      axes: candidate.axes,
-      regions
+      layoutId,
+      layoutHash,
+      blockId,
+      status: "stale",
+      currentHead: head.head,
+      recommendedId: candidate.id,
+      candidates: [candidate]
+    };
+  }
+  return {
+    layoutId,
+    layoutHash,
+    blockId,
+    status: "accepted",
+    currentHead: head.head,
+    recommendedId: candidate.id,
+    renderedId: candidate.id,
+    candidates: [candidate]
+  };
+}
+
+function publicationLayoutCandidate(candidate, registryRoot, registry, layoutId, currentHead) {
+  const candidateHash = hash(candidate);
+  return {
+    id: candidate.id,
+    hash: candidateHash,
+    status: candidateStatus(candidateHash, currentHead),
+    reason: candidate.reason,
+    axes: candidate.axes,
+    regions: candidate.regions.map((region) => ({
+      ...region,
+      block: currentChild(registryRoot, registry, layoutId, candidateHash, region.name)
+    }))
+  };
+}
+
+function currentLayouts(registryRoot, registry, vocabulary, project, contentInput, shellInput) {
+  return Object.entries(registry.layoutHeads ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([layoutId, head]) => {
+    const candidate = registryObject(registryRoot, registry, head.head);
+    return {
+      layoutId,
+      ...(head.routePattern ? {routePattern: head.routePattern} : {}),
+      currentHead: head.head,
+      recommendedId: candidate.id,
+      theme: resolveTheme(candidate.direction, vocabulary),
+      candidates: [publicationLayoutCandidate(candidate, registryRoot, registry, layoutId, head.head)],
+      shell: shellInput ?? defaultShell(project, layoutId),
+      content: contentInput ?? defaultContent(project, layoutId)
     };
   });
 }
 
-function blockCandidates(batch, registry, layoutId, blockId) {
+function overlayLayoutReview(layouts, options, registryRoot, registry, vocabulary, contentInput, shellInput) {
+  const artifact = load(options.artifact, "layout artifact");
+  if (artifact.envelope?.project !== options.project || !Array.isArray(artifact.candidates)) {
+    throw new Error("layout artifact does not match the declared project");
+  }
+  const layoutId = options.layoutId ?? artifact.envelope.surface;
+  const currentHead = registry.layoutHeads?.[layoutId]?.head;
+  const candidates = artifact.candidates.map((candidate) => publicationLayoutCandidate(candidate, registryRoot, registry, layoutId, currentHead));
+  const recommendedId = options.recommendedId ?? candidates[0]?.id;
+  if (!candidates.some((candidate) => candidate.id === recommendedId)) throw new Error("recommended layout candidate is absent");
+  const directionBatch = optional(options.directions);
+  const review = {
+    layoutId,
+    ...(registry.layoutHeads?.[layoutId]?.routePattern ? {routePattern: registry.layoutHeads[layoutId].routePattern} : {}),
+    ...(currentHead ? {currentHead} : {}),
+    recommendedId,
+    theme: resolveTheme(artifact.candidates[0]?.direction, vocabulary),
+    candidates,
+    ...(directionBatch?.directions ? {visualDirections: directionBatch.directions} : {}),
+    ...(directionBatch?.recommended ? {visualDirectionRecommendation: directionBatch.recommended} : {}),
+    shell: shellInput ?? defaultShell(options.project, layoutId),
+    content: contentInput ?? defaultContent(options.project, layoutId)
+  };
+  const index = layouts.findIndex((layout) => layout.layoutId === layoutId);
+  if (index >= 0) layouts[index] = review;
+  else layouts.push(review);
+  const selected = candidates.find((candidate) => candidate.id === recommendedId);
+  return `#/layouts/${layoutId}/${selected.hash}`;
+}
+
+function overlayBlockReview(layouts, options, registryRoot, registry) {
+  const artifact = load(options.artifact, "block artifact");
+  if (artifact.envelope?.project !== options.project || !Array.isArray(artifact.anatomies)) {
+    throw new Error("block artifact does not match the declared project");
+  }
+  const layoutId = options.layoutId;
+  const blockId = options.blockId ?? artifact.envelope.region;
+  const layoutHash = artifact.envelope.layoutHash;
+  if (!layoutId || !blockId || registry.layoutHeads?.[layoutId]?.head !== layoutHash) {
+    throw new Error("block review requires the accepted parent layoutId, layoutHash and blockId");
+  }
+  const layout = layouts.find((item) => item.layoutId === layoutId);
+  const candidate = layout?.candidates.find((item) => item.hash === layoutHash);
+  const region = candidate?.regions.find((item) => item.name === blockId);
+  if (!layout || !candidate || !region) throw new Error("blockId is not declared by the accepted parent layout");
+
   const currentHead = registry.blockHeads?.[`${layoutId}/${blockId}`]?.head;
-  return batch.anatomies.map((anatomy) => {
-    const anatomyHash = hash(anatomy);
-    return {
-      id: anatomy.id,
-      hash: anatomyHash,
-      status: candidateStatus(anatomyHash, currentHead),
-      reason: anatomy.reason,
-      axes: anatomy.axes,
-      states: anatomy.states,
-      parts: anatomy.parts,
-      ...(anatomy.restingCount ? {restingCount: anatomy.restingCount} : {})
-    };
-  });
+  const proposed = artifact.anatomies.map((anatomy) => publicationBlockCandidate(anatomy, currentHead));
+  const existing = region.block.candidates.filter((item) => !proposed.some((candidate) => candidate.hash === item.hash));
+  const recommendedId = options.recommendedId ?? proposed[0]?.id;
+  if (!proposed.some((candidate) => candidate.id === recommendedId)) throw new Error("recommended block candidate is absent");
+  region.block = {
+    ...region.block,
+    recommendedId,
+    candidates: [...proposed, ...existing]
+  };
+  return `#/layouts/${layoutId}/${layoutHash}/blocks/${blockId}`;
 }
 
 function assertOutputPath(outDir, project) {
   const marker = `${sep}.worktrees${sep}${project}${sep}cache${sep}preview${sep}`;
   const normalized = `${resolve(outDir)}${sep}`;
-  if (!normalized.includes(marker)) {
-    throw new Error(`preview output must stay under .worktrees/${project}/cache/preview`);
-  }
+  if (!normalized.includes(marker)) throw new Error(`preview output must stay under .worktrees/${project}/cache/preview`);
 }
 
 function runNpm(args) {
@@ -148,62 +238,36 @@ function buildRuntime(outDir) {
 }
 
 export function buildManifest(options) {
-  const artifact = load(options.artifact, "design artifact");
   const registryRoot = resolve(options.registry);
   const registry = load(join(registryRoot, "design-registry-v2.json"), "design registry");
   const vocabulary = load(options.vocabulary, "visual vocabulary");
-  const phase = options.phase;
-  if (!new Set(["layout", "block"]).has(phase)) throw new Error("--phase must be layout or block");
-  if (artifact.envelope?.project !== options.project) throw new Error("artifact project does not match --project");
+  const contentInput = optional(options.content);
+  const shellInput = optional(options.shell);
+  const layouts = currentLayouts(registryRoot, registry, vocabulary, options.project, contentInput, shellInput);
+  if (!layouts.length) throw new Error("design registry has no accepted layout heads");
 
-  let layoutId;
-  let blockId;
-  let parentLayoutHash;
-  let candidates;
-  let direction;
-  let currentHead;
-
-  if (phase === "layout") {
-    layoutId = options.layoutId ?? artifact.envelope?.surface;
-    if (!layoutId || !Array.isArray(artifact.candidates)) throw new Error("layout artifact or layoutId is invalid");
-    candidates = layoutCandidates(artifact, registry, layoutId);
-    direction = artifact.candidates[0]?.direction;
-    currentHead = registry.layoutHeads?.[layoutId]?.head;
+  let entryRoute;
+  if (options.phase === "layout") {
+    entryRoute = overlayLayoutReview(layouts, options, registryRoot, registry, vocabulary, contentInput, shellInput);
+  } else if (options.phase === "block") {
+    entryRoute = overlayBlockReview(layouts, options, registryRoot, registry);
+  } else if (options.allCurrent) {
+    const first = layouts[0];
+    const candidate = first.candidates.find((item) => item.id === first.recommendedId) ?? first.candidates[0];
+    entryRoute = `#/layouts/${first.layoutId}/${candidate.hash}`;
   } else {
-    layoutId = options.layoutId;
-    blockId = options.blockId ?? artifact.envelope?.region;
-    parentLayoutHash = artifact.envelope?.layoutHash;
-    if (!layoutId || !blockId || !parentLayoutHash || !Array.isArray(artifact.anatomies)) {
-      throw new Error("block review requires layoutId, blockId and an accepted parent layoutHash");
-    }
-    const acceptedHead = registry.layoutHeads?.[layoutId]?.head;
-    if (acceptedHead !== parentLayoutHash) throw new Error("block artifact does not point at the accepted layout head");
-    direction = registryObject(registryRoot, registry, parentLayoutHash).direction;
-    candidates = blockCandidates(artifact, registry, layoutId, blockId);
-    currentHead = registry.blockHeads?.[`${layoutId}/${blockId}`]?.head;
+    throw new Error("supply --all-current or --phase layout|block");
   }
 
-  if (!direction) throw new Error("accepted visual direction cannot be resolved");
-  const directionBatch = optional(options.directions);
-  const recommendedId = options.recommendedId ?? candidates[0]?.id;
-  if (!candidates.some((candidate) => candidate.id === recommendedId)) throw new Error("recommended candidate is absent from the batch");
-  const identity = {layoutId, ...(blockId ? {blockId} : {}), ...(parentLayoutHash ? {parentLayoutHash} : {})};
   return {
-    schemaVersion: 1,
-    phase,
+    schemaVersion: 2,
     project: options.project,
-    identity,
-    artifact: {source: options.artifact, ...(currentHead ? {currentHead} : {}), recommendedId},
-    theme: resolveTheme(direction, vocabulary),
-    candidates,
-    ...(directionBatch?.directions ? {visualDirections: directionBatch.directions} : {}),
-    ...(directionBatch?.recommended ? {visualDirectionRecommendation: directionBatch.recommended} : {}),
-    shell: optional(options.shell) ?? defaultShell(options.project, blockId ?? layoutId),
-    content: optional(options.content) ?? defaultContent(options.project, blockId ?? layoutId),
+    entryRoute,
+    layouts,
     evidence: [
-      {label: "artifact", value: options.artifact},
       {label: "registry", value: join(registryRoot, "design-registry-v2.json")},
-      {label: "vocabularyAt", value: vocabulary.digest}
+      {label: "vocabularyAt", value: vocabulary.digest},
+      ...(options.artifact ? [{label: "reviewArtifact", value: options.artifact}] : [])
     ]
   };
 }
@@ -213,6 +277,7 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--no-build") result.noBuild = true;
+    else if (value === "--all-current") result.allCurrent = true;
     else if (value.startsWith("--")) {
       const key = value.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
       result[key] = argv[index + 1];
@@ -223,9 +288,10 @@ function parseArgs(argv) {
 }
 
 export function renderReview(options) {
-  for (const required of ["phase", "project", "artifact", "registry", "vocabulary", "out"]) {
+  for (const required of ["project", "registry", "vocabulary", "out"]) {
     if (!options[required]) throw new Error(`--${required} is required`);
   }
+  if (options.phase && !options.artifact) throw new Error("--artifact is required when --phase is supplied");
   const outDir = resolve(options.out);
   assertOutputPath(outDir, options.project);
   const manifest = buildManifest(options);
@@ -238,7 +304,7 @@ export function renderReview(options) {
 function main() {
   try {
     const result = renderReview(parseArgs(process.argv.slice(2)));
-    console.log(`review ${result.manifest.phase} ${result.manifest.identity.layoutId} -> ${join(result.outDir, "index.html")}`);
+    console.log(`review graph ${result.manifest.project} (${result.manifest.layouts.length} layouts) -> ${join(result.outDir, "index.html")}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

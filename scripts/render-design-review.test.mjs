@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -7,6 +8,12 @@ import {buildManifest, renderReview} from "./render-design-review.mjs";
 
 const digest = "a".repeat(64);
 const token = (name, value) => ({name, declarations: [{source: "theme.css", value}]});
+const canonical = (value) => Array.isArray(value)
+  ? `[${value.map(canonical).join(",")}]`
+  : value && typeof value === "object"
+    ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`
+    : JSON.stringify(value);
+const hash = (value) => createHash("sha256").update(canonical(value)).digest("hex");
 
 const direction = {
   id: "quiet-review",
@@ -48,76 +55,105 @@ function fixture() {
       token("--muted", "#70747a"), token("--accent", "#e94f99"), token("--separator", "#e4e5e8"), token("--radius", "10px")
     ]
   }));
-  return {root, registry, vocabularyPath};
+
+  const layout = {
+    id: "rail-layout",
+    direction,
+    axes: {navigation: "rail", evidence: "below", secondary: "panel", chrome: "sticky"},
+    citesPrecedent: "none",
+    regions: [{name: "summary", entry: {verdict: "reuse", key: "summary"}, assembler: "Tree", mount: "per-route", whyMatch: "The route needs one stable summary region."}],
+    reason: "The rail keeps navigation beside one stable page body."
+  };
+  const layoutHash = hash(layout);
+  const anatomy = {
+    id: "summary-stack",
+    axes: {dataOwner: "parent", repetition: "single", weight: "populated", composition: "label-value"},
+    citesPrecedent: "none",
+    states: ["populated", "pending", "failed"],
+    parts: [{name: "summary-label", cites: {kind: "leaf", verdict: "reuse", key: "Typography"}, whyMatch: "The summary needs one stable label before its value."}],
+    reason: "A label-value stack keeps the summary readable in every state."
+  };
+  const blockHash = hash(anatomy);
+  writeFileSync(join(registry, "objects", "sha256", `${layoutHash}.json`), JSON.stringify(layout));
+  writeFileSync(join(registry, "objects", "sha256", `${blockHash}.json`), JSON.stringify(anatomy));
+  writeFileSync(join(registry, "design-registry-v2.json"), JSON.stringify({
+    layoutHeads: {"sample-layout": {layoutId: "sample-layout", head: layoutHash, regions: ["summary"]}},
+    blockHeads: {"sample-layout/summary": {layoutId: "sample-layout", blockId: "summary", layoutHash, head: blockHash}},
+    objects: {byHash: {
+      [layoutHash]: {path: `objects/sha256/${layoutHash}.json`},
+      [blockHash]: {path: `objects/sha256/${blockHash}.json`}
+    }}
+  }));
+  return {root, registry, vocabularyPath, layout, layoutHash, anatomy, blockHash};
 }
 
-test("one renderer manifest adapts both layout regions and block parts", () => {
+test("all-current graph binds accepted child blocks to the exact parent layout hash", () => {
   const f = fixture();
   try {
-    const layoutPath = join(f.root, "layout.json");
-    const layout = {
-      schema: 1,
-      envelope: {session: "sample/2026-08-20", round: 1, project: "sample", surface: "sample-layout"},
-      candidates: [{
-        id: "rail-layout",
-        direction,
-        axes: {navigation: "rail", evidence: "below", secondary: "panel", chrome: "sticky"},
-        citesPrecedent: "none",
-        regions: [{name: "summary", entry: {verdict: "reuse", key: "summary"}, assembler: "Tree", mount: "per-route", whyMatch: "The route needs one stable summary region."}],
-        reason: "The rail keeps navigation beside one stable page body."
-      }]
-    };
-    writeFileSync(layoutPath, JSON.stringify(layout));
-    writeFileSync(join(f.registry, "design-registry-v2.json"), JSON.stringify({layoutHeads: {}, blockHeads: {}, objects: {byHash: {}}}));
-
-    const layoutManifest = buildManifest({phase: "layout", project: "sample", artifact: layoutPath, registry: f.registry, vocabulary: f.vocabularyPath});
-    assert.equal(layoutManifest.candidates[0].status, "proposed");
-    assert.equal(layoutManifest.candidates[0].regions[0].blockStatus, "missing");
-    assert.equal(layoutManifest.theme.accent.value, "#e94f99");
-
-    const layoutHash = layoutManifest.candidates[0].hash;
-    writeFileSync(join(f.registry, "objects", "sha256", `${layoutHash}.json`), JSON.stringify(layout.candidates[0]));
-    writeFileSync(join(f.registry, "design-registry-v2.json"), JSON.stringify({
-      layoutHeads: {"sample-layout": {head: layoutHash, regions: ["summary"]}},
-      blockHeads: {},
-      objects: {byHash: {[layoutHash]: {path: `objects/sha256/${layoutHash}.json`}}}
-    }));
-
-    const blockPath = join(f.root, "block.json");
-    writeFileSync(blockPath, JSON.stringify({
-      schema: 1,
-      envelope: {session: "sample-block/2026-08-20", round: 1, project: "sample", region: "summary", layoutHash},
-      anatomies: [{
-        id: "summary-stack",
-        axes: {dataOwner: "parent", repetition: "single", weight: "populated", composition: "label-value"},
-        citesPrecedent: "none",
-        states: ["populated", "pending", "failed"],
-        parts: [{name: "summary-label", cites: {kind: "leaf", verdict: "reuse", key: "Typography"}, whyMatch: "The summary needs one stable label before its value."}],
-        reason: "A label-value stack keeps the summary readable in every state."
-      }]
-    }));
-
-    const blockManifest = buildManifest({phase: "block", project: "sample", layoutId: "sample-layout", blockId: "summary", artifact: blockPath, registry: f.registry, vocabulary: f.vocabularyPath});
-    assert.equal(blockManifest.identity.parentLayoutHash, layoutHash);
-    assert.equal(blockManifest.candidates[0].parts[0].name, "summary-label");
-    assert.deepEqual(blockManifest.candidates[0].states, ["populated", "pending", "failed"]);
-
-    const out = join(f.root, ".worktrees", "sample", "cache", "preview", "sample-layout");
-    renderReview({phase: "layout", project: "sample", artifact: layoutPath, registry: f.registry, vocabulary: f.vocabularyPath, out, noBuild: true});
-    const written = JSON.parse(readFileSync(join(out, "review-manifest.json"), "utf8"));
-    assert.equal(written.identity.layoutId, "sample-layout");
+    const manifest = buildManifest({allCurrent: true, project: "sample", registry: f.registry, vocabulary: f.vocabularyPath});
+    assert.equal(manifest.schemaVersion, 2);
+    assert.equal(manifest.layouts[0].candidates[0].hash, f.layoutHash);
+    const child = manifest.layouts[0].candidates[0].regions[0].block;
+    assert.equal(child.layoutId, "sample-layout");
+    assert.equal(child.layoutHash, f.layoutHash);
+    assert.equal(child.blockId, "summary");
+    assert.equal(child.status, "accepted");
+    assert.equal(child.currentHead, f.blockHash);
+    assert.equal(child.renderedId, "summary-stack");
+    assert.match(manifest.entryRoute, new RegExp(f.layoutHash));
   } finally {
     rmSync(f.root, {recursive: true, force: true});
   }
 });
 
-test("renderer refuses output outside the project preview cache", () => {
+test("block review adds proposed children without replacing the accepted block rendered on layout", () => {
   const f = fixture();
   try {
-    const artifact = join(f.root, "layout.json");
-    writeFileSync(artifact, JSON.stringify({schema: 1, envelope: {project: "sample", surface: "sample-layout"}, candidates: []}));
-    writeFileSync(join(f.registry, "design-registry-v2.json"), JSON.stringify({layoutHeads: {}, blockHeads: {}, objects: {byHash: {}}}));
-    assert.throws(() => renderReview({phase: "layout", project: "sample", artifact, registry: f.registry, vocabulary: f.vocabularyPath, out: join(f.root, "unsafe"), noBuild: true}), /must stay under/);
+    const artifactPath = join(f.root, "block.json");
+    const proposed = {...f.anatomy, id: "summary-grid", reason: "A proposed grid compares the same summary evidence."};
+    writeFileSync(artifactPath, JSON.stringify({
+      schema: 1,
+      envelope: {round: 1, project: "sample", region: "summary", layoutHash: f.layoutHash},
+      anatomies: [proposed]
+    }));
+    const manifest = buildManifest({phase: "block", project: "sample", layoutId: "sample-layout", blockId: "summary", artifact: artifactPath, registry: f.registry, vocabulary: f.vocabularyPath, recommendedId: "summary-grid"});
+    const child = manifest.layouts[0].candidates[0].regions[0].block;
+    assert.equal(child.recommendedId, "summary-grid");
+    assert.equal(child.renderedId, "summary-stack");
+    assert.equal(child.candidates.length, 2);
+    assert.match(manifest.entryRoute, /\/blocks\/summary$/);
+  } finally {
+    rmSync(f.root, {recursive: true, force: true});
+  }
+});
+
+test("a replacement layout marks old child heads stale and falls back to rough content", () => {
+  const f = fixture();
+  try {
+    const artifactPath = join(f.root, "layout.json");
+    const replacement = {...f.layout, id: "new-layout", reason: "A replacement layout changes the parent version."};
+    writeFileSync(artifactPath, JSON.stringify({
+      schema: 1,
+      envelope: {round: 1, project: "sample", surface: "sample-layout"},
+      candidates: [replacement]
+    }));
+    const manifest = buildManifest({phase: "layout", project: "sample", layoutId: "sample-layout", artifact: artifactPath, registry: f.registry, vocabulary: f.vocabularyPath, recommendedId: "new-layout"});
+    const child = manifest.layouts[0].candidates[0].regions[0].block;
+    assert.equal(child.status, "stale");
+    assert.equal(child.renderedId, undefined);
+  } finally {
+    rmSync(f.root, {recursive: true, force: true});
+  }
+});
+
+test("renderer writes one project graph and refuses output outside preview cache", () => {
+  const f = fixture();
+  try {
+    const out = join(f.root, ".worktrees", "sample", "cache", "preview", "design-review");
+    renderReview({allCurrent: true, project: "sample", registry: f.registry, vocabulary: f.vocabularyPath, out, noBuild: true});
+    const written = JSON.parse(readFileSync(join(out, "review-manifest.json"), "utf8"));
+    assert.equal(written.layouts[0].layoutId, "sample-layout");
+    assert.throws(() => renderReview({allCurrent: true, project: "sample", registry: f.registry, vocabulary: f.vocabularyPath, out: join(f.root, "unsafe"), noBuild: true}), /must stay under/);
   } finally {
     rmSync(f.root, {recursive: true, force: true});
   }

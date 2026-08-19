@@ -1,4 +1,3 @@
-export type ReviewPhase = "layout" | "block"
 export type CandidateStatus = "accepted" | "proposed" | "superseded"
 export type BlockStatus = "accepted" | "missing" | "stale"
 
@@ -17,16 +16,6 @@ export type EntryVerdict = {
   readonly why?: string
 }
 
-export type RegionReview = {
-  readonly name: string
-  readonly entry: EntryVerdict
-  readonly assembler: string
-  readonly mount: string
-  readonly whyMatch: string
-  readonly blockStatus: BlockStatus
-  readonly blockHead?: string
-}
-
 export type PartReview = {
   readonly name: string
   readonly cites: Record<string, unknown>
@@ -34,16 +23,44 @@ export type PartReview = {
   readonly whyMatch: string
 }
 
-export type ReviewCandidate = {
+export type BlockCandidate = {
   readonly id: string
   readonly hash: string
   readonly status: CandidateStatus
   readonly reason: string
   readonly axes: Record<string, string>
-  readonly regions?: ReadonlyArray<RegionReview>
-  readonly states?: ReadonlyArray<string>
-  readonly parts?: ReadonlyArray<PartReview>
+  readonly states: ReadonlyArray<string>
+  readonly parts: ReadonlyArray<PartReview>
   readonly restingCount?: number
+}
+
+export type ChildBlockReview = {
+  readonly layoutId: string
+  readonly layoutHash: string
+  readonly blockId: string
+  readonly status: BlockStatus
+  readonly currentHead?: string
+  readonly recommendedId?: string
+  readonly renderedId?: string
+  readonly candidates: ReadonlyArray<BlockCandidate>
+}
+
+export type RegionReview = {
+  readonly name: string
+  readonly entry: EntryVerdict
+  readonly assembler: string
+  readonly mount: string
+  readonly whyMatch: string
+  readonly block: ChildBlockReview
+}
+
+export type LayoutCandidate = {
+  readonly id: string
+  readonly hash: string
+  readonly status: CandidateStatus
+  readonly reason: string
+  readonly axes: Record<string, string>
+  readonly regions: ReadonlyArray<RegionReview>
 }
 
 export type DirectionReview = {
@@ -69,32 +86,29 @@ export type ShellDescriptor = {
   readonly activeItem?: string
 }
 
-export type ReviewManifest = {
-  readonly schemaVersion: 1
-  readonly phase: ReviewPhase
-  readonly project: string
-  readonly identity: {
-    readonly layoutId: string
-    readonly blockId?: string
-    readonly parentLayoutHash?: string
-  }
-  readonly artifact: {
-    readonly source: string
-    readonly currentHead?: string
-    readonly recommendedId: string
-  }
+export type LayoutReview = {
+  readonly layoutId: string
+  readonly routePattern?: string
+  readonly currentHead?: string
+  readonly recommendedId: string
   readonly theme: Record<string, ThemeRole>
-  readonly candidates: ReadonlyArray<ReviewCandidate>
+  readonly candidates: ReadonlyArray<LayoutCandidate>
   readonly visualDirections?: ReadonlyArray<DirectionReview>
   readonly visualDirectionRecommendation?: {readonly id: string; readonly reason: string}
   readonly shell: ShellDescriptor
   readonly content: ReviewContent
+}
+
+export type ReviewManifest = {
+  readonly schemaVersion: 2
+  readonly project: string
+  readonly entryRoute: string
+  readonly layouts: ReadonlyArray<LayoutReview>
   readonly evidence: ReadonlyArray<{readonly label: string; readonly value: string}>
 }
 
-export type Inspector = {
-  readonly kind: "region" | "part" | "candidate" | "evidence" | "approval"
-  readonly title: string
-  readonly subtitle: string
-  readonly data: unknown
+export type ReviewRoute = {
+  readonly layoutId: string
+  readonly layoutHash: string
+  readonly blockId?: string
 }
