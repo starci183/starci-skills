@@ -10,6 +10,7 @@ title: starci-repair · English
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared phase, approval and output contract |
 | `@staleness` | `readiness/staleness/en.md` | en | the one taxonomy and router for every repair module |
+| `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic whole-Source proof for the ordered delivery fence |
 
 ## NESTED SKILLS
 
@@ -41,6 +42,11 @@ Green is earned, never bought. No `eslint-disable`, weakened severity, removed r
 added to end a finding. A decision is returned. Formatting is isolated from behavior. The consumer installs
 published lint rules and never authors or repairs a private copy.
 
+The delivery fence applies independently to every routed role: format → lint → typecheck → build → unit
+coverage → E2E → Sonar. Lint requires 0 errors/0 warnings; unit requires S/L/F ≥80%, branches ≥75% and
+patch/new metrics ≥90%; E2E requires an existing declared entrypoint, real tests and all passing. Skip, todo,
+passWithNoTests, zero-test and check substitutes are rejects.
+
 One repair record covers one role of one project, except a port-offset pass records the family and every
 reached role together. A multi-project request coordinates separate records,
 baselines and diffs under one approval batch. Whole-repository gates run once per checkout by the coordinator.
@@ -56,8 +62,8 @@ frontend contract when declared. Stop before target-source reads if the route is
 ### 2 — Read manifest and select modules
 
 Read the repository manifest and existing gate scripts. Select modules using the rules above, then read
-each selected runtime context record completely before inventory. Do not run end-to-end suites unless the request
-names them.
+each selected runtime context record completely before inventory. For every routed role, source proof is
+mandatory in this order: format, lint, typecheck, build, unit coverage, E2E, Sonar. Do not omit E2E or Sonar.
 
 ### 3 — Establish the baseline state
 
@@ -101,7 +107,12 @@ run file-scoped lint only; the coordinator owns shared-state gates and remeasure
 
 ### 7 — Prove each module
 
-Run every selected module's `Proof`. Re-run the exact original source gates once and report before/after.
+Run every selected module's `Proof`. Re-run the exact original source gates once, in mandatory order, and
+report before/after. A source pass requires lint 0 errors/0 warnings; unit S/L/F ≥80%, branches ≥75% and
+patch/new metrics ≥90%; an existing declared E2E entrypoint with real tests and all passing; and final Sonar
+pass. Skip/todo/passWithNoTests/zero-test/check substitutes reject.
+Use `node @source-quality` for final whole-Source remeasurement; do not replace its failed or unmeasured
+facts with narrative inference.
 Inspect the complete baseline diff for boundary violations and secret material. External enforcement is
 proved by authorized API evidence, never inferred from workflow text.
 

@@ -31,7 +31,7 @@ and proof. Route staleness has no repair module here because its owner is `starc
 |---|---|---|
 | `route` | checkout, contract, branch or recorded head no longer describes this machine | `starci-init` |
 | `port-offset` | Source allocation is absent/invalid, product owns an offset, projection drifts, or local listeners collide | `starci-repair`, port-offset pass |
-| `source` | declared format/lint/type/build/unit gates fail, or no meaningful gate surface exists | `starci-repair`, source-gates pass |
+| `source` | any routed role lacks or fails format→lint→typecheck→build→unit coverage→E2E→Sonar, including lint warnings, low coverage, fake E2E or missing Sonar | `starci-repair`, source-gates pass |
 | `index` | a contract `why` describes a shape instead of the need that finds it | `starci-repair`, why pass |
 | `machine` | published lint canon is absent or a vendored rule copy is imported | `starci-repair`, lint-machine pass |
 | `formatter` | strict-fix scope still has first-party Prettier integration | `starci-repair`, strict-fix pass |
@@ -42,8 +42,10 @@ and proof. Route staleness has no repair module here because its owner is `starc
 ## Shared rules
 
 - `stale-list` reports; it never repairs. `repair` measures before it writes.
-- `ready` requires local execution evidence from the current checkout. A declared gate that was only
-  discovered, not run, is `unmeasured` and can never support a ready verdict.
+- `ready` requires current-checkout evidence for every routed role and the ordered source fence:
+  format→lint→typecheck→build→unit coverage→E2E→Sonar. Lint is 0/0; unit is S/L/F ≥80%, branches ≥75%,
+  patch/new metrics ≥90%; E2E needs an existing declared entrypoint, real tests and all passing. Skip/todo/
+  passWithNoTests/zero-test/check substitutes reject. Undispatched gates are unmeasured and cannot support ready.
 - Every finding carries category, evidence, applicability and owner.
 - `absent`, `invalid`, `stale`, `not required`, `unmeasured external` and `clean` are distinct verdicts.
 - A route finding ends repair before target-source reads. Source repair through a stale route targets an

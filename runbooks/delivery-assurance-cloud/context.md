@@ -23,6 +23,7 @@ npm run lint:check
 npm run typecheck
 npm run build
 npm run test:ci
+npm run test:e2e
 npm run sonar:check
 ```
 
@@ -38,13 +39,13 @@ ends at "analysis uploaded" as unmeasured, never as ready.
 
 This order is mandatory for every assured frontend or backend:
 
-1. Local lint, typecheck, build and unit gates pass.
+1. Local lint finishes with zero errors/warnings; typecheck and build pass.
 2. Generate **exactly one** LCOV report. Two runs for two dashboards is drift, not stronger assurance.
-3. Run authenticated local Sonar analysis from the current checkout, against the local service.
-4. Wait for the quality gate — `sonar.qualitygate.wait=true` with a timeout of at least 600 seconds.
-5. Treat a red gate as a **source repair finding**, not a provider problem and not a CI problem.
-6. Repair the source and rescan until the gate is green.
-7. Only then trust or run provider CI.
+3. Prove statements/functions/lines >=80%, branches >=75% and new-code/patch >=90% for each metric.
+4. Run every declared E2E entrypoint; real non-skipped tests all pass and an empty lane fails.
+5. Run authenticated local Sonar analysis from the exact checkout and wait for the quality gate.
+6. Query provider evidence and prove the strict profile below on the exact checkout SHA.
+7. Repair every failed condition and rescan until the whole profile passes; only then trust provider CI.
 
 "Unmeasured" and "scan uploaded" are not ready. A red gate deferred to CI is a red gate hidden, not
 handled.
@@ -57,6 +58,14 @@ Two further constraints hold whenever analysis runs:
 - **Coverage readiness is four numbers, not one.** Statements, branches, functions and lines each carry
   the threshold independently. A single blended percentage hides the metric that is actually failing —
   in practice branch coverage is the one that lags, and the one an aggregate number conceals.
+
+## Strict Sonar profile
+
+Idempotent gate reconciliation plus authenticated proof requires gate `OK`, bugs/vulnerabilities/code
+smells 0, hotspots reviewed 100%, three A ratings, duplicated-lines density ≤3% overall/new, native
+coverage >=80% overall and >=90% new, and latest analysis SHA equal to checkout. Jest/Vitest owns the four
+distinct metrics; Codecov and Sonar use the same LCOV and gate native project/new metrics only. Scanner and
+admin/operator authority are distinct encrypted tokens and neither may enter logs or arguments.
 
 ```powershell
 $env:SOPS_AGE_KEY_FILE = "$HOME\.starci\master.identity"
@@ -95,7 +104,8 @@ node .claude/scripts/publish-secret.mjs --name CODECOV_TOKEN --stack ".::dev/run
 ```
 
 4. Keep `coverage/lcov.info`, `codecov/codecov-action@v5`, `fail_ci_if_error: true`, and blocking project/
-patch statuses in `codecov.yml`. A coverage target is raised by covering code, never by adding an
+patch statuses in `codecov.yml`: native project 80% and patch 90%; the runner separately enforces S/F/L
+80%, branches 75% and new-code 90% per metric. A target is raised by covering code, never by adding an
 exclusion.
 
 ### SonarQube

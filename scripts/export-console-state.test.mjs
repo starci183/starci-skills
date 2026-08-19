@@ -37,3 +37,11 @@ test("Codecov OIDC satisfies credential identity without inventing a plaintext t
     assert.doesNotMatch(miamia, /Codecov uses a declared CI identity/)
     assert.doesNotMatch(miamia, /Codecov token is encrypted in stacks/)
 })
+
+test("scanner exposes the strict lint, E2E, coverage and Sonar wiring facts", () => {
+    const output = staleOutput()
+    assert.match(output, /lint rejects warnings/)
+    assert.match(output, /full E2E command is declared|CI runs full E2E/)
+    assert.match(output, /project and patch\/new four-metric thresholds declared/)
+    assert.match(output, /strict Sonar proof machine is wired/)
+})

@@ -16,7 +16,9 @@ title: Frontend design layout · Vietnamese
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo reason mà không trả class array |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | sinh kiểm kê token sống cho direction |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate JSON layout candidate |
-| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng design session |
+| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra registry identity-centric và các current head |
+| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps không phá huỷ và verify identity heads current |
+| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact, session và sinh hash |
 
 ## NESTED SKILLS
@@ -25,16 +27,18 @@ Không có. Một điểm dừng kết thúc lượt chạy này. Skill không t
 
 ## Cách chạy
 
-Đọc `@skill-shape` trước. Không có orchestrator, nên skill này tự mở hoặc resume session.
+Đọc `@skill-shape` trước. Skill này nhận `layoutId` ổn định và sở hữu page skeleton; session chỉ là audit
+history tùy chọn.
 
 **JSON mới là artifact; HTML chỉ là cách quan sát.** Approval bind vào hash của canonical JSON, không bind
-vào trang render.
+vào trang render. `registries/design-registry-v2.json` là authority: `layoutHeads[layoutId].head` trỏ tới layout object
+immutable đã accepted; session hoặc review không bao giờ quyết định lookup hiện tại.
 
 ## QUY TRÌNH
 
 ### 1 — Lập context lock
 
-Resolve `Phase: layout`; `Touching` chỉ gồm project registry, session và cache, không gồm frontend source.
+Resolve `Phase: layout`; `Touching` chỉ gồm project registry, audit record tùy chọn và cache, không gồm frontend source.
 Nói vị trí đó bằng một câu thân thiện; không in context thành bảng.
 
 ### 2 — Resolve và kiểm tra workspace route
@@ -50,17 +54,19 @@ của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 `<Source>/.worktrees/<project>/cache/preview` (`WORKTREE-2`), không bao giờ dưới `.claude`
 (`WORKTREE-3`).
 
-### 4 — Resume hoặc mở session
+### 4 — Resolve identity layout ổn định và current head
 
-Bản ghi viết theo đúng hình dạng `@session` khai, tại `registries/decisions/<surface>.json`. Nó mang một
-chuỗi băm, nên ghi thêm một round là niêm phong round đó: sửa lén một round cũ thì nó thôi khớp — điều mà
-một mảng round trần không bao giờ phát hiện được.
+Chạy `@design-registry-migrate --check`, rồi đọc `@design-registry-schema` và
+`registries/design-registry-v2.json`. Bắt buộc caller cung cấp `layoutId` ổn định; không suy ra
+identity từ prompt, surface label hay session id. Resolve `layoutHeads[layoutId]`, rồi resolve `head` qua
+map `objects.byHash` immutable nếu head đã tồn tại. Head là layout accepted và là kết quả lookup hiện tại
+duy nhất. Identity thiếu hoặc schema mismatch thì dừng; thiếu head là identity mới, không phải quyền coi
+candidate proposed là accepted.
 
-**Surface quyết định identity của session**, không phải cách viết prompt. Hai request khác lời cho cùng
-page vẫn là một session; prompt viết lại chỉ mở round mới. In `resumed <id>` hoặc `opened <id>` và giữ mọi
-accepted hash khi resume.
-Session mới dùng session schema 2. Khi resume session schema 1, giữ nguyên các round lịch sử; round mới
-vẫn dùng các field recommendation kết hợp.
+Nếu layout chưa có accepted head, chỉ tiếp tục theo creation path được schema registry cho phép; không tự
+đặt head từ candidate proposed. Session hoặc review cũ có thể đọc làm ngữ cảnh và ghi audit history, nhưng
+không được chọn, thay hoặc hồi sinh head. Giữ mọi accepted hash trong immutable object và chỉ cập nhật head
+tại approval checkpoint.
 
 ### 5 — Sinh các direction choice
 
@@ -147,12 +153,13 @@ không vẽ block internals hay mang product class.
 
 Trình các direction cùng lý do đề xuất một direction bên cạnh các layout đã nhúng direction đó. Mở đúng
 một `### NEED APPROVALS` cho round này: layout hash được đề xuất là default, và `OK` duyệt đồng thời
-direction được nhúng với skeleton. Feedback có thể phản biện direction hoặc structure và mở round mới.
+direction được nhúng với skeleton. Feedback có thể phản biện direction hoặc structure và mở audit review tùy chọn.
 
-Queue hash trong registry. Khi replacement accepted, đánh dấu layout accepted cũ là `superseded` và đặt
-`supersededBy`. Feedback mở sealed round mới. Validate session bằng `@validate-artifact`. Đánh dấu một
-layout có bằng chứng làm default. `OK` accept hash đó ngay; không bắt owner nhận diện lại. Chỉ đóng sau
-khi mọi record và validation thuộc Layout đã hoàn tất.
+Khi `OK`, validate immutable object rồi cập nhật `layoutHeads[layoutId].head` thành `layoutHash` accepted
+(cùng danh sách region ID ổn định đã khai báo) trong design registry. Khi replacement accepted, giữ head cũ trong audit history
+với trạng thái superseded và trỏ sang replacement; không sửa object cũ. Session/review chỉ ghi lời owner,
+không phải lookup authority. Validate registry và artifact, đánh dấu layout có bằng chứng làm default, rồi
+chỉ đóng sau khi mọi write thuộc Layout hoàn tất.
 
 ## Điểm dừng
 
@@ -162,10 +169,13 @@ khi mọi record và validation thuộc Layout đã hoàn tất.
 - Chưa có direction recommendation dựa trên evidence → trả quyết định còn thiếu; chưa sinh layout.
 - Class cần dùng không nằm trong closed set của contract → đây là **contract change**, trả owner.
 - Hai candidate còn trùng axis set → chúng là một; sinh lại thay vì đưa ra lựa chọn giả.
+- `layoutId` ổn định thiếu, mơ hồ hoặc trỏ tới registry head malformed → dừng; không fallback về session hay prompt.
+- Hash proposed không phải registry head → dừng; chỉ approval checkpoint được advance accepted head.
 
 Không điểm dừng nào tự gọi skill khác. Nếu owner muốn phục hồi, đó là request riêng và lượt chạy riêng.
 
 ## ĐẦU RA
 
-Trình các direction, recommendation dựa trên evidence, layout candidate, layout hash mặc định và preview
-URL bằng văn xuôi ngắn. Chỉ dùng một `### NEED APPROVALS` cho quyết định kết hợp accept/feedback. Không in bảng.
+Trình `layoutId`, accepted head hiện tại/sau cập nhật, direction, recommendation dựa trên evidence, layout
+candidate, layout hash mặc định và preview URL bằng văn xuôi ngắn. Chỉ dùng một `### NEED APPROVALS` cho
+quyết định kết hợp accept/feedback. Không in bảng.

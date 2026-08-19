@@ -80,7 +80,8 @@ thể ngay từ đầu nó đã đúng.
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | sự chấp thuận, rồi source backend |
 
-Layout mở session. Execute vẫn từ chối ghi khi còn hash reachable chưa accepted. `OK` chỉ cấp quyền cho
+Layout resolve hoặc tạo stable `layoutId`. Execute vẫn từ chối ghi khi còn region dưới accepted head chưa
+có current accepted block. `OK` chỉ cấp quyền cho
 boundary đã hiển thị; không skill nào tự cho rằng capability khác đã được yêu cầu.
 
 ## Khóa ngữ cảnh
@@ -136,9 +137,10 @@ quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agen
 
 ## Bản ghi
 
-Không có report file riêng. Evidence bền nằm trong kho vốn sở hữu công việc: design run ở session dưới
-`<Source>/.worktrees/<project>/sessions/`, bind theo hash; repair ở commit và diff; lượt chỉ đọc không ghi
-file trừ khi được yêu cầu rõ.
+Không có report file riêng. Design authority bền nằm dưới
+`<Source>/.worktrees/<project>/registries`: stable layout/block IDs trỏ tới accepted hashes, immutable
+objects giữ candidate bodies, và `reviews/` tùy chọn giữ prompt, feedback, verdict. `sessions/` chỉ giữ
+progress dựng lại được; repair ở commit/diff; lượt chỉ đọc không ghi file trừ khi được yêu cầu rõ.
 
 Một boundary được duyệt gọi tên `Approved revision: <identity>` và trích đúng identity đó cùng baseline
 commit. Chính cặp đó chứng minh cái gì đã đổi sau khi được cấp quyền, và nó sống sót ở bất cứ nơi nào
@@ -157,7 +159,7 @@ thêm**.
 2. Mọi hành động `own` tiếp tục không hỏi; không được kết thúc khi `own > 0`.
 3. Chỉ hỏi `need approval` thật, với một default đang hiển thị.
 4. Chỉ `OK` consume approval đang hiển thị và resume ngay.
-5. Một session có một record append-only; hash accepted không sửa tại chỗ.
+5. Một stable layout/block ID có một accepted head; thay head thì append history, không sửa hashed object.
 6. Execute chỉ chạy khi mọi hash reachable đã accepted.
 7. Baseline lấy sau `OK` và trước production write đầu tiên.
 8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
@@ -170,15 +172,15 @@ thêm**.
 
 - **Năng lực chỉ đọc.** Nó không biến measurement thành repair; nó báo evidence và owner của repair
   request riêng.
-- **Session được tiếp tục.** Layout được phép **tiếp** thay vì **mở**. Session id và mọi hash đã chấp
-  nhận sống sót qua lần tiếp đó, không đổi.
+- **Design identity được tiếp tục.** Layout resolve head của `layoutId` hiện có. Review history có thể
+  tiếp tục, nhưng caller không cần review/session id để tìm current accepted state.
 
 ## Ví dụ đã giải
 
 **Lượt chạy.** "Thiết kế trang kết quả bài luyện coding."
 
 Lượt chạy nói: `Em đang thiết kế example-app trên route frontend đã verify; hành động này chỉ ghi design
-session.` Nó trình 3–4 layout có direction cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
+review và registry heads.` Nó trình 3–4 layout có direction cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
 và làm hết mọi mục `own` của Layout mà không hỏi lại. Block vẫn là capability request riêng.
 
 ## Phạm vi

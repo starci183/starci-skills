@@ -9,8 +9,10 @@ title: starci-fe-design-block · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | validate block anatomy JSON |
+| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric layout and block heads |
+| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | verify legacy projections and identity heads agree before block work |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest bound by the accepted layout |
-| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
+| `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | verify registry ownership and preview roots |
@@ -23,7 +25,9 @@ None. This skill never invokes another skill.
 
 ## Run
 
-Read `@skill-shape` first. This skill requires an existing hash-bound session; it never opens its own.
+Read `@skill-shape` first. This skill requires caller-supplied stable `layoutId` and `blockId`; it never
+opens a session or chooses an identity. The accepted layout and current block heads in the design registry
+are authoritative; session/review records are optional audit history only.
 
 **The JSON is the artifact. The HTML is a way of looking at it.** Approval binds to the canonical JSON
 hash, never to a rendered page.
@@ -32,19 +36,21 @@ hash, never to a rendered page.
 
 ### 1 — Establish the context lock
 
-`Phase` is `block`. `Touching` names the project registry only.
+`Phase` is `block`. `Touching` names the project registry only. The caller must provide `layoutId` and
+`blockId`.
 
-### 2 — Require an accepted layout and resolve its direction
+### 2 — Resolve the accepted layout head and declared block identity
 
-The accepted hash is read from the session record `@session` describes; a block round is appended to that
-same session, never to a new one.
+Run `@design-registry-migrate --check`, then read `@design-registry-schema` and
+`registries/design-registry-v2.json`; resolve `layoutHeads[layoutId].head` through immutable
+`objects.byHash`. The head is the accepted layout and the only lookup authority; a session or review cannot
+select a different layout. Require `blockId` to be an exact member of that accepted head's `regions` list.
+An arbitrary blockId, a proposed layout head, missing object or
+schema mismatch stops before any block design work.
 
-Read the session. A region may enter block rounds only if the layout candidate that contains it carries
-an **accepted** hash. Resolve the visual direction through that layout candidate; do not accept a second
-direction hash from the caller. A proposed layout is not a starting point.
-
-Stop if the layout hash is unaccepted. A later revision of one block reuses the same accepted layout
-hash — and therefore the same bound direction — and opens a new round for that region only.
+Resolve the visual direction through the accepted layout object; do not accept a second direction hash from
+the caller. A later revision of one block keeps the same stable `(layoutId, blockId)` identity and accepted
+parent `layoutHash`, while its new immutable anatomy receives a new `blockHash`.
 
 ### 3 — Verify route and roots
 
@@ -128,13 +134,12 @@ nothing binds, say so instead of serving nowhere quietly.
 
 ### 10 — Queue for approval and record the verdict
 
-Queue in `registries`, not `sessions`, and record the accepted parent `layoutHash` beside the independent
-block hash. On acceptance, mark the previous accepted block for that `(layoutHash, region)`
-`superseded` and point `supersededBy` at the replacement. On feedback, open a **new round**, append it,
-and record `REJECTED` with the actual anatomy, its replacement and the owner's words. Mark one
-evidence-backed candidate as the default for each region. `OK` accepts every displayed default and binds
-the hashes immediately; never ask the same approval twice. Validate the updated session with
-`@validate-artifact` and `@session` before closing.
+Queue candidate reviews in the registry's optional audit history, never in a session used for lookup. Record
+the stable `(layoutId, blockId)`, accepted parent `layoutHash` and independent `blockHash`. On `OK`, update
+the scoped `blockHeads[layoutId/blockId].head` and `blocks/by-id/<layoutId>/<blockId>.json`, retaining the previous
+block head as superseded immutable history. Feedback never changes a head. Mark one evidence-backed candidate
+as the default. `OK` accepts every displayed default and binds hashes immediately; never ask the same approval
+twice. Validate the design registry and artifact before closing.
 
 ### 11 — Close the phase
 
@@ -143,7 +148,8 @@ skill. Close only when `own = 0` or a genuine `NEED APPROVALS` item blocks a reg
 
 ## Stops
 
-- No accepted layout hash, or its bound direction cannot be resolved → stop; name the broken dependency.
+- No accepted layout head, or its bound direction cannot be resolved → stop; name the broken dependency.
+- `blockId` is not listed by `layoutHeads[layoutId].regions` → stop; do not create an orphan block head.
 - Direction vocabulary no longer matches the source state it was approved against → stop; mark the visual evidence stale.
 - A part cites a leaf or composite that does not exist → stop; the vocabulary is the authority.
 - A state cannot be determined from source → refusal, not a guess.
@@ -151,4 +157,5 @@ skill. Close only when `own = 0` or a genuine `NEED APPROVALS` item blocks a reg
 
 ## OUTPUT
 
-Follow the skill shape's prose output. No status tables.
+Follow the skill shape's prose output. Include `layoutId`, `blockId`, parent `layoutHash` and updated block
+head. No status tables.

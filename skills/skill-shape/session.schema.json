@@ -2,7 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/skills/skill-shape/session.schema.json",
   "title": "Design session",
-  "description": "The append-only record a design session keeps, stored inside the registry worktree at `<Source>/.worktrees/<project>/registries/decisions/<surface>.json`. Rounds are appended, never edited: an accepted round is evidence, and feedback opens the next round instead of rewriting the last. A candidate body is written once to `objects/sha256/<hash>.json` and referenced by hash from then on, so a round can cite a proposal without copying it — and two rounds proposing the same thing cite one object.",
+  "description": "Historical schema for legacy append-only design review records. It remains readable so old evidence validates, but it is not current-state authority: registry v2 resolves stable layoutId/blockId heads and immutable objects without a session.",
+  "deprecated": true,
   "type": "object",
   "additionalProperties": false,
   "required": [

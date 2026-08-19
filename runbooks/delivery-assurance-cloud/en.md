@@ -23,6 +23,7 @@ npm run lint:check
 npm run typecheck
 npm run build
 npm run test:ci
+npm run test:e2e
 npm run sonar:check
 ```
 
@@ -38,13 +39,15 @@ ends at "analysis uploaded" as unmeasured, never as ready.
 
 This order is mandatory for every assured frontend or backend:
 
-1. Local lint, typecheck, build and unit gates pass.
+1. Local lint finishes with zero errors/warnings; typecheck and build pass.
 2. Generate **exactly one** LCOV report. Two runs for two dashboards is drift, not stronger assurance.
-3. Run authenticated local Sonar analysis from the current checkout, against the local service.
-4. Wait for the quality gate — `sonar.qualitygate.wait=true` with a timeout of at least 600 seconds.
-5. Treat a red gate as a **source repair finding**, not a provider problem and not a CI problem.
-6. Repair the source and rescan until the gate is green.
-7. Only then trust or run provider CI.
+3. Prove statements/functions/lines >=80%, branches >=75% and new-code/patch >=90% for each metric.
+4. Run every declared E2E entrypoint; real non-skipped tests all pass and an empty lane is a failure.
+5. Run authenticated local Sonar analysis from the exact checkout, against the local service.
+6. Wait for the quality gate — `sonar.qualitygate.wait=true` with a timeout of at least 600 seconds.
+7. Query provider evidence and prove the strict profile below on the exact checkout SHA.
+8. Treat any failed condition as a **source repair finding**, not a provider or CI problem.
+9. Repair the source and rescan until the whole profile passes; only then trust provider CI.
 
 "Unmeasured" and "scan uploaded" are not ready. A red gate deferred to CI is a red gate hidden, not
 handled.
@@ -57,6 +60,19 @@ Two further constraints hold whenever analysis runs:
 - **Coverage readiness is four numbers, not one.** Statements, branches, functions and lines each carry
   the threshold independently. A single blended percentage hides the metric that is actually failing —
   in practice branch coverage is the one that lags, and the one an aggregate number conceals.
+
+## Strict Sonar profile
+
+The assigned gate is reconciled idempotently, then authenticated API proof requires Quality Gate `OK`,
+bugs, vulnerabilities and code smells equal to zero, security hotspots reviewed 100%, maintainability,
+reliability and security rating A, duplicated-lines density no more than 3% overall and on new code,
+native coverage at least 80% overall and 90% on new code, and latest analysis SHA equal to the checkout.
+Jest/Vitest enforces the four distinct coverage metrics. Codecov and Sonar consume the same LCOV and gate
+their native project/new coverage metrics only. Badges are visibility, not policy evidence.
+
+The project analysis token scans. Quality-gate reconciliation and hotspot proof may require a distinct
+admin/operator token. Both stay encrypted and enter only through process environment or stdin; neither is
+printed, passed as an argument or stored in plaintext.
 
 ```powershell
 $env:SOPS_AGE_KEY_FILE = "$HOME\.starci\master.identity"
@@ -95,7 +111,9 @@ node .claude/scripts/publish-secret.mjs --name CODECOV_TOKEN --stack ".::dev/run
 ```
 
 4. Keep `coverage/lcov.info`, `codecov/codecov-action@v5`, `fail_ci_if_error: true`, and blocking project/
-patch statuses in `codecov.yml`. A coverage target is raised by covering code, never by adding an
+patch statuses in `codecov.yml`: native project coverage 80% and patch coverage 90%. The local runner
+separately enforces statements/functions/lines 80%, branches 75% and new-code 90% for each metric.
+A coverage target is raised by covering code, never by adding an
 exclusion.
 
 ### SonarQube
@@ -144,6 +162,9 @@ expected GitHub Apps. Required checks must be observed first; do not invent a co
 
 A quality gate reported as `NONE` means the project has never been analysed. That is unmeasured, not
 clean, and it never supports a ready verdict.
+
+Verification also runs the Source quality and Sonar assurance machines; a green workflow or badge without
+exact-SHA metric proof remains incomplete.
 
 ## Stop or rollback
 

@@ -83,12 +83,15 @@ implementation choices available here.
 
 ### 6 — Prove it with the evidence the approval named
 
-Run `@rule-binding-check --be`, then the enumerated cases, not a cheaper substitute. Then the repository's real gates — lint, typecheck,
-build, tests — and the runtime proof the acceptance evidence named, such as a live query or a boot probe.
+Run `@rule-binding-check --be`, then the enumerated cases, not a cheaper substitute. Then every routed role's
+real gates in this order: format, lint, typecheck, build, unit coverage, E2E, Sonar. Lint must be 0 errors and
+0 warnings; unit S/L/F ≥80%, branches ≥75%, patch/new metrics ≥90%; E2E must use an existing declared
+entrypoint with real tests and all passing; Sonar is final. `skip`, `todo`, `passWithNoTests`, zero-test and
+check substitutes reject. Include the runtime proof the acceptance evidence named, such as a live query or boot probe.
 A gate that fails is repaired. For an unreachable gate, exhaust safe fallbacks; if owner authority is
 required, use `### NEED APPROVALS`, otherwise state the external blocker without claiming a pass.
 
-Do not run end-to-end suites unless the approval asked for them.
+Do not omit E2E or Sonar: they are mandatory parts of the backend delivery fence.
 
 ### 7 — Close the phase
 

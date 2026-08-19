@@ -74,12 +74,15 @@ triển khai hợp lệ.
 
 ### 6 — Chứng minh bằng đúng evidence đã duyệt
 
-Chạy `@rule-binding-check --be`, rồi các case đã liệt kê, không thay bằng phép thử rẻ hơn. Sau đó chạy gate thật của repository — lint,
-typecheck, build, tests — cùng runtime proof đã nêu như live query hoặc boot probe. Gate fail thì sửa.
+Chạy `@rule-binding-check --be`, rồi các case đã liệt kê, không thay bằng phép thử rẻ hơn. Sau đó chạy gate thật của
+mỗi routed role theo thứ tự: format, lint, typecheck, build, unit coverage, E2E, Sonar. Lint phải 0 error/0 warning;
+unit S/L/F ≥80%, branches ≥75%, patch/new metric ≥90%; E2E phải dùng entrypoint đã khai báo và tồn tại, test thật,
+mọi test pass; Sonar là gate cuối. `skip`, `todo`, `passWithNoTests`, zero-test và check substitute bị reject.
+Chạy cả runtime proof đã nêu như live query hoặc boot probe. Gate fail thì sửa.
 Gate không chạy được phải thử hết fallback an toàn; nếu cần quyền owner thì dùng `### NEED APPROVALS`,
 nếu không thì nói external blocker và không được báo pass.
 
-Không chạy end-to-end suite nếu approval không yêu cầu.
+Không được bỏ E2E hoặc Sonar: đây là phần bắt buộc của backend delivery fence.
 
 ### 7 — Đóng phase
 

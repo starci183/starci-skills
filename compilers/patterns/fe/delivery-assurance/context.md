@@ -23,9 +23,9 @@ non-empty `reason` is `not required`. Missing or invalid policy keeps the full p
 | Code | Situation | Required refusal |
 |---|---|---|
 | `ASSURANCE-FE-1` | A developer pushes | Husky pre-push runs check-only full lint and unit tests |
-| `ASSURANCE-FE-2` | A pull request changes | Lockfile install runs lint, typecheck, production build and unit coverage |
-| `ASSURANCE-FE-3` | Coverage exists | Exactly one unit run emits `coverage/lcov.info`; Codecov consumes it and project/patch statuses block |
-| `ASSURANCE-FE-4` | Quality analysis runs | A local authenticated scan of the current checkout consumes the same LCOV and waits for a green gate before CI; SonarQube CI repeats that blocking gate |
+| `ASSURANCE-FE-2` | A pull request changes | Lockfile install runs zero-warning lint, typecheck, production build, mature unit coverage and every declared E2E suite without skips or empty-lane success |
+| `ASSURANCE-FE-3` | Coverage exists | One unit run emits LCOV, clears statements/functions/lines 80%, branches 75% and every new-code/patch metric 90%; Codecov consumes it and blocking statuses hold |
+| `ASSURANCE-FE-4` | Quality analysis runs | An authenticated scan of the exact checkout consumes the same LCOV, proves the strict Sonar profile and waits for `OK`; CI repeats that gate |
 | `ASSURANCE-FE-5` | Providers need credentials | Encrypted Source-owner records and repository GitHub secrets exist; workflows use names only |
 | `ASSURANCE-FE-6` | A pull request merges | Required checks bind CI, Codecov and SonarQube to the protected branch |
 | `ASSURANCE-FE-7` | A deploy exists | Deploy depends on successful verification; no deploy is invented when absent |
@@ -44,11 +44,20 @@ Each frontend repository receives repository-scoped GitHub Secrets `CODECOV_TOKE
 frontend deliberately has no product stack; its fixed records are namespaced by frontend project so two
 repositories never overwrite custody. No value appears in source, chat, command arguments or output.
 
+## Blocking quality profile
+
+Every routed frontend has zero lint errors/warnings; statements/functions/lines >=80%, branches >=75% and
+new-code/patch >=90% for each metric from one unit LCOV; real non-skipped E2E tests all pass; and Sonar on
+the exact revision reports gate `OK`, bugs/vulnerabilities/code smells 0, hotspots reviewed 100%, three A
+ratings, duplicated-lines density ≤3% overall/new, native coverage >=80% overall and >=90% new. Sonar
+Codecov and Sonar consume the shared LCOV and prove only native project/new coverage; neither independently
+proves Jest/Vitest statements, functions or branches.
+
 ## Rules
 
-1. Hooks and CI call check-only commands and never fix source.
+1. Hooks and CI call check-only commands and never fix source; readiness requires zero lint warnings.
 2. Local pre-push stays at lint plus unit; typecheck and build stay in CI, while repair runs coverage and analysis locally before trusting CI.
-3. One successful unit coverage run produces the LCOV consumed by both providers.
+3. One successful mature-threshold unit coverage run produces the LCOV consumed by both providers.
 4. CI builds the production frontend before provider upload and scan.
 5. Repair runs local Sonar analysis with `sonar.qualitygate.wait=true`; a red gate is a source finding, not deferred to CI.
 6. README carries every required badge without a token.
@@ -60,3 +69,5 @@ repositories never overwrite custody. No value appears in source, chat, command 
 Run local lint, typecheck, build and unit gates; generate LCOV, run authenticated local Sonar analysis and
 wait for a green gate; prove the hook refuses a controlled failure; parse the CI graph; prove one LCOV path is consumed twice; verify encrypted record names, GitHub secret/variable names,
 all badge SVG endpoints, required checks and deploy dependency. Any unmeasured reached fact is incomplete.
+Record exact lint counts, four project/new-code coverage metrics, E2E suite/test counts and every exact-SHA
+strict Sonar condition; aggregate or badge-only evidence is incomplete.

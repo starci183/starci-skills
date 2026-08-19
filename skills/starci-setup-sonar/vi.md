@@ -1,44 +1,40 @@
----
-title: starci-setup-sonar
----
-
 # starci-setup-sonar
 
 ## LOADS
 
-| Alias | Đích | Loại | Lý do |
+| Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract approval và output dùng chung |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve backend sở hữu stack và project đích |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/vi.md` | vi | contract scanner, token, coverage và quality gate |
-| `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | reconcile tunnel và DNS mà không lộ value |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng phê duyệt và đầu ra dùng chung |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | xác định mọi vai trò Source đã route |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/vi.md` | vi | bằng chứng scanner, coverage và quality |
+| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/vi.md` | vi | bằng chứng frontend scanner, coverage và quality |
+| `@sonar-assurance` | `machines/sonar-assurance/vi.md` | vi | máy gate nghiêm ngặt và ranh giới secret |
+| `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | reconcile hostname tường minh, an toàn giá trị |
 
 ## NESTED SKILLS
 
-Không có.
+None.
 
-## Chạy
+## Run
 
-Đọc `@skill-shape`, `@workspaces` và `@assurance-be`. Resolve route đã xác minh sở hữu file của shared
-StarCi stack, nhưng chạy SonarQube, PostgreSQL, bootstrap cùng connector dưới Docker Compose project `starci`,
-không nằm trong product Compose group. Dùng command `compose:starci` và tái sử dụng service dùng chung;
-không tạo một SonarQube cho từng project. Mỗi project có `sonar.projectKey` riêng và CI `SONAR_TOKEN` riêng;
-coverage phải đến từ cùng measured unit run mà Codecov dùng.
+Xác minh mọi row route Source (`be`/backend, `fe`/frontend và console) rồi kiểm kê project. Dùng một Sonar service
+`compose:starci` dùng chung với project key riêng. Nạp assurance để analysis dùng unit run và coverage
+artifact đã đo. Plan chỉ local và không có giá trị nhạy cảm; chỉ execute tường minh mới reconcile
+provider hoặc công bố hostname.
 
-## DNS và credential
+## Authority and secrets
 
-Cloudflare control-plane toàn Source nằm tại `.workspace/credentials/` (số ít). Tái sử dụng
-`cloudflare-api-token.key.enc` và `cloudflare-<tunnel>-tunnel-token.key.enc` qua SOPS mà không in plaintext.
-SonarQube admin, database và scanner token do product sở hữu vẫn nằm trong encrypted stack record đã duyệt;
-Cloudflare credential không được chuyển vào CI secret của product repository.
-
-Hostname mặc định là `sonar.<zone>`. Dùng `@tunnel-set` để plan chính xác hostname, shared tunnel và SonarQube
-HTTP origin. Mutation tunnel/DNS bên ngoài cần plan `### NEED APPROVALS` đã hiển thị và `OK`. Reconcile phải
-merge route này mà không xóa MCP hoặc ingress khác.
+Scanner token theo project và khác authority admin/operator. Analysis token dùng `SONAR_TOKEN` hoặc stdin; Execute cần `SONAR_ADMIN_TOKEN`. Token không qua argument hay log; thiếu status, SHA hoặc metric bắt buộc là fail. Plan và test không gọi bên ngoài.
 
 ## Proof
 
-Chứng minh mọi container healthy, default admin password SonarQube đã được thay, public system status truy cập
-được, project key không trùng, scanner analysis được nhận, quality gate hoàn tất, encrypted credential record
-tồn tại và không plaintext credential nào bị track hoặc in. Dashboard chạy chưa đủ thành assurance của project;
-CI vẫn phải enforce scanner và kết quả quality gate.
+Chứng minh đủ route, analysis SHA chính xác, gate OK, required findings bằng không, rating A, hotspots
+đã xem 100%, duplicated density không quá 3, native coverage tối thiểu 80% tổng thể và 90% phần mới.
+
+## Stops
+
+- Dừng khi thiếu role, SHA thiếu hoặc lệch, required metric thiếu/lỗi, thiếu authority hoặc mở rộng phạm vi.
+
+## Output
+
+Báo cáo inventory, mode, bằng chứng, đường dẫn thay đổi và lệnh proof tập trung theo ngôn ngữ workspace.

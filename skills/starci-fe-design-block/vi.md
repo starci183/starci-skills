@@ -9,8 +9,10 @@ title: Frontend design block · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@block-schema` | `brainstorms/blocks/schema.json` | file | kiểm tra JSON mô tả anatomy của block |
+| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra layout head và block head identity-centric |
+| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | verify legacy projections và identity heads đồng ý trước block work |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token đã bind trong layout |
-| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng mà một design session được ghi ra |
+| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra registry và preview root |
@@ -22,7 +24,9 @@ Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 
-Đọc `@skill-shape` trước. Skill này chỉ làm việc trong session đã bind bằng hash; nó không tự mở session.
+Đọc `@skill-shape` trước. Skill nhận `layoutId` và `blockId` ổn định do caller cung cấp; không tự mở session
+hay chọn identity. Accepted layout và current block head trong design registry là authority; session/review chỉ
+là audit history tùy chọn.
 
 **JSON mới là artifact; HTML chỉ là cách quan sát.** Approval bind vào hash của canonical JSON, không bind
 vào trang render.
@@ -31,17 +35,18 @@ vào trang render.
 
 ### 1 — Lập context lock
 
-`Phase` là `block`. `Touching` chỉ gọi tên project registry.
+`Phase` là `block`. `Touching` chỉ gọi tên project registry. Caller bắt buộc cung cấp `layoutId` và `blockId`.
 
-### 2 — Yêu cầu layout accepted và resolve direction
+### 2 — Resolve layout head accepted và block identity đã khai báo
 
-Hash đã chấp nhận đọc từ bản ghi session mà `@session` mô tả; một round block được ghi thêm vào **chính**
-session đó, không mở session mới.
+Chạy `@design-registry-migrate --check`, rồi đọc `@design-registry-schema` và
+`registries/design-registry-v2.json`; resolve `layoutHeads[layoutId].head` qua `objects.byHash` immutable. Head là
+layout accepted và lookup authority duy nhất; session/review không được chọn layout khác. `blockId` phải là
+member chính xác trong danh sách `regions` của head accepted. BlockId tùy ý, layout head
+proposed, object thiếu hoặc schema mismatch đều phải dừng trước khi design block.
 
-Đọc session. Một region chỉ vào block round khi layout candidate chứa nó có hash **accepted**. Resolve
-direction qua layout đó, không nhận direction hash thứ hai. Proposed layout không phải điểm bắt đầu.
-
-Block revision dùng lại accepted `layoutHash` và mở round mới cho riêng region.
+Resolve direction qua layout object accepted, không nhận direction hash thứ hai từ caller. Revision block giữ
+identity `(layoutId, blockId)` và parent `layoutHash` accepted; anatomy mới nhận `blockHash` immutable mới.
 
 ### 3 — Kiểm tra route và các root
 
@@ -120,10 +125,11 @@ phải product class. Mọi anatomy dùng cùng direction, copy và data; chỉ 
 
 ### 10 — Đưa vào hàng phê duyệt và ghi verdict
 
-Queue nằm trong registry và ghi parent `layoutHash` cạnh block hash độc lập. Khi replacement accepted,
-đánh dấu block cũ của cùng `(layoutHash, region)` là `superseded` và đặt `supersededBy`. Feedback mở round
-mới. Đánh dấu một candidate có bằng chứng làm default cho mỗi region. `OK` accept mọi default đã hiển thị
-và bind hash ngay; không hỏi lại cùng approval. Validate session bằng `@validate-artifact` và `@session`.
+Queue candidate review trong audit history tùy chọn của registry, không dùng session làm lookup. Ghi
+`(layoutId, blockId)`, parent `layoutHash` accepted và `blockHash` độc lập. Khi `OK`, cập nhật
+`blockHeads[layoutId/blockId].head` và region head tương ứng, giữ block head cũ làm immutable history
+superseded. Feedback không đổi head. Đánh dấu candidate có bằng chứng làm default; `OK` bind hash ngay,
+không hỏi lại approval. Validate design registry và artifact trước khi đóng.
 
 ### 11 — Đóng phase
 
@@ -132,7 +138,8 @@ khi `own = 0` hoặc một mục `NEED APPROVALS` thật đang chặn region.
 
 ## Điểm dừng
 
-- Không có accepted layout hoặc không resolve được direction → dừng.
+- Không có accepted layout head hoặc không resolve được direction → dừng.
+- `blockId` không được liệt kê trong `layoutHeads[layoutId].regions` → dừng; không tạo block head mồ côi.
 - Digest vocabulary không còn khớp → dừng vì visual evidence stale.
 - Part viện dẫn leaf/composite không tồn tại → dừng; vocabulary là thẩm quyền.
 - Không xác định được state từ source → refusal, không đoán.
@@ -140,4 +147,4 @@ khi `own = 0` hoặc một mục `NEED APPROVALS` thật đang chặn region.
 
 ## ĐẦU RA
 
-Theo output văn xuôi của skill shape. Không in bảng trạng thái.
+Theo output văn xuôi của skill shape; nêu `layoutId`, `blockId`, parent `layoutHash` và block head mới. Không in bảng trạng thái.

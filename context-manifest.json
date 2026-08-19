@@ -112,7 +112,7 @@
     "compilers/patterns/be/delivery-assurance/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/delivery-assurance/en.md",
-      "sourceHash": "b790c153072dd71b2b06206bb58fe32aa478444b38c308ca3c15a899e0c3a490",
+      "sourceHash": "f63cf288418ce9b6b19cb006d42cdb04a875c1d315dacbb4f3ec02c65e97610d",
       "contextVersion": 1
     },
     "compilers/patterns/be/domain-modeling/context.md": {
@@ -258,7 +258,7 @@
     "compilers/patterns/fe/delivery-assurance/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/delivery-assurance/en.md",
-      "sourceHash": "2676522080e1ded2f027fda87f8a9c30ef7823d70dc244ac1eec42dabc2feb65",
+      "sourceHash": "bb303a7e60bac90ea54393ee44c296aad4354b162dc3f368d300ce503f5b13c5",
       "contextVersion": 1
     },
     "compilers/patterns/fe/file-layout/context.md": {
@@ -458,7 +458,7 @@
     "contexts/worktrees/context.md": {
       "kind": "module",
       "source": "contexts/worktrees/en.md",
-      "sourceHash": "35c8c47d0da221d311e06b4951c2850d21bc9a9dea75f37d58d2f43a1098b7ac",
+      "sourceHash": "af16ef749e7d5385df7e2cd67e55565a1f6dbd91de8508a9771b207804039820",
       "contextVersion": 1
     },
     "deployment/context.md": {
@@ -689,6 +689,12 @@
       "kind": "router",
       "contextVersion": 1
     },
+    "machines/sonar-assurance/context.md": {
+      "kind": "module",
+      "source": "machines/sonar-assurance/en.md",
+      "sourceHash": "170fd0f7a3dddd159cb36b1e538d4cd2aab4d3f5d1ceaa39794cde2cf8252df8",
+      "contextVersion": 1
+    },
     "machines/suppression/context.md": {
       "kind": "router",
       "contextVersion": 1
@@ -768,13 +774,13 @@
     "readiness/staleness/assurance/context.md": {
       "kind": "module",
       "source": "readiness/staleness/assurance/en.md",
-      "sourceHash": "f3cb99b9b3f5501c75216c4eba2948e91722be485270bd87c9b0560e10b3ff25",
+      "sourceHash": "18ccae62e6a655a87b40f3f8e7772b0fffe4c58131fc74e5b54f24afcc1a50a0",
       "contextVersion": 1
     },
     "readiness/staleness/context.md": {
       "kind": "module",
       "source": "readiness/staleness/en.md",
-      "sourceHash": "4ea76668261141444b56ea6bc61d570cc34ae520a8da43fc6510693062028aad",
+      "sourceHash": "dc9dd441472b84963d58ee380ac59788fffaa16e7e9c0310092ec9960abed7cf",
       "contextVersion": 1
     },
     "readiness/staleness/lint-machine/context.md": {
@@ -804,7 +810,7 @@
     "readiness/staleness/source-gates/context.md": {
       "kind": "module",
       "source": "readiness/staleness/source-gates/en.md",
-      "sourceHash": "0f0ab50c4c708bdadc02e80f9d1e495dd19c6d7e42c096e7d55118c7048624d6",
+      "sourceHash": "572e7e33e63be6563d97f5c42252f8bfe65bc85ca58dcddbd32818947f1e1c06",
       "contextVersion": 1
     },
     "readiness/staleness/strict-fix/context.md": {
@@ -828,7 +834,7 @@
     "runbooks/delivery-assurance-cloud/context.md": {
       "kind": "module",
       "source": "runbooks/delivery-assurance-cloud/en.md",
-      "sourceHash": "393f5059e49f1c102075ff8a0e1b5cdf0b8410f86dfb7a1f5be3afcf128d4b71",
+      "sourceHash": "326c570e176ac1b6061d945c87789d350bd134c6509e6cde6125746d2e39a732",
       "contextVersion": 1
     },
     "runbooks/external-integrations/context.md": {
@@ -868,7 +874,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "20acd97fe333b0a5775921757ce41954fd50f7c1bd9e983053674a744c1a267f",
+      "sourceHash": "70fafd9e5045c956f609b4a8a317e65a946d958545b50a214316b798753de9e2",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

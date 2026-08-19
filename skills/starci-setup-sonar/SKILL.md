@@ -1,6 +1,6 @@
 ---
 name: starci-setup-sonar
-description: Set up the shared Docker SonarQube service for routed StarCi projects and publish its Sonar hostname through the shared Cloudflare control plane. Use for first-machine SonarQube setup, recovery, public DNS, or onboarding another project to the shared scanner.
+description: Set up the shared SonarQube service and reconcile strict quality gates for every routed backend, frontend and console Source role.
 ---
 
 # starci-setup-sonar
@@ -10,9 +10,11 @@ description: Set up the shared Docker SonarQube service for routed StarCi projec
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and output contract |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve the backend owner and target projects |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | scanner, token, coverage and quality-gate contract |
-| `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | value-safe tunnel and DNS reconciliation |
+| `@workspaces` | `contexts/workspaces/context.md` | context | resolve every routed Source role |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | scanner, coverage and quality evidence |
+| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/context.md` | context | frontend scanner, coverage and quality evidence |
+| `@sonar-assurance` | `machines/sonar-assurance/context.md` | context | strict gate and secret-boundary machine |
+| `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | explicit value-safe hostname reconciliation |
 
 ## NESTED SKILLS
 
@@ -20,26 +22,32 @@ None.
 
 ## Run
 
-Read `@skill-shape`, `@workspaces` and `@assurance-be`. Resolve the verified route that owns the shared StarCi stack files, but run SonarQube, PostgreSQL, bootstrap
-and connector under the separate Docker Compose project `starci`, never under a product Compose group. Use
-the declared `compose:starci` command and reuse the existing shared service; do not create one SonarQube per
-project. Onboard projects with distinct `sonar.projectKey` values and their own CI `SONAR_TOKEN`; coverage
-must come from the same measured unit run used by Codecov.
+Resolve and verify every Source row (`be`/backend, `fe`/frontend and console), then inventory projects. Use the
+declared shared `compose:starci` stack and distinct Sonar project keys. Load backend and frontend
+delivery assurance so scanner analysis uses the same measured unit run and coverage artifact.
 
-## DNS and credentials
+Plan is local and value-free. Provider reconciliation, project onboarding, quality-gate mutation and
+public hostname changes require explicit execute authority; execute only the displayed boundary. Never
+create a per-project Sonar service.
 
-The Source-wide Cloudflare control plane lives at `.workspace/credentials/` (singular). Reuse
-`cloudflare-api-token.key.enc` and `cloudflare-<tunnel>-tunnel-token.key.enc` through SOPS without printing
-plaintext. Product-owned SonarQube admin, database and scanner tokens remain in their approved encrypted stack
-records; Cloudflare credentials never move into a product repository's CI secrets.
+## Authority and secrets
 
-Default public naming is `sonar.<zone>`. Plan the exact hostname, shared tunnel and SonarQube HTTP origin with
-`@tunnel-set`. External tunnel/DNS mutation requires the displayed `### NEED APPROVALS` plan and `OK`.
-Reconciliation merges this route without deleting MCP or other ingress entries.
+Scanner tokens are project-scoped and are not admin credentials. Read analysis tokens only from `SONAR_TOKEN` or stdin; execute authority comes only from `SONAR_ADMIN_TOKEN`. Reject token/password/secret arguments and never print values. Admin/operator authority is needed
+for execute-mode API reconciliation. Tests and plan mode make no external calls.
 
 ## Proof
 
-Prove all containers healthy, the default SonarQube admin password replaced, public system status reachable,
-project key unique, scanner analysis accepted, quality gate completed, encrypted credential records present,
-and no plaintext credential tracked or printed. A running dashboard alone is not project assurance; CI must
-still enforce the scanner and quality-gate result.
+Prove all routed roles, exact analysis SHA and present gate OK, zero bugs/vulnerabilities/code smells overall and
+new, A ratings, 100% reviewed hotspots, duplicated density at most 3, and native
+coverage at least 80% overall and 90% new.
+
+## Stops
+
+- Stop when any backend, frontend or console route is missing.
+- Stop when analysis SHA is absent or does not match the requested SHA.
+- Stop when a strict required measure is missing/fails, authority is missing, or execution exceeds the boundary.
+
+## Output
+
+Report route inventory, plan or explicit execution mode, structured gate evidence, changed paths and
+focused proof commands in the workspace language.

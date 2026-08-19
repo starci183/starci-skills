@@ -15,7 +15,7 @@ title: Delivery assurance
 
 Backend and frontend assurance are required by default. Only tracked
 `starci.deliveryAssurance.required: false` with a non-empty `reason` yields `not required`. Missing policy,
-`required: true`, or false without a reason keeps assurance required. For a required backend, any missing
+`required: true`, or false without a reason keeps assurance required. For any required routed role, any missing
 or non-blocking reached `ASSURANCE-*` fact is stale; partial adoption is not a smaller profile.
 
 ## Required README badges
@@ -79,19 +79,17 @@ quality gate. Three facts decide whether that happened:
   quality gate reported as `NONE` means the project was never analysed — unmeasured, not clean.
 - **A red gate is a source finding.** It is repaired in source and rescanned until green; deferring it to
   CI hides it rather than handling it.
-- **Coverage is measured, and whether it gates is the owner's call.** When it does gate, it gates as
-  four independent numbers — statements, branches, functions and lines each carrying the threshold on
-  their own, because one blended percentage conceals the metric that is actually failing, which in
-  practice is branches. When the owner rules it does not gate, the measurement still runs: the report
-  is produced, uploaded and badged, and only its power to refuse a merge is withdrawn.
+- **Coverage is always blocking and four-dimensional.** One successful unit run must prove statements,
+  functions and lines at least 80%, branches at least 75%, and new-code/patch at least 90% for each metric.
+  A blended percentage, informational status or provider badge cannot replace any one of those facts.
+  The same run emits the single LCOV consumed by Codecov and Sonar; providers gate native project/new
+  coverage while the runner owns all four distinct metrics. Every declared E2E lane must also
+  discover real, non-skipped tests and pass; an empty or cheaper substitute is stale.
 
-  That ruling is recorded, and it is recorded as a decision rather than as a threshold nobody notices
-  drifting. It also lands in every place the gate lives at once — the analysis quality gate and the
-  coverage provider both — because leaving one blocking while the other stops does not lighten the bar,
-  it moves the gate to a second dashboard and makes the stated policy false.
-
-  A coverage number that stops gating is not the same as one that stops being true. `unmeasured` remains
-  `unmeasured`; an ungated project still reports what it actually covers.
+- **A green Sonar badge is not the strict profile.** The exact checkout analysis must return gate `OK`,
+  bugs/vulnerabilities/code smells 0, hotspots reviewed 100%, all three ratings A, duplicated-lines
+  density ≤3% overall/new, native coverage >=80% overall and >=90% new. Missing API authority leaves
+  these values `unmeasured external`; it never turns them clean.
 
 **A framework's required emit may carry its own branch threshold.** Where a dependency-injection
 framework compels metadata the runtime needs, the compiler emits guards no test can reach — under
@@ -102,7 +100,7 @@ Statements, functions and lines are unaffected; only branches are polluted, and 
 
 That permits exactly one accommodation, and it is narrow:
 
-- the branch threshold is set **once, project-wide, at the analysis layer**, where the artifact is
+- the 75% branch threshold is set **once, project-wide, at the analysis layer**, where the artifact is
   diluted across the whole source surface and a real shortfall still fails;
 - it is **never** a per-file ignore, an `istanbul ignore`, a coverage-path exclusion, or a relaxed
   statement/function/line bar;
@@ -123,7 +121,8 @@ proven first.
 ## Proof
 
 Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, a current-checkout
-local Sonar analysis whose waited quality gate is green after any source repair, encrypted filenames
+local Sonar analysis whose waited quality gate is `OK` after any source repair, and authenticated exact-SHA
+API evidence for every condition in the blocking quality profile, encrypted filenames
 without plaintext twins, every required badge image endpoint returns an image without a credential in the URL,
 external secret names and required checks through APIs, and deploy dependency. Unmeasured external
 enforcement or an unmeasured badge endpoint leaves the module incomplete.

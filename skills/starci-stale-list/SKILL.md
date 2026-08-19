@@ -13,6 +13,7 @@ description: Read the shared stale registry, inventory every routed workspace ro
 | `@staleness` | `readiness/staleness/context.md` | context | the one taxonomy and router shared with repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | deterministic read-only workspace measurement |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | deterministic Source allocation and collision measurement |
+| `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic routed lint, coverage, E2E and strict Sonar measurement |
 
 ## NESTED SKILLS
 
@@ -54,10 +55,13 @@ explicitly where silence would imply an omitted scan.
 
 ### 4 — Measure local readiness gates
 
-For the source-gates module, execute every declared check-only format/lint/typecheck/build/unit entrypoint in
-registry order. Record exact command and exit status. Generated ignored state is allowed; tracked source
-changes stop the report. A missing prerequisite is `unmeasured`, and no project with an unmeasured or failed
-declared gate may be called ready.
+For the source-gates module, execute every declared entrypoint for every routed role in this order: format,
+lint, typecheck, build, unit coverage, E2E, Sonar. Record exact command and exit status, lint 0/0, coverage
+metrics, E2E entrypoint/test/pass counts and Sonar verdict. Generated ignored state is allowed; tracked source
+changes stop the report. Unit must be S/L/F ≥80%, branches ≥75%, patch/new metrics ≥90%; E2E must have real
+tests and all passing. Missing prerequisites or any unmeasured/failed gate means the project is not ready.
+Use `node @source-quality`; its non-zero exit is the ordered source-fence verdict, not permission to
+reimplement, skip or downgrade a failed fact.
 
 ### 5 — Keep external assurance honest
 

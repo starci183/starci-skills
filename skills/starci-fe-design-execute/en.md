@@ -11,10 +11,13 @@ title: starci-fe-design-execute · English
 | `@lints-fe` | `gates/fe/lints` | module | prove the frontend source at its real gate |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest approved inside each layout |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve files, exports and import boundaries |
-| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
+| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric heads and immutable object references |
+| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | require registry v2 projections to be current before source execution |
+| `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the session graph before production work |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
+| `@worktrees` | `contexts/worktrees/en.md` | en | resolve and verify the registry worktree |
 
 ## NESTED SKILLS
 
@@ -25,6 +28,7 @@ None. This skill never invokes another skill.
 
 Read `@skill-shape` first. This is the only frontend skill that writes
 product source, and it is the one that must be hardest to start.
+The caller supplies stable `layoutId`; the design registry is the sole implementation lookup authority.
 
 ## PROCESS
 
@@ -33,22 +37,23 @@ product source, and it is the one that must be hardest to start.
 `Phase` is `execute`. `Touching` names the exact frontend paths this run may write, and it is confirmed
 with the owner before the first write. Detection is not permission.
 
-### 2 — Refuse unless every reachable hash is accepted
+### 2 — Refuse unless the layout head and every current region block head are accepted
 
-Validate the session with `@validate-artifact` and `@session`. Reachable means the one queue entry whose
-layout state is currently `accepted`, plus block entries whose `layoutHash` equals it. Historical
-`rejected` and `superseded` entries remain evidence but are not implementation inputs. For each reachable
-region, exactly one block may be current; an entry still `queued` is unanswered and refuses.
+Run `@design-registry-migrate --check`. Read `@design-registry-schema` and validate
+`registries/design-registry-v2.json`. Resolve the caller's `layoutId` through
+`layoutHeads[layoutId].head`, then resolve that immutable layout object through `objects.byHash`. The head
+is the accepted layout; do not inspect a session or review to choose another hash. Enumerate every declared
+blockId in `layoutHeads[layoutId].regions`, resolve `blockHeads[layoutId/blockId]` for each, and require its
+`layoutHash` to equal the current layout hash and its `head` object to exist. This traversal is the complete
+implementation input: historical reviews are optional audit history, never authority.
 
-If any is unaccepted, **stop and name it**. There is no orchestrator to have checked this earlier, and
-nothing else in the tree makes a proposed hash acceptable. A partial start is the failure mode this
-skill exists to prevent: it produces code nobody approved, in the one place the tree cannot undo it
-cheaply.
+If the layout head or any region block head is missing, malformed, proposed, or unaccepted, **stop and name
+it**. A partial start would produce code nobody approved, in the one place the tree cannot undo cheaply.
 
 ### 3 — Verify the route, then take the baseline
 
 Read `@workspaces` and verify the `fe` route (`WORKSPACE-5`). Run `@inventory-visual-language`; its digest
-must equal every reachable `direction.vocabularyAt`. Only then commit the current target state and record
+must equal every current layout direction's `vocabularyAt`. Only then commit the current target state and record
 `Baseline commit: <sha>` — taken **before** the first change, never from a half-edited tree, so
 `git diff <baseline>` is the honest account of what this run did.
 
@@ -100,7 +105,7 @@ returns to its owner instead of arriving quietly.
 
 ## Stops
 
-- Any reachable hash unaccepted → stop, name it.
+- Any layout or current region block head missing, proposed or unaccepted → stop, name its stable identity and hash.
 - An accepted layout's direction references a missing reused token → stop; the visual evidence is stale.
 - Accepted layouts assign one shared role incompatibly in the same implementation scope → stop; return the product decision.
 - A required class is outside the contract's closed union → contract change, return to owner.
@@ -111,5 +116,5 @@ returns to its owner instead of arriving quietly.
 
 ## OUTPUT
 
-State the applied revision, material paths and proof in concise prose. A proof that can run is `own` and
+State the `layoutId`, applied revision, material paths and proof in concise prose. A proof that can run is `own` and
 must run before the turn ends; only a genuine authority decision may appear under `### NEED APPROVALS`.

@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Open or resume a hash-bound frontend design session, evidence-select one recommended visual direction, then present 3–4 structural layouts under one combined approval. Use for a new page, layout, overlay or redesign. Writes design records, never frontend source or block internals.
+description: Design or revise the immutable candidate behind a stable layoutId, evidence-select one recommended visual direction, and present 3–4 structural layouts under one combined approval. The accepted layout head in the design registry is authoritative; sessions are optional audit history. Writes design records, never frontend source or block internals.
 ---
 
 # starci-fe-design-layout
@@ -17,7 +17,9 @@ description: Open or resume a hash-bound frontend design session, evidence-selec
 | `@contract-search` | `scripts/contract-search.mjs` | script | Queries contract reasons without exposing class arrays. |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | Produces the live token inventory used by direction candidates. |
 | `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
-| `@session` | `skills/skill-shape/session.schema.json` | file | the shape a design session is written in |
+| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate the identity-centric registry and its current heads |
+| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps non-destructively and verify identity heads are current |
+| `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 
 ## NESTED SKILLS
@@ -30,6 +32,11 @@ Read `@skill-shape` first. This skill owns the page skeleton. Direction supports
 no approval hash or approval checkpoint of its own. The recommended direction is embedded into each layout candidate, so one
 `layoutHash` binds visual intent and skeleton together.
 
+The caller supplies a stable `layoutId`. `registries/design-registry-v2.json` is the authority: its
+`layoutHeads[layoutId].head` points to the accepted immutable layout object. A session or review record
+may explain how a head was reached, but it is optional audit history and is never used to discover the
+current layout.
+
 **JSON is the artifact. HTML is a way of looking at it.** Approval binds to canonical layout JSON,
 never to a rendered page.
 
@@ -37,7 +44,7 @@ never to a rendered page.
 
 ### 1 — Establish the context lock
 
-Resolve `Phase: layout`; `Touching` names the project registry, session and disposable cache, and no
+Resolve `Phase: layout`; `Touching` names the project registry, optional audit record and disposable cache, and no
 frontend source path. Tell the user that location in one friendly sentence; do not print a context table.
 
 ### 2 — Resolve and verify the workspace route
@@ -53,17 +60,19 @@ registry; generated previews stay in cache. Before a registry write, verify that
 and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache/preview`
 (`WORKTREE-2`) and never a path below `.claude` (`WORKTREE-3`).
 
-### 4 — Resume or open the session
+### 4 — Resolve the stable layout identity and current head
 
-The record is written in the shape `@session` declares, at `registries/decisions/<surface>.json`. It carries
-a chain, so appending a round seals it: a round edited in place stops matching, which an array of rounds on
-its own can never notice.
+Run `@design-registry-migrate --check`, then read `@design-registry-schema` and
+`registries/design-registry-v2.json`. Require the caller's stable `layoutId`; do not derive
+it from the prompt, a surface label or a session id. Resolve `layoutHeads[layoutId]`, then resolve its
+`head` through the immutable `objects.byHash` map when one exists. The head is the accepted layout and the
+only current lookup result. A missing identity or schema mismatch stops; an absent head is a new identity,
+not permission to treat a proposed candidate as accepted.
 
-**Session identity is the surface**, not the prompt. Two differently worded requests for the same page
-are the same session; a reworded prompt is a new round, not a new session. Print which happened —
-`resumed <id>` or `opened <id>` — and keep every accepted hash across a resume.
-New sessions use session schema 2. A resumed schema-1 session keeps its historical rounds unchanged;
-new rounds still use the combined recommendation fields.
+If the layout has no accepted head yet, establish the stable identity and continue only under the registry
+schema's allowed creation path; never invent a head from a proposed candidate. A prior session or review
+may be read for context and appended as audit history, but it cannot select, replace or resurrect a head.
+Keep every accepted hash in immutable objects and update the head only at the approval checkpoint.
 
 ### 5 — Generate the direction choices
 
@@ -143,12 +152,13 @@ npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 Show the direction alternatives and why one is recommended together with the direction-backed layout
 candidates. Open exactly one `### NEED APPROVALS` for this round: the recommended layout hash is the
 default, and `OK` approves both its embedded direction and its skeleton. Feedback may challenge either
-the direction or the structure and opens a new layout round; an accepted candidate is never edited.
-When a replacement layout is accepted, mark the previous accepted layout
-`superseded` and point `supersededBy` at the replacement. Validate the updated session with
-`@validate-artifact`; append feedback as a new sealed round and record the owner's words. Mark one
-evidence-backed layout as the default. `OK` accepts that hash immediately; do not ask the owner to identify
-it again. Close only after every Layout-owned record and validation step is complete.
+the direction or the structure and opens an optional audit review; an accepted candidate is never edited.
+On `OK`, validate the immutable object and update `layoutHeads[layoutId].head` in
+`design-registry-v2.json` (plus the deterministic `layouts/by-id/<layoutId>.json` projection) to the accepted `layoutHash`
+(and its declared stable region ID list) in the design registry. When a replacement layout is accepted, retain the
+previous head as superseded audit history and point to the replacement; never edit the old object. Sessions
+and reviews may record the owner's words, but are not lookup authority. Validate the registry and artifact,
+mark one evidence-backed layout as the default, and close only after every Layout-owned write is complete.
 
 ## Stops
 
@@ -158,12 +168,14 @@ it again. Close only after every Layout-owned record and validation step is comp
 - No evidence-backed direction recommendation → return the missing decision; do not generate layouts.
 - A required class is outside the contract's closed set → return the contract change to the owner.
 - Duplicate layout axis sets remain → regenerate rather than ship a fake choice.
+- The stable `layoutId` is absent, ambiguous or resolves to a malformed registry head → stop; do not fall back to a session or prompt.
+- A proposed hash is not the registry head → stop; only the approval checkpoint may advance the accepted head.
 
 No stop invokes another skill. If the owner wants recovery, that is a separate request and a separate
 run.
 
 ## OUTPUT
 
-Present the direction alternatives, evidence-backed recommendation, layout candidates, recommended
-layout hash and preview URL in concise prose. Use one `### NEED APPROVALS` for the combined
-accept-or-feedback decision. No status tables.
+Present the `layoutId`, current/updated accepted head, direction alternatives, evidence-backed
+recommendation, layout candidates, recommended layout hash and preview URL in concise prose. Use one
+`### NEED APPROVALS` for the combined accept-or-feedback decision. No status tables.

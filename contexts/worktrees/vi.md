@@ -41,6 +41,7 @@ rác, và một cây luật có mảnh vụn của session trong đó thì thôi
 | `WORKTREE-4` | Registry worktree thuộc một Git common directory khác | từ chối; đó không phải state của Source này |
 | `WORKTREE-5` | Nhiều agent song song sắp ghi | chỉ cô lập khi hai agent sửa cùng một file |
 | `WORKTREE-6` | Một worktree đã cũ, prunable, hoặc chắn đường | prune có chủ đích; không bao giờ xoá thư mục bằng tay |
+| `WORKTREE-7` | Một design identity cần accepted version bền vững | head record `layoutId`/`blockId` ổn định trong `registries`; body bất biến ở `objects/sha256` |
 
 ## Đọc một lượt chạy
 
@@ -54,6 +55,8 @@ rác, và một cây luật có mảnh vụn của session trong đó thì thôi
    không cần worktree nào cả — `WORKTREE-5`.
 5. **Để repository đích yên.** Giấy tờ nội bộ của một lượt chạy không bao giờ rơi vào repository đang được
    làm; bản ghi sản phẩm bền thuộc về repository đó qua đường rà soát của chính nó, không qua state này.
+6. **Tách identity khỏi review history.** Layout/block ID resolve accepted head trực tiếp từ `registries`;
+   `reviews` giữ decision, còn `sessions` chỉ giữ progress dựng lại được — `WORKTREE-7`.
 
 ## `WORKTREE-1` — state phải sống sót
 
@@ -176,6 +179,32 @@ còn lại. Agent buộc phải dùng chung một worktree thì chạy **lần l
 không còn ở đó, và lượt chạy sau thừa hưởng một lỗi không ai gây ra. Git phá huỷ thì **không bao giờ** chạy
 từ một background agent, nơi không ai đang nhìn xem nó đứng trên nhánh nào.
 
+## `WORKTREE-7` — design identity ổn định; version được hash
+
+**Khi nào gặp.** Một layout hoặc block phải tìm lại được sau khi review run tạo ra nó đã kết thúc.
+
+**Cách nhận ra**
+
+- Route/surface có một semantic `layoutId` ổn định, không phụ thuộc locale, runtime parameter hay prompt.
+- Region có một `blockId` ổn định, scope dưới `layoutId`.
+- Candidate body đã sống dưới immutable SHA-256 objects.
+
+**Tự hỏi.** Executor có resolve current accepted design chỉ từ `layoutId`, không cần biết session id hoặc
+scan review history không?
+
+**Ranh giới**
+
+- `WORKTREE-1`: accepted heads và immutable objects là durable registry state.
+- `WORKTREE-2`: prompt dở, preview và candidate batch chưa xong là rebuildable progress.
+
+**Nó phát ra.** `layouts/by-id/<layoutId>.json` giữ route pattern, accepted layout head và regions đã khai.
+`blocks/by-id/<layoutId>/<blockId>.json` giữ accepted block head cùng exact parent `layoutHash` mà block
+được design dưới đó. `reviews/` có thể cite candidate, feedback và accepted hash, nhưng reader không cần
+review id để tìm current state. Thay head thì append history; không bao giờ sửa object.
+
+**Nó hỏng bằng đường nào.** Skill tìm `decisions/<session>.json`, khiến block hợp lệ thành unreachable khi
+caller không biết review cũ nào tình cờ chứa nó. Session history âm thầm thành current-state database thứ hai.
+
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
@@ -199,6 +228,9 @@ từ một background agent, nơi không ai đang nhìn xem nó đứng trên nh
 7. Giấy tờ nội bộ của một lượt chạy không bao giờ ghi vào repository đích.
 8. Worktree cũ được prune qua Git, không bao giờ bằng cách xoá thư mục, và không bao giờ từ một background
    agent.
+9. Design identity là `layoutId` hoặc `(layoutId, blockId)`; content hash là version, không phải identity.
+10. Accepted head resolve không cần session. Review là append-only evidence; session là progress tùy chọn.
+11. Block head phải nêu parent `layoutHash`; block accept dưới layout cũ là stale, không phải current.
 
 ## Ngoại lệ
 
@@ -219,7 +251,7 @@ durability: <durable | rebuildable>
 path: <.worktrees/<project>/registries | sessions | cache>
 isolation: <required | not required>
 ownership: <đã khoá, sạch, nhánh, git dir sở hữu>
-situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6>
+situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7>
 reason: <sự thật đã quyết định chỗ đặt>
 ```
 

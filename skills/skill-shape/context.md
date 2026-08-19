@@ -74,7 +74,8 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-be-plan` | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approval, then backend source |
 
-Layout opens the session. Execute still refuses to write while any reachable hash is unaccepted. `OK`
+Layout resolves or creates a stable `layoutId`. Execute still refuses to write while any region under its
+accepted head lacks a current accepted block. `OK`
 authorizes the displayed boundary only; no skill assumes another capability was requested.
 
 ## Context lock
@@ -104,7 +105,7 @@ scope. Silence and every word other than `OK` are not approval signals.
 
 ## Decisions and execution
 
-**Design rounds** are the review surface. Direction choices support a layout round and have no approval
+**Design rounds** are optional review evidence. Direction choices support a layout review and have no approval
 hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in
 that layout round's `directionReview`, and the recommended object is embedded in every layout candidate.
 The owner sees both decisions together; one `OK` accepts the recommended layout hash and therefore its
@@ -132,9 +133,11 @@ it, the recommended/default answer and the exact scope `OK` authorises.
 
 ## The record
 
-There is no separate report file. Durable evidence stays in the store that owns the work: a design run in
-its session under `<Source>/.worktrees/<project>/sessions/`, hash-bound; a repair in its own commits and
-diffs; a read-only run in no file unless explicitly requested.
+There is no separate report file. Durable design authority lives under
+`<Source>/.worktrees/<project>/registries`: stable layout/block IDs point to accepted hashes, immutable
+objects hold candidate bodies, and optional `reviews/` preserve prompts, feedback and verdicts. `sessions/`
+holds rebuildable in-progress work only. A repair records through commits/diffs; a read-only run writes no
+file unless explicitly requested.
 
 An approved boundary names its `Approved revision: <identity>` and cites that same identity plus its
 baseline commit. That pairing proves what changed after authorization and survives wherever the work
@@ -153,7 +156,7 @@ appended.
 2. Continue every `own` action without asking; a turn cannot end while `own > 0`.
 3. Ask only for genuine `need approval`, with one displayed default.
 4. Only `OK` consumes displayed approvals and resumes work immediately.
-5. One session has one append-only record; accepted hashes are never edited in place.
+5. One stable layout/block ID has one accepted head; replacing it appends history and never edits a hashed object.
 6. Execute runs only when every reachable hash is accepted.
 7. A baseline is taken after `OK` and before the first production write.
 8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
@@ -166,5 +169,5 @@ appended.
 
 - **A read-only capability.** It never turns measurement into repair; it reports the evidence and owner of
   the separate repair request.
-- **A resumed session.** Layout may resume rather than open. The session id and every accepted hash
-  survive the resume unchanged.
+- **A resumed design identity.** Layout resolves the existing `layoutId` head. Review history may resume,
+  but no caller needs a review/session id to find current accepted state.

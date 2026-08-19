@@ -15,7 +15,7 @@ title: Delivery assurance
 
 Backend và frontend assurance mặc định bắt buộc. Chỉ tracked `starci.deliveryAssurance.required: false` kèm `reason`
 không rỗng mới cho verdict `not required`. Thiếu policy, `required: true`, hoặc false không reason vẫn là
-required. Với backend required, thiếu hoặc không blocking một `ASSURANCE-*` fact đã chạm là stale; partial
+required. Với mọi routed role required, thiếu hoặc không blocking một `ASSURANCE-*` fact đã chạm là stale; partial
 adoption không phải profile nhỏ hơn.
 
 ## README badge bắt buộc
@@ -79,18 +79,17 @@ quyết định điều đó có thật sự xảy ra hay không:
   báo `NONE` nghĩa là project chưa từng được analyse — chưa đo, không phải sạch.
 - **Gate đỏ là source finding.** Phải sửa ở source rồi rescan cho tới khi xanh; đẩy sang CI là giấu nó
   đi chứ không phải xử lý nó.
-- **Coverage luôn được đo, còn nó có chặn hay không là quyết định của chủ sở hữu.** Khi nó chặn, nó chặn
-  bằng bốn con số độc lập — statements, branches, functions và lines mỗi cái tự giữ ngưỡng, vì một phần
-  trăm gộp che đúng cái metric đang fail, mà thực tế là branches. Khi chủ sở hữu quyết nó không chặn,
-  phép đo vẫn chạy: báo cáo vẫn sinh, vẫn upload, vẫn có badge; chỉ quyền từ chối merge bị rút đi.
+- **Coverage luôn blocking và có bốn chiều.** Một unit run thành công phải chứng minh statements,
+  functions và lines tối thiểu 80%, branches tối thiểu 75%, new-code/patch tối thiểu 90% cho từng metric.
+  Phần trăm gộp, informational status hay provider badge không thay được bất kỳ fact nào. Cùng run đó sinh
+  LCOV duy nhất cho Codecov và Sonar; provider gate native project/new coverage còn runner sở hữu bốn
+  metric riêng. Mọi E2E lane đã khai báo cũng phải tìm thấy test thật, không skip và
+  pass; lane rỗng hay cheaper substitute là stale.
 
-  Quyết định đó phải được ghi lại, và ghi như một quyết định chứ không phải một ngưỡng bị trôi mà không
-  ai để ý. Nó cũng phải hạ xuống mọi nơi cái gate đang sống, cùng lúc — cả quality gate của analysis lẫn
-  provider coverage — vì để một bên chặn trong khi bên kia dừng thì không phải nới thanh, mà là dời gate
-  sang một dashboard thứ hai và biến chính sách đã tuyên bố thành lời nói dối.
-
-  Một con số coverage thôi chặn không có nghĩa là nó thôi đúng. `unmeasured` vẫn là `unmeasured`; một
-  project không bị gate vẫn phải báo đúng cái nó thật sự phủ.
+- **Badge Sonar xanh không phải strict profile.** Analysis của đúng checkout phải trả gate `OK`,
+  bugs/vulnerabilities/code smells bằng 0, hotspots reviewed 100%, ba rating A, duplicated-lines density
+  ≤3% overall/new, native coverage >=80% overall và >=90% new. Thiếu API authority giữ các giá trị này
+  `unmeasured external`; không biến chúng thành clean.
 
 **Emit bắt buộc của framework có thể mang ngưỡng branch riêng.** Khi một framework dependency injection
 buộc phải có metadata mà runtime cần, compiler sinh ra guard không test nào chạm tới được — dưới
@@ -101,7 +100,7 @@ Statements, functions và lines không bị ảnh hưởng; chỉ branches bị 
 
 Điều đó chỉ cho phép đúng một nhân nhượng, và nó rất hẹp:
 
-- ngưỡng branch được đặt **một lần, ở phạm vi toàn project, tại tầng analysis**, nơi artifact bị pha
+- ngưỡng branch 75% được đặt **một lần, ở phạm vi toàn project, tại tầng analysis**, nơi artifact bị pha
   loãng trên toàn bộ bề mặt source và một thiếu hụt thật vẫn fail;
 - nó **không bao giờ** là ignore per-file, `istanbul ignore`, coverage-path exclusion, hay hạ ngưỡng
   statement/function/line;
@@ -122,6 +121,7 @@ chính xác đường dẫn cache hỏng trước.
 ## Proof
 
 Prove hook refuse controlled failure, exact CI graph, một LCOV dùng hai lần, local Sonar analysis từ checkout
-hiện tại có waited quality gate xanh sau mọi source repair, encrypted filename không có
+hiện tại có waited quality gate `OK` sau mọi source repair và API evidence có xác thực, exact-SHA cho mọi
+condition trong blocking quality profile, encrypted filename không có
 plaintext twin, mọi badge image endpoint bắt buộc trả image mà URL không có credential, external secret name/required
 check qua API và deploy dependency. External enforcement hoặc badge endpoint chưa đo làm module chưa complete.

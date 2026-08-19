@@ -22,6 +22,7 @@ npm run lint:check
 npm run typecheck
 npm run build
 npm run test:ci
+npm run test:e2e
 npm run sonar:check
 ```
 
@@ -37,13 +38,15 @@ phải coi là chưa đo, không bao giờ coi là sẵn sàng.
 
 Thứ tự này bắt buộc cho mọi frontend hoặc backend được assure:
 
-1. Local lint, typecheck, build và unit gates pass.
+1. Local lint kết thúc với zero error/warning; typecheck và build pass.
 2. Sinh **đúng một** LCOV report. Chạy hai lần cho hai dashboard là drift, không phải assurance mạnh hơn.
-3. Chạy phân tích Sonar có xác thực từ checkout hiện tại, trỏ vào service local.
-4. Chờ quality gate — `sonar.qualitygate.wait=true` với timeout tối thiểu 600 giây.
-5. Gate đỏ là **finding cần sửa ở source**, không phải lỗi provider và không phải chuyện của CI.
-6. Sửa source rồi rescan cho tới khi gate xanh.
-7. Chỉ khi đó mới tin hoặc chạy provider CI.
+3. Chứng minh statements/functions/lines >=80%, branches >=75%, new-code/patch >=90% cho từng metric.
+4. Chạy mọi E2E entrypoint đã khai báo; test thật không skip phải pass và lane rỗng là failure.
+5. Chạy Sonar analysis có xác thực từ đúng checkout, trỏ vào service local.
+6. Chờ quality gate — `sonar.qualitygate.wait=true` với timeout tối thiểu 600 giây.
+7. Query provider evidence và chứng minh strict profile dưới đây trên đúng checkout SHA.
+8. Mọi condition fail là **source repair finding**, không phải lỗi provider hay CI.
+9. Sửa source và rescan tới khi toàn profile pass; chỉ khi đó mới tin provider CI.
 
 "Chưa đo" và "đã upload scan" đều không phải sẵn sàng. Gate đỏ đẩy sang CI là gate đỏ bị giấu, không phải
 gate đỏ được xử lý.
@@ -56,6 +59,19 @@ Hai ràng buộc nữa luôn có hiệu lực mỗi khi phân tích chạy:
 - **Coverage sẵn sàng là bốn con số, không phải một.** Statements, branches, functions và lines mỗi cái
   giữ ngưỡng độc lập. Một phần trăm gộp sẽ giấu đúng cái metric đang fail — thực tế branch coverage là
   cái tụt lại, và cũng là cái mà con số gộp che đi.
+
+## Strict Sonar profile
+
+Gate assigned được reconcile idempotently, rồi API proof có xác thực phải chứng minh Quality Gate `OK`,
+bugs, vulnerabilities và code smells bằng 0, security hotspots reviewed 100%, maintainability/reliability/
+security rating A, duplicated-lines density không quá 3% overall và new code, native coverage tối thiểu
+80% overall và 90% new code, latest analysis SHA khớp checkout. Jest/Vitest enforce bốn coverage metric
+riêng; Codecov và Sonar dùng cùng LCOV và chỉ gate native project/new coverage metric. Badge chỉ để hiển thị,
+không phải policy evidence.
+
+Project analysis token dùng để scan. Reconcile quality gate và prove hotspot có thể cần admin/operator
+token riêng. Cả hai được mã hóa và chỉ vào process qua environment hoặc stdin; không in, truyền qua
+argument hay lưu plaintext.
 
 ```powershell
 $env:SOPS_AGE_KEY_FILE = "$HOME\.starci\master.identity"
@@ -93,7 +109,9 @@ node .claude/scripts/publish-secret.mjs --name CODECOV_TOKEN --stack ".::dev/run
 ```
 
 4. Giữ `coverage/lcov.info`, `codecov/codecov-action@v5`, `fail_ci_if_error: true`, và project/patch
-status blocking trong `codecov.yml`. Nâng coverage target bằng cách cover thêm code, không bao giờ bằng
+status blocking trong `codecov.yml`: native project coverage 80% và patch coverage 90%. Local runner
+enforce riêng statements/functions/lines 80%, branches 75%, new-code 90% cho từng metric. Nâng coverage
+target bằng cách cover thêm code, không bao giờ bằng
 cách thêm exclusion.
 
 ### SonarQube
@@ -142,6 +160,9 @@ không tự đoán context name.
 
 Quality gate báo `NONE` nghĩa là project chưa từng được phân tích. Đó là chưa đo, không phải sạch, và nó
 không bao giờ đủ để kết luận sẵn sàng.
+
+Verification còn chạy Source quality và Sonar assurance machine; workflow hoặc badge xanh mà không có
+exact-SHA metric proof vẫn incomplete.
 
 ## Dừng hoặc rollback
 

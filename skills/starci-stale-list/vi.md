@@ -12,6 +12,7 @@ title: starci-stale-list
 | `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy/router duy nhất dùng chung với repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | Source allocation và collision measurement deterministic |
+| `@source-quality` | `scripts/check-source-quality.mjs` | script | phép đo deterministic cho routed lint, coverage, E2E và strict Sonar |
 
 ## NESTED SKILLS
 
@@ -53,9 +54,13 @@ silence sẽ giống scan bị bỏ.
 
 ### 4 — Đo local readiness gate
 
-Với module source-gates, chạy mọi entrypoint check-only format/lint/typecheck/build/unit đã khai báo theo
-thứ tự registry. Ghi exact command và exit status. State ignored được phép sinh; tracked source thay đổi thì
-dừng report. Thiếu prerequisite là `unmeasured`; project còn gate unmeasured hoặc fail không được gọi ready.
+Với module source-gates, chạy mọi entrypoint đã khai báo cho mọi routed role theo thứ tự: format, lint, typecheck,
+build, unit coverage, E2E, Sonar. Ghi exact command/exit status, lint 0/0, coverage metric, E2E entrypoint/test/
+pass count và Sonar verdict. Unit phải S/L/F ≥80%, branches ≥75%, patch/new metric ≥90%; E2E phải có test thật
+và mọi test pass. State ignored được phép sinh; tracked source đổi thì dừng report. Thiếu prerequisite hoặc gate
+unmeasured/fail khiến project không được gọi ready.
+Dùng `node @source-quality`; exit non-zero của nó là verdict source fence có thứ tự, không phải quyền
+reimplement, skip hoặc hạ failed fact.
 
 ### 5 — Giữ external assurance trung thực
 

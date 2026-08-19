@@ -203,25 +203,35 @@ function readAssurance(diskPath, role) {
   const ciCoverage = ["test:ci", "test:cov", "test:coverage"].some((name) => scriptProducesCoverage(scripts, name));
   const codecovOidc = /use_oidc\s*:\s*true/i.test(prWorkflows) && /id-token\s*:\s*write/i.test(prWorkflows);
   const codecovToken = /secrets\.CODECOV_TOKEN/.test(prWorkflows);
+  const e2eNames = Object.keys(scripts).filter((name) => /^(?:e2e|test:e2e|e2e:test)$/.test(name));
+  const e2eCommands = e2eNames.map((name) => String(scripts[name])).join("\n");
+  const strictQualityText = JSON.stringify(manifest) + "\n" + Object.values(scripts).join("\n");
 
   const checks = {
     "ASSURANCE-1 Husky installed": Boolean(deps.husky),
     "ASSURANCE-1 prepare installs Husky hooks": /\bhusky\b/.test(String(scripts.prepare ?? "")),
     "ASSURANCE-1 pre-push hook exists": Boolean(prePush),
     "ASSURANCE-1 pre-push runs check-only lint": Boolean(scripts["lint:check"]) && /\blint:check\b/.test(prePush),
+    "ASSURANCE-1 lint rejects warnings": /(?:--max-warnings\s+0|--max-warnings=0|warnings?\s*[:=]\s*0)/i.test(String(scripts["lint:check"] ?? scripts.lint ?? "")),
     "ASSURANCE-1 pre-push runs unit tests": Boolean(scripts["test:ci"] || scripts["test:unit"]) && /\btest:(ci|unit)\b/.test(prePush),
     "ASSURANCE-2 PR CI trigger is active": Boolean(prWorkflows),
     "ASSURANCE-2 CI installs from the lockfile": /\b(npm\s+ci|pnpm\s+install\s+--frozen-lockfile|yarn\s+install\s+--immutable|bun\s+install\s+--frozen-lockfile)\b/.test(prWorkflows),
     "ASSURANCE-2 CI runs check-only lint": /\blint:check\b/.test(prWorkflows),
     "ASSURANCE-2 CI runs typecheck or build": /\b(typecheck|build)\b/.test(prWorkflows),
     "ASSURANCE-2 CI runs unit tests": /\btest:(ci|unit|cov|coverage)\b/.test(prWorkflows),
+    "ASSURANCE-2 full E2E command is declared": e2eNames.length > 0 && e2eCommands.trim().length > 0,
+    "ASSURANCE-2 CI runs full E2E": e2eNames.some((name) => new RegExp(`\\b${name.replace(":", "\\:")}\\b`).test(prWorkflows)),
     "ASSURANCE-3 CI produces LCOV coverage": ciCoverage && /lcov|coverage\/lcov\.info/.test(`${prWorkflows} ${JSON.stringify(scripts)}`),
     "ASSURANCE-3 Codecov uploads coverage": /codecov\/codecov-action@/.test(prWorkflows),
+    "ASSURANCE-3 Codecov upload blocks on failure": /fail_ci_if_error\s*:\s*true/i.test(prWorkflows),
     "ASSURANCE-3 Codecov consumes coverage/lcov.info": /coverage\/lcov\.info/.test(prWorkflows),
-    "ASSURANCE-3 Codecov blocks patch and project coverage": /^\s*patch\s*:/m.test(codecovConfig) && /^\s*project\s*:/m.test(codecovConfig) && !/^\s*informational\s*:\s*true\s*$/m.test(codecovConfig),
+    "ASSURANCE-3 Codecov blocks patch and project coverage": /^\s*patch\s*:/m.test(codecovConfig) && /^\s*project\s*:/m.test(codecovConfig) && !/^\s*informational\s*:\s*true\s*$/m.test(codecovConfig) && !/^\s*informational\s*:\s*true\s*$/mi.test(prWorkflows),
+    "ASSURANCE-3 Codecov status checks are blocking": !/^\s*informational\s*:\s*true\s*$/mi.test(codecovConfig) && /status:\s*\n[\s\S]*?project:|status:\s*\n[\s\S]*?patch:/i.test(codecovConfig),
+    "ASSURANCE-3 project and patch/new four-metric thresholds declared": /statements[^\n]{0,80}(?:80|0\.8)/i.test(strictQualityText) && /lines[^\n]{0,80}(?:80|0\.8)/i.test(strictQualityText) && /functions[^\n]{0,80}(?:80|0\.8)/i.test(strictQualityText) && /branches[^\n]{0,80}(?:75|0\.75)/i.test(strictQualityText) && /(?:patch|new)[^\n]{0,120}(?:90|0\.9)/i.test(strictQualityText),
     "ASSURANCE-4 SonarQube scans the checkout": /SonarSource\/sonarqube-scan-action@/i.test(prWorkflows),
     "ASSURANCE-4 SonarQube consumes coverage/lcov.info": /sonar\.(javascript|typescript)\.lcov\.reportPaths\s*=\s*coverage\/lcov\.info/i.test(`${sonarConfig}\n${prWorkflows}`),
-    "ASSURANCE-4 SonarQube quality gate blocks": /SonarSource\/sonarqube-quality-gate-action@|sonar\.qualitygate\.wait\s*=\s*true/i.test(prWorkflows),
+    "ASSURANCE-4 SonarQube quality gate blocks": /SonarSource\/sonarqube-quality-gate-action@|sonar\.qualitygate\.wait\s*=\s*true/i.test(prWorkflows) && !/continue-on-error\s*:\s*true/i.test(prWorkflows),
+    "ASSURANCE-4 strict Sonar proof machine is wired": /sonar-assurance|sonar-quality-gate|evaluateQualityGate/i.test(`${prWorkflows}\n${strictQualityText}`),
     "ASSURANCE-3 README carries a token-free Codecov badge": badges.codecov,
     "ASSURANCE-4 README carries the complete token-free Sonar metric set": Boolean(sonarProjectKey) && badges.sonar,
     "ASSURANCE-5 Codecov uses a declared CI identity": codecovToken || codecovOidc,

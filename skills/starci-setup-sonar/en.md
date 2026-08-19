@@ -1,7 +1,3 @@
----
-title: starci-setup-sonar · English
----
-
 # starci-setup-sonar
 
 ## LOADS
@@ -9,9 +5,11 @@ title: starci-setup-sonar · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and output contract |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve the backend owner and target projects |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/en.md` | en | scanner, token, coverage and quality-gate contract |
-| `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | value-safe tunnel and DNS reconciliation |
+| `@workspaces` | `contexts/workspaces/en.md` | en | resolve every routed Source role |
+| `@assurance-be` | `compilers/patterns/be/delivery-assurance/en.md` | en | scanner, coverage and quality evidence |
+| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/en.md` | en | frontend scanner, coverage and quality evidence |
+| `@sonar-assurance` | `machines/sonar-assurance/en.md` | en | strict gate and secret-boundary machine |
+| `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | explicit value-safe hostname reconciliation |
 
 ## NESTED SKILLS
 
@@ -19,26 +17,25 @@ None.
 
 ## Run
 
-Read `@skill-shape`, `@workspaces` and `@assurance-be`. Resolve the verified route that owns the shared StarCi stack files, but run SonarQube, PostgreSQL, bootstrap
-and connector under the separate Docker Compose project `starci`, never under a product Compose group. Use
-the declared `compose:starci` command and reuse the existing shared service; do not create one SonarQube per
-project. Onboard projects with distinct `sonar.projectKey` values and their own CI `SONAR_TOKEN`; coverage
-must come from the same measured unit run used by Codecov.
+Resolve every verified Source row (`be`/backend, `fe`/frontend and console) and inventory projects. Use one shared
+`compose:starci` Sonar service and distinct project keys. Load delivery assurance so analysis uses the
+measured unit run and coverage artifact. Plan is local and value-free; only explicit execution may
+reconcile provider state or publish a hostname.
 
-## DNS and credentials
+## Authority and secrets
 
-The Source-wide Cloudflare control plane lives at `.workspace/credentials/` (singular). Reuse
-`cloudflare-api-token.key.enc` and `cloudflare-<tunnel>-tunnel-token.key.enc` through SOPS without printing
-plaintext. Product-owned SonarQube admin, database and scanner tokens remain in their approved encrypted stack
-records; Cloudflare credentials never move into a product repository's CI secrets.
-
-Default public naming is `sonar.<zone>`. Plan the exact hostname, shared tunnel and SonarQube HTTP origin with
-`@tunnel-set`. External tunnel/DNS mutation requires the displayed `### NEED APPROVALS` plan and `OK`.
-Reconciliation merges this route without deleting MCP or other ingress entries.
+Scanner tokens are project-scoped and distinct from admin/operator authority. Analysis tokens use `SONAR_TOKEN` or stdin; execution requires `SONAR_ADMIN_TOKEN`. Tokens never enter through arguments or logs. Missing status, SHA or any required measure fails. Tests and plans make
+no external calls.
 
 ## Proof
 
-Prove all containers healthy, the default SonarQube admin password replaced, public system status reachable,
-project key unique, scanner analysis accepted, quality gate completed, encrypted credential records present,
-and no plaintext credential tracked or printed. A running dashboard alone is not project assurance; CI must
-still enforce the scanner and quality-gate result.
+Prove all routes, exact analysis SHA, gate OK, required zero findings, A ratings, reviewed hotspots 100%,
+duplicated density at most 3, and native coverage at least 80% overall and 90% new.
+
+## Stops
+
+- Stop for a missing routed role, missing or mismatched SHA, missing/failed required measure, missing authority or scope expansion.
+
+## Output
+
+Report inventory, mode, evidence, changed paths and focused proof commands in the workspace language.

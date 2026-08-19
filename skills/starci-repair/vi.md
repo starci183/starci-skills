@@ -10,6 +10,7 @@ title: starci-repair
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract chung về phase, approval và output |
 | `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy và router duy nhất cho mọi repair module |
+| `@source-quality` | `scripts/check-source-quality.mjs` | script | whole-Source proof deterministic cho ordered delivery fence |
 
 ## NESTED SKILLS
 
@@ -41,6 +42,10 @@ Green phải kiếm được, không mua. Không `eslint-disable`, hạ severity
 để kết thúc finding. Decision được trả về. Formatting tách behavior. Consumer cài published lint rule và
 không author/repair private copy.
 
+Delivery fence áp dụng độc lập cho mọi routed role: format → lint → typecheck → build → unit coverage → E2E →
+Sonar. Lint cần 0 error/0 warning; unit cần S/L/F ≥80%, branches ≥75%, patch/new metric ≥90%; E2E cần entrypoint
+đã khai báo và tồn tại, test thật, mọi test pass. Skip, todo, passWithNoTests, zero-test và check substitute bị reject.
+
 Một repair record chỉ phủ một role của một project, trừ port-offset pass ghi family và mọi role đã chạm
 cùng nhau. Multi-project request coordinate record, baseline và
 diff riêng trong một approval batch. Whole-repository gate chạy một lần mỗi checkout bởi coordinator.
@@ -56,7 +61,8 @@ contract khi declared. Dừng trước target-source read nếu route absent, in
 ### 2 — Đọc manifest và chọn module
 
 Đọc repository manifest và gate script hiện có. Chọn module theo rule trên, rồi đọc trọn runtime context record của
-từng module trước inventory. Không chạy end-to-end suite trừ khi request gọi tên.
+từng module trước inventory. Với mọi routed role, source proof bắt buộc theo thứ tự: format, lint, typecheck,
+build, unit coverage, E2E, Sonar. Không bỏ E2E hoặc Sonar.
 
 ### 3 — Lập baseline state
 
@@ -98,7 +104,12 @@ coordinator sở hữu shared-state gate và remeasurement.
 
 ### 7 — Prove từng module
 
-Chạy `Proof` của mọi selected module. Chạy lại đúng original source gate một lần và report before/after.
+Chạy `Proof` của mọi selected module. Chạy lại đúng original source gate một lần theo thứ tự bắt buộc và report
+before/after. Source pass cần lint 0 error/0 warning; unit S/L/F ≥80%, branches ≥75%, patch/new metric ≥90%;
+E2E entrypoint đã khai báo và tồn tại, test thật, mọi test pass; Sonar pass cuối. Skip/todo/passWithNoTests/
+zero-test/check substitute bị reject.
+Dùng `node @source-quality` cho whole-Source remeasurement cuối; không thay failed/unmeasured fact của
+machine bằng narrative inference.
 Inspect complete baseline diff cho boundary violation và secret material. External enforcement được prove
 bằng authorized API evidence, không suy từ workflow text.
 

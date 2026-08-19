@@ -137,7 +137,10 @@ Sau mỗi pass, tìm active reference tới legacy/runtime path; kết quả ph�
 
 1. Chạy format/autofix riêng và đọc mọi hunk.
 2. Sửa deep import/mechanical findings riêng.
-3. E2E phải đi qua production transport, dùng shared world helper và assert persisted consequence thật.
+3. E2E nằm trong acceptance bắt buộc của mọi routed FE/BE Source: mọi declared suite phải được thực thi và
+   pass, không `skip`, `todo`, `only`, `passWithNoTests`, zero-test success, focused/check-only substitute hoặc đổi glob để
+   làm suite biến mất. E2E vẫn nằm trong lint surface; nó phải đi qua production transport, dùng shared
+   world helper và assert persisted consequence thật.
 4. AI harness gọi declared provider client thật; không thêm unused SDK import để lừa rule.
 5. REST machine/identity door phải có route/security boundary thật. Plain JSON brand/theme/GPU/admin/
    payment door chuyển sang GraphQL qua `starci-be-plan` và `starci-be-approve`.
@@ -154,9 +157,16 @@ Sau mỗi pass, tìm active reference tới legacy/runtime path; kết quả ph�
    số và bổ sung test thật.
 4. Risk order: auth/payment/credential custody; provisioning/lifecycle; persistence/concurrency; external
    clients; FE state/API/realtime; page rendering cuối cùng.
-5. Completion floor: statements, lines và functions của mọi repo >= 50%. Branch threshold được chốt từ
-   measured DI-metadata ceiling, không làm tròn xuống để vừa số hiện tại. New-code coverage >= 80% cho cả
-   bốn metric; milestone kế tiếp đưa overall lên >= 70%.
+5. Migration floor đầu tiên: statements, lines và functions của mọi repo >= 50%. Không merge một thay đổi
+   làm bất kỳ metric nào giảm trong lúc đi từ baseline tới floor.
+6. Mục tiêu trưởng thành bắt buộc: statements, lines và functions của mọi repo >= 80%; branches >= 75%.
+   Branch bar được chốt từ measured DI-metadata ceiling và không làm tròn xuống để vừa số hiện tại.
+   New-code/patch coverage >= 90% cho riêng statements, branches, functions và lines; một blended
+   percentage không được che metric đang thiếu.
+7. Unit test tăng theo risk order ở mục 4 và phải chứng minh behavior/failure branch; snapshot rỗng, test chỉ
+   kiểm constructor tồn tại hoặc mock toàn bộ logic không được tính là coverage progress. Unit và E2E đều
+   phải ổn định trên cùng exact HEAD; lỗi ở lane nào là defect của lane đó, không phải lý do hạ threshold
+   hoặc bỏ lane khỏi acceptance.
 
 ### Wave 6 — clear Sonar trên exact HEAD
 
@@ -164,8 +174,10 @@ Sau mỗi pass, tìm active reference tới legacy/runtime path; kết quả ph�
 2. Sửa theo thứ tự Bugs, Vulnerabilities, Security Hotspots, correctness smells, complexity, duplication,
    rồi coverage conditions.
 3. Không coi `analysis uploaded` hoặc quality gate `NONE` là pass.
-4. Acceptance: Quality Gate xanh, Bugs/Vulnerabilities bằng 0, Hotspots reviewed 100%, new-code smells bằng
-   0, new duplication < 3%, maintainability/reliability/security rating A.
+4. Acceptance: Quality Gate xanh; Bugs, Vulnerabilities và Code Smells toàn project bằng 0; Security
+   Hotspots reviewed 100%; duplicated-lines density toàn project và new code không quá 3%;
+   maintainability, reliability và security rating A. Không đóng hàng loạt false-positive hoặc exclude
+   authored source để mua verdict.
 5. False-positive chỉ đóng trên Sonar khi có source/test evidence và lý do cụ thể; không mass-dismiss.
 
 ### Wave 7 — provider, badges và merge/deploy fence
@@ -205,8 +217,9 @@ external enforcement. Coordinator là writer duy nhất của `INDEX.md`, root `
 - Không active reference tới `.claude_legacy`, runtime debris, duplicate law, shim hay orphan context sau
   migration; canonical shelf paths chỉ đổi khi có migration evidence riêng.
 - Runtime/EN/VI graphs, context contract, script tests và docs build đều pass.
-- Sáu role ESLint 0/0 và declared source gates xanh.
-- Coverage denominator đúng, mọi repo đạt floor, Codecov/Sonar dùng chung LCOV.
+- Sáu role ESLint 0 error/0 warning; mọi declared E2E suite pass, không skip/todo/zero-test/check substitute.
+- Coverage denominator đúng; mọi repo đạt >= 80% statements/functions/lines, >= 75% branches và new-code
+  coverage >= 90% cho từng metric; Codecov/Sonar dùng chung LCOV.
 - Sonar current HEAD xanh theo các metric đã nêu.
 - Badge hiển thị metric thật cho cả public và private policy mà không lộ credential.
 - Required checks chặn merge và deploy không thể outrun verification.

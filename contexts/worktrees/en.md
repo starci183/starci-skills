@@ -42,6 +42,7 @@ mess, and a rule tree with session debris in it stops reading as authority.
 | `WORKTREE-4` | A registry worktree owned by another Git common directory | rejected; it is not this Source's state |
 | `WORKTREE-5` | Parallel agents about to write | isolate only when two of them mutate one file |
 | `WORKTREE-6` | A worktree is stale, prunable or in the way | pruned deliberately; never force-removed as a directory |
+| `WORKTREE-7` | A design identity needs a durable accepted version | stable `layoutId`/`blockId` head records in `registries`; immutable bodies remain under `objects/sha256` |
 
 ## Reading a run
 
@@ -55,6 +56,8 @@ mess, and a rule tree with session debris in it stops reading as authority.
    no worktree at all — `WORKTREE-5`.
 5. **Leave the target repository alone.** A run's bookkeeping never lands in the repository being worked
    on; durable product records belong to that repository through its own review, not through this state.
+6. **Separate identity from review history.** Layout and block IDs resolve accepted heads directly from
+   `registries`; `reviews` preserve decisions, while `sessions` hold only rebuildable in-progress work — `WORKTREE-7`.
 
 ## `WORKTREE-1` — state that must survive
 
@@ -177,6 +180,33 @@ that must share a worktree run one at a time.
 that is not there, and the next run inherits an error nobody caused. Destructive Git is never run from a
 background agent, where nobody is watching the branch it stands on.
 
+## `WORKTREE-7` — design identity is stable; versions are hashed
+
+**Situation.** A layout or block must be found again after the review run that created it has ended.
+
+**Recognition signs**
+
+- A route/surface has one stable semantic `layoutId` independent of locale, runtime parameters or prompt.
+- A region has one stable `blockId`, scoped by its `layoutId`.
+- Candidate bodies already live as immutable SHA-256 objects.
+
+**Ask yourself.** Can an executor resolve the current accepted design from `layoutId` alone, without
+knowing a session id or scanning review history?
+
+**Boundary**
+
+- `WORKTREE-1`: accepted heads and immutable objects are durable registry state.
+- `WORKTREE-2`: a partial prompt, preview and unfinished candidate batch remain rebuildable progress.
+
+**What it emits.** `layouts/by-id/<layoutId>.json` stores route pattern, accepted layout head and declared
+regions. `blocks/by-id/<layoutId>/<blockId>.json` stores the accepted block head and the exact parent
+`layoutHash` it was designed under. `reviews/` may cite candidates, feedback and accepted hashes, but no
+reader needs a review id to find current state. Replacing a head appends history; it never edits an object.
+
+**How it fails.** A skill searches `decisions/<session>.json`, so a valid block becomes unreachable when
+the caller does not know which old review happened to contain it. Session history silently becomes a
+second current-state database.
+
 ## Inputs
 
 | Input | Evidence required |
@@ -200,6 +230,9 @@ background agent, where nobody is watching the branch it stands on.
 7. A run's bookkeeping never writes into the target repository.
 8. Stale worktrees are pruned through Git, never by deleting a directory, and never from a background
    agent.
+9. Design identity is `layoutId` or `(layoutId, blockId)`; a content hash is a version, never the identity.
+10. Accepted heads resolve without a session. Reviews are append-only evidence; sessions are optional progress.
+11. A block head names the parent `layoutHash`; a block accepted under an older layout is stale, not current.
 
 ## Exceptions
 
@@ -220,7 +253,7 @@ durability: <durable | rebuildable>
 path: <.worktrees/<project>/registries | sessions | cache>
 isolation: <required | not required>
 ownership: <locked, clean, branch, owning git dir>
-situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6>
+situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7>
 reason: <the fact that decided the placement>
 ```
 

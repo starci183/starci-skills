@@ -6,22 +6,23 @@ None.
 
 ## Stale signature
 
-The repository's own check-only format, lint, typecheck, build or unit command fails, or the manifest
-declares no meaningful gate surface. A command the repository does not declare is absent, not failing.
+The declared gate contract is absent, incomplete, fails, or is not executable for every routed role. Order:
+format → lint → typecheck → build → unit coverage → E2E → Sonar. Lint requires 0 errors and 0 warnings.
+Unit requires S/L/F ≥80%, branches ≥75%, and patch/new metrics ≥90%. E2E requires an existing declared
+entrypoint, real tests, and all tests passing; skip/todo/only/passWithNoTests/zero-test/focused-check substitutes reject.
+Sonar is the final required pass. No gate may be weakened or reordered; undeclared commands are absent.
 
 ## List evidence
 
-Read the manifest, list the declared primary entrypoints, then run the check-only gates locally in cheapest
-order: format check, lint, typecheck, build, unit. Generated caches and ignored output are allowed; tracked
-source mutation is not. Record command, exit code and failure counts. A missing prerequisite is
-`unmeasured`, names the prerequisite, and does not support `ready`. Never run end-to-end suites unless the
-request names them.
+Read the manifest and every routed role's primary entrypoints. Run format, lint, typecheck, build, unit
+coverage, E2E and Sonar in that order. Record commands, exit codes, lint counts, coverage metrics, E2E
+entrypoint/test/pass counts and Sonar verdict. Ignored output is allowed, tracked mutation is not. Missing
+prerequisite, entrypoint, real tests, coverage or Sonar evidence is unmeasured/absent and cannot support ready.
 
 ## Repair inventory
 
-Read the manifest before running anything. Do not invent commands. Run existing gates in cheapest order:
-format check, lint, typecheck, build, unit. Do not run end-to-end suites unless named by the request.
-Record exact error, warning, failing-suite and file counts before the first source write.
+Read the manifest first and do not invent commands. Run all declared gates in mandatory order and record exact
+errors, warnings, coverage metrics, failing tests, E2E entrypoint existence and Sonar status before writing.
 
 ## Apply
 
@@ -39,6 +40,5 @@ remove a rule, skip a test or add `any` merely to buy green.
 
 ## Proof
 
-Run the exact original gates again and report before/after counts. Zero is valid only with the same
-commands, checkout revision and machine, without suppression. A ready verdict names every executed local
-gate and its zero exit status.
+Run the exact original gates again in the same order. Ready requires lint 0/0, unit thresholds, real passing
+E2E and final Sonar pass, with no suppression.

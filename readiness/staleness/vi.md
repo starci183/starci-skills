@@ -35,7 +35,7 @@ Route staleness không có repair module ở đây vì owner của nó là `star
 |---|---|---|
 | `route` | checkout, contract, branch hoặc recorded head không còn mô tả đúng máy này | `starci-init` |
 | `port-offset` | Source allocation absent/invalid, product sở hữu offset, projection lệch hoặc local listener collision | `starci-repair`, port-offset pass |
-| `source` | gate format/lint/type/build/unit đã khai báo fail, hoặc không có gate surface có nghĩa | `starci-repair`, source-gates pass |
+| `source` | routed role thiếu hoặc fail fence format→lint→typecheck→build→unit coverage→E2E→Sonar, gồm lint warning, coverage dưới ngưỡng, E2E giả/rỗng hoặc thiếu Sonar | `starci-repair`, source-gates pass |
 | `index` | contract `why` mô tả shape thay vì need dùng để tìm nó | `starci-repair`, why pass |
 | `machine` | thiếu published lint canon hoặc config import vendored rule copy | `starci-repair`, lint-machine pass |
 | `formatter` | strict-fix scope còn first-party Prettier integration | `starci-repair`, strict-fix pass |
@@ -46,8 +46,11 @@ Route staleness không có repair module ở đây vì owner của nó là `star
 ## Luật dùng chung
 
 - `stale-list` chỉ report; không repair. `repair` phải đo trước khi ghi.
-- `ready` cần evidence chạy local trên checkout hiện tại. Gate chỉ được discover mà chưa chạy là
-  `unmeasured` và không bao giờ đủ cho verdict ready.
+- `ready` cần evidence chạy local trên checkout hiện tại cho mọi routed role. Fence source là
+  format→lint→typecheck→build→unit coverage→E2E→Sonar; lint 0 error/0 warning, unit S/L/F ≥80%, branches
+  ≥75%, patch/new metric ≥90%, E2E phải có entrypoint đã khai báo và tồn tại, test thật, mọi test pass.
+  `skip`, `todo`, `passWithNoTests`, zero-test và check substitute bị reject. Gate chỉ discover mà chưa chạy là
+  `unmeasured` và không bao giờ đủ cho ready.
 - Mỗi finding mang category, evidence, applicability và owner.
 - `absent`, `invalid`, `stale`, `not required`, `unmeasured external` và `clean` là các verdict khác nhau.
 - Route finding kết thúc repair trước khi đọc target source. Repair source qua stale route là nhắm vào
