@@ -19,14 +19,20 @@ title: Docs
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates/context.md` | context | judge existing code with evidence |
 | `@initialization` | `readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
+| `@kernel` | `kernel/context.md` | context | resolve route, state, approval identity and evidence before role law |
+| `@machines` | `machines/context.md` | context | locate deterministic dependency, parity, quality, artifact and secret machines |
 | `@mcp` | `mcp/context.md` | context | build and expose routed source context through isolated read-only MCP services |
+| `@operations` | `operations/context.md` | context | route deployment, MCP, readiness and operator procedures without merging their outputs |
 | `@patterns` | `compilers/patterns/context.md` | context | resolve files and import boundaries |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | prove Source family offsets, application slots, projections and local listener uniqueness |
 | `@principles` | `compilers/principles/context.md` | context | resolve classes from accepted situations |
+| `@publication` | `publication/context.md` | context | separate runtime authority from generated human documentation |
 | `@skill-shape` | `skills/skill-shape/context.md` | context | load the shared reporting contract when a skill runs |
 | `@skills` | `skills/context.md` | context | locate the capability registry |
+| `@standards` | `standards/context.md` | context | route role patterns, gates, rule bindings and assurance from one stable entry |
 | `@staleness` | `readiness/staleness/context.md` | context | share one stale taxonomy and category modules between inventory and repair |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+| `@workflows` | `workflows/context.md` | context | group discoverable skills by source, backend, frontend, quality and operations lifecycle |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve Source-wide defaults and verify role routes |
 | `@worktrees` | `contexts/worktrees/context.md` | context | resolve durable write roots |
 
@@ -44,6 +50,27 @@ order follows from it rather than defining it.
 | `@brainstorms` | 3–4 candidates for the owner to choose | a surface or a block is not yet decided |
 | `@compilers` | exactly one answer, no candidates | a shape is accepted and code is about to be written — `@principles` decide the classes, `@patterns` decide which file holds it and what it may import |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
+
+## V4 authority route
+
+The stage trees above remain the one homes of detailed law. V4 adds stable cross-stage routers; it does
+not copy those laws:
+
+```text
+@kernel
+  → @workflows
+  → @standards
+  → approved source write
+  → @gates
+  → @machines
+  → @operations when the request reaches runtime/provider state
+  → @publication for human rendering only
+```
+
+`@standards` holds the accountability chain `pattern situation → gate situation → published machine
+identity → executable proof`. `@workflows` keeps every physical `SKILL.md` under `.claude/skills` so
+Claude and Codex discovery remain intact. A new router is valid only when it points to the existing
+authority and adds no second ruling.
 
 ## Load order
 
@@ -86,7 +113,7 @@ record. Eleven do the work; two only look — one at the machine, one at the oth
 | `starci-stale-list` | every read-only stale fact across routes, port allocation, gates, contracts, lint/formatter adoption, delivery assurance, structure and remnants, with who clears each |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
-| `starci-fe-design-layout` | 3–4 direction choices with no separate hash, then layout candidates that embed the selection and are hash-bound |
+| `starci-fe-design-layout` | one evidence-backed direction recommendation and 3–4 layouts presented under one combined layout-hash approval |
 | `starci-fe-design-block` | block anatomies under the direction embedded in their accepted layout, hash-bound independently |
 | `starci-fe-design-execute` | frontend source, only after every hash is accepted |
 | `starci-be-plan` | the backend brief |

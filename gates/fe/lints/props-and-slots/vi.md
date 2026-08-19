@@ -28,13 +28,14 @@ có năm slot và không component nào có đủ cả năm: `props` là thứ n
 là key nó render còn `render` là một component có tên cho mỗi slot mà key đó khai báo, và `isLoading`
 được truyền xuống chứ không bao giờ tự quyết tại chỗ.
 
-Luật phát biểu **bảy mã**, từ `SLOTS-1` đến `SLOTS-7`. **Ba trong số đó có luật máy.** Đó không phải
+Luật phát biểu **bảy mã**, từ `SLOTS-1` đến `SLOTS-7`. **Bảy luật máy đã xuất bản cưỡng chế bốn mã.** Đó không phải
 tai nạn về độ phủ mà là bố trí luật muốn: các slot alias trong `props.ts` chính là hàng rào, một slot
 thứ năm không qua nổi trình biên dịch chứ không phải không qua nổi review, và một khi bản thân hình
 dạng đã từ chối thì chẳng còn gì cho luật máy đi tuần. Luật máy chỉ tồn tại đúng ở chỗ type không có
 gì để nhìn — một shape KHÔNG CÓ TÊN, một lỗ `children` tự viết tay bên cạnh các alias thay vì nằm
-trong chúng, và một lane `items` chung trên một surface dùng chung. Module này ghi lại một phần ba
-được cưỡng chế ấy một cách trung thực, kể cả những chỗ mà mức cưỡng chế mỏng hơn cái tên của nó.
+trong chúng, bốn cửa CSS của `SLOTS-6`, và một lane `items` chung trên một surface dùng chung. Module
+này ghi lại việc cưỡng chế ấy một cách trung thực, kể cả những chỗ mà mức cưỡng chế mỏng hơn cái tên
+của nó.
 
 ## Luật máy đã xuất bản
 
@@ -42,25 +43,28 @@ trong chúng, và một lane `items` chung trên một surface dùng chung. Modu
 |---|---|---|
 | `no-inline-parameter-type` | `SLOTS-3` | `inline` — một tham số hàm có type khai báo chứa object shape vô danh, kể cả nằm trong ngoặc, trong intersection hay trong union |
 | `no-children-slot` | `SLOTS-4` | `slot` — một thành viên `children` khai trong type, hoặc một key `children` destructure ở tham số, trong file component thuộc phạm vi |
+| `no-per-part-classname-prop` | `SLOTS-6` | `perPart` — một property lower-camel dạng `<part>ClassName` trong source component được hỗ trợ |
+| `no-public-classname-prop` | `SLOTS-6` | `declaration` hoặc `usage` — `className`/`classNames` trong props type component được hỗ trợ hoặc trên JSX call tới house component đã import |
+| `no-public-frame-css-props` | `SLOTS-6` | `css` — `gap`, `padding`, `align`, `justify`, `className`, `classNames`, `style`, `inline` hoặc `nested` trên các tầng cao hơn leaf |
+| `no-css-door-type-laundering` | `SLOTS-6` | `utility` — `Omit`, `Pick` hoặc `Exclude` có union key chứa `className`, `classNames` hoặc `style` |
 | `no-surface-list-items-slot` | `SLOTS-7` | `items` — một attribute JSX `items` trên thẻ đang bind tới `SurfaceListCard` import từ đúng một đường dẫn literal |
 
 `SLOTS-1` (slot dữ liệu chỉ chở dữ liệu, không bao giờ chở hàm, component hay bất cứ giá trị nào mang
 hành vi), `SLOTS-2` (dữ liệu của component khai bằng type alias, không bằng `interface`), `SLOTS-5`
 (component nằm dưới bên sở hữu request thì nhận `isLoading` chứ không tự quyết trạng thái chờ) và
-`SLOTS-6` (diện mạo là một variant có tên quyết định bên trong, không phải `className`, `style`, prop
-khoảng cách hay hook style theo từng phần) **hoàn toàn không có luật máy** ở đây. Ba trong số đó được
-giữ ở nơi khác — `SLOTS-1`, `SLOTS-2` và `SLOTS-6` thuộc tầng `unrepresentable`, do `DataValue`, do
-ràng buộc `D extends ComponentData` và do ba tier alias đóng trong `@canon-fe-props` giữ — còn
-`SLOTS-5` là `documented`, tức chẳng có gì giữ cả. Một lần chạy sạch của module này không nói được gì
-về bốn mã ấy, và ở đâu type chưa từng phủ tới file thì mã đó đơn giản là chưa được cưỡng chế, chứ
-không phải đã được bao phủ.
+`SLOTS-6` giờ được bốn luật máy cưỡng chế tại các cửa CSS công khai, còn `SLOTS-5` vẫn là
+`documented`, tức chẳng có gì giữ cả. `SLOTS-1` và `SLOTS-2` vẫn là `unrepresentable`, do `DataValue`
+và ràng buộc `D extends ComponentData` giữ. Một lần chạy sạch không nói được gì về `SLOTS-5`, và ở
+đâu cổng phạm vi không phủ tới file thì mã đó đơn giản là chưa được cưỡng chế, chứ không phải đã
+được bao phủ.
 
 ## Đọc một diff
 
 1. **Quyết phạm vi trước mọi thứ, và ghi lại.** Ngoài phạm vi ở đây không có nghĩa file đã qua — nó
    có nghĩa là không visitor nào được cài và luật máy không tồn tại đối với file đó.
    `no-inline-parameter-type` không cài cổng đường dẫn nào cả nên không có trạng thái ngoài phạm vi;
-   `no-children-slot` cần `isGoverned`; `no-surface-list-items-slot` cần `/src/` trong đường dẫn.
+   `no-children-slot` cần `isGoverned`; bốn luật `SLOTS-6` có cổng source/test/leaf riêng;
+   `no-surface-list-items-slot` cần `/src/` trong đường dẫn.
 2. **Kiểm tra ngoại lệ trước khi đọc node.** File registry contract được miễn khỏi `no-children-slot`
    vì thành viên `children` của nó mô tả ngữ pháp con đã đóng. File route của framework nằm ngoài
    component tier và được nhận ReactNode, với điều kiện đóng nó thành một projection có tên trước khi
@@ -69,12 +73,13 @@ không phải đã được bao phủ.
    `TSPropertySignature` hoặc một key property trong `ObjectPattern`; một import specifier rồi mới tới
    tên attribute JSX. Node mà visitor không bao giờ tới là chưa được xét, không phải sạch.
 4. **Xuất một block cho mỗi finding**, trên đúng node mà luật máy báo — type annotation, identifier
-   `children`, cả attribute `items`.
+   `children`, property/type reference của cửa CSS, hoặc cả attribute `items`.
 5. **Viết dòng `hatch`** mỗi khi một lối thoát đang mở bên dưới lẽ ra đã che đúng lỗi ấy. Một tham số
    `Readonly<{…}>`, một props type `PropsWithChildren` và một import qua barrel đều lọt, và không cái
    nào trong đó là tuân thủ.
-6. **Đừng báo thứ không luật máy nào canh.** Bốn trên bảy mã không có máy ở đây; một phán quyết nói
-   khác đi là hiểu sai module này.
+6. **Đừng báo thứ không luật máy nào canh.** `SLOTS-1`, `SLOTS-2` và `SLOTS-5` không có luật máy
+   ở đây; một phán quyết nói khác đi là hiểu sai module này. `SLOTS-6` có bốn luật tên riêng, không
+   phải một luật CSS chung chung.
 
 ## `no-inline-parameter-type` — SLOTS-3
 
@@ -112,11 +117,16 @@ backslash thành `/`, trả false cho `isContractTableFile(path)`, và ngoài ra
 `COMPONENT_ROOTS.filter((root) => root !== "src").some((root) => path.includes("/" + root + "/"))` —
 tức `/src/components/` hoặc `/packages/ui/src/`, với entry `src` trần bị bỏ ở đây và chỉ ở đây, bởi
 dùng làm hàng rào thì nó khớp mọi file dưới `src/` và báo một routed page vì đã nhận children, đúng
-cái việc duy nhất mà một page được phép làm. Trong phạm vi có hai visitor. `TSPropertySignature` báo
+cái việc duy nhất mà một page được phép làm. Trong phạm vi có hai visitor tìm finding, được trì hoãn
+qua bookkeeping `Program:exit`. `TSPropertySignature` báo
 khi `node.key.type === "Identifier"` và `node.key.name === "children"`. `Property` báo đúng key đó khi
 cha nó là một `ObjectPattern` và ông nó không phải `VariableDeclarator` — một `children` destructure ở
 tham số, chính là cái slot ấy đi vào bằng cửa khác, trong khi `const {children} = props` trong thân
-hàm được cố ý thả qua.
+hàm được cố ý thả qua. Finding được giữ trong candidate tới `Program:exit`: luật ghi lại tên type bao
+quanh và function có tham số đầu tham chiếu tới type đó, rồi chỉ xóa candidate khi function là
+boundary converter đóng. Converter được phép đọc prop đơn giản và tạo một closure `useCallback`, sau
+đó trả một JSX element duy nhất có attribute có tên mang closure; thêm statement, branch, return thứ
+hai, element tự tạo hay giá trị không đi qua closure đều rơi về report.
 
 **Điểm mù.** Một thành viên viết trong nháy, `"children": ReactNode`, có key là `Literal` chứ
 không phải `Identifier`, và key computed cũng vậy. Một lỗ children mang tên khác — `content: ReactNode`,
@@ -126,11 +136,98 @@ vì luật máy không bao giờ mở file khác. Nửa khẳng định của m�
 không có gì kiểm rằng một container khai `contract` và `render` cùng nhau, và không có gì thấy một
 closed shape mọc thêm `render`. Và cổng tầng chỉ là một đường dẫn: chính component đó nằm dưới
 `apps/web/features/…`, hay dưới một `ui/` không phải component root nào, thì không có luật máy nào
-đụng tới — literal về bố cục là thứ rẻ nhất trong một repository để thay.
+đụng tới — literal về bố cục là thứ rẻ nhất trong một repository để thay. Function có hình dạng
+boundary chỉ được miễn khi toàn thân khớp predicate converter; đổi tên function hay file không thể
+opt in, và thêm một quyết định layout thật sẽ khiến nó bị báo.
 
 **Ranh giới.** Luật máy này chỉ thấy cái lỗ markup và không thấy gì hơn. `BranchProps` giữ nửa khẳng
-định, còn các shell trao thẳng phần bên trong cho cơ chế vendor thì được miễn bằng lời của luật chứ
-không bằng mã của luật máy này.
+định. Boundary-converter shell được miễn theo shape đóng đã nêu; shell bình thường chỉ forward
+`children` vẫn là finding.
+
+## `no-per-part-classname-prop` — SLOTS-6
+
+**Nó báo cái gì.** `perPart` — mỗi property `TSPropertySignature` có tên thường-camel dạng
+`<part>ClassName`, trừ đúng tên public gốc `className`, nhận một báo cáo.
+
+**Nó phát hiện bằng gì.** Luật chuẩn hóa tên file rồi trả `{}` cho file test hoặc file nằm ngoài source
+component được hỗ trợ (`/src/components/` hoặc `/packages/ui/src/`; entry `src` trần không phải source
+component ở đây). Trong phạm vi, luật ghé mọi `TSPropertySignature`, lấy `key` (hoặc fallback
+`property`) qua `propertyName`, rồi báo khi chuỗi kết quả khớp `/^[a-z][A-Za-z0-9]*ClassName$/` và
+không đúng chính xác `className`. Nó bắt cả khai báo trong alias lẫn interface; không xét call site
+JSX hay props type đã import.
+
+**Điểm mù.** Key literal tĩnh được đọc, nhưng key computed, symbol và literal không phải string không
+có `propertyName`. `className` được để cho `no-public-classname-prop`; `classNames` không khớp hậu tố
+số ít. `TitleCSS`, `titleClass`, `title_style` hay `title-className` nằm ngoài regex. Props đã import
+hoặc ghép bằng utility không được mở, và khai báo trong test, route, tooling hay file `src` trần nằm
+ngoài phạm vi. Không có visitor dùng JSX, nên việc truyền `titleClassName` không tự được báo nếu khai
+báo của nó nằm ở file khác.
+
+**Ranh giới.** Đây chỉ là cửa placement theo từng phần. Prop ngữ nghĩa như `tone`, `density` hay
+`titleTone` vẫn có thể tồn tại; component hoặc contract vẫn sở hữu quyết định diện mạo kết quả.
+
+## `no-public-classname-prop` — SLOTS-6
+
+**Nó báo cái gì.** `declaration` — property `className` hoặc `classNames` trong source component được
+hỗ trợ — và `usage` — một trong hai attribute đó trên JSX element có local tag binding đến từ import
+`components/`.
+
+**Nó phát hiện bằng gì.** File test luôn ngoài phạm vi. Với mọi file khác, `ImportDeclaration` ghi lại
+tên local của mọi specifier khi source đã chuẩn hóa chứa `/components/` ở biên đường dẫn; không đòi
+component hay kiểu import cụ thể. Trong source component được hỗ trợ, mọi tên property tĩnh đúng bằng
+`className` hoặc `classNames` báo `declaration`. Trong mọi file không phải test, mỗi `JSXOpeningElement`
+có tag `JSXIdentifier` nằm trong tập binding đó sẽ báo các `JSXAttribute` trùng tên dưới dạng `usage`.
+Cổng declaration và cổng usage cố ý khác nhau.
+
+**Điểm mù.** Key computed/non-static, tag JSX member-expression, spread, và attribute trên component
+không được đưa vào bởi import `components/` khớp đều không được ghé. Barrel hoặc re-export vẫn bị canh
+nếu source của nó còn chứa `/components/`; path tương đối không có đoạn đó thì không. Luật không giải
+alias qua assignment, re-export hay file khác, và không mở props type đã import. Không báo declaration
+trong test, file ngoài component root được hỗ trợ, hoặc tên khác như `class`, `classes`, `style`.
+
+**Ranh giới.** Luật này đóng API placement công khai cho house component. Primitive vendor và prop
+variant ngữ nghĩa nằm ngoài luật, trừ khi được truyền qua house component đã bind bằng một trong hai
+tên cấm.
+
+## `no-public-frame-css-props` — SLOTS-6
+
+**Nó báo cái gì.** `css` — một `TSPropertySignature` có đúng tên `gap`, `padding`, `align`, `justify`,
+`className`, `classNames`, `style`, `inline` hoặc `nested` trong source component không phải leaf.
+
+**Nó phát hiện bằng gì.** Test và file ngoài source component được hỗ trợ là ngoài phạm vi. Tầng leaf
+cũng ngoài phạm vi, gồm cả path single-app và monorepo được `isInComponentTier(filename, "leaves")`
+nhận biết. Mọi file trong phạm vi còn lại ghé `TSPropertySignature`, lấy tên tĩnh bằng `propertyName`
+và báo nếu tên thuộc chính xác `FRAME_CSS_PROPS`. Luật không đọc JSX, import hay utility type.
+
+**Điểm mù.** Key computed, tên động và props kế thừa qua reference không được mở. Cách viết ngoài tập
+chính xác (`margin`, `width`, `direction`, `class`, hoặc object CSS có namespace) sẽ lọt. Khai báo trong
+leaf được phép theo thiết kế, cũng như test và file ngoài component root được hỗ trợ. Utility type giấu
+một tên trong tập này thuộc luật riêng `no-css-door-type-laundering`, vốn chỉ gọi tên `className`,
+`classNames` và `style`.
+
+**Ranh giới.** Component không phải leaf đưa ra state ngữ nghĩa hoặc contract có tên, không đưa ra
+quyết định sắp xếp bằng CSS của frame. Leaf nguyên tử được tự sở hữu spacing cục bộ vì nó sở hữu đúng
+một primitive.
+
+## `no-css-door-type-laundering` — SLOTS-6
+
+**Nó báo cái gì.** `utility` — toàn bộ `TSTypeReference` của `Omit`, `Pick` hoặc `Exclude` khi tham số
+type thứ hai chứa key string `className`, `classNames` hoặc `style`.
+
+**Nó phát hiện bằng gì.** Tên file được chuẩn hóa; test và path không có `/src/` nhận visitor rỗng. Với
+mỗi `TSTypeReference`, luật chỉ nhận utility identifier trong tập ba tên, rồi đọc
+`typeArguments.params` (hoặc `typeParameters.params` kiểu cũ). Nó đệ quy qua union ở tham số thứ hai và
+thu chỉ literal string `TSLiteralType`. Chỉ một key cấm là đủ báo trên node reference. Không resolve
+type và không mở declaration hay call site.
+
+**Điểm mù.** Key cấm đi qua type alias, template literal, computed literal, wrapper không phải union
+hoặc utility tên khác đều vô hình. Tham số utility thứ nhất không được xét cửa, key ngoài
+`className`/`classNames`/`style` không bị báo. Path ngoài `/src/`, test và utility viết qua local alias
+là các lối mở. `gap`, `padding`, `align`, `justify`, `inline`, `nested` không thuộc key set của luật
+này; declaration frame trực tiếp của chúng do `no-public-frame-css-props` xử lý.
+
+**Ranh giới.** Luật ngăn việc dùng utility type để giấu cửa CSS công khai. Nó không chứng minh base type
+thật sự có key đó, cũng không thay thế các luật declaration và usage.
 
 ## `no-surface-list-items-slot` — SLOTS-7
 
@@ -162,13 +259,21 @@ của người đọc.
 
 | Bộ phận | Cơ chế |
 |---|---|
-| chuẩn hóa dấu phân cách | `no-children-slot` và `no-surface-list-items-slot` đổi backslash thành `/` trước khi khớp, nên đường dẫn Windows quyết định y như nhau. `isInlineObjectType` không đọc đường dẫn nào cả |
+| chuẩn hóa dấu phân cách | Mọi luật có đọc tên file đều đổi backslash thành `/` trước khi khớp, nên đường dẫn Windows quyết định y như nhau. `no-inline-parameter-type` không đọc đường dẫn nào cả |
 | ngoài phạm vi | `create` trả về object visitor rỗng. Luật máy không tồn tại với file đó, chứ không phải cho file đó qua |
 | component roots | `COMPONENT_ROOTS = ["src/components", "packages/ui/src", "src"]`, import từ `contract.mjs`; `isGoverned` bỏ entry `src` trần và khớp hai entry còn lại dưới dạng `/<root>/` ở bất kỳ đâu trong đường dẫn |
+| cổng source SLOTS-6 | `no-per-part-classname-prop`, declaration của `no-public-classname-prop` và `no-public-frame-css-props` chỉ nhận hai component root có tên; `no-public-frame-css-props` bỏ tiếp `leaves`; usage của `no-public-classname-prop` không có cổng component-root |
+| cổng test SLOTS-6 | `isTestFile` tắt cả bốn luật SLOTS-6 cho file `.test/.spec`; `no-public-classname-prop` áp dụng cổng này trước cả visitor declaration và usage |
 | miễn trừ registry | `isContractTableFile(path)` — `contracts/index.ts` dưới bất kỳ root được hỗ trợ nào — tắt `no-children-slot` cho file đó |
 | phép duyệt shape | `isInlineObjectType` trả true trên `TSTypeLiteral`, đệ quy qua `TSParenthesizedType`, và `some` qua thành viên `TSIntersectionType` và `TSUnionType`. Không mở gì khác |
+| lấy tên property | `propertyName` đọc key identifier và static string literal từ `TSPropertySignature`; key computed/dynamic trả `null` |
+| matcher từng phần | `no-per-part-classname-prop` áp dụng `/^[a-z][A-Za-z0-9]*ClassName$/` và loại đúng tên `className` |
+| matcher tên public | `no-public-classname-prop` so chính xác tên `className` và `classNames` ở declaration và JSX attribute |
+| tập CSS frame | `no-public-frame-css-props` so membership chính xác trong `gap`, `padding`, `align`, `justify`, `className`, `classNames`, `style`, `inline`, `nested` |
+| bind component | `no-public-classname-prop` ghi mọi local import specifier có source chứa `/components/`; usage JSX chỉ xét tag `JSXIdentifier` trong tập đó |
+| duyệt utility | `no-css-door-type-laundering` chỉ nhận `Omit`, `Pick`, `Exclude`, đọc type parameter thứ hai và đệ quy qua member string literal của `TSUnionType` |
 | bind surface | Một regex nguồn import, `/(?:^|\/)components\/branches\/SurfaceListCard$/`, cộng một phép so đúng `imported.name === "SurfaceListCard"`, sinh ra tập tên thẻ cục bộ mà visitor JSX sẽ nhìn |
-| với ra ngoài file | Không có. Cả ba luật máy đọc một file; không luật máy nào mở một type đã import, một re-export hay chính component surface |
+| với ra ngoài file | Không có. Cả bảy luật máy đọc một file; không luật máy nào mở một type đã import, một re-export hay chính component surface |
 
 ## Lối thoát hợp lệ
 
@@ -181,8 +286,13 @@ của người đọc.
 | Một method signature không thân hàm, trong file khai báo | `TSEmptyBodyFunctionExpression` là một trong bốn dạng hàm được ghé |
 | `interface XProps { children?: ReactNode }` | `TSPropertySignature` ghé thành viên của interface và của type literal như nhau |
 | `function X({children, ...rest}: XProps)` | Một `children` destructure ở tham số bị báo như chính cái slot ấy đi vào bằng cửa khác |
+| Boundary converter đóng với một closure `useCallback` và một handoff JSX có tên | `Program:exit` nhận ra toàn shape và chỉ xóa candidate đó; thêm một quyết định layout thật sẽ bị báo |
 | Cùng component đó trong monorepo tại `packages/ui/src/...` | `COMPONENT_ROOTS` mang sẵn bố cục đó, nên hàng rào đứng ở cả hai repository chứ không im lặng ở cả hai |
 | Đường dẫn Windows với backslash | Cả hai phép thử phạm vi chuẩn hóa dấu phân cách trước |
+| `type P = { titleClassName?: string }` trong branch | Matcher per-part bắt mọi property `<part>ClassName` lower-camel, trừ đúng tên gốc `className` |
+| `type P = { className?: string }` trên tầng leaf | `no-public-classname-prop` và `no-public-frame-css-props` cùng đóng cửa public trực tiếp trong phạm vi tương ứng |
+| `<SurfaceCard classNames={map} />` sau import từ `components/` | Tập binding ghi tên local của import và visitor JSX kiểm cả hai tên placement public chính xác |
+| `type P = Omit<Base, "className">` | Walker utility đọc tham số thứ hai và báo key CSS ngay cả khi declaration đang bị thu hẹp |
 | `import {SurfaceListCard as ListCard}` rồi `<ListCard items={…} />` | Tập binding khóa theo `imported.name` và lưu tên cục bộ, nên một alias vẫn bị canh |
 | `<SurfaceListCard items={tasks} className="…" />` | Mọi `JSXAttribute` trên thẻ đã khớp đều được quét; các attribute khác không đổi gì |
 
@@ -193,21 +303,27 @@ của người đọc.
 | `no-inline-parameter-type` | **Một tham số không annotation**, **một shape cách đúng một utility type** — `Readonly<{…}>`, `Partial<{…}>`, `{…}[]` — và **bất kỳ cái tên nào**, vì `XProps` cho component `X` chỉ được đọc chứ không bao giờ được kiểm |
 | `no-children-slot` | **Một key viết trong nháy hoặc computed**, **một lỗ markup mang tên khác** như `content: ReactNode`, **`PropsWithChildren` hay bất kỳ props type nào import về**, **`const {children} = props` trong thân hàm**, **một đường dẫn ngoài hai component root**, và **trọn nửa khẳng định** — không gì kiểm rằng `contract` và `render` xuất hiện cùng nhau, hay rằng một closed shape chưa mọc thêm `render` |
 | `no-surface-list-items-slot` | **Mọi surface dùng chung khác**, **một barrel, một re-export, một đuôi file trong đường dẫn hay một default import**, **một thẻ có namespace**, **một binding gián tiếp**, **một spread attribute**, và **đúng cái lane chung đó viết thành `rows`, `entries` hay `data`** |
-| không luật máy nào | **Mọi thứ mà `SLOTS-1`, `SLOTS-2`, `SLOTS-5` và `SLOTS-6` cấm** — một handler đi trong `props`, một data shape khai bằng `interface`, một component tự quyết trạng thái chờ, và `className`, `style`, prop khoảng cách hay hook style theo từng phần. Ba trong số đó do type giữ, ở mọi nơi tier alias được dùng; một props type viết tay chưa từng dùng tier alias thì không có gì giữ, còn `SLOTS-5` thì không có gì giữ ở bất cứ đâu |
+| `no-per-part-classname-prop` | **Tên ngoài regex `<part>ClassName` lower-camel**, **`className`/`classNames` (do luật tên public sở hữu)**, **key computed**, **file test**, **file ngoài hai component root**, **props import hoặc ghép bằng utility**, và **usage site** |
+| `no-public-classname-prop` | **Key computed**, **JSX spread/member-expression**, **assignment và re-export không biểu diễn bởi import binding**, **import có source thiếu `/components/`**, **test**, **declaration ngoài component root**, và **tên CSS khác** |
+| `no-public-frame-css-props` | **File leaf**, **test**, **file ngoài hai component root**, **props computed hoặc kế thừa**, và **tên ngoài tập chính xác chín tên** |
+| `no-css-door-type-laundering` | **Alias, template/computed literal, wrapper không phải union, utility ngoài `Omit`/`Pick`/`Exclude`, cửa ở tham số thứ nhất, key ngoài `className`/`classNames`/`style`, test và path không có `/src/`** |
+| không luật máy nào | **Mọi thứ mà `SLOTS-1`, `SLOTS-2` và `SLOTS-5` cấm** — một handler đi trong `props`, một data shape khai bằng `interface`, và một component tự quyết trạng thái chờ. Type giữ hai mã đầu nơi tier alias được dùng; `SLOTS-5` thì không có gì giữ ở bất cứ đâu |
 
-Dòng cuối đó là bản tóm tắt trung thực: trong bảy mã, ba do luật máy ở đây giữ, ba do một hình dạng
-chỉ giữ được ở nơi hình dạng ấy được dùng, và một do người đọc giữ.
+Dòng cuối đó là bản tóm tắt trung thực: bảy luật máy đã xuất bản cưỡng chế `SLOTS-3`, `SLOTS-4`,
+`SLOTS-6` và `SLOTS-7`; `SLOTS-1` và `SLOTS-2` do type giữ nơi alias được dùng, còn `SLOTS-5` do
+người đọc giữ.
 
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
 | tên file | Đường dẫn đúng như luật máy nhìn thấy, dấu phân cách chuẩn hóa thành `/` |
-| quyết định phạm vi | Cổng nào đã khớp — `isGoverned`, `/src/`, hay không cổng nào cả — hoặc không cổng nào khớp |
+| quyết định phạm vi | Cổng nào đã khớp — `isGoverned`, cổng source/test/leaf của SLOTS-6, `/src/`, hay không cổng nào cả — hoặc không cổng nào khớp |
 | annotation tham số | `typeAnnotation.typeAnnotation` của mọi tham số hàm, và loại node ở từng lớp của nó |
-| key của property | Mọi key `TSPropertySignature`, và mọi key property trong `ObjectPattern`, kèm loại node của cha và ông |
+| key của property | Mọi key `TSPropertySignature`, kết quả tên tĩnh, và mọi key property trong `ObjectPattern`, kèm loại node của cha và ông |
 | import specifier | Chuỗi source đã chuẩn hóa, `imported.name` và `local.name` của từng specifier |
 | thẻ và attribute JSX | Mọi thẻ mở `JSXIdentifier`, và từng tên `JSXAttribute` trên các thẻ đã khớp một binding |
+| utility reference | Tên utility, danh sách type argument, loại node của tham số thứ hai, và mọi key string tĩnh được thu từ union |
 
 ## Quy tắc
 
@@ -221,13 +337,15 @@ chỉ giữ được ở nơi hình dạng ấy được dùng, và một do ng�
 8. Mỗi component một tier alias; component cần một alias khác là component đã chọn nhầm tầng.
 9. Danh tính của một luật máy là cái tên đã xuất bản của nó. Mã `SLOTS-<n>` gọi tên tình huống, ổn
    định, được trích dẫn từ ngoài module, và không bao giờ bị đánh số lại.
-10. Không luật máy nào nhận option: cả ba đều khai `schema: []`. Severity là núm vặn duy nhất một
-    repository có, và mức đã xuất bản là `error` cho cả ba dưới tiền tố `starci-fe/`.
-11. Mỗi luật máy đọc đúng một file. Không luật máy nào mở một type đã import hay chính component
-    surface.
+10. Không luật máy nào nhận option: cả bảy đều khai `schema: []`. Severity là núm vặn duy nhất một
+    repository có, và mức đã xuất bản là `error` cho cả bảy dưới tiền tố `starci-fe/`.
+11. Mỗi luật máy đọc đúng một file. Không luật máy nào mở một type đã import, utility alias, re-export
+    hay chính component surface.
 12. Ngoài phạm vi nghĩa là không visitor nào được cài, không phải file đã qua.
 13. `no-inline-parameter-type` báo mỗi tham số vi phạm một lần; `no-children-slot` mỗi node `children`
-    một lần; `no-surface-list-items-slot` mỗi attribute vi phạm một lần.
+    một lần; `no-per-part-classname-prop`, `no-public-classname-prop` và `no-public-frame-css-props`
+    mỗi property hoặc attribute vi phạm một lần; `no-css-door-type-laundering` mỗi utility reference
+    vi phạm một lần; `no-surface-list-items-slot` mỗi attribute vi phạm một lần.
 
 ## Ngoại lệ
 
@@ -241,16 +359,21 @@ phóng.
   việc duy nhất một page được phép làm. File route của framework được nhận ReactNode, và phải đóng nó
   thành một projection có tên trước khi ghép component. Ngoại lệ này cũng nằm trong mã, dưới dạng
   entry `src` trần bị bỏ.
-- **Các shell đóng.** `SLOTS-4` miễn cho những shell trao thẳng phần bên trong cho cơ chế vendor —
-  modal, drawer và dropdown — vì chúng không sắp xếp gì và không thể từ chối một hình dạng do vendor
-  khai. Danh sách là bốn file, gọi theo tên; không có miễn trừ theo cả thư mục. Ngoại lệ này sống
-  trong lời của luật chứ không trong luật máy: một shell nằm trong component tier vẫn bị
-  `no-children-slot` báo như mọi file khác.
+- **Boundary-converter shell.** `SLOTS-4` miễn một shape đóng trong component tier: function chỉ đọc
+  props, tạo một closure `useCallback` từ children, và trao reference đó cho đúng một JSX component
+  dưới một prop có tên. `Program:exit` kiểm tra function thật gắn với props type, không kiểm filename
+  hay export name. Return thứ hai, conditional, element cục bộ, data read hay giá trị bypass closure
+  sẽ đóng hatch và bị báo.
 - **Hai lane cho `render`.** `SLOTS-4` được thỏa bằng slot đã bind và bằng một component type có
   thương hiệu ổn định. Lane nào áp dụng là do dữ liệu runtime có lặp hay không quyết định, không phải
   do sở thích. Không luật máy nào đọc lane nào cả.
 - **Một tham số vô hướng.** `SLOTS-3` quản các shape. Một tham số kiểu `string` không phải một shape
   không nơi tra cứu và không cần alias — và `isInlineObjectType` trả false cho nó mà chẳng cần ai dặn.
+- **Leaf nguyên tử.** `SLOTS-6` cho phép leaf tự sở hữu spacing của frame cục bộ. Luật frame trực
+  tiếp bị tắt bởi `isInComponentTier(filename, "leaves")`; luật tên public và per-part vẫn xét các
+  declaration mà chúng được thiết kế để xét, còn test vẫn ngoài phạm vi cả bốn luật.
+- **Variant ngữ nghĩa không phải cửa CSS.** `tone`, `density`, `titleTone` và tên khác không khớp
+  tập luật chính xác vẫn hợp lệ. Bốn máy đóng tên placement; chúng không biến mọi prop thành finding.
 
 Không luật máy nào khai option, allowlist hay lối tắt riêng cho từng file. Lối ra duy nhất còn lại là
 một comment disable, và module này không cấp cái nào. Repository nào cần một cái là đang thay đổi luật,
@@ -262,10 +385,10 @@ Mỗi finding một block:
 
 ```text
 file: <path as the rule sees it, forward slashes>
-rule: <no-inline-parameter-type | no-children-slot | no-surface-list-items-slot>
+rule: <một trong bảy tên luật máy đã xuất bản>
 scope: <in | out — the gate that decided it, or "no gate">
-report: <inline | slot | items> at <node>
-code: <SLOTS-3 | SLOTS-4 | SLOTS-7>
+report: <inline | slot | perPart | declaration | usage | css | utility | items> at <node>
+code: <SLOTS-3 | SLOTS-4 | SLOTS-6 | SLOTS-7>
 hatch: <the open hatch that would have hidden this, or none>
 ```
 
@@ -402,5 +525,5 @@ hatch: the annotation is a TSTypeReference and isInlineObjectType recurses only 
 Module này ghi lại việc cưỡng chế, không ghi lại luật. Nó không gọi tên sản phẩm, thư viện component
 hay repository nào. Tên luật máy, message id, token mã và tiền tố plugin là những định danh xuất hiện
 trong build output nên được chép lại nguyên văn; mọi thứ viết quanh chúng là TSX bình thường. Phần do
-type giữ — `SLOTS-1`, `SLOTS-2`, `SLOTS-6` — thuộc về `@canon-fe-props`, còn phần không gì giữ —
-`SLOTS-5` — thuộc về người đọc.
+type giữ — `SLOTS-1` và `SLOTS-2` — thuộc về `@canon-fe-props`; bốn cửa CSS public của `SLOTS-6`
+thuộc về các luật máy đã nêu, còn phần không gì giữ — `SLOTS-5` — thuộc về người đọc.

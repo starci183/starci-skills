@@ -9,6 +9,12 @@ title: starci-be-plan · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
+| `@workspaces` | `contexts/workspaces/en.md` | en | canonical route and freshness verification before target reads |
+| `@be-patterns` | `standards/backend/patterns/en.md` | en | bind accepted backend facts to fixed pattern situations and exact files |
+| `@rule-bindings` | `standards/backend/rule-bindings/en.md` | en | prove enforced situations remain accountable to gates and machines |
+| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | refuse a brief missing the complete compiler boundary |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the approval-ready brief before presentation |
+| `@plan-check` | `machines/backend-plan/check.mjs` | script | prove content hash, real situations and complete file coverage |
 
 ## NESTED SKILLS
 
@@ -53,19 +59,25 @@ The brief lists each path the capability will need, with what it holds and why i
 Nothing is deferred to "wherever it ends up": a plan that cannot name its files cannot have its boundary
 approved, and an unapproved boundary is how unrelated code arrives in the diff.
 
-### 6 — Enumerate the test cases now
+### 6 — Bind every file to backend pattern situations
+
+Route the accepted shape through `@be-patterns`. Every reached module names fixed situation codes,
+exact paths and live schema/sibling evidence. A file with no binding is unplanned; a situation with no
+path is decorative law; an enforced situation missing rule accountability stops the plan.
+
+### 7 — Enumerate the test cases now
 
 Write the cases while the branches that would suggest them do not exist yet — that is the point of doing
 it here. Name the failing paths: rejected input, absent row, forbidden viewer, concurrent write,
 duplicate delivery, empty projection. Every exception the capability can raise derives from the abstract
 exception; a bare throw is not a case, it is a defect.
 
-### 7 — State boundaries, alternatives and acceptance evidence
+### 8 — State boundaries, alternatives and acceptance evidence
 
 The brief closes with: what this capability will not do, which alternatives were considered and why they
 lost, and exactly what evidence will prove it works — which test, which query, which runtime call.
 
-### 8 — Close the phase
+### 9 — Close the phase
 
 State the brief and exact boundary in friendly prose. Do not end while any planning work remains under
 `own`; the exact brief and boundary are the only `NEED APPROVALS` item.

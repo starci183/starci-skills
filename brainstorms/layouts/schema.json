@@ -39,7 +39,7 @@
       "required": ["id", "direction", "axes", "regions", "reason"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
-        "direction": {"$ref": "../directions/schema.json#/$defs/direction", "description": "The owner's selected direction, embedded so the one layout hash binds both visual intent and skeleton."},
+        "direction": {"$ref": "../directions/schema.json#/$defs/direction", "description": "The evidence-backed recommended direction, embedded so the owner's one layout approval binds both visual intent and skeleton."},
         "axes": {"$ref": "#/$defs/axes"},
         "citesPrecedent": {
           "type": "string",

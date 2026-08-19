@@ -68,7 +68,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-stale-list` | every workspace staleness category, including executed local gates and frontend or backend assurance wiring, and who clears each |
 | `starci-diagnose` | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
-| `starci-fe-design-layout` | 3–4 direction choices with no separate hash, then 3–4 layout candidates per surface, hash-bound |
+| `starci-fe-design-layout` | evidence-select one direction recommendation, then present 3–4 direction-backed layouts under one hash approval |
 | `starci-fe-design-block` | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
 | `starci-fe-design-execute` | frontend source, only after every reachable hash is accepted |
 | `starci-be-plan` | the backend brief: files, boundary, test cases |
@@ -105,10 +105,11 @@ scope. Silence and every word other than `OK` are not approval signals.
 ## Decisions and execution
 
 **Design rounds** are the review surface. Direction choices support a layout round and have no approval
-hash of their own; their exact candidates, selection or feedback live in that layout round's
-`directionReview`, and the selected object is embedded in the layout candidate. Each recorded round keeps the exact prompt, the candidates, the
-feedback and the owner's verdict, and acceptance is bound to a hash. Feedback opens a new round; it
-never edits an accepted round.
+hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in
+that layout round's `directionReview`, and the recommended object is embedded in every layout candidate.
+The owner sees both decisions together; one `OK` accepts the recommended layout hash and therefore its
+embedded direction. Each recorded round keeps the exact prompt, candidates, feedback and owner verdict.
+Feedback on either direction or structure opens a new round; it never edits an accepted round.
 
 Before writing, read canon, contracts and live source, then name the objective, evidence, exact boundary,
 decision and acceptance evidence. When owner authority is required, wait for `OK` before the first

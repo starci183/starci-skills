@@ -59,6 +59,8 @@ một mảng round trần không bao giờ phát hiện được.
 **Surface quyết định identity của session**, không phải cách viết prompt. Hai request khác lời cho cùng
 page vẫn là một session; prompt viết lại chỉ mở round mới. In `resumed <id>` hoặc `opened <id>` và giữ mọi
 accepted hash khi resume.
+Session mới dùng session schema 2. Khi resume session schema 1, giữ nguyên các round lịch sử; round mới
+vẫn dùng các field recommendation kết hợp.
 
 ### 5 — Sinh các direction choice
 
@@ -67,11 +69,17 @@ direction từ request, audience, feeling, token sống, màn đã duyệt, bran
 precedent. Validate bằng `@validate-artifact` với vocabulary, không dùng `--hash`; mọi preview dùng cùng
 content và reference skeleton.
 
-### 6 — Yêu cầu owner chọn một direction
+### 6 — Chọn direction đề xuất bằng evidence
 
-Hiện preview, evidence reuse/new, rejection và trade-off. Owner chọn exact object hoặc feedback; không sinh
-`directionHash`. Ghi nguyên candidates cùng selection hoặc lời feedback vào `directionReview` của layout
-round, rồi validate session bằng `@validate-artifact` và `@session`. Chưa chọn thì chưa sinh layout.
+So mọi direction hợp lệ với request, audience, feeling, vocabulary sống, brand evidence và precedent đã
+chấp nhận. Chọn đúng một object làm đề xuất dựa trên evidence và nói rõ vì sao nó phù hợp nhất. Đây là
+default tạm thời, không phải approval của owner, nên không dừng, không in `### NEED APPROVALS` và không
+sinh `directionHash` ở đây.
+
+Ghi direction batch với `schema: 2` cùng object `recommended`. Trong `directionReview` của layout round,
+ghi nguyên candidates, `state: recommended`, `recommendedId`, `selectionSource: evidence` và
+`selectionReason`, rồi validate cả hai artifact. Nếu evidence không đủ chọn một đề xuất, trả product
+decision còn thiếu dưới dạng refusal; chưa sinh layout.
 
 ### 7 — Đọc structural input
 
@@ -99,7 +107,7 @@ một surface thật không tìm được entry theo need. Đưa nguyên need v�
 
 ### 9 — Sinh 3–4 layout skeleton
 
-Nhúng cùng direction object vào mọi candidate, chỉ thay closed layout axes. Trùng axis set là một
+Nhúng cùng direction object được đề xuất vào mọi candidate, chỉ thay closed layout axes. Trùng axis set là một
 candidate; ít nhất một phải rời nearest precedent. Chỉ trả một khi thật sự chỉ có một skeleton hợp lệ.
 
 ### 10 — Từ chối product decision bằng chứng không giải được
@@ -132,10 +140,14 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-CSS preview chỉ là documentation chrome: vẽ region, tên, axis, entry và branch dưới direction đã chọn;
+CSS preview chỉ là documentation chrome: vẽ region, tên, axis, entry và branch dưới direction được đề xuất;
 không vẽ block internals hay mang product class.
 
 ### 12 — Queue approval và đóng
+
+Trình các direction cùng lý do đề xuất một direction bên cạnh các layout đã nhúng direction đó. Mở đúng
+một `### NEED APPROVALS` cho round này: layout hash được đề xuất là default, và `OK` duyệt đồng thời
+direction được nhúng với skeleton. Feedback có thể phản biện direction hoặc structure và mở round mới.
 
 Queue hash trong registry. Khi replacement accepted, đánh dấu layout accepted cũ là `superseded` và đặt
 `supersededBy`. Feedback mở sealed round mới. Validate session bằng `@validate-artifact`. Đánh dấu một
@@ -147,7 +159,7 @@ khi mọi record và validation thuộc Layout đã hoàn tất.
 - Route không có hoặc stale → dừng; báo đúng bằng chứng route đã fail rồi kết thúc lượt chạy.
 - Registry không lock, dirty hoặc thuộc Git khác → dừng; báo đúng bằng chứng ownership đã fail và không ghi.
 - Visual inventory rỗng hoặc không đọc được → dừng; không suy token từ screenshot.
-- Chưa chọn đúng một direction → giữ lựa chọn direction mở; chưa sinh layout.
+- Chưa có direction recommendation dựa trên evidence → trả quyết định còn thiếu; chưa sinh layout.
 - Class cần dùng không nằm trong closed set của contract → đây là **contract change**, trả owner.
 - Hai candidate còn trùng axis set → chúng là một; sinh lại thay vì đưa ra lựa chọn giả.
 
@@ -155,5 +167,5 @@ Không điểm dừng nào tự gọi skill khác. Nếu owner muốn phục h�
 
 ## ĐẦU RA
 
-Trình direction đã chọn, layout candidate, recommended default, hash và preview URL bằng văn xuôi ngắn.
-Chỉ dùng `### NEED APPROVALS` cho selection hiện tại hoặc quyết định accept/feedback. Không in bảng.
+Trình các direction, recommendation dựa trên evidence, layout candidate, layout hash mặc định và preview
+URL bằng văn xuôi ngắn. Chỉ dùng một `### NEED APPROVALS` cho quyết định kết hợp accept/feedback. Không in bảng.

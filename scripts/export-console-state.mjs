@@ -49,7 +49,7 @@ const ESLINT_CONFIGS = ["eslint.config.mjs", "eslint.config.js", "eslint.config.
 const PRIMARY_GATES = ["format", "lint", "typecheck", "build", "test"];
 const PRETTIER_PACKAGES = /^(prettier|eslint-plugin-prettier|eslint-config-prettier|prettier-plugin-.+)$/;
 
-function readMachine(diskPath) {
+function readMachine(diskPath, role) {
   const manifest = join(diskPath, "package.json");
   if (!existsSync(manifest)) return null;
   let deps = {};
@@ -59,16 +59,22 @@ function readMachine(diskPath) {
   } catch {
     return {installed: [], vendored: null, verdict: "unreadable manifest"};
   }
+  const expected = role === "fe" || role === "be" ? `@starci/eslint-canon-${role}` : null;
   const installed = Object.keys(deps).filter((name) => CANON_PACKAGES.test(name));
   const config = ESLINT_CONFIGS.map((name) => join(diskPath, name)).find(existsSync) ?? null;
   let vendored = null;
+  let importsExpected = false;
   if (config) {
     const text = readFileSync(config, "utf8");
     const local = text.match(/from\s+"(\.[^"]*eslint-canon[^"]*)"/) ?? text.match(/require\("(\.[^"]*eslint-canon[^"]*)"\)/);
     if (local) vendored = local[1];
+    importsExpected = Boolean(expected && text.includes(expected));
   }
-  const verdict = vendored ? "vendored" : installed.length ? "installed" : config ? "absent" : "no eslint config";
-  return {installed, vendored, config, verdict};
+  const verdict = vendored ? "vendored"
+    : expected && installed.includes(expected) && importsExpected ? "installed"
+    : config ? "absent"
+    : "no eslint config";
+  return {expected, installed, importsExpected, vendored, config, verdict};
 }
 
 // Reading the manifest tells us which gate surfaces exist without executing the project. The result is
@@ -126,8 +132,35 @@ function readFormatter(diskPath) {
 // Assurance is the delivery machine around otherwise-green gates. All local facts are readable without
 // executing the checkout. Secret VALUES are never opened: the scan proves only encrypted stack records
 // and symbolic workflow references. Branch protection remains an explicit external fact.
+function scriptProducesCoverage(scripts, name, seen = new Set()) {
+  if (seen.has(name)) return false;
+  seen.add(name);
+  const command = String(scripts[name] ?? "");
+  if (/\b(--coverage|test:(?:cov|coverage))\b|coverageReporters|vitest\s+run\s+--coverage/.test(command)) return true;
+  const nested = [...command.matchAll(/(?:npm|pnpm|yarn|bun)\s+run\s+([\w:-]+)/g)].map((match) => match[1]);
+  return nested.some((script) => scriptProducesCoverage(scripts, script, seen));
+}
+
+function deployWaitsForVerification(text) {
+  if (/workflow_(?:run|call)\s*:/i.test(text)) return true;
+  const needs = [...text.matchAll(/needs\s*:\s*(?:\[([^\]]+)\]|([^\s#]+))/gi)]
+    .flatMap((match) => `${match[1] ?? ""},${match[2] ?? ""}`.split(/[\s,]+/).filter(Boolean));
+  return needs.some((name) => /^(?:verify|verification|ci|quality|build|unit|test|coverage|sonar)$/i.test(name));
+}
+
+function badgeSurface(diskPath, sonarProjectKey) {
+  const readmePath = ["README.md", "README.MD", "readme.md"].map((name) => join(diskPath, name)).find(existsSync);
+  const readme = readmePath ? readFileSync(readmePath, "utf8") : "";
+  const sonarMetrics = ["alert_status", "coverage", "bugs", "vulnerabilities", "code_smells", "sqale_rating", "reliability_rating", "security_rating"];
+  return {
+    readmePath,
+    codecov: /codecov\.io\/gh\/[^\s)]+\/graph\/badge\.svg/.test(readme) && !/codecov[^\s)]*[?&]token=/i.test(readme),
+    sonar: sonarMetrics.every((metric) => new RegExp(`project_badges/measure\\?[^\\s)]*project=${sonarProjectKey || "[^&\\s)]+"}[^\\s)]*metric=${metric}`).test(readme)
+      || new RegExp(`project_badges/measure\\?[^\\s)]*metric=${metric}[^\\s)]*project=${sonarProjectKey || "[^&\\s)]+"}`).test(readme)),
+  };
+}
+
 function readAssurance(diskPath, role) {
-  if (role !== "be") return null;
   const manifestPath = join(diskPath, "package.json");
   if (!existsSync(manifestPath)) return {verdict: "stale", missing: ["package manifest"], external: ["branch protection not measured"]};
 
@@ -165,6 +198,11 @@ function readAssurance(diskPath, role) {
   const codecovConfig = codecovConfigPath ? readFileSync(codecovConfigPath, "utf8") : "";
   const sonarConfigPath = join(diskPath, "sonar-project.properties");
   const sonarConfig = existsSync(sonarConfigPath) ? readFileSync(sonarConfigPath, "utf8") : "";
+  const sonarProjectKey = sonarConfig.match(/^sonar\.projectKey\s*=\s*(\S+)\s*$/m)?.[1] ?? null;
+  const badges = badgeSurface(diskPath, sonarProjectKey);
+  const ciCoverage = ["test:ci", "test:cov", "test:coverage"].some((name) => scriptProducesCoverage(scripts, name));
+  const codecovOidc = /use_oidc\s*:\s*true/i.test(prWorkflows) && /id-token\s*:\s*write/i.test(prWorkflows);
+  const codecovToken = /secrets\.CODECOV_TOKEN/.test(prWorkflows);
 
   const checks = {
     "ASSURANCE-1 Husky installed": Boolean(deps.husky),
@@ -177,20 +215,22 @@ function readAssurance(diskPath, role) {
     "ASSURANCE-2 CI runs check-only lint": /\blint:check\b/.test(prWorkflows),
     "ASSURANCE-2 CI runs typecheck or build": /\b(typecheck|build)\b/.test(prWorkflows),
     "ASSURANCE-2 CI runs unit tests": /\btest:(ci|unit|cov|coverage)\b/.test(prWorkflows),
-    "ASSURANCE-3 CI produces LCOV coverage": /(test:(cov|coverage)|--coverage)\b/.test(prWorkflows) && /lcov|coverage\/lcov\.info/.test(`${prWorkflows} ${JSON.stringify(scripts)}`),
+    "ASSURANCE-3 CI produces LCOV coverage": ciCoverage && /lcov|coverage\/lcov\.info/.test(`${prWorkflows} ${JSON.stringify(scripts)}`),
     "ASSURANCE-3 Codecov uploads coverage": /codecov\/codecov-action@/.test(prWorkflows),
     "ASSURANCE-3 Codecov consumes coverage/lcov.info": /coverage\/lcov\.info/.test(prWorkflows),
     "ASSURANCE-3 Codecov blocks patch and project coverage": /^\s*patch\s*:/m.test(codecovConfig) && /^\s*project\s*:/m.test(codecovConfig) && !/^\s*informational\s*:\s*true\s*$/m.test(codecovConfig),
     "ASSURANCE-4 SonarQube scans the checkout": /SonarSource\/sonarqube-scan-action@/i.test(prWorkflows),
     "ASSURANCE-4 SonarQube consumes coverage/lcov.info": /sonar\.(javascript|typescript)\.lcov\.reportPaths\s*=\s*coverage\/lcov\.info/i.test(`${sonarConfig}\n${prWorkflows}`),
     "ASSURANCE-4 SonarQube quality gate blocks": /SonarSource\/sonarqube-quality-gate-action@|sonar\.qualitygate\.wait\s*=\s*true/i.test(prWorkflows),
-    "ASSURANCE-5 workflow references CODECOV_TOKEN": /secrets\.CODECOV_TOKEN/.test(prWorkflows),
+    "ASSURANCE-3 README carries a token-free Codecov badge": badges.codecov,
+    "ASSURANCE-4 README carries the complete token-free Sonar metric set": Boolean(sonarProjectKey) && badges.sonar,
+    "ASSURANCE-5 Codecov uses a declared CI identity": codecovToken || codecovOidc,
     "ASSURANCE-5 workflow references SONAR_TOKEN": /secrets\.SONAR_TOKEN/.test(prWorkflows),
     "ASSURANCE-5 workflow references SONAR_HOST_URL": /(vars|secrets)\.SONAR_HOST_URL/.test(prWorkflows),
     "ASSURANCE-5 stack-secret entrypoint exists": /stack-secret\.mjs\s+set/.test(String(scripts["secret:set"] ?? "")),
-    "ASSURANCE-5 Codecov token is encrypted in stacks": existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "codecov-token.key.enc")),
+    "ASSURANCE-5 Codecov token is encrypted in stacks": codecovOidc || existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "codecov-token.key.enc")),
     "ASSURANCE-5 SonarQube token is encrypted in stacks": existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "sonarqube-token.key.enc")),
-    "ASSURANCE-7 deployment waits for verification": deployWorkflows.length === 0 || deployWorkflows.every((text) => /needs:\s*(\[[^\]]*verify[^\]]*\]|verify\b)|workflow_(run|call)\s*:/i.test(text)),
+    "ASSURANCE-7 deployment waits for verification": deployWorkflows.length === 0 || deployWorkflows.every(deployWaitsForVerification),
   };
   const missing = declarationIssues.concat(Object.entries(checks).filter(([, present]) => !present).map(([name]) => name));
   return {
@@ -249,7 +289,10 @@ function readWorkspaces() {
   const root = join(source, ".workspace");
   const rows = [];
   for (const project of dirs(root)) {
-    for (const role of dirs(join(root, project))) {
+    const projectRoot = join(root, project);
+    const routedRoles = dirs(projectRoot).filter((role) => existsSync(join(projectRoot, role, "config.json")));
+    if (routedRoles.length === 0) continue;
+    for (const role of routedRoles) {
       const route = join(root, project, role, "config.json");
       if (!existsSync(route)) {
         rows.push({project, role, route, diskPath: null, diskPathExists: false, contract: null, contractExists: false, contractSource: null, branch: null, recordedHead: null, liveHead: null, verdict: "absent", reason: "no config.json at the route"});
@@ -301,7 +344,7 @@ function readWorkspaces() {
       }
 
       const remnant = diskPathExists ? readRemnant(diskPath) : null;
-      const machine = diskPathExists ? readMachine(diskPath) : null;
+      const machine = diskPathExists ? readMachine(diskPath, role) : null;
       const gates = diskPathExists ? readGateSurface(diskPath) : null;
       const formatter = diskPathExists ? readFormatter(diskPath) : null;
       const assurance = diskPathExists ? readAssurance(diskPath, role) : null;

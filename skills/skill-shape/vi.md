@@ -74,7 +74,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-stale-list` | mọi stale category, gồm local gate được chạy và frontend hoặc backend assurance wiring, cùng ai dọn từng loại |
 | `starci-diagnose` | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
-| `starci-fe-design-layout` | 3–4 lựa chọn direction không có hash riêng, rồi 3–4 phương án layout mỗi bề mặt, buộc theo hash |
+| `starci-fe-design-layout` | chọn một direction recommendation bằng evidence, rồi trình 3–4 layout đã nhúng direction dưới một approval hash |
 | `starci-fe-design-block` | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
 | `starci-fe-design-execute` | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
@@ -110,10 +110,11 @@ phải tín hiệu approval.
 ## Quyết định và thi hành
 
 **Các lượt design** chính là mặt để rà soát. Lựa chọn direction hỗ trợ một lượt layout và không có
-approval hash riêng; candidate chính xác, lựa chọn hoặc phản hồi của nó nằm trong `directionReview` của
-lượt layout, còn object được chọn nằm trong candidate layout. Mỗi lượt được ghi giữ đúng prompt, các phương án, phản hồi và phán
-quyết của người chủ, và sự chấp nhận **buộc theo hash**. Phản hồi mở một lượt mới; nó không bao giờ sửa
-một lượt đã được chấp nhận.
+approval hash hay checkpoint owner riêng. Candidate chính xác cùng recommendation dựa trên evidence nằm
+trong `directionReview`, còn object được đề xuất nằm trong mọi candidate layout. Owner xem hai quyết định
+cùng lúc; một `OK` chấp nhận layout hash mặc định và vì vậy chấp nhận direction được nhúng. Mỗi lượt giữ
+đúng prompt, candidate, feedback và phán quyết của owner. Phản hồi về direction hoặc structure mở lượt
+mới; nó không bao giờ sửa lượt đã được chấp nhận.
 
 Trước khi ghi, đọc canon, hợp đồng và source sống rồi nêu mục tiêu, bằng chứng, boundary chính xác,
 quyết định và bằng chứng nghiệm thu. Khi cần quyền owner, chờ `OK` trước lần ghi sản phẩm đầu tiên và giữ

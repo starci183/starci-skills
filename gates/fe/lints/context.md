@@ -26,12 +26,16 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `no-unknown-contract-key` | machine-only identity | a requested contract key is absent | `contract/context.md` |
 | `no-interaction-class-in-entry` | CONTRACT-12 | a contract entry owns interaction, paint or elevation | `contract/context.md` |
 | `no-dead-contract-key` | CONTRACT-13 | a contract key has no reachable consumer | `contract/context.md` |
+| `contract-children-are-typed` | CONTRACT-11 | a contract child/slot declaration omits or contradicts its typed owner and cardinality | `contract/context.md` |
+| `no-structural-arrangement-in-leaf` | CONTRACT-1, CONTRACT-7 | a leaf arranges multiple structural contents and therefore escapes the contract boundary through its tier exemption | `contract/context.md` |
 | `export-matches-folder` | FILE-1 | a surface's named export differs from its folder | `file-layout/context.md` |
 | `surface-folder-two-files-only` | FILE-2 | a surface folder contains files beyond its closed pair | `file-layout/context.md` |
 | `no-helper-folder-in-components` | FILE-3 | a helper-like folder appears in the component tree | `file-layout/context.md` |
 | `no-runtime-namespace` | FILE-4 | a runtime namespace object is introduced | `file-layout/context.md` |
 | `monorepo-tier-belongs-to-its-side` | FILE-5 | feature tiers cross the app/shared-package boundary | `file-layout/context.md` |
 | `route-tree-holds-routes-only` | FILE-6 | non-route implementation lives in the route tree | `file-layout/context.md` |
+| `source-tier-marker-matches-folder` | FILE-7 | a declared source-tier marker disagrees with the file's actual tier folder | `file-layout/context.md` |
+| `no-shell-tier` | FILE-8 | a retired shell tier or shell-shaped source boundary is introduced | `file-layout/context.md` |
 | `no-off-scale-glyph-size` | ICON-1 | an icon size is fractional, arbitrary or off the approved scale | `icon/context.md` |
 | `no-vendor-icon-outside-icon-leaf` | ICON-6 | a vendor glyph is imported outside the icon leaf | `icon/context.md` |
 | `heroicons-is-the-glyph-vendor` | ICON-7 | a glyph package is outside the approved Heroicons families | `icon/context.md` |
@@ -49,6 +53,10 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `no-inline-parameter-type` | SLOTS-3 | a destructured parameter carries an inline object type | `props-and-slots/context.md` |
 | `no-children-slot` | SLOTS-4 | a governed surface exposes a generic `children` slot | `props-and-slots/context.md` |
 | `no-surface-list-items-slot` | SLOTS-7 | a surface accepts pre-shaped list items rather than owned data | `props-and-slots/context.md` |
+| `no-public-classname-prop` | SLOTS-6 | a public props surface exposes a generic `className` appearance door | `props-and-slots/context.md` |
+| `no-per-part-classname-prop` | SLOTS-6 | a public props surface exposes a `<part>ClassName` appearance door | `props-and-slots/context.md` |
+| `no-public-frame-css-props` | SLOTS-6 | a non-leaf public surface exposes CSS-shaped frame props | `props-and-slots/context.md` |
+| `no-css-door-type-laundering` | SLOTS-6 | `Omit`, `Pick` or `Exclude` launders an appearance door through a public props type | `props-and-slots/context.md` |
 | `api-client-attaches-the-locale` | LOCALE-1 | the terminal HTTP client omits locale attachment | `served-locale/context.md` |
 | `locale-header-belongs-to-the-link` | LOCALE-5 | `x-locale` is attached outside the locale link | `served-locale/context.md` |
 | `presentational-purity` | SPLIT-1 | a presentational component reaches into state or services | `the-split/context.md` |

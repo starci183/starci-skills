@@ -10,6 +10,13 @@ description: Challenge a backend plan against real schema and sibling code, loop
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
+| `@workspaces` | `contexts/workspaces/context.md` | context | re-verify checkout, branch and source revision before approval |
+| `@be-patterns` | `standards/backend/patterns/context.md` | context | challenge the plan's situation-to-file bindings against current source |
+| `@rule-bindings` | `standards/backend/rule-bindings/context.md` | context | refuse an enforced situation whose gate or machine identity drifted |
+| `@rule-binding-check` | `machines/rule-bindings/check.mjs` | script | execute backend gate-to-canon parity before approval and after implementation |
+| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate that the revision being approved carries the complete compiler boundary |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | refuse a malformed or incomplete brief before the approval loop |
+| `@plan-check` | `machines/backend-plan/check.mjs` | script | refuse stale content identity, invented situations or uncovered files |
 
 ## NESTED SKILLS
 
@@ -18,7 +25,7 @@ None. This skill never invokes another skill.
 
 ## Run
 
-Read `@skill-shape` first. This skill contains both the approval loop and
+Read `@skill-shape`, `@workspaces`, `@be-patterns` and `@rule-bindings` in that order. This skill contains both the approval loop and
 the implementation, with a hard stop between them. The stop is the whole point: everything before it is
 reversible, everything after it is in the product.
 
@@ -33,10 +40,15 @@ exact backend paths the approved boundary names, and nothing else.
 
 Re-read what the plan claims, against the checkout rather than against the plan's own summary:
 
+First validate the exact revision against `@plan-schema` using `@validate-artifact`, then run
+`@plan-check`; a prose summary is not an approval identity.
+
 - does every named file's parent folder exist, and does the family really look like that?
 - does every field the plan uses exist in the schema under that name?
 - does the exception path derive from the abstract exception, as the siblings do?
 - are the enumerated test cases the ones this capability can actually fail on?
+- does every planned file have a binding with fixed pattern situations and live evidence?
+- does each binding still route to the same authority, and does `@rule-binding-check --be` pass?
 
 A plan that survives this unchanged is rare. Say what changed, and why.
 
@@ -62,15 +74,16 @@ current target state and record `Baseline commit: <sha>` — taken before the fi
 ### 5 — Implement exactly the approved revision
 
 Only the approved files. A required path outside the boundary returns to the owner; it never arrives
-quietly in the diff. Mirror the sibling family the plan cited: layering, transport, data access,
-exception identity, naming. Every exception derives from the abstract exception.
+quietly in the diff. Mirror the sibling family and every approved pattern binding the plan cited:
+layering, transport, data access, exception identity, naming and every other reached situation. Every
+exception derives from the abstract exception. A binding is an implementation constraint, not review prose.
 
 Preserve unrelated work in the tree. Suppressions, weakened gates and skipped tests are not
 implementation choices available here.
 
 ### 6 — Prove it with the evidence the approval named
 
-Run the enumerated cases, not a cheaper substitute. Then the repository's real gates — lint, typecheck,
+Run `@rule-binding-check --be`, then the enumerated cases, not a cheaper substitute. Then the repository's real gates — lint, typecheck,
 build, tests — and the runtime proof the acceptance evidence named, such as a live query or a boot probe.
 A gate that fails is repaired. For an unreachable gate, exhaust safe fallbacks; if owner authority is
 required, use `### NEED APPROVALS`, otherwise state the external blocker without claiming a pass.
@@ -89,6 +102,9 @@ every production path and match the approved boundary exactly.
   once; `OK` for the displayed default is not ambiguous.
 - The tree is already dirty with unrelated work → stop; a baseline from mixed state proves nothing.
 - A required path is outside the boundary → return to the owner rather than widening it silently.
+- A file has no approved pattern binding, or a binding no longer matches current law/source → return to
+  planning; approval cannot repair incomplete compiler input.
+- Backend rule-binding parity is red → stop before production write; machine and law disagree.
 - A gate cannot pass without weakening it → stop; the rule does not bend to the code.
 
 ## OUTPUT

@@ -9,15 +9,16 @@
 | `@artifact-validator` | `scripts/validate-artifact.mjs` | script | Enforces batch diversity and token provenance before selection. |
 
 You are given a product request and the frontend's live visual vocabulary, and return **3–4 visual
-directions** for the owner to choose between. A direction decides the intended relationship between
+directions** with one evidence-backed recommendation. A direction decides the intended relationship between
 semantic roles and tokens. It does not decide layout, block anatomy, or a class.
 
 ## Law
 
 Visual taste is a product decision. The machine can refuse an invented token, a duplicated option, or
-a choice that cannot be traced to evidence; it cannot declare one valid option beautiful. The owner
-selects one exact direction object before structural design begins. That object becomes durable only
-inside the later layout candidate and its single layout hash.
+a recommendation that cannot be traced to evidence; it cannot declare one valid option beautiful. This
+stage selects one exact object as a provisional recommendation so structural design can continue without
+a separate owner checkpoint. The owner approves or challenges that direction only when it is embedded in
+the later layout candidate under the single layout hash.
 
 External style libraries are recommendation sources only. A recommendation becomes a candidate only
 after it is expressed through this project's vocabulary or names every new token it would require.
@@ -90,6 +91,7 @@ approval.
 6. At least one direction departs from the nearest precedent when a precedent exists.
 7. Return fewer than three only when the evidence permits fewer, and state why; never pad a batch.
 8. Feedback opens a new round. An accepted direction is never edited in place.
+9. Every schema-2 batch recommends exactly one candidate and states the evidence-backed reason.
 
 ## Preview
 
@@ -108,8 +110,9 @@ has authorised a new one. Return the missing decision and the roles it blocks.
 
 ## Output
 
-The output is JSON validated by `@direction-schema`. Validate it against both the schema and
-the generated vocabulary before presenting it for selection:
+The output is JSON validated by `@direction-schema`. New runs write `schema: 2`, including
+`recommended.id` and its evidence-backed reason, then validate against both the schema and the generated
+vocabulary before structural design:
 
 ```bash
 node @artifact-validator \
@@ -117,6 +120,7 @@ node @artifact-validator \
   --data <batch.json> --vocabulary <visual-vocabulary.json>
 ```
 
-The direction round has no approval hash. The selected direction object is copied unchanged into every
-layout candidate in the next round, where the one layout hash binds visual intent and skeleton together.
+The direction round has no approval hash and no separate owner checkpoint. The recommended direction
+object is copied unchanged into every layout candidate in the same layout round, where one `OK` on the
+layout hash approves visual intent and skeleton together.
 The vocabulary snapshot conforms to `@visual-vocabulary-schema`.

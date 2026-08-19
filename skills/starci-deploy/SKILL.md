@@ -12,6 +12,7 @@ description: Adopt, set up, deploy, monitor, recover or roll back a routed proje
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval, persistence and output contract |
 | `@initialization` | `readiness/initialization/context.md` | context | identity, bootstrap, routed workspace and worktree readiness |
 | `@deployment` | `deployment/context.md` | context | manifest, `.infra`, setup, domain, deploy and monitor law |
+| `@deployment-plan` | `scripts/deployment-plan.mjs` | script | validate, plan and initialize the declared deployment without duplicating manifest logic in the skill |
 
 ## NESTED SKILLS
 

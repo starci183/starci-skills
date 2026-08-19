@@ -41,6 +41,16 @@ export const groups = [
     description: "Executable operator guides for every StarCi service and external integration: provision, start, verify, rotate, stop and recover without exposing credentials.",
   },
   {
+    source: "standards/backend",
+    title: "Backend standards",
+    description: "Stable v4 pattern bindings and pattern-to-gate-to-machine accountability for approved backend source.",
+  },
+  {
+    source: "standards/frontend",
+    title: "Frontend standards",
+    description: "Stable v4 accountability between frontend design/source patterns, gates and the published lint canon.",
+  },
+  {
     source: "compilers/principles",
     title: "Principles",
     description: "Ground rules: each module decides one className from a business relationship, never from how it looks.",
@@ -58,12 +68,12 @@ export const groups = [
   {
     source: "brainstorms/directions",
     title: "Directions",
-    description: "From live product tokens and brand evidence to 3–4 visual directions; the selected object is embedded in the layout rather than approved under a second hash.",
+    description: "From live product tokens and brand evidence to 3–4 visual directions and one evidence-backed recommendation, with no separate approval checkpoint.",
   },
   {
     source: "brainstorms/layouts",
     title: "Layouts",
-    description: "From one selected direction and a business request to 3–4 structural layout JSON candidates — one layout hash binds both.",
+    description: "From one recommended direction and a business request to 3–4 structural layout JSON candidates — one owner approval binds both.",
   },
   {
     source: "brainstorms/blocks",

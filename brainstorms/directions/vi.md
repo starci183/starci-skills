@@ -13,15 +13,15 @@ title: Directions · Vietnamese
 | `@artifact-validator` | `scripts/validate-artifact.mjs` | script | Enforces batch diversity and token provenance before selection. |
 
 Đầu vào là yêu cầu sản phẩm cùng vốn thị giác đang sống của frontend, và đầu ra là **3–4 hướng thị
-giác** để người chủ chọn. Một hướng quyết định quan hệ dự kiến giữa vai trò ngữ nghĩa và token. Nó
+giác** cùng một recommendation dựa trên evidence. Một hướng quyết định quan hệ dự kiến giữa vai trò ngữ nghĩa và token. Nó
 không quyết định layout, giải phẫu block hay class.
 
 ## Luật
 
-Gu thị giác là một quyết định sản phẩm. Máy có thể từ chối token bịa, phương án trùng hay lựa chọn
-không truy được về bằng chứng; máy không thể tuyên bố một phương án hợp lệ là đẹp. Người chủ chấp
-chọn đúng một object direction trước khi thiết kế cấu trúc bắt đầu. Object đó chỉ trở thành bền vững
-khi nằm trong candidate layout về sau cùng một layout hash duy nhất.
+Gu thị giác là một quyết định sản phẩm. Máy có thể từ chối token bịa, phương án trùng hay recommendation
+không truy được về bằng chứng; máy không thể tuyên bố một phương án hợp lệ là đẹp. Tầng này chọn đúng một
+object làm recommendation tạm thời để thiết kế cấu trúc tiếp tục mà không mở checkpoint owner riêng.
+Owner duyệt hoặc phản biện direction đó khi nó đã nằm trong candidate layout dưới layout hash duy nhất.
 
 Kho style bên ngoài chỉ là nguồn đề xuất. Một đề xuất chỉ thành candidate sau khi được phát biểu bằng
 vốn của project này, hoặc gọi tên mọi token mới mà nó sẽ cần.
@@ -94,6 +94,7 @@ chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt ri�
 6. Có ít nhất một direction rời tiền lệ gần nhất khi tiền lệ tồn tại.
 7. Chỉ trả ít hơn ba khi bằng chứng chỉ cho phép ít hơn, và nói lý do; không bao giờ nhồi cho đủ.
 8. Feedback mở một lượt mới. Direction đã chấp nhận không bao giờ bị sửa tại chỗ.
+9. Mọi batch schema 2 đề xuất đúng một candidate và ghi lý do dựa trên evidence.
 
 ## Preview
 
@@ -112,8 +113,8 @@ chưa ai cho phép tạo token mới. Trả về quyết định còn thiếu c�
 
 ## Đầu ra
 
-Đầu ra là JSON được kiểm bởi `@direction-schema`. Kiểm nó với cả schema lẫn vốn được sinh
-trước khi trình để chọn:
+Đầu ra là JSON được kiểm bởi `@direction-schema`. Lượt mới ghi `schema: 2`, gồm `recommended.id` và lý do
+dựa trên evidence, rồi kiểm với cả schema lẫn vốn được sinh trước khi thiết kế cấu trúc:
 
 ```bash
 node @artifact-validator \
@@ -121,9 +122,9 @@ node @artifact-validator \
   --data <batch.json> --vocabulary <visual-vocabulary.json>
 ```
 
-Vòng direction không có approval hash. Object direction được chọn được chép nguyên vào mọi candidate
-layout ở vòng kế tiếp, nơi một layout hash duy nhất buộc ý định thị giác với sườn. Snapshot vốn khớp
-`@visual-vocabulary-schema`.
+Vòng direction không có approval hash và không có checkpoint owner riêng. Object direction được đề xuất
+được chép nguyên vào mọi candidate layout trong cùng layout round, nơi một `OK` trên layout hash duyệt
+đồng thời ý định thị giác với sườn. Snapshot vốn khớp `@visual-vocabulary-schema`.
 
 ## Ví dụ đã giải
 

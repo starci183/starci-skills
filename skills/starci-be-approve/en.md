@@ -9,6 +9,13 @@ title: starci-be-approve · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
+| `@workspaces` | `contexts/workspaces/en.md` | en | re-verify checkout, branch and source revision before approval |
+| `@be-patterns` | `standards/backend/patterns/en.md` | en | challenge situation-to-file bindings against current source |
+| `@rule-bindings` | `standards/backend/rule-bindings/en.md` | en | refuse drift between enforced situations, gates and machines |
+| `@rule-binding-check` | `machines/rule-bindings/check.mjs` | script | execute backend gate-to-canon parity |
+| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate the complete compiler boundary being approved |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | refuse a malformed brief before the approval loop |
+| `@plan-check` | `machines/backend-plan/check.mjs` | script | refuse stale identity, invented situations and uncovered files |
 
 ## NESTED SKILLS
 
@@ -17,7 +24,7 @@ None. This skill never invokes another skill.
 
 ## Run
 
-Read `@skill-shape` first. This skill contains both the approval loop and
+Read `@skill-shape`, `@be-patterns` and `@rule-bindings` in that order. This skill contains both the approval loop and
 the implementation, with a hard stop between them. The stop is the whole point: everything before it is
 reversible, everything after it is in the product.
 
@@ -36,6 +43,8 @@ Re-read what the plan claims, against the checkout rather than against the plan'
 - does every field the plan uses exist in the schema under that name?
 - does the exception path derive from the abstract exception, as the siblings do?
 - are the enumerated test cases the ones this capability can actually fail on?
+- does every planned file have fixed pattern situations, exact paths and live evidence?
+- does `@rule-binding-check --be` prove gate-to-canon parity?
 
 A plan that survives this unchanged is rare. Say what changed, and why.
 
@@ -69,7 +78,7 @@ implementation choices available here.
 
 ### 6 — Prove it with the evidence the approval named
 
-Run the enumerated cases, not a cheaper substitute. Then the repository's real gates — lint, typecheck,
+Run `@rule-binding-check --be`, then the enumerated cases, not a cheaper substitute. Then the repository's real gates — lint, typecheck,
 build, tests — and the runtime proof the acceptance evidence named, such as a live query or a boot probe.
 A gate that fails is repaired. For an unreachable gate, exhaust safe fallbacks; if owner authority is
 required, use `### NEED APPROVALS`, otherwise state the external blocker without claiming a pass.

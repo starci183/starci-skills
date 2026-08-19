@@ -34,7 +34,7 @@ including the places where a rule is narrower than the sentence it is named afte
 
 ## Published rules
 
-Ten rules ship, and the source publishes exactly ten entries in its `rules` export.
+Twelve rules ship, and the source publishes exactly twelve entries in its `rules` export.
 
 | Rule | Code | What it reports |
 |---|---|---|
@@ -43,11 +43,13 @@ Ten rules ship, and the source publishes exactly ten entries in its `rules` expo
 | `only-the-frame-wears-a-node` | `CONTRACT-4` | `worn` — a call to `contractNodeProps` anywhere but the frame |
 | `contract-why-is-a-reason` | `CONTRACT-6` | `tooShort` — a reason under twelve words; `restates` — a reason built only from the words of the key |
 | `no-structural-host-outside-contract-frame` | `CONTRACT-7` | `host` — a hand-written neutral box; `styledSemantic` — a semantic element carrying a class |
+| `no-structural-arrangement-in-leaf` | `CONTRACT-1, CONTRACT-7` | `arrangement` — a leaf nests a structural host or owns multiple structural host siblings |
 | `no-hand-written-contract-attrs` | `CONTRACT-8` | `marker` — a `data-node` or `data-why` attribute written by hand |
 | `no-duplicate-entry-shape` | `CONTRACT-9` | `duplicate` — an entry whose classes, host and slots another entry already spells |
 | `no-unknown-contract-key` | *none* | `unknown` — a key that is not in the table, with the list of keys that are |
 | `no-interaction-class-in-entry` | `CONTRACT-12` | `interaction`, `paint`, `raised` — an entry class that is behaviour, paint or elevation rather than arrangement |
 | `no-dead-contract-key` | `CONTRACT-13` | `dead` — a key in the table that no walked file and no sibling slot names |
+| `contract-children-are-typed` | `CONTRACT-11` | `missing` — an entry has no object-valued `children` grammar; `untyped` — a slot has no `leaf`, `composite` or `contract` owner identity |
 
 **`no-unknown-contract-key` enforces no code in the law, and that is a finding rather than a gap to
 paper over.** Its message quotes `CONTRACT-9` and `CONTRACT-5` as advice, but the check it performs is
@@ -55,11 +57,13 @@ membership: does this string appear as a key in the table. No numbered code stat
 governs whether a NEW key is justified — a judgement no rule takes — and the rule that actually holds
 `CONTRACT-9` is `no-duplicate-entry-shape`. A verdict citing this rule writes `code: none`.
 
-Three codes have no rule and are not meant to have one. `CONTRACT-3` and `CONTRACT-11` are closed
-unions and a checked slot record, held by the type system. `CONTRACT-5` — a key's NAME fixes what goes
-inside it — is held by nothing and appears only as prose inside another rule's message. `CONTRACT-10`
-is expressed as an exemption rather than a rule: four named surface branches are excused from two
-rules so each can own its fixed wrapper.
+Three codes have no published rule and are not meant to have one. `CONTRACT-3` is a closed union held
+by the type system. `CONTRACT-11` is held partly by the slot record type and partly by
+`contract-children-are-typed`, because the table's object literal is written before a consuming
+component gives it a type. `CONTRACT-5` — a key's NAME fixes what goes inside it — is held by nothing
+and appears only as prose inside another rule's message. `CONTRACT-10` is expressed as an exemption
+rather than a rule: four named surface branches are excused from two rules so each can own its fixed
+wrapper.
 
 ## Reading a diff
 
@@ -68,7 +72,8 @@ rules so each can own its fixed wrapper.
    either way, so the verdict has to say which.
 2. **Check the exemptions second**, before reading any node. `leaves/`, `branches/Tree/`, the four
    named surface branches, `.test.`/`.spec.` files and `.artifacts` each switch specific rules off.
-3. **Read the file's nodes for the nine AST rules.** One parser, one file, one pass.
+3. **Read the file's nodes for the AST rules.** One parser, one file, one pass; table rules inspect
+   the selected `buildContracts` object, and the leaf rule inspects the leaf's JSX tree.
 4. **Read the table and the tree only where a rule asks for them** — the key list for
    `no-unknown-contract-key`, the repository walk for `no-dead-contract-key`.
 5. **Emit one block per finding**, naming the mechanism that fired.
@@ -267,14 +272,63 @@ mentioning `ContractKey` promotes every quoted hyphenated literal in it to a ref
 **Boundary.** A tree that cannot be walked produces no findings at all rather than a table declared
 dead.
 
+## `contract-children-are-typed` — CONTRACT-11
+
+**What it reports.** `missing` when a static contract entry has no object-valued `children` grammar;
+`untyped` when one of that grammar's slots is not an object or names no owner identity. An identity is
+one of the literal property names `leaf`, `composite` or `contract`.
+
+**How it detects.** Only a file recognised as a contract table is visited. On each bare
+`buildContracts({ ... })` call whose first argument is an object, the rule checks each object-valued
+entry. It finds the entry's own `children` property and requires an `ObjectExpression`, so
+`children: {}` is a valid empty grammar. It then walks each slot property and requires an object value
+containing at least one property named `leaf`, `composite` or `contract`. The rule reports on the entry
+when the grammar is absent or not an object, and on the slot when its owner identity is absent.
+
+**What it cannot see.** It does not type-check the identity value, `props`, `optional`, `repeats` or
+`restingCount`, and it does not require exactly one identity: `{leaf: "x", contract: "y"}` passes this
+rule. A spread, computed property, non-object entry, or a second table not reached through a bare
+`buildContracts` call is skipped or only judged by the nodes the visitor can read. The companion TypeScript
+types still own the closed value vocabulary and the `repeats`/`restingCount` pairing.
+
+**Boundary.** This is the table-side enforcement of `CONTRACT-11`, not a check of rendered React
+children. `CONTRACT-5` asks whether the key's name fixes what belongs inside; this rule asks whether
+every declared slot has a typed owner. `CONTRACT-10` wrapper mechanics and `CONTRACT-12` runtime props
+are outside its AST.
+
+## `no-structural-arrangement-in-leaf` — CONTRACT-1, CONTRACT-7
+
+**What it reports.** `arrangement` when a file under a `leaves/` tier nests a structural host below
+another structural host, or when a non-structural JSX parent directly owns two or more structural host
+siblings. Structural hosts are the seven neutral names (`div`, `section`, `main`, `header`, `footer`,
+`aside`, `nav`) plus the four semantic names (`ul`, `ol`, `li`, `form`). It reports the nested opening
+or the second sibling opening and sends ownership to a branch rendered through `<Tree contract="..." />`.
+
+**How it detects.** The rule runs only for a leaf path; tests and the frame are skipped. It records
+top-level declarations whose static string or hole-free template is one of the eleven host names, so
+`const Tag = "div"` followed by `<Tag>` is recognised. It then walks JSX openings for structural
+ancestors and direct structural siblings. A leaf may still own one atomic primitive; the rule is the
+guard that makes the `CONTRACT-1`/`CONTRACT-7` leaf exemption stop at the second structural decision.
+
+**What it cannot see.** It does not inspect helper implementations, vendor props, custom components,
+spread children, mapped or dynamically-created JSX, or aliases declared inside a function, assigned
+indirectly, or resolved from an expression. It does not inspect class strings, so one structural host
+with any leaf-owned glue is outside this rule.
+
+**Boundary.** The pattern law binds this rule to the leaf exception for `CONTRACT-1` (structural
+classes) and `CONTRACT-7` (structural hosts), not to a new CONTRACT code. It is not `CONTRACT-11`:
+that rule checks named slots in the table, while this one checks whether a supposedly atomic leaf has
+become a second JSX tree. It is not `CONTRACT-10`: named surface branches are not leaf files and own
+their fixed vendor wrapper through a separate exception.
+
 ## Detection
 
 The machinery every rule shares, and the two rules that reach outside the file.
 
 | Part | Mechanism |
 |---|---|
-| path gate | All ten gates are substring or suffix tests on the forward-slashed `context.filename`, resting on `/src/` |
-| AST pass | Nine rules read the file's own nodes: one parser, one file, one pass |
+| path gate | All twelve gates are substring or suffix tests on the forward-slashed `context.filename`, resting on `/src/` |
+| AST pass | Source-node rules use one parser, one file and one pass; table rules inspect the selected `buildContracts` object and the leaf rule inspects its JSX tree |
 | table read | `no-unknown-contract-key` reads the contract table off disk as TEXT — an ESLint rule cannot import a TypeScript module — walking up at most forty levels over three relative paths, then matching keys by regex. The key cache invalidates on the table's mtime |
 | tree walk | `no-dead-contract-key` walks the repository once per table per process, from a root recovered by longest-suffix match |
 
@@ -297,22 +351,28 @@ The machinery every rule shares, and the two rules that reach outside the file.
 | Reordering slots or their alternatives | Slots sort by name; alternatives de-duplicate and sort before joining |
 | A key rendered only from a sibling entry's slot | Child contract keys are collected before the report loop |
 | A key rendered only in a story or a test | Stories and tests are walked exactly like product source |
+| `children: {}` | An explicitly empty child grammar is typed and passes `contract-children-are-typed` |
+| `children: {rows: {props: RowProps}}` | The slot has no `leaf`, `composite` or `contract` identity, so `untyped` fires |
+| `children: {rows: {leaf: "row", contract: "row-stack"}}` | The rule checks identity-property presence only; TypeScript owns the stricter slot shape |
+| `const Tag = "div"; <Tag><Vendor /></Tag>` in a leaf | A top-level static host alias is resolved and the nested structural host fires |
+| `meta.shape = "leaf"` or `data-tier="leaf"` | Metadata does not exempt JSX structural arrangement |
 
 **Open** — shipped blindness. A verdict must not claim these were judged.
 
 | Scope | What passes |
 |---|---|
-| all ten | **Any path without `/src/`.** An app with its routes at the repository root is not partly linted, it is entirely unlinted, and the run is green |
+| all twelve | **Any path without `/src/`.** An app with its routes at the repository root is not partly linted, it is entirely unlinted, and the run is green |
 | `no-literal-structural-class` | **The whole `leaves/` folder, at any depth.** The exemption is a folder, so it is a policy boundary rather than a type |
+| `no-structural-arrangement-in-leaf` | **Structural JSX hidden behind helpers, vendor props, dynamic aliases or expressions.** The rule reads only the leaf file's recognised JSX hosts and top-level static aliases |
 | literal-class and host rules | **The four named surface branches, including nested subfolders.** The exemption is total rather than scoped to the wrapper seam: a fifth surface branch gets none, and a helper filed under one of the four gets a full one |
-| three table rules | **A table copy inside a plan record.** Only `no-dead-contract-key` skips `/.artifacts/`, so the other three lint a design candidate's copied vocabulary as if it shipped |
+| table rules | **A table copy inside a plan record.** Only `no-dead-contract-key` skips `/.artifacts/`, so the source-AST table rules, including `contract-children-are-typed`, still lint a design candidate's copied vocabulary as if it shipped |
 
 ## Inputs
 
 | Input | What reads it |
 |---|---|
 | `context.filename` | Every rule |
-| The file's AST | Nine rules |
+| The file's AST | Source-node rules, including `contract-children-are-typed` and `no-structural-arrangement-in-leaf` |
 | The contract table on disk, read as TEXT | `no-unknown-contract-key` |
 | The repository tree on disk | `no-dead-contract-key` |
 | The table's mtime | The key cache, which invalidates on it |
@@ -328,15 +388,20 @@ The machinery every rule shares, and the two rules that reach outside the file.
 5. Entry-level rules read entries off the selected `buildContracts` call, never off every object in
    the file, so a second table in one file cannot report the first.
 6. A pair of duplicate entries is reported once, on the later one.
+7. `contract-children-are-typed` checks the entry object itself because the consuming TypeScript type
+   cannot see an untyped plain object literal before it is consumed.
+8. `no-structural-arrangement-in-leaf` guards the leaf exemption: one atomic primitive is allowed,
+   but a nested structural host or a second direct structural sibling is a composite arrangement.
 
 ## Exceptions
 
 Each exemption is a folder or a filename test, which makes every one of them a policy boundary
 anybody can walk into by moving a file.
 
-- **The leaf tier.** Any file under `leaves/` writes its own classes and opens its own boxes. What
-  keeps a component out is a question a person asks — does this file arrange two contents — and no
-  gate asks it.
+- **The leaf tier.** Any file under `leaves/` writes its own classes and opens its own boxes. The
+  exemption is guarded by `no-structural-arrangement-in-leaf`, which asks the limited source question
+  the machine can see — does this file nest structural hosts or own two direct structural siblings?
+  Helpers, vendor props and dynamic JSX remain outside that rule's sight.
 - **The frame.** Any file under `branches/Tree/` may open hosts and paint markers, because turning a
   key into an element is its job. The exemption is the FOLDER: flatten the frame to a single file
   beside its siblings and the frame becomes a violator of the rule it implements.

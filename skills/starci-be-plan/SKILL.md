@@ -10,6 +10,12 @@ description: Name every file a backend capability will need before any of them e
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
+| `@workspaces` | `contexts/workspaces/context.md` | context | canonical route and freshness verification before target reads |
+| `@be-patterns` | `standards/backend/patterns/context.md` | context | bind every accepted backend fact to fixed pattern situations and exact files |
+| `@rule-bindings` | `standards/backend/rule-bindings/context.md` | context | prove enforced situations remain accountable to gates and published machines |
+| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | machine-refuse a brief missing files, pattern bindings, tests, exclusions or proof |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the approval-ready backend brief before presenting it |
+| `@plan-check` | `machines/backend-plan/check.mjs` | script | prove content hash, real pattern identities and complete file coverage |
 
 ## NESTED SKILLS
 
@@ -17,7 +23,8 @@ None. Planning ends with a brief; it never starts setup or approval.
 
 ## Run
 
-Read `@skill-shape` first. This phase produces a brief and nothing else.
+Read `@skill-shape` and `@workspaces` first. After the backend route verifies, read `@be-patterns` and
+`@rule-bindings`. This phase produces a brief and nothing else.
 It ends with an approval-ready boundary; it never writes backend source.
 
 ## PROCESS
@@ -54,19 +61,38 @@ The brief lists each path the capability will need, with what it holds and why i
 Nothing is deferred to "wherever it ends up": a plan that cannot name its files cannot have its boundary
 approved, and an unapproved boundary is how unrelated code arrives in the diff.
 
-### 6 — Enumerate the test cases now
+### 6 — Bind every file to backend pattern situations
+
+Route the accepted shape through `@be-patterns`. For every reached pattern, name its fixed situation
+codes, exact files and the live schema/sibling evidence that selected it. The brief carries:
+
+```json
+{
+  "module": "<pattern module>",
+  "situations": ["<fixed situation code>"],
+  "paths": ["<exact file path>"],
+  "evidence": ["<live schema or sibling fact>"]
+}
+```
+
+A file with no pattern binding is unplanned. A situation with no path is decorative law. An enforced
+situation absent from rule accountability stops the plan rather than being silently downgraded.
+Validate the completed brief against `@plan-schema` with `@validate-artifact`, then run `@plan-check`
+before presenting it. `planHash` binds the complete canonical brief; `sourceRevision` binds its evidence.
+
+### 7 — Enumerate the test cases now
 
 Write the cases while the branches that would suggest them do not exist yet — that is the point of doing
 it here. Name the failing paths: rejected input, absent row, forbidden viewer, concurrent write,
 duplicate delivery, empty projection. Every exception the capability can raise derives from the abstract
 exception; a bare throw is not a case, it is a defect.
 
-### 7 — State boundaries, alternatives and acceptance evidence
+### 8 — State boundaries, alternatives and acceptance evidence
 
 The brief closes with: what this capability will not do, which alternatives were considered and why they
 lost, and exactly what evidence will prove it works — which test, which query, which runtime call.
 
-### 8 — Close the phase
+### 9 — Close the phase
 
 State the brief and exact boundary in friendly prose. Do not end while any planning work remains under
 `own`; the exact brief and boundary are the only `NEED APPROVALS` item.
@@ -77,10 +103,14 @@ State the brief and exact boundary in friendly prose. Do not end while any plann
 - The schema cannot be read → stop; a plan written against a remembered schema is fiction.
 - No sibling of this kind exists → say so explicitly and propose the shape as a **new family**, with the
   reason, so approval knows it is setting a precedent rather than following one.
+- A reached backend fact has no pattern situation → stop and return a standards gap; do not invent a
+  local convention inside the product plan.
+- A planned file has no pattern binding, or a binding has no exact path/evidence → the brief is incomplete.
 
 ## OUTPUT
 
-Return the approval-ready brief and exact file boundary in concise prose. No status tables.
+Return the approval-ready brief, exact file boundary and complete `patternBindings` in concise prose. No
+status tables.
 
 | Output | Owner |
 |---|---|

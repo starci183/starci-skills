@@ -11,6 +11,7 @@ title: StarCi deploy
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract approval, persistence và output dùng chung |
 | `@initialization` | `readiness/initialization/vi.md` | vi | readiness identity, bootstrap, routed workspace và worktree |
 | `@deployment` | `deployment/vi.md` | vi | luật manifest, `.infra`, setup, domain, deploy và monitor |
+| `@deployment-plan` | `scripts/deployment-plan.mjs` | script | validate, plan và init deployment đã khai mà không chép logic manifest vào skill |
 
 ## NESTED SKILLS
 

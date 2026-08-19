@@ -32,6 +32,12 @@ The installation is intentionally kept together:
     brainstorms/
     compilers/
     gates/
+    kernel/
+    standards/
+    workflows/
+    machines/
+    operations/
+    publication/
     scripts/
     skills/
 ```
@@ -39,6 +45,19 @@ The installation is intentionally kept together:
 Do not copy individual skills into a second directory. A skill can depend on schemas, scripts,
 compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
 that can drift from its dependencies.
+
+The original stage trees remain the detailed authorities. The v4 roots are stable process routers:
+
+- `kernel` resolves routes, state and approval identity;
+- `workflows` groups discoverable skills by lifecycle without moving their `SKILL.md` entries;
+- `standards` connects role patterns, gates, rule bindings and assurance;
+- `machines` exposes deterministic parity and evidence checks;
+- `operations` routes deployment, MCP, readiness and runbooks without merging their laws;
+- `publication` keeps generated human documentation separate from runtime context.
+
+The binding chain is `pattern situation → gate situation → published machine rule → executable proof`.
+A rule in the machine with no gate route, or an enforced gate with no machine rule, is a broken trust
+tree even when a consumer repository happens to lint green.
 
 ## Use with Codex and Claude
 

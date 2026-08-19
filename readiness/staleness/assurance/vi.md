@@ -79,8 +79,18 @@ quyết định điều đó có thật sự xảy ra hay không:
   báo `NONE` nghĩa là project chưa từng được analyse — chưa đo, không phải sạch.
 - **Gate đỏ là source finding.** Phải sửa ở source rồi rescan cho tới khi xanh; đẩy sang CI là giấu nó
   đi chứ không phải xử lý nó.
-- **Coverage sẵn sàng là bốn con số độc lập.** Statements, branches, functions và lines mỗi cái tự giữ
-  ngưỡng. Một phần trăm gộp che đúng cái metric đang fail, mà thực tế là branches.
+- **Coverage luôn được đo, còn nó có chặn hay không là quyết định của chủ sở hữu.** Khi nó chặn, nó chặn
+  bằng bốn con số độc lập — statements, branches, functions và lines mỗi cái tự giữ ngưỡng, vì một phần
+  trăm gộp che đúng cái metric đang fail, mà thực tế là branches. Khi chủ sở hữu quyết nó không chặn,
+  phép đo vẫn chạy: báo cáo vẫn sinh, vẫn upload, vẫn có badge; chỉ quyền từ chối merge bị rút đi.
+
+  Quyết định đó phải được ghi lại, và ghi như một quyết định chứ không phải một ngưỡng bị trôi mà không
+  ai để ý. Nó cũng phải hạ xuống mọi nơi cái gate đang sống, cùng lúc — cả quality gate của analysis lẫn
+  provider coverage — vì để một bên chặn trong khi bên kia dừng thì không phải nới thanh, mà là dời gate
+  sang một dashboard thứ hai và biến chính sách đã tuyên bố thành lời nói dối.
+
+  Một con số coverage thôi chặn không có nghĩa là nó thôi đúng. `unmeasured` vẫn là `unmeasured`; một
+  project không bị gate vẫn phải báo đúng cái nó thật sự phủ.
 
 **Emit bắt buộc của framework có thể mang ngưỡng branch riêng.** Khi một framework dependency injection
 buộc phải có metadata mà runtime cần, compiler sinh ra guard không test nào chạm tới được — dưới

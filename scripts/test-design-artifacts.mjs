@@ -71,9 +71,21 @@ const quiet = direction("quiet-precision", {contrast: "balanced", density: "comp
 const editorial = direction("editorial-clarity", {contrast: "strong", density: "spacious", shape: "square", depth: "flat", motion: "still"}, "--secondary");
 const fakeEditorial = direction("fake-editorial", {contrast: "strong", density: "spacious", shape: "square", depth: "flat", motion: "still"});
 const directionBatch = write("directions.json", {
-  schema: 1,
+  schema: 2,
   envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
   directions: [quiet, editorial],
+  recommended: {id: quiet.id, reason: "quiet hierarchy best matches the stated comparison task"},
+});
+const missingRecommendation = write("missing-recommendation.json", {
+  schema: 2,
+  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  directions: [quiet, editorial],
+});
+const unknownRecommendation = write("unknown-recommendation.json", {
+  schema: 2,
+  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  directions: [quiet, editorial],
+  recommended: {id: "missing-direction", reason: "this deliberately points at no candidate in the batch"},
 });
 const fakeDirections = write("fake-directions.json", {
   schema: 1,
@@ -128,7 +140,7 @@ const blocks = write("blocks.json", {
   }],
 });
 const session = write("session.json", {
-  schema: 1,
+  schema: 2,
   id: "course-catalogue/2026-08-18",
   project: "example-app",
   surface: "course-catalogue",
@@ -139,7 +151,14 @@ const session = write("session.json", {
       number: 1,
       phase: "layout",
       prompt: "compare courses quickly",
-      directionReview: {vocabularyAt, candidates: [quiet, editorial], state: "selected", selectedId: quiet.id},
+      directionReview: {
+        vocabularyAt,
+        candidates: [quiet, editorial],
+        state: "recommended",
+        recommendedId: quiet.id,
+        selectionSource: "evidence",
+        selectionReason: "quiet hierarchy best matches the stated comparison task",
+      },
       produced: [{id: "a", hash}],
       verdict: {state: "accepted", acceptedHash: hash},
       sealed: hash,
@@ -164,6 +183,14 @@ const brokenSession = write("broken-session.json", {
   ...JSON.parse(readFileSync(session, "utf8")),
   queue: [{hash, phase: "layout", state: "accepted"}, {hash: blockHash, phase: "block", region: "results", state: "accepted"}],
 });
+const uncombinedSessionValue = JSON.parse(readFileSync(session, "utf8"));
+uncombinedSessionValue.rounds[0].directionReview = {
+  vocabularyAt,
+  candidates: [quiet, editorial],
+  state: "selected",
+  selectedId: quiet.id,
+};
+const uncombinedSession = write("uncombined-session.json", uncombinedSessionValue);
 const worktreeRoots = write("worktree-roots.json", {
   schema: 1,
   project: "example-app",
@@ -191,23 +218,32 @@ try {
     throw new Error("visual inventory did not preserve case or retain both mode declarations");
   }
   run("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary);
+  if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", missingRecommendation, "--vocabulary", vocabulary).includes("must name one evidence-backed default")) {
+    throw new Error("missing direction recommendation failed for the wrong reason");
+  }
+  if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", unknownRecommendation, "--vocabulary", vocabulary).includes("does not name a direction in this batch")) {
+    throw new Error("unknown direction recommendation failed for the wrong reason");
+  }
   if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", fakeDirections, "--vocabulary", vocabulary).includes("same render-affecting token decisions")) {
     throw new Error("fake direction choices failed for the wrong reason");
   }
-  if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary, "--hash").includes("selection has no approval hash")) {
+  if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary, "--hash").includes("recommendation has no approval hash")) {
     throw new Error("direction --hash failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", layouts, "--vocabulary", vocabulary, "--hash");
-  if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", splitLayouts, "--vocabulary", vocabulary, "--hash").includes("must share the one direction")) {
+  if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", splitLayouts, "--vocabulary", vocabulary, "--hash").includes("must share the one evidence-backed direction")) {
     throw new Error("split layout directions failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", blocks, "--hash");
   run("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", session);
+  if (!mustFail("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", uncombinedSession).includes("require one evidence-backed recommendation")) {
+    throw new Error("schema 2 session without combined recommendation failed for the wrong reason");
+  }
   if (!mustFail("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", brokenSession).includes("must name its parent layout")) {
     throw new Error("missing block-to-layout edge failed for the wrong reason");
   }
   run("--schema", join(root, "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
-  console.log("ok  direction selection, one layout hash, independent block hash, and dependency edge hold");
+  console.log("ok  evidence recommendation, one combined layout approval hash, independent block hash, and dependency edge hold");
 } finally {
   rmSync(temp, {recursive: true, force: true});
 }

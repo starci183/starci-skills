@@ -177,7 +177,14 @@ function directionLaws(data, vocabulary) {
       ? data.candidates.flatMap((candidate, index) => candidate.direction ? [{direction: candidate.direction, at: `candidates[${index}].direction`}] : [])
       : [];
   if (!selected.length) return found;
-  if (!vocabulary) return ["direction evidence: --vocabulary is required so token verdicts are evidence-backed"];
+  if (Array.isArray(data.directions) && data.schema === 2) {
+    if (!data.recommended) {
+      found.push("recommended: schema 2 direction batches must name one evidence-backed default");
+    } else if (!data.directions.some((direction) => direction.id === data.recommended.id)) {
+      found.push("recommended.id: does not name a direction in this batch");
+    }
+  }
+  if (!vocabulary) return [...found, "direction evidence: --vocabulary is required so token verdicts are evidence-backed"];
 
   const known = new Set((vocabulary.tokens ?? []).map((token) => token.name));
   const RAW_VALUE = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|hsl|oklch|lab|lch)\s*\()/i;
@@ -238,7 +245,7 @@ function directionLaws(data, vocabulary) {
   if (Array.isArray(data.candidates) && selected.length > 1) {
     const first = canonical(selected[0].direction);
     for (const {direction, at} of selected.slice(1)) {
-      if (canonical(direction) !== first) found.push(`${at}: layout candidates must share the one direction the owner selected first`);
+      if (canonical(direction) !== first) found.push(`${at}: layout candidates must share the one evidence-backed direction presented for combined approval`);
     }
   }
   return found;
@@ -257,6 +264,21 @@ function sessionLaws(data) {
       else if (!review.candidates?.some((candidate) => candidate.id === review.selectedId)) {
         found.push(`rounds[${index}].directionReview.selectedId: does not name a candidate in this review`);
       }
+    }
+    if (review?.state === "recommended") {
+      if (!review.recommendedId) found.push(`rounds[${index}].directionReview.recommendedId: recommended review must name the exact direction`);
+      else if (!review.candidates?.some((candidate) => candidate.id === review.recommendedId)) {
+        found.push(`rounds[${index}].directionReview.recommendedId: does not name a candidate in this review`);
+      }
+      if (review.selectionSource !== "evidence") {
+        found.push(`rounds[${index}].directionReview.selectionSource: combined review recommendation must come from evidence`);
+      }
+      if (!review.selectionReason) {
+        found.push(`rounds[${index}].directionReview.selectionReason: combined review must preserve why this direction is recommended`);
+      }
+    }
+    if (data.schema === 2 && round.phase === "layout" && (round.produced?.length ?? 0) > 0 && review?.state !== "recommended") {
+      found.push(`rounds[${index}].directionReview.state: schema 2 layout candidates require one evidence-backed recommendation before combined approval`);
     }
     if (review?.state === "feedback" && !review.feedback) {
       found.push(`rounds[${index}].directionReview.feedback: feedback state must preserve the owner's words`);
@@ -319,7 +341,7 @@ if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((cand
 
 const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data)];
 if (wantHash && Array.isArray(data.directions)) {
-  broken.push("directions: selection has no approval hash; embed the chosen object in a layout candidate and hash that layout");
+  broken.push("directions: recommendation has no approval hash; embed the recommended object in a layout candidate and hash that layout");
 }
 
 if (errors.length) {

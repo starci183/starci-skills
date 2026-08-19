@@ -37,7 +37,7 @@ Bảy, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuy�
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
 | 1 | Yêu cầu nghiệp vụ, đúng nguyên văn | không có ý định nào, chỉ có một cái hình |
-| 2 | Một object direction được chọn từ vòng direction | các sườn bị so dưới những ý định thị giác khác nhau |
+| 2 | Một object direction được đề xuất bằng evidence cho lượt duyệt kết hợp | các sườn bị so dưới những ý định thị giác khác nhau |
 | 3 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
 | 4 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
 | 5 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
@@ -130,7 +130,7 @@ Mười hai luật mà **mọi** phương án phải thoả. Phương án phạm
 
 ## Quy tắc
 
-1. Phương án không mang class. Token hay giá trị thị giác duy nhất của nó nằm trong cùng object `direction` đã chọn ở mọi phương án.
+1. Phương án không mang class. Token hay giá trị thị giác duy nhất của nó nằm trong cùng object `direction` được đề xuất ở mọi phương án.
 2. Mọi region trích một entry key, hoặc khai một entry mới kèm `why` của nó.
 3. Mọi region gọi tên branch ghép nó.
 4. Phương án khai bộ giá trị trục, và không hai phương án nào trong một lô trùng cả bộ.

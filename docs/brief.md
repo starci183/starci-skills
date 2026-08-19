@@ -43,22 +43,23 @@ state they were made against, and execution stops when that evidence is stale or
 
 | Skill | Use it for | Approval boundary |
 |---|---|---|
-| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Generate 3–4 visual directions, select one, then generate structural layout candidates | one `layoutHash` binds the selected direction and skeleton |
+| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Recommend one of 3–4 visual directions, then generate structural layouts without pausing | one `layoutHash` approval binds the recommended direction and skeleton |
 | [`starci-fe-design-block`](./skills/starci-fe-design-block) | Design or revise one region's anatomy, states, repetition, and data ownership | an independent `blockHash`, linked to its accepted `layoutHash` |
 | [`starci-fe-design-execute`](./skills/starci-fe-design-execute) | Implement the accepted design in real frontend source | starts only when every currently reachable hash is accepted |
 
 Frontend design keeps the page skeleton and block detail separate:
 
 ```text
-3–4 directions → select one → 3–4 layouts → accept layoutHash
-                                              ↓
-                         design each region → accept blockHash
-                                              ↓
-                         verify current graph → execute source
+3–4 directions → evidence-backed recommendation → 3–4 layouts
+                                                    ↓ one OK accepts layoutHash + embedded direction
+                               design each region → accept blockHash
+                                                    ↓
+                               verify current graph → execute source
 ```
 
-A direction has no separate approval hash. The selected direction object is embedded unchanged in each
-layout candidate. A block remains independently hashable so one block can be redesigned without reopening
+A direction has no separate approval hash or approval checkpoint. The evidence-backed recommended object
+is embedded unchanged in each layout candidate; one `OK` accepts the layout hash and both decisions it
+binds. A block remains independently hashable so one block can be redesigned without reopening
 the page layout; the session records which accepted layout makes that block reachable.
 
 ### Backend change
@@ -73,7 +74,7 @@ the page layout; the session records which accepted layout makes that block reac
 - a stale or unresolved workspace route;
 - a visual direction that invents a reused token or hides a fake duplicate behind different labels;
 - a separate `directionHash`;
-- layout candidates that embed different selected directions;
+- layout candidates that embed different recommended directions;
 - a block decision without its parent `layoutHash` dependency;
 - execution while a currently reachable layout or block is unaccepted;
 - classes outside the closed contract vocabulary;

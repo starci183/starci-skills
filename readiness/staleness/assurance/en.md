@@ -79,9 +79,19 @@ quality gate. Three facts decide whether that happened:
   quality gate reported as `NONE` means the project was never analysed — unmeasured, not clean.
 - **A red gate is a source finding.** It is repaired in source and rescanned until green; deferring it to
   CI hides it rather than handling it.
-- **Coverage readiness is four independent numbers.** Statements, branches, functions and lines each
-  carry the threshold on their own. One blended percentage conceals the metric that is actually failing,
-  which in practice is branches.
+- **Coverage is measured, and whether it gates is the owner's call.** When it does gate, it gates as
+  four independent numbers — statements, branches, functions and lines each carrying the threshold on
+  their own, because one blended percentage conceals the metric that is actually failing, which in
+  practice is branches. When the owner rules it does not gate, the measurement still runs: the report
+  is produced, uploaded and badged, and only its power to refuse a merge is withdrawn.
+
+  That ruling is recorded, and it is recorded as a decision rather than as a threshold nobody notices
+  drifting. It also lands in every place the gate lives at once — the analysis quality gate and the
+  coverage provider both — because leaving one blocking while the other stops does not lighten the bar,
+  it moves the gate to a second dashboard and makes the stated policy false.
+
+  A coverage number that stops gating is not the same as one that stops being true. `unmeasured` remains
+  `unmeasured`; an ungated project still reports what it actually covers.
 
 **A framework's required emit may carry its own branch threshold.** Where a dependency-injection
 framework compels metadata the runtime needs, the compiler emits guards no test can reach — under

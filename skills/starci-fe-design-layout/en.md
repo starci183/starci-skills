@@ -26,7 +26,7 @@ None. A stop ends this run. This skill never invokes another skill as recovery.
 ## Run
 
 Read `@skill-shape` first. This skill owns the page skeleton. Direction supports that decision; it has
-no approval hash of its own. The selected direction is embedded into each layout candidate, so one
+no approval hash or approval checkpoint of its own. The recommended direction is embedded into each layout candidate, so one
 `layoutHash` binds visual intent and skeleton together.
 
 **JSON is the artifact. HTML is a way of looking at it.** Approval binds to canonical layout JSON,
@@ -61,6 +61,8 @@ its own can never notice.
 **Session identity is the surface**, not the prompt. Two differently worded requests for the same page
 are the same session; a reworded prompt is a new round, not a new session. Print which happened —
 `resumed <id>` or `opened <id>` — and keep every accepted hash across a resume.
+New sessions use session schema 2. A resumed schema-1 session keeps its historical rounds unchanged;
+new rounds still use the combined recommendation fields.
 
 ### 5 — Generate the direction choices
 
@@ -73,18 +75,19 @@ Validate the batch with `@validate-artifact` and the generated vocabulary **with
 every direction over the same content and reference skeleton. External style catalogues may broaden the
 search, but remain recommendations.
 
-### 6 — Ask the owner to select one direction
+### 6 — Evidence-select the recommended direction
 
-Show all valid directions with previews, token reuse/new evidence, explicit rejections and tradeoffs.
-The owner selects one or gives feedback. Feedback regenerates the direction choices. Selection is not a
-separate approval artifact and produces no `directionHash`.
+Compare every valid direction against the request, audience, intended feeling, live vocabulary, brand
+evidence and accepted precedents. Select one exact object as the evidence-backed recommendation and state
+why it best fits. This is a provisional default, not an owner approval, so do not pause or print
+`### NEED APPROVALS` here and do not produce a `directionHash`.
 
-Append the exact candidates and the owner's selection or words to this layout round's `directionReview`.
-Validate the session with `@validate-artifact` and `@session`; a no-hash review is durable evidence, not
-a second approval artifact.
+Write a direction batch with `schema: 2` and its `recommended` object. Append the exact candidates,
+`state: recommended`, `recommendedId`, `selectionSource: evidence` and `selectionReason` to this layout
+round's `directionReview`. Validate both artifacts. If evidence cannot support one recommendation, return
+the missing product decision as a refusal; do not generate structural candidates.
 
-Do not start structural candidates until one exact direction object is selected. Preserve that object
-unchanged for the layout candidates in this round.
+Preserve the recommended direction object unchanged in every layout candidate in this round.
 
 ### 7 — Read the structural inputs
 
@@ -109,7 +112,7 @@ node @contract-search <project> <role> --need "<the region stated as a need>"
 
 ### 9 — Generate 3–4 layout skeletons
 
-Embed the **same selected direction object** in every candidate, then vary only the closed layout axes.
+Embed the **same recommended direction object** in every candidate, then vary only the closed layout axes.
 Drop candidates whose entire structural axis sets match. At least one candidate departs from the nearest
 layout precedent. Return one only when the request admits one valid skeleton, with the reason; never pad.
 
@@ -124,7 +127,7 @@ Run `@validate-artifact` with `@layout-schema`, the same visual vocabulary and `
 invalid embedded direction, candidates embedding different directions, class tokens, duplicate layout
 axis sets and a missing departure. The printed hash is the one and only `layoutHash` for that candidate.
 
-Render region boxes, names, axes, branches and contract citations under the selected direction. Do not
+Render region boxes, names, axes, branches and contract citations under the recommended direction. Do not
 draw block internals. Preview CSS is disposable evidence and never a source of product classes.
 
 Generate one HTML page per candidate in `cache/preview`, then serve it. Start at 8080; if occupied, try
@@ -136,8 +139,11 @@ npx -y http-server .worktrees/<project>/cache/preview -p 8080 -c-1 --silent
 
 ### 12 — Queue approval and close
 
-Queue layout hashes in the durable registry. Feedback opens a new layout round; an accepted candidate
-is never edited. When a replacement layout is accepted, mark the previous accepted layout
+Show the direction alternatives and why one is recommended together with the direction-backed layout
+candidates. Open exactly one `### NEED APPROVALS` for this round: the recommended layout hash is the
+default, and `OK` approves both its embedded direction and its skeleton. Feedback may challenge either
+the direction or the structure and opens a new layout round; an accepted candidate is never edited.
+When a replacement layout is accepted, mark the previous accepted layout
 `superseded` and point `supersededBy` at the replacement. Validate the updated session with
 `@validate-artifact`; append feedback as a new sealed round and record the owner's words. Mark one
 evidence-backed layout as the default. `OK` accepts that hash immediately; do not ask the owner to identify
@@ -148,7 +154,7 @@ it again. Close only after every Layout-owned record and validation step is comp
 - Route absent or stale → stop; report the exact failed route evidence and end this run.
 - Registry unlocked, dirty or foreign-owned → stop; report the failed ownership evidence and do not write.
 - Visual inventory empty or unreadable → stop; do not infer tokens from screenshots.
-- No exact direction selected → keep the direction choice open; do not generate layouts.
+- No evidence-backed direction recommendation → return the missing decision; do not generate layouts.
 - A required class is outside the contract's closed set → return the contract change to the owner.
 - Duplicate layout axis sets remain → regenerate rather than ship a fake choice.
 
@@ -157,6 +163,6 @@ run.
 
 ## OUTPUT
 
-Present the selected direction, layout candidates, recommended default, hashes and preview URL in concise
-prose. Use `### NEED APPROVALS` only for the current selection or accept-or-feedback decision. No status
-tables.
+Present the direction alternatives, evidence-backed recommendation, layout candidates, recommended
+layout hash and preview URL in concise prose. Use one `### NEED APPROVALS` for the combined
+accept-or-feedback decision. No status tables.

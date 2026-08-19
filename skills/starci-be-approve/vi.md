@@ -9,6 +9,13 @@ title: Backend approve · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | reverify checkout, branch và source revision trước approval |
+| `@be-patterns` | `standards/backend/patterns/vi.md` | vi | challenge situation-to-file binding với source hiện tại |
+| `@rule-bindings` | `standards/backend/rule-bindings/vi.md` | vi | từ chối drift giữa situation enforced, gate và machine |
+| `@rule-binding-check` | `machines/rule-bindings/check.mjs` | script | chạy parity backend gate-to-canon |
+| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate compiler boundary đầy đủ đang được duyệt |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | từ chối brief malformed trước approval loop |
+| `@plan-check` | `machines/backend-plan/check.mjs` | script | từ chối stale identity, situation giả và file chưa bind |
 
 ## NESTED SKILLS
 
@@ -16,7 +23,7 @@ Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 
-Đọc `@skill-shape` trước. Skill này giữ cả vòng phê duyệt lẫn phần triển khai, ngăn cách bằng một hard
+Đọc `@skill-shape`, `@be-patterns` và `@rule-bindings` theo thứ tự đó. Skill này giữ cả vòng phê duyệt lẫn phần triển khai, ngăn cách bằng một hard
 stop. Trước ranh giới ấy mọi thứ còn đảo ngược được; sau nó, thay đổi đã đi vào sản phẩm.
 
 ## QUY TRÌNH
@@ -33,7 +40,9 @@ trong ranh giới đã duyệt.
 - thư mục cha của từng file có thật không, và family có đúng shape đã mô tả không;
 - mọi field được dùng có thật trong schema dưới đúng tên đó không;
 - đường exception có kế thừa abstract exception giống sibling không;
-- các test case liệt kê có đúng là những đường capability này thực sự có thể hỏng không.
+- các test case liệt kê có đúng là những đường capability này thực sự có thể hỏng không;
+- mọi file có fixed pattern situations, exact paths và live evidence không;
+- `@rule-binding-check --be` có chứng minh gate-to-canon parity không.
 
 Hiếm khi kế hoạch đi qua bước này mà không đổi. Phải nói rõ đổi gì và vì sao.
 
@@ -65,7 +74,7 @@ triển khai hợp lệ.
 
 ### 6 — Chứng minh bằng đúng evidence đã duyệt
 
-Chạy các case đã liệt kê, không thay bằng phép thử rẻ hơn. Sau đó chạy gate thật của repository — lint,
+Chạy `@rule-binding-check --be`, rồi các case đã liệt kê, không thay bằng phép thử rẻ hơn. Sau đó chạy gate thật của repository — lint,
 typecheck, build, tests — cùng runtime proof đã nêu như live query hoặc boot probe. Gate fail thì sửa.
 Gate không chạy được phải thử hết fallback an toàn; nếu cần quyền owner thì dùng `### NEED APPROVALS`,
 nếu không thì nói external blocker và không được báo pass.

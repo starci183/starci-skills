@@ -33,7 +33,7 @@ Seven, and no more. Each is here because something specific breaks without it.
 | # | Input | Without it |
 |---|---|---|
 | 1 | The business request, verbatim | there is no intent, only a shape |
-| 2 | The one direction object selected from the direction round | skeletons are compared under different visual intent |
+| 2 | The one evidence-backed direction recommended for the combined review | skeletons are compared under different visual intent |
 | 3 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
 | 4 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
 | 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
@@ -125,7 +125,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 
 ## Rules
 
-1. A candidate carries no class. Its only tokens or visual values are inside the same selected `direction` object in every candidate.
+1. A candidate carries no class. Its only tokens or visual values are inside the same recommended `direction` object in every candidate.
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.

@@ -11,6 +11,7 @@ title: starci-deploy · English
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval, persistence and output contract |
 | `@initialization` | `readiness/initialization/en.md` | en | identity, bootstrap, routed workspace and worktree readiness |
 | `@deployment` | `deployment/en.md` | en | manifest, `.infra`, setup, domain, deploy and monitor law |
+| `@deployment-plan` | `scripts/deployment-plan.mjs` | script | validate, plan and initialize the declared deployment without duplicating manifest logic in the skill |
 
 ## NESTED SKILLS
 

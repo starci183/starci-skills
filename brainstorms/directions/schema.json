@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/brainstorms/directions/schema.json",
   "title": "Visual direction batch",
-  "description": "One transient round of visual-direction brainstorming. The owner selects one direction; it becomes hash-bound only when embedded in a layout candidate.",
+  "description": "One transient round of visual-direction brainstorming. Schema 2 evidence-selects one recommendation; the owner approves it only through the layout hash that embeds it.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "envelope", "directions"],
   "properties": {
-    "schema": {"const": 1},
+    "schema": {"enum": [1, 2]},
     "envelope": {"$ref": "#/$defs/envelope"},
     "directions": {
       "type": "array",
@@ -15,6 +15,7 @@
       "maxItems": 4,
       "items": {"$ref": "#/$defs/direction"}
     },
+    "recommended": {"$ref": "#/$defs/recommendation"},
     "refusal": {"$ref": "#/$defs/refusal"}
   },
   "$defs": {
@@ -32,7 +33,7 @@
       }
     },
     "direction": {
-      "description": "A selectable direction. No timestamps, preview paths, or per-run ids; the chosen object is embedded unchanged in each layout candidate.",
+      "description": "A direction candidate. No timestamps, preview paths, or per-run ids; the recommended object is embedded unchanged in each layout candidate.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "vocabularyAt", "axes", "citesPrecedent", "personality", "roles", "rejects", "reason"],
@@ -130,6 +131,15 @@
           }
         }
       ]
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "reason"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug", "description": "The exact direction candidate selected as the evidence-backed default."},
+        "reason": {"type": "string", "minLength": 12}
+      }
     },
     "refusal": {
       "type": "object",

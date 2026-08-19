@@ -34,7 +34,7 @@ những chỗ rule hẹp hơn chính câu mà nó mang tên.
 
 ## Luật máy đã xuất bản
 
-Mười rule xuất xưởng, và source xuất ra đúng mười mục trong `rules`.
+Mười hai rule xuất xưởng, và source xuất ra đúng mười hai mục trong `rules`.
 
 | Rule | Mã | Nó báo cái gì |
 |---|---|---|
@@ -43,11 +43,13 @@ Mười rule xuất xưởng, và source xuất ra đúng mười mục trong `r
 | `only-the-frame-wears-a-node` | `CONTRACT-4` | `worn` — một lời gọi `contractNodeProps` ở bất cứ đâu ngoài frame |
 | `contract-why-is-a-reason` | `CONTRACT-6` | `tooShort` — lý do dưới mười hai từ; `restates` — lý do chỉ ghép lại từ chính các từ của khoá |
 | `no-structural-host-outside-contract-frame` | `CONTRACT-7` | `host` — một hộp trung tính viết tay; `styledSemantic` — một phần tử ngữ nghĩa có mang class |
+| `no-structural-arrangement-in-leaf` | `CONTRACT-1, CONTRACT-7` | `arrangement` — leaf lồng một structural host hoặc tự sở hữu nhiều structural host anh em |
 | `no-hand-written-contract-attrs` | `CONTRACT-8` | `marker` — thuộc tính `data-node` hoặc `data-why` viết tay |
 | `no-duplicate-entry-shape` | `CONTRACT-9` | `duplicate` — một mục có class, host và slot trùng với mục khác đã ghi |
 | `no-unknown-contract-key` | *không có* | `unknown` — một khoá không có trong bảng, kèm danh sách các khoá đang có |
 | `no-interaction-class-in-entry` | `CONTRACT-12` | `interaction`, `paint`, `raised` — một class trong mục là hành vi, màu sơn hay độ nổi chứ không phải sự sắp đặt |
 | `no-dead-contract-key` | `CONTRACT-13` | `dead` — một khoá trong bảng mà không file nào được duyệt và không slot anh em nào gọi tên |
+| `contract-children-are-typed` | `CONTRACT-11` | `missing` — entry không có grammar `children` dạng object; `untyped` — slot không có identity chủ `leaf`, `composite` hoặc `contract` |
 
 **`no-unknown-contract-key` không thi hành mã nào trong luật, và đó là một phát hiện chứ không phải
 một khe hở để trát vữa lên.** Thông điệp của nó trích `CONTRACT-9` và `CONTRACT-5` như lời khuyên,
@@ -56,11 +58,12 @@ không. Không mã đánh số nào phát biểu điều đó. `CONTRACT-9` qu�
 hay không — một phán đoán mà không rule nào nhận — và rule thật sự giữ `CONTRACT-9` là
 `no-duplicate-entry-shape`. Phán quyết trích rule này thì ghi `code: none`.
 
-Ba mã không có rule và cũng không định có. `CONTRACT-3` và `CONTRACT-11` là union đóng và một bản ghi
-slot đã được kiểm, do hệ kiểu giữ. `CONTRACT-5` — **tên** của khoá quy định thứ nằm bên trong nó —
-không do gì giữ cả, chỉ xuất hiện dưới dạng văn xuôi trong thông điệp của một rule khác. `CONTRACT-10`
-được diễn đạt thành một miễn trừ chứ không phải một rule: bốn nhánh bề mặt có tên được tha khỏi hai
-rule để mỗi cái tự sở hữu lớp bọc cố định của mình.
+Ba mã không có rule xuất bản và cũng không định có. `CONTRACT-3` là union đóng do hệ kiểu giữ.
+`CONTRACT-11` được giữ một phần bởi kiểu record slot và một phần bởi `contract-children-are-typed`,
+vì object literal của bảng được viết trước khi component tiêu thụ nó gán kiểu. `CONTRACT-5` — **tên**
+của khoá quy định thứ nằm bên trong nó — không do gì giữ cả, chỉ xuất hiện dưới dạng văn xuôi trong
+thông điệp của một rule khác. `CONTRACT-10` được diễn đạt thành một miễn trừ chứ không phải một rule:
+bốn nhánh bề mặt có tên được tha khỏi hai rule để mỗi cái tự sở hữu lớp bọc cố định của mình.
 
 ## Đọc một diff
 
@@ -69,7 +72,8 @@ rule để mỗi cái tự sở hữu lớp bọc cố định của mình.
    chạy vẫn xanh trong cả hai trường hợp, nên phán quyết buộc phải nói rõ là cái nào.
 2. **Kiểm miễn trừ thứ hai**, trước khi đọc bất kỳ nút nào. `leaves/`, `branches/Tree/`, bốn nhánh bề
    mặt có tên, file `.test.`/`.spec.` và `.artifacts` mỗi thứ tắt đi một số rule cụ thể.
-3. **Đọc các nút của file cho chín rule chạy trên AST.** Một parser, một file, một lượt.
+3. **Đọc các nút của file cho các rule chạy trên AST.** Một parser, một file, một lượt; rule trên bảng
+   đọc object `buildContracts` đã chọn, còn rule leaf đọc cây JSX của leaf.
 4. **Chỉ đọc bảng và cây thư mục ở chỗ có rule đòi** — danh sách khoá cho `no-unknown-contract-key`,
    lượt duyệt repository cho `no-dead-contract-key`.
 5. **Mỗi phát hiện phát một khối**, gọi tên cơ chế đã bắn.
@@ -272,14 +276,62 @@ lên thành tham chiếu.
 **Ranh giới.** Một cây không duyệt được thì không sinh phát hiện nào, chứ không tuyên bố cả bảng là
 chết.
 
+## `contract-children-are-typed` — CONTRACT-11
+
+**Nó báo cái gì.** `missing` khi một entry contract tĩnh không có grammar `children` dạng object;
+`untyped` khi một slot trong grammar đó không phải object hoặc không nêu identity của chủ. Identity là
+một trong các tên property literal `leaf`, `composite` hoặc `contract`.
+
+**Nó phát hiện bằng gì.** Rule chỉ chạy trên file được nhận là bảng contract. Với mỗi lời gọi trần
+`buildContracts({ ... })` có argument đầu là object, rule kiểm từng entry dạng object. Nó tìm property
+`children` của chính entry và bắt buộc value là `ObjectExpression`, nên `children: {}` là grammar rỗng
+hợp lệ. Sau đó nó duyệt từng slot và bắt buộc value là object có ít nhất một property tên `leaf`,
+`composite` hoặc `contract`. Grammar thiếu hoặc không phải object báo trên entry; identity thiếu báo
+trên slot.
+
+**Điểm mù.** Rule không kiểm kiểu của value identity, `props`, `optional`, `repeats` hay
+`restingCount`, và không bắt buộc đúng một identity: `{leaf: "x", contract: "y"}` vẫn qua rule này.
+Spread, property tính toán, entry không phải object, hoặc bảng thứ hai không đi qua lời gọi trần
+`buildContracts` chỉ bị xét theo những nút visitor đọc được hoặc bị bỏ qua. Kiểu TypeScript đi kèm
+vẫn sở hữu từ vựng value đóng và cặp `repeats`/`restingCount`.
+
+**Ranh giới.** Đây là phần thi hành phía bảng của `CONTRACT-11`, không phải phép kiểm các React child
+đã render. `CONTRACT-5` hỏi tên khoá có cố định thứ ở bên trong không; rule này hỏi từng slot đã khai
+có chủ được gõ kiểu chưa. Cơ chế wrapper của `CONTRACT-10` và runtime props của `CONTRACT-12` nằm ngoài
+AST của nó.
+
+## `no-structural-arrangement-in-leaf` — CONTRACT-1, CONTRACT-7
+
+**Nó báo cái gì.** `arrangement` khi file dưới tầng `leaves/` lồng một structural host bên dưới một
+structural host khác, hoặc khi một JSX parent không phải structural trực tiếp sở hữu từ hai structural
+host anh em trở lên. Structural host gồm bảy tên trung tính (`div`, `section`, `main`, `header`,
+`footer`, `aside`, `nav`) cộng bốn tên ngữ nghĩa (`ul`, `ol`, `li`, `form`). Rule báo opening lồng
+hoặc opening anh em thứ hai, rồi đẩy ownership về branch được render bằng `<Tree contract="..." />`.
+
+**Nó phát hiện bằng gì.** Rule chỉ chạy trên đường dẫn leaf; test và frame bị bỏ qua. Nó ghi nhận các
+khai báo cấp cao nhất có chuỗi tĩnh hoặc template không lỗ là một trong mười một host đó, nên
+`const Tag = "div"` rồi dùng `<Tag>` cũng bị nhận ra. Sau đó nó duyệt opening JSX để tìm structural
+ancestor và các structural sibling trực tiếp. Leaf vẫn được sở hữu một primitive nguyên tử; rule này
+là hàng rào khiến miễn trừ leaf của `CONTRACT-1`/`CONTRACT-7` dừng ở quyết định cấu trúc thứ hai.
+
+**Điểm mù.** Rule không đọc implementation của helper, vendor prop, custom component, child qua
+spread, JSX tạo động hoặc alias khai báo trong function, gán gián tiếp hay resolve từ expression. Nó
+không đọc chuỗi class, nên một structural host duy nhất với glue do leaf sở hữu nằm ngoài rule này.
+
+**Ranh giới.** Luật pattern gắn rule này vào miễn trừ leaf của `CONTRACT-1` (class cấu trúc) và
+`CONTRACT-7` (structural host), không tạo một mã CONTRACT mới. Nó không phải `CONTRACT-11`: mã kia
+kiểm slot có tên trong bảng, còn mã này kiểm leaf tưởng là nguyên tử có biến thành một cây JSX thứ hai
+không. Nó không phải `CONTRACT-10`: các surface branch có tên không phải file leaf và sở hữu wrapper
+vendor cố định qua một miễn trừ khác.
+
 ## Cách phát hiện
 
 Bộ máy dùng chung, và hai rule với tay ra ngoài file.
 
 | Bộ phận | Cơ chế |
 |---|---|
-| cổng đường dẫn | Cả mười cổng đều là phép kiểm chuỗi con hoặc hậu tố trên `context.filename` đã đổi sang gạch chéo xuôi, tựa trên `/src/` |
-| lượt đọc AST | Chín rule đọc chính các nút của file: một parser, một file, một lượt |
+| cổng đường dẫn | Cả mười hai cổng đều là phép kiểm chuỗi con hoặc hậu tố trên `context.filename` đã đổi sang gạch chéo xuôi, tựa trên `/src/` |
+| lượt đọc AST | Các rule đọc source dùng một parser, một file, một lượt; rule bảng đọc object `buildContracts` đã chọn và rule leaf đọc cây JSX của nó |
 | đọc bảng | `no-unknown-contract-key` đọc bảng hợp đồng từ đĩa dưới dạng **chữ** — một rule ESLint không import được module TypeScript — đi ngược lên tối đa bốn mươi tầng qua ba đường dẫn tương đối, rồi khớp khoá bằng regex. Bộ nhớ đệm khoá vô hiệu theo mtime của bảng |
 | duyệt cây | `no-dead-contract-key` duyệt repository một lần cho mỗi bảng trong mỗi tiến trình, từ gốc phục dựng bằng khớp hậu tố dài nhất |
 
@@ -302,22 +354,28 @@ Bộ máy dùng chung, và hai rule với tay ra ngoài file.
 | Đảo slot hoặc đảo các phương án của slot | Slot sắp theo tên; phương án khử trùng và sắp trước khi ghép |
 | Một khoá chỉ được render từ slot của mục anh em | Khoá con được gom trước vòng lặp báo cáo |
 | Một khoá chỉ được render trong story hoặc test | Story và test được duyệt y như source sản phẩm |
+| `children: {}` | Grammar con rỗng nhưng được khai rõ là có kiểu, nên `contract-children-are-typed` cho qua |
+| `children: {rows: {props: RowProps}}` | Slot không có identity `leaf`, `composite` hay `contract`, nên `untyped` bắn |
+| `children: {rows: {leaf: "row", contract: "row-stack"}}` | Rule chỉ kiểm property identity có hiện diện; TypeScript giữ hình dạng slot chặt hơn |
+| `const Tag = "div"; <Tag><Vendor /></Tag>` trong leaf | Alias host tĩnh ở cấp cao nhất được resolve và structural host lồng bị bắn |
+| `meta.shape = "leaf"` hoặc `data-tier="leaf"` | Metadata không miễn cho cấu trúc JSX |
 
 **Còn mở** — chỗ mù đã xuất xưởng. Một phán quyết không được nhận là đã xét mấy chỗ này.
 
 | Phạm vi | Cái gì lọt |
 |---|---|
-| cả mười | **Mọi đường dẫn không có `/src/`.** Một app để route ở gốc repository không phải bị lint thiếu, nó **hoàn toàn không được lint**, và lượt chạy vẫn xanh |
+| cả mười hai | **Mọi đường dẫn không có `/src/`.** Một app để route ở gốc repository không phải bị lint thiếu, nó **hoàn toàn không được lint**, và lượt chạy vẫn xanh |
 | `no-literal-structural-class` | **Cả thư mục `leaves/`, ở mọi độ sâu.** Miễn trừ là một thư mục, nên nó là ranh giới chính sách chứ không phải một kiểu dữ liệu |
+| `no-structural-arrangement-in-leaf` | **JSX cấu trúc bị giấu sau helper, vendor prop, alias động hoặc expression.** Rule chỉ đọc những host JSX nhận ra được và alias tĩnh cấp cao nhất trong chính file leaf |
 | rule class và rule host | **Bốn nhánh bề mặt có tên, kể cả thư mục con.** Miễn trừ là toàn bộ chứ không bó vào đúng chỗ nối lớp bọc: nhánh bề mặt thứ năm không được miễn gì, còn một file phụ trợ nằm nhờ trong bốn thư mục kia thì được miễn hết |
-| ba rule bảng | **Một bản sao bảng nằm trong hồ sơ thiết kế.** Chỉ `no-dead-contract-key` bỏ qua `/.artifacts/`, nên ba rule còn lại lint từ vựng chép lại của một phương án thiết kế như thể nó đã xuất xưởng |
+| các rule bảng | **Một bản sao bảng nằm trong hồ sơ thiết kế.** Chỉ `no-dead-contract-key` bỏ qua `/.artifacts/`, nên các rule bảng đọc AST, gồm cả `contract-children-are-typed`, vẫn lint từ vựng chép lại của một phương án thiết kế như thể nó đã xuất xưởng |
 
 ## Đầu vào
 
 | Đầu vào | Ai đọc nó |
 |---|---|
 | `context.filename` | Mọi rule |
-| AST của file | Chín rule |
+| AST của file | Các rule đọc source, gồm `contract-children-are-typed` và `no-structural-arrangement-in-leaf` |
 | Bảng hợp đồng trên đĩa, đọc dưới dạng **chữ** | `no-unknown-contract-key` |
 | Cây repository trên đĩa | `no-dead-contract-key` |
 | mtime của bảng | Bộ nhớ đệm khoá, vô hiệu theo nó |
@@ -333,15 +391,20 @@ Bộ máy dùng chung, và hai rule với tay ra ngoài file.
 5. Các rule cấp mục đọc mục từ đúng lời gọi `buildContracts` đã chọn, không đọc mọi đối tượng trong
    file, nên một bảng thứ hai trong cùng file không thể báo lên bảng thứ nhất.
 6. Một cặp mục trùng nhau chỉ bị báo một lần, ở mục đứng sau.
+7. `contract-children-are-typed` kiểm chính object entry vì kiểu TypeScript ở component tiêu thụ không
+   thể nhìn thấy một object literal chưa được gán kiểu.
+8. `no-structural-arrangement-in-leaf` canh miễn trừ leaf: một primitive nguyên tử được phép, nhưng
+   structural host lồng hoặc structural sibling trực tiếp thứ hai đã là arrangement của composite.
 
 ## Ngoại lệ
 
 Mỗi miễn trừ là một phép kiểm thư mục hoặc tên file, nên tất cả đều là ranh giới chính sách mà ai cũng
 bước qua được bằng cách dời một file.
 
-- **Tầng lá.** Mọi file dưới `leaves/` tự viết class và tự mở hộp của mình. Thứ giữ một component
-  đứng ngoài là một câu hỏi do người đặt ra — file này có sắp đặt hai phần nội dung không — và không
-  cổng nào hỏi câu đó.
+- **Tầng lá.** Mọi file dưới `leaves/` tự viết class và tự mở hộp của mình. Miễn trừ được canh bởi
+  `no-structural-arrangement-in-leaf`, rule hỏi đúng câu máy đọc được — file này có lồng structural
+  host hoặc tự sở hữu hai structural sibling trực tiếp không? Helper, vendor prop và JSX động vẫn nằm
+  ngoài tầm nhìn của rule.
 - **Frame.** Mọi file dưới `branches/Tree/` được mở host và vẽ marker, vì biến một khoá thành một
   phần tử chính là việc của nó. Miễn trừ là **thư mục**: dẹp frame thành một file phẳng nằm cạnh anh
   em nó thì frame thành kẻ vi phạm chính cái rule nó cài đặt.

@@ -9,6 +9,12 @@ title: Backend plan · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | verify route và freshness theo canonical law trước target read |
+| `@be-patterns` | `standards/backend/patterns/vi.md` | vi | bind backend fact vào fixed pattern situations và exact files |
+| `@rule-bindings` | `standards/backend/rule-bindings/vi.md` | vi | chứng minh situation enforced còn accountable với gate và machine |
+| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | từ chối brief thiếu compiler boundary đầy đủ |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate brief sẵn sàng approval trước khi trình |
+| `@plan-check` | `machines/backend-plan/check.mjs` | script | chứng minh content hash, situation thật và file coverage đầy đủ |
 
 ## NESTED SKILLS
 
@@ -50,18 +56,24 @@ Brief phải liệt kê từng path capability cần, file đó chứa gì và v
 “sẽ đặt ở đâu đó”: chưa gọi tên được file thì chưa thể duyệt ranh giới, và ranh giới chưa duyệt là nơi
 code ngoài scope lặng lẽ đi vào diff.
 
-### 6 — Liệt kê test case ngay bây giờ
+### 6 — Bind mọi file vào backend pattern situations
+
+Route accepted shape qua `@be-patterns`. Mọi module được route tới phải có fixed situation codes, exact
+paths và live schema/sibling evidence. File không có binding là chưa được plan; situation không có path
+chỉ là luật trang trí; situation enforced thiếu rule accountability thì dừng plan.
+
+### 7 — Liệt kê test case ngay bây giờ
 
 Viết test case khi các branch gợi ý chúng còn chưa tồn tại. Gọi tên từng đường lỗi: input bị từ chối,
 không có row, viewer không đủ quyền, concurrent write, delivery trùng, projection rỗng. Mọi exception mà
 capability có thể raise phải kế thừa abstract exception; một bare throw là defect, không phải test case.
 
-### 7 — Xác định ranh giới, phương án khác và bằng chứng chấp nhận
+### 8 — Xác định ranh giới, phương án khác và bằng chứng chấp nhận
 
 Cuối brief phải nêu capability không làm gì, những phương án đã cân nhắc và lý do loại, cùng bằng chứng
 chính xác sẽ chứng minh nó chạy đúng: test nào, query nào, runtime call nào.
 
-### 8 — Đóng phase
+### 9 — Đóng phase
 
 Nói brief và boundary chính xác bằng văn xuôi thân thiện. Không kết thúc khi vẫn còn việc plan thuộc
 `own`; brief cùng boundary chính xác là mục `NEED APPROVALS` duy nhất.

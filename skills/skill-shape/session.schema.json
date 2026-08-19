@@ -17,7 +17,8 @@
   ],
   "properties": {
     "schema": {
-      "const": 1
+      "enum": [1, 2],
+      "description": "Schema 1 preserves historical direction-first records. New combined direction-and-layout review records use schema 2."
     },
     "id": {
       "$ref": "#/$defs/id"
@@ -108,12 +109,12 @@
         },
         "directionReview": {
           "$ref": "#/$defs/directionReview",
-          "description": "Present on a layout round while the owner compares no-hash direction choices."
+          "description": "Present on a layout round to preserve no-hash direction choices and the evidence-backed recommendation shown with layouts."
         },
         "produced": {
           "type": "array",
           "minItems": 0,
-          "description": "Empty only while a direction review is still open; layout and block candidates are stored by hash once produced.",
+          "description": "Empty only while a refusal blocks candidate generation; layout and block candidates are stored by hash once produced.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -211,11 +212,24 @@
           "enum": [
             "pending",
             "selected",
+            "recommended",
             "feedback"
           ]
         },
         "selectedId": {
-          "$ref": "#/$defs/slug"
+          "$ref": "#/$defs/slug",
+          "description": "Historical schema-1 field for the owner-selected direction-first workflow."
+        },
+        "recommendedId": {
+          "$ref": "#/$defs/slug",
+          "description": "The exact evidence-backed direction embedded in every layout candidate for the combined review."
+        },
+        "selectionSource": {
+          "const": "evidence"
+        },
+        "selectionReason": {
+          "type": "string",
+          "minLength": 12
         },
         "feedback": {
           "type": "string",
