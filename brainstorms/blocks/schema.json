@@ -21,9 +21,8 @@
     "envelope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["session", "round", "project", "region", "layoutHash"],
+      "required": ["round", "project", "region", "layoutHash"],
       "properties": {
-        "session": {"$ref": "#/$defs/id"},
         "round": {"type": "integer", "minimum": 1},
         "project": {"$ref": "#/$defs/slug"},
         "region": {"$ref": "#/$defs/slug"},
@@ -130,7 +129,6 @@
     },
     "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
     "name": {"type": "string", "pattern": "^[a-zA-Z0-9]+([-a-zA-Z0-9]*)$"},
-    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(/[0-9]{4}-[0-9]{2}-[0-9]{2})?$"}
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
   }
 }

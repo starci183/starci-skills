@@ -179,7 +179,6 @@ decision re-run in a later round produces the same hash.
 {
   "schema": 1,
   "envelope": {
-    "session": "course-catalogue/2026-08-18",
     "round": 1,
     "project": "example-app",
     "surface": "course-catalogue",
@@ -229,7 +228,6 @@ courses, so that is not assumed.
 {
   "schema": 1,
   "envelope": {
-    "session": "course-catalogue/2026-08-18",
     "round": 1,
     "project": "example-app",
     "surface": "course-catalogue",

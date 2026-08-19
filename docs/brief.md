@@ -61,7 +61,7 @@ Frontend design keeps the page skeleton and block detail separate:
 A direction has no separate approval hash or approval checkpoint. The evidence-backed recommended object
 is embedded unchanged in each layout candidate; one `OK` accepts the layout hash and both decisions it
 binds. A block remains independently hashable so one block can be redesigned without reopening
-the page layout; the session records which accepted layout makes that block reachable.
+the page layout; the block head records which accepted layout makes that block reachable.
 
 ### Backend change
 

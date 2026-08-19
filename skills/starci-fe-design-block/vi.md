@@ -12,12 +12,11 @@ title: Frontend design block · Vietnamese
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra layout head và block head identity-centric |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate current layout/block identities mà không đọc legacy maps |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token đã bind trong layout |
-| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra registry và preview root |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
-| `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa Vite review manifest, typed modals và authority boundary dùng chung |
+| `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa Vite graph cha-con, block-detail routes và authority boundary dùng chung |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | build review app dùng chung từ block JSON đã validate thay vì HTML riêng |
 
 ## NESTED SKILLS
@@ -26,9 +25,9 @@ Không có. Skill này không tự gọi skill khác.
 
 ## Cách chạy
 
-Đọc `@skill-shape` trước. Skill nhận `layoutId` và `blockId` ổn định do caller cung cấp; không tự mở session
-hay chọn identity. Accepted layout và current block head trong design registry là authority; session/review chỉ
-là audit history tùy chọn.
+Đọc `@skill-shape` trước. Skill nhận `layoutId` và `blockId` ổn định do caller cung cấp; không tự chọn
+identity. Accepted layout và current block head trong design registry là authority; review chỉ là audit
+history.
 
 **JSON mới là artifact; Vite review dùng chung chỉ là cách quan sát.** Approval bind vào hash của canonical
 JSON, không bind vào manifest hay application đã render.
@@ -43,7 +42,7 @@ JSON, không bind vào manifest hay application đã render.
 
 Chạy `@design-registry-check`, rồi đọc `@design-registry-schema` và
 `registries/design-registry-v2.json`; resolve `layoutHeads[layoutId].head` qua `objects.byHash` immutable. Head là
-layout accepted và lookup authority duy nhất; session/review không được chọn layout khác. `blockId` phải là
+layout accepted và lookup authority duy nhất; review history không được chọn layout khác. `blockId` phải là
 member chính xác trong danh sách `regions` của head accepted. BlockId tùy ý, layout head
 proposed, object thiếu hoặc schema mismatch đều phải dừng trước khi design block.
 
@@ -121,18 +120,20 @@ node @render-design-review \
   --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
   --content <representative-content.json> \
   --recommended-id <candidateId> \
-  --out .worktrees/<project>/cache/preview/<layoutId>/<blockId>
+  --out .worktrees/<project>/cache/preview/design-review
 ```
 
-Renderer chỉ resolve direction của parent accepted. Candidate và state controls thuộc shared application;
-mọi state đã liệt kê phải mở được. Click part mở typed inspector modal cùng citation, optionality và ownership
-evidence. Mọi anatomy dùng cùng direction, copy và representative data; đổi các dữ kiện đó giữa candidates
-hoặc chỉ hiện populated state làm comparison invalid. Không tự viết HTML, CSS hay JavaScript riêng cho candidate.
+Block route riêng là `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`. Route hiện rõ parent `layoutId`
+và exact `layoutHash`, so anatomy candidates và giải thích mọi state ngay trên page, không dùng modal.
+Proposed candidates chỉ hiện ở block route; layout canvas tiếp tục render child accepted hiện tại hoặc rough
+content khi chưa có compatible child. Mọi anatomy dùng cùng direction, copy và representative data; đổi các
+dữ kiện đó giữa candidates hoặc chỉ hiện populated state làm comparison invalid. Không tự viết HTML, CSS hay
+JavaScript riêng cho candidate.
 
 Serve thư mục đã build:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview/<layoutId>/<blockId> -p 8080 -c-1 --silent
+npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
 
 **8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
@@ -142,15 +143,17 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-Shared Vite UI và inspector modals là documentation chrome, không phải product class hay behavior.
+Shared Vite UI và dedicated block-detail routes là documentation chrome, không phải product class hay behavior.
 
 ### 10 — Đưa vào hàng phê duyệt và ghi verdict
 
-Queue candidate review trong audit history tùy chọn của registry, không dùng session làm lookup. Ghi
+Queue candidate review trong audit history tùy chọn của registry. Ghi
 `(layoutId, blockId)`, parent `layoutHash` accepted và `blockHash` độc lập. Khi `OK`, cập nhật
 `blockHeads[layoutId/blockId].head` và region head tương ứng, giữ block head cũ làm immutable history
 superseded. Feedback không đổi head. Đánh dấu candidate có bằng chứng làm default; `OK` bind hash ngay,
-không hỏi lại approval. Validate design registry và artifact trước khi đóng.
+không hỏi lại approval. Validate design registry và artifact trước khi đóng. Sau `OK`, build lại project
+graph để layout route thay rough content bằng accepted child parts; projection phải tiếp tục ghi parent
+`layoutHash` rõ ràng.
 
 ### 11 — Đóng phase
 

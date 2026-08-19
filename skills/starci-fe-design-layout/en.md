@@ -19,7 +19,6 @@ title: starci-fe-design-layout · English
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate the identity-centric registry and its current heads |
 | `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps non-destructively and verify identity heads are current |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects and by-id projections |
-| `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 | `@design-review` | `publication/design-review-preview/en.md` | en | defines the universal Vite review manifest, interactions and authority boundary |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated layout JSON instead of bespoke HTML |
@@ -35,9 +34,8 @@ no approval hash or approval checkpoint of its own. The recommended direction is
 `layoutHash` binds visual intent and skeleton together.
 
 The caller supplies a stable `layoutId`. `registries/design-registry-v2.json` is the authority: its
-`layoutHeads[layoutId].head` points to the accepted immutable layout object. A session or review record
-may explain how a head was reached, but it is optional audit history and is never used to discover the
-current layout.
+`layoutHeads[layoutId].head` points to the accepted immutable layout object. Review history may explain
+how a head was reached, but it is never used to discover the current layout.
 
 **JSON is the artifact. The shared Vite review is a way of looking at it.** Approval binds to canonical
 layout JSON, never to the manifest or rendered application.
@@ -46,7 +44,7 @@ layout JSON, never to the manifest or rendered application.
 
 ### 1 — Establish the context lock
 
-Resolve `Phase: layout`; `Touching` names the project registry, session and disposable cache, and no
+Resolve `Phase: layout`; `Touching` names the project registry and disposable cache, and no
 frontend source path. Tell the user that location in one friendly sentence; do not print a context table.
 
 ### 2 — Resolve and verify the workspace route
@@ -66,14 +64,14 @@ and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache
 
 If v2 is absent, run `@design-registry-migrate --apply`; then run `@design-registry-check`, read `@design-registry-schema` and
 `registries/design-registry-v2.json`. Require the caller's stable `layoutId`; do not derive
-it from the prompt, a surface label or a session id. Resolve `layoutHeads[layoutId]`, then resolve its
+it from the prompt or a surface label. Resolve `layoutHeads[layoutId]`, then resolve its
 `head` through the immutable `objects.byHash` map when one exists. The head is the accepted layout and the
 only current lookup result. A missing identity or schema mismatch stops; an absent head is a new identity,
 not permission to treat a proposed candidate as accepted.
 
 If the layout has no accepted head yet, establish the stable identity and continue only under the registry
-schema's allowed creation path; never invent a head from a proposed candidate. A prior session or review
-may be read for context and appended as audit history, but it cannot select, replace or resurrect a head.
+schema's allowed creation path; never invent a head from a proposed candidate. Prior review history may
+be read for context and appended, but it cannot select, replace or resurrect a head.
 Keep every accepted hash in immutable objects and update the head only at the approval checkpoint.
 
 ### 5 — Generate the direction choices
@@ -140,7 +138,7 @@ invalid embedded direction, candidates embedding different directions, class tok
 axis sets and a missing departure. The printed hash is the one and only `layoutHash` for that candidate.
 
 Read `@design-review`. Write optional shell and representative-content descriptors into the project cache,
-then build one universal review application for the whole batch:
+then overlay this batch onto the one project review graph:
 
 ```bash
 node @render-design-review \
@@ -150,14 +148,17 @@ node @render-design-review \
   --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
   --content <representative-content.json> --shell <shell-descriptor.json> \
   --recommended-id <candidateId> \
-  --out .worktrees/<project>/cache/preview/<layoutId>
+  --out .worktrees/<project>/cache/preview/design-review
 ```
 
-The shared renderer supplies candidate, direction and viewport switching. It permanently outlines every
-layout-owned region with its entry citation, assembler and mount lifetime; clicking a region opens its
-typed inspector modal with current block-head status. Representative content and legacy-backed imagery
-make reading order and density perceptible, but the manifest must not settle block parts, states, data
-ownership or final copy. A blank canvas or a layout with no region overlay is invalid.
+The layout route renders a complete page. Every declared region carries rough representative content so
+geometry, density and reading order are judgeable before child blocks exist. A child block renders its
+accepted parts only when its recorded `layoutHash` equals the candidate displayed; missing or stale children
+stay rough. Clicking a region navigates to
+`#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`; it never opens a modal.
+
+The layout artifact still does not settle block parts, states, data ownership or final copy. A blank canvas,
+a region with no content, or a layout with no region overlay is invalid.
 
 Do not author candidate-specific HTML, CSS or JavaScript. Project shell and content are manifest data;
 the Vite application is project-neutral and its interactions never mutate the registry. Serve the generated
@@ -165,7 +166,7 @@ directory. Start at 8080; if occupied, try the next port, bounded to twenty atte
 actually bound:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview/<layoutId> -p 8080 -c-1 --silent
+npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
 
 ### 12 — Queue approval and close
@@ -177,9 +178,12 @@ the direction or the structure and opens an optional audit review; an accepted c
 On `OK`, validate the immutable object and update `layoutHeads[layoutId].head` in
 `design-registry-v2.json` plus `layouts/by-id/<layoutId>.json` to the accepted `layoutHash`
 (and its declared stable region ID list) in the design registry. When a replacement layout is accepted, retain the
-previous head as superseded audit history and point to the replacement; never edit the old object. Sessions
-and reviews may record the owner's words, but are not lookup authority. Validate the registry and artifact,
+previous head as superseded audit history and point to the replacement; never edit the old object. Reviews
+may record the owner's words, but are not lookup authority. Validate the registry and artifact,
 mark one evidence-backed layout as the default, and close only after every Layout-owned write is complete.
+Rebuild the project review graph after the head advances; block heads bound to the previous layout hash must
+appear stale and the new layout must fall back to rough child content until each block is redesigned or
+explicitly accepted under the new parent.
 
 ## Stops
 
@@ -189,7 +193,7 @@ mark one evidence-backed layout as the default, and close only after every Layou
 - No evidence-backed direction recommendation → return the missing decision; do not generate layouts.
 - A required class is outside the contract's closed set → return the contract change to the owner.
 - Duplicate layout axis sets remain → regenerate rather than ship a fake choice.
-- The stable `layoutId` is absent, ambiguous or resolves to a malformed registry head → stop; do not fall back to a session or prompt.
+- The stable `layoutId` is absent, ambiguous or resolves to a malformed registry head → stop; do not fall back to a prompt.
 - A proposed hash is not the registry head → stop; only the approval checkpoint may advance the accepted head.
 
 No stop invokes another skill. If the owner wants recovery, that is a separate request and a separate

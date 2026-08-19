@@ -32,7 +32,7 @@ Without a scenario it traces what every run of that skill needs. With one, it tr
 ## The law this skill exists to protect
 
 **A trace performs no step it is tracing.** It reads, resolves, checks and measures; it never writes a
-registry, never opens a session, never commits a baseline. The moment a diagnosis writes anything the
+registry, never opens a review round, never commits a baseline. The moment a diagnosis writes anything the
 target skill would write, it has stopped being a diagnosis and become an unapproved run.
 
 **A stop is not a defect.** These are two different findings and conflating them is the failure this
@@ -121,8 +121,8 @@ before closing; do not turn incomplete diagnosis work into an owed list.
 |---|---|---|---|
 | 1 establish context lock | — | — | `pass` |
 | 2 resolve + verify the `fe` route | `.workspace/second-app/fe/config.json` | `.workspace/` holds `example-app` only; no `second-app` | **`would-stop`** — `WORKSPACE-2` |
-| 3 worktree roots | `.worktrees/second-app/{registries,sessions,cache}` | absent, as expected without a route | `blocked` behind step 2 |
-| 4 open or resume the session | the registry | unreachable | `blocked` behind step 3 |
+| 3 worktree roots | `.worktrees/second-app/{registries,cache}` | absent, as expected without a route | `blocked` behind step 2 |
+| 4 open or resume review work | the registry | unreachable | `blocked` behind step 3 |
 | 5 read the six inputs | the contract at `context.contract` | **that checkout has no `components/contracts` directory** | `defect` in the *environment*, not the skill |
 | 6 per-region verdicts | contract keys by `why` | no contract to search, so every region would resolve `new` | `blocked` by step 5 |
 | 7–11 | — | not reached | `cannot-tell` |
@@ -163,7 +163,7 @@ cleared-by: restoring the declared registry root; the design record is
 
 ### What the trace does NOT do
 
-It does not create the route, does not open a session, does not write a registry, and does not generate
+It does not create the route, does not open review work, does not write a registry, and does not generate
 a single candidate — even though step 2's fix is one skill away and the temptation to "just set it up
 while we are here" is exactly how a diagnosis becomes an unapproved run.
 

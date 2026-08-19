@@ -30,14 +30,14 @@ The project segment is mandatory. State that is not filed under a project is sta
 will read as its own.
 
 `.claude` is a trust tree, never a runtime storage root. A tree that stores the work also stores the
-mess, and a rule tree with session debris in it stops reading as authority.
+mess, and a rule tree with run debris in it stops reading as authority.
 
 ## Situation codes
 
 | Code | Situation | Where it goes |
 |---|---|---|
 | `WORKTREE-1` | State must survive and be reviewable | `<Source>/.worktrees/<project>/registries`, locked linked worktree on its own branch |
-| `WORKTREE-2` | Progress or a rebuildable pack | `<Source>/.worktrees/<project>/sessions` or `cache`, ignored |
+| `WORKTREE-2` | Draft progress or a rebuildable pack | `<Source>/.worktrees/<project>/cache`, ignored |
 | `WORKTREE-3` | A path without the project segment, or under `.claude` | rejected; migrate behind `<project>` |
 | `WORKTREE-4` | A registry worktree owned by another Git common directory | rejected; it is not this Source's state |
 | `WORKTREE-5` | Parallel agents about to write | isolate only when two of them mutate one file |
@@ -56,8 +56,8 @@ mess, and a rule tree with session debris in it stops reading as authority.
    no worktree at all — `WORKTREE-5`.
 5. **Leave the target repository alone.** A run's bookkeeping never lands in the repository being worked
    on; durable product records belong to that repository through its own review, not through this state.
-6. **Separate identity from review history.** Layout and block IDs resolve accepted heads directly from
-   `registries`; `reviews` preserve decisions, while `sessions` hold only rebuildable in-progress work — `WORKTREE-7`.
+6. **Separate authority from rebuildable progress.** Layout and block IDs resolve accepted heads directly
+   from `registries`; `reviews` preserve decisions, while unfinished drafts live under `cache/drafts` — `WORKTREE-7`.
 
 ## `WORKTREE-1` — state that must survive
 
@@ -191,7 +191,7 @@ background agent, where nobody is watching the branch it stands on.
 - Candidate bodies already live as immutable SHA-256 objects.
 
 **Ask yourself.** Can an executor resolve the current accepted design from `layoutId` alone, without
-knowing a session id or scanning review history?
+knowing a review id or scanning review history?
 
 **Boundary**
 
@@ -203,9 +203,9 @@ regions. `blocks/by-id/<layoutId>/<blockId>.json` stores the accepted block head
 `layoutHash` it was designed under. `reviews/` may cite candidates, feedback and accepted hashes, but no
 reader needs a review id to find current state. Replacing a head appends history; it never edits an object.
 
-**How it fails.** A skill searches `decisions/<session>.json`, so a valid block becomes unreachable when
-the caller does not know which old review happened to contain it. Session history silently becomes a
-second current-state database.
+**How it fails.** A skill searches an old review record, so a valid block becomes unreachable when the
+caller does not know which review happened to contain it. Review history silently becomes a second
+current-state database.
 
 ## Inputs
 
@@ -216,7 +216,7 @@ second current-state database.
 | source | The repository holding the trust tree |
 | outputs | Each thing the run will write, and whether it is rebuildable |
 | worktree list | Git's own account of worktrees, with lock and prunable status |
-| ignore proof | That `sessions` and `cache` are ignored by Source |
+| ignore proof | That `cache` is ignored by Source |
 
 ## Rules
 
@@ -231,7 +231,7 @@ second current-state database.
 8. Stale worktrees are pruned through Git, never by deleting a directory, and never from a background
    agent.
 9. Design identity is `layoutId` or `(layoutId, blockId)`; a content hash is a version, never the identity.
-10. Accepted heads resolve without a session. Reviews are append-only evidence; sessions are optional progress.
+10. Accepted heads resolve directly from stable identities. Reviews are append-only evidence; drafts are rebuildable cache.
 11. A block head names the parent `layoutHash`; a block accepted under an older layout is stale, not current.
 
 ## Exceptions
@@ -250,7 +250,7 @@ One block per thing the run writes:
 ```text
 output: <what is being written>
 durability: <durable | rebuildable>
-path: <.worktrees/<project>/registries | sessions | cache>
+path: <.worktrees/<project>/registries | cache>
 isolation: <required | not required>
 ownership: <locked, clean, branch, owning git dir>
 situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7>

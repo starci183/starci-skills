@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/skills/skill-shape/session.schema.json",
-  "title": "Design session",
-  "description": "Historical schema for legacy append-only design review records. It remains readable so old evidence validates, but it is not current-state authority: registry v2 resolves stable layoutId/blockId heads and immutable objects without a session.",
+  "title": "Legacy design review record",
+  "description": "Historical compatibility schema for append-only design review records created before stable registry heads. New runs never create this shape; registry v2 resolves stable layoutId/blockId heads and immutable objects directly.",
   "deprecated": true,
   "type": "object",
   "additionalProperties": false,
@@ -30,7 +30,7 @@
     },
     "surface": {
       "$ref": "#/$defs/slug",
-      "description": "Session identity IS the surface. A reworded prompt is a new round, not a new session."
+      "description": "Historical review identity equalled the surface. Retained only so old evidence remains readable."
     },
     "phase": {
       "enum": [
@@ -48,14 +48,14 @@
       }
     },
     "queue": {
-      "description": "Pending decisions. Durable, which is why it lives in `registries` and not in the disposable `sessions` root.",
+      "description": "Historical pending decisions retained in durable registry evidence.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/queued"
       }
     },
     "chain": {
-      "description": "Seals the rounds. `head` is the hash of the last sealed round and `sequence` counts them, so a round edited in place stops matching the chain — the property the round array alone cannot have. Mirrors `registry.json` at the registry root, which seals every session in the project the same way.",
+      "description": "Historical chain seal retained for validating old append-only review evidence.",
       "type": "object",
       "additionalProperties": false,
       "required": [

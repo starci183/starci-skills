@@ -158,8 +158,8 @@ it, the recommended/default answer and the exact scope `OK` authorises.
 
 There is no separate report file. Durable design authority lives under
 `<Source>/.worktrees/<project>/registries`: stable layout/block IDs point to accepted hashes, immutable
-objects hold candidate bodies, and optional `reviews/` preserve prompts, feedback and verdicts. `sessions/`
-holds rebuildable in-progress work only. A repair records through commits/diffs; a read-only run writes no
+objects hold candidate bodies, and optional `reviews/` preserve prompts, feedback and verdicts.
+Rebuildable in-progress work lives below `cache/drafts`. A repair records through commits/diffs; a read-only run writes no
 file unless explicitly requested.
 
 An approved boundary names its `Approved revision: <identity>` and cites that same identity plus its
@@ -196,7 +196,7 @@ appended.
 - **A read-only capability.** It never turns measurement into repair; it reports the evidence and owner of
   the separate repair request.
 - **A resumed design identity.** Layout resolves the existing `layoutId` head. Review history may resume,
-  but no caller needs a review/session id to find current accepted state.
+  but no caller needs a review id to find current accepted state.
 
 ## Worked example
 

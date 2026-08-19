@@ -13,9 +13,8 @@ title: Frontend design execute · Vietnamese
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve file, export và ranh giới import |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra identity-centric head và immutable object ref |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | yêu cầu registry v2 heads/projections current trước source execution |
-| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session graph trước production write |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts trước production write |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | resolve và kiểm tra registry worktree |
 
@@ -41,7 +40,7 @@ xác nhận trước write đầu tiên. Phát hiện một path không đồng 
 Chạy `@design-registry-check`. Đọc `@design-registry-schema`, validate
 `registries/design-registry-v2.json`, rồi resolve `layoutId` caller cung cấp qua
 `layoutHeads[layoutId].head`, rồi resolve layout object immutable qua `objects.byHash`. Head là layout
-accepted; không đọc session/review để chọn hash khác. Liệt kê mọi blockId trong
+accepted; không đọc review history để chọn hash khác. Liệt kê mọi blockId trong
 `layoutHeads[layoutId].regions`, resolve `blockHeads[layoutId/blockId]` và yêu cầu
 `layoutHash` bằng layout hash hiện tại, `head` object tồn tại. Đây là toàn bộ implementation input; review
 lịch sử chỉ là audit history tùy chọn, không phải authority.

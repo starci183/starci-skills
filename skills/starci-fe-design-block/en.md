@@ -12,12 +12,11 @@ title: starci-fe-design-block · English
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric layout and block heads |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate current layout/block identities without consulting legacy maps |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest bound by the accepted layout |
-| `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | verify registry ownership and preview roots |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
-| `@design-review` | `publication/design-review-preview/en.md` | en | defines the universal Vite review manifest, typed modals and authority boundary |
+| `@design-review` | `publication/design-review-preview/en.md` | en | defines the parent-child Vite graph, block-detail routes and authority boundary |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated block JSON instead of bespoke HTML |
 
 ## NESTED SKILLS
@@ -28,8 +27,8 @@ None. This skill never invokes another skill.
 ## Run
 
 Read `@skill-shape` first. This skill requires caller-supplied stable `layoutId` and `blockId`; it never
-opens a session or chooses an identity. The accepted layout and current block heads in the design registry
-are authoritative; session/review records are optional audit history only.
+chooses an identity. The accepted layout and current block heads in the design registry are authoritative;
+review records are audit history only.
 
 **The JSON is the artifact. The shared Vite review is a way of looking at it.** Approval binds to the
 canonical JSON hash, never to the manifest or rendered application.
@@ -45,7 +44,7 @@ canonical JSON hash, never to the manifest or rendered application.
 
 Run `@design-registry-check`, then read `@design-registry-schema` and
 `registries/design-registry-v2.json`; resolve `layoutHeads[layoutId].head` through immutable
-`objects.byHash`. The head is the accepted layout and the only lookup authority; a session or review cannot
+`objects.byHash`. The head is the accepted layout and the only lookup authority; review history cannot
 select a different layout. Require `blockId` to be an exact member of that accepted head's `regions` list.
 An arbitrary blockId, a proposed layout head, missing object or
 schema mismatch stops before any block design work.
@@ -116,8 +115,8 @@ Beyond the shape, the validator refuses a class token anywhere in the batch, two
 axis set, a `repeats` anatomy with no `restingCount`, and a batch where no anatomy cites `none`. The hash
 covers the anatomy only, never the envelope.
 
-Read `@design-review`, write optional representative-content data into the project cache, then build one
-universal review application for the anatomy batch:
+Read `@design-review`, write optional representative-content data into the project cache, then overlay the
+anatomy batch onto its exact parent in the one project review graph:
 
 ```bash
 node @render-design-review \
@@ -128,19 +127,21 @@ node @render-design-review \
   --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
   --content <representative-content.json> \
   --recommended-id <candidateId> \
-  --out .worktrees/<project>/cache/preview/<layoutId>/<blockId>
+  --out .worktrees/<project>/cache/preview/design-review
 ```
 
-The renderer resolves only the accepted parent direction. Candidate and state controls belong to the
-shared application; every enumerated state must be reachable. Clicking a part opens its typed inspector
-modal with citation, optionality and ownership evidence. Every anatomy uses the same direction, copy and
+The dedicated block route is
+`#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`. It visibly names the parent `layoutId` and exact
+`layoutHash`, compares anatomy candidates and explains every enumerated state on the page—never in a modal.
+Proposed candidates appear only on that block route; the layout canvas keeps rendering the current accepted
+child, or rough content when no compatible child exists. Every anatomy uses the same direction, copy and
 representative data; changing those between candidates or showing only the populated state invalidates the
 comparison. Do not author candidate-specific HTML, CSS or JavaScript.
 
 Serve the generated directory:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview/<layoutId>/<blockId> -p 8080 -c-1 --silent
+npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
 
 **8080 is where the search starts, not where it stops.** Bind it; if it is taken, try 8081, 8082, and keep
@@ -152,12 +153,14 @@ nothing binds, say so instead of serving nowhere quietly.
 
 ### 10 — Queue for approval and record the verdict
 
-Queue candidate reviews in the registry's optional audit history, never in a session used for lookup. Record
+Queue candidate reviews in the registry's optional audit history. Record
 the stable `(layoutId, blockId)`, accepted parent `layoutHash` and independent `blockHash`. On `OK`, update
 the scoped `blockHeads[layoutId/blockId].head` and `blocks/by-id/<layoutId>/<blockId>.json`, retaining the previous
 block head as superseded immutable history. Feedback never changes a head. Mark one evidence-backed candidate
 as the default. `OK` accepts every displayed default and binds hashes immediately; never ask the same approval
 twice. Validate the design registry and artifact before closing.
+After `OK`, rebuild the project graph so the layout route replaces rough content with the accepted child
+parts. The block projection's parent `layoutHash` must remain explicit.
 
 ### 11 — Close the phase
 

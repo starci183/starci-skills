@@ -1,4 +1,4 @@
-// Scan this machine's workspace routes, design registries and sessions, and write what the console
+// Scan this machine's workspace routes and design registries, and write what the console
 // renders. Read-only: it opens no editor, writes no route, prunes nothing.
 //
 //   node .claude/scripts/export-console-state.mjs --out <console-checkout>/public/state.json
@@ -444,62 +444,13 @@ function readRegistry(project, root) {
   };
 }
 
-// A session is any JSON in the registry that carries a surface and rounds — the shape
-// skills/skill-shape/session.schema.json describes. Anything else in there is not a session.
-function readSessions(root) {
-  const registries = join(root, "registries");
-  const found = [];
-  const walk = (path, depth) => {
-    if (depth > 3 || !existsSync(path)) return;
-    for (const entry of readdirSync(path, {withFileTypes: true})) {
-      const child = join(path, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name !== ".git") walk(child, depth + 1);
-        continue;
-      }
-      if (!entry.name.endsWith(".json")) continue;
-      try {
-        const data = JSON.parse(readFileSync(child, "utf8"));
-        if (!data || typeof data !== "object" || !data.surface || !Array.isArray(data.rounds)) continue;
-        found.push({
-          id: data.id ?? entry.name,
-          file: child,
-          surface: data.surface,
-          phase: data.phase ?? "unknown",
-          rounds: data.rounds.length,
-          acceptedHashes: data.rounds.flatMap((r) => (r.verdict?.acceptedHash ? [r.verdict.acceptedHash] : [])),
-          queued: Array.isArray(data.queue) ? data.queue : [],
-          // The rounds themselves, because the point of an append-only record is that a reader can
-          // see what was proposed and refused, not only what survived.
-          history: data.rounds.map((r, index) => ({
-            number: r.number ?? index + 1,
-            phase: r.phase ?? "unknown",
-            region: r.region ?? null,
-            prompt: r.prompt ?? "",
-            produced: Array.isArray(r.produced) ? r.produced : [],
-            refusal: r.refusal ?? null,
-            state: r.verdict?.state ?? "pending",
-            acceptedHash: r.verdict?.acceptedHash ?? null,
-            rejected: Array.isArray(r.verdict?.rejected) ? r.verdict.rejected : [],
-          })),
-        });
-      } catch {
-        warnings.push(`unreadable json in the registry: ${child}`);
-      }
-    }
-  };
-  walk(registries, 0);
-  return found;
-}
-
 const projects = dirs(join(source, ".worktrees")).map((project) => {
   const root = join(source, ".worktrees", project);
   const roots = {
     registries: existsSync(join(root, "registries")),
-    sessions: existsSync(join(root, "sessions")),
     cache: existsSync(join(root, "cache")),
   };
-  return {project, root, roots, registry: readRegistry(project, root), sessions: readSessions(root)};
+  return {project, root, roots, registry: readRegistry(project, root)};
 });
 
 const workspaces = readWorkspaces();

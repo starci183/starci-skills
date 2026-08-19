@@ -22,7 +22,7 @@ thì trace những gì mọi lượt chạy đều cần; có scenario thì trac
 ## Luật skill này bảo vệ
 
 **Trace không thực hiện bước đang trace.** Nó chỉ đọc, resolve, kiểm tra và đo; không ghi registry, không
-mở session, không commit baseline. Vừa ghi thứ target skill sẽ ghi là diagnosis đã biến thành một lượt
+mở review round, không commit baseline. Vừa ghi thứ target skill sẽ ghi là diagnosis đã biến thành một lượt
 chạy chưa được duyệt.
 
 **Một stop không phải defect.** `environment` nghĩa skill dừng đúng vì bằng chứng nó cần chưa có;
@@ -84,8 +84,8 @@ Invocation: `/starci-diagnose <skill>  render the settings page at second-app`.
 |---|---|---|---|
 | 1 lập context lock | — | — | `pass` |
 | 2 resolve + xác minh route `fe` | `.workspace/second-app/fe/config.json` | `.workspace/` chỉ có `example-app`; không có `second-app` | **`would-stop`** — `WORKSPACE-2` |
-| 3 các root worktree | `.worktrees/second-app/{registries,sessions,cache}` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
-| 4 mở hoặc tiếp session | registry | không thể đi tới | `blocked` sau bước 3 |
+| 3 các root worktree | `.worktrees/second-app/{registries,cache}` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
+| 4 mở hoặc tiếp review work | registry | không thể đi tới | `blocked` sau bước 3 |
 | 5 đọc sáu input | contract tại `context.contract` | **checkout đó không có thư mục `components/contracts`** | `defect` trong *environment*, không phải skill |
 | 6 verdict theo từng region | contract key theo `why` | không có contract để search, nên mọi region sẽ resolve thành `new` | `blocked` bởi bước 5 |
 | 7–11 | — | chưa đi tới | `cannot-tell` |
@@ -126,7 +126,7 @@ cleared-by: khôi phục registry root đã khai; design record là
 
 ### Trace không làm gì
 
-Không tạo route, không mở session, không ghi registry và không sinh một candidate nào — dù cách sửa bước 2
+Không tạo route, không mở review work, không ghi registry và không sinh một candidate nào — dù cách sửa bước 2
 chỉ cách một skill, chính cám dỗ “tiện thể setup luôn” là thứ biến diagnosis thành một lượt chạy chưa được
 duyệt.
 

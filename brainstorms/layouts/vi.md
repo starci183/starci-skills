@@ -179,7 +179,6 @@ không phải cái trích đoạn dưới đây. `envelope` giữ những thứ 
 {
   "schema": 1,
   "envelope": {
-    "session": "course-catalogue/2026-08-18",
     "round": 1,
     "project": "example-app",
     "surface": "course-catalogue",
@@ -229,7 +228,6 @@ quay ra hay không, nên chuyện đó không được giả định.
 {
   "schema": 1,
   "envelope": {
-    "session": "course-catalogue/2026-08-18",
     "round": 1,
     "project": "example-app",
     "surface": "course-catalogue",

@@ -12,7 +12,6 @@ const inventoryScript = join(root, "scripts", "inventory-visual-language.mjs");
 const temp = mkdtempSync(join(tmpdir(), "starci-direction-"));
 const hash = "a".repeat(64);
 const vocabularyAt = "b".repeat(64);
-const blockHash = "c".repeat(64);
 
 const write = (name, value) => {
   const path = join(temp, name);
@@ -72,24 +71,24 @@ const editorial = direction("editorial-clarity", {contrast: "strong", density: "
 const fakeEditorial = direction("fake-editorial", {contrast: "strong", density: "spacious", shape: "square", depth: "flat", motion: "still"});
 const directionBatch = write("directions.json", {
   schema: 2,
-  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  envelope: {round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
   directions: [quiet, editorial],
   recommended: {id: quiet.id, reason: "quiet hierarchy best matches the stated comparison task"},
 });
 const missingRecommendation = write("missing-recommendation.json", {
   schema: 2,
-  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  envelope: {round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
   directions: [quiet, editorial],
 });
 const unknownRecommendation = write("unknown-recommendation.json", {
   schema: 2,
-  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  envelope: {round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
   directions: [quiet, editorial],
   recommended: {id: "missing-direction", reason: "this deliberately points at no candidate in the batch"},
 });
 const fakeDirections = write("fake-directions.json", {
   schema: 1,
-  envelope: {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
+  envelope: {round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", vocabularyAt},
   directions: [quiet, fakeEditorial],
 });
 
@@ -108,7 +107,7 @@ const layout = (id, axes, selected = quiet) => ({
   regions: [region],
   reason: "this skeleton gives the owner a materially different reading order",
 });
-const layoutEnvelope = {session: "course-catalogue/2026-08-18", round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", contractAt: "abc123"};
+const layoutEnvelope = {round: 1, project: "example-app", surface: "course-catalogue", prompt: "compare courses quickly", contractAt: "abc123"};
 const layouts = write("layouts.json", {
   schema: 1,
   envelope: layoutEnvelope,
@@ -128,7 +127,7 @@ const splitLayouts = write("split-layouts.json", {
 
 const blocks = write("blocks.json", {
   schema: 1,
-  envelope: {session: "course-catalogue/2026-08-18", round: 2, project: "example-app", region: "results", layoutHash: hash},
+  envelope: {round: 2, project: "example-app", region: "results", layoutHash: hash},
   anatomies: [{
     id: "a",
     axes: {dataOwner: "parent", repetition: "repeats", weight: "populated", composition: "label-value"},
@@ -139,58 +138,6 @@ const blocks = write("blocks.json", {
     reason: "rows preserve comparison while every settled state keeps one owner",
   }],
 });
-const session = write("session.json", {
-  schema: 2,
-  id: "course-catalogue/2026-08-18",
-  project: "example-app",
-  surface: "course-catalogue",
-  phase: "block",
-  chain: {head: hash, sequence: 2},
-  rounds: [
-    {
-      number: 1,
-      phase: "layout",
-      prompt: "compare courses quickly",
-      directionReview: {
-        vocabularyAt,
-        candidates: [quiet, editorial],
-        state: "recommended",
-        recommendedId: quiet.id,
-        selectionSource: "evidence",
-        selectionReason: "quiet hierarchy best matches the stated comparison task",
-      },
-      produced: [{id: "a", hash}],
-      verdict: {state: "accepted", acceptedHash: hash},
-      sealed: hash,
-    },
-    {
-      number: 2,
-      phase: "block",
-      prompt: "design the result rows",
-      region: "results",
-      layoutHash: hash,
-      produced: [{id: "a", hash: blockHash}],
-      verdict: {state: "accepted", acceptedHash: blockHash},
-      sealed: blockHash,
-    },
-  ],
-  queue: [
-    {hash, phase: "layout", state: "accepted"},
-    {hash: blockHash, phase: "block", region: "results", layoutHash: hash, state: "accepted"},
-  ],
-});
-const brokenSession = write("broken-session.json", {
-  ...JSON.parse(readFileSync(session, "utf8")),
-  queue: [{hash, phase: "layout", state: "accepted"}, {hash: blockHash, phase: "block", region: "results", state: "accepted"}],
-});
-const uncombinedSessionValue = JSON.parse(readFileSync(session, "utf8"));
-uncombinedSessionValue.rounds[0].directionReview = {
-  vocabularyAt,
-  candidates: [quiet, editorial],
-  state: "selected",
-  selectedId: quiet.id,
-};
-const uncombinedSession = write("uncombined-session.json", uncombinedSessionValue);
 const worktreeRoots = write("worktree-roots.json", {
   schema: 1,
   project: "example-app",
@@ -202,7 +149,6 @@ const worktreeRoots = write("worktree-roots.json", {
       ignored: false,
       ownership: {locked: true, clean: true, branch: "registry/example-app", owningGit: root},
     },
-    sessions: {path: ".worktrees/example-app/sessions", durability: "rebuildable", ignored: true},
     cache: {path: ".worktrees/example-app/cache", durability: "rebuildable", ignored: true},
   },
 });
@@ -235,13 +181,6 @@ try {
     throw new Error("split layout directions failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", blocks, "--hash");
-  run("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", session);
-  if (!mustFail("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", uncombinedSession).includes("require one evidence-backed recommendation")) {
-    throw new Error("schema 2 session without combined recommendation failed for the wrong reason");
-  }
-  if (!mustFail("--schema", join(root, "skills", "skill-shape", "session.schema.json"), "--data", brokenSession).includes("must name its parent layout")) {
-    throw new Error("missing block-to-layout edge failed for the wrong reason");
-  }
   run("--schema", join(root, "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
   console.log("ok  evidence recommendation, one combined layout approval hash, independent block hash, and dependency edge hold");
 } finally {

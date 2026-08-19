@@ -147,7 +147,6 @@ covers an anatomy only.
 {
   "schema": 1,
   "envelope": {
-    "session": "coding-drill-result/2026-08-18",
     "round": 1,
     "project": "example-app",
     "region": "criteria",

@@ -19,8 +19,7 @@ title: Frontend design layout · Vietnamese
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra registry identity-centric và các current head |
 | `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps không phá huỷ và verify identity heads current |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects và by-id projections |
-| `@session` | `skills/skill-shape/session.schema.json` | file | hình dạng audit history tùy chọn; không phải lookup authority |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact, session và sinh hash |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact và sinh hash |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa manifest, interaction và authority boundary của Vite review dùng chung |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | build review app dùng chung từ layout JSON đã validate thay vì HTML riêng |
 
@@ -30,12 +29,12 @@ Không có. Một điểm dừng kết thúc lượt chạy này. Skill không t
 
 ## Cách chạy
 
-Đọc `@skill-shape` trước. Skill này nhận `layoutId` ổn định và sở hữu page skeleton; session chỉ là audit
-history tùy chọn.
+Đọc `@skill-shape` trước. Skill này nhận `layoutId` ổn định và sở hữu page skeleton; review history chỉ là
+bằng chứng audit.
 
 **JSON mới là artifact; Vite review dùng chung chỉ là cách quan sát.** Approval bind vào hash của canonical
 JSON, không bind vào manifest hay application đã render. `registries/design-registry-v2.json` là authority: `layoutHeads[layoutId].head` trỏ tới layout object
-immutable đã accepted; session hoặc review không bao giờ quyết định lookup hiện tại.
+immutable đã accepted; review không bao giờ quyết định lookup hiện tại.
 
 ## QUY TRÌNH
 
@@ -61,13 +60,13 @@ của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 
 Nếu v2 chưa có, chạy `@design-registry-migrate --apply`; sau đó chạy `@design-registry-check`, đọc `@design-registry-schema` và
 `registries/design-registry-v2.json`. Bắt buộc caller cung cấp `layoutId` ổn định; không suy ra
-identity từ prompt, surface label hay session id. Resolve `layoutHeads[layoutId]`, rồi resolve `head` qua
+identity từ prompt hay surface label. Resolve `layoutHeads[layoutId]`, rồi resolve `head` qua
 map `objects.byHash` immutable nếu head đã tồn tại. Head là layout accepted và là kết quả lookup hiện tại
 duy nhất. Identity thiếu hoặc schema mismatch thì dừng; thiếu head là identity mới, không phải quyền coi
 candidate proposed là accepted.
 
 Nếu layout chưa có accepted head, chỉ tiếp tục theo creation path được schema registry cho phép; không tự
-đặt head từ candidate proposed. Session hoặc review cũ có thể đọc làm ngữ cảnh và ghi audit history, nhưng
+đặt head từ candidate proposed. Review history cũ có thể đọc làm ngữ cảnh và ghi audit history, nhưng
 không được chọn, thay hoặc hồi sinh head. Giữ mọi accepted hash trong immutable object và chỉ cập nhật head
 tại approval checkpoint.
 
@@ -137,7 +136,7 @@ token, candidate trùng axis set và batch không candidate nào viện dẫn `n
 không phủ envelope; cùng quyết định phải sinh cùng hash ở round sau.
 
 Đọc `@design-review`. Ghi shell descriptor và representative-content descriptor tùy chọn vào project cache,
-rồi build một universal review application cho cả batch:
+rồi overlay batch này vào một project review graph duy nhất:
 
 ```bash
 node @render-design-review \
@@ -147,20 +146,22 @@ node @render-design-review \
   --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
   --content <representative-content.json> --shell <shell-descriptor.json> \
   --recommended-id <candidateId> \
-  --out .worktrees/<project>/cache/preview/<layoutId>
+  --out .worktrees/<project>/cache/preview/design-review
 ```
 
-Renderer dùng chung sở hữu candidate, direction và viewport switching. Nó luôn khoanh mọi layout-owned
-region, ghi entry citation, assembler và mount lifetime; click region mở typed inspector modal cùng trạng
-thái block head hiện tại. Content đại diện và imagery có evidence làm reading order và density nhìn thấy
-được, nhưng manifest không được chốt block parts, states, data ownership hay final copy. Canvas rỗng hoặc
-layout không có region overlay là invalid.
+Layout route render một page hoàn chỉnh. Mọi region có rough representative content để geometry, density và
+reading order đánh giá được trước khi child block tồn tại. Child chỉ render accepted parts khi `layoutHash`
+đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
+`#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`, không mở modal.
+
+Layout artifact vẫn không chốt block parts, states, data ownership hay final copy. Canvas rỗng, region không
+có content hoặc layout không có region overlay đều invalid.
 
 Không tự viết HTML, CSS hay JavaScript riêng cho candidate. Project shell và content là manifest data;
 Vite application trung lập với project và interaction của nó không mutate registry. Serve thư mục đã build:
 
 ```bash
-npx -y http-server .worktrees/<project>/cache/preview/<layoutId> -p 8080 -c-1 --silent
+npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
 
 **8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
@@ -170,8 +171,8 @@ lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có 
 ra, đừng lặng lẽ phục vụ vào hư không.
 
 
-Dashed overlay và inspector modals là documentation chrome; chúng giúp prototype đọc được như một page thật
-nhưng không biến thành block anatomy hay mang product class.
+Dashed overlay và dedicated block-detail routes là documentation chrome; chúng giúp prototype đọc được như
+một page thật nhưng không biến rough region thành block anatomy hay mang product class.
 
 ### 12 — Queue approval và đóng
 
@@ -181,9 +182,11 @@ direction được nhúng với skeleton. Feedback có thể phản biện direc
 
 Khi `OK`, validate immutable object rồi cập nhật `layoutHeads[layoutId].head` thành `layoutHash` accepted
 (cùng danh sách region ID ổn định đã khai báo) trong design registry. Khi replacement accepted, giữ head cũ trong audit history
-với trạng thái superseded và trỏ sang replacement; không sửa object cũ. Session/review chỉ ghi lời owner,
+với trạng thái superseded và trỏ sang replacement; không sửa object cũ. Review chỉ ghi lời owner,
 không phải lookup authority. Validate registry và artifact, đánh dấu layout có bằng chứng làm default, rồi
 chỉ đóng sau khi mọi write thuộc Layout hoàn tất.
+Build lại project review graph sau khi head advance; block head bind layout hash cũ phải hiện stale và layout
+mới quay về rough child content cho tới khi block được redesign hoặc accepted dưới parent mới.
 
 ## Điểm dừng
 
@@ -193,7 +196,7 @@ chỉ đóng sau khi mọi write thuộc Layout hoàn tất.
 - Chưa có direction recommendation dựa trên evidence → trả quyết định còn thiếu; chưa sinh layout.
 - Class cần dùng không nằm trong closed set của contract → đây là **contract change**, trả owner.
 - Hai candidate còn trùng axis set → chúng là một; sinh lại thay vì đưa ra lựa chọn giả.
-- `layoutId` ổn định thiếu, mơ hồ hoặc trỏ tới registry head malformed → dừng; không fallback về session hay prompt.
+- `layoutId` ổn định thiếu, mơ hồ hoặc trỏ tới registry head malformed → dừng; không fallback về prompt.
 - Hash proposed không phải registry head → dừng; chỉ approval checkpoint được advance accepted head.
 
 Không điểm dừng nào tự gọi skill khác. Nếu owner muốn phục hồi, đó là request riêng và lượt chạy riêng.

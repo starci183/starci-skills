@@ -29,14 +29,14 @@ không thuộc loại nào cả và không nhận bất cứ giấy tờ nội b
 thành của mình.
 
 `.claude` là cây quy tắc, **không bao giờ** là kho chứa state lúc chạy. Cây nào chứa việc thì cũng chứa
-rác, và một cây luật có mảnh vụn của session trong đó thì thôi đọc ra thẩm quyền.
+rác, và một cây luật có mảnh vụn của run trong đó thì thôi đọc ra thẩm quyền.
 
 ## Mã tình huống
 
 | Mã | Tình huống | Nó đi đâu |
 |---|---|---|
 | `WORKTREE-1` | State phải sống sót và phải rà soát được | `<Source>/.worktrees/<project>/registries`, worktree liên kết đã khoá, trên nhánh riêng |
-| `WORKTREE-2` | Tiến độ hoặc gói dựng lại được | `<Source>/.worktrees/<project>/sessions` hoặc `cache`, bị ignore |
+| `WORKTREE-2` | Draft progress hoặc gói dựng lại được | `<Source>/.worktrees/<project>/cache`, bị ignore |
 | `WORKTREE-3` | Đường dẫn thiếu phân đoạn project, hoặc nằm dưới `.claude` | từ chối; di trú về sau `<project>` |
 | `WORKTREE-4` | Registry worktree thuộc một Git common directory khác | từ chối; đó không phải state của Source này |
 | `WORKTREE-5` | Nhiều agent song song sắp ghi | chỉ cô lập khi hai agent sửa cùng một file |
@@ -56,7 +56,7 @@ rác, và một cây luật có mảnh vụn của session trong đó thì thôi
 5. **Để repository đích yên.** Giấy tờ nội bộ của một lượt chạy không bao giờ rơi vào repository đang được
    làm; bản ghi sản phẩm bền thuộc về repository đó qua đường rà soát của chính nó, không qua state này.
 6. **Tách identity khỏi review history.** Layout/block ID resolve accepted head trực tiếp từ `registries`;
-   `reviews` giữ decision, còn `sessions` chỉ giữ progress dựng lại được — `WORKTREE-7`.
+   `reviews` giữ decision, còn draft chưa xong nằm dưới `cache/drafts` — `WORKTREE-7`.
 
 ## `WORKTREE-1` — state phải sống sót
 
@@ -189,7 +189,7 @@ từ một background agent, nơi không ai đang nhìn xem nó đứng trên nh
 - Region có một `blockId` ổn định, scope dưới `layoutId`.
 - Candidate body đã sống dưới immutable SHA-256 objects.
 
-**Tự hỏi.** Executor có resolve current accepted design chỉ từ `layoutId`, không cần biết session id hoặc
+**Tự hỏi.** Executor có resolve current accepted design chỉ từ `layoutId`, không cần biết review id hoặc
 scan review history không?
 
 **Ranh giới**
@@ -202,8 +202,8 @@ scan review history không?
 được design dưới đó. `reviews/` có thể cite candidate, feedback và accepted hash, nhưng reader không cần
 review id để tìm current state. Thay head thì append history; không bao giờ sửa object.
 
-**Nó hỏng bằng đường nào.** Skill tìm `decisions/<session>.json`, khiến block hợp lệ thành unreachable khi
-caller không biết review cũ nào tình cờ chứa nó. Session history âm thầm thành current-state database thứ hai.
+**Nó hỏng bằng đường nào.** Skill tìm một review record cũ, khiến block hợp lệ thành unreachable khi caller
+không biết review nào tình cờ chứa nó. Review history âm thầm thành current-state database thứ hai.
 
 ## Đầu vào
 
@@ -214,7 +214,7 @@ caller không biết review cũ nào tình cờ chứa nó. Session history âm 
 | source | Repository chứa cây quy tắc |
 | đầu ra | Từng thứ lượt chạy sẽ ghi, và nó có dựng lại được không |
 | danh sách worktree | Chính lời khai của Git, kèm trạng thái khoá và prunable |
-| bằng chứng ignore | Rằng `sessions` và `cache` đang bị Source ignore |
+| bằng chứng ignore | Rằng `cache` đang bị Source ignore |
 
 ## Quy tắc
 
@@ -229,7 +229,7 @@ caller không biết review cũ nào tình cờ chứa nó. Session history âm 
 8. Worktree cũ được prune qua Git, không bao giờ bằng cách xoá thư mục, và không bao giờ từ một background
    agent.
 9. Design identity là `layoutId` hoặc `(layoutId, blockId)`; content hash là version, không phải identity.
-10. Accepted head resolve không cần session. Review là append-only evidence; session là progress tùy chọn.
+10. Accepted head resolve trực tiếp từ stable identity. Review là append-only evidence; draft là cache dựng lại được.
 11. Block head phải nêu parent `layoutHash`; block accept dưới layout cũ là stale, không phải current.
 
 ## Ngoại lệ
@@ -248,7 +248,7 @@ Mỗi thứ lượt chạy ghi ra một khối:
 ```text
 output: <cái đang được ghi>
 durability: <durable | rebuildable>
-path: <.worktrees/<project>/registries | sessions | cache>
+path: <.worktrees/<project>/registries | cache>
 isolation: <required | not required>
 ownership: <đã khoá, sạch, nhánh, git dir sở hữu>
 situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7>

@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-execute
-description: Implement the accepted frontend design for a stable layoutId — applying its embedded visual direction, traversing every current declared region block head, resolving classes through the principles, and proving the result against the lints. The design registry heads are authoritative; sessions are optional audit history. Refuses to start on a proposed hash.
+description: Implement the accepted frontend design for a stable layoutId — applying its embedded visual direction, traversing every current declared region block head, resolving classes through the principles, and proving the result against the lints. The design registry heads are authoritative. Refuses to start on a proposed hash.
 ---
 
 # starci-fe-design-execute
@@ -14,9 +14,8 @@ description: Implement the accepted frontend design for a stable layoutId — ap
 | `@patterns-fe` | `compilers/patterns/fe/context.md` | context | resolve files, exports and import boundaries |
 | `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric heads and immutable object references |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | require registry v2 heads and projections to be current before source execution |
-| `@session` | `skills/skill-shape/session.schema.json` | file | optional audit-history shape; never the lookup authority |
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the session graph before production work |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts before production work |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/context.md` | context | resolve and verify the registry worktree |
 
@@ -43,7 +42,7 @@ with the owner before the first write. Detection is not permission.
 Run `@design-registry-check`. Read `@design-registry-schema` and validate
 `registries/design-registry-v2.json`. Resolve the caller's `layoutId` through
 `layoutHeads[layoutId].head`, then resolve that immutable layout object through `objects.byHash`. The head
-is the accepted layout; do not inspect a session or review to choose another hash. Enumerate every declared
+is the accepted layout; do not inspect review history to choose another hash. Enumerate every declared
 blockId in `layoutHeads[layoutId].regions`, resolve `blockHeads[layoutId/blockId]` for each, and require its
 `layoutHash` to equal the current layout hash and its `head` object to exist. This traversal is the complete
 implementation input: historical reviews are optional audit history, never authority.

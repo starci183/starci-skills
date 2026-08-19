@@ -146,7 +146,6 @@ Layout đó đã buộc direction, nên block không mang hash phụ thuộc th�
 {
   "schema": 1,
   "envelope": {
-    "session": "coding-drill-result/2026-08-18",
     "round": 1,
     "project": "example-app",
     "region": "criteria",

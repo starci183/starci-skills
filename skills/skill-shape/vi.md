@@ -157,8 +157,8 @@ quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agen
 
 Không có report file riêng. Design authority bền nằm dưới
 `<Source>/.worktrees/<project>/registries`: stable layout/block IDs trỏ tới accepted hashes, immutable
-objects giữ candidate bodies, và `reviews/` tùy chọn giữ prompt, feedback, verdict. `sessions/` chỉ giữ
-progress dựng lại được; repair ở commit/diff; lượt chỉ đọc không ghi file trừ khi được yêu cầu rõ.
+objects giữ candidate bodies, và `reviews/` tùy chọn giữ prompt, feedback, verdict. Progress dựng lại được
+nằm dưới `cache/drafts`; repair ở commit/diff; lượt chỉ đọc không ghi file trừ khi được yêu cầu rõ.
 
 Một boundary được duyệt gọi tên `Approved revision: <identity>` và trích đúng identity đó cùng baseline
 commit. Chính cặp đó chứng minh cái gì đã đổi sau khi được cấp quyền, và nó sống sót ở bất cứ nơi nào
@@ -194,7 +194,7 @@ thêm**.
 - **Năng lực chỉ đọc.** Nó không biến measurement thành repair; nó báo evidence và owner của repair
   request riêng.
 - **Design identity được tiếp tục.** Layout resolve head của `layoutId` hiện có. Review history có thể
-  tiếp tục, nhưng caller không cần review/session id để tìm current accepted state.
+  tiếp tục, nhưng caller không cần review id để tìm current accepted state.
 
 ## Ví dụ đã giải
 
