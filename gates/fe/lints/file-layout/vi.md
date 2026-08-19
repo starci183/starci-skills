@@ -116,7 +116,7 @@ trong danh sách khe của khung nền.
 `app/` ở gốc không bao giờ khớp, và đó lại là bố cục phổ biến hơn ngoài đời. Một file route vẫn fetch
 và sắp xếp thoải mái ngay trong `page.tsx` — luật đọc **tên**, và "đang vẽ" không phải một tính chất
 mà tên file mang được; chính mã nguồn nói thẳng điều đó. Gạch dưới trên một FILE ở ngay gốc cây,
-`app/_FleetPage.tsx`, vì cổng miễn trừ so với cả phần đường dẫn còn lại chứ không so theo từng đoạn.
+`app/FleetPageBase.tsx`, vì cổng miễn trừ so với cả phần đường dẫn còn lại chứ không so theo từng đoạn.
 Và tấm gương lật ngược của nó: `app/dashboard/_components/Card.tsx` **bị** báo trong khi
 `app/_components/Card.tsx` thì không — cùng một quy ước, hai phán quyết ngược nhau, thư mục riêng chỉ
 được miễn ở ngay gốc cây, đúng chỗ ít ai viết nó nhất. Một thành phần đặt tên theo một khe — một màn
@@ -405,7 +405,7 @@ src/components/pages/FleetPage/utils/format.ts
 
 ```tsx
 // src/components/pages/FleetPage/index.tsx
-export const Fleet = () => <_FleetPage />
+export const Fleet = () => <FleetPageBase />
 ```
 
 ```text
@@ -457,7 +457,7 @@ src/components/pages/FleetPage/component.tsx
 
 ```tsx
 // src/components/pages/FleetPage/index.tsx
-export const FleetPage = () => <_FleetPage />
+export const FleetPage = () => <FleetPageBase />
 ```
 
 Nhưng hai cửa còn mở vẫn sống sót qua bản sửa. Người viết nào chuyển `PriceTag` vào trong

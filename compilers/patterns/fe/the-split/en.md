@@ -78,7 +78,7 @@ later. They cross the same exact twin.
 4. **Ask each code's question of every surface, in order.** Does this file read the world
    (`SPLIT-6`)? Does the drawing half ask anyone anything (`SPLIT-1`)? Does the connected half decide
    appearance (`SPLIT-2`)? Does the lifecycle cross as one name (`SPLIT-3`)? Do the words cross
-   resolved (`SPLIT-4`)? Does every JSX path go through `_X` (`SPLIT-5`)? Each answer is *holds* or
+   resolved (`SPLIT-4`)? Does every JSX path go through `XBase` (`SPLIT-5`)? Each answer is *holds* or
    *breaks*; there is no third answer.
 5. **When two codes both match, record both.** Calling a translation hook inside `component.tsx`
    breaks `SPLIT-1` because the drawing half asked the world, and breaks `SPLIT-4` because the words
@@ -223,8 +223,8 @@ The reason: a connected file that renders a tree of its own has become both halv
 loses its meaning the first time it is crossed. After that nobody can say "reviewing this half does
 not require opening the other file", because something might be sitting on the other side.
 
-**What it emits in source.** `import { _X } from "./component"` in `index.tsx`, where `X` is the
-folder name, and `_X` is the only JSX identifier the file renders.
+**What it emits in source.** `import { XBase } from "./component"` in `index.tsx`, where `X` is the
+folder name, and `XBase` is the only JSX identifier the file renders.
 
 **No thin-block exception.** One leaf, one tree in every state, no local domain state, or a twin that
 only forwards props — those are precisely the cases most likely to grow a second situation. They
@@ -232,8 +232,8 @@ cross the same exact twin.
 
 **Recognition signs.**
 
-- The connected file has a JSX identifier other than `_X`.
-- The connected file imports `_X` but has a `return` branch that does not go through it.
+- The connected file has a JSX identifier other than `XBase`.
+- The connected file imports `XBase` but has a `return` branch that does not go through it.
 - There is an early branch like `if (error) return null` — that branch has drawn something (drawing
   nothing is also a presentation decision) without crossing the twin.
 
@@ -305,7 +305,7 @@ product's folder, is what is being pointed at.
 | `SPLIT-2` | `components/**/index.tsx` that import `./component` | No `className`, no spacing value, no element choice anywhere in the connected file. Grepping `className` across every connected index and getting zero hits is the check; a `variant`-shaped prop naming an appearance is the part this anchor cannot see |
 | `SPLIT-3` | `components/**/component.tsx` | The exported props type is a union of members discriminated by a literal `state`. Counter-check the same files for `readonly isLoading?: boolean` and similar incoming flags — every hit is a line that crossed as a flag |
 | `SPLIT-4` | The boundary props declared in `component.tsx`, and the JSX that fills them in `index.tsx` | Copy-carrying props are typed `string` and hold sentences. No prop named `*Key`, no dotted namespace literal passed down. A `selectedKey`-shaped identity prop is not copy and is not a hit |
-| `SPLIT-5` | `components/**/index.tsx` and `@canon-fe` | `import { _X } from "./component"` where `X` is the folder name, and `_X` is the only JSX identifier the file renders. The rule's `connectedBlock` matcher fixes `X` from the folder, so the twin name is not a convention a file can restate differently |
+| `SPLIT-5` | `components/**/index.tsx` and `@canon-fe` | `import { XBase } from "./component"` where `X` is the folder name, and `XBase` is the only JSX identifier the file renders. The rule's `connectedBlock` matcher fixes `X` from the folder, so the twin name is not a convention a file can restate differently |
 | `SPLIT-6` | Folders holding `index.tsx` and no `component.tsx` | The index makes no world call: it composes other connected surfaces, or holds only local UI state such as which overlay is open. The absence of `component.tsx` is correct only while the absence of a request is |
 
 A code with no anchor is a proposal, not a law. All six are anchored; none is unanchored.
@@ -329,7 +329,7 @@ A code with no anchor is a proposal, not a law. All six are anchored; none is un
 4. A situation crosses the line as one value from a closed set, never as several independent
    booleans.
 5. Copy crosses the line resolved.
-6. A connected file renders exactly one JSX identifier of its own: its `_X` twin.
+6. A connected file renders exactly one JSX identifier of its own: its `XBase` twin.
 7. A surface with no request is one file.
 8. Neither review has to read the other file.
 
@@ -359,7 +359,7 @@ One block per surface folder the accepted shape produces.
 surface: <folder>
 request: <yes | no>
 files: <index.tsx + component.tsx | index.tsx only>
-twin: <_X | none>
+twin: <XBase | none>
 situations: <closed set of state names | none>
 codes: <SPLIT-1..SPLIT-6, each holds | breaks>
 reason: <which half could be wrong while the network is fine>
@@ -384,7 +384,7 @@ codes: SPLIT-1 holds | SPLIT-2 holds | SPLIT-3 holds | SPLIT-4 holds | SPLIT-5 h
 reason: the rail composes three connected children and reads nothing itself, so it owns no half that could be wrong while the network is fine
 ```
 
-The fact that excludes the adjacent code: `SPLIT-5` would demand a `_ProgressRail` twin, but
+The fact that excludes the adjacent code: `SPLIT-5` would demand a `ProgressRailBase` twin, but
 `SPLIT-5` applies only to a surface that has a request, and this file makes no world call — arranging
 three children that each settle their own situation is not a request.
 
@@ -392,7 +392,7 @@ three children that each settle their own situation is not a request.
 surface: CourseProgress
 request: yes
 files: index.tsx + component.tsx
-twin: _CourseProgress
+twin: CourseProgressBase
 situations: pending | empty | failed | settled
 codes: SPLIT-1 holds | SPLIT-2 holds | SPLIT-3 holds | SPLIT-4 holds | SPLIT-5 holds | SPLIT-6 holds
 reason: the request, the settled situation and the resolved words could be wrong while the tree is fine, and the tree, the seams and a missing state could be wrong while the network is fine
@@ -405,7 +405,7 @@ the world itself, and once there is a request there is a data half — so the sp
 as a sentence rather than as a key, which is what keeps `SPLIT-4` from breaking.
 
 What the accepted shape does not state, and therefore does not resolve: it does not say that the rail
-is one file and the block is two, it does not name `_CourseProgress`, it does not say the four states
+is one file and the block is two, it does not name `CourseProgressBase`, it does not say the four states
 cross as a single discriminated `state`, and it does not say the retry copy arrives already
 translated. Every one of those is settled here, by the codes, and not by the shape.
 

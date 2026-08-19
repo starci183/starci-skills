@@ -77,7 +77,7 @@ tình huống thứ hai nhất. Chúng vẫn băng qua đúng cái sinh đôi �
 4. **Hỏi câu hỏi của từng mã cho từng surface, theo thứ tự.** File này có đọc thế giới không
    (`SPLIT-6`)? Nửa vẽ có đi hỏi ai điều gì không (`SPLIT-1`)? Nửa connected có quyết định hình thức
    không (`SPLIT-2`)? Vòng đời có băng qua dưới một cái tên không (`SPLIT-3`)? Chữ có băng qua ở dạng
-   đã dịch không (`SPLIT-4`)? Mọi nhánh JSX có đi qua `_X` không (`SPLIT-5`)? Mỗi câu trả lời là *giữ*
+   đã dịch không (`SPLIT-4`)? Mọi nhánh JSX có đi qua `XBase` không (`SPLIT-5`)? Mỗi câu trả lời là *giữ*
    hoặc *phá*; không có đáp án thứ ba.
 5. **Khi hai mã cùng khớp thì ghi cả hai.** Gọi hook dịch trong `component.tsx` phá `SPLIT-1` vì nửa
    vẽ đã đi hỏi thế giới, và phá `SPLIT-4` vì chữ lẽ ra đã phải dịch xong cách đó một file. Các mã
@@ -212,8 +212,8 @@ Lý do: một file connected mà tự render một cây riêng đã trở thành
 ngay lần đầu bị vượt. Sau đó không ai còn nói được "review nửa này không cần đọc file kia" nữa, vì có
 thể có thứ gì đó nằm bên kia.
 
-**Source phải thể hiện gì.** Dòng `import { _X } from "./component"` trong `index.tsx`, với `X` là
-tên folder, và `_X` là JSX identifier duy nhất mà file ấy render.
+**Source phải thể hiện gì.** Dòng `import { XBase } from "./component"` trong `index.tsx`, với `X` là
+tên folder, và `XBase` là JSX identifier duy nhất mà file ấy render.
 
 **Không có ngoại lệ cho block mỏng.** Chỉ một leaf, một cây giống nhau ở mọi trạng thái, không có
 local domain state, hay một sinh đôi chỉ forward props — đó chính là những trường hợp dễ mọc thêm tình
@@ -221,8 +221,8 @@ huống thứ hai nhất. Chúng vẫn băng qua đúng cái sinh đôi ấy.
 
 **Cách nhận ra.**
 
-- File connected có JSX identifier nào khác ngoài `_X`.
-- File connected import `_X` nhưng có một nhánh `return` không đi qua nó.
+- File connected có JSX identifier nào khác ngoài `XBase`.
+- File connected import `XBase` nhưng có một nhánh `return` không đi qua nó.
 - Có một nhánh sớm kiểu `if (error) return null` — nhánh đó vừa vẽ một thứ (không vẽ gì cũng là một
   quyết định trình bày) mà không băng qua sinh đôi.
 
@@ -293,7 +293,7 @@ phải folder của riêng sản phẩm nào.
 | `SPLIT-2` | `components/**/index.tsx` có import `./component` | Không `className`, không giá trị spacing, không lựa chọn element ở bất cứ đâu trong file connected. Grep `className` trên mọi index connected và ra zero là phép kiểm; một prop kiểu `variant` đặt tên cho hình thức là phần điểm neo này không nhìn thấy được |
 | `SPLIT-3` | `components/**/component.tsx` | Props type export là một union phân biệt bằng literal `state`. Kiểm ngược cùng những file ấy tìm `readonly isLoading?: boolean` và các cờ đi vào tương tự — mỗi lần trúng là một dòng đã băng qua dưới dạng cờ |
 | `SPLIT-4` | Các prop biên khai trong `component.tsx`, và JSX điền chúng trong `index.tsx` | Prop mang chữ có kiểu `string` và chứa câu chữ. Không prop nào tên `*Key`, không literal namespace chấm nào bị truyền xuống. Một prop định danh kiểu `selectedKey` không phải copy và không tính là trúng |
-| `SPLIT-5` | `components/**/index.tsx` và `@canon-fe` | `import { _X } from "./component"` với `X` là tên folder, và `_X` là JSX identifier duy nhất file ấy render. Matcher `connectedBlock` của rule chốt `X` từ folder, nên tên sinh đôi không phải một quy ước mà file được phép phát biểu lại kiểu khác |
+| `SPLIT-5` | `components/**/index.tsx` và `@canon-fe` | `import { XBase } from "./component"` với `X` là tên folder, và `XBase` là JSX identifier duy nhất file ấy render. Matcher `connectedBlock` của rule chốt `X` từ folder, nên tên sinh đôi không phải một quy ước mà file được phép phát biểu lại kiểu khác |
 | `SPLIT-6` | Folder chỉ có `index.tsx` và không có `component.tsx` | Index không gọi gì ra thế giới: nó ghép các surface connected khác, hoặc chỉ giữ state UI cục bộ như overlay nào đang mở. Việc vắng `component.tsx` chỉ đúng chừng nào việc vắng request còn đúng |
 
 Một mã không có điểm neo là một đề xuất, không phải một luật. Cả sáu mã đều đã neo; không mã nào chưa
@@ -318,7 +318,7 @@ neo được.
 4. Một tình huống băng qua đường ranh dưới dạng một giá trị lấy từ tập đóng, không bao giờ dưới dạng
    nhiều boolean độc lập.
 5. Chữ băng qua đường ranh ở dạng đã resolve.
-6. Một file connected render đúng một JSX identifier của riêng nó: cái sinh đôi `_X` của nó.
+6. Một file connected render đúng một JSX identifier của riêng nó: cái sinh đôi `XBase` của nó.
 7. Surface không có request thì một file.
 8. Người review một bên không phải đọc file bên kia.
 
@@ -347,7 +347,7 @@ Một block cho mỗi folder surface mà shape đã duyệt sinh ra.
 surface: <folder>
 request: <yes | no>
 files: <index.tsx + component.tsx | index.tsx only>
-twin: <_X | none>
+twin: <XBase | none>
 situations: <closed set of state names | none>
 codes: <SPLIT-1..SPLIT-6, each holds | breaks>
 reason: <which half could be wrong while the network is fine>
@@ -371,7 +371,7 @@ codes: SPLIT-1 holds | SPLIT-2 holds | SPLIT-3 holds | SPLIT-4 holds | SPLIT-5 h
 reason: the rail composes three connected children and reads nothing itself, so it owns no half that could be wrong while the network is fine
 ```
 
-Sự thật loại trừ mã kề bên: `SPLIT-5` lẽ ra đòi một sinh đôi `_ProgressRail`, nhưng `SPLIT-5` chỉ áp
+Sự thật loại trừ mã kề bên: `SPLIT-5` lẽ ra đòi một sinh đôi `ProgressRailBase`, nhưng `SPLIT-5` chỉ áp
 cho surface có request, còn file này không gọi gì ra thế giới — xếp ba phần tử con mà mỗi đứa tự chốt tình
 huống của mình thì không phải một request.
 
@@ -379,7 +379,7 @@ huống của mình thì không phải một request.
 surface: CourseProgress
 request: yes
 files: index.tsx + component.tsx
-twin: _CourseProgress
+twin: CourseProgressBase
 situations: pending | empty | failed | settled
 codes: SPLIT-1 holds | SPLIT-2 holds | SPLIT-3 holds | SPLIT-4 holds | SPLIT-5 holds | SPLIT-6 holds
 reason: the request, the settled situation and the resolved words could be wrong while the tree is fine, and the tree, the seams and a missing state could be wrong while the network is fine
@@ -392,7 +392,7 @@ là thứ giữ cho `SPLIT-3` không bị phá; chữ trên nút thử lại bă
 một key, đó là thứ giữ cho `SPLIT-4` không bị phá.
 
 Shape đã duyệt không nói gì, và vì thế không giải quyết gì, ở những chỗ này: nó không nói rail là một
-file còn block là hai, không đặt tên `_CourseProgress`, không nói bốn trạng thái băng qua dưới một
+file còn block là hai, không đặt tên `CourseProgressBase`, không nói bốn trạng thái băng qua dưới một
 `state` phân biệt duy nhất, và không nói chữ thử lại tới nơi đã dịch sẵn. Từng điều một trong số đó
 được chốt ở đây, bởi các mã, chứ không phải bởi shape.
 

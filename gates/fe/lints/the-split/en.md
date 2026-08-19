@@ -100,11 +100,11 @@ directly. `JSXOpeningElement` pushes every `JSXIdentifier` tag onto a rendered l
 **What it cannot see.** Laundering the world read disables the check entirely: if the index calls
 `useOrderData()`, `readsWorld` stays false, `Program:exit` returns, and the block is invisible rather
 than non-compliant — the two rules share one detector, so one launder defeats both. Rendering without
-JSX, `createElement(Row, props)` beside a JSX `<_X />`, leaves an entire alternate tree undrawn in the
+JSX, `createElement(Row, props)` beside a JSX `<XBase />`, leaves an entire alternate tree undrawn in the
 rendered list while `rendersTwin` is true. A namespaced tag, `<Ui.Card>`, is a `JSXMemberExpression`
 and never enters the list. A path outside the one literal — `features/…`, `app/…`,
 `components/blocks/…` without `src`, a lowercase folder, an entrypoint named `index.ts` — has no rule
-on it. And the twin is never opened: `_X` may not exist, may fetch, may draw nothing. "Has
+on it. And the twin is never opened: `XBase` may not exist, may fetch, may draw nothing. "Has
 presentational twin" is decided from a NAME.
 
 **Boundary.** This rule keys on `imported.name`, so an alias at the import still counts as reading the
@@ -126,7 +126,7 @@ world — the exact hole `presentational-purity` leaves open.
 | Written this way | Why it still fires |
 |---|---|
 | `import {useTranslations as translate}` in the connected half | The twin rule keys on `imported.name`, not the local name |
-| `<div><_X /></div>` | Every `JSXIdentifier` tag is collected, lowercase hosts included, so the wrapper is reported as `bypass` |
+| `<div><XBase /></div>` | Every `JSXIdentifier` tag is collected, lowercase hosts included, so the wrapper is reported as `bypass` |
 | Burying a block deep in sub-folders | The scope regex allows any number of intermediate segments |
 | A Windows path with backslashes | Both scope tests normalise separators first |
 | Moving the drawing half to another tier, same name | The scope anchors on a path-segment boundary, so `component.tsx` is in scope anywhere |
@@ -214,7 +214,7 @@ export function OrderTotal({id}) {
 
 ```tsx
 // component.tsx
-export function _OrderTotal({label}) {
+export function OrderTotalBase({label}) {
   const t = useTranslations("order")
   return <p>{label ?? t("fallback")}</p>
 }
@@ -226,7 +226,7 @@ matches the purity scope, so that rule runs too.
 ```text
 file: src/components/blocks/order/OrderTotal/index.tsx
 rule: connected-block-has-presentational-twin
-scope: in — block index regex, folder OrderTotal, twin _OrderTotal
+scope: in — block index regex, folder OrderTotal, twin OrderTotalBase
 report: missing at Program:exit
 code: SPLIT-5
 hatch: none

@@ -113,7 +113,7 @@ basename matching the framework slot list.
 `/src/app/`, a root-level `app/` never matches, and that is the more common of the two layouts in the
 wild. A route file that fetches and arranges inside `page.tsx` — the rule tests the NAME, and
 "drawing" is not a property a filename can carry; the source says so itself. An underscore on a FILE
-at the top of the tree, `app/_FleetPage.tsx`, because the opt-out is tested against the whole
+at the top of the tree, `app/FleetPageBase.tsx`, because the opt-out is tested against the whole
 remaining path rather than against a segment. And note the mirror: `app/dashboard/_components/Card.tsx`
 DOES fire while `app/_components/Card.tsx` does not — same convention, opposite result, the private
 folder exempt only at the root of the tree, which is the one place it is least likely to be written. A

@@ -318,7 +318,7 @@
     "compilers/patterns/fe/the-split/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/the-split/en.md",
-      "sourceHash": "ffb7a7879f45a902a84136ed34456c9dccdfeb3331b8b1099f4c13cc4befbe8f",
+      "sourceHash": "71cce13efdfe9321cbf4232043351f1fe97ec6e45d46fb17a91bfacc463b8d0c",
       "contextVersion": 1
     },
     "compilers/patterns/fe/tokens/context.md": {
@@ -590,7 +590,7 @@
     "gates/fe/lints/file-layout/context.md": {
       "kind": "module",
       "source": "gates/fe/lints/file-layout/en.md",
-      "sourceHash": "64a8fe129b8ae31bf42dc72f4fdfee123e35ba67ad8f6f56cf1e9a187cb0065e",
+      "sourceHash": "f2bf71c8bb821b2359328147d0e48447604d8f924a492a5cdc67ece8e2b0e9e3",
       "contextVersion": 1
     },
     "gates/fe/lints/icon/context.md": {
@@ -638,7 +638,7 @@
     "gates/fe/lints/the-split/context.md": {
       "kind": "module",
       "source": "gates/fe/lints/the-split/en.md",
-      "sourceHash": "dd25aa81c3a0235aa195232acd7e9d86906e5660b246bc44d93ccc23277a6bed",
+      "sourceHash": "bd011bb0aa34c5c2a0c4782cf81796ce060f3dc2223206b0feb7095e159cec9e",
       "contextVersion": 1
     },
     "gates/fe/lints/tokens/context.md": {

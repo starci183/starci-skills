@@ -69,7 +69,7 @@ later. They cross the same exact twin.
 4. **Ask each code's question of every surface, in order.** Does this file read the world
    (`SPLIT-6`)? Does the drawing half ask anyone anything (`SPLIT-1`)? Does the connected half decide
    appearance (`SPLIT-2`)? Does the lifecycle cross as one name (`SPLIT-3`)? Do the words cross
-   resolved (`SPLIT-4`)? Does every JSX path go through `_X` (`SPLIT-5`)? Each answer is *holds* or
+   resolved (`SPLIT-4`)? Does every JSX path go through `XBase` (`SPLIT-5`)? Each answer is *holds* or
    *breaks*; there is no third answer.
 5. **When two codes both match, record both.** Calling a translation hook inside `component.tsx`
    breaks `SPLIT-1` because the drawing half asked the world, and breaks `SPLIT-4` because the words
@@ -163,8 +163,8 @@ The reason: a connected file that renders a tree of its own has become both halv
 loses its meaning the first time it is crossed. After that nobody can say "reviewing this half does
 not require opening the other file", because something might be sitting on the other side.
 
-**What it emits in source.** `import { _X } from "./component"` in `index.tsx`, where `X` is the
-folder name, and `_X` is the only JSX identifier the file renders.
+**What it emits in source.** `import { XBase } from "./component"` in `index.tsx`, where `X` is the
+folder name, and `XBase` is the only JSX identifier the file renders.
 
 **Boundary.** It is not `SPLIT-2`, which is a presentation decision leaking through props rather than
 markup in the file. It is not `SPLIT-6`: `SPLIT-5` applies only to a surface that *has* a request, and
@@ -224,7 +224,7 @@ credited with holding them.
 4. A situation crosses the line as one value from a closed set, never as several independent
    booleans.
 5. Copy crosses the line resolved.
-6. A connected file renders exactly one JSX identifier of its own: its `_X` twin.
+6. A connected file renders exactly one JSX identifier of its own: its `XBase` twin.
 7. A surface with no request is one file.
 8. Neither review has to read the other file.
 
@@ -254,7 +254,7 @@ One block per surface folder the accepted shape produces.
 surface: <folder>
 request: <yes | no>
 files: <index.tsx + component.tsx | index.tsx only>
-twin: <_X | none>
+twin: <XBase | none>
 situations: <closed set of state names | none>
 codes: <SPLIT-1..SPLIT-6, each holds | breaks>
 reason: <which half could be wrong while the network is fine>

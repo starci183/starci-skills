@@ -100,11 +100,11 @@ khớp chính xác. `Program:exit` lặng lẽ thoát nếu không có `readsWor
 **Điểm mù.** Giặt sạch lần đọc thế giới là tắt luôn cả phép kiểm: nếu index gọi
 `useOrderData()` thì `readsWorld` vẫn là false, `Program:exit` thoát, và khối đó trở nên **tàng hình**
 chứ không phải không tuân thủ — hai rule dùng chung một bộ dò, nên một lần giặt hạ cả hai. Render
-không qua JSX, `createElement(Row, props)` đặt cạnh một `<_X />`, để nguyên một cây thay thế không lọt
+không qua JSX, `createElement(Row, props)` đặt cạnh một `<XBase />`, để nguyên một cây thay thế không lọt
 vào danh sách trong khi `rendersTwin` vẫn đúng. Một thẻ có namespace, `<Ui.Card>`, là
 `JSXMemberExpression` nên không bao giờ vào danh sách. Một đường dẫn ngoài đúng một khuôn — `features/…`,
 `app/…`, `components/blocks/…` mà thiếu `src`, thư mục viết thường, entrypoint tên `index.ts` — thì
-không có rule nào trên nó. Và twin **không bao giờ được mở ra**: `_X` có thể không tồn tại, có thể đi
+không có rule nào trên nó. Và twin **không bao giờ được mở ra**: `XBase` có thể không tồn tại, có thể đi
 fetch, có thể chẳng vẽ gì. "Có twin trình bày" được quyết từ một **cái tên**.
 
 **Ranh giới.** Rule này khoá vào `imported.name`, nên một bí danh ở chỗ import vẫn tính là đọc thế
@@ -126,7 +126,7 @@ giới — đúng cái lỗ mà `presentational-purity` để hở.
 | Viết kiểu này | Vì sao vẫn bắn |
 |---|---|
 | `import {useTranslations as translate}` ở nửa có kết nối | Rule twin khoá vào `imported.name`, không phải tên cục bộ |
-| `<div><_X /></div>` | Mọi thẻ `JSXIdentifier` đều được thu, kể cả thẻ host viết thường, nên lớp bọc bị báo `bypass` |
+| `<div><XBase /></div>` | Mọi thẻ `JSXIdentifier` đều được thu, kể cả thẻ host viết thường, nên lớp bọc bị báo `bypass` |
 | Chôn khối thật sâu trong thư mục con | Regex phạm vi cho phép bao nhiêu đoạn trung gian cũng được |
 | Đường dẫn Windows với dấu gạch ngược | Cả hai phép kiểm chuẩn hoá dấu phân cách trước |
 | Dời nửa vẽ sang tầng khác mà giữ tên | Phạm vi neo vào ranh giới đoạn đường dẫn, nên `component.tsx` nằm đâu cũng trong phạm vi |
@@ -214,7 +214,7 @@ export function OrderTotal({id}) {
 
 ```tsx
 // component.tsx
-export function _OrderTotal({label}) {
+export function OrderTotalBase({label}) {
   const t = useTranslations("order")
   return <p>{label ?? t("fallback")}</p>
 }
@@ -226,7 +226,7 @@ purity nên rule kia cũng chạy.
 ```text
 file: src/components/blocks/order/OrderTotal/index.tsx
 rule: connected-block-has-presentational-twin
-scope: in — regex index khối, thư mục OrderTotal, twin _OrderTotal
+scope: in — regex index khối, thư mục OrderTotal, twin OrderTotalBase
 report: missing tại Program:exit
 code: SPLIT-5
 hatch: none
