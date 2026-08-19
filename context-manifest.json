@@ -127,6 +127,12 @@
       "sourceHash": "99f1c798a03c845d9d0c3e1fc7838434ec68d27d75ae1e4345fc966784c154cb",
       "contextVersion": 1
     },
+    "compilers/patterns/be/port-offset/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/be/port-offset/en.md",
+      "sourceHash": "6c2b6f9c3e366aa1c991049764f432b030f6d0a2c3ac3772d51c90999ebb7e3e",
+      "contextVersion": 1
+    },
     "compilers/patterns/be/testing/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/testing/en.md",
