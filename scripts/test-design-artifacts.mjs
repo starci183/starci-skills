@@ -137,6 +137,28 @@ const boundedLayouts = write("bounded-layouts.json", {
     regions: [{...region, geometry: {placement: "main", width: "wide", height: "fill", align: "stretch"}}],
   }],
 });
+const unbriefedLayouts = write("unbriefed-layouts.json", {
+  schema: 3,
+  envelope: layoutEnvelope,
+  candidates: [{
+    ...layout("a", {navigation: "navbar", evidence: "beside", secondary: "panel", chrome: "sticky"}),
+    regions: [{...region, geometry: {placement: "main", width: "wide", height: "fill", align: "stretch"}}],
+  }],
+});
+const briefedLayouts = write("briefed-layouts.json", {
+  schema: 3,
+  envelope: layoutEnvelope,
+  candidates: [{
+    ...layout("a", {navigation: "navbar", evidence: "beside", secondary: "panel", chrome: "sticky"}),
+    regions: [{...region, geometry: {placement: "main", width: "wide", height: "fill", align: "stretch"}, brief: {
+      kind: "content",
+      title: "Course catalogue",
+      summary: "Representative offers make the proposed density and reading order judgeable.",
+      items: [{role: "text", label: "System Design Mastery", value: "Open course"}],
+      primaryAction: "Browse course",
+    }}],
+  }],
+});
 
 const blocks = write("blocks.json", {
   schema: 1,
@@ -199,6 +221,10 @@ try {
     throw new Error("schema 2 layout without child geometry failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", boundedLayouts, "--vocabulary", vocabulary, "--hash");
+  if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", unbriefedLayouts, "--vocabulary", vocabulary, "--hash").includes("representative child brief")) {
+    throw new Error("schema 3 layout without child brief failed for the wrong reason");
+  }
+  run("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", briefedLayouts, "--vocabulary", vocabulary, "--hash");
   if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", splitLayouts, "--vocabulary", vocabulary, "--hash").includes("must share the one evidence-backed direction")) {
     throw new Error("split layout directions failed for the wrong reason");
   }

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"enum": [1, 2], "description": "Artifact version. Schema 2 requires hashed child-region geometry; older accepted objects remain valid and are never rewritten."},
+    "schema": {"enum": [1, 2, 3], "description": "Artifact version. Schema 2 requires hashed child-region geometry; schema 3 also requires a hashed representative brief for every child. Older accepted objects remain valid and are never rewritten."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -88,7 +88,8 @@
         "assembler": {"$ref": "#/$defs/pascal", "description": "A branch that exists in the frontend's branch inventory."},
         "mount": {"enum": ["mounts-once", "per-route", "overlay"]},
         "whyMatch": {"type": "string", "minLength": 12, "description": "The business reason this region and that entry share. Matching is on `why`, never on shape."},
-        "geometry": {"$ref": "#/$defs/geometry"}
+        "geometry": {"$ref": "#/$defs/geometry"},
+        "brief": {"$ref": "#/$defs/brief"}
       }
     },
     "geometry": {
@@ -101,6 +102,33 @@
         "width": {"enum": ["intrinsic", "narrow", "medium", "wide", "full"]},
         "height": {"enum": ["content", "fill", "viewport"]},
         "align": {"enum": ["start", "center", "end", "stretch"]}
+      }
+    },
+    "brief": {
+      "description": "Hashed representative child brief owned by layout review. It makes density and reading order visible without claiming final block anatomy or copy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "summary", "items"],
+      "properties": {
+        "kind": {"enum": ["form", "navigation", "summary", "flow", "content"]},
+        "title": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 12},
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "label"],
+            "properties": {
+              "role": {"enum": ["shortcut", "divider", "field", "choice", "link", "fact", "status", "step", "navigation", "text"]},
+              "label": {"type": "string", "minLength": 1},
+              "value": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "primaryAction": {"type": "string", "minLength": 1},
+        "secondaryAction": {"type": "string", "minLength": 1}
       }
     },
     "entryVerdict": {

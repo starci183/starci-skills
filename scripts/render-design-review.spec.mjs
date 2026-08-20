@@ -61,7 +61,7 @@ function fixture() {
     direction,
     axes: {navigation: "rail", evidence: "below", secondary: "panel", chrome: "sticky"},
     citesPrecedent: "none",
-    regions: [{name: "summary", entry: {verdict: "reuse", key: "summary"}, assembler: "Tree", mount: "per-route", whyMatch: "The route needs one stable summary region."}],
+    regions: [{name: "summary", entry: {verdict: "reuse", key: "summary"}, assembler: "Tree", mount: "per-route", whyMatch: "The route needs one stable summary region.", geometry: {placement: "main", width: "wide", height: "fill", align: "stretch"}, brief: {kind: "summary", title: "Account summary", summary: "Representative account facts make the proposed density and reading order visible.", items: [{role: "fact", label: "Balance", value: "$125"}], primaryAction: "Add funds"}}],
     reason: "The rail keeps navigation beside one stable page body."
   };
   const layoutHash = hash(layout);
@@ -100,6 +100,7 @@ test("all-current graph binds accepted child blocks to the exact parent layout h
     assert.equal(child.status, "accepted");
     assert.equal(child.currentHead, f.blockHash);
     assert.equal(child.renderedId, "summary-stack");
+    assert.equal(manifest.layouts[0].candidates[0].regions[0].brief.items[0].label, "Balance");
     assert.match(manifest.entryRoute, new RegExp(f.layoutHash));
   } finally {
     rmSync(f.root, {recursive: true, force: true});

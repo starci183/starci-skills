@@ -95,9 +95,10 @@ decision còn thiếu dưới dạng refusal; chưa sinh layout.
 ### 7 — Đọc structural input
 
 Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
-persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 2: layout quyết
-region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), lifetime và route
-relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa trước khi có block.
+persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 3: layout quyết
+region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), brief đại diện đã hash,
+lifetime và route relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa với form
+đại diện nhận ra được trước khi có block; rail phải chiếm đúng rail slot với destinations đại diện.
 
 ### 8 — Resolve từng region theo contract
 
@@ -162,8 +163,9 @@ Render graph kết hợp đúng một lần với `--layout-draft-index <index.j
 Entry đầu tiên sở hữu route mở đầu. Việc này chỉ kết hợp khâu review: mỗi candidate vẫn giữ hash bất biến
 riêng và vẫn phải được duyệt rõ ràng trước khi bắt đầu bất kỳ vòng block nào.
 
-Layout route render một page hoàn chỉnh. Mọi region có rough representative content để geometry, density và
-reading order đánh giá được trước khi child block tồn tại. Child chỉ render accepted parts khi `layoutHash`
+Layout route render một page hoàn chỉnh. Mọi region render brief đại diện đã hash để geometry, density và
+reading order đánh giá được trước khi child block tồn tại. Brief form hiện fields và actions đại diện; brief
+navigation/flow hiện destinations hoặc chuỗi bước. Child chỉ render accepted parts khi `layoutHash`
 đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`, không mở modal.
 

@@ -58,6 +58,18 @@ export type RegionReview = {
     readonly height: "content" | "fill" | "viewport"
     readonly align: "start" | "center" | "end" | "stretch"
   }
+  readonly brief?: {
+    readonly kind: "form" | "navigation" | "summary" | "flow" | "content"
+    readonly title: string
+    readonly summary: string
+    readonly items: ReadonlyArray<{
+      readonly role: "shortcut" | "divider" | "field" | "choice" | "link" | "fact" | "status" | "step" | "navigation" | "text"
+      readonly label: string
+      readonly value?: string
+    }>
+    readonly primaryAction?: string
+    readonly secondaryAction?: string
+  }
   readonly block: ChildBlockReview
 }
 

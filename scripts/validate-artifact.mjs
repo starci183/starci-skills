@@ -314,12 +314,13 @@ function sessionLaws(data) {
   return found;
 }
 
-function layoutGeometryLaws(data) {
-  if (data.schema !== 2 || !Array.isArray(data.candidates)) return [];
+function layoutRegionLaws(data) {
+  if (data.schema < 2 || !Array.isArray(data.candidates)) return [];
   const found = [];
   for (const [candidateIndex, candidate] of data.candidates.entries()) {
     for (const [regionIndex, region] of (candidate.regions ?? []).entries()) {
-      if (!region.geometry) found.push(`candidates[${candidateIndex}].regions[${regionIndex}].geometry: schema 2 requires hashed child bounding geometry`);
+      if (!region.geometry) found.push(`candidates[${candidateIndex}].regions[${regionIndex}].geometry: schema ${data.schema} requires hashed child bounding geometry`);
+      if (data.schema >= 3 && !region.brief) found.push(`candidates[${candidateIndex}].regions[${regionIndex}].brief: schema ${data.schema} requires a hashed representative child brief`);
     }
   }
   return found;
@@ -350,7 +351,7 @@ if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((cand
   await check(vocabularySchema, vocabulary, "$vocabulary", {doc: vocabularySchema, dir: dirname(vocabularySchemaPath)}, errors);
 }
 
-const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data), ...layoutGeometryLaws(data)];
+const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data), ...layoutRegionLaws(data)];
 if (wantHash && Array.isArray(data.directions)) {
   broken.push("directions: recommendation has no approval hash; embed the recommended object in a layout candidate and hash that layout");
 }

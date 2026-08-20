@@ -108,9 +108,10 @@ Read `@layouts`: request verbatim; contract queried one need per region through 
 every branch and what it may contain; every route page and persistent layout; closed layout axes; and
 this project's accepted layout precedents with their rejections.
 
-Layout remains a skeleton. New work uses layout schema 2 and names regions, hashed child bounding geometry
-(`placement`, `width`, `height`, `align`), mount lifetime and route relationship. A centered authentication
-panel must render centered before its block exists; a rail region must occupy the rail slot.
+Layout remains a skeleton. New work uses layout schema 3 and names regions, hashed child bounding geometry
+(`placement`, `width`, `height`, `align`), a hashed representative brief, mount lifetime and route relationship.
+A centered authentication panel must render centered with a recognizable representative form before its block
+exists; a rail region must occupy the rail slot with representative destinations.
 It never decides a block's internal parts, states or data ownership. That separation is what lets one
 block be redesigned later without reopening the page layout.
 
@@ -165,8 +166,9 @@ Render the combined graph once with `--layout-draft-index <index.json>` in place
 The first index entry owns the initial route. This only combines review: each candidate keeps its own
 immutable hash and still requires explicit approval before any block round starts.
 
-The layout route renders a complete page. Every declared region carries rough representative content so
-geometry, density and reading order are judgeable before child blocks exist. A child block renders its
+The layout route renders a complete page. Every declared region renders its hashed representative brief so
+geometry, density and reading order are judgeable before child blocks exist. Form briefs show representative
+fields and actions; navigation and flow briefs show their destinations or ordered steps. A child block renders its
 accepted parts only when its recorded `layoutHash` equals the candidate displayed; missing or stale children
 stay rough. Clicking a region navigates to
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`; it never opens a modal.

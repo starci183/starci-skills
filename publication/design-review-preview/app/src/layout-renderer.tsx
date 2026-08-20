@@ -13,6 +13,29 @@ const regionEntry = (entry: Record<string, unknown>) =>
 const selectedBlock = (recommendedId: string | undefined, candidates: ReadonlyArray<BlockCandidate>) =>
   candidates.find((candidate) => candidate.id === recommendedId) ?? candidates[0]
 
+const renderBrief = (region: RegionReview) => {
+  const brief = region.brief
+  if (!brief) return null
+  return (
+    <span className={`region-brief brief-${brief.kind}`}>
+      <span className="brief-heading"><strong>{brief.title}</strong><small>{brief.summary}</small></span>
+      <span className="brief-items">
+        {brief.items.map((item, index) => (
+          <span className={`brief-item brief-item-${item.role}`} key={`${item.role}-${item.label}-${index}`}>
+            <span>{item.label}</span>{item.value ? <small>{item.value}</small> : null}
+          </span>
+        ))}
+      </span>
+      {brief.primaryAction || brief.secondaryAction ? (
+        <span className="brief-actions">
+          {brief.primaryAction ? <b>{brief.primaryAction}</b> : null}
+          {brief.secondaryAction ? <small>{brief.secondaryAction}</small> : null}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
 export const LayoutRenderer = ({candidate, content, shell, openBlock}: LayoutRendererProps) => {
   const navigation = candidate.axes.navigation
   const evidenceBeside = candidate.axes.evidence === "beside"
@@ -45,7 +68,7 @@ export const LayoutRenderer = ({candidate, content, shell, openBlock}: LayoutRen
           </span>
         ) : (
           <span className="rough-block-preview">
-            {geometry?.placement === "rail" || geometry?.placement === "navbar" || geometry?.placement === "footer" ? (
+            {region.brief ? renderBrief(region) : geometry?.placement === "rail" || geometry?.placement === "navbar" || geometry?.placement === "footer" ? (
               <span className="rough-navigation">{shell.navigation.map((item) => <i className={item.id === shell.activeItem ? "active" : ""} key={item.id}>{item.label}</i>)}</span>
             ) : (
               <><strong>{geometry?.placement === "center" || index === 0 ? content.title : content.rows[index % content.rows.length]?.title ?? region.name}</strong><small>{content.rows[index % content.rows.length]?.description ?? region.whyMatch}</small><span className="rough-lines" aria-hidden="true"><i /><i /><i /></span></>

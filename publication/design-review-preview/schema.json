@@ -10,6 +10,7 @@
     "project": {"$ref": "#/$defs/slug"},
     "entryRoute": {"type": "string", "pattern": "^#/layouts/[a-z0-9-]+/[0-9a-f]{64}(?:/blocks/[a-z0-9-]+)?$"},
     "layouts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/layoutReview"}},
+    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
     "evidence": {
       "type": "array",
       "items": {
@@ -23,6 +24,45 @@
   "$defs": {
     "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "nodes", "edges"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "label": {"type": "string", "minLength": 1},
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "layoutId", "order", "route"],
+            "properties": {
+              "id": {"$ref": "#/$defs/slug"},
+              "label": {"type": "string", "minLength": 1},
+              "layoutId": {"$ref": "#/$defs/slug"},
+              "blockId": {"$ref": "#/$defs/slug"},
+              "order": {"type": "integer", "minimum": 1},
+              "route": {"type": "string", "pattern": "^#/layouts/[a-z0-9-]+/[0-9a-f]{64}(?:/blocks/[a-z0-9-]+)?$"}
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": {"$ref": "#/$defs/slug"},
+              "to": {"$ref": "#/$defs/slug"},
+              "label": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
     "themeRole": {
       "type": "object",
       "additionalProperties": false,
@@ -113,7 +153,46 @@
         "assembler": {"type": "string", "minLength": 1},
         "mount": {"type": "string", "minLength": 1},
         "whyMatch": {"type": "string", "minLength": 1},
+        "geometry": {"$ref": "#/$defs/geometry"},
+        "brief": {"$ref": "#/$defs/brief"},
         "block": {"$ref": "#/$defs/childBlock"}
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["placement", "width", "height", "align"],
+      "properties": {
+        "placement": {"enum": ["header", "navbar", "rail", "main", "aside", "center", "footer", "overlay"]},
+        "width": {"enum": ["intrinsic", "narrow", "medium", "wide", "full"]},
+        "height": {"enum": ["content", "fill", "viewport"]},
+        "align": {"enum": ["start", "center", "end", "stretch"]}
+      }
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "summary", "items"],
+      "properties": {
+        "kind": {"enum": ["form", "navigation", "summary", "flow", "content"]},
+        "title": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "label"],
+            "properties": {
+              "role": {"enum": ["shortcut", "divider", "field", "choice", "link", "fact", "status", "step", "navigation", "text"]},
+              "label": {"type": "string", "minLength": 1},
+              "value": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "primaryAction": {"type": "string", "minLength": 1},
+        "secondaryAction": {"type": "string", "minLength": 1}
       }
     },
     "layoutCandidate": {

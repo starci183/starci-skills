@@ -23,9 +23,11 @@ already decided.
 
 ## Law
 
-A schema 2 candidate names regions, who owns each region's geometry, what mounts once and what changes
-per route. Every region hashes its minimum child bounding geometry: `placement`, `width`, `height` and
-`align`. This positions the child without deciding its internal block anatomy. Schema 1 remains valid only
+A schema 3 candidate names regions, who owns each region's geometry, what mounts once and what changes
+per route. Every region hashes its minimum child bounding geometry (`placement`, `width`, `height`, `align`)
+and one representative brief (`kind`, title, summary, content roles and actions). The brief makes the promised
+child visible enough to judge density and reading order; it does not settle final anatomy, states, copy or data
+ownership. Schema 1–2 remain valid only
 for immutable accepted history. It never names a class. Classes are decided later from the accepted shape;
 a candidate that carries one has spent a decision that was not its to spend.
 
@@ -150,8 +152,10 @@ not empty placeholder rectangles. Every layout region stays enclosed by a dashed
 names the region, contract entry, assembler and mount lifetime. Preview-only interactions may demonstrate
 navigation ownership, sticky behavior and responsive collapse; they do not become product behavior.
 
-Content inside a region communicates density and reading order only. It cannot settle a block's parts, states,
-data owner or final copy. Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
+Content inside a region is rendered from its hashed representative brief and communicates density and reading
+order. A login brief therefore shows its shortcut, divider, credential fields, supporting choices and actions;
+a flow brief shows its ordered steps. It cannot settle a block's final parts, states, data owner or final copy.
+Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
 when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated
 polished mockup are both invalid previews.
 

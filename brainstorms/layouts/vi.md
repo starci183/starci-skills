@@ -23,9 +23,10 @@ rồi.
 
 ## Luật
 
-Phương án schema 2 gọi tên region, ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
-region hash geometry bounding tối thiểu của child: `placement`, `width`, `height` và `align`. Geometry này
-đặt child đúng vị trí mà chưa quyết anatomy bên trong block. Schema 1 chỉ còn hợp lệ cho lịch sử accepted
+Phương án schema 3 gọi tên region, ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
+region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và brief đại diện (`kind`,
+title, summary, vai trò content và action). Brief làm child hiện đủ thật để duyệt density và reading order
+nhưng chưa quyết anatomy, state, copy cuối hay data ownership. Schema 1–2 chỉ còn hợp lệ cho lịch sử accepted
 bất biến. Phương án **không bao giờ** gọi tên class; class được quyết sau từ hình đã chấp nhận.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
@@ -149,8 +150,9 @@ những rectangle placeholder rỗng. Mỗi layout region luôn nằm trong dash
 region, contract entry, assembler và mount lifetime. Interaction preview-only có thể minh họa navigation
 ownership, sticky behavior và responsive collapse, nhưng không trở thành product behavior.
 
-Content trong region chỉ truyền đạt mật độ và reading order. Nó không được chốt parts, states, data owner hay
-final copy của block. Ưu tiên hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
+Content trong region render từ brief đại diện đã hash và chỉ truyền đạt mật độ cùng reading order. Brief login
+phải hiện shortcut, divider, credential fields, lựa chọn phụ và action; brief flow phải hiện các bước có thứ tự.
+Nó không được chốt parts, states, data owner hay final copy của block. Ưu tiên hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
 SVG bỏ đi được có thể làm hình minh họa, nhưng không bao giờ được đưa thành source hay JSON. Blank-box page và
 mockup bóng bẩy không có annotation đều là preview không hợp lệ.
 

@@ -18,8 +18,8 @@ an exact `layoutId/layoutHash` owns declared regions, and each region resolves o
 Canonical layout/block JSON and registry heads remain authority. The Vite bundle, graph manifest, HeroUI
 controls and representative content are rebuildable publication evidence.
 
-The layout route renders the complete page with content in every region. A missing or stale child uses a
-rough representation sufficient to judge geometry, density and reading order; it cannot imply block parts
+The layout route renders the complete page with content in every region. A missing or stale child uses the
+layout candidate's hashed representative brief, sufficient to judge geometry, density and reading order; it cannot imply final block parts
 or states. An accepted child whose recorded `layoutHash` equals the displayed parent renders its accepted
 parts more precisely.
 
@@ -65,9 +65,10 @@ The application uses hash routes:
 #/layouts/<layoutId>/<layoutHash>/blocks/<blockId>
 ```
 
-Schema 2 layout regions carry hashed `placement`, `width`, `height` and `align`. The preview honors those
-bounds even when a child is missing and only rough content exists; it never flattens them into one generic
-stack. Schema 1 geometry fallback exists only for immutable accepted history.
+Schema 3 layout regions carry hashed `placement`, `width`, `height`, `align` and a representative child brief.
+The preview honors those bounds and renders the brief even when a child is missing; it never flattens regions
+into one generic stack or substitutes a skeleton for declared form/navigation/flow content. Schema 1–2 fallback
+exists only for immutable accepted history.
 
 The script installs pinned Vite/HeroUI dependencies only when absent, builds once into the declared project
 cache and writes one `review-manifest.json`.
