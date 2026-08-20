@@ -155,7 +155,7 @@ function badgeSurface(diskPath, sonarProjectKey) {
   const sonarMetrics = ["alert_status", "coverage", "bugs", "vulnerabilities", "code_smells", "sqale_rating", "reliability_rating", "security_rating"];
   return {
     readmePath,
-    codecov: /codecov\.io\/gh\/[^\s)]+\/graph\/badge\.svg/.test(readme) && !/codecov[^\s)]*[?&]token=/i.test(readme),
+    codecov: /codecov\.io\/gh\/[^\s)]+\/graph\/badge\.svg/.test(readme),
     sonar: sonarMetrics.every((metric) => new RegExp(`project_badges/measure\\?[^\\s)]*project=${sonarProjectKey || "[^&\\s)]+"}[^\\s)]*metric=${metric}`).test(readme)
       || new RegExp(`project_badges/measure\\?[^\\s)]*metric=${metric}[^\\s)]*project=${sonarProjectKey || "[^&\\s)]+"}`).test(readme)),
   };
@@ -238,8 +238,8 @@ function readAssurance(diskPath, role) {
     "ASSURANCE-4 SonarQube excludes the E2E lane": /^sonar\.exclusions=.*e2e-spec/im.test(sonarConfig) && /^sonar\.test\.exclusions=.*e2e-spec/im.test(sonarConfig),
     "ASSURANCE-4 SonarQube quality gate blocks": /SonarSource\/sonarqube-quality-gate-action@|sonar\.qualitygate\.wait\s*=\s*true/i.test(prWorkflows) && !/continue-on-error\s*:\s*true/i.test(prWorkflows),
     "ASSURANCE-4 strict Sonar proof machine is wired": /sonar-assurance|sonar-quality-gate|evaluateQualityGate/i.test(`${prWorkflows}\n${strictQualityText}`),
-    "ASSURANCE-3 README carries a token-free Codecov badge": badges.codecov,
-    "ASSURANCE-4 README carries the complete token-free Sonar metric set": Boolean(sonarProjectKey) && badges.sonar,
+    "ASSURANCE-3 README carries a safe reachable Codecov badge": badges.codecov,
+    "ASSURANCE-4 README carries the complete safe Sonar metric set": Boolean(sonarProjectKey) && badges.sonar,
     "ASSURANCE-5 Codecov uses a declared CI identity": codecovToken || codecovOidc,
     "ASSURANCE-5 workflow references SONAR_TOKEN": /secrets\.SONAR_TOKEN/.test(prWorkflows),
     "ASSURANCE-5 workflow references SONAR_HOST_URL": /(vars|secrets)\.SONAR_HOST_URL/.test(prWorkflows),

@@ -5,6 +5,47 @@ import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const errorText = /\b(?:unknown|project has not been found|no analysis|not analysed|not analyzed)\b/i
+const forbiddenCredentialKey = /^(?:access_token|api[_-]?key|key|secret|password|auth|authorization|bearer)$/i
+
+function parsedBadge(url) {
+    try {
+        const parsed = new URL(url)
+        const isCodecov = parsed.hostname.toLowerCase() === "codecov.io"
+            && /^\/gh\/[^/]+\/[^/]+\/graph\/badge\.svg$/i.test(parsed.pathname)
+        const isSonar = /\/api\/project_badges\/measure$/i.test(parsed.pathname)
+            && parsed.searchParams.has("project")
+            && parsed.searchParams.has("metric")
+        return { parsed, isCodecov, isSonar }
+    } catch {
+        return { parsed: null, isCodecov: false, isSonar: false }
+    }
+}
+
+export function credentialFailure(url) {
+    const { parsed, isCodecov, isSonar } = parsedBadge(url)
+    if (!parsed) return "invalid badge URL"
+    for (const key of parsed.searchParams.keys()) {
+        if (forbiddenCredentialKey.test(key)) return "credential-bearing URL"
+    }
+    const tokens = parsed.searchParams.getAll("token")
+    if (tokens.length && (tokens.length !== 1 || !tokens[0] || (!isCodecov && !isSonar))) return "credential-bearing URL"
+    const allowedKeys = isCodecov
+        ? new Set(["token", "branch", "flag", "component"])
+        : isSonar
+            ? new Set(["project", "metric", "token"])
+            : new Set()
+    for (const key of parsed.searchParams.keys()) {
+        if (!allowedKeys.has(key)) return "unsupported badge query"
+    }
+    return null
+}
+
+export function redactBadgeUrl(url) {
+    const { parsed } = parsedBadge(url)
+    if (!parsed) return url
+    if (parsed.searchParams.has("token")) parsed.searchParams.set("token", "REDACTED")
+    return parsed.toString()
+}
 
 export function badgeUrls(markdown) {
     const urls = [...markdown.matchAll(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g)].map((match) => match[1])
@@ -13,7 +54,8 @@ export function badgeUrls(markdown) {
 
 export function classifyBadge(url, status, contentType, body) {
     const failures = []
-    if (/[?&](?:token|access_token|key|secret)=/i.test(url)) failures.push("credential-bearing URL")
+    const credential = credentialFailure(url)
+    if (credential) failures.push(credential)
     if (status < 200 || status >= 300) failures.push(`HTTP ${status}`)
     if (!/image\/svg\+xml|image\/svg|text\/xml|application\/xml/i.test(contentType) && !/<svg\b/i.test(body)) {
         failures.push(`not SVG (${contentType || "no content type"})`)
@@ -24,13 +66,15 @@ export function classifyBadge(url, status, contentType, body) {
 }
 
 export async function checkUrl(url, fetcher = fetch) {
-    if (/[?&](?:token|access_token|key|secret)=/i.test(url)) return { url, failures: ["credential-bearing URL"] }
+    const safeUrl = redactBadgeUrl(url)
+    const credential = credentialFailure(url)
+    if (credential) return { url: safeUrl, failures: [credential] }
     try {
         const response = await fetcher(url, { redirect: "follow", signal: AbortSignal.timeout(15_000) })
         const body = await response.text()
-        return { url, failures: classifyBadge(url, response.status, response.headers.get("content-type") ?? "", body) }
+        return { url: safeUrl, failures: classifyBadge(url, response.status, response.headers.get("content-type") ?? "", body) }
     } catch (error) {
-        return { url, failures: [`request failed: ${error.message}`] }
+        return { url: safeUrl, failures: [`request failed: ${error.message}`] }
     }
 }
 

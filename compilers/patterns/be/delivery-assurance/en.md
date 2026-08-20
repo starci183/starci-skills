@@ -74,8 +74,8 @@ Read `package.json` before evaluating any `ASSURANCE-*` situation:
 |---|---|---|
 | `ASSURANCE-1` | A developer is about to push | Husky is installed; `pre-push` runs full check-only lint and the fast unit lane, and exits on either failure |
 | `ASSURANCE-2` | A pull request is opened or updated | An active PR workflow installs from the lockfile and runs zero-warning check-only lint, typecheck/build, mature unit coverage and every declared E2E suite; no CI command fixes source, skips a suite or accepts an empty lane |
-| `ASSURANCE-3` | Unit tests ran in CI | One run emits LCOV, independently clears statements, functions and lines at 80% plus branches at 75%, enforces 90% on new-code/patch for all four metrics, uploads through Codecov, exposes blocking patch/project statuses, and README links a reachable token-free Codecov badge |
-| `ASSURANCE-4` | The same revision needs quality and security analysis | A local authenticated scan of the exact checkout consumes the LCOV, proves the strict Sonar profile and waits for `OK` before CI; SonarQube CI repeats that blocking gate and README exposes the full token-free metric set |
+| `ASSURANCE-3` | Unit tests ran in CI | One run emits LCOV, independently clears statements, functions and lines at 80% plus branches at 75%, enforces 90% on new-code/patch for all four metrics, uploads through Codecov, exposes blocking patch/project statuses, and README links a reachable safe Codecov badge |
+| `ASSURANCE-4` | The same revision needs quality and security analysis | A local authenticated scan of the exact checkout consumes the LCOV, proves the strict Sonar profile and waits for `OK` before CI; SonarQube CI repeats that blocking gate and README exposes the full safe metric set |
 | `ASSURANCE-5` | Codecov or SonarQube needs a credential | `codecov-token.key.enc` and `sonarqube-token.key.enc` exist under `.stacks/dev/runtime/files/`; workflows reference named GitHub secrets and never decrypt stacks |
 | `ASSURANCE-6` | A pull request is ready to merge | GitHub branch protection or a ruleset requires CI, Codecov and SonarQube checks from their expected apps |
 | `ASSURANCE-7` | A deploy workflow exists | Deployment depends on successful verification through `needs`, a reusable workflow, or a successful workflow-run trigger |
@@ -131,14 +131,17 @@ workflow calls repository scripts. A commented trigger or a manual-only workflow
 
 `ASSURANCE-3` owns coverage movement. Unit CI emits `coverage/lcov.info`; Codecov uploads that exact file
 and its patch/project statuses are intended to block. README exposes the repository's real Codecov badge;
-the image URL is reachable and contains no credential. Coverage percentage belongs to the service policy,
+the image URL is reachable and uses no credential except a provider-issued, project-scoped read-only badge
+token required for a private project. That token is confined to the official image endpoint and grants no
+upload or API authority. Coverage percentage belongs to the service policy,
 not a second Jest invocation.
 
 `ASSURANCE-4` owns analysis. Repair first scans the current local checkout with
 `sonar.qualitygate.wait=true`; a red gate is repaired in source and scanned again before CI. SonarQube CI
 consumes the same revision and LCOV report. Scan success and quality gate success are different facts; the workflow must wait for or receive the gate result. README exposes
 reachable badges for quality gate, coverage, bugs, vulnerabilities, code smells, maintainability,
-reliability and security for the same project key without embedding a token.
+reliability and security for the same project key. Public badges are token-free; private badges may use
+only the same provider-issued read-only badge capability and never a scan, API or admin credential.
 
 `ASSURANCE-5` owns custody. The stack keeps encrypted provider tokens by fixed names. GitHub Secrets are
 the CI projection, `SONAR_HOST_URL` is a repository variable unless the installation treats it as secret,
@@ -169,7 +172,7 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 | manifest | package manager, check-only lint, unit, typecheck/build and coverage scripts |
 | hooks | tracked Husky hook content |
 | CI | active workflow triggers, commands and dependency graph |
-| coverage | one LCOV path consumed by Codecov and SonarQube; token-free reachable README badges for both |
+| coverage | one LCOV path consumed by Codecov and SonarQube; safe reachable README badges for both |
 | secrets | encrypted stack filenames and symbolic workflow references, never values |
 | external enforcement | GitHub API/UI evidence for required checks and expected apps |
 
@@ -179,7 +182,7 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 2. Hooks and CI invoke check-only commands and never mutate source; readiness requires zero lint warnings.
 3. Local pre-push stays at lint plus unit; repair runs local coverage and waited Sonar analysis separately.
 4. Codecov and SonarQube consume the same LCOV report from the same successful mature-threshold unit run, and README exposes
-   reachable token-free badges for both provider results.
+   reachable safe badges for both provider results.
 5. Provider tokens are encrypted in stacks and projected to GitHub Secrets without plaintext transit through source or chat.
 6. A green local Sonar scan never claims branch protection is configured without external evidence.
 7. A deploy cannot begin before verification passes.

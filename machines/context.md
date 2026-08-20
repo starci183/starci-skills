@@ -13,7 +13,7 @@ None.
 | Pattern→gate→published rule accountability | `machines/rule-bindings/context.md` |
 | Exactly one lifecycle route for every discoverable skill | `machines/workflows/context.md` |
 | Source-level lint, type, coverage and Sonar suppression refusal | `machines/suppression/context.md` |
-| Token-free provider badge reachability and semantic SVG validity | `machines/badges/context.md` |
+| Provider badge capability safety, reachability and semantic SVG validity | `machines/badges/context.md` |
 | Exact-revision strict Sonar metrics and quality-gate policy | `machines/sonar-assurance/context.md` |
 | Content-bound backend plans with complete real pattern coverage | `machines/backend-plan/context.md` |
 | Active legacy path evidence before retirement | `machines/retirement/context.md` |

@@ -23,7 +23,7 @@ và required check nghiêm vẫn giữ, delivery chỉ đi tiếp tới ngày h�
 
 ## README badge bắt buộc
 
-Mọi backend hoặc frontend required phải có đủ bộ token-free dưới đây trong README. Thiếu một badge vẫn là assurance
+Mọi backend hoặc frontend required phải có đủ bộ badge an toàn dưới đây trong README. Thiếu một badge vẫn là assurance
 finding dù provider check đang xanh:
 
 | Provider | Badge | Metric |
@@ -39,16 +39,19 @@ finding dù provider check đang xanh:
 | SonarQube | security | `security_rating` |
 
 Codecov dùng host `codecov.io` với path `/gh/<owner>/<repo>/graph/badge.svg`. SonarQube dùng
-`<SONAR_HOST_URL>/api/project_badges/measure?project=<projectKey>&metric=<metric>`. URL không được chứa
-`token`, credential hay secret query opaque. Mọi image endpoint phải trả SVG và mỗi badge phải link đúng
-dashboard repository/project của provider.
+`<SONAR_HOST_URL>/api/project_badges/measure?project=<projectKey>&metric=<metric>`. Project public dùng URL
+ảnh token-free. Project private chỉ được thêm `token` badge read-only, scope riêng cho project do provider
+cấp khi provider bắt buộc, và chỉ trên official image endpoint đó. Capability này không được phép upload,
+scan, gọi API hay quản trị. Mọi credential key khác, secret query opaque và badge token trên URL không phải
+badge đều bị từ chối. Output của machine phải redact badge token. Mọi image endpoint phải trả SVG và mỗi
+badge phải link đúng dashboard repository/project của provider.
 
 ## Evidence cho stale list
 
 Đọc manifest policy trước. Với `not required`, report exact reason và dừng module. Nếu không, đọc
 `@assurance-be` cho backend hoặc `@assurance-fe` cho frontend rồi chỉ inspect tên/wiring: Husky check-only pre-push, active PR CI, một unit LCOV producer,
 Codecov consumer, Sonar scan cộng quality gate, fixed encrypted stack record, symbolic GitHub secret
-reference, README badge không chứa token cho Codecov cùng SonarQube quality gate, coverage, bugs,
+reference, README badge an toàn cho Codecov cùng SonarQube quality gate, coverage, bugs,
 vulnerabilities, code smells, maintainability, reliability, security, required check và deploy dependency.
 Không decrypt credential. Provider value và required-check app binding giữ `unmeasured
 external` nếu không có authorized API evidence.
@@ -66,7 +69,7 @@ và required check. Hiện command `scripts/publish-secret.mjs --plan` không c�
 typecheck/build và đúng một coverage run; một `coverage/lcov.info` cho Codecov lẫn Sonar; Codecov
 project/patch cùng Sonar quality gate blocking; scanner có xác thực phải chạy từ checkout local hiện tại,
 đợi và pass Sonar quality gate trước khi tin provider CI; encrypted stack custody và GitHub projection; README badge
-token-free và reachable cho Codecov cùng full SonarQube quality metric set; required check; mọi deploy hiện có phụ thuộc
+an toàn và reachable cho Codecov cùng full SonarQube quality metric set; required check; mọi deploy hiện có phụ thuộc
 verification. Repository không có deploy thì không invent.
 
 Secret đến từ process env theo tên hoặc hidden input qua `scripts/publish-secret.mjs`; không qua chat,
@@ -141,6 +144,6 @@ chính xác đường dẫn cache hỏng trước.
 Prove hook refuse controlled failure, exact CI graph, một LCOV dùng hai lần, local Sonar analysis từ checkout
 hiện tại có waited quality gate `OK` sau mọi source repair và API evidence có xác thực, exact-SHA cho mọi
 condition trong blocking quality profile, encrypted filename không có
-plaintext twin, mọi badge image endpoint bắt buộc trả image mà URL không có credential, external secret name/required
+plaintext twin, mọi badge image endpoint bắt buộc trả image và không dùng credential ngoài badge capability read-only được phép, external secret name/required
 check qua API và deploy dependency. External enforcement hoặc badge endpoint chưa đo làm module chưa complete.
 Debt còn hạn có thể cho delivery đi tiếp trong khi module vẫn incomplete và không ready.

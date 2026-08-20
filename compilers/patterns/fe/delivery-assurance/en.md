@@ -40,10 +40,13 @@ non-empty `reason` is `not required`. Missing or invalid policy keeps the full p
 
 ## Badge surface
 
-README must expose the token-free Codecov graph badge and the complete SonarQube set for the same project
+README must expose a safe Codecov graph badge and the complete safe SonarQube set for the same project
 key: `alert_status`, `coverage`, `bugs`, `vulnerabilities`, `code_smells`, `sqale_rating`,
 `reliability_rating`, and `security_rating`. Every image endpoint returns SVG and links to its provider
-dashboard. Missing, unreachable or credential-bearing badge URLs keep assurance stale.
+dashboard. Public projects use token-free images. Private projects may use a provider-issued,
+project-scoped read-only badge `token` only on the official image endpoint; it must grant no upload, scan,
+API or admin authority. Missing or unreachable badges, other credential keys, opaque secret queries and
+tokens on non-badge URLs keep assurance stale.
 
 ## Credential custody
 
@@ -76,7 +79,7 @@ is renamed as the other.
 3. One successful mature-threshold unit coverage run produces the LCOV consumed by both providers.
 4. CI builds the production frontend before provider upload and scan.
 5. Repair runs local Sonar analysis with `sonar.qualitygate.wait=true`; a red gate is a source finding, not deferred to CI.
-6. README carries every required badge without a token.
+6. README carries every required badge token-free when public, or with only the allowed provider-issued read-only badge capability when private.
 7. Filesystem wiring never proves required checks; authorized provider/GitHub API evidence does.
 8. Existing deploys cannot outrun verification.
 9. Unit is the sole LCOV producer; E2E is an independent behavioral lane excluded from Sonar analysis and

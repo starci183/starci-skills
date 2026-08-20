@@ -72,8 +72,8 @@ chỉ target một repository; batch nhiều repository đòi credential có sco
 |---|---|---|
 | `ASSURANCE-1` | Developer sắp push | Husky đã cài; `pre-push` chạy full lint check-only và fast unit lane, fail một cái là dừng |
 | `ASSURANCE-2` | Pull request được mở hoặc cập nhật | PR workflow active, install từ lockfile rồi chạy lint check-only zero-warning, typecheck/build, mature unit coverage và mọi E2E suite đã khai báo; CI không sửa source, skip suite hay chấp nhận lane rỗng |
-| `ASSURANCE-3` | Unit test chạy trong CI | Một run sinh LCOV, độc lập đạt statements/functions/lines 80% và branches 75%, bắt new-code/patch 90% cho cả bốn metric, upload Codecov, có patch/project status blocking và README link badge Codecov token-free, reachable |
-| `ASSURANCE-4` | Cùng revision cần quality/security analysis | Local authenticated scan của đúng checkout dùng LCOV, chứng minh strict Sonar profile và đợi `OK` trước CI; SonarQube CI lặp blocking gate và README expose full token-free metric set |
+| `ASSURANCE-3` | Unit test chạy trong CI | Một run sinh LCOV, độc lập đạt statements/functions/lines 80% và branches 75%, bắt new-code/patch 90% cho cả bốn metric, upload Codecov, có patch/project status blocking và README link badge Codecov an toàn, reachable |
+| `ASSURANCE-4` | Cùng revision cần quality/security analysis | Local authenticated scan của đúng checkout dùng LCOV, chứng minh strict Sonar profile và đợi `OK` trước CI; SonarQube CI lặp blocking gate và README expose full metric set an toàn |
 | `ASSURANCE-5` | Codecov hoặc SonarQube cần credential | Có `codecov-token.key.enc` và `sonarqube-token.key.enc` dưới `.stacks/dev/runtime/files/`; workflow chỉ gọi tên GitHub secret, không decrypt stacks |
 | `ASSURANCE-6` | Pull request sẵn sàng merge | GitHub branch protection hoặc ruleset bắt CI, Codecov và SonarQube check từ đúng app phải pass |
 | `ASSURANCE-7` | Có deploy workflow | Deploy phụ thuộc verification thành công qua `needs`, reusable workflow hoặc successful workflow-run trigger |
@@ -126,13 +126,16 @@ scripts. Trigger bị comment hoặc workflow manual-only chưa phải CI adopti
 
 `ASSURANCE-3` sở hữu coverage movement. Unit CI sinh `coverage/lcov.info`; Codecov upload đúng file đó và
 patch/project status được dùng để block. README expose badge Codecov thật của repository; image URL phải
-reachable và không chứa credential. Coverage percentage thuộc service policy, không thuộc Jest run thứ hai.
+reachable và không dùng credential ngoài badge token read-only, scope riêng cho project do provider cấp
+khi project private cần nó. Token này chỉ nằm trên official image endpoint và không có quyền upload hay API.
+Coverage percentage thuộc service policy, không thuộc Jest run thứ hai.
 
 `ASSURANCE-4` sở hữu analysis. Repair scan checkout local hiện tại trước với `sonar.qualitygate.wait=true`;
 gate đỏ được sửa trong source rồi scan lại trước CI. SonarQube CI dùng cùng revision và LCOV report. Scan success và quality-gate
 success là hai fact khác nhau; workflow phải chờ hoặc nhận kết quả gate. README expose badge reachable cho
 quality gate, coverage, bugs, vulnerabilities, code smells, maintainability, reliability và security của
-cùng project key mà không nhúng token.
+cùng project key. Badge public token-free; badge private chỉ được dùng cùng badge capability read-only do
+provider cấp, không bao giờ dùng scan token, API token hay admin credential.
 
 `ASSURANCE-5` sở hữu custody. Stack giữ provider token mã hóa bằng tên cố định. GitHub Secrets là projection
 cho CI; `SONAR_HOST_URL` là repository variable trừ khi installation xem nó là secret; workflow không giải
@@ -163,7 +166,7 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 | manifest | package manager, check-only lint, unit, typecheck/build và coverage scripts |
 | hooks | nội dung Husky hook tracked |
 | CI | active workflow trigger, command và dependency graph |
-| coverage | một LCOV path được Codecov và SonarQube dùng chung; README badge token-free, reachable cho cả hai |
+| coverage | một LCOV path được Codecov và SonarQube dùng chung; README badge an toàn, reachable cho cả hai |
 | secrets | tên encrypted stack file và symbolic workflow reference, không bao giờ là value |
 | external enforcement | GitHub API/UI evidence cho required checks và expected apps |
 
@@ -172,7 +175,7 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 1. Backend assurance mặc định là bắt buộc; chỉ declaration trong manifest ở Applicability mới có thể miễn.
 2. Hook và CI gọi command check-only, không sửa source; readiness đòi zero lint warning.
 3. Local pre-push chỉ có lint cộng unit; repair chạy local coverage và waited Sonar analysis riêng.
-4. Codecov và SonarQube dùng cùng LCOV report từ cùng một unit run đạt mature threshold; README expose badge token-free,
+4. Codecov và SonarQube dùng cùng LCOV report từ cùng một unit run đạt mature threshold; README expose badge an toàn,
    reachable cho kết quả của cả hai provider.
 5. Provider token được mã hóa trong stacks rồi project sang GitHub Secrets mà không đi plaintext qua source hay chat.
 6. Local Sonar scan xanh không tuyên bố branch protection đã cấu hình nếu chưa có external evidence.

@@ -28,6 +28,9 @@ scanner command trong manifest, LCOV path và CI reference. Mỗi route sở h�
 project-analysis service identity riêng; không bao giờ tái dùng admin token hoặc scanner token của route
 khác. Khi execute đã được duyệt, tạo project/identity còn thiếu rồi bind identity vào encrypted record,
 repository secret `SONAR_TOKEN` và variable `SONAR_HOST_URL` của chính route đó.
+Với project private, còn tạo hoặc reuse badge token read-only riêng, scope theo project và chỉ đặt nó trên
+official README badge image endpoint. Đây là capability cố ý public, không phải analysis/admin credential;
+không bao giờ thay bằng scanner/admin token.
 
 ## Authority and secrets
 
@@ -57,6 +60,8 @@ dùng `-Rotate` khi chủ đích rotate credential.
 Chứng minh đủ route, mỗi route có project-analysis identity riêng cùng encrypted/GitHub projection,
 analysis SHA chính xác, gate OK, required findings bằng không, rating A, hotspots
 đã xem 100%, duplicated density không quá 3, native coverage tối thiểu 80% tổng thể và 90% phần mới.
+Chứng minh mọi README badge endpoint trả semantic SVG và badge token của project private là read-only,
+scope theo project, đồng thời được redact khỏi output.
 
 ## Stops
 

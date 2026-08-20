@@ -112,7 +112,7 @@
     "compilers/patterns/be/delivery-assurance/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/delivery-assurance/en.md",
-      "sourceHash": "0eab2df15dd4ce1bb610c4f419084d134f291ad4dc88e14481fbb5a0c3bc14d0",
+      "sourceHash": "7d948aac616c2a6de4e4f73b79f36aaa591ce98c0efab596f967fc0088270fc2",
       "contextVersion": 1
     },
     "compilers/patterns/be/domain-modeling/context.md": {
@@ -258,7 +258,7 @@
     "compilers/patterns/fe/delivery-assurance/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/delivery-assurance/en.md",
-      "sourceHash": "c264f9df162e96a64a6c01af5de4f472576987b179cdc167e8c2b3fb29f3a330",
+      "sourceHash": "4724d7a3f4a08e6ac5723b58a4b8e6c661fd4d255646cc61dd640c6e328c2b75",
       "contextVersion": 1
     },
     "compilers/patterns/fe/file-layout/context.md": {
@@ -786,7 +786,7 @@
     "readiness/staleness/assurance/context.md": {
       "kind": "module",
       "source": "readiness/staleness/assurance/en.md",
-      "sourceHash": "699489c1b6666966ad42989e283323ce57618c362e6d1c2ef43362a5d686778a",
+      "sourceHash": "b361342ec39e82517275c34e0ebd08b6910e1fd6c36ae2c1f570b88e2bd62359",
       "contextVersion": 1
     },
     "readiness/staleness/context.md": {
@@ -852,7 +852,7 @@
     "runbooks/delivery-assurance-cloud/context.md": {
       "kind": "module",
       "source": "runbooks/delivery-assurance-cloud/en.md",
-      "sourceHash": "326c570e176ac1b6061d945c87789d350bd134c6509e6cde6125746d2e39a732",
+      "sourceHash": "9b72311fc591a701e1e388adeb90447e6492549e35fb8e8352f2982a4bf44318",
       "contextVersion": 1
     },
     "runbooks/external-integrations/context.md": {

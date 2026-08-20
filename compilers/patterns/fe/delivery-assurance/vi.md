@@ -36,10 +36,13 @@ không rỗng mới là `not required`. Policy thiếu hoặc invalid vẫn gi�
 
 ## Badge surface
 
-README phải có Codecov graph badge token-free và đủ SonarQube metric cho cùng project key:
+README phải có Codecov graph badge an toàn và đủ SonarQube metric an toàn cho cùng project key:
 `alert_status`, `coverage`, `bugs`, `vulnerabilities`, `code_smells`, `sqale_rating`,
 `reliability_rating`, `security_rating`. Mọi image endpoint trả SVG và link provider dashboard. Badge thiếu,
-unreachable hoặc URL chứa credential giữ assurance stale.
+unreachable giữ assurance stale. Project public dùng ảnh token-free. Project private chỉ được dùng badge
+`token` read-only, scope riêng cho project do provider cấp trên official image endpoint; token đó không có
+quyền upload, scan, API hay admin. Credential key khác, secret query opaque hoặc token trên URL không phải
+badge giữ assurance stale.
 
 ## Credential custody
 
@@ -72,7 +75,7 @@ lập: E2E pass không phải Sonar evidence, Sonar pass không phải E2E evide
 3. Một unit coverage run đạt mature threshold sinh LCOV cho cả hai provider.
 4. CI build production frontend trước provider upload/scan.
 5. Repair chạy local Sonar analysis với `sonar.qualitygate.wait=true`; gate đỏ là source finding, không đẩy sang CI.
-6. README có đủ badge bắt buộc mà không token.
+6. README có đủ badge bắt buộc: token-free khi public, hoặc chỉ dùng badge capability read-only được provider cấp khi private.
 7. Wiring filesystem không chứng minh required check; authorized provider/GitHub API mới chứng minh.
 8. Deploy hiện có không được outrun verification.
 9. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập bị loại khỏi Sonar analysis và coverage,

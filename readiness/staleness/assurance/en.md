@@ -23,7 +23,7 @@ thresholds/checks stay installed, and delivery is allowed only until expiry.
 
 ## Required README badges
 
-Every required backend or frontend README carries this complete token-free set. A missing badge is an assurance
+Every required backend or frontend README carries this complete safe set. A missing badge is an assurance
 finding even when its provider check is green:
 
 | Provider | Badge | Metric |
@@ -39,16 +39,19 @@ finding even when its provider check is green:
 | SonarQube | security | `security_rating` |
 
 Codecov uses host `codecov.io` with path `/gh/<owner>/<repo>/graph/badge.svg`. SonarQube uses
-`<SONAR_HOST_URL>/api/project_badges/measure?project=<projectKey>&metric=<metric>`. Neither URL may contain
-`token`, credentials or an opaque secret query. Every image endpoint must return an SVG, and every badge
-must link to the matching provider repository/project dashboard.
+`<SONAR_HOST_URL>/api/project_badges/measure?project=<projectKey>&metric=<metric>`. Public projects use
+token-free image URLs. A private project may add only the provider-issued, project-scoped read-only badge
+`token` when the provider requires it, and only on that official image endpoint. This capability must not
+authorize upload, scan, API or administration. Other credential keys, opaque secret queries and badge
+tokens on non-badge URLs are refused. Machine output redacts the badge token. Every image endpoint must
+return an SVG, and every badge must link to the matching provider repository/project dashboard.
 
 ## List evidence
 
 Read the manifest policy first. For `not required`, report the exact reason and stop this module. Otherwise
 read `@assurance-be` for a backend or `@assurance-fe` for a frontend and inspect names/wiring only: Husky check-only pre-push, active PR CI, one unit LCOV
 producer, Codecov consumer, Sonar scan plus quality gate, fixed encrypted stack records, symbolic GitHub
-secret references, token-free README badges for Codecov plus SonarQube quality gate, coverage, bugs,
+ secret references, safe README badges for Codecov plus SonarQube quality gate, coverage, bugs,
 vulnerabilities, code smells, maintainability, reliability and security, required checks and deploy
 dependency. Never decrypt credentials. Provider values and required-check app binding
 stay `unmeasured external` without authorized API evidence.
@@ -66,7 +69,7 @@ Apply the routed assurance pattern as one graph: local pre-push lint+unit; activ
 typecheck/build and exactly one coverage run; one `coverage/lcov.info` consumed by Codecov and Sonar;
 an authenticated scanner run from the current local checkout that waits for and passes the Sonar quality
 gate before provider CI is trusted; blocking Codecov project/patch plus Sonar quality gate; encrypted stack custody and GitHub projections;
-reachable token-free README badges for Codecov and the full SonarQube quality metric set; required checks; every existing deploy
+reachable safe README badges for Codecov and the full SonarQube quality metric set; required checks; every existing deploy
 dependent on verification. A repository with no deploy invents none.
 
 Secrets come from process env by name or hidden input through `scripts/publish-secret.mjs`; never chat,
@@ -142,7 +145,7 @@ proven first.
 Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, a current-checkout
 local Sonar analysis whose waited quality gate is `OK` after any source repair, and authenticated exact-SHA
 API evidence for every condition in the blocking quality profile, encrypted filenames
-without plaintext twins, every required badge image endpoint returns an image without a credential in the URL,
+without plaintext twins, every required badge image endpoint returns an image using no credential other than an allowed read-only badge capability,
 external secret names and required checks through APIs, and deploy dependency. Unmeasured external
 enforcement or an unmeasured badge endpoint leaves the module incomplete.
 Active debt may allow delivery while this module remains incomplete and non-ready.

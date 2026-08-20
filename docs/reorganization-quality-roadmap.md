@@ -121,8 +121,10 @@ Sau mỗi pass, tìm active reference tới legacy/runtime path; kết quả ph�
    missing token.
 4. Badge validator đọc semantic SVG và từ chối `unknown`, `Project has not been found`, `NONE` hoặc
    no-analysis result dù HTTP là 200.
-5. Public project dùng direct token-free badge. Private project dùng declared Cloudflare badge proxy:
-   allowlist project/metric, credential server-side, cache/rate-limit, không trả source hay issue detail.
+5. Public project dùng direct token-free badge. Private project ưu tiên provider-issued badge/embed token
+   read-only, scope theo project, chỉ trên official image endpoint và redact khỏi log; capability đó không
+   được có quyền upload/API/admin. Chỉ dùng declared Cloudflare badge proxy khi provider không có capability
+   riêng đủ hẹp: allowlist project/metric, credential server-side, cache/rate-limit, không trả source hay issue detail.
 6. CI/deploy checker đọc dependency graph/capability, không dựa vào tên job.
 7. Scanner chứng minh ESLint config import canon package name, không chỉ package tồn tại trong manifest.
 8. `clean`, `stale`, `unmeasured external`, `private` và `not required` là các verdict tách biệt.

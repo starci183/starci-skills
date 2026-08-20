@@ -95,6 +95,12 @@ Mỗi project có record token phân tích riêng, đặt tên theo project, đ�
 của nhau. Service local và service publish là cùng một instance gọi bằng hai tên:
 `http://localhost:9011` cho phân tích local, `https://sonar.starci.org` cho CI và cho README badge.
 
+Quyền đọc README badge là surface least-privilege riêng. Project public dùng provider image URL token-free.
+Khi provider bắt project private dùng token, chỉ dùng badge/embed token read-only, scope riêng cho project do
+provider cấp trên official image endpoint. Capability này có thể commit vì endpoint cố ý public nó; nó không
+được có quyền upload, scan, đọc API chung hay quản trị. Không bao giờ thay bằng `CODECOV_TOKEN`, `SONAR_TOKEN`
+hoặc `SONAR_ADMIN_TOKEN`. Badge check redact giá trị capability khỏi log và vẫn reject semantic error SVG.
+
 ## Chạy
 
 ### Codecov

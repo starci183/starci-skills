@@ -27,7 +27,10 @@ Read every routed repository's complete Sonar declaration before planning: `sona
 manifest scanner commands, LCOV path and CI references. One route owns one Sonar project and one
 project-analysis service identity; never reuse the admin token or another route's scanner token. Create
 missing projects and identities during approved execute, then bind each identity to its own encrypted
-record, repository `SONAR_TOKEN` secret and `SONAR_HOST_URL` variable.
+record, repository `SONAR_TOKEN` secret and `SONAR_HOST_URL` variable. For a private project, also create or
+reuse a separate project-scoped read-only badge token and place it only on official README badge image
+endpoints. It is an intentionally published capability, not an analysis/admin credential; never substitute
+the scanner or admin token.
 
 ## Authority and secrets
 
@@ -58,6 +61,8 @@ never an input. Use `-Rotate` only for an intentional credential rotation.
 Prove all routes, one distinct project-analysis identity and encrypted/GitHub projection per route,
 exact analysis SHA, gate OK, required zero findings, A ratings, reviewed hotspots 100%,
 duplicated density at most 3, and native coverage at least 80% overall and 90% new.
+Prove every README badge endpoint returns semantic SVG and any private-project badge token is read-only,
+project-scoped and redacted from output.
 
 ## Stops
 

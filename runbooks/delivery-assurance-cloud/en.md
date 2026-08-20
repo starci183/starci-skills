@@ -97,6 +97,13 @@ overwrite one another's custody. The local service and the published service are
 reached by two names: `http://localhost:9011` for local analysis, `https://sonar.starci.org` for CI and
 for README badges.
 
+README badge access is a separate least-privilege surface. Public projects use token-free provider image
+URLs. When a private provider project requires it, use only its provider-issued, project-scoped read-only
+badge/embed token on the official image endpoint. That capability may be committed because the endpoint
+intentionally publishes it; it must not authorize upload, scan, general API reads or administration.
+Never substitute `CODECOV_TOKEN`, `SONAR_TOKEN` or `SONAR_ADMIN_TOKEN`. Badge checks redact the capability
+value from logs and still reject semantic error SVGs.
+
 ## Run
 
 ### Codecov
