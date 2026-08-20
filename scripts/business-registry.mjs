@@ -24,7 +24,7 @@ if (!project || (!inputPath && !check)) {
   process.exit(2);
 }
 
-const businessRoot = join(source, ".worktrees", project, "business");
+const businessRoot = join(source, ".worktrees", project, "businesses");
 const registryPath = join(businessRoot, "business-registry-v1.json");
 const featureSchema = join(claudeRoot, "contexts", "business", "schema.json");
 const registrySchema = join(claudeRoot, "contexts", "business", "registry.schema.json");
@@ -199,7 +199,7 @@ function assertBusinessWorktree() {
   const owned = git(source, "worktree", "list", "--porcelain").split(/\r?\n\r?\n/).find((entry) => entry.split(/\r?\n/)[0] === `worktree ${normalized(businessRoot)}` || entry.split(/\r?\n/)[0] === `worktree ${businessRoot}`);
   if (!owned) throw new Error(`business root is not owned by Source git: ${businessRoot}`);
   const branch = git(businessRoot, "branch", "--show-current");
-  if (branch !== `codex/business/${project}`) throw new Error(`business root branch must be codex/business/${project}, got ${branch}`);
+  if (branch !== `codex/businesses/${project}`) throw new Error(`business root branch must be codex/businesses/${project}, got ${branch}`);
   const status = git(businessRoot, "status", "--porcelain");
   if (status) throw new Error(`business worktree must be clean before publication:\n${status}`);
   return common;

@@ -16,7 +16,7 @@ actors, flows, rules, states, entities, operations, surfaces, acceptance conditi
 
 ## Law
 
-`<Source>/.worktrees/<project>/business` is a locked linked worktree on `codex/business/<project>`.
+`<Source>/.worktrees/<project>/businesses` is a locked linked worktree on `codex/businesses/<project>`.
 Stable `featureId` heads point to immutable SHA-256 objects. Current `model.json`, compact `CONTEXT.md`,
 task-routed modules, aggregate `spec.md` and `evidence.json` are views of that object. Every claim cites exact routed source evidence; missing
 evidence is an `unknown`, never representative content. Consumers check source heads before use and
@@ -39,5 +39,5 @@ business: <project>/<featureId>@<hash>
 sources: <role@head ...>
 surfaces: <surface ids>
 unknowns: <count>
-path: .worktrees/<project>/business/features/<featureId>/
+path: .worktrees/<project>/businesses/features/<featureId>/
 ```

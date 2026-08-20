@@ -42,7 +42,7 @@ rác, và một cây luật có mảnh vụn của run trong đó thì thôi đ�
 | `WORKTREE-5` | Nhiều agent song song sắp ghi | chỉ cô lập khi hai agent sửa cùng một file |
 | `WORKTREE-6` | Một worktree đã cũ, prunable, hoặc chắn đường | prune có chủ đích; không bao giờ xoá thư mục bằng tay |
 | `WORKTREE-7` | Một design identity cần accepted version bền vững | head record `layoutId`/`blockId` ổn định trong `registries`; body bất biến ở `objects/sha256` |
-| `WORKTREE-8` | Product truth có evidence phải phục vụ FE, BE và design | stable `featureId` head trong `business`, lock trên `codex/business/<project>` |
+| `WORKTREE-8` | Product truth có evidence phải phục vụ FE, BE và design | stable `featureId` head trong `businesses`, lock trên `codex/businesses/<project>` |
 
 ## Đọc một lượt chạy
 
@@ -58,7 +58,7 @@ rác, và một cây luật có mảnh vụn của run trong đó thì thôi đ�
    làm; bản ghi sản phẩm bền thuộc về repository đó qua đường rà soát của chính nó, không qua state này.
 6. **Tách identity khỏi review history.** Layout/block ID resolve accepted head trực tiếp từ `registries`;
    `reviews` giữ decision, còn draft chưa xong nằm dưới `cache/drafts` — `WORKTREE-7`.
-7. **Tách product truth khỏi design decision.** Business feature head và evidence nằm trong `business`;
+7. **Tách product truth khỏi design decision.** Business feature head và evidence nằm trong `businesses`;
    layout/block head vẫn nằm trong `registries` — `WORKTREE-8`.
 
 ## `WORKTREE-1` — state phải sống sót
@@ -228,8 +228,8 @@ của từng claim không?
 - `WORKTREE-2`: draft analysis và generated prototype pack là rebuildable progress.
 - `WORKTREE-4`: business worktree phải thuộc Source, đã lock, sạch và đúng project branch.
 
-**Nó phát ra.** `.worktrees/<project>/business` là linked worktree đã lock trên
-`codex/business/<project>`. `business-registry-v1.json` map stable feature ID tới immutable object;
+**Nó phát ra.** `.worktrees/<project>/businesses` là linked worktree đã lock trên
+`codex/businesses/<project>`. `business-registry-v1.json` map stable feature ID tới immutable object;
 `features/<featureId>/CONTEXT.md` route LLM context, còn `model.json`, Markdown module và
 `evidence.json` là current generated view.
 
@@ -240,7 +240,7 @@ thành truth, hoặc thành tài liệu viết tay không còn khớp repository
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
-| ba root | Hai durable worktree `registries`, `business` cùng `cache` đã ignore, hợp `@schema` |
+| ba root | Hai durable worktree `registries`, `businesses` cùng `cache` đã ignore, hợp `@schema` |
 | project | Tên project do người khai, không bao giờ suy từ tên thư mục |
 | source | Repository chứa cây quy tắc |
 | đầu ra | Từng thứ lượt chạy sẽ ghi, và nó có dựng lại được không |

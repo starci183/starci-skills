@@ -21,7 +21,7 @@ Không có. Một stop kết thúc run; skill này không gọi skill khác đ�
 
 Build hoặc refresh một `featureId` ổn định từ frontend/backend đã route tại committed head. Kết quả là
 immutable machine model cùng `CONTEXT.md` gọn, module route theo task và evidence dưới
-`.worktrees/<project>/business`.
+`.worktrees/<project>/businesses`.
 
 ## Biên
 
@@ -33,7 +33,7 @@ minh trở thành unknown rõ ràng.
 
 1. Resolve Source, project, stable `featureId`, requested surface và runtime language.
 2. Verify path, branch, committed head, origin và local instruction của mọi role đã route.
-3. Verify business worktree đã lock, sạch, do Source sở hữu trên `codex/business/<project>`.
+3. Verify business worktree đã lock, sạch, do Source sở hữu trên `codex/businesses/<project>`.
 4. Đọc route mount và connected UI state, rồi frontend operation/type/test, rồi backend
    operation/schema/service/test. Chỉ đọc sibling để chốt một contract chính xác.
 5. Tạo model hợp lệ với `@business/@feature-schema`. Mọi actor, flow, rule, state, entity, operation,

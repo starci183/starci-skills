@@ -36,7 +36,7 @@ adds no write. Execute requested local actions in registry order:
    every declared project/role read route against the real checkout. Allocation stays in
    `.workspace/ports.json`; init never copies it into a product.
 4. **Worktrees** — verify the project design registry, business authority and cache roots against Git's
-   own worktree account and path policy. Create/reuse business on `codex/business/<project>` independently
+   own worktree account and path policy. Create/reuse businesses on `codex/businesses/<project>` independently
    from design registry.
 
 State the evidence and exact action per boundary before changing it. A direct init instruction naming

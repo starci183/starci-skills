@@ -22,7 +22,7 @@ None. A stop ends this run; this skill never invokes another skill as recovery.
 
 Build or refresh one stable `featureId` from the routed FE and BE at committed heads. The output is an
 immutable machine model plus a compact `CONTEXT.md`, task-routed Markdown modules and `evidence.json` under
-`.worktrees/<project>/business`. The model is the source design, planning and implementation use; the
+`.worktrees/<project>/businesses`. The model is the source design, planning and implementation use; the
 Markdown is its human view.
 
 ## Boundary
@@ -37,8 +37,8 @@ source become explicit `unknowns`.
 1. Resolve runtime language, Source, declared project, `featureId`, and requested/related surfaces.
 2. Verify every routed role: disk path, branch, committed head, origin and instructions. Refreshing a
    stale workspace route belongs to the initialization owner; do not approximate it here.
-3. Verify `.worktrees/<project>/business` is locked, clean, owned by Source Git and on
-   `codex/business/<project>`. Refuse foreign, unlocked, dirty or missing roots.
+3. Verify `.worktrees/<project>/businesses` is locked, clean, owned by Source Git and on
+   `codex/businesses/<project>`. Refuse foreign, unlocked, dirty or missing roots.
 4. Read source in this order:
    - route mounts, connected pages and user-facing states;
    - frontend operations, types, session/authorization and interaction tests;

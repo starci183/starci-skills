@@ -21,8 +21,8 @@ idea, sample document or agent inference into product truth.
 
 ## Law
 
-Every project owns `<Source>/.worktrees/<project>/business`, a locked linked worktree on
-`codex/business/<project>`. Stable `featureId` heads point to immutable SHA-256 objects. Each current
+Every project owns `<Source>/.worktrees/<project>/businesses`, a locked linked worktree on
+`codex/businesses/<project>`. Stable `featureId` heads point to immutable SHA-256 objects. Each current
 feature also publishes a machine-readable `model.json`, compact `CONTEXT.md`, task-routed Markdown
 modules, aggregate `spec.md` and `evidence.json`.
 
@@ -55,5 +55,5 @@ business: <project>/<featureId>@<hash>
 sources: <role@head ...>
 surfaces: <surface ids>
 unknowns: <count>
-path: .worktrees/<project>/business/features/<featureId>/
+path: .worktrees/<project>/businesses/features/<featureId>/
 ```

@@ -12,10 +12,10 @@
     "roots": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["registries", "business", "cache"],
+      "required": ["registries", "businesses", "cache"],
       "properties": {
         "registries": {"$ref": "#/$defs/durableRoot"},
-        "business": {"$ref": "#/$defs/durableRoot"},
+        "businesses": {"$ref": "#/$defs/durableRoot"},
         "cache": {"$ref": "#/$defs/rebuildableRoot"}
       }
     }

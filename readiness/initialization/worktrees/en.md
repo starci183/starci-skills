@@ -8,9 +8,9 @@ title: Initialization · worktrees
 
 None.
 
-`<Source>/.worktrees/<project>/{registries,business,cache}` is the project write boundary. Design registry
+`<Source>/.worktrees/<project>/{registries,businesses,cache}` is the project write boundary. Design registry
 and business authority are separate locked linked worktrees on `codex/fe-design-registry/<project>` and
-`codex/business/<project>`; cache is ignored rebuildable local state and unfinished drafts live below
+`codex/businesses/<project>`; cache is ignored rebuildable local state and unfinished drafts live below
 `cache/drafts`.
 
 Measure with `git worktree list`, then verify path, lock, cleanliness, branch, Git common-directory owner,

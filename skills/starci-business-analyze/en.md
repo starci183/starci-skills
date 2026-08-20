@@ -21,7 +21,7 @@ None. A stop ends this run; this skill never invokes another skill as recovery.
 
 Build or refresh one stable `featureId` from routed frontend and backend source at committed heads. The
 result is an immutable machine model plus a compact `CONTEXT.md`, task-routed modules and evidence under
-`.worktrees/<project>/business`.
+`.worktrees/<project>/businesses`.
 
 ## Boundary
 
@@ -33,7 +33,7 @@ Unproved claims become explicit unknowns.
 
 1. Resolve the Source, project, stable `featureId`, requested surfaces and runtime language.
 2. Verify every routed role's path, branch, committed head, origin and local instructions.
-3. Verify the locked, clean, Source-owned business worktree on `codex/business/<project>`.
+3. Verify the locked, clean, Source-owned business worktree on `codex/businesses/<project>`.
 4. Read route mounts and connected UI states, then frontend operations/types/tests, then backend
    operations/schema/services/tests. Read siblings only to settle an exact contract.
 5. Create a model valid against `@business/@feature-schema`. Every non-unknown actor, flow, rule, state,

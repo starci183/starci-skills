@@ -448,7 +448,7 @@
     "contexts/business/context.md": {
       "kind": "module",
       "source": "contexts/business/en.md",
-      "sourceHash": "8df6ac38ce7f8d7203d17225f370fd64397732e0a1ce523956b2c36a3fbc4c35",
+      "sourceHash": "3b05d6068c4192d54894d3ca4482ebfdd9becb4e7969efbb75ed249817bee28a",
       "contextVersion": 1
     },
     "contexts/context.md": {
@@ -470,7 +470,7 @@
     "contexts/worktrees/context.md": {
       "kind": "module",
       "source": "contexts/worktrees/en.md",
-      "sourceHash": "85e5587453ffcdc69389b81c524f08070d88133e8d1831e2549a8465aa56169c",
+      "sourceHash": "e5b5b1085f7c019ab0de4da7de08b6b0814d073999a2d6a937ab741027e7d2d2",
       "contextVersion": 1
     },
     "deployment/context.md": {
@@ -786,7 +786,7 @@
     "readiness/initialization/worktrees/context.md": {
       "kind": "module",
       "source": "readiness/initialization/worktrees/en.md",
-      "sourceHash": "57ec09754712d05eae5e5ca18da426fdfb187b53e24c7361a3e3b75e6cc8b817",
+      "sourceHash": "e22f8c835ef2cb24a19eeb08e7b5fb6922cb74cb16e5aae6766982cf0d9fa2f2",
       "contextVersion": 1
     },
     "readiness/staleness/assurance/context.md": {

@@ -20,8 +20,8 @@ rõ ràng. Nó không copy raw source hoặc nâng design idea, tài liệu mẫ
 
 ## Law
 
-Mỗi project sở hữu `<Source>/.worktrees/<project>/business`, linked worktree đã lock trên
-`codex/business/<project>`. Stable `featureId` head trỏ tới immutable SHA-256 object. Mỗi feature hiện
+Mỗi project sở hữu `<Source>/.worktrees/<project>/businesses`, linked worktree đã lock trên
+`codex/businesses/<project>`. Stable `featureId` head trỏ tới immutable SHA-256 object. Mỗi feature hiện
 hành còn publish `model.json` cho máy, `CONTEXT.md` gọn, Markdown module route theo task, aggregate
 `spec.md` và `evidence.json`.
 
@@ -54,5 +54,5 @@ business: <project>/<featureId>@<hash>
 sources: <role@head ...>
 surfaces: <surface ids>
 unknowns: <count>
-path: .worktrees/<project>/business/features/<featureId>/
+path: .worktrees/<project>/businesses/features/<featureId>/
 ```

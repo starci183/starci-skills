@@ -8,9 +8,9 @@ title: Khởi tạo · worktrees
 
 None.
 
-`<Source>/.worktrees/<project>/{registries,business,cache}` là write boundary của project. Design registry
+`<Source>/.worktrees/<project>/{registries,businesses,cache}` là write boundary của project. Design registry
 và business authority là hai linked worktree riêng đã lock trên `codex/fe-design-registry/<project>` và
-`codex/business/<project>`; cache là local state dựng lại được đã ignore và draft chưa xong nằm dưới
+`codex/businesses/<project>`; cache là local state dựng lại được đã ignore và draft chưa xong nằm dưới
 `cache/drafts`.
 
 Đo bằng `git worktree list`, rồi verify path, lock, cleanliness, branch, Git common-directory owner và

@@ -43,7 +43,7 @@ mess, and a rule tree with run debris in it stops reading as authority.
 | `WORKTREE-5` | Parallel agents about to write | isolate only when two of them mutate one file |
 | `WORKTREE-6` | A worktree is stale, prunable or in the way | pruned deliberately; never force-removed as a directory |
 | `WORKTREE-7` | A design identity needs a durable accepted version | stable `layoutId`/`blockId` head records in `registries`; immutable bodies remain under `objects/sha256` |
-| `WORKTREE-8` | Evidence-backed product truth must serve FE, BE and design | stable `featureId` heads in `business`, locked on `codex/business/<project>` |
+| `WORKTREE-8` | Evidence-backed product truth must serve FE, BE and design | stable `featureId` heads in `businesses`, locked on `codex/businesses/<project>` |
 
 ## Reading a run
 
@@ -60,7 +60,7 @@ mess, and a rule tree with run debris in it stops reading as authority.
 6. **Separate authority from rebuildable progress.** Layout and block IDs resolve accepted heads directly
    from `registries`; `reviews` preserve decisions, while unfinished drafts live under `cache/drafts` — `WORKTREE-7`.
 7. **Separate product truth from design decisions.** Business feature heads and evidence live in
-   `business`; layout/block heads remain in `registries` — `WORKTREE-8`.
+   `businesses`; layout/block heads remain in `registries` — `WORKTREE-8`.
 
 ## `WORKTREE-1` — state that must survive
 
@@ -230,8 +230,8 @@ and inspect every claim's evidence?
 - `WORKTREE-2`: draft analysis and generated prototype packs remain rebuildable progress.
 - `WORKTREE-4`: the business worktree must be Source-owned, locked, clean and on its project branch.
 
-**What it emits.** `.worktrees/<project>/business` is a locked linked worktree on
-`codex/business/<project>`. `business-registry-v1.json` maps stable feature IDs to immutable objects;
+**What it emits.** `.worktrees/<project>/businesses` is a locked linked worktree on
+`codex/businesses/<project>`. `business-registry-v1.json` maps stable feature IDs to immutable objects;
 `features/<featureId>/CONTEXT.md` routes LLM context, while `model.json`, modular Markdown and
 `evidence.json` are generated current views.
 
@@ -242,7 +242,7 @@ with truth, or becomes a hand-written document whose claims no longer match eith
 
 | Input | Evidence required |
 |---|---|
-| roots | The durable `registries` and `business` worktrees plus ignored `cache`, valid against `@schema` |
+| roots | The durable `registries` and `businesses` worktrees plus ignored `cache`, valid against `@schema` |
 | project | A declared project name, never inferred from a folder |
 | source | The repository holding the trust tree |
 | outputs | Each thing the run will write, and whether it is rebuildable |
