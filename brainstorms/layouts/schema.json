@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"const": 1, "description": "Artifact version. A record written under an older schema is never rewritten."},
+    "schema": {"enum": [1, 2], "description": "Artifact version. Schema 2 requires hashed child-region geometry; older accepted objects remain valid and are never rewritten."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -17,6 +17,23 @@
     },
     "refusal": {"$ref": "#/$defs/refusal"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema": {"const": 2}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "allOf": [
+                {"$ref": "#/$defs/candidate"},
+                {"properties": {"regions": {"items": {"allOf": [{"$ref": "#/$defs/region"}, {"required": ["geometry"]}]}}}}
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "envelope": {
       "description": "Never hashed. Two runs of the same decision must produce the same candidate hash, so nothing that varies per run may sit inside a candidate.",
@@ -70,7 +87,20 @@
         "entry": {"$ref": "#/$defs/entryVerdict"},
         "assembler": {"$ref": "#/$defs/pascal", "description": "A branch that exists in the frontend's branch inventory."},
         "mount": {"enum": ["mounts-once", "per-route", "overlay"]},
-        "whyMatch": {"type": "string", "minLength": 12, "description": "The business reason this region and that entry share. Matching is on `why`, never on shape."}
+        "whyMatch": {"type": "string", "minLength": 12, "description": "The business reason this region and that entry share. Matching is on `why`, never on shape."},
+        "geometry": {"$ref": "#/$defs/geometry"}
+      }
+    },
+    "geometry": {
+      "description": "Hashed minimum bounding geometry owned by the layout. It positions the child without deciding its internal anatomy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["placement", "width", "height", "align"],
+      "properties": {
+        "placement": {"enum": ["header", "navbar", "rail", "main", "aside", "center", "footer", "overlay"]},
+        "width": {"enum": ["intrinsic", "narrow", "medium", "wide", "full"]},
+        "height": {"enum": ["content", "fill", "viewport"]},
+        "align": {"enum": ["start", "center", "end", "stretch"]}
       }
     },
     "entryVerdict": {

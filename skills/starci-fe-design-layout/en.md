@@ -108,7 +108,9 @@ Read `@layouts`: request verbatim; contract queried one need per region through 
 every branch and what it may contain; every route page and persistent layout; closed layout axes; and
 this project's accepted layout precedents with their rejections.
 
-Layout remains a skeleton. It names regions, geometry ownership, mount lifetime and route relationship.
+Layout remains a skeleton. New work uses layout schema 2 and names regions, hashed child bounding geometry
+(`placement`, `width`, `height`, `align`), mount lifetime and route relationship. A centered authentication
+panel must render centered before its block exists; a rail region must occupy the rail slot.
 It never decides a block's internal parts, states or data ownership. That separation is what lets one
 block be redesigned later without reopening the page layout.
 

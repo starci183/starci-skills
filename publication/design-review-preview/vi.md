@@ -64,6 +64,10 @@ Application dùng hash routes:
 #/layouts/<layoutId>/<layoutHash>/blocks/<blockId>
 ```
 
+Region layout schema 2 mang `placement`, `width`, `height` và `align` đã hash. Preview tuân theo bounding
+đó kể cả khi child còn thiếu và chỉ có rough content; không dàn phẳng chúng thành một stack chung. Geometry
+fallback schema 1 chỉ tồn tại cho lịch sử accepted bất biến.
+
 Script chỉ cài Vite/HeroUI dependencies đã pin khi còn thiếu, build một lần vào project cache rồi ghi một
 `review-manifest.json`.
 

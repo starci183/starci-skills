@@ -31,7 +31,8 @@ const themeStyle = (layout: LayoutReview) => ({
   "--review-muted": layout.theme.mutedContent?.value ?? "#6f7378",
   "--review-accent": layout.theme.accent?.value ?? "#e94f99",
   "--review-separator": layout.theme.separator?.value ?? "#e6e6e8",
-  "--review-radius": layout.theme.radius?.value ?? "10px"
+  "--review-radius": layout.theme.radius?.value ?? "10px",
+  "--review-elevation": layout.theme.elevation?.value ?? "0 .8rem 2rem rgb(22 23 26 / 9%)"
 } as React.CSSProperties)
 
 export const ReviewApp = ({manifest}: ReviewAppProps) => {

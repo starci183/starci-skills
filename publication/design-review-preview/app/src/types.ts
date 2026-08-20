@@ -52,6 +52,12 @@ export type RegionReview = {
   readonly assembler: string
   readonly mount: string
   readonly whyMatch: string
+  readonly geometry?: {
+    readonly placement: "header" | "navbar" | "rail" | "main" | "aside" | "center" | "footer" | "overlay"
+    readonly width: "intrinsic" | "narrow" | "medium" | "wide" | "full"
+    readonly height: "content" | "fill" | "viewport"
+    readonly align: "start" | "center" | "end" | "stretch"
+  }
   readonly block: ChildBlockReview
 }
 

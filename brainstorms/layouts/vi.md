@@ -23,9 +23,10 @@ rồi.
 
 ## Luật
 
-Một phương án gọi tên các region, ai sở hữu hình học của từng region, cái gì mount một lần và cái gì đổi
-theo route. Nó **không bao giờ** gọi tên một class. Class được quyết sau, bằng luật, từ cái hình mà tầng
-này chấp nhận; một phương án mang class là đã tiêu một quyết định không thuộc quyền nó tiêu.
+Phương án schema 2 gọi tên region, ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
+region hash geometry bounding tối thiểu của child: `placement`, `width`, `height` và `align`. Geometry này
+đặt child đúng vị trí mà chưa quyết anatomy bên trong block. Schema 1 chỉ còn hợp lệ cho lịch sử accepted
+bất biến. Phương án **không bao giờ** gọi tên class; class được quyết sau từ hình đã chấp nhận.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
 một entry mới và vì sao. Region không trích gì cả là một thành phần bịa ra đang khoác cấu trúc JSON.

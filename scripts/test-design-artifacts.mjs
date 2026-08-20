@@ -124,6 +124,19 @@ const splitLayouts = write("split-layouts.json", {
     layout("b", {navigation: "rail", evidence: "below", secondary: "route", chrome: "scrolls"}, editorial),
   ],
 });
+const geometryLayouts = write("geometry-layouts.json", {
+  schema: 2,
+  envelope: layoutEnvelope,
+  candidates: [layout("a", {navigation: "navbar", evidence: "beside", secondary: "panel", chrome: "sticky"})],
+});
+const boundedLayouts = write("bounded-layouts.json", {
+  schema: 2,
+  envelope: layoutEnvelope,
+  candidates: [{
+    ...layout("a", {navigation: "navbar", evidence: "beside", secondary: "panel", chrome: "sticky"}),
+    regions: [{...region, geometry: {placement: "main", width: "wide", height: "fill", align: "stretch"}}],
+  }],
+});
 
 const blocks = write("blocks.json", {
   schema: 1,
@@ -182,6 +195,10 @@ try {
     throw new Error("direction --hash failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", layouts, "--vocabulary", vocabulary, "--hash");
+  if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", geometryLayouts, "--vocabulary", vocabulary, "--hash").includes("geometry")) {
+    throw new Error("schema 2 layout without child geometry failed for the wrong reason");
+  }
+  run("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", boundedLayouts, "--vocabulary", vocabulary, "--hash");
   if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", splitLayouts, "--vocabulary", vocabulary, "--hash").includes("must share the one evidence-backed direction")) {
     throw new Error("split layout directions failed for the wrong reason");
   }

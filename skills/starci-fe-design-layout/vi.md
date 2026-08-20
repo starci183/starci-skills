@@ -95,8 +95,9 @@ decision còn thiếu dưới dạng refusal; chưa sinh layout.
 ### 7 — Đọc structural input
 
 Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
-persistent layout, closed axes và accepted precedent. Layout chỉ quyết region, geometry ownership, lifetime
-và route relationship; không quyết block internals.
+persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 2: layout quyết
+region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), lifetime và route
+relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa trước khi có block.
 
 ### 8 — Resolve từng region theo contract
 

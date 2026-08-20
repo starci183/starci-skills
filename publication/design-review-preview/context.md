@@ -65,6 +65,10 @@ The application uses hash routes:
 #/layouts/<layoutId>/<layoutHash>/blocks/<blockId>
 ```
 
+Schema 2 layout regions carry hashed `placement`, `width`, `height` and `align`. The preview honors those
+bounds even when a child is missing and only rough content exists; it never flattens them into one generic
+stack. Schema 1 geometry fallback exists only for immutable accepted history.
+
 The script installs pinned Vite/HeroUI dependencies only when absent, builds once into the declared project
 cache and writes one `review-manifest.json`.
 

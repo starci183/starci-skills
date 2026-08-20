@@ -32,7 +32,7 @@
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "71e31a79f493b0c991eb06f9db1d6a5169524cc65531cf08fe7022db89801eac",
+      "sourceHash": "f390412f84ee0e3a8aba17ccecd9b6134882750dec9c6a6c63d106e2fe8275fe",
       "contextVersion": 1
     },
     "brainstorms/layouts/precedents/context.md": {
@@ -750,7 +750,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "9df7ba284cd12abb4049cffac8c99909a74dedc40aa1060f41da2313b106d957",
+      "sourceHash": "7e55c024b4de814c6a617b7351e2162f3bff834f186cca89d82155e032236ce4",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {

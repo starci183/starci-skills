@@ -23,8 +23,10 @@ already decided.
 
 ## Law
 
-A candidate names regions, who owns each region's geometry, what mounts once and what changes per
-route. It never names a class. Classes are decided later, by law, from the shape this stage accepts;
+A schema 2 candidate names regions, who owns each region's geometry, what mounts once and what changes
+per route. Every region hashes its minimum child bounding geometry: `placement`, `width`, `height` and
+`align`. This positions the child without deciding its internal block anatomy. Schema 1 remains valid only
+for immutable accepted history. It never names a class. Classes are decided later from the accepted shape;
 a candidate that carries one has spent a decision that was not its to spend.
 
 Every region cites something that exists: an entry in the contract, or an explicit statement that a

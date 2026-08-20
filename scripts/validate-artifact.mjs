@@ -314,6 +314,17 @@ function sessionLaws(data) {
   return found;
 }
 
+function layoutGeometryLaws(data) {
+  if (data.schema !== 2 || !Array.isArray(data.candidates)) return [];
+  const found = [];
+  for (const [candidateIndex, candidate] of data.candidates.entries()) {
+    for (const [regionIndex, region] of (candidate.regions ?? []).entries()) {
+      if (!region.geometry) found.push(`candidates[${candidateIndex}].regions[${regionIndex}].geometry: schema 2 requires hashed child bounding geometry`);
+    }
+  }
+  return found;
+}
+
 // Canonical form: keys sorted at every depth, envelope excluded. Two runs of the same decision must
 // produce the same hash, so nothing that varies per run may sit inside the hashed object.
 function canonical(value) {
@@ -339,7 +350,7 @@ if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((cand
   await check(vocabularySchema, vocabulary, "$vocabulary", {doc: vocabularySchema, dir: dirname(vocabularySchemaPath)}, errors);
 }
 
-const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data)];
+const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data), ...layoutGeometryLaws(data)];
 if (wantHash && Array.isArray(data.directions)) {
   broken.push("directions: recommendation has no approval hash; embed the recommended object in a layout candidate and hash that layout");
 }
