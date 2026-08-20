@@ -62,22 +62,25 @@ and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache
 
 ### 4 — Resolve the stable layout identity and current head
 
-If v2 is absent, run `@design-registry-migrate --apply`; then run `@design-registry-check`, read `@design-registry-schema` and
+If v2 is absent, run `node @design-registry-migrate --registry .worktrees/<project>/registries --apply`; then run
+`node @design-registry-check --registry .worktrees/<project>/registries`, read `@design-registry-schema` and
 `registries/design-registry-v2.json`. Require the caller's stable `layoutId`; do not derive
 it from the prompt or a surface label. Resolve `layoutHeads[layoutId]`, then resolve its
 `head` through the immutable `objects.byHash` map when one exists. The head is the accepted layout and the
 only current lookup result. A missing identity or schema mismatch stops; an absent head is a new identity,
 not permission to treat a proposed candidate as accepted.
 
-If the layout has no accepted head yet, establish the stable identity and continue only under the registry
-schema's allowed creation path; never invent a head from a proposed candidate. Prior review history may
+If the layout has no accepted head yet, keep `layoutHeads[layoutId]` absent while the caller-supplied stable
+`layoutId` identifies the review envelope and candidates. Approval writes the first immutable object and
+head together; there is no headless registry entry and no proposed candidate is current. Prior review history may
 be read for context and appended, but it cannot select, replace or resurrect a head.
 Keep every accepted hash in immutable objects and update the head only at the approval checkpoint.
 
 ### 5 — Generate the direction choices
 
-Run `@inventory-visual-language` against the verified checkout and record its generated digest as
-`vocabularyAt`. Read `@directions`, then generate 3–4 choices from the request, audience, intended
+Run `@inventory-visual-language` against the verified checkout. The inventory follows stylesheet
+`@import` edges, including resolvable installed package CSS, but does not evaluate runtime-generated
+CSS from TypeScript or JSON. Record its generated digest as `vocabularyAt`. Read `@directions`, then generate 3–4 choices from the request, audience, intended
 feeling, live tokens, approved screens, brand evidence, installed vendor guidance, closed axes and this
 project's precedents with their rejections.
 

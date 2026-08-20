@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -35,6 +35,12 @@ function fixture() {
 
 test("accepts current identity heads without any session record", () => {
     assert.equal(checkDesignRegistry(fixture()).ok, true)
+})
+
+test("accepts v2 authority without the optional legacy registry metadata", () => {
+    const root = fixture()
+    rmSync(join(root, "registry.json"))
+    assert.equal(checkDesignRegistry(root).ok, true)
 })
 
 test("refuses undeclared or stale block heads", () => {

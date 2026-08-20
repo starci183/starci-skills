@@ -15,12 +15,14 @@ export function checkDesignRegistry(registryRoot) {
     const failures = []
     const rootPath = join(root, "registry.json")
     const designPath = join(root, "design-registry-v2.json")
-    if (!existsSync(rootPath)) return { ok: false, failures: ["registry.json is absent"] }
     if (!existsSync(designPath)) return { ok: false, failures: ["design-registry-v2.json is absent; run migration"] }
-    const registry = readJson(rootPath)
     const design = readJson(designPath)
-    if (registry.schemaVersion !== 2 || registry.designRegistry !== "design-registry-v2.json") failures.push("registry.json does not declare v2 identity authority")
-    if (design.schemaVersion !== 2 || design.project !== registry.project) failures.push("design registry identity/version disagrees with registry root")
+    if (design.schemaVersion !== 2 || !SLUG.test(design.project ?? "")) failures.push("design registry has invalid v2 project identity")
+    if (existsSync(rootPath)) {
+        const registry = readJson(rootPath)
+        if (registry.schemaVersion !== 2 || registry.designRegistry !== "design-registry-v2.json") failures.push("registry.json does not point at v2 identity authority")
+        if (registry.project !== design.project) failures.push("legacy registry metadata disagrees with design registry identity")
+    }
     const objectFile = (hash) => join(root, "objects", "sha256", `${hash}.json`)
     for (const [hash, ref] of Object.entries(design.objects?.byHash ?? {})) {
         if (!HASH.test(hash) || ref?.hash !== hash || ref?.path !== `objects/sha256/${hash}.json` || !existsSync(objectFile(hash))) failures.push(`${hash}: invalid or missing immutable object reference`)

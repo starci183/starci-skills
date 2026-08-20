@@ -206,6 +206,31 @@ test("a replacement layout marks old child heads stale and falls back to rough c
   }
 });
 
+test("the first layout candidate renders before an accepted layout head exists", () => {
+  const f = fixture();
+  try {
+    writeFileSync(join(f.registry, "design-registry-v2.json"), JSON.stringify({
+      schemaVersion: 2,
+      project: "sample",
+      layoutHeads: {},
+      blockHeads: {},
+      objects: {immutable: true, byHash: {}}
+    }));
+    const artifactPath = join(f.root, "first-layout.json");
+    writeFileSync(artifactPath, JSON.stringify({
+      schema: 1,
+      envelope: {round: 1, project: "sample", surface: "sample-layout"},
+      candidates: [f.layout]
+    }));
+    const manifest = buildManifest({phase: "layout", project: "sample", layoutId: "sample-layout", artifact: artifactPath, registry: f.registry, vocabulary: f.vocabularyPath, recommendedId: f.layout.id});
+    assert.equal(manifest.layouts.length, 1);
+    assert.equal(manifest.layouts[0].layoutId, "sample-layout");
+    assert.equal(manifest.layouts[0].candidates[0].status, "proposed");
+  } finally {
+    rmSync(f.root, {recursive: true, force: true});
+  }
+});
+
 test("renderer writes one project graph and refuses output outside preview cache", () => {
   const f = fixture();
   try {

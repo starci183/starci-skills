@@ -10,7 +10,8 @@
 import {existsSync, readdirSync, readFileSync, statSync} from "node:fs";
 import {mkdir, writeFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
-import {dirname, relative, resolve, sep} from "node:path";
+import {createRequire} from "node:module";
+import {dirname, extname, relative, resolve, sep} from "node:path";
 
 const args = process.argv.slice(2);
 const valueOf = (name) => {
@@ -48,6 +49,39 @@ function walk(path) {
 }
 
 walk(root);
+
+const imported = /@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?[^;]*;/g;
+const allFiles = new Set(files);
+const queue = [...files];
+
+function resolveStylesheet(specifier, importer) {
+  if (specifier.startsWith(".") || specifier.startsWith("/")) {
+    const base = resolve(dirname(importer), specifier);
+    for (const candidate of [base, `${base}.css`, resolve(base, "index.css")]) {
+      if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+    }
+    return undefined;
+  }
+  try {
+    return createRequire(importer).resolve(specifier);
+  } catch {
+    return undefined;
+  }
+}
+
+for (let at = 0; at < queue.length; at += 1) {
+  const importer = queue[at];
+  const css = readFileSync(importer, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const match of css.matchAll(imported)) {
+    const dependency = resolveStylesheet(match[1], importer);
+    if (!dependency || !extensions.has(extname(dependency).toLowerCase()) || allFiles.has(dependency)) continue;
+    allFiles.add(dependency);
+    queue.push(dependency);
+  }
+}
+
+files.length = 0;
+files.push(...allFiles);
 files.sort();
 
 const declarations = new Map();

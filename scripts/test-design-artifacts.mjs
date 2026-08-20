@@ -156,12 +156,17 @@ const worktreeRoots = write("worktree-roots.json", {
 try {
   const frontend = join(temp, "frontend");
   mkdirSync(frontend);
-  writeFileSync(join(frontend, "app.css"), ":root { --background: white; --foreground: black; --BrandAccent: red; }\n.dark { --background: black; }\n", "utf8");
+  const vendor = join(frontend, "node_modules", "vendor-theme");
+  mkdirSync(vendor, {recursive: true});
+  writeFileSync(join(vendor, "package.json"), JSON.stringify({name: "vendor-theme", type: "module", exports: {"./css": "./index.css"}}), "utf8");
+  writeFileSync(join(vendor, "index.css"), "@import \"./theme.css\";\n", "utf8");
+  writeFileSync(join(vendor, "theme.css"), ":root { --vendor-surface: white; --vendor-accent: plum; }\n", "utf8");
+  writeFileSync(join(frontend, "app.css"), "@import \"vendor-theme/css\";\n:root { --background: white; --foreground: black; --BrandAccent: red; }\n.dark { --background: black; }\n", "utf8");
   const generatedInventory = join(temp, "generated-vocabulary.json");
   execFileSync(process.execPath, [inventoryScript, "--root", frontend, "--out", generatedInventory], {encoding: "utf8"});
   const generated = JSON.parse(readFileSync(generatedInventory, "utf8"));
-  if (!/^[0-9a-f]{64}$/.test(generated.digest) || generated.tokens.length !== 3 || !generated.tokens.some((token) => token.name === "--BrandAccent") || generated.tokens.find((token) => token.name === "--background")?.declarations.length !== 2) {
-    throw new Error("visual inventory did not preserve case or retain both mode declarations");
+  if (!/^[0-9a-f]{64}$/.test(generated.digest) || generated.tokens.length !== 5 || !generated.tokens.some((token) => token.name === "--BrandAccent") || generated.tokens.find((token) => token.name === "--background")?.declarations.length !== 2 || !generated.tokens.some((token) => token.name === "--vendor-accent") || !generated.sources.some((source) => source.endsWith("node_modules/vendor-theme/theme.css"))) {
+    throw new Error("visual inventory did not preserve modes or follow declared vendor stylesheet imports");
   }
   run("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary);
   if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", missingRecommendation, "--vocabulary", vocabulary).includes("must name one evidence-backed default")) {

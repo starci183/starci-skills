@@ -247,7 +247,7 @@ export function buildManifest(options) {
   const contentInput = optional(options.content);
   const shellInput = optional(options.shell);
   const layouts = currentLayouts(registryRoot, registry, vocabulary, options.project, contentInput, shellInput);
-  if (!layouts.length) throw new Error("design registry has no accepted layout heads");
+  if (!layouts.length && options.phase !== "layout") throw new Error("design registry has no accepted layout heads");
 
   let entryRoute;
   if (options.draftIndex) {

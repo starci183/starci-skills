@@ -58,21 +58,24 @@ của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 
 ### 4 — Resolve identity layout ổn định và current head
 
-Nếu v2 chưa có, chạy `@design-registry-migrate --apply`; sau đó chạy `@design-registry-check`, đọc `@design-registry-schema` và
+Nếu v2 chưa có, chạy `node @design-registry-migrate --registry .worktrees/<project>/registries --apply`; sau đó chạy
+`node @design-registry-check --registry .worktrees/<project>/registries`, đọc `@design-registry-schema` và
 `registries/design-registry-v2.json`. Bắt buộc caller cung cấp `layoutId` ổn định; không suy ra
 identity từ prompt hay surface label. Resolve `layoutHeads[layoutId]`, rồi resolve `head` qua
 map `objects.byHash` immutable nếu head đã tồn tại. Head là layout accepted và là kết quả lookup hiện tại
 duy nhất. Identity thiếu hoặc schema mismatch thì dừng; thiếu head là identity mới, không phải quyền coi
 candidate proposed là accepted.
 
-Nếu layout chưa có accepted head, chỉ tiếp tục theo creation path được schema registry cho phép; không tự
-đặt head từ candidate proposed. Review history cũ có thể đọc làm ngữ cảnh và ghi audit history, nhưng
+Nếu layout chưa có accepted head, giữ `layoutHeads[layoutId]` vắng mặt; `layoutId` ổn định do caller cung
+cấp định danh review envelope và candidates. Approval ghi immutable object đầu tiên cùng head; registry
+không có headless entry và proposed candidate chưa bao giờ là current. Review history cũ có thể đọc làm ngữ cảnh và ghi audit history, nhưng
 không được chọn, thay hoặc hồi sinh head. Giữ mọi accepted hash trong immutable object và chỉ cập nhật head
 tại approval checkpoint.
 
 ### 5 — Sinh các direction choice
 
-Chạy `@inventory-visual-language`; dùng digest sinh ra làm `vocabularyAt`. Đọc `@directions`, sinh 3–4
+Chạy `@inventory-visual-language`. Inventory đi theo các cạnh `@import` stylesheet, gồm CSS package đã
+cài đặt resolve được, nhưng không thực thi CSS sinh động từ TypeScript hoặc JSON. Dùng digest sinh ra làm `vocabularyAt`. Đọc `@directions`, sinh 3–4
 direction từ request, audience, feeling, token sống, màn đã duyệt, brand, vendor guidance, closed axes và
 precedent. Validate bằng `@validate-artifact` với vocabulary, không dùng `--hash`; mọi preview dùng cùng
 content và reference skeleton.
