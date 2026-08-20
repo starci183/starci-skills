@@ -3,7 +3,7 @@
 import { execFileSync, spawnSync } from "node:child_process"
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { reconcileGateOnly } from "./sonar-quality-gate.mjs"
 
@@ -51,8 +51,6 @@ const assertSafeReadmeWrites = (rows) => {
     for (const row of rows) {
         const conflicts = execFileSync("git", ["-C", row.repo, "diff", "--name-only", "--diff-filter=U"], { encoding: "utf8", windowsHide: true }).trim()
         if (conflicts) fail(`${row.project}/${row.role} repository has unresolved conflicts`)
-        const readmeStatus = execFileSync("git", ["-C", row.repo, "status", "--porcelain", "--", "README.md", "README.MD", "readme.md"], { encoding: "utf8", windowsHide: true }).trim()
-        if (readmeStatus) fail(`${row.project}/${row.role} README is already dirty; separate that work before Sonar badge reconciliation`)
     }
 }
 
@@ -136,6 +134,9 @@ const reconcileReadmeBadges = ({ repo, host, projectKey, badgeToken }) => {
     const before = readFileSync(readme, "utf8")
     const after = reconcileSonarBadgeMarkdown(before, { host, projectKey, badgeToken })
     if (after === before) return "current"
+    const readmeRelative = relative(repo, readme)
+    const status = execFileSync("git", ["-C", repo, "status", "--porcelain", "--", readmeRelative], { encoding: "utf8", windowsHide: true }).trim()
+    if (status) fail(`${projectKey} README has unrelated uncommitted content; separate it before badge reconciliation`)
     writeFileSync(readme, after, "utf8")
     return "updated"
 }
