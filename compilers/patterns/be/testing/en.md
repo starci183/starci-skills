@@ -347,13 +347,13 @@ wrong value impossible to write; `enforced` means a lint rule in `@canon-be` cat
 | `TESTING-4` | `documented` | — |
 | `TESTING-5` | `documented` | — |
 | `TESTING-6` | `enforced` | `no-call-only-spec` (export `noCallOnlySpec`) |
-| `TESTING-7` | `documented` | — |
+| `TESTING-7` | `enforced` | `unit-test-colocated` (export `unitTestColocated`) |
 | `TESTING-8` | `documented` | — |
 | `TESTING-9` | `enforced` | `no-model-call-in-e2e` (export `noModelCallInE2e`) |
 | `TESTING-10` | `enforced` | `harness-calls-provider-directly` (export `harnessCallsProviderDirectly`) |
 | `TESTING-11` | `documented` | — |
 
-**Five enforced, six documented, none unrepresentable.** The gap is the point of this table. A test
+**Six enforced, five documented, none unrepresentable.** The gap is the point of this table. A test
 lane is a property of a whole file, not of a value, so no closed union can make the wrong shape
 unwritable — a spec is legal TypeScript whether it asserts a consequence or an envelope. Every code
 in the `documented` row is an open risk, and it is recorded as one, together with what a rule would

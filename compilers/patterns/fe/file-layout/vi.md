@@ -3,7 +3,7 @@ title: File layout · Vietnamese
 description: Một shape đã duyệt thì code của nó đi đâu — file nào, tier nào, export ra gì, đặt tên là gì.
 module: file-layout
 kind: pattern
-codes: [FILE-1, FILE-2, FILE-3, FILE-4, FILE-5, FILE-6]
+codes: [FILE-1, FILE-2, FILE-3, FILE-4, FILE-5, FILE-6, FILE-7, FILE-8, FILE-9]
 ---
 
 # Bố cục file
@@ -60,7 +60,6 @@ src/
         api/graphql/                clients, queries, mutations, and their types
     i18n/                   the translation runtime
     messages/               the copy itself, per locale
-    tests/
 ```
 
 **Tầng category không phải để trang trí.** `blocks/` và `overlays/` gom theo feature vì chúng biết
@@ -119,6 +118,7 @@ tuyên bố.
 | `FILE-6` | Shape cần một URL, nên có thứ gì đó đang được viết dưới `app/` | File dưới `app/` nói page nào render ở URL nào, và là một trong các slot của chính framework. Cấm: fetch, sắp đặt hay contract key trong route file; bất kỳ file component có tên riêng nào dưới `app/` |
 | `FILE-7` | Một file tự khai nó thuộc tầng nào, trong source, ngay cạnh đường dẫn vốn đã khai điều đó | Một dấu hiệu trong source phải khớp với thư mục sở hữu nó. Cấm: một file nằm dưới tầng này lại tự khai mình là tầng khác |
 | `FILE-8` | Một component cần một cơ chế của vendor hoặc của nền tảng bọc quanh nội dung đã được kiểm | Chủ của nó là một **branch có tên**, giữ cơ chế đóng kín bên trong. Cấm: một tầng `shells/`, và mọi tầng đóng thế vai trò đó |
+| `FILE-9` | Một frontend unit test đang được đặt | Unit là twin `.spec.` nằm cạnh owner. Cấm tên `.test.` và cây frontend `src/tests`, `test/unit` hay `e2e` tách riêng |
 
 `FILE-2` VÀ `FILE-3` KHÔNG PHẢI CÙNG MỘT LỜI TỪ CHỐI. `FILE-2` đếm file trong một thư mục màn hình và
 không quan tâm chúng là gì; `FILE-3` gọi tên bốn thư mục sai ở mọi chỗ dưới `components/`, kể cả cạnh
@@ -364,6 +364,7 @@ Tier nào thật sự giữ mỗi mã, và — ở chỗ tier hứa quá tay —
 | `FILE-6` | `enforced` | `route-tree-holds-routes-only` | Việc vẽ. "Fetch và sắp đặt" không phải thuộc tính một rule đường dẫn đo được: một route mount một component và một route sắp đặt sáu thứ đều trả về JSX. Một `page.tsx` tự vẽ vẫn qua. |
 | `FILE-7` | `enforced` | `source-tier-marker-matches-folder` | Một repository không khai dấu hiệu nào. Rule đọc dấu hiệu nếu gặp; nó không bao giờ đòi phải có, nên một cây không dùng quy ước này thì im lặng chứ không đỏ — inert theo cấu tạo, giống `FILE-5` trong checkout single-app. |
 | `FILE-8` | `enforced` | `no-shell-tier` | Một branch mà mọi thứ đều là shell trừ cái thư mục của nó. Rule đọc đường dẫn, nên một cơ chế đậu trong `branches/` dưới một cái tên mơ hồ vẫn qua — đặt tên là câu hỏi của `FILE-1`. |
+| `FILE-9` | `enforced` | `unit-test-colocated` | Rule thấy suffix và bucket path bị cấm; nó không chứng minh spec thật sự exercise owner kề bên. |
 
 Cả sáu mã đều được một rule có tên giữ, nên không dòng nào ghi `documented`. Đó là tin tốt, và cũng là
 toàn bộ cái bẫy của bảng này: một mã có thể `enforced` mà vẫn gần như không được giữ, vì rule đọc ĐƯỜNG
@@ -442,7 +443,7 @@ Mỗi file mà shape sinh ra là một khối.
 file: <path being placed>
 identity: <what it is, independent of who calls it>
 tier: <contracts | leaves | composites | branches | blocks | overlays | layouts | pages | route | hooks | modules | resources>
-situation: <FILE-1 | FILE-2 | FILE-3 | FILE-4 | FILE-5 | FILE-6>
+situation: <FILE-1 | FILE-2 | FILE-3 | FILE-4 | FILE-5 | FILE-6 | FILE-7 | FILE-8 | FILE-9>
 destination: <the path it belongs at>
 reason: <the fact about the file that excludes the adjacent code>
 ```

@@ -19,11 +19,11 @@ cục, và nó phải chỉ được vào đúng đoạn đường dẫn hay đ�
 ## Luật
 
 Chỗ một file nằm là một lời khẳng định về việc file đó là cái gì. Tài liệu luật phát biểu điều này
-mang tám mã, `FILE-1` tới `FILE-8`.
+mang chín mã, `FILE-1` tới `FILE-9`.
 
-Luật phát biểu tám mã. **Cả tám đều có máy giữ.** Mỗi luật lint giữ đúng một mã, và mỗi mã được giữ
+Luật phát biểu chín mã. **Cả chín đều có máy giữ.** Mỗi luật lint giữ đúng một mã, và mỗi mã được giữ
 bởi đúng một luật lint — không mã nào thiếu máy giữ, không luật lint nào không neo vào một mã. Ánh xạ
-một-đối-một ấy là tin tốt, và cũng là toàn bộ cái bẫy: năm luật chỉ đọc **đường dẫn**, hai luật đọc
+một-đối-một ấy là tin tốt, và cũng là toàn bộ cái bẫy: sáu luật chỉ đọc **đường dẫn**, hai luật đọc
 đường dẫn rồi đọc thêm marker hoặc danh sách export, còn một luật chỉ đọc **danh sách export**. Đó là
 lý do chúng rẻ và chính xác, và cũng là cái giá phải trả. Một luật đọc đường dẫn phân biệt được thư
 mục với thư mục, chứ không phân biệt được một thành phần với một hàm tiện ích, một route đang vẽ với
@@ -47,13 +47,14 @@ nguyên độ mạnh của nó.
 | `monorepo-tier-belongs-to-its-side` | `FILE-5` | `featureInPackage` khi một tầng nghiệp vụ nằm trong gói dùng chung, `vocabularyInApp` khi một tầng hình dạng nằm bên trong một ứng dụng; mỗi bên đều gọi tên tầng và đích đến |
 | `source-tier-marker-matches-folder` | `FILE-7` | `mismatch` — gọi tên tầng và giá trị `meta.shape` đã khai báo, rồi đòi chủ sở hữu trong đường dẫn và marker nguồn phải đồng nhất |
 | `no-shell-tier` | `FILE-8` | `shell` — gọi tên đường dẫn `shells/` không có kiểu và đẩy chủ sở hữu về một branch có tên cùng nội dung contract có kiểu |
+| `unit-test-colocated` | `FILE-9` | `suffix` cho unit `.test.` và `bucket` cho cây unit/E2E frontend tách riêng; đẩy spec về cạnh owner |
 
-**Không mã nào bị bỏ lại không có luật máy.** `FILE-1` tới `FILE-8` đều có đúng một máy giữ, nên ở
+**Không mã nào bị bỏ lại không có luật máy.** `FILE-1` tới `FILE-9` đều có đúng một máy giữ, nên ở
 đây không có gì để tuyên bố là chưa được giữ. Cái phải tuyên bố là **tầm với** của những cái máy đó:
-năm cái chỉ đọc đường dẫn, hai cái đọc nguồn sau cổng đường dẫn, một cái đọc nguồn không có cổng,
+sáu cái chỉ đọc đường dẫn, hai cái đọc nguồn sau cổng đường dẫn, một cái đọc nguồn không có cổng,
 và phần Lối thoát hợp lệ bên dưới là danh sách trung thực của những gì lọt qua.
 
-Phần header trong chính mã nguồn nói là "bốn luật". Nó xuất bản tám. Header đã cũ; bảng export mới là
+Phần header trong chính mã nguồn nói là "bốn luật". Nó xuất bản chín. Header đã cũ; bảng export mới là
 sự thật.
 
 ## Đọc một diff
@@ -63,13 +64,13 @@ sự thật.
    `out of scope` là hai câu trả lời khác nhau, và ghi cái thứ hai thành cái thứ nhất chính là cách
    một luật hở dần được tin là kín.
 2. **Kiểm tra các cổng miễn trừ theo đúng thứ tự đã publish.** Với luật định tuyến: phần đường dẫn còn
-   lại bắt đầu bằng `api/` hoặc `_`, rồi basename khớp `\.test\.(tsx?|jsx?)$`, rồi basename nằm trong
+   lại bắt đầu bằng `api/` hoặc `_`, rồi basename khớp `\.spec\.(tsx?|jsx?)$`, rồi basename nằm trong
    danh sách khe của khung nền. Cái gì bị cổng trước bắt thì không bao giờ được đưa tới cổng sau.
 3. **Chỉ đọc nút AST cho ba luật đọc nguồn.** `export-matches-folder` đọc danh sách export sau cổng tên
    file; `source-tier-marker-matches-folder` đọc object `meta` được export sau cổng tầng; và
-   `no-runtime-namespace` đọc các declarator mà không có cổng đường dẫn nào. Năm luật còn lại chỉ nhận
+   `no-runtime-namespace` đọc các declarator mà không có cổng đường dẫn nào. Sáu luật còn lại chỉ nhận
    một chuỗi và không nhận gì khác.
-4. **Phát một khối cho mỗi phát hiện.** Năm luật chỉ-đọc-đường-dẫn báo một lần cho mỗi file, trên nút
+4. **Phát một khối cho mỗi phát hiện.** Sáu luật chỉ-đọc-đường-dẫn báo một lần cho mỗi file, trên nút
    `Program`; `export-matches-folder` báo ở `Program:exit`, `source-tier-marker-matches-folder` báo
    trên literal `shape` lệch, còn `no-runtime-namespace` báo trên identifier của binding.
 5. **Viết dòng `hatch` mỗi khi một cửa còn mở đủ sức dập tắt đúng lỗi đó**, gọi tên chính xác cách viết
@@ -86,7 +87,7 @@ sự thật.
 **Nó phát hiện bằng gì.** `context.filename`, đổi dấu gạch chéo ngược thành gạch chéo xuôi, so với
 `/src/components/(pages|layouts)/<Name>/<rest>` hoặc
 `/src/components/overlays/<category>/<Name>/<rest>`; rồi `<rest>` được so với
-`^(component|index)(\.test)?\.tsx?$`.
+`^(component|index)(\.spec)?\.tsx?$`.
 
 **Điểm mù.** Chuyển thành phần thứ ba vào thẳng `component.tsx` rồi export từ đó — luật đếm
 **file**, và ba thành phần trong một file vẫn là một file. Một thư mục màn hình chỉ có `index.tsx` và
@@ -109,7 +110,7 @@ khung nền, rồi đẩy một màn hình về tầng page và một câu nghi�
 trên `Program`.
 
 **Nó phát hiện bằng gì.** `context.filename` khớp `/src/app/<rest>`; ba cổng chạy theo đúng thứ tự —
-`<rest>` bắt đầu bằng `api/` hoặc `_`, rồi basename khớp `\.test\.(tsx?|jsx?)$`, rồi basename nằm
+`<rest>` bắt đầu bằng `api/` hoặc `_`, rồi basename khớp `\.spec\.(tsx?|jsx?)$`, rồi basename nằm
 trong danh sách khe của khung nền.
 
 **Điểm mù.** Cây định tuyến đặt ở gốc kho, không có `src/`: biểu thức là `/src/app/`, một
@@ -200,7 +201,7 @@ loại và số đếm tụt xuống dưới ngưỡng. Một binding viết th�
 trượt ngay cổng đầu tiên.
 
 **Ranh giới.** Luật này không có cổng đường dẫn, nên nó áp lên **mọi** file được lint trong kho, kể cả
-những file hoàn toàn không phải thành phần. Chỗ một file nằm là chuyện của năm luật đường dẫn, không
+những file hoàn toàn không phải thành phần. Chỗ một file nằm là chuyện của sáu luật đường dẫn, không
 bao giờ là chuyện của luật này.
 
 ## `monorepo-tier-belongs-to-its-side` — FILE-5
@@ -275,17 +276,17 @@ không đọc slot contract, và không thực thi luật marker riêng của `F
 | Bộ phận | Cơ chế |
 |---|---|
 | chuẩn hoá dấu phân cách | Mọi luật đường dẫn đổi gạch chéo ngược thành gạch chéo xuôi trước khi so, nên một biểu thức phục vụ cả hai nền tảng |
-| phạm vi màn hình | `/src/components/(pages\|layouts)/<Name>/<rest>` hoặc `/src/components/overlays/<category>/<Name>/<rest>`, rồi `<rest>` so với `^(component\|index)(\.test)?\.tsx?$` |
-| phạm vi định tuyến | `/src/app/<rest>`, rồi ba cổng miễn trừ theo thứ tự: `<rest>` bắt đầu bằng `api/` hoặc `_`, basename khớp `\.test\.(tsx?\|jsx?)$`, basename nằm trong danh sách khe của khung nền |
+| phạm vi màn hình | `/src/components/(pages\|layouts)/<Name>/<rest>` hoặc `/src/components/overlays/<category>/<Name>/<rest>`, rồi `<rest>` so với `^(component\|index)(\.spec)?\.tsx?$` |
+| phạm vi định tuyến | `/src/app/<rest>`, rồi ba cổng miễn trừ theo thứ tự: `<rest>` bắt đầu bằng `api/` hoặc `_`, basename khớp `\.spec\.(tsx?\|jsx?)$`, basename nằm trong danh sách khe của khung nền |
 | phạm vi thư mục tiện ích | `/src/components/.*/(constants\|utils\|types\|hooks)/` — dấu gạch chéo cuối biến nó thành phép thử thư mục, `.*/` đòi một đoạn ở giữa |
 | phạm vi workspace | `/packages/<name>/src/(blocks\|overlays\|pages\|layouts)/` và `/apps/<name>/src/(components/)?(contracts\|leaves\|composites\|branches\|shells)/`; phép thử phía gói chạy trước và thoát ngay |
 | phạm vi marker nguồn | `/(?:src/components\|packages/[^/]+/src\|apps/[^/]+/src/(?:components/)?)/(leaves\|composites\|branches\|blocks\|layouts\|overlays\|pages)/`; chỉ declarator `meta` dạng variable được export, bóc `TSAsExpression` / `TSSatisfiesExpression`, rồi đọc `shape` literal |
 | phạm vi shell | `/(?:src/components\|packages/[^/]+/src\|apps/[^/]+/src/(?:components/)?)/shells/`; file khớp báo trên `Program` mà không đọc AST |
 | bộ đọc export | Cổng tên file `/<PascalCaseFolder>/index.tsx?$`, rồi `ExportNamedDeclaration` thu `id.name` của declarator, `id.name` của hàm và `exported.name` của mọi specifier, quyết định ở `Program:exit` |
 | bộ đọc declarator | Không có cổng đường dẫn nào: `id.name` viết hoa, `init` bóc qua `TSAsExpression` và bắt buộc là `ObjectExpression`, thành viên là các khoá `Property` không tính toán dạng `Identifier` |
-| cái gì với ra ngoài file | Không gì ngoài glob của trình chạy. Năm luật không bao giờ mở file; hai luật đọc source sau cổng đường dẫn; một luật không bao giờ đọc đường dẫn; extension mà cấu hình tiêu thụ không lint thì không tới được luật nào ở đây |
+| cái gì với ra ngoài file | Không gì ngoài glob của trình chạy. Sáu luật không bao giờ mở file; hai luật đọc source sau cổng đường dẫn; một luật không bao giờ đọc đường dẫn; extension mà cấu hình tiêu thụ không lint thì không tới được luật nào ở đây |
 
-Ba điều rút ra từ bảng này, đáng nói thẳng. **Năm trên tám luật không bao giờ đọc file** — toàn bộ
+Ba điều rút ra từ bảng này, đáng nói thẳng. **Sáu trên chín luật không bao giờ đọc file** — toàn bộ
 đầu vào của chúng là một chuỗi, và đổi chuỗi đi là luật **ngừng tồn tại** cho file đó, chứ không phải
 file đó qua. **Hai luật chỉ đọc source sau cổng đường dẫn** — bộ đọc export và bộ đọc `meta.shape`.
 **Một luật không bao giờ đọc đường dẫn** — `no-runtime-namespace` áp lên mọi file được lint trong kho.
@@ -322,7 +323,7 @@ file đó qua. **Hai luật chỉ đọc source sau cổng đường dẫn** —
 | `source-tier-marker-matches-folder` | **Đường dẫn `contracts/` và `shells/`**, đường dẫn package `src/components/`, cây ở gốc, `meta` không export hoặc không phải variable, `shape` tính toán/spread/method, shape không phải literal, `meta` lồng, entry `contracts` không thể chạm tới trong map marker, và extension không được lint |
 | `no-shell-tier` | **`shells/` ngoài ba prefix hỗ trợ**, tên gần nghĩa shell nhưng khác `shells`, import có `/shells/`, `meta.shape = "shell"`, cây ở gốc và extension không được lint; luật chỉ đọc đường dẫn |
 
-Đó là bản tổng kết trung thực: cả tám mã đều có máy giữ. Năm cái quyết định chỉ từ chuỗi đường dẫn,
+Đó là bản tổng kết trung thực: cả chín mã đều có máy giữ. Sáu cái quyết định chỉ từ chuỗi đường dẫn,
 hai cái nối cổng đường dẫn với một lần đọc source hẹp, và một cái đọc source không có cổng đường dẫn.
 Vì vậy một lần đổi tên bình thường hay một đoạn thư mục thừa có thể gỡ luật đi chứ không phải làm luật
 nổ.
@@ -344,7 +345,7 @@ nổ.
    comment tắt luật gọi tên, và mà một báo cáo trích dẫn. Không có mã số thứ hai.
 2. Một luật lint giữ đúng một mã luật, và một mã luật được giữ bởi đúng một luật lint.
 3. Một luật đọc đường dẫn thì chỉ đọc đường dẫn. Không được mô tả nó như thể nó đọc nội dung file.
-4. Năm luật chỉ-đọc-đường-dẫn báo một lần cho mỗi file, trên nút `Program`. `export-matches-folder`
+4. Sáu luật chỉ-đọc-đường-dẫn báo một lần cho mỗi file, trên nút `Program`. `export-matches-folder`
    báo ở `Program:exit`, `source-tier-marker-matches-folder` báo trên literal `shape` lệch, còn
    `no-runtime-namespace` báo trên identifier của binding. Một file hoặc thuộc phạm vi hoặc không;
    không có phán quyết nửa vời.
@@ -362,7 +363,7 @@ Mỗi ngoại lệ đều đóng và gọi tên luật lint mà nó áp vào.
   trước nó, và con số đó là một cuộc di trú chứ không phải một đống lỗi. Nó không giải phóng gì về bản
   thân lỗi lệch tên — chỉ giải phóng mức nghiêm trọng.
 - **File kiểm thử nằm cạnh file route được miễn**, giải phóng `route-tree-holds-routes-only` cho mọi
-  basename khớp `\.test\.(tsx?|jsx?)$`. Một file kiểm thử không đi vào bản dựng nào và không route nào
+  basename khớp `\.spec\.(tsx?|jsx?)$`. Một file kiểm thử không đi vào bản dựng nào và không route nào
   dựng nó, nên nó không thể trở thành màn hình thứ hai mà luật này sinh ra để chặn. Tên của nó **cố ý**
   không bị bắt phải trùng với tên khe, vì kiểm thử của một route chia theo mối quan tâm.
 - **Mã máy chủ và thư mục riêng của khung nền được miễn khỏi luật định tuyến**, giải phóng mọi phần
@@ -380,7 +381,7 @@ Một khối cho mỗi phát hiện:
 
 ```text
 rule: <published rule name>
-code: <FILE-1 … FILE-8>
+code: <FILE-1 … FILE-9>
 file: <path the rule was given>
 mechanism: <path match | export list | both>
 verdict: <reported | silent | out of scope>
@@ -498,5 +499,5 @@ như chúng xuất xưởng, vì chính những chuỗi đó là thứ bản d�
 văn xuôi bình thường về những đường dẫn bình thường và những đoạn markup bình thường. Việc một file
 route có đang vẽ hay không, một leaf trong gói dùng chung có biết nghiệp vụ hay không, một thư mục tiện
 ích có thật sự chứa mã không dựng hình hay không, marker có mô tả đúng hành vi hay branch có tên đã thay
-shell hay chưa — tất cả đều thuộc về tài liệu luật phát biểu `FILE-1` tới `FILE-8`, không bao giờ thuộc
-về tám cái máy này.
+shell hay chưa — tất cả đều thuộc về tài liệu luật phát biểu `FILE-1` tới `FILE-9`, không bao giờ thuộc
+về chín cái máy này.

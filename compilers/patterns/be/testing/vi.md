@@ -338,13 +338,13 @@ sai không viết ra được; `enforced` nghĩa là một lint rule trong `@can
 | `TESTING-4` | `documented` | — |
 | `TESTING-5` | `documented` | — |
 | `TESTING-6` | `enforced` | `no-call-only-spec` (export `noCallOnlySpec`) |
-| `TESTING-7` | `documented` | — |
+| `TESTING-7` | `enforced` | `unit-test-colocated` (export `unitTestColocated`) |
 | `TESTING-8` | `documented` | — |
 | `TESTING-9` | `enforced` | `no-model-call-in-e2e` (export `noModelCallInE2e`) |
 | `TESTING-10` | `enforced` | `harness-calls-provider-directly` (export `harnessCallsProviderDirectly`) |
 | `TESTING-11` | `documented` | — |
 
-**Năm mã enforced, sáu mã documented, không mã nào unrepresentable.** Khoảng trống đó chính là điểm
+**Sáu mã enforced, năm mã documented, không mã nào unrepresentable.** Khoảng trống đó chính là điểm
 của bảng này. Lane của một test là thuộc tính của cả một file, không phải của một giá trị, nên không
 union đóng nào làm cho hình dạng sai trở nên không viết được — một spec vẫn là TypeScript hợp lệ dù nó
 assert hệ quả hay assert phong bì. Mọi mã ở hàng `documented` đều là một rủi ro còn mở, và được ghi

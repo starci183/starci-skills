@@ -51,7 +51,6 @@ src/
         api/graphql/                clients, queries, mutations, and their types
     i18n/                   the translation runtime
     messages/               the copy itself, per locale
-    tests/
 ```
 
 **The category level is not decoration.** `blocks/` and `overlays/` group by feature because they
@@ -110,6 +109,7 @@ holds less than the code claims.
 | `FILE-6` | The shape needs a URL, so something is being written under `app/` | A file under `app/` names which page renders at which URL, and is one of the framework's own slots. Forbidden: fetching, arrangement or a contract key in a route file; any named component file under `app/` |
 | `FILE-7` | A file states which tier it belongs to, in source, beside the path that already states it | A source marker agrees with the folder that owns it. Forbidden: a file under one tier declaring itself another |
 | `FILE-8` | A component needs a fixed vendor or native mechanic around checked content | The owner is a **named branch** that keeps the mechanic closed inside it. Forbidden: a `shells/` tier, and any tier standing in for one |
+| `FILE-9` | A frontend unit test is being placed | The unit is a colocated `.spec.` twin beside its owner. Forbidden: `.test.` names and separate frontend test trees |
 
 `FILE-2` AND `FILE-3` ARE NOT THE SAME REFUSAL. `FILE-2` counts files in one surface folder and
 does not care what they are; `FILE-3` names four folders that are wrong anywhere under
@@ -290,6 +290,7 @@ cannot see. The last column is the honest part of this table.
 | `FILE-6` | `enforced` | `route-tree-holds-routes-only` | Drawing. "Fetches and arranges" is not a property a path rule can measure: a route that mounts one component and a route that arranges six both return JSX. A `page.tsx` that draws still passes. |
 | `FILE-7` | `enforced` | `source-tier-marker-matches-folder` | A repository that declares no marker. The rule reads a marker it finds; it never asks for one, so a tree without the convention is silent rather than red — inert by construction, like `FILE-5` in a single-app checkout. |
 | `FILE-8` | `enforced` | `no-shell-tier` | A branch that is a shell in everything but its folder. The rule reads the path, so a mechanic parked inside `branches/` under a vague name passes — naming is `FILE-1`'s question. |
+| `FILE-9` | `enforced` | `unit-test-colocated` | It sees suffix and forbidden bucket paths; it cannot prove the spec exercises the adjacent owner. |
 
 All six codes are held by a named rule, so no row reads `documented`. That is the good news and it is
 also the whole trap of this table: a code can be `enforced` and still be mostly unheld, because the

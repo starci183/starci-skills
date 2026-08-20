@@ -28,20 +28,19 @@ recorded here rather than papered over.
 
 ## Published rules
 
-Five rules are published. Each maps to exactly one law code; none is orphaned.
+The testing rules below are published. Each maps to exactly one law code; none is orphaned.
 
 | Rule | Code | What it reports |
 |---|---|---|
 | `no-call-only-spec` | `TESTING-6` | A unit spec in which every assertion is a call matcher, so the file restates the handler's own source instead of testing it. Message names the matchers found. |
+| `unit-test-colocated` | `TESTING-7` | A unit uses `.test.ts` or sits in a separate unit bucket instead of a colocated `.spec.ts` beside its owner. |
 | `e2e-asserts-persisted-state` | `TESTING-2` | An end-to-end spec in which no state-reading name appears anywhere, so the flow can stop persisting and the file stays green. |
 | `no-model-call-in-e2e` | `TESTING-9` | An end-to-end spec importing a model provider package, or a house model helper. Message names the import source. |
 | `e2e-uses-production-transport` | `TESTING-3` | Two things: importing an application dispatcher from the framework's CQRS package, and any non-computed `.execute()` or `.process()` call. |
 | `harness-calls-provider-directly` | `TESTING-10` | Four things in a model-quality harness: no approved provider SDK import at all, a symbol or provider override that impersonates the production gateway, a house helper hiding the call, and a consumer or CLI credential string. |
 
-`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` and `TESTING-11` have **no rule at
-all**. They are unenforced, not covered, and a green run says nothing about any of them. `TESTING-7` is
-the sharpest case: lane membership by filename suffix is the law every gate on this shelf relies on to
-decide whether it runs, yet no rule ever reports on it.
+`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-8` and `TESTING-11` have documented portions no rule can
+fully certify. `TESTING-7` is now held for unit suffix and bucket placement by `unit-test-colocated`.
 
 The identity of a rule is its published name. The plugin exposes them under the `starci-be/` prefix,
 which is the string a build log prints and the string a disable comment must spell. All five ship at

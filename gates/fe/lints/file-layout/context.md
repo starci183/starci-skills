@@ -14,12 +14,12 @@ export it refuses on.
 
 ## Law
 
-Where a file sits is a claim about what it is. The law that states this carries eight codes, `FILE-1`
-through `FILE-8`.
+Where a file sits is a claim about what it is. The law that states this carries nine codes, `FILE-1`
+through `FILE-9`.
 
-The law states eight codes. **All eight have a rule.** Each rule holds exactly one code, and each code is
+The law states nine codes. **All nine have a rule.** Each rule holds exactly one code, and each code is
 held by exactly one rule — there is no code here without enforcement and no rule here without a code.
-That one-to-one map is the good news and the whole of the trap: five rules read only the PATH, two read
+That one-to-one map is the good news and the whole of the trap: six rules read only the PATH, two read
 the PATH and a source marker or export list, and one reads only the export list. That is what makes
 them cheap and exact, and is also what they cost. A path rule can tell a folder from a folder. It
 cannot tell a component from a helper, a drawing route from a mounting one, or a domain sentence from
@@ -42,14 +42,15 @@ strength.
 | `monorepo-tier-belongs-to-its-side` | `FILE-5` | `featureInPackage` when a feature tier sits in the shared package, `vocabularyInApp` when a shape tier sits inside one app; each names the tier and the destination |
 | `source-tier-marker-matches-folder` | `FILE-7` | `mismatch` — names the tier and the declared `meta.shape` value, then requires the path owner and marker to agree |
 | `no-shell-tier` | `FILE-8` | `shell` — names the untyped `shells/` path and sends the owner to a named branch with typed contract content |
+| `unit-test-colocated` | `FILE-9` | `suffix` for `.test.` units and `bucket` for a frontend unit/E2E test tree; sends the spec beside its owner |
 
-**No code is left without a rule.** `FILE-1` through `FILE-8` each
+**No code is left without a rule.** `FILE-1` through `FILE-9` each
 have exactly one machine, so there is nothing here to declare unenforced. What must be declared
-instead is the reach of those machines: five are path-only, two use a path gate before reading source,
+instead is the reach of those machines: six are path-only, two use a path gate before reading source,
 one reads source without a path gate, and the Escape hatches section below is the honest list of what
 that leaves through.
 
-The source's own file header describes "four rules". It publishes eight. The header is stale; the export
+The source's own file header describes "four rules". It publishes nine. The header is stale; the export
 table is the truth.
 
 ## Reading a diff
@@ -59,13 +60,13 @@ table is the truth.
    `out of scope` are different answers, and reporting the second as the first is how a leaky rule
    comes to be believed closed.
 2. **Check the exemptions in their published order.** For the routing rule: a remaining path starting
-   with `api/` or `_`, then a basename matching `\.test\.(tsx?|jsx?)$`, then a basename in the
+   with `api/` or `_`, then a basename matching `\.spec\.(tsx?|jsx?)$`, then a basename in the
    framework slot list. Anything caught by an earlier gate is never shown to a later one.
 3. **Read the nodes only for the three source-reading rules.** `export-matches-folder` reads the export
    list after its filename gate; `source-tier-marker-matches-folder` reads an exported `meta` object
    after its tier gate; `no-runtime-namespace` reads declarators with no path gate at all. The other
-   five rules receive a string and nothing else.
-4. **Emit one block per finding.** The five path-only rules report once per file, on `Program`;
+   six rules receive a string and nothing else.
+4. **Emit one block per finding.** The six path-only rules report once per file, on `Program`;
    `export-matches-folder` reports on `Program:exit`, `source-tier-marker-matches-folder` reports on
    the mismatched `shape` value, and `no-runtime-namespace` reports on the binding identifier.
 5. **Write the `hatch` line whenever an open hatch would have silenced the same failure**, naming the
@@ -82,7 +83,7 @@ the destination each kind of stray belongs to. Once per file, on `Program`.
 **How it detects.** `context.filename`, back-slashes normalised, matched against
 `/src/components/(pages|layouts)/<Name>/<rest>` or
 `/src/components/overlays/<category>/<Name>/<rest>`; `<rest>` is then tested against
-`^(component|index)(\.test)?\.tsx?$`.
+`^(component|index)(\.spec)?\.tsx?$`.
 
 **What it cannot see.** Moving the third component INTO `component.tsx` and exporting it from there —
 the rule counts FILES, and three components in one file is one file. A surface folder holding only
@@ -106,7 +107,7 @@ framework slot, then sends a screen to the page tier and a domain sentence to th
 file, on `Program`.
 
 **How it detects.** `context.filename` matched against `/src/app/<rest>`; three gates applied in
-order — `<rest>` starting with `api/` or `_`, then a basename matching `\.test\.(tsx?|jsx?)$`, then a
+order — `<rest>` starting with `api/` or `_`, then a basename matching `\.spec\.(tsx?|jsx?)$`, then a
 basename matching the framework slot list.
 
 **What it cannot see.** A routing tree at the repository root with no `src/`: the pattern is
@@ -271,17 +272,17 @@ branch, inspect contract slots, or enforce the separate marker law in `FILE-7`.
 | Part | Mechanism |
 |---|---|
 | separator normalisation | Every path rule normalises back-slashes to forward slashes before matching, so one pattern serves both platforms |
-| surface scope | `/src/components/(pages\|layouts)/<Name>/<rest>` or `/src/components/overlays/<category>/<Name>/<rest>`, with `<rest>` tested against `^(component\|index)(\.test)?\.tsx?$` |
-| routing scope | `/src/app/<rest>`, then three exemption gates in order: `<rest>` starting with `api/` or `_`, a basename matching `\.test\.(tsx?\|jsx?)$`, a basename in the framework slot list |
+| surface scope | `/src/components/(pages\|layouts)/<Name>/<rest>` or `/src/components/overlays/<category>/<Name>/<rest>`, with `<rest>` tested against `^(component\|index)(\.spec)?\.tsx?$` |
+| routing scope | `/src/app/<rest>`, then three exemption gates in order: `<rest>` starting with `api/` or `_`, a basename matching `\.spec\.(tsx?\|jsx?)$`, a basename in the framework slot list |
 | helper scope | `/src/components/.*/(constants\|utils\|types\|hooks)/` — the trailing slash makes it a folder test, the `.*/` demands one intermediate segment |
 | workspace scope | `/packages/<name>/src/(blocks\|overlays\|pages\|layouts)/` and `/apps/<name>/src/(components/)?(contracts\|leaves\|composites\|branches\|shells)/`; the package test runs first and returns |
 | source-marker scope | `/(?:src/components\|packages/[^/]+/src\|apps/[^/]+/src/(?:components/)?)/(leaves\|composites\|branches\|blocks\|layouts\|overlays\|pages)/`; only exported `meta` variable declarations, unwrapped through `TSAsExpression` / `TSSatisfiesExpression`, contribute a literal `shape` |
 | shell scope | `/(?:src/components\|packages/[^/]+/src\|apps/[^/]+/src/(?:components/)?)/shells/`; a matching file reports on `Program` without reading its AST |
 | export reader | Filename gate `/<PascalCaseFolder>/index.tsx?$`, then `ExportNamedDeclaration` collecting declarator `id.name`, function `id.name` and every specifier `exported.name`, decided on `Program:exit` |
 | declarator reader | No path gate at all: upper-case `id.name`, `init` unwrapped through `TSAsExpression` and required to be an `ObjectExpression`, members the non-computed `Identifier` `Property` keys |
-| what reaches outside the file | Nothing but the runner's globs. Five rules never open the file; two read source only after path gates; one never reads the path; an extension the consuming config does not lint reaches no rule here at all |
+| what reaches outside the file | Nothing but the runner's globs. Six rules never open the file; two read source only after path gates; one never reads the path; an extension the consuming config does not lint reaches no rule here at all |
 
-Three facts follow and are worth stating plainly. **Five of eight rules never read the file** — their
+Three facts follow and are worth stating plainly. **Six of nine rules never read the file** — their
 entire input is a string, and changing the string makes the rule cease to exist for that file, not
 pass it. **Two rules read source only after a path gate** — the export list and `meta.shape` reader.
 **One rule never reads the path** — `no-runtime-namespace` applies to every linted file in the
@@ -319,7 +320,7 @@ repository.
 | `source-tier-marker-matches-folder` | **`contracts/` and `shells/` paths**, package `src/components/` paths, root-level trees, non-exported or non-variable `meta`, computed/spread/method `shape`, non-literal shape values, nested `meta`, the unreachable `contracts` expected-marker entry, and an extension the runner does not lint |
 | `no-shell-tier` | **`shells/` outside the three supported prefixes**, shell-like names other than `shells`, imports containing `/shells/`, `meta.shape = "shell"`, root-level trees, and unlinted extensions; the rule is path-only |
 
-That is the honest summary: all eight codes are held. Five holders decide from a path string alone,
+That is the honest summary: all nine codes are held. Six holders decide from a path string alone,
 two join a path gate to a narrow source read, and one reads source without a path gate. An ordinary
 rename or one extra folder segment can therefore remove a rule rather than failing it.
 
@@ -329,7 +330,7 @@ rename or one extra folder segment can therefore remove a rule rather than faili
    comment names, and what a report cites. There is no second identifier.
 2. A rule holds exactly one law code, and a law code is held by exactly one rule.
 3. A path rule reads the path and nothing else. It may not be described as if it read the file.
-4. The five path-only rules report once per file, on `Program`. `export-matches-folder` reports on
+4. The six path-only rules report once per file, on `Program`. `export-matches-folder` reports on
    `Program:exit`, `source-tier-marker-matches-folder` on the mismatched `shape` value, and
    `no-runtime-namespace` on the binding identifier. A file is either in scope or it is not; there
    is no partial verdict.
@@ -347,7 +348,7 @@ Each exception is closed and names the rule it applies to.
   predates it, and that count is a migration, not a defect. It releases nothing about the mismatch
   itself — only its severity.
 - **A twin test beside a route file is exempt**, releasing `route-tree-holds-routes-only` for any
-  basename matching `\.test\.(tsx?|jsx?)$`. A test ships in no bundle and no route renders it, so it
+  basename matching `\.spec\.(tsx?|jsx?)$`. A test ships in no bundle and no route renders it, so it
   cannot become the second screen the routing rule exists to prevent. The test's name is deliberately
   not required to match its subject, because route tests split by concern.
 - **Server code and the framework's own opt-out folder are exempt from the routing rule**, releasing
@@ -365,7 +366,7 @@ One block per finding:
 
 ```text
 rule: <published rule name>
-code: <FILE-1 … FILE-8>
+code: <FILE-1 … FILE-9>
 file: <path the rule was given>
 mechanism: <path match | export list | both>
 verdict: <reported | silent | out of scope>

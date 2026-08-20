@@ -32,21 +32,19 @@ viết ra — nó không nhìn thấy cái gì. Sáu mã luật hoàn toàn khô
 
 ## Luật máy đã xuất bản
 
-Năm quy tắc được công bố. Mỗi quy tắc giữ đúng một mã luật; không quy tắc nào mồ côi.
+Các quy tắc testing dưới đây đã được công bố. Mỗi quy tắc giữ đúng một mã luật; không quy tắc nào mồ côi.
 
 | Quy tắc | Mã | Nó báo cái gì |
 |---|---|---|
 | `no-call-only-spec` | `TESTING-6` | Một unit spec mà mọi khẳng định đều là matcher về lời gọi, nên tệp chép lại mã nguồn của handler thay vì kiểm thử nó. Thông báo nêu tên các matcher đã thấy. |
+| `unit-test-colocated` | `TESTING-7` | Unit dùng `.test.ts` hoặc nằm trong bucket unit riêng thay vì `.spec.ts` nằm cạnh owner. |
 | `e2e-asserts-persisted-state` | `TESTING-2` | Một e2e mà không có tên nào của lớp đọc trạng thái xuất hiện ở bất cứ đâu, nên luồng có thể ngừng ghi dữ liệu mà tệp vẫn xanh. |
 | `no-model-call-in-e2e` | `TESTING-9` | Một e2e nhập khẩu gói SDK của nhà cung cấp mô hình, hoặc trợ giúp mô hình nội bộ. Thông báo nêu nguồn nhập khẩu. |
 | `e2e-uses-production-transport` | `TESTING-3` | Hai thứ: nhập khẩu một bộ điều phối ứng dụng từ gói CQRS của khung, và bất kỳ lời gọi `.execute()` hay `.process()` nào không tính toán. |
 | `harness-calls-provider-directly` | `TESTING-10` | Bốn thứ trong một harness chất lượng mô hình: không có dòng nhập khẩu SDK nhà cung cấp được chấp nhận nào, một ký hiệu hoặc một lần ghi đè nhà cung cấp giả trang cổng sản xuất, một trợ giúp nội bộ giấu lời gọi, và một chuỗi chứng thư người dùng cuối hoặc dòng lệnh. |
 
-`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` và `TESTING-11` **không có quy tắc
-nào**. Chúng là không được canh, chứ không phải đã được phủ, và một lần chạy xanh không nói gì về bất
-kỳ mã nào trong số đó. `TESTING-7` là trường hợp gắt nhất: làn tách bằng hậu tố tên tệp chính là điều
-luật mà mọi cổng trên kệ này dựa vào để quyết định có chạy hay không, vậy mà không quy tắc nào báo về
-nó.
+`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-8` và `TESTING-11` còn phần documented mà máy không thể
+chứng nhận trọn vẹn. `TESTING-7` nay được `unit-test-colocated` giữ suffix và bucket placement của unit.
 
 Định danh của một quy tắc là cái tên nó công bố. Plugin phơi chúng dưới tiền tố `starci-be/`, đó là
 chuỗi in ra trong log build và là chuỗi phải viết đúng trong một dòng vô hiệu hoá. Cả năm chạy ở mức
