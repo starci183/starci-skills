@@ -23,6 +23,13 @@ if (-not $Execute) {
     exit $LASTEXITCODE
 }
 
+& node @arguments --check-authority
+if ($LASTEXITCODE -eq 0) {
+    '{}' | & node @arguments --execute
+    if ($LASTEXITCODE -ne 0) { throw "Sonar credential bootstrap exited $LASTEXITCODE." }
+    exit 0
+}
+
 $login = Read-Host 'Sonar operator login'
 if ([string]::IsNullOrWhiteSpace($login)) { throw 'Sonar operator login is required.' }
 $securePassword = Read-Host 'Sonar operator password (hidden; never paste it into chat)' -AsSecureString

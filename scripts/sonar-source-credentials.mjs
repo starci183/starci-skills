@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from "node:child_process"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -13,14 +13,15 @@ const defaultSourceRoot = resolve(trustRoot, "..")
 const fail = (message) => { throw new Error(`sonar-source-credentials: ${message}`) }
 
 const parseArgs = (args) => {
-    const allowed = new Set(["--source", "--host", "--execute", "--rotate", "--plan"])
-    const values = { sourceRoot: defaultSourceRoot, host: "https://sonar.starci.org", execute: false, rotate: false }
+    const allowed = new Set(["--source", "--host", "--execute", "--rotate", "--plan", "--check-authority"])
+    const values = { sourceRoot: defaultSourceRoot, host: "https://sonar.starci.org", execute: false, rotate: false, checkAuthority: false }
     for (let index = 0; index < args.length; index += 1) {
         const item = args[index]
         if (!allowed.has(item)) fail(`unknown argument ${item}; credentials are stdin-only`)
         if (item === "--execute") values.execute = true
         else if (item === "--rotate") values.rotate = true
         else if (item === "--plan") values.execute = false
+        else if (item === "--check-authority") values.checkAuthority = true
         else {
             const value = args[index + 1]
             if (!value || value.startsWith("--")) fail(`${item} needs a value`)
@@ -44,6 +45,15 @@ const gitHubRepo = (repo) => {
     const match = origin.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/i)
     if (!match) fail(`cannot resolve GitHub repository for ${repo}`)
     return `${match[1]}/${match[2]}`
+}
+
+const assertSafeReadmeWrites = (rows) => {
+    for (const row of rows) {
+        const conflicts = execFileSync("git", ["-C", row.repo, "diff", "--name-only", "--diff-filter=U"], { encoding: "utf8", windowsHide: true }).trim()
+        if (conflicts) fail(`${row.project}/${row.role} repository has unresolved conflicts`)
+        const readmeStatus = execFileSync("git", ["-C", row.repo, "status", "--porcelain", "--", "README.md", "README.MD", "readme.md"], { encoding: "utf8", windowsHide: true }).trim()
+        if (readmeStatus) fail(`${row.project}/${row.role} README is already dirty; separate that work before Sonar badge reconciliation`)
+    }
 }
 
 export const inventorySonarRoutes = (sourceRoot) => {
@@ -86,6 +96,49 @@ const stdinJson = async () => {
 }
 
 const authHeader = (login, secret) => `Basic ${Buffer.from(`${login}:${secret}`).toString("base64")}`
+
+const sonarBadgeMetrics = [
+    ["Quality Gate", "alert_status"],
+    ["Coverage", "coverage"],
+    ["Bugs", "bugs"],
+    ["Vulnerabilities", "vulnerabilities"],
+    ["Code Smells", "code_smells"],
+    ["Maintainability", "sqale_rating"],
+    ["Reliability", "reliability_rating"],
+    ["Security", "security_rating"],
+]
+
+export const reconcileSonarBadgeMarkdown = (markdown, { host, projectKey, badgeToken }) => {
+    if (!String(badgeToken ?? "").trim()) fail("project badge token is absent")
+    const origin = new URL(host).origin
+    const newline = markdown.includes("\r\n") ? "\r\n" : "\n"
+    const dashboard = `${origin}/dashboard?id=${encodeURIComponent(projectKey)}`
+    const block = sonarBadgeMetrics.map(([label, metric]) => {
+        const image = `${origin}/api/project_badges/measure?project=${encodeURIComponent(projectKey)}&metric=${metric}&token=${encodeURIComponent(badgeToken)}`
+        return `[![SonarQube ${label}](${image})](${dashboard})`
+    }).join(newline)
+    const withoutExisting = markdown
+        .split(/\r?\n/)
+        .filter((line) => !/!\[[^\]]*\]\(https?:\/\/[^\s)]+\/api\/project_badges\/measure\?/i.test(line))
+        .join(newline)
+    const lines = withoutExisting.split(newline)
+    const codecovIndex = lines.findIndex((line) => /!\[[^\]]*codecov[^\]]*\]\(/i.test(line))
+    const headingIndex = lines.findIndex((line) => /^#\s+/.test(line))
+    const insertAfter = codecovIndex >= 0 ? codecovIndex : headingIndex
+    if (insertAfter < 0) fail("README has no heading or Codecov badge insertion point")
+    lines.splice(insertAfter + 1, 0, ...block.split(newline))
+    return lines.join(newline)
+}
+
+const reconcileReadmeBadges = ({ repo, host, projectKey, badgeToken }) => {
+    const readme = ["README.md", "README.MD", "readme.md"].map((name) => join(repo, name)).find(existsSync)
+    if (!readme) fail(`README is absent in ${repo}`)
+    const before = readFileSync(readme, "utf8")
+    const after = reconcileSonarBadgeMarkdown(before, { host, projectKey, badgeToken })
+    if (after === before) return "current"
+    writeFileSync(readme, after, "utf8")
+    return "updated"
+}
 
 const request = async ({ host, path, method = "GET", authorization, body }) => {
     const headers = { authorization }
@@ -189,16 +242,16 @@ const issueToken = async ({ host, authorization, login, name, type, projectKey, 
 }
 
 const execute = async (input, rows, args) => {
+    assertSafeReadmeWrites(rows)
     const login = String(input.login ?? "").trim()
     let password = String(input.password ?? "")
-    if (!login || !password) fail("operator login/password envelope is incomplete")
-    const operatorAuthorization = authHeader(login, password)
-    const validated = await request({ host: args.host, path: "/api/authentication/validate", authorization: operatorAuthorization })
-    if (validated.valid !== true) fail("operator credential is invalid")
-
     const adminRecord = "dev/runtime/files/sonarqube-admin-token.key"
     let adminToken = decryptRecord(args.sourceRoot, adminRecord)
     if (!(await hasAdminAuthority(args.host, adminToken))) {
+        if (!login || !password) fail("stored admin authority is unavailable; operator login/password intake is required")
+        const operatorAuthorization = authHeader(login, password)
+        const validated = await request({ host: args.host, path: "/api/authentication/validate", authorization: operatorAuthorization })
+        if (validated.valid !== true) fail("operator credential is invalid")
         if (adminToken && !args.rotate) fail("stored admin token lacks authority; rerun with -Rotate")
         adminToken = await issueToken({
             host: args.host, authorization: operatorAuthorization, login,
@@ -216,6 +269,15 @@ const execute = async (input, rows, args) => {
         }
         await reconcileGateOnly({ baseUrl: args.host, projectKey: row.key, token: adminToken })
 
+        const badge = await request({
+            host: args.host,
+            path: `/api/project_badges/token?project=${encodeURIComponent(row.key)}`,
+            authorization: adminAuthorization,
+        })
+        const badgeToken = String(badge.token ?? "").trim()
+        if (!badgeToken) fail(`Sonar did not return a badge token for ${row.key}`)
+        const readmeBadges = reconcileReadmeBadges({ repo: row.repo, host: args.host, projectKey: row.key, badgeToken })
+
         let analysisToken = decryptRecord(row.stackOwner, row.record)
         if (!(await validToken(args.host, analysisToken)) || args.rotate) {
             analysisToken = await issueToken({
@@ -227,7 +289,7 @@ const execute = async (input, rows, args) => {
         publishSecret({ sourceRoot: args.sourceRoot, name: "SONAR_TOKEN", value: analysisToken, stackOwner: row.stackOwner, record: row.record, github: row.github })
         setHostVariable(row.github, args.host)
         analysisToken = ""
-        console.log(JSON.stringify({ route: `${row.project}/${row.role}`, projectKey: row.key, identity: "project-analysis-token", gate: "starci-strict", projections: ["encrypted-stack", "github-secret", "github-variable"] }))
+        console.log(JSON.stringify({ route: `${row.project}/${row.role}`, projectKey: row.key, identity: "project-analysis-token", badge: "read-only-project-scope", readmeBadges, gate: "starci-strict", projections: ["encrypted-stack", "github-secret", "github-variable"] }))
     }
     adminToken = ""
 }
@@ -235,7 +297,15 @@ const execute = async (input, rows, args) => {
 const main = async () => {
     const args = parseArgs(process.argv.slice(2))
     const rows = inventorySonarRoutes(args.sourceRoot)
-    for (const row of rows) console.log(JSON.stringify({ mode: args.execute ? "execute" : "plan", route: `${row.project}/${row.role}`, projectKey: row.key, github: row.github, stack: `${row.stackOwner}::${row.record}`, identity: "project-analysis-token" }))
+    if (args.checkAuthority) {
+        let token = decryptRecord(args.sourceRoot, "dev/runtime/files/sonarqube-admin-token.key")
+        const available = await hasAdminAuthority(args.host, token)
+        token = ""
+        console.log(JSON.stringify({ authority: available ? "stored-admin-valid" : "operator-intake-required" }))
+        if (!available) process.exitCode = 3
+        return
+    }
+    for (const row of rows) console.log(JSON.stringify({ mode: args.execute ? "execute" : "plan", route: `${row.project}/${row.role}`, projectKey: row.key, github: row.github, stack: `${row.stackOwner}::${row.record}`, identity: "project-analysis-token", badge: "read-only-project-scope" }))
     if (!args.execute) return
     await execute(await stdinJson(), rows, args)
 }
