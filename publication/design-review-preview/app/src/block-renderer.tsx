@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@heroui/react/button"
-import type { BlockCandidate, ChildBlockReview, ReviewContent } from "./types"
+import type { BlockCandidate, RegionReview, ReviewContent } from "./types"
 
 type BlockRendererProps = {
-  readonly block: ChildBlockReview
+  readonly region: RegionReview
   readonly content: ReviewContent
   readonly back: () => void
 }
 
-export const BlockRenderer = ({block, content, back}: BlockRendererProps) => {
+type ReviewTab = "layout-brief" | "block-candidates" | "evidence"
+
+export const BlockRenderer = ({region, content, back}: BlockRendererProps) => {
+  const block = region.block
   const initialCandidate = block.candidates.find((candidate) => candidate.id === block.recommendedId) ?? block.candidates[0]
   const [candidateId, setCandidateId] = useState(initialCandidate?.id)
   const candidate = useMemo(() => block.candidates.find((item) => item.id === candidateId) ?? block.candidates[0], [block.candidates, candidateId])
   const states = useMemo(() => candidate?.states ?? [], [candidate])
   const [state, setState] = useState(states[0])
+  const [reviewTab, setReviewTab] = useState<ReviewTab>("layout-brief")
 
   useEffect(() => setState(states[0]), [candidateId, states])
+  useEffect(() => setReviewTab("layout-brief"), [block.blockId])
 
   return (
     <section className="block-detail-page">
@@ -28,7 +33,28 @@ export const BlockRenderer = ({block, content, back}: BlockRendererProps) => {
         </div>
         <span className={`child-status ${block.status}`}>{block.status}</span>
       </header>
-      {candidate ? (
+      <nav className="block-review-tabs" aria-label="Block review tabs">
+        <button className={reviewTab === "layout-brief" ? "active" : ""} type="button" onClick={() => setReviewTab("layout-brief")}>Layout brief</button>
+        <button className={reviewTab === "block-candidates" ? "active" : ""} type="button" onClick={() => setReviewTab("block-candidates")}>Block candidates <small>{block.candidates.length}</small></button>
+        <button className={reviewTab === "evidence" ? "active" : ""} type="button" onClick={() => setReviewTab("evidence")}>Evidence</button>
+      </nav>
+      {reviewTab === "layout-brief" ? (
+        <article className={`layout-brief-panel brief-${region.brief?.kind ?? "content"}`}>
+          <span className="region-label">{region.name} · {region.entry.verdict} {String(region.entry.key ?? region.entry.to ?? "new entry")} · {region.assembler} · {region.mount}</span>
+          <header><span className="eyebrow">Rough child from accepted layout intent</span><h2>{region.brief?.title ?? content.title}</h2><p>{region.brief?.summary ?? region.whyMatch}</p></header>
+          <div className="layout-brief-items">
+            {(region.brief?.items ?? content.rows.map((row) => ({role: "text" as const, label: row.title, value: row.description}))).map((item, index) => (
+              <section className={`layout-brief-item item-${item.role}`} key={`${item.role}-${item.label}-${index}`}>
+                <small>{item.role}</small><strong>{item.label}</strong>{item.value ? <span>{item.value}</span> : null}
+              </section>
+            ))}
+          </div>
+          {region.brief?.primaryAction || region.brief?.secondaryAction ? <footer className="layout-brief-actions">{region.brief.primaryAction ? <b>{region.brief.primaryAction}</b> : null}{region.brief.secondaryAction ? <span>{region.brief.secondaryAction}</span> : null}</footer> : null}
+          <p className="layout-brief-disclaimer">Đây là prototype cảm tính từ business truth của layout. Parts, repeats và states chỉ được khóa trong block design round.</p>
+        </article>
+      ) : reviewTab === "evidence" ? (
+        <article className="block-evidence-panel"><h2>Parent evidence</h2><p>{region.whyMatch}</p><pre>{JSON.stringify({layoutId: block.layoutId, layoutHash: block.layoutHash, blockId: block.blockId, entry: region.entry, geometry: region.geometry, status: block.status}, null, 2)}</pre></article>
+      ) : candidate ? (
         <>
           <nav className="block-candidate-switcher" aria-label="Block candidates">
             {block.candidates.map((item) => <button className={item.id === candidate.id ? "active" : ""} type="button" key={item.id} onClick={() => setCandidateId(item.id)}><strong>{item.id}</strong><small>{item.status}</small></button>)}
@@ -60,8 +86,8 @@ export const BlockRenderer = ({block, content, back}: BlockRendererProps) => {
         </>
       ) : (
         <div className="missing-block-detail">
-          <h2>Block design is missing</h2>
-          <p>This region still uses rough layout content. Run the block design phase under this exact parent layout hash.</p>
+          <h2>Chưa có block candidate</h2>
+          <p>Layout brief ở tab bên cạnh là prototype tạm. Chạy block design phase dưới đúng parent layout hash này để mở candidate, anatomy và state tabs chi tiết.</p>
           <pre>{JSON.stringify({layoutId: block.layoutId, layoutHash: block.layoutHash, blockId: block.blockId}, null, 2)}</pre>
         </div>
       )}

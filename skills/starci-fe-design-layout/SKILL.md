@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Design or revise the immutable candidate behind a stable layoutId, evidence-select one recommended visual direction, and present 3–4 structural layouts under one combined approval. The accepted layout head in the design registry is authoritative. Writes design records, never frontend source or block internals.
+description: Design or revise the immutable candidate behind a stable layoutId, evidence-select one recommended visual direction, and render 3–4 business-backed rough prototypes under one combined approval. The accepted layout head in the design registry is authoritative. Writes design records, never frontend source or block internals.
 ---
 
 # starci-fe-design-layout
@@ -130,6 +130,14 @@ labels and sample values explain intent, but do not claim exact parts, states, b
 It never decides a block's internal parts, states or data ownership. That separation is what lets one
 block be redesigned later without reopening the page layout.
 
+Every region brief is mandatory, non-empty and traceable to the business surface or related flow loaded in step 3.
+Use only supported identities or categories, labels, values, statuses and actions. Never invent instance names,
+counts, money, domains, dates, success states or actions to make the canvas look complete. Keep independently
+owned business surfaces as stable, independently clickable region IDs; do not collapse them into a generic
+`overview`, `content` or `summary` region merely to simplify the layout. Modes owned by one route stay modes of
+one region: render the representative/default mode plus an alternate-mode cue, not separate layouts or complete
+future block anatomy.
+
 ### 9 — Resolve every region against the contract
 
 Query by business reason, never by shape. Each region receives one verdict: `reuse <key>`,
@@ -190,6 +198,12 @@ accepted parts only when its recorded `layoutHash` equals the candidate displaye
 stay rough. Clicking a region navigates to
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`; it never opens a modal.
 
+The block-detail route always opens a tabbed review. `Layout brief` is the default and renders the exact parent
+region brief even while the child is missing or stale. `Block candidates` reports zero/missing until the parent
+layout is accepted and a block round supplies candidates. `Evidence` shows the exact parent binding, contract
+verdict and geometry. Candidate anatomy and state controls appear only when block candidates exist. The renderer
+must render every declared brief item; an arbitrary item cap is forbidden.
+
 The layout artifact still does not settle block parts, states, data ownership or final copy. A blank canvas,
 a region with no content, or a layout with no region overlay is invalid.
 
@@ -201,6 +215,11 @@ actually bound:
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
+
+Before approval, browser-QA every candidate at desktop and one narrow viewport. Prove that every region has
+recognizable business-backed content, every region link resolves to its version-bound block route, `Layout brief`
+is the default block tab, the full brief is visible, back navigation works and the console is clean. A generic
+skeleton line, placeholder-only card or region whose purpose is knowable only from its debug label fails the run.
 
 ### 13 — Queue approval and close
 

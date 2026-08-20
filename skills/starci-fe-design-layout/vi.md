@@ -112,6 +112,13 @@ lifetime và route relationship; không quyết block internals. Panel login ở
 đại diện nhận diện được; rail phải chiếm đúng rail slot với destinations đại diện. Wireframe phải rõ là rough:
 label và sample value giải thích intent nhưng không chốt exact parts, states, behavior hay final copy.
 
+Brief của mọi region là bắt buộc, không rỗng và phải truy được về business surface hoặc related flow đã load ở
+bước 3. Chỉ dùng identity/category, label, value, status và action mà business truth cho phép. Cấm tự bịa instance
+name, count, money, domain, date, success state hoặc action để lấp canvas. Business surface có ownership độc lập
+phải giữ stable region ID riêng và click độc lập; không gom chúng vào một region `overview`, `content` hoặc
+`summary` chung chỉ để layout đơn giản hơn. Các mode do cùng route sở hữu vẫn là mode của một region: layout chỉ
+render mode đại diện/mặc định cùng cue chuyển mode, không tách thành layout khác hay vẽ trước block anatomy đầy đủ.
+
 ### 9 — Resolve từng region theo contract
 
 ```bash
@@ -183,6 +190,12 @@ xuất hiện cho surfaces đã nằm rõ trong scope. Child chỉ render accept
 đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`, không mở modal.
 
+Block-detail route luôn mở review có tabs. `Layout brief` là tab mặc định và render đúng brief của parent region
+kể cả khi child missing hoặc stale. `Block candidates` báo zero/missing cho tới khi parent layout accepted và block
+round sinh candidates. `Evidence` hiện exact parent binding, contract verdict và geometry. Anatomy/state controls
+chỉ xuất hiện khi block candidates tồn tại. Renderer phải render đủ mọi brief item đã khai báo; cấm cắt theo một
+giới hạn tùy tiện.
+
 Layout artifact vẫn không chốt block parts, states, data ownership hay final copy. Canvas rỗng, region không
 có content hoặc layout không có region overlay đều invalid.
 
@@ -192,6 +205,11 @@ Vite application trung lập với project và interaction của nó không muta
 ```bash
 npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
+
+Trước approval, browser-QA mọi candidate ở desktop và một narrow viewport. Phải chứng minh mọi region có content
+business-backed nhận diện được, mọi region link resolve đúng block route bind version, `Layout brief` là tab block
+mặc định, toàn bộ brief nhìn thấy được, back navigation hoạt động và console sạch. Generic skeleton line,
+placeholder-only card hoặc region chỉ hiểu được nhờ debug label đều làm lượt chạy fail.
 
 **8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
 khi bind được, rồi **in ra URL thật sự đang phục vụ**. Một lượt chạy chết vì dev server của người khác đang

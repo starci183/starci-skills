@@ -24,9 +24,15 @@ density cùng reading order; nó không được
 ngụ ý fields, actions, states, block parts hay copy cuối. Child accepted
 có `layoutHash` đã ghi khớp parent đang hiển thị được render parts accepted chính xác hơn.
 
+Mọi brief là manifest data bám business truth và phải render đủ items đã khai báo. Application không cắt brief,
+không thay bằng generic skeleton lines và không tự bịa product values. Region chỉ hiểu được nhờ documentation
+label không phải prototype hợp lệ.
+
 Click region navigate sang block-detail route riêng, không mở modal. Block route nêu exact parent layout
-version, so anatomy candidates và giải thích mọi state đã liệt kê. Khi block accepted, registry head thay đổi;
-build lại graph sẽ thay rough content trên layout route bằng child accepted.
+version và luôn mở ba tabs: `Layout brief`, `Block candidates`, `Evidence`. `Layout brief` là tab mặc định,
+render prototype của parent region khi block missing hoặc stale. Anatomy/state controls chỉ xuất hiện sau khi
+candidates tồn tại. Khi block accepted, registry head thay đổi; build lại graph sẽ thay rough content trên layout
+route bằng child accepted.
 
 ## Input
 
@@ -85,6 +91,8 @@ Script chỉ cài Vite/HeroUI dependencies đã pin khi còn thiếu, build mộ
 8. Layout hash mới làm child bind hash cũ thành stale.
 9. HeroUI chỉ là documentation chrome, không phải product anatomy evidence.
 10. Preview navigation không mutate registry hay tính là approval.
+11. Render đủ mọi brief item đã khai báo; cấm arbitrary item cap và placeholder-only region.
+12. Block route missing/stale mặc định mở `Layout brief`; anatomy/state controls chưa được hiện trước block round.
 
 ## Đầu ra
 
@@ -103,4 +111,5 @@ canvas; mọi region đã khai báo link tới block-detail page bind đúng ver
 
 Chạy graph-adapter tests, manifest validation, Vite typecheck/build và browser QA. Browser proof phải thấy
 rough block missing/stale, accepted block chính xác, navigation layout → block detail, parent hash nhìn thấy,
-state switching và back navigation không có console error.
+tab `Layout brief` mặc định với representative content đầy đủ, candidate/state controls chỉ khi có dữ liệu,
+state switching và back navigation không có console error. Check mọi candidate ở desktop và một narrow viewport.

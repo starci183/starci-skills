@@ -135,6 +135,27 @@ button { color: inherit; font: inherit; cursor: pointer; }
 .block-detail-header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; margin-bottom: 1rem; }
 .block-detail-header h1 { margin: .5rem 0 .2rem; }
 .block-detail-header .eyebrow { display: block; margin-top: 1rem; }
+.block-review-tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 1px solid var(--review-separator); }
+.block-review-tabs button { padding: .55rem .75rem; border: 1px solid var(--review-separator); border-radius: 999px; background: var(--review-surface); color: var(--review-muted); }
+.block-review-tabs button.active { border-color: var(--review-accent); color: var(--review-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--review-accent) 18%, transparent); font-weight: 800; }
+.block-review-tabs small { margin-left: .25rem; }
+.layout-brief-panel { position: relative; display: grid; gap: 1rem; min-height: 28rem; padding: 3rem 1.25rem 1.25rem; border: 2px dashed #a86bd2; border-radius: var(--review-radius); background: var(--review-surface); }
+.layout-brief-panel header h2 { margin: .35rem 0; font-size: clamp(1.5rem, 4vw, 2.5rem); }
+.layout-brief-panel header p, .layout-brief-disclaimer { color: var(--review-muted); }
+.layout-brief-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .65rem; align-content: start; }
+.layout-brief-item { display: grid; gap: .3rem; min-height: 5.5rem; padding: .8rem; border: 1px solid var(--review-separator); border-radius: calc(var(--review-radius) * .8); background: color-mix(in srgb, var(--review-ground), transparent 22%); }
+.layout-brief-item small { color: var(--review-accent); font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.layout-brief-item span { color: var(--review-muted); }
+.layout-brief-panel.brief-form .layout-brief-items { grid-template-columns: 1fr; }
+.layout-brief-panel.brief-form .layout-brief-item { min-height: 3.4rem; }
+.layout-brief-panel.brief-form .item-divider { min-height: auto; text-align: center; border: 0; background: transparent; }
+.layout-brief-actions { display: flex; flex-wrap: wrap; gap: .55rem; align-items: center; }
+.layout-brief-actions b, .layout-brief-actions span { padding: .6rem .8rem; border-radius: 999px; }
+.layout-brief-actions b { color: white; background: var(--review-accent); }
+.layout-brief-actions span { color: var(--review-muted); border: 1px dashed var(--review-separator); }
+.layout-brief-disclaimer { margin-top: auto; padding-top: .8rem; border-top: 1px dashed var(--review-separator); font-size: .78rem; }
+.block-evidence-panel { min-height: 28rem; padding: 1.25rem; border: 1px solid var(--review-separator); border-radius: var(--review-radius); background: var(--review-surface); }
+.block-evidence-panel pre { overflow: auto; white-space: pre-wrap; font-size: .72rem; }
 .parent-reference { max-width: 60rem; overflow-wrap: anywhere; color: var(--review-muted); font: .72rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .child-status { padding: .35rem .6rem; border-radius: 999px; background: #eceef1; font-size: .72rem; font-weight: 800; }
 .child-status.accepted { color: #226b48; background: #e5f5ec; }

@@ -16,7 +16,7 @@ const selectedBlock = (recommendedId: string | undefined, candidates: ReadonlyAr
 const renderBrief = (region: RegionReview) => {
   const brief = region.brief
   if (!brief) return null
-  const visibleItems = brief.items.slice(0, 5)
+  const visibleItems = brief.items
   return (
     <span className={`region-brief brief-${brief.kind}`}>
       <span className="brief-heading"><strong>{brief.title}</strong><small>{brief.summary}</small></span>

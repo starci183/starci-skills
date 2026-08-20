@@ -22,9 +22,15 @@ The layout route renders the complete page with content in every region. A missi
 layout candidate's hashed impressionistic brief, rendered as a labeled rough wireframe sufficient to imagine purpose and judge geometry, density and reading order; it cannot imply final block fields, actions, states, parts or copy. An accepted child whose recorded `layoutHash` equals the displayed parent renders its accepted
 parts more precisely.
 
+Every brief is business-backed manifest data and renders all declared items. The application never truncates a
+brief, replaces it with generic skeleton lines or invents product values. A region whose purpose is visible only
+through documentation labels is not a valid prototype.
+
 Clicking a region navigates to a dedicated block-detail route. It never opens a modal. The block route names
-its exact parent layout version, compares anatomy candidates and explains every enumerated state. Accepting a
-block changes the registry head; rebuilding the graph then replaces rough region content on the layout route.
+its exact parent layout version and always opens three tabs: `Layout brief`, `Block candidates` and `Evidence`.
+`Layout brief` is the default and renders the parent region prototype while the block is missing or stale.
+Candidate anatomy and state controls appear only after candidates exist. Accepting a block changes the registry
+head; rebuilding the graph then replaces rough region content on the layout route.
 
 ## Inputs
 
@@ -84,6 +90,8 @@ cache and writes one `review-manifest.json`.
 8. A new layout hash makes children bound to the old hash stale.
 9. HeroUI is documentation chrome only; it is not product anatomy evidence.
 10. Preview navigation never mutates registry state or counts as approval.
+11. Every declared brief item renders; arbitrary item caps and placeholder-only regions are forbidden.
+12. A missing/stale block route defaults to `Layout brief`; candidate anatomy and state controls remain absent until supplied by a block round.
 
 ## Output
 
@@ -102,4 +110,5 @@ a layout canvas; every declared region links to a version-bound block-detail pag
 
 Run graph-adapter tests, manifest validation, Vite typecheck/build and browser QA. Browser proof must show rough
 missing/stale blocks, precise accepted blocks, navigation from layout to block detail, parent hash visibility,
-state switching and back navigation without console errors.
+the default `Layout brief` tab with full representative content, candidate/state controls only when available,
+state switching and back navigation without console errors. Check every candidate at desktop and one narrow viewport.

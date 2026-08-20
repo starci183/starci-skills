@@ -87,7 +87,7 @@ export const ReviewApp = ({manifest}: ReviewAppProps) => {
       <main className="review-stage">
         <div className={`viewport-frame ${route.blockId ? "desktop" : viewport}`}>
           {route.blockId ? (
-            region ? <BlockRenderer block={region.block} content={region.block.content ?? layout.content} back={() => navigate(layoutRoute(layout.layoutId, candidate.hash))} /> : <main className="fatal"><h1>Block not declared</h1><p>{route.blockId} is not a child of this layout version.</p></main>
+            region ? <BlockRenderer key={`${layout.layoutId}:${candidate.hash}:${region.name}`} region={region} content={region.block.content ?? layout.content} back={() => navigate(layoutRoute(layout.layoutId, candidate.hash))} /> : <main className="fatal"><h1>Block not declared</h1><p>{route.blockId} is not a child of this layout version.</p></main>
           ) : view === "directions" && layout.visualDirections ? (
             <DirectionComparison directions={layout.visualDirections} recommendedId={layout.visualDirectionRecommendation?.id} content={layout.content} />
           ) : (
