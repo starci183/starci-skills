@@ -11,6 +11,7 @@ title: starci-repair
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract chung về phase, approval và output |
 | `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy và router duy nhất cho mọi repair module |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | whole-Source proof deterministic cho ordered delivery fence |
+| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | nhận diện debt đã được owner duyệt và giữ verdict trung thực |
 
 ## NESTED SKILLS
 
@@ -31,6 +32,8 @@ Chỉ đọc module đã chạm trong repair:
 - đọc `@stale-strict-fix` khi request strict-fix hoặc first-party surface của nó hiện diện;
 - đọc `@stale-why` khi route có contract;
 - đọc `@stale-assurance` cho backend hoặc frontend rồi tuân tracked applicability declaration;
+- đọc `@stale-debts` khi có `.worktrees/<project>/debts/<role>.md`; repair chỉ report, không tạo, gia hạn hay
+  xoá — một capability trả nợ riêng sở hữu việc đó;
 - đọc `@stale-retired-structure` cho frontend component tree;
 - chỉ đọc `@stale-remnant` cho `.claude/` nested trong resolved target.
 
@@ -112,6 +115,8 @@ Dùng `node @source-quality` cho whole-Source remeasurement cuối; không thay 
 machine bằng narrative inference.
 Inspect complete baseline diff cho boundary violation và secret material. External enforcement được prove
 bằng authorized API evidence, không suy từ workflow text.
+Debt active cho verdict `debt`, không phải `pass`; repair chỉ report delivery allowed khi máy chung trả
+`deliveryAllowed`, trong khi readiness vẫn false và debt record không đổi.
 
 ### 8 — Đóng
 

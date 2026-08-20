@@ -4,9 +4,9 @@ import {mkdtempSync, mkdirSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import test from "node:test";
-import {checkRepository, sonar} from "./check-source-quality.mjs";
+import {checkRepository, listDebts, sonar} from "./check-source-quality.mjs";
 
-function fixture({lint = "node -e process.exit(0)", unit = "node -e process.exit(0)", e2e = "node -e process.exit(0)", secondE2e, coverage = true, e2eFiles = true, packageManager = "npm@11.0.0"} = {}) {
+function fixture({lint = "node -e process.exit(0)", unit = "node -e process.exit(0)", e2e = "node -e process.exit(0)", secondE2e, coverage = true, e2eFiles = true, packageManager = "npm@11.0.0", temporaryDebt} = {}) {
   const dir = mkdtempSync(join(tmpdir(), "starci-quality-"));
   mkdirSync(join(dir, "e2e"));
   if (e2eFiles) writeFileSync(join(dir, "e2e", "smoke.e2e-spec.js"), "test('smoke', async () => {});\n");
@@ -17,7 +17,9 @@ function fixture({lint = "node -e process.exit(0)", unit = "node -e process.exit
     mkdirSync(join(dir, "coverage"), {recursive: true});
     writeFileSync(join(dir, "coverage", "patch-summary.json"), JSON.stringify(evidence));
   }
-  return {project: "fixture", role: "fe", route: join(dir, "route.json"), diskPath: dir, valid: true};
+  const debtPath = join(dir, "debt.md");
+  if (temporaryDebt) writeFileSync(debtPath, `---\nversion: 1\nproject: fixture\nrole: fe\napprovedBy: ${temporaryDebt.approvedBy}\napprovedOn: ${temporaryDebt.approvedOn}\nexpiresOn: ${temporaryDebt.expiresOn}\nreason: ${temporaryDebt.reason}\nscopes: ${temporaryDebt.scopes.join(", ")}\n---\n\n# Temporary quality debt\n\n## Baseline\n\nMeasured baseline exists.\n\n## Exit criteria\n\n- Clear every named scope.\n`);
+  return {project: "fixture", role: "fe", route: join(dir, "route.json"), debtPath, diskPath: dir, valid: true};
 }
 
 test("passes only when declared lint, unit, full E2E and concrete coverage evidence pass", async () => {
@@ -106,6 +108,74 @@ test("failing Sonar remains independent when E2E passes", async () => {
   const result = await checkRepository(fixture(), {execute: true, sonarEvidence: {status: "fail"}});
   assert.match(result.findings.join("; "), /Sonar/);
   assert.doesNotMatch(result.findings.join("; "), /E2E/);
+});
+
+test("records owner-approved project coverage and Sonar as debt without calling them pass", async () => {
+  const temporaryDebt = {
+    approvedBy: "owner",
+    approvedOn: "2099-01-01",
+    expiresOn: "2099-03-31",
+    reason: "Temporary measured maturity debt.",
+    scopes: ["source:project-coverage", "assurance:sonar"],
+    baseline: {projectCoverage: {statements: 40}, sonar: "external-unmeasured"},
+  };
+  const result = await checkRepository(fixture({coverage: false, temporaryDebt}), {execute: true, sonarEvidence: {status: "fail"}});
+  assert.equal(result.verdict, "fail");
+  assert.match(result.findings.join("; "), /change\/patch/);
+
+  const row = fixture({temporaryDebt});
+  writeFileSync(join(row.diskPath, "coverage-summary.json"), JSON.stringify({total: {statements: {pct: 40}, lines: {pct: 40}, functions: {pct: 30}, branches: {pct: 35}}}));
+  const accepted = await checkRepository(row, {execute: true, sonarEvidence: {status: "fail"}});
+  assert.equal(accepted.verdict, "debt");
+  assert.equal(accepted.deliveryAllowed, true);
+  assert.equal(accepted.findings.length, 0);
+  assert.match(accepted.debtFindings.join("; "), /project coverage/);
+  assert.match(accepted.debtFindings.join("; "), /Sonar/);
+});
+
+test("expired or overlong debt fails closed", async () => {
+  const result = await checkRepository(fixture({temporaryDebt: {
+    approvedBy: "owner",
+    approvedOn: "2020-01-01",
+    expiresOn: "2099-12-31",
+    reason: "Not temporary.",
+    scopes: ["assurance:sonar"],
+    baseline: {sonar: "unmeasured"},
+  }}), {execute: true, sonarEvidence: {status: "fail"}});
+  assert.equal(result.verdict, "fail");
+  assert.match(result.findings.join("; "), /90 days/);
+});
+
+test("temporary debt never forgives lint, unit, patch or E2E failures", async () => {
+  const temporaryDebt = {
+    approvedBy: "owner",
+    approvedOn: "2099-01-01",
+    expiresOn: "2099-03-31",
+    reason: "Scoped debt only.",
+    scopes: ["source:project-coverage", "assurance:sonar"],
+    baseline: {projectCoverage: {statements: 40}, sonar: "failed"},
+  };
+  const row = fixture({lint: "node -e process.exit(1)", e2e: "node -e process.exit(1)", temporaryDebt});
+  writeFileSync(join(row.diskPath, "coverage", "patch-summary.json"), JSON.stringify({total: {statements: {pct: 89}, lines: {pct: 95}, functions: {pct: 95}, branches: {pct: 95}}}));
+  const result = await checkRepository(row, {execute: true, sonarEvidence: {status: "fail"}});
+  assert.equal(result.verdict, "fail");
+  assert.match(result.findings.join("; "), /lint/);
+  assert.match(result.findings.join("; "), /E2E/);
+  assert.match(result.findings.join("; "), /change\/patch/);
+});
+
+test("lists Markdown debts by project and role without treating them as pass", () => {
+  const root = mkdtempSync(join(tmpdir(), "starci-debt-list-"));
+  const roleRoot = join(root, ".workspace", "fixture", "be");
+  const debtRoot = join(root, ".worktrees", "fixture", "debts");
+  mkdirSync(roleRoot, {recursive: true});
+  mkdirSync(debtRoot, {recursive: true});
+  writeFileSync(join(roleRoot, "config.json"), JSON.stringify({repository: {diskPath: root}}));
+  writeFileSync(join(debtRoot, "be.md"), `---\nversion: 1\nproject: fixture\nrole: be\napprovedBy: owner\napprovedOn: 2099-01-01\nexpiresOn: 2099-03-31\nreason: Complex debt can be explained below.\nscopes: structure:legacy-tier\n---\n\n# Debt\n\n## Baseline\n\nA complex measured baseline.\n\n## Exit criteria\n\n- Remove the legacy tier.\n`);
+  const report = listDebts({root, project: "fixture", role: "be", now: new Date("2099-02-01T00:00:00Z")});
+  assert.equal(report.valid, true);
+  assert.equal(report.records[0].verdict, "debt");
+  assert.equal(report.records[0].debt.scopes[0], "structure:legacy-tier");
 });
 
 test("empty E2E surface fails even with unit and coverage evidence", async () => {

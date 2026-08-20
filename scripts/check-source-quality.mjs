@@ -30,7 +30,7 @@ const routeRows = (root = source) => {
       if (!existsSync(route)) continue;
       const config = readJson(route);
       const diskPath = config?.repository?.diskPath;
-      rows.push({project, role, route, diskPath: diskPath ? resolve(diskPath) : null, valid: Boolean(diskPath && existsSync(diskPath))});
+      rows.push({project, role, route, debtPath: join(root, ".worktrees", project, "debts", `${role}.md`), diskPath: diskPath ? resolve(diskPath) : null, valid: Boolean(diskPath && existsSync(diskPath))});
     }
   }
   return rows;
@@ -44,6 +44,62 @@ const packageManager = (dir) => {
   return locks.length === 1 ? locks[0] : null;
 };
 const scriptsFor = (dir) => readJson(join(dir, "package.json"))?.scripts ?? {};
+const DEBT_SCOPE = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
+function readDebtMarkdown(file) {
+  if (!file || !existsSync(file)) return null;
+  const text = readFileSync(file, "utf8");
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!match) return {parseError: "temporary debt needs YAML front matter", body: text};
+  const attributes = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const separator = line.indexOf(":");
+    if (separator < 1) return {parseError: `invalid temporary debt front matter line: ${line}`, body: match[2]};
+    const key = line.slice(0, separator).trim();
+    const raw = line.slice(separator + 1).trim();
+    attributes[key] = raw.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, "$1$2");
+  }
+  return {...attributes, body: match[2]};
+}
+function temporaryDebt(row, now = new Date()) {
+  const debt = readDebtMarkdown(row.debtPath);
+  if (debt === null) return {active: false, scopes: [], errors: []};
+  const errors = [];
+  if (debt.parseError) errors.push(debt.parseError);
+  const text = (key) => typeof debt?.[key] === "string" ? debt[key].trim() : "";
+  const approvedBy = text("approvedBy");
+  const reason = text("reason");
+  const approvedOn = text("approvedOn");
+  const expiresOn = text("expiresOn");
+  if (text("version") !== "1") errors.push("temporary debt version must be 1");
+  if (text("project") !== row.project) errors.push("temporary debt project does not match its route");
+  if (text("role") !== row.role) errors.push("temporary debt role does not match its route");
+  if (!approvedBy) errors.push("temporary debt needs approvedBy");
+  if (!reason) errors.push("temporary debt needs reason");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(approvedOn)) errors.push("temporary debt approvedOn must be YYYY-MM-DD");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresOn)) errors.push("temporary debt expiresOn must be YYYY-MM-DD");
+  const scopes = [...new Set(text("scopes").split(",").map((scope) => scope.trim()).filter(Boolean))];
+  if (scopes.length === 0 || scopes.some((scope) => !DEBT_SCOPE.test(scope))) errors.push("temporary debt scopes must be namespaced as category:finding");
+  const section = (name) => (debt.body ?? "")
+    .split(/^## /m)
+    .find((part) => part.startsWith(`${name}\n`) || part.startsWith(`${name}\r\n`))
+    ?.replace(/^.*?\r?\n/, "")
+    .trim() ?? "";
+  const baseline = section("Baseline");
+  const exitCriteria = section("Exit criteria");
+  if (!baseline) errors.push("temporary debt needs a measured Baseline section");
+  if (!exitCriteria) errors.push("temporary debt needs an Exit criteria section");
+  const approvedAt = Date.parse(`${approvedOn}T00:00:00Z`);
+  const expiresAt = Date.parse(`${expiresOn}T23:59:59Z`);
+  if (Number.isFinite(approvedAt) && Number.isFinite(expiresAt)) {
+    const days = (expiresAt - approvedAt) / 86_400_000;
+    if (expiresAt < approvedAt) errors.push("temporary debt expires before approval");
+    if (days > 91) errors.push("temporary debt may not exceed 90 days");
+  }
+  const expired = Number.isFinite(expiresAt) && now.getTime() > expiresAt;
+  if (expired) errors.push("temporary debt has expired");
+  return {active: errors.length === 0, approvedBy, reason, approvedOn, expiresOn, scopes, baseline, exitCriteria, file: row.debtPath, errors};
+}
 const firstScript = (scripts, names) => names.find((name) => typeof scripts[name] === "string" && scripts[name].trim());
 function runScript(dir, name) {
   const manager = packageManager(dir);
@@ -179,26 +235,65 @@ export async function checkRepository(row, {execute = true, sonarEvidence = null
   const cov = coverage(row.diskPath);
   const e2eRuns = execute ? e2e.scripts.map((name) => runScript(row.diskPath, name)) : [];
   const sonarResult = sonarEvidence ?? (existsSync(join(row.diskPath, "sonar-project.properties")) ? await sonar(row.diskPath) : {status: "external-unmeasured", reason: "no sonar-project.properties"});
+  const debt = temporaryDebt(row);
   const findings = [];
+  const debtFindings = [];
+  if (debt.errors.length) findings.push(...debt.errors);
   if (!lintName || !lint.passed || /\b\d+\s+warning[s]?\b/i.test(lint.output ?? "") || /\b\d+\s+error[s]?\b/i.test(lint.output ?? "")) findings.push("lint is missing or not 0 errors/0 warnings");
   if (!unitName || !unit.passed) findings.push("unit test command is missing or failed");
-  if (!cov.pass) findings.push("coverage is missing or below project statements/lines/functions 80% and branches 75%, or change/patch four-metric evidence 90%");
+  if (!cov.project.pass) {
+    const message = "project coverage is missing or below statements/lines/functions 80% and branches 75%";
+    if (debt.active && debt.scopes.includes("source:project-coverage")) debtFindings.push(message); else findings.push(message);
+  }
+  if (!cov.change.pass) {
+    const message = "change/patch four-metric coverage evidence is below 90% or missing";
+    if (debt.active && debt.scopes.includes("source:patch-coverage")) debtFindings.push(message); else findings.push(message);
+  }
   const e2eFailed = e2eRuns.length !== e2e.scripts.length || e2eRuns.some((run) => !run.passed || /0\s+(?:tests?|specs?)\b|no tests? found/i.test(run.output ?? ""));
   if (e2e.scripts.length === 0 || !e2e.exists || e2e.blocked || e2eFailed) findings.push("full E2E commands/spec surface is missing, empty, skipped, todo, passWithNoTests or failed");
-  if (sonarResult.status !== "pass") findings.push("Sonar quality gate, exact SHA or strict metrics are missing/unmeasured/failed");
+  if (sonarResult.status !== "pass") {
+    const message = "Sonar quality gate, exact SHA or strict metrics are missing/unmeasured/failed";
+    if (debt.active && debt.scopes.includes("assurance:sonar")) debtFindings.push(message); else findings.push(message);
+  }
   const publicCommand = (command) => command && {name: command.name, command: command.command, status: command.status, passed: command.passed, ...(command.unmeasured ? {unmeasured: true} : {})};
-  return {...row, verdict: findings.length ? "fail" : "pass", commands: {lint: publicCommand(lint), unit: publicCommand(unit), e2e: e2eRuns.map(publicCommand)}, coverage: cov, e2e, sonar: sonarResult, findings: findings.map(redact)};
+  const verdict = findings.length ? "fail" : debtFindings.length ? "debt" : "pass";
+  return {...row, verdict, deliveryAllowed: verdict !== "fail", commands: {lint: publicCommand(lint), unit: publicCommand(unit), e2e: e2eRuns.map(publicCommand)}, coverage: cov, e2e, sonar: sonarResult, debt, debtFindings: debtFindings.map(redact), findings: findings.map(redact)};
 }
 
 export async function runQuality({root = source, execute = true} = {}) {
   const rows = routeRows(root);
   const results = [];
   for (const row of rows) results.push(await checkRepository(row, {execute}));
-  return {source: root, results, pass: results.length > 0 && results.every((r) => r.verdict === "pass")};
+  return {
+    source: root,
+    results,
+    pass: results.length > 0 && results.every((r) => r.verdict === "pass"),
+    deliveryAllowed: results.length > 0 && results.every((r) => r.deliveryAllowed === true),
+  };
+}
+
+export function listDebts({root = source, project = null, role = null, now = new Date()} = {}) {
+  const records = routeRows(root)
+    .filter((row) => (!project || row.project === project) && (!role || row.role === role))
+    .filter((row) => row.debtPath && existsSync(row.debtPath))
+    .map((row) => {
+      const debt = temporaryDebt(row, now);
+      return {
+        project: row.project,
+        role: row.role,
+        file: row.debtPath,
+        verdict: debt.active ? "debt" : "invalid",
+        debt,
+      };
+    });
+  return {source: root, records, valid: records.every((record) => record.verdict === "debt")};
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const report = await runQuality({execute: !args.includes("--scan-only")});
+  const valueAfter = (flag) => args.includes(flag) ? args[args.indexOf(flag) + 1] : null;
+  const report = args.includes("--debts")
+    ? listDebts({project: valueAfter("--project"), role: valueAfter("--role")})
+    : await runQuality({execute: !args.includes("--scan-only")});
   console.log(JSON.stringify(report, null, 2));
-  process.exitCode = report.pass ? 0 : 1;
+  process.exitCode = args.includes("--debts") ? report.valid ? 0 : 1 : report.deliveryAllowed ? 0 : 1;
 }

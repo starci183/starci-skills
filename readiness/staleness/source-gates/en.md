@@ -6,7 +6,9 @@ title: Source gates
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@stale-debts` | `readiness/staleness/debts/en.md` | en | scoped, measured, expiring owner debt |
 
 ## Stale signature
 
@@ -27,6 +29,10 @@ Only backend E2E may occupy a separate test tree; a frontend `src/tests`/`e2e` b
 Patch/new-code is explicitly `not applicable` only when a base-SHA diff proves there is no changed
 authored production code; an empty working-tree diff, missing base SHA or missing coverage entry is not N/A.
 
+An active `@stale-debts` record may classify only project coverage, patch coverage or Sonar as `debt`.
+The measured gate remains red/unmeasured and never supports `ready`; delivery alone may continue. Lint,
+typecheck, build, unit execution and E2E remain blocking and cannot be debt.
+
 ## Lane separation
 
 Unit coverage and E2E are independent gates. The unit lane is the only coverage producer: it emits the
@@ -42,6 +48,7 @@ mandatory order above; do not skip E2E or Sonar because they are expensive. Gene
 output are allowed; tracked source mutation is not. Record command, exit code, lint errors/warnings,
 coverage metrics, E2E entrypoint/test/pass counts and Sonar verdict. A missing prerequisite, entrypoint,
 real test, coverage report or external Sonar evidence is `unmeasured`/`absent` and cannot support `ready`.
+Read `.worktrees/<project>/debts/<role>.md` after the route verifies and report accepted findings separately.
 
 ## Repair inventory
 
@@ -70,3 +77,4 @@ Run the exact original gates again, in the same order, and report before/after c
 valid only with the same commands, checkout revision and machine, without suppression. A ready verdict
 requires format pass; lint 0 errors/0 warnings; typecheck/build pass; unit S/L/F ≥80%, branches ≥75% and
 patch/new metrics ≥90%; declared real E2E entrypoint with all tests passing; and final Sonar pass.
+Verdict `debt` may allow delivery under `@stale-debts`; it is not a ready verdict or a gate pass.

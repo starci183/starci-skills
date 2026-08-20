@@ -65,9 +65,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The fifteen capabilities
+## The sixteen capabilities
 
-Thirteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Fourteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -81,6 +81,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-stale-list` | every workspace staleness category, including executed local gates and frontend or backend assurance wiring, and who clears each |
 | `starci-diagnose` | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
+| `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
 | `starci-fe-design-layout` | evidence-select one direction recommendation, then present 3–4 direction-backed layouts under one hash approval |
 | `starci-fe-design-block` | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
 | `starci-fe-design-execute` | frontend source, only after every reachable hash is accepted |

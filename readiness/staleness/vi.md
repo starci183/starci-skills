@@ -14,13 +14,14 @@ title: Stale registry
 | `@stale-strict-fix` | `readiness/staleness/strict-fix/vi.md` | vi | first-party Prettier integration |
 | `@stale-why` | `readiness/staleness/why/vi.md` | vi | contract index findability |
 | `@stale-assurance` | `readiness/staleness/assurance/vi.md` | vi | applicability và delivery fence của frontend lẫn backend |
+| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | nợ chất lượng có owner duyệt, baseline và hạn |
 | `@stale-retired-structure` | `readiness/staleness/retired-structure/vi.md` | vi | component tier đã bỏ, kể cả path rỗng |
 | `@stale-remnant` | `readiness/staleness/remnant/vi.md` | vi | legacy `.claude/` tree nested |
 
 ## Mục đích
 
 Registry route qua `@stale-source-gates`, `@stale-port-offset`, `@stale-lint-machine`, `@stale-strict-fix`, `@stale-why`,
-`@stale-assurance`, `@stale-retired-structure` và `@stale-remnant`.
+`@stale-assurance`, `@stale-debts`, `@stale-retired-structure` và `@stale-remnant`.
 
 Cho `starci-repair` và `starci-stale-list` dùng một vocabulary. Stale list đo các category này; repair áp
 owner được nêu ở đây. Category bị copy vào một trong hai skill là second home và phải bỏ.
@@ -40,6 +41,7 @@ Route staleness không có repair module ở đây vì owner của nó là `star
 | `machine` | thiếu published lint canon hoặc config import vendored rule copy | `starci-repair`, lint-machine pass |
 | `formatter` | strict-fix scope còn first-party Prettier integration | `starci-repair`, strict-fix pass |
 | `assurance` | assurance bắt buộc và delivery-fence fact đã chạm bị thiếu hoặc không blocking | `starci-repair`, assurance pass |
+| `debt` | `.worktrees/<project>/debts/<role>.md` hợp lệ ghi mọi finding chưa giải quyết theo scope namespace; máy sở hữu quyết định tác động delivery, debt sai/hết hạn fail closed | owner của finding, rồi xoá khi exit criteria pass |
 | `structure` | tier đã retire vẫn tồn tại, kể cả directory rỗng | `starci-repair`, retired-structure pass |
 | `remnant` | routed checkout chứa `.claude/` nested từ tree cũ | `starci-repair`, remnant pass hoặc owner decision |
 
@@ -52,7 +54,9 @@ Route staleness không có repair module ở đây vì owner của nó là `star
   `skip`, `todo`, `passWithNoTests`, zero-test và check substitute bị reject. Gate chỉ discover mà chưa chạy là
   `unmeasured` và không bao giờ đủ cho ready.
 - Mỗi finding mang category, evidence, applicability và owner.
-- `absent`, `invalid`, `stale`, `not required`, `unmeasured external` và `clean` là các verdict khác nhau.
+- Debt không đổi số đo thành xanh. `pass` vẫn false khi còn debt; delivery chỉ đi tiếp nếu mọi finding còn
+  lại được debt còn hạn phủ và mọi gate không thuộc debt đã xanh.
+- `absent`, `invalid`, `stale`, `debt`, `not required`, `unmeasured external` và `clean` là các verdict khác nhau.
 - Route finding kết thúc repair trước khi đọc target source. Repair source qua stale route là nhắm vào
   checkout chưa verify.
 - Decision được trả về; không giả làm defect để run tiếp tục.

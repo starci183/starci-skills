@@ -2,7 +2,9 @@
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@stale-debts` | `readiness/staleness/debts/context.md` | context | scoped, measured, expiring owner debt |
 
 ## Stale signature
 
@@ -18,6 +20,9 @@ Frontend and backend unit files are colocated beside their production owner and 
 E2E may occupy a separate test tree; frontend test buckets and unit `.test.` files are stale.
 Patch/new is N/A only when an explicit base-SHA diff proves no authored production change; empty
 working-tree evidence or a missing coverage entry is not N/A.
+An active debt record may classify only project coverage, patch coverage or Sonar as `debt`. The gate
+stays red/unmeasured and cannot support ready; delivery alone may continue. Lint, typecheck, build, unit
+execution and E2E remain non-waivable.
 
 ## List evidence
 
@@ -25,6 +30,7 @@ Read the manifest and every routed role's primary entrypoints. Run format, lint,
 coverage, E2E and Sonar in that order. Record commands, exit codes, lint counts, coverage metrics, E2E
 entrypoint/test/pass counts and Sonar verdict. Ignored output is allowed, tracked mutation is not. Missing
 prerequisite, entrypoint, real tests, coverage or Sonar evidence is unmeasured/absent and cannot support ready.
+Read the exact `.worktrees/<project>/debts/<role>.md` after route verification and report debt separately.
 
 ## Repair inventory
 
@@ -49,3 +55,4 @@ remove a rule, skip a test or add `any` merely to buy green.
 
 Run the exact original gates again in the same order. Ready requires lint 0/0, unit thresholds, real passing
 E2E and final Sonar pass, with no suppression.
+Verdict `debt` may allow delivery under `@stale-debts`; it is never ready or pass.

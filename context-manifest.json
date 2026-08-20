@@ -786,13 +786,19 @@
     "readiness/staleness/assurance/context.md": {
       "kind": "module",
       "source": "readiness/staleness/assurance/en.md",
-      "sourceHash": "35e7884e205a8a13ca720768a3e1e2ba8e293e76af6b1ab3fcd17212711a152c",
+      "sourceHash": "699489c1b6666966ad42989e283323ce57618c362e6d1c2ef43362a5d686778a",
       "contextVersion": 1
     },
     "readiness/staleness/context.md": {
       "kind": "module",
       "source": "readiness/staleness/en.md",
-      "sourceHash": "dc9dd441472b84963d58ee380ac59788fffaa16e7e9c0310092ec9960abed7cf",
+      "sourceHash": "55beb447eb51c74d47010e57b57abc50ec841eed51ca84904155684b7045ab81",
+      "contextVersion": 1
+    },
+    "readiness/staleness/debts/context.md": {
+      "kind": "module",
+      "source": "readiness/staleness/debts/en.md",
+      "sourceHash": "b7d47c7c9b5723ec9db6c929ef8c8e634ee4413356594d28ce3c5c840be5ca7a",
       "contextVersion": 1
     },
     "readiness/staleness/lint-machine/context.md": {
@@ -822,7 +828,7 @@
     "readiness/staleness/source-gates/context.md": {
       "kind": "module",
       "source": "readiness/staleness/source-gates/en.md",
-      "sourceHash": "434db5e0185ccdfe3a8407bbccd4768c9aa8abdbfdf97cc88aab3a9d40ce2d8e",
+      "sourceHash": "b07cf71a3c95a4f384b42c5847fd7a248b65e0d52aae92547f38d96e0354c618",
       "contextVersion": 1
     },
     "readiness/staleness/strict-fix/context.md": {
@@ -886,7 +892,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "994772ea08c2b0aa99762220c1f52eeb0b5b593470ee8b893ba6f3f36ee9db3f",
+      "sourceHash": "88e134743b274fbfa9828bd4400759872bea80176a0fbd01008dfe9ab3ab1578",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

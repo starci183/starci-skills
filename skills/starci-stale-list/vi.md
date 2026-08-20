@@ -13,6 +13,7 @@ title: starci-stale-list
 | `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | Source allocation và collision measurement deterministic |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | phép đo deterministic cho routed lint, coverage, E2E và strict Sonar |
+| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | validate và report debt project/role hiện tại mà không repair |
 
 ## NESTED SKILLS
 
@@ -46,6 +47,8 @@ reimplement scan trong conversation.
 Sau đó chạy `node @port-offset-check`. Exit non-zero của nó là verdict `port-offset`. Gọi tên rõ mọi project
 được exclude có chủ ý; không làm family bị exclude biến mất khỏi report.
 
+Chạy `node @source-quality --debts` và report riêng mọi Markdown debt active, invalid hoặc expired.
+
 ### 3 — Report verdict từ registry
 
 Group theo project, role nằm dưới. Dùng category/verdict name từ `@staleness`. Với mỗi module, emit
@@ -61,6 +64,7 @@ và mọi test pass. State ignored được phép sinh; tracked source đổi th
 unmeasured/fail khiến project không được gọi ready.
 Dùng `node @source-quality`; exit non-zero của nó là verdict source fence có thứ tự, không phải quyền
 reimplement, skip hoặc hạ failed fact.
+Report đúng verdict `debt` và `deliveryAllowed`; không đổi tên thành `pass` hay `ready`.
 
 ### 5 — Giữ external assurance trung thực
 

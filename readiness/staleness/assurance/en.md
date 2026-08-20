@@ -10,6 +10,7 @@ title: Delivery assurance
 |---|---|---|---|
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/en.md` | en | authoritative seven-part backend fence |
 | `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/en.md` | en | authoritative seven-part frontend fence |
+| `@stale-debts` | `readiness/staleness/debts/en.md` | en | owner-approved temporary coverage/Sonar debt |
 
 ## Stale signature
 
@@ -17,6 +18,8 @@ Backend and frontend assurance are required by default. Only tracked
 `starci.deliveryAssurance.required: false` with a non-empty `reason` yields `not required`. Missing policy,
 `required: true`, or false without a reason keeps assurance required. For any required routed role, any missing
 or non-blocking reached `ASSURANCE-*` fact is stale; partial adoption is not a smaller profile.
+A valid debt record does not make assurance optional: covered ASSURANCE-3/4 facts become `debt`, strict
+thresholds/checks stay installed, and delivery is allowed only until expiry.
 
 ## Required README badges
 
@@ -49,6 +52,7 @@ secret references, token-free README badges for Codecov plus SonarQube quality g
 vulnerabilities, code smells, maintainability, reliability and security, required checks and deploy
 dependency. Never decrypt credentials. Provider values and required-check app binding
 stay `unmeasured external` without authorized API evidence.
+Read the role debt record and display its baseline and expiry beside covered coverage or Sonar facts.
 
 ## Repair inventory
 
@@ -102,6 +106,10 @@ quality gate. Three facts decide whether that happened:
   density ≤3% overall/new, native coverage >=80% overall and >=90% new. Missing API authority leaves
   these values `unmeasured external`; it never turns them clean.
 
+`@stale-debts` may temporarily accept project/patch coverage or Sonar without changing this blocking
+profile, provider checks or badges. The verdict is `debt`, never green; every non-debt fact remains blocking,
+and malformed or expired debt fails closed.
+
 **A framework's required emit may carry its own branch threshold.** Where a dependency-injection
 framework compels metadata the runtime needs, the compiler emits guards no test can reach — under
 `emitDecoratorMetadata`, every constructor parameter typed by a value import emits a
@@ -137,3 +145,4 @@ API evidence for every condition in the blocking quality profile, encrypted file
 without plaintext twins, every required badge image endpoint returns an image without a credential in the URL,
 external secret names and required checks through APIs, and deploy dependency. Unmeasured external
 enforcement or an unmeasured badge endpoint leaves the module incomplete.
+Active debt may allow delivery while this module remains incomplete and non-ready.

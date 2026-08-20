@@ -14,13 +14,14 @@ title: Stale registry
 | `@stale-strict-fix` | `readiness/staleness/strict-fix/en.md` | en | first-party Prettier integration |
 | `@stale-why` | `readiness/staleness/why/en.md` | en | contract index findability |
 | `@stale-assurance` | `readiness/staleness/assurance/en.md` | en | frontend and backend delivery assurance applicability and fence |
+| `@stale-debts` | `readiness/staleness/debts/en.md` | en | owner-approved, measured, expiring quality debt |
 | `@stale-retired-structure` | `readiness/staleness/retired-structure/en.md` | en | removed component tiers including empty paths |
 | `@stale-remnant` | `readiness/staleness/remnant/en.md` | en | nested legacy `.claude/` trees |
 
 ## Purpose
 
 The registry routes through `@stale-source-gates`, `@stale-port-offset`, `@stale-lint-machine`, `@stale-strict-fix`,
-`@stale-why`, `@stale-assurance`, `@stale-retired-structure` and `@stale-remnant`.
+`@stale-why`, `@stale-assurance`, `@stale-debts`, `@stale-retired-structure` and `@stale-remnant`.
 
 Give `starci-repair` and `starci-stale-list` one vocabulary. The list measures these categories; repair
 applies the owner named here. A category copied into either skill becomes a second home and must be removed.
@@ -40,6 +41,7 @@ and proof. Route staleness has no repair module here because its owner is `starc
 | `machine` | published lint canon is absent or a vendored rule copy is imported | `starci-repair`, lint-machine pass |
 | `formatter` | strict-fix scope still has first-party Prettier integration | `starci-repair`, strict-fix pass |
 | `assurance` | assurance is required and any reached delivery-fence fact is absent or non-blocking | `starci-repair`, assurance pass |
+| `debt` | a valid `.worktrees/<project>/debts/<role>.md` records any owner-approved unresolved finding by namespaced scope; its owning machine decides delivery impact, and malformed/expired debt fails closed | finding owner, then removal after exit criteria pass |
 | `structure` | a retired tier still exists, including an empty directory | `starci-repair`, retired-structure pass |
 | `remnant` | a routed checkout contains an old nested `.claude/` | `starci-repair`, remnant pass or owner decision |
 
@@ -52,7 +54,9 @@ and proof. Route staleness has no repair module here because its owner is `starc
   real tests and all passing. `skip`, `todo`, `passWithNoTests`, zero-test and check substitutes reject.
   A declared gate only discovered, not run, is `unmeasured` and can never support ready.
 - Every finding carries category, evidence, applicability and owner.
-- `absent`, `invalid`, `stale`, `not required`, `unmeasured external` and `clean` are distinct verdicts.
+- Debt never changes a measurement to green. `pass` remains false while debt exists; delivery may continue
+  only when every remaining finding is covered by active debt and every non-debt gate is green.
+- `absent`, `invalid`, `stale`, `debt`, `not required`, `unmeasured external` and `clean` are distinct verdicts.
 - A route finding ends repair before target-source reads. Source repair through a stale route targets an
   unverified checkout.
 - A decision is returned; it is never disguised as a defect to keep a run moving.

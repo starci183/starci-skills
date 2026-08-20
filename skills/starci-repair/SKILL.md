@@ -12,6 +12,7 @@ description: Take a routed source that is red, structurally stale, port-conflict
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared phase, approval and output contract |
 | `@staleness` | `readiness/staleness/context.md` | context | the one taxonomy and router for every repair module |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic whole-Source proof for the ordered delivery fence |
+| `@stale-debts` | `readiness/staleness/debts/context.md` | context | identify existing owner-approved debt and preserve truthful verdicts |
 
 ## NESTED SKILLS
 
@@ -32,6 +33,8 @@ Read only reached modules during repair:
 - read `@stale-strict-fix` when strict-fix was requested or its first-party surface is present;
 - read `@stale-why` when the route has a contract;
 - read `@stale-assurance` for a backend or frontend, then obey its tracked applicability declaration;
+- read `@stale-debts` when `.worktrees/<project>/debts/<role>.md` exists; repair may report it but never create,
+  extend or remove it — a separate debt repayment capability owns that work;
 - read `@stale-retired-structure` for a frontend component tree;
 - read `@stale-remnant` only for nested `.claude/` inside the resolved target.
 
@@ -116,6 +119,8 @@ Use `node @source-quality` for final whole-Source remeasurement; do not replace 
 facts with narrative inference.
 Inspect the complete baseline diff for boundary violations and secret material. External enforcement is
 proved by authorized API evidence, never inferred from workflow text.
+An active debt produces `debt`, not `pass`; this skill may close delivery as allowed only when the shared
+machine says `deliveryAllowed`, while readiness remains false and the debt record stays untouched.
 
 ### 8 — Close
 

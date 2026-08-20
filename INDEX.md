@@ -102,8 +102,8 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Fifteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. Eleven do the work; two only look — one at the machine, one at the other skills.
+Sixteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+record. Fourteen do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
 |---|---|
@@ -115,6 +115,7 @@ record. Eleven do the work; two only look — one at the machine, one at the oth
 | `starci-stale-list` | every read-only stale fact across routes, port allocation, gates, contracts, lint/formatter adoption, delivery assurance, structure and remnants, with who clears each |
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
+| `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
 | `starci-fe-design-layout` | one stable `layoutId` whose accepted head binds an evidence-backed direction and layout skeleton |
 | `starci-fe-design-block` | one stable `(layoutId, blockId)` head, independently hash-versioned under its current accepted layout |
 | `starci-fe-design-execute` | frontend source, only from one layout head whose every declared region has a current accepted block head |

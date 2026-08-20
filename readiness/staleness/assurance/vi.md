@@ -10,6 +10,7 @@ title: Delivery assurance
 |---|---|---|---|
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/vi.md` | vi | backend fence bảy phần có thẩm quyền |
 | `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/vi.md` | vi | frontend fence bảy phần có thẩm quyền |
+| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | debt coverage/Sonar tạm thời có owner duyệt |
 
 ## Dấu hiệu stale
 
@@ -17,6 +18,8 @@ Backend và frontend assurance mặc định bắt buộc. Chỉ tracked `starci
 không rỗng mới cho verdict `not required`. Thiếu policy, `required: true`, hoặc false không reason vẫn là
 required. Với mọi routed role required, thiếu hoặc không blocking một `ASSURANCE-*` fact đã chạm là stale; partial
 adoption không phải profile nhỏ hơn.
+Debt hợp lệ không biến assurance thành optional: fact ASSURANCE-3/4 được phủ mang verdict `debt`, threshold
+và required check nghiêm vẫn giữ, delivery chỉ đi tiếp tới ngày hết hạn.
 
 ## README badge bắt buộc
 
@@ -49,6 +52,7 @@ reference, README badge không chứa token cho Codecov cùng SonarQube quality 
 vulnerabilities, code smells, maintainability, reliability, security, required check và deploy dependency.
 Không decrypt credential. Provider value và required-check app binding giữ `unmeasured
 external` nếu không có authorized API evidence.
+Đọc debt record của role và hiện baseline cùng hạn cạnh fact coverage hoặc Sonar được phủ.
 
 ## Inventory cho repair
 
@@ -102,6 +106,9 @@ quyết định điều đó có thật sự xảy ra hay không:
   ≤3% overall/new, native coverage >=80% overall và >=90% new. Thiếu API authority giữ các giá trị này
   `unmeasured external`; không biến chúng thành clean.
 
+`@stale-debts` có thể tạm nhận project/patch coverage hoặc Sonar mà không đổi blocking profile, provider
+check hay badge. Verdict là `debt`, không phải xanh; mọi fact ngoài debt vẫn blocking, debt sai/hết hạn fail closed.
+
 **Emit bắt buộc của framework có thể mang ngưỡng branch riêng.** Khi một framework dependency injection
 buộc phải có metadata mà runtime cần, compiler sinh ra guard không test nào chạm tới được — dưới
 `emitDecoratorMetadata`, mỗi constructor parameter có kiểu đến từ value import sẽ emit
@@ -136,3 +143,4 @@ hiện tại có waited quality gate `OK` sau mọi source repair và API eviden
 condition trong blocking quality profile, encrypted filename không có
 plaintext twin, mọi badge image endpoint bắt buộc trả image mà URL không có credential, external secret name/required
 check qua API và deploy dependency. External enforcement hoặc badge endpoint chưa đo làm module chưa complete.
+Debt còn hạn có thể cho delivery đi tiếp trong khi module vẫn incomplete và không ready.

@@ -6,7 +6,9 @@ title: Source gates
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Vì sao |
+|---|---|---|---|
+| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | debt có owner, baseline, scope và hạn |
 
 ## Dấu hiệu stale
 
@@ -26,6 +28,10 @@ Trên cả frontend và backend, unit file nằm cạnh production owner và dù
 Patch/new-code chỉ `not applicable` khi diff từ base SHA chứng minh không có authored production code
 thay đổi; working-tree diff rỗng, thiếu base SHA hoặc thiếu coverage entry không phải N/A.
 
+Record `@stale-debts` còn hạn chỉ được xếp project coverage, patch coverage hoặc Sonar thành `debt`.
+Gate đo được vẫn đỏ/chưa đo và không đủ cho `ready`; chỉ delivery được đi tiếp. Lint, typecheck, build,
+unit execution và E2E vẫn blocking và không được ghi nợ.
+
 ## Tách lane
 
 Unit coverage và E2E là hai gate độc lập. Unit lane là coverage producer duy nhất: nó sinh LCOV và summary
@@ -41,6 +47,7 @@ bỏ E2E hay Sonar vì tốn thời gian. Cache/output ignored được phép si
 Ghi command, exit code, lint error/warning, coverage metric, E2E entrypoint/test/pass count và Sonar verdict.
 Thiếu prerequisite, entrypoint, test thật, coverage report hoặc evidence Sonar external là
 `unmeasured`/`absent`, không đủ cho `ready`.
+Đọc `.worktrees/<project>/debts/<role>.md` sau khi route hợp lệ và report finding được nhận nợ riêng.
 
 ## Inventory cho repair
 
@@ -69,3 +76,4 @@ Chạy lại đúng gate ban đầu, cùng thứ tự, và report before/after c
 command, checkout revision, machine và không suppression. Verdict ready cần format pass; lint 0 error/0
 warning; typecheck/build pass; unit S/L/F ≥80%, branches ≥75%, patch/new metric ≥90%; E2E entrypoint thật
 và mọi test pass; Sonar pass cuối cùng.
+Verdict `debt` có thể cho delivery đi tiếp theo `@stale-debts`; nó không phải ready hay gate pass.

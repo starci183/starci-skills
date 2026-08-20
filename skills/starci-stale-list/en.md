@@ -13,6 +13,7 @@ title: starci-stale-list · English
 | `@export-state` | `scripts/export-console-state.mjs` | script | deterministic read-only workspace measurement |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | deterministic Source allocation and collision measurement |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic routed lint, coverage, E2E and strict Sonar measurement |
+| `@stale-debts` | `readiness/staleness/debts/en.md` | en | validate and report current project/role debt without repairing it |
 
 ## NESTED SKILLS
 
@@ -46,6 +47,8 @@ not a reason to reimplement the scan in conversation.
 Then run `node @port-offset-check`. Its non-zero exit is the `port-offset` verdict. Name every deliberate
 project exclusion explicitly; do not make an excluded family disappear from the report.
 
+Run `node @source-quality --debts` and report every active, invalid or expired Markdown debt separately.
+
 ### 3 — Report registry verdicts
 
 Group by project, with roles underneath. Use category and verdict names from `@staleness`. For every
@@ -61,6 +64,7 @@ changes stop the report. Unit must be S/L/F ≥80%, branches ≥75%, patch/new m
 tests and all passing. Missing prerequisites or any unmeasured/failed gate means the project is not ready.
 Use `node @source-quality`; its non-zero exit is the ordered source-fence verdict, not permission to
 reimplement, skip or downgrade a failed fact.
+Verdict `debt` and `deliveryAllowed` are reported exactly; neither is renamed `pass` or `ready`.
 
 ### 5 — Keep external assurance honest
 

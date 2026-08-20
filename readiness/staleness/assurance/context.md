@@ -6,6 +6,7 @@
 |---|---|---|---|
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | authoritative seven-part backend fence |
 | `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/context.md` | context | authoritative seven-part frontend fence |
+| `@stale-debts` | `readiness/staleness/debts/context.md` | context | owner-approved temporary coverage/Sonar debt |
 
 ## Stale signature
 
@@ -13,6 +14,8 @@ Backend and frontend assurance are required by default. Only tracked
 `starci.deliveryAssurance.required: false` with a non-empty `reason` yields `not required`. Missing policy,
 `required: true`, or false without a reason keeps assurance required. For any required routed role, any missing
 or non-blocking reached `ASSURANCE-*` fact is stale; partial adoption is not a smaller profile.
+A valid debt record keeps assurance required and strict checks installed, but classifies its exact coverage/
+Sonar findings as `debt` until expiry. It never makes them pass.
 
 ## Required README badges
 
@@ -45,6 +48,7 @@ secret references, token-free README badges for Codecov plus SonarQube quality g
 vulnerabilities, code smells, maintainability, reliability and security, required checks and deploy
 dependency. Never decrypt credentials. Provider values and required-check app binding
 stay `unmeasured external` without authorized API evidence.
+Read the role debt record and report its baseline/expiry beside covered findings.
 
 ## Repair inventory
 
@@ -115,6 +119,9 @@ Parallel scanner lanes must not share one binary cache; give each source its own
 scan sequentially. A shared cache is never deleted to clear a symptom unless an exact corrupt path is
 proven first.
 
+Active debt may temporarily accept project/patch coverage or Sonar without changing the strict profile.
+The module remains incomplete/non-ready; delivery may continue only while every other fact is green.
+
 ## Proof
 
 Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, a current-checkout
@@ -123,3 +130,4 @@ for every blocking-profile condition, encrypted filenames
 without plaintext twins, every required badge image endpoint returns an image without a credential in the URL,
 external secret names and required checks through APIs, and deploy dependency. Unmeasured external
 enforcement or an unmeasured badge endpoint leaves the module incomplete.
+Debt is reported explicitly and removed when its exit criteria pass.
