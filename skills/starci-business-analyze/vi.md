@@ -19,7 +19,7 @@ Không có. Một stop kết thúc run; skill này không gọi skill khác đ�
 
 ## Mục đích
 
-Build hoặc refresh một `featureId` ổn định từ frontend/backend đã route tại committed head. Kết quả là
+Build, advance hoặc reconcile một `featureId` ổn định từ source đã route và owner intent rõ ràng. Kết quả là
 immutable machine model cùng `CONTEXT.md` gọn, module route theo task và evidence dưới
 `.worktrees/<project>/businesses`.
 
@@ -36,20 +36,22 @@ minh trở thành unknown rõ ràng.
 3. Verify business worktree đã lock, sạch, do Source sở hữu trên `codex/businesses/<project>`.
 4. Đọc route mount và connected UI state, rồi frontend operation/type/test, rồi backend
    operation/schema/service/test. Chỉ đọc sibling để chốt một contract chính xác.
-5. Tạo model hợp lệ với `@business/@feature-schema`. Mọi actor, flow, rule, state, entity, operation,
+5. Chọn đúng một authority operation: ghi implemented truth mới, publish `pending`, advance sang
+   `in-progress`, publish `rejected`, hoặc reconcile source thành `implemented`. Không được bỏ qua write boundary.
+6. Tạo model hợp lệ với `@business/@feature-schema`. Mọi actor, flow, rule, state, entity, operation,
    surface, region và acceptance không phải unknown đều cite evidence trong cùng model.
-6. Đặt identity, status, action và state thật vào surface region để render prototype; không bịa total,
+7. Đặt identity, status, action và state thật vào surface region để render prototype; không bịa total,
    role, API hay behavior.
-7. Validate bằng `business-registry.mjs`, apply, kiểm tra generated view và chỉ commit business worktree
+8. Validate bằng `business-registry.mjs`, apply, kiểm tra generated view và chỉ commit business worktree
    với `docs(business): refresh <featureId>`.
-8. Prove currentness bằng `--check --feature <featureId>` rồi report feature hash, routed head, surface
+9. Prove currentness bằng `--check --feature <featureId>` rồi report status, base head, feature hash, routed head, surface
    ID, unknown count và business commit.
 
 ## Hợp đồng refresh cho consumer
 
-Consumer phụ thuộc business kiểm tra feature head trước khi suy luận. Truth thiếu hoặc stale phải được
-đọc lại và republish từ evidence hiện hành; cấm chỉ đổi recorded source head. Giữ unknown khi current
-source không trả lời được product choice.
+Consumer tin cả head lẫn state: `pending` cho design/planning, `in-progress` cho đúng implementation đó,
+`implemented` là runtime truth, còn `rejected` từ chối work. Thay đổi thuần kỹ thuật bind implemented
+truth với `businessImpact: none`; không bịa feature.
 
 ## Từ chối
 
@@ -58,7 +60,7 @@ source không trả lời được product choice.
 - Business worktree thiếu, dirty, unlocked, foreign hoặc sai branch.
 - Claim không có evidence hoặc evidence ID dangling.
 - Screenshot, conversation, example hay design candidate bị coi là implemented truth.
-- Request thực chất là thay product behavior thay vì phân tích business.
+- Transition bỏ qua state machine hoặc làm mất implemented base/immediate predecessor.
 
 ## Output
 

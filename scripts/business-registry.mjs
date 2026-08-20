@@ -3,6 +3,7 @@ import {execFileSync} from "node:child_process";
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve, sep} from "node:path";
 import {fileURLToPath} from "node:url";
+import {authorityStatus, proveBusinessTransition} from "./business-authority.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -69,6 +70,17 @@ function dirtyPaths(repo) {
 
 function proveModel(model) {
   if (model.project !== project) throw new Error(`model project ${model.project} does not match --project ${project}`);
+  if (model.schemaVersion === 2) {
+    const authority = model.authority;
+    const intentStates = new Set(["pending", "in-progress", "rejected"]);
+    if (!authority || ![...intentStates, "implemented"].includes(authority.status)) throw new Error("schema 2 business model requires a valid authority status");
+    if (intentStates.has(authority.status) && authority.basis !== "owner-intent") throw new Error(`${authority.status} status requires owner-intent basis`);
+    if (authority.status === "implemented" && authority.basis !== "reconciled") throw new Error("implemented status requires reconciled basis");
+    if (authority.requiredRoles.some((role) => !model.sources.some((sourceRef) => sourceRef.role === role))) throw new Error("business authority requiredRoles must be present in sources");
+    if (authority.baseHead !== undefined && !/^[0-9a-f]{64}$/.test(authority.baseHead)) throw new Error("authority baseHead must be a business hash");
+    if (["in-progress", "rejected"].includes(authority.status) && !/^[0-9a-f]{64}$/.test(authority.previousHead ?? "")) throw new Error(`${authority.status} status requires previousHead`);
+    if (intentStates.has(authority.status) && !model.evidence.some((row) => row.kind === "owner-decision")) throw new Error(`${authority.status} status requires owner-decision evidence`);
+  }
   const evidenceIds = new Set(model.evidence.map((row) => row.id));
   const refs = [];
   for (const group of [model.actors, model.flows, model.rules, model.states, model.entities, model.operations, model.surfaces, model.acceptance]) {
@@ -82,23 +94,40 @@ function proveModel(model) {
   for (const sourceRef of model.sources) {
     const route = workspaceRoute(sourceRef.role);
     routes.set(sourceRef.role, route);
-    if (sourceRef.head !== route.head) throw new Error(`${sourceRef.role} source head ${sourceRef.head} does not match routed HEAD ${route.head}`);
+    if (model.schemaVersion !== 2 || model.authority.status === "implemented") {
+      if (sourceRef.head !== route.head) throw new Error(`${sourceRef.role} source head ${sourceRef.head} does not match routed HEAD ${route.head}`);
+    } else {
+      git(route.diskPath, "cat-file", "-e", `${sourceRef.head}^{commit}`);
+    }
     const origin = route.route.repository.gitRepository;
     if (sourceRef.repository !== origin) throw new Error(`${sourceRef.role} repository does not match routed origin`);
   }
 
   for (const row of model.evidence) {
+    if (row.kind === "owner-decision") {
+      if (model.schemaVersion !== 2 || row.authority !== "owner" || !/^[0-9a-f]{64}$/.test(row.decisionId ?? "")) throw new Error(`${row.id} has invalid owner-decision authority`);
+      continue;
+    }
     const route = routes.get(row.role);
     if (!route) throw new Error(`${row.id} cites undeclared role ${row.role}`);
     const absolute = resolve(route.diskPath, row.path);
     const prefix = `${normalized(resolve(route.diskPath))}/`;
-    if (!normalized(absolute).startsWith(prefix) || !existsSync(absolute)) throw new Error(`${row.id} cites absent or escaping path ${row.path}`);
-    const lines = readFileSync(absolute, "utf8").split(/\r?\n/).length;
+    if (!normalized(absolute).startsWith(prefix)) throw new Error(`${row.id} cites escaping path ${row.path}`);
+    let content;
+    try {
+      content = model.schemaVersion === 2 && model.authority.status !== "implemented"
+        ? git(route.diskPath, "show", `${model.sources.find((item) => item.role === row.role).head}:${normalized(row.path)}`)
+        : readFileSync(absolute, "utf8");
+    } catch {
+      throw new Error(`${row.id} cites absent path ${row.path} at its declared source head`);
+    }
+    const lines = content.split(/\r?\n/).length;
     if (row.endLine < row.startLine || row.endLine > lines) throw new Error(`${row.id} line range ${row.startLine}-${row.endLine} exceeds ${row.path} (${lines} lines)`);
   }
 
   for (const route of routes.values()) {
-    const cited = new Set(model.evidence.filter((row) => row.role === route.role).map((row) => normalized(row.path)));
+    if (model.schemaVersion === 2 && model.authority.status !== "implemented") continue;
+    const cited = new Set(model.evidence.filter((row) => row.kind !== "owner-decision" && row.role === route.role).map((row) => normalized(row.path)));
     const overlap = dirtyPaths(route.diskPath).filter((path) => cited.has(path));
     if (overlap.length) throw new Error(`${route.role} cited evidence is dirty and cannot back an immutable snapshot: ${overlap.join(", ")}`);
   }
@@ -118,13 +147,13 @@ function renderSpec(model, hash) {
   const operations = model.operations.map((operation) => `- **${operation.name}** (${operation.kind}, ${operation.owner}) — input: ${operation.inputs.join(", ") || "none"}; output: ${operation.outputs.join(", ") || "none"}; failures: ${operation.failures.join(", ") || "none"} — ${evidenceRefs(operation.evidenceIds)}`).join("\n");
   const acceptance = model.acceptance.map((item) => `- **${item.id}** ${item.statement} — ${evidenceRefs(item.evidenceIds)}`).join("\n");
   const unknowns = model.unknowns.map((item) => `- **${item.question}** — ${item.impact}`).join("\n");
-  const evidence = model.evidence.map((row) => `| ${row.id} | ${row.role} | \`${row.path}:${row.startLine}\` | ${row.kind} | ${row.claim} |`).join("\n");
+  const evidence = model.evidence.map((row) => row.kind === "owner-decision" ? `| ${row.id} | owner | \`decision:${row.decisionId}\` | ${row.kind} | ${row.claim} |` : `| ${row.id} | ${row.role} | \`${row.path}:${row.startLine}\` | ${row.kind} | ${row.claim} |`).join("\n");
   return `# ${model.title}\n\n> Business head: \`${hash}\`\n>\n> This document is generated from the immutable business model. Update the model through \`starci-business-analyze\`; do not hand-edit this view.\n\n## 1. Overview\n\n${model.summary}\n\nIncluded:\n${bullets(model.scope.includes)}\n\nExcluded:\n${bullets(model.scope.excludes)}\n\n## 2. Source heads\n\n| Role | Repository | Head |\n|---|---|---|\n${sourceRows}\n\n## 3. Actors and access\n\n${actors || "No actor is confirmed."}\n\n## 4. Entry points and surfaces\n\n${surfaces}\n\n## 5. Business flows\n\n${flows}\n\n## 6. Business rules\n\n${rules || "No business rule is confirmed."}\n\n## 7. State model\n\n${states || "No state is confirmed."}\n\n## 8. Entities and data\n\n${entities || "No entity is confirmed."}\n\n## 9. Operations and APIs\n\n${operations || "No operation is confirmed."}\n\n## 10. Acceptance conditions\n\n${acceptance}\n\n## 11. Explicit unknowns\n\n${unknowns || "No unresolved question is recorded."}\n\n## 12. Evidence index\n\n| ID | Role | Source | Kind | Claim |\n|---|---|---|---|---|\n${evidence}\n`;
 }
 
 function renderContext(model, hash) {
   const primary = model.flows[0];
-  const sourceHeads = model.sources.map((item) => `\`${item.role}@${item.head.slice(0, 12)}\``).join(", ");
+  const sourceHeads = `authority \`${authorityStatus(model)}\`${model.authority?.baseHead ? ` · base \`${model.authority.baseHead}\`` : ""} · ${model.sources.map((item) => `\`${item.role}@${item.head.slice(0, 12)}\``).join(", ")}`;
   const invariants = model.rules.slice(0, 5).map((rule) => `- \`${rule.id}\` — ${rule.statement}`).join("\n") || "- No confirmed invariant.";
   const flow = primary.steps.map((step) => step.stateId ?? step.action).join(" → ");
   const surfaces = model.surfaces.map((surface) => `| \`${surface.id}\` | \`${surface.routePattern}\` | ${surface.purpose} | [surface](surfaces/${surface.id}.md) |`).join("\n");
@@ -217,7 +246,11 @@ function checkRegistry() {
     const objectPath = join(businessRoot, registry.objects.byHash[head.head]?.path ?? "");
     if (!existsSync(objectPath)) throw new Error(`business object is absent for ${id}@${head.head}`);
     const model = readJson(objectPath);
+    validate(featureSchema, objectPath);
     if (sha256(model) !== head.head) throw new Error(`business object hash mismatch for ${id}`);
+    if (head.authorityStatus && head.authorityStatus !== authorityStatus(model)) throw new Error(`business authority status mismatch for ${id}`);
+    if (head.baseHead !== model.authority?.baseHead) throw new Error(`business baseHead mismatch for ${id}`);
+    if (head.previousHead !== model.authority?.previousHead) throw new Error(`business previousHead mismatch for ${id}`);
     proveModel(model);
   }
   console.log(`business registry ${project}: ${Object.keys(selected).length} feature(s) current`);
@@ -236,11 +269,21 @@ if (check) {
   } else {
     const registry = existsSync(registryPath) ? readJson(registryPath) : {schemaVersion: 1, project, hashAlgorithm: "sha256", canonicalization: "RFC8785-JCS", featureHeads: {}, objects: {immutable: true, byHash: {}}};
     if (registry.project !== project) throw new Error(`business registry project is ${registry.project}, expected ${project}`);
+    const previousEntry = registry.featureHeads[model.featureId];
+    const previousModel = previousEntry ? readJson(join(businessRoot, registry.objects.byHash[previousEntry.head].path)) : undefined;
+    proveBusinessTransition(previousEntry?.head, previousModel, model);
     const objectRelative = `objects/sha256/${hash}.json`;
     const objectPath = join(businessRoot, objectRelative);
     if (existsSync(objectPath) && sha256(readJson(objectPath)) !== hash) throw new Error(`immutable business object collision at ${objectRelative}`);
     writeJson(objectPath, model);
-    registry.featureHeads[model.featureId] = {featureId: model.featureId, head: hash, sources: model.sources.map(({role, head}) => ({role, head}))};
+    registry.featureHeads[model.featureId] = {
+      featureId: model.featureId,
+      head: hash,
+      authorityStatus: authorityStatus(model),
+      ...(model.schemaVersion === 2 && model.authority.baseHead ? {baseHead: model.authority.baseHead} : {}),
+      ...(model.schemaVersion === 2 && model.authority.previousHead ? {previousHead: model.authority.previousHead} : {}),
+      sources: model.sources.map(({role, head}) => ({role, head})),
+    };
     registry.objects.byHash[hash] = {hash, path: objectRelative};
     writeJson(registryPath, registry);
     const featureRoot = join(businessRoot, "features", model.featureId);

@@ -8,117 +8,106 @@ title: starci-fe-design-execute · English
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@lints-fe` | `gates/fe/lints` | module | prove the frontend source at its real gate |
-| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | reproduce the token digest approved inside each layout |
-| `@patterns-fe` | `compilers/patterns/fe` | module | resolve files, exports and import boundaries |
-| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate identity-centric heads and immutable object references |
-| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | require registry v2 heads and projections to be current before source execution |
-| `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts before production work |
+| `@skill-shape` | `skills/skill-shape/en.md` | en | shared write approval and reporting boundary |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
-| `@worktrees` | `contexts/worktrees/en.md` | en | resolve and verify the registry worktree |
-| `@business` | `contexts/business/en.md` | en | prove accepted design still matches current product truth |
+| `@worktrees` | `contexts/worktrees/en.md` | en | verify accepted revision authority |
+| `@business` | `contexts/business/en.md` | en | prove accepted behavior still matches product truth |
+| `@principles` | `compilers/principles` | module | resolve accepted principle obligations |
+| `@design-review` | `publication/design-review-preview/en.md` | en | accepted bundle and screenshot parity contract |
+| `@patterns-fe` | `compilers/patterns/fe` | module | resolve product files, exports and boundaries before writing |
+| `@lints-fe` | `gates/fe/lints` | module | prove source at the canonical frontend gate |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify tokens bound by the accepted layout |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve and validate current layout/block revision heads |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | verify accepted design metadata and preview digest |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove authority before source write |
 
 ## NESTED SKILLS
 
-None. This skill never invokes another skill.
-
+None.
 
 ## Run
 
-Read `@skill-shape` first. This is the only frontend skill that writes
-product source, and it is the one that must be hardest to start.
-The caller supplies stable `layoutId`; the design registry is the sole implementation lookup authority.
+This capability implements one accepted frontend composed page or page flow. It is the design capability that writes product source,
+so exact paths require one disclosed `Touching` approval and a clean baseline before the first write.
 
-## PROCESS
+**Authority.**
 
-### 1 — Establish the context lock
+The current layout head and every declared block head must resolve to an immutable bundle:
 
-`Phase` is `execute`. `Touching` names the exact frontend paths this run may write, and it is confirmed
-with the owner before the first write. Detection is not permission.
+```text
+registries/revisions/<revisionHash>/design.json
+registries/revisions/<revisionHash>/preview.html
+```
 
-### 2 — Refuse unless the layout head and every current region block head are accepted
+`design.json` owns identity, ownership, contract/anatomy and the state viewport manifest. `preview.html` owns
+composition. Verify its `previewSha256` and recompute `revisionHash` from canonical design metadata plus the
+preview digest. Registry revision heads are implementation authority. Legacy objects remain readable history but
+cannot start a new execution without a current revision bundle.
 
-Run `@design-registry-check`. Read `@design-registry-schema` and validate
-`registries/design-registry-v2.json`. Resolve the caller's `layoutId` through
-`layoutHeads[layoutId].head`, then resolve that immutable layout object through `objects.byHash`. The head
-is the accepted layout; do not inspect review history to choose another hash. Enumerate every declared
-blockId in `layoutHeads[layoutId].regions`, resolve `blockHeads[layoutId/blockId]` for each, and require its
-`layoutHash` to equal the current layout hash and its `head` object to exist. This traversal is the complete
-implementation input: historical reviews are optional audit history, never authority.
+## Process
 
-If the layout head or any region block head is missing, malformed, proposed, or unaccepted, **stop and name
-it**. A partial start would produce code nobody approved, in the one place the tree cannot undo cheaply.
+**1. Resolve complete accepted input.**
 
-### 3 — Verify the route, then take the baseline
+Run the registry check. Resolve every page and ordered nested ownership node in the current layout revision, then
+every declared block revision against its owning page. Require an exact
+parent `layoutHash`, accepted artifacts, valid preview digest and complete state viewport manifests. A proposed,
+missing, legacy-only or stale child stops execution before source inspection becomes a write plan.
 
-Resolve every business feature cited by the accepted design and check its head against routed FE/BE
-commits. Refresh missing or stale truth before the baseline. If current business invalidates accepted
-anatomy, stop and return to design approval; never force source to implement stale truth.
+**2. Verify current truth and the write boundary.**
 
-Read `@workspaces` and verify the `fe` route (`WORKSPACE-5`). Run `@inventory-visual-language`; its digest
-must equal every current layout direction's `vocabularyAt`. Only then commit the current target state and record
-`Baseline commit: <sha>` — taken **before** the first change, never from a half-edited tree, so
-`git diff <baseline>` is the honest account of what this run did.
+Verify the routed frontend, business heads and visual vocabulary. If current behavior changes a route, data
+owner, action or reachable state, return to design rather than implementing stale authority.
 
-### 4 — Apply the direction embedded in the layout
+Read source and `@patterns-fe`, then disclose the smallest exact frontend path boundary under
+`### NEED APPROVALS`. `OK` authorizes those paths once. Take a clean baseline commit before the first product
+write. Unrelated dirty work stops the run because it cannot produce an honest diff.
 
-Read the exact `direction` object carried by each accepted layout. Reused token decisions must still
-resolve in the frontend vocabulary. New token decisions apply only the name and value embedded in the
-accepted layout; preview CSS is never copied into product source.
+**3. Implement the accepted composition.**
 
-When two accepted layouts in the same implementation scope assign one shared semantic role
-incompatibly, stop and return the conflict. There is no separate direction hash to choose between: the
-layout hash is the approval that binds the direction it contains.
+Reuse every source-bound `existing` node rather than duplicating or redesigning it. Preserve page-set composition,
+hierarchy, readable measure, surface and boundary ownership, breakpoint exclusivity,
+selected treatment, icon meaning and exactly one scroll owner per axis. Reuse existing contract owners before
+creating or generalizing one. Preview CSS is visual evidence, not source to paste blindly; frontend tokens,
+principles and patterns remain implementation law.
 
-### 5 — Resolve every class through the principles
+Implement every viewport/state pair named by each design record. A divider, `ScrollBranch` or `SurfaceListCard`
+is required only when the accepted situation uses it. An example is never promoted to a universal architecture
+rule.
 
-The accepted JSON carries no class; that was its law. Each node's classes are now resolved
-deterministically:
+**4. Prove code and visual parity.**
 
-- one situation code per node per principle, and exactly one className from that code;
-- a class that is not a member of the contract's closed union is **unrepresentable** — needing one is a
-  contract change that returns to the owner, not a value to approximate;
-- two adjacent codes both matching resolves to the smaller rung, not to a preference.
+Run canonical lint and tests. Capture the implementation at the exact accepted viewport/state pairs and compare:
 
-A resolution that requires taste means a principle is incomplete. Record it; do not decide it here.
+- breakpoint-exclusive desktop/mobile chrome;
+- hierarchy and content measure;
+- region and surface bounds;
+- boundary/divider ownership;
+- scroll ownership;
+- selected and state treatments.
 
-### 6 — Land the files through the patterns
+Lint-clean visual drift still fails. Repair it inside `Touching`; never suppress a gate or silently add a path.
 
-Where a file lives, what it exports, what it may import and what it is named are decided by
-`@patterns-fe`, not by convenience. Patterns are compilers, not gates: they answer a shape
-already accepted, so they are read **before** the first line rather than consulted after it, when the
-only remaining option is to move code that is already written. The entry's node is **rendered**, not imitated: copying an
-entry's classes onto a vendor element drops what that element cannot carry — the `host` — and the
-result claims the contract is honoured while the accessibility tree is wrong.
+**5. Close.**
 
-Every `reuse`, `generalize` and `new` verdict in the accepted JSON is carried out as recorded. A
-`generalize` verdict updates every measured call site; a rename that leaves one behind is not done.
-
-### 7 — Prove it against the gates
-
-Run the frontend lints from `@lints-fe`. A finding is repaired, not suppressed: no rule is
-weakened, disabled or hatched to make a run pass. Then prove the surface renders — the evidence the
-approval named, not a substitute that is easier to produce.
-
-### 8 — Close the phase
-
-Close with the applied revision, the baseline commit and the tracked diff. The diff lists every
-production path and must match the approved boundary; a path outside `Touching`
-returns to its owner instead of arriving quietly.
+Report applied layout/block revision heads, baseline, exact changed paths and executable code/visual proof. A new
+path or product decision returns to the owner. Deterministic repair remains owned work and does not create another
+approval checkpoint.
 
 ## Stops
 
-- Any layout or current region block head missing, proposed or unaccepted → stop, name its stable identity and hash.
-- An accepted layout's direction references a missing reused token → stop; the visual evidence is stale.
-- Accepted layouts assign one shared role incompatibly in the same implementation scope → stop; return the product decision.
-- A required class is outside the contract's closed union → contract change, return to owner.
-- A principle cannot resolve without preference → record the gap, stop that node.
-- A lint finding that cannot be repaired inside `Touching` → return the boundary, do not suppress.
-- Baseline commit not possible because the tree is already dirty with unrelated work → stop; a baseline
-  taken from mixed state proves nothing.
+- Missing/proposed/legacy-only revision, preview digest mismatch, incomplete states or stale parent binding stops
+  execution and names the identity.
+- Stale business behavior or vocabulary returns to design.
+- Dirty target tree or a required path outside approved `Touching` stops the run.
+- Unrepresentable contract class or pattern returns the contract decision; it is never approximated.
+- Lint or visual parity that cannot be repaired inside the boundary returns that boundary; no gate is suppressed.
+
+Implementation must reproduce the accepted condition inventory, business-content matrix and transition graph.
+Browser proof reaches every accepted state through product controls, resizes the same page across breakpoints and
+exercises reachable modal, drawer, menu/popover, expanded/collapsed, loading, empty, error, locked and disabled
+conditions. A render-only implementation or screenshot-only parity fails.
 
 ## OUTPUT
 
-State the `layoutId`, applied revision, material paths and proof in concise prose. A proof that can run is `own` and
-must run before the turn ends; only a genuine authority decision may appear under `### NEED APPROVALS`.
+State `layoutId`, applied layout/block revision hashes, baseline, material paths and code/visual proof in concise
+prose. Only a genuine new authority decision appears under `### NEED APPROVALS`. No status tables.

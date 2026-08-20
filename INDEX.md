@@ -9,7 +9,7 @@ title: Docs
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
-| `@brainstorms` | `brainstorms/context.md` | context | produce candidates before a shape is accepted |
+| `@brainstorms` | `brainstorms/context.md` | context | challenge a design and expose only materially useful alternatives before a shape is accepted |
 | `@business` | `contexts/business/context.md` | context | resolve evidence-backed actors, flows, rules, states, operations and prototype surfaces |
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
@@ -50,9 +50,15 @@ order follows from it rather than defining it.
 | Tree | Returns | Read it when |
 |---|---|---|
 | `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
-| `@brainstorms` | 3–4 candidates for the owner to choose | a surface or a block is not yet decided |
+| `@brainstorms` | 3–4 evidence-backed alternatives that the model challenges, ranks and selects | a page/page-flow or block is not yet decided |
 | `@compilers` | exactly one answer, no candidates | a shape is accepted and code is about to be written — `@principles` decide the classes, `@patterns` decide which file holds it and what it may import |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
+
+Frontend design alternatives are functional, business-faithful HTML pages, never static render cards. Each round
+inventories every evidenced viewport, overlay, disclosure, async, data, permission and interaction condition;
+renders production-like representative content; and proves reachable transitions through in-page controls.
+Desktop/mobile, modal, drawer, menu/popover, loading, empty, error, locked and disabled states are represented
+when reachable. The QA viewer may inspect states but may not substitute for product interaction.
 
 ## V4 authority route
 
@@ -85,12 +91,16 @@ loading a stage the skill did not ask for is paying for a tree you are not using
 
 1. `@workspaces` — resolve the project's role routes and **verify**
    them. A stale route stops the work; it is not approximated.
-2. `@worktrees` — only if the work writes state that must survive.
-3. `@compilers` — **before the first line**: `@principles` for
+2. `@business` — classify `businessImpact`. Business-affecting work requires the exact feature head at
+   `in-progress`; technical-only work declares `none` and binds current `implemented` truth. `pending` and
+   `rejected` are read-only for product source.
+3. `@worktrees` — only if the work writes state that must survive.
+4. `@compilers` — **before the first line**: `@principles` for
    every class, `@patterns` for which file holds the code and what it may import.
    Both answer a shape already accepted, so reading them afterwards leaves only one move — moving code
    that is already written.
-4. `@gates` — last, on code that exists.
+5. `@gates` — last, on code that exists. Business-affecting work closes only after final committed source
+   is reconciled to an `implemented` business head.
 
 `@brainstorms` is deliberately absent from that list: if the shape is not decided,
 coding has not started, and deciding it belongs to a skill — direction inside layout, then block.
@@ -118,8 +128,8 @@ record. Fifteen do the work; two only look — one at the machine, one at the ot
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
-| `starci-fe-design-layout` | one stable `layoutId` whose accepted head binds an evidence-backed direction and layout skeleton |
-| `starci-fe-design-block` | one stable `(layoutId, blockId)` head, independently hash-versioned under its current accepted layout |
+| `starci-fe-design-layout` | one stable `layoutId` whose accepted head binds a complete source-aware page/page-flow composition selected by visual judgment and evidence |
+| `starci-fe-design-block` | one stable `(layoutId, blockId)` head whose accepted anatomy is judged inside its complete current page |
 | `starci-fe-design-execute` | frontend source, only from one layout head whose every declared region has a current accepted block head |
 | `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
 | `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |

@@ -10,12 +10,14 @@ title: starci-be-approve · English
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/en.md` | en | re-verify checkout, branch and source revision before approval |
+| `@business` | `contexts/business/en.md` | en | bind approval and implementation to product authority |
 | `@be-patterns` | `standards/backend/patterns/en.md` | en | challenge situation-to-file bindings against current source |
 | `@rule-bindings` | `standards/backend/rule-bindings/en.md` | en | refuse drift between enforced situations, gates and machines |
 | `@rule-binding-check` | `machines/rule-bindings/check.mjs` | script | execute backend gate-to-canon parity |
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate the complete compiler boundary being approved |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | refuse a malformed brief before the approval loop |
 | `@plan-check` | `machines/backend-plan/check.mjs` | script | refuse stale identity, invented situations and uncovered files |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | refuse writes without exact in-progress intent |
 
 ## NESTED SKILLS
 

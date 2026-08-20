@@ -37,7 +37,7 @@ mess, and a rule tree with run debris in it stops reading as authority.
 | `WORKTREE-4` | A registry worktree owned by another Git common directory | rejected; it is not this Source's state |
 | `WORKTREE-5` | Parallel agents about to write | isolate only when two of them mutate one file |
 | `WORKTREE-6` | A worktree is stale, prunable or in the way | pruned deliberately; never force-removed as a directory |
-| `WORKTREE-7` | A design identity needs a durable accepted version | stable `layoutId`/`blockId` head records in `registries`; immutable bodies remain under `objects/sha256` |
+| `WORKTREE-7` | A design identity needs a durable accepted version | stable `layoutId`/`blockId` heads plus immutable `revisions/<revisionHash>/{design.json,preview.html}` bundles |
 | `WORKTREE-8` | Evidence-backed product truth must serve FE, BE and design | stable `featureId` heads in `businesses`, locked on `codex/businesses/<project>` |
 
 ## Reading a run
@@ -52,8 +52,8 @@ mess, and a rule tree with run debris in it stops reading as authority.
    no worktree at all — `WORKTREE-5`.
 5. **Leave the target repository alone.** A run's bookkeeping never lands in the repository being worked
    on; durable product records belong to that repository through its own review, not through this state.
-6. **Separate authority from rebuildable progress.** Layout and block IDs resolve accepted heads directly
-   from `registries`; `reviews` preserve decisions, while unfinished drafts live under `cache/drafts` — `WORKTREE-7`.
+6. **Separate authority from rebuildable progress.** Layout and block IDs resolve accepted revision heads
+   directly from `registries`; losing candidates and unfinished drafts live under `cache/drafts` — `WORKTREE-7`.
 7. **Separate product truth from design decisions.** Business feature heads and evidence live in
    `businesses`; layout/block heads remain in `registries` — `WORKTREE-8`.
 
@@ -186,20 +186,22 @@ background agent, where nobody is watching the branch it stands on.
 
 - A route/surface has one stable semantic `layoutId` independent of locale, runtime parameters or prompt.
 - A region has one stable `blockId`, scoped by its `layoutId`.
-- Candidate bodies already live as immutable SHA-256 objects.
+- An accepted design needs immutable metadata and the exact HTML that was approved.
 
 **Ask yourself.** Can an executor resolve the current accepted design from `layoutId` alone, without
 knowing a review id or scanning review history?
 
 **Boundary**
 
-- `WORKTREE-1`: accepted heads and immutable objects are durable registry state.
-- `WORKTREE-2`: a partial prompt, preview and unfinished candidate batch remain rebuildable progress.
+- `WORKTREE-1`: accepted heads and their two-file revision bundles are durable registry state.
+- `WORKTREE-2`: a partial prompt and every unaccepted candidate preview remain rebuildable progress.
 
-**What it emits.** `layouts/by-id/<layoutId>.json` stores route pattern, accepted layout head and declared
-regions. `blocks/by-id/<layoutId>/<blockId>.json` stores the accepted block head and the exact parent
-`layoutHash` it was designed under. `reviews/` may cite candidates, feedback and accepted hashes, but no
-reader needs a review id to find current state. Replacing a head appends history; it never edits an object.
+**What it emits.** `design-registry-v2.json` maps stable layout and block identities directly to accepted
+revision hashes. Each `revisions/<revisionHash>/` contains only `design.json` and `preview.html`;
+`design.json` binds identity, state viewports and the preview digest, while a block also binds the exact
+parent `layoutHash`. The revision hash binds canonical design metadata plus that preview digest. Legacy
+`objects/sha256` records remain readable during migration, but new acceptance never requires by-id
+projections or review records as a second authority.
 
 **How it fails.** A skill searches an old review record, so a valid block becomes unreachable when the
 caller does not know which review happened to contain it. Review history silently becomes a second
@@ -257,7 +259,7 @@ with truth, or becomes a hand-written document whose claims no longer match eith
 8. Stale worktrees are pruned through Git, never by deleting a directory, and never from a background
    agent.
 9. Design identity is `layoutId` or `(layoutId, blockId)`; a content hash is a version, never the identity.
-10. Accepted heads resolve directly from stable identities. Reviews are append-only evidence; drafts are rebuildable cache.
+10. Accepted heads resolve directly from stable identities to immutable two-file revision bundles; drafts are rebuildable cache.
 11. A block head names the parent `layoutHash`; a block accepted under an older layout is stale, not current.
 12. Business feature identity is `featureId`; every head binds routed source commits and immutable evidence.
 

@@ -45,9 +45,8 @@ wearing the authority of this tree.
    that key still exists under that name — `PRECEDENT-3`.
 3. **Read what was rejected.** The rejected candidates in the nearest precedent are the fastest way to
    avoid re-proposing a shape this source already refused.
-4. **Guarantee one departure.** Of the 3–4 candidates generated, at least one must not follow the
-   nearest precedent — `PRECEDENT-4`. Precedent is how a corpus stays consistent; the departure is how
-   it stays alive.
+4. **Permit departure when evidence earns it.** Never manufacture a departure. Show one only when it
+   solves a material problem the nearest precedent cannot — `PRECEDENT-4`.
 5. **Never let a precedent silence a law.** A precedent that violates a layout law is not a precedent
    to follow; it is a defect to record — `PRECEDENT-5`.
 

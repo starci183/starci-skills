@@ -11,13 +11,13 @@ title: Business authority
 | `@feature-schema` | `contexts/business/schema.json` | file | refuse unsupported or untraceable business claims |
 | `@registry-schema` | `contexts/business/registry.schema.json` | file | validate stable feature heads and immutable objects |
 | `@business-registry` | `scripts/business-registry.mjs` | script | validate, hash, publish and check business snapshots |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove an exact head authorizes or forbids source writes |
 
 ## Record
 
-The business root is the evidence-backed product model shared by frontend, backend and design work. It
-records what the routed sources demonstrably do: actors, flows, rules, states, entities, operations,
-surfaces, acceptance conditions and explicit unknowns. It never copies raw source or promotes a design
-idea, sample document or agent inference into product truth.
+The business root is the sole product-truth authority shared by frontend, backend, design and every
+other routed repository. It records both the last implemented truth and explicit owner-approved intent.
+Product source proves implementation; it never silently defines a different product truth.
 
 ## Law
 
@@ -31,10 +31,17 @@ evidence row bound to a routed role and exact source head. Missing evidence beco
 not representative content. A dirty target is allowed only when every dirty path is outside the cited
 evidence boundary and the snapshot binds committed `HEAD`, never working-tree bytes.
 
-Before a business-dependent skill reasons from a feature, it checks the current feature head against
-the routed FE/BE heads. Missing or stale truth is refreshed by `starci-business-analyze`; a consumer
-does not silently repair it. Design previews use the selected surface and region data from the current
-business object, while layout remains impressionistic and block design still owns final anatomy.
+Schema-v2 authority has exactly four states. `pending` is accepted intent whose implementation has not
+opened. `in-progress` is the exact intent currently allowed to change source. `implemented` is reconciled
+truth bound to final committed source heads. `rejected` is retained decision history and never authorizes
+source work. `baseHead` points to the most recent implemented truth; `previousHead` proves the immediate
+workflow transition. Legacy schema-v1 heads are read as `implemented`.
+
+The only valid forward transitions are `implemented → pending → in-progress → implemented`, with
+`pending|in-progress → rejected` and `rejected → pending`. A business-affecting product write requires
+the matching feature head to be `in-progress` before the first write. After code and gates, the feature
+must be reconciled to `implemented` against final committed source heads. A purely technical change
+declares `businessImpact: none`, binds the current implemented head, and does not create a fake feature.
 
 ## Rules
 
@@ -45,8 +52,11 @@ business object, while layout remains impressionistic and block design still own
 5. Imported examples contribute shape only, never business facts.
 6. `CONTEXT.md`, task modules, `spec.md` and `evidence.json` are generated views of `model.json`; only the immutable object is authority.
 7. LLMs load `CONTEXT.md` first, then only the flow/surface modules required by the task.
-8. A consumer refuses a stale feature rather than inventing representative data.
-9. Updating business does not authorize product source changes.
+8. Every routed repository trusts the business head and reads its authority status before acting.
+9. `pending` can drive design and planning; only `in-progress` authorizes business-affecting source writes.
+10. `rejected` never describes runtime truth and never authorizes implementation.
+11. Creativity runs first inside accepted intent, then principles review, source patterns, code and gates.
+12. Updating business alone does not authorize unrelated product source changes.
 
 ## Output
 

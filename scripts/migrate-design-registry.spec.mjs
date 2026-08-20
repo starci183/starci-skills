@@ -86,3 +86,39 @@ test("migration does not promote a block accepted under a stale layout", async (
   assert.equal(registry.layoutHeads["course-home"].regions.hero, undefined);
   assert.equal(registry.reviewHistory.blocks["course-home/hero"][0].acceptedHash, blockHash);
 });
+
+test("migration preserves revision bundles already recorded by v2", async (t) => {
+  const root = await fixture();
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const revisionHash = "e".repeat(64);
+  const existingPath = join(root, "design-registry-v2.json");
+  await writeFile(existingPath, JSON.stringify({
+    schemaVersion: 2,
+    project: "example-app",
+    layoutHeads: {},
+    blockHeads: {},
+    revisions: {immutable: true, byHash: {[revisionHash]: {hash: revisionHash, path: `revisions/${revisionHash}`}}},
+  }));
+
+  await migrateDesignRegistry(root, "apply");
+  const registry = JSON.parse(readFileSync(existingPath, "utf8"));
+  assert.deepEqual(registry.revisions.byHash[revisionHash], {hash: revisionHash, path: `revisions/${revisionHash}`});
+});
+
+test("migration does not require legacy objects for revision-backed heads", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "starci-design-registry-bundle-"));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const revisionHash = "e".repeat(64);
+  await writeFile(join(root, "design-registry-v2.json"), JSON.stringify({
+    schemaVersion: 2,
+    project: "example-app",
+    layoutHeads: {"course-home": {layoutId: "course-home", head: revisionHash, regions: ["hero"]}},
+    blockHeads: {},
+    revisions: {immutable: true, byHash: {[revisionHash]: {hash: revisionHash, path: `revisions/${revisionHash}`}}},
+  }));
+
+  await migrateDesignRegistry(root, "apply");
+  const registry = JSON.parse(readFileSync(join(root, "design-registry-v2.json"), "utf8"));
+  assert.equal(registry.layoutHeads["course-home"].head, revisionHash);
+  assert.equal(registry.objects, undefined);
+});

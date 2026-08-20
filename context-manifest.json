@@ -4,7 +4,7 @@
     "brainstorms/blocks/context.md": {
       "kind": "module",
       "source": "brainstorms/blocks/en.md",
-      "sourceHash": "6edda84c937736ba63ff644fbf0bed6a537c193c646e29deaea1fb9d2c5c6f4a",
+      "sourceHash": "08c4fa18699cd7470ff85d503987455715de7959ff8bbfd2f7c0c2ea7b055dde",
       "contextVersion": 1
     },
     "brainstorms/blocks/precedents/context.md": {
@@ -32,13 +32,13 @@
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "9950c66176f03f7b33a54a2baf7bd02b34f45df1dfd8f2420659dc5ff5ba1683",
+      "sourceHash": "d909fd24f728d10a6524645cc0e0f234218cfbcbc26ccae3b7c67ffbda903222",
       "contextVersion": 1
     },
     "brainstorms/layouts/precedents/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/precedents/en.md",
-      "sourceHash": "1ca99c0c32fd22965640c88031982b025cf3276d84f6e6d3a8867f14b2ecfb61",
+      "sourceHash": "a08bd629d37e76d870dafc4f5265e95ba3354bfb3550abf01090c4aec79e967a",
       "contextVersion": 1
     },
     "compilers/context.md": {
@@ -448,7 +448,7 @@
     "contexts/business/context.md": {
       "kind": "module",
       "source": "contexts/business/en.md",
-      "sourceHash": "3b05d6068c4192d54894d3ca4482ebfdd9becb4e7969efbb75ed249817bee28a",
+      "sourceHash": "d9e2db491cc0cd956190b345777499445f3336ab505391d68a60dd00ce108007",
       "contextVersion": 1
     },
     "contexts/context.md": {
@@ -470,7 +470,7 @@
     "contexts/worktrees/context.md": {
       "kind": "module",
       "source": "contexts/worktrees/en.md",
-      "sourceHash": "e5b5b1085f7c019ab0de4da7de08b6b0814d073999a2d6a937ab741027e7d2d2",
+      "sourceHash": "a1e886b02db8382c5914655cb3c67c6cf8721fbca758e8dc0e03069447af5412",
       "contextVersion": 1
     },
     "deployment/context.md": {
@@ -756,7 +756,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "1c4c4134999c8addbbaf5d7693c2fe7123e017985a2355054f51debb1aaaabdc",
+      "sourceHash": "d4f5cf7e14a1e1f7e119486dba321ef58c2db6957cc9f14becd7be4c78f03110",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {
@@ -898,7 +898,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "5acd2592fd615c2e25280f46f96813284ccd4452794c196b6f68dc3431756f92",
+      "sourceHash": "f5c28c4df4f16dac6037f81a1803827a0d0a4e704f849f700adc5c0027edad1e",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

@@ -15,19 +15,20 @@ title: Layouts · Vietnamese
 
 ## Bản ghi
 
-Mô-đun này nhận một yêu cầu nghiệp vụ viết bằng lời thường, rồi trả về **3–4 phương án layout**, mỗi phương
-án là một cấu trúc JSON để thầy chọn giữa chúng — hoặc **một lời từ chối** nêu tên quyết định sản phẩm
-còn thiếu. Đây không phải compiler: compiler trả về một đáp án vì luật của nó tự đóng lựa chọn. Ở đây lựa
-chọn là **quyết định sản phẩm**, nên trả về một đáp án là compiler đang giả vờ rằng người chủ đã quyết
-rồi.
+Mô-đun này nhận ảnh chụp một page hoặc mô tả một page flow, rồi trả về 3–4 page set hoàn chỉnh khác nhau đáng
+kể, xếp hạng theo evidence và tự chọn phương án mạnh nhất — hoặc một lời từ chối nêu product truth còn thiếu.
+Model sở hữu visual judgment và selection; schema chỉ ghi nhận và chứng minh kết quả.
 
 ## Luật
 
-Phương án schema 3 gọi tên region, ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
+Phương án schema 4 gọi tên scope `page`/`flow`, mọi page đã compose, ownership nodes lồng theo thứ tự, region,
+ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
 region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và impressionistic child brief
 (`kind`, title, summary, labels, values và actions đại diện). Wireframe giúp hình dung purpose, density và reading
-order nhưng không phê duyệt exact parts, fields, copy, actions, states hoặc data ownership. Schema 1–2 chỉ còn hợp lệ cho lịch sử accepted
-bất biến. Phương án **không bao giờ** gọi tên class; class được quyết sau từ hình đã chấp nhận.
+order nhưng không phê duyệt exact parts, fields, copy, actions, states hoặc data ownership. Mỗi node là
+`existing`, `proposed` hoặc `new`; `existing` phải trích source thật cùng SHA-256 source hash và không được khác
+giữa các phương án. Schema 1–3 chỉ còn hợp lệ cho lịch sử accepted bất biến. Phương án **không bao giờ** gọi tên
+class; class được quyết sau từ hình đã chấp nhận.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
 một entry mới và vì sao. Region không trích gì cả là một thành phần bịa ra đang khoác cấu trúc JSON.
@@ -140,8 +141,8 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 2. Mọi region trích một entry key, hoặc khai một entry mới kèm `why` của nó.
 3. Mọi region gọi tên branch ghép nó.
 4. Phương án khai bộ giá trị trục, và không hai phương án nào trong một lô trùng cả bộ.
-5. 3–4 phương án khi yêu cầu cho phép hơn một cấu trúc; ít hơn khi nó không cho phép, kèm lý do. **Không
-   bao giờ** nhồi cho đủ ba.
+5. Trả về 3–4 phương án. Mỗi phương án phải thay đổi đáng kể hierarchy, navigation, grouping hoặc interaction
+   ownership; chỉ đổi trang trí, spacing hay wording là trùng. Xếp hạng bộ hợp lệ và tự chọn một phương án.
 6. Quyết định sản phẩm còn thiếu thì trả về cho người chủ. Không bao giờ đoán để lô cho đủ.
 7. JSON của phương án là dạng chuẩn hoá — thứ tự khoá cố định, không timestamp, không id theo lượt — vì
    **hash của nó** là thứ lời chấp thuận gắn vào.
@@ -149,18 +150,28 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 
 ## Preview
 
-HTML phải là web prototype responsive với content đại diện đủ thật và illustration có evidence, không phải
-những rectangle placeholder rỗng. Mỗi layout region luôn nằm trong dashed border; label nhìn thấy được phải ghi
-region, contract entry, assembler và mount lifetime. Interaction preview-only có thể minh họa navigation
-ownership, sticky behavior và responsive collapse, nhưng không trở thành product behavior.
+HTML phải là product prototype nguyên trang, responsive và functional, có content đại diện đủ thật, không phải rectangle
+placeholder rỗng. Ảnh chụp phải tái dựng toàn bộ viewport nhìn thấy; flow phải render mọi page/step được nêu rõ.
+Nested layout `existing` luôn nhìn thấy và bám đúng source; chỉ ownership `proposed`/`new` mới được thay đổi.
+Navigation, tab, disclosure, drawer, modal, menu/popover, form, primary/retry action và responsive collapse phải
+chạy transition in-memory có tính tất định ở mọi nơi page có evidence là reachable. Prototype không mutation
+backend, nhưng QA state selector không bao giờ thay product control. Trước khi vẽ phải inventory các condition
+viewport, overlay, disclosure, async, data, permission và interaction; mỗi value reachable map tới authored HTML,
+còn family không liên quan phải ghi rõ `not-applicable` cùng evidence.
 
-Content trong region render thành wireframe cảm tính có label từ brief đã hash. Tên, value và action đại diện
-giúp hình dung purpose, density cùng reading order; control nét đứt cho thấy đây chưa phải anatomy hay final copy.
+Content trong region render thành authored product HTML từ brief đã hash. Tên, value và action đại diện giúp
+hình dung purpose, density cùng reading order; review/schema/debug label nằm ngoài product canvas.
 Region login có thể hiện ví dụ mang dáng credential, còn sign-up và recovery vẫn là block states của vòng sau.
-Flow cue chỉ xuất hiện khi flow được đưa rõ vào product scope và vẫn chỉ là rough sequence, không phải step contract. Ưu tiên
+Flow chỉ xuất hiện khi được đưa rõ vào product scope và render thành page set hoàn chỉnh. Ưu tiên
 hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
 SVG bỏ đi được có thể làm hình minh họa, nhưng không bao giờ được đưa thành source hay JSON. Blank-box page và
 mockup bóng bẩy không có annotation đều là preview không hợp lệ.
+
+Representative không có nghĩa là viết tắt. Phải dựng content matrix cho từng page/state từ business truth rồi
+render đúng entity type, value có nghĩa, count, status, metadata, action, consequence và production-like density
+cần để hiểu surface. Lorem, generic card, toy row count, filler lặp và title-only shell đều là lỗi. Chỉ content
+ngoài scope đã khai mới được làm nhẹ về thị giác; owned business content không được rút gọn chỉ để author preview
+nhanh hơn.
 
 ## Từ chối
 
@@ -183,6 +194,10 @@ blocked: <những region không giải được nếu thiếu nó>
 Đầu ra **chính là** JSON, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này —
 không phải cái trích đoạn dưới đây. `envelope` giữ những thứ đổi theo lượt; hash chỉ phủ **một phương
 án**, nên cùng một quyết định chạy lại ở lượt sau vẫn ra đúng hash đó.
+
+Work mới dùng schema 4: `envelope.scope` khai screenshot `page` hoặc `flow` được mô tả; mọi candidate mang cùng
+danh sách `pages` có thứ tự, mỗi page mang nested `nodes` và tên region nó sở hữu, mỗi region bind `pageId` cùng
+`change`. Ví dụ schema 1 bên dưới chỉ ghi lại immutable history còn đọc được.
 
 ```json
 {

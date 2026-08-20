@@ -1,5 +1,5 @@
 ---
-title: Frontend design execute · Vietnamese
+title: starci-fe-design-execute · Vietnamese
 ---
 
 # starci-fe-design-execute
@@ -8,106 +8,74 @@ title: Frontend design execute · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@lints-fe` | `gates/fe/lints` | module | chứng minh source frontend bằng gate thật của nó |
-| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | tái tạo digest token được duyệt trong layout |
-| `@patterns-fe` | `compilers/patterns/fe` | module | resolve file, export và ranh giới import |
-| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra identity-centric head và immutable object ref |
-| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | yêu cầu registry v2 heads/projections current trước source execution |
-| `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts trước production write |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | resolve và kiểm tra registry worktree |
-| `@business` | `contexts/business/vi.md` | vi | chứng minh design đã accept vẫn khớp product truth hiện hành |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | ranh giới write approval và báo cáo dùng chung |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra frontend checkout |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra accepted revision authority |
+| `@business` | `contexts/business/vi.md` | vi | chứng minh behavior accepted còn khớp product truth |
+| `@principles` | `compilers/principles` | module | resolve accepted principle obligations |
+| `@design-review` | `publication/design-review-preview/vi.md` | vi | hợp đồng accepted bundle và screenshot parity |
+| `@patterns-fe` | `compilers/patterns/fe` | module | resolve product files, exports và boundary trước write |
+| `@lints-fe` | `gates/fe/lints` | module | chứng minh source ở canonical frontend gate |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | kiểm tra token đã bind bởi accepted layout |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve và validate current revision heads |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra accepted metadata và preview digest |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove authority trước source write |
 
 ## NESTED SKILLS
 
-Không có. Skill này không tự gọi skill khác.
+Không có.
 
-## Cách chạy
+## Run
 
-Đọc `@skill-shape` trước. Đây là skill frontend duy nhất ghi product source, vì vậy điều kiện bắt đầu của
-nó phải chặt nhất.
-Caller cung cấp `layoutId` ổn định; design registry là lookup authority duy nhất cho implementation.
+Capability này implement một accepted frontend composed page hoặc page flow và có quyền ghi product source. Exact path phải được nêu
+trong một `Touching` approval, rồi lấy clean baseline trước write đầu tiên.
 
-## QUY TRÌNH
+Current layout head và mọi declared block head phải resolve tới:
 
-### 1 — Lập context lock
+```text
+registries/revisions/<revisionHash>/design.json
+registries/revisions/<revisionHash>/preview.html
+```
 
-`Phase` là `execute`. `Touching` gọi đúng tên các path frontend lượt chạy được phép ghi và phải được owner
-xác nhận trước write đầu tiên. Phát hiện một path không đồng nghĩa được phép sửa nó.
+`design.json` sở hữu identity, ownership, contract/anatomy và state viewport manifest. `preview.html` sở hữu
+composition. Phải kiểm tra `previewSha256` và tính lại `revisionHash` từ canonical metadata cộng preview digest.
+Registry revision heads là implementation authority; legacy objects chỉ là lịch sử đọc được.
 
-### 2 — Từ chối nếu layout head hoặc mọi current region block head chưa accepted
+## Process
 
-Chạy `@design-registry-check`. Đọc `@design-registry-schema`, validate
-`registries/design-registry-v2.json`, rồi resolve `layoutId` caller cung cấp qua
-`layoutHeads[layoutId].head`, rồi resolve layout object immutable qua `objects.byHash`. Head là layout
-accepted; không đọc review history để chọn hash khác. Liệt kê mọi blockId trong
-`layoutHeads[layoutId].regions`, resolve `blockHeads[layoutId/blockId]` và yêu cầu
-`layoutHash` bằng layout hash hiện tại, `head` object tồn tại. Đây là toàn bộ implementation input; review
-lịch sử chỉ là audit history tùy chọn, không phải authority.
+1. Chạy registry check; resolve mọi page và nested ownership node có thứ tự trong current layout revision, rồi
+   mọi declared block revision theo page sở hữu. Bắt buộc exact parent
+   `layoutHash`, accepted artifacts, preview digest hợp lệ và state viewport manifest đầy đủ.
+2. Kiểm tra routed frontend, business heads và vocabulary. Nếu behavior hiện hành đổi route, data owner, action
+   hay reachable state, quay lại design thay vì implement authority stale.
+3. Đọc source và `@patterns-fe`, nêu smallest exact frontend path boundary dưới `### NEED APPROVALS`. `OK` chỉ
+   authorize các path đó. Lấy clean baseline trước first write; unrelated dirty work phải dừng.
+4. Tái dùng mọi node `existing` đã bind source, không nhân bản hay redesign. Implement accepted page-set
+   composition, giữ hierarchy, readable measure, surface/boundary ownership, breakpoint
+   exclusivity, selected treatment, icon meaning và đúng một scroll owner mỗi trục. Ưu tiên contract owner hiện có.
+   Preview CSS là evidence, không phải code để copy mù; token/pattern source vẫn là luật implementation.
+5. Implement mọi viewport/state pair trong từng `design.json`. Divider, `ScrollBranch` hay `SurfaceListCard` chỉ
+   bắt buộc khi accepted situation dùng nó; ví dụ không trở thành luật kiến trúc chung.
+6. Chạy canonical lint/tests và chụp product ở exact accepted viewport/state. So breakpoint chrome, hierarchy,
+   measure, region/surface bounds, divider ownership, scroll ownership và state treatment. Lint xanh nhưng visual
+   drift vẫn fail và phải sửa trong `Touching`.
+7. Đóng với applied revision heads, baseline, exact changed paths và proof chạy được. Path hay product decision
+   mới phải trả owner; deterministic repair không tạo approval checkpoint mới.
 
-Layout head hoặc bất kỳ region block head nào thiếu, malformed, proposed hay chưa accepted thì **dừng và
-gọi tên identity/hash**. Bắt đầu một phần sẽ sinh code chưa ai duyệt ở nơi khó hoàn tác nhất.
+## Stops
 
-### 3 — Kiểm tra route, rồi lấy baseline
+- Revision thiếu/proposed/legacy-only, digest sai, state thiếu hoặc stale parent → dừng và gọi identity.
+- Business behavior/vocabulary stale → quay lại design.
+- Target tree dirty hoặc cần path ngoài `Touching` → dừng.
+- Contract class/pattern không biểu diễn được → trả contract decision, không xấp xỉ.
+- Không sửa được lint/visual parity trong boundary → trả boundary, không suppress gate.
 
-Resolve mọi business feature mà design đã accept viện dẫn và check head với commit FE/BE đã route.
-Refresh truth thiếu hoặc stale trước baseline. Nếu business hiện hành làm anatomy đã accept không còn
-đúng, dừng và quay lại design approval; không ép source implement truth cũ.
+Implementation phải tái tạo accepted condition inventory, business-content matrix và transition graph. Browser
+proof phải tới mọi accepted state qua product control, resize cùng một page qua breakpoint và exercise mọi modal,
+drawer, menu/popover, expanded/collapsed, loading, empty, error, locked và disabled condition reachable.
+Render-only implementation hay screenshot-only parity đều fail.
 
-Đọc `@workspaces`, kiểm tra route `fe` (`WORKSPACE-5`), rồi chạy `@inventory-visual-language`. Digest phải
-bằng `direction.vocabularyAt` của mọi layout hiện tại. Sau đó mới commit target state và ghi
-`Baseline commit: <sha>` **trước** production write đầu tiên.
+## OUTPUT
 
-### 4 — Áp dụng direction nằm trong layout
-
-Đọc exact direction từ accepted layout. Token `reuse` phải còn resolve; token `new` chỉ áp dụng name và
-value đã bind, không chép preview CSS. Hai accepted layout trong cùng scope gán một semantic role xung đột
-thì dừng; không có direction hash thứ hai để chọn.
-
-### 5 — Resolve mọi class qua principles
-
-JSON đã accepted không chứa class. Bây giờ resolve class của từng node theo cách tất định:
-
-- mỗi node có một situation code cho mỗi principle và đúng một className từ code đó;
-- class ngoài closed union của contract là **unrepresentable**; nếu cần nó thì đây là contract change
-  phải trả owner, không được xấp xỉ;
-- khi hai code kề nhau cùng khớp, chọn rung nhỏ hơn chứ không chọn theo sở thích.
-
-Nếu phải dùng gu thẩm mỹ mới resolve được, principle đang thiếu. Ghi lại và không tự quyết tại đây.
-
-### 6 — Đặt file theo patterns
-
-Vị trí file, export, import được phép và tên gọi đều do `@patterns-fe` quyết định. Pattern là compiler,
-không phải gate, nên phải đọc **trước** dòng code đầu tiên. Node của entry phải được **render**, không được
-bắt chước: chép class sang vendor element sẽ làm mất `host` mà element đó không mang nổi, khiến source
-tưởng như theo contract trong khi accessibility tree lại sai.
-
-Thực hiện đúng mọi verdict `reuse`, `generalize`, `new` trong JSON accepted. `generalize` phải cập nhật
-mọi call site đã đo; rename còn sót một chỗ chưa hoàn tất.
-
-### 7 — Chứng minh bằng gates
-
-Chạy frontend lints từ `@lints-fe`. Finding phải được sửa, không suppression, disable hay khoét ngoại lệ
-để pass. Sau đó chứng minh surface render bằng đúng evidence approval yêu cầu, không dùng bản thay thế dễ
-làm hơn.
-
-### 8 — Đóng phase
-
-Ghi applied revision, baseline commit và tracked diff. Diff liệt kê mọi production path và phải khớp
-ranh giới đã duyệt; path ngoài `Touching` phải quay lại owner.
-
-## Điểm dừng
-
-- Layout hoặc current region block head thiếu, proposed hay chưa accepted → dừng và gọi tên identity/hash.
-- Direction tham chiếu token mất hoặc digest stale → dừng.
-- Accepted layout xung đột semantic role → trả product decision.
-- Class cần dùng nằm ngoài closed union → contract change, trả owner.
-- Principle không resolve được nếu thiếu preference → ghi gap và dừng node đó.
-- Lint finding không sửa được trong `Touching` → trả lại ranh giới, không suppression.
-- Không thể tạo baseline vì tree đã dirty bởi việc khác → dừng; baseline trộn state không chứng minh gì.
-
-## ĐẦU RA
-
-Nói `layoutId`, applied revision, path chính và proof bằng văn xuôi ngắn. Proof chạy được là `own` và phải chạy trước
-khi hết lượt; chỉ quyết định thẩm quyền thật mới nằm dưới `### NEED APPROVALS`.
+Nêu `layoutId`, applied layout/block revision hashes, baseline, material paths và code/visual proof bằng văn xuôi
+ngắn. Chỉ authority decision mới được nằm dưới `### NEED APPROVALS`. Không dùng bảng trạng thái.

@@ -11,9 +11,12 @@ description: Apply one small behavior or rendering correction inside an existing
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | use the shared context, ownership, approval, and reporting contract |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the requested frontend checkout |
+| `@business` | `contexts/business/context.md` | context | bind technical correction to implemented product truth |
+| `@principles` | `compilers/principles/context.md` | context | resolve existing visual situations without ad-hoc taste |
 | `@patterns-fe` | `compilers/patterns/fe/context.md` | context | load only the pattern modules reached by the existing component and requested correction |
 | `@lints-fe` | `gates/fe/lints/context.md` | context | route canonical lint findings without suppressing or guessing unknown rules |
 | `@scope-check` | `scripts/check-fe-minor-fix-scope.mjs` | script | enforce the existing-folder, file-count, and production-churn fence before and after the patch |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove technical-only work binds implemented truth |
 
 ## NESTED SKILLS
 
@@ -43,21 +46,25 @@ work and visual changes requiring a new anatomy are not minor fixes.
 ## Process
 
 1. Read `@skill-shape`, resolve `defaultLang`, then read `@workspaces` and verify the declared `fe` route.
-2. Name the exact component folder and run `@scope-check` without `--base`. Its printed HEAD is the scope
+2. Classify this lane as `businessImpact: none`; any changed flow, rule, state, operation, surface ownership or
+   acceptance condition is not minor and is rejected. Name the owning `featureId`, then run `@business-boundary`
+   against its current `implemented` head and routed FE baseline. Do not create a feature for a technical fix.
+3. Name the exact component folder and run `@scope-check` without `--base`. Its printed HEAD is the scope
    baseline. A dirty target or invalid tier is `MINOR-FIX-REJECTED`.
-3. Read the component, its colocated tests, its current callers only when needed to understand the defect,
+4. Read the component, its colocated tests, its current callers only when needed to understand the defect,
    and the contract entries it already cites. Do not open a design registry: this skill cannot change a
    design decision.
-4. Read `@patterns-fe` and load only reached child contexts before the first line. Keep the existing tier,
+5. For a visual correction, resolve the existing situation through `@principles`; then read `@patterns-fe` and
+   load only reached child contexts before the first line. Keep the existing tier,
    export family, connected/pure split, contract keys, tokens, copy ownership, and vendor boundary.
-5. Apply the smallest patch that changes the reported behavior. Do not refactor adjacent code, add a
+6. Apply the smallest patch that changes the reported behavior. Do not refactor adjacent code, add a
    helper folder, widen types, rename exports, or opportunistically clear unrelated findings.
-6. Run `@scope-check --base <baseline>`. If it rejects, undo only this run's hunks with `apply_patch`,
+7. Run `@scope-check --base <baseline>`. If it rejects, undo only this run's hunks with `apply_patch`,
    return `MINOR-FIX-REJECTED`, and leave pre-existing work untouched.
-7. Run the colocated targeted tests, repository typecheck, and canonical lint scoped to the component
+8. Run the colocated targeted tests, repository typecheck, and canonical lint scoped to the component
    folder. Read `@lints-fe` only for emitted rules. Repair findings inside the boundary without suppression;
    an unknown rule or a required outside path rejects the minor-fix run.
-8. Report the baseline, changed paths, production churn, and proof. Do not commit or push unless the
+9. Report the business head, baseline, changed paths, production churn, and proof. Do not commit or push unless the
    request explicitly includes that action.
 
 ## Stops

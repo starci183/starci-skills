@@ -76,6 +76,19 @@ async function check(schema, data, at, ctx, errors) {
     return;
   }
 
+  if (schema.anyOf) {
+    const outcomes = [];
+    for (const option of schema.anyOf) {
+      const local = [];
+      await check(option, data, at, ctx, local);
+      outcomes.push(local);
+    }
+    if (!outcomes.some((list) => list.length === 0)) {
+      const detail = outcomes.map((list, index) => `  option ${index}: ${list[0] ?? "matched"}`).join("\n");
+      errors.push(`${at}: matched no anyOf option\n${detail}`);
+    }
+  }
+
   if ("const" in schema && data !== schema.const) {
     return errors.push(`${at}: expected ${JSON.stringify(schema.const)}, got ${JSON.stringify(data)}`);
   }
@@ -326,6 +339,66 @@ function layoutRegionLaws(data) {
   return found;
 }
 
+function pageSetLaws(data) {
+  if (data.schema < 4 || !Array.isArray(data.candidates)) return [];
+  const found = [];
+  const candidates = data.candidates;
+  const first = candidates[0];
+  if (candidates.length < 3 || candidates.length > 4) {
+    found.push("candidates: every page or flow requires 3-4 complete page-set choices for model ranking");
+  }
+
+  const scopeSignature = canonical((first?.pages ?? []).map((page) => ({id: page.id, route: page.route, state: page.state})));
+  const existing = new Map();
+  for (const page of first?.pages ?? []) {
+    for (const node of page.nodes ?? []) if (node.change === "existing") existing.set(`${page.id}/${node.id}`, canonical(node));
+  }
+
+  for (const [candidateIndex, candidate] of candidates.entries()) {
+    if (canonical((candidate.pages ?? []).map((page) => ({id: page.id, route: page.route, state: page.state}))) !== scopeSignature) {
+      found.push(`candidates[${candidateIndex}].pages: candidate changes the approved page/route/state scope rather than its composition`);
+    }
+    const regionByName = new Map();
+    const candidateExisting = new Set();
+    for (const [regionIndex, region] of (candidate.regions ?? []).entries()) {
+      if (regionByName.has(region.name)) found.push(`candidates[${candidateIndex}].regions[${regionIndex}].name: duplicate block identity ${region.name}`);
+      regionByName.set(region.name, region);
+    }
+    const referenced = new Set();
+    const pageIds = new Set();
+    for (const [pageIndex, page] of (candidate.pages ?? []).entries()) {
+      if (pageIds.has(page.id)) found.push(`candidates[${candidateIndex}].pages[${pageIndex}].id: duplicate page identity ${page.id}`);
+      pageIds.add(page.id);
+      const nodeIds = new Set();
+      for (const [nodeIndex, node] of (page.nodes ?? []).entries()) {
+        if (nodeIds.has(node.id)) found.push(`candidates[${candidateIndex}].pages[${pageIndex}].nodes[${nodeIndex}].id: duplicate composition node ${node.id}`);
+        if (node.parentId && !nodeIds.has(node.parentId)) found.push(`candidates[${candidateIndex}].pages[${pageIndex}].nodes[${nodeIndex}].parentId: parent must precede its child`);
+        nodeIds.add(node.id);
+        const key = `${page.id}/${node.id}`;
+        if (node.change === "existing") candidateExisting.add(key);
+        if (existing.has(key) && canonical(node) !== existing.get(key)) found.push(`candidates[${candidateIndex}].pages[${pageIndex}].nodes[${nodeIndex}]: existing source-bound node differs between candidates`);
+      }
+      for (const [regionIndex, name] of (page.regions ?? []).entries()) {
+        if (referenced.has(name)) found.push(`candidates[${candidateIndex}].pages[${pageIndex}].regions[${regionIndex}]: region ${name} is owned by more than one page`);
+        referenced.add(name);
+        const region = regionByName.get(name);
+        if (!region) found.push(`candidates[${candidateIndex}].pages[${pageIndex}].regions[${regionIndex}]: absent region ${name}`);
+        else if (region.pageId !== page.id) found.push(`candidates[${candidateIndex}].regions: ${name} binds ${region.pageId}, not page ${page.id}`);
+      }
+    }
+    for (const name of regionByName.keys()) if (!referenced.has(name)) found.push(`candidates[${candidateIndex}].regions: ${name} is not placed on any page`);
+    for (const [key] of existing) {
+      const [pageId, nodeId] = key.split("/");
+      const node = (candidate.pages ?? []).find((page) => page.id === pageId)?.nodes?.find((item) => item.id === nodeId);
+      if (!node) found.push(`candidates[${candidateIndex}].pages: existing node ${key} disappeared from this choice`);
+    }
+    for (const key of candidateExisting) {
+      if (!existing.has(key)) found.push(`candidates[${candidateIndex}].pages: existing node ${key} was introduced in only this choice`);
+    }
+  }
+  return found;
+}
+
 // Canonical form: keys sorted at every depth, envelope excluded. Two runs of the same decision must
 // produce the same hash, so nothing that varies per run may sit inside the hashed object.
 function canonical(value) {
@@ -351,7 +424,7 @@ if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((cand
   await check(vocabularySchema, vocabulary, "$vocabulary", {doc: vocabularySchema, dir: dirname(vocabularySchemaPath)}, errors);
 }
 
-const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data), ...layoutRegionLaws(data)];
+const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data), ...layoutRegionLaws(data), ...pageSetLaws(data)];
 if (wantHash && Array.isArray(data.directions)) {
   broken.push("directions: recommendation has no approval hash; embed the recommended object in a layout candidate and hash that layout");
 }

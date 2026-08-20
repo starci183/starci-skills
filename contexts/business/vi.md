@@ -11,12 +11,13 @@ title: Business authority
 | `@feature-schema` | `contexts/business/schema.json` | file | từ chối business claim không được hỗ trợ hoặc truy vết |
 | `@registry-schema` | `contexts/business/registry.schema.json` | file | validate stable feature head và immutable object |
 | `@business-registry` | `scripts/business-registry.mjs` | script | validate, hash, publish và check business snapshot |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove exact head cấp quyền hoặc chặn source write |
 
 ## Record
 
-Business root là product model có evidence dùng chung cho frontend, backend và design. Nó ghi lại điều
-source đã route thực sự làm: actor, flow, rule, state, entity, operation, surface, acceptance và unknown
-rõ ràng. Nó không copy raw source hoặc nâng design idea, tài liệu mẫu hay suy luận của agent thành product truth.
+Business root là authority duy nhất của product truth dùng chung cho frontend, backend, design và mọi
+repo đã route. Nó ghi cả truth đã implement gần nhất lẫn intent được owner duyệt rõ ràng. Product source
+chứng minh implementation; nó không được âm thầm tự định nghĩa product truth khác.
 
 ## Law
 
@@ -30,10 +31,17 @@ Mọi claim ảnh hưởng flow, rule, state, API, surface hoặc acceptance ph�
 representative content. Target dirty chỉ được phép khi mọi dirty path nằm ngoài cited evidence boundary
 và snapshot bind committed `HEAD`, không bind working-tree bytes.
 
-Trước khi skill phụ thuộc business suy luận từ feature, nó check feature head hiện tại với routed FE/BE
-head. Truth thiếu hoặc stale được refresh bởi `starci-business-analyze`; consumer không tự sửa ngầm.
-Design preview dùng selected surface/region từ business object hiện hành, còn layout vẫn impressionistic
-và block design vẫn sở hữu anatomy cuối.
+Authority schema-v2 có đúng bốn state. `pending` là intent đã duyệt nhưng chưa mở implementation.
+`in-progress` là exact intent hiện được phép sửa source. `implemented` là truth đã reconcile với final
+committed source heads. `rejected` là lịch sử quyết định bị loại và tuyệt đối không cấp quyền sửa source.
+`baseHead` trỏ tới implemented truth gần nhất; `previousHead` chứng minh transition liền trước. Head
+schema-v1 cũ được đọc là `implemented`.
+
+Transition tiến hợp lệ duy nhất là `implemented → pending → in-progress → implemented`, có nhánh
+`pending|in-progress → rejected` và `rejected → pending`. Product write ảnh hưởng business bắt buộc
+feature head tương ứng ở `in-progress` trước write đầu tiên. Sau code và gates, feature phải reconcile
+thành `implemented` với final committed source heads. Thay đổi thuần kỹ thuật khai
+`businessImpact: none`, bind implemented head hiện tại và không tạo feature giả.
 
 ## Rules
 
@@ -44,8 +52,11 @@ và block design vẫn sở hữu anatomy cuối.
 5. Example import chỉ cho cấu trúc, không cho business fact.
 6. `CONTEXT.md`, task module, `spec.md` và `evidence.json` là view sinh từ `model.json`; immutable object mới là authority.
 7. LLM load `CONTEXT.md` trước, rồi chỉ load flow/surface module task cần.
-8. Consumer từ chối feature stale thay vì bịa representative data.
-9. Update business không cấp quyền sửa product source.
+8. Mọi repo đã route tin business head và đọc authority status trước khi hành động.
+9. `pending` được dùng cho design/planning; chỉ `in-progress` cấp quyền write source ảnh hưởng business.
+10. `rejected` không mô tả runtime truth và không bao giờ cấp quyền implementation.
+11. Sáng tạo chạy trước trong intent đã duyệt, rồi principles review, source patterns, code và gates.
+12. Update business riêng nó không cấp quyền sửa product source ngoài intent.
 
 ## Output
 

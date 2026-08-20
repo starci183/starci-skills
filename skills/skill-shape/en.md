@@ -88,15 +88,15 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-diagnose` | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
-| `starci-fe-design-layout` | evidence-select one direction recommendation, then present 3–4 direction-backed layouts under one hash approval |
-| `starci-fe-design-block` | 3–4 anatomies per region under the direction embedded in its layout, hash-bound |
+| `starci-fe-design-layout` | challenge and compose complete source-bound page/page-flow previews; expose only alternatives that materially improve the decision |
+| `starci-fe-design-block` | judge a region inside its complete accepted page and expose only materially distinct anatomies, hash-bound |
 | `starci-fe-design-execute` | frontend source, only after every reachable hash is accepted |
 | `starci-fe-minor-fix` | one small contract-preserving correction inside one clean existing block, composite or leaf folder, machine-rejected when its scope grows |
 | `starci-conversation-record` | provider-neutral conversation provenance snapshots and exact FE/BE artifact links without raw transcript Git storage |
 | `starci-be-plan` | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approval, then backend source |
 
-Layout resolves or creates a stable `layoutId`. Execute still refuses to write while any region under its
+Layout resolves or creates a stable `layoutId` for a composed page set, reusing source-bound existing nested layouts. Execute still refuses to write while any region under its
 accepted head lacks a current accepted block. `OK`
 authorizes the displayed boundary only; no skill assumes another capability was requested.
 
@@ -138,12 +138,22 @@ The owner sees both decisions together; one `OK` accepts the recommended layout 
 embedded direction. Each recorded round keeps the exact prompt, candidates, feedback and owner verdict.
 Feedback on either direction or structure opens a new round; it never edits an accepted round.
 
-Before writing, read canon, contracts and live source, then name the objective, evidence, exact boundary,
-decision and acceptance evidence. When owner authority is required, wait for `OK` before the first
-production write and preserve rejected alternatives with the owner's reason.
+Every frontend design candidate is a self-contained functional HTML page at production-like representative
+business density. Before drawing, inventory viewport, overlay, disclosure, async, data, permission and interaction
+conditions; render every reachable state, explicitly mark irrelevant families `not-applicable`, and connect states
+with visible keyboard-operable in-page controls. Desktop/mobile, modal, drawer, menu/popover, loading, empty,
+error, locked and disabled conditions are proof obligations when evidence makes them reachable. A static render,
+toy content or QA-only state switcher cannot be selected or published.
+
+Before writing, read business authority, canon, contracts and live source, then name `businessImpact`,
+the stable feature/head, objective, evidence, exact boundary, decision and acceptance evidence.
+Business-affecting work requires `in-progress`; technical-only work binds `implemented` with
+`businessImpact: none` and creates no feature. When owner authority is required, wait for `OK` before the
+first production write and preserve rejected alternatives with the owner's reason.
 
 After authorization, confirm the write boundary, record a baseline commit taken **before** the change,
-implement the approved revision and prove it at the production boundary. A path outside `Touching`
+implement the approved revision and prove it at the production boundary. Business-affecting work then
+reconciles final committed source to `implemented`. A path outside `Touching`
 returns to its owner instead of arriving quietly in a diff.
 
 ## User-facing output
@@ -206,7 +216,7 @@ appended.
 **Run.** "Design the coding drill result page."
 
 The run says: `I am designing example-app against the verified frontend route; this action writes only
-the design review.` It presents 3–4 direction-backed layouts and one default under `NEED APPROVALS`.
+the design review.` It presents the schema-enforced adaptive number of complete page-set choices and one default under `NEED APPROVALS`.
 After `OK`, it binds the hash and finishes every `own` item in Layout without asking again. Block remains
 a separate capability request.
 

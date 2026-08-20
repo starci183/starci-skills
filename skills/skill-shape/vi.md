@@ -89,15 +89,15 @@ thể ngay từ đầu nó đã đúng.
 | `starci-diagnose` | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
-| `starci-fe-design-layout` | chọn một direction recommendation bằng evidence, rồi trình 3–4 layout đã nhúng direction dưới một approval hash |
-| `starci-fe-design-block` | 3–4 giải phẫu mỗi region dưới direction nằm trong layout của nó, buộc theo hash |
+| `starci-fe-design-layout` | chất vấn và compose preview page/page-flow nguyên vẹn đã bind source; chỉ đưa ra alternative thực sự cải thiện quyết định |
+| `starci-fe-design-block` | đánh giá region trong toàn accepted page và chỉ đưa ra anatomy khác biệt đáng kể, buộc theo hash |
 | `starci-fe-design-execute` | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
 | `starci-fe-minor-fix` | một correction nhỏ giữ nguyên contract trong một folder block, composite hoặc leaf hiện hữu và sạch; machine reject khi scope lớn lên |
 | `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | sự chấp thuận, rồi source backend |
 
-Layout resolve hoặc tạo stable `layoutId`. Execute vẫn từ chối ghi khi còn region dưới accepted head chưa
+Layout resolve hoặc tạo stable `layoutId` cho page set đã compose và tái dùng nested layout existing có source binding. Execute vẫn từ chối ghi khi còn region dưới accepted head chưa
 có current accepted block. `OK` chỉ cấp quyền cho
 boundary đã hiển thị; không skill nào tự cho rằng capability khác đã được yêu cầu.
 
@@ -138,12 +138,21 @@ cùng lúc; một `OK` chấp nhận layout hash mặc định và vì vậy ch�
 đúng prompt, candidate, feedback và phán quyết của owner. Phản hồi về direction hoặc structure mở lượt
 mới; nó không bao giờ sửa lượt đã được chấp nhận.
 
-Trước khi ghi, đọc canon, hợp đồng và source sống rồi nêu mục tiêu, bằng chứng, boundary chính xác,
-quyết định và bằng chứng nghiệm thu. Khi cần quyền owner, chờ `OK` trước lần ghi sản phẩm đầu tiên và giữ
-lại phương án bị từ chối cùng lý do của owner.
+Mọi frontend design candidate phải là trang HTML functional, self-contained với representative business density
+gần production. Trước khi vẽ phải inventory condition viewport, overlay, disclosure, async, data, permission và
+interaction; render mọi state reachable, ghi rõ `not-applicable` cho family không liên quan, và nối state bằng
+in-page control visible, keyboard-operable. Desktop/mobile, modal, drawer, menu/popover, loading, empty, error,
+locked và disabled là proof obligation khi evidence cho thấy reachable. Static render, toy content hay QA-only
+state switcher không thể được chọn hoặc publish.
+
+Trước khi ghi, đọc business authority, canon, hợp đồng và source sống rồi nêu `businessImpact`, stable
+feature/head, mục tiêu, bằng chứng, boundary chính xác, quyết định và bằng chứng nghiệm thu. Work ảnh hưởng
+business cần `in-progress`; work thuần kỹ thuật bind `implemented` với `businessImpact: none` và không tạo
+feature. Khi cần quyền owner, chờ `OK` trước lần ghi sản phẩm đầu tiên và giữ lại phương án bị từ chối cùng lý do của owner.
 
 Sau khi được cấp quyền, xác nhận boundary ghi, lấy baseline commit **trước** khi sửa, thi hành revision
-đã duyệt và chứng minh tại biên sản phẩm. Một đường dẫn ngoài `Touching` được trả về cho chủ của nó,
+đã duyệt và chứng minh tại biên sản phẩm. Work ảnh hưởng business sau đó reconcile final committed source
+thành `implemented`. Một đường dẫn ngoài `Touching` được trả về cho chủ của nó,
 không được lặng lẽ xuất hiện trong diff.
 
 ## Đầu ra cho người dùng
@@ -204,7 +213,7 @@ thêm**.
 **Lượt chạy.** "Thiết kế trang kết quả bài luyện coding."
 
 Lượt chạy nói: `Em đang thiết kế example-app trên route frontend đã verify; hành động này chỉ ghi design
-review và registry heads.` Nó trình 3–4 layout có direction cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
+review và registry heads.` Nó trình số page-set hoàn chỉnh thích ứng theo schema cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
 và làm hết mọi mục `own` của Layout mà không hỏi lại. Block vẫn là capability request riêng.
 
 ## Phạm vi

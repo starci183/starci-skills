@@ -149,6 +149,8 @@
       "required": ["name", "entry", "assembler", "mount", "whyMatch", "block"],
       "properties": {
         "name": {"$ref": "#/$defs/slug"},
+        "pageId": {"$ref": "#/$defs/slug"},
+        "change": {"enum": ["existing", "proposed", "new"]},
         "entry": {"type": "object"},
         "assembler": {"type": "string", "minLength": 1},
         "mount": {"type": "string", "minLength": 1},
@@ -205,18 +207,53 @@
         "status": {"enum": ["accepted", "proposed", "superseded"]},
         "reason": {"type": "string"},
         "axes": {"type": "object", "additionalProperties": {"type": "string"}},
+        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/composedPage"}},
         "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}}
+      }
+    },
+    "compositionNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "change"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "kind": {"enum": ["root-layout", "app-layout", "feature-layout", "page", "modal", "drawer", "popover", "floating-action", "panel"]},
+        "change": {"enum": ["existing", "proposed", "new"]},
+        "parentId": {"$ref": "#/$defs/slug"},
+        "source": {"type": "string"},
+        "sourceHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "composedPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "route", "state", "nodes", "regions"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "route": {"type": "string", "minLength": 1},
+        "state": {"$ref": "#/$defs/slug"},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/compositionNode"}},
+        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/slug"}}
       }
     },
     "layoutReview": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["layoutId", "recommendedId", "theme", "candidates", "shell", "content"],
+      "required": ["layoutId", "recommendedId", "theme", "candidates"],
       "properties": {
         "layoutId": {"$ref": "#/$defs/slug"},
         "routePattern": {"type": "string"},
         "currentHead": {"$ref": "#/$defs/hash"},
         "recommendedId": {"$ref": "#/$defs/slug"},
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": {"enum": ["page", "flow"]},
+            "source": {"enum": ["screenshot", "description"]}
+          }
+        },
         "theme": {"type": "object", "additionalProperties": {"$ref": "#/$defs/themeRole"}},
         "candidates": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/layoutCandidate"}},
         "visualDirections": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "object"}},

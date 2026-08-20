@@ -2,10 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v2/contexts/worktrees/design-registry.schema.json",
   "title": "Identity-centric design registry",
-  "description": "Version 2 keeps stable layout and block identities separate from mutable review records. Hash-addressed objects are immutable; heads are the only current pointers.",
+  "description": "Version 2 keeps stable layout and block identities separate from mutable review records. New accepted designs are immutable two-file revision bundles; legacy hash-addressed JSON objects remain readable during migration.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "project", "hashAlgorithm", "canonicalization", "layoutHeads", "blockHeads", "objects"],
+  "required": ["schemaVersion", "project", "hashAlgorithm", "canonicalization", "layoutHeads", "blockHeads"],
+  "anyOf": [
+    {"required": ["revisions"]},
+    {"required": ["objects"]}
+  ],
   "properties": {
     "schemaVersion": {"const": 2},
     "project": {"$ref": "#/$defs/slug"},
@@ -20,6 +24,19 @@
       "type": "object",
       "propertyNames": {"$ref": "#/$defs/scopedId"},
       "additionalProperties": {"$ref": "#/$defs/blockHead"}
+    },
+    "revisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["immutable", "byHash"],
+      "properties": {
+        "immutable": {"const": true},
+        "byHash": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/hash"},
+          "additionalProperties": {"$ref": "#/$defs/revisionRef"}
+        }
+      }
     },
     "objects": {
       "type": "object",
@@ -83,6 +100,15 @@
       "properties": {
         "hash": {"$ref": "#/$defs/hash"},
         "path": {"type": "string", "pattern": "^objects/sha256/[0-9a-f]{64}\\.json$"}
+      }
+    },
+    "revisionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash", "path"],
+      "properties": {
+        "hash": {"$ref": "#/$defs/hash"},
+        "path": {"type": "string", "pattern": "^revisions/[0-9a-f]{64}$"}
       }
     },
     "review": {

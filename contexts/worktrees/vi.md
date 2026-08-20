@@ -41,7 +41,7 @@ rác, và một cây luật có mảnh vụn của run trong đó thì thôi đ�
 | `WORKTREE-4` | Registry worktree thuộc một Git common directory khác | từ chối; đó không phải state của Source này |
 | `WORKTREE-5` | Nhiều agent song song sắp ghi | chỉ cô lập khi hai agent sửa cùng một file |
 | `WORKTREE-6` | Một worktree đã cũ, prunable, hoặc chắn đường | prune có chủ đích; không bao giờ xoá thư mục bằng tay |
-| `WORKTREE-7` | Một design identity cần accepted version bền vững | head record `layoutId`/`blockId` ổn định trong `registries`; body bất biến ở `objects/sha256` |
+| `WORKTREE-7` | Một design identity cần accepted version bền vững | head `layoutId`/`blockId` ổn định cùng bundle bất biến `revisions/<revisionHash>/{design.json,preview.html}` |
 | `WORKTREE-8` | Product truth có evidence phải phục vụ FE, BE và design | stable `featureId` head trong `businesses`, lock trên `codex/businesses/<project>` |
 
 ## Đọc một lượt chạy
@@ -56,8 +56,8 @@ rác, và một cây luật có mảnh vụn của run trong đó thì thôi đ�
    không cần worktree nào cả — `WORKTREE-5`.
 5. **Để repository đích yên.** Giấy tờ nội bộ của một lượt chạy không bao giờ rơi vào repository đang được
    làm; bản ghi sản phẩm bền thuộc về repository đó qua đường rà soát của chính nó, không qua state này.
-6. **Tách identity khỏi review history.** Layout/block ID resolve accepted head trực tiếp từ `registries`;
-   `reviews` giữ decision, còn draft chưa xong nằm dưới `cache/drafts` — `WORKTREE-7`.
+6. **Tách authority khỏi progress dựng lại được.** Layout/block ID resolve accepted revision head trực tiếp
+   từ `registries`; candidate thua và draft chưa xong nằm dưới `cache/drafts` — `WORKTREE-7`.
 7. **Tách product truth khỏi design decision.** Business feature head và evidence nằm trong `businesses`;
    layout/block head vẫn nằm trong `registries` — `WORKTREE-8`.
 
@@ -190,20 +190,21 @@ từ một background agent, nơi không ai đang nhìn xem nó đứng trên nh
 
 - Route/surface có một semantic `layoutId` ổn định, không phụ thuộc locale, runtime parameter hay prompt.
 - Region có một `blockId` ổn định, scope dưới `layoutId`.
-- Candidate body đã sống dưới immutable SHA-256 objects.
+- Design đã accept cần metadata bất biến cùng đúng HTML mà owner đã duyệt.
 
 **Tự hỏi.** Executor có resolve current accepted design chỉ từ `layoutId`, không cần biết review id hoặc
 scan review history không?
 
 **Ranh giới**
 
-- `WORKTREE-1`: accepted heads và immutable objects là durable registry state.
-- `WORKTREE-2`: prompt dở, preview và candidate batch chưa xong là rebuildable progress.
+- `WORKTREE-1`: accepted head và bundle revision hai file của nó là durable registry state.
+- `WORKTREE-2`: prompt dở và mọi preview candidate chưa accept là progress dựng lại được.
 
-**Nó phát ra.** `layouts/by-id/<layoutId>.json` giữ route pattern, accepted layout head và regions đã khai.
-`blocks/by-id/<layoutId>/<blockId>.json` giữ accepted block head cùng exact parent `layoutHash` mà block
-được design dưới đó. `reviews/` có thể cite candidate, feedback và accepted hash, nhưng reader không cần
-review id để tìm current state. Thay head thì append history; không bao giờ sửa object.
+**Nó phát ra.** `design-registry-v2.json` map stable layout/block identity trực tiếp tới accepted revision
+hash. Mỗi `revisions/<revisionHash>/` chỉ chứa `design.json` và `preview.html`; `design.json` bind identity,
+state viewport và preview digest, còn block bind thêm exact parent `layoutHash`. Revision hash bind canonical
+design metadata cùng preview digest đó. Record legacy ở `objects/sha256` vẫn đọc được trong lúc di trú,
+nhưng acceptance mới không cần by-id projection hay review record làm authority thứ hai.
 
 **Nó hỏng bằng đường nào.** Skill tìm một review record cũ, khiến block hợp lệ thành unreachable khi caller
 không biết review nào tình cờ chứa nó. Review history âm thầm thành current-state database thứ hai.
@@ -260,7 +261,7 @@ thành truth, hoặc thành tài liệu viết tay không còn khớp repository
 8. Worktree cũ được prune qua Git, không bao giờ bằng cách xoá thư mục, và không bao giờ từ một background
    agent.
 9. Design identity là `layoutId` hoặc `(layoutId, blockId)`; content hash là version, không phải identity.
-10. Accepted head resolve trực tiếp từ stable identity. Review là append-only evidence; draft là cache dựng lại được.
+10. Accepted head resolve trực tiếp từ stable identity tới bundle revision hai file bất biến; draft là cache dựng lại được.
 11. Block head phải nêu parent `layoutHash`; block accept dưới layout cũ là stale, không phải current.
 12. Business feature identity là `featureId`; mỗi head bind source commit đã route và immutable evidence.
 

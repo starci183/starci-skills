@@ -1,6 +1,6 @@
 ---
 name: starci-business-analyze
-description: "Analyze one routed project's frontend and backend into an evidence-backed business feature registry with stable feature heads, human specs and prototype-ready surfaces. Use when product truth is missing, stale, disputed, or needed before design/planning; never changes product source or imports facts from examples."
+description: "Create, advance or reconcile one routed project's evidence-backed business feature authority through pending, in-progress, implemented and rejected heads. Use when product truth or owner intent must exist before design, planning or source writes; never changes product source or imports facts from examples."
 ---
 
 # starci-business-analyze
@@ -20,7 +20,7 @@ None. A stop ends this run; this skill never invokes another skill as recovery.
 
 ## Purpose
 
-Build or refresh one stable `featureId` from the routed FE and BE at committed heads. The output is an
+Build, advance or reconcile one stable `featureId` from routed source evidence and explicit owner intent. The output is an
 immutable machine model plus a compact `CONTEXT.md`, task-routed Markdown modules and `evidence.json` under
 `.worktrees/<project>/businesses`. The model is the source design, planning and implementation use; the
 Markdown is its human view.
@@ -44,29 +44,32 @@ source become explicit `unknowns`.
    - frontend operations, types, session/authorization and interaction tests;
    - backend resolvers/controllers, handlers/services, schema/entities and tests;
    - sibling feature families only when needed to resolve an exact contract.
-5. Create one feature model valid against `@business/@feature-schema`. Every actor, flow, rule, state,
+5. Select exactly one authority operation: observe a new implemented feature, publish accepted intent as
+   `pending`, advance that exact head to `in-progress`, publish `rejected`, or reconcile completed source
+   as `implemented`. Never skip `pending → in-progress` for a business-affecting write.
+6. Create one feature model valid against `@business/@feature-schema`. Every actor, flow, rule, state,
    entity, operation, surface, region and acceptance assertion cites evidence in the same model.
    Evidence records role, relative path, exact line range, claim and kind.
-6. Keep presentation and truth separate. Surface regions carry real identities, statuses, actions and
+7. Keep presentation and truth separate. Surface regions carry real identities, statuses, actions and
    states for prototype rendering, but never add totals, roles, APIs or behavior absent from evidence.
-7. Run:
+8. Run:
    `node .claude/scripts/business-registry.mjs --source <Source> --project <project> --input <model.json>`.
    Fix schema, reference, route, head, line-range or dirty-evidence failures before publication.
-8. Re-run with `--apply`, inspect the generated `model.json`, `spec.md` and `evidence.json`, then commit
+9. Re-run with `--apply`, inspect the generated `model.json`, `spec.md` and `evidence.json`, then commit
    only the business worktree with `docs(business): refresh <featureId>`. The generated feature folder is:
    `CONTEXT.md`, `overview.md`, `actors.md`, `rules.md`, `states.md`, `contracts.md`, `acceptance.md`,
    `flows/<flowId>.md`, `surfaces/<surfaceId>.md`, `model.json`, `evidence.json` and aggregate `spec.md`.
    `CONTEXT.md` is the default LLM entry; load only the flow/surface module needed by the task.
-9. Prove currentness with `--check --feature <featureId>` and report the feature hash, source heads,
+10. Prove currentness with `--check --feature <featureId>` and report authority status, base head, feature hash, source heads,
    surface IDs, unknown count and committed business head.
 
 ## Refresh contract for consumers
 
-Business-dependent layout, block, execute and backend planning runs check the required feature before
-using it. If the feature is absent or stale, that run performs this same evidence-and-publication phase
-inside its disclosed business write boundary before continuing. It must not merely rewrite source heads:
-changed source requires re-reading affected claims and line ranges. If current source cannot answer a
-product choice, preserve the unknown and request approval only when the consuming task cannot proceed.
+Business-dependent consumers trust the current business head, including its state. `pending` permits
+design and planning. `in-progress` permits only the exact declared implementation. `implemented` is
+runtime truth. `rejected` refuses implementation. Purely technical work binds the current implemented
+head with `businessImpact: none`; it never creates or advances a feature. Reconciliation must re-read
+changed claims and bind final committed source heads, never merely rewrite hashes.
 
 ## Refusals
 
@@ -75,8 +78,8 @@ product choice, preserve the unknown and request approval only when the consumin
 - The business worktree is missing, dirty, unlocked, foreign or on the wrong branch.
 - A claim cites no evidence, or an evidence ID is dangling.
 - An example, screenshot, conversation or design candidate is being treated as implemented business.
-- The request actually asks to change product behavior; that belongs to its implementation skill after
-  business truth or owner intent is explicit.
+- A requested transition skips the state machine, loses `baseHead`/`previousHead`, or tries to implement
+  a `pending` or `rejected` head.
 
 ## Output
 

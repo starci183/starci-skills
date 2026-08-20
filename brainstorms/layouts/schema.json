@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"enum": [1, 2, 3], "description": "Artifact version. Schema 2 requires hashed child-region geometry; schema 3 also requires a hashed representative brief for every child. Older accepted objects remain valid and are never rewritten."},
+    "schema": {"enum": [1, 2, 3, 4], "description": "Artifact version. Schema 4 binds a composed page set: every visible page records its nested layouts, routed page, active overlays and target regions. Older accepted objects remain valid and are never rewritten."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -32,6 +32,34 @@
           }
         }
       }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 4}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope"]}]},
+          "candidates": {
+            "items": {
+              "allOf": [
+                {"$ref": "#/$defs/candidate"},
+                {
+                  "required": ["pages"],
+                  "properties": {
+                    "regions": {
+                      "items": {
+                        "allOf": [
+                          {"$ref": "#/$defs/region"},
+                          {"required": ["pageId", "change", "geometry", "brief"]}
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -45,7 +73,18 @@
         "project": {"$ref": "#/$defs/slug"},
         "surface": {"$ref": "#/$defs/slug", "description": "Stable layout identity is the surface, not the prompt."},
         "prompt": {"type": "string", "minLength": 1},
-        "contractAt": {"type": "string", "minLength": 1, "description": "The contract state these candidates were resolved against."}
+        "contractAt": {"type": "string", "minLength": 1, "description": "The contract state these candidates were resolved against."},
+        "scope": {"$ref": "#/$defs/scope"}
+      }
+    },
+    "scope": {
+      "description": "How the owner supplied the experience. Candidate count is derived from the number of rendered page/overlay surfaces, never padded by habit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source"],
+      "properties": {
+        "kind": {"enum": ["page", "flow"]},
+        "source": {"enum": ["screenshot", "description"]}
       }
     },
     "candidate": {
@@ -63,8 +102,42 @@
           "description": "A precedent id, or `none`. At least one candidate in a batch must be `none` — the departure. Written as one pattern rather than a choice between an id and a literal, because `none` satisfies both and an ambiguous choice is not a choice."
         },
         "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}},
+        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/page"}},
         "reason": {"type": "string", "minLength": 12}
       }
+    },
+    "page": {
+      "description": "One complete visible page in a page set. Nodes are ordered outermost to innermost and include every active overlay or floating surface visible in the reviewed state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "route", "state", "nodes", "regions"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "route": {"type": "string", "minLength": 1},
+        "state": {"$ref": "#/$defs/slug"},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/compositionNode"}},
+        "regions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}
+      }
+    },
+    "compositionNode": {
+      "description": "One visible owner in the composed viewport. Existing owners are source-bound evidence and may not vary across candidates.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "change"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "kind": {"enum": ["root-layout", "app-layout", "feature-layout", "page", "modal", "drawer", "popover", "floating-action", "panel"]},
+        "change": {"enum": ["existing", "proposed", "new"]},
+        "parentId": {"$ref": "#/$defs/slug"},
+        "source": {"type": "string", "minLength": 1},
+        "sourceHash": {"$ref": "#/$defs/hash"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"change": {"const": "existing"}}, "required": ["change"]},
+          "then": {"required": ["source", "sourceHash"]}
+        }
+      ]
     },
     "axes": {
       "description": "The closed diversity set. Two candidates with an identical set are one candidate.",
@@ -84,6 +157,8 @@
       "required": ["name", "entry", "assembler", "mount", "whyMatch"],
       "properties": {
         "name": {"$ref": "#/$defs/slug"},
+        "pageId": {"$ref": "#/$defs/slug"},
+        "change": {"enum": ["existing", "proposed", "new"]},
         "entry": {"$ref": "#/$defs/entryVerdict"},
         "assembler": {"$ref": "#/$defs/pascal", "description": "A branch that exists in the frontend's branch inventory."},
         "mount": {"enum": ["mounts-once", "per-route", "overlay"]},
@@ -181,6 +256,7 @@
         "blocked": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/slug"}}
       }
     },
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
     "pascal": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"}
   }

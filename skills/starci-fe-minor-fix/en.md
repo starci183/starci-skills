@@ -10,9 +10,12 @@ title: starci-fe-minor-fix · English
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | use the shared context, ownership, approval, and reporting contract |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the requested frontend checkout |
+| `@business` | `contexts/business/en.md` | en | bind correction to implemented truth |
+| `@principles` | `compilers/principles` | module | resolve existing visual situations |
 | `@patterns-fe` | `compilers/patterns/fe` | module | load only the pattern modules reached by the existing component and requested correction |
 | `@lints-fe` | `gates/fe/lints` | module | route canonical lint findings without suppressing or guessing unknown rules |
 | `@scope-check` | `scripts/check-fe-minor-fix-scope.mjs` | script | enforce the existing-folder, file-count, and production-churn fence before and after the patch |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove technical-only business boundary |
 
 ## NESTED SKILLS
 

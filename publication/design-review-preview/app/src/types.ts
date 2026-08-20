@@ -23,6 +23,22 @@ export type PartReview = {
   readonly whyMatch: string
 }
 
+export type PreviewViewport = {
+  readonly width: number
+  readonly height: number
+}
+
+export type HtmlPreviewState = {
+  readonly id: string
+  readonly html: string
+  readonly viewport: PreviewViewport
+}
+
+export type HtmlPreview = {
+  readonly html: string
+  readonly states: ReadonlyArray<HtmlPreviewState>
+}
+
 export type BlockCandidate = {
   readonly id: string
   readonly hash: string
@@ -32,6 +48,7 @@ export type BlockCandidate = {
   readonly states: ReadonlyArray<string>
   readonly parts: ReadonlyArray<PartReview>
   readonly restingCount?: number
+  readonly preview?: HtmlPreview
 }
 
 export type ChildBlockReview = {
@@ -42,12 +59,13 @@ export type ChildBlockReview = {
   readonly currentHead?: string
   readonly recommendedId?: string
   readonly renderedId?: string
-  readonly content?: ReviewContent
   readonly candidates: ReadonlyArray<BlockCandidate>
 }
 
 export type RegionReview = {
   readonly name: string
+  readonly pageId?: string
+  readonly change?: "existing" | "proposed" | "new"
   readonly entry: EntryVerdict
   readonly assembler: string
   readonly mount: string
@@ -79,7 +97,22 @@ export type LayoutCandidate = {
   readonly status: CandidateStatus
   readonly reason: string
   readonly axes: Record<string, string>
+  readonly pages?: ReadonlyArray<{
+    readonly id: string
+    readonly route: string
+    readonly state: string
+    readonly nodes: ReadonlyArray<{
+      readonly id: string
+      readonly kind: "root-layout" | "app-layout" | "feature-layout" | "page" | "modal" | "drawer" | "popover" | "floating-action" | "panel"
+      readonly change: "existing" | "proposed" | "new"
+      readonly parentId?: string
+      readonly source?: string
+      readonly sourceHash?: string
+    }>
+    readonly regions: ReadonlyArray<string>
+  }>
   readonly regions: ReadonlyArray<RegionReview>
+  readonly preview?: HtmlPreview
 }
 
 export type DirectionReview = {
@@ -91,31 +124,16 @@ export type DirectionReview = {
   readonly reason: string
 }
 
-export type ReviewContent = {
-  readonly eyebrow: string
-  readonly title: string
-  readonly description: string
-  readonly primaryAction: string
-  readonly rows: ReadonlyArray<{readonly title: string; readonly description: string; readonly meta?: string}>
-}
-
-export type ShellDescriptor = {
-  readonly product: string
-  readonly navigation: ReadonlyArray<{readonly id: string; readonly label: string}>
-  readonly activeItem?: string
-}
-
 export type LayoutReview = {
   readonly layoutId: string
   readonly routePattern?: string
   readonly currentHead?: string
   readonly recommendedId: string
+  readonly scope?: {readonly kind: "page" | "flow"; readonly source: "screenshot" | "description"}
   readonly theme: Record<string, ThemeRole>
   readonly candidates: ReadonlyArray<LayoutCandidate>
   readonly visualDirections?: ReadonlyArray<DirectionReview>
   readonly visualDirectionRecommendation?: {readonly id: string; readonly reason: string}
-  readonly shell: ShellDescriptor
-  readonly content: ReviewContent
 }
 
 export type ReviewManifest = {

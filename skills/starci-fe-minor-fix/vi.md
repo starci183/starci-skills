@@ -10,9 +10,12 @@ title: starci-fe-minor-fix · Vietnamese
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | dùng contract chung về context, ownership, approval và báo cáo |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend được yêu cầu |
+| `@business` | `contexts/business/vi.md` | vi | bind correction vào implemented truth |
+| `@principles` | `compilers/principles` | module | resolve existing visual situations |
 | `@patterns-fe` | `compilers/patterns/fe` | module | chỉ nạp pattern module mà component hiện hữu và correction thực sự chạm tới |
 | `@lints-fe` | `gates/fe/lints` | module | route lint finding chuẩn mà không suppress hoặc đoán unknown rule |
 | `@scope-check` | `scripts/check-fe-minor-fix-scope.mjs` | script | ép biên folder hiện hữu, số file và production churn trước/sau patch |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove technical-only business boundary |
 
 ## NESTED SKILLS
 

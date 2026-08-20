@@ -1,5 +1,5 @@
 ---
-title: Frontend design layout · Vietnamese
+title: starci-fe-design-layout · Vietnamese
 ---
 
 # starci-fe-design-layout
@@ -8,248 +8,111 @@ title: Frontend design layout · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape/vi.md` | vi | cung cấp interaction và approval contract chung |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | tách record bền khỏi preview dùng xong bỏ |
-| `@business` | `contexts/business/vi.md` | vi | resolve feature truth hiện hành và surface sẵn sàng cho prototype |
-| `@directions` | `brainstorms/directions/vi.md` | vi | sinh lựa chọn thị giác được nhúng vào layout |
-| `@layouts` | `brainstorms/layouts/vi.md` | vi | định nghĩa region, axis và contract verdict của layout |
-| `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo reason mà không trả class array |
-| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | sinh kiểm kê token sống cho direction |
-| `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate JSON layout candidate |
-| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | kiểm tra registry identity-centric và các current head |
-| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps không phá huỷ và verify identity heads current |
-| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects và by-id projections |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate artifact và sinh hash |
-| `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa manifest, interaction và authority boundary của Vite review dùng chung |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | build review app dùng chung từ layout JSON đã validate thay vì HTML riêng |
+| `@skill-shape` | `skills/skill-shape/vi.md` | vi | ranh giới approval và báo cáo dùng chung |
+| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra route frontend |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | tách revision bền vững khỏi draft tạm |
+| `@business` | `contexts/business/vi.md` | vi | bind trang vào product truth hiện hành |
+| `@principles` | `compilers/principles` | module | review quyết định thị giác sau sáng tạo |
+| `@directions` | `brainstorms/directions/vi.md` | vi | chọn direction có bằng chứng để nhúng vào layout |
+| `@layouts` | `brainstorms/layouts/vi.md` | vi | region, axis, ownership và contract verdict của layout |
+| `@design-review` | `publication/design-review-preview/vi.md` | vi | review HTML được viết thật và hợp đồng bundle bất biến |
+| `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo lý do mà không lộ class |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind lựa chọn vào vocabulary frontend hiện hành |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash design artifact |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | kiểm tra head và accepted revision hiện hành |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | publish cache review và accepted preview bundle |
 
 ## NESTED SKILLS
 
-Không có. Một điểm dừng kết thúc lượt chạy này. Skill không tự gọi skill khác để phục hồi.
+Không có.
 
-## Cách chạy
+## Run
 
-Đọc `@skill-shape` trước. Skill này nhận `layoutId` ổn định và sở hữu page skeleton; review history chỉ là
-bằng chứng audit.
+Capability này thiết kế hoặc sửa một tập page đã compose dưới một `layoutId` ổn định. Một ảnh chụp nghĩa là
+toàn bộ page nhìn thấy: mọi nested layout, routed page, state hiện tại, modal/drawer/panel/floating action đang
+hiện, geometry, divider và scroll owner. Một flow được mô tả nghĩa là mọi page/step được nêu rõ trong flow đó.
+Nó nhận đúng một lựa chọn, hoàn tất state tất định rồi publish một accepted revision bất biến; không ghi frontend
+source.
 
-**JSON mới là artifact; Vite review dùng chung chỉ là cách quan sát.** Approval bind vào hash của canonical
-JSON, không bind vào manifest hay application đã render. `registries/design-registry-v2.json` là authority: `layoutHeads[layoutId].head` trỏ tới layout object
-immutable đã accepted; review không bao giờ quyết định lookup hiện tại.
+**Thẩm quyền.**
 
-## QUY TRÌNH
+- `design.json` sở hữu identity, ownership nghiệp vụ/contract, regions, accepted artifact, state IDs và viewport.
+- `preview.html` sở hữu composition, hierarchy, surfaces, responsive behavior và HTML của mọi state.
 
-### 1 — Lập context lock
+Draft chỉ sống dưới `.worktrees/<project>/cache`. Khi accepted, chỉ ghi:
 
-Resolve `Phase: layout`; `Touching` chỉ gồm project registry, audit record tùy chọn và cache, không gồm frontend source.
-Nói vị trí đó bằng một câu thân thiện; không in context thành bảng.
-
-Trước khi resolve bất kỳ `layoutId` nào, ghi scope ledger dùng một lần với ba danh sách: product surfaces được
-yêu cầu rõ, modes do cùng một surface sở hữu, và ví dụ minh họa. Chỉ requested surfaces được vào layout batch
-hoặc flow trong draft index. Ví dụ năng lực vẫn là evidence cho tới khi owner đưa nó vào product scope rõ ràng.
-
-### 2 — Resolve và kiểm tra workspace route
-
-Đọc `@workspaces` và resolve role `fe`. Trước khi đọc source, kiểm tra checkout tồn
-tại và `context.contract` vẫn là file thật. Route stale phải **dừng lượt chạy** (`WORKSPACE-5`); không chọn
-checkout gần nhất rồi tiếp tục với contract của sản phẩm khác.
-
-### 3 — Resolve và refresh business truth
-
-Trước khi sinh lựa chọn hình ảnh, resolve route tới stable business feature và surface ID. Check feature
-head với commit FE/BE đã route; refresh và commit truth thiếu hoặc stale trong business worktree. Chỉ
-load `CONTEXT.md`, surface đã chọn và flow liên quan. Screenshot và candidate không phải business truth.
-
-### 4 — Resolve worktree roots
-
-Đọc `@worktrees`. Registry ở `<Source>/.worktrees/<project>/registries` phải lock, sạch, đúng project branch và thuộc Git
-của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
-`<Source>/.worktrees/<project>/cache/preview` (`WORKTREE-2`), không bao giờ dưới `.claude`
-(`WORKTREE-3`).
-
-### 5 — Resolve identity layout ổn định và current head
-
-Nếu v2 chưa có, chạy `node @design-registry-migrate --registry .worktrees/<project>/registries --apply`; sau đó chạy
-`node @design-registry-check --registry .worktrees/<project>/registries`, đọc `@design-registry-schema` và
-`registries/design-registry-v2.json`. Bắt buộc caller cung cấp `layoutId` ổn định; không suy ra
-identity từ prompt hay surface label. Resolve `layoutHeads[layoutId]`, rồi resolve `head` qua
-map `objects.byHash` immutable nếu head đã tồn tại. Head là layout accepted và là kết quả lookup hiện tại
-duy nhất. Identity thiếu hoặc schema mismatch thì dừng; thiếu head là identity mới, không phải quyền coi
-candidate proposed là accepted.
-
-Nếu layout chưa có accepted head, giữ `layoutHeads[layoutId]` vắng mặt; `layoutId` ổn định do caller cung
-cấp định danh review envelope và candidates. Approval ghi immutable object đầu tiên cùng head; registry
-không có headless entry và proposed candidate chưa bao giờ là current. Review history cũ có thể đọc làm ngữ cảnh và ghi audit history, nhưng
-không được chọn, thay hoặc hồi sinh head. Giữ mọi accepted hash trong immutable object và chỉ cập nhật head
-tại approval checkpoint.
-
-### 6 — Sinh các direction choice
-
-Chạy `@inventory-visual-language`. Inventory đi theo các cạnh `@import` stylesheet, gồm CSS package đã
-cài đặt resolve được, nhưng không thực thi CSS sinh động từ TypeScript hoặc JSON. Dùng digest sinh ra làm `vocabularyAt`. Đọc `@directions`, sinh 3–4
-direction từ request, audience, feeling, token sống, màn đã duyệt, brand, vendor guidance, closed axes và
-precedent. Validate bằng `@validate-artifact` với vocabulary, không dùng `--hash`; mọi preview dùng cùng
-content và reference skeleton.
-
-### 7 — Chọn direction đề xuất bằng evidence
-
-So mọi direction hợp lệ với request, audience, feeling, vocabulary sống, brand evidence và precedent đã
-chấp nhận. Chọn đúng một object làm đề xuất dựa trên evidence và nói rõ vì sao nó phù hợp nhất. Đây là
-default tạm thời, không phải approval của owner, nên không dừng, không in `### NEED APPROVALS` và không
-sinh `directionHash` ở đây.
-
-Ghi direction batch với `schema: 2` cùng object `recommended`. Trong `directionReview` của layout round,
-ghi nguyên candidates, `state: recommended`, `recommendedId`, `selectionSource: evidence` và
-`selectionReason`, rồi validate cả hai artifact. Nếu evidence không đủ chọn một đề xuất, trả product
-decision còn thiếu dưới dạng refusal; chưa sinh layout.
-
-### 8 — Đọc structural input
-
-Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
-persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 3: layout quyết
-region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), impressionistic child brief đã hash,
-lifetime và route relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa với content
-đại diện nhận diện được; rail phải chiếm đúng rail slot với destinations đại diện. Wireframe phải rõ là rough:
-label và sample value giải thích intent nhưng không chốt exact parts, states, behavior hay final copy.
-
-Brief của mọi region là bắt buộc, không rỗng và phải truy được về business surface hoặc related flow đã load ở
-bước 3. Chỉ dùng identity/category, label, value, status và action mà business truth cho phép. Cấm tự bịa instance
-name, count, money, domain, date, success state hoặc action để lấp canvas. Business surface có ownership độc lập
-phải giữ stable region ID riêng và click độc lập; không gom chúng vào một region `overview`, `content` hoặc
-`summary` chung chỉ để layout đơn giản hơn. Các mode do cùng route sở hữu vẫn là mode của một region: layout chỉ
-render mode đại diện/mặc định cùng cue chuyển mode, không tách thành layout khác hay vẽ trước block anatomy đầy đủ.
-
-### 9 — Resolve từng region theo contract
-
-```bash
-node @contract-search <project> <role> --need "<the region stated as a need>"
+```text
+registries/revisions/<revisionHash>/design.json
+registries/revisions/<revisionHash>/preview.html
 ```
 
-Hỏi bằng **lý do**, không hỏi bằng shape. Kết quả có dấu `~` chỉ khớp từ ngẫu nhiên, không phải câu trả
-lời. Mỗi region nhận đúng một verdict:
+`design.json` mang `schemaVersion`, `kind: "layout"`, `layoutId`, accepted artifact, state viewport manifest và
+`previewSha256`. `revisionHash` bind canonical design metadata với exact preview digest. Revision map và stable
+layout head trong registry là authority. Legacy object chỉ được đọc để tương thích lịch sử.
 
-- `reuse <key>` — `why` hiện có đã trả lời region;
-- `generalize <key> -> <key>` — entry đúng nghĩa nhưng mang tên feature; phải đo call-site count trước;
-- `new <key>` — không entry nào trả lời reason; ghi `why` entry mới sẽ mang.
+Direction không có approval riêng; recommendation có bằng chứng được nhúng vào mọi candidate, nên một lựa chọn
+layout chấp thuận cả direction lẫn composition.
 
-Không có call-site count thì từ chối `generalize`, không đoán.
+## Process
 
-Query không có kết quả exit 1 và cho hai dữ kiện: với lượt này là verdict `new`; với tree là finding rằng
-một surface thật không tìm được entry theo need. Đưa nguyên need vào `WARNINGS` để chỉ đúng reason đã fail.
+1. Đọc `@skill-shape`; resolve `layoutId`, kiểm tra route `fe`, registry sạch/đúng owner, business surface và
+   visual vocabulary hiện hành. Trước khi vẽ, lập pattern sheet từ route tree thật: root/app/feature layouts,
+   routed pages, overlays và regions theo thứ tự lồng. Gắn mỗi node là `existing`, `proposed` hoặc `new`;
+   `existing` phải có source + source hash và được tái dùng nguyên trạng trong mọi phương án.
+2. Đọc `@directions` và `@layouts`, chọn một direction recommendation có bằng chứng, resolve region theo lý do
+   nghiệp vụ rồi viết **3–4 page-set HTML/CSS độc lập và hoàn chỉnh** với cùng content và viewport. Xếp hạng theo
+   business fit, precedent, hierarchy, reuse, accessibility và boundary ownership rồi tự chọn phương án mạnh
+   nhất. Candidate phải khác thật ở
+   composition, navigation, secondary region hoặc density; đổi màu đơn thuần là trùng.
+3. JSON không mang class. Mỗi region có verdict `reuse`, `generalize` đã đo hoặc `new`. Quyết định route,
+   mounting hay ownership chưa đủ bằng chứng phải trả về owner, không tự bịa.
+4. QA mọi candidate ở desktop và ít nhất một narrow viewport. Canvas chỉ chứa UI sản phẩm được viết thật; cấm
+   template chung, rough child, anatomy card nét đứt, placeholder skeleton, schema/debug label, hash hay evidence.
+5. Hiển thị ranking và candidate model tự chọn. Owner có thể override nhưng không phải vận hành A/B/C/D gate.
+   Chỉ mở `### NEED APPROVALS` khi product truth hoặc write authority không resolve được. Feedback mở draft round
+   mới, không sửa revision accepted.
+6. Sau `OK`, render mọi state tất định mà layout thực sự có. Responsive/collapsed state chỉ có khi reachable.
+   Không hỏi approval lần hai. Nếu state cần quyết định mới về route, owner, action hay outcome, mở một product
+   decision round mới thay vì đoán.
+7. Validate base và mọi state/viewport, tính digest/hash, ghi bundle hai file bất biến, đăng ký revision, nâng
+   layout head, build lại review graph và chạy registry check. Candidate thua chỉ ở cache.
 
-### 10 — Sinh 3–4 layout skeleton
+## Visual quality
 
-Nhúng cùng direction object được đề xuất vào mọi candidate, chỉ thay closed layout axes. Trùng axis set là một
-candidate; ít nhất một phải rời nearest precedent. Chỉ trả một khi thật sự chỉ có một skeleton hợp lệ.
+Mọi candidate và state accepted phải chứng minh:
 
-### 11 — Từ chối product decision bằng chứng không giải được
+1. Navigation desktop/mobile không xuất hiện đồng thời ở breakpoint.
+2. Heading, primary action và supporting content có hierarchy rõ.
+3. Nội dung đọc có measure chủ ý và dễ đọc.
+4. Divider/boundary thuộc đúng region phân tách nhóm; không có semantic boundary thì không bắt buộc divider.
+5. Mỗi trục scroll có đúng một owner; nested scroll cần independent viewport có bằng chứng.
+6. Mọi state reachable trong `design.json` có authored HTML đúng viewport.
 
-Product decision mà request không nói và luật không suy ra được phải tạo refusal block. Refusal đi cùng
-candidates để phần còn lại của batch vẫn đọc được.
+`ScrollBranch`, `SurfaceListCard` và divider chỉ là ví dụ về contract resolution, không phải luật áp dụng cho mọi
+layout.
 
-### 12 — Validate, hash và render skeleton
+## Stops
 
-```bash
-node @validate-artifact \
-  --schema @layout-schema \
-  --data <batch.json> --vocabulary <visual-vocabulary.json> --hash
-```
+- Route, business truth, vocabulary hoặc registry ownership thiếu/stale → dừng kèm evidence chính xác.
+- Thiếu stable identity, candidate trùng axis hoặc content tự bịa → từ chối draft.
+- Thiếu candidate/state HTML hay viewport coverage → không approval/publish.
+- State sau lựa chọn cần product decision mới → trả quyết định đó; không hỏi lại deterministic work.
+- Proposed/legacy object không được đóng vai current authority.
 
-Schema dùng `additionalProperties: false` để class trở thành unrepresentable. Validator còn từ chối class
-token, candidate trùng axis set và batch không candidate nào viện dẫn `none`. Hash chỉ phủ candidate,
-không phủ envelope; cùng quyết định phải sinh cùng hash ở round sau.
+Mọi candidate phải là page HTML/CSS/JS functional, self-contained, không phải static render. Trước khi vẽ phải
+inventory condition viewport, overlay, disclosure, async, data, permission và interaction. Phải render
+desktop/mobile, modal, drawer, menu/popover, expanded/collapsed, loading, empty, partial, error, success, locked
+và disabled khi business/source evidence cho thấy reachable; family không liên quan phải ghi `not-applicable`
+cùng evidence. Product control—not review chrome—phải chạy transition in-memory tất định; cấm network và backend
+mutation. Resize thật phải điều khiển responsive behavior.
 
-Đọc `@design-review`. Ghi shell descriptor và representative-content descriptor tùy chọn vào project cache,
-rồi overlay batch này vào một project review graph duy nhất:
+Mỗi page/state còn có business-content matrix và render production-like representative density: đúng entity
+kind, value có nghĩa, count, status, metadata, action và consequence. Lorem, placeholder copy, generic card, toy
+row, filler lặp, title-only shell và owned surface bị render thiếu đều là lỗi chặn. Thiếu condition coverage,
+executable transition hoặc business fidelity thì không được chọn/publish.
 
-```bash
-node @render-design-review \
-  --phase layout --project <project> --layout-id <layoutId> \
-  --artifact <layout-batch.json> --directions <direction-batch.json> \
-  --registry .worktrees/<project>/registries \
-  --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
-  --content <representative-content.json> --shell <shell-descriptor.json> \
-  --recommended-id <candidateId> \
-  --out .worktrees/<project>/cache/preview/design-review
-```
+## OUTPUT
 
-Khi chủ sở hữu yêu cầu so sánh hoặc duyệt nhiều layout identity ổn định trong cùng một vòng, hãy ghi một
-`layout-draft-index.json` cạnh các batch. Mảng `layouts` chứa các entry khai báo `layoutId`, `artifact`,
-`directions` tùy chọn, `content` tùy chọn, `shell` tùy chọn và `recommendedId`; đường dẫn được tính tương
-đối từ index. `flows` tùy chọn khai báo các node có thứ tự tham chiếu `layoutId` và `blockId` đã khai báo
-nếu có; renderer tự tạo route bất biến và edge kề mặc định, rồi hiển thị chuỗi trong review.
-Render graph kết hợp đúng một lần với `--layout-draft-index <index.json>` thay cho `--phase layout`.
-Entry đầu tiên sở hữu route mở đầu. Việc này chỉ kết hợp khâu review: mỗi candidate vẫn giữ hash bất biến
-riêng và vẫn phải được duyệt rõ ràng trước khi bắt đầu bất kỳ vòng block nào.
-
-Layout route render một page hoàn chỉnh. Mọi region render wireframe cảm tính có label từ brief đã hash để
-purpose, geometry, density và reading order đánh giá được trước khi child block tồn tại. Dùng label, value và action
-đại diện trong control nhẹ nét đứt; không trình bày chúng như accepted parts, states, behavior hay final copy.
-Modes dùng chung route owner vẫn là block states của vòng block sau. Navigation/flow cue chỉ
-xuất hiện cho surfaces đã nằm rõ trong scope. Child chỉ render accepted parts khi `layoutHash`
-đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
-`#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`, không mở modal.
-
-Block-detail route luôn mở review có tabs. `Layout brief` là tab mặc định và render đúng brief của parent region
-kể cả khi child missing hoặc stale. `Block candidates` báo zero/missing cho tới khi parent layout accepted và block
-round sinh candidates. `Evidence` hiện exact parent binding, contract verdict và geometry. Anatomy/state controls
-chỉ xuất hiện khi block candidates tồn tại. Renderer phải render đủ mọi brief item đã khai báo; cấm cắt theo một
-giới hạn tùy tiện.
-
-Layout artifact vẫn không chốt block parts, states, data ownership hay final copy. Canvas rỗng, region không
-có content hoặc layout không có region overlay đều invalid.
-
-Không tự viết HTML, CSS hay JavaScript riêng cho candidate. Project shell và content là manifest data;
-Vite application trung lập với project và interaction của nó không mutate registry. Serve thư mục đã build:
-
-```bash
-npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
-```
-
-Trước approval, browser-QA mọi candidate ở desktop và một narrow viewport. Phải chứng minh mọi region có content
-business-backed nhận diện được, mọi region link resolve đúng block route bind version, `Layout brief` là tab block
-mặc định, toàn bộ brief nhìn thấy được, back navigation hoạt động và console sạch. Generic skeleton line,
-placeholder-only card hoặc region chỉ hiểu được nhờ debug label đều làm lượt chạy fail.
-
-**8080 là chỗ bắt đầu tìm, không phải chỗ dừng.** Thử bind nó; bị chiếm thì thử 8081, 8082, cứ thế cho tới
-khi bind được, rồi **in ra URL thật sự đang phục vụ**. Một lượt chạy chết vì dev server của người khác đang
-giữ 8080 là chết ở chỗ chẳng ai hỏi tới, còn in ra một URL không ai mở được thì tệ hơn là không in. Chặn số
-lần thử lại — hai mươi cổng là máy đang bận, hai trăm là có lỗi — và nếu không cổng nào bind được thì nói
-ra, đừng lặng lẽ phục vụ vào hư không.
-
-
-Dashed overlay và dedicated block-detail routes là documentation chrome; chúng giúp prototype đọc được như
-một page thật nhưng không biến rough region thành block anatomy hay mang product class.
-
-### 13 — Queue approval và đóng
-
-Trình các direction cùng lý do đề xuất một direction bên cạnh các layout đã nhúng direction đó. Mở đúng
-một `### NEED APPROVALS` cho round này: layout hash được đề xuất là default, và `OK` duyệt đồng thời
-direction được nhúng với skeleton. Feedback có thể phản biện direction hoặc structure và mở audit review tùy chọn.
-
-Khi `OK`, validate immutable object rồi cập nhật `layoutHeads[layoutId].head` thành `layoutHash` accepted
-(cùng danh sách region ID ổn định đã khai báo) trong design registry. Khi replacement accepted, giữ head cũ trong audit history
-với trạng thái superseded và trỏ sang replacement; không sửa object cũ. Review chỉ ghi lời owner,
-không phải lookup authority. Validate registry và artifact, đánh dấu layout có bằng chứng làm default, rồi
-chỉ đóng sau khi mọi write thuộc Layout hoàn tất.
-Build lại project review graph sau khi head advance; block head bind layout hash cũ phải hiện stale và layout
-mới quay về rough child content cho tới khi block được redesign hoặc accepted dưới parent mới.
-
-## Điểm dừng
-
-- Route không có hoặc stale → dừng; báo đúng bằng chứng route đã fail rồi kết thúc lượt chạy.
-- Registry không lock, dirty hoặc thuộc Git khác → dừng; báo đúng bằng chứng ownership đã fail và không ghi.
-- Visual inventory rỗng hoặc không đọc được → dừng; không suy token từ screenshot.
-- Chưa có direction recommendation dựa trên evidence → trả quyết định còn thiếu; chưa sinh layout.
-- Class cần dùng không nằm trong closed set của contract → đây là **contract change**, trả owner.
-- Hai candidate còn trùng axis set → chúng là một; sinh lại thay vì đưa ra lựa chọn giả.
-- `layoutId` ổn định thiếu, mơ hồ hoặc trỏ tới registry head malformed → dừng; không fallback về prompt.
-- Hash proposed không phải registry head → dừng; chỉ approval checkpoint được advance accepted head.
-
-Không điểm dừng nào tự gọi skill khác. Nếu owner muốn phục hồi, đó là request riêng và lượt chạy riêng.
-
-## ĐẦU RA
-
-Trình `layoutId`, accepted head hiện tại/sau cập nhật, direction, recommendation dựa trên evidence, layout
-candidate, layout hash mặc định và preview URL bằng văn xuôi ngắn. Chỉ dùng một `### NEED APPROVALS` cho
-quyết định kết hợp accept/feedback. Không in bảng.
+Trước approval, nêu `layoutId`, scope `page`/`flow`, số lựa chọn thích ứng, recommendation và review URL bằng văn xuôi ngắn. Chỉ một approval
+checkpoint. Sau `OK`, nêu accepted `revisionHash`, state/viewport đã persist và region còn cần block design.
+Không dùng bảng trạng thái.

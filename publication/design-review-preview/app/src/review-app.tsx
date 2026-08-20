@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
-import { Button } from "@heroui/react/button"
 import { BlockRenderer } from "./block-renderer"
-import { DirectionComparison } from "./direction-review"
 import { LayoutRenderer } from "./layout-renderer"
 import type { LayoutReview, ReviewManifest, ReviewRoute } from "./types"
 
 type ReviewAppProps = {readonly manifest: ReviewManifest}
-type Viewport = "desktop" | "tablet" | "mobile"
-type ReviewView = "candidate" | "directions"
 
 const parseRoute = (hash: string, fallback: string): ReviewRoute => {
   const path = (hash || fallback).replace(/^#/, "")
@@ -37,8 +33,7 @@ const themeStyle = (layout: LayoutReview) => ({
 
 export const ReviewApp = ({manifest}: ReviewAppProps) => {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash, manifest.entryRoute))
-  const [viewport, setViewport] = useState<Viewport>("desktop")
-  const [view, setView] = useState<ReviewView>("candidate")
+  const [stateId, setStateId] = useState<string>()
 
   useEffect(() => {
     if (!window.location.hash) window.history.replaceState(null, "", manifest.entryRoute)
@@ -50,6 +45,9 @@ export const ReviewApp = ({manifest}: ReviewAppProps) => {
   const layout = useMemo(() => manifest.layouts.find((item) => item.layoutId === route.layoutId) ?? manifest.layouts[0], [manifest.layouts, route.layoutId])
   const candidate = useMemo(() => layout?.candidates.find((item) => item.hash === route.layoutHash) ?? layout?.candidates.find((item) => item.id === layout.recommendedId) ?? layout?.candidates[0], [layout, route.layoutHash])
   const region = route.blockId ? candidate?.regions.find((item) => item.name === route.blockId) : undefined
+  const layoutState = candidate?.preview?.states.find((item) => item.id === stateId) ?? candidate?.preview?.states[0]
+
+  useEffect(() => setStateId(candidate?.preview?.states[0]?.id), [candidate])
 
   if (!layout || !candidate) return <main className="fatal"><h1>Review route unavailable</h1><p>The manifest does not contain the requested layout version.</p></main>
 
@@ -58,7 +56,6 @@ export const ReviewApp = ({manifest}: ReviewAppProps) => {
       <header className="review-header">
         <div><span className="phase-pill">{route.blockId ? "block" : "layout"}</span><strong>{manifest.project}</strong><h1>{route.blockId ? `${layout.layoutId} / ${route.blockId}` : layout.layoutId}</h1></div>
         <div className="header-actions">
-          {!route.blockId && layout.visualDirections?.length ? <Button variant="secondary" size="sm" onPress={() => setView(view === "directions" ? "candidate" : "directions")}>{view === "directions" ? "Layout" : "Directions"}</Button> : null}
           <details className="evidence-details"><summary>Evidence</summary><pre>{JSON.stringify(manifest.evidence, null, 2)}</pre></details>
         </div>
       </header>
@@ -78,20 +75,20 @@ export const ReviewApp = ({manifest}: ReviewAppProps) => {
           <>
             <span className="sidebar-label">Candidates</span>
             {layout.candidates.map((item) => <button className={item.hash === candidate.hash ? "active" : ""} type="button" key={item.id} onClick={() => navigate(layoutRoute(layout.layoutId, item.hash))}><strong>{item.id}</strong><small>{item.status}</small></button>)}
-            <span className="sidebar-label">Viewport</span>
-            <div className="viewport-switcher">{(["desktop", "tablet", "mobile"] as const).map((item) => <button className={item === viewport ? "active" : ""} type="button" key={item} onClick={() => setViewport(item)}>{item}</button>)}</div>
+            <span className="sidebar-label">Authored states</span>
+            <div className="state-switcher">{candidate.preview?.states.map((item) => <button className={item.id === layoutState?.id ? "active" : ""} type="button" key={item.id} onClick={() => setStateId(item.id)}><strong>{item.id}</strong><small>{item.viewport.width} × {item.viewport.height}</small></button>)}</div>
             <details className="candidate-detail"><summary>Candidate details</summary><pre>{JSON.stringify({id: candidate.id, hash: candidate.hash, axes: candidate.axes, reason: candidate.reason}, null, 2)}</pre></details>
           </>
         ) : null}
       </aside>
       <main className="review-stage">
-        <div className={`viewport-frame ${route.blockId ? "desktop" : viewport}`}>
+        <div className="viewport-frame" style={!route.blockId && layoutState ? {width: `min(100%, ${layoutState.viewport.width}px)`} : undefined}>
           {route.blockId ? (
-            region ? <BlockRenderer key={`${layout.layoutId}:${candidate.hash}:${region.name}`} region={region} content={region.block.content ?? layout.content} back={() => navigate(layoutRoute(layout.layoutId, candidate.hash))} /> : <main className="fatal"><h1>Block not declared</h1><p>{route.blockId} is not a child of this layout version.</p></main>
-          ) : view === "directions" && layout.visualDirections ? (
-            <DirectionComparison directions={layout.visualDirections} recommendedId={layout.visualDirectionRecommendation?.id} content={layout.content} />
+            region ? <BlockRenderer key={`${layout.layoutId}:${candidate.hash}:${region.name}`} region={region} back={() => navigate(layoutRoute(layout.layoutId, candidate.hash))} /> : <main className="fatal"><h1>Block not declared</h1><p>{route.blockId} is not a child of this layout version.</p></main>
+          ) : layoutState ? (
+            <LayoutRenderer candidate={candidate} state={layoutState} />
           ) : (
-            <LayoutRenderer candidate={candidate} content={layout.content} shell={layout.shell} openBlock={(blockId) => navigate(blockRoute(layout.layoutId, candidate.hash, blockId))} />
+            <main className="fatal"><h1>Authored state unavailable</h1></main>
           )}
         </div>
       </main>

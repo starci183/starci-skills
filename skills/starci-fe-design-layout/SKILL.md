@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Design or revise the immutable candidate behind a stable layoutId, evidence-select one recommended visual direction, and render 3–4 business-backed rough prototypes under one combined approval. The accepted layout head in the design registry is authoritative. Writes design records, never frontend source or block internals.
+description: Challenge, design or revise one composed frontend page or flow using GPT‑5.6 visual judgment, source precedent and StarCi truth/proof boundaries. Renders a functional authored HTML prototype covering every evidenced UI condition and publishes one accepted immutable revision; never writes frontend source.
 ---
 
 # starci-fe-design-layout
@@ -9,250 +9,146 @@ description: Design or revise the immutable candidate behind a stable layoutId, 
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-shape` | `skills/skill-shape/context.md` | context | Supplies the shared interaction and approval contract. |
-| `@workspaces` | `contexts/workspaces/context.md` | context | Resolves and verifies the frontend checkout this run reads. |
-| `@worktrees` | `contexts/worktrees/context.md` | context | Separates durable decision records from disposable preview work. |
-| `@business` | `contexts/business/context.md` | context | Resolves current feature truth and prototype-ready surfaces before visual reasoning. |
-| `@directions` | `brainstorms/directions/context.md` | context | Generates the visual choice that every layout candidate embeds. |
-| `@layouts` | `brainstorms/layouts/context.md` | context | Defines structural regions, axes, contract verdicts and output. |
-| `@contract-search` | `scripts/contract-search.mjs` | script | Queries contract reasons without exposing class arrays. |
-| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | Produces the live token inventory used by direction candidates. |
-| `@layout-schema` | `brainstorms/layouts/schema.json` | file | validate layout candidate JSON |
-| `@design-registry-schema` | `contexts/worktrees/design-registry.schema.json` | file | validate the identity-centric registry and its current heads |
-| `@design-registry-migrate` | `scripts/migrate-design-registry.mjs` | script | migrate legacy maps non-destructively and verify identity heads are current |
-| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | validate v2 heads, regions, immutable objects and by-id projections |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
-| `@design-review` | `publication/design-review-preview/context.md` | context | defines the universal Vite review manifest, interactions and authority boundary |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated layout JSON instead of bespoke HTML |
+| `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and reporting boundary |
+| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
+| `@worktrees` | `contexts/worktrees/context.md` | context | separate durable revisions from disposable drafts |
+| `@business` | `contexts/business/context.md` | context | bind the page to current product truth |
+| `@principles` | `compilers/principles/context.md` | context | review model-selected visual decisions after creativity |
+| `@directions` | `brainstorms/directions/context.md` | context | evidence-select the visual direction embedded in the layout |
+| `@layouts` | `brainstorms/layouts/context.md` | context | layout regions, axes, ownership and contract verdicts |
+| `@design-review` | `publication/design-review-preview/context.md` | context | authored HTML review and immutable bundle contract |
+| `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
+| `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind choices to the current frontend vocabulary |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
+| `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify current heads and accepted revisions |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | publish the cache review and accepted preview bundle |
 
 ## NESTED SKILLS
 
-None. A stop ends this run. This skill never invokes another skill as recovery.
+None.
 
 ## Run
 
-Read `@skill-shape` first. This skill owns the page skeleton. Direction supports that decision; it has
-no approval hash or approval checkpoint of its own. The recommended direction is embedded into each layout candidate, so one
-`layoutHash` binds visual intent and skeleton together.
+Read `@skill-shape` first. The caller supplies one stable `layoutId`; that identity owns a composed page set,
+not one framework layout component. The input is either one screenshot/current page or an explicitly requested
+multi-page flow. This skill renders the complete visible experience and does not write frontend source.
 
-The caller supplies a stable `layoutId`. `registries/design-registry-v2.json` is the authority: its
-`layoutHeads[layoutId].head` points to the accepted immutable layout object. Review history may explain
-how a head was reached, but it is never used to discover the current layout.
+A composed page is the ordered nested layout chain plus its routed page, current state and every visible modal,
+drawer, popover, panel or floating action. Decomposition is internal evidence; the owner reviews full viewports.
+Every composition node is classified `existing`, `proposed` or `new`. An `existing` node is bound to its source
+path and content hash, is embedded unchanged in every candidate and is outside the design diff unless the request
+explicitly targets it.
 
-**JSON is the artifact. The shared Vite review is a way of looking at it.** Approval binds to canonical
-layout JSON, never to the manifest or rendered application.
+JSON and HTML have separate authority:
 
-## PROCESS
+- `design.json` owns identity, business/contract ownership, regions, the per-state business-content matrix,
+  UI-condition inventory, transition graph, state IDs and viewport obligations.
+- `preview.html` owns composition, hierarchy, surfaces, responsive behavior and executable rendering of every
+  declared condition/state.
 
-### 1 — Establish the context lock
+Drafts live only below `.worktrees/<project>/cache`. Acceptance writes exactly one immutable bundle:
 
-Resolve `Phase: layout`; `Touching` names the project registry, optional audit record and disposable cache, and no
-frontend source path. Tell the user that location in one friendly sentence; do not print a context table.
-
-Before resolving any `layoutId`, write a disposable scope ledger with three lists: explicitly requested product
-surfaces, modes owned by one surface, and illustrative examples. Only requested surfaces may enter a layout batch
-or draft-index flow. A capability example stays evidence until the owner explicitly promotes it into product scope.
-
-### 2 — Resolve and verify the workspace route
-
-Read `@workspaces`. Resolve the user-declared project and `fe` role. Verify the checkout, branch,
-recorded head and contract path before reading product evidence. A stale route stops the run
-(`WORKSPACE-5`).
-
-### 3 — Resolve and refresh business truth
-
-Read `@business`. Map the requested route/surface to stable `featureId`s. Verify the locked business
-worktree and run `business-registry.mjs --check --feature <featureId>`. When a required feature is absent
-or stale, perform the evidence analysis/publication phase inside this run's disclosed business boundary,
-commit that worktree, then check again. Load `features/<featureId>/CONTEXT.md` plus only the requested
-surface and related flow modules. A screenshot, prompt or design candidate is never business truth.
-
-### 4 — Resolve the state roots
-
-Read `@worktrees`. Accepted layout candidates, no-hash direction reviews and verdicts go to the project
-registry; generated previews stay in cache. Before a registry write, verify that it is locked, clean
-and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache/preview`
-(`WORKTREE-2`) and never a path below `.claude` (`WORKTREE-3`).
-
-### 5 — Resolve the stable layout identity and current head
-
-If v2 is absent, run `node @design-registry-migrate --registry .worktrees/<project>/registries --apply`; then run
-`node @design-registry-check --registry .worktrees/<project>/registries`, read `@design-registry-schema` and
-`registries/design-registry-v2.json`. Require the caller's stable `layoutId`; do not derive
-it from the prompt or a surface label. Resolve `layoutHeads[layoutId]`, then resolve its
-`head` through the immutable `objects.byHash` map when one exists. The head is the accepted layout and the
-only current lookup result. A missing identity or schema mismatch stops; an absent head is a new identity,
-not permission to treat a proposed candidate as accepted.
-
-If the layout has no accepted head yet, keep `layoutHeads[layoutId]` absent while the caller-supplied stable
-`layoutId` identifies the review envelope and candidates. Approval writes the first immutable object and
-head together; there is no headless registry entry and no proposed candidate is current. Prior review history may be
-read for context and appended, but it cannot select, replace or resurrect a head.
-Keep every accepted hash in immutable objects and update the head only at the approval checkpoint.
-
-### 6 — Generate the direction choices
-
-Run `@inventory-visual-language` against the verified checkout. The inventory follows stylesheet
-`@import` edges, including resolvable installed package CSS, but does not evaluate runtime-generated
-CSS from TypeScript or JSON. Record its generated digest as `vocabularyAt`. Read `@directions`, then generate 3–4 choices from the request, audience, intended
-feeling, live tokens, approved screens, brand evidence, installed vendor guidance, closed axes and this
-project's precedents with their rejections.
-
-Validate the batch with `@validate-artifact` and the generated vocabulary **without `--hash`**. Render
-every direction over the same content and reference skeleton. External style catalogues may broaden the
-search, but remain recommendations.
-
-### 7 — Evidence-select the recommended direction
-
-Compare every valid direction against the request, audience, intended feeling, live vocabulary, brand
-evidence and accepted precedents. Select one exact object as the evidence-backed recommendation and state
-why it best fits. This is a provisional default, not an owner approval, so do not pause or print
-`### NEED APPROVALS` here and do not produce a `directionHash`.
-
-Write a direction batch with `schema: 2` and its `recommended` object. Append the exact candidates,
-`state: recommended`, `recommendedId`, `selectionSource: evidence` and `selectionReason` to this layout
-round's `directionReview`. Validate both artifacts. If evidence cannot support one recommendation, return
-the missing product decision as a refusal; do not generate structural candidates.
-
-Preserve the recommended direction object unchanged in every layout candidate in this round.
-
-### 8 — Read the structural inputs
-
-Read `@layouts`: request verbatim; contract queried one need per region through `@contract-search`;
-every branch and what it may contain; every route page and persistent layout; closed layout axes; and
-this project's accepted layout precedents with their rejections.
-
-Layout remains a skeleton. New work uses layout schema 3 and names regions, hashed child bounding geometry
-(`placement`, `width`, `height`, `align`), a hashed impressionistic child brief, mount lifetime and route relationship.
-A centered authentication panel must render centered with recognizable representative content before its block
-exists; a rail region must occupy the rail slot with representative destinations. Keep the wireframe visibly rough:
-labels and sample values explain intent, but do not claim exact parts, states, behavior or final copy.
-It never decides a block's internal parts, states or data ownership. That separation is what lets one
-block be redesigned later without reopening the page layout.
-
-Every region brief is mandatory, non-empty and traceable to the business surface or related flow loaded in step 3.
-Use only supported identities or categories, labels, values, statuses and actions. Never invent instance names,
-counts, money, domains, dates, success states or actions to make the canvas look complete. Keep independently
-owned business surfaces as stable, independently clickable region IDs; do not collapse them into a generic
-`overview`, `content` or `summary` region merely to simplify the layout. Modes owned by one route stay modes of
-one region: render the representative/default mode plus an alternate-mode cue, not separate layouts or complete
-future block anatomy.
-
-### 9 — Resolve every region against the contract
-
-Query by business reason, never by shape. Each region receives one verdict: `reuse <key>`,
-`generalize <key> -> <key>` with a measured call-site count and rewritten `why`, or `new <key>` with the
-reason it will carry. An empty query is a `new` verdict for this run and a warning that the contract
-reason index did not answer the need.
-
-```bash
-node @contract-search <project> <role> --need "<the region stated as a need>"
+```text
+registries/revisions/<revisionHash>/design.json
+registries/revisions/<revisionHash>/preview.html
 ```
 
-### 10 — Generate 3–4 layout skeletons
+`design.json` carries `schemaVersion`, `kind: "layout"`, `layoutId`, the accepted page-set artifact, the state viewport
+manifest and `previewSha256`. `revisionHash` binds canonical design metadata plus the preview digest. The
+registry's revision map and layout head are lookup authority; legacy objects are read-only compatibility.
 
-Embed the **same recommended direction object** in every candidate, then vary only the closed layout axes.
-Drop candidates whose entire structural axis sets match. At least one candidate departs from the nearest
-layout precedent. Return one only when the request admits one valid skeleton, with the reason; never pad.
+## Process
 
-### 11 — Refuse product decisions that evidence cannot settle
+1. Resolve the context lock, verified `fe` route, clean registry worktree, current business surface and visual
+   vocabulary. Before drawing, inventory the real route tree and emit a compact pattern sheet naming every nested
+   layout, page, active overlay, region, breakpoint and scroll owner. `Touching` names only the project registry
+   and disposable cache.
+2. Convert the request into one page set. A screenshot produces exactly the visible page/state. A described flow
+   produces every explicitly requested page in order, with shared layouts represented once and reused. Examples
+   remain evidence unless the owner explicitly put them in scope.
+3. Read `@directions` and `@layouts`, then run a short design challenge before drawing: identify the first visual
+   focus, competing regions, navigation/content/evidence roles, reusable precedents, and the owner of width,
+   divider, sticky and scroll behavior. Reject a composition that is only schema-complete. Evidence-select one
+   direction without a separate approval.
+4. Keep JSON free of classes. Schema 4 records each page's route, preview state, ordered composition nodes and
+   regions. Bind every `existing` node to source path/hash and keep it identical across candidates. Resolve only
+   target regions by business reason as `reuse`, measured `generalize`, or `new`; refuse unresolved ownership.
+5. Before drawing, inventory every evidenced UI condition: wide/narrow viewport, overlay closed/open, drawer,
+   modal, popover/menu, expanded/collapsed, ready/loading/empty/partial/error/success, permission/locked/disabled
+   and any route or selection mode the page can reach. Record `not-applicable` with evidence instead of silently
+   omitting a family. Author 3–4 complete functional HTML/CSS/JS page sets. Each must change hierarchy, navigation model, grouping or interaction
+   ownership materially; decoration, spacing or wording alone is a duplicate. Rank them against business fit,
+   precedent fit, visual hierarchy, reuse, accessibility and scroll/boundary ownership, then select the strongest.
+   Review every candidate at desktop and one narrow viewport. Each candidate is the full composed viewport,
+   never an isolated layout or page fragment. The product canvas contains only authored product
+   UI: no generic template, rough child, dashed anatomy card, placeholder skeleton, schema/debug label, hash or
+   evidence chrome. Build a business-content matrix for every page/state from the loaded surface and flows: real
+   entity types, representative names/values, counts, statuses, metadata, actions, consequences and copy density.
+   The reviewed scope must be as information-complete as the product truth, never reduced to a title, a few cards
+   or toy rows. Navigation, tabs, disclosure, drawer/modal controls, forms and primary/retry actions execute
+   in-memory transitions between declared states; the QA state selector is never the only way to reach a state.
+6. After selecting the strongest candidate, review each unresolved visual decision through `@principles`.
+   Creativity comes first; principles audit it rather than generating the candidates. Persist the resulting
+   class-free `principleObligations` (`target`, principle module, canonical situation and reason) in `design.json`.
+   Missing or conflicting principle law returns the design decision; do not approximate it with ad-hoc CSS.
+7. Publish the model-selected candidate and its evidence. The skill invocation delegates this visual selection;
+   the owner may override it, but does not have to choose A/B/C/D. Open `### NEED APPROVALS` only when evidence
+   cannot close a business/product decision or the next action crosses an undisclosed write boundary. Feedback
+   opens a new draft round and never edits accepted history.
+8. Render every deterministic state owed by every page in the selected page set, including responsive,
+   overlay, expanded/collapsed, async, data and permission conditions when the layout can actually reach them.
+   Resize the same authored composition for responsive proof; a separately painted mobile copy is not responsive
+   behavior. This is owned completion and has no
+   second approval. If a state requires a new route, owner, action or other product decision, stop and open one
+   new approval round instead of guessing.
+9. Validate the selected base and all page/state viewports, write the immutable two-file revision bundle, advance the
+   layout head to `revisionHash`, rebuild the review graph and run the registry check. Never persist losing
+   candidates outside cache.
 
-Return unresolved ownership, route or mounting decisions to the owner. Ship the refusal with whatever
-resolved; never guess merely to complete a batch.
+## Visual quality
 
-### 12 — Validate, hash and render the skeletons
+Every candidate and selected state must prove:
 
-Run `@validate-artifact` with `@layout-schema`, the same visual vocabulary and `--hash`. It refuses an
-invalid embedded direction, candidates embedding different directions, class tokens, duplicate layout
-axis sets and a missing departure. The printed hash is the one and only `layoutHash` for that candidate.
+- the viewport includes the entire nested layout chain, routed page and every visible overlay/floating surface;
+- source-bound `existing` nodes are visually and structurally unchanged between candidates;
+- desktop and mobile navigation are mutually exclusive at their breakpoints;
+- heading, primary action and supporting content have an intentional hierarchy;
+- each state renders business-faithful representative content at production-like density, including the facts,
+  statuses, actions and consequences needed to understand the surface without reading evidence outside the canvas;
+- reading content has an intentional, readable measure;
+- each visible boundary or divider belongs to the region that separates the groups; absence is valid when no
+  boundary is needed;
+- each scrolling axis has exactly one declared owner; nested scrolling requires an evidenced independent
+  viewport;
+- all reachable layout states in `design.json` have matching authored HTML and declared viewports.
+- every declared transition has a visible, keyboard-operable in-page control and reaches its target state without
+  network or backend mutation;
+- every condition in the inventory maps to at least one rendered state, and every reachable modal, drawer,
+  popover, menu, loading, empty, error, locked and disabled surface is represented when evidence says it exists;
+- the same preview responds to actual viewport resize; desktop/mobile screenshots are proof points, not separate
+  unrelated compositions.
 
-Read `@design-review`. Write optional shell and representative-content descriptors into the project cache,
-then overlay this batch onto the one project review graph:
-
-```bash
-node @render-design-review \
-  --phase layout --project <project> --layout-id <layoutId> \
-  --artifact <layout-batch.json> --directions <direction-batch.json> \
-  --registry .worktrees/<project>/registries \
-  --vocabulary .worktrees/<project>/cache/preview/visual-vocabulary.json \
-  --content <representative-content.json> --shell <shell-descriptor.json> \
-  --recommended-id <candidateId> \
-  --out .worktrees/<project>/cache/preview/design-review
-```
-
-When the owner asks to compare or approve several stable layout identities in one round, write one
-`layout-draft-index.json` beside their batches. Its `layouts` array entries declare `layoutId`, `artifact`,
-optional `directions`, optional `content`, optional `shell`, and `recommendedId`; paths are relative to the
-index. Optional `flows` declare ordered nodes that reference a `layoutId` and optional declared `blockId`;
-the renderer derives immutable routes and default adjacent edges, then exposes the sequences in review.
-Render the combined graph once with `--layout-draft-index <index.json>` in place of `--phase layout`.
-The first index entry owns the initial route. This only combines review: each candidate keeps its own
-immutable hash and still requires explicit approval before any block round starts.
-
-The layout route renders a complete page. Every declared region renders a labeled impressionistic wireframe from
-its hashed brief so purpose, geometry, density and reading order are judgeable before child blocks exist. Use
-representative labels, values and actions inside dashed lightweight controls; never present them as accepted parts,
-states, behavior or final copy. Modes sharing the route owner remain block states for the later block round.
-Navigation and flow cues appear only for explicitly scoped surfaces. A child block renders its
-accepted parts only when its recorded `layoutHash` equals the candidate displayed; missing or stale children
-stay rough. Clicking a region navigates to
-`#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`; it never opens a modal.
-
-The block-detail route always opens a tabbed review. `Layout brief` is the default and renders the exact parent
-region brief even while the child is missing or stale. `Block candidates` reports zero/missing until the parent
-layout is accepted and a block round supplies candidates. `Evidence` shows the exact parent binding, contract
-verdict and geometry. Candidate anatomy and state controls appear only when block candidates exist. The renderer
-must render every declared brief item; an arbitrary item cap is forbidden.
-
-The layout artifact still does not settle block parts, states, data ownership or final copy. A blank canvas,
-a region with no content, or a layout with no region overlay is invalid.
-
-Do not author candidate-specific HTML, CSS or JavaScript. Project shell and content are manifest data;
-the Vite application is project-neutral and its interactions never mutate the registry. Serve the generated
-directory. Start at 8080; if occupied, try the next port, bounded to twenty attempts, and print the URL that
-actually bound:
-
-```bash
-npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
-```
-
-Before approval, browser-QA every candidate at desktop and one narrow viewport. Prove that every region has
-recognizable business-backed content, every region link resolves to its version-bound block route, `Layout brief`
-is the default block tab, the full brief is visible, back navigation works and the console is clean. A generic
-skeleton line, placeholder-only card or region whose purpose is knowable only from its debug label fails the run.
-
-### 13 — Queue approval and close
-
-Show the direction alternatives and why one is recommended together with the direction-backed layout
-candidates. Open exactly one `### NEED APPROVALS` for this round: the recommended layout hash is the
-default, and `OK` approves both its embedded direction and its skeleton. Feedback may challenge either
-the direction or the structure and opens an optional audit review; an accepted candidate is never edited.
-On `OK`, validate the immutable object and update `layoutHeads[layoutId].head` in
-`design-registry-v2.json` (plus the deterministic `layouts/by-id/<layoutId>.json` projection) to the accepted `layoutHash`
-(and its declared stable region ID list) in the design registry. When a replacement layout is accepted, retain the
-previous head as superseded audit history and point to the replacement; never edit the old object. Reviews
-may record the owner's words, but are not lookup authority. Validate the registry and artifact,
-mark one evidence-backed layout as the default, and close only after every Layout-owned write is complete.
-Rebuild the project review graph after the head advances; block heads bound to the previous layout hash must
-appear stale and the new layout must fall back to rough child content until each block is redesigned or
-explicitly accepted under the new parent.
+`ScrollBranch`, `SurfaceListCard` and a divider are examples of possible contract resolutions, not universal
+requirements. Choose them only when the accepted situation calls for them.
 
 ## Stops
 
-- Route absent or stale → stop; report the exact failed route evidence and end this run.
-- Registry unlocked, dirty or foreign-owned → stop; report the failed ownership evidence and do not write.
-- Visual inventory empty or unreadable → stop; do not infer tokens from screenshots.
-- No evidence-backed direction recommendation → return the missing decision; do not generate layouts.
-- A required class is outside the contract's closed set → return the contract change to the owner.
-- Duplicate layout axis sets remain → regenerate rather than ship a fake choice.
-- The stable `layoutId` is absent, ambiguous or resolves to a malformed registry head → stop; do not fall back to a prompt.
-- A proposed hash is not the registry head → stop; only the approval checkpoint may advance the accepted head.
-
-No stop invokes another skill. If the owner wants recovery, that is a separate request and a separate
-run.
+- Missing/stale route, business truth, vocabulary or registry ownership → stop with exact evidence.
+- Missing stable `layoutId`, page-set decomposition, source evidence for an `existing` node, duplicate candidate
+  axes or fabricated product content → refuse the draft.
+- Lorem ipsum, placeholder labels, generic cards, toy row counts, repeated filler or a visibly partial business
+  surface → refuse the draft even when schema and interactions pass.
+- Fewer than 3 or more than 4 valid candidates, or candidates differing only by decoration → refuse the draft.
+- Missing candidate HTML, required selected-state HTML, UI-condition coverage, executable transition or viewport
+  coverage → do not approve or publish. A render-only preview is invalid.
+- A post-choice state needs a new product decision → return that decision; do not request approval twice for
+  deterministic work.
+- A proposed or legacy compatibility object is presented as current authority → stop; only the current revision
+  head may be replaced at acceptance.
 
 ## OUTPUT
 
-Present the `layoutId`, current/updated accepted head, direction alternatives, evidence-backed
-recommendation, layout candidates, recommended layout hash and preview URL in concise prose. Use one
-`### NEED APPROVALS` for the combined accept-or-feedback decision. No status tables.
+In concise prose, give `layoutId`, page/flow scope, the pattern sheet, 3–4 ranked candidates, the model-selected
+recommendation and review URL. Ask nothing unless a genuine product decision or write boundary remains.
+Use one approval checkpoint. After `OK`, report the accepted `revisionHash`, persisted page/state viewports and
+remaining block regions. No status tables.

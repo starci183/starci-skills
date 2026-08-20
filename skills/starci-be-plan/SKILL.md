@@ -25,8 +25,9 @@ None. Planning ends with a brief; it never starts setup or approval.
 ## Run
 
 Read `@skill-shape`, `@workspaces` and `@business` first. After the backend route verifies, resolve the
-stable business `featureId`, check its routed FE/BE heads and refresh/commit it inside the disclosed
-business boundary when absent or stale. Load `CONTEXT.md` plus only the flow/contract modules this plan
+stable business `featureId` and its authority status. A behavior change must first publish explicit owner intent
+as `pending`, based on the latest implemented head; planning never advances it to `in-progress`. A purely
+technical plan declares `businessImpact: none` and binds implemented truth without creating a feature. Load `CONTEXT.md` plus only the flow/contract modules this plan
 changes. Then read `@be-patterns` and `@rule-bindings`. Aside from a required business refresh, this
 phase produces a brief and no product source.
 It ends with an approval-ready boundary; it never writes backend source.
@@ -93,8 +94,8 @@ exception; a bare throw is not a case, it is a defect.
 
 ### 8 — State boundaries, alternatives and acceptance evidence
 
-The brief closes with: what this capability will not do, which alternatives were considered and why they
-lost, and exactly what evidence will prove it works — which test, which query, which runtime call.
+The brief closes with: `businessImpact`, stable `featureId`, exact business head/status, what this capability
+will not do, which alternatives were considered and why they lost, and exactly what evidence will prove it works — which test, which query, which runtime call.
 
 ### 9 — Close the phase
 

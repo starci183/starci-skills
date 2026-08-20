@@ -10,19 +10,20 @@
 
 ## Record
 
-You are given a business request in prose and you return **3–4 layout candidates**, each a JSON
-structure the owner can choose between — or one refusal naming the product decision that is missing.
-This is not a compiler: a compiler returns one answer because its law closes the choice. Here the
-choice is a product decision, so returning one answer would be a compiler pretending the owner had
-already decided.
+You are given a screenshot of one page or a prose description of a page flow and return 3–4 materially distinct
+complete composed page sets, rank them against evidence and select the strongest — or one refusal naming missing
+product truth. The model owns visual judgment and selection; the schema records and proves the result rather
+than asking the owner to operate a candidate gate.
 
 ## Law
 
-A schema 3 candidate names regions, who owns each region's geometry, what mounts once and what changes
+A schema 4 candidate names its `page` or `flow` scope, every composed page, ordered nested ownership nodes,
+regions, who owns each region's geometry, what mounts once and what changes
 per route. Every region hashes its minimum child bounding geometry (`placement`, `width`, `height`, `align`)
 and one impressionistic child brief (`kind`, title, summary, representative labels, values and actions). The
-wireframe makes purpose, density and reading order imaginable without previewing or approving exact parts,
-fields, copy, actions, states or data ownership. Schema 1–2 remain valid only
+full-page composition makes purpose, density and reading order imaginable without approving exact parts,
+fields, copy, actions, states or data ownership. Each node is `existing`, `proposed` or `new`; `existing` cites
+the real source and SHA-256 source hash and cannot differ between choices. Schema 1–3 remain valid only
 for immutable accepted history. It never names a class. Classes are decided later from the accepted shape;
 a candidate that carries one has spent a decision that was not its to spend.
 
@@ -137,8 +138,8 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.
-5. 3–4 candidates when the request admits more than one structure; fewer when it does not, with the
-   reason stated. A batch is never padded to reach three.
+5. Return 3–4 candidates. Each must change hierarchy, navigation, grouping or interaction ownership materially;
+   decoration, spacing or wording alone does not create a candidate. Rank the valid set and select one.
 6. A missing product decision is returned to the owner. It is never guessed to complete a batch.
 7. A candidate's JSON is canonical — fixed key order, no timestamps, no per-run ids — because its hash
    is what the owner's approval attaches to.
@@ -146,19 +147,29 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 
 ## Preview
 
-The HTML view is a responsive web prototype with realistic representative content and illustration evidence,
-not empty placeholder rectangles. Every layout region stays enclosed by a dashed boundary whose visible label
-names the region, contract entry, assembler and mount lifetime. Preview-only interactions may demonstrate
-navigation ownership, sticky behavior and responsive collapse; they do not become product behavior.
+The HTML view is a responsive, functional full-page product prototype with realistic representative content, not empty
+placeholder rectangles. A screenshot reproduces the entire visible viewport. A flow renders every explicit
+page or step. Nested existing layouts remain visible and source-faithful while only proposed/new ownership may
+change. Navigation, tabs, disclosure, drawers, modals, menus/popovers, forms, primary/retry actions and responsive
+collapse execute deterministic in-memory transitions wherever the evidenced page can reach them. The prototype
+performs no backend mutation, but a QA state selector never substitutes for product controls. Before drawing,
+inventory viewport, overlay, disclosure, async, data, permission and interaction conditions; each reachable value
+must map to authored HTML and each irrelevant family is explicitly `not-applicable` with evidence.
 
-Content inside a region is rendered as a labeled impressionistic wireframe from its hashed brief. Representative
-names, values and actions make the block's purpose, density and reading order imaginable; dashed lightweight
-controls make clear that the content is not accepted anatomy or final copy. A login region may therefore show
+Content inside a region is rendered as authored product HTML from its hashed brief. Representative names, values
+and actions make the block's purpose, density and reading order imaginable; review/schema/debug labels stay
+outside the product canvas. A login region may therefore show
 credential-shaped examples, while sign-up and recovery remain later block states. A flow cue appears only when
-that flow is explicitly in product scope and remains a rough sequence, never a step contract.
+that flow is explicitly in product scope and renders as its complete page set.
 Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
 when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated
 polished mockup are both invalid previews.
+
+Representative does not mean abbreviated. Build a page/state content matrix from business truth and render the
+real entity types, meaningful values, counts, statuses, metadata, actions, consequences and production-like
+density needed to understand the surface. Lorem, generic cards, toy row counts, repeated filler and a title-only
+shell are defects. Only content outside the declared scope may be visually quiet; owned business content is never
+reduced merely to make the preview faster to author.
 
 ## Refusal
 
@@ -181,6 +192,10 @@ blocked: <which regions cannot be resolved without it>
 The output **is** JSON, and its authority is `@schema` beside this record — not this
 excerpt. `envelope` holds what varies between runs; the hash covers a candidate only, so the same
 decision re-run in a later round produces the same hash.
+
+New work uses schema 4: `envelope.scope` declares screenshot `page` or described `flow`; every candidate carries
+the same ordered `pages`, each page carries its nested `nodes` and owned region names, and each region binds its
+`pageId` plus `change`. The schema 1 example below documents readable immutable history only.
 
 ```json
 {

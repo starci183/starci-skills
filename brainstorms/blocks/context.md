@@ -9,10 +9,9 @@
 
 ## Record
 
-You are given one region of an accepted layout and its accepted visual direction, and you return **3–4 block anatomies**, each a JSON
-structure the owner can choose between — or one refusal naming the product decision that is missing. Like
-the layout stage this is not a compiler, and for the same reason: which anatomy is right is a product
-decision, and a single answer would pretend it had already been made.
+You are given one region of an accepted layout and its accepted visual direction, and you return 3–4 materially
+distinct block anatomies inside the complete parent page, rank them and select the strongest — or one refusal
+naming missing product truth. The model owns visual and compositional judgment; JSON records and proves it.
 
 ## Law
 
@@ -47,7 +46,8 @@ Not read at this stage: class arrays, unaccepted theme choices, locale copy, lin
 ## Reading an accepted region
 
 1. **Require an accepted layout hash and resolve its direction.** A proposed layout is not a starting point, and its bound direction is not restated as a second hash here.
-2. **Enumerate the states first.** Populated, empty, pending, failed, partial, forbidden — which can this
+2. **Enumerate the conditions and states first.** Viewport, overlay, disclosure, async, data, permission and
+   interaction conditions come before anatomy. Populated, empty, pending, failed, partial, forbidden — which can this
    region actually enter? Read it from source; do not infer it from `optional`.
 3. **Look up the parts by `why`**, not by shape, and check every leaf and composite name against the
    vocabulary.
@@ -101,16 +101,21 @@ an anatomy.
 | `BLOCK-11` | Every action owns its own pending flag, and one block is one settling unit. | one shared loading flag across several actions — a spinner on the wrong button |
 | `BLOCK-12` | A failure has a visible owner in every layout. A failure is a settled answer, not a wait. | an error rendered as a spinner that never resolves |
 | `BLOCK-13` | A block accepts closed data. It never accepts arbitrary content and never lets the caller decide what appears inside it. | arbitrary content, which makes the block a branch |
-| `BLOCK-14` | Proposals are per block. A surface with `N` blocks yields 3–4 candidates for each of them. | turning several blocks into 3–4 page-wide combinations |
+| `BLOCK-14` | Proposals are per block. A surface with `N` blocks is judged region by region; alternatives stay inside their owning region. | turning several block decisions into page-wide combinations |
 
 ## Rules
 
 1. An anatomy carries no class, no token, no colour.
-2. The state set is enumerated before the anatomy is designed, and the anatomy draws all of it.
+2. The condition/state set is enumerated before the anatomy is designed, and the anatomy draws all of it. Modal,
+   drawer, popover/menu, loading, empty, error, locked and disabled surfaces are included when reachable; an
+   irrelevant family is explicitly `not-applicable` with evidence.
+3. A business-content matrix names the real entity, representative fields, counts, statuses, actions,
+   consequences and density for each state. A title plus a few generic rows is not representative content.
 3. `repeats` carries a `restingCount`.
 4. Every part cites a name that exists, or declares a new one with its `why`.
 5. No two anatomies in a batch share the whole axis set.
-6. 3–4 anatomies when the region admits more than one; fewer with the reason stated, never padded.
+6. Return 3–4 anatomies. Each changes meaningful grouping, repetition, hierarchy or interaction ownership;
+   decoration alone is a duplicate. Rank the valid set and select one.
 7. A missing product decision is returned to the owner.
 8. The JSON is canonical, and its hash is what approval attaches to.
 9. Feedback opens a new round; an accepted anatomy is never edited in place.

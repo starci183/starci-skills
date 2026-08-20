@@ -107,16 +107,19 @@ export function buildMigration(registryRoot) {
   const blockMap = readJson(join(root, "blocks", "map", "current-heads.json")) ?? {};
   const bySurface = readJson(join(root, "blocks", "map", "by-surface.json")) ?? {};
   const sessions = readSessions(root);
-  const layoutHeads = {};
-  const blockHeads = {};
-  const history = {layouts: {}, blocks: {}};
-  const objects = {};
+  const layoutHeads = existingV2.schemaVersion === 2 ? structuredClone(existingV2.layoutHeads ?? {}) : {};
+  const blockHeads = existingV2.schemaVersion === 2 ? structuredClone(existingV2.blockHeads ?? {}) : {};
+  const history = sessions.length === 0 && existingV2.schemaVersion === 2
+    ? structuredClone(existingV2.reviewHistory ?? {layouts: {}, blocks: {}})
+    : {layouts: {}, blocks: {}};
+  const objects = existingV2.schemaVersion === 2 ? structuredClone(existingV2.objects?.byHash ?? {}) : {};
+  const revisions = existingV2.schemaVersion === 2 ? structuredClone(existingV2.revisions?.byHash ?? {}) : {};
 
   for (const [rawId, rawHash] of Object.entries(layoutMap.heads ?? {})) {
     const layoutId = asSlug(rawId);
     const hash = asHash(rawHash);
     if (!layoutId || !hash) continue;
-    layoutHeads[layoutId] = {layoutId, head: hash, regions: []};
+    layoutHeads[layoutId] ??= {layoutId, head: hash, regions: []};
     const existingPattern = existingV2.layoutHeads?.[layoutId]?.routePattern;
     if (typeof existingPattern === "string" && existingPattern.trim()) layoutHeads[layoutId].routePattern = existingPattern.trim();
     addObject(objects, hash);
@@ -174,7 +177,7 @@ export function buildMigration(registryRoot) {
       if (entry.layoutHash !== head.head) continue;
       const scoped = `${layoutId}/${entry.blockId}`;
       if (!head.regions.includes(entry.blockId)) head.regions.push(entry.blockId);
-      blockHeads[scoped] = {layoutId, blockId: entry.blockId, layoutHash: head.head, head: entry.head};
+      blockHeads[scoped] ??= {layoutId, blockId: entry.blockId, layoutHash: head.head, head: entry.head};
     }
   }
 
@@ -212,6 +215,10 @@ export function buildMigration(registryRoot) {
 
   for (const block of Object.values(blockHeads)) addObject(objects, block.head);
 
+  // A current bundle head is resolved through revisions, never through the
+  // legacy object store even when old projection maps contain the same hash.
+  for (const hash of Object.keys(revisions)) delete objects[hash];
+
   for (const hash of Object.keys(objects)) {
     const objectPath = join(root, "objects", "sha256", `${hash}.json`);
     if (!existsSync(objectPath)) throw new Error(`design registry references missing immutable object ${hash}`);
@@ -224,8 +231,9 @@ export function buildMigration(registryRoot) {
     canonicalization: "RFC8785-JCS",
     layoutHeads: sortObject(layoutHeads),
     blockHeads: sortObject(blockHeads),
-    objects: {immutable: true, byHash: sortObject(objects)},
   };
+  if (Object.keys(objects).length) result.objects = {immutable: true, byHash: sortObject(objects)};
+  if (Object.keys(revisions).length) result.revisions = {immutable: true, byHash: sortObject(revisions)};
   if (Object.keys(history.layouts).length || Object.keys(history.blocks).length) {
     result.reviewHistory = sortObject(history);
   }

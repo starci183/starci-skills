@@ -15,9 +15,8 @@ title: Blocks · Vietnamese
 ## Bản ghi
 
 Mô-đun này nhận **một region của một layout đã được chấp nhận** cùng direction đã chọn trong layout đó,
-rồi trả về **3–4 giải phẫu khối**, mỗi cái
-là một cấu trúc JSON để thầy chọn giữa chúng — hoặc một lời từ chối nêu tên quyết định sản phẩm còn
-thiếu. Cũng như tầng layout, đây không phải compiler, và vì đúng lý do đó: giải phẫu nào là đúng là một
+rồi trả về **3–4 giải phẫu khối** khác biệt đáng kể trong toàn parent page, xếp hạng và tự chọn phương án mạnh
+nhất — hoặc một lời từ chối nêu product truth còn thiếu. Model sở hữu visual/composition judgment;
 **quyết định sản phẩm**, và trả về một đáp án là giả vờ rằng quyết định ấy đã được đưa ra.
 
 ## Luật
@@ -53,7 +52,8 @@ Không đọc ở tầng này: mảng class, lựa chọn theme chưa duyệt, c
 ## Đọc một region đã chấp nhận
 
 1. **Đòi hash layout đã chấp nhận và giải direction của nó.** Layout đang đề xuất không phải điểm bắt đầu, và direction đã buộc trong nó không được chép thành hash thứ hai ở đây.
-2. **Liệt kê trạng thái trước.** Có dữ liệu, rỗng, đang tải, thất bại, một phần, bị chặn quyền — region
+2. **Liệt kê condition và trạng thái trước.** Viewport, overlay, disclosure, async, data, permission và interaction
+   phải có trước anatomy. Có dữ liệu, rỗng, đang tải, thất bại, một phần, bị chặn quyền — region
    này **thật sự** vào được những cái nào? Đọc từ source; không suy từ `optional`.
 3. **Tra các phần theo `why`**, không theo hình, và kiểm mọi tên leaf và composite với từ vựng.
 4. **Chọn các trục** mà những giải phẫu sẽ khác nhau ở đó. Trùng bộ trục là **một** giải phẫu.
@@ -106,16 +106,21 @@ Mười bốn luật mà **mọi** giải phẫu phải thoả. Giải phẫu ph
 | `BLOCK-11` | **Mỗi hành động sở hữu cờ pending của riêng nó**, và một khối là **một đơn vị ngã ngũ**. | một cờ loading dùng chung cho nhiều hành động — spinner nhảy sai nút |
 | `BLOCK-12` | Thất bại có **owner nhìn thấy được trong mọi bố cục**. Thất bại là một **câu trả lời đã ngã ngũ**, không phải một lần chờ. | vẽ lỗi thành một spinner không bao giờ dứt |
 | `BLOCK-13` | Khối nhận **dữ liệu đóng**. Nó không nhận nội dung tuỳ ý và không bao giờ để caller quyết cái gì hiện bên trong nó. | nội dung tuỳ ý, thứ biến khối thành một branch |
-| `BLOCK-14` | **Phương án tính theo từng khối.** Một bề mặt có `N` khối thì ra 3–4 phương án cho **mỗi** khối. | biến nhiều khối thành 3–4 tổ hợp cấp-trang |
+| `BLOCK-14` | **Phương án tính theo từng khối.** Một bề mặt có `N` khối được đánh giá từng region; alternative nằm trong region sở hữu nó. | biến nhiều quyết định block thành tổ hợp cấp-trang |
 
 ## Quy tắc
 
 1. Giải phẫu không mang class, không mang token, không mang màu.
-2. Bộ trạng thái được liệt kê trước khi thiết kế, và giải phẫu vẽ **đủ** bộ đó.
+2. Bộ condition/state được liệt kê trước khi thiết kế, và giải phẫu vẽ **đủ** bộ đó. Modal, drawer,
+   popover/menu, loading, empty, error, locked và disabled được đưa vào khi reachable; family không liên quan phải
+   ghi rõ `not-applicable` cùng evidence.
+3. Business-content matrix gọi đúng entity, field đại diện, count, status, action, consequence và density cho mỗi
+   state. Một title cộng vài generic row không phải representative content.
 3. `repeats` phải mang `restingCount`.
 4. Mọi phần trích một cái tên có thật, hoặc khai một tên mới kèm `why`.
 5. Không hai giải phẫu nào trong một lô trùng cả bộ trục.
-6. 3–4 giải phẫu khi region cho phép hơn một; ít hơn thì kèm lý do, **không bao giờ** nhồi cho đủ.
+6. Trả về 3–4 anatomy. Mỗi cái phải đổi grouping, repetition, hierarchy hoặc interaction ownership đáng kể;
+   chỉ đổi trang trí là trùng. Xếp hạng bộ hợp lệ và tự chọn một phương án.
 7. Quyết định sản phẩm còn thiếu thì trả về cho người chủ.
 8. JSON là dạng chuẩn hoá, và **hash của nó** là thứ lời chấp thuận gắn vào.
 9. Feedback mở một lượt mới; giải phẫu đã chấp nhận không bao giờ bị sửa tại chỗ.

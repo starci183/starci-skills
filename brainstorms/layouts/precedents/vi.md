@@ -47,8 +47,8 @@ thẩm quyền của cây này.
    tại dưới đúng cái tên ấy — `PRECEDENT-3`.
 3. **Đọc phần bị loại.** Những phương án bị loại trong tiền lệ gần nhất là đường nhanh nhất để không đề
    xuất lại một hình mà source này đã từ chối.
-4. **Bảo đảm có một cái rời đi.** Trong 3–4 phương án sinh ra, **ít nhất một** không được noi theo tiền
-   lệ gần nhất — `PRECEDENT-4`. Tiền lệ giữ corpus nhất quán; cái rời đi giữ nó còn sống.
+4. **Chỉ rời precedent khi evidence xứng đáng.** Không chế tạo một phương án rời precedent. Chỉ đưa ra
+   khi nó giải quyết vấn đề quan trọng mà precedent gần nhất không giải quyết được — `PRECEDENT-4`.
 5. **Không để tiền lệ bịt miệng luật.** Một tiền lệ phạm luật layout không phải tiền lệ để noi theo; nó
    là một khuyết tật cần ghi lại — `PRECEDENT-5`.
 

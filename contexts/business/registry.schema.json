@@ -19,6 +19,9 @@
         "properties": {
           "featureId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
           "head": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "authorityStatus": {"enum": ["pending", "in-progress", "implemented", "rejected"]},
+          "baseHead": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "previousHead": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
           "sources": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["role", "head"], "properties": {"role": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}, "head": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}}}
         }
       }
