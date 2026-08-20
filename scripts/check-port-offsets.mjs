@@ -10,28 +10,43 @@ const value = (name) => {
 const trustRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = resolve(value("--source") ?? join(trustRoot, ".."));
 const excluded = new Set(args.flatMap((arg, index) => arg === "--exclude" ? [args[index + 1]] : []).filter(Boolean));
-const registryPath = join(source, ".workspace", "ports.json");
+const workspaceRoot = join(source, ".workspace");
+const registryRoot = join(workspaceRoot, "ports");
+const configPath = join(registryRoot, "config.json");
 const findings = [];
 const rows = [];
+const allocations = new Map();
 const isIntegerPort = (port) => Number.isInteger(port) && port > 0 && port <= 65535;
 const readJson = (path, label) => {
   try { return JSON.parse(readFileSync(path, "utf8")); }
   catch (error) { findings.push(`${label}: invalid JSON — ${error.message}`); return null; }
 };
 
-if (!existsSync(registryPath)) {
-  console.error(`port-offset stale: absent ${registryPath}`);
+if (!existsSync(registryRoot)) {
+  console.error(`port-offset stale: absent ${registryRoot}`);
   process.exit(1);
 }
-const registry = readJson(registryPath, "registry");
-if (!registry) process.exit(1);
-if (registry.version !== 1 || !Number.isInteger(registry.slotStep) || registry.slotStep < 1 || !registry.families || typeof registry.families !== "object") {
-  findings.push("registry: expected version=1, positive integer slotStep and families object");
+if (!existsSync(configPath)) {
+  console.error(`port-offset stale: absent ${configPath}`);
+  process.exit(1);
+}
+const config = readJson(configPath, "registry config");
+if (!config) process.exit(1);
+if (config.version !== 1 || !Number.isInteger(config.slotStep) || config.slotStep < 1) {
+  findings.push("registry config: expected version=1 and positive integer slotStep");
 }
 
-for (const [family, allocation] of Object.entries(registry.families ?? {})) {
-  if (excluded.has(family)) continue;
-  if (!Number.isInteger(allocation?.offset) || allocation.offset < 0 || !allocation.applications || typeof allocation.applications !== "object") {
+const allocationFiles = readdirSync(registryRoot, {withFileTypes: true})
+  .filter((entry) => entry.isFile() && entry.name.endsWith(".json") && entry.name !== "config.json")
+  .sort((left, right) => left.name.localeCompare(right.name));
+for (const entry of allocationFiles) {
+  const family = entry.name.slice(0, -".json".length);
+  const allocation = readJson(join(registryRoot, entry.name), `${family} allocation`);
+  if (!allocation) continue;
+  if (allocation.version !== 1 || allocation.project !== family) {
+    findings.push(`${family}: allocation must declare version=1 and project matching its filename`);
+  }
+  if (!Number.isInteger(allocation.offset) || allocation.offset < 0 || !allocation.applications || typeof allocation.applications !== "object" || Array.isArray(allocation.applications)) {
     findings.push(`${family}: invalid offset/applications allocation`);
     continue;
   }
@@ -41,11 +56,25 @@ for (const [family, allocation] of Object.entries(registry.families ?? {})) {
     else if (occupied.has(slot)) findings.push(`${family}: applications ${occupied.get(slot)} and ${application} share slot ${slot}`);
     else occupied.set(slot, application);
   }
+  allocations.set(family, allocation);
 }
 
-const workspaceRoot = join(source, ".workspace");
-for (const family of existsSync(workspaceRoot) ? readdirSync(workspaceRoot, {withFileTypes: true}).filter((entry) => entry.isDirectory()).map((entry) => entry.name) : []) {
-  if (excluded.has(family) || !registry.families?.[family]) continue;
+const routedFamilies = existsSync(workspaceRoot)
+  ? readdirSync(workspaceRoot, {withFileTypes: true})
+    .filter((entry) => entry.isDirectory() && (
+      existsSync(join(workspaceRoot, entry.name, "be", "config.json"))
+      || existsSync(join(workspaceRoot, entry.name, "fe", "config.json"))
+    ))
+    .map((entry) => entry.name)
+    .sort()
+  : [];
+for (const family of routedFamilies) {
+  if (excluded.has(family)) continue;
+  const allocation = allocations.get(family);
+  if (!allocation) {
+    findings.push(`${family}: allocation record is absent at ${join(registryRoot, `${family}.json`)}`);
+    continue;
+  }
   const routePath = join(workspaceRoot, family, "be", "config.json");
   if (!existsSync(routePath)) continue;
   const route = readJson(routePath, `${family}/be route`);
@@ -60,11 +89,10 @@ for (const family of existsSync(workspaceRoot) ? readdirSync(workspaceRoot, {wit
   for (const retired of ["portOffset", "portOffsetNote", "basePorts", "fixedPorts", "fixedPortsNote", "twoApplicationsNote"]) {
     if (Object.hasOwn(metadata, retired)) findings.push(`${family}: product metadata still owns retired field ${retired}`);
   }
-  if (!metadata.portServices || typeof metadata.portServices !== "object") {
+  if (!metadata.portServices || typeof metadata.portServices !== "object" || Array.isArray(metadata.portServices)) {
     findings.push(`${family}: metadata.portServices is absent`);
     continue;
   }
-  const allocation = registry.families[family];
   for (const [service, declaration] of Object.entries(metadata.portServices)) {
     const scope = declaration?.scope;
     let expected;
@@ -73,7 +101,7 @@ for (const family of existsSync(workspaceRoot) ? readdirSync(workspaceRoot, {wit
     else if (scope === "application") {
       const slot = allocation.applications?.[declaration.application];
       if (!Number.isInteger(slot)) findings.push(`${family}/${service}: application ${declaration.application ?? "<absent>"} has no slot`);
-      else expected = declaration.basePort + allocation.offset + slot * registry.slotStep;
+      else expected = declaration.basePort + allocation.offset + slot * config.slotStep;
     } else if (scope === "tool" || scope === "external") {
       expected = declaration.port;
       local = scope === "tool";
@@ -99,11 +127,11 @@ for (const row of rows.filter((item) => item.local)) {
   else listeners.set(row.port, row);
 }
 
-console.log(`registry: ${registryPath}`);
-console.log(`slot step: ${registry.slotStep}`);
+console.log(`registry: ${registryRoot}`);
+console.log(`slot step: ${config.slotStep}`);
 console.log(`excluded: ${[...excluded].sort().join(", ") || "none"}`);
-for (const [family, allocation] of Object.entries(registry.families ?? {}).filter(([family]) => !excluded.has(family)).sort()) {
-  const slots = Object.entries(allocation.applications ?? {}).sort((a, b) => a[1] - b[1]).map(([name, slot]) => `${name}=+${slot * registry.slotStep}`).join(", ") || "none";
+for (const [family, allocation] of [...allocations.entries()].filter(([family]) => !excluded.has(family)).sort(([left], [right]) => left.localeCompare(right))) {
+  const slots = Object.entries(allocation.applications ?? {}).sort((a, b) => a[1] - b[1]).map(([name, slot]) => `${name}=+${slot * config.slotStep}`).join(", ") || "none";
   console.log(`${family}: offset +${allocation.offset}; applications ${slots}`);
   for (const row of rows.filter((item) => item.family === family).sort((a, b) => a.port - b.port || a.service.localeCompare(b.service))) console.log(`  ${row.service}=${row.port} (${row.scope})`);
 }

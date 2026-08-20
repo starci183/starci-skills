@@ -37,9 +37,11 @@ còn lọt ở dưới mới là lý do trang này tồn tại, không phải ph
 | `prefer-arrow-export` | `NAMING-1` | Một khai báo `function` đứng ở cấp mô-đun, được gọi đúng tên trong thông báo, kèm sẵn dạng viết lại bằng arrow const |
 | `handler-on-prefix` | `NAMING-2` | Một biến, một thuộc tính JSX hay một trường của kiểu có tên bắt đầu bằng `handle` + một chữ hoa, kèm luôn cái tên `on…` mà nó lẽ ra phải mang từ lúc sinh ra |
 | `no-second-language-in-path` | `NAMING-3` | Đúng một đoạn đường dẫn — chỉ đoạn phạm đầu tiên — mang ngôn ngữ thứ hai, bằng một chữ cái có dấu hoặc bằng phép trùng khít với một danh sách các đoạn phiên âm đã liệt kê |
+| `no-direct-const-alias` | danh tính chỉ có ở máy | Một declarator `const A = B` mà binding và giá trị khởi tạo đều là định danh, vì nó cho một giá trị hai cái tên mà không thêm hành vi |
 
-Mọi quy tắc công bố đều ứng với một mã, và mọi mã luật nêu đều có quy tắc: **không mã nào ở đây bị bỏ
-lại không có máy giữ.** Phần chưa được thi hành thì hẹp hơn một mã và tuyệt đối không được đọc thành đã
+Mọi mã luật nêu đều có quy tắc, còn `no-direct-const-alias` được ghi rõ là danh tính chỉ có ở máy:
+**không mã nào bị bỏ không có máy giữ, và không danh tính chỉ có ở máy nào bị gán một mã giả.** Phần
+chưa được thi hành thì hẹp hơn một mã và tuyệt đối không được đọc thành đã
 phủ — đòi hỏi **arrow** cho đúng trong `NAMING-1`, và lệnh cấm đặt tên nói ra nơi thứ đó được dùng, đều
 không có quy tắc nào canh. Một lần chạy xanh không nói gì về hai điều đó.
 
@@ -56,10 +58,10 @@ ký tự hiện trong log build, trong dòng chú thích tắt quy tắc, và tr
    nghiệp vụ là một va chạm đã biết, không phải một sự cho phép.
 3. **Đọc nút, đừng đọc chữ.** `prefer-arrow-export` đọc `FunctionDeclaration` và cha của nó;
    `handler-on-prefix` đọc đúng ba loại nút; `no-second-language-in-path` đọc `context.filename` trước
-   khi có visitor nào. Một cái tên nằm trong chú thích, trong chuỗi hay trong giá trị thì cả ba đều
-   không thấy.
+   khi có visitor nào; `no-direct-const-alias` đọc một `VariableDeclarator` const có hai vế đều là
+   định danh. Một cái tên nằm trong chú thích hay chuỗi thì các quy tắc không thấy.
 4. **Mỗi phát hiện một khối.** `no-second-language-in-path` phát ra nhiều nhất một báo cáo cho mỗi tệp;
-   hai quy tắc kia báo một lần cho mỗi nút phạm.
+   ba quy tắc AST kia báo một lần cho mỗi nút phạm.
 5. **Viết dòng `hatch` mỗi khi một cửa còn mở lẽ ra đã che đúng lỗi đó.** Một phán quyết `silent` với
    `hatch: none` là lời khẳng định rằng cách viết đã sạch; một phán quyết `silent` có gọi tên một cửa là
    lời khẳng định rằng cách viết **chưa được ai đọc lại**. Đó là hai sự thật khác nhau.
@@ -152,6 +154,23 @@ lỗi cùng lúc, ở một đoạn không ai trong kho sửa được.
 **Ranh giới.** Quy tắc này quyết định một lần cho mỗi tệp, chỉ từ đường dẫn, trước khi duyệt cây. Không
 gì bên trong tệp đổi được phán quyết của nó, và không quy tắc nào khác ở đây đọc đường dẫn.
 
+## `no-direct-const-alias` — danh tính chỉ có ở máy
+
+**Nó báo cái gì.** Định danh được khai báo trong `const A = B` khi cả `A` và `B` đều là định danh thuần.
+Thông báo gọi tên cả hai và yêu cầu dùng trực tiếp định danh gốc, hoặc để const mới giữ kết quả của một
+phép biến đổi thật.
+
+**Nó phát hiện bằng gì.** Thăm `VariableDeclarator`, yêu cầu kind của khai báo cha là `const`, rồi yêu
+cầu cả `node.id.type` lẫn `node.init.type` đều là `Identifier`. Nó không phân giải import hay kiểu và
+không quan tâm hai tên có phải PascalCase hay không.
+
+**Điểm mù.** `let A = B`, `const A = object.B`, destructuring, alias trong import, re-export, hoặc một
+lời gọi bọc như `const A = identity(B)`. Đó là các hình AST khác; quy tắc này từ chối đúng alias const
+trực tiếp, không phải một máy chứng minh tương đương luồng dữ liệu.
+
+**Ranh giới.** Truy cập member, lời gọi, `await`, literal hoặc giá trị được dựng đều thêm một thao tác và
+không thuộc quy tắc này. Thao tác ấy có hữu ích hay không thuộc luật riêng của nó.
+
 ## Cách phát hiện
 
 | Phần | Cơ chế |
@@ -159,6 +178,7 @@ gì bên trong tệp đổi được phán quyết của nó, và không quy t�
 | `prefer-arrow-export` | Thăm `FunctionDeclaration`. Đọc `node.parent.type` và chỉ tiếp tục khi giá trị đó là `Program`, `ExportNamedDeclaration` hoặc `ExportDefaultDeclaration`. Báo tại `node.id`, lùi về chính nút đó khi khai báo không tên; thông báo điền `node.id.name`, hoặc chữ `default`. |
 | `handler-on-prefix` | Thăm đúng ba loại nút. `VariableDeclarator`, chỉ khi `node.id.type === "Identifier"`. `JSXAttribute`, đọc `node.name.name`. `TSPropertySignature`, chỉ khi `node.key.type === "Identifier"`. Mỗi tên được kiểm bằng `/^handle[A-Z]/`; thông báo dựng từ `name.slice("handle".length)`. |
 | `no-second-language-in-path` | Đọc `context.filename` (lùi về `context.getFilename()`) TRƯỚC khi trả về bất kỳ visitor nào. Đổi `\` thành `/`, hạ chữ thường toàn bộ, tách theo `/`, bỏ đoạn rỗng. Một đoạn phạm khi regex chữ cái có dấu của một bảng chữ duy nhất khớp nó, HOẶC khi đoạn đó sau khi bỏ `(`, `)`, `[` và `]` trùng khít một phần tử trong danh sách hai mươi đoạn phiên âm. Chỉ đoạn phạm đầu tiên sống sót qua `.find`. Khi không đoạn nào phạm, quy tắc trả về visitor rỗng và tệp không bị duyệt; ngược lại báo một lần tại `Program`. |
+| `no-direct-const-alias` | Thăm `VariableDeclarator`; báo khi kind của cha là `const` và cả `id` lẫn `init` đều là nút `Identifier`. |
 | Cái duy nhất với ra ngoài tệp | Chỉ `context.filename`. Không quy tắc nào đọc thông tin kiểu, phân giải import hay xem xét một giá trị; mọi thứ còn lại quyết định từ hình dạng bên trong tệp. |
 
 ## Lối thoát hợp lệ
@@ -173,6 +193,7 @@ gì bên trong tệp đổi được phán quyết của nó, và không quy t�
 | `let handleClick = …` / `var handleClick = …` | `handler-on-prefix` | Visitor là `VariableDeclarator`, thứ mà mọi kiểu khai báo đều sinh ra; `const` không được xét riêng |
 | `const handleClick = useCallback(() => {}, [])` | `handler-on-prefix` | Giá trị khởi tạo không bao giờ bị xem; chỉ có định danh được khai báo |
 | `<Field handleChange={fn} />` | `handler-on-prefix` | Một thuộc tính JSX bị kiểm bằng chính tên nó, độc lập với kiểu của thành phần nhận |
+| `const localValue: typeof sourceValue = sourceValue` | `no-direct-const-alias` | Chú thích kiểu không đổi hai nút định danh hoặc kind của khai báo cha |
 | `app/(marketing)/dang-nhap/page.tsx` | `no-second-language-in-path` | Ngoặc của nhóm tuyến và ngoặc vuông của đoạn động bị bóc trước khi so với danh sách |
 | `app/DANG-KY/page.tsx` | `no-second-language-in-path` | Toàn bộ đường dẫn bị hạ chữ thường trước mọi phép so |
 | `components/Đăng nhập/index.tsx` | `no-second-language-in-path` | Nhánh dấu khớp ở bất kỳ đâu trong đoạn; không đòi dấu phân cách hay ranh giới từ |
@@ -193,6 +214,7 @@ gì bên trong tệp đổi được phán quyết của nó, và không quy t�
 | `type Props = { "handleClick": () => void }` | `handler-on-prefix` | Khoá là một chuỗi ký tự, mà điều kiện đòi `Identifier` |
 | `clickHandler`, `submitHandler`, `doSubmit`, `handle_click` | `handler-on-prefix` | Regex neo vào `handle` rồi một chữ hoa. Cách viết hậu tố là từ vựng thay thế phổ biến nhất và hoàn toàn vô hình |
 | `<Field {...{ handleChange }} />` | `handler-on-prefix` | Một phép trải là `JSXSpreadAttribute`; quy tắc chỉ thấy thuộc tính có tên |
+| `const Alias = object.Original`, `const Alias = identity(Original)`, hoặc `import { Original as Alias }` | `no-direct-const-alias` | Truy cập member, lời gọi và import specifier không phải declarator const hai vế đều là định danh trực tiếp |
 | Một đoạn phiên âm ngoài danh sách hai mươi phần tử — `bai-hoc`, `nguoi-dung`, `dat-hang` | `no-second-language-in-path` | Phép thuộc là trùng khít danh sách. Danh sách là cố ý, không phải cẩu thả: đoán theo hình dạng sẽ từ chối `capacity` và `dangerous`, mà một quy tắc bắt nhầm từ của ngôn ngữ chung là quy tắc bị tắt |
 | `dang-nhap-v2`, `auth-dang-nhap`, `dangnhap`, `dang_nhap` | `no-second-language-in-path` | Phép so là bằng nhau nguyên đoạn. Bất kỳ tiền tố, hậu tố hay dấu phân cách khác đều thoát |
 | `[...dang-nhap]` và `@dang-nhap` | `no-second-language-in-path` | Tập bóc đúng là `(`, `)`, `[`, `]`. Ba dấu chấm của đoạn bắt-tất-cả và dấu `@` của tuyến song song còn lại và phá phép so bằng |
@@ -210,7 +232,7 @@ gì bên trong tệp đổi được phán quyết của nó, và không quy t�
 | bộ phân tích | TypeScript có bật JSX — hai trong ba visitor của `handler-on-prefix` là nút TypeScript hoặc JSX, và nếu không thì chúng lặng lẽ không bao giờ được chạm tới |
 | `context.filename` | Một đường dẫn tuyệt đối đúng như trình kiểm báo về, thứ mà `no-second-language-in-path` đọc trước khi trả về bất kỳ visitor nào |
 | glob | Cấu hình của kho tiêu thụ quyết định tệp nào được kiểm. Một tệp không glob nào gọi tên là một tệp mà ở đây không có quy tắc nào tồn tại cho nó |
-| mức nghiêm trọng | Ý kiến của chính các quy tắc là `error` cho cả ba; cấu hình của kho tiêu thụ vẫn là nơi quyết định cái gì được bật |
+| mức nghiêm trọng | Ý kiến của chính các quy tắc là `error` cho cả bốn; cấu hình của kho tiêu thụ vẫn là nơi quyết định cái gì được bật |
 
 ## Quy tắc
 
@@ -247,8 +269,8 @@ gì bên trong tệp đổi được phán quyết của nó, và không quy t�
 Mỗi phát hiện một khối:
 
 ```text
-rule: <prefer-arrow-export | handler-on-prefix | no-second-language-in-path>
-code: <NAMING-1 | NAMING-2 | NAMING-3>
+rule: <prefer-arrow-export | handler-on-prefix | no-second-language-in-path | no-direct-const-alias>
+code: <NAMING-1 | NAMING-2 | NAMING-3 | danh tính chỉ có ở máy>
 node: <the exact node the rule visits>
 verdict: <fires | silent>
 hatch: <none | the open row from the table above that explains the silence>

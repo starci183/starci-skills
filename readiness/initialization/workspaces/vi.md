@@ -12,9 +12,10 @@ None.
 read route `.workspace/<project>/<role>/config.json`. Project và role phải do owner khai, không suy ra từ
 tên thư mục hay lượt chạy trước.
 
-`.workspace/ports.json` sở hữu family offset và application slot bền của cùng Source. Khi project đã khai
-bind local service, initialization tạo hoặc validate allocation record trước khi route được reuse. Nó không
-copy offset vào target repository và không sửa target.
+`.workspace/ports/config.json` sở hữu slot step chung của Source, còn mỗi
+`.workspace/ports/<project>.json` sở hữu family offset cùng application slot map bền. Khi project đã khai
+bind local service, initialization tạo hoặc validate project-named allocation record trước khi route được
+reuse. Nó không copy offset vào target repository và không sửa target.
 
 Verify checkout, repository, branch/head, manifest và vị trí contract thật trước khi phân loại route là
 `create`, `reuse`, hoặc `refresh`. Contract chỉ là `null` khi repository thật sự không có. Route là mô tả

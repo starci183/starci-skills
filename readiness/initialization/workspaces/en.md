@@ -12,9 +12,10 @@ None.
 `.workspace/<project>/<role>/config.json` read route. Project and roles are owner-declared, never inferred
 from directory names or a previous run.
 
-`.workspace/ports.json` owns the same Source's persistent family offsets and application slots. When a
-declared project binds local services, initialization creates or validates that allocation record before
-the route is reusable. It never copies the offset into a target repository and never edits a target.
+`.workspace/ports/config.json` owns the same Source's slot step, while one
+`.workspace/ports/<project>.json` owns each persistent family offset and application slot map. When a
+declared project binds local services, initialization creates or validates its project-named allocation
+record before the route is reusable. It never copies the offset into a target repository and never edits a target.
 
 Verify checkout, repository, branch/head, manifests, and the real contract location before classifying a
 route as `create`, `reuse`, or `refresh`. A missing contract is `null` only when the repository truly has

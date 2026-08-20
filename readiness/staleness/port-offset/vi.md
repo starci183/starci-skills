@@ -10,8 +10,9 @@ Không có.
 
 ## Luật
 
-`.workspace/ports.json` là authority Source-wide duy nhất cho family offset và application slot được lưu
-bền. Product repository được khai service identity/base port và giữ `ports` đã resolve cho runtime consumer;
+`.workspace/ports/config.json` là authority duy nhất cho slot step chung của Source, và mỗi
+`.workspace/ports/<project>.json` là authority duy nhất cho family offset cùng application slot map bền.
+Product repository được khai service identity/base port và giữ `ports` đã resolve cho runtime consumer;
 không được sở hữu offset hay slot.
 
 Shared service resolve bằng `basePort + family.offset`. Application service resolve bằng
@@ -29,7 +30,7 @@ Service declaration trong backend `metadata.json` dùng một scope:
 
 ## Stale khi
 
-- registry absent hoặc invalid;
+- registry config hoặc bất kỳ project allocation record nào absent/invalid;
 - routed family/application chưa có allocation, hai application trùng slot, hoặc product còn lưu
   `portOffset`, `basePorts`, `fixedPorts`, offset note hay allocation authority khác;
 - service không resolve được, projection `ports` lệch công thức, hoặc effective local port đụng service khác;
@@ -37,7 +38,7 @@ Service declaration trong backend `metadata.json` dùng một scope:
 
 ## Evidence cho stale list
 
-Chạy `node .claude/scripts/check-port-offsets.mjs`. Report registry path, slot step, từng family được gồm,
+Chạy `node .claude/scripts/check-port-offsets.mjs`. Report registry root, config path, slot step, từng family được gồm,
 application slot, service projection, collision set, exclusion và mọi exact finding. Command chỉ check,
 không mở target secret hay ghi target.
 
@@ -48,7 +49,8 @@ allocation defect khỏi consumer drift. Project bị exclude vẫn phải đư�
 
 ## Apply
 
-Ghi allocation đúng một lần trong `.workspace/ports.json`. Thay product allocation ownership bằng
+Ghi slot step chung đúng một lần trong `.workspace/ports/config.json` và từng family allocation đúng một lần
+trong `.workspace/ports/<project>.json`. Thay product allocation ownership bằng
 `portServices` và projection `ports` đã derive, rồi cập nhật mọi consumer đã chạm. Migration một family
 coordinate frontend/backend route thành một structural pass vì di chuyển một nửa tạo runtime pair sai.
 Không renumber effective port đang sạch trừ khi xử collision đã đo.

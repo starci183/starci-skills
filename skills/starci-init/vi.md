@@ -30,8 +30,8 @@ local action đã yêu cầu theo thứ tự registry:
 2. **Bootstrap** — chứng minh trust entry tồn tại; phân loại và trình toàn bộ before/after của `AGENTS.md`
    cùng `CLAUDE.md`.
 3. **Workspaces** — verify ngôn ngữ chung, family offset/application slot bền và mọi read route
-   project/role đã khai với checkout thật. Allocation chỉ ở `.workspace/ports.json`; init không copy
-   nó vào product.
+   project/role đã khai với checkout thật. Allocation chỉ ở `.workspace/ports/config.json` cùng một
+   `.workspace/ports/<project>.json`; init không copy ownership đó vào product.
 4. **Worktrees** — verify design registry, business authority và cache root của project bằng account
    worktree của Git cùng path policy. Tạo hoặc reuse `businesses` độc lập trên
    `codex/businesses/<project>`; không đặt nó trong design-registry worktree hay cache dùng một lần.

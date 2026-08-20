@@ -196,7 +196,7 @@
     "compilers/patterns/be/port-offset/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/port-offset/en.md",
-      "sourceHash": "4c3008af208d83c1302431cb1050feb382f9e81ac23c67a6cceaa9075861c256",
+      "sourceHash": "6663037be55a24d65cd35fe71d865f167318a07fc8219afa50a4aa5638f429f9",
       "contextVersion": 1
     },
     "compilers/patterns/be/resilience/context.md": {
@@ -626,7 +626,7 @@
     "gates/fe/lints/naming/context.md": {
       "kind": "module",
       "source": "gates/fe/lints/naming/en.md",
-      "sourceHash": "cfe5d575240d74faa047dc6ce79dcc1332bf30de79c1b12e32115868cbb40197",
+      "sourceHash": "a0f7a5bc961521ea22146d6d8aabece2aad597493c6cc363abce95f5e87b8eca",
       "contextVersion": 1
     },
     "gates/fe/lints/props-and-slots/context.md": {
@@ -780,7 +780,7 @@
     "readiness/initialization/workspaces/context.md": {
       "kind": "module",
       "source": "readiness/initialization/workspaces/en.md",
-      "sourceHash": "fef30ddbe0a38f8c56cd18ad2b168eef8340942698974aad0a638c6c1f29ef82",
+      "sourceHash": "c14c08ef9efd4dde6ade6f218d2b3c5c8cf5fe7ecf80c120344ce02166ca9055",
       "contextVersion": 1
     },
     "readiness/initialization/worktrees/context.md": {
@@ -816,7 +816,7 @@
     "readiness/staleness/port-offset/context.md": {
       "kind": "module",
       "source": "readiness/staleness/port-offset/en.md",
-      "sourceHash": "0e63c93234c05d6cbe0e0b213de4d59aee7569f0a66e7d8792cd3756fe7de875",
+      "sourceHash": "514ba04a08fbd867ab887b32b107c8f39e78a376df793d9733c55b1bce6edf22",
       "contextVersion": 1
     },
     "readiness/staleness/remnant/context.md": {

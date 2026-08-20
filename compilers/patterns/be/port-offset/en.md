@@ -16,7 +16,8 @@ and resolved runtime projections without changing a clean effective port.
 
 ## Law
 
-`.workspace/ports.json` is the only persistent owner of family offsets and application slots. Backend
+`.workspace/ports/config.json` owns the Source-wide slot step, and one
+`.workspace/ports/<project>.json` is the only persistent owner of that family's offset and application slots. Backend
 `metadata.json` declares service identity and base ports in `portServices`, and may carry resolved
 `ports` for consumers. A product never stores `portOffset`, slot numbers, or a second allocation table.
 
@@ -30,7 +31,7 @@ Tool and external ports are explicit exceptions with reasons.
 
 | Code | Situation | What the source must look like |
 |---|---|---|
-| `PORT-OFFSET-1` | A Source family needs durable allocation | The family offset and distinct non-negative application slots live only in `.workspace/ports.json` |
+| `PORT-OFFSET-1` | A Source family needs durable allocation | The family offset and distinct non-negative application slots live only in `.workspace/ports/<project>.json`; the shared slot step lives in `.workspace/ports/config.json` |
 | `PORT-OFFSET-2` | A backend service binds on the Source host | `metadata.json.portServices` declares its scope and base port; `metadata.json.ports` carries the resolved projection |
 | `PORT-OFFSET-3` | A frontend and backend belong to one application | Both declarations name the same application slot and every reached consumer uses the corresponding projections |
 | `PORT-OFFSET-4` | A tool or external service cannot use family arithmetic | The declaration uses an explicit port and non-empty reason; only `external` is excluded from host-collision proof |
@@ -49,8 +50,9 @@ Tool and external ports are explicit exceptions with reasons.
 
 **Situation.** Several repositories share one host and need stable, non-colliding port ranges.
 
-**What it emits in source.** One family record in `.workspace/ports.json` with `offset`, `applications`,
-and the Source-wide `slotStep`. Product repositories contain no offset or slot authority.
+**What it emits in source.** One `.workspace/ports/<project>.json` family record with `project`, `offset`
+and `applications`, plus the Source-wide `slotStep` in `.workspace/ports/config.json`. Product repositories
+contain no offset or slot authority.
 
 **Boundary.** It does not declare services; that is `PORT-OFFSET-2`. It does not repair a consumer;
 that is `PORT-OFFSET-3` or `PORT-OFFSET-5`.
@@ -99,7 +101,7 @@ reached consumers, followed by checker and concurrent runtime evidence.
 
 | Code | Tier | What holds it |
 |---|---|---|
-| `PORT-OFFSET-1` | `enforced` | `.workspace/ports.json` schema and `check-port-offsets.mjs` |
+| `PORT-OFFSET-1` | `enforced` | per-project/config registry schemas and `check-port-offsets.mjs` |
 | `PORT-OFFSET-2` | `enforced` | metadata declarations/projections checked by `check-port-offsets.mjs` |
 | `PORT-OFFSET-3` | `documented` | routed consumer inventory plus family-wide proof |
 | `PORT-OFFSET-4` | `enforced` | explicit reason and collision classification in `check-port-offsets.mjs` |
@@ -109,7 +111,7 @@ reached consumers, followed by checker and concurrent runtime evidence.
 
 | Input | Evidence required |
 |---|---|
-| Source registry | `.workspace/ports.json`, family offset, slot step and application map |
+| Source registry | `.workspace/ports/config.json` plus `.workspace/ports/<project>.json` family records |
 | backend declaration | routed `metadata.json` with `portServices` and `ports` |
 | consumers | compose/env scripts, application defaults, examples and paired frontend references |
 | listeners | every local host binding and every explicitly excluded external service |
@@ -135,7 +137,7 @@ reached consumers, followed by checker and concurrent runtime evidence.
 
 ```text
 family: <Source family>
-allocation: <offset and application slots from .workspace/ports.json>
+allocation: <offset and application slots from .workspace/ports/<project>.json>
 services: <metadata portServices declarations>
 projection: <resolved metadata ports>
 consumers: <updated backend/frontend runtime paths>

@@ -12,7 +12,8 @@ and resolved runtime projections without changing a clean effective port.
 
 ## Law
 
-`.workspace/ports.json` alone owns family offsets and application slots. Backend `metadata.json`
+`.workspace/ports/config.json` owns the Source slot step; one `.workspace/ports/<project>.json` alone owns
+that family's offset and application slots. Backend `metadata.json`
 declares service identity and base ports in `portServices`, and may carry resolved `ports` for runtime
 consumers. A product never stores an offset, slot, or second allocation table.
 
@@ -24,7 +25,7 @@ bases `3000`/`3001`, so the resolved backend port is always the resolved fronten
 
 | Code | Situation | What the source must look like |
 |---|---|---|
-| `PORT-OFFSET-1` | A Source family needs durable allocation | Offset and distinct non-negative application slots live only in `.workspace/ports.json` |
+| `PORT-OFFSET-1` | A Source family needs durable allocation | Offset and distinct non-negative application slots live only in `.workspace/ports/<project>.json`; slot step lives in `.workspace/ports/config.json` |
 | `PORT-OFFSET-2` | A backend service binds on the Source host | `portServices` declares scope/base/application and `ports` carries the resolved projection |
 | `PORT-OFFSET-3` | Frontend and backend form one application | Both use the same application slot and every reached consumer matches the projection |
 | `PORT-OFFSET-4` | A tool or external service cannot use family arithmetic | It has an explicit port and reason; only external is excluded from host collision proof |
@@ -42,8 +43,8 @@ bases `3000`/`3001`, so the resolved backend port is always the resolved fronten
 
 **Situation.** Several repositories share one host and need stable non-colliding port ranges.
 
-**What it emits in source.** One `.workspace/ports.json` family record with `offset`, `applications`
-and Source-wide `slotStep`; no product offset or slot authority.
+**What it emits in source.** One `.workspace/ports/<project>.json` record with `project`, `offset` and
+`applications`, plus `.workspace/ports/config.json` for Source-wide `slotStep`; no product offset or slot authority.
 
 **Boundary.** Service identity belongs to `PORT-OFFSET-2`; consumer repair belongs to
 `PORT-OFFSET-3` or `PORT-OFFSET-5`.
@@ -99,7 +100,7 @@ consumer, followed by checker and concurrent runtime evidence.
 
 | Input | Evidence required |
 |---|---|
-| Source registry | family offset, slot step and application map |
+| Source registry | shared config plus one project-named family allocation record |
 | backend declaration | routed `metadata.json` with `portServices` and `ports` |
 | consumers | compose/env scripts, defaults, examples and paired frontend references |
 | listeners | every local binding and explicitly excluded external service |

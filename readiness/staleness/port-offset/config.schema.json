@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v4/readiness/staleness/port-offset/config.schema.json",
+  "title": "Source port allocation configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "slotStep"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "version": {"const": 1},
+    "slotStep": {"type": "integer", "minimum": 1}
+  }
+}

@@ -33,7 +33,8 @@ adds no write. Execute requested local actions in registry order:
    `AGENTS.md` and `CLAUDE.md`.
 3. **Workspaces** — verify the Source-wide language, persistent family offsets/application slots, and
    every declared project/role read route against the real checkout. Allocation stays in
-   `.workspace/ports.json`; init never copies it into a product.
+   `.workspace/ports/config.json` plus one `.workspace/ports/<project>.json`; init never copies allocation
+   ownership into a product.
 4. **Worktrees** — verify the project design registry, business authority and cache roots against Git's
    own worktree account and path policy. Create or reuse `businesses` independently on
    `codex/businesses/<project>`; never place it in the design-registry worktree or disposable cache.

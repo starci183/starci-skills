@@ -37,9 +37,11 @@ is the reason this file exists, not an appendix to it.
 | `prefer-arrow-export` | `NAMING-1` | A `function` declaration standing at module level, named in the message, with the arrow-const rewrite spelled out |
 | `handler-on-prefix` | `NAMING-2` | A binding, JSX attribute or type property whose name begins `handle` + an uppercase letter, quoting the `on…` name it should have been born with |
 | `no-second-language-in-path` | `NAMING-3` | One path segment — the first offender only — that carries a second language, either by an accented letter or by an exact match against a named list of romanised segments |
+| `no-direct-const-alias` | machine-only identity | A `const A = B` declarator whose binding and initializer are both identifiers, because it gives one value two names without adding behavior |
 
-Every published rule maps to a code, and every code the law states has a rule: **no code here is left
-without a machine.** What is left unenforced is narrower than a code and must not be read as covered —
+Every code the law states has a rule, while `no-direct-const-alias` is explicitly machine-only:
+**no code here is left without a machine, and no machine-only identity is assigned a false code.**
+What is left unenforced is narrower than a code and must not be read as covered —
 `NAMING-1`'s demand for an ARROW specifically, and the law's ban on a name that says where a thing is
 used, have no rule watching them. A green run says nothing about either.
 
@@ -57,8 +59,8 @@ failure.
    grant.
 3. **Read the nodes, not the text.** `prefer-arrow-export` reads `FunctionDeclaration` and its parent;
    `handler-on-prefix` reads exactly three node types; `no-second-language-in-path` reads
-   `context.filename` before any visitor exists. A name in a comment, a string or a value is invisible
-   to all three.
+   `context.filename` before any visitor exists; `no-direct-const-alias` reads a const
+   `VariableDeclarator` whose two sides are identifiers. A name in a comment or string is invisible.
 4. **Emit one block per finding.** `no-second-language-in-path` produces at most one report per file;
    the other two report once per offending node.
 5. **Write the `hatch` line whenever an open hatch would have hidden the same failure.** A `silent`
@@ -153,6 +155,23 @@ every file in the repository report at once, on a segment nobody in the reposito
 **Boundary.** This rule decides once per file, from the path alone, before traversal. Nothing inside the
 file changes its verdict, and no other rule here reads a path.
 
+## `no-direct-const-alias` — machine-only identity
+
+**What it reports.** The declared identifier in `const A = B` when both `A` and `B` are plain
+identifiers. The message names both and requires the original identifier to be used directly, or the
+new const to hold the result of a real transformation.
+
+**How it detects.** Visits `VariableDeclarator`, requires the parent declaration kind to be `const`,
+then requires `node.id.type` and `node.init.type` both to be `Identifier`. It does not resolve imports
+or types and does not care whether either name is PascalCase.
+
+**What it cannot see.** `let A = B`, `const A = object.B`, destructuring, an import alias, a re-export,
+or a wrapper call such as `const A = identity(B)`. Those are different AST shapes; this rule is the
+literal refusal of direct const aliases, not a data-flow equivalence engine.
+
+**Boundary.** A member access, call, `await`, literal, or constructed value adds an operation and is not
+this rule. Whether that operation is useful belongs to its own law.
+
 ## Detection
 
 | Part | Mechanism |
@@ -160,6 +179,7 @@ file changes its verdict, and no other rule here reads a path.
 | `prefer-arrow-export` | Visits `FunctionDeclaration`. Reads `node.parent.type` and continues only when it is `Program`, `ExportNamedDeclaration` or `ExportDefaultDeclaration`. Reports on `node.id`, falling back to the node when the declaration is anonymous; the message interpolates `node.id.name`, or the literal `default`. |
 | `handler-on-prefix` | Visits exactly three node types. `VariableDeclarator`, only when `node.id.type === "Identifier"`. `JSXAttribute`, reading `node.name.name`. `TSPropertySignature`, only when `node.key.type === "Identifier"`. Each name is tested against `/^handle[A-Z]/`; the message is built from `name.slice("handle".length)`. |
 | `no-second-language-in-path` | Reads `context.filename` (falling back to `context.getFilename()`) BEFORE returning any visitor. Normalises backslashes to `/`, lowercases the whole string, splits on `/`, drops empty segments. A segment offends if a single-alphabet accented-letter regex matches it, OR if the segment with `(`, `)`, `[` and `]` removed is an exact member of a 20-entry list of romanised segments. Only the first offender survives `.find`. When nothing offends, the rule returns an empty visitor object and the file is never walked; otherwise it reports once on `Program`. |
+| `no-direct-const-alias` | Visits `VariableDeclarator`; reports when the parent kind is `const` and both `id` and `init` are `Identifier` nodes. |
 | what reaches outside the file | Only `context.filename`. No rule reads type information, resolves an import or inspects a value; everything else is decided from shape inside the file. |
 
 ## Escape hatches
@@ -174,6 +194,7 @@ file changes its verdict, and no other rule here reads a path.
 | `let handleClick = …` / `var handleClick = …` | `handler-on-prefix` | The visitor is `VariableDeclarator`, which every declaration kind produces; `const` is not special-cased |
 | `const handleClick = useCallback(() => {}, [])` | `handler-on-prefix` | The initialiser is never inspected; only the declared identifier is |
 | `<Field handleChange={fn} />` | `handler-on-prefix` | A JSX attribute is checked by its own name, independently of what the receiving component's type says |
+| `const localValue: typeof sourceValue = sourceValue` | `no-direct-const-alias` | A type annotation does not change either identifier node or the parent declaration kind |
 | `app/(marketing)/dang-nhap/page.tsx` | `no-second-language-in-path` | Route-group parentheses and dynamic-segment brackets are stripped before the list comparison |
 | `app/DANG-KY/page.tsx` | `no-second-language-in-path` | The whole path is lowercased before any comparison |
 | `components/Đăng nhập/index.tsx` | `no-second-language-in-path` | The accented branch matches anywhere in the segment; no separator or word boundary is required |
@@ -194,6 +215,7 @@ file changes its verdict, and no other rule here reads a path.
 | `type Props = { "handleClick": () => void }` | `handler-on-prefix` | The key is a string literal, and the guard requires `Identifier` |
 | `clickHandler`, `submitHandler`, `doSubmit`, `handle_click` | `handler-on-prefix` | The regex is anchored on `handle` followed by an uppercase letter. The suffix spelling is the most common alternative vocabulary and is entirely invisible |
 | `<Field {...{ handleChange }} />` | `handler-on-prefix` | A spread is a `JSXSpreadAttribute`; the rule only sees a named attribute |
+| `const Alias = object.Original`, `const Alias = identity(Original)`, or `import { Original as Alias }` | `no-direct-const-alias` | Member access, calls and import specifiers are not direct identifier-to-identifier const declarators |
 | A romanised segment outside the 20-entry list — `bai-hoc`, `nguoi-dung`, `dat-hang` | `no-second-language-in-path` | Membership is exact-list. The list is deliberate, not lazy: inferred matching would refuse `capacity` and `dangerous`, and a rule that fires on the shared language is one a repository switches off |
 | `dang-nhap-v2`, `auth-dang-nhap`, `dangnhap`, `dang_nhap` | `no-second-language-in-path` | The comparison is equality on the whole segment. Any prefix, suffix or different separator escapes |
 | `[...dang-nhap]` and `@dang-nhap` | `no-second-language-in-path` | The strip set is exactly `(`, `)`, `[`, `]`. A catch-all's leading dots and a parallel-route `@` survive and break equality |
@@ -211,7 +233,7 @@ file changes its verdict, and no other rule here reads a path.
 | parser | TypeScript with JSX enabled — two of `handler-on-prefix`'s three visitors are TypeScript or JSX nodes and are silently never reached otherwise |
 | `context.filename` | An absolute path as the linter reports it, which `no-second-language-in-path` reads before it returns any visitor |
 | glob | The consuming configuration decides which files are linted. A file no glob names is a file no rule here exists for |
-| severity | The rules' own opinion is `error` for all three; the consuming configuration remains the authority on what is switched on |
+| severity | The rules' own opinion is `error` for all four; the consuming configuration remains the authority on what is switched on |
 
 ## Rules
 
@@ -249,8 +271,8 @@ file changes its verdict, and no other rule here reads a path.
 One block per finding:
 
 ```text
-rule: <prefer-arrow-export | handler-on-prefix | no-second-language-in-path>
-code: <NAMING-1 | NAMING-2 | NAMING-3>
+rule: <prefer-arrow-export | handler-on-prefix | no-second-language-in-path | no-direct-const-alias>
+code: <NAMING-1 | NAMING-2 | NAMING-3 | machine-only identity>
 node: <the exact node the rule visits>
 verdict: <fires | silent>
 hatch: <none | the open row from the table above that explains the silence>

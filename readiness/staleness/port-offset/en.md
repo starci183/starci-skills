@@ -10,8 +10,9 @@ None.
 
 ## Law
 
-`.workspace/ports.json` is the only Source-wide authority for persistent family offsets and application
-slots. A product repository may declare service identity and base ports and may carry resolved `ports`
+`.workspace/ports/config.json` is the only authority for the Source-wide slot step, and one
+`.workspace/ports/<project>.json` is the only authority for each persistent family offset and application
+slot map. A product repository may declare service identity and base ports and may carry resolved `ports`
 for runtime consumers; it never owns an offset or slot.
 
 Shared services resolve as `basePort + family.offset`. Application services resolve as
@@ -29,7 +30,7 @@ A service declaration in backend `metadata.json` uses one of these scopes:
 
 ## Stale when
 
-- the registry is absent or invalid;
+- the registry config or any project allocation record is absent or invalid;
 - a routed family or application has no allocation, two applications share a slot, or a product stores
   `portOffset`, `basePorts`, `fixedPorts`, an offset note, or another allocation authority;
 - a declared service cannot resolve, its resolved `ports` projection differs from the formula, or a
@@ -38,7 +39,7 @@ A service declaration in backend `metadata.json` uses one of these scopes:
 
 ## List evidence
 
-Run `node .claude/scripts/check-port-offsets.mjs`. Report registry path, slot step, each included family,
+Run `node .claude/scripts/check-port-offsets.mjs`. Report registry root, config path, slot step, each included family,
 application slots, service projection, collision set, exclusions and every exact finding. This command is
 check-only and never opens a target secret or writes a target.
 
@@ -50,7 +51,8 @@ silence never implies measurement.
 
 ## Apply
 
-Write the allocation once in `.workspace/ports.json`. Replace product allocation ownership with
+Write the shared slot step once in `.workspace/ports/config.json` and each family allocation once in
+`.workspace/ports/<project>.json`. Replace product allocation ownership with
 `portServices` declarations and a derived `ports` projection, then update all reached consumers. A family
 migration coordinates its routed frontend and backend as one structural pass because a partial move creates
 a false runtime pair. Do not renumber a clean effective port unless resolving a measured collision.

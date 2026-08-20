@@ -51,6 +51,7 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `prefer-arrow-export` | NAMING-1 | a top-level exported function declaration is used | `naming/context.md` |
 | `handler-on-prefix` | NAMING-2 | a handler name begins with `handle` instead of `on` | `naming/context.md` |
 | `no-second-language-in-path` | NAMING-3 | a governed path segment uses the second language | `naming/context.md` |
+| `no-direct-const-alias` | machine-only identity | a const declarator only renames another identifier through `const A = B` | `naming/context.md` |
 | `no-inline-parameter-type` | SLOTS-3 | a destructured parameter carries an inline object type | `props-and-slots/context.md` |
 | `no-children-slot` | SLOTS-4 | a governed surface exposes a generic `children` slot | `props-and-slots/context.md` |
 | `no-surface-list-items-slot` | SLOTS-7 | a surface accepts pre-shaped list items rather than owned data | `props-and-slots/context.md` |
