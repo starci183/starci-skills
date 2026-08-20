@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {execFileSync} from "node:child_process";
 import {mkdtempSync, mkdirSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -133,6 +134,46 @@ test("Sonar proof requests strict overall and new metrics and rejects incomplete
   assert.equal(result.status, "fail");
   assert.ok(urls.some((url) => url.includes("new_coverage") && url.includes("new_bugs")));
   assert.ok(result.failures.some((failure) => failure.metric === "bugs"));
+});
+
+test("Sonar proof reads new-code conditions separately from overall measures", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "starci-sonar-conditions-"));
+  writeFileSync(join(dir, "sonar-project.properties"), "sonar.projectKey=fixture\n");
+  execFileSync("git", ["init"], {cwd: dir});
+  execFileSync("git", ["config", "user.email", "fixture@example.invalid"], {cwd: dir});
+  execFileSync("git", ["config", "user.name", "Fixture"], {cwd: dir});
+  execFileSync("git", ["add", "sonar-project.properties"], {cwd: dir});
+  execFileSync("git", ["commit", "-m", "fixture"], {cwd: dir});
+  const sha = execFileSync("git", ["rev-parse", "HEAD"], {cwd: dir, encoding: "utf8"}).trim();
+  const oldHost = process.env.SONAR_HOST_URL;
+  const oldToken = process.env.SONAR_TOKEN;
+  process.env.SONAR_HOST_URL = "https://sonar.invalid";
+  process.env.SONAR_TOKEN = "test-only";
+  const fetchImpl = async (url) => {
+    if (String(url).includes("project_status")) return {json: async () => ({projectStatus: {status: "OK", conditions: [
+      {metricKey: "new_reliability_rating", actualValue: "1"},
+      {metricKey: "new_security_rating", actualValue: "1"},
+      {metricKey: "new_maintainability_rating", actualValue: "1"},
+      {metricKey: "new_coverage", actualValue: "95"},
+      {metricKey: "new_duplicated_lines_density", actualValue: "0"},
+      {metricKey: "new_violations", actualValue: "0"},
+    ]}})};
+    if (String(url).includes("measures")) return {json: async () => ({component: {measures: [
+      {metric: "bugs", value: "0"}, {metric: "vulnerabilities", value: "0"},
+      {metric: "code_smells", value: "0"}, {metric: "reliability_rating", value: "1"},
+      {metric: "security_rating", value: "1"}, {metric: "sqale_rating", value: "1"},
+      {metric: "duplicated_lines_density", value: "0"}, {metric: "coverage", value: "90"},
+      {metric: "security_hotspots", value: "0"},
+    ]}})};
+    return {json: async () => ({analyses: [{key: "a", revision: sha}]})};
+  };
+  const result = await sonar(dir, {fetchImpl});
+  if (oldHost === undefined) delete process.env.SONAR_HOST_URL; else process.env.SONAR_HOST_URL = oldHost;
+  if (oldToken === undefined) delete process.env.SONAR_TOKEN; else process.env.SONAR_TOKEN = oldToken;
+  assert.equal(result.status, "pass");
+  assert.equal(result.metrics.new_coverage, "95");
+  assert.equal(result.metrics.new_bugs, 0);
+  assert.equal(result.metrics.security_hotspots_reviewed, 100);
 });
 
 test("public report never exposes command output or known process secrets", async () => {

@@ -129,7 +129,7 @@ export async function sonar(dir, {fetchImpl = fetch} = {}) {
     const headers = {authorization: `Basic ${auth}`};
     const statusResponse = await fetchImpl(`${host.replace(/\/$/, "")}/api/qualitygates/project_status?projectKey=${encodeURIComponent(key)}`, {headers});
     const status = await statusResponse.json();
-    const strictKeys = ["bugs", "vulnerabilities", "code_smells", "new_bugs", "new_vulnerabilities", "new_code_smells", "reliability_rating", "security_rating", "sqale_rating", "security_hotspots_reviewed", "duplicated_lines_density", "new_duplicated_lines_density", "coverage", "new_coverage"];
+    const strictKeys = ["bugs", "vulnerabilities", "code_smells", "new_bugs", "new_vulnerabilities", "new_code_smells", "reliability_rating", "security_rating", "sqale_rating", "security_hotspots", "new_security_hotspots", "security_hotspots_reviewed", "new_security_hotspots_reviewed", "duplicated_lines_density", "new_duplicated_lines_density", "coverage", "new_coverage"];
     const measuresResponse = await fetchImpl(`${host.replace(/\/$/, "")}/api/measures/component?component=${encodeURIComponent(key)}&metricKeys=${strictKeys.join(",")}`, {headers});
     const measures = await measuresResponse.json();
     const analysesResponse = await fetchImpl(`${host.replace(/\/$/, "")}/api/project_analyses/search?project=${encodeURIComponent(key)}&ps=20`, {headers});
@@ -137,6 +137,27 @@ export async function sonar(dir, {fetchImpl = fetch} = {}) {
     const latest = analyses.analyses?.[0];
     const metricRows = measures.component?.measures ?? [];
     const metricMap = Object.fromEntries(metricRows.map((item) => [item.metric, item.value ?? item.periods?.[0]?.value]));
+    // SonarQube 26 exposes current new-code condition values on project_status even when the same
+    // `new_*` keys are null in component measures. Both are authenticated evidence from the same
+    // analysis, so merge the condition surface before evaluating the strict profile.
+    for (const condition of status?.projectStatus?.conditions ?? []) {
+      if (condition?.metricKey && condition.actualValue !== undefined && condition.actualValue !== null) {
+        metricMap[condition.metricKey] = condition.actualValue;
+      }
+    }
+    // The Community gate exposes zero new issues as one `new_violations` condition. Zero is strong
+    // enough to prove each issue subtype is also zero; a nonzero aggregate proves none of them.
+    if (Number(metricMap.new_violations) === 0) {
+      metricMap.new_bugs = 0;
+      metricMap.new_vulnerabilities = 0;
+      metricMap.new_code_smells = 0;
+    }
+    // Reviewed percentage is undefined for an empty set. An authenticated zero-hotspot count is the
+    // exact vacuous proof that no unreviewed hotspot remains overall or on new code.
+    if (Number(metricMap.security_hotspots) === 0) {
+      metricMap.security_hotspots_reviewed = 100;
+      metricMap.new_security_hotspots_reviewed = 100;
+    }
     // The runner requires the strict profile; an absent response is missing evidence, never an exemption.
     const proof = evaluateQualityGate({status: status?.projectStatus?.status, analysis: {sha: latest?.revision ?? latest?.sha}, measures: metricMap}, {analysisSha: sha});
     return {status: proof.ok ? "pass" : "fail", qualityGate: status?.projectStatus?.status ?? "UNKNOWN", analysisId: latest?.key ?? null, metrics: metricMap, sha, projectKey: key, failures: proof.failures};
