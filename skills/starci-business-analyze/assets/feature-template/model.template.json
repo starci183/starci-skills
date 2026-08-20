@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "project": "project-id",
+  "featureId": "feature-id",
+  "title": "Feature title",
+  "summary": "One sentence describing the business outcome.",
+  "sources": [
+    {
+      "role": "fe",
+      "repository": "D:/Repositories/project-fe",
+      "head": "0000000000000000000000000000000000000000"
+    }
+  ],
+  "scope": {
+    "includes": ["The exact capability modeled by this feature"],
+    "excludes": ["A nearby capability owned by another feature"]
+  },
+  "actors": [
+    {
+      "id": "primary-actor",
+      "label": "Primary actor",
+      "capabilities": ["Completes the primary outcome"],
+      "evidenceIds": ["EV-001"]
+    }
+  ],
+  "flows": [
+    {
+      "id": "primary-flow",
+      "title": "Primary flow",
+      "trigger": "The actor opens the feature entry surface",
+      "steps": [
+        {
+          "id": "open-entry",
+          "actor": "primary-actor",
+          "action": "Opens the feature",
+          "result": "The entry surface is available",
+          "surfaceId": "entry-surface",
+          "stateId": "resting"
+        }
+      ],
+      "outcomes": ["The primary outcome is completed or an explicit failure is shown"],
+      "evidenceIds": ["EV-001"]
+    }
+  ],
+  "rules": [
+    {
+      "id": "BR-01",
+      "statement": "Every business invariant is stated as an observable rule.",
+      "strength": "confirmed",
+      "evidenceIds": ["EV-001"]
+    }
+  ],
+  "states": [
+    {
+      "id": "resting",
+      "label": "Resting",
+      "kind": "initial",
+      "transitions": ["pending"],
+      "evidenceIds": ["EV-001"]
+    }
+  ],
+  "entities": [],
+  "operations": [],
+  "surfaces": [
+    {
+      "id": "entry-surface",
+      "routePattern": "/entry",
+      "title": "Feature title",
+      "eyebrow": "Feature",
+      "purpose": "Lets the primary actor start the primary flow.",
+      "navigation": [],
+      "regions": [
+        {
+          "id": "primary-region",
+          "kind": "content",
+          "title": "Primary region",
+          "summary": "Representative content proven by source evidence.",
+          "items": [
+            {
+              "id": "representative-fact",
+              "role": "fact",
+              "label": "Representative fact"
+            }
+          ],
+          "actions": [
+            {
+              "id": "continue-action",
+              "label": "Continue",
+              "kind": "primary"
+            }
+          ],
+          "states": ["resting", "pending", "failed"],
+          "evidenceIds": ["EV-001"]
+        }
+      ],
+      "evidenceIds": ["EV-001"]
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "AC-01",
+      "statement": "The primary actor can reach the primary outcome.",
+      "evidenceIds": ["EV-001"]
+    }
+  ],
+  "unknowns": [],
+  "evidence": [
+    {
+      "id": "EV-001",
+      "role": "fe",
+      "path": "src/path/to/evidence.tsx",
+      "startLine": 1,
+      "endLine": 1,
+      "claim": "Replace with the exact claim supported by this range.",
+      "kind": "ui"
+    }
+  ]
+}

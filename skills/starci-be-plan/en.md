@@ -10,6 +10,7 @@ title: starci-be-plan · English
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/en.md` | en | canonical route and freshness verification before target reads |
+| `@business` | `contexts/business/en.md` | en | bind the plan to current actors, flows, rules, states and operations |
 | `@be-patterns` | `standards/backend/patterns/en.md` | en | bind accepted backend facts to fixed pattern situations and exact files |
 | `@rule-bindings` | `standards/backend/rule-bindings/en.md` | en | prove enforced situations remain accountable to gates and machines |
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | refuse a brief missing the complete compiler boundary |
@@ -39,6 +40,10 @@ anything from it (`WORKSPACE-5`). A stale route means the schema and the sibling
 mirror belong to a different state of the product.
 
 ### 3 — Read the live schema, not the remembered one
+
+Before schema reasoning, resolve the stable business `featureId`, check its routed FE/BE heads and
+refresh/commit it when absent or stale. Load `CONTEXT.md` plus only the flow, contracts and rules this
+plan changes. Business refresh is the only durable plan-phase write; backend source remains untouched.
 
 The schema is evidence, and it is read from the checkout: entities, relations, enums, projections, and
 whatever the transport already exposes. A field you remember is a field that may have been renamed. What

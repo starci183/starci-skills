@@ -17,6 +17,7 @@ title: Frontend design execute · Vietnamese
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts trước production write |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | resolve và kiểm tra registry worktree |
+| `@business` | `contexts/business/vi.md` | vi | chứng minh design đã accept vẫn khớp product truth hiện hành |
 
 ## NESTED SKILLS
 
@@ -49,6 +50,10 @@ Layout head hoặc bất kỳ region block head nào thiếu, malformed, propose
 gọi tên identity/hash**. Bắt đầu một phần sẽ sinh code chưa ai duyệt ở nơi khó hoàn tác nhất.
 
 ### 3 — Kiểm tra route, rồi lấy baseline
+
+Resolve mọi business feature mà design đã accept viện dẫn và check head với commit FE/BE đã route.
+Refresh truth thiếu hoặc stale trước baseline. Nếu business hiện hành làm anatomy đã accept không còn
+đúng, dừng và quay lại design approval; không ép source implement truth cũ.
 
 Đọc `@workspaces`, kiểm tra route `fe` (`WORKSPACE-5`), rồi chạy `@inventory-visual-language`. Digest phải
 bằng `direction.vocabularyAt` của mọi layout hiện tại. Sau đó mới commit target state và ghi

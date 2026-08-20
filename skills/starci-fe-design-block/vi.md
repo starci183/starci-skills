@@ -15,6 +15,7 @@ title: Frontend design block · Vietnamese
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra registry và preview root |
+| `@business` | `contexts/business/vi.md` | vi | bind anatomy vào flow, state, contract và surface region hiện hành |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash candidate artifact |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | định nghĩa Vite graph cha-con, block-detail routes và authority boundary dùng chung |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | build review app dùng chung từ block JSON đã validate thay vì HTML riêng |
@@ -59,6 +60,10 @@ Chạy `@inventory-visual-language`; digest mới phải bằng `direction.vocab
 trước khi một preview stale sinh ra quyết định block mới.
 
 ### 4 — Đọc tám input
+
+Trước hết resolve business feature và surface hiện hành của layout đã accept. Check head với commit FE/BE
+đã route; refresh và commit truth thiếu hoặc stale. Load `CONTEXT.md`, surface đã chọn và chỉ flow chạm
+block này. Content, state hay action không được chứng minh vẫn là unknown.
 
 | Input | Nội dung đọc |
 |---|---|

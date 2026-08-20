@@ -18,6 +18,7 @@ description: Implement the accepted frontend design for a stable layoutId — ap
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts before production work |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/context.md` | context | resolve and verify the registry worktree |
+| `@business` | `contexts/business/context.md` | context | prove accepted design still matches current product truth |
 
 ## NESTED SKILLS
 
@@ -56,6 +57,11 @@ Read `@workspaces` and verify the `fe` route (`WORKSPACE-5`). Run `@inventory-vi
 must equal every current layout direction's `vocabularyAt`. Only then commit the current target state and record
 `Baseline commit: <sha>` — taken **before** the first change, never from a half-edited tree, so
 `git diff <baseline>` is the honest account of what this run did.
+
+Resolve every business feature cited by accepted layout/block objects. Check each head against routed
+FE/BE commits before the baseline; refresh and commit missing/stale truth inside the disclosed business
+boundary. If a changed region, state or action invalidates accepted design, stop for a new design review.
+Never force product source to implement an obsolete business snapshot.
 
 ### 4 — Apply the direction embedded in the layout
 

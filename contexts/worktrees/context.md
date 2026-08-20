@@ -38,6 +38,7 @@ mess, and a rule tree with run debris in it stops reading as authority.
 | `WORKTREE-5` | Parallel agents about to write | isolate only when two of them mutate one file |
 | `WORKTREE-6` | A worktree is stale, prunable or in the way | pruned deliberately; never force-removed as a directory |
 | `WORKTREE-7` | A design identity needs a durable accepted version | stable `layoutId`/`blockId` head records in `registries`; immutable bodies remain under `objects/sha256` |
+| `WORKTREE-8` | Evidence-backed product truth must serve FE, BE and design | stable `featureId` heads in `business`, locked on `codex/business/<project>` |
 
 ## Reading a run
 
@@ -53,6 +54,8 @@ mess, and a rule tree with run debris in it stops reading as authority.
    on; durable product records belong to that repository through its own review, not through this state.
 6. **Separate authority from rebuildable progress.** Layout and block IDs resolve accepted heads directly
    from `registries`; `reviews` preserve decisions, while unfinished drafts live under `cache/drafts` — `WORKTREE-7`.
+7. **Separate product truth from design decisions.** Business feature heads and evidence live in
+   `business`; layout/block heads remain in `registries` — `WORKTREE-8`.
 
 ## `WORKTREE-1` — state that must survive
 
@@ -202,11 +205,39 @@ reader needs a review id to find current state. Replacing a head appends history
 caller does not know which review happened to contain it. Review history silently becomes a second
 current-state database.
 
+## `WORKTREE-8` — business identity is stable; evidence is versioned
+
+**Situation.** FE, BE and design need one current account of an actor, flow, rule, state, entity,
+operation or surface, including what remains unknown.
+
+**Recognition signs**
+
+- A later skill must cite the same product fact without reinterpreting source.
+- The fact is source-derived but its grouping and explicit unknowns are reviewable decisions.
+- A design preview needs representative identities, statuses and actions without inventing them.
+
+**Ask yourself.** Can a consumer resolve current product truth from `featureId`, prove its FE/BE heads,
+and inspect every claim's evidence?
+
+**Boundary**
+
+- `WORKTREE-1`: immutable feature objects and accepted feature heads are durable state.
+- `WORKTREE-2`: draft analysis and generated prototype packs remain rebuildable progress.
+- `WORKTREE-4`: the business worktree must be Source-owned, locked, clean and on its project branch.
+
+**What it emits.** `.worktrees/<project>/business` is a locked linked worktree on
+`codex/business/<project>`. `business-registry-v1.json` maps stable feature IDs to immutable objects;
+`features/<featureId>/CONTEXT.md` routes LLM context, while `model.json`, modular Markdown and
+`evidence.json` are generated current views.
+
+**How it fails.** Business lives in cache and disappears, shares the design registry and confuses intent
+with truth, or becomes a hand-written document whose claims no longer match either routed repository.
+
 ## Inputs
 
 | Input | Evidence required |
 |---|---|
-| roots | The three paths under `.worktrees/<project>/`, valid against `@schema` beside this record |
+| roots | The durable `registries` and `business` worktrees plus ignored `cache`, valid against `@schema` |
 | project | A declared project name, never inferred from a folder |
 | source | The repository holding the trust tree |
 | outputs | Each thing the run will write, and whether it is rebuildable |
@@ -228,6 +259,7 @@ current-state database.
 9. Design identity is `layoutId` or `(layoutId, blockId)`; a content hash is a version, never the identity.
 10. Accepted heads resolve directly from stable identities. Reviews are append-only evidence; drafts are rebuildable cache.
 11. A block head names the parent `layoutHash`; a block accepted under an older layout is stale, not current.
+12. Business feature identity is `featureId`; every head binds routed source commits and immutable evidence.
 
 ## Exceptions
 
@@ -248,6 +280,6 @@ durability: <durable | rebuildable>
 path: <.worktrees/<project>/registries | cache>
 isolation: <required | not required>
 ownership: <locked, clean, branch, owning git dir>
-situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7>
+situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7 | WORKTREE-8>
 reason: <the fact that decided the placement>
 ```

@@ -10,6 +10,7 @@ title: Backend plan · Vietnamese
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | verify route và freshness theo canonical law trước target read |
+| `@business` | `contexts/business/vi.md` | vi | bind plan vào actor, flow, rule, state và operation hiện hành |
 | `@be-patterns` | `standards/backend/patterns/vi.md` | vi | bind backend fact vào fixed pattern situations và exact files |
 | `@rule-bindings` | `standards/backend/rule-bindings/vi.md` | vi | chứng minh situation enforced còn accountable với gate và machine |
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | từ chối brief thiếu compiler boundary đầy đủ |
@@ -39,6 +40,10 @@ phê duyệt của chính nó.
 sản phẩm khác; phải dừng tại đây.
 
 ### 3 — Đọc schema đang chạy, không dùng trí nhớ
+
+Trước khi reasoning từ schema, resolve stable business `featureId`, check head FE/BE đã route và
+refresh/commit nếu thiếu hoặc stale. Load `CONTEXT.md` cùng đúng flow, contract và rule mà plan thay đổi.
+Business refresh là durable write duy nhất của plan; backend source vẫn không được chạm.
 
 Schema trong checkout mới là bằng chứng: entity, relation, enum, projection và những gì transport đang
 công bố. Field nhớ được có thể đã đổi tên. Capability sẽ re-key theo enrolment, user hay course đều phải

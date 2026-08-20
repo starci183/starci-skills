@@ -42,6 +42,7 @@ rác, và một cây luật có mảnh vụn của run trong đó thì thôi đ�
 | `WORKTREE-5` | Nhiều agent song song sắp ghi | chỉ cô lập khi hai agent sửa cùng một file |
 | `WORKTREE-6` | Một worktree đã cũ, prunable, hoặc chắn đường | prune có chủ đích; không bao giờ xoá thư mục bằng tay |
 | `WORKTREE-7` | Một design identity cần accepted version bền vững | head record `layoutId`/`blockId` ổn định trong `registries`; body bất biến ở `objects/sha256` |
+| `WORKTREE-8` | Product truth có evidence phải phục vụ FE, BE và design | stable `featureId` head trong `business`, lock trên `codex/business/<project>` |
 
 ## Đọc một lượt chạy
 
@@ -57,6 +58,8 @@ rác, và một cây luật có mảnh vụn của run trong đó thì thôi đ�
    làm; bản ghi sản phẩm bền thuộc về repository đó qua đường rà soát của chính nó, không qua state này.
 6. **Tách identity khỏi review history.** Layout/block ID resolve accepted head trực tiếp từ `registries`;
    `reviews` giữ decision, còn draft chưa xong nằm dưới `cache/drafts` — `WORKTREE-7`.
+7. **Tách product truth khỏi design decision.** Business feature head và evidence nằm trong `business`;
+   layout/block head vẫn nằm trong `registries` — `WORKTREE-8`.
 
 ## `WORKTREE-1` — state phải sống sót
 
@@ -205,11 +208,39 @@ review id để tìm current state. Thay head thì append history; không bao gi
 **Nó hỏng bằng đường nào.** Skill tìm một review record cũ, khiến block hợp lệ thành unreachable khi caller
 không biết review nào tình cờ chứa nó. Review history âm thầm thành current-state database thứ hai.
 
+## `WORKTREE-8` — business identity ổn định; evidence có version
+
+**Khi nào gặp.** FE, BE và design cần một bản hiện hành chung về actor, flow, rule, state, entity,
+operation hoặc surface, kể cả điều còn unknown.
+
+**Cách nhận ra**
+
+- Skill sau phải cite cùng product fact mà không diễn giải lại source.
+- Fact suy ra từ source nhưng cách nhóm và unknown rõ ràng là quyết định cần review.
+- Design preview cần identity, status và action đại diện mà không bịa.
+
+**Tự hỏi.** Consumer có resolve current product truth từ `featureId`, prove FE/BE head và inspect evidence
+của từng claim không?
+
+**Ranh giới**
+
+- `WORKTREE-1`: immutable feature object và accepted feature head là durable state.
+- `WORKTREE-2`: draft analysis và generated prototype pack là rebuildable progress.
+- `WORKTREE-4`: business worktree phải thuộc Source, đã lock, sạch và đúng project branch.
+
+**Nó phát ra.** `.worktrees/<project>/business` là linked worktree đã lock trên
+`codex/business/<project>`. `business-registry-v1.json` map stable feature ID tới immutable object;
+`features/<featureId>/CONTEXT.md` route LLM context, còn `model.json`, Markdown module và
+`evidence.json` là current generated view.
+
+**Nó hỏng bằng đường nào.** Business nằm trong cache rồi biến mất, trộn với design registry khiến intent
+thành truth, hoặc thành tài liệu viết tay không còn khớp repository đã route.
+
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
-| ba root | Ba đường dẫn dưới `.worktrees/<project>/`, hợp `@schema` nằm cạnh bản ghi này |
+| ba root | Hai durable worktree `registries`, `business` cùng `cache` đã ignore, hợp `@schema` |
 | project | Tên project do người khai, không bao giờ suy từ tên thư mục |
 | source | Repository chứa cây quy tắc |
 | đầu ra | Từng thứ lượt chạy sẽ ghi, và nó có dựng lại được không |
@@ -231,6 +262,7 @@ không biết review nào tình cờ chứa nó. Review history âm thầm thàn
 9. Design identity là `layoutId` hoặc `(layoutId, blockId)`; content hash là version, không phải identity.
 10. Accepted head resolve trực tiếp từ stable identity. Review là append-only evidence; draft là cache dựng lại được.
 11. Block head phải nêu parent `layoutHash`; block accept dưới layout cũ là stale, không phải current.
+12. Business feature identity là `featureId`; mỗi head bind source commit đã route và immutable evidence.
 
 ## Ngoại lệ
 
@@ -251,7 +283,7 @@ durability: <durable | rebuildable>
 path: <.worktrees/<project>/registries | cache>
 isolation: <required | not required>
 ownership: <đã khoá, sạch, nhánh, git dir sở hữu>
-situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7>
+situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7 | WORKTREE-8>
 reason: <sự thật đã quyết định chỗ đặt>
 ```
 

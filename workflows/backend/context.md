@@ -8,6 +8,7 @@ None.
 
 ```text
 accepted capability request
+  → current business feature head
   → starci-be-plan
   → exact revision and pattern bindings
   → starci-be-approve
@@ -18,6 +19,7 @@ accepted capability request
 
 | Phase | Binding skill |
 |---|---|
+| Refresh actors, flows, rules, states and operation truth when absent or stale | `skills/starci-business-analyze/SKILL.md` |
 | Plan exact files, schema evidence, sibling family and tests | `skills/starci-be-plan/SKILL.md` |
 | Challenge, approve, implement and prove the exact revision | `skills/starci-be-approve/SKILL.md` |
 

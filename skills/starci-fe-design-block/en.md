@@ -15,6 +15,7 @@ title: starci-fe-design-block · English
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | verify registry ownership and preview roots |
+| `@business` | `contexts/business/en.md` | en | bind anatomy to current flows, states, contracts and surface regions |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 | `@design-review` | `publication/design-review-preview/en.md` | en | defines the parent-child Vite graph, block-detail routes and authority boundary |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated block JSON instead of bespoke HTML |
@@ -63,6 +64,10 @@ Run `@inventory-visual-language` again. Its digest must equal the accepted direc
 a mismatch stops here, before a stale preview can produce a new block decision.
 
 ### 4 — Read the eight inputs
+
+First resolve the accepted layout's current business feature and surface. Check its head against routed
+FE/BE commits; refresh and commit absent or stale truth. Load `CONTEXT.md`, the selected surface and only
+flows touching this block. Unsupported content, state or action remains an unknown.
 
 | Input | Read |
 |---|---|

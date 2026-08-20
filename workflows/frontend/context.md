@@ -6,6 +6,7 @@ None.
 
 | Phase | Binding skill |
 |---|---|
+| Refresh the required evidence-backed business feature before visual reasoning | `skills/starci-business-analyze/SKILL.md` |
 | Evidence-select direction and produce layout candidates | `skills/starci-fe-design-layout/SKILL.md` |
 | Produce block anatomy candidates under accepted layout | `skills/starci-fe-design-block/SKILL.md` |
 | Implement only when every reachable hash is accepted | `skills/starci-fe-design-execute/SKILL.md` |

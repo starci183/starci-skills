@@ -10,6 +10,7 @@ title: Docs
 |---|---|---|---|
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
 | `@brainstorms` | `brainstorms/context.md` | context | produce candidates before a shape is accepted |
+| `@business` | `contexts/business/context.md` | context | resolve evidence-backed actors, flows, rules, states, operations and prototype surfaces |
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
 | `@compilers` | `compilers/context.md` | context | compile an accepted shape into one answer |
@@ -102,11 +103,12 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Sixteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. Fourteen do the work; two only look — one at the machine, one at the other skills.
+Seventeen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+record. Fifteen do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
 |---|---|
+| `starci-business-analyze` | evidence-backed FE+BE business feature heads, modular LLM context and prototype-ready surfaces |
 | `starci-init` | making a Source ready: SOPS+age identity, bootstrap, `.workspace/<project>/`, and `.worktrees/<project>/` |
 | `starci-cloudflare-tunnel-set` | the Source-wide multi-project Cloudflare control plane: API custody in `.workspace/credentials` and declared HTTP(S) tunnel/DNS routes |
 | `starci-deploy` | adopting, setting up, deploying, monitoring, recovering and rolling back a routed product from durable `.stacks` intent through ignored `.infra` execution state |

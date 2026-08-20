@@ -13,6 +13,7 @@ Workflows route user intent into existing discoverable skills. `SKILL.md` remain
 
 | Lifecycle | Runtime target |
 |---|---|
+| Business actors, flows, rules, states, contracts and product surfaces | `workflows/business/context.md` |
 | Source readiness, inventory, diagnosis and repair | `workflows/source/context.md` |
 | Backend plan, approval, implementation and proof | `workflows/backend/context.md` |
 | Frontend direction, layout, block and execution | `workflows/frontend/context.md` |

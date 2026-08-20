@@ -445,6 +445,12 @@
       "sourceHash": "3facef03a385bc963023f6c8bc600ae6000630159a738ed0cbb5a05e5a4f9c46",
       "contextVersion": 1
     },
+    "contexts/business/context.md": {
+      "kind": "module",
+      "source": "contexts/business/en.md",
+      "sourceHash": "8df6ac38ce7f8d7203d17225f370fd64397732e0a1ce523956b2c36a3fbc4c35",
+      "contextVersion": 1
+    },
     "contexts/context.md": {
       "kind": "router",
       "contextVersion": 1
@@ -464,7 +470,7 @@
     "contexts/worktrees/context.md": {
       "kind": "module",
       "source": "contexts/worktrees/en.md",
-      "sourceHash": "10abcb8d23a0b02e4032691046591799bb2a77ab53a9bfa284f377655b1cf73a",
+      "sourceHash": "85e5587453ffcdc69389b81c524f08070d88133e8d1831e2549a8465aa56169c",
       "contextVersion": 1
     },
     "deployment/context.md": {
@@ -780,7 +786,7 @@
     "readiness/initialization/worktrees/context.md": {
       "kind": "module",
       "source": "readiness/initialization/worktrees/en.md",
-      "sourceHash": "c0dd22e95c9bb7ea3802614cb3eb5dc0bb13144339c3268027539f6ec0929dec",
+      "sourceHash": "57ec09754712d05eae5e5ca18da426fdfb187b53e24c7361a3e3b75e6cc8b817",
       "contextVersion": 1
     },
     "readiness/staleness/assurance/context.md": {
@@ -892,7 +898,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "88e134743b274fbfa9828bd4400759872bea80176a0fbd01008dfe9ab3ab1578",
+      "sourceHash": "5acd2592fd615c2e25280f46f96813284ccd4452794c196b6f68dc3431756f92",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {
@@ -935,6 +941,12 @@
     },
     "workflows/backend/context.md": {
       "kind": "router",
+      "contextVersion": 1
+    },
+    "workflows/business/context.md": {
+      "kind": "module",
+      "source": "workflows/business/en.md",
+      "sourceHash": "71e370982d9a73390037068c2170df125d74a2f61e2d4f13b290310959925c9a",
       "contextVersion": 1
     },
     "workflows/context.md": {

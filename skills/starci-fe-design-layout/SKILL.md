@@ -12,6 +12,7 @@ description: Design or revise the immutable candidate behind a stable layoutId, 
 | `@skill-shape` | `skills/skill-shape/context.md` | context | Supplies the shared interaction and approval contract. |
 | `@workspaces` | `contexts/workspaces/context.md` | context | Resolves and verifies the frontend checkout this run reads. |
 | `@worktrees` | `contexts/worktrees/context.md` | context | Separates durable decision records from disposable preview work. |
+| `@business` | `contexts/business/context.md` | context | Resolves current feature truth and prototype-ready surfaces before visual reasoning. |
 | `@directions` | `brainstorms/directions/context.md` | context | Generates the visual choice that every layout candidate embeds. |
 | `@layouts` | `brainstorms/layouts/context.md` | context | Defines structural regions, axes, contract verdicts and output. |
 | `@contract-search` | `scripts/contract-search.mjs` | script | Queries contract reasons without exposing class arrays. |
@@ -58,14 +59,22 @@ Read `@workspaces`. Resolve the user-declared project and `fe` role. Verify the 
 recorded head and contract path before reading product evidence. A stale route stops the run
 (`WORKSPACE-5`).
 
-### 3 — Resolve the state roots
+### 3 — Resolve and refresh business truth
+
+Read `@business`. Map the requested route/surface to stable `featureId`s. Verify the locked business
+worktree and run `business-registry.mjs --check --feature <featureId>`. When a required feature is absent
+or stale, perform the evidence analysis/publication phase inside this run's disclosed business boundary,
+commit that worktree, then check again. Load `features/<featureId>/CONTEXT.md` plus only the requested
+surface and related flow modules. A screenshot, prompt or design candidate is never business truth.
+
+### 4 — Resolve the state roots
 
 Read `@worktrees`. Accepted layout candidates, no-hash direction reviews and verdicts go to the project
 registry; generated previews stay in cache. Before a registry write, verify that it is locked, clean
 and owned by this Source's Git (`WORKTREE-1`, `WORKTREE-4`). Preview uses `cache/preview`
 (`WORKTREE-2`) and never a path below `.claude` (`WORKTREE-3`).
 
-### 4 — Resolve the stable layout identity and current head
+### 5 — Resolve the stable layout identity and current head
 
 If v2 is absent, run `node @design-registry-migrate --registry .worktrees/<project>/registries --apply`; then run
 `node @design-registry-check --registry .worktrees/<project>/registries`, read `@design-registry-schema` and
@@ -81,7 +90,7 @@ head together; there is no headless registry entry and no proposed candidate is 
 read for context and appended, but it cannot select, replace or resurrect a head.
 Keep every accepted hash in immutable objects and update the head only at the approval checkpoint.
 
-### 5 — Generate the direction choices
+### 6 — Generate the direction choices
 
 Run `@inventory-visual-language` against the verified checkout. The inventory follows stylesheet
 `@import` edges, including resolvable installed package CSS, but does not evaluate runtime-generated
@@ -93,7 +102,7 @@ Validate the batch with `@validate-artifact` and the generated vocabulary **with
 every direction over the same content and reference skeleton. External style catalogues may broaden the
 search, but remain recommendations.
 
-### 6 — Evidence-select the recommended direction
+### 7 — Evidence-select the recommended direction
 
 Compare every valid direction against the request, audience, intended feeling, live vocabulary, brand
 evidence and accepted precedents. Select one exact object as the evidence-backed recommendation and state
@@ -107,7 +116,7 @@ the missing product decision as a refusal; do not generate structural candidates
 
 Preserve the recommended direction object unchanged in every layout candidate in this round.
 
-### 7 — Read the structural inputs
+### 8 — Read the structural inputs
 
 Read `@layouts`: request verbatim; contract queried one need per region through `@contract-search`;
 every branch and what it may contain; every route page and persistent layout; closed layout axes; and
@@ -121,7 +130,7 @@ labels and sample values explain intent, but do not claim exact parts, states, b
 It never decides a block's internal parts, states or data ownership. That separation is what lets one
 block be redesigned later without reopening the page layout.
 
-### 8 — Resolve every region against the contract
+### 9 — Resolve every region against the contract
 
 Query by business reason, never by shape. Each region receives one verdict: `reuse <key>`,
 `generalize <key> -> <key>` with a measured call-site count and rewritten `why`, or `new <key>` with the
@@ -132,18 +141,18 @@ reason index did not answer the need.
 node @contract-search <project> <role> --need "<the region stated as a need>"
 ```
 
-### 9 — Generate 3–4 layout skeletons
+### 10 — Generate 3–4 layout skeletons
 
 Embed the **same recommended direction object** in every candidate, then vary only the closed layout axes.
 Drop candidates whose entire structural axis sets match. At least one candidate departs from the nearest
 layout precedent. Return one only when the request admits one valid skeleton, with the reason; never pad.
 
-### 10 — Refuse product decisions that evidence cannot settle
+### 11 — Refuse product decisions that evidence cannot settle
 
 Return unresolved ownership, route or mounting decisions to the owner. Ship the refusal with whatever
 resolved; never guess merely to complete a batch.
 
-### 11 — Validate, hash and render the skeletons
+### 12 — Validate, hash and render the skeletons
 
 Run `@validate-artifact` with `@layout-schema`, the same visual vocabulary and `--hash`. It refuses an
 invalid embedded direction, candidates embedding different directions, class tokens, duplicate layout
@@ -193,7 +202,7 @@ actually bound:
 npx -y http-server .worktrees/<project>/cache/preview/design-review -p 8080 -c-1 --silent
 ```
 
-### 12 — Queue approval and close
+### 13 — Queue approval and close
 
 Show the direction alternatives and why one is recommended together with the direction-backed layout
 candidates. Open exactly one `### NEED APPROVALS` for this round: the recommended layout hash is the

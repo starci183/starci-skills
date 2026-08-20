@@ -34,8 +34,9 @@ adds no write. Execute requested local actions in registry order:
 3. **Workspaces** — verify the Source-wide language, persistent family offsets/application slots, and
    every declared project/role read route against the real checkout. Allocation stays in
    `.workspace/ports.json`; init never copies it into a product.
-4. **Worktrees** — verify the project registry and cache roots against Git's own worktree
-   account and path policy.
+4. **Worktrees** — verify the project design registry, business authority and cache roots against Git's
+   own worktree account and path policy. Create or reuse business independently on
+   `codex/business/<project>`; never place it in the design-registry worktree or disposable cache.
 
 State the evidence and exact action per boundary before changing it. A direct init instruction naming
 the needed Source and Project authorises these bounded local writes; do not add a generic approval stop.

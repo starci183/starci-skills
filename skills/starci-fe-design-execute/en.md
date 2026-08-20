@@ -17,6 +17,7 @@ title: starci-fe-design-execute · English
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate accepted design artifacts before production work |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | resolve and verify the registry worktree |
+| `@business` | `contexts/business/en.md` | en | prove accepted design still matches current product truth |
 
 ## NESTED SKILLS
 
@@ -50,6 +51,10 @@ If the layout head or any region block head is missing, malformed, proposed, or 
 it**. A partial start would produce code nobody approved, in the one place the tree cannot undo cheaply.
 
 ### 3 — Verify the route, then take the baseline
+
+Resolve every business feature cited by the accepted design and check its head against routed FE/BE
+commits. Refresh missing or stale truth before the baseline. If current business invalidates accepted
+anatomy, stop and return to design approval; never force source to implement stale truth.
 
 Read `@workspaces` and verify the `fe` route (`WORKSPACE-5`). Run `@inventory-visual-language`; its digest
 must equal every current layout direction's `vocabularyAt`. Only then commit the current target state and record

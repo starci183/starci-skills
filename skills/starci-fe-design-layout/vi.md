@@ -11,6 +11,7 @@ title: Frontend design layout · Vietnamese
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | cung cấp interaction và approval contract chung |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra checkout frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | tách record bền khỏi preview dùng xong bỏ |
+| `@business` | `contexts/business/vi.md` | vi | resolve feature truth hiện hành và surface sẵn sàng cho prototype |
 | `@directions` | `brainstorms/directions/vi.md` | vi | sinh lựa chọn thị giác được nhúng vào layout |
 | `@layouts` | `brainstorms/layouts/vi.md` | vi | định nghĩa region, axis và contract verdict của layout |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo reason mà không trả class array |
@@ -53,14 +54,20 @@ hoặc flow trong draft index. Ví dụ năng lực vẫn là evidence cho tới
 tại và `context.contract` vẫn là file thật. Route stale phải **dừng lượt chạy** (`WORKSPACE-5`); không chọn
 checkout gần nhất rồi tiếp tục với contract của sản phẩm khác.
 
-### 3 — Resolve worktree roots
+### 3 — Resolve và refresh business truth
+
+Trước khi sinh lựa chọn hình ảnh, resolve route tới stable business feature và surface ID. Check feature
+head với commit FE/BE đã route; refresh và commit truth thiếu hoặc stale trong business worktree. Chỉ
+load `CONTEXT.md`, surface đã chọn và flow liên quan. Screenshot và candidate không phải business truth.
+
+### 4 — Resolve worktree roots
 
 Đọc `@worktrees`. Registry ở `<Source>/.worktrees/<project>/registries` phải lock, sạch, đúng project branch và thuộc Git
 của Source này (`WORKTREE-1`, `WORKTREE-4`). Preview nằm tại
 `<Source>/.worktrees/<project>/cache/preview` (`WORKTREE-2`), không bao giờ dưới `.claude`
 (`WORKTREE-3`).
 
-### 4 — Resolve identity layout ổn định và current head
+### 5 — Resolve identity layout ổn định và current head
 
 Nếu v2 chưa có, chạy `node @design-registry-migrate --registry .worktrees/<project>/registries --apply`; sau đó chạy
 `node @design-registry-check --registry .worktrees/<project>/registries`, đọc `@design-registry-schema` và
@@ -76,7 +83,7 @@ không có headless entry và proposed candidate chưa bao giờ là current. Re
 không được chọn, thay hoặc hồi sinh head. Giữ mọi accepted hash trong immutable object và chỉ cập nhật head
 tại approval checkpoint.
 
-### 5 — Sinh các direction choice
+### 6 — Sinh các direction choice
 
 Chạy `@inventory-visual-language`. Inventory đi theo các cạnh `@import` stylesheet, gồm CSS package đã
 cài đặt resolve được, nhưng không thực thi CSS sinh động từ TypeScript hoặc JSON. Dùng digest sinh ra làm `vocabularyAt`. Đọc `@directions`, sinh 3–4
@@ -84,7 +91,7 @@ direction từ request, audience, feeling, token sống, màn đã duyệt, bran
 precedent. Validate bằng `@validate-artifact` với vocabulary, không dùng `--hash`; mọi preview dùng cùng
 content và reference skeleton.
 
-### 6 — Chọn direction đề xuất bằng evidence
+### 7 — Chọn direction đề xuất bằng evidence
 
 So mọi direction hợp lệ với request, audience, feeling, vocabulary sống, brand evidence và precedent đã
 chấp nhận. Chọn đúng một object làm đề xuất dựa trên evidence và nói rõ vì sao nó phù hợp nhất. Đây là
@@ -96,7 +103,7 @@ ghi nguyên candidates, `state: recommended`, `recommendedId`, `selectionSource:
 `selectionReason`, rồi validate cả hai artifact. Nếu evidence không đủ chọn một đề xuất, trả product
 decision còn thiếu dưới dạng refusal; chưa sinh layout.
 
-### 7 — Đọc structural input
+### 8 — Đọc structural input
 
 Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
 persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 3: layout quyết
@@ -105,7 +112,7 @@ lifetime và route relationship; không quyết block internals. Panel login ở
 đại diện nhận diện được; rail phải chiếm đúng rail slot với destinations đại diện. Wireframe phải rõ là rough:
 label và sample value giải thích intent nhưng không chốt exact parts, states, behavior hay final copy.
 
-### 8 — Resolve từng region theo contract
+### 9 — Resolve từng region theo contract
 
 ```bash
 node @contract-search <project> <role> --need "<the region stated as a need>"
@@ -123,17 +130,17 @@ Không có call-site count thì từ chối `generalize`, không đoán.
 Query không có kết quả exit 1 và cho hai dữ kiện: với lượt này là verdict `new`; với tree là finding rằng
 một surface thật không tìm được entry theo need. Đưa nguyên need vào `WARNINGS` để chỉ đúng reason đã fail.
 
-### 9 — Sinh 3–4 layout skeleton
+### 10 — Sinh 3–4 layout skeleton
 
 Nhúng cùng direction object được đề xuất vào mọi candidate, chỉ thay closed layout axes. Trùng axis set là một
 candidate; ít nhất một phải rời nearest precedent. Chỉ trả một khi thật sự chỉ có một skeleton hợp lệ.
 
-### 10 — Từ chối product decision bằng chứng không giải được
+### 11 — Từ chối product decision bằng chứng không giải được
 
 Product decision mà request không nói và luật không suy ra được phải tạo refusal block. Refusal đi cùng
 candidates để phần còn lại của batch vẫn đọc được.
 
-### 11 — Validate, hash và render skeleton
+### 12 — Validate, hash và render skeleton
 
 ```bash
 node @validate-artifact \
@@ -196,7 +203,7 @@ ra, đừng lặng lẽ phục vụ vào hư không.
 Dashed overlay và dedicated block-detail routes là documentation chrome; chúng giúp prototype đọc được như
 một page thật nhưng không biến rough region thành block anatomy hay mang product class.
 
-### 12 — Queue approval và đóng
+### 13 — Queue approval và đóng
 
 Trình các direction cùng lý do đề xuất một direction bên cạnh các layout đã nhúng direction đó. Mở đúng
 một `### NEED APPROVALS` cho round này: layout hash được đề xuất là default, và `OK` duyệt đồng thời

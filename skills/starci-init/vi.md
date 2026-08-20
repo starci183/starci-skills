@@ -32,8 +32,9 @@ local action đã yêu cầu theo thứ tự registry:
 3. **Workspaces** — verify ngôn ngữ chung, family offset/application slot bền và mọi read route
    project/role đã khai với checkout thật. Allocation chỉ ở `.workspace/ports.json`; init không copy
    nó vào product.
-4. **Worktrees** — verify registry và cache root của project bằng account worktree của Git và
-   path policy.
+4. **Worktrees** — verify design registry, business authority và cache root của project bằng account
+   worktree của Git cùng path policy. Tạo hoặc reuse business độc lập trên
+   `codex/business/<project>`; không đặt nó trong design-registry worktree hay cache dùng một lần.
 
 Nêu evidence và action chính xác của từng boundary trước khi đổi. Chỉ thị init trực tiếp đã nêu Source và
 Project cần thiết cho phép các local write có giới hạn này; không thêm approval stop chung. Chỉ hỏi nếu

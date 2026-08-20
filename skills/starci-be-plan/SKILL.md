@@ -11,6 +11,7 @@ description: Name every file a backend capability will need before any of them e
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/context.md` | context | canonical route and freshness verification before target reads |
+| `@business` | `contexts/business/context.md` | context | bind the plan to current actors, flows, rules, states and operations |
 | `@be-patterns` | `standards/backend/patterns/context.md` | context | bind every accepted backend fact to fixed pattern situations and exact files |
 | `@rule-bindings` | `standards/backend/rule-bindings/context.md` | context | prove enforced situations remain accountable to gates and published machines |
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | machine-refuse a brief missing files, pattern bindings, tests, exclusions or proof |
@@ -23,8 +24,11 @@ None. Planning ends with a brief; it never starts setup or approval.
 
 ## Run
 
-Read `@skill-shape` and `@workspaces` first. After the backend route verifies, read `@be-patterns` and
-`@rule-bindings`. This phase produces a brief and nothing else.
+Read `@skill-shape`, `@workspaces` and `@business` first. After the backend route verifies, resolve the
+stable business `featureId`, check its routed FE/BE heads and refresh/commit it inside the disclosed
+business boundary when absent or stale. Load `CONTEXT.md` plus only the flow/contract modules this plan
+changes. Then read `@be-patterns` and `@rule-bindings`. Aside from a required business refresh, this
+phase produces a brief and no product source.
 It ends with an approval-ready boundary; it never writes backend source.
 
 ## PROCESS

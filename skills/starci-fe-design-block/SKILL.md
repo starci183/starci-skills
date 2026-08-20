@@ -16,6 +16,7 @@ description: Given a stable layoutId and blockId, produce 3–4 block anatomy JS
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/context.md` | context | verify registry ownership and preview roots |
+| `@business` | `contexts/business/context.md` | context | bind anatomy to current feature flows, states, contracts and surface regions |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
 | `@design-review` | `publication/design-review-preview/context.md` | context | defines the parent-child Vite graph, block-detail routes and authority boundary |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | builds the shared review app from validated block JSON instead of bespoke HTML |
@@ -59,6 +60,11 @@ parent `layoutHash`, while its new immutable anatomy receives a new `blockHash`.
 Read `@workspaces` and verify the `fe` route before reading (`WORKSPACE-5`), then read `@worktrees` and
 verify the registry's lock, cleanliness and ownership (`WORKTREE-1`, `WORKTREE-4`). Preview into
 `cache/preview` (`WORKTREE-2`), never below `.claude` (`WORKTREE-3`).
+
+Resolve the accepted layout's business feature and surface. Check its current head against routed FE/BE;
+when absent or stale, refresh and commit it inside the disclosed business boundary. Load `CONTEXT.md`,
+the exact surface module and only the flow/contract modules this block owns. A state, repeat, data owner
+or action absent from business truth is an unknown, not anatomy.
 
 Run `@inventory-visual-language` again. Its digest must equal the accepted direction's `vocabularyAt`;
 a mismatch stops here, before a stale preview can produce a new block decision.
