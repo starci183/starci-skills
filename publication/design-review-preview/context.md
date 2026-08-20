@@ -19,8 +19,7 @@ Canonical layout/block JSON and registry heads remain authority. The Vite bundle
 controls and representative content are rebuildable publication evidence.
 
 The layout route renders the complete page with content in every region. A missing or stale child uses the
-layout candidate's hashed representative brief, sufficient to judge geometry, density and reading order; it cannot imply final block parts
-or states. An accepted child whose recorded `layoutHash` equals the displayed parent renders its accepted
+layout candidate's hashed rough cue, rendered as an unlabeled silhouette sufficient to judge geometry, density and reading order; it cannot imply final block fields, actions, states, parts or copy. An accepted child whose recorded `layoutHash` equals the displayed parent renders its accepted
 parts more precisely.
 
 Clicking a region navigates to a dedicated block-detail route. It never opens a modal. The block route names
@@ -65,8 +64,8 @@ The application uses hash routes:
 #/layouts/<layoutId>/<layoutHash>/blocks/<blockId>
 ```
 
-Schema 3 layout regions carry hashed `placement`, `width`, `height`, `align` and a representative child brief.
-The preview honors those bounds and renders the brief even when a child is missing; it never flattens regions
+Schema 3 layout regions carry hashed `placement`, `width`, `height`, `align` and a rough child cue.
+The preview honors those bounds and renders an unlabeled silhouette even when a child is missing; it never flattens regions
 into one generic stack or substitutes a skeleton for declared form/navigation/flow content. Schema 1–2 fallback
 exists only for immutable accepted history.
 

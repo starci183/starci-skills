@@ -105,7 +105,7 @@
       }
     },
     "brief": {
-      "description": "Hashed representative child brief owned by layout review. It makes density and reading order visible without claiming final block anatomy or copy.",
+      "description": "Hashed rough child cue owned by layout review. It communicates only block identity, approximate density and reading order; labels and actions are evidence metadata and never authorize final anatomy, copy or states.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "title", "summary", "items"],

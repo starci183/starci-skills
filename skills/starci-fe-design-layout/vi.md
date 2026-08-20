@@ -43,6 +43,10 @@ immutable đã accepted; review không bao giờ quyết định lookup hiện t
 Resolve `Phase: layout`; `Touching` chỉ gồm project registry, audit record tùy chọn và cache, không gồm frontend source.
 Nói vị trí đó bằng một câu thân thiện; không in context thành bảng.
 
+Trước khi resolve bất kỳ `layoutId` nào, ghi scope ledger dùng một lần với ba danh sách: product surfaces được
+yêu cầu rõ, modes do cùng một surface sở hữu, và ví dụ minh họa. Chỉ requested surfaces được vào layout batch
+hoặc flow trong draft index. Ví dụ năng lực vẫn là evidence cho tới khi owner đưa nó vào product scope rõ ràng.
+
 ### 2 — Resolve và kiểm tra workspace route
 
 Đọc `@workspaces` và resolve role `fe`. Trước khi đọc source, kiểm tra checkout tồn
@@ -96,9 +100,9 @@ decision còn thiếu dưới dạng refusal; chưa sinh layout.
 
 Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
 persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 3: layout quyết
-region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), brief đại diện đã hash,
-lifetime và route relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa với form
-đại diện nhận ra được trước khi có block; rail phải chiếm đúng rail slot với destinations đại diện.
+region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), rough child cue đã hash,
+lifetime và route relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa như một
+form silhouette; rail phải chiếm đúng rail slot với mật độ navigation xấp xỉ. Không vẽ fields, actions, parts hay states.
 
 ### 8 — Resolve từng region theo contract
 
@@ -163,9 +167,10 @@ Render graph kết hợp đúng một lần với `--layout-draft-index <index.j
 Entry đầu tiên sở hữu route mở đầu. Việc này chỉ kết hợp khâu review: mỗi candidate vẫn giữ hash bất biến
 riêng và vẫn phải được duyệt rõ ràng trước khi bắt đầu bất kỳ vòng block nào.
 
-Layout route render một page hoàn chỉnh. Mọi region render brief đại diện đã hash để geometry, density và
-reading order đánh giá được trước khi child block tồn tại. Brief form hiện fields và actions đại diện; brief
-navigation/flow hiện destinations hoặc chuỗi bước. Child chỉ render accepted parts khi `layoutHash`
+Layout route render một page hoàn chỉnh. Mọi region render silhouette không label từ rough cue đã hash để
+geometry, density và reading order đánh giá được trước khi child block tồn tại. Không render named fields,
+actions, parts hay states; modes dùng chung route owner vẫn là block states của vòng block sau. Navigation/flow cue chỉ
+xuất hiện cho surfaces đã nằm rõ trong scope. Child chỉ render accepted parts khi `layoutHash`
 đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`, không mở modal.
 

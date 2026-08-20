@@ -24,9 +24,9 @@ rồi.
 ## Luật
 
 Phương án schema 3 gọi tên region, ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
-region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và brief đại diện (`kind`,
-title, summary, vai trò content và action). Brief làm child hiện đủ thật để duyệt density và reading order
-nhưng chưa quyết anatomy, state, copy cuối hay data ownership. Schema 1–2 chỉ còn hợp lệ cho lịch sử accepted
+region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và rough child cue (`kind`,
+title, summary cùng content roles xấp xỉ). Cue giúp duyệt layout theo density và reading order nhưng không
+preview hay phê duyệt parts, fields, copy, actions, states hoặc data ownership. Schema 1–2 chỉ còn hợp lệ cho lịch sử accepted
 bất biến. Phương án **không bao giờ** gọi tên class; class được quyết sau từ hình đã chấp nhận.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
@@ -58,8 +58,10 @@ locale, lint. Tất cả thuộc những tầng đến sau.
 
 ## Đọc một yêu cầu
 
-1. **Liệt kê những bề mặt mà yêu cầu nói ra.** Yêu cầu gọi tên một trang thì có một bề mặt; gọi tên một
-   luồng thì có nhiều, và mỗi bề mặt một lô riêng.
+1. **Ghi scope ledger trước khi đặt identity.** Tách product surfaces được yêu cầu rõ, modes do cùng một
+   surface sở hữu, và ví dụ minh họa. Chỉ nhóm đầu được thành `layoutId`. Yêu cầu gọi tên một trang thì có
+   một surface; product flow thật có nhiều; “ví dụ A → B” chỉ minh họa năng lực framework cho tới khi owner
+   đưa nó vào product scope rõ ràng.
 2. **Tra trước khi thiết kế.** Với mỗi region, tra contract theo `why`, và đọc `why` đúng bản chất của
    nó: **không phải một lời mô tả nghiệp vụ, mà là lời khai khi nào bạn cần tới entry này.** Hai entry
    cùng class mà khác nhu cầu là hai entry khác nhau; hai entry khác class mà trả lời cùng một nhu cầu
@@ -112,7 +114,7 @@ thành cái nghiệp vụ nó xuất phát từ đó.
 
 ## Luật cho phương án
 
-Mười hai luật mà **mọi** phương án phải thoả. Phương án phạm một luật không phải là phương án yếu hơn — nó
+Mười bốn luật mà **mọi** phương án phải thoả. Phương án phạm một luật không phải là phương án yếu hơn — nó
 **không phải phương án**, và đem nó vào 3–4 là tiêu sự chú ý của thầy vào thứ đã bị từ chối từ trước.
 
 | Mã | Luật | Nó từ chối |
@@ -128,7 +130,9 @@ Mười hai luật mà **mọi** phương án phải thoả. Phương án phạm
 | `LAYOUT-9` | Region được ghim nghỉ **dưới chrome của trang nó đang đứng trên**, đo từ frame của chính trang đó, và khai **mức trần chiều cao trong cùng một quyết định** với offset. | offset bê từ trang khác sang, hoặc offset không có trần |
 | `LAYOUT-10` | Chiều rộng của một region do **contract ghép cái hàng** mà region đó nằm trong viết ra, nhắm vào **danh tính** của con chứ không vào vị trí của nó, lấy từ union class đóng, và mọi số đo cố định đi kèm việc **từ chối co lại**. | region tự quyết chiều rộng của mình, hoặc chiều rộng nhắm theo số thứ tự anh em |
 | `LAYOUT-11` | Luật này trả về một **phân loại** — chạy hết chiều ngang, hay control gọn — **không bao giờ** trả về một chiều rộng. Cả hai phán quyết của người chủ trên cùng một control đều còn giá trị. | chọn một trong hai phán quyết làm mặc định |
-| `LAYOUT-12` | Mọi kết quả nghiệp vụ phải thành một **brief khối tường minh trước khi** thiết kế bất cứ component nào: khối có tồn tại chưa, phương án này có dùng nó không, nó vẽ gì, nằm đâu, cần những trạng thái nào, và registry là dùng lại, mở rộng hay còn thiếu. | thiết kế component trước khi kết quả nghiệp vụ có brief |
+| `LAYOUT-12` | Mỗi region phải có rough child cue trước layout review: block có tồn tại chưa, phương án có dùng không, mục đích, mật độ và reading order xấp xỉ, cùng verdict reuse/generalize/new. Parts, fields, states, data ownership và copy chỉ thuộc block round sau. | thiết kế block anatomy khi parent layout vẫn còn proposed |
+| `LAYOUT-13` | Chỉ product surface được yêu cầu rõ mới được thành layout identity hoặc flow node. Ví dụ dùng để giải thích năng lực vẫn chỉ là evidence cho tới khi owner đưa nó vào scope rõ ràng. | biến “ví dụ create order” thành product page |
+| `LAYOUT-14` | Các mode dùng chung một route và một page owner là block states. Layout preview chỉ render state mặc định có evidence; block review sau đó mới liệt kê các mode còn lại. | sinh sign-in, sign-up và recovery thành layout hay layout variant riêng |
 
 ## Quy tắc
 
@@ -150,9 +154,11 @@ những rectangle placeholder rỗng. Mỗi layout region luôn nằm trong dash
 region, contract entry, assembler và mount lifetime. Interaction preview-only có thể minh họa navigation
 ownership, sticky behavior và responsive collapse, nhưng không trở thành product behavior.
 
-Content trong region render từ brief đại diện đã hash và chỉ truyền đạt mật độ cùng reading order. Brief login
-phải hiện shortcut, divider, credential fields, lựa chọn phụ và action; brief flow phải hiện các bước có thứ tự.
-Nó không được chốt parts, states, data owner hay final copy của block. Ưu tiên hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
+Content trong region render thành silhouette không label từ rough cue đã hash và chỉ truyền đạt identity, mật độ
+cùng reading order xấp xỉ. Region login chỉ hiện cảm giác một card form nằm giữa; không vẽ field, action,
+sign-up hay recovery anatomy. Các chi tiết đó chỉ được thiết kế ở block round sau khi layout head đã accepted.
+Flow cue chỉ xuất hiện khi flow được đưa rõ vào product scope và vẫn chỉ là rough sequence, không phải step contract. Ưu tiên
+hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
 SVG bỏ đi được có thể làm hình minh họa, nhưng không bao giờ được đưa thành source hay JSON. Blank-box page và
 mockup bóng bẩy không có annotation đều là preview không hợp lệ.
 
@@ -295,6 +301,6 @@ Lời từ chối giao **kèm** các phương án. Cả hai vẫn đọc đượ
 ## Phạm vi
 
 Tầng này quyết định một bề mặt gồm những gì và ai ghép chúng. Nó không quyết định giải phẫu của một khối
-— đó là tầng sau — và không quyết định một class, đó là việc của luật. Mười hai luật mà một phương án phải
+— đó là tầng sau — và không quyết định một class, đó là việc của luật. Mười bốn luật mà một phương án phải
 thoả được phát biểu ở trên dưới dạng mã `LAYOUT-n`, nên phương án được đối chiếu với **một mã trích dẫn
 được**, không phải với trí nhớ của người đọc về cây legacy.

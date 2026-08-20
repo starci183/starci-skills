@@ -47,6 +47,10 @@ layout JSON, never to the manifest or rendered application.
 Resolve `Phase: layout`; `Touching` names the project registry and disposable cache, and no
 frontend source path. Tell the user that location in one friendly sentence; do not print a context table.
 
+Before resolving any `layoutId`, write a disposable scope ledger with three lists: explicitly requested product
+surfaces, modes owned by one surface, and illustrative examples. Only requested surfaces may enter a layout batch
+or draft-index flow. A capability example stays evidence until the owner explicitly promotes it into product scope.
+
 ### 2 — Resolve and verify the workspace route
 
 Read `@workspaces`. Resolve the user-declared project and `fe` role. Verify the checkout, branch,
@@ -109,9 +113,9 @@ every branch and what it may contain; every route page and persistent layout; cl
 this project's accepted layout precedents with their rejections.
 
 Layout remains a skeleton. New work uses layout schema 3 and names regions, hashed child bounding geometry
-(`placement`, `width`, `height`, `align`), a hashed representative brief, mount lifetime and route relationship.
-A centered authentication panel must render centered with a recognizable representative form before its block
-exists; a rail region must occupy the rail slot with representative destinations.
+(`placement`, `width`, `height`, `align`), a hashed rough child cue, mount lifetime and route relationship.
+A centered authentication panel must render centered as a recognizable form silhouette before its block exists;
+a rail region must occupy the rail slot with approximate navigation density. Do not draw fields, actions, parts or states.
 It never decides a block's internal parts, states or data ownership. That separation is what lets one
 block be redesigned later without reopening the page layout.
 
@@ -166,9 +170,10 @@ Render the combined graph once with `--layout-draft-index <index.json>` in place
 The first index entry owns the initial route. This only combines review: each candidate keeps its own
 immutable hash and still requires explicit approval before any block round starts.
 
-The layout route renders a complete page. Every declared region renders its hashed representative brief so
-geometry, density and reading order are judgeable before child blocks exist. Form briefs show representative
-fields and actions; navigation and flow briefs show their destinations or ordered steps. A child block renders its
+The layout route renders a complete page. Every declared region renders an unlabeled silhouette from its hashed
+rough cue so geometry, density and reading order are judgeable before child blocks exist. It must not render named
+fields, actions, parts or states. Modes sharing the route owner remain block states for the later block round.
+Navigation and flow cues appear only for explicitly scoped surfaces. A child block renders its
 accepted parts only when its recorded `layoutHash` equals the candidate displayed; missing or stale children
 stay rough. Clicking a region navigates to
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`; it never opens a modal.

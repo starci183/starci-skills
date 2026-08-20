@@ -20,9 +20,9 @@ already decided.
 
 A schema 3 candidate names regions, who owns each region's geometry, what mounts once and what changes
 per route. Every region hashes its minimum child bounding geometry (`placement`, `width`, `height`, `align`)
-and one representative brief (`kind`, title, summary, content roles and actions). The brief makes the promised
-child visible enough to judge density and reading order; it does not settle final anatomy, states, copy or data
-ownership. Schema 1–2 remain valid only
+and one rough child cue (`kind`, title, summary and approximate content roles). The cue makes the promised
+layout visible enough to judge density and reading order; it never previews or approves internal parts, fields,
+copy, actions, states or data ownership. Schema 1–2 remain valid only
 for immutable accepted history. It never names a class. Classes are decided later from the accepted shape;
 a candidate that carries one has spent a decision that was not its to spend.
 
@@ -55,8 +55,10 @@ queries, locale copy, lints. Those belong to the stages that come after.
 
 ## Reading a request
 
-1. **List the surfaces the request states.** A request naming one page states one surface; a request
-   naming a flow states several, and each gets its own batch.
+1. **Write a scope ledger before naming identities.** Separate explicitly requested product surfaces,
+   modes owned by one surface, and illustrative examples. Only the first may become `layoutId`s. A request
+   naming one page states one surface; a real product flow states several; “for example A → B” demonstrates
+   framework capability until the owner explicitly promotes it into product scope.
 2. **Look up before designing.** For every region, search the contract by `why`, and read `why` for what
    it is: **not a description of the business, but a statement of when you would reach for this entry.**
    Two entries with the same classes and different needs are different entries; two with different
@@ -109,7 +111,7 @@ than the feature it came from.
 
 ## Candidate laws
 
-Twelve laws every candidate must satisfy. A candidate that breaks one is not a weaker option — it is not
+Fourteen laws every candidate must satisfy. A candidate that breaks one is not a weaker option — it is not
 a candidate, and shipping it as one of the 3–4 spends the owner's attention on something already refused.
 
 | Code | Law | What it rejects |
@@ -125,7 +127,9 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 | `LAYOUT-9` | A pinned region rests below the chrome of the page it stands on, measured from that page's own frame, and declares a height cap in the same decision as the offset. | an offset carried over from another page, or an offset with no cap |
 | `LAYOUT-10` | A region's width is written by the contract composing the row it sits in, aimed at the child's identity rather than its position, taken from the closed class union, with every fixed measure paired against shrinking. | a region deciding its own width, or a width aimed at a sibling index |
 | `LAYOUT-11` | This law returns a classification — full-width run or compact control — never a width. Both owner rulings on the same control stand. | picking one of the two rulings as a default |
-| `LAYOUT-12` | Every business outcome becomes an explicit block brief before any component is designed: whether the block exists, whether this candidate uses it, what it renders, where it sits, which states it needs, and whether the registry is reused, extended or missing. | designing a component before the outcome has a brief |
+| `LAYOUT-12` | Every region gets a rough child cue before layout review: whether the block exists, whether this candidate uses it, its purpose, approximate density and reading order, and whether the registry is reused, extended or missing. Parts, fields, states, data ownership and copy belong only to the later block round. | designing block anatomy while the parent layout is still proposed |
+| `LAYOUT-13` | Only an explicitly requested product surface may become a layout identity or flow node. An example introduced to explain capability remains evidence until the owner explicitly promotes it into scope. | turning “for example create order” into a product page |
+| `LAYOUT-14` | Modes that share one route and one page owner are block states. Layout preview renders the evidenced default state only; later block review enumerates the remaining modes. | generating sign-in, sign-up and recovery as separate layouts or layout variants |
 
 ## Rules
 
@@ -147,9 +151,11 @@ not empty placeholder rectangles. Every layout region stays enclosed by a dashed
 names the region, contract entry, assembler and mount lifetime. Preview-only interactions may demonstrate
 navigation ownership, sticky behavior and responsive collapse; they do not become product behavior.
 
-Content inside a region is rendered from its hashed representative brief and communicates density and reading
-order. A login brief therefore shows its shortcut, divider, credential fields, supporting choices and actions;
-a flow brief shows its ordered steps. It cannot settle a block's final parts, states, data owner or final copy.
+Content inside a region is rendered as an unlabeled silhouette from its hashed rough cue. It communicates only
+the block's identity, approximate density and reading order. A login region therefore shows a centered card-like
+form silhouette, never named fields, actions, sign-up or recovery anatomy. Those are designed only after the
+layout head is accepted in the block round. A flow cue appears only when that flow is explicitly in product scope
+and remains a rough sequence, never a step contract.
 Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
 when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated
 polished mockup are both invalid previews.
