@@ -106,6 +106,18 @@ button { color: inherit; font: inherit; cursor: pointer; }
 .wireframe-actions > b, .wireframe-actions > small { padding: .45rem .65rem; border-radius: 999px; }
 .wireframe-actions > b { color: white; background: var(--review-accent); }
 .wireframe-actions > small { color: var(--review-muted); border: 1px dashed var(--review-separator); }
+.brief-summary .brief-wireframe { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.brief-summary .wireframe-item { grid-template-columns: 2.35rem 1fr; grid-template-rows: auto 1fr; min-height: 7.2rem; padding: .85rem; align-content: start; border-style: solid; background: var(--review-surface); box-shadow: 0 .45rem 1.2rem color-mix(in srgb, var(--review-content) 7%, transparent); }
+.brief-summary .wireframe-item > small { grid-row: 1 / 3; display: grid; width: 2.1rem; height: 2.1rem; place-items: center; overflow: hidden; border-radius: .65rem; color: var(--review-accent); background: color-mix(in srgb, var(--review-accent) 13%, transparent); font-size: 0; }
+.brief-summary .wireframe-item > small::before { content: ""; width: .75rem; height: .75rem; border: 2px solid var(--review-accent); border-radius: .24rem; }
+.brief-summary .wireframe-item > span { align-self: center; font-weight: 800; }
+.brief-summary .wireframe-item > em { grid-column: 2; align-self: end; width: fit-content; max-width: 100%; padding: .25rem .45rem; border-radius: 999px; background: color-mix(in srgb, var(--review-muted) 10%, transparent); }
+.brief-form .wireframe-field { grid-template-columns: 1fr; gap: .25rem; min-height: 3.25rem; }
+.brief-form .wireframe-field > small { font-size: .58rem; }
+.brief-form .wireframe-field > em { font-size: .82rem; }
+.brief-navigation .wireframe-navigation { grid-template-columns: 1.5rem 1fr; }
+.brief-navigation .wireframe-navigation > small { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; overflow: hidden; border-radius: .4rem; background: color-mix(in srgb, var(--review-accent) 12%, transparent); font-size: 0; }
+.brief-navigation .wireframe-navigation > small::before { content: ""; width: .45rem; height: .45rem; border: 2px solid var(--review-accent); border-radius: .18rem; }
 .rough-lines { display: grid; gap: .35rem; margin-top: .25rem; }
 .rough-lines i { display: block; height: .55rem; border-radius: 999px; background: color-mix(in srgb, var(--review-muted) 13%, transparent); }
 .rough-lines i:nth-child(2) { width: 78%; }
