@@ -20,9 +20,9 @@ already decided.
 
 A schema 3 candidate names regions, who owns each region's geometry, what mounts once and what changes
 per route. Every region hashes its minimum child bounding geometry (`placement`, `width`, `height`, `align`)
-and one rough child cue (`kind`, title, summary and approximate content roles). The cue makes the promised
-layout visible enough to judge density and reading order; it never previews or approves internal parts, fields,
-copy, actions, states or data ownership. Schema 1–2 remain valid only
+and one impressionistic child brief (`kind`, title, summary, representative labels, values and actions). The
+wireframe makes purpose, density and reading order imaginable without previewing or approving exact parts,
+fields, copy, actions, states or data ownership. Schema 1–2 remain valid only
 for immutable accepted history. It never names a class. Classes are decided later from the accepted shape;
 a candidate that carries one has spent a decision that was not its to spend.
 
@@ -127,7 +127,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 | `LAYOUT-9` | A pinned region rests below the chrome of the page it stands on, measured from that page's own frame, and declares a height cap in the same decision as the offset. | an offset carried over from another page, or an offset with no cap |
 | `LAYOUT-10` | A region's width is written by the contract composing the row it sits in, aimed at the child's identity rather than its position, taken from the closed class union, with every fixed measure paired against shrinking. | a region deciding its own width, or a width aimed at a sibling index |
 | `LAYOUT-11` | This law returns a classification — full-width run or compact control — never a width. Both owner rulings on the same control stand. | picking one of the two rulings as a default |
-| `LAYOUT-12` | Every region gets a rough child cue before layout review: whether the block exists, whether this candidate uses it, its purpose, approximate density and reading order, and whether the registry is reused, extended or missing. Parts, fields, states, data ownership and copy belong only to the later block round. | designing block anatomy while the parent layout is still proposed |
+| `LAYOUT-12` | Every region gets an impressionistic child brief before layout review: whether the block exists, whether this candidate uses it, its purpose, representative content, approximate density and reading order, and whether the registry is reused, extended or missing. It must be recognizable rather than blank, while exact parts, fields, states, data ownership and copy belong only to the later block round. | either blank boxes or final block anatomy while the parent layout is still proposed |
 | `LAYOUT-13` | Only an explicitly requested product surface may become a layout identity or flow node. An example introduced to explain capability remains evidence until the owner explicitly promotes it into scope. | turning “for example create order” into a product page |
 | `LAYOUT-14` | Modes that share one route and one page owner are block states. Layout preview renders the evidenced default state only; later block review enumerates the remaining modes. | generating sign-in, sign-up and recovery as separate layouts or layout variants |
 
@@ -151,11 +151,11 @@ not empty placeholder rectangles. Every layout region stays enclosed by a dashed
 names the region, contract entry, assembler and mount lifetime. Preview-only interactions may demonstrate
 navigation ownership, sticky behavior and responsive collapse; they do not become product behavior.
 
-Content inside a region is rendered as an unlabeled silhouette from its hashed rough cue. It communicates only
-the block's identity, approximate density and reading order. A login region therefore shows a centered card-like
-form silhouette, never named fields, actions, sign-up or recovery anatomy. Those are designed only after the
-layout head is accepted in the block round. A flow cue appears only when that flow is explicitly in product scope
-and remains a rough sequence, never a step contract.
+Content inside a region is rendered as a labeled impressionistic wireframe from its hashed brief. Representative
+names, values and actions make the block's purpose, density and reading order imaginable; dashed lightweight
+controls make clear that the content is not accepted anatomy or final copy. A login region may therefore show
+credential-shaped examples, while sign-up and recovery remain later block states. A flow cue appears only when
+that flow is explicitly in product scope and remains a rough sequence, never a step contract.
 Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
 when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated
 polished mockup are both invalid previews.

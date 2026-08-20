@@ -105,7 +105,7 @@
       }
     },
     "brief": {
-      "description": "Hashed rough child cue owned by layout review. It communicates only block identity, approximate density and reading order; labels and actions are evidence metadata and never authorize final anatomy, copy or states.",
+      "description": "Hashed impressionistic child brief owned by layout review. Representative labels, values and actions make purpose, density and reading order imaginable, but remain wireframe evidence and never authorize final anatomy, copy or states.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "title", "summary", "items"],

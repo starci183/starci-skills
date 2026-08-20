@@ -100,9 +100,10 @@ decision còn thiếu dưới dạng refusal; chưa sinh layout.
 
 Đọc `@layouts`: request nguyên văn; contract query từng need qua `@contract-search`; branch, route,
 persistent layout, closed axes và accepted precedent. Công việc mới dùng layout schema 3: layout quyết
-region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), rough child cue đã hash,
-lifetime và route relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa như một
-form silhouette; rail phải chiếm đúng rail slot với mật độ navigation xấp xỉ. Không vẽ fields, actions, parts hay states.
+region, geometry bounding đã hash của child (`placement`, `width`, `height`, `align`), impressionistic child brief đã hash,
+lifetime và route relationship; không quyết block internals. Panel login ở giữa phải render đúng giữa với content
+đại diện nhận diện được; rail phải chiếm đúng rail slot với destinations đại diện. Wireframe phải rõ là rough:
+label và sample value giải thích intent nhưng không chốt exact parts, states, behavior hay final copy.
 
 ### 8 — Resolve từng region theo contract
 
@@ -167,9 +168,10 @@ Render graph kết hợp đúng một lần với `--layout-draft-index <index.j
 Entry đầu tiên sở hữu route mở đầu. Việc này chỉ kết hợp khâu review: mỗi candidate vẫn giữ hash bất biến
 riêng và vẫn phải được duyệt rõ ràng trước khi bắt đầu bất kỳ vòng block nào.
 
-Layout route render một page hoàn chỉnh. Mọi region render silhouette không label từ rough cue đã hash để
-geometry, density và reading order đánh giá được trước khi child block tồn tại. Không render named fields,
-actions, parts hay states; modes dùng chung route owner vẫn là block states của vòng block sau. Navigation/flow cue chỉ
+Layout route render một page hoàn chỉnh. Mọi region render wireframe cảm tính có label từ brief đã hash để
+purpose, geometry, density và reading order đánh giá được trước khi child block tồn tại. Dùng label, value và action
+đại diện trong control nhẹ nét đứt; không trình bày chúng như accepted parts, states, behavior hay final copy.
+Modes dùng chung route owner vẫn là block states của vòng block sau. Navigation/flow cue chỉ
 xuất hiện cho surfaces đã nằm rõ trong scope. Child chỉ render accepted parts khi `layoutHash`
 đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
 `#/layouts/<layoutId>/<layoutHash>/blocks/<blockId>`, không mở modal.

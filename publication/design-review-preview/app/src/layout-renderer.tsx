@@ -16,15 +16,21 @@ const selectedBlock = (recommendedId: string | undefined, candidates: ReadonlyAr
 const renderBrief = (region: RegionReview) => {
   const brief = region.brief
   if (!brief) return null
-  const cueCount = Math.max(2, Math.min(5, brief.items.length))
+  const visibleItems = brief.items.slice(0, 5)
   return (
     <span className={`region-brief brief-${brief.kind}`}>
-      <span className="brief-heading"><strong>{brief.title}</strong><small>rough {brief.kind} block</small></span>
-      <span className="brief-silhouette" aria-label={`${brief.title} rough density cue`}>
-        {Array.from({length: cueCount}, (_, index) => (
-          <i className={`silhouette-${brief.items[index]?.role ?? "text"}`} key={index} aria-hidden="true" />
+      <span className="brief-heading"><strong>{brief.title}</strong><small>{brief.summary}</small></span>
+      <span className="brief-wireframe" aria-label={`${brief.title} representative content`}>
+        {visibleItems.map((item, index) => (
+          <span className={`wireframe-item wireframe-${item.role}`} key={`${item.role}-${item.label}-${index}`}>
+            <small>{item.role}</small><span>{item.label}</span>{item.value ? <em>{item.value}</em> : null}
+          </span>
         ))}
       </span>
+      {brief.primaryAction || brief.secondaryAction ? <span className="wireframe-actions">
+        {brief.primaryAction ? <b>{brief.primaryAction}</b> : null}
+        {brief.secondaryAction ? <small>{brief.secondaryAction}</small> : null}
+      </span> : null}
     </span>
   )
 }

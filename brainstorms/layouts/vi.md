@@ -24,9 +24,9 @@ rồi.
 ## Luật
 
 Phương án schema 3 gọi tên region, ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
-region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và rough child cue (`kind`,
-title, summary cùng content roles xấp xỉ). Cue giúp duyệt layout theo density và reading order nhưng không
-preview hay phê duyệt parts, fields, copy, actions, states hoặc data ownership. Schema 1–2 chỉ còn hợp lệ cho lịch sử accepted
+region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và impressionistic child brief
+(`kind`, title, summary, labels, values và actions đại diện). Wireframe giúp hình dung purpose, density và reading
+order nhưng không phê duyệt exact parts, fields, copy, actions, states hoặc data ownership. Schema 1–2 chỉ còn hợp lệ cho lịch sử accepted
 bất biến. Phương án **không bao giờ** gọi tên class; class được quyết sau từ hình đã chấp nhận.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
@@ -130,7 +130,7 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 | `LAYOUT-9` | Region được ghim nghỉ **dưới chrome của trang nó đang đứng trên**, đo từ frame của chính trang đó, và khai **mức trần chiều cao trong cùng một quyết định** với offset. | offset bê từ trang khác sang, hoặc offset không có trần |
 | `LAYOUT-10` | Chiều rộng của một region do **contract ghép cái hàng** mà region đó nằm trong viết ra, nhắm vào **danh tính** của con chứ không vào vị trí của nó, lấy từ union class đóng, và mọi số đo cố định đi kèm việc **từ chối co lại**. | region tự quyết chiều rộng của mình, hoặc chiều rộng nhắm theo số thứ tự anh em |
 | `LAYOUT-11` | Luật này trả về một **phân loại** — chạy hết chiều ngang, hay control gọn — **không bao giờ** trả về một chiều rộng. Cả hai phán quyết của người chủ trên cùng một control đều còn giá trị. | chọn một trong hai phán quyết làm mặc định |
-| `LAYOUT-12` | Mỗi region phải có rough child cue trước layout review: block có tồn tại chưa, phương án có dùng không, mục đích, mật độ và reading order xấp xỉ, cùng verdict reuse/generalize/new. Parts, fields, states, data ownership và copy chỉ thuộc block round sau. | thiết kế block anatomy khi parent layout vẫn còn proposed |
+| `LAYOUT-12` | Mỗi region phải có impressionistic child brief trước layout review: block có tồn tại chưa, phương án có dùng không, mục đích, content đại diện, mật độ và reading order xấp xỉ, cùng verdict reuse/generalize/new. Nó phải nhận diện được thay vì là hộp trắng; exact parts, fields, states, data ownership và copy chỉ thuộc block round sau. | hộp trắng hoặc final block anatomy khi parent layout vẫn còn proposed |
 | `LAYOUT-13` | Chỉ product surface được yêu cầu rõ mới được thành layout identity hoặc flow node. Ví dụ dùng để giải thích năng lực vẫn chỉ là evidence cho tới khi owner đưa nó vào scope rõ ràng. | biến “ví dụ create order” thành product page |
 | `LAYOUT-14` | Các mode dùng chung một route và một page owner là block states. Layout preview chỉ render state mặc định có evidence; block review sau đó mới liệt kê các mode còn lại. | sinh sign-in, sign-up và recovery thành layout hay layout variant riêng |
 
@@ -154,9 +154,9 @@ những rectangle placeholder rỗng. Mỗi layout region luôn nằm trong dash
 region, contract entry, assembler và mount lifetime. Interaction preview-only có thể minh họa navigation
 ownership, sticky behavior và responsive collapse, nhưng không trở thành product behavior.
 
-Content trong region render thành silhouette không label từ rough cue đã hash và chỉ truyền đạt identity, mật độ
-cùng reading order xấp xỉ. Region login chỉ hiện cảm giác một card form nằm giữa; không vẽ field, action,
-sign-up hay recovery anatomy. Các chi tiết đó chỉ được thiết kế ở block round sau khi layout head đã accepted.
+Content trong region render thành wireframe cảm tính có label từ brief đã hash. Tên, value và action đại diện
+giúp hình dung purpose, density cùng reading order; control nét đứt cho thấy đây chưa phải anatomy hay final copy.
+Region login có thể hiện ví dụ mang dáng credential, còn sign-up và recovery vẫn là block states của vòng sau.
 Flow cue chỉ xuất hiện khi flow được đưa rõ vào product scope và vẫn chỉ là rough sequence, không phải step contract. Ưu tiên
 hình từ source hiện hành hoặc legacy; khi không có asset tái dùng được thì inline
 SVG bỏ đi được có thể làm hình minh họa, nhưng không bao giờ được đưa thành source hay JSON. Blank-box page và

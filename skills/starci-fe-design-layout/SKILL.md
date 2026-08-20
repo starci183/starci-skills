@@ -114,9 +114,10 @@ every branch and what it may contain; every route page and persistent layout; cl
 this project's accepted layout precedents with their rejections.
 
 Layout remains a skeleton. New work uses layout schema 3 and names regions, hashed child bounding geometry
-(`placement`, `width`, `height`, `align`), a hashed rough child cue, mount lifetime and route relationship.
-A centered authentication panel must render centered as a recognizable form silhouette before its block exists;
-a rail region must occupy the rail slot with approximate navigation density. Do not draw fields, actions, parts or states.
+(`placement`, `width`, `height`, `align`), a hashed impressionistic child brief, mount lifetime and route relationship.
+A centered authentication panel must render centered with recognizable representative content before its block
+exists; a rail region must occupy the rail slot with representative destinations. Keep the wireframe visibly rough:
+labels and sample values explain intent, but do not claim exact parts, states, behavior or final copy.
 It never decides a block's internal parts, states or data ownership. That separation is what lets one
 block be redesigned later without reopening the page layout.
 
@@ -171,9 +172,10 @@ Render the combined graph once with `--layout-draft-index <index.json>` in place
 The first index entry owns the initial route. This only combines review: each candidate keeps its own
 immutable hash and still requires explicit approval before any block round starts.
 
-The layout route renders a complete page. Every declared region renders an unlabeled silhouette from its hashed
-rough cue so geometry, density and reading order are judgeable before child blocks exist. It must not render named
-fields, actions, parts or states. Modes sharing the route owner remain block states for the later block round.
+The layout route renders a complete page. Every declared region renders a labeled impressionistic wireframe from
+its hashed brief so purpose, geometry, density and reading order are judgeable before child blocks exist. Use
+representative labels, values and actions inside dashed lightweight controls; never present them as accepted parts,
+states, behavior or final copy. Modes sharing the route owner remain block states for the later block round.
 Navigation and flow cues appear only for explicitly scoped surfaces. A child block renders its
 accepted parts only when its recorded `layoutHash` equals the candidate displayed; missing or stale children
 stay rough. Clicking a region navigates to

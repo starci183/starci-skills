@@ -18,8 +18,9 @@ Module render một Vite review application cho mỗi project. Manifest là grap
 Layout/block JSON canonical và registry heads vẫn là authority. Vite bundle, graph manifest, HeroUI controls
 và content đại diện chỉ là publication evidence có thể build lại.
 
-Layout route render toàn page với content trong mọi region. Child missing hoặc stale dùng rough cue đã hash của
-layout candidate để render silhouette không label, đủ đánh giá geometry, density và reading order; nó không được
+Layout route render toàn page với content trong mọi region. Child missing hoặc stale dùng impressionistic brief
+đã hash của layout candidate để render wireframe rough có label, đủ hình dung purpose và đánh giá geometry,
+density cùng reading order; nó không được
 ngụ ý fields, actions, states, block parts hay copy cuối. Child accepted
 có `layoutHash` đã ghi khớp parent đang hiển thị được render parts accepted chính xác hơn.
 
@@ -65,8 +66,8 @@ Application dùng hash routes:
 #/layouts/<layoutId>/<layoutHash>/blocks/<blockId>
 ```
 
-Region layout schema 3 mang `placement`, `width`, `height`, `align` và rough child cue đã hash. Preview
-tuân theo bounding và render silhouette không label kể cả khi child còn thiếu; không dàn phẳng thành stack chung hay thay form,
+Region layout schema 3 mang `placement`, `width`, `height`, `align` và impressionistic child brief đã hash. Preview
+tuân theo bounding và render content đại diện có label trong wireframe rõ là rough kể cả khi child còn thiếu; không dàn phẳng thành stack chung hay thay form,
 navigation hoặc flow đã khai báo bằng skeleton. Fallback schema 1–2 chỉ tồn tại cho lịch sử accepted bất biến.
 
 Script chỉ cài Vite/HeroUI dependencies đã pin khi còn thiếu, build một lần vào project cache rồi ghi một
