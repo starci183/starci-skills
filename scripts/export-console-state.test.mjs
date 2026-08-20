@@ -46,3 +46,11 @@ test("scanner exposes the strict lint, E2E, coverage and Sonar wiring facts", ()
     assert.match(output, /project and patch\/new four-metric thresholds declared/)
     assert.match(output, /strict Sonar proof machine is wired/)
 })
+
+test("frontend assurance accepts namespaced encrypted credentials owned by the Source", () => {
+    const output = staleOutput()
+    const starci = output.match(/  starci-academy\/fe\s+(?:stale|installed)([\s\S]*?)(?=\n  [\w-]+\/|\n\n)/)?.[1] ?? ""
+    assert.doesNotMatch(starci, /stack-secret entrypoint exists/)
+    assert.doesNotMatch(starci, /Codecov token is encrypted in stacks/)
+    assert.doesNotMatch(starci, /SonarQube token is encrypted in stacks/)
+})

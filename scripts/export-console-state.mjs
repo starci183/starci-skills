@@ -200,6 +200,10 @@ function readAssurance(diskPath, role) {
   const sonarConfigPath = join(diskPath, "sonar-project.properties");
   const sonarConfig = existsSync(sonarConfigPath) ? readFileSync(sonarConfigPath, "utf8") : "";
   const sonarProjectKey = sonarConfig.match(/^sonar\.projectKey\s*=\s*(\S+)\s*$/m)?.[1] ?? null;
+  const sourceCredential = (provider) => Boolean(sonarProjectKey) && existsSync(join(
+    source, ".stacks", "dev", "runtime", "files", `${provider}-${sonarProjectKey}-token.key.enc`,
+  ));
+  const sourceOwnedFrontendCredential = role === "fe" && existsSync(join(source, ".claude", "scripts", "publish-secret.mjs"));
   const badges = badgeSurface(diskPath, sonarProjectKey);
   const ciCoverage = ["test:ci", "test:cov", "test:coverage"].some((name) => scriptProducesCoverage(scripts, name));
   const codecovOidc = /use_oidc\s*:\s*true/i.test(prWorkflows) && /id-token\s*:\s*write/i.test(prWorkflows);
@@ -238,9 +242,9 @@ function readAssurance(diskPath, role) {
     "ASSURANCE-5 Codecov uses a declared CI identity": codecovToken || codecovOidc,
     "ASSURANCE-5 workflow references SONAR_TOKEN": /secrets\.SONAR_TOKEN/.test(prWorkflows),
     "ASSURANCE-5 workflow references SONAR_HOST_URL": /(vars|secrets)\.SONAR_HOST_URL/.test(prWorkflows),
-    "ASSURANCE-5 stack-secret entrypoint exists": /stack-secret\.mjs\s+set/.test(String(scripts["secret:set"] ?? "")),
-    "ASSURANCE-5 Codecov token is encrypted in stacks": codecovOidc || existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "codecov-token.key.enc")),
-    "ASSURANCE-5 SonarQube token is encrypted in stacks": existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "sonarqube-token.key.enc")),
+    "ASSURANCE-5 stack-secret entrypoint exists": /stack-secret\.mjs\s+set/.test(String(scripts["secret:set"] ?? "")) || (sourceOwnedFrontendCredential && sourceCredential("sonarqube")),
+    "ASSURANCE-5 Codecov token is encrypted in stacks": codecovOidc || existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "codecov-token.key.enc")) || (sourceOwnedFrontendCredential && sourceCredential("codecov")),
+    "ASSURANCE-5 SonarQube token is encrypted in stacks": existsSync(join(diskPath, ".stacks", "dev", "runtime", "files", "sonarqube-token.key.enc")) || (sourceOwnedFrontendCredential && sourceCredential("sonarqube")),
     "ASSURANCE-7 deployment waits for verification": deployWorkflows.length === 0 || deployWorkflows.every(deployWaitsForVerification),
   };
   const missing = declarationIssues.concat(Object.entries(checks).filter(([, present]) => !present).map(([name]) => name));
