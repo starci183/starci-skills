@@ -68,6 +68,11 @@ export const ReviewApp = ({manifest}: ReviewAppProps) => {
           const target = item.candidates.find((candidate) => candidate.id === item.recommendedId) ?? item.candidates[0]
           return <button className={selected ? "active" : ""} type="button" key={item.layoutId} onClick={() => target && navigate(layoutRoute(item.layoutId, target.hash))}><strong>{item.layoutId}</strong><small>{item.currentHead ? "accepted head" : "review"}</small></button>
         })}
+        {manifest.flows?.length ? <span className="sidebar-label">Flows</span> : null}
+        {manifest.flows?.map((flow) => <div className="review-flow" key={flow.id}>
+          <strong>{flow.label}</strong>
+          <ol>{flow.nodes.map((node) => <li key={node.id}><button className={node.layoutId === route.layoutId && node.blockId === route.blockId ? "active" : ""} type="button" onClick={() => navigate(node.route)}><span>{node.order}</span>{node.label}</button></li>)}</ol>
+        </div>)}
         {!route.blockId ? (
           <>
             <span className="sidebar-label">Candidates</span>

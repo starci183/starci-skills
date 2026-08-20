@@ -218,6 +218,42 @@ function overlayBlockReview(layouts, options, registryRoot, registry) {
   return `#/layouts/${layoutId}/${layoutHash}/blocks/${blockId}`;
 }
 
+function resolveLayoutFlows(flows, layouts) {
+  if (flows === undefined) return [];
+  if (!Array.isArray(flows)) throw new Error("layout draft flows must be an array");
+  const flowIds = new Set();
+  return flows.map((flow) => {
+    if (!flow?.id || !flow?.label || !Array.isArray(flow.nodes) || !flow.nodes.length) {
+      throw new Error("each layout draft flow requires id, label and at least one node");
+    }
+    if (flowIds.has(flow.id)) throw new Error(`duplicate layout draft flow id: ${flow.id}`);
+    flowIds.add(flow.id);
+    const nodeIds = new Set();
+    const nodes = flow.nodes.map((node, index) => {
+      if (!node?.id || !node?.label || !node?.layoutId) throw new Error(`flow ${flow.id} has an incomplete node`);
+      if (nodeIds.has(node.id)) throw new Error(`flow ${flow.id} has duplicate node id: ${node.id}`);
+      nodeIds.add(node.id);
+      const layout = layouts.find((item) => item.layoutId === node.layoutId);
+      if (!layout) throw new Error(`flow ${flow.id} references absent layout: ${node.layoutId}`);
+      const candidate = layout.candidates.find((item) => item.id === layout.recommendedId) ?? layout.candidates[0];
+      if (!candidate) throw new Error(`flow ${flow.id} layout has no candidate: ${node.layoutId}`);
+      if (node.blockId && !candidate.regions.some((region) => region.name === node.blockId)) {
+        throw new Error(`flow ${flow.id} references absent block region: ${node.layoutId}/${node.blockId}`);
+      }
+      const route = node.blockId
+        ? `#/layouts/${node.layoutId}/${candidate.hash}/blocks/${node.blockId}`
+        : `#/layouts/${node.layoutId}/${candidate.hash}`;
+      return {...node, order: index + 1, route};
+    });
+    const edges = flow.edges ?? nodes.slice(1).map((node, index) => ({from: nodes[index].id, to: node.id}));
+    if (!Array.isArray(edges)) throw new Error(`flow ${flow.id} edges must be an array`);
+    for (const edge of edges) {
+      if (!nodeIds.has(edge?.from) || !nodeIds.has(edge?.to)) throw new Error(`flow ${flow.id} has an edge with an absent node`);
+    }
+    return {id: flow.id, label: flow.label, nodes, edges};
+  });
+}
+
 function assertOutputPath(outDir, project) {
   const marker = `${sep}.worktrees${sep}${project}${sep}cache${sep}preview${sep}`;
   const normalized = `${resolve(outDir)}${sep}`;
@@ -247,10 +283,39 @@ export function buildManifest(options) {
   const contentInput = optional(options.content);
   const shellInput = optional(options.shell);
   const layouts = currentLayouts(registryRoot, registry, vocabulary, options.project, contentInput, shellInput);
-  if (!layouts.length && options.phase !== "layout") throw new Error("design registry has no accepted layout heads");
+  if (!layouts.length && options.phase !== "layout" && !options.layoutDraftIndex) {
+    throw new Error("design registry has no accepted layout heads");
+  }
 
   let entryRoute;
-  if (options.draftIndex) {
+  let flows = [];
+  if (options.layoutDraftIndex) {
+    const indexPath = resolve(options.layoutDraftIndex);
+    const payload = load(indexPath, "layout draft index");
+    const drafts = Array.isArray(payload) ? payload : payload.layouts;
+    if (!Array.isArray(drafts) || !drafts.length) throw new Error("layout draft index must contain at least one entry");
+    const root = dirname(indexPath);
+    for (const draft of drafts) {
+      const draftOptions = {
+        ...options,
+        phase: "layout",
+        ...draft,
+        artifact: resolve(root, draft.artifact),
+        ...(draft.directions ? {directions: resolve(root, draft.directions)} : {})
+      };
+      const route = overlayLayoutReview(
+        layouts,
+        draftOptions,
+        registryRoot,
+        registry,
+        vocabulary,
+        draft.content ? optional(resolve(root, draft.content)) : contentInput,
+        draft.shell ? optional(resolve(root, draft.shell)) : shellInput
+      );
+      entryRoute ??= route;
+    }
+    flows = resolveLayoutFlows(Array.isArray(payload) ? undefined : payload.flows, layouts);
+  } else if (options.draftIndex) {
     const indexPath = resolve(options.draftIndex);
     const drafts = load(indexPath, "block draft index");
     if (!Array.isArray(drafts) || !drafts.length) throw new Error("block draft index must contain at least one entry");
@@ -283,10 +348,12 @@ export function buildManifest(options) {
     project: options.project,
     entryRoute,
     layouts,
+    ...(flows.length ? {flows} : {}),
     evidence: [
       {label: "registry", value: join(registryRoot, "design-registry-v2.json")},
       {label: "vocabularyAt", value: vocabulary.digest},
       ...(options.artifact ? [{label: "reviewArtifact", value: options.artifact}] : []),
+      ...(options.layoutDraftIndex ? [{label: "layoutDraftIndex", value: options.layoutDraftIndex}] : []),
       ...(options.draftIndex ? [{label: "draftIndex", value: options.draftIndex}] : [])
     ]
   };

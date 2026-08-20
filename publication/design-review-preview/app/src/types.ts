@@ -105,6 +105,12 @@ export type ReviewManifest = {
   readonly project: string
   readonly entryRoute: string
   readonly layouts: ReadonlyArray<LayoutReview>
+  readonly flows?: ReadonlyArray<{
+    readonly id: string
+    readonly label: string
+    readonly nodes: ReadonlyArray<{readonly id: string; readonly label: string; readonly layoutId: string; readonly blockId?: string; readonly order: number; readonly route: string}>
+    readonly edges: ReadonlyArray<{readonly from: string; readonly to: string; readonly label?: string}>
+  }>
   readonly evidence: ReadonlyArray<{readonly label: string; readonly value: string}>
 }
 

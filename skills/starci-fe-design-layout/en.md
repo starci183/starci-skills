@@ -154,6 +154,15 @@ node @render-design-review \
   --out .worktrees/<project>/cache/preview/design-review
 ```
 
+When the owner asks to compare or approve several stable layout identities in one round, write one
+`layout-draft-index.json` beside their batches. Its `layouts` array entries declare `layoutId`, `artifact`,
+optional `directions`, optional `content`, optional `shell`, and `recommendedId`; paths are relative to the
+index. Optional `flows` declare ordered nodes that reference a `layoutId` and optional declared `blockId`;
+the renderer derives immutable routes and default adjacent edges, then exposes the sequences in review.
+Render the combined graph once with `--layout-draft-index <index.json>` in place of `--phase layout`.
+The first index entry owns the initial route. This only combines review: each candidate keeps its own
+immutable hash and still requires explicit approval before any block round starts.
+
 The layout route renders a complete page. Every declared region carries rough representative content so
 geometry, density and reading order are judgeable before child blocks exist. A child block renders its
 accepted parts only when its recorded `layoutHash` equals the candidate displayed; missing or stale children

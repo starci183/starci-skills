@@ -231,6 +231,71 @@ test("the first layout candidate renders before an accepted layout head exists",
   }
 });
 
+test("layout draft index overlays multiple first layouts into one project graph", () => {
+  const f = fixture();
+  try {
+    writeFileSync(join(f.registry, "design-registry-v2.json"), JSON.stringify({
+      schemaVersion: 2,
+      project: "sample",
+      layoutHeads: {},
+      blockHeads: {},
+      objects: {immutable: true, byHash: {}}
+    }));
+    const drafts = join(f.root, "layout-drafts");
+    mkdirSync(drafts);
+    const layouts = [
+      {layoutId: "authentication", id: "centred-door"},
+      {layoutId: "dashboard", id: "sticky-spine"}
+    ];
+    for (const item of layouts) {
+      writeFileSync(join(drafts, `${item.layoutId}.json`), JSON.stringify({
+        schema: 1,
+        envelope: {round: 1, project: "sample", surface: item.layoutId},
+        candidates: [{...f.layout, id: item.id}]
+      }));
+      writeFileSync(join(drafts, `${item.layoutId}.content.json`), JSON.stringify({
+        eyebrow: item.layoutId,
+        title: `${item.layoutId} content`,
+        description: "Representative content for this layout only.",
+        rows: [{title: "Evidence", description: "One stable row."}]
+      }));
+    }
+    writeFileSync(join(drafts, "index.json"), JSON.stringify({
+      schema: 1,
+      layouts: layouts.map((item) => ({
+        layoutId: item.layoutId,
+        artifact: `${item.layoutId}.json`,
+        content: `${item.layoutId}.content.json`,
+        recommendedId: item.id
+      })),
+      flows: [{
+        id: "entry-to-console",
+        label: "Entry to console",
+        nodes: [
+          {id: "sign-in", label: "Sign in", layoutId: "authentication"},
+          {id: "open-dashboard", label: "Open dashboard", layoutId: "dashboard", blockId: "summary"}
+        ]
+      }]
+    }));
+    const manifest = buildManifest({
+      layoutDraftIndex: join(drafts, "index.json"),
+      project: "sample",
+      registry: f.registry,
+      vocabulary: f.vocabularyPath
+    });
+    assert.deepEqual(manifest.layouts.map((layout) => layout.layoutId), ["authentication", "dashboard"]);
+    assert.equal(manifest.layouts[0].content.title, "authentication content");
+    assert.equal(manifest.layouts[1].content.title, "dashboard content");
+    assert.match(manifest.entryRoute, /\/layouts\/authentication\//);
+    assert.equal(manifest.flows[0].nodes[0].order, 1);
+    assert.match(manifest.flows[0].nodes[1].route, /\/layouts\/dashboard\/.+\/blocks\/summary$/);
+    assert.deepEqual(manifest.flows[0].edges, [{from: "sign-in", to: "open-dashboard"}]);
+    assert.equal(manifest.evidence.at(-1).label, "layoutDraftIndex");
+  } finally {
+    rmSync(f.root, {recursive: true, force: true});
+  }
+});
+
 test("renderer writes one project graph and refuses output outside preview cache", () => {
   const f = fixture();
   try {

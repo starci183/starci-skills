@@ -52,6 +52,12 @@ During layout review, add `--phase layout --layout-id <layoutId> --artifact <bat
 `--directions <batch.json>` and `--recommended-id <candidateId>`. During block review, use
 `--phase block --layout-id <layoutId> --block-id <blockId> --artifact <batch.json>`.
 
+For a combined first-layout review, use `--layout-draft-index <index.json>`. The index has a non-empty
+`layouts` array whose entries declare `layoutId`, `artifact`, optional `directions`, optional `content`,
+optional `shell`, and `recommendedId`; entry paths are relative to the index. Optional `flows` hold ordered
+nodes referencing a layout and optional declared block region. The renderer resolves their immutable review
+routes and adjacent edges. All proposed layouts share one manifest without requiring an accepted head.
+
 The application uses hash routes:
 
 ```text

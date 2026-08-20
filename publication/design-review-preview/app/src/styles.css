@@ -22,6 +22,12 @@ button { color: inherit; font: inherit; cursor: pointer; }
 .review-sidebar > button:not(.candidate-detail) { display: grid; gap: .2rem; width: 100%; padding: .7rem; text-align: left; border: 1px solid transparent; border-radius: .7rem; background: transparent; }
 .review-sidebar > button.active { border-color: #efb6d3; background: #fff4f9; }
 .review-sidebar small { color: #777b82; }
+.review-flow { display: grid; gap: .45rem; padding: .7rem; border: 1px dashed #c8cad0; border-radius: .7rem; background: #fff; }
+.review-flow > strong { font-size: .78rem; }
+.review-flow ol { display: grid; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+.review-flow button { display: grid; grid-template-columns: 1.5rem 1fr; align-items: center; gap: .45rem; width: 100%; padding: .4rem; border: 0; border-radius: .5rem; background: transparent; text-align: left; }
+.review-flow button span { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border: 1px solid #d7d9de; border-radius: 999px; font-size: .65rem; }
+.review-flow button.active { background: #fff4f9; color: #a52c67; }
 .viewport-switcher { display: grid; grid-template-columns: repeat(3, 1fr); gap: .25rem; }
 .viewport-switcher button { padding: .45rem .25rem; border: 1px solid #dfe1e5; background: #fff; font-size: .72rem; }
 .viewport-switcher button:first-child { border-radius: .55rem 0 0 .55rem; }

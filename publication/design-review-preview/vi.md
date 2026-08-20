@@ -51,6 +51,12 @@ Trong layout review, thêm `--phase layout --layout-id <layoutId> --artifact <ba
 `--directions <batch.json>` và `--recommended-id <candidateId>`. Trong block review, dùng
 `--phase block --layout-id <layoutId> --block-id <blockId> --artifact <batch.json>`.
 
+Với review nhiều layout đầu tiên trong cùng một graph, dùng `--layout-draft-index <index.json>`. Index có
+mảng `layouts` không rỗng; mỗi entry khai báo `layoutId`, `artifact`, `directions` tùy chọn, `content` tùy
+chọn, `shell` tùy chọn và `recommendedId`; đường dẫn entry tính tương đối từ index. `flows` tùy chọn chứa
+các node có thứ tự tham chiếu layout và block region đã khai báo nếu có. Renderer resolve route review bất
+biến cùng edge kề. Tất cả layout đề xuất dùng chung một manifest mà chưa cần accepted head.
+
 Application dùng hash routes:
 
 ```text

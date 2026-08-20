@@ -152,6 +152,15 @@ node @render-design-review \
   --out .worktrees/<project>/cache/preview/design-review
 ```
 
+Khi chủ sở hữu yêu cầu so sánh hoặc duyệt nhiều layout identity ổn định trong cùng một vòng, hãy ghi một
+`layout-draft-index.json` cạnh các batch. Mảng `layouts` chứa các entry khai báo `layoutId`, `artifact`,
+`directions` tùy chọn, `content` tùy chọn, `shell` tùy chọn và `recommendedId`; đường dẫn được tính tương
+đối từ index. `flows` tùy chọn khai báo các node có thứ tự tham chiếu `layoutId` và `blockId` đã khai báo
+nếu có; renderer tự tạo route bất biến và edge kề mặc định, rồi hiển thị chuỗi trong review.
+Render graph kết hợp đúng một lần với `--layout-draft-index <index.json>` thay cho `--phase layout`.
+Entry đầu tiên sở hữu route mở đầu. Việc này chỉ kết hợp khâu review: mỗi candidate vẫn giữ hash bất biến
+riêng và vẫn phải được duyệt rõ ràng trước khi bắt đầu bất kỳ vòng block nào.
+
 Layout route render một page hoàn chỉnh. Mọi region có rough representative content để geometry, density và
 reading order đánh giá được trước khi child block tồn tại. Child chỉ render accepted parts khi `layoutHash`
 đã ghi khớp candidate đang hiển thị; child missing hoặc stale vẫn giữ content thô. Click region navigate tới
