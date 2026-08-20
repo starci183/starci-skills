@@ -294,7 +294,7 @@ Each code, and real code it can be checked against.
 |---|---|---|
 | `SLOTS-1` | `@canon-fe-props` | The `DataValue` union and `ComponentData`; confirm no member is a function type, then try to assign a handler to `props` |
 | `SLOTS-2` | `@canon-fe-props` | `LeafProps<D extends ComponentData>`; declare a data shape with `interface` and pass it in — the constraint fails |
-| `SLOTS-3` | `@canon-fe` | `isInlineObjectType`, which walks intersections and parentheses, and the invalid fixtures in `props-and-slots.test.mjs` |
+| `SLOTS-3` | `@canon-fe` | `isInlineObjectType`, which walks intersections and parentheses, and the invalid fixtures in `props-and-slots.spec.mjs` |
 | `SLOTS-4` | `@canon-fe-props` · `@canon-fe` | `BranchProps` carrying `contract` + `render` and no markup hole; then `CHILDREN_SHELLS` and `isGoverned` for the exempt shells and the tiers the rule governs |
 | `SLOTS-5` | `@canon-fe-props` | `BlockProps` — two slots, no `isLoading`, which anchors the RECEIVED half only. The DECIDED half has no anchor |
 | `SLOTS-6` | `@canon-fe-props` | `LeafProps`, `CompositeProps`, `BranchProps`; confirm there is no appearance member and no index signature that would admit one |

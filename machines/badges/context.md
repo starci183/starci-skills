@@ -10,5 +10,5 @@ truth remain separate evidence.
 
 ```text
 node .claude/machines/badges/check.mjs <repository-root>
-node --test .claude/machines/badges/check.test.mjs
+node --test .claude/machines/badges/check.spec.mjs
 ```

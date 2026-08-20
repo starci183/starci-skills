@@ -10,5 +10,5 @@ it does not invoke a skill or restate its procedure.
 
 ```text
 node .claude/machines/workflows/check.mjs
-node --test .claude/machines/workflows/check.test.mjs
+node --test .claude/machines/workflows/check.spec.mjs
 ```

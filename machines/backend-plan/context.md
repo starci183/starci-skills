@@ -10,5 +10,5 @@ boundary, and `planHash` binds the complete canonical plan content independently
 
 ```text
 node .claude/machines/backend-plan/check.mjs <plan.json>
-node --test .claude/machines/backend-plan/check.test.mjs
+node --test .claude/machines/backend-plan/check.spec.mjs
 ```

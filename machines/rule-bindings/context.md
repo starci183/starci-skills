@@ -14,5 +14,5 @@ it never repairs consumer repositories.
 
 ```text
 node .claude/machines/rule-bindings/check.mjs --all
-node --test .claude/machines/rule-bindings/check.test.mjs
+node --test .claude/machines/rule-bindings/check.spec.mjs
 ```

@@ -288,7 +288,7 @@ Từng mã, và code thật để đối chiếu.
 |---|---|---|
 | `SLOTS-1` | `@canon-fe-props` | Union `DataValue` và `ComponentData`; xác nhận không thành viên nào là kiểu hàm, rồi thử gán một handler vào `props` |
 | `SLOTS-2` | `@canon-fe-props` | `LeafProps<D extends ComponentData>`; khai một shape dữ liệu bằng `interface` rồi truyền vào — ràng buộc sẽ hỏng |
-| `SLOTS-3` | `@canon-fe` | `isInlineObjectType`, hàm đi xuyên intersection và dấu ngoặc, cùng các fixture invalid trong `props-and-slots.test.mjs` |
+| `SLOTS-3` | `@canon-fe` | `isInlineObjectType`, hàm đi xuyên intersection và dấu ngoặc, cùng các fixture invalid trong `props-and-slots.spec.mjs` |
 | `SLOTS-4` | `@canon-fe-props` · `@canon-fe` | `BranchProps` mang `contract` + `render` và không có lỗ markup; rồi `CHILDREN_SHELLS` và `isGoverned` cho các shell được miễn và các tầng rule quản |
 | `SLOTS-5` | `@canon-fe-props` | `BlockProps` — hai slot, không có `isLoading`, tức chỉ neo được nửa NHẬN. Nửa TỰ QUYẾT thì chưa neo được |
 | `SLOTS-6` | `@canon-fe-props` | `LeafProps`, `CompositeProps`, `BranchProps`; xác nhận không có thành viên ngoại hình và không có index signature nào cho phép một thành viên như vậy lọt vào |

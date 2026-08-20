@@ -306,7 +306,7 @@
     "compilers/patterns/fe/props-and-slots/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/props-and-slots/en.md",
-      "sourceHash": "a38fad170b9c890189d1a7b0a8c76015729dfb094eae0b85092798147504ce93",
+      "sourceHash": "fe07093ac2e5673bba47a9ff695116b44d31e23a674c0a8d7efe43171e002de6",
       "contextVersion": 1
     },
     "compilers/patterns/fe/served-locale/context.md": {

@@ -107,7 +107,7 @@ Mỗi commit phải pass:
 ```text
 node scripts/check-deps.mjs --all
 node scripts/compile-context.mjs --check .
-node --test "scripts/*.test.mjs"
+node --test "scripts/*.spec.mjs"
 npm --prefix docs run build
 ```
 
@@ -127,7 +127,7 @@ Sau mỗi pass, tìm active reference tới legacy/runtime path; kết quả ph�
 7. Scanner chứng minh ESLint config import canon package name, không chỉ package tồn tại trong manifest.
 8. `clean`, `stale`, `unmeasured external`, `private` và `not required` là các verdict tách biệt.
 9. Đồng bộ `en.md`, `vi.md`, curated `context.md`, manifest và regression tests trong cùng pass; thêm
-   `scripts/export-console-state.test.mjs` cho FE, `test:ci`, OIDC, central custody, deploy dependency,
+   `scripts/export-console-state.spec.mjs` cho FE, `test:ci`, OIDC, central custody, deploy dependency,
    semantic badges, canon import và informational-coverage decision.
 10. Coverage blocking/informational là tracked owner decision trong manifest và hạ xuống Codecov lẫn
     Sonar cùng lúc; năm `codecov.yml` informational hiện tại không được coi là policy nếu declaration

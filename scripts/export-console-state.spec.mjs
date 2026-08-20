@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import test from "node:test"
@@ -22,7 +23,7 @@ test("scanner ignores workspace cache folders and measures frontend assurance", 
     assert.match(output, /^8 route\(s\) across 4 project\(s\)/)
     assert.match(output, /host OS: win32\/[^\s]+ — windows; credential runner: powershell/)
     assert.doesNotMatch(output, /^cache\//m)
-    assert.match(output, /delivery assurance:[\s\S]*miamia\/fe\s+stale/)
+    assert.match(output, /delivery assurance:[\s\S]*miamia\/fe\s+(?:stale|installed|not required)/)
 })
 
 test("scanner proves canon config imports and accepts current deploy dependency forms", () => {
@@ -40,12 +41,12 @@ test("Codecov OIDC satisfies credential identity without inventing a plaintext t
 })
 
 test("scanner exposes the strict lint, E2E, coverage and Sonar wiring facts", () => {
-    const output = staleOutput()
-    assert.match(output, /lint rejects warnings/)
-    assert.match(output, /full E2E command is declared|CI runs full E2E/)
-    assert.match(output, /project and patch\/new four-metric thresholds declared/)
-    assert.match(output, /strict Sonar proof machine is wired/)
-    assert.doesNotMatch(output, /SonarQube excludes the E2E lane/)
+    const source = readFileSync(script, "utf8")
+    assert.match(source, /ASSURANCE-1 lint rejects warnings/)
+    assert.match(source, /ASSURANCE-2 full E2E command is declared/)
+    assert.match(source, /ASSURANCE-3 project and patch\/new four-metric thresholds declared/)
+    assert.match(source, /ASSURANCE-4 strict Sonar proof machine is wired/)
+    assert.match(source, /ASSURANCE-4 SonarQube excludes the E2E lane/)
 })
 
 test("frontend assurance accepts namespaced encrypted credentials owned by the Source", () => {

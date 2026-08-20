@@ -10,5 +10,5 @@ in the owning law and machine configuration, never in a local comment that bypas
 
 ```text
 node .claude/machines/suppression/check.mjs <repository-root>
-node --test .claude/machines/suppression/check.test.mjs
+node --test .claude/machines/suppression/check.spec.mjs
 ```
