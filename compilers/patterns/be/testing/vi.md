@@ -57,7 +57,7 @@ dẫn ai đó đã đặt.
 | `TESTING-4` | Một nhánh thất bại đang đi tìm lane | Happy path là chủ thể; một nhánh hỏng chỉ giành được e2e khi nó kéo theo một flow trọng yếu. Cấm một e2e mà toàn bộ chủ thể là một lỗi validation |
 | `TESTING-5` | Một handler có nhiều đường ra | Một unit spec phủ mọi nhánh có thể đổi kết quả, kể cả biên. Cấm coi dòng đã chạy là quyết định đã phủ |
 | `TESTING-6` | Spec đã chạy handler và đang chọn kiểm cái gì | Spec assert thứ trả về hoặc thứ đã đổi. Cấm một spec mà mọi assertion đều là `toHaveBeenCalled*` |
-| `TESTING-7` | Một file test đang được đặt cạnh code nó kiểm | Lane khai bằng hậu tố tên file: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`, `*.harness-spec.ts`. Cấm suy ra lane từ thư mục ai đó đã xếp file vào |
+| `TESTING-7` | Một file test đang được đặt | Unit test nằm cạnh owner với tên `*.spec.ts`. Chỉ backend E2E được ở cây test riêng với `*.e2e-spec.ts`; integration và harness giữ suffix tường minh. Cấm bucket unit `src/tests`/`test/unit` và tên `.test.` chung |
 | `TESTING-8` | Một lane đã cấu hình, đã có script, đã nằm trong CI | Lane đã cấu hình thì phải có test, hoặc bị xoá đi. Cấm một lane có script mà xanh chỉ vì không tìm thấy gì |
 | `TESTING-9` | Một flow đi qua model | Flow đi qua model giữ thật transport, orchestration, quota và persistence, và chỉ thay kết quả của provider bên ngoài — bằng JSON thật dạng, theo mặc định. Cấm gọi model thật trong e2e; cấm stub trả về một chuỗi đánh dấu; cấm một stub mà từng tác giả flow phải tự nhớ cài |
 | `TESTING-10` | Chủ thể chính là câu trả lời của model | Harness import đúng một SDK provider đã duyệt, cấp một API key server do provider cấp, khai tên model và endpoint, và gọi thật — một hai case mỗi capability. Cấm chạm provider qua một tier, catalog, chuỗi fallback, key pool hay wrapper nhà; cấm cung cấp hay ghi đè AI gateway production; cấm xác thực bằng credential tiêu dùng hoặc của CLI; cấm mọc thêm một case cho mỗi edge |
@@ -218,12 +218,13 @@ nghiệp vụ thành sai ⇒ file vẫn xanh. Spec đọc lên nghe **giống h�
 **Tình huống nghiệp vụ hay gặp.** Handler tính giá sau coupon; service trừ quota; worker chuyển trạng
 thái đơn; mapper dựng payload; policy quyết cho phép hay từ chối.
 
-## `TESTING-7` — lane nằm ở hậu tố, không nằm ở thư mục
+## `TESTING-7` — unit nằm cạnh owner, E2E mới có cây riêng
 
 **Khi nào gặp.** Bạn đặt một file test cạnh code nó kiểm, và cần lane chạy nhanh vẫn nhanh.
 
-**Source phải thể hiện gì.** Một tên file mang một trong bốn hậu tố — `*.spec.ts`, `*.int-spec.ts`,
-`*.e2e-spec.ts`, `*.harness-spec.ts` — và các config lane chỉ phân biệt bằng đúng hậu tố đó.
+**Source phải thể hiện gì.** Unit file nằm cạnh production owner và mang tên `*.spec.ts`. Integration và
+harness giữ `*.int-spec.ts`, `*.harness-spec.ts`. Chỉ backend E2E được tách dưới cây E2E đã khai báo với
+`*.e2e-spec.ts`; bucket unit như `src/tests` hay `test/unit` là invalid.
 
 **Cách nhận ra.** Bốn hậu tố: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`,
 `*.harness-spec.ts`. Config lane loại trừ nhau bằng **hậu tố**, không bằng đường dẫn. Nếu phải mở file
@@ -390,7 +391,7 @@ Mọi mã đều đã có neo. Không mã nào còn "chưa neo được".
 1. Một file e2e là một flow nghiệp vụ, và tên file chính là flow đó.
 2. Một assertion gọi tên hệ quả, không phải phong bì.
 3. Một e2e vào bằng đúng cửa production vào và chờ trạng thái, không bao giờ chờ đồng hồ.
-4. Lane khai bằng hậu tố, và không bằng bất cứ thứ gì khác.
+4. Unit nằm cạnh owner và khai bằng `.spec.`; chỉ backend E2E được ở cây test riêng.
 5. Một lane đã cấu hình thì hoặc có test, hoặc không tồn tại.
 6. Chỉ lane harness trả tiền cho provider; chỉ lane harness gọi thẳng provider.
 7. Stub của một model trả về payload mà parser production parse được thật.

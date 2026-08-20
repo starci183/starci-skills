@@ -121,7 +121,7 @@ Và tấm gương lật ngược của nó: `app/dashboard/_components/Card.tsx`
 `app/_components/Card.tsx` thì không — cùng một quy ước, hai phán quyết ngược nhau, thư mục riêng chỉ
 được miễn ở ngay gốc cây, đúng chỗ ít ai viết nó nhất. Một thành phần đặt tên theo một khe — một màn
 hình đầy đủ viết trong `template.tsx` hay `default.tsx` — được nhận vào mà không ai xem bên trong, vì
-danh sách khe là một allow-list. Một thành phần đội lốt file kiểm thử, `Hero.test.tsx`, được miễn
+danh sách khe là một allow-list. Một thành phần đội lốt file kiểm thử, `Hero.spec.tsx`, được miễn
 trước khi danh sách khe được hỏi tới.
 
 **Ranh giới.** Luật này phán xét một basename dưới một cây định tuyến. File chứa gì, và cái thành phần
@@ -314,7 +314,7 @@ file đó qua. **Hai luật chỉ đọc source sau cổng đường dẫn** —
 | Luật lint | Cái gì đi qua |
 |---|---|
 | `surface-folder-two-files-only` | **Thành phần thứ ba chuyển vào thẳng `component.tsx`**, một thư mục chỉ có `index.tsx` và vẽ luôn bên trong, **lớp phủ đặt phẳng** không có tầng nhóm, file thứ ba trong thư mục block, composite, branch, leaf hay shell, `constants.json` / `copy.md` / `styles.css` nằm cạnh hai nửa, và mọi thư mục màn hình ngoài `components/` |
-| `route-tree-holds-routes-only` | **Cây định tuyến ở gốc kho, không có `src/`**, một file route vừa fetch vừa sắp xếp ngay trong `page.tsx`, gạch dưới trên một FILE ở gốc cây, tấm gương lật ngược nơi `app/dashboard/_components/Card.tsx` nổ còn `app/_components/Card.tsx` thì không, một màn hình đầy đủ đội tên khe như `template.tsx` hay `default.tsx`, và một thành phần đội tên `.test.tsx` |
+| `route-tree-holds-routes-only` | **Cây định tuyến ở gốc kho, không có `src/`**, một file route vừa fetch vừa sắp xếp ngay trong `page.tsx`, gạch dưới trên một FILE ở gốc cây, tấm gương lật ngược nơi `app/dashboard/_components/Card.tsx` nổ còn `app/_components/Card.tsx` thì không, một màn hình đầy đủ đội tên khe như `template.tsx` hay `default.tsx`, và một thành phần đội tên `.spec.tsx` |
 | `no-helper-folder-in-components` | **Thư mục tiện ích đặt thẳng dưới gốc cây thành phần**, mọi từ đồng nghĩa — `helpers/`, `lib/`, `shared/`, `util/`, `const/`, `models/`, `data/` — một tiện ích viết thành FILE chứ không phải thư mục, và những phần mở rộng không được lint như `constants/tone.json` |
 | `export-matches-folder` | **`export * from "./component"`**, `export default`, `export class` và `export enum`, **một export đúng họ gánh theo bao nhiêu hành khách không liên quan cũng được**, thư mục không PascalCase hoặc nửa không tên `index` hoặc phần mở rộng không phải `.ts`/`.tsx`, và `export type` |
 | `no-runtime-namespace` | **`Object.assign(CardRoot, { Header, Footer })`**, `Card.Header = CardHeader` viết sau khai báo, khai báo trước rồi `export { Card }`, `export default { Root, Header }`, **một thành viên viết thường như `displayName`**, `satisfies` thay cho `as`, khoá đặt trong ngoặc kép, và binding viết thường |

@@ -208,7 +208,7 @@
     "compilers/patterns/be/testing/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/testing/en.md",
-      "sourceHash": "76494ff7e3de591ea474c6b18cc89e1fc67619e3870c6d15e4dadbb8bd1cc30d",
+      "sourceHash": "f0c9cc7c1358961ee3f27e60efcc56bb5083e2dd95a3b0eafb9a955246a896fc",
       "contextVersion": 1
     },
     "compilers/patterns/be/transport/context.md": {
@@ -264,7 +264,7 @@
     "compilers/patterns/fe/file-layout/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/file-layout/en.md",
-      "sourceHash": "53b70b54084ccc6f48c91b2d66aa154875334c267a7d643ba26d9cfb7f3d8034",
+      "sourceHash": "5518294b68c5fac0167b3f3141209f6087cddec42527ad68e432ebb42c21bf53",
       "contextVersion": 1
     },
     "compilers/patterns/fe/icon/context.md": {
@@ -590,7 +590,7 @@
     "gates/fe/lints/file-layout/context.md": {
       "kind": "module",
       "source": "gates/fe/lints/file-layout/en.md",
-      "sourceHash": "f2bf71c8bb821b2359328147d0e48447604d8f924a492a5cdc67ece8e2b0e9e3",
+      "sourceHash": "7412737e24668800354b3e20a64ad1e46a1685cd3306452f58bc06cf7745283f",
       "contextVersion": 1
     },
     "gates/fe/lints/icon/context.md": {
@@ -822,7 +822,7 @@
     "readiness/staleness/source-gates/context.md": {
       "kind": "module",
       "source": "readiness/staleness/source-gates/en.md",
-      "sourceHash": "ac9fe3d9370e3177113d9c8c262252fcca0951df789079c3ee923f0099bec827",
+      "sourceHash": "434db5e0185ccdfe3a8407bbccd4768c9aa8abdbfdf97cc88aab3a9d40ce2d8e",
       "contextVersion": 1
     },
     "readiness/staleness/strict-fix/context.md": {

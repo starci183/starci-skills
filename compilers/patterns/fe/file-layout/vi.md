@@ -184,7 +184,7 @@ hai nửa: `index.tsx` là phần đấu dây — request, tình huống, chữ 
 dạng. Cộng thêm bài test sinh đôi của mỗi nửa. Hết.
 
 **Source phải thể hiện gì.** Đúng `index.tsx` và `component.tsx` trong thư mục màn hình, kèm
-`component.test.tsx` và `index.test.tsx` ở nơi có test. Mọi thứ khác mà shape sinh ra thì đi về tier
+`component.spec.tsx` và `index.spec.tsx` ở nơi có test. Mọi thứ khác mà shape sinh ra thì đi về tier
 của nó: một row nghiệp vụ về `blocks/<category>/<Name>/`, một hàm format về `modules/utils/`, một shape
 của response về `modules/types/`, một cấu hình cột về `resources/`.
 
@@ -285,7 +285,7 @@ key. Và ngược lại: `app/` không chứa thứ gì khác ngoài slot của 
 `template`, `loading`, `error`, `not-found`, `default`, `route` và anh em của chúng — mount một màn hình
 sống ở `components/pages/<Name>/`. Cộng thêm `providers` và `globals.css`, hai thứ được root layout
 mount và không có chỗ nào khác để đi. `app/api/**` là server code, `_folder` là cửa thoát của chính
-framework, và file `.test.` được miễn vì test không ship trong bundle nào và không route nào render nó.
+framework, và file `.spec.` được miễn vì test không ship trong bundle nào và không route nào render nó.
 **Mọi file khác ở đó là một component nằm trong thư mục không ai grep.**
 
 **Cách nhận ra.** Route file gọi hook, đọc session, dựng cây layout. Trong `app/` có một file tên
@@ -378,11 +378,11 @@ cây thư mục là điểm neo phụ vì đó là nơi luật thật sự đư�
 | Mã | Điểm neo | Cần nhìn gì |
 |---|---|---|
 | `FILE-1` | `@canon-fe`, case `FILE-1: the path predicts the name` · `components/*/**/<Name>/index.tsx` | Một named export trực tiếp bằng đúng tên thư mục, hoặc bắt đầu bằng tên đó rồi nối tiếp bằng một chữ hoa |
-| `FILE-2` | Cùng file, case `FILE-2: a surface folder holds its two halves and their twins` · `components/pages/*/` và `components/overlays/*/*/` | Mỗi thư mục liệt kê đúng `component.tsx` và `index.tsx`, cộng bản sinh đôi `.test.tsx` ở nơi có |
+| `FILE-2` | Cùng file, case `FILE-2: a surface folder holds its two halves and their twins` · `components/pages/*/` và `components/overlays/*/*/` | Mỗi thư mục liệt kê đúng `component.tsx` và `index.tsx`, cộng bản sinh đôi `.spec.tsx` ở nơi có |
 | `FILE-3` | Cùng file, case `FILE-3: a helper folder under components has a real home elsewhere` · `hooks/`, `modules/utils/` | Các đích đến tồn tại và có nội dung, và tìm đệ quy các thư mục `constants`, `utils`, `types` hoặc `hooks` dưới `components/` thì không ra gì |
 | `FILE-4` | Cùng file, case `FILE-4: a family is exported as members, not as one object` · mọi `index.tsx` dưới `components/` | Thành viên của họ được export mỗi câu lệnh một cái; không có `export const <Capital> = { … }` chỉ chứa các thành viên viết hoa |
 | `FILE-5` | Cùng file, case `FILE-5: each tier sits on its own side of the feature line` — **chưa neo được trong code production** | Không có workspace nào có `packages/` và `apps/` để chỉ vào; bằng chứng sống duy nhất là các đường dẫn fixture của chính rule |
-| `FILE-6` | Cùng file, case `FILE-6: the routing tree holds route files and nothing else` · `app/**` | Mọi tên file đều là một slot của framework, `providers`, `globals.css`, một bản sinh đôi `.test.`, nằm dưới `api/`, hoặc nằm dưới một thư mục `_` — và không gì khác |
+| `FILE-6` | Cùng file, case `FILE-6: the routing tree holds route files and nothing else` · `app/**` | Mọi tên file đều là một slot của framework, `providers`, `globals.css`, một bản sinh đôi `.spec.`, nằm dưới `api/`, hoặc nằm dưới một thư mục `_` — và không gì khác |
 
 `FILE-5` là mã duy nhất không có điểm neo production, và nó vẫn ở lại trong luật vì cây một app là một
 lát cắt thời điểm, không phải một quyết định. Nó được ghi lại như một rủi ro còn mở chứ không bị lặng lẽ
@@ -410,14 +410,15 @@ hạ cấp.
 7. `app/` chỉ chứa slot của framework; một component có tên riêng ở đó là một component không ai grep.
 8. Thư mục đích chưa tồn tại thì tạo, không đi vòng.
 9. Mỗi mã ứng với đúng một tình huống, và không tình huống nào mang hai mã.
+10. Mọi frontend unit test nằm cạnh owner và dùng `.spec.`; frontend không có cây unit hay E2E tách riêng.
 
 ## Ngoại lệ
 
 Ngoại lệ là một phần của luật, không phải chỗ để lách. Mỗi ngoại lệ đều đóng và nêu rõ mã nó áp vào.
 
-- **Test sinh đôi.** `FILE-2` cho phép `component.test.tsx` và `index.test.tsx` trong thư mục màn hình —
+- **Test sinh đôi.** `FILE-2` cho phép `component.spec.tsx` và `index.spec.tsx` trong thư mục màn hình —
   chúng là bản sinh đôi của hai nửa, không phải thứ thứ ba.
-- **Test của route.** `FILE-6` miễn mọi file `.test.` dưới `app/`. Test không ship trong bundle nào và
+- **Test của route.** `FILE-6` miễn mọi file `.spec.` dưới `app/`. Test không ship trong bundle nào và
   không route nào render nó, nên nó không thể trở thành cái "page thứ hai" mà mã này sinh ra để chặn.
   Tên của nó cố ý không bị bắt phải khớp `page` hay `layout`: test của một route tách theo MỐI QUAN TÂM,
   và ép tất cả vào một file chỉ đổi lấy một file dài hơn.

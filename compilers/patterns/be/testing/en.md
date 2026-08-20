@@ -57,7 +57,7 @@ somebody already made.
 | `TESTING-4` | A failure branch is looking for a lane | The happy path is the subject; an unhappy path earns an e2e only by dragging a critical flow behind it. It forbids an e2e whose whole subject is a validation error |
 | `TESTING-5` | A handler has several ways out | A unit spec covers every branch that can change the outcome, boundaries included. It forbids treating executed lines as covered decisions |
 | `TESTING-6` | A spec has run the handler and is choosing what to check | A spec asserts what came back or what changed. It forbids a spec whose every assertion is `toHaveBeenCalled*` |
-| `TESTING-7` | A test file is being placed next to the code it checks | The lane is declared by filename suffix: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`, `*.harness-spec.ts`. It forbids inferring a lane from which folder somebody filed the file in |
+| `TESTING-7` | A test file is being placed | A unit test is colocated beside its owner as `*.spec.ts`. Only backend E2E may live in a separate test tree, declared as `*.e2e-spec.ts`; integration and harness keep explicit suffixes. Unit buckets and generic `.test.` names are forbidden |
 | `TESTING-8` | A lane is configured, scripted and in CI | A configured lane has tests, or it is deleted. It forbids a scripted lane that passes because it found nothing |
 | `TESTING-9` | A flow passes through a model | A flow through a model keeps transport, orchestration, quota and persistence real, and replaces only the external provider result — with realistic JSON, by default. It forbids a real model call in an e2e; a stub returning a marker string; a stub each flow author must remember to install |
 | `TESTING-10` | The subject is the model's own answer | A harness imports one approved provider SDK, supplies a provider-issued server API key, names the model and endpoint, and calls for real — one or two cases per capability. It forbids reaching the provider through a tier, catalog, fallback chain, key pool or house wrapper; providing or overriding the production AI gateway; authenticating with a consumer or CLI credential; growing a case per edge |
@@ -227,8 +227,9 @@ deny.
 **Situation.** You are placing a test file next to the code it checks, and the fast lane must stay
 fast.
 
-**What it emits in source.** A filename carrying one of four suffixes — `*.spec.ts`, `*.int-spec.ts`,
-`*.e2e-spec.ts`, `*.harness-spec.ts` — and lane configs that discriminate on that suffix alone.
+**What it emits in source.** A unit file beside its production owner named `*.spec.ts`. Integration and
+harness files keep `*.int-spec.ts` and `*.harness-spec.ts`. Only backend E2E may be separated under the
+declared E2E tree as `*.e2e-spec.ts`; a unit bucket such as `src/tests` or `test/unit` is invalid.
 
 **Recognition signs.** Four suffixes: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`,
 `*.harness-spec.ts`. Lane configs exclude each other by **suffix**, not by path. If you have to open
@@ -398,7 +399,7 @@ Every code is anchored. None is unanchored.
 1. One e2e file is one business flow, and the filename is that flow.
 2. An assertion names a consequence, not an envelope.
 3. An e2e enters where production enters and waits on state, never on a timer.
-4. A lane is declared by suffix and by nothing else.
+4. A unit is colocated beside its owner and declared by `.spec.`; only backend E2E may occupy a separate test tree.
 5. A configured lane either holds tests or does not exist.
 6. Only the harness lane pays a provider; only the harness lane calls one directly.
 7. A stub of a model returns a payload the production parser can actually parse.

@@ -124,7 +124,7 @@ DOES fire while `app/_components/Card.tsx` does not — same convention, opposit
 folder exempt only at the root of the tree, which is the one place it is least likely to be written. A
 component named for a slot — a full page implementation in `template.tsx` or `default.tsx` — is
 admitted without inspection, because slot names are an allow-list. A component parked under a test
-name, `Hero.test.tsx`, is exempt before the slot list is consulted.
+name, `Hero.spec.tsx`, is exempt before the slot list is consulted.
 
 **Boundary.** This rule judges a basename under one routing tree. What the file contains, and where
 the component it hides should have lived, is decided by the law, not by this machine.
@@ -317,7 +317,7 @@ repository.
 | Rule | What passes |
 |---|---|
 | `surface-folder-two-files-only` | **The third component moved INTO `component.tsx`**, a folder holding only `index.tsx` with the drawing inline, **a flat overlay folder** with no category segment, a third file in a block, composite, branch, leaf or shell folder, `constants.json` / `copy.md` / `styles.css` beside the two halves, and any surface folder outside `components/` |
-| `route-tree-holds-routes-only` | **A routing tree at the repository root with no `src/`**, a route file that fetches and arranges inside `page.tsx`, an underscore on a FILE at the top of the tree, the mirror where `app/dashboard/_components/Card.tsx` fires and `app/_components/Card.tsx` does not, a full page wearing a slot name such as `template.tsx` or `default.tsx`, and a component parked under a `.test.tsx` name |
+| `route-tree-holds-routes-only` | **A routing tree at the repository root with no `src/`**, a route file that fetches and arranges inside `page.tsx`, an underscore on a FILE at the top of the tree, the mirror where `app/dashboard/_components/Card.tsx` fires and `app/_components/Card.tsx` does not, a full page wearing a slot name such as `template.tsx` or `default.tsx`, and a component parked under a `.spec.tsx` name |
 | `no-helper-folder-in-components` | **A helper folder directly under the component root**, any synonym — `helpers/`, `lib/`, `shared/`, `util/`, `const/`, `models/`, `data/` — a helper written as a FILE rather than a folder, and unlinted extensions such as `constants/tone.json` |
 | `export-matches-folder` | **`export * from "./component"`**, `export default`, `export class` and `export enum`, **one matching export carrying any number of unrelated passengers**, a non-PascalCase folder or a half that is not `index` or an extension that is not `.ts`/`.tsx`, and `export type` |
 | `no-runtime-namespace` | **`Object.assign(CardRoot, { Header, Footer })`**, `Card.Header = CardHeader` after the declaration, declare-then-`export { Card }`, `export default { Root, Header }`, **one lower-case member such as `displayName`**, `satisfies` instead of `as`, quoted keys, and a lower-case binding |

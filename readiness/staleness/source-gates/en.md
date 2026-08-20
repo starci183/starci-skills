@@ -22,6 +22,8 @@ Sonar is the final gate and must pass for every routed role. No gate may be weak
 Unit is the sole coverage producer for Codecov and Sonar; E2E is an independent behavioral lane and may
 neither mutate nor contribute to that coverage, and E2E files are excluded from the Sonar scanner scope.
 E2E and Sonar verdicts never imply or relabel each other.
+Across frontend and backend, unit files are colocated beside their production owner and use `.spec.`.
+Only backend E2E may occupy a separate test tree; a frontend `src/tests`/`e2e` bucket or any unit `.test.` file is stale.
 Patch/new-code is explicitly `not applicable` only when a base-SHA diff proves there is no changed
 authored production code; an empty working-tree diff, missing base SHA or missing coverage entry is not N/A.
 

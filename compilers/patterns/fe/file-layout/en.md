@@ -185,7 +185,7 @@ halves: `index.tsx` is the wiring — request, situation, copy — and `componen
 the twin test of each half. Nothing else.
 
 **What it emits in source.** Exactly `index.tsx` and `component.tsx` in the surface folder, with
-`component.test.tsx` and `index.test.tsx` where tests exist. Anything else the shape produced leaves
+`component.spec.tsx` and `index.spec.tsx` where tests exist. Anything else the shape produced leaves
 for its own tier: a domain row to `blocks/<category>/<Name>/`, a formatter to `modules/utils/`, a
 response shape to `modules/types/`, a column config to `resources/`.
 
@@ -289,7 +289,7 @@ no contract key. And the reverse: `app/` holds nothing except the framework's ow
 `loading`, `error`, `not-found`, `default`, `route` and their siblings — that mounts a screen living
 at `components/pages/<Name>/`. Plus `providers` and `globals.css`, which the root layout mounts and
 which have nowhere else to go. `app/api/**` is server code, `_folder` is the framework's own opt-out,
-and `.test.` files are exempt because a test ships in no bundle and no route renders it. **Every other
+and `.spec.` files are exempt because a test ships in no bundle and no route renders it. **Every other
 file there is a component sitting in a folder nobody will grep.**
 
 **Recognition signs.** A route file calls a hook, reads the session, assembles a layout tree. A
@@ -382,11 +382,11 @@ codes directly; the tree glob is the secondary anchor because it is where the la
 | Code | Anchor | What to look for |
 |---|---|---|
 | `FILE-1` | `@canon-fe`, case `FILE-1: the path predicts the name` · `components/*/**/<Name>/index.tsx` | A direct named export equal to the folder name, or starting with it and continuing with a capital |
-| `FILE-2` | Same file, case `FILE-2: a surface folder holds its two halves and their twins` · `components/pages/*/` and `components/overlays/*/*/` | Each folder listing exactly `component.tsx` and `index.tsx`, plus `.test.tsx` twins where they exist |
+| `FILE-2` | Same file, case `FILE-2: a surface folder holds its two halves and their twins` · `components/pages/*/` and `components/overlays/*/*/` | Each folder listing exactly `component.tsx` and `index.tsx`, plus `.spec.tsx` twins where they exist |
 | `FILE-3` | Same file, case `FILE-3: a helper folder under components has a real home elsewhere` · `hooks/`, `modules/utils/` | The destinations exist and are populated, and a recursive search for `constants`, `utils`, `types` or `hooks` directories under `components/` returns nothing |
 | `FILE-4` | Same file, case `FILE-4: a family is exported as members, not as one object` · every `index.tsx` under `components/` | Family members exported one per statement; no `export const <Capital> = { … }` holding only capitalised members |
 | `FILE-5` | Same file, case `FILE-5: each tier sits on its own side of the feature line` — **not anchorable in production code** | No workspace with `packages/` and `apps/` exists to point at; the only live evidence is the rule's own fixture paths |
-| `FILE-6` | Same file, case `FILE-6: the routing tree holds route files and nothing else` · `app/**` | Every filename is a framework slot, `providers`, `globals.css`, a `.test.` twin, under `api/`, or under an `_` folder — and nothing else |
+| `FILE-6` | Same file, case `FILE-6: the routing tree holds route files and nothing else` · `app/**` | Every filename is a framework slot, `providers`, `globals.css`, a `.spec.` twin, under `api/`, or under an `_` folder — and nothing else |
 
 `FILE-5` is the one code with no production anchor, and it stays in the law anyway because the
 single-app tree is a snapshot, not a decision. It is recorded as an open risk rather than quietly
@@ -414,14 +414,15 @@ downgraded.
 7. `app/` holds framework slots only; a named component there is a component nobody will grep for.
 8. A destination folder that does not exist yet is created, not worked around.
 9. Every code maps to exactly one situation, and no situation carries two codes.
+10. Every frontend unit test is colocated with its owner and uses `.spec.`; frontend has no separate unit or E2E test tree.
 
 ## Exceptions
 
 Exceptions are part of the rule, not relief from it. Each is closed and cites the code it applies to.
 
-- **Twin tests.** `FILE-2` admits `component.test.tsx` and `index.test.tsx` in the surface folder;
+- **Twin tests.** `FILE-2` admits `component.spec.tsx` and `index.spec.tsx` in the surface folder;
   they are the twins of the two halves, not a third thing.
-- **Route tests.** `FILE-6` exempts any `.test.` file under `app/`. A test ships in no bundle and no
+- **Route tests.** `FILE-6` exempts any `.spec.` file under `app/`. A test ships in no bundle and no
   route renders it, so it cannot become the second page the code exists to prevent. Its name is
   deliberately not required to match `page` or `layout`: a route's tests split by CONCERN, and forcing
   them into one file buys nothing but a longer file.

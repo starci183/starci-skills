@@ -21,6 +21,8 @@ gate cuối và phải pass cho mọi routed role. Không gate nào được wea
 Unit là coverage producer duy nhất cho Codecov và Sonar; E2E là behavioral lane độc lập, không được mutate
 hay đóng góp vào coverage đó, và file E2E bị loại khỏi Sonar scanner scope. Verdict E2E và Sonar không
 bao giờ suy ra hoặc đổi nhãn cho nhau.
+Trên cả frontend và backend, unit file nằm cạnh production owner và dùng `.spec.`. Chỉ backend E2E được
+ở cây test riêng; frontend có bucket `src/tests`/`e2e` hoặc unit file `.test.` là stale.
 Patch/new-code chỉ `not applicable` khi diff từ base SHA chứng minh không có authored production code
 thay đổi; working-tree diff rỗng, thiếu base SHA hoặc thiếu coverage entry không phải N/A.
 

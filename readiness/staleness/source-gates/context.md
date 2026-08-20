@@ -14,6 +14,8 @@ Sonar is the final required pass. No gate may be weakened or reordered; undeclar
 Unit is the sole coverage producer for Codecov and Sonar. E2E is an independent behavioral lane: it may
 not create, merge, mutate or improve unit coverage; its files are excluded from Sonar scanner scope, and
 E2E/Sonar verdicts never imply or relabel each other.
+Frontend and backend unit files are colocated beside their production owner and use `.spec.`. Only backend
+E2E may occupy a separate test tree; frontend test buckets and unit `.test.` files are stale.
 Patch/new is N/A only when an explicit base-SHA diff proves no authored production change; empty
 working-tree evidence or a missing coverage entry is not N/A.
 
