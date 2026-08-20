@@ -13,8 +13,8 @@ const defaultSourceRoot = resolve(trustRoot, "..")
 const fail = (message) => { throw new Error(`sonar-source-credentials: ${message}`) }
 
 const parseArgs = (args) => {
-    const allowed = new Set(["--source", "--host", "--execute", "--rotate", "--plan", "--check-authority"])
-    const values = { sourceRoot: defaultSourceRoot, host: "https://sonar.starci.org", execute: false, rotate: false, checkAuthority: false }
+    const allowed = new Set(["--source", "--host", "--execute", "--rotate", "--plan", "--check-authority", "--badges-only"])
+    const values = { sourceRoot: defaultSourceRoot, host: "https://sonar.starci.org", execute: false, rotate: false, checkAuthority: false, badgesOnly: false }
     for (let index = 0; index < args.length; index += 1) {
         const item = args[index]
         if (!allowed.has(item)) fail(`unknown argument ${item}; credentials are stdin-only`)
@@ -22,6 +22,7 @@ const parseArgs = (args) => {
         else if (item === "--rotate") values.rotate = true
         else if (item === "--plan") values.execute = false
         else if (item === "--check-authority") values.checkAuthority = true
+        else if (item === "--badges-only") values.badgesOnly = true
         else {
             const value = args[index + 1]
             if (!value || value.startsWith("--")) fail(`${item} needs a value`)
@@ -136,9 +137,25 @@ const reconcileReadmeBadges = ({ repo, host, projectKey, badgeToken }) => {
     if (after === before) return "current"
     const readmeRelative = relative(repo, readme)
     const status = execFileSync("git", ["-C", repo, "status", "--porcelain", "--", readmeRelative], { encoding: "utf8", windowsHide: true }).trim()
-    if (status) fail(`${projectKey} README has unrelated uncommitted content; separate it before badge reconciliation`)
+    const contentDiff = spawnSync("git", ["-C", repo, "diff", "--quiet", "--", readmeRelative], { windowsHide: true })
+    if (status && contentDiff.status !== 0) fail(`${projectKey} README has unrelated uncommitted content; separate it before badge reconciliation`)
     writeFileSync(readme, after, "utf8")
     return "updated"
+}
+
+const reconcileAllReadmeBadges = async (rows, args, adminToken) => {
+    const authorization = authHeader(adminToken, "")
+    for (const row of rows) {
+        const badge = await request({
+            host: args.host,
+            path: `/api/project_badges/token?project=${encodeURIComponent(row.key)}`,
+            authorization,
+        })
+        const badgeToken = String(badge.token ?? "").trim()
+        if (!badgeToken) fail(`Sonar did not return a badge token for ${row.key}`)
+        const readmeBadges = reconcileReadmeBadges({ repo: row.repo, host: args.host, projectKey: row.key, badgeToken })
+        console.log(JSON.stringify({ route: `${row.project}/${row.role}`, projectKey: row.key, badge: "read-only-project-scope", readmeBadges }))
+    }
 }
 
 const request = async ({ host, path, method = "GET", authorization, body }) => {
@@ -304,6 +321,14 @@ const main = async () => {
         token = ""
         console.log(JSON.stringify({ authority: available ? "stored-admin-valid" : "operator-intake-required" }))
         if (!available) process.exitCode = 3
+        return
+    }
+    if (args.badgesOnly) {
+        let token = decryptRecord(args.sourceRoot, "dev/runtime/files/sonarqube-admin-token.key")
+        if (!(await hasAdminAuthority(args.host, token))) fail("stored admin authority is unavailable; operator intake is required")
+        assertSafeReadmeWrites(rows)
+        await reconcileAllReadmeBadges(rows, args, token)
+        token = ""
         return
     }
     for (const row of rows) console.log(JSON.stringify({ mode: args.execute ? "execute" : "plan", route: `${row.project}/${row.role}`, projectKey: row.key, github: row.github, stack: `${row.stackOwner}::${row.record}`, identity: "project-analysis-token", badge: "read-only-project-scope" }))

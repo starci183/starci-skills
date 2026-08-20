@@ -42,6 +42,7 @@ test("refuses to write a private Sonar badge without its separate read-only capa
 test("authority probing is an explicit value-free mode", () => {
     const source = readFileSync(new URL("./sonar-source-credentials.mjs", import.meta.url), "utf8")
     assert.match(source, /--check-authority/)
+    assert.match(source, /--badges-only/)
     assert.match(source, /stored-admin-valid/)
     assert.match(source, /operator-intake-required/)
 })
