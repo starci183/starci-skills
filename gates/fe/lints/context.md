@@ -30,6 +30,7 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `no-structural-arrangement-in-leaf` | CONTRACT-1, CONTRACT-7 | a leaf arranges multiple structural contents and therefore escapes the contract boundary through its tier exemption | `contract/context.md` |
 | `export-matches-folder` | FILE-1 | a surface's named export differs from its folder | `file-layout/context.md` |
 | `surface-folder-two-files-only` | FILE-2 | a surface folder contains files beyond its closed pair | `file-layout/context.md` |
+| `unit-test-colocated` | FILE-9 | a frontend unit uses `.test.` or lives in a separate unit/E2E tree | `file-layout/context.md` |
 | `no-helper-folder-in-components` | FILE-3 | a helper-like folder appears in the component tree | `file-layout/context.md` |
 | `no-runtime-namespace` | FILE-4 | a runtime namespace object is introduced | `file-layout/context.md` |
 | `monorepo-tier-belongs-to-its-side` | FILE-5 | feature tiers cross the app/shared-package boundary | `file-layout/context.md` |

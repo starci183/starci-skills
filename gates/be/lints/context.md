@@ -44,6 +44,7 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `no-framework-logger` | OBSERVABILITY-1 | code imports or constructs a framework logger | `observability/context.md` |
 | `no-interpolated-log-message` | OBSERVABILITY-2 | a house log message is dynamically built | `observability/context.md` |
 | `no-call-only-spec` | TESTING-6 | a unit spec asserts calls but no result or state | `testing/context.md` |
+| `unit-test-colocated` | TESTING-7 | a backend unit uses `.test.` or lives in a separate unit bucket | `testing/context.md` |
 | `harness-calls-provider-directly` | TESTING-10 | a model-quality harness bypasses the approved provider path | `testing/context.md` |
 | `rest-door-needs-a-reason` | TRANSPORT-2 | a REST controller has no documented exception reason | `transport/context.md` |
 | `door-lives-in-features` | TRANSPORT-3 | a transport door lives outside the feature tree | `transport/context.md` |
