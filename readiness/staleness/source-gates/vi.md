@@ -18,8 +18,18 @@ Unit coverage phải báo statements/lines (S/L), functions (F) và branches: S/
 mỗi metric của patch/new code ≥90%. E2E phải có entrypoint đã khai báo và tồn tại, có test thật, mọi test
 đều pass. `skip`, `todo`, `only`, `passWithNoTests`, run zero-test hoặc focused/check substitute đều bị reject. Sonar là
 gate cuối và phải pass cho mọi routed role. Không gate nào được weaken hoặc đổi thứ tự.
+Unit là coverage producer duy nhất cho Codecov và Sonar; E2E là behavioral lane độc lập, không được mutate
+hay đóng góp vào coverage đó. Verdict E2E và Sonar không bao giờ suy ra hoặc đổi nhãn cho nhau.
 Patch/new-code chỉ `not applicable` khi diff từ base SHA chứng minh không có authored production code
 thay đổi; working-tree diff rỗng, thiếu base SHA hoặc thiếu coverage entry không phải N/A.
+
+## Tách lane
+
+Unit coverage và E2E là hai gate độc lập. Unit lane là coverage producer duy nhất: nó sinh LCOV và summary
+bốn metric cho Codecov cùng Sonar. E2E lane chỉ chứng minh behavior deployed hoặc integrated; nó không được
+sinh, merge, overwrite, xóa hay làm tăng unit coverage evidence, và file E2E không bao giờ nằm trong Sonar
+coverage. E2E pass không suy ra Sonar pass, Sonar pass không suy ra E2E pass, và failure của lane nào phải
+được report đúng lane đó thay vì đổi nhãn sang lane kia.
 
 ## Evidence cho stale list
 

@@ -114,6 +114,13 @@ native project/new coverage metrics they actually expose; neither may be describ
 Jest statements, functions or branches. A badge, an uploaded analysis, `NONE`, a stale revision or an unmeasured provider
 value is not proof.
 
+## Lane separation
+
+Unit is the sole coverage-producing lane. E2E is a separate behavioral refusal and never contributes to,
+merges with or rewrites the LCOV consumed by Sonar. CI may order unit, E2E and Sonar, but it records their
+verdicts independently: E2E pass is not Sonar evidence, Sonar pass is not E2E evidence, and neither failure
+is renamed as the other.
+
 ## The seven refusals
 
 `ASSURANCE-1` is local latency, not authority. It requires `.husky/pre-push` to call the manifest's
@@ -176,6 +183,8 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 5. Provider tokens are encrypted in stacks and projected to GitHub Secrets without plaintext transit through source or chat.
 6. A green local Sonar scan never claims branch protection is configured without external evidence.
 7. A deploy cannot begin before verification passes.
+8. Unit is the sole LCOV producer; E2E is an independent behavioral lane and never contributes to Sonar
+   coverage or substitutes for a Sonar verdict.
 
 ## Exceptions
 

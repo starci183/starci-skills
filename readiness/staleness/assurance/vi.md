@@ -69,6 +69,14 @@ Secret đến từ process env theo tên hoặc hidden input qua `scripts/publis
 stdout, command argument hay plaintext tracked file. Repository token chỉ target một repository trừ khi
 provider thật sự cấp scope rộng hơn.
 
+## Tách lane
+
+Unit, E2E và Sonar giữ ownership riêng dù CI schedule chúng trong cùng workflow. Chỉ unit sinh
+`coverage/lcov.info`; Sonar dùng unit artifact đó và không bao giờ dùng E2E report. E2E chỉ sở hữu behavior
+end-to-end thật cùng test/pass count của chính nó. Workflow và proof machine phải giữ ba verdict độc lập:
+E2E không được nâng hay thỏa Sonar coverage, còn Sonar không được thỏa hoặc miễn E2E. E2E làm thay đổi unit
+coverage artifact là boundary violation stale.
+
 ## Thứ tự analysis local
 
 Chỉ tin provider CI sau khi analysis local trên đúng checkout này đã đợi và pass quality gate. Ba sự kiện
@@ -79,6 +87,8 @@ quyết định điều đó có thật sự xảy ra hay không:
   báo `NONE` nghĩa là project chưa từng được analyse — chưa đo, không phải sạch.
 - **Gate đỏ là source finding.** Phải sửa ở source rồi rescan cho tới khi xanh; đẩy sang CI là giấu nó
   đi chứ không phải xử lý nó.
+- **E2E không phải Sonar coverage lane.** Chỉ unit sinh LCOV mà Sonar dùng. E2E chỉ sở hữu behavior
+  end-to-end và không được mutate unit coverage artifact; E2E cùng Sonar giữ verdict độc lập.
 - **Coverage luôn blocking và có bốn chiều.** Một unit run thành công phải chứng minh statements,
   functions và lines tối thiểu 80%, branches tối thiểu 75%, new-code/patch tối thiểu 90% cho từng metric.
   Phần trăm gộp, informational status hay provider badge không thay được bất kỳ fact nào. Cùng run đó sinh

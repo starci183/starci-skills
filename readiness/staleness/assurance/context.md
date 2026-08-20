@@ -75,6 +75,8 @@ quality gate. Three facts decide whether that happened:
   quality gate reported as `NONE` means the project was never analysed — unmeasured, not clean.
 - **A red gate is a source finding.** It is repaired in source and rescanned until green; deferring it to
   CI hides it rather than handling it.
+- **E2E is not a Sonar coverage lane.** Unit alone emits the LCOV consumed by Sonar. E2E owns only
+  end-to-end behavior, must not mutate unit coverage artifacts and keeps an independent verdict.
 - **Coverage is always blocking and four-dimensional.** One unit run must prove statements/functions/
   lines >=80%, branches >=75%, and new-code/patch >=90% for each metric, then emit the single LCOV used
   by Codecov and Sonar; providers gate native project/new coverage while the runner owns four metrics.

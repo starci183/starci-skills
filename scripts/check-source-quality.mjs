@@ -150,16 +150,18 @@ export async function checkRepository(row, {execute = true, sonarEvidence = null
   const lintName = firstScript(scripts, ["lint:check", "lint"]);
   const unitName = firstScript(scripts, ["test:ci", "test:unit", "test:coverage", "test:cov", "test"]);
   const e2e = e2eSurface(row.diskPath, scripts);
-  const runs = execute ? [lintName, unitName, ...e2e.scripts].filter(Boolean).map((name) => runScript(row.diskPath, name)) : [];
-  const lint = runs.find((r) => r.name === lintName) ?? {passed: false, unmeasured: true};
-  const unit = runs.find((r) => r.name === unitName) ?? {passed: false, unmeasured: true};
+  const sourceRuns = execute ? [lintName, unitName].filter(Boolean).map((name) => runScript(row.diskPath, name)) : [];
+  const lint = sourceRuns.find((r) => r.name === lintName) ?? {passed: false, unmeasured: true};
+  const unit = sourceRuns.find((r) => r.name === unitName) ?? {passed: false, unmeasured: true};
+  // Unit owns coverage. Capture its evidence before E2E runs so an E2E command can neither
+  // contribute to, overwrite nor erase the LCOV/summary used by the coverage and Sonar lanes.
   const cov = coverage(row.diskPath);
+  const e2eRuns = execute ? e2e.scripts.map((name) => runScript(row.diskPath, name)) : [];
   const sonarResult = sonarEvidence ?? (existsSync(join(row.diskPath, "sonar-project.properties")) ? await sonar(row.diskPath) : {status: "external-unmeasured", reason: "no sonar-project.properties"});
   const findings = [];
   if (!lintName || !lint.passed || /\b\d+\s+warning[s]?\b/i.test(lint.output ?? "") || /\b\d+\s+error[s]?\b/i.test(lint.output ?? "")) findings.push("lint is missing or not 0 errors/0 warnings");
   if (!unitName || !unit.passed) findings.push("unit test command is missing or failed");
   if (!cov.pass) findings.push("coverage is missing or below project statements/lines/functions 80% and branches 75%, or change/patch four-metric evidence 90%");
-  const e2eRuns = e2e.scripts.map((name) => runs.find((run) => run.name === name)).filter(Boolean);
   const e2eFailed = e2eRuns.length !== e2e.scripts.length || e2eRuns.some((run) => !run.passed || /0\s+(?:tests?|specs?)\b|no tests? found/i.test(run.output ?? ""));
   if (e2e.scripts.length === 0 || !e2e.exists || e2e.blocked || e2eFailed) findings.push("full E2E commands/spec surface is missing, empty, skipped, todo, passWithNoTests or failed");
   if (sonarResult.status !== "pass") findings.push("Sonar quality gate, exact SHA or strict metrics are missing/unmeasured/failed");

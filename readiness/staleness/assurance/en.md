@@ -69,6 +69,14 @@ Secrets come from process env by name or hidden input through `scripts/publish-s
 stdout, command arguments or plaintext tracked files. Repository tokens target one repository unless the
 provider actually issued wider scope.
 
+## Lane separation
+
+Unit, E2E and Sonar retain separate ownership even when CI schedules them in one workflow. Unit alone
+produces `coverage/lcov.info`; Sonar consumes that unit artifact and never an E2E report. E2E owns only
+real end-to-end behavior and its own pass/fail count. The workflow and proof machine must keep three
+independent verdicts: E2E cannot raise or satisfy Sonar coverage, and Sonar cannot satisfy or excuse E2E.
+Any E2E mutation of unit coverage artifacts is a stale boundary violation.
+
 ## Local analysis order
 
 Provider CI is trusted only after local analysis of this exact checkout has waited for and passed the
@@ -79,6 +87,8 @@ quality gate. Three facts decide whether that happened:
   quality gate reported as `NONE` means the project was never analysed — unmeasured, not clean.
 - **A red gate is a source finding.** It is repaired in source and rescanned until green; deferring it to
   CI hides it rather than handling it.
+- **E2E is not a Sonar coverage lane.** Unit alone emits the LCOV consumed by Sonar. E2E owns only
+  end-to-end behavior and must not mutate unit coverage artifacts; E2E and Sonar keep independent verdicts.
 - **Coverage is always blocking and four-dimensional.** One successful unit run must prove statements,
   functions and lines at least 80%, branches at least 75%, and new-code/patch at least 90% for each metric.
   A blended percentage, informational status or provider badge cannot replace any one of those facts.

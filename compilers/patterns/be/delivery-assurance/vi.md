@@ -109,6 +109,13 @@ coverage metric chúng thật sự expose; không được mô tả hai provider
 statements/functions/branches. Badge,
 analysis uploaded, `NONE`, stale revision hoặc provider value chưa đo đều không phải proof.
 
+## Tách lane
+
+Unit là lane duy nhất sinh coverage. E2E là behavioral refusal riêng và không bao giờ đóng góp, merge hay
+rewrite LCOV mà Sonar dùng. CI có thể chạy unit, E2E rồi Sonar theo thứ tự, nhưng phải ghi ba verdict độc
+lập: E2E pass không phải Sonar evidence, Sonar pass không phải E2E evidence, và failure của lane nào không
+được đổi tên thành lane kia.
+
 ## Bảy refusal
 
 `ASSURANCE-1` là local latency, không phải authority. `.husky/pre-push` phải gọi `lint:check` và `test:ci`
@@ -170,6 +177,8 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 5. Provider token được mã hóa trong stacks rồi project sang GitHub Secrets mà không đi plaintext qua source hay chat.
 6. Local Sonar scan xanh không tuyên bố branch protection đã cấu hình nếu chưa có external evidence.
 7. Deploy không thể bắt đầu trước khi verification pass.
+8. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập, không bao giờ đóng góp vào Sonar
+   coverage hay thay thế Sonar verdict.
 
 ## Ngoại lệ
 

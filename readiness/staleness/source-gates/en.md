@@ -19,8 +19,18 @@ Unit coverage must report statements/lines (S/L), functions (F) and branches: S/
 and every patch/new-code metric ≥90%. E2E must name a declared entrypoint that exists, contain real tests,
 and pass all tests. `skip`, `todo`, `only`, `passWithNoTests`, zero-test runs, or a focused/check substitute are rejects.
 Sonar is the final gate and must pass for every routed role. No gate may be weakened or reordered.
+Unit is the sole coverage producer for Codecov and Sonar; E2E is an independent behavioral lane and may
+neither mutate nor contribute to that coverage. E2E and Sonar verdicts never imply or relabel each other.
 Patch/new-code is explicitly `not applicable` only when a base-SHA diff proves there is no changed
 authored production code; an empty working-tree diff, missing base SHA or missing coverage entry is not N/A.
+
+## Lane separation
+
+Unit coverage and E2E are independent gates. The unit lane is the only coverage producer: it emits the
+LCOV and four-metric summaries consumed by Codecov and Sonar. The E2E lane proves deployed or integrated
+behavior only; it must not generate, merge, overwrite, delete or improve unit coverage evidence, and its
+files are never included in Sonar coverage. E2E pass cannot imply Sonar pass, Sonar pass cannot imply E2E
+pass, and a failure in one lane must be reported under that lane rather than relabelled as the other.
 
 ## List evidence
 

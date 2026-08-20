@@ -58,6 +58,13 @@ ba rating A, duplicated-lines density ≤3% overall/new, native coverage >=80% o
 Jest/Vitest sở hữu bốn coverage metric riêng; Codecov và Sonar dùng cùng LCOV và chỉ chứng minh native
 project/new coverage metric của chúng.
 
+## Tách lane
+
+Unit là lane duy nhất sinh coverage. E2E là behavioral refusal riêng và không bao giờ đóng góp, merge hay
+rewrite LCOV mà Sonar dùng. CI có thể chạy unit, E2E rồi Sonar theo thứ tự, nhưng phải ghi ba verdict độc
+lập: E2E pass không phải Sonar evidence, Sonar pass không phải E2E evidence, và failure của lane nào không
+được đổi tên thành lane kia.
+
 ## Rules
 
 1. Hook và CI gọi command check-only, không fix source; readiness đòi zero lint warning.
@@ -68,6 +75,8 @@ project/new coverage metric của chúng.
 6. README có đủ badge bắt buộc mà không token.
 7. Wiring filesystem không chứng minh required check; authorized provider/GitHub API mới chứng minh.
 8. Deploy hiện có không được outrun verification.
+9. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập, không bao giờ đóng góp vào Sonar
+   coverage hay thay thế Sonar verdict.
 
 ## Proof
 

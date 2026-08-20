@@ -62,6 +62,13 @@ reviewed 100%, all three ratings A, duplicated-lines density ≤3% overall/new, 
 overall and >=90% new. Jest/Vitest owns the four distinct coverage metrics; Codecov and Sonar consume the
 same LCOV and prove only their native project/new coverage metrics.
 
+## Lane separation
+
+Unit is the sole coverage-producing lane. E2E is a separate behavioral refusal and never contributes to,
+merges with or rewrites the LCOV consumed by Sonar. CI may order unit, E2E and Sonar, but it records their
+verdicts independently: E2E pass is not Sonar evidence, Sonar pass is not E2E evidence, and neither failure
+is renamed as the other.
+
 ## Rules
 
 1. Hooks and CI call check-only commands and never fix source; readiness requires zero lint warnings.
@@ -72,6 +79,8 @@ same LCOV and prove only their native project/new coverage metrics.
 6. README carries every required badge without a token.
 7. Filesystem wiring never proves required checks; authorized provider/GitHub API evidence does.
 8. Existing deploys cannot outrun verification.
+9. Unit is the sole LCOV producer; E2E is an independent behavioral lane and never contributes to Sonar
+   coverage or substitutes for a Sonar verdict.
 
 ## Proof
 

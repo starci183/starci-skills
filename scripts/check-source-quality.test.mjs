@@ -54,6 +54,28 @@ test("fails nonzero lint and E2E even when a summary exists", async () => {
   assert.equal(result.verdict, "fail");
   assert.match(result.findings.join("; "), /lint/);
   assert.match(result.findings.join("; "), /E2E/);
+  assert.doesNotMatch(result.findings.join("; "), /Sonar/);
+});
+
+test("captures unit coverage before E2E so E2E cannot become the coverage producer", async () => {
+  const destructiveE2e = `node -e "require('node:fs').rmSync('coverage-summary.json');require('node:fs').rmSync('coverage/patch-summary.json')"`;
+  const result = await checkRepository(fixture({e2e: destructiveE2e}), {execute: true, sonarEvidence: {status: "pass"}});
+  assert.equal(result.coverage.pass, true);
+  assert.equal(result.verdict, "pass");
+});
+
+test("rejects missing unit coverage even when E2E writes perfect coverage afterward", async () => {
+  const row = fixture({coverage: false, e2e: "node write-e2e-coverage.cjs"});
+  writeFileSync(join(row.diskPath, "write-e2e-coverage.cjs"), `
+    const {mkdirSync, writeFileSync} = require("node:fs");
+    const evidence = JSON.stringify({total: {statements: {pct: 100}, lines: {pct: 100}, functions: {pct: 100}, branches: {pct: 100}}});
+    mkdirSync("coverage", {recursive: true});
+    writeFileSync("coverage-summary.json", evidence);
+    writeFileSync("coverage/patch-summary.json", evidence);
+  `);
+  const result = await checkRepository(row, {execute: true, sonarEvidence: {status: "pass"}});
+  assert.equal(result.coverage.pass, false);
+  assert.match(result.findings.join("; "), /coverage is missing/);
 });
 
 test("executes and requires every declared E2E entrypoint", async () => {
@@ -79,9 +101,10 @@ test("fails closed when package manager identity is ambiguous", async () => {
   assert.match(result.findings.join("; "), /package manager/);
 });
 
-test("missing Sonar evidence makes an otherwise measured role fail", async () => {
-  const result = await checkRepository(fixture(), {execute: false});
+test("failing Sonar remains independent when E2E passes", async () => {
+  const result = await checkRepository(fixture(), {execute: true, sonarEvidence: {status: "fail"}});
   assert.match(result.findings.join("; "), /Sonar/);
+  assert.doesNotMatch(result.findings.join("; "), /E2E/);
 });
 
 test("empty E2E surface fails even with unit and coverage evidence", async () => {

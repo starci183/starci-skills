@@ -63,6 +63,8 @@ proves Jest/Vitest statements, functions or branches.
 6. README carries every required badge without a token.
 7. Filesystem wiring never proves required checks; authorized provider/GitHub API evidence does.
 8. Existing deploys cannot outrun verification.
+9. Unit is the sole LCOV producer; E2E is an independent behavioral lane and never contributes to Sonar
+   coverage or substitutes for a Sonar verdict.
 
 ## Proof
 
