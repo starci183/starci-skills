@@ -159,8 +159,8 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 5. Provider tokens are encrypted in stacks and projected to GitHub Secrets without plaintext transit through source or chat.
 6. A green local Sonar scan never claims branch protection is configured without external evidence.
 7. A deploy cannot begin before verification passes.
-8. Unit is the sole LCOV producer; E2E is an independent behavioral lane and never contributes to Sonar
-   coverage or substitutes for a Sonar verdict.
+8. Unit is the sole LCOV producer; E2E is an independent behavioral lane excluded from Sonar analysis and
+   coverage, and never substitutes for a Sonar verdict.
 
 ## Exceptions
 

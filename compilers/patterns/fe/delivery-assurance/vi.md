@@ -75,8 +75,8 @@ lập: E2E pass không phải Sonar evidence, Sonar pass không phải E2E evide
 6. README có đủ badge bắt buộc mà không token.
 7. Wiring filesystem không chứng minh required check; authorized provider/GitHub API mới chứng minh.
 8. Deploy hiện có không được outrun verification.
-9. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập, không bao giờ đóng góp vào Sonar
-   coverage hay thay thế Sonar verdict.
+9. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập bị loại khỏi Sonar analysis và coverage,
+   không bao giờ thay thế Sonar verdict.
 
 ## Proof
 

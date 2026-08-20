@@ -235,6 +235,7 @@ function readAssurance(diskPath, role) {
     "ASSURANCE-3 project and patch/new four-metric thresholds declared": /statements[^\n]{0,80}(?:80|0\.8)/i.test(strictQualityText) && /lines[^\n]{0,80}(?:80|0\.8)/i.test(strictQualityText) && /functions[^\n]{0,80}(?:80|0\.8)/i.test(strictQualityText) && /branches[^\n]{0,80}(?:75|0\.75)/i.test(strictQualityText) && /(?:patch|new)[^\n]{0,120}(?:90|0\.9)/i.test(strictQualityText),
     "ASSURANCE-4 SonarQube scans the checkout": /SonarSource\/sonarqube-scan-action@/i.test(prWorkflows),
     "ASSURANCE-4 SonarQube consumes coverage/lcov.info": /sonar\.(javascript|typescript)\.lcov\.reportPaths\s*=\s*coverage\/lcov\.info/i.test(`${sonarConfig}\n${prWorkflows}`),
+    "ASSURANCE-4 SonarQube excludes the E2E lane": /^sonar\.exclusions=.*e2e-spec/im.test(sonarConfig) && /^sonar\.test\.exclusions=.*e2e-spec/im.test(sonarConfig),
     "ASSURANCE-4 SonarQube quality gate blocks": /SonarSource\/sonarqube-quality-gate-action@|sonar\.qualitygate\.wait\s*=\s*true/i.test(prWorkflows) && !/continue-on-error\s*:\s*true/i.test(prWorkflows),
     "ASSURANCE-4 strict Sonar proof machine is wired": /sonar-assurance|sonar-quality-gate|evaluateQualityGate/i.test(`${prWorkflows}\n${strictQualityText}`),
     "ASSURANCE-3 README carries a token-free Codecov badge": badges.codecov,

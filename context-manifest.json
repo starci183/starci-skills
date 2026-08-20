@@ -112,7 +112,7 @@
     "compilers/patterns/be/delivery-assurance/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/delivery-assurance/en.md",
-      "sourceHash": "d3f61aeca6e0fe23041578d621901ff28cb675286d768d3ee35b780e97dde391",
+      "sourceHash": "0eab2df15dd4ce1bb610c4f419084d134f291ad4dc88e14481fbb5a0c3bc14d0",
       "contextVersion": 1
     },
     "compilers/patterns/be/domain-modeling/context.md": {
@@ -258,7 +258,7 @@
     "compilers/patterns/fe/delivery-assurance/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/delivery-assurance/en.md",
-      "sourceHash": "0a9abd67f3eddc972a0a9f3bcaef89bffeceaaadce7856da8d28e91588e07d83",
+      "sourceHash": "c264f9df162e96a64a6c01af5de4f472576987b179cdc167e8c2b3fb29f3a330",
       "contextVersion": 1
     },
     "compilers/patterns/fe/file-layout/context.md": {
@@ -786,7 +786,7 @@
     "readiness/staleness/assurance/context.md": {
       "kind": "module",
       "source": "readiness/staleness/assurance/en.md",
-      "sourceHash": "dd4eeae421051d42fc2c0a6ce4188ce89e5fe8793bb92cff28a79199f6cc9887",
+      "sourceHash": "35e7884e205a8a13ca720768a3e1e2ba8e293e76af6b1ab3fcd17212711a152c",
       "contextVersion": 1
     },
     "readiness/staleness/context.md": {
@@ -822,7 +822,7 @@
     "readiness/staleness/source-gates/context.md": {
       "kind": "module",
       "source": "readiness/staleness/source-gates/en.md",
-      "sourceHash": "bdb68faa5a8d8a10a1abb052050af1322d1508076d340e96be84d70a6729b192",
+      "sourceHash": "ac9fe3d9370e3177113d9c8c262252fcca0951df789079c3ee923f0099bec827",
       "contextVersion": 1
     },
     "readiness/staleness/strict-fix/context.md": {

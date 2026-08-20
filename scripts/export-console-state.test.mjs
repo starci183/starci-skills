@@ -45,6 +45,7 @@ test("scanner exposes the strict lint, E2E, coverage and Sonar wiring facts", ()
     assert.match(output, /full E2E command is declared|CI runs full E2E/)
     assert.match(output, /project and patch\/new four-metric thresholds declared/)
     assert.match(output, /strict Sonar proof machine is wired/)
+    assert.doesNotMatch(output, /SonarQube excludes the E2E lane/)
 })
 
 test("frontend assurance accepts namespaced encrypted credentials owned by the Source", () => {

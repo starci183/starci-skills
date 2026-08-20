@@ -177,8 +177,8 @@ revision khi check đỏ; `paths-ignore` không thay được dependency.
 5. Provider token được mã hóa trong stacks rồi project sang GitHub Secrets mà không đi plaintext qua source hay chat.
 6. Local Sonar scan xanh không tuyên bố branch protection đã cấu hình nếu chưa có external evidence.
 7. Deploy không thể bắt đầu trước khi verification pass.
-8. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập, không bao giờ đóng góp vào Sonar
-   coverage hay thay thế Sonar verdict.
+8. Unit là LCOV producer duy nhất; E2E là behavioral lane độc lập bị loại khỏi Sonar analysis và coverage,
+   không bao giờ thay thế Sonar verdict.
 
 ## Ngoại lệ
 
