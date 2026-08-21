@@ -126,14 +126,14 @@
     },
     {
       "id": "collapsible-rail",
-      "intent": "Port the StarCi collapsible navigation owner exactly: one bordered motion host, one title-and-toggle header, one SidebarSimple glyph and state-specific inset around the same destination order.",
+      "intent": "Port the StarCi collapsible navigation owner exactly: one bordered motion host, one circular ghost SidebarSimple toggle, an optional evidenced title and state-specific inset around the same destination order.",
       "triggerFacts": ["region-adjacent", "region-persistent", "width-user-collapsible"],
       "decisionQuestions": ["Are there exactly two meaningful navigation presentations rather than a continuously chosen width?", "Can compact destinations retain meaning through stable glyphs and accessible labels?"],
       "variableAxes": ["width", "visible-copy", "inline-inset"],
-      "invariants": ["stable-host", "right-edge-separator", "title-and-toggle-header-row", "single-sidebar-simple-toggle-glyph", "same-toggle-glyph-both-states", "visible-collapse-control", "keyboard-operable-collapse-control", "collapse-state-exposed", "expanded-p-6", "collapsed-px-3-py-6", "scroll-owner", "boundary-height", "destination-order"],
+      "invariants": ["stable-host", "right-edge-separator", "optional-evidenced-title-only", "no-invented-rail-title", "single-sidebar-simple-toggle-glyph", "same-toggle-glyph-both-states", "circular-ghost-toggle-hit-area", "visible-collapse-control", "keyboard-operable-collapse-control", "collapse-state-exposed", "expanded-p-6", "collapsed-px-3-py-6", "scroll-owner", "boundary-height", "destination-order"],
       "interactionProof": [
         {"id": "collapse-control", "kind": "interaction", "assertion": "A visible keyboard-operable control toggles the two rail presentations and exposes the current collapsed state."},
-        {"id": "header-toggle-anatomy", "kind": "dom", "assertion": "The expanded header places the visible title and SidebarSimple toggle on one row; compact state hides only the title and keeps the same glyph."},
+        {"id": "header-toggle-anatomy", "kind": "dom", "assertion": "The header keeps one circular ghost SidebarSimple toggle; it renders a title only when the routed product supplies evidenced title copy, and compact state hides that title without swapping glyphs."},
         {"id": "rail-separator", "kind": "computed-style", "assertion": "The motion host keeps one full-height separator on its trailing edge in both width states."},
         {"id": "state-inset", "kind": "computed-style", "assertion": "Expanded rail resolves to 24px on every edge; compact rail resolves to 24px block and 12px inline inset."},
         { "id": "stable-motion-host", "kind": "dom", "assertion": "Collapse and expand preserve the same motion host identity." },
@@ -142,8 +142,8 @@
       ],
       "counterexampleCaseRefs": ["resizable-content-rail-not-collapsible"],
       "templateRef": "./templates/collapsible-rail.template.tsx",
-      "templateHash": "sha256:293f776af8e909b3730cd78ae7d8f4a384ca7c3c68308ac3aa8ef402ce65ca95",
-      "rulings": ["founder-feedback:2026-08-21:collapsed-rail-keeps-legacy-motion", "founder-feedback:2026-08-21:collapsible-rail-ports-starci-sidebar-simple-owner-exactly"],
+      "templateHash": "sha256:a88a1616a08adb4dafbc5630f1914b08fbac0ae43cde9420bf20a776e41fab86",
+      "rulings": ["founder-feedback:2026-08-21:collapsed-rail-keeps-legacy-motion", "founder-feedback:2026-08-21:collapsible-rail-ports-starci-sidebar-simple-owner-exactly", "founder-feedback:2026-08-21:rail-title-must-not-be-invented-and-toggle-hit-area-is-circular-ghost"],
       "goldenCaseRefs": ["collapsible-navigation-rail"]
     },
     {

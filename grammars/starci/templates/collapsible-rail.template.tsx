@@ -2,7 +2,7 @@
 type CollapsibleRailProps = {
     readonly collapsed: boolean
     readonly reduceMotion: boolean
-    readonly title: string
+    readonly title?: string
     readonly toggle: () => void
 }
 declare const MotionRail: (props: {
@@ -13,10 +13,11 @@ declare const MotionRail: (props: {
     readonly height: "app-rail"
     readonly children: JSX.Element
 }) => JSX.Element
-declare const HeaderRow: (props: { readonly justify: "between" | "center"; readonly children: JSX.Element }) => JSX.Element
+declare const HeaderRow: (props: { readonly justify: "between" | "center" | "end"; readonly children: JSX.Element }) => JSX.Element
 declare const TitlePresence: (props: { readonly visible: boolean; readonly transition: "fade-150" | "instant"; readonly children: string }) => JSX.Element
 declare const ToggleControl: (props: {
     readonly glyph: "sidebar-simple"
+    readonly appearance: "circular-ghost"
     readonly label: "Collapse navigation" | "Expand navigation"
     readonly pressed: boolean
     readonly activate: () => void
@@ -33,12 +34,15 @@ export const CollapsibleRailTemplate = (props: CollapsibleRailProps) => (
         boundary="border-r border-default"
         height="app-rail"
     >
-        <HeaderRow justify={props.collapsed ? "center" : "between"}>
-            <TitlePresence visible={!props.collapsed} transition={props.reduceMotion ? "instant" : "fade-150"}>
-                {props.title}
-            </TitlePresence>
+        <HeaderRow justify={props.collapsed ? "center" : props.title === undefined ? "end" : "between"}>
+            {props.title === undefined ? null : (
+                <TitlePresence visible={!props.collapsed} transition={props.reduceMotion ? "instant" : "fade-150"}>
+                    {props.title}
+                </TitlePresence>
+            )}
             <ToggleControl
                 glyph="sidebar-simple"
+                appearance="circular-ghost"
                 label={props.collapsed ? "Expand navigation" : "Collapse navigation"}
                 pressed={props.collapsed}
                 activate={props.toggle}
@@ -58,6 +62,8 @@ export const invariants = {
     scrollOwner: "destination-groups",
     toggleOwner: "collapsible-rail",
     toggleGlyph: "sidebar-simple",
+    toggleAppearance: "circular-ghost",
+    titlePolicy: "evidenced-optional-never-invented",
     toggleKeyboardOperable: true,
     toggleStateExposed: true,
     expandedInset: "p-6",

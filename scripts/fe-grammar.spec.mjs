@@ -134,7 +134,7 @@ test("principle context contains only delta concerns for selected owners", () =>
   assert.doesNotMatch(JSON.stringify(resolved.contextPack), /surface-in-surface|typography|responsive/)
 })
 
-test("collapsible rail preserves the exact StarCi header, glyph, separator, inset and motion contract", () => {
+test("collapsible rail preserves the exact StarCi optional title, circular ghost toggle, separator, inset and motion contract", () => {
   const loaded = loadAndValidateGrammar(GRAMMAR_ROOT)
   const resolved = resolveGrammar({
     grammar: loaded.grammar,
@@ -146,7 +146,9 @@ test("collapsible rail preserves the exact StarCi header, glyph, separator, inse
   })
   const decision = resolved.decisions.find((item) => item.outcome === "collapsible-rail-transition")
   assert.ok(decision)
-  assert.ok(decision.obligations.includes("header-row-owns-title-and-toggle"))
+  assert.ok(decision.obligations.includes("header-row-owns-toggle-and-evidenced-title-only"))
+  assert.ok(decision.obligations.includes("no-invented-rail-title"))
+  assert.ok(decision.obligations.includes("circular-ghost-toggle-hit-area"))
   assert.ok(decision.obligations.includes("single-sidebar-simple-toggle-glyph"))
   assert.ok(decision.obligations.includes("right-edge-separator"))
   assert.ok(decision.obligations.includes("expanded-all-axis-inset-6"))
@@ -155,5 +157,7 @@ test("collapsible rail preserves the exact StarCi header, glyph, separator, inse
   assert.equal(decision.obligations.includes("inline-inset-3-in-all-states"), false)
   const template = resolved.contextPack.templates.find((item) => item.templateRef === "./templates/collapsible-rail.template.tsx")
   assert.match(template.content, /glyph="sidebar-simple"/)
+  assert.match(template.content, /appearance="circular-ghost"/)
+  assert.match(template.content, /title\?: string/)
   assert.match(template.content, /spring-420-38/)
 })

@@ -3,7 +3,7 @@
   "grammar": "starci",
   "caseId": "collapsible-navigation-rail",
   "kind": "golden",
-  "because": "Course navigation has one bordered StarCi motion host whose title-and-SidebarSimple header, exact state inset and internal group scrolling survive both width presentations.",
+  "because": "Course navigation has one bordered StarCi motion host whose circular ghost SidebarSimple control, optional evidenced title, exact state inset and internal group scrolling survive both width presentations without inventing rail copy.",
   "facts": [
     "collection-navigation",
     "navigation-compact-icon-only",
