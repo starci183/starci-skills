@@ -6,6 +6,8 @@
 |---|---|---|---|
 | `@manifest-schema` | `publication/design-review-preview/schema.json` | file | validate the session-local review graph |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | render authored candidates below project cache |
+| `@baseline-schema` | `brainstorms/composition/schema.json` | file | bind the four-lock reference and owner tree |
+| `@visual-proof-schema` | `publication/design-review-preview/visual-proof.schema.json` | file | prove same-viewport parity and delivery completion |
 
 ## Record
 
@@ -13,7 +15,7 @@ This module displays layout and block choices without becoming product authority
 
 ## Authority
 
-Business authority, routed grammar, contracts and current source constrain the design. The cache review pack proves what the owner saw during the invocation but never becomes a durable head or an input to another task.
+Business authority, legacy/current baseline, MASTER, routed grammar, contracts and current source constrain the design in that order. Page overrides contain deviations only. The cache review pack proves what the owner saw during the invocation but never becomes authority.
 
 Within one session:
 
@@ -48,7 +50,7 @@ Representative content must be business-faithful and production-like. Lorem, gen
 
 ## Quality proof
 
-Review every candidate and the selected product result at desktop and narrow viewports. Prove hierarchy, readable measure, boundary ownership, one scroll owner per axis, breakpoint exclusivity, complete state coverage, keyboard-operable transitions, clean console and no preview network requests. After source implementation, repeat the critical interaction and viewport proof against the real product.
+Review every candidate and result at the exact baseline viewport/state pairs. Prove the full viewport, target region and preserved regions; computed CSS supports but never replaces this comparison. `visual-proof.json` must record zero known defects and reach the requested delivery state.
 
 Creativity precedes principles review. Only the selected candidate is audited into class-free `principleObligations`; source implementation resolves those obligations through current principles and patterns.
 
@@ -62,6 +64,7 @@ Creativity precedes principles review. Only the selected candidate is audited in
 6. Preview navigation never writes state or counts as approval.
 7. Source code, tests and browser proof are the durable accepted outcome.
 8. Creativity precedes principles review; implementation follows source patterns and gates.
+9. MASTER is shared by every candidate; page files record deviations only and principles inspect deltas only.
 
 ## Stops
 

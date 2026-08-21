@@ -5,6 +5,7 @@ import {execFileSync} from "node:child_process";
 import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync} from "node:fs";
 import {dirname, join, resolve, sep} from "node:path";
 import {fileURLToPath} from "node:url";
+import {validateDesignBaseline} from "./validate-design-baseline.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const appRoot = resolve(dirname(scriptPath), "../publication/design-review-preview/app");
@@ -64,11 +65,19 @@ function regionsFor(candidate, phase, blockId) {
 }
 
 export function buildManifest(options) {
-  for (const required of ["project", "artifact", "htmlIndex"]) if (!options[required]) throw new Error(`--${required} is required`);
+  for (const required of ["project", "artifact", "htmlIndex", "designSystem", "baseline"]) if (!options[required]) throw new Error(`--${required} is required`);
   const artifactPath = resolve(options.artifact);
   const indexPath = resolve(options.htmlIndex);
   const artifact = load(artifactPath, "design artifact");
   const previewIndex = load(indexPath, "HTML preview index");
+  const designSystemPath = resolve(options.designSystem);
+  const baselinePath = resolve(options.baseline);
+  const designSystem = load(designSystemPath, "MASTER design system");
+  const baseline = load(baselinePath, "composition baseline");
+  const baselineVerdict = validateDesignBaseline(baseline);
+  if (!baselineVerdict.ok) throw new Error(`invalid composition baseline: ${baselineVerdict.failures.join("; ")}`);
+  if (designSystem.systemId !== "starci-master") throw new Error("review requires the StarCi MASTER design system");
+  if (baseline.project !== options.project) throw new Error("baseline project differs from review project");
   const candidates = artifact.candidates ?? artifact.anatomies;
   if (!Array.isArray(candidates) || candidates.length < 3 || candidates.length > 4) throw new Error("design artifact must contain 3-4 candidates");
   if (!Array.isArray(previewIndex.candidates) || previewIndex.candidates.length !== candidates.length) throw new Error("preview index must cover every candidate");
@@ -104,6 +113,8 @@ export function buildManifest(options) {
     schemaVersion: 3,
     project: options.project,
     sessionId: options.sessionId ?? "current-session",
+    systemId: designSystem.systemId,
+    baselineAt: sha256(canonical(baseline)),
     phase,
     entryRoute: `#/reviews/${layoutId}/${recommended.hash}`,
     layouts: [{
@@ -116,6 +127,8 @@ export function buildManifest(options) {
     evidence: [
       {label: "sessionArtifact", value: artifactPath},
       {label: "htmlPreviewIndex", value: indexPath},
+      {label: "masterDesignSystem", value: designSystemPath},
+      {label: "compositionBaseline", value: baselinePath},
       {label: "durability", value: "ignored-session-cache"}
     ]
   };

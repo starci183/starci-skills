@@ -64,6 +64,8 @@ export const loadAndValidateGrammar = (grammarRoot) => {
   const grammar = json(resolve(root, "grammar.json"))
   const factCatalog = json(resolve(root, grammar.factCatalog))
   const evidenceCatalog = json(resolve(root, grammar.evidenceCatalog))
+  const rulingCatalog = json(resolve(root, grammar.rulingCatalog))
+  const designSystem = json(resolve(root, grammar.designSystem))
   const casesRoot = resolve(root, "cases")
   const cases = readdirSync(casesRoot)
     .filter((name) => name.endsWith(".json"))
@@ -73,12 +75,29 @@ export const loadAndValidateGrammar = (grammarRoot) => {
     .filter((name) => name.endsWith(".json") && name !== "profile.schema.json")
     .map((name) => json(resolve(profilesRoot, name)))
 
-  for (const [name, value] of Object.entries({ grammar, factCatalog, evidenceCatalog, cases, profiles })) {
+  for (const [name, value] of Object.entries({ grammar, factCatalog, evidenceCatalog, rulingCatalog, designSystem, cases, profiles })) {
     assertNoStoredSourceOrigin(value, name)
   }
 
-  if (grammar.grammar !== factCatalog.grammar || grammar.grammar !== evidenceCatalog.grammar) {
-    throw new Error("grammar, fact and evidence catalog identities must match")
+  if (grammar.grammar !== factCatalog.grammar || grammar.grammar !== evidenceCatalog.grammar || grammar.grammar !== rulingCatalog.grammar || grammar.grammar !== designSystem.grammar) {
+    throw new Error("grammar, fact, evidence, ruling and design-system identities must match")
+  }
+  if (designSystem.systemId !== "starci-master") throw new Error("grammar requires starci-master design system")
+  if (JSON.stringify(designSystem.spacingRungs) !== JSON.stringify([1, 2, 3, 4, 6, 8])) throw new Error("MASTER spacing rungs differ from StarCi closed rhythm")
+  if (!designSystem.componentLanguage?.length || !designSystem.antiPatterns?.length) throw new Error("MASTER requires component language and anti-patterns")
+  if (designSystem.legacyPolicy?.precedence !== "legacy-baseline-before-master" || designSystem.legacyPolicy?.preserveOutsideTarget !== true || designSystem.legacyPolicy?.pageOverrideMode !== "deviations-only") {
+    throw new Error("MASTER legacy and page-override policy is invalid")
+  }
+
+  const rulingById = new Map()
+  for (const ruling of rulingCatalog.rulings) {
+    if (rulingById.has(ruling.id)) throw new Error(`duplicate founder ruling: ${ruling.id}`)
+    rulingById.set(ruling.id, ruling)
+    if (ruling.scope.level === "profile" && !ruling.scope.profileId) throw new Error(`profile ruling requires profileId: ${ruling.id}`)
+    if (ruling.scope.level === "surface" && !ruling.scope.surfaceId) throw new Error(`surface ruling requires surfaceId: ${ruling.id}`)
+    if (!Array.isArray(ruling.doesNotApplyWhen) || ruling.doesNotApplyWhen.length === 0) {
+      throw new Error(`founder ruling requires negative scope: ${ruling.id}`)
+    }
   }
 
   const factIds = new Set()
@@ -102,10 +121,14 @@ export const loadAndValidateGrammar = (grammarRoot) => {
     if (!Array.isArray(capsule.rulings) || capsule.rulings.length === 0) {
       throw new Error(`behavior capsule requires founder rulings: ${capsule.id}`)
     }
-    for (const ruling of capsule.rulings) {
-      if (!/^founder-(?:feedback|ruling):[a-zA-Z0-9:._-]+$/.test(ruling)) {
-        throw new Error(`behavior capsule has a non-founder ruling: ${capsule.id}`)
-      }
+    const capsuleRulings = capsule.rulings.map((ruling) => {
+      if (!/^founder-(?:feedback|ruling):[a-zA-Z0-9:._-]+$/.test(ruling)) throw new Error(`behavior capsule has a non-founder ruling: ${capsule.id}`)
+      const record = rulingById.get(ruling)
+      if (!record) throw new Error(`behavior capsule references an unknown founder ruling: ${capsule.id} -> ${ruling}`)
+      return record
+    })
+    if (!capsuleRulings.some((ruling) => ["invariant", "correction"].includes(ruling.kind) && ruling.scope.level === "starci-family")) {
+      throw new Error(`behavior capsule lacks a promotable family ruling: ${capsule.id}`)
     }
     if (!Array.isArray(capsule.goldenCaseRefs) || capsule.goldenCaseRefs.length === 0) {
       throw new Error(`behavior capsule requires golden cases: ${capsule.id}`)
@@ -162,6 +185,7 @@ export const loadAndValidateGrammar = (grammarRoot) => {
 
   for (const profile of profiles) {
     if (profile.grammar !== grammar.grammar) throw new Error(`profile grammar mismatch: ${profile.profileId}`)
+    for (const outcome of outcomeIds) if (!profile.owners[outcome]) throw new Error(`profile ${profile.profileId} has no owner for grammar outcome ${outcome}`)
     for (const [outcome, owner] of Object.entries(profile.owners)) {
       for (const evidenceRef of owner.capsuleRefs) {
         if (!evidenceById.has(evidenceRef)) throw new Error(`unknown owner behavior capsule ${evidenceRef} for ${outcome}`)
@@ -183,9 +207,19 @@ export const loadAndValidateGrammar = (grammarRoot) => {
         }
       }
     }
+    const masterOverride = designSystem.profileOverrides[profile.profileId]
+    if (!masterOverride) throw new Error(`MASTER design system has no override for profile ${profile.profileId}`)
+    const themeOwner = profile.owners["starci-dashboard-theme"]
+    if (!themeOwner?.visualContract) throw new Error(`profile ${profile.profileId} has no dashboard visual contract`)
+    if (themeOwner.visualContract.roles.accent !== masterOverride.accent) {
+      throw new Error(`profile ${profile.profileId} accent differs from MASTER override`)
+    }
+    for (const [role, token] of Object.entries(designSystem.roles)) {
+      if (themeOwner.visualContract.roles[role] !== token) throw new Error(`profile ${profile.profileId} changes MASTER role ${role}`)
+    }
   }
 
-  return { grammar, factCatalog, evidenceCatalog, cases, profiles, templateCatalog }
+  return { grammar, factCatalog, evidenceCatalog, rulingCatalog, designSystem, cases, profiles, templateCatalog }
 }
 
 const parseArgs = (argv) => Object.fromEntries(argv.slice(2).map((value, index, values) => {
@@ -201,6 +235,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     grammar: loaded.grammar.grammar,
     facts: loaded.factCatalog.facts.length,
     capsules: loaded.evidenceCatalog.capsules.length,
+    rulings: loaded.rulingCatalog.rulings.length,
+    system: loaded.designSystem.systemId,
     cases: loaded.cases.length,
     templates: Object.keys(loaded.templateCatalog).length,
   })}\n`)

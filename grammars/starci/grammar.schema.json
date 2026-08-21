@@ -4,7 +4,7 @@
   "title": "StarCi product-family deterministic UI grammar",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "grammar", "grammarId", "version", "factCatalog", "evidenceCatalog", "rules"],
+  "required": ["schemaVersion", "grammar", "grammarId", "version", "factCatalog", "evidenceCatalog", "rulingCatalog", "designSystem", "rules"],
   "properties": {
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
@@ -13,6 +13,8 @@
     "version": { "type": "integer", "minimum": 1 },
     "factCatalog": { "const": "./facts.json" },
     "evidenceCatalog": { "const": "./capsules.json" },
+    "rulingCatalog": { "const": "./rulings.json" },
+    "designSystem": { "const": "./design-system.json" },
     "rules": {
       "type": "array",
       "minItems": 1,

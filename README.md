@@ -153,6 +153,11 @@ Because these records contain machine-local paths and Git state, keep `.workspac
 repository history. Run `starci-init` again when adding a role or project, or when a checkout, branch,
 or recorded head changes. Do not duplicate the nearest config by hand.
 
+StarCi frontend work resolves one compact visual system from `grammars/starci/design-system.json`. The
+routed profile may override declared roles such as accent; a page/session file records deviations only.
+Legacy or screenshot baseline wins inside its exact target scope, while MASTER keeps every untouched region
+visually consistent. Grammar selects semantic owners and principles resolve only remaining deltas.
+
 Conversation provenance is project-scoped and provider-neutral:
 
 ```text

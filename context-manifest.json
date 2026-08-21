@@ -4,7 +4,13 @@
     "brainstorms/blocks/context.md": {
       "kind": "module",
       "source": "brainstorms/blocks/en.md",
-      "sourceHash": "6a905170f7b68b98e21934ac3a931cdbcc9a795707cf254f2daff99cee710af8",
+      "sourceHash": "dd3a670356782758db7a12b7b20bbe2bfea3c82e5d08ccea9a7325fc81bb4bc7",
+      "contextVersion": 1
+    },
+    "brainstorms/composition/context.md": {
+      "kind": "module",
+      "source": "brainstorms/composition/en.md",
+      "sourceHash": "49ea210b79d42842fce003d48a35c4099628416247adf3cef717bb5686cbc5d7",
       "contextVersion": 1
     },
     "brainstorms/context.md": {
@@ -14,13 +20,13 @@
     "brainstorms/directions/context.md": {
       "kind": "module",
       "source": "brainstorms/directions/en.md",
-      "sourceHash": "0d5edc6ff9299bdca86f992ef1a1cc867a270bb304008c6cd4e10c37fcdff417",
+      "sourceHash": "2425899eb0f0e813b93595ca94141f559ca551f4ef3b3b996333b72400826e9f",
       "contextVersion": 1
     },
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "d3562808b23d4e1dc46e30b2a3bcc1b128efba733d50d537f312257f5ae11eba",
+      "sourceHash": "2aeddd11e08091e8df677d293842a1389cab0867d139802303ece124918afd1d",
       "contextVersion": 1
     },
     "compilers/context.md": {
@@ -452,7 +458,7 @@
     "contexts/worktrees/context.md": {
       "kind": "module",
       "source": "contexts/worktrees/en.md",
-      "sourceHash": "eb6b1317811730293ea29154ccb235ebe0eaeed827ee31af11e99ee2442a93cc",
+      "sourceHash": "90e11bcdb7de69ca0a6c1b5efcb98f82e0a258c6c12f710ca75f8515db4124f1",
       "contextVersion": 1
     },
     "deployment/context.md": {
@@ -666,7 +672,7 @@
     "grammars/starci/context.md": {
       "kind": "module",
       "source": "grammars/starci/en.md",
-      "sourceHash": "72473b77680bc29d4c8d186490c40c447bcf599a71c80b796374de766d751ced",
+      "sourceHash": "b945fef3e2b5e52ed07895a08b95c165ca1d76cf41ee4b70dccea0ec85f663bb",
       "contextVersion": 1
     },
     "kernel/context.md": {
@@ -748,7 +754,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "610bd5c5f588d00dbb30b09ac4327abc482b4c58c0931463b323dbe43217bd2d",
+      "sourceHash": "d9c40c6c22409c0d0815118998b04f4d638e4222481108de16c330c0c6665b5d",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {
@@ -890,7 +896,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "de2ea810550ba08a8b2ff3e4fed40be7b111d5cea5b299078e95b22ee3e3057b",
+      "sourceHash": "299a29e7770d63f341740fe49de962b80e2cf0fd59a357884fe5c52c57cc785c",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

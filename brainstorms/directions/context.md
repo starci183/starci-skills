@@ -12,6 +12,10 @@ You are given a product request and the frontend's live visual vocabulary, and r
 directions** with one evidence-backed recommendation. A direction decides the intended relationship between
 semantic roles and tokens. It does not decide layout, block anatomy, or a class.
 
+When the routed grammar supplies a MASTER visual system, stop before candidate generation: return that system
+and any explicitly evidenced page deviations. StarCi uses this closed path; its pages never reselect style,
+palette, typography, density, shape, depth or motion.
+
 ## Law
 
 Visual taste is a product decision. The machine can refuse an invented token, a duplicated option, or
@@ -94,6 +98,7 @@ approval.
 8. Feedback replaces the cache round; no direction becomes durable authority outside the invocation.
 9. Every schema-2 batch recommends exactly one candidate and states the evidence-backed reason.
 10. A grammar visual contract is copied byte-for-byte into `lockedTokens`; changing its axes, role token or value refuses the direction.
+11. A routed MASTER replaces direction brainstorming; page work records deviations only.
 
 ## Preview
 

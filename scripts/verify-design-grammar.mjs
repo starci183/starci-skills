@@ -19,7 +19,7 @@ const verifyVisualContract = (design, decisions, preview) => {
     throw new Error("grammar-locked visual design requires preview.html proof")
   }
   const direction = design.artifact?.direction
-  if (direction === undefined) throw new Error("accepted design omits its grammar-locked visual direction")
+  if (direction === undefined) throw new Error("session design omits its grammar-locked MASTER direction")
   for (const contract of contracts) {
     if (!same(direction.axes, contract.axes)) {
       throw new Error("accepted visual direction axes differ from the grammar-locked theme")
@@ -69,7 +69,7 @@ const verifyVisualContract = (design, decisions, preview) => {
   }
 }
 
-/** Prove an accepted design still resolves to its recorded deterministic grammar authority. */
+/** Prove the selected session design still resolves to current grammar and MASTER before source writes. */
 export function verifyDesignGrammar({ design, grammarRoot, profilePath, preview }) {
   const loaded = loadAndValidateGrammar(grammarRoot)
   const profile = readJson(profilePath)
@@ -80,11 +80,13 @@ export function verifyDesignGrammar({ design, grammarRoot, profilePath, preview 
     profile,
     factCatalog: loaded.factCatalog,
     evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
     templateCatalog: loaded.templateCatalog,
     facts: design.grammarFacts,
   })
-  if (!same(design.grammarDecisions, resolved.decisions)) throw new Error("accepted grammar decisions are stale")
-  if (!same(design.grammarReceipt, resolved.receipt)) throw new Error("accepted grammar receipt is stale")
+  if (!same(design.grammarDecisions, resolved.decisions)) throw new Error("session grammar decisions are stale")
+  if (!same(design.grammarReceipt, resolved.receipt)) throw new Error("session grammar receipt is stale")
   verifyVisualContract(design, resolved.decisions, preview)
   return resolved
 }

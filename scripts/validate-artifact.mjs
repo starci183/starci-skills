@@ -169,7 +169,7 @@ function laws(data) {
     else seen.set(key, index);
   }
 
-  if (members.length > 1 && !members.some((member) => member.citesPrecedent === "none")) {
+  if (data.schema !== 5 && members.length > 1 && !members.some((member) => member.citesPrecedent === "none")) {
     found.push("members: no candidate departs from precedent — at least one must cite `none`");
   }
 
@@ -303,6 +303,11 @@ function pageSetLaws(data) {
   }
 
   for (const [candidateIndex, candidate] of candidates.entries()) {
+    if (data.schema === 5) {
+      if (candidate.systemId !== "starci-master") found.push(`candidates[${candidateIndex}].systemId: schema 5 requires starci-master`);
+      if (!candidate.pageOverride || !Array.isArray(candidate.pageOverride.deviations)) found.push(`candidates[${candidateIndex}].pageOverride: schema 5 requires deviations-only page override`);
+      if (candidate.direction !== undefined) found.push(`candidates[${candidateIndex}].direction: schema 5 must not reselect taste outside MASTER`);
+    }
     if (canonical((candidate.pages ?? []).map((page) => ({id: page.id, route: page.route, state: page.state}))) !== scopeSignature) {
       found.push(`candidates[${candidateIndex}].pages: candidate changes the approved page/route/state scope rather than its composition`);
     }

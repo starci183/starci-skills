@@ -35,7 +35,7 @@ Project segment là bắt buộc. `.claude` là trust tree, không phải runtim
 2. Bắt buộc `.worktrees/<project>/` trước mọi state path.
 3. Chỉ kiểm tra Git ownership cho business worktree bền vững.
 4. Isolate collision file thật, không isolate chỉ vì có nhiều agent.
-5. Giữ candidate dưới `cache/design/<session-id>/`. Pack có thể chứa artifact, `preview.html`, preview index, screenshot và `review-manifest.json`.
+5. Giữ candidate dưới `cache/design/<session-id>/`. Pack chứa `baseline.json`, page override deviations-only nếu có, artifact, preview, screenshot, `review-manifest.json` và `visual-proof.json`.
 6. Sau owner approval, chỉ giữ selected pack đủ lâu để implement và prove source trong cùng invocation. Source history, test và browser proof là record bền vững.
 7. Không tạo layout head, block head, immutable design revision hoặc design-registry branch.
 
@@ -65,7 +65,7 @@ Prune qua Git sau khi chứng minh exact target. Không xóa tay thư mục link
 
 ## `WORKTREE-7` — design và execute cùng phiên
 
-Design candidate không có durable head. Review pack bind task hiện tại, routed source baseline, business head, grammar/profile receipt, contract evidence, candidate key, UI-condition inventory, transition và viewport proof. Approval cho phép selected candidate và exact source boundary một lần. Cùng invocation đó implement, test và visual proof. Nếu execution không thể tiếp tục, task sau dựng lại từ current authority thay vì coi cache là accepted truth.
+Design candidate không có durable head. Review pack bind baseline bốn lock, StarCi MASTER, page override deviations-only, business head, grammar/profile receipt, contract evidence, candidate key và same-viewport proof. Approval cho phép selected candidate cùng exact source boundary một lần. Cùng invocation đó implement, test và visual proof.
 
 ## `WORKTREE-8` — product truth
 

@@ -12,6 +12,7 @@ description: Biến feedback owner cụ thể trên frontend implementation đã
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | approval và reporting boundary dùng chung |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | verify frontend và grammar/profile |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ preview trong session cache |
+| `@composition` | `brainstorms/composition/vi.md` | vi | phân biệt parent sai với law thiếu |
 | `@business` | `contexts/business/vi.md` | vi | phân biệt visual correction với product truth |
 | `@grammar` | `grammars` | module | test stable facts và owners |
 | `@principles` | `compilers/principles` | module | test product-neutral visual law |
@@ -24,6 +25,9 @@ description: Biến feedback owner cụ thể trên frontend implementation đã
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove product write authority |
 | `@compile-context` | `scripts/compile-context.mjs` | script | rebuild runtime context |
 | `@check-deps` | `scripts/check-deps.mjs` | script | prove dependency graph |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | prove bốn lock |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | từ chối phantom concern |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | từ chối delivery thiếu |
 
 ## NESTED SKILLS
 
@@ -35,7 +39,7 @@ Tìm xem feedback lộ ra law, evidence, application, pattern, gate hay source f
 
 ## Process
 
-Chạy authority gate trước classification; `misdrawn` bắt buộc có counterexample. Dựng và xin duyệt exact authority/source impact cone. Sửa authority trước, compile và prove, render correction preview dưới project cache nếu cần, rồi sửa và visual proof source trong cùng invocation. Reconcile business authority khi behavior đổi.
+Chạy authority gate và baseline bốn lock trước classification; `misdrawn` bắt buộc có counterexample. Apply MASTER một lần, chỉ ghi page deviation và chỉ route delta unresolved tới principles. Sửa và prove same-viewport full page trong cùng invocation.
 
 ## Rules
 

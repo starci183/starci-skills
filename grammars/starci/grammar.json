@@ -6,6 +6,8 @@
   "version": 18,
   "factCatalog": "./facts.json",
   "evidenceCatalog": "./capsules.json",
+  "rulingCatalog": "./rulings.json",
+  "designSystem": "./design-system.json",
   "rules": [
     {
       "id": "single-primary-continuation-highlight",

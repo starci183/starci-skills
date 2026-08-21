@@ -6,7 +6,8 @@ None.
 
 ## Record
 
-Route each unresolved visual decision to the smallest applicable principle module. Read only the
+Route each unresolved visual delta to the smallest applicable principle module. MASTER, legacy baseline,
+current source and grammar owner are read first. Read only the
 selected child `context.md`; do not load the whole shelf. A rendered element may require several
 modules because each module owns a different axis, but one decision within an axis resolves to one
 situation code and its emitted class mapping.
@@ -33,13 +34,14 @@ situation code and its emitted class mapping.
 
 ## Routing rules
 
-1. Route from the accepted content, anatomy, relationship and behaviour; never from visual taste.
-2. Resolve direct ownership at the immediate parent or element named by the selected module.
+1. Route only a delta left unresolved by MASTER, legacy, current source and grammar; never re-decide their visual language.
+2. Require the composition baseline's direct owner and child set before selecting any module.
 3. Use the selected module's situation table as the closed vocabulary; preserve its no-class cases.
 4. When two modules appear to answer the same symptom, separate the axes. For example, `flow`
    selects the arrangement, `distribution` assigns surplus/deficit, `alignment` positions on the
    other axis, and `responsive` acts only on a named width failure.
 5. If the compact runtime record cannot settle the route, stop and report the missing runtime law.
+6. A concern id with no real module is invalid; route it to an existing axis or to source patterns instead of inventing a shelf.
 
 ## Output
 

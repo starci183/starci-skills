@@ -20,10 +20,8 @@
     "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
     "Concern": {
       "enum": [
-        "alignment", "colour", "contrast", "density", "distribution", "divider", "elevation",
-        "flow", "focus-order", "gap", "grid", "margin", "motion", "optical", "overflow",
-        "padding", "position", "radius", "ratio", "responsive", "size", "state",
-        "surface-in-surface", "target-size", "text-expansion", "typography"
+        "alignment", "colour", "distribution", "divider", "flow", "gap", "grid", "overflow",
+        "padding", "radius", "responsive", "size", "state", "surface-in-surface", "typography"
       ]
     },
     "Owner": {

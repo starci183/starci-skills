@@ -21,14 +21,14 @@ Model sở hữu visual judgment và selection; schema chỉ ghi nhận và ch�
 
 ## Luật
 
-Phương án schema 4 gọi tên scope `page`/`flow`, mọi page đã compose, ownership nodes lồng theo thứ tự, region,
+Phương án schema 5 gọi tên scope `page`/`flow`, MASTER system id, page override chỉ chứa deviation, mọi page đã compose, ownership nodes lồng theo thứ tự, region,
 ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
 region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và impressionistic child brief
 (`kind`, title, summary, labels, values và actions đại diện). Wireframe giúp hình dung purpose, density và reading
 order nhưng không phê duyệt exact parts, fields, copy, actions, states hoặc data ownership. Mỗi node là
 `existing`, `proposed` hoặc `new`; `existing` phải trích source thật cùng SHA-256 source hash và không được khác
-giữa các phương án. New session artifact dùng schema 4; schema cũ không còn là input được hỗ trợ. Phương án
-**không bao giờ** gọi tên class; class được quyết sau selection trong cùng invocation.
+giữa các phương án. New session artifact dùng schema 5; schema cũ là compatibility input. Phương án
+**không bao giờ** gọi tên class; MASTER khóa macro taste một lần và class chỉ được quyết cho delta unresolved.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
 một entry mới và vì sao. Region không trích gì cả là một thành phần bịa ra đang khoác cấu trúc JSON.
@@ -40,7 +40,7 @@ Bảy, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuy�
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
 | 1 | Yêu cầu nghiệp vụ, đúng nguyên văn | không có ý định nào, chỉ có một cái hình |
-| 2 | Một object direction được đề xuất bằng evidence cho lượt duyệt kết hợp | các sườn bị so dưới những ý định thị giác khác nhau |
+| 2 | StarCi MASTER cùng page override deviations-only nếu có | mỗi candidate âm thầm chọn taste riêng |
 | 3 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
 | 4 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
 | 5 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
@@ -137,7 +137,7 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 
 ## Quy tắc
 
-1. Phương án không mang class. Token hay giá trị thị giác duy nhất của nó nằm trong cùng object `direction` được đề xuất ở mọi phương án.
+1. Phương án không mang class. Candidate schema 5 dùng chung `starci-master`; page override chỉ list deviation.
 2. Mọi region trích một entry key, hoặc khai một entry mới kèm `why` của nó.
 3. Mọi region gọi tên branch ghép nó.
 4. Phương án khai bộ giá trị trục, và không hai phương án nào trong một lô trùng cả bộ.
@@ -195,9 +195,9 @@ blocked: <những region không giải được nếu thiếu nó>
 không phải cái trích đoạn dưới đây. `envelope` giữ những thứ đổi theo lượt; hash chỉ phủ **một phương
 án**, nên cùng một quyết định chạy lại ở lượt sau vẫn ra đúng hash đó.
 
-Work mới dùng schema 4: `envelope.scope` khai screenshot `page` hoặc `flow` được mô tả; mọi candidate mang cùng
+Work mới dùng schema 5: `envelope.scope` khai screenshot `page` hoặc `flow` được mô tả; mọi candidate mang `systemId: starci-master`, page override deviations-only và cùng
 danh sách `pages` có thứ tự, mỗi page mang nested `nodes` và tên region nó sở hữu, mỗi region bind `pageId` cùng
-`change`. New session artifact dùng schema 4; schema cũ không còn là input được hỗ trợ.
+`change`. Schema cũ chỉ là compatibility input.
 
 ```json
 {

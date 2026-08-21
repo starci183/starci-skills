@@ -24,18 +24,17 @@ be redesigned rather than extended when the empty case arrives.
 
 ## Inputs
 
-Eight, and no more.
+Seven, and no more.
 
 | # | Input | Without it |
 |---|---|---|
-| 1 | The accepted region and its business reason | there is no subject, only a shape |
-| 2 | The **accepted** layout hash the region came from, which binds its direction | anatomies get built on a layout or direction that may be discarded |
-| 3 | The direction resolved through that layout | an anatomy is drawn with visual choices nobody approved |
+| 1 | The current source region and its business reason | there is no subject, only a shape |
+| 2 | The validated four-lock baseline and current parent digest | anatomies get built under a partial or wrong parent |
+| 3 | StarCi MASTER and deviations-only page override | each block quietly chooses its own taste |
 | 4 | Contract: **key**, `why`, `host`, children **names**, `repeats`, `optional` — not the class arrays | parts get invented instead of looked up |
 | 5 | Vocabulary: leaf names the contract cites, composite names, blocks that exist | a part cites a component that does not exist |
 | 6 | How the region's data actually fails, read from page and block source | `optional` gets mistaken for a full state set |
 | 7 | The closed list of anatomy axes | the 3–4 anatomies differ by decoration |
-| 8 | Precedents accepted for THIS project, the one the workspace route declared | every region is answered as if it were the first |
 
 **Input 6 exists because the contract cannot answer it.** `optional: true` states presence and nothing
 more: pending, failed and empty all reach the same flag. Separating them is read from the page and block

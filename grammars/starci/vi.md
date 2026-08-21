@@ -11,6 +11,8 @@ title: StarCi deterministic frontend grammar · Vietnamese
 | `@grammar` | `grammars/starci/grammar.json` | file | luật đóng từ fact sang outcome |
 | `@facts` | `grammars/starci/facts.json` | file | catalog fact quan sát được và đóng |
 | `@capsules` | `grammars/starci/capsules.json` | file | behavior bền vững, ruling và binding case/template |
+| `@rulings` | `grammars/starci/rulings.json` | file | owner statement đã normalize, scope và negative boundary |
+| `@master-system` | `grammars/starci/design-system.json` | file | một compact visual system dùng chung trước page deviation |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | chọn một winner tất định mỗi slot và emit context pack gọn |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh identity, case, hash, template và provenance bị cấm |
 
@@ -28,23 +30,24 @@ khám phá rule, nhưng source origin bị cấm trong package đã promote.
 
 1. `GRAMMAR-1` — Chỉ resolve grammar và profile do workspace route đã verify khai báo.
 2. `GRAMMAR-2` — Rule nhận fact id đóng và emit outcome cùng obligation đóng.
-3. `GRAMMAR-3` — Mọi behavior được promote có founder ruling, durable capsule, cả hai loại case và TSX template được hash.
+3. `GRAMMAR-3` — Mọi behavior được promote có ruling family-scoped loại invariant/correction với negative scope, durable capsule, cả hai loại case và TSX template được hash. Example không tự promote.
 4. `GRAMMAR-4` — Mỗi slot có một winner theo priority, specificity rồi lexical rule id.
 5. `GRAMMAR-5` — Thiếu route, owner hoặc fact thì dừng; không được hand-build JSX fallback.
 6. `GRAMMAR-6` — Remote, revision, path, symbol, blob và source-origin record của repository bị cấm.
 7. `GRAMMAR-7` — Resolution chỉ trả fact, capsule, template và principle concern đã chọn.
 8. `GRAMMAR-8` — Visual contract của profile khóa trục direction, semantic role token và giá trị token chính xác; design cùng execute từ chối mọi thay thế.
+9. `GRAMMAR-9` — MASTER khóa visual language một lần; profile chỉ override role đã khai và page chỉ ghi deviation.
 
 ## Routing
 
 Layout và block design phân loại tình huống có bằng chứng thành fact id, chạy `@resolve-grammar`, rồi
-bind receipt vào accepted design revision. Outcome giới hạn semantic owner nào được reuse, extend hay
+bind receipt cùng MASTER vào session baseline hiện tại. Outcome giới hạn semantic owner nào được reuse, extend hay
 báo `new-required`; outcome không chọn visual class. Owner đã chọn có thể mang thêm visual contract,
 khóa semantic theme token và giá trị trước khi so direction.
 
-Execute tính lại đúng receipt từ fact đã accept và profile hiện hành đã khai báo. Hash drift, capsule
-thiếu, template đổi hoặc owner vắng mặt đều trả về design. Nó chỉ load compact context pack đã emit,
-sau đó resolve `principleConcerns` qua principle compiler.
+Cùng skill invocation tính lại receipt trước source write. Hash drift, capsule thiếu, template đổi hoặc owner
+vắng mặt đều trả về candidate work. Nó chỉ resolve `principleConcerns` còn là delta sau khi MASTER, legacy và
+current source đã trả lời visual decision.
 Visual contract còn bắt buộc mọi preview state mount boundary, khai báo và dùng chính xác mọi locked token,
 đồng thời không mang raw palette value nằm ngoài contract.
 
@@ -56,7 +59,7 @@ Visual contract còn bắt buộc mọi preview state mount boundary, khai báo 
 4. Counterexample phải chứng minh rule gần nhất không fire.
 5. Template giữ owner boundary và state transition; đó là reference, không phải source để paste mù.
 6. Optional immutable ref chỉ là provenance và không được thay đổi durable authority.
-7. Design skill ghi grammar/profile id cùng receipt hash để execution phát hiện drift.
+7. Design skill ghi grammar/profile id, MASTER system id cùng receipt hash để same-session source execution phát hiện drift.
 8. Visual contract do grammar khóa là bất biến giữa candidate composition, viewport và interaction state.
 9. Receipt có visual contract chưa hoàn chỉnh nếu thiếu `preview.html` proof tương ứng.
 

@@ -20,18 +20,31 @@ function fixture(phase = "layout") {
   for (const candidate of candidates) writeFileSync(join(previewRoot, `${candidate.id}.html`), html(candidate.id));
   const htmlIndex = join(previewRoot, "preview-index.json");
   writeFileSync(htmlIndex, JSON.stringify({phase, layoutId: "course-page", ...(phase === "block" ? {blockId: "summary"} : {}), recommendedId: "focused", candidates: candidates.map((candidate) => ({id: candidate.id, html: `${candidate.id}.html`, states, functional: true}))}));
-  return {root, artifact, htmlIndex};
+  const designSystem = join(root, "design-system.json");
+  writeFileSync(designSystem, JSON.stringify({systemId: "starci-master"}));
+  const baseline = join(root, "baseline.json");
+  writeFileSync(baseline, JSON.stringify({
+    schemaVersion: 1, project: "sample", scope: {kind: "page", routes: ["/course"]},
+    references: [{id: "ready", kind: "legacy", route: "/course", state: "ready", viewport: {width: 1440, height: 900}}],
+    owner: {id: "course-page", directChildren: ["heading", "content"], annotation: {x: 0, y: 0, width: 1440, height: 900}, childBounds: {heading: {x: 20, y: 20, width: 1000, height: 100}, content: {x: 20, y: 140, width: 1000, height: 700}}},
+    invariant: {kind: "page", statement: "The current page preserves its heading and content owners."},
+    proof: [{referenceId: "ready", fullViewport: true, targetRegion: true}], preserve: ["heading"], allowedDeltas: ["content"]
+  }));
+  return {root, artifact, htmlIndex, designSystem, baseline};
 }
+
+const options = (f) => ({project: "sample", artifact: f.artifact, htmlIndex: f.htmlIndex, designSystem: f.designSystem, baseline: f.baseline});
 
 test("layout review packages only current session candidates", () => {
   const f = fixture();
   try {
-    const manifest = buildManifest({project: "sample", artifact: f.artifact, htmlIndex: f.htmlIndex, sessionId: "abc"});
+    const manifest = buildManifest({...options(f), sessionId: "abc"});
     assert.equal(manifest.schemaVersion, 3);
     assert.equal(manifest.sessionId, "abc");
     assert.equal(manifest.layouts[0].recommendedId, "focused");
     assert.equal(manifest.layouts[0].candidates.length, 3);
     assert.doesNotMatch(manifest.layouts[0].candidates[0].preview.states[0].html, /<template/);
+    assert.equal(manifest.systemId, "starci-master");
     assert.equal(manifest.evidence.at(-1).value, "ignored-session-cache");
   } finally { rmSync(f.root, {recursive: true, force: true}); }
 });
@@ -39,7 +52,7 @@ test("layout review packages only current session candidates", () => {
 test("block review binds current source parent without registry state", () => {
   const f = fixture("block");
   try {
-    const manifest = buildManifest({project: "sample", phase: "block", layoutId: "course-page", blockId: "summary", artifact: f.artifact, htmlIndex: f.htmlIndex});
+    const manifest = buildManifest({...options(f), phase: "block", layoutId: "course-page", blockId: "summary"});
     assert.equal(manifest.phase, "block");
     assert.equal(manifest.layouts[0].candidates[0].regions[0].name, "summary");
     assert.ok(manifest.layouts[0].candidates.every((candidate) => /^[a-f0-9]{64}$/.test(candidate.hash)));
@@ -50,9 +63,9 @@ test("renderer writes below project design cache and refuses other output", () =
   const f = fixture();
   try {
     const out = join(f.root, ".worktrees", "sample", "cache", "design", "abc", "review");
-    renderReview({project: "sample", artifact: f.artifact, htmlIndex: f.htmlIndex, out, noBuild: true});
+    renderReview({...options(f), out, noBuild: true});
     assert.equal(JSON.parse(readFileSync(join(out, "review-manifest.json"), "utf8")).schemaVersion, 3);
-    assert.throws(() => renderReview({project: "sample", artifact: f.artifact, htmlIndex: f.htmlIndex, out: join(f.root, "unsafe"), noBuild: true}), /must stay under/);
+    assert.throws(() => renderReview({...options(f), out: join(f.root, "unsafe"), noBuild: true}), /must stay under/);
   } finally { rmSync(f.root, {recursive: true, force: true}); }
 });
 
@@ -60,6 +73,6 @@ test("review refuses incomplete candidate sets", () => {
   const f = fixture();
   try {
     writeFileSync(f.artifact, JSON.stringify({envelope: {project: "sample", surface: "course-page"}, candidates: [{id: "only"}]}));
-    assert.throws(() => buildManifest({project: "sample", artifact: f.artifact, htmlIndex: f.htmlIndex}), /3-4 candidates/);
+    assert.throws(() => buildManifest(options(f)), /3-4 candidates/);
   } finally { rmSync(f.root, {recursive: true, force: true}); }
 });

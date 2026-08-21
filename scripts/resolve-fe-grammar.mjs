@@ -24,10 +24,11 @@ const matches = (rule, factSet) => {
 const specificity = (rule) => rule.when.all.length + rule.when.any.length + rule.when.none.length
 
 /** Resolve project facts without model judgement. One deterministic winner is emitted per slot. */
-export const resolveGrammar = ({ grammar, profile, factCatalog, evidenceCatalog, templateCatalog, facts }) => {
+export const resolveGrammar = ({ grammar, profile, factCatalog, evidenceCatalog, rulingCatalog, designSystem, templateCatalog, facts }) => {
   if (grammar.grammar !== profile.grammar) throw new Error("grammar/profile identity mismatch")
   if (grammar.grammar !== factCatalog.grammar) throw new Error("grammar/fact catalog identity mismatch")
   if (grammar.grammar !== evidenceCatalog.grammar) throw new Error("grammar/evidence catalog identity mismatch")
+  if (grammar.grammar !== rulingCatalog.grammar || grammar.grammar !== designSystem.grammar) throw new Error("grammar/ruling/design-system identity mismatch")
   const normalizedFacts = [...new Set(facts)].sort()
   const knownFacts = new Set(factCatalog.facts.map((fact) => fact.id))
   const unknownFacts = normalizedFacts.filter((fact) => !knownFacts.has(fact))
@@ -91,6 +92,7 @@ export const resolveGrammar = ({ grammar, profile, factCatalog, evidenceCatalog,
     .filter((decision) => decision.principleMode === "delta")
     .flatMap((decision) => decision.principleConcerns))].sort()
   const contextPack = {
+    master: {systemId: designSystem.systemId, axes: designSystem.axes, roles: designSystem.roles, spacingRungs: designSystem.spacingRungs, antiPatterns: designSystem.antiPatterns},
     facts: selectedFacts,
     evidenceRefs: selectedCapsuleRefs,
     evidence: selectedEvidence,
@@ -106,6 +108,9 @@ export const resolveGrammar = ({ grammar, profile, factCatalog, evidenceCatalog,
     profileHash: hash(profile),
     factCatalogHash: hash(factCatalog),
     evidenceCatalogHash: hash(evidenceCatalog),
+    rulingCatalogHash: hash(rulingCatalog),
+    designSystemHash: hash(designSystem),
+    designSystemId: designSystem.systemId,
     factsHash: hash(normalizedFacts),
     decisionsHash: hash(decisions),
     contextPackHash: hash(contextPack),
@@ -122,8 +127,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
   const args = parseArgs(process.argv)
   if (!args.grammar || !args.profile || !args.facts) throw new Error("Usage: --grammar <grammar root> --profile <profile JSON> --facts <JSON file>")
   const root = resolve(args.grammar)
-  const { grammar, factCatalog, evidenceCatalog, templateCatalog } = loadAndValidateGrammar(root)
+  const { grammar, factCatalog, evidenceCatalog, rulingCatalog, designSystem, templateCatalog } = loadAndValidateGrammar(root)
   const profile = JSON.parse(readFileSync(resolve(args.profile), "utf8"))
   const input = JSON.parse(readFileSync(resolve(args.facts), "utf8"))
-  process.stdout.write(`${JSON.stringify(resolveGrammar({ grammar, profile, factCatalog, evidenceCatalog, templateCatalog, facts: input.facts }), null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify(resolveGrammar({ grammar, profile, factCatalog, evidenceCatalog, rulingCatalog, designSystem, templateCatalog, facts: input.facts }), null, 2)}\n`)
 }

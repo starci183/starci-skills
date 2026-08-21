@@ -12,6 +12,7 @@ description: Turn concrete owner feedback on an accepted frontend implementation
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and reporting boundary |
 | `@workspaces` | `contexts/workspaces/en.md` | en | verify frontend and grammar/profile |
 | `@worktrees` | `contexts/worktrees/en.md` | en | keep previews in session cache |
+| `@composition` | `brainstorms/composition/en.md` | en | distinguish wrong parent from missing law |
 | `@business` | `contexts/business/en.md` | en | distinguish visual correction from product truth |
 | `@grammar` | `grammars` | module | test stable facts and owners |
 | `@principles` | `compilers/principles` | module | test product-neutral visual law |
@@ -24,6 +25,9 @@ description: Turn concrete owner feedback on an accepted frontend implementation
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove product write authority |
 | `@compile-context` | `scripts/compile-context.mjs` | script | rebuild runtime contexts |
 | `@check-deps` | `scripts/check-deps.mjs` | script | prove dependency graphs |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | prove the four locks |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | refuse phantom concerns |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | refuse incomplete delivery |
 
 ## NESTED SKILLS
 
@@ -35,7 +39,7 @@ Find whether feedback exposes a law, evidence, application, pattern, gate or sou
 
 ## Process
 
-Run authority gates before classification; require a counterexample for `misdrawn`. Build and approve the exact authority/source impact cone. Change authority first, compile and prove it, render any correction preview under project cache, then correct and visually prove source in the same invocation. Reconcile business authority when behavior changes.
+Run authority gates and the four-lock baseline before classification; require a counterexample for `misdrawn`. Apply MASTER once, record only page deviations, and route only unresolved deltas to principles. Correct and prove the same-viewport full page in the same invocation.
 
 ## Rules
 

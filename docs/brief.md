@@ -52,7 +52,7 @@ when that evidence is stale or incomplete.
 Frontend design keeps review evidence temporary and makes source the durable result:
 
 ```text
-business + grammar + contract + current source
+legacy/current baseline + StarCi MASTER + business + grammar + contract + current source
                     ↓
        3–4 functional cache candidates
                     ↓ one OK selects candidate + exact source boundary
@@ -61,9 +61,9 @@ business + grammar + contract + current source
              gates + browser proof
 ```
 
-A direction has no separate approval hash or durable identity. Candidate digests are cache keys only. A page
-or block skill implements the selected result immediately; another task regenerates from current business,
-grammar, contract and source rather than reading a design registry.
+MASTER fixes pattern, density, token roles, spacing rhythm, shape, depth, motion and anti-patterns once. Profiles
+override declared roles only; pages record deviations only. Candidate digests are cache keys, and principles
+resolve only visual deltas left unanswered by baseline, MASTER, grammar and source.
 
 ### Backend change
 

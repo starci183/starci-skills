@@ -12,6 +12,7 @@ description: Challenge, preview, duyệt, implement và visual proof một front
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | approval và reporting boundary dùng chung |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify frontend route |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ review evidence trong session cache |
+| `@composition` | `brainstorms/composition/vi.md` | vi | khóa highlighted parent và preserved page |
 | `@business` | `contexts/business/vi.md` | vi | resolve data, action và state thật |
 | `@grammar` | `grammars` | module | load routed block facts, outcomes và owners |
 | `@principles` | `compilers/principles` | module | audit selected anatomy |
@@ -23,6 +24,9 @@ description: Challenge, preview, duyệt, implement và visual proof một front
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove routed grammar package |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session artifacts |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | từ chối partial parent |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | từ chối phantom concern |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | enforce full-page proof |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish cache review |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove business authority trước source write |
 
@@ -32,11 +36,11 @@ None. Skill này sở hữu block decision tới implementation và full-page QA
 
 ## Run
 
-Resolve FE, grammar/profile, business, contract và committed source baseline. Đọc complete current parent page cùng block-owning subtree. Inventory mọi reachable condition và representative content.
+Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng.
 
 Tạo một ignored session pack và author ba hoặc bốn functional block candidate khác biệt đáng kể trong exact parent page, giữ nguyên untargeted region. Rank và chỉ audit recommendation. Render cache review, disclose exact source path và chờ một `OK`.
 
-Sau approval, lấy target baseline, implement ngay qua current patterns và contracts, rồi chạy lint, test và full-page browser proof ở desktop và narrow width. Cache không có authority sau completion.
+Sau approval, implement ngay rồi prove full page, target và preserved region ở exact baseline viewport. Known defect hoặc delivery chưa đạt cấm nói hoàn tất.
 
 ## Rules
 
@@ -45,6 +49,7 @@ Sau approval, lấy target baseline, implement ngay qua current patterns và con
 3. Preview artifact chỉ sống trong ignored cache.
 4. Không có design registry hay durable design identity.
 5. Source cùng full-page proof là durable outcome.
+6. MASTER được inherit; chỉ page/block deviation được khác.
 
 ## Stops
 

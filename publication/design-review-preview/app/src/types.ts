@@ -49,6 +49,8 @@ export type ReviewManifest = {
   readonly schemaVersion: 3
   readonly project: string
   readonly sessionId: string
+  readonly systemId: "starci-master"
+  readonly baselineAt: string
   readonly phase: "layout" | "block"
   readonly entryRoute: string
   readonly layouts: ReadonlyArray<LayoutReview>

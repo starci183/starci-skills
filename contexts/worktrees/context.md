@@ -35,7 +35,7 @@ The project segment is mandatory. `.claude` is a trust tree, never runtime stora
 2. Require `.worktrees/<project>/` before any state path.
 3. Verify Git ownership only for durable business worktrees.
 4. Isolate actual file collisions, not mere parallelism.
-5. Keep candidates under `cache/design/<session-id>/`. The pack may contain artifacts, `preview.html`, preview indexes, screenshots and `review-manifest.json`.
+5. Keep candidates under `cache/design/<session-id>/`. The pack contains `baseline.json`, optional deviations-only page override, artifacts, previews, screenshots, `review-manifest.json` and `visual-proof.json`.
 6. After owner approval, retain the selected pack only long enough to implement and prove the source in the same invocation. Source history, tests and browser proof are the durable record.
 7. Never create layout heads, block heads, immutable design revisions or design-registry branches.
 
@@ -65,7 +65,7 @@ Prune through Git after proving the exact target. Never delete a linked worktree
 
 ## `WORKTREE-7` — same-session design and execution
 
-A design candidate has no durable head. The review pack binds the current task, routed source baseline, business head, grammar/profile receipt, contract evidence, candidate key, UI-condition inventory, transitions and viewport proof. Approval authorizes the selected candidate and exact source boundary once. That same invocation implements, tests and visually proves the result. If execution cannot continue, the next task regenerates from current authority rather than treating cache as accepted truth.
+A design candidate has no durable head. The review pack binds the four-lock baseline, StarCi MASTER, deviations-only page override, business head, grammar/profile receipt, contract evidence, candidate key and same-viewport proof. Approval authorizes the selected candidate and exact source boundary once. That invocation implements, tests and visually proves the result.
 
 ## `WORKTREE-8` — product truth
 

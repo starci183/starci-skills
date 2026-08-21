@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/brainstorms/directions/schema.json",
   "title": "Visual direction batch",
-  "description": "One transient round of visual-direction brainstorming. Schema 2 evidence-selects one recommendation; the owner approves it only through the layout hash that embeds it.",
+  "description": "Transient direction brainstorming for a project without routed MASTER. StarCi MASTER bypasses this batch and pages record deviations only.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "envelope", "directions"],

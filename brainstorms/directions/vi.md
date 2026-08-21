@@ -16,6 +16,10 @@ title: Directions · Vietnamese
 giác** cùng một recommendation dựa trên evidence. Một hướng quyết định quan hệ dự kiến giữa vai trò ngữ nghĩa và token. Nó
 không quyết định layout, giải phẫu block hay class.
 
+Khi routed grammar cung cấp MASTER visual system, dừng trước candidate generation: trả system đó cùng page
+deviation có evidence nếu có. StarCi dùng closed path này; page không chọn lại style, palette, typography,
+density, shape, depth hay motion.
+
 ## Luật
 
 Gu thị giác là một quyết định sản phẩm. Máy có thể từ chối token bịa, phương án trùng hay recommendation
@@ -97,6 +101,7 @@ chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt ri�
 8. Feedback thay cache round; direction không trở thành durable authority ngoài invocation.
 9. Mọi batch schema 2 đề xuất đúng một candidate và ghi lý do dựa trên evidence.
 10. Visual contract của grammar được chép byte-for-byte vào `lockedTokens`; đổi trục, role token hay giá trị đều làm direction bị từ chối.
+11. Routed MASTER thay direction brainstorming; page chỉ ghi deviation.
 
 ## Preview
 

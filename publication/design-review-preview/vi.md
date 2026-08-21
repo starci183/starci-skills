@@ -6,6 +6,8 @@
 |---|---|---|---|
 | `@manifest-schema` | `publication/design-review-preview/schema.json` | file | kiểm tra review graph chỉ sống trong phiên |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | render authored candidate dưới project cache |
+| `@baseline-schema` | `brainstorms/composition/schema.json` | file | bind reference bốn lock và owner tree |
+| `@visual-proof-schema` | `publication/design-review-preview/visual-proof.schema.json` | file | prove same-viewport parity và delivery completion |
 
 ## Record
 
@@ -13,7 +15,7 @@ Module này hiển thị lựa chọn layout và block nhưng không trở thàn
 
 ## Authority
 
-Business authority, routed grammar, contract và current source ràng buộc design. Cache review pack chứng minh owner đã xem gì trong invocation nhưng không trở thành durable head hay input cho task khác.
+Business authority, legacy/current baseline, MASTER, routed grammar, contract và current source ràng buộc design theo thứ tự đó. Page override chỉ chứa deviation. Cache review pack chứng minh owner đã xem gì nhưng không trở thành authority.
 
 Trong một session:
 
@@ -48,7 +50,7 @@ Representative content phải trung thực với business và có production-lik
 
 ## Quality proof
 
-Review mọi candidate và selected product result ở desktop và narrow viewport. Prove hierarchy, readable measure, boundary ownership, một scroll owner mỗi axis, breakpoint exclusivity, state coverage đầy đủ, keyboard-operable transition, clean console và không có preview network request. Sau source implementation, lặp critical interaction và viewport proof trên product thật.
+Review mọi candidate và result ở exact baseline viewport/state. Prove full viewport, target region và preserved region; computed CSS chỉ support, không thay comparison này. `visual-proof.json` phải ghi zero known defect và đạt requested delivery state.
 
 Creativity đi trước principles review. Chỉ selected candidate được audit thành class-free `principleObligations`; source implementation resolve obligation qua current principles và patterns.
 
@@ -62,6 +64,7 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 6. Preview navigation không ghi state và không tính là approval.
 7. Source code, test và browser proof là accepted outcome bền vững.
 8. Creativity đi trước principles review; implementation theo source patterns và gates.
+9. MASTER dùng chung cho mọi candidate; page file chỉ ghi deviation và principles chỉ inspect delta.
 
 ## Stops
 

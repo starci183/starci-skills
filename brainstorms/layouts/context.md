@@ -17,14 +17,14 @@ than asking the owner to operate a candidate gate.
 
 ## Law
 
-A schema 4 candidate names its `page` or `flow` scope, every composed page, ordered nested ownership nodes,
+A schema 5 candidate names its `page` or `flow` scope, MASTER system id, deviations-only page override, every composed page, ordered nested ownership nodes,
 regions, who owns each region's geometry, what mounts once and what changes
 per route. Every region hashes its minimum child bounding geometry (`placement`, `width`, `height`, `align`)
 and one impressionistic child brief (`kind`, title, summary, representative labels, values and actions). The
 full-page composition makes purpose, density and reading order imaginable without approving exact parts,
 fields, copy, actions, states or data ownership. Each node is `existing`, `proposed` or `new`; `existing` cites
-the real source and SHA-256 source hash and cannot differ between choices. New session artifacts use schema 4;
-older schemas are unsupported input. It never names a class. Classes are decided after selection in the same invocation;
+the real source and SHA-256 source hash and cannot differ between choices. New session artifacts use schema 5;
+older schemas are compatibility input. It never names a class. MASTER fixes macro taste once; classes are decided only for unresolved deltas;
 a candidate that carries one has spent a decision that was not its to spend.
 
 Every region cites something that exists: an entry in the contract, or an explicit statement that a
@@ -38,7 +38,7 @@ Seven, and no more. Each is here because something specific breaks without it.
 | # | Input | Without it |
 |---|---|---|
 | 1 | The business request, verbatim | there is no intent, only a shape |
-| 2 | The one evidence-backed direction recommended for the combined review | skeletons are compared under different visual intent |
+| 2 | StarCi MASTER plus an optional deviations-only page override | each candidate silently chooses its own taste |
 | 3 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
 | 4 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
 | 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
@@ -134,7 +134,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 
 ## Rules
 
-1. A candidate carries no class. Its only tokens or visual values are inside the same recommended `direction` object in every candidate.
+1. A candidate carries no class. Schema 5 candidates share `starci-master`; page overrides list deviations only.
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.
@@ -193,9 +193,9 @@ The output **is** JSON, and its authority is `@schema` beside this record — no
 excerpt. `envelope` holds what varies between runs; the hash covers a candidate only, so the same
 decision re-run in a later round produces the same hash.
 
-New work uses schema 4: `envelope.scope` declares screenshot `page` or described `flow`; every candidate carries
+New work uses schema 5: `envelope.scope` declares screenshot `page` or described `flow`; every candidate carries `systemId: starci-master`, deviations-only `pageOverride`,
 the same ordered `pages`, each page carries its nested `nodes` and owned region names, and each region binds its
-`pageId` plus `change`. The schema 1 example below documents readable immutable history only.
+`pageId` plus `change`. Older examples are compatibility documentation only.
 
 ```json
 {

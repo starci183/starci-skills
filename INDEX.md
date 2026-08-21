@@ -62,6 +62,10 @@ renders production-like representative content; and proves reachable transitions
 Desktop/mobile, modal, drawer, menu/popover, loading, empty, error, locked and disabled states are represented
 when reachable. The QA viewer may inspect states but may not substitute for product interaction.
 
+Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
+then applies one routed StarCi MASTER visual system. Profiles override declared roles only, pages record deviations
+only, grammar selects semantic owners, and principles resolve visual deltas left unanswered by those authorities.
+
 ## V4 authority route
 
 The stage trees above remain the one homes of detailed law. V4 adds stable cross-stage routers; it does
@@ -148,18 +152,17 @@ under pressure:
   `@contract-search`, which returns a contract entry's `key`,
   `why` and `host` and never extracts its classes — a stage that cannot see a class cannot write one, and
   the value not arriving is what holds that, not a rule asking a reader to skip a field;
-- a direction batch is vocabulary-bound but not separately hash-bound; the selected object becomes
-  durable only inside the layout candidate whose one hash covers both visual intent and skeleton;
+- a direction batch is vocabulary-bound and MASTER-constrained; candidate hashes are session cache keys,
+  while frontend source and proof are the durable result;
 - every schema sets `additionalProperties: false`, so a stray `className` is invalid rather than
   arguable;
-- `@validate-artifact` refuses a batch whose candidates
-  share an axis set, or where none departs from precedent;
+- `@validate-artifact` refuses a batch whose candidates share an axis set; current source and legacy are
+  precedent evidence, not a separately persisted design corpus;
 - the lint machines are real ESLint plugins, published from `@eslint-repo` as
   `@canon-fe` and `@canon-be`, each rule shipped with the test that fires it.
   **This tree is the law; that repository is the machine.** A rule there with no law here is
   unaccountable; a law here with no rule there only advises;
-- an approval binds to the hash of canonical JSON with the envelope outside it, so re-running the same
-  decision yields the same hash.
+- approval binds one selected cache candidate plus its disclosed source boundary for the same invocation.
 
 ## Authoring
 

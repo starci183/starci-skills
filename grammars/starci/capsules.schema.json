@@ -43,7 +43,7 @@
         "templateRef": { "type": "string", "pattern": "^\\./templates/[a-z0-9]+(?:-[a-z0-9]+)*\\.template\\.tsx$" },
         "templateHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
         "rulings": {
-          "description": "Founder rulings retained as durable product-family evidence, never source provenance.",
+          "description": "References into rulings.json. Only family-scoped invariant/correction records authorize promotion.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,

@@ -11,6 +11,7 @@ title: Skill shape · Vietnamese
 | `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve ngôn ngữ chung của Source cho mọi phản hồi tới người dùng |
 | `@credential-intake` | `runbooks/secrets/vi.md` | vi | nhận credential operator còn thiếu ngay qua intake ẩn và được mã hóa |
 | `@host-os` | `scripts/check-host-os.mjs` | script | chỉ chọn credential/setup entrypoint được host hiện tại hỗ trợ |
+| `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset và completion transition |
 
 
 ## Bản ghi
@@ -130,6 +131,14 @@ phải tín hiệu approval.
 
 ## Quyết định và thi hành
 
+### Control protocol
+
+`A`, hoặc candidate label đang hiển thị khác, chỉ chọn candidate đó. `OK` duyệt exact write boundary đã hiển thị và execution phải resume ngay. `continue` hoặc `tiếp tục` resume phần own còn nợ, không recap, không re-plan và không mở checkpoint khác. Nghĩa này ổn định giữa các frontend skill.
+
+Mọi owner rejection rõ ràng invalidate current candidate và mọi assumption sinh từ nó. Strong negative feedback không phải yêu cầu patch incremental tiếp: dựng lại baseline bốn lock, đọc lại complete page/flow và classify failure trước khi sửa.
+
+Trước implementation, khóa `Scope`, `Owner`, `Invariant`, `Proof`. Request nói shared phải đo mọi consumer; bounded screenshot annotation giữ local trừ khi owner promote rõ.
+
 **Các lượt design** là session evidence tùy chọn. Lựa chọn direction hỗ trợ một lượt layout và không có
 durable hash hay checkpoint owner riêng. Candidate chính xác cùng recommendation dựa trên evidence nằm
 trong project cache của invocation hiện tại. Một `OK` chọn recommendation và cấp quyền cho source boundary
@@ -158,7 +167,7 @@ Không in bảng trạng thái, section rỗng, dòng `None`, context nội bộ
 đáng kể kế tiếp, nói thân thiện: `Trước khi làm tiếp, em còn nợ: ...`, rồi trả trong cùng lượt. Một lượt
 chỉ kết thúc khi `own = 0`, hoặc đang chờ một mục `### NEED APPROVALS` thật.
 
-Khi hoàn tất, nói gọn kết quả, path chính và proof bằng văn xuôi hoặc danh sách ngắn. Khi bị chặn bởi thẩm
+Khi hoàn tất, nói gọn kết quả, path chính và proof bằng văn xuôi hoặc danh sách ngắn. Không dùng từ hoàn tất khi còn known defect, viewport/state bắt buộc thiếu full-page proof, gate đỏ, source ở sai repository hoặc requested delivery state chưa đạt. Phải nói chính xác `verified locally`, `committed`, `pushed` hoặc `merged`. Khi bị chặn bởi thẩm
 quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agent không thể tự sở hữu, default được
 đề xuất và scope chính xác mà `OK` cấp phép.
 
@@ -197,21 +206,21 @@ thêm**.
 12. Credential còn thiếu kích hoạt intake owner ngay và không chứa value; value không bao giờ đi qua chat,
     argument, generated command hoặc log.
 13. Đo host OS trước khi chọn setup script; không bao giờ thử extension không tương thích.
+14. Candidate label chỉ chọn; chỉ `OK` authorize write; `continue` resume không mở checkpoint mới.
+15. Owner rejection reset baseline và assumptions trước edit tiếp theo.
+16. Completion cần zero known defect, đủ requested proof và đúng declared delivery state.
 
 ## Ngoại lệ
 
 - **Năng lực chỉ đọc.** Nó không biến measurement thành repair; nó báo evidence và owner của repair
   request riêng.
-- **Design identity được tiếp tục.** Layout resolve head của `layoutId` hiện có. Review history có thể
-  tiếp tục, nhưng caller không cần review id để tìm current accepted state.
+- **Design-only request.** Cache preview hết hiệu lực cùng invocation và task sau dựng lại từ baseline hiện hành.
 
 ## Ví dụ đã giải
 
 **Lượt chạy.** "Thiết kế trang kết quả bài luyện coding."
 
-Lượt chạy nói: `Em đang thiết kế example-app trên route frontend đã verify; hành động này chỉ ghi design
-review và registry heads.` Nó trình số page-set hoàn chỉnh thích ứng theo schema cùng một default dưới `NEED APPROVALS`. Sau `OK`, nó bind hash
-và làm hết mọi mục `own` của Layout mà không hỏi lại. Block vẫn là capability request riêng.
+Lượt chạy nói exact cache/source boundary, trình page-set hoàn chỉnh dưới một MASTER system và một default dưới `NEED APPROVALS`. Sau `OK`, nó implement source, chạy full-page proof và làm hết mọi mục `own` mà không hỏi lại.
 
 ## Phạm vi
 

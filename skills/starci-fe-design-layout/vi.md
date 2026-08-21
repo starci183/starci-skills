@@ -12,12 +12,12 @@ description: Chốt một composed page hoặc end-to-end page flow, rồi chall
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | approval và reporting boundary dùng chung |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify frontend route |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ review evidence trong session cache |
+| `@composition` | `brainstorms/composition/vi.md` | vi | khóa Scope, Owner, Invariant và Proof |
 | `@business` | `contexts/business/vi.md` | vi | bind page với current product truth |
 | `@grammar` | `grammars` | module | load routed facts, outcomes và owners |
 | `@principles` | `compilers/principles` | module | audit selected visual decisions |
 | `@patterns-fe` | `compilers/patterns/fe` | module | chọn source file và ownership trước khi ghi |
 | `@lints-fe` | `gates/fe/lints` | module | prove implemented source |
-| `@directions` | `brainstorms/directions/vi.md` | vi | evidence-select visual direction |
 | `@layouts` | `brainstorms/layouts/vi.md` | vi | compose page, region và ownership |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | authored HTML review trong cache |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reason không lộ class |
@@ -26,6 +26,9 @@ description: Chốt một composed page hoặc end-to-end page flow, rồi chall
 | `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | refuse theme hoặc receipt drift |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind candidate với current vocabulary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session design artifacts |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | từ chối parent sai hoặc thiếu full-page proof |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | từ chối phantom principle concern |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | enforce parity và delivery completion |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish cache review |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove business authority trước source write |
 
@@ -37,9 +40,9 @@ None. Skill này sở hữu design tới implementation và QA trong một invoc
 
 Chốt đúng một scope: `page` cho một composed route cùng mọi state/overlay reachable, hoặc `flow` cho sequence start-to-end rõ ràng. Resolve FE, grammar/profile, business, contract và source baseline. Tạo một ignored session pack dưới `.worktrees/<project>/cache/design/<session-id>`.
 
-Inventory mọi UI condition và business content reachable trước khi vẽ. Author ba hoặc bốn complete functional HTML candidate khác biệt đáng kể, chứa mọi owned region. Rank và chỉ audit recommendation qua principles. Render cache review, disclose exact candidate và source path, rồi chờ một `OK`.
+Inventory mọi UI condition và viết baseline bốn lock trước khi vẽ. Author ba hoặc bốn complete candidate dưới một MASTER visual system; page override chỉ ghi deviation. Chỉ audit delta unresolved qua principles. Render cache review, disclose exact source path, rồi chờ một `OK`.
 
-Sau approval, lấy target baseline, implement ngay selected outcome vào current source, chạy patterns, gates, tests và browser proof ở mọi viewport/state bị ảnh hưởng, rồi reconcile business authority khi cần. Cache không trở thành authority và task khác không được resume nó.
+Sau approval, implement ngay rồi so full page, target và preserved region với mọi same-viewport reference. Known defect hoặc delivery state chưa đạt cấm nói hoàn tất.
 
 ## Rules
 
@@ -49,6 +52,7 @@ Sau approval, lấy target baseline, implement ngay selected outcome vào curren
 4. Complete page/flow chứa mọi owned region và reachable condition.
 5. Exact source path cần approval trước khi ghi.
 6. Source cùng executable proof là durable outcome.
+7. MASTER được chọn một lần; principles chỉ resolve evidenced delta.
 
 ## Stops
 

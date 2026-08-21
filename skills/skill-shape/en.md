@@ -11,6 +11,7 @@ title: Skill shape
 | `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve the Source-wide language for every user-facing reply |
 | `@credential-intake` | `runbooks/secrets/en.md` | en | acquire missing operator credentials immediately through hidden, encrypted intake |
 | `@host-os` | `scripts/check-host-os.mjs` | script | select only credential and setup entrypoints supported by this host |
+| `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset and completion transitions |
 
 
 ## Record
@@ -130,6 +131,14 @@ scope. Silence and every word other than `OK` are not approval signals.
 
 ## Decisions and execution
 
+### Control protocol
+
+`A`, or another displayed candidate label, selects that candidate and nothing else. `OK` approves the exact displayed write boundary and resumes execution immediately. `continue` or `tiếp tục` resumes outstanding owned work without recap, re-planning or another checkpoint. These meanings are stable across frontend skills.
+
+Any explicit owner rejection invalidates the current candidate and every assumption derived from it. Strong negative feedback is not a request for another incremental patch: rebuild the four-lock baseline, reread the complete page/flow and classify the failure before editing again.
+
+Before implementation, lock `Scope`, `Owner`, `Invariant` and `Proof`. A shared request measures all consumers; a bounded screenshot annotation remains local unless the owner explicitly promotes it.
+
 **Design rounds** are optional session evidence. Direction choices support a layout review and have no durable
 hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in the
 project cache for the current invocation. One `OK` selects the recommendation and authorizes its disclosed
@@ -161,6 +170,7 @@ owe: ...`, then pay it in the same run. A turn may end only when `own = 0`, or w
 `### NEED APPROVALS` item.
 
 On completion, state the outcome, material paths changed and proof run in compact prose or a short list.
+Never use completion wording while known defects remain, a required viewport/state lacks full-page proof, a gate is red, source is in the wrong repository, or the requested delivery state has not been reached. Say `verified locally`, `committed`, `pushed` or `merged` exactly.
 When blocked on owner authority, `### NEED APPROVALS` explains what is missing, why the agent cannot own
 it, the recommended/default answer and the exact scope `OK` authorises.
 
@@ -200,13 +210,15 @@ appended.
 12. Missing credentials trigger immediate value-free owner intake; values never enter chat, arguments,
     generated commands or logs.
 13. Host OS is measured before selecting a setup script; an incompatible extension is never attempted.
+14. Candidate labels select; only `OK` authorizes writes; `continue` resumes without a new checkpoint.
+15. Owner rejection resets the baseline and assumptions before another edit.
+16. Completion requires zero known defects, every requested proof and the declared delivery state.
 
 ## Exceptions
 
 - **A read-only capability.** It never turns measurement into repair; it reports the evidence and owner of
   the separate repair request.
-- **A resumed design identity.** Layout resolves the existing `layoutId` head. Review history may resume,
-  but no caller needs a review id to find current accepted state.
+- **A design-only request.** Its cache preview expires with the invocation; another task regenerates from the current baseline.
 
 ## Worked example
 

@@ -12,6 +12,7 @@ description: Challenge, preview, approve, implement and visually prove one front
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and reporting boundary |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | keep review evidence in session cache |
+| `@composition` | `brainstorms/composition/en.md` | en | lock highlighted parent and preserved page |
 | `@business` | `contexts/business/en.md` | en | resolve real data, actions and states |
 | `@grammar` | `grammars` | module | load routed block facts, outcomes and owners |
 | `@principles` | `compilers/principles` | module | audit the selected anatomy |
@@ -23,6 +24,9 @@ description: Challenge, preview, approve, implement and visually prove one front
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session artifacts |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | refuse partial parents |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | refuse phantom concerns |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | enforce full-page proof |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish the cache review |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove business authority before source writes |
 
@@ -32,11 +36,11 @@ None. This skill owns the block decision through implementation and full-page QA
 
 ## Run
 
-Resolve FE, grammar/profile, business, contract and the committed source baseline. Read the complete current parent page and block-owning subtree. Inventory all reachable conditions and representative content.
+Resolve FE, grammar/profile, MASTER, business, contract and source. Write a four-lock baseline; a highlighted region must name one parent containing every enclosed direct child.
 
 Create one ignored session pack and author three or four materially distinct functional block candidates inside the exact parent page while preserving untargeted regions. Rank them and audit only the recommendation. Render the cache review, disclose the exact source paths and wait for one `OK`.
 
-After approval, take the target baseline, implement immediately through current patterns and contracts, then run lint, tests and full-page browser proof at desktop and narrow widths. Cache has no authority after completion.
+After approval, implement immediately, then prove the full page, target and preserved regions at the exact baseline viewports. Known defects or unmet delivery forbid completion.
 
 ## Rules
 
@@ -45,6 +49,7 @@ After approval, take the target baseline, implement immediately through current 
 3. Preview artifacts live only in ignored cache.
 4. No design registry or durable design identity exists.
 5. Source plus full-page proof is the durable outcome.
+6. MASTER is inherited; only page/block deviations may differ.
 
 ## Stops
 

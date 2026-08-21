@@ -27,8 +27,10 @@ const withGrammarCopy = (run) => {
 test("durable grammar evidence has rulings, both case kinds, existing hashed templates and compilable TSX", () => {
   const loaded = loadAndValidateGrammar(GRAMMAR_ROOT)
   assert.equal(loaded.grammar.evidenceCatalog, "./capsules.json")
+  assert.equal(loaded.grammar.rulingCatalog, "./rulings.json")
   assert.equal("capsuleCatalog" in loaded.grammar, false)
   assert.ok(loaded.evidenceCatalog.capsules.length > 0)
+  assert.ok(loaded.rulingCatalog.rulings.length > 0)
   for (const capsule of loaded.evidenceCatalog.capsules) {
     assert.ok(capsule.rulings.length > 0, capsule.id)
     assert.ok(capsule.goldenCaseRefs.length > 0, capsule.id)
@@ -45,6 +47,8 @@ test("every golden and counterexample case resolves deterministically", () => {
       profile: PROFILE,
       factCatalog: loaded.factCatalog,
       evidenceCatalog: loaded.evidenceCatalog,
+      rulingCatalog: loaded.rulingCatalog,
+      designSystem: loaded.designSystem,
       templateCatalog: loaded.templateCatalog,
     }
     const forward = resolveGrammar({ ...input, facts: item.facts })
@@ -82,6 +86,33 @@ test("a behavior capsule cannot be promoted without a founder ruling", () => wit
   assert.throws(() => loadAndValidateGrammar(grammarRoot), /requires founder rulings/)
 }))
 
+test("an example cannot promote a family behavior capsule", () => withGrammarCopy((grammarRoot) => {
+  const evidenceFile = join(grammarRoot, "capsules.json")
+  const rulingFile = join(grammarRoot, "rulings.json")
+  const evidence = JSON.parse(readFileSync(evidenceFile, "utf8"))
+  const rulings = JSON.parse(readFileSync(rulingFile, "utf8"))
+  const refs = new Set(evidence.capsules[0].rulings)
+  for (const ruling of rulings.rulings) if (refs.has(ruling.id)) ruling.kind = "example"
+  writeFileSync(rulingFile, `${JSON.stringify(rulings, null, 2)}\n`)
+  assert.throws(() => loadAndValidateGrammar(grammarRoot), /lacks a promotable family ruling/)
+}))
+
+test("rulings require explicit negative scope", () => withGrammarCopy((grammarRoot) => {
+  const rulingFile = join(grammarRoot, "rulings.json")
+  const rulings = JSON.parse(readFileSync(rulingFile, "utf8"))
+  rulings.rulings[0].doesNotApplyWhen = []
+  writeFileSync(rulingFile, `${JSON.stringify(rulings, null, 2)}\n`)
+  assert.throws(() => loadAndValidateGrammar(grammarRoot), /requires negative scope/)
+}))
+
+test("MASTER fixes one spacing rhythm and profile-declared accent override", () => withGrammarCopy((grammarRoot) => {
+  const systemFile = join(grammarRoot, "design-system.json")
+  const system = JSON.parse(readFileSync(systemFile, "utf8"))
+  system.spacingRungs = [1, 2, 3, 4, 5, 6, 8]
+  writeFileSync(systemFile, `${JSON.stringify(system, null, 2)}\n`)
+  assert.throws(() => loadAndValidateGrammar(grammarRoot), /spacing rungs differ/)
+}))
+
 test("template bytes must match their durable hash", () => withGrammarCopy((grammarRoot) => {
   const evidence = JSON.parse(readFileSync(join(grammarRoot, "capsules.json"), "utf8"))
   const templateFile = resolve(grammarRoot, evidence.capsules[0].templateRef)
@@ -107,6 +138,8 @@ test("resolution loads only evidence, templates and facts selected by winning ru
     profile: PROFILE,
     factCatalog: loaded.factCatalog,
     evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
     templateCatalog: loaded.templateCatalog,
     facts: ["boundary-shared", "collection-peer"],
   })
@@ -116,6 +149,8 @@ test("resolution loads only evidence, templates and facts selected by winning ru
   assert.deepEqual(resolved.contextPack.evidence.map((capsule) => capsule.id), ["surface-list"])
   assert.deepEqual(resolved.contextPack.templates.map((template) => template.templateRef), ["./templates/surface-list.template.tsx"])
   assert.deepEqual(resolved.contextPack.principleConcerns, [])
+  assert.equal(resolved.contextPack.master.systemId, "starci-master")
+  assert.equal(resolved.receipt.designSystemId, "starci-master")
   const serialized = JSON.stringify(resolved.contextPack)
   assert.doesNotMatch(serialized, /hierarchical-disclosure|resizable-rail|typography/)
 })
@@ -127,10 +162,12 @@ test("principle context contains only delta concerns for selected owners", () =>
     profile: PROFILE,
     factCatalog: loaded.factCatalog,
     evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
     templateCatalog: loaded.templateCatalog,
     facts: ["active-item-present", "collection-navigation", "selection-single"],
   })
-  assert.deepEqual(resolved.contextPack.principleConcerns, ["focus-order", "state", "target-size"])
+  assert.deepEqual(resolved.contextPack.principleConcerns, ["size", "state"])
   assert.doesNotMatch(JSON.stringify(resolved.contextPack), /surface-in-surface|typography|responsive/)
 })
 
@@ -141,6 +178,8 @@ test("collapsible rail preserves the exact StarCi optional title, circular ghost
     profile: PROFILE,
     factCatalog: loaded.factCatalog,
     evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
     templateCatalog: loaded.templateCatalog,
     facts: ["region-adjacent", "region-persistent", "region-independent-scroll", "width-user-collapsible"],
   })

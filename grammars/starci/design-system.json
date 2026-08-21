@@ -1,0 +1,36 @@
+{
+  "$schema": "./design-system.schema.json",
+  "schemaVersion": 1,
+  "grammar": "starci",
+  "systemId": "starci-master",
+  "axes": {"contrast": "balanced", "density": "compact", "shape": "soft", "depth": "layered", "motion": "measured"},
+  "roles": {
+    "ground": "--starci-background", "surface": "--starci-surface", "content": "--starci-foreground",
+    "mutedContent": "--starci-muted", "separator": "--starci-separator", "display": "--starci-font-sans",
+    "body": "--starci-font-sans", "label": "--starci-font-sans", "radius": "--starci-radius-3xl",
+    "elevation": "--starci-surface-shadow", "duration": "--starci-duration", "easing": "--starci-easing"
+  },
+  "spacingRungs": [1, 2, 3, 4, 6, 8],
+  "componentLanguage": [
+    "one clear page hierarchy before local decoration",
+    "one semantic surface owner for each visible boundary",
+    "ListBox for single-selection destinations",
+    "accordion disclosure for long parent-descendant collections",
+    "SurfaceList for comparable peer rows sharing one boundary",
+    "one local scroll owner per axis",
+    "one highlighted surface only for a singular primary continuation"
+  ],
+  "antiPatterns": [
+    "redesigning source-bound legacy composition outside the targeted region",
+    "choosing colour, radius or shadow independently inside each block",
+    "using several status chips where one metadata sentence has one semantic status",
+    "flattening an evidenced hierarchy into peer rows",
+    "rebuilding ListBox, accordion, surface-list or scroll mechanics by hand",
+    "proving computed CSS while ignoring the full-viewport reference hierarchy"
+  ],
+  "legacyPolicy": {"precedence": "legacy-baseline-before-master", "preserveOutsideTarget": true, "pageOverrideMode": "deviations-only"},
+  "profileOverrides": {
+    "starci-academy": {"accent": "--starci-accent", "deviations": ["Academy owns the rose accent role while the MASTER topology remains unchanged."]},
+    "nivo-console": {"accent": "--nivo-accent", "deviations": ["Nivo owns the unicorn-red accent role while the MASTER topology remains unchanged."]}
+  }
+}

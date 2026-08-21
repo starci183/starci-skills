@@ -12,12 +12,12 @@ description: Confirm one composed page or end-to-end page flow, then challenge, 
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and reporting boundary |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | keep review evidence in session cache |
+| `@composition` | `brainstorms/composition/en.md` | en | lock Scope, Owner, Invariant and Proof |
 | `@business` | `contexts/business/en.md` | en | bind the page to current product truth |
 | `@grammar` | `grammars` | module | load routed product-family facts, outcomes and owners |
 | `@principles` | `compilers/principles` | module | audit selected visual decisions |
 | `@patterns-fe` | `compilers/patterns/fe` | module | choose source files and ownership before writing |
 | `@lints-fe` | `gates/fe/lints` | module | prove the implemented source |
-| `@directions` | `brainstorms/directions/en.md` | en | evidence-select visual direction |
 | `@layouts` | `brainstorms/layouts/en.md` | en | compose pages, regions and ownership |
 | `@design-review` | `publication/design-review-preview/en.md` | en | authored HTML review in cache |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
@@ -26,6 +26,9 @@ description: Confirm one composed page or end-to-end page flow, then challenge, 
 | `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | refuse theme or receipt drift |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind candidates to current frontend vocabulary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate session design artifacts |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | refuse wrong parent or missing full-page proof |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | refuse phantom principle concerns |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | enforce parity and delivery completion |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish the cache review |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove business authority before source writes |
 
@@ -37,9 +40,9 @@ None. This skill owns design through implementation and QA in one invocation.
 
 Confirm exactly one scope checkpoint: `page` for one composed route and all reachable states/overlays, or `flow` for an explicit start-to-end sequence. Resolve FE, grammar/profile, business, contract and source baseline. Build one ignored session pack under `.worktrees/<project>/cache/design/<session-id>`.
 
-Inventory all reachable UI conditions and business content before drawing. Author three or four materially distinct complete functional HTML candidates containing every owned region. Rank them and audit only the recommendation through principles. Render the cache review, disclose the exact candidate and source paths, and wait for one `OK`.
+Inventory all reachable UI conditions and write the four-lock baseline before drawing. Author three or four complete candidates under one MASTER visual system; page overrides record deviations only. Audit only unresolved deltas through principles. Render the cache review, disclose exact source paths, and wait for one `OK`.
 
-After approval, take the target baseline, implement the selected outcome immediately in current source, run patterns, gates, tests and browser proof at every affected viewport/state, and reconcile business authority when required. Cache never becomes authority and another task cannot resume it.
+After approval, implement immediately, then compare the full page, target and preserved regions against every same-viewport reference. Known defects or an unmet requested delivery state forbid completion wording.
 
 ## Rules
 
@@ -49,6 +52,7 @@ After approval, take the target baseline, implement the selected outcome immedia
 4. Complete pages/flows include every owned region and reachable condition.
 5. Exact source paths require approval before writing.
 6. Source plus executable proof is the durable outcome.
+7. MASTER is chosen once; principles resolve only evidenced deltas.
 
 ## Stops
 

@@ -11,6 +11,8 @@ title: StarCi deterministic frontend grammar · English
 | `@grammar` | `grammars/starci/grammar.json` | file | closed fact-to-outcome rules |
 | `@facts` | `grammars/starci/facts.json` | file | closed observable fact catalog |
 | `@capsules` | `grammars/starci/capsules.json` | file | durable behavior, rulings and case/template bindings |
+| `@rulings` | `grammars/starci/rulings.json` | file | normalized owner statements, scope and negative boundaries |
+| `@master-system` | `grammars/starci/design-system.json` | file | one compact visual system shared before page-level deviations |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | select one deterministic winner per slot and emit a compact context pack |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove package identity, cases, hashes, templates and forbidden provenance |
 
@@ -29,23 +31,24 @@ the promoted package.
 
 1. `GRAMMAR-1` — Resolve only the grammar and profile declared by the verified workspace route.
 2. `GRAMMAR-2` — A rule consumes closed fact ids and emits closed outcomes and obligations.
-3. `GRAMMAR-3` — Every promoted behavior has founder rulings, a durable capsule, both case kinds and a hashed TSX template.
+3. `GRAMMAR-3` — Every promoted behavior has a family-scoped invariant/correction ruling with negative scope, a durable capsule, both case kinds and a hashed TSX template. Examples never promote themselves.
 4. `GRAMMAR-4` — One winner per slot is selected by priority, specificity and lexical rule id.
 5. `GRAMMAR-5` — A missing route, owner or fact stops; it never authorizes hand-built fallback JSX.
 6. `GRAMMAR-6` — Repository remotes, revisions, paths, symbols, blobs and source-origin records are forbidden.
 7. `GRAMMAR-7` — Resolution returns only selected facts, capsules, templates and principle concerns.
 8. `GRAMMAR-8` — A profile visual contract locks direction axes, semantic role tokens and exact token values; design and execution refuse substitutions.
+9. `GRAMMAR-9` — MASTER fixes visual language once; a profile may override only declared roles and a page records deviations only.
 
 ## Routing
 
 Layout and block design classify evidenced situations into fact ids, run `@resolve-grammar`, and bind
-the resulting receipt into their accepted design revision. Outcomes constrain which semantic owner is
+the resulting receipt plus MASTER into the current session baseline. Outcomes constrain which semantic owner is
 reused, extended or reported as `new-required`; they do not choose visual classes. A selected owner may
 also carry a visual contract, which fixes semantic theme tokens and values before direction comparison.
 
-Execute recomputes the same receipt from accepted facts and the current declared profile. A hash drift,
-missing capsule, changed template or absent owner returns to design. It loads only the emitted compact
-context pack, then resolves the emitted `principleConcerns` through the principle compiler.
+The same skill invocation recomputes the receipt before source writes. A hash drift, missing capsule,
+changed template or absent owner returns to candidate work. It resolves only emitted `principleConcerns`
+that remain as deltas after MASTER, legacy and current source have answered the visual decision.
 A visual contract additionally requires every preview state to mount its boundary, declare and use every
 locked token exactly, and carry no raw palette value outside that contract.
 
@@ -57,7 +60,7 @@ locked token exactly, and carry no raw palette value outside that contract.
 4. A counterexample must prove the nearby rule does not fire.
 5. Templates preserve owner boundaries and state transitions; they are references, not source to paste blindly.
 6. Optional immutable refs are provenance only and may never change durable authority.
-7. Design skills record grammar/profile ids and receipt hashes so execution can detect drift.
+7. Design skills record grammar/profile ids, MASTER system id and receipt hashes so same-session source execution can detect drift.
 8. Grammar-locked visual contracts are invariant across candidate composition, viewport and interaction state.
 9. A visual-contract receipt is incomplete without its matching `preview.html` proof.
 

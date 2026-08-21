@@ -82,6 +82,33 @@ test("schema 4 accepts three complete single-page choices with source-bound exis
     assert.equal(result.status, 0, result.stderr)
 })
 
+test("schema 5 keeps every page choice under StarCi MASTER with deviations only", () => {
+    const candidates = axes.map((axis, index) => {
+        const candidate = pageCandidate(["one", "two", "three"][index], axis)
+        delete candidate.direction
+        delete candidate.citesPrecedent
+        candidate.systemId = "starci-master"
+        candidate.pageOverride = {deviations: []}
+        return candidate
+    })
+    const result = runArtifact({...batch(candidates), schema: 5})
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 5 refuses a candidate that silently omits MASTER", () => {
+    const candidates = axes.map((axis, index) => {
+        const candidate = pageCandidate(["one", "two", "three"][index], axis)
+        delete candidate.direction
+        delete candidate.citesPrecedent
+        candidate.systemId = "starci-master"
+        candidate.pageOverride = {deviations: []}
+        return candidate
+    })
+    delete candidates[1].systemId
+    const result = runArtifact({...batch(candidates), schema: 5})
+    assert.notEqual(result.status, 0)
+})
+
 test("grammar-locked token values must match an existing vocabulary declaration", () => {
     const candidates = axes.map((axis, index) => pageCandidate(["one", "two", "three"][index], axis))
     for (const candidate of candidates) candidate.direction = { ...candidate.direction, lockedTokens: { "--accent": "rose" } }

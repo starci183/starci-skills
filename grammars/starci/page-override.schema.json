@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/schema/grammars/starci/page-override.schema.json",
+  "title": "Session-local StarCi page deviations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "systemId", "project", "pageId", "baselineAt", "deviations"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "systemId": {"const": "starci-master"},
+    "project": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "pageId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "baselineAt": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["axis", "from", "to", "reason", "evidence"],
+        "properties": {
+          "axis": {"enum": ["composition", "hierarchy", "colour", "typography", "spacing", "shape", "depth", "motion", "interaction"]},
+          "from": {"type": "string", "minLength": 1}, "to": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 16}, "evidence": {"type": "string", "minLength": 8}
+        }
+      }
+    }
+  }
+}

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"enum": [1, 2, 3, 4], "description": "Artifact version. Schema 4 binds a composed page set: every visible page records its nested layouts, routed page, active overlays and target regions. Older accepted objects remain valid and are never rewritten."},
+    "schema": {"enum": [1, 2, 3, 4, 5], "description": "Schema 5 binds a composed page set to StarCi MASTER plus a deviations-only page override. Older session shapes remain compatibility input."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -60,6 +60,15 @@
           }
         }
       }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 5}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope"]}]},
+          "candidates": {"items": {"allOf": [{"$ref": "#/$defs/candidate"}, {"required": ["systemId", "pageOverride", "pages"]}]}}
+        }
+      }
     }
   ],
   "$defs": {
@@ -91,10 +100,15 @@
       "description": "Hashed. Canonical JSON, keys sorted, no timestamps, no per-run ids.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "direction", "axes", "regions", "reason"],
+      "required": ["id", "axes", "regions", "reason"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
-        "direction": {"$ref": "../directions/schema.json#/$defs/direction", "description": "The evidence-backed recommended direction, embedded so the owner's one layout approval binds both visual intent and skeleton."},
+        "direction": {"$ref": "../directions/schema.json#/$defs/direction", "description": "Legacy session direction. Schema 5 uses MASTER instead."},
+        "systemId": {"const": "starci-master"},
+        "pageOverride": {
+          "type": "object", "additionalProperties": false, "required": ["deviations"],
+          "properties": {"deviations": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["axis", "from", "to", "reason"], "properties": {"axis": {"type": "string"}, "from": {"type": "string"}, "to": {"type": "string"}, "reason": {"type": "string", "minLength": 16}}}}}
+        },
         "axes": {"$ref": "#/$defs/axes"},
         "citesPrecedent": {
           "type": "string",

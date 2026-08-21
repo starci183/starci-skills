@@ -30,18 +30,17 @@ có dữ liệu thì lúc trường hợp rỗng xuất hiện là phải **thi�
 
 ## Đầu vào
 
-Tám, không hơn.
+Bảy, không hơn.
 
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
-| 1 | Region đã chấp nhận và lý do nghiệp vụ của nó | không có chủ thể, chỉ có một cái hình |
-| 2 | Hash layout **đã được chấp nhận** mà region này đến từ, vốn đã buộc direction | giải phẫu bị dựng trên layout hay direction có thể bị bỏ |
-| 3 | Direction giải ra qua layout đó | giải phẫu được vẽ bằng lựa chọn thị giác chưa ai duyệt |
+| 1 | Current source region và lý do nghiệp vụ của nó | không có chủ thể, chỉ có một cái hình |
+| 2 | Baseline bốn lock đã validate cùng current parent digest | giải phẫu bị dựng dưới partial hoặc wrong parent |
+| 3 | StarCi MASTER cùng page override deviations-only | mỗi block âm thầm chọn taste riêng |
 | 4 | Contract: **key**, `why`, `host`, **tên** children, `repeats`, `optional` — không lấy mảng class | phần bị bịa ra thay vì được tra |
 | 5 | Từ vựng: tên leaf mà contract gọi, tên composite, những block đang có | một phần trích một thành phần không tồn tại |
 | 6 | Dữ liệu của region **thật sự hỏng thế nào**, đọc từ source của page và block | `optional` bị hiểu lầm là đủ bộ trạng thái |
 | 7 | Bộ trục giải phẫu đóng | 3–4 giải phẫu khác nhau bằng trang trí |
-| 8 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi region bị trả lời như thể nó là region đầu tiên |
 
 **Đầu vào số 6 tồn tại vì contract không trả lời được nó.** `optional: true` khai **sự hiện diện** và
 không gì hơn: đang tải, thất bại và rỗng đều rơi vào cùng một cờ đó. Tách chúng ra thì phải đọc từ source

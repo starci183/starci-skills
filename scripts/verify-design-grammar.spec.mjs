@@ -19,6 +19,8 @@ function fixture() {
     profile,
     factCatalog: loaded.factCatalog,
     evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
     templateCatalog: loaded.templateCatalog,
     facts: ["boundary-shared", "collection-peer"],
   })
@@ -31,7 +33,7 @@ function fixture() {
   }
 }
 
-test("accepted design grammar recomputes byte-identically", () => {
+test("session design grammar and MASTER recompute byte-identically", () => {
   assert.equal(verifyDesignGrammar({design: fixture(), grammarRoot, profilePath}).decisions.length, 1)
 })
 
@@ -47,6 +49,8 @@ function dashboardFixture() {
     profile,
     factCatalog: loaded.factCatalog,
     evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
     templateCatalog: loaded.templateCatalog,
     facts: ["surface-dashboard-console"],
   })
