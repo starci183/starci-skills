@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "visible-label-navigation-not-compact",
+  "kind": "counterexample",
+  "because": "A visible-label destination list keeps ordinary ListBox rows and does not invent a circular compact presentation.",
+  "facts": ["collection-navigation", "selection-single", "keyboard-navigation-required"],
+  "expectedOutcomes": ["selection-listbox"],
+  "rejectedOutcomes": ["circular-icon-destination"]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "course-content-map",
+  "kind": "golden",
+  "because": "A searchable hierarchical course map combines disclosure, selection and a resizable independent content rail.",
+  "facts": [
+    "collection-hierarchical",
+    "collection-navigation",
+    "interaction-local-disclosure",
+    "selection-single",
+    "active-item-present",
+    "keyboard-navigation-required",
+    "filter-local",
+    "group-progress-present",
+    "region-adjacent",
+    "region-persistent",
+    "region-independent-scroll",
+    "width-user-adjustable",
+    "rail-content-plane",
+    "route-primary-plane",
+    "navigation-controls-pinned",
+    "navigation-groups-long",
+    "scroll-internal"
+  ],
+  "expectedOutcomes": [
+    "resizable-rail",
+    "active-descendant-follow",
+    "selection-listbox",
+    "surface-accordion",
+    "search-reveals-matches",
+    "adaptive-group-summary",
+    "rail-content-spacing",
+    "primary-content-spacing",
+    "navigation-groups-scroll-viewport"
+  ],
+  "rejectedOutcomes": ["collapsible-rail-transition"]
+}

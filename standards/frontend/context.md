@@ -9,6 +9,7 @@ None.
 | Need | Runtime target |
 |---|---|
 | Generate design candidates | `brainstorms/context.md` |
+| Resolve declared product-family facts into semantic outcomes and owners | `compilers/grammars/context.md` |
 | Resolve visual classes from accepted semantics | `compilers/principles/context.md` |
 | Resolve frontend files, props, contracts and boundaries | `compilers/patterns/fe/context.md` |
 | Judge canonical frontend lint findings | `gates/fe/lints/context.md` |

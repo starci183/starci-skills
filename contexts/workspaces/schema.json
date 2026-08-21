@@ -44,7 +44,7 @@
       "description": "What the role must read before it can answer anything.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["instructions", "contract", "contractSource", "manifests"],
+      "required": ["instructions", "contract", "contractSource", "manifests", "grammar", "grammarProfile"],
       "properties": {
         "instructions": {"type": "array", "items": {"$ref": "#/$defs/absolutePath"}},
         "contract": {
@@ -55,8 +55,23 @@
           "oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
           "description": "How that path was chosen — `declared:…` or `discovered:…`. A reviewer is owed this when the path turns out wrong."
         },
-        "manifests": {"type": "array", "items": {"$ref": "#/$defs/absolutePath"}, "description": "Package or workspace manifests, used to choose commands."}
-      }
+        "manifests": {"type": "array", "items": {"$ref": "#/$defs/absolutePath"}, "description": "Package or workspace manifests, used to choose commands."},
+        "grammar": {
+          "oneOf": [{"$ref": "#/$defs/slug"}, {"type": "null"}],
+          "description": "Explicit product-family grammar id. Never inferred from project or repository identity."
+        },
+        "grammarProfile": {
+          "oneOf": [{"$ref": "#/$defs/slug"}, {"type": "null"}],
+          "description": "Explicit owner profile inside the selected grammar. Must be null when grammar is null."
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"grammar": {"type": "null"}}, "required": ["grammar"]},
+          "then": {"properties": {"grammarProfile": {"type": "null"}}},
+          "else": {"properties": {"grammarProfile": {"$ref": "#/$defs/slug"}}}
+        }
+      ]
     },
     "updatedAt": {"type": "string", "minLength": 20, "description": "When setup last verified this route, not when it was written."}
   },

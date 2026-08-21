@@ -23,3 +23,6 @@ docs/content/
 # Universal Vite design-review runtime dependencies and rebuildable bundle
 publication/design-review-preview/app/node_modules/
 publication/design-review-preview/app/dist/
+
+# Root development dependencies used by grammar/template validation.
+/node_modules/

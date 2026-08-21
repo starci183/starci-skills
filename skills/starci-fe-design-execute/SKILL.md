@@ -13,11 +13,15 @@ description: Implement one accepted composed page or page flow from immutable de
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/context.md` | context | verify accepted revision authority |
 | `@business` | `contexts/business/context.md` | context | prove accepted behavior still matches product truth |
+| `@grammar` | `compilers/grammars/context.md` | context | recompute and verify accepted product-family outcomes and owners |
 | `@principles` | `compilers/principles/context.md` | context | resolve accepted principle obligations to current classes |
 | `@design-review` | `publication/design-review-preview/context.md` | context | accepted bundle and screenshot parity contract |
 | `@patterns-fe` | `compilers/patterns/fe/context.md` | context | resolve product files, exports and boundaries before writing |
 | `@lints-fe` | `gates/fe/lints/context.md` | context | prove source at the canonical frontend gate |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify tokens bound by the accepted layout |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | compare the current receipt with accepted design authority |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove capsule, case and template authority before source writes |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | recompute accepted facts and refuse decision or receipt drift |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve and validate current layout/block revision heads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | verify accepted design metadata and preview digest |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove business authority before the first source write |
@@ -39,7 +43,7 @@ registries/revisions/<revisionHash>/design.json
 registries/revisions/<revisionHash>/preview.html
 ```
 
-`design.json` owns identity, ownership, contract/anatomy, the UI-condition inventory, transition graph and state
+`design.json` owns identity, ownership, grammar facts/decisions/receipt, contract/anatomy, the UI-condition inventory, transition graph and state
 viewport manifest. `preview.html` owns functional composition. Verify `previewSha256` and recompute `revisionHash` from canonical design metadata plus the preview
 digest. Registry revision heads are authority; legacy objects are read-only compatibility and cannot start a new
 execution by themselves.
@@ -48,13 +52,14 @@ execution by themselves.
 
 1. Run the registry check. Resolve the current page-set revision and every declared block revision; require exact
    parent `layoutHash`, owning page, accepted artifacts, complete preview HTML and complete page/state manifests.
+   Validate the explicit grammar/profile route, recompute every accepted receipt from its facts, and require byte-identical decisions/context hashes.
 2. Verify the routed frontend, current business heads and visual vocabulary. Classify `businessImpact`.
    Business-affecting execution requires the exact feature head at `in-progress` before the first source write;
    technical-only execution declares `none` and binds current `implemented` truth. Run
    `business-write-boundary.mjs` with routed role and clean baseline. `pending` and `rejected` never authorize code.
    If current product behavior changes
    a route, data owner, action or reachable state, return to design instead of implementing stale authority.
-3. Resolve every accepted `principleObligation` through current `@principles`, then inspect source and
+3. Load only templates/capsules/principle concerns selected by the recomputed grammar context pack. Resolve every accepted `principleObligation` through current `@principles`, then inspect source and
    `@patterns-fe`. Principles choose the situation classes; patterns choose the owning files and imports. A stale
    or unrepresentable obligation returns to design. Then disclose the smallest exact frontend file boundary under
    `### NEED APPROVALS`. `OK` authorizes those paths once. Record a clean baseline commit before the first write;
@@ -82,7 +87,7 @@ execution by themselves.
 
 ## Stops
 
-- Missing/proposed/legacy-only layout or block revision, preview digest mismatch, render-only preview, incomplete
+- Missing/proposed/legacy-only layout or block revision, grammar/profile/receipt drift, preview digest mismatch, render-only preview, incomplete
   UI-condition/transition coverage, incomplete states or stale
   parent binding → stop and name the identity.
 - Accepted business behavior or vocabulary is stale → return to design.
@@ -92,6 +97,6 @@ execution by themselves.
 
 ## OUTPUT
 
-State `layoutId`, applied layout/block revision hashes, baseline, material paths and code/visual proof in concise
+State `layoutId`, applied layout/block revision hashes, grammar receipt, baseline, material paths and code/visual proof in concise
 prose. Only a genuine new authority decision may appear under `### NEED APPROVALS`; deterministic repair remains
 owned work. No status tables.

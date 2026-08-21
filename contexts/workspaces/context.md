@@ -40,6 +40,7 @@ missing forces a question, stale invites a confident wrong answer.
 | `WORKSPACE-5` | The route records a path or head that no longer holds | stop; the route is stale, not approximate |
 | `WORKSPACE-6` | The route carries local paths, secrets or credentials | route stays machine-local; never copied into the trust tree |
 | `WORKSPACE-7` | The Source-wide workspace config resolves | apply `defaultLang` to every user-facing reply |
+| `WORKSPACE-8` | A frontend role declares product-family grammar | verify the exact grammar and profile; never infer either from identity |
 
 ## Reading a start request
 
@@ -57,6 +58,8 @@ missing forces a question, stale invites a confident wrong answer.
 6. **Never widen the route.** A missing or stale route returns to setup — `WORKSPACE-2`,
    `WORKSPACE-5` — and setup refreshes configuration only; it never clones, links, copies or edits a
    target repository.
+7. **Resolve grammar explicitly.** When `context.grammar` is non-null, verify
+   `compilers/grammars/<grammar>/grammar.json` and the declared profile before design — `WORKSPACE-8`.
 
 ## `WORKSPACE-1` — a start request names project and roles
 
@@ -207,6 +210,24 @@ in this Source.
 **How it fails.** Each skill chooses its own reporting language, so one run replies in Vietnamese and
 the next silently returns to English even though both use the same Source.
 
+## `WORKSPACE-8` — frontend grammar is explicitly routed
+
+**Situation.** A frontend role uses a product-family grammar and one project owner profile.
+
+**Recognition signs**
+
+- `context.grammar` and `context.grammarProfile` are both non-null.
+- The compiler package and profile exist under the trust tree.
+
+**Ask yourself.** Did the route state this identity, or did the project/repository name merely resemble it?
+
+**Boundary**
+
+- A role with no product-family grammar records both values as `null`; one null and one non-null is stale.
+
+**How it fails.** A design skill sees “StarCi” in a checkout name and silently loads product behavior the
+route never selected, or loads every grammar and lets the model choose.
+
 ## Inputs
 
 | Input | Evidence required |
@@ -216,6 +237,7 @@ the next silently returns to English even though both use the same Source.
 | route | `.workspace/<project>/<role>/config.json`, valid against `@schema` beside this record |
 | checkout | The directory at `repository.diskPath`, present on disk |
 | contract | The file at `context.contract`, and `context.contractSource` for its provenance |
+| grammar | Exact `context.grammar` package and `context.grammarProfile`, or both explicitly `null` |
 | freshness | Recorded head and branch still describing that checkout |
 
 ## Rules
@@ -229,6 +251,7 @@ the next silently returns to English even though both use the same Source.
    never route values in the first place.
 7. Every start request resolves to exactly one verdict per role: read, or stop.
 8. `defaultLang` is resolved once from `.workspace/config.json` and applies across every project and role.
+9. Grammar and profile are an explicit pair; identity names never select them.
 
 ## Exceptions
 
@@ -250,7 +273,8 @@ role: <role>
 route: .workspace/<project>/<role>/config.json
 repository: <diskPath>
 verified: <what was checked against disk or git>
-situation: <WORKSPACE-1 | WORKSPACE-2 | WORKSPACE-3 | WORKSPACE-4 | WORKSPACE-5 | WORKSPACE-6>
+sense: <grammar/profile, or none>
+situation: <WORKSPACE-1 | WORKSPACE-2 | WORKSPACE-3 | WORKSPACE-4 | WORKSPACE-5 | WORKSPACE-6 | WORKSPACE-7 | WORKSPACE-8>
 verdict: <read | stop>
 reason: <the fact that decided it>
 ```

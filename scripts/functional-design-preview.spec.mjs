@@ -41,3 +41,8 @@ test("refuses omitted UI condition families and network-backed previews", () => 
     assert.ok(failures.some((failure) => failure.includes("may not perform network")))
     assert.ok(failures.some((failure) => failure.includes("conditionInventory is missing")))
 })
+
+test("refuses a routed grammar without its accepted receipt", () => {
+    const failures = functionalPreviewFailures({...design, grammar: "starci", grammarProfile: "starci-academy", grammarFacts: [], grammarDecisions: []}, preview)
+    assert.ok(failures.some((failure) => failure.includes("requires grammarReceipt")))
+})

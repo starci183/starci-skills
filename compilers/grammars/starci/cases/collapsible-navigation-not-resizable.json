@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "collapsible-navigation-not-resizable",
+  "kind": "counterexample",
+  "because": "Two stable navigation presentations switch state rather than exposing a continuous width choice.",
+  "facts": ["collection-navigation", "region-adjacent", "region-persistent", "region-independent-scroll", "width-user-collapsible"],
+  "expectedOutcomes": ["collapsible-rail-transition"],
+  "rejectedOutcomes": ["resizable-rail"]
+}

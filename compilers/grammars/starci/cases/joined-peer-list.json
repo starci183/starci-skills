@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "joined-peer-list",
+  "kind": "golden",
+  "because": "Comparable peer rows share one surface boundary and full-bleed interior separators.",
+  "facts": ["collection-peer", "boundary-shared"],
+  "expectedOutcomes": ["surface-list"],
+  "rejectedOutcomes": ["surface-accordion"]
+}

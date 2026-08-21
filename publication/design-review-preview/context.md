@@ -16,7 +16,7 @@ accepted composition is durable HTML bound to one immutable revision.
 
 JSON and HTML are co-authorities with disjoint responsibilities:
 
-- `design.json` owns identity, parent binding, business/contract ownership, accepted artifact, post-creative
+- `design.json` owns identity, parent binding, business/contract ownership, routed grammar facts/decisions/receipt, accepted artifact, post-creative
   `principleObligations`, UI-condition inventory, transition graph and the state viewport manifest.
 - `preview.html` owns composition, hierarchy, surfaces, responsive behavior and the executable authored rendering
   of every declared state.

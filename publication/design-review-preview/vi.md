@@ -20,7 +20,7 @@ accepted composition là HTML bền vững bind vào một revision bất biến
 
 JSON và HTML cùng có thẩm quyền nhưng sở hữu hai việc khác nhau:
 
-- `design.json` sở hữu identity, parent binding, business/contract ownership, accepted artifact,
+- `design.json` sở hữu identity, parent binding, business/contract ownership, grammar fact/decision/receipt đã route, accepted artifact,
   `principleObligations` sau sáng tạo, business-content matrix theo state, UI-condition inventory, transition graph và state viewport manifest.
 - `preview.html` sở hữu composition, hierarchy, surfaces, responsive behavior và executable authored rendering
   của mọi state đã khai báo.

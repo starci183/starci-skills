@@ -1,6 +1,8 @@
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const REQUIRED_CONDITION_FAMILIES = ["viewport", "overlay", "disclosure", "async", "data", "permission", "interaction"]
 const PRINCIPLE_MODULES = new Set(["alignment", "colour", "distribution", "divider", "flow", "gap", "grid", "overflow", "padding", "radius", "responsive", "size", "state", "surface-in-surface", "typography"])
+const RECEIPT_HASH_FIELDS = ["grammarHash", "profileHash", "factCatalogHash", "evidenceCatalogHash", "factsHash", "decisionsHash", "contextPackHash"]
+const HEX_HASH = /^[0-9a-f]{64}$/
 
 const containsAttribute = (html, name, value) => new RegExp(`${name}\\s*=\\s*(?:"${value}"|'${value}')`, "i").test(html)
 
@@ -12,6 +14,26 @@ export function functionalPreviewFailures(design, html, label = "design preview"
         return failures
     }
     if (design.functional !== true) fail("design.json must declare functional: true")
+    const hasGrammar = [design.grammar, design.grammarProfile, design.grammarFacts, design.grammarDecisions, design.grammarReceipt]
+        .some((value) => value !== undefined)
+    if (hasGrammar) {
+        if (!SLUG.test(design.grammar ?? "") || !SLUG.test(design.grammarProfile ?? "")) {
+            fail("design.json grammar and grammarProfile must be explicit slugs")
+        }
+        if (!Array.isArray(design.grammarFacts) || design.grammarFacts.some((fact) => !SLUG.test(fact ?? ""))) {
+            fail("design.json grammarFacts must be a closed slug array")
+        }
+        if (!Array.isArray(design.grammarDecisions)) fail("design.json requires grammarDecisions")
+        const receipt = design.grammarReceipt
+        if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+            fail("design.json requires grammarReceipt")
+        } else {
+            if (receipt.grammar !== design.grammar || receipt.profileId !== design.grammarProfile) {
+                fail("grammarReceipt identity differs from the routed grammar/profile")
+            }
+            for (const field of RECEIPT_HASH_FIELDS) if (!HEX_HASH.test(receipt[field] ?? "")) fail(`grammarReceipt.${field} must be a canonical SHA-256 hash`)
+        }
+    }
     const obligations = Array.isArray(design.principleObligations) ? design.principleObligations : []
     const obligationKeys = new Set()
     if (requirePrinciples && !obligations.length) fail("design.json requires principleObligations from post-creative principles review")

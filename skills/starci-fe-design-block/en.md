@@ -12,10 +12,13 @@ title: starci-fe-design-block · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/en.md` | en | resolve real data, actions and reachable states |
+| `@grammar` | `compilers/grammars` | module | resolve routed product-family facts into block outcomes and owners |
 | `@principles` | `compilers/principles` | module | audit selected anatomy after creativity |
 | `@blocks` | `brainstorms/blocks/en.md` | en | block ownership, anatomy, state and contract law |
 | `@design-review` | `publication/design-review-preview/en.md` | en | exact-parent HTML review and immutable bundle contract |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify the vocabulary bound by the parent layout |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | recompute deterministic block grammar decisions and receipt |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package before anatomy work |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify accepted parent and block heads |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish cache review and accepted preview bundle |
@@ -33,8 +36,8 @@ block state, and publishes one immutable accepted revision. It never writes fron
 
 **Authority.**
 
-- `design.json` owns `(layoutId, blockId)`, parent `layoutHash`, data ownership, contract verdicts, anatomy,
-  reachable state IDs and viewport obligations.
+- `design.json` owns `(layoutId, blockId)`, parent `layoutHash`, grammar facts/decisions/receipt, data ownership,
+  contract verdicts, anatomy, reachable state IDs and viewport obligations.
 - `preview.html` owns block composition and every rendered state inside the exact accepted parent page.
 
 Draft candidates exist only below `.worktrees/<project>/cache`. Acceptance writes exactly:
@@ -63,7 +66,9 @@ Read only the business surface and flows that touch the region. Enumerate every 
 the candidates. `optional` describes presence; it cannot tell pending, empty and failed apart. Unknown ownership,
 actions or outcomes are product decisions and are returned to the owner.
 
-Read `@blocks`, resolve every part by business reason, and keep JSON class-free. Existing vocabulary must support
+Validate the explicit grammar/profile pair and require the accepted parent's grammar receipt. Read `@blocks`,
+classify evidenced block situations into closed facts, run `@resolve-grammar`, resolve every part by business reason,
+and keep JSON class-free. Existing vocabulary must support
 each cited leaf/composite, or the artifact records a measured generalization/new contract need.
 
 **3. Author the choices in the full parent page.**
@@ -108,7 +113,7 @@ Every candidate and accepted state must prove:
 
 ## Stops
 
-- Missing accepted parent revision, undeclared block or stale parent binding stops the run.
+- Missing accepted parent revision, grammar/profile/receipt, undeclared block or stale parent binding stops the run.
 - Unknown data ownership, action, outcome or state returns the product decision.
 - Missing candidate HTML, exact-parent embedding, selected-state HTML or viewport coverage blocks
   approval/publication.

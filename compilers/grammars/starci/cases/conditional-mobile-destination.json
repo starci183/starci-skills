@@ -1,0 +1,14 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "conditional-mobile-destination",
+  "kind": "golden",
+  "because": "A local mobile destination disappears when no backing panel exists and stale selection must reset.",
+  "facts": [
+    "navigation-mobile-destination-conditional",
+    "destination-content-absent",
+    "navigation-local-view-state"
+  ],
+  "expectedOutcomes": ["omit-empty-mobile-destination"],
+  "rejectedOutcomes": []
+}

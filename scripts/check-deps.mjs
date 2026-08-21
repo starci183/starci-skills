@@ -21,6 +21,7 @@ if (!modeLanes.has(mode) || process.argv.length > 3) {
 const selectedLanes = new Set(modeLanes.get(mode));
 const findings = { context: [], en: [], vi: [] };
 const packageCache = new Map();
+const ignoredRuntimeDirectories = new Set([".git", ".claude", ".testtmp", "docs", "node_modules", "worktrees", "sessions", "cache"]);
 
 function laneFor(file) {
   if (file.endsWith(`${sep}context.md`) || file.endsWith(`${sep}SKILL.md`) || file === join(root, "INDEX.md")) return "context";
@@ -38,7 +39,7 @@ function report(file, line, message) {
 function markdownFiles(directory) {
   const files = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === ".git" || entry.name === "docs") continue;
+    if (ignoredRuntimeDirectories.has(entry.name)) continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) files.push(...markdownFiles(path));
     else if (entry.isFile() && entry.name.endsWith(".md")) files.push(path);

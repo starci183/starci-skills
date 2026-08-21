@@ -1,0 +1,16 @@
+{
+  "name": "starci-skills",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Executable checks for the StarCi skills trust tree.",
+  "scripts": {
+    "test": "node --test scripts/fe-grammar.spec.mjs scripts/verify-design-grammar.spec.mjs scripts/functional-design-preview.spec.mjs",
+    "test:all": "node --test \"scripts/*.spec.mjs\"",
+    "check:contexts": "node scripts/compile-context.mjs --check .",
+    "check:deps": "node scripts/check-deps.mjs --all",
+    "validate:grammars": "node scripts/validate-fe-grammar.mjs --grammar compilers/grammars/starci"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

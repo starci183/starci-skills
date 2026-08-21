@@ -13,10 +13,13 @@ description: Challenge and design one declared block inside its exact accepted c
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/context.md` | context | resolve real data, actions and reachable states |
+| `@grammar` | `compilers/grammars/context.md` | context | resolve routed product-family facts into block outcomes and owners |
 | `@principles` | `compilers/principles/context.md` | context | audit the model-selected anatomy after creativity |
 | `@blocks` | `brainstorms/blocks/context.md` | context | block ownership, anatomy, state and contract law |
 | `@design-review` | `publication/design-review-preview/context.md` | context | exact-parent HTML review and immutable bundle contract |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify the vocabulary bound by the parent layout |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | recompute deterministic block grammar decisions and receipt |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package before anatomy work |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify accepted parent and block heads |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish cache review and accepted preview bundle |
@@ -33,8 +36,8 @@ page's full nested composition, direction and geometry; it never accepts a secon
 
 JSON and HTML have separate authority:
 
-- `design.json` owns `(layoutId, blockId)`, parent `layoutHash`, data ownership, contract verdicts, anatomy,
-  per-state business-content matrix, UI-condition inventory, transitions, reachable state IDs and viewport obligations.
+- `design.json` owns `(layoutId, blockId)`, parent `layoutHash`, grammar facts/decisions/receipt, data ownership,
+  contract verdicts, anatomy, per-state business-content matrix, UI-condition inventory, transitions, reachable state IDs and viewport obligations.
 - `preview.html` owns the block's functional composition and every rendered state inside the exact accepted parent page.
 
 Drafts live only below `.worktrees/<project>/cache`. Acceptance writes exactly one immutable bundle:
@@ -51,9 +54,9 @@ compatibility.
 
 ## Process
 
-1. Resolve the context lock, verified `fe` route, clean registry worktree and current accepted layout revision.
+1. Resolve the context lock, verified `fe` route, explicit grammar/profile pair, clean registry worktree and current accepted layout revision.
    Resolve the owning page and refuse an undeclared `blockId`, stale parent binding, missing page placement or
-   mismatched visual vocabulary.
+   mismatched visual vocabulary. Validate the grammar package and require the parent grammar receipt.
 2. Read only the business surface and flows touching this region. Enumerate every reachable condition before drawing:
    viewport, overlay, disclosure, async, data, permission and interaction states. Modal, drawer, popover/menu,
    loading, empty, partial, error, success, locked and disabled are included when evidence can reach them;
@@ -63,7 +66,8 @@ compatibility.
    candidates; contract `optional` never substitutes for source evidence about pending, empty or failed states.
 3. Read `@blocks`, then challenge the region before drawing: identify its visual job, what the eye should read
    first, whether an existing ListBox/list surface/card/branch already solves grouping, and who owns its boundary
-   and scroll. Resolve parts by business reason. Author 3–4 complete HTML/CSS blocks inside the exact accepted
+   and scroll. Classify evidenced block situations into closed grammar facts, run `@resolve-grammar`, and bind
+   emitted outcomes/owners as constraints before resolving parts by business reason. Author 3–4 complete HTML/CSS blocks inside the exact accepted
    page state in parent `preview.html`, exact region bounds and representative data. Candidates are functional
    HTML/CSS/JS, not screenshots: their controls execute deterministic in-memory transitions. Each must change meaningful
    anatomy, grouping or interaction ownership; decoration alone is a duplicate. Rank them against business fit,
@@ -107,7 +111,7 @@ Every candidate and selected state must prove:
 
 ## Stops
 
-- Missing accepted parent revision, owning page, undeclared block identity or stale `layoutHash` → stop.
+- Missing accepted parent revision, owning page, grammar/profile/receipt, undeclared block identity or stale `layoutHash` → stop.
 - Unknown data ownership, action, outcome or state → return the product decision, never infer it.
 - Missing candidate HTML, parent embedding, selected-state HTML, condition coverage, executable transition or
   viewport coverage → do not approve or publish. A render-only block is invalid.
@@ -120,5 +124,5 @@ Every candidate and selected state must prove:
 
 In concise prose, give `layoutId`, `blockId`, parent `layoutHash`, 3–4 ranked candidates, the model-selected
 recommendation and review URL. Ask nothing unless a genuine product decision remains.
-Use one approval checkpoint. After `OK`, report the accepted `revisionHash` and proved states/viewports. No status
+Use one approval checkpoint. After `OK`, report the accepted `revisionHash`, grammar receipt and proved states/viewports. No status
 tables.

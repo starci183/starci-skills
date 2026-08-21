@@ -34,7 +34,8 @@ adds no write. Execute requested local actions in registry order:
 3. **Workspaces** — verify the Source-wide language, persistent family offsets/application slots, and
    every declared project/role read route against the real checkout. Allocation stays in
    `.workspace/ports/config.json` plus one `.workspace/ports/<project>.json`; init never copies allocation
-   ownership into a product.
+   ownership into a product. For every role, write `grammar` and `grammarProfile` as both null or an
+   explicitly declared pair whose compiler package and profile exist; never infer them from identity.
 4. **Worktrees** — verify the project design registry, business authority and cache roots against Git's
    own worktree account and path policy. Create or reuse `businesses` independently on
    `codex/businesses/<project>`; never place it in the design-registry worktree or disposable cache.

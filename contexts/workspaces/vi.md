@@ -45,6 +45,7 @@ thì buộc phải hỏi, cũ thì mời người ta trả lời sai một cách
 | `WORKSPACE-5` | Route ghi một đường dẫn hoặc head không còn đúng | dừng; route đã cũ, không phải xấp xỉ |
 | `WORKSPACE-6` | Route mang đường dẫn máy, khoá hoặc thông tin đăng nhập | route ở lại trong máy; không bao giờ chép vào cây quy tắc |
 | `WORKSPACE-7` | Config workspace chung của Source resolve được | áp dụng `defaultLang` cho mọi phản hồi tới người dùng |
+| `WORKSPACE-8` | Role frontend khai báo product-family grammar | verify đúng grammar và profile; không suy ra từ identity |
 
 ## Đọc một lệnh khởi động
 
@@ -62,6 +63,8 @@ thì buộc phải hỏi, cũ thì mời người ta trả lời sai một cách
 6. **Không bao giờ nới route ra.** Route thiếu hoặc cũ thì trả về setup — `WORKSPACE-2`,
    `WORKSPACE-5` — và setup chỉ làm mới cấu hình; nó không clone, không link, không copy, không sửa
    repository đích.
+7. **Resolve grammar rõ ràng.** Khi `context.grammar` khác null, verify
+   `compilers/grammars/<grammar>/grammar.json` và profile đã khai báo trước design — `WORKSPACE-8`.
 
 ## `WORKSPACE-1` — lệnh khởi động gọi tên project và vai trò
 
@@ -213,6 +216,24 @@ trong Source này.
 **Nó hỏng bằng đường nào.** Mỗi skill tự chọn ngôn ngữ báo cáo, nên một lượt trả lời tiếng Việt còn lượt
 sau âm thầm quay về tiếng Anh dù cả hai dùng cùng Source.
 
+## `WORKSPACE-8` — frontend grammar được route rõ ràng
+
+**Khi nào gặp.** Một role frontend dùng product-family grammar và một owner profile theo project.
+
+**Cách nhận ra**
+
+- `context.grammar` và `context.grammarProfile` đều khác null.
+- Compiler package và profile tồn tại trong trust tree.
+
+**Tự hỏi.** Route đã nêu identity này, hay tên project/repository chỉ trông giống nó?
+
+**Ranh giới**
+
+- Role không dùng product-family grammar ghi cả hai giá trị là `null`; một null một khác null là stale.
+
+**Nó hỏng bằng đường nào.** Design skill thấy chữ “StarCi” trong tên checkout rồi tự load product
+behavior route chưa chọn, hoặc load mọi grammar rồi để model đoán.
+
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
@@ -222,6 +243,7 @@ sau âm thầm quay về tiếng Anh dù cả hai dùng cùng Source.
 | route | `.workspace/<project>/<role>/config.json`, hợp `@schema` nằm cạnh bản ghi này |
 | checkout | Thư mục tại `repository.diskPath`, có thật trên đĩa |
 | hợp đồng | Tệp tại `context.contract`, và `context.contractSource` cho xuất xứ của nó |
+| grammar | Đúng package `context.grammar` và `context.grammarProfile`, hoặc cả hai ghi rõ `null` |
 | độ mới | Head và nhánh đã ghi còn mô tả đúng checkout đó |
 
 ## Quy tắc
@@ -235,6 +257,7 @@ sau âm thầm quay về tiếng Anh dù cả hai dùng cùng Source.
    thì ngay từ đầu đã không phải giá trị của route.
 7. Mỗi lệnh khởi động ra đúng một phán quyết cho mỗi vai trò: đọc, hoặc dừng.
 8. `defaultLang` được resolve một lần từ `.workspace/config.json` và áp dụng xuyên mọi project, role.
+9. Grammar và profile là một cặp khai báo rõ; tên identity không được chọn thay.
 
 ## Ngoại lệ
 
@@ -256,7 +279,8 @@ role: <role>
 route: .workspace/<project>/<role>/config.json
 repository: <diskPath>
 verified: <đã kiểm gì với đĩa hoặc với git>
-situation: <WORKSPACE-1 | WORKSPACE-2 | WORKSPACE-3 | WORKSPACE-4 | WORKSPACE-5 | WORKSPACE-6>
+sense: <grammar/profile, hoặc none>
+situation: <WORKSPACE-1 | WORKSPACE-2 | WORKSPACE-3 | WORKSPACE-4 | WORKSPACE-5 | WORKSPACE-6 | WORKSPACE-7 | WORKSPACE-8>
 verdict: <read | stop>
 reason: <sự thật đã quyết định điều đó>
 ```

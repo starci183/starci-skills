@@ -13,11 +13,14 @@ description: Challenge, design or revise one composed frontend page or flow usin
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/context.md` | context | bind the page to current product truth |
+| `@grammar` | `compilers/grammars/context.md` | context | resolve explicitly routed product-family facts into outcomes and owners |
 | `@principles` | `compilers/principles/context.md` | context | review model-selected visual decisions after creativity |
 | `@directions` | `brainstorms/directions/context.md` | context | evidence-select the visual direction embedded in the layout |
 | `@layouts` | `brainstorms/layouts/context.md` | context | layout regions, axes, ownership and contract verdicts |
 | `@design-review` | `publication/design-review-preview/context.md` | context | authored HTML review and immutable bundle contract |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit deterministic selected grammar decisions and compact context |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package before candidate work |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind choices to the current frontend vocabulary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify current heads and accepted revisions |
@@ -41,8 +44,8 @@ explicitly targets it.
 
 JSON and HTML have separate authority:
 
-- `design.json` owns identity, business/contract ownership, regions, the per-state business-content matrix,
-  UI-condition inventory, transition graph, state IDs and viewport obligations.
+- `design.json` owns identity, business/contract ownership, grammar facts/decisions/receipt, regions, the
+  per-state business-content matrix, UI-condition inventory, transition graph, state IDs and viewport obligations.
 - `preview.html` owns composition, hierarchy, surfaces, responsive behavior and executable rendering of every
   declared condition/state.
 
@@ -59,8 +62,8 @@ registry's revision map and layout head are lookup authority; legacy objects are
 
 ## Process
 
-1. Resolve the context lock, verified `fe` route, clean registry worktree, current business surface and visual
-   vocabulary. Before drawing, inventory the real route tree and emit a compact pattern sheet naming every nested
+1. Resolve the context lock, verified `fe` route, its explicit grammar/profile pair, clean registry worktree,
+   current business surface and visual vocabulary. Validate the grammar package before drawing. Inventory the real route tree and emit a compact pattern sheet naming every nested
    layout, page, active overlay, region, breakpoint and scroll owner. `Touching` names only the project registry
    and disposable cache.
 2. Convert the request into one page set. A screenshot produces exactly the visible page/state. A described flow
@@ -69,7 +72,9 @@ registry's revision map and layout head are lookup authority; legacy objects are
 3. Read `@directions` and `@layouts`, then run a short design challenge before drawing: identify the first visual
    focus, competing regions, navigation/content/evidence roles, reusable precedents, and the owner of width,
    divider, sticky and scroll behavior. Reject a composition that is only schema-complete. Evidence-select one
-   direction without a separate approval.
+   direction without a separate approval. Classify only evidenced situations into closed grammar facts, run
+   `@resolve-grammar`, and treat every emitted owner/outcome as a binding semantic constraint. Missing facts or
+   `new-required` owners return the decision instead of producing generic markup.
 4. Keep JSON free of classes. Schema 4 records each page's route, preview state, ordered composition nodes and
    regions. Bind every `existing` node to source path/hash and keep it identical across candidates. Resolve only
    target regions by business reason as `reuse`, measured `generalize`, or `new`; refuse unresolved ownership.
@@ -133,7 +138,7 @@ requirements. Choose them only when the accepted situation calls for them.
 
 ## Stops
 
-- Missing/stale route, business truth, vocabulary or registry ownership → stop with exact evidence.
+- Missing/stale route, grammar/profile, grammar receipt, business truth, vocabulary or registry ownership → stop with exact evidence.
 - Missing stable `layoutId`, page-set decomposition, source evidence for an `existing` node, duplicate candidate
   axes or fabricated product content → refuse the draft.
 - Lorem ipsum, placeholder labels, generic cards, toy row counts, repeated filler or a visibly partial business
@@ -150,5 +155,5 @@ requirements. Choose them only when the accepted situation calls for them.
 
 In concise prose, give `layoutId`, page/flow scope, the pattern sheet, 3–4 ranked candidates, the model-selected
 recommendation and review URL. Ask nothing unless a genuine product decision or write boundary remains.
-Use one approval checkpoint. After `OK`, report the accepted `revisionHash`, persisted page/state viewports and
+Use one approval checkpoint. After `OK`, report the accepted `revisionHash`, grammar receipt, persisted page/state viewports and
 remaining block regions. No status tables.

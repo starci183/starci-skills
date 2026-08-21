@@ -19,7 +19,9 @@ record before the route is reusable. It never copies the offset into a target re
 
 Verify checkout, repository, branch/head, manifests, and the real contract location before classifying a
 route as `create`, `reuse`, or `refresh`. A missing contract is `null` only when the repository truly has
-none. Route records are machine-local descriptions: they never clone, mirror, mount, or edit a target,
+none. Record `grammar` and `grammarProfile` as an explicit pair: both `null`, or both resolving to the
+exact compiler package and profile. Project and repository names never infer them. Route records are
+machine-local descriptions: they never clone, mirror, mount, or edit a target,
 and never contain credentials or environment values.
 
 Evidence is the shared config, port allocation, every role record, and each resolved checkout fact. Action writes or

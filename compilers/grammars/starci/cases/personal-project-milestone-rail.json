@@ -1,0 +1,24 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "personal-project-milestone-rail",
+  "kind": "golden",
+  "because": "Authored milestone labels live in a resizable content rail whose long groups scroll below pinned controls.",
+  "facts": [
+    "collection-navigation",
+    "region-adjacent",
+    "region-persistent",
+    "region-independent-scroll",
+    "width-user-adjustable",
+    "rail-content-plane",
+    "navigation-controls-pinned",
+    "navigation-groups-long",
+    "scroll-internal"
+  ],
+  "expectedOutcomes": [
+    "resizable-rail",
+    "rail-content-spacing",
+    "navigation-groups-scroll-viewport"
+  ],
+  "rejectedOutcomes": ["collapsible-rail-transition"]
+}

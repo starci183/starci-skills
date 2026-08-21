@@ -45,6 +45,16 @@
       "kind": "router",
       "contextVersion": 1
     },
+    "compilers/grammars/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "compilers/grammars/starci/context.md": {
+      "kind": "module",
+      "source": "compilers/grammars/starci/en.md",
+      "sourceHash": "6855bc99365f1c147644a8de5f07cb2feb3200a7f9b14e694e91e677c9bb6f4c",
+      "contextVersion": 1
+    },
     "compilers/patterns/be/api-evolution/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/api-evolution/en.md",
@@ -464,7 +474,7 @@
     "contexts/workspaces/context.md": {
       "kind": "module",
       "source": "contexts/workspaces/en.md",
-      "sourceHash": "3a350d8684664fcb870de3e002585e2cce270d869d2da40a01869a2cca9351b1",
+      "sourceHash": "d24db7cc27b84d89a2a94b2f3530af369eb9a918f9fd2a11bf615a0eb7a15aa3",
       "contextVersion": 1
     },
     "contexts/worktrees/context.md": {
@@ -756,7 +766,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "d4f5cf7e14a1e1f7e119486dba321ef58c2db6957cc9f14becd7be4c78f03110",
+      "sourceHash": "1e127bf977dad3b4e80916ba41f15658f6d21a8d1e707cfb3924f45311f6039b",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {
@@ -780,7 +790,7 @@
     "readiness/initialization/workspaces/context.md": {
       "kind": "module",
       "source": "readiness/initialization/workspaces/en.md",
-      "sourceHash": "c14c08ef9efd4dde6ade6f218d2b3c5c8cf5fe7ecf80c120344ce02166ca9055",
+      "sourceHash": "480fc5fe4ec90766e4cd1c2777d22efee0bee35aa1fb139a548f2148ac3e9c48",
       "contextVersion": 1
     },
     "readiness/initialization/worktrees/context.md": {
@@ -898,7 +908,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "f5c28c4df4f16dac6037f81a1803827a0d0a4e704f849f700adc5c0027edad1e",
+      "sourceHash": "b07ab09553333beaa1e2bd0531949558d21654f03d5584cf01f440d79d6b90c8",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

@@ -12,11 +12,15 @@ title: starci-fe-design-execute · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | verify accepted revision authority |
 | `@business` | `contexts/business/en.md` | en | prove accepted behavior still matches product truth |
+| `@grammar` | `compilers/grammars` | module | recompute and verify accepted product-family outcomes and owners |
 | `@principles` | `compilers/principles` | module | resolve accepted principle obligations |
 | `@design-review` | `publication/design-review-preview/en.md` | en | accepted bundle and screenshot parity contract |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve product files, exports and boundaries before writing |
 | `@lints-fe` | `gates/fe/lints` | module | prove source at the canonical frontend gate |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify tokens bound by the accepted layout |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | compare the current receipt with accepted design authority |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove capsule, case and template authority before source writes |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | recompute accepted facts and refuse decision or receipt drift |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve and validate current layout/block revision heads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | verify accepted design metadata and preview digest |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove authority before source write |
@@ -39,7 +43,7 @@ registries/revisions/<revisionHash>/design.json
 registries/revisions/<revisionHash>/preview.html
 ```
 
-`design.json` owns identity, ownership, contract/anatomy and the state viewport manifest. `preview.html` owns
+`design.json` owns identity, ownership, grammar facts/decisions/receipt, contract/anatomy and the state viewport manifest. `preview.html` owns
 composition. Verify its `previewSha256` and recompute `revisionHash` from canonical design metadata plus the
 preview digest. Registry revision heads are implementation authority. Legacy objects remain readable history but
 cannot start a new execution without a current revision bundle.
@@ -52,6 +56,8 @@ Run the registry check. Resolve every page and ordered nested ownership node in 
 every declared block revision against its owning page. Require an exact
 parent `layoutHash`, accepted artifacts, valid preview digest and complete state viewport manifests. A proposed,
 missing, legacy-only or stale child stops execution before source inspection becomes a write plan.
+Validate the explicit grammar/profile route and recompute every accepted receipt from its facts. Only the selected
+capsules, templates and principle concerns enter implementation context; any hash drift returns to design.
 
 **2. Verify current truth and the write boundary.**
 
@@ -95,7 +101,7 @@ approval checkpoint.
 
 ## Stops
 
-- Missing/proposed/legacy-only revision, preview digest mismatch, incomplete states or stale parent binding stops
+- Missing/proposed/legacy-only revision, grammar/profile/receipt drift, preview digest mismatch, incomplete states or stale parent binding stops
   execution and names the identity.
 - Stale business behavior or vocabulary returns to design.
 - Dirty target tree or a required path outside approved `Touching` stops the run.
@@ -109,5 +115,5 @@ conditions. A render-only implementation or screenshot-only parity fails.
 
 ## OUTPUT
 
-State `layoutId`, applied layout/block revision hashes, baseline, material paths and code/visual proof in concise
+State `layoutId`, applied layout/block revision hashes, grammar receipt, baseline, material paths and code/visual proof in concise
 prose. Only a genuine new authority decision appears under `### NEED APPROVALS`. No status tables.

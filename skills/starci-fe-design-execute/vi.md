@@ -12,11 +12,15 @@ title: starci-fe-design-execute · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra frontend checkout |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra accepted revision authority |
 | `@business` | `contexts/business/vi.md` | vi | chứng minh behavior accepted còn khớp product truth |
+| `@grammar` | `compilers/grammars` | module | tính lại và verify product-family outcome/owner đã accept |
 | `@principles` | `compilers/principles` | module | resolve accepted principle obligations |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | hợp đồng accepted bundle và screenshot parity |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve product files, exports và boundary trước write |
 | `@lints-fe` | `gates/fe/lints` | module | chứng minh source ở canonical frontend gate |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | kiểm tra token đã bind bởi accepted layout |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | so receipt hiện hành với design authority đã accept |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh capsule, case, template trước khi ghi source |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | tính lại fact đã accept và từ chối decision/receipt drift |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve và validate current revision heads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra accepted metadata và preview digest |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove authority trước source write |
@@ -37,9 +41,12 @@ registries/revisions/<revisionHash>/design.json
 registries/revisions/<revisionHash>/preview.html
 ```
 
-`design.json` sở hữu identity, ownership, contract/anatomy và state viewport manifest. `preview.html` sở hữu
+`design.json` sở hữu identity, ownership, grammar fact/decision/receipt, contract/anatomy và state viewport manifest. `preview.html` sở hữu
 composition. Phải kiểm tra `previewSha256` và tính lại `revisionHash` từ canonical metadata cộng preview digest.
 Registry revision heads là implementation authority; legacy objects chỉ là lịch sử đọc được.
+
+Validate route grammar/profile rõ ràng rồi tính lại mọi accepted receipt từ fact. Chỉ capsule, template và
+principle concern đã chọn được vào implementation context; hash drift phải quay lại design.
 
 ## Process
 
@@ -64,7 +71,7 @@ Registry revision heads là implementation authority; legacy objects chỉ là l
 
 ## Stops
 
-- Revision thiếu/proposed/legacy-only, digest sai, state thiếu hoặc stale parent → dừng và gọi identity.
+- Revision thiếu/proposed/legacy-only, grammar/profile/receipt drift, digest sai, state thiếu hoặc stale parent → dừng và gọi identity.
 - Business behavior/vocabulary stale → quay lại design.
 - Target tree dirty hoặc cần path ngoài `Touching` → dừng.
 - Contract class/pattern không biểu diễn được → trả contract decision, không xấp xỉ.
@@ -77,5 +84,5 @@ Render-only implementation hay screenshot-only parity đều fail.
 
 ## OUTPUT
 
-Nêu `layoutId`, applied layout/block revision hashes, baseline, material paths và code/visual proof bằng văn xuôi
+Nêu `layoutId`, applied layout/block revision hashes, grammar receipt, baseline, material paths và code/visual proof bằng văn xuôi
 ngắn. Chỉ authority decision mới được nằm dưới `### NEED APPROVALS`. Không dùng bảng trạng thái.

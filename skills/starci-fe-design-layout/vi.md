@@ -12,11 +12,14 @@ title: starci-fe-design-layout · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra route frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | tách revision bền vững khỏi draft tạm |
 | `@business` | `contexts/business/vi.md` | vi | bind trang vào product truth hiện hành |
+| `@grammar` | `compilers/grammars` | module | resolve product-family fact được route rõ thành outcome và owner |
 | `@principles` | `compilers/principles` | module | review quyết định thị giác sau sáng tạo |
 | `@directions` | `brainstorms/directions/vi.md` | vi | chọn direction có bằng chứng để nhúng vào layout |
 | `@layouts` | `brainstorms/layouts/vi.md` | vi | region, axis, ownership và contract verdict của layout |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | review HTML được viết thật và hợp đồng bundle bất biến |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo lý do mà không lộ class |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit grammar decision tất định và context gọn đã chọn |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh grammar package trước khi tạo candidate |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind lựa chọn vào vocabulary frontend hiện hành |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash design artifact |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | kiểm tra head và accepted revision hiện hành |
@@ -36,7 +39,7 @@ source.
 
 **Thẩm quyền.**
 
-- `design.json` sở hữu identity, ownership nghiệp vụ/contract, regions, accepted artifact, state IDs và viewport.
+- `design.json` sở hữu identity, ownership nghiệp vụ/contract, grammar fact/decision/receipt, regions, accepted artifact, state IDs và viewport.
 - `preview.html` sở hữu composition, hierarchy, surfaces, responsive behavior và HTML của mọi state.
 
 Draft chỉ sống dưới `.worktrees/<project>/cache`. Khi accepted, chỉ ghi:
@@ -59,7 +62,9 @@ layout chấp thuận cả direction lẫn composition.
    visual vocabulary hiện hành. Trước khi vẽ, lập pattern sheet từ route tree thật: root/app/feature layouts,
    routed pages, overlays và regions theo thứ tự lồng. Gắn mỗi node là `existing`, `proposed` hoặc `new`;
    `existing` phải có source + source hash và được tái dùng nguyên trạng trong mọi phương án.
-2. Đọc `@directions` và `@layouts`, chọn một direction recommendation có bằng chứng, resolve region theo lý do
+2. Validate cặp grammar/profile được route khai rõ. Đọc `@directions` và `@layouts`, phân loại chỉ tình huống có
+   bằng chứng thành closed fact rồi chạy `@resolve-grammar`. Outcome/owner emit ra là semantic constraint bắt buộc;
+   thiếu fact hoặc owner `new-required` thì trả decision. Chọn một direction recommendation có bằng chứng, resolve region theo lý do
    nghiệp vụ rồi viết **3–4 page-set HTML/CSS độc lập và hoàn chỉnh** với cùng content và viewport. Xếp hạng theo
    business fit, precedent, hierarchy, reuse, accessibility và boundary ownership rồi tự chọn phương án mạnh
    nhất. Candidate phải khác thật ở
@@ -114,5 +119,5 @@ executable transition hoặc business fidelity thì không được chọn/publi
 ## OUTPUT
 
 Trước approval, nêu `layoutId`, scope `page`/`flow`, số lựa chọn thích ứng, recommendation và review URL bằng văn xuôi ngắn. Chỉ một approval
-checkpoint. Sau `OK`, nêu accepted `revisionHash`, state/viewport đã persist và region còn cần block design.
+checkpoint. Sau `OK`, nêu accepted `revisionHash`, grammar receipt, state/viewport đã persist và region còn cần block design.
 Không dùng bảng trạng thái.

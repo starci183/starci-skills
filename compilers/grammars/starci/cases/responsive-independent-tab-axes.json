@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "responsive-independent-tab-axes",
+  "kind": "golden",
+  "because": "Two bounded peer-choice axes govern different dimensions of one result and must remain independently selectable when their toolbar stacks at narrow widths.",
+  "facts": ["tab-axes-independent", "tab-axis-bounded", "tab-labels-variable-width", "viewport-adaptive"],
+  "expectedOutcomes": ["responsive-tab-toolbar", "tab-axis-horizontal-overflow"],
+  "rejectedOutcomes": ["merged-tab-axis", "wrapped-tab-labels"]
+}

@@ -12,10 +12,13 @@ title: starci-fe-design-block · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra route frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | tách revision bền vững khỏi draft tạm |
 | `@business` | `contexts/business/vi.md` | vi | resolve data, action và state reachable thật |
+| `@grammar` | `compilers/grammars` | module | resolve product-family fact đã route thành block outcome và owner |
 | `@principles` | `compilers/principles` | module | audit anatomy được chọn sau sáng tạo |
 | `@blocks` | `brainstorms/blocks/vi.md` | vi | luật ownership, anatomy, state và contract của block |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | review HTML trong exact parent và hợp đồng bundle bất biến |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | kiểm tra vocabulary đã bind bởi parent layout |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | tính lại block grammar decision và receipt tất định |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh grammar package trước anatomy |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash design artifact |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | kiểm tra accepted parent và block heads |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish cache review và accepted preview bundle |
@@ -33,8 +36,8 @@ bất biến. Nó không ghi frontend source.
 
 **Thẩm quyền.**
 
-- `design.json` sở hữu `(layoutId, blockId)`, parent `layoutHash`, data ownership, contract verdicts, anatomy,
-  reachable state IDs và viewport.
+- `design.json` sở hữu `(layoutId, blockId)`, parent `layoutHash`, grammar fact/decision/receipt, data ownership,
+  contract verdicts, anatomy, reachable state IDs và viewport.
 - `preview.html` sở hữu composition của block và mọi state đã render trong exact accepted parent.
 
 Draft chỉ ở cache. Accepted bundle chỉ gồm:
@@ -55,7 +58,8 @@ và scoped block head là authority; legacy object chỉ để đọc lịch s�
    phải dừng.
 2. Đọc đúng business surface/flow chạm region và liệt kê mọi state reachable trước khi vẽ. `optional` không phân
    biệt pending, empty và failed. Ownership/action/outcome chưa rõ là product decision phải trả owner.
-3. Đọc `@blocks`, resolve parts theo business reason rồi viết **3–4 block HTML/CSS hoàn chỉnh** trong exact parent
+3. Validate cặp grammar/profile và parent grammar receipt. Đọc `@blocks`, phân loại tình huống block có bằng chứng
+   thành closed fact, chạy `@resolve-grammar`, bind outcome/owner rồi resolve parts theo business reason và viết **3–4 block HTML/CSS hoàn chỉnh** trong exact parent
    `preview.html`, exact region bounds, cùng data và viewport. Candidate phải khác thật về anatomy/composition;
    model xếp hạng theo business fit, precedent, hierarchy, reuse, accessibility và boundary ownership rồi tự chọn.
 4. QA cả parent page ở desktop và narrow. Mọi nested layout, sibling region và overlay ngoài block phải y nguyên
@@ -81,7 +85,7 @@ và scoped block head là authority; legacy object chỉ để đọc lịch s�
 
 ## Stops
 
-- Thiếu accepted parent, block không khai báo hoặc stale parent binding → dừng.
+- Thiếu accepted parent, grammar/profile/receipt, block không khai báo hoặc stale parent binding → dừng.
 - Data ownership, action, outcome hay state chưa rõ → trả product decision.
 - Thiếu candidate HTML, exact-parent embedding, selected-state HTML hoặc viewport → không approval/publish.
 - Thiếu contract/vocabulary support → dừng, không bịa component.

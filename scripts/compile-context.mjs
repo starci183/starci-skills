@@ -18,6 +18,7 @@ const optionalExampleLabels = new Set([
   "common business situations",
   "common situations",
 ]);
+const ignoredRuntimeDirectories = new Set([".git", ".claude", ".testtmp", "docs", "node_modules", "worktrees", "sessions", "cache"]);
 
 function normalize(text) {
   return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").trimEnd() + "\n";
@@ -171,7 +172,7 @@ function discoverSources(target) {
   }
   const sources = [];
   for (const entry of readdirSync(absolute, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name === ".git" || entry.name === "docs") continue;
+    if (ignoredRuntimeDirectories.has(entry.name)) continue;
     const path = join(absolute, entry.name);
     if (entry.isDirectory()) sources.push(...discoverSources(path));
     else if (entry.isFile() && entry.name === "en.md" && !existsSync(join(absolute, "SKILL.md"))) sources.push(path);
@@ -185,7 +186,7 @@ function discoverContexts(target) {
   if (statSync(absolute).isFile()) return basename(absolute) === "context.md" ? [absolute] : [];
   const contexts = [];
   for (const entry of readdirSync(absolute, {withFileTypes: true}).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name === ".git" || entry.name === "docs") continue;
+    if (ignoredRuntimeDirectories.has(entry.name)) continue;
     const path = join(absolute, entry.name);
     if (entry.isDirectory()) contexts.push(...discoverContexts(path));
     else if (entry.isFile() && entry.name === "context.md") contexts.push(path);

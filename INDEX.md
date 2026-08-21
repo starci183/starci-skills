@@ -21,6 +21,7 @@ title: Docs
 | `@design-review` | `publication/design-review-preview/context.md` | context | render layout and block artifacts through one project-neutral Vite review application |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates/context.md` | context | judge existing code with evidence |
+| `@grammars` | `compilers/grammars/context.md` | context | resolve explicitly selected product-family UI facts into deterministic outcomes and owners |
 | `@initialization` | `readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
 | `@kernel` | `kernel/context.md` | context | resolve route, state, approval identity and evidence before role law |
 | `@machines` | `machines/context.md` | context | locate deterministic dependency, parity, quality, artifact and secret machines |
@@ -51,7 +52,7 @@ order follows from it rather than defining it.
 |---|---|---|
 | `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
 | `@brainstorms` | 3–4 evidence-backed alternatives that the model challenges, ranks and selects | a page/page-flow or block is not yet decided |
-| `@compilers` | exactly one answer, no candidates | a shape is accepted and code is about to be written — `@principles` decide the classes, `@patterns` decide which file holds it and what it may import |
+| `@compilers` | exactly one answer, no candidates | product facts or an accepted shape need one answer — grammar decides outcomes/owners, `@principles` decide classes, and `@patterns` decide files/imports |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
 Frontend design alternatives are functional, business-faithful HTML pages, never static render cards. Each round
@@ -95,8 +96,8 @@ loading a stage the skill did not ask for is paying for a tree you are not using
    `in-progress`; technical-only work declares `none` and binds current `implemented` truth. `pending` and
    `rejected` are read-only for product source.
 3. `@worktrees` — only if the work writes state that must survive.
-4. `@compilers` — **before the first line**: `@principles` for
-   every class, `@patterns` for which file holds the code and what it may import.
+4. `@compilers` — **before the first line**: resolve an explicitly routed product grammar first,
+   then use `@principles` for every class and `@patterns` for which file holds the code and what it may import.
    Both answer a shape already accepted, so reading them afterwards leaves only one move — moving code
    that is already written.
 5. `@gates` — last, on code that exists. Business-affecting work closes only after final committed source
@@ -113,8 +114,8 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Seventeen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. Fifteen do the work; two only look — one at the machine, one at the other skills.
+Eighteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+record. Sixteen do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
 |---|---|
@@ -131,6 +132,7 @@ record. Fifteen do the work; two only look — one at the machine, one at the ot
 | `starci-fe-design-layout` | one stable `layoutId` whose accepted head binds a complete source-aware page/page-flow composition selected by visual judgment and evidence |
 | `starci-fe-design-block` | one stable `(layoutId, blockId)` head whose accepted anatomy is judged inside its complete current page |
 | `starci-fe-design-execute` | frontend source, only from one layout head whose every declared region has a current accepted block head |
+| `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
 | `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
 | `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |
 | `starci-be-plan` | the backend brief |

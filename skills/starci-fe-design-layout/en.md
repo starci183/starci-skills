@@ -12,11 +12,14 @@ title: starci-fe-design-layout · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/en.md` | en | bind the page to current product truth |
+| `@grammar` | `compilers/grammars` | module | resolve explicitly routed product-family facts into outcomes and owners |
 | `@principles` | `compilers/principles` | module | review selected visual decisions after creativity |
 | `@directions` | `brainstorms/directions/en.md` | en | evidence-select the visual direction embedded in the layout |
 | `@layouts` | `brainstorms/layouts/en.md` | en | layout regions, axes, ownership and contract verdicts |
 | `@design-review` | `publication/design-review-preview/en.md` | en | authored HTML review and immutable bundle contract |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit deterministic selected grammar decisions and compact context |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package before candidate work |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind choices to the current frontend vocabulary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify current heads and accepted revisions |
@@ -38,8 +41,8 @@ writes design records and review HTML, never frontend source.
 
 JSON and HTML answer different questions:
 
-- `design.json` owns identity, business and contract ownership, regions, accepted artifact, state IDs and
-  viewport obligations.
+- `design.json` owns identity, business/contract ownership, grammar facts/decisions/receipt, regions, accepted
+  artifact, state IDs and viewport obligations.
 - `preview.html` owns composition, hierarchy, surfaces, responsive behavior and every rendered state.
 
 Unaccepted candidates are drafts and live only below `.worktrees/<project>/cache`. Acceptance writes exactly:
@@ -69,7 +72,9 @@ route tree: ordered root/app/feature layouts, routed pages, overlays and regions
 
 **2. Author the choices.**
 
-Read `@directions` and `@layouts`. Evidence-select one recommended direction, resolve every region against the
+Validate the explicit grammar/profile pair from the route. Read `@directions` and `@layouts`, classify only
+evidenced situations into closed facts, and run `@resolve-grammar`. Its outcomes and owners are binding semantic
+constraints; missing facts or `new-required` owners return the decision. Evidence-select one recommended direction, resolve every region against the
 contract by business reason, and author complete standalone HTML/CSS page-set candidates over the same
 business-backed content and viewport set. Author three or four materially distinct choices, rank them against
 business fit, precedent, hierarchy, reuse, accessibility and boundary ownership, then select the strongest.
@@ -125,7 +130,7 @@ universal requirements and must not be introduced when the accepted situation do
 
 ## Stops
 
-- Missing/stale route, business truth, vocabulary or registry ownership stops the run with exact evidence.
+- Missing/stale route, grammar/profile or receipt, business truth, vocabulary or registry ownership stops the run with exact evidence.
 - Missing stable identity, duplicate candidate axes or fabricated product content refuses the draft.
 - Missing candidate HTML, selected-state HTML or viewport coverage blocks approval/publication.
 - A deterministic state that actually needs a product decision returns that decision; it never triggers a
@@ -147,5 +152,5 @@ defects. Missing condition coverage, executable transitions or business fidelity
 ## OUTPUT
 
 Before approval, report `layoutId`, scope (`page` or `flow`), the adaptive choice count, recommendation and review URL in concise prose.
-Use one approval checkpoint. After `OK`, report accepted `revisionHash`, persisted state/viewports and regions
+Use one approval checkpoint. After `OK`, report accepted `revisionHash`, grammar receipt, persisted state/viewports and regions
 still requiring block design. No status tables.
