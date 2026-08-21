@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "grammar": "starci",
   "grammarId": "starci-ui",
-  "version": 12,
+  "version": 14,
   "factCatalog": "./facts.json",
   "evidenceCatalog": "./capsules.json",
   "rules": [
