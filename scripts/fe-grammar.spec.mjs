@@ -133,3 +133,27 @@ test("principle context contains only delta concerns for selected owners", () =>
   assert.deepEqual(resolved.contextPack.principleConcerns, ["focus-order", "state", "target-size"])
   assert.doesNotMatch(JSON.stringify(resolved.contextPack), /surface-in-surface|typography|responsive/)
 })
+
+test("collapsible rail preserves the exact StarCi header, glyph, separator, inset and motion contract", () => {
+  const loaded = loadAndValidateGrammar(GRAMMAR_ROOT)
+  const resolved = resolveGrammar({
+    grammar: loaded.grammar,
+    profile: PROFILE,
+    factCatalog: loaded.factCatalog,
+    evidenceCatalog: loaded.evidenceCatalog,
+    templateCatalog: loaded.templateCatalog,
+    facts: ["region-adjacent", "region-persistent", "region-independent-scroll", "width-user-collapsible"],
+  })
+  const decision = resolved.decisions.find((item) => item.outcome === "collapsible-rail-transition")
+  assert.ok(decision)
+  assert.ok(decision.obligations.includes("header-row-owns-title-and-toggle"))
+  assert.ok(decision.obligations.includes("single-sidebar-simple-toggle-glyph"))
+  assert.ok(decision.obligations.includes("right-edge-separator"))
+  assert.ok(decision.obligations.includes("expanded-all-axis-inset-6"))
+  assert.ok(decision.obligations.includes("collapsed-inline-inset-3"))
+  assert.ok(decision.obligations.includes("spring-420-38-when-motion-safe"))
+  assert.equal(decision.obligations.includes("inline-inset-3-in-all-states"), false)
+  const template = resolved.contextPack.templates.find((item) => item.templateRef === "./templates/collapsible-rail.template.tsx")
+  assert.match(template.content, /glyph="sidebar-simple"/)
+  assert.match(template.content, /spring-420-38/)
+})

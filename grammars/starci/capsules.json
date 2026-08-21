@@ -126,21 +126,24 @@
     },
     {
       "id": "collapsible-rail",
-      "intent": "Keep one navigation host while expanded and compact presentations change width and visible copy.",
+      "intent": "Port the StarCi collapsible navigation owner exactly: one bordered motion host, one title-and-toggle header, one SidebarSimple glyph and state-specific inset around the same destination order.",
       "triggerFacts": ["region-adjacent", "region-persistent", "width-user-collapsible"],
       "decisionQuestions": ["Are there exactly two meaningful navigation presentations rather than a continuously chosen width?", "Can compact destinations retain meaning through stable glyphs and accessible labels?"],
-      "variableAxes": ["width", "visible-copy"],
-      "invariants": ["stable-host", "visible-collapse-control", "keyboard-operable-collapse-control", "collapse-state-exposed", "inset", "scroll-owner", "boundary-height", "destination-order"],
+      "variableAxes": ["width", "visible-copy", "inline-inset"],
+      "invariants": ["stable-host", "right-edge-separator", "title-and-toggle-header-row", "single-sidebar-simple-toggle-glyph", "same-toggle-glyph-both-states", "visible-collapse-control", "keyboard-operable-collapse-control", "collapse-state-exposed", "expanded-p-6", "collapsed-px-3-py-6", "scroll-owner", "boundary-height", "destination-order"],
       "interactionProof": [
         {"id": "collapse-control", "kind": "interaction", "assertion": "A visible keyboard-operable control toggles the two rail presentations and exposes the current collapsed state."},
+        {"id": "header-toggle-anatomy", "kind": "dom", "assertion": "The expanded header places the visible title and SidebarSimple toggle on one row; compact state hides only the title and keeps the same glyph."},
+        {"id": "rail-separator", "kind": "computed-style", "assertion": "The motion host keeps one full-height separator on its trailing edge in both width states."},
+        {"id": "state-inset", "kind": "computed-style", "assertion": "Expanded rail resolves to 24px on every edge; compact rail resolves to 24px block and 12px inline inset."},
         { "id": "stable-motion-host", "kind": "dom", "assertion": "Collapse and expand preserve the same motion host identity." },
         { "id": "reduced-motion", "kind": "interaction", "assertion": "Reduced-motion preference changes width immediately without interpolation." },
         { "id": "body-reflow", "kind": "computed-style", "assertion": "The adjacent body reflows beside the changed rail width." }
       ],
       "counterexampleCaseRefs": ["resizable-content-rail-not-collapsible"],
       "templateRef": "./templates/collapsible-rail.template.tsx",
-      "templateHash": "sha256:b86414ad602ead42434dc5fa4fb81e689e05f2efc4852ad4b5e09bbae8b5a583",
-      "rulings": ["founder-feedback:2026-08-21:collapsed-rail-keeps-legacy-motion", "founder-feedback:2026-08-21:course-sidebar-uses-px-3-py-6"],
+      "templateHash": "sha256:293f776af8e909b3730cd78ae7d8f4a384ca7c3c68308ac3aa8ef402ce65ca95",
+      "rulings": ["founder-feedback:2026-08-21:collapsed-rail-keeps-legacy-motion", "founder-feedback:2026-08-21:collapsible-rail-ports-starci-sidebar-simple-owner-exactly"],
       "goldenCaseRefs": ["collapsible-navigation-rail"]
     },
     {
