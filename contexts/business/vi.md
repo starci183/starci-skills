@@ -37,8 +37,12 @@ committed source heads. `rejected` là lịch sử quyết định bị loại v
 `baseHead` trỏ tới implemented truth gần nhất; `previousHead` chứng minh transition liền trước. Head
 schema-v1 cũ được đọc là `implemented`.
 
-Transition tiến hợp lệ duy nhất là `implemented → pending → in-progress → implemented`, có nhánh
-`pending|in-progress → rejected` và `rejected → pending`. Product write ảnh hưởng business bắt buộc
+Các transition product-intent hợp lệ là `implemented → pending → in-progress → implemented`, có nhánh
+`pending|in-progress → rejected` và `rejected → pending`. Transition reconcile kỹ thuật đóng
+`implemented → implemented` cũng hợp lệ chỉ khi `basis: reconciled`, `previousHead` và `baseHead`
+đều trỏ đúng implemented head liền trước, source identity không đổi, và mọi business claim cùng
+evidence identity/claim giữ nguyên byte sau khi loại source hash và line range evidence. Transition này
+chỉ refresh committed source/evidence location, không biểu diễn intent. Product write ảnh hưởng business bắt buộc
 feature head tương ứng ở `in-progress` trước write đầu tiên. Sau code và gates, feature phải reconcile
 thành `implemented` với final committed source heads. Thay đổi thuần kỹ thuật khai
 `businessImpact: none`, bind implemented head hiện tại và không tạo feature giả.

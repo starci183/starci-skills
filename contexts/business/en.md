@@ -37,8 +37,12 @@ truth bound to final committed source heads. `rejected` is retained decision his
 source work. `baseHead` points to the most recent implemented truth; `previousHead` proves the immediate
 workflow transition. Legacy schema-v1 heads are read as `implemented`.
 
-The only valid forward transitions are `implemented → pending → in-progress → implemented`, with
-`pending|in-progress → rejected` and `rejected → pending`. A business-affecting product write requires
+The valid product-intent transitions are `implemented → pending → in-progress → implemented`, with
+`pending|in-progress → rejected` and `rejected → pending`. A closed technical-reconciliation transition
+`implemented → implemented` is also valid only when `basis: reconciled`, `previousHead` and `baseHead`
+both name the exact preceding implemented head, source identities stay fixed, and every business claim
+plus evidence identity/claim stays byte-equivalent after excluding source hashes and evidence line ranges.
+It refreshes committed source/evidence locations and never expresses intent. A business-affecting product write requires
 the matching feature head to be `in-progress` before the first write. After code and gates, the feature
 must be reconciled to `implemented` against final committed source heads. A purely technical change
 declares `businessImpact: none`, binds the current implemented head, and does not create a fake feature.
