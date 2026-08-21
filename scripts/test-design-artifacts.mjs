@@ -173,6 +173,23 @@ const blocks = write("blocks.json", {
     reason: "rows preserve comparison while every settled state keeps one owner",
   }],
 });
+const blockAnatomy = JSON.parse(readFileSync(blocks, "utf8")).anatomies[0];
+const auditedBlock = write("audited-block.json", {
+  schema: 2,
+  envelope: {round: 1, project: "example-app", region: "results", parentAt: hash, mode: "audit"},
+  anatomies: [blockAnatomy],
+  audit: {verdict: "pass", findings: []},
+});
+const brainstormedBlock = write("brainstormed-block.json", {
+  schema: 2,
+  envelope: {round: 2, project: "example-app", region: "results", parentAt: hash, mode: "brainstorm", explicitRequest: "Show three alternative result anatomies."},
+  anatomies: ["one-part", "label-value", "label-visual-caption"].map((composition, index) => ({
+    ...blockAnatomy,
+    id: ["compact", "balanced", "visual"][index],
+    axes: {...blockAnatomy.axes, composition},
+    reason: `Owner-requested ${composition} anatomy inside the same parent geometry`,
+  })),
+});
 const worktreeRoots = write("worktree-roots.json", {
   schema: 1,
   project: "example-app",
@@ -227,8 +244,13 @@ try {
     throw new Error("split layout directions failed for the wrong reason");
   }
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", blocks, "--hash");
+  run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", auditedBlock, "--hash");
+  run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", brainstormedBlock, "--hash");
+  if (!mustFail("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", write("invalid-block-brainstorm.json", {...JSON.parse(readFileSync(brainstormedBlock, "utf8")), anatomies: [blockAnatomy]})).includes("requires 3-4 alternatives")) {
+    throw new Error("block brainstorm count failed for the wrong reason");
+  }
   run("--schema", join(root, "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
-  console.log("ok  evidence recommendation, session-local candidate keys, current-parent block binding, and cache-only design roots hold");
+  console.log("ok  single complete generation, audited blocks, explicit brainstorm alternatives, MASTER binding and static cache review hold");
 } finally {
   rmSync(temp, {recursive: true, force: true});
 }

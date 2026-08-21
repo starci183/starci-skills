@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Confirm one composed page or end-to-end page flow, then challenge, preview, approve, implement and visually prove that exact frontend scope in one invocation using routed business truth, grammar, contracts and current source. Preview artifacts are disposable cache; no design registry is created.
+description: Generate, preview, approve, implement and prove one complete long page or full end-to-end flow. Emits one coherent baseline by default and 3–4 alternatives only after an explicit owner brainstorm request.
 ---
 
 # starci-fe-design-layout
@@ -40,13 +40,15 @@ None. This skill owns design through implementation and QA in one invocation.
 
 Confirm exactly one scope checkpoint: `page` for one composed route and all reachable states/overlays, or `flow` for an explicit start-to-end sequence. Resolve FE, grammar/profile, business, contract and source baseline. Build one ignored session pack under `.worktrees/<project>/cache/design/<session-id>`.
 
-Inventory all reachable UI conditions and write the four-lock baseline before drawing. Author three or four complete candidates under one MASTER visual system; page overrides record deviations only. Audit only unresolved deltas through principles. Render the cache review, disclose exact source paths, and wait for one `OK`.
+Inventory all reachable conditions and write the four-lock baseline. Default `generate` mode emits exactly one complete result: a long page includes every section/block/state; a flow includes every page/step, shared layout and transition from start to end. Layout owns all block anatomy required for implementation.
+
+Only explicit `brainstorm` after owner review emits 3–4 targeted alternatives against that baseline. “80%” is an owner signal, not a numeric gate.
 
 After approval, implement immediately, then compare the full page, target and preserved regions against every same-viewport reference. Known defects or an unmet requested delivery state forbid completion wording.
 
 ## Rules
 
-1. Design, approval, implementation and QA happen in one invocation.
+1. One complete page/flow is the default; alternatives require explicit brainstorming.
 2. Review artifacts live only in ignored project cache.
 3. No design registry, durable head or immutable preview revision exists.
 4. Complete pages/flows include every owned region and reachable condition.

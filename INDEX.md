@@ -18,7 +18,7 @@ title: Docs
 | `@contexts` | `contexts/context.md` | context | resolve where reads and writes occur |
 | `@deployment` | `deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
-| `@design-review` | `publication/design-review-preview/context.md` | context | render layout and block artifacts through one project-neutral Vite review application |
+| `@design-review` | `publication/design-review-preview/context.md` | context | write static HTML layout/block review files directly under project cache |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates/context.md` | context | judge existing code with evidence |
 | `@grammars` | `grammars/context.md` | context | load explicitly selected product-family UI facts, outcomes, owners and durable behavior authority |
@@ -52,11 +52,11 @@ order follows from it rather than defining it.
 |---|---|---|
 | `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
 | `@grammars` | deterministic product-family facts, outcomes, owners and durable behavior | a verified workspace route explicitly selects a grammar/profile |
-| `@brainstorms` | 3–4 evidence-backed alternatives that the model challenges, ranks and selects | a page/page-flow or block is not yet decided |
+| `@brainstorms` | one complete generated baseline, or 3–4 targeted alternatives only after an explicit owner brainstorm request | a complete baseline or requested variation is not yet decided |
 | `@compilers` | exactly one answer, no candidates | an accepted shape needs execution detail — `@principles` decide classes and `@patterns` decide files/imports |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
-Frontend design alternatives are functional, business-faithful HTML pages, never static render cards. Each round
+Frontend layout generation produces one functional, business-faithful complete long page or full flow by default, never a static render card. It owns every block, page/step, state and transition required for implementation. Three or four alternatives appear only after the owner explicitly asks to brainstorm against that baseline. Each round
 inventories every evidenced viewport, overlay, disclosure, async, data, permission and interaction condition;
 renders production-like representative content; and proves reachable transitions through in-page controls.
 Desktop/mobile, modal, drawer, menu/popover, loading, empty, error, locked and disabled states are represented
@@ -134,8 +134,8 @@ record. Sixteen do the work; two only look — one at the machine, one at the ot
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
-| `starci-fe-design-layout` | one complete source-aware page/page flow designed, reviewed, implemented and proved in one invocation; previews remain cache |
-| `starci-fe-design-block` | one block judged, reviewed, implemented and proved inside its current complete page in one invocation |
+| `starci-fe-design-layout` | one complete long page/full flow generated with all blocks and states, then reviewed, implemented and proved; targeted alternatives are opt-in |
+| `starci-fe-design-block` | audit/correct one Layout-generated block in its complete page; anatomy brainstorming is opt-in |
 | `starci-fe-feedback-evolve` | proven owner feedback evolved through the correct durable authority layer and affected frontend source |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
 | `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |

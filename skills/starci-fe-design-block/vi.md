@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-block
-description: Challenge, preview, duyệt, implement và visual proof một frontend block bên trong exact current composed page trong cùng invocation. Dùng routed business truth, grammar, contract và source; preview là cache tạm và không tạo design registry.
+description: Audit, correct và prove một block đã được Layout generate trong complete page. Chỉ tạo alternative sau explicit block-brainstorm request.
 ---
 
 # starci-fe-design-block
@@ -38,13 +38,13 @@ None. Skill này sở hữu block decision tới implementation và full-page QA
 
 Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng.
 
-Tạo một ignored session pack và author ba hoặc bốn functional block candidate khác biệt đáng kể trong exact parent page, giữ nguyên untargeted region. Rank và chỉ audit recommendation. Render cache review, disclose exact source path và chờ một `OK`.
+Default `audit` inspect một generated block, trả pass hoặc exact findings và correct trong khi giữ nguyên page. Chỉ explicit `brainstorm` mới emit 3–4 targeted anatomy trong cùng parent geometry.
 
 Sau approval, implement ngay rồi prove full page, target và preserved region ở exact baseline viewport. Known defect hoặc delivery chưa đạt cấm nói hoàn tất.
 
 ## Rules
 
-1. Current routed source là parent authority.
+1. Current routed source là parent authority; audit là default và alternative là opt-in.
 2. Design, approval, implementation và QA xảy ra trong cùng invocation.
 3. Preview artifact chỉ sống trong ignored cache.
 4. Không có design registry hay durable design identity.

@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Confirm one composed page or end-to-end page flow, then challenge, preview, approve, implement and visually prove that exact frontend scope in one invocation using routed business truth, grammar, contracts and current source. Preview artifacts are disposable cache; no design registry is created.
+description: Generate, preview, approve, implement and visually prove one complete long page or end-to-end page flow in one invocation using routed business truth, MASTER, grammar, contracts and current source. Generates one coherent baseline by default; creates 3–4 alternatives only when the owner explicitly requests brainstorming after reviewing that baseline.
 ---
 
 # starci-fe-design-layout
@@ -44,7 +44,9 @@ Resolve the verified FE route, explicit grammar/profile, MASTER visual system, c
 
 Create one ignored session root at `.worktrees/<project>/cache/design/<session-id>`. Use `@composition` to write and validate `baseline.json`: Scope, exact parent/direct children, semantic invariant, preserved nodes, allowed deltas and same-viewport proof obligations. Legacy/screenshot evidence outranks MASTER inside its declared scope; MASTER governs everything not overridden. Read the complete current composition and preserve every source-bound existing node outside `allowedDeltas`.
 
-Author three or four materially distinct complete functional HTML candidates covering the entire page or flow. Every candidate shares MASTER axes, roles, spacing rhythm and anti-patterns; a page override records deviations only. Rank them using baseline parity, business fit, hierarchy, reuse, accessibility and responsive behavior. Audit only visual deltas still unresolved after baseline, MASTER, grammar and source through `@principles`.
+In default `generate` mode, author exactly one coherent complete functional result. A page includes its entire long vertical composition, every section/block, overlay and reachable state. A flow includes every page/step from the confirmed start to end, shared layouts, transitions and reachable success/error/loading/empty/permission states. Layout owns all block anatomy needed to make that result implementable; it never defers completeness to later block work.
+
+Only after the owner has a satisfactory baseline and explicitly requests `brainstorm` may Layout generate 3–4 alternatives. Those alternatives start from the selected baseline, vary only the requested region/axis, preserve everything else and remain under MASTER. “About 80%” is an owner signal, never a numeric machine threshold.
 
 Render the cache review and disclose one `### NEED APPROVALS` boundary containing the recommended candidate, exact frontend source paths and product decision, if any. `OK` authorizes the candidate and those paths once. Take the target baseline after approval and before the first source write.
 
@@ -58,10 +60,11 @@ Run canonical lint/tests and browser proof against the real product at every ref
 2. Candidates and selected preview live only in project cache.
 3. No layout head, block head, immutable design revision or design branch is created.
 4. Another task regenerates from current business, grammar, contract and source.
-5. A page/flow candidate includes every owned region; incomplete compositions are refused.
+5. Default generation emits one complete long page/full flow including every owned block and state; incomplete compositions are refused.
 6. Exact source paths require one disclosed approval before the first write.
 7. Frontend source and executable proof are the durable outcome.
 8. MASTER is selected once; page files contain deviations only, and principles resolve deltas only.
+9. Three or four alternatives require an explicit owner brainstorm request against an existing baseline.
 
 ## Stops
 
@@ -74,4 +77,4 @@ Run canonical lint/tests and browser proof against the real product at every ref
 
 ## OUTPUT
 
-Before approval, report scope, ranked candidates, recommendation, cache review URL and exact source boundary. After `OK`, report baseline, changed source paths, business status and code/browser proof. Never report registry heads or accepted revision hashes.
+Before approval, report the single complete page/flow, cache review URL and exact source boundary. In explicit brainstorm mode, report 3–4 targeted alternatives. After `OK`, report baseline, changed source paths, business status and code/browser proof.

@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Chốt một composed page hoặc end-to-end page flow, rồi challenge, preview, duyệt, implement và visual proof đúng frontend scope đó trong cùng invocation bằng routed business truth, grammar, contract và current source. Preview là cache tạm; không tạo design registry.
+description: Generate, preview, duyệt, implement và prove một complete long page hoặc full end-to-end flow. Mặc định emit một coherent baseline; chỉ tạo 3–4 alternative sau explicit owner brainstorm request.
 ---
 
 # starci-fe-design-layout
@@ -40,13 +40,15 @@ None. Skill này sở hữu design tới implementation và QA trong một invoc
 
 Chốt đúng một scope: `page` cho một composed route cùng mọi state/overlay reachable, hoặc `flow` cho sequence start-to-end rõ ràng. Resolve FE, grammar/profile, business, contract và source baseline. Tạo một ignored session pack dưới `.worktrees/<project>/cache/design/<session-id>`.
 
-Inventory mọi UI condition và viết baseline bốn lock trước khi vẽ. Author ba hoặc bốn complete candidate dưới một MASTER visual system; page override chỉ ghi deviation. Chỉ audit delta unresolved qua principles. Render cache review, disclose exact source path, rồi chờ một `OK`.
+Inventory mọi condition và viết baseline bốn lock. Default `generate` emit đúng một complete result: long page có mọi section/block/state; flow có mọi page/step, shared layout và transition từ start tới end. Layout sở hữu toàn bộ block anatomy cần cho implementation.
+
+Chỉ explicit `brainstorm` sau owner review mới emit 3–4 targeted alternative trên baseline đó. “80%” là owner signal, không phải numeric gate.
 
 Sau approval, implement ngay rồi so full page, target và preserved region với mọi same-viewport reference. Known defect hoặc delivery state chưa đạt cấm nói hoàn tất.
 
 ## Rules
 
-1. Design, approval, implementation và QA xảy ra trong cùng invocation.
+1. Một complete page/flow là default; alternative cần explicit brainstorm.
 2. Review artifact chỉ sống trong ignored project cache.
 3. Không có design registry, durable head hoặc immutable preview revision.
 4. Complete page/flow chứa mọi owned region và reachable condition.

@@ -10,7 +10,7 @@ None.
 |---|---|
 | Visual direction and semantic token roles | `directions/context.md` |
 | Scope, legacy baseline, highlighted parent and proof locks | `composition/context.md` |
-| Page, layout or overlay regions and structural axes | `layouts/context.md` |
-| One region's parts, states, repetition and data ownership | `blocks/context.md` |
+| One complete long page/full flow, or explicit targeted layout brainstorm | `layouts/context.md` |
+| Audit one generated block, or explicit targeted anatomy brainstorm | `blocks/context.md` |
 
 Use current routed source as precedent evidence. No separate accepted-design corpus is loaded.

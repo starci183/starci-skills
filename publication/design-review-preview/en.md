@@ -5,13 +5,13 @@
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@manifest-schema` | `publication/design-review-preview/schema.json` | file | validate the session-local review graph |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | render authored candidates below project cache |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | write static HTML previews below project cache with no app build |
 | `@baseline-schema` | `brainstorms/composition/schema.json` | file | bind the four-lock reference and owner tree |
 | `@visual-proof-schema` | `publication/design-review-preview/visual-proof.schema.json` | file | prove same-viewport parity and delivery completion |
 
 ## Record
 
-This module displays layout and block choices without becoming product authority. Every candidate, selected composition, screenshot and manifest is disposable session evidence. The skill that obtains owner approval implements the selected outcome in frontend source before the same invocation ends.
+This module writes static `index.html` plus one raw HTML file per candidate/state. It has no React/Vite review app, dependency installation or viewer build. Every output remains disposable session evidence.
 
 ## Authority
 
@@ -34,11 +34,11 @@ No accepted bundle, revision map, layout head, block head or design branch exist
 
 ### Layout
 
-Display three or four complete standalone authored page/page-flow candidates using the same product-backed content and viewport set. Existing source-bound nodes remain unchanged between choices. Rank candidates and recommend one. After approval, the same skill invocation implements the selected composition and proves it in the product.
+Default `generate` displays one complete long page or full start-to-end flow containing every block, page/step, state and transition needed for implementation. Only explicit `brainstorm` displays three or four targeted alternatives against that reviewed baseline.
 
 ### Block
 
-Display three or four materially different block candidates inside the exact current parent page and region geometry. The parent comes from current routed source or a parent preview created earlier in the same invocation. After approval, the same skill invocation updates the owning frontend source and proves the complete page.
+Default `audit` displays the one Layout-generated block inside its complete parent page and reports pass or exact correction. Only explicit block `brainstorm` displays three or four anatomies inside the same parent geometry.
 
 ## Canvas law
 
@@ -65,6 +65,7 @@ Creativity precedes principles review. Only the selected candidate is audited in
 7. Source code, tests and browser proof are the durable accepted outcome.
 8. Creativity precedes principles review; implementation follows source patterns and gates.
 9. MASTER is shared by every candidate; page files record deviations only and principles inspect deltas only.
+10. Generate/audit modes contain exactly one result; 3–4 alternatives require explicit brainstorm mode and an existing reviewed baseline.
 
 ## Stops
 
@@ -76,4 +77,4 @@ Creativity precedes principles review. Only the selected candidate is audited in
 
 ## Output and proof
 
-Publish one cache review application, identify the recommended candidate and exact source boundary, obtain approval once, implement in the same invocation, then report changed source paths and real-product proof. Do not report revision hashes or registry heads.
+Write one static cache `index.html` plus raw candidate/state files, identify the result and exact source boundary, obtain approval once, implement in the same invocation, then report changed source paths and real-product proof.

@@ -14,9 +14,9 @@ title: Blocks
 
 ## Record
 
-You are given one region of the current source page and its routed visual vocabulary, and you return 3–4 materially
-distinct block anatomies inside the complete parent page, rank them and select the strongest — or one refusal
-naming missing product truth. The model owns visual and compositional judgment; JSON records and proves it.
+You are given one Layout-generated region inside its complete current page. Default `audit` returns one current
+anatomy plus pass/exact findings and correction. Explicit owner `brainstorm` alone returns 3–4 targeted anatomies
+inside the same parent geometry.
 
 ## Law
 
@@ -118,8 +118,7 @@ an anatomy.
 3. `repeats` carries a `restingCount`.
 4. Every part cites a name that exists, or declares a new one with its `why`.
 5. No two anatomies in a batch share the whole axis set.
-6. Return 3–4 anatomies. Each changes meaningful grouping, repetition, hierarchy or interaction ownership;
-   decoration alone is a duplicate. Rank the valid set and select one.
+6. `audit` returns exactly one current anatomy and verdict. Explicit `brainstorm` returns 3–4 anatomies varying only the requested axis; decoration alone is a duplicate.
 7. A missing product decision is returned to the owner.
 8. The JSON is canonical, and its hash is what approval attaches to.
 9. Feedback opens a new round; an accepted anatomy is never edited in place.

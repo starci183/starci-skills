@@ -37,7 +37,7 @@
       "if": {"properties": {"schema": {"const": 4}}, "required": ["schema"]},
       "then": {
         "properties": {
-          "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope"]}]},
+          "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope", "mode"]}]},
           "candidates": {
             "items": {
               "allOf": [
@@ -83,7 +83,9 @@
         "surface": {"$ref": "#/$defs/slug", "description": "Stable layout identity is the surface, not the prompt."},
         "prompt": {"type": "string", "minLength": 1},
         "contractAt": {"type": "string", "minLength": 1, "description": "The contract state these candidates were resolved against."},
-        "scope": {"$ref": "#/$defs/scope"}
+        "scope": {"$ref": "#/$defs/scope"},
+        "mode": {"enum": ["generate", "brainstorm"]},
+        "baselineCandidateAt": {"$ref": "#/$defs/hash", "description": "Required only for explicit brainstorm mode after the owner has reviewed a complete generated baseline."}
       }
     },
     "scope": {

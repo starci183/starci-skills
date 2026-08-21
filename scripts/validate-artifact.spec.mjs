@@ -82,31 +82,70 @@ test("schema 4 accepts three complete single-page choices with source-bound exis
     assert.equal(result.status, 0, result.stderr)
 })
 
-test("schema 5 keeps every page choice under StarCi MASTER with deviations only", () => {
-    const candidates = axes.map((axis, index) => {
-        const candidate = pageCandidate(["one", "two", "three"][index], axis)
+test("schema 5 generate emits one complete result under StarCi MASTER", () => {
+    const candidates = [axes[0]].map((axis, index) => {
+        const candidate = pageCandidate(["one"][index], axis)
         delete candidate.direction
         delete candidate.citesPrecedent
         candidate.systemId = "starci-master"
         candidate.pageOverride = {deviations: []}
         return candidate
     })
-    const result = runArtifact({...batch(candidates), schema: 5})
+    const artifact = {...batch(candidates), schema: 5}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
     assert.equal(result.status, 0, result.stderr)
 })
 
 test("schema 5 refuses a candidate that silently omits MASTER", () => {
-    const candidates = axes.map((axis, index) => {
-        const candidate = pageCandidate(["one", "two", "three"][index], axis)
+    const candidates = [axes[0]].map((axis, index) => {
+        const candidate = pageCandidate(["one"][index], axis)
         delete candidate.direction
         delete candidate.citesPrecedent
         candidate.systemId = "starci-master"
         candidate.pageOverride = {deviations: []}
         return candidate
     })
-    delete candidates[1].systemId
-    const result = runArtifact({...batch(candidates), schema: 5})
+    delete candidates[0].systemId
+    const artifact = {...batch(candidates), schema: 5}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
     assert.notEqual(result.status, 0)
+})
+
+test("schema 5 brainstorm requires a reviewed baseline and 3-4 targeted alternatives", () => {
+    const candidates = axes.map((axis, index) => {
+        const candidate = pageCandidate(["one", "two", "three"][index], axis)
+        delete candidate.direction
+        delete candidate.citesPrecedent
+        candidate.systemId = "starci-master"
+        candidate.pageOverride = {deviations: [{axis: "composition", from: "baseline", to: candidate.id, reason: "Owner explicitly requested alternatives for this composition axis."}]}
+        return candidate
+    })
+    const artifact = {...batch(candidates), schema: 5}
+    artifact.envelope.mode = "brainstorm"
+    artifact.envelope.baselineCandidateAt = "d".repeat(64)
+    assert.equal(runArtifact(artifact).status, 0)
+    delete artifact.envelope.baselineCandidateAt
+    assert.notEqual(runArtifact(artifact).status, 0)
+})
+
+test("schema 5 generate accepts one complete long flow with every page and region", () => {
+    const pageIds = ["discover", "configure", "review", "submit", "success"]
+    const pages = pageIds.map((pageId) => ({
+        id: pageId, route: `/flow/${pageId}`, state: `${pageId}-ready`,
+        nodes: [existingShell, {id: `${pageId}-page`, kind: "page", change: "new", parentId: "app-shell"}],
+        regions: [`${pageId}-content`],
+    }))
+    const candidate = {
+        id: "complete-flow", systemId: "starci-master", pageOverride: {deviations: []},
+        axes: axes[0], pages, regions: pages.map((page) => region(page.id, page.regions[0])),
+        reason: "One complete start-to-end flow contains every page, transition owner and content region.",
+    }
+    const artifact = batch([candidate], {kind: "flow", source: "description"})
+    artifact.schema = 5
+    artifact.envelope.mode = "generate"
+    assert.equal(runArtifact(artifact).status, 0)
 })
 
 test("grammar-locked token values must match an existing vocabulary declaration", () => {

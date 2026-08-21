@@ -14,9 +14,9 @@ title: Blocks · Vietnamese
 
 ## Bản ghi
 
-Mô-đun này nhận **một region của một layout đã được chấp nhận** cùng direction đã chọn trong layout đó,
-rồi trả về **3–4 giải phẫu khối** khác biệt đáng kể trong toàn parent page, xếp hạng và tự chọn phương án mạnh
-nhất — hoặc một lời từ chối nêu product truth còn thiếu. Model sở hữu visual/composition judgment;
+Mô-đun này nhận một Layout-generated region trong complete current page. Default `audit` trả một current
+anatomy cùng pass/exact findings và correction. Chỉ explicit owner `brainstorm` mới trả 3–4 targeted anatomy
+trong cùng parent geometry. Model sở hữu visual/composition judgment;
 **quyết định sản phẩm**, và trả về một đáp án là giả vờ rằng quyết định ấy đã được đưa ra.
 
 ## Luật
@@ -40,7 +40,7 @@ Bảy, không hơn.
 | 4 | Contract: **key**, `why`, `host`, **tên** children, `repeats`, `optional` — không lấy mảng class | phần bị bịa ra thay vì được tra |
 | 5 | Từ vựng: tên leaf mà contract gọi, tên composite, những block đang có | một phần trích một thành phần không tồn tại |
 | 6 | Dữ liệu của region **thật sự hỏng thế nào**, đọc từ source của page và block | `optional` bị hiểu lầm là đủ bộ trạng thái |
-| 7 | Bộ trục giải phẫu đóng | 3–4 giải phẫu khác nhau bằng trang trí |
+| 7 | Trong brainstorm mode, requested anatomy axis | alternative drift ngoài yêu cầu owner |
 
 **Đầu vào số 6 tồn tại vì contract không trả lời được nó.** `optional: true` khai **sự hiện diện** và
 không gì hơn: đang tải, thất bại và rỗng đều rơi vào cùng một cờ đó. Tách chúng ra thì phải đọc từ source
@@ -118,8 +118,7 @@ Mười bốn luật mà **mọi** giải phẫu phải thoả. Giải phẫu ph
 3. `repeats` phải mang `restingCount`.
 4. Mọi phần trích một cái tên có thật, hoặc khai một tên mới kèm `why`.
 5. Không hai giải phẫu nào trong một lô trùng cả bộ trục.
-6. Trả về 3–4 anatomy. Mỗi cái phải đổi grouping, repetition, hierarchy hoặc interaction ownership đáng kể;
-   chỉ đổi trang trí là trùng. Xếp hạng bộ hợp lệ và tự chọn một phương án.
+6. `audit` trả đúng một current anatomy cùng verdict. Explicit `brainstorm` trả 3–4 anatomy chỉ đổi requested axis; chỉ đổi trang trí là trùng.
 7. Quyết định sản phẩm còn thiếu thì trả về cho người chủ.
 8. JSON là dạng chuẩn hoá, và **hash của nó** là thứ lời chấp thuận gắn vào.
 9. Feedback mở một lượt mới; giải phẫu đã chấp nhận không bao giờ bị sửa tại chỗ.

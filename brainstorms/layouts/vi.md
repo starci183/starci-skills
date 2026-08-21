@@ -15,9 +15,9 @@ title: Layouts · Vietnamese
 
 ## Bản ghi
 
-Mô-đun này nhận ảnh chụp một page hoặc mô tả một page flow, rồi trả về 3–4 page set hoàn chỉnh khác nhau đáng
-kể, xếp hạng theo evidence và tự chọn phương án mạnh nhất — hoặc một lời từ chối nêu product truth còn thiếu.
-Model sở hữu visual judgment và selection; schema chỉ ghi nhận và chứng minh kết quả.
+Mô-đun này nhận ảnh chụp một page hoặc mô tả page flow. Default `generate` trả một complete long page hoặc
+full flow start-to-end, gồm mọi block, page/step, state và transition cần cho implementation. Chỉ explicit
+`brainstorm` mới trả 3–4 targeted alternative trên reviewed baseline.
 
 ## Luật
 
@@ -44,8 +44,8 @@ Bảy, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuy�
 | 3 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
 | 4 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
 | 5 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
-| 6 | Bộ trục khác biệt đóng | 3–4 phương án khác nhau bằng trang trí, tức là **một** phương án bốn lần |
-| 7 | Tiền lệ đã chấp nhận của **chính project này**, project mà route workspace đã khai | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
+| 6 | Chỉ trong brainstorm mode, requested diversity axis | alternative drift qua phần không liên quan của reviewed baseline |
+| 7 | Current source và legacy baseline của project | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
 
 **Đầu vào số 3 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
 truy vấn qua `@contract-search`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
@@ -141,8 +141,7 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 2. Mọi region trích một entry key, hoặc khai một entry mới kèm `why` của nó.
 3. Mọi region gọi tên branch ghép nó.
 4. Phương án khai bộ giá trị trục, và không hai phương án nào trong một lô trùng cả bộ.
-5. Trả về 3–4 phương án. Mỗi phương án phải thay đổi đáng kể hierarchy, navigation, grouping hoặc interaction
-   ownership; chỉ đổi trang trí, spacing hay wording là trùng. Xếp hạng bộ hợp lệ và tự chọn một phương án.
+5. `generate` trả đúng một complete implementable result. Explicit `brainstorm` trả 3–4 targeted alternative chỉ đổi requested axis và giữ reviewed baseline ở phần còn lại.
 6. Quyết định sản phẩm còn thiếu thì trả về cho người chủ. Không bao giờ đoán để lô cho đủ.
 7. JSON của phương án là dạng chuẩn hoá — thứ tự khoá cố định, không timestamp, không id theo lượt — vì
    **hash của nó** là thứ lời chấp thuận gắn vào.

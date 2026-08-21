@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v3/brainstorms/blocks/schema.json",
-  "title": "Block anatomy batch",
-  "description": "One round of block brainstorming for one accepted region. `anatomies[i]` is what a hash binds to; `envelope` is what changes between runs.",
+  "$id": "starci-v4/brainstorms/blocks/schema.json",
+  "title": "Block audit or explicit anatomy brainstorm",
+  "description": "Schema 2 audits one Layout-generated block by default. Three or four anatomies are legal only in explicit brainstorm mode.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "envelope", "anatomies"],
   "properties": {
-    "schema": {"const": 1},
+    "schema": {"enum": [1, 2]},
     "envelope": {"$ref": "#/$defs/envelope"},
     "anatomies": {
       "type": "array",
@@ -15,6 +15,7 @@
       "maxItems": 4,
       "items": {"$ref": "#/$defs/anatomy"}
     },
+    "audit": {"$ref": "#/$defs/audit"},
     "refusal": {"$ref": "#/$defs/refusal"}
   },
   "$defs": {
@@ -27,7 +28,17 @@
         "project": {"$ref": "#/$defs/slug"},
         "region": {"$ref": "#/$defs/slug"},
         "parentAt": {"$ref": "#/$defs/hash", "description": "Session-local digest of the current source parent page used for this review."},
-        "contractAt": {"type": "string", "minLength": 1}
+        "contractAt": {"type": "string", "minLength": 1},
+        "mode": {"enum": ["audit", "brainstorm"]},
+        "explicitRequest": {"type": "string", "minLength": 8, "description": "Required only for owner-requested brainstorm mode."}
+      }
+    },
+    "audit": {
+      "type": "object", "additionalProperties": false, "required": ["verdict", "findings"],
+      "properties": {
+        "verdict": {"enum": ["pass", "correct"]},
+        "findings": {"type": "array", "items": {"type": "string", "minLength": 12}},
+        "correction": {"type": "string", "minLength": 12}
       }
     },
     "anatomy": {

@@ -15,10 +15,9 @@ title: Layouts
 
 ## Record
 
-You are given a screenshot of one page or a prose description of a page flow and return 3–4 materially distinct
-complete composed page sets, rank them against evidence and select the strongest — or one refusal naming missing
-product truth. The model owns visual judgment and selection; the schema records and proves the result rather
-than asking the owner to operate a candidate gate.
+You are given a screenshot of one page or a prose description of a page flow. Default `generate` returns one
+complete long page or full start-to-end flow, including every block, page/step, state and transition needed for
+implementation. Explicit `brainstorm` alone returns 3–4 targeted alternatives against the reviewed baseline.
 
 ## Law
 
@@ -47,8 +46,8 @@ Seven, and no more. Each is here because something specific breaks without it.
 | 3 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
 | 4 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
 | 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
-| 6 | The closed list of diversity axes | the 3–4 candidates differ by decoration, which is the same candidate four times |
-| 7 | Precedents accepted for THIS project, the one the workspace route declared | every request is answered as if it were the first |
+| 6 | In brainstorm mode only, the requested diversity axis | alternatives drift across unrelated parts of the reviewed baseline |
+| 7 | Current source and legacy baseline for this project | every request is answered as if it were the first |
 
 **Input 3 is queried, not read, and the class arrays are never extracted.** One need per region through
 `@contract-search`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
@@ -143,8 +142,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.
-5. Return 3–4 candidates. Each must change hierarchy, navigation, grouping or interaction ownership materially;
-   decoration, spacing or wording alone does not create a candidate. Rank the valid set and select one.
+5. `generate` returns exactly one complete implementable result. Explicit `brainstorm` returns 3–4 targeted alternatives that vary only the requested axis and preserve the reviewed baseline elsewhere.
 6. A missing product decision is returned to the owner. It is never guessed to complete a batch.
 7. A candidate's JSON is canonical — fixed key order, no timestamps, no per-run ids — because its hash
    is what the owner's approval attaches to.

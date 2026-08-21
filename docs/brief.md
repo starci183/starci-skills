@@ -17,7 +17,7 @@ StarCi separates work by what each stage may return:
 | Stage | Returns | Does not return |
 |---|---|---|
 | Context | verified read and write locations | product decisions |
-| Brainstorm | 3–4 evidence-backed candidates | implementation |
+| Generate/brainstorm | one complete baseline by default; 3–4 targeted alternatives only on explicit request | implementation |
 | Compiler | one deterministic answer from an accepted shape | alternatives |
 | Gate | pass or a refusal with exact evidence | advice |
 
@@ -44,8 +44,8 @@ when that evidence is stale or incomplete.
 
 | Skill | Use it for | Approval boundary |
 |---|---|---|
-| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Design, review, approve, implement and prove one complete page/page flow | one `OK` binds the selected cache candidate to exact source paths in the same invocation |
-| [`starci-fe-design-block`](./skills/starci-fe-design-block) | Design, review, approve, implement and prove one region inside its current source page | one `OK` binds the selected cache candidate to the owning block paths in the same invocation |
+| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Generate one complete long page/full flow with every block and state; brainstorm alternatives only on request | one `OK` binds the complete baseline to exact source paths |
+| [`starci-fe-design-block`](./skills/starci-fe-design-block) | Audit/correct a Layout-generated block in its full page; brainstorm anatomies only on request | audit findings and correction stay inside the owning block paths |
 | [`starci-grammar-refresh-references`](./skills/starci-grammar-refresh-references) | Refresh stale optional immutable grammar provenance without changing durable authority | routed grammar reference sidecar only |
 | [`starci-fe-minor-fix`](./skills/starci-fe-minor-fix) | Correct one existing block, composite, or leaf without changing its contract, ownership, or public shape | one clean component folder, at most two production files, two tests, and 40 production changed lines |
 
@@ -54,12 +54,16 @@ Frontend design keeps review evidence temporary and makes source the durable res
 ```text
 legacy/current baseline + StarCi MASTER + business + grammar + contract + current source
                     ↓
-       3–4 functional cache candidates
-                    ↓ one OK selects candidate + exact source boundary
+       one complete static HTML page/full flow
+                    ↓ one OK selects baseline + exact source boundary
           implement source in the same invocation
                     ↓
              gates + browser proof
 ```
+
+After the owner accepts the baseline enough to request exploration, a targeted brainstorm may generate 3–4
+alternatives for one region/axis. “80%” is an owner signal, not a numeric gate. Review output is static HTML;
+there is no separate React/Vite viewer build.
 
 MASTER fixes pattern, density, token roles, spacing rhythm, shape, depth, motion and anti-patterns once. Profiles
 override declared roles only; pages record deviations only. Candidate digests are cache keys, and principles

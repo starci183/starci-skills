@@ -169,7 +169,7 @@ function laws(data) {
     else seen.set(key, index);
   }
 
-  if (data.schema !== 5 && members.length > 1 && !members.some((member) => member.citesPrecedent === "none")) {
+  if (data.schema !== 5 && !data.envelope?.mode && members.length > 1 && !members.some((member) => member.citesPrecedent === "none")) {
     found.push("members: no candidate departs from precedent — at least one must cite `none`");
   }
 
@@ -292,9 +292,12 @@ function pageSetLaws(data) {
   const found = [];
   const candidates = data.candidates;
   const first = candidates[0];
-  if (candidates.length < 3 || candidates.length > 4) {
-    found.push("candidates: every page or flow requires 3-4 complete page-set choices for model ranking");
-  }
+  if (data.schema === 5 && data.envelope?.mode === "generate" && candidates.length !== 1) found.push("candidates: generate mode requires exactly one complete long-page/full-flow result");
+  else if (data.schema === 5 && data.envelope?.mode === "brainstorm" && (candidates.length < 3 || candidates.length > 4)) found.push("candidates: explicit brainstorm mode requires 3-4 targeted alternatives");
+  else if (data.schema === 5 && !["generate", "brainstorm"].includes(data.envelope?.mode)) found.push("envelope.mode: schema 5 requires generate or brainstorm");
+  else if (data.schema < 5 && (candidates.length < 3 || candidates.length > 4)) found.push("candidates: legacy page/flow review requires 3-4 complete page-set choices");
+  if (data.schema === 5 && data.envelope?.mode === "brainstorm" && !/^[a-f0-9]{64}$/.test(data.envelope?.baselineCandidateAt ?? "")) found.push("envelope.baselineCandidateAt: brainstorm requires the reviewed generated baseline");
+  if (data.schema === 5 && data.envelope?.mode === "generate" && data.envelope?.baselineCandidateAt !== undefined) found.push("envelope.baselineCandidateAt: generate mode has no earlier candidate dependency");
 
   const scopeSignature = canonical((first?.pages ?? []).map((page) => ({id: page.id, route: page.route, state: page.state})));
   const existing = new Map();
@@ -352,6 +355,21 @@ function pageSetLaws(data) {
   return found;
 }
 
+function blockModeLaws(data) {
+  if (data.schema !== 2 || !Array.isArray(data.anatomies)) return [];
+  const found = [];
+  if (data.envelope?.mode === "audit") {
+    if (data.anatomies.length !== 1) found.push("anatomies: audit mode requires exactly one Layout-generated current anatomy");
+    if (!data.audit || !["pass", "correct"].includes(data.audit.verdict)) found.push("audit: audit mode requires pass or correct verdict");
+    if (data.audit?.verdict === "correct" && !data.audit.correction) found.push("audit.correction: correct verdict requires the exact correction");
+  } else if (data.envelope?.mode === "brainstorm") {
+    if (data.anatomies.length < 3 || data.anatomies.length > 4) found.push("anatomies: explicit block brainstorm requires 3-4 alternatives");
+    if (!data.envelope.explicitRequest) found.push("envelope.explicitRequest: block brainstorm requires the owner's request");
+    if (data.audit !== undefined) found.push("audit: brainstorm mode cannot masquerade as audit");
+  } else found.push("envelope.mode: schema 2 block work requires audit or brainstorm");
+  return found;
+}
+
 // Canonical form: keys sorted at every depth, envelope excluded. Two runs of the same decision must
 // produce the same hash, so nothing that varies per run may sit inside the hashed object.
 function canonical(value) {
@@ -377,7 +395,7 @@ if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((cand
   await check(vocabularySchema, vocabulary, "$vocabulary", {doc: vocabularySchema, dir: dirname(vocabularySchemaPath)}, errors);
 }
 
-const broken = [...laws(data), ...directionLaws(data, vocabulary), ...layoutRegionLaws(data), ...pageSetLaws(data)];
+const broken = [...laws(data), ...directionLaws(data, vocabulary), ...layoutRegionLaws(data), ...pageSetLaws(data), ...blockModeLaws(data)];
 
 if (errors.length) {
   console.error(`SCHEMA (${errors.length})`);

@@ -5,13 +5,13 @@
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@manifest-schema` | `publication/design-review-preview/schema.json` | file | kiểm tra review graph chỉ sống trong phiên |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | render authored candidate dưới project cache |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | ghi static HTML preview dưới project cache, không build app |
 | `@baseline-schema` | `brainstorms/composition/schema.json` | file | bind reference bốn lock và owner tree |
 | `@visual-proof-schema` | `publication/design-review-preview/visual-proof.schema.json` | file | prove same-viewport parity và delivery completion |
 
 ## Record
 
-Module này hiển thị lựa chọn layout và block nhưng không trở thành product authority. Mọi candidate, selected composition, screenshot và manifest đều là session evidence tạm thời. Skill nhận owner approval phải triển khai kết quả đã chọn vào frontend source trước khi cùng invocation kết thúc.
+Module này ghi static `index.html` cùng một raw HTML file cho mỗi candidate/state. Không còn React/Vite review app, dependency install hay viewer build. Mọi output vẫn là session evidence tạm thời.
 
 ## Authority
 
@@ -34,11 +34,11 @@ Không có accepted bundle, revision map, layout head, block head hoặc design 
 
 ### Layout
 
-Hiển thị ba hoặc bốn candidate page/page-flow authored đầy đủ, dùng cùng product-backed content và viewport set. Existing source-bound node giữ nguyên giữa các lựa chọn. Rank và recommend một candidate. Sau approval, cùng skill invocation implement composition được chọn và prove trong product.
+Default `generate` hiển thị một complete long page hoặc full flow start-to-end chứa mọi block, page/step, state và transition cần cho implementation. Chỉ explicit `brainstorm` mới hiển thị ba hoặc bốn targeted alternative trên reviewed baseline đó.
 
 ### Block
 
-Hiển thị ba hoặc bốn block candidate khác biệt đáng kể bên trong exact current parent page và region geometry. Parent đến từ current routed source hoặc parent preview tạo trước đó trong cùng invocation. Sau approval, cùng skill invocation cập nhật frontend source sở hữu block và prove toàn trang.
+Default `audit` hiển thị một Layout-generated block trong complete parent page và trả pass hoặc exact correction. Chỉ explicit block `brainstorm` mới hiển thị ba hoặc bốn anatomy trong cùng parent geometry.
 
 ## Canvas law
 
@@ -65,6 +65,7 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 7. Source code, test và browser proof là accepted outcome bền vững.
 8. Creativity đi trước principles review; implementation theo source patterns và gates.
 9. MASTER dùng chung cho mọi candidate; page file chỉ ghi deviation và principles chỉ inspect delta.
+10. Generate/audit mode có đúng một result; 3–4 alternative cần explicit brainstorm mode và reviewed baseline.
 
 ## Stops
 
@@ -76,4 +77,4 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 
 ## Output and proof
 
-Publish một cache review application, nêu recommended candidate và exact source boundary, xin approval một lần, implement trong cùng invocation, rồi báo changed source paths và real-product proof. Không báo revision hash hoặc registry head.
+Ghi một static cache `index.html` cùng raw candidate/state files, nêu result và exact source boundary, xin approval một lần, implement trong cùng invocation, rồi báo changed source paths và real-product proof.
