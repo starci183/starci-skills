@@ -1,6 +1,6 @@
 {
   "name": "@starci/eslint-canon-fe",
-  "version": "1.0.1",
+  "version": "1.4.1",
   "description": "The StarCi front-end lint canon: every rule its laws publish, gathered as one flat-config plugin.",
   "type": "module",
   "license": "UNLICENSED",

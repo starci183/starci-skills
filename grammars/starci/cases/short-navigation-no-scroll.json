@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "short-navigation-no-scroll",
+  "kind": "counterexample",
+  "because": "A short destination collection fits its boundary and needs no internal scrolling owner.",
+  "facts": ["collection-navigation", "navigation-controls-pinned"],
+  "expectedOutcomes": [],
+  "rejectedOutcomes": ["navigation-groups-scroll-viewport"]
+}

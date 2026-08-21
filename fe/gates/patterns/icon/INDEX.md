@@ -10,7 +10,7 @@ template: patterns-v2
 
 # INDEX.md
 
-Version: `2.00` · Module: `icon`
+Version: `2.01` · Module: `icon`
 
 ## Law
 
@@ -40,7 +40,7 @@ not a component, a size or a package name.
 | `ICON-4` | A chip glyph is the native 16 solid micro drawing at `size-4` | A 24 outline glyph scaled down; the 20px mini family used as a chip |
 | `ICON-5` | A glyph draws in `currentColor` | A product glyph carrying its own colour |
 | `ICON-6` | Only the icon leaf names a glyph library; callers name meanings | A glyph component imported at a call site, or a second route into the library from a sibling file |
-| `ICON-7` | Two families only: 24 outline and 16 solid | Any other glyph package, even inside the icon leaf; a brand mark approximated from a general package |
+| `ICON-7` | One product entry package, two families only: `@starci/heroicons` 24 outline and 16 solid | Direct upstream imports, any other glyph package, or a brand mark approximated from a general package |
 | `ICON-8` | Every role carries `shrink-0` | A glyph deforming when its row becomes tight |
 | `ICON-9` | The source feature map owns meaning-to-glyph selection, and name, map and table move together | Two unrelated meanings sharing one glyph; a stale or missing row |
 | `ICON-10` | A compact business fact whose reference is text-only stays text-only | A decorative feature glyph on a metric, goal, kind label, streak caption or fact cell |
@@ -95,7 +95,7 @@ paths under `sources/fe/` are the rules in this trust tree.
 | `ICON-4` | `src/components/leaves/Icon/index.tsx` | The separate 16 solid import block, aliased per meaning, and the `chip` entry reading `size-4 shrink-0` |
 | `ICON-5` | `src/components/leaves/Icon/index.tsx` · `src/components/leaves/Icon/brands.tsx` | `stroke="currentColor"` on the locally drawn glyphs; in the brand file, one mark keeping four authored hex fills while the monochrome mark uses `currentColor` — the exception and the rule side by side |
 | `ICON-6` | `sources/fe/icon.mjs` | `noVendorIconOutsideIconLeaf`; the single allowed module path; the package list matched by prefix |
-| `ICON-7` | `sources/fe/icon.mjs` | `heroiconsIsTheGlyphVendor`; the two-package allow set; the rank exemption threaded through both vendor rules |
+| `ICON-7` | `sources/fe/icon.mjs` · `packages/heroicons/src/24/outline/index.tsx` · `packages/heroicons/src/16/solid/index.tsx` | `heroiconsIsTheGlyphVendor`; the two-entry-point allow set; upstream re-exports and reviewed compatible product cuts; the rank exemption threaded through both vendor rules |
 | `ICON-8` | `src/components/leaves/Icon/index.tsx` | Every one of the three role strings ending in `shrink-0` — including `chip`, the one most often assumed too small to matter |
 | `ICON-9` | `src/components/leaves/Icon/icon.md` · `src/components/leaves/Icon/index.tsx` | The feature table beside the meaning union and the glyph map, in one folder. The parity test named by the law: `chưa neo được` |
 | `ICON-10` | `sources/fe/icon.mjs` · `src/components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` and the path it is bound to; that composite rendering a label, a figure and a bar with no glyph |
@@ -116,6 +116,8 @@ paths under `sources/fe/` are the rules in this trust tree.
 ## Invariants
 
 - A caller names a meaning and a role; the icon leaf owns vendor, family, drawing and size.
+- Product source enters glyphs only through `@starci/heroicons`; that package re-exports approved
+  upstream cuts and adds a product cut only after the meaning is stable and upstream has no faithful glyph.
 - One meaning maps to one drawing, and one drawing serves one meaning.
 - Role does not follow from plate size, container size, viewport or density.
 - A glyph inherits colour; an identity mark keeps the colours that make it that identity.
@@ -132,6 +134,9 @@ Exceptions are part of the rule, not relief from it. Each is closed and cites th
   its colours; recolouring it produces a different mark. Monochrome marks still take `currentColor`.
 - **Identity marks are local SVG** (`ICON-7`). A brand is drawn exactly, from a file in the icon
   folder — never approximated by the nearest glyph in a general-purpose package.
+- **Missing upstream product glyph** (`ICON-7`). Extend `@starci/heroicons` with both a 24 outline
+  and 16 solid cut using `currentColor` and Heroicons geometry; never draw it in a screen or import
+  upstream directly to bypass review.
 - **Reference-backed generic semantics stay** (`ICON-10`). Complete, failed, pending, close and
   disclosure are meanings a compact reference genuinely carries. Navigation, named feature entry
   points and large empty-region headings keep their reference glyphs, because there the glyph is part

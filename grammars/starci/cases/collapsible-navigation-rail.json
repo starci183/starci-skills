@@ -1,0 +1,25 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "collapsible-navigation-rail",
+  "kind": "golden",
+  "because": "Course navigation has two stable width presentations with one persistent host and internal group scrolling.",
+  "facts": [
+    "collection-navigation",
+    "navigation-compact-icon-only",
+    "shape-circular",
+    "region-adjacent",
+    "region-persistent",
+    "region-independent-scroll",
+    "width-user-collapsible",
+    "navigation-controls-pinned",
+    "navigation-groups-long",
+    "scroll-internal"
+  ],
+  "expectedOutcomes": [
+    "collapsible-rail-transition",
+    "circular-icon-destination",
+    "navigation-groups-scroll-viewport"
+  ],
+  "rejectedOutcomes": ["resizable-rail"]
+}

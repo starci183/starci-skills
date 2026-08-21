@@ -10,7 +10,7 @@ template: lints-v2
 
 # INDEX.md
 
-Version: `2.00` · Module: `icon`
+Version: `2.01` · Module: `icon`
 
 ## Law
 
@@ -60,7 +60,7 @@ unenforced by this module.
 | Rule | Mechanism |
 |---|---|
 | `no-vendor-icon-outside-icon-leaf` | Visits `ImportDeclaration`; reads `node.source.value`. A source matches when it equals or starts with one of ten package prefixes, or when it is an external specifier (not starting with `.` or `@/`) whose text matches `/(?:icon\|glyph\|lucide\|feather\|tabler\|fortawesome)/i`. File gate: `context.filename`, back-slashes normalised to forward, must contain `/src/` and must not end with `/leaves/Icon/index.tsx`. One exemption: filename ends with `/leaves/RankMark/index.tsx` **and** the source is exactly the award package. |
-| `heroicons-is-the-glyph-vendor` | Same `ImportDeclaration` visitor and same glyph test, minus the leaf gate: every file containing `/src/` is scanned. A hit is dropped only when the source is exactly `@heroicons/react/24/outline` or `@heroicons/react/16/solid`, or when it is the same rank-leaf-plus-package pair. |
+| `heroicons-is-the-glyph-vendor` | Same `ImportDeclaration` visitor and same glyph test, minus the leaf gate: every file containing `/src/` is scanned. A hit is dropped only when the source is exactly `@starci/heroicons/24/outline` or `@starci/heroicons/16/solid`, or when it is the same rank-leaf-plus-package pair. Direct `@heroicons/react` imports therefore report even inside the icon leaf. |
 | `no-off-scale-glyph-size` | Visits `JSXAttribute` whose `name.name` is `className` or `class`, and every `VariableDeclarator`. Extracts static text from a string `Literal`, from a `TemplateLiteral` with zero expressions, or through a `JSXExpressionContainer` wrapping either. Tests that text against `/\bsize-(?:\d+\.\d+\|\[[^\]]+\])/` and reports the first match only. |
 | `no-decorative-icon-in-metric-cell` | Visits `JSXOpeningElement`; reports when `node.name.type === "JSXIdentifier"` and `node.name.name === "Icon"`. File gate is the whole rule: the filename must end with `/composites/LabelledProgressRow/index.tsx`, otherwise the visitor is never installed. |
 | `rank-artwork-is-a-closed-set` | Visits every `Literal`; ignores non-strings and any string not starting with the artwork-collection prefix `fluent-emoji-flat:`. File gates: must contain `/src/`, must not match `/\.test\.tsx?$/`. Filename ending with `/leaves/RankMark/index.tsx` selects the closed-set branch; every other file takes the "named outside the leaf" branch. |

@@ -11,9 +11,35 @@
         "auditResults": {
           "type": "array", "minItems": 1,
           "items": {
-            "type": "object", "required": ["rule", "status", "evidence"],
+            "type": "object", "additionalProperties": false, "required": ["rule", "status", "evidence"],
             "properties": { "rule": { "type": "string" }, "status": { "enum": ["pass", "fail", "not-applicable"] }, "evidence": { "type": "string" } }
-          }
+          },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["rule", "status"],
+                "properties": {
+                  "rule": { "const": "principle-receipt-coverage" },
+                  "status": { "const": "pass" }
+                }
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["rule", "status"],
+                "properties": {
+                  "rule": { "const": "principle-recipe-exact" },
+                  "status": { "const": "pass" }
+                }
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
         }
       }
     },

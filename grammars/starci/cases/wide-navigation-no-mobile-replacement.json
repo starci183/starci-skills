@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "wide-navigation-no-mobile-replacement",
+  "kind": "counterexample",
+  "because": "A wide destination column alone does not imply a narrow bottom navigation replacement.",
+  "facts": ["navigation-desktop-column", "navigation-peer-destinations"],
+  "expectedOutcomes": [],
+  "rejectedOutcomes": ["mobile-destination-bar"]
+}

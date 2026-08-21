@@ -13,14 +13,14 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const args = { check: false, targets: [], contracts: [] };
+  const args = { check: false, targets: [], contracts: [], grammars: [], grammarProfiles: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === '--check') {
       args.check = true;
       continue;
     }
-    if (!['--source', '--project', '--target', '--contract'].includes(token)) {
+    if (!['--source', '--project', '--target', '--contract', '--grammar', '--grammar-profile'].includes(token)) {
       fail(`Unknown argument: ${token}`);
     }
     const value = argv[index + 1];
@@ -29,6 +29,8 @@ function parseArgs(argv) {
     }
     if (token === '--target') args.targets.push(value);
     else if (token === '--contract') args.contracts.push(value);
+    else if (token === '--grammar') args.grammars.push(value);
+    else if (token === '--grammar-profile') args.grammarProfiles.push(value);
     else args[token.slice(2)] = value;
     index += 1;
   }
@@ -94,7 +96,7 @@ function parseTarget(value) {
   return [role, targetPath];
 }
 
-async function contextRoutes(repository, explicitContract) {
+async function contextRoutes(repository, explicitContract, grammar, grammarProfile) {
   const instructions = [];
   const manifests = [];
   const instructionCandidates = [
@@ -136,7 +138,7 @@ async function contextRoutes(repository, explicitContract) {
       }
     }
   }
-  return { instructions, contract, contractSource, manifests };
+  return { instructions, contract, contractSource, manifests, grammar: grammar ?? null, grammarProfile: grammarProfile ?? null };
 }
 
 async function inspectRepository(candidate) {
@@ -222,6 +224,18 @@ async function verifyConfig(sourcePath, workspaceRoot, configPath) {
   if (!config.context || !Array.isArray(config.context.instructions) || !Array.isArray(config.context.manifests)) {
     fail(`${configPath} has invalid context routes.`);
   }
+  if (config.context.grammar !== null) {
+    if (!ID_PATTERN.test(config.context.grammar)) fail(`${configPath} has invalid context.grammar.`);
+    if (!ID_PATTERN.test(config.context.grammarProfile ?? '')) fail(`${configPath} requires a valid context.grammarProfile.`);
+    const grammarRoot = path.join(sourcePath, '.claude', 'grammars', config.context.grammar);
+    for (const name of ['grammar.json', 'facts.json', 'evidence.json']) {
+      if (!(await exists(path.join(grammarRoot, name)))) fail(`Grammar route does not exist: ${path.join(grammarRoot, name)}`);
+    }
+    const profilePath = path.join(grammarRoot, 'profiles', `${config.context.grammarProfile}.json`);
+    if (!(await exists(profilePath))) fail(`Grammar profile route does not exist: ${profilePath}`);
+  } else if (config.context.grammarProfile !== null) {
+    fail(`${configPath} cannot select context.grammarProfile without context.grammar.`);
+  }
   const contextPaths = [...config.context.instructions, ...config.context.manifests, config.context.contract].filter(Boolean);
   for (const contextPath of contextPaths) {
     if (!(await exists(contextPath))) fail(`Context route does not exist: ${contextPath}`);
@@ -274,8 +288,22 @@ async function main() {
 
   const targets = new Map(args.targets.map(parseTarget));
   const contracts = new Map(args.contracts.map(parseTarget));
+  const grammars = new Map(args.grammars.map(parseTarget));
+  const grammarProfiles = new Map(args.grammarProfiles.map(parseTarget));
   for (const role of contracts.keys()) {
     if (!targets.has(role)) fail(`Contract role has no target in this run: ${role}`);
+  }
+  for (const role of grammars.keys()) {
+    if (!targets.has(role)) fail(`Grammar role has no target in this run: ${role}`);
+    if (!ID_PATTERN.test(grammars.get(role))) fail(`Invalid grammar id for ${role}: ${grammars.get(role)}`);
+  }
+  for (const role of grammarProfiles.keys()) {
+    if (!targets.has(role)) fail(`Grammar profile role has no target in this run: ${role}`);
+    if (!ID_PATTERN.test(grammarProfiles.get(role))) fail(`Invalid grammar profile id for ${role}: ${grammarProfiles.get(role)}`);
+    if (!grammars.has(role)) fail(`Grammar profile role has no grammar in this run: ${role}`);
+  }
+  for (const role of grammars.keys()) {
+    if (!grammarProfiles.has(role)) fail(`Grammar role requires --grammar-profile ${role}=<profile>: ${role}`);
   }
   const written = [];
   const missingContracts = [];
@@ -287,7 +315,7 @@ async function main() {
     const repository = await inspectRepository(targetPath);
     const aliasPath = path.join(roleDirectory, 'repo');
     if (await removeLegacyAlias(aliasPath, repository.diskPath)) removedLegacyAliases.push(`${args.project}/${role}/repo`);
-    const context = await contextRoutes(repository, contracts.get(role));
+    const context = await contextRoutes(repository, contracts.get(role), grammars.get(role), grammarProfiles.get(role));
     if (!context.contract) missingContracts.push(`${args.project}/${role}`);
 
     const config = {

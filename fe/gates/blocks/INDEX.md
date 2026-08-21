@@ -10,5 +10,10 @@ responsive behavior, contract decision and pure/connected ownership split. The f
 some blocks and continue altering the rest. Gate 3 opens only when every required block hash is
 whitelisted.
 
+Collection kind is descriptive, not sufficient interaction law. Every proposal must carry the
+accepted layout's grammar decisions and implement their obligations through the project owner. An
+absent owner is `new-required`; a plain loop is never an implicit replacement for ListBox,
+Accordion, SurfaceListCard or a rail separator.
+
 Goal: [`GOAL.md`](GOAL.md). Contract: [`gate.schema.json`](gate.schema.json). Cardinality owner:
 [`laws/b14-proposals-are-per-block/`](laws/b14-proposals-are-per-block/).

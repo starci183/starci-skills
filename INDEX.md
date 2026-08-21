@@ -1,7 +1,8 @@
 # The canon, v2
 
 Before using this index, read [`common/config/INDEX.md`](common/config/INDEX.md). The trust tree has
-exactly three rules registries: [`common/`](common/config/registry.md), [`fe/`](fe/) and [`be/`](be/).
+exactly four rules registries: [`common/`](common/config/registry.md), [`fe/`](fe/), [`be/`](be/) and
+explicitly selected [`grammars/`](grammars/INDEX.md).
 Skills, sources and scripts execute those rules; they are not parallel registries.
 
 The rules this codebase is written by, one file per concept, filed on an axis.
@@ -45,6 +46,11 @@ run:
 - [`starci-setup-worktrees`](skills/starci-setup-worktrees/SKILL.md) owns only
   `<Source>/.worktrees/<project>/` registry, session and cache state.
 
+Optional immutable grammar provenance is maintained by one continuous skill:
+[`starci-grammar-refresh-references`](skills/starci-grammar-refresh-references/SKILL.md). It refreshes
+only stale `references.json` entries and cannot alter durable templates, capsules, rulings, cases,
+rules or profiles.
+
 [`common/config/workspace.md`](common/config/workspace.md) defines how
 `start <project> <role...>` resolves ignored, per-machine
 `.workspace/<project>/<role>/config.json` routes. The trust tree carries only the path-free loading
@@ -66,7 +72,7 @@ folders inside one shelf. A file that seems to fit two axes is usually two files
 |---|---|---|
 | **canon** | How is this spelled here? The law the code already follows, and the machine enforces. | `fe/canon/` |
 | **principles** | Which primitive facts must implementation never violate? The binding construction rules — closed, non-subjective outputs such as spacing, colour, type, position, responsive behavior and surface ownership. | `fe/gates/principles/` |
-| **senses** | What does the reader PERCEIVE, and which contextual product judgement selects among otherwise legal choices? Actions, hierarchy, input behavior, affordance and restraint. | `fe/senses/` |
+| **grammar** | Which deterministic product-family outcome follows from closed UI facts, and which owner implements it? | `grammars/<grammar>/` |
 | **governance** | How are exceptions and observable parity recorded without becoming visual law? | `fe/governance/` |
 | **intent** | Which honest user outcome, evidence and friction should guide legal layout/block choices? | `fe/intent/` |
 | **baselines** | What does ONE screen already promise its users? Named product behaviour a parity request must preserve. Names its product, unlike every shelf above. | `fe/baselines/` |
@@ -157,33 +163,29 @@ on a product component registry and is not a shelf for taste, strategy or migrat
 [`surface-in-surface`](fe/gates/principles/surface-in-surface/INDEX.md) ·
 [`typography`](fe/gates/principles/typography/INDEX.md).
 
-`fe/senses/` holds what the reader PERCEIVES — contextual judgement that can be correct only after
-product job, state and moment are known:
-[`call-to-action`](fe/senses/call-to-action/INDEX.md) ·
-[`hierarchy`](fe/senses/hierarchy/INDEX.md) ·
-[`input`](fe/senses/input/INDEX.md) ·
-[`press-affordance`](fe/senses/press-affordance/INDEX.md) ·
-[`restraint`](fe/senses/restraint/INDEX.md).
+`grammars/<grammar>/` holds deterministic product-family grammar promoted into durable behavior
+capsules, founder rulings, golden/counterexample cases and compiled TSX templates. It turns closed
+facts into semantic outcomes, behavior obligations and project owner decisions without retaining
+repository provenance. Workspace roles select it explicitly; `starci` is never inferred from a
+project name.
 
 `fe/governance/` holds exceptions and parity — process evidence rather than design outputs:
 [`exception`](fe/governance/exception/INDEX.md) ·
 [`refactor-parity`](fe/governance/refactor-parity/INDEX.md).
 
-Every module on all three shelves carries `INDEX.md`, `vi.md`, `example.md`, `audit.md` and
+Every module on the FE rule shelves carries `INDEX.md`, `vi.md`, `example.md`, `audit.md` and
 `changelog.md`. The shape stops being uniform there, so open the folder rather than assume it:
-a `fe/gates/principles/` module carries those FIVE and no more, its `prompt.md` having been folded into
-`example.md`, while two `fe/senses/` modules — `call-to-action` and `input` — still carry a sixth
-record, `prompt.md`.
+a `fe/gates/principles/` module carries those FIVE and no more, while project grammars use their own
+machine-readable schema, profile and golden cases.
 
 **Which shelf a concept goes on is decided first by what kind of answer it produces.** A primitive,
-non-negotiable fact belongs in `principles/`; a contextual choice belongs in `senses/`; lifecycle and
-evidence rules belong in `governance/`. A law with an
+role-wide construction fact belongs in `principles/`; a deterministic product choice belongs in its
+project grammar; lifecycle and evidence rules belong in `governance/`. A law with an
 enforceable half belongs in `canon/patterns/` beside its artifact — `icon` began as a principle and
-moved, because it turned out to have measurable steps and a rule that can see them. A law that
-states a contextual reason rather than a primitive fact stays in `senses/`.
+moved, because it turned out to have measurable steps and a rule that can see them.
 
-Reading principles and senses without canon leaves a reader with taste and no spelling; reading canon
-without them leaves them able to type a legal value for the wrong reason.
+Reading principles and project grammar without canon leaves a reader with outcomes and no spelling;
+reading canon without them leaves them able to type a legal value for the wrong product reason.
 
 Frontend invention follows the five-gate journey in [`fe/gates/`](fe/gates/INDEX.md), informed by
 [`fe/intent/`](fe/intent/INDEX.md) and bounded by contracts/backend truth:

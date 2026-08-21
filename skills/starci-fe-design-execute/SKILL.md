@@ -18,7 +18,16 @@ and exact production `Touching`. Confirm the production write boundary before th
 ## PROCESS
 
 Verify every accepted object's canonical bytes and decision ref, and prove no reachable unit is
-queued. Run Gate 3 Principles, Gate 4 Patterns and Gate 5 Lints as a single exact-input chain. Each
+queued. Reload the exact workspace-selected grammar/profile, re-resolve every accepted fact set and require the
+receipt, decisions, owners and obligations to match byte-for-byte. A stale or missing grammar result
+is `returned-to-owner`. Before any production write, enumerate every accepted render decision as a
+stable `slot + concern` decision ID. Gate 3 must emit one principle receipt for every ID: accepted
+hash, contract key, node path, classification inputs, situation code, exact output and evidence.
+Run `node <trust-root>/scripts/validate-principle-receipts.mjs --receipt <principles-output.json>`.
+Missing coverage, a recipe not present in the selected principle table, an invented class, or a
+different element/className is blocking; never repair it by visual judgement inside Execute.
+
+Run Gate 3 Principles, Gate 4 Patterns and Gate 5 Lints as a single exact-input chain. Each
 stage emits one result and binds its input/output hash. If accepted JSON does not settle a product
 choice, write `returned-to-owner`; do not choose inside execution.
 
@@ -27,6 +36,14 @@ context for every file. Run adopted lint, typecheck, focused tests, rendered sta
 flow proof where applicable. Append `### LIVE FLOW PROOF` and inspect UI, Network, Console and
 frontend/backend terminal evidence in the same time window. Record the production diff and
 registry/workflow receipt.
+
+Gate 4 must carry `principleReceiptHash` and `coverageHash` unchanged. Gate 5 must contain passing
+`principle-receipt-coverage` and `principle-recipe-exact` audits. A lint/typecheck/test pass cannot
+substitute for either audit, because structural tests do not prove a visual recipe was classified.
+
+Execution may create or extend an owner only when the accepted grammar decision says so. It may not
+replace ListBox, Accordion, a joined surface or a separator/resizer with page-local markup even when
+that shortcut satisfies the visual screenshot.
 
 ## OUTPUT
 

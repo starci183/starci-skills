@@ -9,7 +9,7 @@ description: Lịch sử phiên bản của hồ sơ thực thi luật biểu t�
 
 # changelog.md
 
-> Phiên bản hiện tại: `2.00` · Mô-đun: `icon`
+> Phiên bản hiện tại: `2.01` · Mô-đun: `icon`
 
 ## Quy ước phiên bản
 
@@ -24,6 +24,12 @@ Với kệ thực thi này, những thứ sau đều là thay đổi phải ghi:
   `INDEX.md` phải đổi cùng nhau.
 - Một miễn trừ được thêm, hoặc mất vế giá trị và chỉ còn vế tệp.
 - Ánh xạ giữa một luật và một mã trong văn bản luật thay đổi.
+
+## 2.01 — 2026-08-21
+
+- Allow-list chuyển sang đúng hai entry point của `@starci/heroicons`; import trực tiếp
+  `@heroicons/react` trong product source nay bị báo, kể cả trong icon leaf.
+- Twin tests thêm case direct-upstream bị từ chối và giữ case hai entry point extension được chấp nhận.
 
 ## 2.00 — 2026-08-16
 

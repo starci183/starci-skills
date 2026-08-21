@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "ordinary-route-not-focused-work",
+  "kind": "counterexample",
+  "because": "An ordinary route retains persistent chrome because it is not a live evaluated work session.",
+  "facts": ["chrome-persistent-navigation-present"],
+  "expectedOutcomes": [],
+  "rejectedOutcomes": ["focused-work-surface"]
+}

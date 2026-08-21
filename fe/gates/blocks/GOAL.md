@@ -6,3 +6,7 @@ contract decision và pure/connected owner.
 
 Mỗi block là một đơn vị quyết định độc lập với 3–4 proposals. Proposal phải follow sát `fe/intent`
 của surface và block, nhưng không được tự bịa data, proof, urgency, state hay capability backend.
+
+Proposal phải giữ nguyên grammar receipt của layout, ghi rule/outcome/obligations áp dụng và resolve
+đúng project owner. Nếu owner chưa tồn tại thì trả `new-required`; không được dùng `map()` hoặc
+markup tự ghép để làm cho candidate trông như đã hoàn chỉnh.

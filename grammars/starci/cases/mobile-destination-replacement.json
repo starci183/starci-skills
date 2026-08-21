@@ -1,0 +1,15 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "mobile-destination-replacement",
+  "kind": "golden",
+  "because": "A persistent wide destination column requires one narrow bottom navigation replacement for the same local panels.",
+  "facts": [
+    "navigation-desktop-column",
+    "navigation-narrow-replacement-required",
+    "navigation-peer-destinations",
+    "navigation-local-view-state"
+  ],
+  "expectedOutcomes": ["mobile-destination-bar"],
+  "rejectedOutcomes": []
+}

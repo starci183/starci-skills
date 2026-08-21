@@ -4,7 +4,7 @@
   "title": "StarCi FE iterative design session",
   "type": "object",
   "additionalProperties": false,
-  "required": ["sessionId", "project", "status", "roots", "activeUnit", "events", "checkpoint"],
+  "required": ["sessionId", "project", "status", "roots", "activeUnit", "events", "checkpoint", "grammarReceipt"],
   "properties": {
     "sessionId": { "$ref": "#/$defs/Id" },
     "project": { "$ref": "#/$defs/Id" },
@@ -13,12 +13,22 @@
     "activeUnit": { "$ref": "#/$defs/UnitRef" },
     "events": { "type": "array", "items": { "$ref": "#/$defs/Event" } },
     "checkpoint": { "$ref": "#/$defs/Checkpoint" },
-    "registryReceipt": { "$ref": "#/$defs/RegistryReceipt" }
+    "registryReceipt": { "$ref": "#/$defs/RegistryReceipt" },
+    "grammarReceipt": { "$ref": "#/$defs/GrammarReceipt" }
   },
   "$defs": {
     "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
     "Hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "Timestamp": { "type": "string", "format": "date-time" },
+    "GrammarReceipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["grammar", "grammarId", "version", "profileId", "grammarHash", "profileHash", "factCatalogHash"],
+      "properties": {
+        "grammar": { "$ref": "#/$defs/Id" }, "grammarId": { "$ref": "#/$defs/Id" }, "version": { "type": "integer", "minimum": 1 },
+        "profileId": { "$ref": "#/$defs/Id" }, "grammarHash": { "$ref": "#/$defs/Hash" }, "profileHash": { "$ref": "#/$defs/Hash" },
+        "factCatalogHash": { "$ref": "#/$defs/Hash" }
+      }
+    },
     "UnitRef": {
       "type": "object", "additionalProperties": false,
       "required": ["gate", "surfaceId", "unitId"],

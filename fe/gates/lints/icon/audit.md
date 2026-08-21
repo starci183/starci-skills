@@ -9,7 +9,7 @@ description: Phản biện mức thực thi của luật biểu tượng — lu�
 
 # audit.md
 
-> Phiên bản: `2.00` · Mô-đun: `icon`
+> Phiên bản: `2.01` · Mô-đun: `icon`
 
 Bài phản biện này không hỏi luật văn bản có đúng không. Nó hỏi **máy có giữ được luật không**, và
 nếu không thì hở ở đâu.

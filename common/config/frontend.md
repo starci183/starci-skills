@@ -16,10 +16,12 @@ For each FE role config:
 2. Read `context.contract` when present. For `fe`, this is primary domain/composition context and
    should be read before broad component searches.
 3. Read `context.manifests` only to resolve package manager, scripts and workspace boundaries.
-4. Before the first code write, read every applicable module under
+4. For FE design, read the role's `context.grammar`, then load exactly
+   `.claude/grammars/<grammar>/grammar.json` and `profile.json`. Missing route stops the journey.
+5. Before the first code write, read every applicable module under
    `.claude/fe/gates/patterns/<pattern>/` completely, starting with its `INDEX.md` and following the
    module's required references. No FE or FE-legacy code may be written before this gate.
-5. Inspect source and tests as implementation evidence.
+6. Inspect source and tests as implementation evidence.
 
 Select patterns from the actual change surface, not from one guessed filename. A change spanning
 contracts, props, layout and comments loads every matching module. When applicability is unclear,

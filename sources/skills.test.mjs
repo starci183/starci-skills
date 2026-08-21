@@ -151,6 +151,7 @@ test("every capability has its declared lifecycle", () => {
     "starci-fe-design-layout",
     "starci-fe-design-block",
     "starci-fe-design-execute",
+    "starci-grammar-refresh-references",
   ])
   const phasesByCapability = new Map()
   const invalid = []

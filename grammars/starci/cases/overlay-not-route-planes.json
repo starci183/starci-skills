@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "overlay-not-route-planes",
+  "kind": "counterexample",
+  "because": "An overlay covers the page and therefore does not inherit adjacent rail or primary route-plane recipes.",
+  "facts": ["region-overlay"],
+  "expectedOutcomes": [],
+  "rejectedOutcomes": ["resizable-rail", "rail-content-spacing", "primary-content-spacing"]
+}

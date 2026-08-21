@@ -1,0 +1,17 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "authored-markdown-document",
+  "kind": "golden",
+  "because": "A multi-block authored document must preserve its semantic outline, collections, links and locally bounded wide content.",
+  "facts": [
+    "content-authored-markdown",
+    "content-block-structure-present",
+    "content-headings-present",
+    "document-host-owns-title",
+    "content-wide-blocks-present",
+    "content-links-present"
+  ],
+  "expectedOutcomes": ["markdown-document", "host-relative-document-headings"],
+  "rejectedOutcomes": []
+}

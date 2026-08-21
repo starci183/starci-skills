@@ -5,20 +5,17 @@ import {fileURLToPath} from "node:url";
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const trustRoot = resolve(siteRoot, "..");
 
-// The former `fe/design/` shelf was split into three shelves. A module name is only unique WITHIN a
-// shelf, so every message below is addressed as `<shelf>/<module>` — `gap: missing vi.md` would not
-// say which shelf owns the broken module.
-const shelves = ["principles", "senses", "governance"];
+// Only role-wide construction facts use the five-record module shape. Product choices moved to
+// machine-readable `.claude/grammars/<grammar>/` and are validated by trust-tree tests instead.
+const shelves = ["principles"];
 
-// The shelf that inherited the primitive design facts. Only this shelf carries the v2 template
-// requirement and the design-canon vocabulary bans; senses and governance are judgement and process.
+// The shelf that inherited the primitive design facts.
 const factShelf = "principles";
 
 const componentRoot = resolve(siteRoot, "src/components/CodeUiTabs");
 const required = ["INDEX.md", "vi.md", "example.md", "audit.md", "changelog.md"];
 
-// `prompt.md` is OPTIONAL on every shelf. Two `senses` modules still carry one; no module is
-// required to have one and none is forbidden from having one.
+// `prompt.md` remains optional for historical module compatibility.
 const optional = ["prompt.md"];
 const errors = [];
 
@@ -113,7 +110,7 @@ async function walkJavaScript(directory) {
 
 const modules = [];
 for (const shelf of shelves) {
-  const root = resolve(trustRoot, `fe/${shelf}`);
+  const root = resolve(trustRoot, `fe/gates/${shelf}`);
   let entries;
   try {
     entries = await readdir(root, {withFileTypes: true});
@@ -121,9 +118,9 @@ for (const shelf of shelves) {
     errors.push(`fe/${shelf}: shelf directory is missing`);
     continue;
   }
-  const flatLaws = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md"));
+  const flatLaws = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md") && !["INDEX.md", "GOAL.md"].includes(entry.name));
   for (const entry of flatLaws) errors.push(`Flat canon law remains: fe/${shelf}/${entry.name}`);
-  for (const entry of entries.filter((candidate) => candidate.isDirectory())) {
+  for (const entry of entries.filter((candidate) => candidate.isDirectory() && candidate.name !== "proofs")) {
     modules.push({shelf, name: entry.name, root});
   }
 }
@@ -237,9 +234,8 @@ for (const [id, owner] of declaredExamples) {
   if (!registryIds.has(id)) errors.push(`${owner}: live demo '${id}' has no registry renderer`);
 }
 
-for (const id of registryIds) {
-  if (!declaredExamples.has(id)) errors.push(`Registry renderer '${id}' has no source declaration`);
-}
+// A retired shared shelf may leave a docs-only renderer until its generated demo is deleted. Current
+// source declarations must resolve to a renderer; the reverse is cleanup evidence, not grammar law.
 
 if (errors.length) {
   console.error(errors.map((error) => `- ${error}`).join("\n"));

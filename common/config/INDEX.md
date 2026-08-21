@@ -5,13 +5,14 @@ It is the shared configuration entrypoint for Claude and Codex; root bootstrap f
 
 ## Registry invariant
 
-The trust tree has exactly three rules registries:
+The trust tree has exactly four rules registries:
 
 | Registry | Owns |
 |---|---|
 | `.claude/common/` | Source/workspace routing, shared config, workflow shape and cross-role rules |
 | `.claude/fe/` | Frontend construction, contract, UI and frontend lint rules |
 | `.claude/be/` | Backend architecture, transport, data and backend lint rules |
+| `.claude/grammars/<grammar>/` | Deterministic product-family UI facts, outcomes and owner mappings selected by workspace role |
 
 `.claude/skills/`, `.claude/sources/` and `.claude/scripts/` execute or enforce registry rules; they
 are not additional rules registries. Read [`registry.md`](registry.md) for ownership boundaries.
@@ -29,9 +30,11 @@ are not additional rules registries. Read [`registry.md`](registry.md) for owner
 5. For role `fe`, read [`frontend.md`](frontend.md), then load `context.contract` before scanning
    implementation. For `fe-legacy`, read the same config but treat it only as parity evidence. For
    role `be`, read [`backend.md`](backend.md).
-6. Read only the relevant `.claude/fe/` or `.claude/be/` rule modules named by the task. Shared
+6. For FE design, read `context.grammar` from the resolved FE role and require the exact
+   `.claude/grammars/<grammar>/grammar.json` and `profile.json`; never infer it from Project or repo.
+7. Read only the relevant `.claude/fe/` or `.claude/be/` rule modules named by the task. Shared
    routing and lifecycle rules remain under `.claude/common/`.
-7. Read `.claude/skill-shape.md` and the selected skill before invoking a capability.
+8. Read `.claude/skill-shape.md` and the selected skill before invoking a capability.
 
 User intent decides the product goal. Target instructions govern their repository. The FE contract
 owns frontend composition/context; executable backend behavior owns business truth; registry rules

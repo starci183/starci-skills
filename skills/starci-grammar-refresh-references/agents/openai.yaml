@@ -1,0 +1,4 @@
+interface:
+  display_name: "Refresh Grammar References"
+  short_description: "Refresh stale optional grammar refs in one run"
+  default_prompt: "Use $starci-grammar-refresh-references to audit and refresh stale optional immutable grammar references without changing durable templates, capsules, rulings, cases, rules, or profiles."

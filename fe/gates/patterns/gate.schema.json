@@ -7,7 +7,7 @@
   },
   "$defs": {
     "Hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "PrinciplesReceipt": { "type": "object", "additionalProperties": false, "required": ["principlesHash", "whitelistHashes"], "properties": { "principlesHash": { "$ref": "#/$defs/Hash" }, "whitelistHashes": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/Hash" } } } },
+    "PrinciplesReceipt": { "type": "object", "additionalProperties": false, "required": ["principlesHash", "principleReceiptHash", "coverageHash", "whitelistHashes"], "properties": { "principlesHash": { "$ref": "#/$defs/Hash" }, "principleReceiptHash": { "$ref": "#/$defs/Hash" }, "coverageHash": { "$ref": "#/$defs/Hash" }, "whitelistHashes": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/Hash" } } } },
     "PatternResult": { "type": "object", "additionalProperties": false, "required": ["inputHash", "files", "contracts", "componentSplit", "outputHash"], "properties": { "inputHash": { "$ref": "#/$defs/Hash" }, "files": { "type": "array", "items": { "type": "object" } }, "contracts": { "type": "array", "items": { "type": "string" } }, "componentSplit": { "type": "array", "items": { "type": "object" } }, "outputHash": { "$ref": "#/$defs/Hash" } } }
   }
 }

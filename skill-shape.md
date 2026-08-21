@@ -20,6 +20,11 @@ Plan → Review → Apply stages: `starci-setup-workspace` owns only
 repository. Missing identity, ambiguous paths, collisions or an expanded write boundary still stop
 at Review for one batched approval.
 
+Optional grammar-reference refresh is one standalone continuous capability:
+`starci-grammar-refresh-references` audits, compares and updates only immutable provenance refs in
+one run. It never edits durable templates, capsules, rulings, cases, rules or profiles, so it has no
+separate approval phase and no authority to change grammar behavior.
+
 ## CONTEXT — print before doing anything
 
 Present and append the table under the exact Markdown heading `### CONTEXT`. A plain `CONTEXT` label
@@ -44,7 +49,8 @@ is invalid because the workflow validator cannot identify its section.
 | Touching | exact paths this phase may write |
 
 For FE design session records, `Phase` is `layout`, `block`, `execute` or `complete`. Every event
-keeps the same `Session id` and immutable object hashes.
+keeps the same `Session id`, immutable object hashes and exact workspace-selected grammar receipt. A changed
+grammar or profile hash reopens the affected decision owner; it is not silently adopted by Execute.
 
 `Source` is the current Codex project context that owns `AGENTS.md`, `.claude` and `.workflows`; it is
 not automatically a target repository. Resolve `Trust`, `Skills` and `Workflow root` from `Source`;
@@ -75,9 +81,11 @@ Read the governing canon, contracts, live source and named references before pro
 Produce a brief: objective, evidence, boundaries, decisions, alternatives and acceptance evidence.
 Do not write production code.
 
-For FE Design, Plan opens/resumes one hash-bound registry session and routes target surfaces to
-Layout. It does not create HTML previews. Layout and Block JSON rounds are the review surface; each
-round keeps exact prompt, response, candidates, feedback and founder verdict.
+For FE Design, Plan opens/resumes one hash-bound registry session, resolves the FE role's exact
+workspace-selected
+deterministic grammar and routes target surfaces to Layout. It does not create HTML previews.
+Layout and Block JSON rounds are the review surface; each round keeps exact prompt, response,
+candidates, feedback, founder verdict and grammar receipt.
 
 ### Review
 

@@ -7,16 +7,17 @@
   "$defs": {
     "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }, "Hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "BlockInput": {
-      "type": "object", "additionalProperties": false, "required": ["acceptedLayout", "blockIds", "promptHash"],
+      "type": "object", "additionalProperties": false, "required": ["acceptedLayout", "blockIds", "promptHash", "grammarReceipt"],
       "properties": {
         "acceptedLayout": { "$ref": "https://starci.academy/schema/fe/gates/layouts/gate.schema.json#/$defs/SelectedLayoutBundle" },
         "blockIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } },
-        "promptHash": { "$ref": "#/$defs/Hash" }, "basedOnHash": { "$ref": "#/$defs/Hash" }
+        "promptHash": { "$ref": "#/$defs/Hash" }, "basedOnHash": { "$ref": "#/$defs/Hash" },
+        "grammarReceipt": { "$ref": "https://starci.academy/schema/fe/gates/layouts/gate.schema.json#/$defs/GrammarReceipt" }
       }
     },
     "BlockCandidate": {
       "type": "object", "additionalProperties": false,
-      "required": ["candidateId", "blockId", "sourceLayoutHash", "role", "render", "collection", "fields", "data", "states", "actions", "copySlots", "responsive", "contract", "ownership"],
+      "required": ["candidateId", "blockId", "sourceLayoutHash", "role", "render", "collection", "fields", "data", "states", "actions", "copySlots", "responsive", "contract", "ownership", "grammarDecisions"],
       "properties": {
         "candidateId": { "$ref": "#/$defs/Id" }, "blockId": { "$ref": "#/$defs/Id" }, "sourceLayoutHash": { "$ref": "#/$defs/Hash" },
         "role": { "type": "string", "minLength": 12 },
@@ -27,7 +28,8 @@
         "actions": { "type": "array", "items": { "type": "string" } }, "copySlots": { "type": "array", "items": { "type": "string" } },
         "responsive": { "type": "string", "minLength": 8 },
         "contract": { "type": "object", "required": ["decision", "key"], "properties": { "decision": { "enum": ["reuse", "extend", "new-required", "not-applicable"] }, "key": { "type": ["string", "null"] } } },
-        "ownership": { "type": "object", "required": ["owner", "split"], "properties": { "owner": { "type": "string" }, "split": { "enum": ["pure", "connected", "pure-plus-connected"] } } }
+        "ownership": { "type": "object", "required": ["owner", "split"], "properties": { "owner": { "type": "string" }, "split": { "enum": ["pure", "connected", "pure-plus-connected"] } } },
+        "grammarDecisions": { "type": "array", "minItems": 1, "items": { "$ref": "https://starci.academy/schema/fe/gates/layouts/gate.schema.json#/$defs/GrammarDecision" } }
       }
     },
     "BlockCandidateSet": {

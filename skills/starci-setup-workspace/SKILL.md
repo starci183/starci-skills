@@ -27,7 +27,7 @@ and `<Source>/.workspace/`; never edit target repositories.
 ### Plan
 
 Inspect each target read-only: resolved disk path, Git root, `origin` repository, branch, HEAD,
-instruction entrypoints, manifests and primary contract. Inspect existing role configs, Source
+instruction entrypoints, manifests, primary contract and any explicitly assigned grammar id. Inspect existing role configs, Source
 ignore rules and filesystem collisions. Require this exact shape:
 
 ```text
@@ -46,7 +46,7 @@ tracked `.claude/common/config/` contains only the path-free protocol and schema
 ### Review
 
 Verify every proposed role against disk. Freeze project, role, `repository.diskPath`, required
-`repository.gitRepository`, context routes, schema version and collision handling. A direct user
+`repository.gitRepository`, context routes including explicit `context.grammar`, schema version and collision handling. A direct user
 instruction naming the project and exact targets authorizes this local routing boundary; ask one
 batched question only for missing identity, ambiguous paths, collisions or a write outside the
 declared boundary. Append the reviewed revision before writing configs.
@@ -62,13 +62,15 @@ node <trust-root>/skills/starci-setup-workspace/scripts/setup-workspace.mjs `
   --target fe=<Frontend> `
   --target be=<Backend> `
   --target fe-legacy=<LegacyFrontend> `
-  --contract fe=<FrontendContract>
+  --contract fe=<FrontendContract> `
+  --grammar fe=<GrammarId>
 ```
 
 Include only declared roles. Add `--contract <role>=<path>` when discovery does not find an approved
-contract. The script writes one config per role, points directly to the real checkout, records the
-Git origin and context paths, removes only verified legacy `repo` links, and never changes target
-source.
+contract. Add `--grammar <role>=<id>` only when the user explicitly assigns that grammar to the
+role; never infer it from the project or repository name. The script writes one config per role,
+points directly to the real checkout, records the Git origin and context paths, removes only
+verified legacy `repo` links, and never changes target source.
 
 Then verify all local routes:
 

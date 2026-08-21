@@ -1,8 +1,9 @@
 # Gate 1 — layouts
 
-Layout converts raw business input into complete surface and block briefs. Input may name one or
-many pages, layouts, modals, drawers or overlays. Every target gets an independent set of 3–4 JSON
-candidates in every round; there is no recommended candidate and no implicit acceptance.
+Layout converts raw business input into closed UI facts, resolves the declared project's
+grammar, then produces complete surface and block briefs. Input may name one or many pages,
+layouts, modals, drawers or overlays. Every target gets an independent set of 3–4 JSON candidates
+inside the remaining legal space; there is no recommended candidate and no implicit acceptance.
 
 Each candidate has exactly three design payloads:
 
@@ -12,6 +13,9 @@ Each candidate has exactly three design payloads:
   render and when.
 - `extends`: navbar, modal, drawer or other dependent surface edges with owner, trigger, mount and
   render brief.
+
+Every candidate also carries the exact grammar decisions used by its blocks. A candidate contradicting
+an obligation or omitting an owner decision is invalid rather than an alternative.
 
 Accepting a candidate whitelists its hash and queues every unresolved `extends.surfaceId` for its own
 3–4 candidates. A shared surface has one stable node but keeps distinct parent edges. Cycles become

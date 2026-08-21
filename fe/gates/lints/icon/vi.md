@@ -9,7 +9,7 @@ description: Từng luật lint của biểu tượng — bắt gì, giữ mã n
 
 # vi.md
 
-> Phiên bản: `2.00` · Mô-đun: `icon`
+> Phiên bản: `2.01` · Mô-đun: `icon`
 
 # Máy giữ luật biểu tượng
 
@@ -77,7 +77,7 @@ thứ hai ngay bên trong.
 
 **Phát hiện thế nào?** Cùng nút `ImportDeclaration` và cùng phép thử gói hình như luật trên, nhưng bỏ
 cổng chiếc lá: mọi tệp chứa `/src/` đều bị quét. Một lần trúng chỉ được tha khi nguồn đúng bằng
-`@heroicons/react/24/outline` hoặc `@heroicons/react/16/solid`, hoặc khi đúng cặp
+`@starci/heroicons/24/outline` hoặc `@starci/heroicons/16/solid`, hoặc khi đúng cặp
 chiếc-lá-xếp-hạng-cộng-gói-tranh-giải.
 
 **Vì sao nên để máy giữ luật này?** Vì luật trên một mình thì để lộ đúng một chỗ, và đó là chỗ nguy

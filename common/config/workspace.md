@@ -48,6 +48,7 @@ Every `.workspace/<project>/<role>/config.json` conforms to
 | `context.instructions` | Target instruction files to read first |
 | `context.contract` | Primary domain contract path, especially for `fe` |
 | `context.contractSource` | Explicit or discovered origin of the contract route |
+| `context.grammar` | Explicit grammar id for this role, or `null`; never inferred from project/repository |
 | `context.manifests` | Package/workspace manifests used to choose commands |
 
 The agent opens `repository.diskPath` directly. `.workspace` stores configuration only: it never mirrors,

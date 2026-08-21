@@ -9,7 +9,7 @@ description: Phản biện mức phân định, tầng giữ và khả năng neo
 
 # audit.md
 
-> Version: `2.00` · Module: `icon`
+> Version: `2.01` · Module: `icon`
 
 Audit này kiểm ba thứ: luật có chọn được **một** quyết định từ các dữ kiện đã nêu không, mỗi mã đang
 được **cái gì** giữ, và mã đó **chỉ được ở đâu** trong code thật.

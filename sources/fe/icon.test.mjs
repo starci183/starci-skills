@@ -36,12 +36,7 @@ const ICON_LEAF_BRANDS = `${R}/leaves/Icon/brands.tsx`
 const OTHER_LEAF = `${R}/leaves/SeeMoreLink/index.tsx`
 const BLOCK = `${R}/blocks/dashboard/DailyQuest/component.tsx`
 const METRIC_CELL = `${R}/composites/LabelledProgressRow/index.tsx`
-const ICON_LAW = readFileSync(new URL("../../fe/canon/patterns/icon.md", import.meta.url), "utf8")
-const MAPPING_TABLE = ICON_LAW.match(/\| Meaning \(`IconName`\)[\s\S]*?(?=\n## Forbidden)/)?.[0] ?? ""
-const MAPPING_ROWS = Array.from(
-  MAPPING_TABLE.matchAll(/^\| `(\w+)` \| [^|]+ \| `(\w+)` \|$/gm),
-  (match) => ({ meaning: match[1], glyph: match[2] }),
-)
+const ICON_LAW = readFileSync(new URL("../../fe/gates/patterns/icon/INDEX.md", import.meta.url), "utf8")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -52,7 +47,7 @@ test("every rule this law declares is exported under its published name", () => 
 test("ICON-6: the icon leaf owns the library, and a subpath does not walk around it", () => {
   tester.run("no-vendor-icon-outside-icon-leaf", noVendorIconOutsideIconLeaf, {
     valid: [
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@starci/heroicons/24/outline\"" },
       // a second file INSIDE the leaf folder is still the leaf
       { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
       { filename: OTHER_LEAF, code: "import { Icon } from \"@/components/leaves/Icon\"" },
@@ -93,17 +88,16 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
   })
 })
 
-test("ICON-9: the canon feature map gives every meaning unique glyph ownership", () => {
-  assert.ok(MAPPING_ROWS.length > 0, "icon.md has no readable feature mapping rows")
-  assert.equal(new Set(MAPPING_ROWS.map(({ meaning }) => meaning)).size, MAPPING_ROWS.length)
-  assert.equal(new Set(MAPPING_ROWS.map(({ glyph }) => glyph)).size, MAPPING_ROWS.length)
+test("ICON-9: the active canon publishes unique glyph ownership and the extension boundary", () => {
+  assert.match(ICON_LAW, /One meaning maps to one drawing, and one drawing serves one meaning\./)
+  assert.match(ICON_LAW, /@starci\/heroicons/)
 })
 
-test("ICON-7: only the Heroicons outline and micro families may supply glyphs", () => {
+test("ICON-7: only the StarCi Heroicons extension outline and micro entry points may supply glyphs", () => {
   tester.run("heroicons-is-the-glyph-vendor", heroiconsIsTheGlyphVendor, {
     valid: [
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
-      { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/16/solid\"" },
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@starci/heroicons/24/outline\"" },
+      { filename: ICON_LEAF, code: "import { FireIcon } from \"@starci/heroicons/16/solid\"" },
       { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
       { filename: "D:/repo/scripts/build.ts", code: "import { X } from \"lucide-react\"" },
     ],
@@ -116,6 +110,11 @@ test("ICON-7: only the Heroicons outline and micro families may supply glyphs", 
       {
         filename: ICON_LEAF,
         code: "import { Flame } from \"lucide-react\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: ICON_LEAF,
+        code: "import { FireIcon } from \"@heroicons/react/24/outline\"",
         errors: [{ messageId: "vendor" }],
       },
       {

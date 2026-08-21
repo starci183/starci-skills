@@ -9,7 +9,7 @@ description: Lịch sử phiên bản của luật Icon.
 
 # changelog.md
 
-> Current version: `2.00` · Module: `icon`
+> Current version: `2.01` · Module: `icon`
 
 ## Version Policy
 
@@ -19,6 +19,14 @@ chính (`x.00`) dành cho thay đổi cấu trúc module hoặc shelf mà nó n�
 Mã tình huống **không bao giờ được đánh số lại và không bao giờ bị xoá**. Mã được trích dẫn từ những
 file luật khác và từ các bản ghi công việc cũ; đổi số một mã là bẻ gãy im lặng một trích dẫn đã có.
 Một mã bị cho là sai thì vẫn bảo toàn và được tranh luận trong [`audit.md`](./audit.md).
+
+## 2.01 — 2026-08-21
+
+- Đóng cửa import upstream trong source: chỉ `@starci/heroicons/24/outline` và
+  `@starci/heroicons/16/solid` được phép vào icon leaf.
+- Ghi quy trình mở rộng khi upstream thiếu đúng nghĩa: nghĩa ổn định, đủ hai cut, `currentColor`,
+  hình học Heroicons, ánh xạ semantic một lần tại icon leaf.
+- Neo luật vào package thật `packages/heroicons` và grammar case `product-glyph-extension`.
 
 ## 2.00 — 2026-08-16
 

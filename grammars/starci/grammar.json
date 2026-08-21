@@ -1,0 +1,476 @@
+{
+  "$schema": "./grammar.schema.json",
+  "schemaVersion": 1,
+  "grammar": "starci",
+  "grammarId": "starci-ui",
+  "version": 9,
+  "factCatalog": "./facts.json",
+  "evidenceCatalog": "./capsules.json",
+  "rules": [
+    {
+      "id": "joined-peer-list",
+      "slot": "collection-surface",
+      "priority": 100,
+      "when": {
+        "all": ["collection-peer", "boundary-shared"],
+        "any": [],
+        "none": ["collection-hierarchical", "interaction-local-disclosure"]
+      },
+      "emit": {
+        "outcome": "surface-list",
+        "obligations": ["one-bounded-surface", "full-bleed-row-dividers", "rows-own-content"]
+      },
+      "capsuleRefs": ["surface-list"]
+    },
+    {
+      "id": "hierarchical-local-disclosure",
+      "slot": "collection-surface",
+      "priority": 200,
+      "when": {
+        "all": ["collection-hierarchical", "interaction-local-disclosure"],
+        "any": [],
+        "none": ["all-groups-must-remain-visible"]
+      },
+      "emit": {
+        "outcome": "surface-accordion",
+        "obligations": ["vendor-disclosure-mechanics", "controlled-expanded-keys", "summary-and-panel-contracts", "full-bleed-group-dividers"]
+      },
+      "capsuleRefs": ["hierarchical-disclosure"]
+    },
+    {
+      "id": "selectable-navigation-collection",
+      "slot": "collection-interaction",
+      "priority": 200,
+      "when": {
+        "all": ["collection-navigation", "selection-single"],
+        "any": ["active-item-present", "keyboard-navigation-required"],
+        "none": []
+      },
+      "emit": {
+        "outcome": "selection-listbox",
+        "obligations": ["heroui-listbox", "controlled-selected-key", "keyboard-navigation", "focus-visible", "item-text-value"]
+      },
+      "capsuleRefs": ["selection-listbox"]
+    },
+    {
+      "id": "viewable-entitlement-gate",
+      "slot": "destination-operability",
+      "priority": 300,
+      "when": {
+        "all": ["collection-navigation", "destination-entitlement-gated", "destination-gate-preview-viewable"],
+        "any": [],
+        "none": ["destination-hard-disabled"]
+      },
+      "emit": {
+        "outcome": "navigable-gated-destination",
+        "obligations": ["activation-remains-available", "route-to-gate-surface", "do-not-set-disabled", "preserve-locked-status"]
+      },
+      "capsuleRefs": ["navigation-fact-chip"]
+    },
+    {
+      "id": "locked-navigation-fact-chip",
+      "slot": "locked-fact-presentation",
+      "priority": 300,
+      "when": {
+        "all": ["collection-navigation", "trailing-fact-locked", "trailing-fact-emphasis-required"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "navigation-locked-chip",
+        "obligations": ["badge-leaf-owner", "warning-tone", "compact-pill-shape", "non-action-trailing-slot"]
+      },
+      "capsuleRefs": ["navigation-fact-chip"]
+    },
+    {
+      "id": "rank-navigation-fact-chip",
+      "slot": "rank-fact-presentation",
+      "priority": 300,
+      "when": {
+        "all": ["collection-navigation", "trailing-fact-rank", "trailing-fact-emphasis-required"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "navigation-rank-chip",
+        "obligations": ["badge-leaf-owner", "accent-tone", "hash-prefixed-value", "compact-pill-shape", "non-action-trailing-slot"]
+      },
+      "capsuleRefs": ["navigation-fact-chip"]
+    },
+    {
+      "id": "due-navigation-fact-chip",
+      "slot": "due-fact-presentation",
+      "priority": 300,
+      "when": {
+        "all": ["collection-navigation", "trailing-fact-due-count", "trailing-fact-emphasis-required"],
+        "any": [],
+        "none": ["trailing-fact-zero"]
+      },
+      "emit": {
+        "outcome": "navigation-due-chip",
+        "obligations": ["badge-leaf-owner", "warning-tone", "compact-pill-shape", "non-action-trailing-slot", "omit-zero-value"]
+      },
+      "capsuleRefs": ["navigation-fact-chip"]
+    },
+    {
+      "id": "persistent-adjustable-side-region",
+      "slot": "adjacent-region",
+      "priority": 200,
+      "when": {
+        "all": ["region-adjacent", "region-persistent", "region-independent-scroll", "width-user-adjustable"],
+        "any": [],
+        "none": ["region-overlay"]
+      },
+      "emit": {
+        "outcome": "resizable-rail",
+        "obligations": ["visible-divider", "shared-edge-divider", "zero-layout-width-hit-target", "separator-role", "pointer-resize", "keyboard-resize", "bounded-width", "persisted-width", "independent-scroll"]
+      },
+      "capsuleRefs": ["resizable-rail"]
+    },
+    {
+      "id": "rail-content-inset",
+      "slot": "adjacent-region-inset",
+      "priority": 300,
+      "when": {
+        "all": ["region-adjacent", "region-persistent", "region-independent-scroll", "rail-content-plane"],
+        "any": [],
+        "none": ["region-overlay"]
+      },
+      "emit": {
+        "outcome": "rail-content-spacing",
+        "obligations": ["inline-inset-3", "no-outer-block-inset"]
+      },
+      "capsuleRefs": ["rail-planes"]
+    },
+    {
+      "id": "route-primary-content-inset",
+      "slot": "primary-region-inset",
+      "priority": 300,
+      "when": {
+        "all": ["region-adjacent", "route-primary-plane"],
+        "any": [],
+        "none": ["region-overlay"]
+      },
+      "emit": {
+        "outcome": "primary-content-spacing",
+        "obligations": ["all-axis-inset-6", "normal-flow-left-alignment", "no-auto-inline-margin"]
+      },
+      "capsuleRefs": ["rail-planes"]
+    },
+    {
+      "id": "persistent-collapsible-side-region",
+      "slot": "collapsible-adjacent-region",
+      "priority": 300,
+      "when": {
+        "all": ["region-adjacent", "region-persistent", "region-independent-scroll", "width-user-collapsible"],
+        "any": [],
+        "none": ["region-overlay"]
+      },
+      "emit": {
+        "outcome": "collapsible-rail-transition",
+        "obligations": ["stable-host-across-states", "animate-width-geometry", "spring-when-motion-safe", "instant-under-reduced-motion", "persisted-collapse-state", "surrounding-body-reflows", "shares-band-offset-with-adjacent-boundary", "full-height-boundary-to-viewport-edge", "block-inset-6", "inline-inset-3-in-all-states"]
+      },
+      "capsuleRefs": ["collapsible-rail", "rail-planes"]
+    },
+    {
+      "id": "circular-compact-navigation-destination",
+      "slot": "compact-destination-shape",
+      "priority": 300,
+      "when": {
+        "all": ["collection-navigation", "navigation-compact-icon-only", "shape-circular"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "circular-icon-destination",
+        "obligations": ["equal-inline-block-size", "rounded-full", "centered-glyph", "accessible-label", "target-size-preserved", "shared-centreline-with-rail-toggle", "visual-circle-owns-hover-and-selection", "outer-hit-target-transparent"]
+      },
+      "capsuleRefs": ["compact-navigation", "selection-listbox"]
+    },
+    {
+      "id": "pinned-navigation-group-scroll",
+      "slot": "navigation-overflow-owner",
+      "priority": 300,
+      "when": {
+        "all": ["collection-navigation", "navigation-controls-pinned", "navigation-groups-long", "scroll-internal"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "navigation-groups-scroll-viewport",
+        "obligations": ["scroll-viewport-branch-owner", "only-groups-scroll", "pinned-controls-outside-scroll", "vendor-scroll-shadow-utilities", "native-scrollbar-hidden", "overscroll-contained"]
+      },
+      "capsuleRefs": ["navigation-scroll"]
+    },
+    {
+      "id": "focused-live-work-surface",
+      "slot": "surface-chrome",
+      "priority": 300,
+      "when": {
+        "all": ["surface-live-evaluated", "surface-owns-work-header", "chrome-persistent-navigation-present"],
+        "any": ["chrome-assistant-present"],
+        "none": ["surface-result-state"]
+      },
+      "emit": {
+        "outcome": "focused-work-surface",
+        "obligations": ["shared-route-predicate", "remove-persistent-navigation", "remove-assistant", "remove-reading-inset", "full-viewport-body", "result-restores-chrome"]
+      },
+      "capsuleRefs": ["focused-work-surface"]
+    },
+    {
+      "id": "narrow-destination-replacement",
+      "slot": "navigation-narrow-form",
+      "priority": 300,
+      "when": {
+        "all": ["navigation-desktop-column", "navigation-narrow-replacement-required", "navigation-peer-destinations", "navigation-local-view-state"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "mobile-destination-bar",
+        "obligations": ["wide-column-hidden-below-breakpoint", "bottom-edge-navigation", "same-destination-identity", "one-visible-local-panel", "active-state-shared", "not-an-action-bar"]
+      },
+      "capsuleRefs": ["mobile-destination-bar"]
+    },
+    {
+      "id": "conditional-mobile-destination",
+      "slot": "navigation-conditional-destination",
+      "priority": 300,
+      "when": {
+        "all": ["navigation-mobile-destination-conditional", "destination-content-absent", "navigation-local-view-state"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "omit-empty-mobile-destination",
+        "obligations": ["omit-unreachable-destination", "reset-stale-local-selection", "preserve-content-destination", "no-empty-panel"]
+      },
+      "capsuleRefs": ["mobile-destination-bar"]
+    },
+    {
+      "id": "active-descendant-in-disclosure",
+      "slot": "active-descendant-state",
+      "priority": 200,
+      "when": {
+        "all": ["collection-hierarchical", "interaction-local-disclosure", "active-item-present"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "active-descendant-follow",
+        "obligations": ["active-parent-auto-open", "active-item-scroll-into-view", "active-row-visible"]
+      },
+      "capsuleRefs": ["hierarchical-disclosure"]
+    },
+    {
+      "id": "hierarchy-search",
+      "slot": "filter-state",
+      "priority": 200,
+      "when": {
+        "all": ["collection-hierarchical", "filter-local", "interaction-local-disclosure"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "search-reveals-matches",
+        "obligations": ["matching-groups-auto-open", "module-match-keeps-children", "child-match-keeps-parent", "settled-no-match-state"]
+      },
+      "capsuleRefs": ["hierarchical-disclosure"]
+    },
+    {
+      "id": "group-progress-summary",
+      "slot": "group-summary-state",
+      "priority": 200,
+      "when": {
+        "all": ["collection-hierarchical", "group-progress-present", "interaction-local-disclosure"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "adaptive-group-summary",
+        "obligations": ["expanded-shows-progress-meter", "collapsed-shows-compact-count", "group-title-single-line"]
+      },
+      "capsuleRefs": ["hierarchical-disclosure"]
+    },
+    {
+      "id": "deep-path-back-link",
+      "slot": "path-navigation-form",
+      "priority": 300,
+      "when": {
+        "all": ["path-depth-three-or-more", "path-parent-navigable"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "back-link",
+        "obligations": ["deepest-pressable-ancestor", "quiet-text-link", "current-step-not-pressable", "loading-shape-parity"]
+      },
+      "capsuleRefs": ["adaptive-path-navigation"]
+    },
+    {
+      "id": "shallow-path-breadcrumbs",
+      "slot": "path-navigation-form",
+      "priority": 200,
+      "when": {
+        "all": ["path-depth-under-three"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "breadcrumb-trail",
+        "obligations": ["vendor-breadcrumb-semantics", "current-step-not-pressable"]
+      },
+      "capsuleRefs": ["adaptive-path-navigation"]
+    },
+    {
+      "id": "deep-path-without-target",
+      "slot": "path-navigation-form",
+      "priority": 400,
+      "when": {
+        "all": ["path-depth-three-or-more", "path-parent-not-navigable"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "breadcrumb-trail",
+        "obligations": ["no-inert-back-link", "current-step-not-pressable"]
+      },
+      "capsuleRefs": ["adaptive-path-navigation"]
+    },
+    {
+      "id": "responsive-independent-tab-toolbar",
+      "slot": "tab-toolbar-form",
+      "priority": 300,
+      "when": {
+        "all": ["tab-axes-independent", "tab-axis-bounded", "viewport-adaptive"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "responsive-tab-toolbar",
+        "obligations": ["axes-stack-narrow", "axes-share-row-wide", "selection-owned-per-axis", "omit-inert-axes", "labels-never-wrap"]
+      },
+      "capsuleRefs": ["responsive-tab-toolbar"]
+    },
+    {
+      "id": "responsive-tab-axis-overflow",
+      "slot": "tab-axis-overflow",
+      "priority": 300,
+      "when": {
+        "all": ["tab-axis-bounded", "tab-labels-variable-width", "viewport-adaptive"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "tab-axis-horizontal-overflow",
+        "obligations": ["overflow-owned-per-axis", "overscroll-contained", "labels-never-wrap"]
+      },
+      "capsuleRefs": ["responsive-tab-toolbar"]
+    },
+    {
+      "id": "responsive-single-tab-toolbar",
+      "slot": "tab-toolbar-form",
+      "priority": 250,
+      "when": {
+        "all": ["tab-axis-bounded", "tab-axis-variable", "viewport-adaptive"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "responsive-tab-toolbar",
+        "obligations": ["one-variable-axis-remains", "omit-inert-axes", "labels-never-wrap"]
+      },
+      "capsuleRefs": ["responsive-tab-toolbar"]
+    },
+    {
+      "id": "omit-inert-tab-axis",
+      "slot": "tab-axis-presence",
+      "priority": 300,
+      "when": {
+        "all": [],
+        "any": ["tab-axis-companion-inert", "tab-axis-all-inert"],
+        "none": []
+      },
+      "emit": {
+        "outcome": "omit-inert-tab-axis",
+        "obligations": ["no-empty-tablist", "no-disabled-single-tab-axis"]
+      },
+      "capsuleRefs": ["responsive-tab-toolbar"]
+    },
+    {
+      "id": "authored-markdown-document",
+      "slot": "authored-content-renderer",
+      "priority": 300,
+      "when": {
+        "all": ["content-authored-markdown", "content-block-structure-present"],
+        "any": [],
+        "none": ["content-inline-only"]
+      },
+      "emit": {
+        "outcome": "markdown-document",
+        "obligations": ["semantic-block-elements", "one-semantic-outline", "semantic-list-kinds", "wide-block-local-overflow", "safe-link-disposition", "responsive-min-width-zero", "registered-extension-owners"]
+      },
+      "capsuleRefs": ["markdown-document"]
+    },
+    {
+      "id": "host-owned-document-title",
+      "slot": "document-heading-origin",
+      "priority": 300,
+      "when": {
+        "all": ["content-authored-markdown", "content-headings-present", "document-host-owns-title"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "host-relative-document-headings",
+        "obligations": ["host-remains-only-h1", "authored-headings-follow-host", "stable-heading-identities"]
+      },
+      "capsuleRefs": ["markdown-document"]
+    },
+    {
+      "id": "authored-document-outline",
+      "slot": "document-outline-source",
+      "priority": 300,
+      "when": {
+        "all": ["content-authored-markdown", "content-headings-present", "content-outline-requested"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "source-derived-document-outline",
+        "obligations": ["same-parsed-heading-model", "stable-heading-identities", "no-dom-rescan", "responsive-outline-presentation-owned-by-layout"]
+      },
+      "capsuleRefs": ["markdown-document"]
+    },
+    {
+      "id": "selectable-authored-passages",
+      "slot": "document-selection-grounding",
+      "priority": 300,
+      "when": {
+        "all": ["content-authored-markdown", "selection-grounding-requested"],
+        "any": [],
+        "none": ["selection-grounding-not-requested"]
+      },
+      "emit": {
+        "outcome": "selectable-document-passages",
+        "obligations": ["explicit-selection-boundary", "stable-passage-identities", "no-global-prose-opt-in", "selection-controls-owned-outside-document"]
+      },
+      "capsuleRefs": ["markdown-document"]
+    },
+    {
+      "id": "product-glyph-extension",
+      "slot": "glyph-source",
+      "priority": 300,
+      "when": {
+        "all": ["product-meaning-stable", "upstream-glyph-absent"],
+        "any": [],
+        "none": ["brand-mark", "product-reaction"]
+      },
+      "emit": {
+        "outcome": "heroicons-extension",
+        "obligations": ["outline-24-cut", "solid-16-cut", "current-color", "heroicons-geometry", "icon-leaf-only"]
+      },
+      "capsuleRefs": ["heroicons-extension"]
+    }
+  ]
+}

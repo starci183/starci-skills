@@ -9,7 +9,7 @@ description: Tất cả case và ngoại lệ của từng mã ICON-N, viết b�
 
 # example.md
 
-> Version: `2.00` · Module: `icon` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Version: `2.01` · Module: `icon` · Luật: [`INDEX.md`](./INDEX.md) · Tình huống: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mọi ví dụ dưới đây là **TSX thường**. `Icon` ở đây là icon leaf — file duy nhất được phép gọi tên thư
 viện glyph — và người gọi chỉ truyền vào **ý nghĩa** cùng **vai trò**. Không tên sản phẩm, không tên
@@ -337,7 +337,7 @@ export const PartnerMark = (input: SVGProps<SVGSVGElement>) => (
 
 ---
 
-## `ICON-7` — một vendor, hai family
+## `ICON-7` — một package vào, hai family
 
 ### Case: thêm một thư viện glyph thứ hai
 
@@ -351,6 +351,21 @@ import { Rocket } from "lucide-react"
 
 `ICON-6` cố ý không nhìn vào icon leaf, vì đó là file được phép nhập. `ICON-7` là mã nhìn vào đúng
 chỗ đó — nếu thiếu nó, quyền sở hữu bản đồ sẽ tự biến thành giấy phép mở một ngôn ngữ hình thứ hai.
+
+### Case: upstream không có đúng nghĩa sản phẩm
+
+```tsx
+{/* SAI — tự vẽ ở màn hình hoặc import upstream trực tiếp */}
+import { Bars3BottomLeftIcon } from "@heroicons/react/24/outline"
+
+{/* ĐÚNG trong packages/heroicons: đủ hai cut; source chỉ gọi meaning */}
+export const CourseRailIcon = outlineIcon("CourseRailIcon", <>{/* Heroicons geometry */}</>)
+<Icon props={{ name: "collapseRail", role: "leading" }} />
+```
+
+Thiếu glyph không cho phép lấy hình gần đúng. Nó kích hoạt grammar `product-glyph-extension`: chốt
+nghĩa, kiểm upstream, vẽ đủ 24 outline và 16 solid trong `@starci/heroicons`, rồi ánh xạ một lần tại
+icon leaf.
 
 ### Case: brand mark lấy từ package tổng hợp
 

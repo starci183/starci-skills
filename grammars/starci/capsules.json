@@ -1,0 +1,266 @@
+{
+  "$schema": "./capsules.schema.json",
+  "schemaVersion": 1,
+  "grammar": "starci",
+  "capsules": [
+    {
+      "id": "surface-list",
+      "intent": "Render comparable peer rows as one bounded collection with shared edge-to-edge separators.",
+      "triggerFacts": ["collection-peer", "boundary-shared"],
+      "decisionQuestions": ["Are the members comparable peers rather than parent and descendant groups?", "Does one boundary own the separators between every row?"],
+      "variableAxes": ["row-content", "row-state"],
+      "invariants": ["one-bounded-surface", "full-bleed-row-dividers", "rows-own-content"],
+      "interactionProof": [
+        { "id": "one-surface-owner", "kind": "dom", "assertion": "Exactly one bounded surface contains the complete peer collection." },
+        { "id": "divider-reaches-edges", "kind": "computed-style", "assertion": "Every interior divider reaches both shared surface edges." }
+      ],
+      "counterexampleCaseRefs": ["hierarchical-collection-not-peer-list"],
+      "templateRef": "./templates/surface-list.template.tsx",
+      "templateHash": "sha256:1f07ef7c32b107015c036a364a1033c7a58265011a3bd02083f984dcd0c36f59",
+      "rulings": ["founder-feedback:2026-08-21:list-renders-as-surface-list"],
+      "goldenCaseRefs": ["joined-peer-list"]
+    },
+    {
+      "id": "hierarchical-disclosure",
+      "intent": "Keep parent groups, descendants, local disclosure, search and progress summaries under one hierarchy owner.",
+      "triggerFacts": ["collection-hierarchical", "interaction-local-disclosure"],
+      "decisionQuestions": ["Do members contain ordered descendants rather than compare as peers?", "May each parent reveal its descendants independently?"],
+      "variableAxes": ["expanded-groups", "filter-query", "active-descendant"],
+      "invariants": ["active-parent-auto-open", "search-reveals-matches", "adaptive-group-summary", "vendor-disclosure-mechanics"],
+      "interactionProof": [
+        { "id": "active-parent-opens", "kind": "state", "assertion": "The parent containing the active descendant remains expanded." },
+        { "id": "search-keeps-context", "kind": "interaction", "assertion": "A descendant match retains its parent and reveals the matching row." }
+      ],
+      "counterexampleCaseRefs": ["static-hierarchy"],
+      "templateRef": "./templates/hierarchical-disclosure.template.tsx",
+      "templateHash": "sha256:d946cb527e92d828e40c93e4bad7fc169a3ddd49b174086a3f7f58f1fde844f9",
+      "rulings": ["founder-feedback:2026-08-21:long-hierarchy-renders-as-accordion"],
+      "goldenCaseRefs": ["course-content-map"]
+    },
+    {
+      "id": "selection-listbox",
+      "intent": "Delegate single-selection destination traversal, activation and focus behavior to one ListBox owner.",
+      "triggerFacts": ["collection-navigation", "selection-single"],
+      "decisionQuestions": ["Are these rows destinations rather than informational peers?", "Must keyboard traversal and one current destination be preserved?"],
+      "variableAxes": ["selected-key", "destination-content"],
+      "invariants": ["heroui-listbox", "keyboard-navigation", "focus-visible", "item-text-value"],
+      "interactionProof": [
+        { "id": "keyboard-traversal", "kind": "interaction", "assertion": "Arrow traversal and activation remain owned by the ListBox primitive." },
+        { "id": "single-selected-key", "kind": "state", "assertion": "At most one destination exposes selected state at a time." }
+      ],
+      "counterexampleCaseRefs": ["peer-information-not-listbox"],
+      "templateRef": "./templates/selection-listbox.template.tsx",
+      "templateHash": "sha256:fc9699bfcf069d7d8f557a717719a5106bba883fad7365f4068c9a4537a152b5",
+      "rulings": ["founder-feedback:2026-08-21:navigation-collection-uses-heroui-listbox"],
+      "goldenCaseRefs": ["course-content-map"]
+    },
+    {
+      "id": "navigation-fact-chip",
+      "intent": "Keep viewable gates operable and render prominent locked, rank or due facts as semantic trailing chips.",
+      "triggerFacts": ["collection-navigation", "trailing-fact-emphasis-required"],
+      "decisionQuestions": ["Does activation lead to an explanatory gate rather than a forbidden destination?", "Does the trailing fact carry actionable semantic emphasis?"],
+      "variableAxes": ["fact-kind", "fact-value", "entitlement-state"],
+      "invariants": ["activation-remains-available", "badge-leaf-owner", "non-action-trailing-slot", "omit-zero-value"],
+      "interactionProof": [
+        { "id": "viewable-gate-operable", "kind": "accessibility", "assertion": "A viewable gated destination is not exposed as disabled." },
+        { "id": "zero-due-omitted", "kind": "state", "assertion": "A zero due count produces no trailing attention chip." }
+      ],
+      "counterexampleCaseRefs": ["zero-due-count", "hard-disabled-destination"],
+      "templateRef": "./templates/navigation-fact-chip.template.tsx",
+      "templateHash": "sha256:c3951cd2e43cd0d97cc25f138b4450871bc107f33febeb6306f97a623e68c2ec",
+      "rulings": ["founder-feedback:2026-08-21:locked-destinations-remain-viewable", "founder-feedback:2026-08-21:locked-and-rank-render-as-colour-chips"],
+      "goldenCaseRefs": ["navigation-gate-prominent-facts"]
+    },
+    {
+      "id": "resizable-rail",
+      "intent": "Resize one persistent content rail along a shared zero-width separator while rail and body keep independent scroll planes.",
+      "triggerFacts": ["region-adjacent", "region-persistent", "region-independent-scroll", "width-user-adjustable"],
+      "decisionQuestions": ["Must the reader continuously choose the rail width rather than switch between two presentations?", "Do the rail and routed body own separate scrolling?"],
+      "variableAxes": ["rail-width"],
+      "invariants": ["inline-width-only", "shared-edge-divider", "zero-layout-width-hit-target", "independent-scroll", "boundary-height", "boundary-zero-inset", "content-inset-owner"],
+      "interactionProof": [
+        { "id": "pointer-and-keyboard-resize", "kind": "interaction", "assertion": "Pointer drag and keyboard arrows change only the bounded inline width." },
+        { "id": "shared-edge-zero-width", "kind": "computed-style", "assertion": "Rail right, separator left and body left share one coordinate while separator layout width is zero." },
+        { "id": "scroll-planes-independent", "kind": "interaction", "assertion": "Scrolling the body does not change the rail scroll position and the inverse also holds." }
+      ],
+      "counterexampleCaseRefs": ["collapsible-navigation-not-resizable"],
+      "templateRef": "./templates/resizable-rail.template.tsx",
+      "templateHash": "sha256:9c71fba493b4f5982eeaaf03d5192a2822fa3313969c0c3b225054b84882bddb",
+      "rulings": ["founder-feedback:2026-08-21:content-and-project-rails-resize-independently"],
+      "goldenCaseRefs": ["course-content-map", "personal-project-milestone-rail"]
+    },
+    {
+      "id": "rail-planes",
+      "intent": "Keep boundary geometry, collapsible navigation inset, resizable panel inset and primary inset as separate owners.",
+      "triggerFacts": ["region-adjacent", "rail-content-plane", "route-primary-plane"],
+      "decisionQuestions": ["Which plane owns each inset rather than borrowing spacing from its neighbor?", "Does the sticky boundary start at the navbar edge without counting internal padding twice?"],
+      "variableAxes": ["rail-content", "primary-content"],
+      "invariants": ["collapsible-rail-px-3-py-6", "resizable-boundary-zero-inset", "resizable-content-px-3-no-block-inset", "primary-p-6", "normal-flow-left-alignment", "navbar-border-accounted", "no-auto-inline-margin"],
+      "interactionProof": [
+        { "id": "rail-padding", "kind": "computed-style", "assertion": "Collapsible navigation keeps 24px block and 12px inline padding; resizable content keeps 12px inline and zero outer block padding." },
+        { "id": "zero-document-jitter", "kind": "computed-style", "assertion": "A fixed learn route has zero document scroll range after navbar and separator accounting." }
+      ],
+      "counterexampleCaseRefs": ["overlay-not-route-planes"],
+      "templateRef": "./templates/rail-planes.template.tsx",
+      "templateHash": "sha256:70ffb99cb635e60c7764e74a83fc7e1f4cf94d7bad733da5ef27d08f73e07ec4",
+      "rulings": ["founder-feedback:2026-08-21:course-sidebar-uses-px-3-py-6", "founder-feedback:2026-08-21:learn-primary-content-uses-p-6"],
+      "goldenCaseRefs": ["course-content-map", "personal-project-milestone-rail"]
+    },
+    {
+      "id": "collapsible-rail",
+      "intent": "Keep one navigation host while expanded and compact presentations change width and visible copy.",
+      "triggerFacts": ["region-adjacent", "region-persistent", "width-user-collapsible"],
+      "decisionQuestions": ["Are there exactly two meaningful navigation presentations rather than a continuously chosen width?", "Can compact destinations retain meaning through stable glyphs and accessible labels?"],
+      "variableAxes": ["width", "visible-copy"],
+      "invariants": ["stable-host", "inset", "scroll-owner", "boundary-height", "destination-order"],
+      "interactionProof": [
+        { "id": "stable-motion-host", "kind": "dom", "assertion": "Collapse and expand preserve the same motion host identity." },
+        { "id": "reduced-motion", "kind": "interaction", "assertion": "Reduced-motion preference changes width immediately without interpolation." },
+        { "id": "body-reflow", "kind": "computed-style", "assertion": "The adjacent body reflows beside the changed rail width." }
+      ],
+      "counterexampleCaseRefs": ["resizable-content-rail-not-collapsible"],
+      "templateRef": "./templates/collapsible-rail.template.tsx",
+      "templateHash": "sha256:c931bcee28e63d74632d552e6c807e8cfd28eef8cf8e6d556dbf569ece86459a",
+      "rulings": ["founder-feedback:2026-08-21:collapsed-rail-keeps-legacy-motion", "founder-feedback:2026-08-21:course-sidebar-uses-px-3-py-6"],
+      "goldenCaseRefs": ["collapsible-navigation-rail"]
+    },
+    {
+      "id": "compact-navigation",
+      "intent": "Render compact navigation as an accessible hit target containing one independently painted circular glyph surface.",
+      "triggerFacts": ["collection-navigation", "navigation-compact-icon-only", "shape-circular"],
+      "decisionQuestions": ["Does the compact form intentionally remove visible copy while preserving destination meaning?", "Is the painted circle smaller than the accessible hit target?"],
+      "variableAxes": ["selected-state", "hover-state"],
+      "invariants": ["shared-centreline", "transparent-outer-hit-target", "painted-inner-circle", "accessible-label", "target-size"],
+      "interactionProof": [
+        { "id": "target-larger-than-circle", "kind": "computed-style", "assertion": "The accessible target remains larger than the painted circular surface." },
+        { "id": "paint-owner", "kind": "interaction", "assertion": "Hover and selection paint only the inner circle." }
+      ],
+      "counterexampleCaseRefs": ["visible-label-navigation-not-compact"],
+      "templateRef": "./templates/compact-navigation.template.tsx",
+      "templateHash": "sha256:d70dc44d6383f6decc49cdba423ae23c293bf2cef341542b0f12095d0e7f32c1",
+      "rulings": ["founder-feedback:2026-08-21:compact-navigation-icons-are-circular"],
+      "goldenCaseRefs": ["collapsible-navigation-rail"]
+    },
+    {
+      "id": "navigation-scroll",
+      "intent": "Keep rail controls pinned while only long repeating destination groups own bounded internal scrolling.",
+      "triggerFacts": ["collection-navigation", "navigation-controls-pinned", "navigation-groups-long", "scroll-internal"],
+      "decisionQuestions": ["Which repeating content may move without carrying controls and overview with it?", "Would a native scrollbar thumb compete visually with the rail separator?"],
+      "variableAxes": ["group-scroll-position"],
+      "invariants": ["only-groups-scroll", "controls-pinned", "native-scrollbar-hidden", "overscroll-contained"],
+      "interactionProof": [
+        { "id": "controls-remain-pinned", "kind": "interaction", "assertion": "Scrolling destination groups leaves collapse, overview and progress controls fixed." },
+        { "id": "native-thumb-hidden", "kind": "computed-style", "assertion": "The internal viewport scrolls while its native scrollbar thumb remains hidden." }
+      ],
+      "counterexampleCaseRefs": ["short-navigation-no-scroll"],
+      "templateRef": "./templates/navigation-scroll.template.tsx",
+      "templateHash": "sha256:ac74454056918320f12b6a0fee0aea5bf07380f88fc7ec2c12c1aa513b56d157",
+      "rulings": ["founder-feedback:2026-08-21:learn-navigation-scroll-uses-scroll-branch"],
+      "goldenCaseRefs": ["collapsible-navigation-rail", "course-content-map", "personal-project-milestone-rail"]
+    },
+    {
+      "id": "focused-work-surface",
+      "intent": "Give live evaluated work the viewport and restore persistent chrome only after the result state begins.",
+      "triggerFacts": ["surface-live-evaluated", "surface-owns-work-header", "chrome-persistent-navigation-present"],
+      "decisionQuestions": ["Is this an active evaluated work session rather than its setup or result page?", "Does the surface already own the controls needed while work is live?"],
+      "variableAxes": ["work-phase"],
+      "invariants": ["shared-route-predicate", "live-full-viewport", "live-assistant-hidden", "result-restores-chrome"],
+      "interactionProof": [
+        { "id": "live-removes-chrome", "kind": "dom", "assertion": "Persistent navigation and assistant are absent during the live evaluated phase." },
+        { "id": "result-restores-chrome", "kind": "state", "assertion": "The result phase restores the persistent application chrome." }
+      ],
+      "counterexampleCaseRefs": ["focused-work-result", "ordinary-route-not-focused-work"],
+      "templateRef": "./templates/focused-work-surface.template.tsx",
+      "templateHash": "sha256:a30e2a78204d04be39c3736de3773df106d0d9f21a8b1da6d4efbc532f845446",
+      "rulings": ["founder-ruling:focused-live-work-owns-its-viewport"],
+      "goldenCaseRefs": ["focused-live-work"]
+    },
+    {
+      "id": "mobile-destination-bar",
+      "intent": "Replace an unreachable wide destination column with one bottom navigation form that switches one local panel.",
+      "triggerFacts": ["navigation-desktop-column", "navigation-narrow-replacement-required", "navigation-peer-destinations", "navigation-local-view-state"],
+      "decisionQuestions": ["Are the narrow controls peer destinations rather than primary actions?", "Does switching them change a local panel without changing route identity?"],
+      "variableAxes": ["available-destinations", "selected-local-panel"],
+      "invariants": ["one-visible-local-panel", "same-destination-identity", "bottom-edge-navigation", "not-action-bar", "stale-selection-resets"],
+      "interactionProof": [
+        { "id": "one-panel-visible", "kind": "state", "assertion": "Exactly one available local destination panel is visible." },
+        { "id": "missing-destination-omitted", "kind": "interaction", "assertion": "Removing backing content also removes its destination and resets stale selection." }
+      ],
+      "counterexampleCaseRefs": ["wide-navigation-no-mobile-replacement"],
+      "templateRef": "./templates/mobile-destination-bar.template.tsx",
+      "templateHash": "sha256:369f3ec3ecb802281f2df545c057b4188347f4eec95e9e46dc42781472a62139",
+      "rulings": ["founder-ruling:mobile-replacement-is-a-distinct-navigation-form"],
+      "goldenCaseRefs": ["mobile-destination-replacement", "conditional-mobile-destination"]
+    },
+    {
+      "id": "adaptive-path-navigation",
+      "intent": "Preserve orientation on shallow paths and replace paths of depth three or more with one legal return affordance.",
+      "triggerFacts": ["path-depth-three-or-more", "path-depth-under-three"],
+      "decisionQuestions": ["Does the path contain at least three ordered steps?", "Which nearest ancestor exposes a legal navigation action?"],
+      "variableAxes": ["path-depth", "parent-action", "loading-state"],
+      "invariants": ["depth-three-back-link", "deepest-pressable-ancestor", "current-step-not-pressable", "loading-shape-parity"],
+      "interactionProof": [
+        { "id": "one-path-presentation", "kind": "dom", "assertion": "Exactly one breadcrumb trail or one Back link is rendered for the addressed path." },
+        { "id": "back-activates-ancestor", "kind": "interaction", "assertion": "The Back link activates the deepest pressable ancestor and never the current step." }
+      ],
+      "counterexampleCaseRefs": ["deep-path-without-back-target"],
+      "templateRef": "./templates/adaptive-path-navigation.template.tsx",
+      "templateHash": "sha256:1be8367cfe741737504c76d5a433534f4b4edc82da8526e99780893485e570c3",
+      "rulings": ["founder-feedback:2026-08-21:path-depth-three-or-more-uses-back-link"],
+      "goldenCaseRefs": ["deep-path-becomes-back-link", "shallow-path-keeps-breadcrumbs"]
+    },
+    {
+      "id": "responsive-tab-toolbar",
+      "intent": "Keep bounded independent tab axes operable without label wrapping as the available inline measure changes.",
+      "triggerFacts": ["tab-axis-bounded", "viewport-adaptive"],
+      "decisionQuestions": ["Do the tab axes change independent dimensions with separate selected keys?", "Which axes still have more than one enabled choice?"],
+      "variableAxes": ["axis-count", "enabled-choice-count", "tab-label-width", "viewport-width"],
+      "invariants": ["selection-owned-per-axis", "axes-stack-narrow", "axes-share-row-wide", "overflow-owned-per-axis", "labels-never-wrap", "omit-inert-axes"],
+      "interactionProof": [
+        { "id": "axes-select-independently", "kind": "state", "assertion": "Changing one selected tab key does not mutate the companion axis selection." },
+        { "id": "axis-owns-overflow", "kind": "computed-style", "assertion": "A narrow variable-width tab axis contains its own horizontal overflow without wrapping labels." }
+      ],
+      "counterexampleCaseRefs": ["inert-values-are-not-tabs"],
+      "templateRef": "./templates/responsive-tab-toolbar.template.tsx",
+      "templateHash": "sha256:487ca66119fe5bce52ef279ff0b0cb503f3c723e100a9d11f1709cfa43a13656",
+      "rulings": ["founder-feedback:2026-08-21:responsive-tabs-preserve-independent-axes"],
+      "goldenCaseRefs": ["responsive-independent-tab-axes", "single-variable-tab-axis"]
+    },
+    {
+      "id": "markdown-document",
+      "intent": "Render an authored multi-block document without flattening semantics or leaking wide content into the page.",
+      "triggerFacts": ["content-authored-markdown", "content-block-structure-present"],
+      "decisionQuestions": ["Does the payload carry meaningful block structure rather than inline-only copy?", "Which optional outline, selection and extension capabilities are explicitly requested?"],
+      "variableAxes": ["heading-origin", "reading-density", "outline-capability", "selection-capability", "extension-set"],
+      "invariants": ["one-semantic-outline", "semantic-block-elements", "semantic-list-kinds", "wide-block-local-overflow", "safe-link-disposition", "responsive-min-width-zero", "source-derived-outline", "opt-in-passage-selection", "registered-extension-owners"],
+      "interactionProof": [
+        { "id": "semantic-document-model", "kind": "dom", "assertion": "Headings, lists, quotes, code and tables retain their semantic elements after rendering." },
+        { "id": "wide-block-overflow-local", "kind": "computed-style", "assertion": "Wide code and table blocks scroll locally while the reading column remains min-width zero." },
+        { "id": "outline-shares-model", "kind": "state", "assertion": "The document outline and rendered headings use the same stable parsed heading identities." },
+        { "id": "selection-is-explicit", "kind": "interaction", "assertion": "Passage selection grounding exists only inside an explicitly selectable document boundary." }
+      ],
+      "counterexampleCaseRefs": ["inline-rich-text-not-markdown-document", "markdown-selection-not-global"],
+      "templateRef": "./templates/markdown-document.template.tsx",
+      "templateHash": "sha256:a2a57036d3c2ec3b54eff48e65b8f60891d2fd9cec8130c6cd4d88527a8f6273",
+      "rulings": ["founder-feedback:2026-08-21:grammar-must-know-markdown-content"],
+      "goldenCaseRefs": ["authored-markdown-document", "markdown-outline-from-document-model"]
+    },
+    {
+      "id": "heroicons-extension",
+      "intent": "Extend one closed icon vocabulary only for stable product meanings that have no faithful upstream glyph.",
+      "triggerFacts": ["product-meaning-stable", "upstream-glyph-absent"],
+      "decisionQuestions": ["Is the meaning stable product vocabulary rather than a brand mark or reaction?", "Has the approved upstream vocabulary been checked for a faithful glyph?"],
+      "variableAxes": ["icon-role"],
+      "invariants": ["outline-24-cut", "solid-16-cut", "current-color", "heroicons-geometry", "icon-leaf-only"],
+      "interactionProof": [
+        { "id": "paired-cuts-typecheck", "kind": "typecheck", "assertion": "Both required optical cuts export under one closed product meaning." },
+        { "id": "current-color", "kind": "computed-style", "assertion": "Every extension glyph inherits currentColor instead of owning paint." }
+      ],
+      "counterexampleCaseRefs": ["upstream-glyph-present"],
+      "templateRef": "./templates/heroicons-extension.template.tsx",
+      "templateHash": "sha256:4c974d5f12aba41826a57dd5c84babb28aec48d5d7bfad3b324300b6135a8f68",
+      "rulings": ["founder-feedback:2026-08-21:starci-heroicons-extends-missing-product-glyphs"],
+      "goldenCaseRefs": ["product-glyph-extension"]
+    }
+  ]
+}

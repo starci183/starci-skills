@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/schema/grammars/starci/grammar.schema.json",
+  "title": "StarCi product-family deterministic UI grammar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "grammar", "grammarId", "version", "factCatalog", "evidenceCatalog", "rules"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "grammar": { "const": "starci" },
+    "grammarId": { "const": "starci-ui" },
+    "version": { "type": "integer", "minimum": 1 },
+    "factCatalog": { "const": "./facts.json" },
+    "evidenceCatalog": { "const": "./capsules.json" },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Rule" }
+    }
+  },
+  "$defs": {
+    "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "slot", "priority", "when", "emit", "capsuleRefs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "slot": { "$ref": "#/$defs/Id" },
+        "priority": { "type": "integer", "minimum": 0 },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all", "any", "none"],
+          "properties": {
+            "all": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } },
+            "any": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } },
+            "none": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } }
+          }
+        },
+        "emit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "obligations"],
+          "properties": {
+            "outcome": { "$ref": "#/$defs/Id" },
+            "obligations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } }
+          }
+        },
+        "capsuleRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } }
+      }
+    }
+  }
+}

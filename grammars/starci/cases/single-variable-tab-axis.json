@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "single-variable-tab-axis",
+  "kind": "golden",
+  "because": "Only the axis with more than one available choice is interactive; a fixed companion value is content rather than a second tab control.",
+  "facts": ["tab-axis-bounded", "tab-axis-variable", "tab-axis-companion-inert", "viewport-adaptive"],
+  "expectedOutcomes": ["responsive-tab-toolbar", "omit-inert-tab-axis"],
+  "rejectedOutcomes": ["empty-tablist", "disabled-single-tab-axis"]
+}

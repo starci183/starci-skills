@@ -9,7 +9,7 @@ description: Các tình huống ICON-N, nhận diện bằng nghiệp vụ chứ
 
 # vi.md
 
-> Version: `2.00` · Module: `icon`
+> Version: `2.01` · Module: `icon`
 
 # Icon
 
@@ -195,14 +195,15 @@ mà đáng lẽ chỉ phải trả lời **một**?
 
 ---
 
-## `ICON-7` — một vendor, hai family
+## `ICON-7` — một package vào, hai family
 
-**Tình huống.** Có người muốn thêm một bộ icon nữa: đẹp hơn, đủ hình hơn, hoặc "chỉ dùng đúng một
-cái thôi".
+**Tình huống.** Có người muốn thêm một bộ icon nữa, import thẳng upstream, hoặc tự vẽ icon tại màn
+hình vì catalogue chưa có đúng nghĩa sản phẩm.
 
 **Dấu hiệu nhận biết**
 
 - Trong `package.json` xuất hiện một thư viện glyph thứ hai.
+- Source sản phẩm import thẳng `@heroicons/react` thay vì đi qua `@starci/heroicons`.
 - Một brand mark được chọn từ một package tổng hợp thay vì vẽ đúng.
 - Có người lập luận "cái này bên kia không có" — đúng, và đó chính là lúc phải quyết định về **ý
   nghĩa**, không phải về **package**.
@@ -212,6 +213,9 @@ cái thôi".
 **Ranh giới**
 
 - ↔ `ICON-6`: xem trên. `ICON-7` áp dụng **cả bên trong** icon leaf, chỗ mà `ICON-6` cố ý không nhìn.
+- Nếu nghĩa sản phẩm đã ổn định và upstream không có hình trung thực, mở rộng đúng hai cut trong
+  `@starci/heroicons`: 24 outline và 16 solid, `currentColor`, hình học cùng họ. Caller vẫn chỉ gọi
+  `IconName`; package không trở thành catalogue tuỳ hứng.
 - Ngoại lệ artwork giải thưởng: đúng một file, đúng một package, đúng bốn identity. Cái thứ năm vẫn
   bị báo — ngoại lệ đó là **một bộ từ vựng**, không phải một cánh cửa.
 

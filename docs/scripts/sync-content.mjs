@@ -23,8 +23,8 @@ function normalizeDocument(source) {
     .replace(/\]\((?:\.\/)?(prompt|vi|example|audit|changelog)\.md(#[^)]+)?\)/g, "](./$1$2)")
     .replace(/\]\(\.\.\/([^/)]+)\/INDEX\.md(#[^)]+)?\)/g, "](../$1$2)")
     .replace(/\]\(\.\.\/([^/)]+)\/(prompt|vi|example|audit|changelog)\.md(#[^)]+)?\)/g, "](../$1/$2$3)")
-    .replace(/\]\(fe\/(principles|senses|governance)\/([^/)]+)\/INDEX\.md(#[^)]+)?\)/g, "](fe/$1/$2$3)")
-    .replace(/\]\(fe\/(principles|senses|governance)\/([^/)]+)\/(prompt|vi|example|audit|changelog)\.md(#[^)]+)?\)/g, "](fe/$1/$2/$3$4)");
+    .replace(/\]\(fe\/gates\/(principles)\/([^/)]+)\/INDEX\.md(#[^)]+)?\)/g, "](fe/$1/$2$3)")
+    .replace(/\]\(fe\/gates\/(principles)\/([^/)]+)\/(prompt|vi|example|audit|changelog)\.md(#[^)]+)?\)/g, "](fe/$1/$2/$3$4)");
 }
 
 async function publish(sourcePath, destinationPath) {
@@ -55,8 +55,6 @@ const groups = [
   {key: "layouts", title: "Layouts", description: "Từ một yêu cầu nghiệp vụ ra bố cục trang: archetype nào, mỗi vùng giữ gì."},
   {key: "blocks", title: "Blocks", description: "Từ một vùng ra giải phẫu khối: khối nào, gồm những phần nào, mỗi trạng thái vẽ gì."},
   {key: "principles", title: "Principles", description: "Primitive facts and principles that implementation must not violate."},
-  {key: "senses", title: "Senses", description: "Contextual product judgement such as hierarchy, actions and affordance."},
-  {key: "governance", title: "Governance", description: "Exception and refactor evidence; not visual design law."},
 ];
 
 const REQUIRED = ["INDEX.md", "vi.md", "example.md", "audit.md"];
@@ -84,7 +82,7 @@ async function discoverModules(root, prefix = "") {
 }
 
 async function discoverGroup(group) {
-  const found = await discoverModules(resolve(trustRoot, `fe/${group.key}`));
+  const found = await discoverModules(resolve(trustRoot, `fe/gates/${group.key}`));
   found.sort((a, b) => a.id.localeCompare(b.id));
   return {
     ...group,
@@ -101,12 +99,12 @@ await Promise.all([
   ...publishedGroups.flatMap((group) => [
     writeGenerated(`fe/${group.key}/index.mdx`, `---\ntitle: ${group.title}\n---\n\n# ${group.title}\n\n${group.description}\n\n${group.modules.map((moduleName) => `- [${moduleName}](./${moduleName})`).join("\n")}\n`),
     ...group.modules.flatMap((moduleName) => [
-      publish(`fe/${group.key}/${moduleName}/INDEX.md`, `fe/${group.key}/${moduleName}/index.mdx`),
-      ...(group.promptModules.has(moduleName) ? [publish(`fe/${group.key}/${moduleName}/prompt.md`, `fe/${group.key}/${moduleName}/prompt.mdx`)] : []),
-      publish(`fe/${group.key}/${moduleName}/vi.md`, `fe/${group.key}/${moduleName}/vi.mdx`),
-      publish(`fe/${group.key}/${moduleName}/example.md`, `fe/${group.key}/${moduleName}/example.mdx`),
-      publish(`fe/${group.key}/${moduleName}/audit.md`, `fe/${group.key}/${moduleName}/audit.mdx`),
-      publish(`fe/${group.key}/${moduleName}/changelog.md`, `fe/${group.key}/${moduleName}/changelog.mdx`)
+      publish(`fe/gates/${group.key}/${moduleName}/INDEX.md`, `fe/${group.key}/${moduleName}/index.mdx`),
+      ...(group.promptModules.has(moduleName) ? [publish(`fe/gates/${group.key}/${moduleName}/prompt.md`, `fe/${group.key}/${moduleName}/prompt.mdx`)] : []),
+      publish(`fe/gates/${group.key}/${moduleName}/vi.md`, `fe/${group.key}/${moduleName}/vi.mdx`),
+      publish(`fe/gates/${group.key}/${moduleName}/example.md`, `fe/${group.key}/${moduleName}/example.mdx`),
+      publish(`fe/gates/${group.key}/${moduleName}/audit.md`, `fe/${group.key}/${moduleName}/audit.mdx`),
+      publish(`fe/gates/${group.key}/${moduleName}/changelog.md`, `fe/${group.key}/${moduleName}/changelog.mdx`)
     ])
   ])
 ]);

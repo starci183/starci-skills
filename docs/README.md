@@ -1,7 +1,7 @@
 # StarCi Skills Docs — Nextra
 
-Nextra auto-discovers standardized modules under `.claude/fe/{design,senses,governance}` and
-renders their public records:
+Nextra auto-discovers shared gate modules under `.claude/fe/gates/` and links deterministic project
+grammars under `.claude/grammars/<grammar>/`. Product choices are not published as shared senses.
 
 ```text
 <concept>/
@@ -13,8 +13,8 @@ renders their public records:
 └─ changelog.md # version history
 ```
 
-All six records are published. The generated `content/` directory is ignored; run the sync command
-after changing a source record.
+Grammar projects publish their schema, rules, owner profile and golden cases. The generated
+`content/` directory is ignored; run the sync command after changing a source record.
 
 ```bash
 cd .claude/docs

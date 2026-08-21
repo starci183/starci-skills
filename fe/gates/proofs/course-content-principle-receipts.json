@@ -1,0 +1,163 @@
+{
+  "principleReceipts": [
+    {
+      "decisionId": "course-map-module-title-typography",
+      "acceptedHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "slotId": "module-title",
+      "contractKey": "content-map-module-summary-copy",
+      "nodePath": "content-map-panel.modules.module.summary.copy.title",
+      "concern": "typography",
+      "code": "TYPOGRAPHY-5",
+      "source": ".claude/fe/gates/principles/typography/INDEX.md",
+      "inputs": {
+        "outline": "none",
+        "owner": "dominant-object",
+        "relationship": "independent",
+        "repetition": false
+      },
+      "output": {
+        "element": "div",
+        "className": "text-base font-medium text-foreground",
+        "reason": "The expanded module title leads the single current module region."
+      },
+      "evidenceRefs": [
+        "grammar:starci/course-content-map",
+        "contract:content-map-module-summary-copy"
+      ]
+    },
+    {
+      "decisionId": "course-map-lesson-title-typography",
+      "acceptedHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "slotId": "lesson-title",
+      "contractKey": "content-map-module-body",
+      "nodePath": "content-map-panel.modules.module.body.list.item.title",
+      "concern": "typography",
+      "code": "TYPOGRAPHY-12",
+      "source": ".claude/fe/gates/principles/typography/INDEX.md",
+      "inputs": {
+        "outline": "none",
+        "owner": "none",
+        "relationship": "independent",
+        "repetition": true
+      },
+      "output": {
+        "element": "p",
+        "className": "text-base font-normal text-foreground",
+        "reason": "The lesson title is readable content without an admitted outline rank or owner."
+      },
+      "evidenceRefs": [
+        "grammar:starci/course-content-map",
+        "contract:content-map-module-body"
+      ]
+    },
+    {
+      "decisionId": "content-reader-inner-margin",
+      "acceptedHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "slotId": "reader-inner",
+      "contractKey": "content-reader-inner",
+      "nodePath": "content-reader-frame.main.inner",
+      "concern": "margin",
+      "code": "MARGIN-0",
+      "source": ".claude/fe/gates/principles/margin/INDEX.md",
+      "inputs": {
+        "parentLayout": "flex-column",
+        "freeSpace": "none",
+        "job": "ordinary"
+      },
+      "output": {
+        "element": null,
+        "className": null,
+        "reason": "The parent owns placement and the reader remains in normal flow."
+      },
+      "evidenceRefs": [
+        "grammar:starci/content-reader-frame",
+        "contract:content-reader-inner"
+      ]
+    },
+    {
+      "decisionId": "course-content-overview-padding",
+      "acceptedHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "slotId": "overview-plane",
+      "contractKey": "course-content-home-overview-page",
+      "nodePath": "course-content-home-frame.overview",
+      "concern": "padding",
+      "code": "PADDING-6",
+      "source": ".claude/fe/gates/principles/padding/INDEX.md",
+      "inputs": {
+        "boundaryOwner": "route-primary-plane",
+        "directContent": "primary-task",
+        "role": "primary-plane"
+      },
+      "output": {
+        "element": null,
+        "className": "p-6",
+        "reason": "The course overview is the primary route plane and owns one all-axis reading inset."
+      },
+      "evidenceRefs": [
+        "grammar:starci/primary-content-spacing",
+        "contract:course-content-home-overview-page"
+      ]
+    },
+    {
+      "decisionId": "content-reader-inner-padding",
+      "acceptedHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "slotId": "reader-inner",
+      "contractKey": "content-reader-inner",
+      "nodePath": "content-reader-frame.main.inner",
+      "concern": "padding",
+      "code": "PADDING-6",
+      "source": ".claude/fe/gates/principles/padding/INDEX.md",
+      "inputs": {
+        "boundaryOwner": "route-primary-plane",
+        "directContent": "primary-task",
+        "role": "primary-plane"
+      },
+      "output": {
+        "element": null,
+        "className": "p-6",
+        "reason": "The lesson reader is the route's focused reading plane and owns one all-axis inset."
+      },
+      "evidenceRefs": [
+        "grammar:starci/primary-content-spacing",
+        "contract:content-reader-inner"
+      ]
+    },
+    {
+      "decisionId": "course-content-overview-margin",
+      "acceptedHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "slotId": "overview-plane",
+      "contractKey": "course-content-home-overview-page",
+      "nodePath": "course-content-home-frame.overview",
+      "concern": "margin",
+      "code": "MARGIN-0",
+      "source": ".claude/fe/gates/principles/margin/INDEX.md",
+      "inputs": {
+        "parentLayout": "flex-row",
+        "freeSpace": "owned-by-grow",
+        "job": "ordinary"
+      },
+      "output": {
+        "element": null,
+        "className": null,
+        "reason": "The frame owns placement, so the primary plane starts in normal flow immediately after the shared edge."
+      },
+      "evidenceRefs": [
+        "grammar:starci/primary-content-spacing",
+        "contract:course-content-home-overview-page"
+      ]
+    }
+  ],
+  "coverage": {
+    "acceptedDecisionIds": [
+      "course-map-module-title-typography",
+      "course-map-lesson-title-typography",
+      "content-reader-inner-margin",
+      "course-content-overview-padding",
+      "content-reader-inner-padding",
+      "course-content-overview-margin"
+    ],
+    "uncoveredDecisionIds": []
+  },
+  "principleReceiptHash": "6249690e7841ac936edce6fd5ba89e2f1c34176f03cd49609646b229d685e6dd",
+  "coverageHash": "1d04cf8f6c5608b79ecb05e9b1802baf7852c18fbd4e091e273b93356a5e6423"
+}

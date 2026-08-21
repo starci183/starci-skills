@@ -30,13 +30,19 @@ test('writes one config per role using direct disk paths and no repo aliases', a
     await makeRepository(frontend);
     await mkdir(path.join(source, '.claude', 'context'), { recursive: true });
     await mkdir(path.join(source, '.claude', 'skills'), { recursive: true });
+    await mkdir(path.join(source, '.claude', 'grammars', 'starci'), { recursive: true });
+    await writeFile(path.join(source, '.claude', 'grammars', 'starci', 'grammar.json'), '{}\n', 'utf8');
+    await writeFile(path.join(source, '.claude', 'grammars', 'starci', 'facts.json'), '{}\n', 'utf8');
+    await writeFile(path.join(source, '.claude', 'grammars', 'starci', 'evidence.json'), '{}\n', 'utf8');
+    await mkdir(path.join(source, '.claude', 'grammars', 'starci', 'profiles'), { recursive: true });
+    await writeFile(path.join(source, '.claude', 'grammars', 'starci', 'profiles', 'academy.json'), '{}\n', 'utf8');
     await mkdir(path.join(source, '.workflows'), { recursive: true });
     await writeFile(path.join(source, 'AGENTS.md'), '# test\n', 'utf8');
     await writeFile(path.join(source, '.gitignore'), '.workspace/\n', 'utf8');
     await mkdir(path.join(frontend, 'src', 'components', 'contracts'), { recursive: true });
     await writeFile(path.join(frontend, 'src', 'components', 'contracts', 'index.ts'), 'export {};\n', 'utf8');
 
-    const command = [script, '--source', source, '--project', 'academy', '--target', `fe=${frontend}`, '--target', `be=${source}`];
+    const command = [script, '--source', source, '--project', 'academy', '--target', `fe=${frontend}`, '--target', `be=${source}`, '--grammar', 'fe=starci', '--grammar-profile', 'fe=academy'];
     execFileSync(process.execPath, command, { encoding: 'utf8' });
     execFileSync(process.execPath, command, { encoding: 'utf8' });
     execFileSync(process.execPath, [script, '--source', source, '--check'], { encoding: 'utf8' });
@@ -50,10 +56,14 @@ test('writes one config per role using direct disk paths and no repo aliases', a
     assert.equal('alias' in fe.repository, false);
     assert.equal(fe.context.contractSource, 'discovered:src/components/contracts/index.ts');
     assert.equal(await realpath(fe.context.contract), await realpath(path.join(frontend, 'src', 'components', 'contracts', 'index.ts')));
+    assert.equal(fe.context.grammar, 'starci');
+    assert.equal(fe.context.grammarProfile, 'academy');
     assert.equal(be.role, 'be');
     assert.equal(be.repository.diskPath, await realpath(source));
     assert.equal('workspace' in be.repository, false);
     assert.equal('alias' in be.repository, false);
+    assert.equal(be.context.grammar, null);
+    assert.equal(be.context.grammarProfile, null);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

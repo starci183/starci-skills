@@ -1,12 +1,113 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://starci.academy/schema/fe/gates/principles/gate.schema.json",
-  "title": "Gate 3 - linear principles executor", "type": "object", "additionalProperties": false, "required": ["input", "output"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.academy/schema/fe/gates/principles/gate.schema.json",
+  "title": "Gate 3 - linear principles executor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["input", "output"],
   "properties": {
     "input": { "$ref": "https://starci.academy/schema/fe/gates/blocks/gate.schema.json#/$defs/SelectedDesignBundle" },
-    "output": { "oneOf": [{ "$ref": "#/$defs/PrinciplesResult" }, { "$ref": "https://starci.academy/schema/fe/gates/session.schema.json#/$defs/ReturnToOwner" }] }
+    "output": {
+      "oneOf": [
+        { "$ref": "#/$defs/PrinciplesResult" },
+        { "$ref": "https://starci.academy/schema/fe/gates/session.schema.json#/$defs/ReturnToOwner" }
+      ]
+    }
   },
   "$defs": {
+    "Id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
     "Hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "PrinciplesResult": { "type": "object", "additionalProperties": false, "required": ["inputHash", "nodes", "states", "visualRules", "findings", "outputHash"], "properties": { "inputHash": { "$ref": "#/$defs/Hash" }, "nodes": { "type": "array", "items": { "type": "object" } }, "states": { "type": "array", "items": { "type": "object" } }, "visualRules": { "type": "array", "items": { "type": "string" } }, "findings": { "type": "array", "items": { "type": "string" } }, "outputHash": { "$ref": "#/$defs/Hash" } } }
+    "Scalar": { "type": ["string", "number", "boolean"] },
+    "PrincipleReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionId", "acceptedHash", "slotId", "contractKey", "nodePath", "concern",
+        "code", "source", "inputs", "output", "evidenceRefs"
+      ],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/Id" },
+        "acceptedHash": { "$ref": "#/$defs/Hash" },
+        "slotId": { "$ref": "#/$defs/Id" },
+        "contractKey": { "$ref": "#/$defs/Id" },
+        "nodePath": { "type": "string", "minLength": 3 },
+        "concern": {
+          "enum": [
+            "alignment", "colour", "contrast", "density", "distribution", "divider", "elevation",
+            "flow", "focus-order", "gap", "grid", "margin", "motion", "optical", "overflow",
+            "padding", "position", "radius", "ratio", "responsive", "size", "state",
+            "surface-in-surface", "target-size", "text-expansion", "typography"
+          ]
+        },
+        "code": { "type": "string", "pattern": "^[A-Z]+(?:-[A-Z]+)*-[0-9]+$" },
+        "source": {
+          "type": "string",
+          "pattern": "^\\.claude/fe/gates/principles/[a-z]+(?:-[a-z]+)*/INDEX\\.md$"
+        },
+        "inputs": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": { "$ref": "#/$defs/Scalar" }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["element", "className", "reason"],
+          "properties": {
+            "element": { "type": ["string", "null"] },
+            "className": { "type": ["string", "null"] },
+            "reason": { "type": "string", "minLength": 12 }
+          }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "DecisionCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acceptedDecisionIds", "uncoveredDecisionIds"],
+      "properties": {
+        "acceptedDecisionIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Id" }
+        },
+        "uncoveredDecisionIds": {
+          "type": "array",
+          "maxItems": 0,
+          "items": { "$ref": "#/$defs/Id" }
+        }
+      }
+    },
+    "PrinciplesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputHash", "nodes", "states", "principleReceipts", "coverage",
+        "principleReceiptHash", "coverageHash", "visualRules", "findings", "outputHash"
+      ],
+      "properties": {
+        "inputHash": { "$ref": "#/$defs/Hash" },
+        "nodes": { "type": "array", "items": { "type": "object" } },
+        "states": { "type": "array", "items": { "type": "object" } },
+        "principleReceipts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/PrincipleReceipt" }
+        },
+        "coverage": { "$ref": "#/$defs/DecisionCoverage" },
+        "principleReceiptHash": { "$ref": "#/$defs/Hash" },
+        "coverageHash": { "$ref": "#/$defs/Hash" },
+        "visualRules": { "type": "array", "items": { "type": "string" } },
+        "findings": { "type": "array", "items": { "type": "string" } },
+        "outputHash": { "$ref": "#/$defs/Hash" }
+      }
+    }
   }
 }

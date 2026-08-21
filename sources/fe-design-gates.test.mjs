@@ -13,6 +13,9 @@ test("all five gate and shared schemas are valid JSON Schema documents", () => {
     "fe/gates/layouts/gate.schema.json", "fe/gates/blocks/gate.schema.json",
     "fe/gates/principles/gate.schema.json", "fe/gates/patterns/gate.schema.json",
     "fe/gates/lints/gate.schema.json", "fe/intent/intent.schema.json",
+    "grammars/starci/grammar.schema.json",
+    "grammars/starci/facts.schema.json", "grammars/starci/capsules.schema.json",
+    "grammars/starci/profiles/profile.schema.json", "grammars/starci/case.schema.json",
   ]) {
     const schema = json(path)
     assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema", path)
@@ -62,4 +65,38 @@ test("every gate declares its own goal", () => {
   assert.match(readFileSync(join(ROOT, "fe/gates/layouts/GOAL.md"), "utf8"), /reuse.*extend.*new-required.*not-applicable/s)
   assert.match(readFileSync(join(ROOT, "fe/gates/blocks/GOAL.md"), "utf8"), /render gì/)
   assert.match(readFileSync(join(ROOT, "fe/gates/principles/GOAL.md"), "utf8"), /Không hallucinate/)
+})
+
+test("Layout, Block, session and skills require exact workspace grammar receipts", () => {
+  const layout = json("fe/gates/layouts/gate.schema.json")
+  const block = json("fe/gates/blocks/gate.schema.json")
+  const session = json("fe/gates/session.schema.json")
+  assert.ok(layout.$defs.LayoutInput.required.includes("grammarReceipt"))
+  assert.ok(layout.$defs.TargetSurface.required.includes("grammarFacts"))
+  assert.ok(layout.$defs.LayoutPlan.required.includes("grammarDecisions"))
+  assert.ok(block.$defs.BlockInput.required.includes("grammarReceipt"))
+  assert.ok(block.$defs.BlockCandidate.required.includes("grammarDecisions"))
+  assert.ok(session.required.includes("grammarReceipt"))
+  for (const skill of ["plan", "layout", "block", "execute"]) {
+    const text = readFileSync(join(ROOT, "skills", `starci-fe-design-${skill}`, "SKILL.md"), "utf8")
+    assert.match(text, /grammar/i, skill)
+  }
+})
+
+test("Execute is structurally blocked without complete exact principle receipts", () => {
+  const principles = json("fe/gates/principles/gate.schema.json")
+  const patterns = json("fe/gates/patterns/gate.schema.json")
+  const lints = json("fe/gates/lints/gate.schema.json")
+  const required = principles.$defs.PrinciplesResult.required
+  for (const field of ["principleReceipts", "coverage", "principleReceiptHash", "coverageHash"]) {
+    assert.ok(required.includes(field), field)
+  }
+  const patternReceipt = patterns.$defs.PrinciplesReceipt.required
+  assert.ok(patternReceipt.includes("principleReceiptHash"))
+  assert.ok(patternReceipt.includes("coverageHash"))
+  const lintText = JSON.stringify(lints)
+  assert.match(lintText, /principle-receipt-coverage/)
+  assert.match(lintText, /principle-recipe-exact/)
+  const execute = readFileSync(join(ROOT, "skills/starci-fe-design-execute/SKILL.md"), "utf8")
+  assert.match(execute, /validate-principle-receipts\.mjs/)
 })

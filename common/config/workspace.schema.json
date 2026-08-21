@@ -37,12 +37,14 @@
     "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["instructions", "contract", "contractSource", "manifests"],
+      "required": ["instructions", "contract", "contractSource", "manifests", "grammar", "grammarProfile"],
       "properties": {
         "instructions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "contract": { "type": ["string", "null"] },
         "contractSource": { "type": ["string", "null"] },
-        "manifests": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+        "manifests": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "grammar": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "grammarProfile": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9._-]*$" }
       }
     },
     "updatedAt": { "type": "string", "format": "date-time" }

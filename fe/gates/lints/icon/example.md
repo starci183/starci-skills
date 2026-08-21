@@ -9,7 +9,7 @@ description: Mã thật cho từng luật lint biểu tượng — cái gì bị
 
 # example.md
 
-> Phiên bản: `2.00` · Mô-đun: `icon` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
+> Phiên bản: `2.01` · Mô-đun: `icon` · Luật: [`INDEX.md`](./INDEX.md) · Diễn giải: [`vi.md`](./vi.md) · Phản biện: [`audit.md`](./audit.md)
 
 Mỗi luật có nhiều cặp **SAI** (luật nổ) và **ĐÚNG** (luật im), rồi tới mục **Chỗ lách và chỗ dễ nhầm**
 mang mã đi lọt.
@@ -54,8 +54,8 @@ này được viết ra sau khi phát hiện.
 
 ```tsx
 // src/components/leaves/Icon/index.tsx
-import { BookOpenIcon } from "@heroicons/react/24/outline"
-import { XMarkIcon } from "@heroicons/react/16/solid"
+import { BookOpenIcon } from "@starci/heroicons/24/outline"
+import { XMarkIcon } from "@starci/heroicons/16/solid"
 ```
 
 ### SAI — một gói không có trong danh sách nhưng tên đã tự khai
@@ -129,8 +129,8 @@ miễn trừ cho chiếc lá.
 
 ```tsx
 // src/components/leaves/Icon/index.tsx
-import { FireIcon, HomeIcon } from "@heroicons/react/24/outline"
-import { CheckCircleIcon } from "@heroicons/react/16/solid"
+import { FireIcon, HomeIcon } from "@starci/heroicons/24/outline"
+import { CheckCircleIcon } from "@starci/heroicons/16/solid"
 ```
 
 ### SAI — họ ở giữa, đúng nhà cung cấp nhưng sai họ

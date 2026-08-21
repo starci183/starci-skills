@@ -1,0 +1,16 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "focused-work-result",
+  "kind": "counterexample",
+  "because": "A result state restores persistent chrome and is no longer the live focused-work surface.",
+  "facts": [
+    "surface-live-evaluated",
+    "surface-owns-work-header",
+    "chrome-persistent-navigation-present",
+    "chrome-assistant-present",
+    "surface-result-state"
+  ],
+  "expectedOutcomes": [],
+  "rejectedOutcomes": ["focused-work-surface"]
+}

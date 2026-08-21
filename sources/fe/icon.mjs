@@ -28,6 +28,7 @@ const LABELLED_PROGRESS_ROW_RELATIVE = "composites/LabelledProgressRow/index.tsx
  * `@phosphor-icons/react/dist/ssr`, which an equality check on the package name does not see.
  */
 const GLYPH_PACKAGES = [
+  "@starci/heroicons",
   "@phosphor-icons/",
   "lucide-react",
   "react-icons",
@@ -43,10 +44,10 @@ const GLYPH_PACKAGES = [
 /** Package-name signal for a glyph catalogue not yet listed explicitly. */
 const GLYPH_PACKAGE_NAME = /(?:icon|glyph|lucide|feather|tabler|fortawesome)/i
 
-/** The two Heroicon families selected by the product roles. */
+/** The two StarCi entry points that re-export approved Heroicons and reviewed product cuts. */
 const HEROICON_PACKAGES = new Set([
-  "@heroicons/react/24/outline",
-  "@heroicons/react/16/solid",
+  "@starci/heroicons/24/outline",
+  "@starci/heroicons/16/solid",
 ])
 
 /**
@@ -166,11 +167,11 @@ export const noVendorIconOutsideIconLeaf = {
 export const heroiconsIsTheGlyphVendor = {
   meta: {
     type: "problem",
-    docs: { description: "Only the Heroicons heading and micro families may supply product glyphs." },
+    docs: { description: "Only the StarCi Heroicons extension heading and micro entry points may supply product glyphs." },
     schema: [],
     messages: {
       vendor:
-        "`{{source}}` is not one of StarCi's two glyph families. Heading and leading roles use `@heroicons/react/24/outline`; chip roles use `@heroicons/react/16/solid`. Map the meaning there instead. Brand marks are exact house SVGs. Product reactions use the attributed Fluent Emoji Flat SVG subset checked into `public/reactions/`, never another glyph import.",
+        "`{{source}}` is not one of StarCi's two glyph entry points. Heading and leading roles use `@starci/heroicons/24/outline`; chip roles use `@starci/heroicons/16/solid`. The package re-exports approved upstream Heroicons and owns reviewed product cuts when upstream has no faithful meaning. Map the meaning there instead. Brand marks are exact house SVGs. Product reactions use the attributed Fluent Emoji Flat SVG subset checked into `public/reactions/`, never another glyph import.",
     },
   },
   create(context) {

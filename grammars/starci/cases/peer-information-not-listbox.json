@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "peer-information-not-listbox",
+  "kind": "counterexample",
+  "because": "Comparable informational peers share a surface but do not expose destination selection semantics.",
+  "facts": ["collection-peer", "boundary-shared"],
+  "expectedOutcomes": ["surface-list"],
+  "rejectedOutcomes": ["selection-listbox"]
+}
