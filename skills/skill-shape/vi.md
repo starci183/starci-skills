@@ -70,9 +70,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười tám năng lực
+## Mười chín năng lực
 
-Mười sáu capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -92,6 +92,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-fe-design-layout` | chất vấn và compose preview page/page-flow nguyên vẹn đã bind source; chỉ đưa ra alternative thực sự cải thiện quyết định |
 | `starci-fe-design-block` | đánh giá region trong toàn accepted page và chỉ đưa ra anatomy khác biệt đáng kể, buộc theo hash |
 | `starci-fe-design-execute` | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
+| `starci-fe-feedback-evolve` | biến feedback owner đã chứng minh thành cải tiến authority bền vững nhỏ nhất, design revision thay thế và source correction |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |
 | `starci-fe-minor-fix` | một correction nhỏ giữ nguyên contract trong một folder block, composite hoặc leaf hiện hữu và sạch; machine reject khi scope lớn lên |
 | `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |

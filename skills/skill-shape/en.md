@@ -70,9 +70,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The eighteen capabilities
+## The nineteen capabilities
 
-Sixteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Seventeen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -91,6 +91,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-fe-design-layout` | challenge and compose complete source-bound page/page-flow previews; expose only alternatives that materially improve the decision |
 | `starci-fe-design-block` | judge a region inside its complete accepted page and expose only materially distinct anatomies, hash-bound |
 | `starci-fe-design-execute` | frontend source, only after every reachable hash is accepted |
+| `starci-fe-feedback-evolve` | turn proven owner feedback into the smallest durable authority improvement, superseding design revision and source correction |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |
 | `starci-fe-minor-fix` | one small contract-preserving correction inside one clean existing block, composite or leaf folder, machine-rejected when its scope grows |
 | `starci-conversation-record` | provider-neutral conversation provenance snapshots and exact FE/BE artifact links without raw transcript Git storage |
