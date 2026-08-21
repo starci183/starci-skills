@@ -58,7 +58,8 @@ For every feedback item, write and prove this chain before proposing a file:
 observed symptom
 → expected outcome
 → source/legacy evidence
-→ missing invariant
+→ governing rule named and put on trial
+→ missing or misdrawn invariant
 → correct authority layer
 → nearby counterexample
 → enforcement opportunity
@@ -67,12 +68,49 @@ observed symptom
 ```
 
 The chain is incomplete if it jumps from screenshot directly to CSS, from one source example directly to a
-grammar rule, or from a principle sentence directly to unrelated product churn.
+grammar rule, or from a principle sentence directly to unrelated product churn. It is equally incomplete if the
+governing rule is cited but never tried: quoting a situation table is not the same as asking whether that
+situation is drawn where it belongs.
+
+## Authority interrogation
+
+**The law is examined before the product is.** Owner feedback is evidence that something in the chain is wrong,
+and the chain begins at the rule, not at the component. A run that reads a situation table, finds an answer and
+proceeds to blame the code has skipped the only step that can find a defective rule — because a defective rule
+always has an answer. That is what makes it defective rather than absent.
+
+Before classifying anything, measure the authority itself. Run `@check-deps` and `@validate-grammar` over the
+trust tree and read every finding as a fact about the law, not as noise to be cleared later. A publication that
+carries a situation its runtime record does not, a profile owner whose stated debt is still open, a manifest hash
+that no longer matches its source — each of these will otherwise be discovered as a false gap in the product.
+
+Then, for each feedback item, name the exact rule, situation code or profile owner that governs it, and return
+one of three verdicts. A verdict is not optional and `sound` is not the default.
+
+| Verdict | What it means | Where it goes |
+|---|---|---|
+| `sound` | The rule answers this situation and answers it correctly | classify against the product |
+| `misdrawn` | The rule answers, and the answer is wrong for this situation | `Law misruling` |
+| `absent` | No rule reaches this situation at all | `Grammar gap` or `Principle gap` |
+
+`misdrawn` must be earned, not asserted. It requires a **counterexample the current rule decides wrongly** —
+one real composition where following the rule to the letter produces the outcome the owner is correcting. Owner
+dissatisfaction alone is not a counterexample; neither is a rule that merely feels coarse. Without one, the
+verdict is `sound` and the correction belongs to the product.
+
+Interrogation is also how an owner is answered when the law survives it. A rule that has been tried and held can
+be shown to the owner with its boundary and its adjacent code, which is a reason. A rule that was only looked up
+can be shown to the owner only as a citation, which is an appeal to authority.
 
 ## Classification
 
 Choose exactly one primary class per feedback item; secondary consequences may cite it.
 
+- **Law misruling** — an existing rule, situation or profile owner governs this case and decides it wrongly:
+  its boundary is drawn in the wrong place, or it emits the wrong outcome. Correct the rule at its owning module,
+  carry the paired publications and runtime record together, and add the counterexample that fails under the old
+  wording and passes under the new. Never resolve a misruling by changing the product to satisfy a rule that is
+  itself wrong.
 - **Evidence inventory miss** — routed source or accepted legacy already contained the required element, state,
   owner or relationship, but design decomposition omitted it. Correct the design/source and strengthen the
   inventory proof only when the omission could recur mechanically.
@@ -96,37 +134,46 @@ Choose exactly one primary class per feedback item; secondary consequences may c
 
 1. Resolve language, Source, project, routed FE, grammar/profile, business head, accepted layout/block heads,
    committed source baseline and exact owner feedback. Verify registry and target worktrees are clean.
-2. Reproduce the reported state at its real viewport. Read the complete relevant source/legacy subtree, not only
+2. **Interrogate the authority first.** Run `@check-deps` and `@validate-grammar` over the trust tree and record
+   every finding as a fact about the law. Then name the governing rule, situation code or profile owner for each
+   feedback item and return its verdict — `sound`, `misdrawn` or `absent` — with the counterexample any
+   `misdrawn` verdict requires. A red or stale authority is reported before it is reasoned from, never after.
+3. Reproduce the reported state at its real viewport. Read the complete relevant source/legacy subtree, not only
    the element named in the feedback: header, identity, surface owner, controls, overlays and responsive owner.
-3. Run the reasoning ladder and classification for each item. Search current grammar and principle situation
-   tables before declaring any gap. An existing answer makes this an application miss.
-4. Build the **impact cone** before writing: exact authority files, grammar/profile hashes that change, accepted
+4. Run the reasoning ladder and classification for each item, carrying the verdict from step 2. An existing
+   answer makes this an application miss only when that answer survived interrogation; an answer that failed is
+   a `Law misruling` and the law moves, not the product.
+5. Build the **impact cone** before writing: exact authority files, grammar/profile hashes that change, accepted
    design receipts made stale, layout/block heads that require a new immutable revision, source owners and tests.
    Unaffected accepted revisions remain immutable and are never mass-refreshed to make a check green.
-5. Present one `### NEED APPROVALS` boundary naming the exact authority, registry and source paths plus the
+6. Present one `### NEED APPROVALS` boundary naming the exact authority, registry and source paths plus the
    recommended correction. `OK` authorizes that boundary once. Take trust-tree and FE baselines after approval
    and before the first write.
-6. Write authority before product code:
+7. Write authority before product code:
    - paired `en.md` and `vi.md`, then derived runtime `context.md` and manifest when a module law changes;
    - the complete grammar promotion set when classification is `Grammar gap`;
    - pattern/gate law and its real machine twin together when enforcement is approved and routed.
-7. Validate grammar, compile/check runtime contexts and run all three dependency graphs. Add counterexamples that
+8. Validate grammar, compile/check runtime contexts and run all three dependency graphs. Add counterexamples that
    distinguish the new situation from its nearest existing rule; wording-only tests are insufficient.
-8. Append corrected layout/block revisions. Preserve the full composed page or flow, existing source-bound nodes,
+9. Append corrected layout/block revisions. Preserve the full composed page or flow, existing source-bound nodes,
    every evidenced state and overlay. Recompute grammar receipts and principle obligations only for affected
    identities; never edit an accepted bundle in place.
-9. Implement the accepted correction in the routed frontend. Reuse semantic owners emitted by grammar and source
+10. Implement the accepted correction in the routed frontend. Reuse semantic owners emitted by grammar and source
    patterns. Do not paste preview CSS or introduce caller styling doors.
-10. Run scoped and repository gates, targeted unit/interaction tests and browser proof at every affected viewport
+11. Run scoped and repository gates, targeted unit/interaction tests and browser proof at every affected viewport
     and state. Compare the new render against both owner feedback and the newly strengthened authority.
-11. Commit trust authority, design registry and frontend separately so each history states what changed. Do not
+12. Commit trust authority, design registry and frontend separately so each history states what changed. Do not
     push unless explicitly requested. Report any unrelated baseline failure without absorbing it.
 
 ## Stops
 
 - The feedback has no observable page/state and no recoverable expected outcome.
 - Routed source contradicts the claimed product fact and the owner has not supplied a product decision.
-- A proposed grammar/principle addition is already expressible by current authority.
+- A proposed grammar/principle **addition** is already expressible by current authority. Correcting a rule that
+  is present and misdrawn is not an addition and is not stopped here; it stops only when it has no counterexample.
+- A `misdrawn` verdict carries no counterexample the current rule decides wrongly, or an item reached
+  classification with no verdict recorded at all.
+- Authority gates were not run before the first classification, or a gate finding was carried past it unreported.
 - A grammar change has no golden case, counterexample, capsule, template, profile owner or impact cone.
 - A principle change cannot name the nearest adjacent situation and why it is insufficient.
 - An accepted revision would be edited rather than replaced, or unrelated receipts would be rewritten.
