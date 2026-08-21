@@ -41,7 +41,6 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `no-vendor-icon-outside-icon-leaf` | ICON-6 | a vendor glyph is imported outside the icon leaf | `icon/context.md` |
 | `heroicons-is-the-glyph-vendor` | ICON-7 | a glyph package is outside the approved Heroicons families | `icon/context.md` |
 | `no-decorative-icon-in-metric-cell` | ICON-10 | a metric cell contains a decorative icon | `icon/context.md` |
-| `rank-artwork-is-a-closed-set` | machine-only identity | rank artwork falls outside its closed identifier and asset set | `icon/context.md` |
 | `routed-page-is-a-main-landmark` | LANDMARK-4 | routed page chrome lacks its main landmark | `landmark/context.md` |
 | `main-landmark-belongs-to-a-route-file` | LANDMARK-5 | a lower tier opens the main landmark | `landmark/context.md` |
 | `no-inline-lint-config` | LINT-ESCAPE-1 | source contains an inline ESLint directive | `lint-escape-hatch/context.md` |

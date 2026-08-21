@@ -48,6 +48,7 @@ emit nothing, because deciding to let content grow is a decision, not an absence
 | `OVERFLOW-5` | The content is wider than the column and scrolls sideways in its own frame | `overflow-x-auto` |
 | `OVERFLOW-6` | Siblings in one row compete for width; who yields must be declared | `min-w-0 flex-1` · `flex-none` |
 | `OVERFLOW-7` | Content owns the height; the ceiling belongs to an ancestor, not here | *no overflow class* |
+| `OVERFLOW-8` | Parallel panes share one bounded viewport and move independently | The parent owns the exact height and clips; every moving pane stretches `h-full min-h-0` and owns one `overflow-y-auto`; no child sticky offset or max-height seam |
 
 THE TWO CODES THAT EMIT NOTHING ARE NOT THE SAME CODE. `OVERFLOW-0` says overflow **cannot happen** —
 the value comes from a closed set, or is a number of known width. `OVERFLOW-7` says overflow **is
@@ -373,6 +374,26 @@ the main content area between two rails.
 | axis | Does it overrun inline (width) or block (height)? |
 | ceiling owner | Which ancestor owns the height limit: this box, a rail, or the viewport? |
 
+## `OVERFLOW-8` — parallel panes share one viewport
+
+**Situation.** A route places two or more panes beside each other and each pane can exceed the visible
+height independently: a course map, a reading document and an on-page outline.
+
+**What it emits.** The common parent owns one exact viewport height and `overflow-hidden`. Each moving
+pane is projected through the house scroll branch and carries `h-full min-h-0 overflow-y-auto`; pinned
+controls stay outside their inner scroll child. Sibling panes begin and end on the same edges.
+
+**Recognition signs.** Scrollbars start at different vertical positions. A small empty strip appears
+between panes. A child combines `sticky top-*`, `max-h-*` and `overflow-y-auto` while its sibling uses
+another height rule. Scrolling reaches the end of one pane but clips the other.
+
+**Boundary.** Not `OVERFLOW-4`: that code classifies one scrolling box. This code owns the shared
+height and alignment between several independent boxes. `sticky top-*` or `max-h-*` on those children
+creates an unowned seam and is refused.
+
+**Machine.** The product's `ScrollViewport` and composed-page specs assert the shared-height frame,
+the two named scroll projections and the absence of child-owned sticky/max-height seams.
+
 ## Rules
 
 1. Consider **each box** before the data exists, at the greatest length real data can reach.
@@ -425,7 +446,7 @@ One block per box, outermost first:
 box: <the element that receives the content>
 axis: <inline | block>
 bound: <closed | unbounded>
-situation: <OVERFLOW-0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>
+situation: <OVERFLOW-0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>
 className: <no class | truncate | line-clamp-n | break-words | max-h-* overflow-y-auto | overflow-x-auto | min-w-0 flex-1 | flex-none>
 recovery: <how the reader reaches the full value, or "none needed">
 reason: <business fact that excludes the adjacent code>

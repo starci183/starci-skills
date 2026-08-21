@@ -23,15 +23,9 @@ nhất đổi cặp đó thành hình vẽ thật. Kiểu dữ liệu đã đón
 escape còn lại đúng là phần kiểu dữ liệu không nhìn thấy: một chỗ gọi nhập thẳng gói hình, một chiếc lá
 lặng lẽ thêm nhà cung cấp thứ hai, và một cỡ viết ra không nằm trong các bậc mà vai trò đưa ra.
 
-Mô-đun luật có năm luật lint, và tài liệu này ghi đúng năm. Danh tính của một luật là **tên công bố**
-của nó — chuỗi in ra trong log build và chuỗi viết trong dòng tắt luật — nên ở đây không đặt thêm số
-cho luật nào. **Bốn trong năm luật giữ một mã luật**: `ICON-6`, `ICON-7`, `ICON-1` (chỉ nửa về cỡ) và
-`ICON-10`. Luật thứ năm không giữ mã nào: mô-đun luật đề `rank-artwork-is-a-closed-set` bằng `ICON-11`,
-nhưng trong văn bản luật `ICON-11` nói mỗi ô hình luôn mang hình vai trò dẫn dắt ở cỡ năm — một câu về
-cỡ hình so với cỡ tấm nền, không liên quan gì tới tranh giải. Vậy là một luật và hai nhánh miễn trừ
-đang thực thi một quyết định mà luật chưa từng công bố, còn người đọc lần theo mã từ thông điệp về tới
-luật thì rơi vào một câu hoàn toàn khác. Ở đây ghi lại đúng như thế thay vì sửa, vì bịa ra ánh xạ chính
-là bịa ra luật.
+Mô-đun có bốn luật lint và tài liệu này ghi đúng bốn. Mỗi luật giữ một mã đã công bố: `ICON-6`,
+`ICON-7`, `ICON-1` (chỉ nửa về cỡ) và `ICON-10`. Artwork xếp hạng không có ngoại lệ vendor; medal còn
+thiếu sống trong `@starci/heroicons` và đi qua owner icon thông thường.
 
 ## Luật máy đã xuất bản
 
@@ -41,7 +35,6 @@ là bịa ra luật.
 | `heroicons-is-the-glyph-vendor` | `ICON-7` | Câu `import` trỏ vào gói hình nằm ngoài hai họ đã duyệt — từ **mọi** tệp nguồn, kể cả chiếc lá biểu tượng |
 | `no-off-scale-glyph-size` | `ICON-1` (chỉ nửa về cỡ) | Tiện ích `size-` viết bằng phân số thập phân hoặc bằng giá trị tuỳ ý trong ngoặc vuông, trong thuộc tính lớp hoặc trong một biến giữ chuỗi lớp tĩnh |
 | `no-decorative-icon-in-metric-cell` | `ICON-10` | Thẻ JSX tên `Icon` bên trong đúng một tệp ô số liệu lặp lại |
-| `rank-artwork-is-a-closed-set` | **không có mã trong luật** | Định danh tranh giải nêu ngoài chiếc lá xếp hạng, hoặc định danh nêu bên trong chiếc lá đó nhưng không thuộc bốn cái đã duyệt |
 
 Những mã mà kệ này có nêu tên nhưng không luật nào giữ: `ICON-2`, `ICON-3` và `ICON-4` — vai trò nào đi
 với cỡ nào — **hoàn toàn không có luật lint nào**, và cỡ nguyên lệch thang cũng vậy, nên `ICON-1` chỉ
@@ -54,7 +47,7 @@ chạy sạch không nói gì về bất kỳ mã nào trong đó.
 ## Đọc một diff
 
 1. **Quyết phạm vi trước mọi thứ khác, và ghi lại.** Ngoài phạm vi ở đây không có nghĩa là tệp đã qua —
-   nghĩa là không bộ duyệt nào được lắp và luật đó không tồn tại cho tệp đó. Bốn trong năm luật đòi
+   nghĩa là không bộ duyệt nào được lắp và luật đó không tồn tại cho tệp đó. Ba trong bốn luật đòi
    đường dẫn có `/src/`; `no-decorative-icon-in-metric-cell` đòi đúng đường dẫn của riêng nó và không
    gì khác.
 2. **Xem lại các miễn trừ, vốn đều là cặp.** Chiếc lá biểu tượng chỉ được miễn luật dành cho chỗ gọi.
@@ -163,40 +156,15 @@ theo mặc định.
 **Ranh giới.** Luật không phân biệt hình tính năng với hình trạng thái. Trong tệp đó, mọi thẻ `Icon`
 đều bị báo.
 
-## `rank-artwork-is-a-closed-set` — none
-
-**Nó báo cái gì.** Hai chuyện, bằng hai thông điệp. `outside` — một định danh tranh giải nêu **ngoài**
-chiếc lá xếp hạng, vì bản đồ hạng-sang-tranh phải nằm một chỗ để màn hình thứ hai không trả lời khác
-đi. Và `unknown` — một định danh nêu **bên trong** chiếc lá đó nhưng không thuộc bốn cái đã duyệt, vì
-miễn trừ mua về bốn tấm huy chương chứ không mua về nguyên một catalog.
-
-**Nó phát hiện bằng gì.** Duyệt **mọi** `Literal`; bỏ qua giá trị không phải chuỗi và mọi chuỗi không
-mở đầu bằng tiền tố bộ sưu tập `fluent-emoji-flat:`. Cổng tệp: phải chứa `/src/`, không được khớp
-`/\.test\.tsx?$/`. Tệp kết thúc bằng `/leaves/RankMark/index.tsx` đi nhánh kiểm tập đóng; mọi tệp khác
-đi nhánh "nêu ngoài chiếc lá".
-
-**Điểm mù.** Định danh ghép bằng template: dựng chuỗi từ số thứ hạng làm **cả hai** nhánh biến
-mất cùng lúc — tập đóng và cả quyền sở hữu — mà ghép chuỗi lại đúng là cách tự nhiên nhất để viết một
-bản đồ hạng-sang-tranh. Một bộ sưu tập tranh khác: chỉ một tiền tố được nhận ra, nên một tấm huy chương
-hay một chiếc cúp lấy từ bộ sưu tập khác trong cùng catalog lọt cả trong lẫn ngoài chiếc lá. Tệp kiểm
-thử, theo tên: miễn trừ này có lập luận nhưng không có biên — mọi tệp kết thúc `.test.tsx` ở bất kỳ đâu
-đều được gọi tên bất kỳ định danh nào. Và một chiếc lá xếp hạng thứ hai, theo đúng lối so đuôi đường
-dẫn như chiếc lá biểu tượng.
-
-**Ranh giới.** Cùng một chuỗi mang hai thông điệp khác nhau tuỳ chỗ nó đứng. Nhánh nào chạy là do tên
-tệp quyết, trước cả khi giá trị được đọc.
-
 ## Cách phát hiện
 
 | Bộ phận | Cơ chế |
 |---|---|
 | chuẩn hoá dấu chéo | `context.filename` (hoặc `getFilename()`) được đổi hết dấu chéo ngược thành chéo xuôi trước mọi phép so đuôi, nên cổng đường dẫn cư xử như nhau trên cả hai nền |
-| cổng `/src/` | Bốn trong năm luật đòi đường dẫn chứa `/src/`; `no-decorative-icon-in-metric-cell` tự có cổng đường dẫn riêng và không gì khác |
+| cổng `/src/` | Ba trong bốn luật đòi đường dẫn chứa `/src/`; `no-decorative-icon-in-metric-cell` tự có cổng đường dẫn riêng và không gì khác |
 | phép thử nguồn gói hình | Dùng chung cho hai luật nhập: một nguồn trúng khi nó bằng hoặc bắt đầu bằng một trong mười tiền tố gói, hoặc khi nó là gói ngoài (không mở đầu bằng `.` hay `@/`) khớp `/(?:icon\|glyph\|lucide\|feather\|tabler\|fortawesome)/i` |
 | bộ rút chuỗi tĩnh | Đọc `Literal` chuỗi, `TemplateLiteral` không biểu thức, hoặc một trong hai xuyên qua `JSXExpressionContainer`; một lời gọi hàm không cho ra gì |
 | mẫu cỡ | `/\bsize-(?:\d+\.\d+\|\[[^\]]+\])/`, chỉ lần trúng đầu tiên, không toàn cục |
-| tiền tố tranh giải | Đúng một tiền tố bộ sưu tập `fluent-emoji-flat:`; chuỗi không mở đầu bằng nó bị bỏ qua trước khi bất kỳ nhánh nào chạy |
-| hình dạng miễn trừ | Mọi miễn trừ là một cặp — một tệp **và** một giá trị — và mọi cổng đường dẫn là phép so đuôi, nên nó đặt tên cho một hình dạng đường dẫn chứ không phải một tệp duy nhất |
 
 Phát hiện thuần cú pháp: không phân giải mô-đun, không hỏi kiểu, không chạy mã, và không với ra ngoài
 tệp đang bị lint.
@@ -213,9 +181,6 @@ tệp đang bị lint.
 | `className={"size-[18px]"}` hoặc `` className={`size-[18px]`} `` | Bộ rút chuỗi tĩnh bóc lớp expression container và đọc được template literal không mang biểu thức nào |
 | `const ICON = "size-[18px]"`, dùng ở tận đâu | Mọi `VariableDeclarator` có khởi tạo là chuỗi tĩnh đều bị quét, nên kiểu giặt literal đơn giản nhất đã bị bịt sẵn cho riêng luật này |
 | Một bộ hình không ai liệt kê | Một gói ngoài mang `icon`, `glyph`, `lucide`, `feather`, `tabler` hay `fortawesome` trong tên vẫn bị coi là gói hình dù không nằm trong danh sách nào |
-| Chiếc lá xếp hạng nhập một nhà cung cấp *khác* | Miễn trừ là một cặp — đúng tệp đó **và** đúng gói đó. Gói khác từ tệp đó vẫn bị báo |
-| Thêm tấm huy chương thứ năm ngay trong chiếc lá xếp hạng | Bên trong chiếc lá, một định danh mang tiền tố tranh giải phải là một trong bốn; khác đi là bị báo |
-| Chép các định danh xếp hạng sang tệp khác | Ngoài chiếc lá, mọi định danh mang tiền tố đó bị báo ngay, nên bản đồ không thể bị trả lời lần thứ hai |
 | Thêm nhà cung cấp từ bên trong chiếc lá biểu tượng | Luật nhà cung cấp cố tình không giữ miễn trừ cho chiếc lá, nên chiếc lá bị ràng buộc y như mọi tệp khác |
 
 **Còn mở** — chỗ mù đã xuất xưởng. Một phán quyết không được nói rằng những chỗ này đã được xét.
@@ -238,10 +203,6 @@ tệp đang bị lint.
 | `no-decorative-icon-in-metric-cell` | Tên tệp. Luật chỉ tồn tại cho một đường dẫn; đổi tên tệp, hoặc chuyển phần đánh dấu sang tệp anh em cùng thư mục, là xoá được luật mà không chạm một dòng nào vào luật |
 | `no-decorative-icon-in-metric-cell` | Mọi thẻ không đúng chữ `Icon`: bí danh lúc nhập, gọi qua thuộc tính của object, một thành phần tile hay badge tự vẽ hình bên trong, hay một hình truyền xuống bằng prop |
 | `no-decorative-icon-in-metric-cell` | Mọi ô dữ kiện gọn khác trong sản phẩm. Luật viết chung cho mọi ô; máy giữ đúng một tệp, còn ô số liệu thứ mười viết tuần sau nằm ngoài theo mặc định |
-| `rank-artwork-is-a-closed-set` | Định danh ghép bằng template. Dựng chuỗi từ số thứ hạng làm cả hai nhánh biến mất cùng lúc — tập đóng và quyền sở hữu — mà đó lại là cách tự nhiên nhất để viết một bản đồ hạng-sang-tranh |
-| `rank-artwork-is-a-closed-set` | Một bộ sưu tập tranh khác. Chỉ một tiền tố được nhận ra, nên huy chương hay cúp lấy từ bộ sưu tập khác trong cùng catalog lọt cả trong lẫn ngoài chiếc lá |
-| `rank-artwork-is-a-closed-set` | Tệp kiểm thử, theo tên. Miễn trừ có lập luận nhưng không có biên: mọi tệp kết thúc `.test.tsx` ở bất kỳ đâu đều được gọi tên bất kỳ định danh nào |
-| `rank-artwork-is-a-closed-set` | Một chiếc lá xếp hạng thứ hai, theo đúng lối so đuôi đường dẫn như chiếc lá biểu tượng |
 | không luật nào | Mọi thứ mà `ICON-2`, `ICON-3`, `ICON-4`, `ICON-11` và `ICON-13` phát biểu — vai trò nào đi với cỡ nào, hình vai trò dẫn dắt ở cỡ năm trên mỗi ô, và tập định danh phản ứng đã đóng. Có tài liệu, có kiểu, có xuất ra, không được thực thi |
 
 ## Đầu vào
@@ -279,7 +240,7 @@ Mỗi miễn trừ đều đóng, và đều được viết dưới dạng mộ
   `unknown`; một trong bốn nêu ở nơi khác bị báo là `outside`.
 - **Tệp kiểm thử** được miễn luật tranh giải, để một bài kiểm thử sinh đôi chứng minh được tập đã đóng
   bằng cách gọi tên cả cái ở trong lẫn cái ở ngoài.
-- **Mọi thứ ngoài `/src/`** không bị bốn trong năm luật soi tới. Đây là một quyết định phạm vi, không
+- **Mọi thứ ngoài `/src/`** không bị ba trong bốn luật soi tới. Đây là một quyết định phạm vi, không
   phải một giấy phép, và nó là cửa mở rộng nhất trên kệ này.
 
 ## Đầu ra
@@ -313,13 +274,12 @@ const GLYPH = "shrink-0 size-[18px] text-current"
 export const LeaderboardRow = ({ place }: Props) => (
   <div className="flex items-center gap-2">
     <Flame className={GLYPH} />
-    <Iconify icon="fluent-emoji-flat:1st-place-medal" className="size-5" />
   </div>
 )
 ```
 
 Đường dẫn có `/src/`, không phải chiếc lá biểu tượng, không phải chiếc lá xếp hạng và không phải tệp
-kiểm thử, nên bốn trong năm luật được lắp. Luật ô số liệu thì không: đường dẫn này không kết thúc bằng
+kiểm thử, nên ba trong bốn luật được lắp. Luật ô số liệu thì không: đường dẫn này không kết thúc bằng
 `/composites/LabelledProgressRow/index.tsx`, nên bộ duyệt của nó còn chưa từng được tạo ra.
 
 ```text
@@ -352,16 +312,6 @@ scope:   in — contains /src/
 node:    VariableDeclarator
 value:   shrink-0 size-[18px] text-current
 message: offScale
-hatch:   none
-```
-
-```text
-rule:    rank-artwork-is-a-closed-set
-file:    src/components/blocks/LeaderboardRow/index.tsx
-scope:   in — contains /src/, does not match /\.test\.tsx?$/, not the rank leaf
-node:    Literal
-value:   fluent-emoji-flat:1st-place-medal
-message: outside
 hatch:   none
 ```
 

@@ -18,6 +18,13 @@ leaf must own, and what the source must look like once the shape has landed.
 An icon is a **closed product meaning**, drawn through one glyph vocabulary. A caller names what the
 glyph MEANS and the ROLE it performs. The icon leaf alone chooses the concrete drawing.
 
+The frontend UI surface is closed to exactly three libraries: `@heroui/react` for UI primitives,
+`@heroicons/react` for upstream Heroicons, and `@starci/heroicons` only for StarCi cuts missing from
+upstream. The StarCi package never re-exports upstream icons. Product source chooses an existing
+upstream Heroicon first; only a genuinely missing drawing is copied or authored into the matching
+`24/outline` or `16/solid` StarCi entry point. Iconify, Phosphor and every other UI/glyph library are
+outside this closed set.
+
 The question that classifies the role is: **is this introducing content, leading an ordinary control
 or row, or sitting inside a compact chip?** A heading glyph is not a leading glyph made larger, and
 a chip glyph is not either one made smaller. The vocabulary ships separate drawings for those jobs,
@@ -41,7 +48,7 @@ not a component, a size or a package name.
 | `ICON-4` | A glyph inside a chip that already has its own shell | A chip glyph is the native 16 solid micro drawing at `size-4`. Never a 24 outline glyph scaled down; never the 20px mini family used as a chip |
 | `ICON-5` | A glyph inside a region carrying state (disabled, muted, selected) | A glyph draws in `currentColor`. No product glyph carries its own colour |
 | `ICON-6` | A screen needs a drawing it does not yet have | Only the icon leaf names a glyph library; callers name meanings. No glyph component imported at a call site, and no second route into the library from a sibling file |
-| `ICON-7` | Somebody wants to add another icon set | Two families only: 24 outline and 16 solid. No other glyph package, even inside the icon leaf; no brand mark approximated from a general package |
+| `ICON-7` | Somebody wants to add another icon set | Exactly two glyph packages: upstream `@heroicons/react` plus custom-only `@starci/heroicons`, both limited to 24 outline and 16 solid. No other glyph package |
 | `ICON-8` | The row narrows, the words lengthen | Every role carries `shrink-0`. No glyph deforming when its row becomes tight |
 | `ICON-9` | Adding a new meaning to the product | The source feature map owns meaning-to-glyph selection, and name, map and table move together. No two unrelated meanings sharing one glyph; no stale or missing row |
 | `ICON-10` | A metric cell, goal, kind label, streak caption or fact cell | A compact business fact whose reference is text-only stays text-only. No decorative feature glyph on it |
@@ -153,17 +160,18 @@ prefix, so a subpath cannot walk around the check — plus the single allowed mo
 imported. A file in the right place calling the wrong package is silent to `ICON-6` and caught only by
 `ICON-7`. Not `ICON-9`: when no meaning matches, the answer is to ADD a meaning, not to import.
 
-## `ICON-7` — one vendor, two families
+## `ICON-7` — upstream plus custom-only extension, two families
 
 **Situation.** Somebody wants another icon set: prettier, more complete, or "just this one icon".
 
-**What it emits in source.** `starci-fe/heroicons-is-the-glyph-vendor` — a two-package allow set that
-applies inside the icon leaf too, which is the half `ICON-6` cannot see, with the rank exemption
-threaded through both vendor rules.
+**What it emits in source.** `starci-fe/heroicons-is-the-glyph-vendor` — a closed allow set containing
+only `@heroicons/react/24/outline`, `@heroicons/react/16/solid`, `@starci/heroicons/24/outline` and
+`@starci/heroicons/16/solid`. The StarCi entry points contain custom cuts only and never re-export
+upstream. The rule applies inside the icon leaf too, which is the half `ICON-6` cannot see.
 
 **Boundary.** Not `ICON-6`: see above. `ICON-7` applies INSIDE the icon leaf, the place `ICON-6`
-deliberately does not look. The award-artwork exemption is exactly one file, one package, four
-identities; a fifth is still reported — that exemption is a vocabulary, not a door.
+deliberately does not look. Award artwork has no Iconify exemption: use upstream `TrophyIcon` where
+faithful, and add missing medal cuts to `@starci/heroicons` before product source imports them.
 
 ## `ICON-8` — a glyph never shrinks
 
@@ -264,11 +272,8 @@ a reader holds it.
 | `ICON-12` | `documented` | Peer identity is a judgement about a set, and no rule reads a set |
 | `ICON-13` | `documented` | The reaction identities are a closed set in the leaf; no rule refuses a Unicode pictograph or an asset path at a call site |
 
-FIVE RULES EXIST, FOUR CODES CARRY ONE. The fifth, `starci-fe/rank-artwork-is-a-closed-set`, guards
-a named exemption to `ICON-7` — one file, one package, four artwork identities — and its own comments
-cite `ICON-11`, which in this law means the plated tile. The number collision is real and is recorded
-rather than fixed by renumbering, because a code somebody has already cited cannot quietly change
-meaning.
+The retired `rank-artwork-is-a-closed-set` rule must not reopen Iconify. Rank remains a closed product
+meaning owned by `RankMark`; the ordinary `ICON-6` and `ICON-7` vendor boundary applies to it.
 
 ## Inputs
 
@@ -305,9 +310,8 @@ Exceptions are part of the rule, not relief from it. Each is closed and cites th
   of locating the region.
 - **Reaction artwork** (`ICON-13`). A closed set of product artwork, owned by one leaf, passed by
   identity. It is a narrow artwork boundary and does not open a second glyph vocabulary.
-- **Award artwork** (`ICON-7`, by the rank exemption in the lint source). One file may name one extra
-  package, for four artwork identities and no fifth. It is bounded on three sides at once, and it is
-  recorded as a decision made knowing the checked-in route was the stronger mechanism.
+- **Award artwork** (`ICON-7`). Use upstream `TrophyIcon` when it is faithful; missing place-medal
+  drawings are closed custom cuts in `@starci/heroicons`. Product source gets no extra package.
 
 ## Output
 

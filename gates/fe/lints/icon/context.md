@@ -19,15 +19,11 @@ pair into a concrete drawing. Types close the meaning and role unions, so the es
 the ones types cannot see: a call site that imports a glyph package directly, a leaf that quietly adds
 a second vendor, and a size written as neither of the steps the roles offer.
 
-Five rules exist in the rule module, and this file documents five. Their identity is the published
-name — the string that appears in a build log and in a disable comment — and no numeric code is
-invented for them here. **Four of the five hold a law code**: `ICON-6`, `ICON-7`, `ICON-1` (its size
-half only) and `ICON-10`. The fifth holds none: the rule module heads
-`rank-artwork-is-a-closed-set` with `ICON-11`, but in the law `ICON-11` says every tile carries a
-leading-role glyph at size five — a statement about plate versus glyph size, with nothing to do with
-award artwork. So one rule and two exemption branches enforce a decision the law never published, and
-a reader who follows the code from the message to the law lands on an unrelated sentence. Recorded
-rather than repaired, because inventing the mapping would be inventing the law.
+Four rules exist in the rule module, and this file documents four. Their identity is the published
+name — the string that appears in a build log and in a disable comment — and each holds one published
+law code: `ICON-6`, `ICON-7`, `ICON-1` (its size half only) and `ICON-10`. Rank artwork receives no
+vendor exemption; missing medal cuts live in `@starci/heroicons` and pass through the ordinary icon
+leaf ownership boundary.
 
 ## Published rules
 
@@ -37,7 +33,6 @@ rather than repaired, because inventing the mapping would be inventing the law.
 | `heroicons-is-the-glyph-vendor` | `ICON-7` | An `import` whose source resolves to a glyph package outside the two approved families — from **any** source file, the icon leaf included |
 | `no-off-scale-glyph-size` | `ICON-1` (size half only) | A `size-` utility written as a decimal fraction or an arbitrary bracket value, in a class attribute or in a variable holding a static class string |
 | `no-decorative-icon-in-metric-cell` | `ICON-10` | A JSX element named `Icon` inside the one repeated metric-cell file |
-| `rank-artwork-is-a-closed-set` | **none in the law** | An award-artwork identifier named outside the rank leaf, or an identifier inside that leaf which is not one of the four approved ones |
 
 The codes this shelf names and no rule holds: `ICON-2`, `ICON-3` and `ICON-4` — which of the three
 roles takes which of the three sizes — have **no rule at all**, and neither do integer sizes off the
@@ -50,12 +45,11 @@ them.
 ## Reading a diff
 
 1. **Decide scope before anything else, and record it.** Out of scope here does not mean the file
-   passed — it means no visitor was installed and the rule did not exist for that file. Four of the
-   five rules require `/src/` in the path; `no-decorative-icon-in-metric-cell` requires its own path
+   passed — it means no visitor was installed and the rule did not exist for that file. Three of the
+   four rules require `/src/` in the path; `no-decorative-icon-in-metric-cell` requires its own path
    and nothing else.
-2. **Check the exemptions, which are pairs.** The icon leaf is exempt from the caller rule only. The
-   rank leaf is exempt from both import rules for exactly one package. Test files are exempt from the
-   artwork rule. No file is exempt from a rule wholesale.
+2. **Check the owner boundary.** The icon leaf is exempt from the caller rule only; it is never exempt
+   from the closed vendor allow set. No rank or artwork file gets another package.
 3. **Read the nodes the rules actually stand on** — `ImportDeclaration` source strings, static class
    text from a class attribute or a variable init, `JSXIdentifier` element names, and every string
    `Literal`. A value that never reaches one of those nodes was never judged.
@@ -76,8 +70,7 @@ which drawing, how big — and the next screen answers all three differently.
 equals or starts with one of ten package prefixes, or when it is an external specifier (not starting
 with `.` or `@/`) whose text matches `/(?:icon|glyph|lucide|feather|tabler|fortawesome)/i`. File gate:
 `context.filename`, back-slashes normalised to forward, must contain `/src/` and must not end with
-`/leaves/Icon/index.tsx`. One exemption: filename ends with `/leaves/RankMark/index.tsx` **and** the
-source is exactly the award package.
+`/leaves/Icon/index.tsx`. There is no rank or artwork exemption.
 
 **What it cannot see.** `require("lucide-react")`, `await import("lucide-react")` and a lazily-loaded
 component built from a dynamic import: only the `ImportDeclaration` node is visited.
@@ -100,8 +93,8 @@ to open a second drawing vocabulary inside it.
 
 **How it detects.** Same `ImportDeclaration` visitor and same glyph test as the rule above, minus the
 leaf gate: every file containing `/src/` is scanned. A hit is dropped only when the source is exactly
-`@heroicons/react/24/outline` or `@heroicons/react/16/solid`, or when it is the same
-rank-leaf-plus-package pair.
+`@heroicons/react/24/outline`, `@heroicons/react/16/solid`, `@starci/heroicons/24/outline` or
+`@starci/heroicons/16/solid`. StarCi entry points are custom-only; upstream icons use upstream imports.
 
 **What it cannot see.** A glyph catalogue whose package name carries none of the six name signals and
 is on no list — pictogram, emoji and mark packages routinely qualify. A local `.svg` or a hand-written
@@ -161,29 +154,6 @@ outside it by default.
 **Boundary.** The rule does not distinguish a feature glyph from a status glyph. Inside that file,
 every `Icon` tag reports.
 
-## `rank-artwork-is-a-closed-set` — none
-
-**What it reports.** Two things, by two messages. `outside` — an award-artwork identifier named
-**outside** the rank leaf, because the place-to-artwork map must sit in one place so a second screen
-cannot answer it differently. And `unknown` — an identifier named **inside** that leaf which is not
-one of the four approved ones, because the exemption bought four medals, not a whole catalogue.
-
-**How it detects.** Visits every `Literal`; ignores non-strings and any string not starting with the
-artwork-collection prefix `fluent-emoji-flat:`. File gates: must contain `/src/`, must not match
-`/\.test\.tsx?$/`. Filename ending with `/leaves/RankMark/index.tsx` selects the closed-set branch;
-every other file takes the "named outside the leaf" branch.
-
-**What it cannot see.** An interpolated identifier: building the string from a place number makes both
-branches disappear at once — the closed set and the ownership check — and it is the way somebody would
-naturally write a place-to-artwork map. A different artwork collection: only one prefix is recognised,
-so a medal or trophy taken from any other collection in the same catalogue passes, inside the leaf and
-out. Test files, by name: the exemption is deliberate and argued, but it is unbounded — any file
-ending `.test.tsx` may name any identifier anywhere in the tree. And a second rank leaf, by the same
-path-suffix reasoning as the icon leaf.
-
-**Boundary.** The same string carries two different messages depending on where it stands. Which
-branch runs is decided by the filename, before the value is read at all.
-
 ## Detection
 
 | Part | Mechanism |
@@ -211,9 +181,7 @@ reaches outside the linted file.
 | `className={"size-[18px]"}` or `` className={`size-[18px]`} `` | The static-text extractor unwraps an expression container and reads a template literal that carries no expressions |
 | `const ICON = "size-[18px]"`, used far away | Every `VariableDeclarator` with a static string init is scanned, so the plainest form of constant laundering is covered for this one rule |
 | A glyph catalogue nobody listed | An external specifier carrying `icon`, `glyph`, `lucide`, `feather`, `tabler` or `fortawesome` in its name is treated as a glyph package even though it appears in no list |
-| The rank leaf importing a *different* vendor | The exemption is a pair — that file **and** that one package. Any other package from that file still reports |
-| A fifth medal added inside the rank leaf | Inside the leaf, an identifier carrying the artwork prefix must be one of the four; anything else reports |
-| The rank identifiers copied into another file | Outside the leaf, any identifier with that prefix reports on sight, so the map cannot be answered twice |
+| The rank leaf importing Iconify | Rank has no import exemption; only the icon leaf may name an approved glyph package |
 | Adding a vendor from inside the icon leaf | The vendor rule deliberately keeps no leaf exemption, so the leaf is bound by it like every other file |
 
 **Open** — shipped blindness. A verdict must not claim these were judged.
@@ -236,10 +204,6 @@ reaches outside the linted file.
 | `no-decorative-icon-in-metric-cell` | The filename. The rule exists only for one path; renaming the file, or moving the row's markup into a sibling file in the same folder, deletes the rule with no diff to it |
 | `no-decorative-icon-in-metric-cell` | Any tag that is not literally `Icon`: an alias at the import, a member expression, a tile or badge component that renders a glyph internally, or a glyph handed in as a prop |
 | `no-decorative-icon-in-metric-cell` | Every other compact fact cell in the product. The law is general; the rule is one file, and the tenth metric cell written next week is outside it by default |
-| `rank-artwork-is-a-closed-set` | An interpolated identifier. Building the string from a place number makes both branches disappear at once — the closed set and the ownership check — and it is the way somebody would naturally write a place-to-artwork map |
-| `rank-artwork-is-a-closed-set` | A different artwork collection. Only one prefix is recognised, so a medal or trophy taken from any other collection in the same catalogue passes, inside the leaf and out |
-| `rank-artwork-is-a-closed-set` | Test files, by name. The exemption is deliberate and argued, but it is unbounded: any file ending `.test.tsx` may name any identifier anywhere in the tree |
-| `rank-artwork-is-a-closed-set` | A second rank leaf, by the same path-suffix reasoning as the icon leaf |
 | none | Everything `ICON-2`, `ICON-3`, `ICON-4`, `ICON-11` and `ICON-13` state — which role takes which size, the tile's leading-role glyph at size five, and the closed reaction identity set. Documented, typed, exported, unenforced |
 
 ## Rules
@@ -248,25 +212,16 @@ reaches outside the linted file.
 2. Detection is purely syntactic. No module is resolved, no type is consulted, no code runs.
 3. A file is in scope only when its path carries `/src/`, except the metric-cell rule, which is gated
    on its own path and nothing else.
-4. Every exemption is a pair — a file **and** a value. No file is exempt from a rule wholesale.
-5. A path gate is a suffix test, so it names a shape of path rather than a unique file.
-6. The module's own severity opinion is `error` for all five; the consuming configuration remains the
+4. A path gate is a suffix test, so it names a shape of path rather than a unique file.
+5. The module's own severity opinion is `error` for all four; the consuming configuration remains the
    authority on what is actually switched on.
 
 ## Exceptions
 
-Each exemption is closed, and each is written as a pair.
-
 - **The icon leaf** is exempt from the caller rule only. It may name a glyph package; it may not name
-  a package outside the two approved families, because the vendor rule keeps no leaf exemption — that
+  a package outside the four approved subpaths, because the vendor rule keeps no leaf exemption — that
   is deliberate, since the most dangerous escape comes from whoever believes they hold the authority.
-- **The rank leaf** is exempt from both import rules, for exactly one package. A different package
-  from that file, or that package from a different file, still reports.
-- **The four award identifiers** are the complete vocabulary of the rank leaf. A fifth reports as
-  `unknown`; any of the four reports outside the leaf as `outside`.
-- **Test files** are exempt from the artwork rule, so a twin test can prove the set is closed by
-  naming both a member and a non-member.
-- **Everything outside `/src/`** is not examined by four of the five rules. This is a scope decision,
+- **Everything outside `/src/`** is not examined by three of the four rules. This is a scope decision,
   not a grant, and it is the widest open hatch on the shelf.
 
 ## Output

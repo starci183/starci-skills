@@ -23,6 +23,12 @@ trông ra sao sau khi shape đã hạ xuống code.
 Icon là **một ý nghĩa sản phẩm đã đóng**, được vẽ ra qua **một** bộ từ vựng glyph duy nhất. Người gọi
 nói glyph đó NGHĨA LÀ GÌ và nó đang làm VIỆC GÌ; chỉ riêng icon leaf mới chọn hình vẽ cụ thể.
 
+Bề mặt UI frontend đóng đúng ba thư viện: `@heroui/react` cho UI primitive, `@heroicons/react` cho
+Heroicons gốc, và `@starci/heroicons` chỉ cho custom cut StarCi còn thiếu ở upstream. Package StarCi
+không re-export icon upstream. Source sản phẩm phải chọn Heroicon gốc có sẵn trước; chỉ hình thật sự
+thiếu mới được chép hoặc tự vẽ vào đúng entry point StarCi `24/outline` hay `16/solid`. Iconify,
+Phosphor và mọi thư viện UI/glyph khác nằm ngoài tập đóng này.
+
 Câu hỏi phân loại vai trò là: **nó đang mở đầu một vùng nội dung, đang dẫn một control hay một row
 bình thường, hay đang nằm trong một chip gọn?** Glyph heading không phải glyph leading phóng to, và
 glyph chip cũng không phải một trong hai bản kia thu nhỏ. Bộ từ vựng đã vẽ những bản riêng cho từng
@@ -46,7 +52,7 @@ component, một kích thước hay một tên package.
 | `ICON-4` | Glyph nằm trong một chip đã có vỏ riêng | Glyph chip là bản 16 solid micro nguyên bản ở `size-4`. Không thu nhỏ glyph 24 outline; không dùng family mini 20px làm chip |
 | `ICON-5` | Glyph nằm trong vùng đang mang state (disabled, muted, selected) | Glyph vẽ bằng `currentColor`. Không glyph sản phẩm nào mang màu riêng |
 | `ICON-6` | Một màn cần một hình chưa có | Chỉ icon leaf được gọi tên thư viện glyph; người gọi gọi tên ý nghĩa. Không import component glyph tại call site, và không có đường thứ hai vào thư viện từ một file cạnh bên |
-| `ICON-7` | Có người muốn thêm một bộ icon nữa | Chỉ hai family: 24 outline và 16 solid. Không package glyph nào khác, kể cả bên trong icon leaf; không lấy hình gần giống trong package tổng hợp làm brand mark |
+| `ICON-7` | Có người muốn thêm một bộ icon nữa | Đúng hai package glyph: `@heroicons/react` upstream và `@starci/heroicons` chỉ chứa custom cut, cùng giới hạn ở 24 outline và 16 solid. Không package glyph nào khác |
 | `ICON-8` | Row hẹp lại, chữ dài ra | Mọi vai trò mang `shrink-0`. Không glyph nào được méo khi row chật |
 | `ICON-9` | Thêm một ý nghĩa mới vào sản phẩm | Bảng nguồn sở hữu việc chọn ý nghĩa → hình, và tên, map, bảng đổi cùng lúc. Không hai ý nghĩa không liên quan dùng chung một hình; không có dòng cũ hay dòng thiếu |
 | `ICON-10` | Ô số liệu, mục tiêu, nhãn loại, caption streak hay cell dữ kiện | Một dữ kiện nghiệp vụ gọn mà reference chỉ có chữ thì giữ nguyên chữ. Không thêm glyph trang trí vào đó |
@@ -197,22 +203,23 @@ có ý nghĩa nào khớp, đáp án là thêm một ý nghĩa, chứ không ph�
 **Tình huống nghiệp vụ hay gặp.** Màn mới cần một mũi tên · file brand cần thêm một mark · một block
 "tạm dùng" một icon khác · code copy từ ví dụ trên mạng.
 
-## `ICON-7` — một vendor, hai family
+## `ICON-7` — upstream cộng extension chỉ-custom, hai family
 
 **Khi nào gặp.** Có người muốn thêm một bộ icon nữa: đẹp hơn, đủ hình hơn, hoặc "chỉ dùng đúng một cái
 thôi".
 
-**Source phải thể hiện gì.** `starci-fe/heroicons-is-the-glyph-vendor` — một allow set gồm hai
-package, áp dụng cả bên trong icon leaf, tức là đúng nửa phần mà `ICON-6` không nhìn thấy, với ngoại lệ
-rank được luồn qua cả hai rule vendor.
+**Source phải thể hiện gì.** `starci-fe/heroicons-is-the-glyph-vendor` — allow set đóng chỉ gồm
+`@heroicons/react/24/outline`, `@heroicons/react/16/solid`, `@starci/heroicons/24/outline` và
+`@starci/heroicons/16/solid`. Hai entry point StarCi chỉ chứa custom cut, không re-export upstream.
+Rule áp dụng cả bên trong icon leaf, tức là đúng nửa phần mà `ICON-6` không nhìn thấy.
 
 **Cách nhận ra.** Trong `package.json` xuất hiện một thư viện glyph thứ hai. Một brand mark được
 chọn từ một package tổng hợp thay vì vẽ đúng. Có người lập luận "cái này bên kia không có" — đúng, và
 đó chính là lúc phải quyết định về Ý NGHĨA, không phải về PACKAGE.
 
 **Ranh giới.** Không phải `ICON-6`: xem trên. `ICON-7` áp dụng CẢ BÊN TRONG icon leaf, chỗ mà `ICON-6`
-cố ý không nhìn. Ngoại lệ artwork giải thưởng là đúng một file, đúng một package, đúng bốn identity;
-cái thứ năm vẫn bị báo — ngoại lệ đó là một bộ từ vựng, không phải một cánh cửa.
+cố ý không nhìn. Artwork giải thưởng không có ngoại lệ Iconify: dùng `TrophyIcon` upstream khi trung
+thực, còn medal thiếu thì thêm vào `@starci/heroicons` trước khi source sản phẩm import.
 
 **Tình huống nghiệp vụ hay gặp.** Thêm icon mạng xã hội · icon huy hiệu/giải thưởng · icon minh hoạ
 marketing · icon file type · logo đối tác.
@@ -355,11 +362,8 @@ hay một prop shape làm cho giá trị sai không viết ra được; `enforce
 | `ICON-12` | `documented` | Peer là một phán đoán về cả một tập, và không rule nào đọc được một tập |
 | `ICON-13` | `documented` | Các identity reaction là một tập đóng trong leaf; không rule nào từ chối một pictograph Unicode hay một đường dẫn tài nguyên tại call site |
 
-CÓ NĂM RULE, BỐN MÃ MỖI MÃ MANG MỘT. Rule thứ năm, `starci-fe/rank-artwork-is-a-closed-set`, canh một
-ngoại lệ có tên của `ICON-7` — một file, một package, bốn identity artwork — và chính comment của nó
-lại trích `ICON-11`, mã mà trong luật này nghĩa là plated tile. Va chạm số hiệu đó là thật, và nó được
-GHI LẠI chứ không được sửa bằng cách đánh số lại, vì một mã đã có người trích dẫn thì không thể lặng lẽ
-đổi nghĩa.
+Rule `rank-artwork-is-a-closed-set` đã nghỉ không được mở lại Iconify. Rank vẫn là một ý nghĩa sản phẩm
+đóng do `RankMark` sở hữu; biên vendor `ICON-6` và `ICON-7` áp dụng như mọi glyph khác.
 
 ## Điểm neo
 
@@ -374,7 +378,7 @@ dẫn dưới `starci-eslint/packages/fe/` là các rule trong trust tree này.
 | `ICON-4` | `components/leaves/Icon/index.tsx` | Khối import 16 solid riêng, alias theo từng ý nghĩa, và entry `chip` đọc là `size-4 shrink-0` |
 | `ICON-5` | `components/leaves/Icon/index.tsx` · `components/leaves/Icon/brands.tsx` | `stroke="currentColor"` trên những glyph vẽ cục bộ; trong file brand, một mark giữ bốn hex fill được vẽ sẵn còn mark đơn sắc dùng `currentColor` — ngoại lệ và luật nằm cạnh nhau |
 | `ICON-6` | `@canon-fe` | `noVendorIconOutsideIconLeaf`; đúng một module path được phép; danh sách package khớp theo prefix |
-| `ICON-7` | `@canon-fe` | `heroiconsIsTheGlyphVendor`; allow set hai package; ngoại lệ rank luồn qua cả hai rule vendor |
+| `ICON-7` | `@canon-fe` | `heroiconsIsTheGlyphVendor`; allow set hai package glyph, subpath chính xác và không có ngoại lệ rank |
 | `ICON-8` | `components/leaves/Icon/index.tsx` | Cả ba chuỗi vai trò đều kết thúc bằng `shrink-0` — kể cả `chip`, cái hay bị cho là quá nhỏ để phải bận tâm |
 | `ICON-9` | `components/leaves/Icon/icon.md` · `components/leaves/Icon/index.tsx` | Bảng tính năng nằm cạnh union ý nghĩa và glyph map, trong một thư mục. Bài test parity mà luật gọi tên: chưa neo được |
 | `ICON-10` | `@canon-fe` · `components/composites/LabelledProgressRow/index.tsx` | `noDecorativeIconInMetricCell` và đường dẫn nó buộc vào; composite đó render một label, một con số và một thanh bar, không glyph |
@@ -419,9 +423,8 @@ vào.
   định vị vùng.
 - **Artwork reaction** (`ICON-13`). Một tập đóng gồm artwork sản phẩm, do một leaf sở hữu, truyền bằng
   identity. Đó là một biên artwork hẹp và nó không mở ra một bộ từ vựng glyph thứ hai.
-- **Artwork giải thưởng** (`ICON-7`, theo ngoại lệ rank trong source lint). Đúng một file được gọi tên
-  thêm một package, cho bốn identity artwork và không có cái thứ năm. Nó bị chặn ở cả ba phía cùng lúc,
-  và nó được ghi lại như một quyết định đưa ra khi đã biết rằng đường check-in mới là cơ chế mạnh hơn.
+- **Artwork giải thưởng** (`ICON-7`). Dùng `TrophyIcon` upstream khi trung thực; hình medal còn thiếu là
+  closed custom cut trong `@starci/heroicons`. Source sản phẩm không nhận thêm package.
 
 ## Đầu ra
 

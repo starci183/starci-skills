@@ -46,6 +46,7 @@ ra gì cả, vì quyết định để nội dung nở ra là một quyết đ�
 | `OVERFLOW-5` | Nội dung rộng hơn cột và cuộn ngang trong khung riêng của nó | `overflow-x-auto` |
 | `OVERFLOW-6` | Các phần tử cùng cấp trên một hàng tranh bề rộng; phải khai ai nhường | `min-w-0 flex-1` · `flex-none` |
 | `OVERFLOW-7` | Nội dung sở hữu chiều cao; trần là của tổ tiên, không phải của đây | *không khai báo* |
+| `OVERFLOW-8` | Các pane song song dùng chung một viewport có biên và cuộn độc lập | Parent sở hữu chiều cao chính xác và clip; mỗi pane di chuyển kéo `h-full min-h-0` và đúng một `overflow-y-auto`; không có seam từ sticky offset hay max-height ở child |
 
 HAI MÃ KHÔNG PHÁT RA CLASS KHÔNG PHẢI MỘT MÃ. `OVERFLOW-0` nói tràn **không thể xảy ra** — giá trị
 đến từ một tập đóng, hoặc là một con số có bề rộng biết trước. `OVERFLOW-7` nói tràn **được phép xảy
@@ -350,6 +351,27 @@ phải nói được thành lời khi đánh giá hỏi.
 lưới thẻ trên trang danh mục · trang chi tiết đơn hàng · danh sách kết quả tìm kiếm phân trang · nội
 dung thẻ tab trên trang · vùng nội dung chính giữa hai thanh dọc.
 
+## `OVERFLOW-8` — các pane song song dùng chung một viewport
+
+**Khi nào gặp.** Một route đặt từ hai pane cạnh nhau và mỗi pane có thể dài quá chiều cao nhìn thấy
+theo cách độc lập: sơ đồ khóa học, tài liệu đọc và mục lục trên trang.
+
+**Source phải thể hiện gì.** Parent chung sở hữu một chiều cao viewport chính xác và
+`overflow-hidden`. Mỗi pane di chuyển được chiếu qua scroll branch của nhà và mang
+`h-full min-h-0 overflow-y-auto`; control ghim nằm ngoài scroll child bên trong. Các pane bắt đầu và
+kết thúc trên cùng cạnh.
+
+**Cách nhận ra.** Scrollbar bắt đầu ở các cao độ khác nhau. Có một dải rỗng nhỏ giữa các pane. Một
+child ghép `sticky top-*`, `max-h-*` và `overflow-y-auto` trong khi sibling dùng luật chiều cao khác.
+Cuộn hết một pane nhưng pane kia bị cắt.
+
+**Ranh giới.** Không phải `OVERFLOW-4`: mã đó phân loại một hộp cuộn. Mã này sở hữu chiều cao chung và
+canh hàng giữa nhiều hộp độc lập. `sticky top-*` hoặc `max-h-*` trên các child đó tạo seam không owner
+và bị từ chối.
+
+**Máy giữ.** Spec `ScrollViewport` và spec trang compose của sản phẩm khẳng định frame chung chiều
+cao, hai scroll projection có tên và sự vắng mặt của seam sticky/max-height do child tự giữ.
+
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
@@ -408,7 +430,7 @@ Mỗi hộp một khối, từ ngoài vào trong:
 box: <phần tử nhận nội dung>
 axis: <inline | block>
 bound: <closed | unbounded>
-situation: <OVERFLOW-0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>
+situation: <OVERFLOW-0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>
 className: <không class | truncate | line-clamp-n | break-words | max-h-* overflow-y-auto | overflow-x-auto | min-w-0 flex-1 | flex-none>
 recovery: <cách người đọc lấy lại giá trị đầy đủ, hoặc "không cần">
 reason: <sự thật nghiệp vụ loại trừ mã liền kề>
