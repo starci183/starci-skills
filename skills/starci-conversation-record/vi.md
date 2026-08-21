@@ -23,8 +23,8 @@ Không có.
 
 ## Run
 
-Skill ghi provenance, không sở hữu authority. FE layout/block và BE capability/operation head vẫn thuộc
-registry của chúng. Conversation snapshot cite exact hash nhưng không advance head đó.
+Skill ghi provenance, không sở hữu authority. Frontend design cache là tạm thời; FE provenance bền bind
+implemented source commit và path. BE capability/operation authority vẫn có owner riêng.
 
 ### 1 — Resolve scope
 

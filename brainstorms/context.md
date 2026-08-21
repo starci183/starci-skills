@@ -12,10 +12,4 @@ None.
 | Page, layout or overlay regions and structural axes | `layouts/context.md` |
 | One region's parts, states, repetition and data ownership | `blocks/context.md` |
 
-When generating candidates, load only the matching precedent record:
-
-| Selected route | Precedent runtime target |
-|---|---|
-| Direction | `directions/precedents/context.md` |
-| Layout | `layouts/precedents/context.md` |
-| Block | `blocks/precedents/context.md` |
+Use current routed source as precedent evidence. No separate accepted-design corpus is loaded.

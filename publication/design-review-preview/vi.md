@@ -1,134 +1,76 @@
----
-title: Review thiết kế bằng HTML được viết thật
----
-
-# Review thiết kế bằng HTML được viết thật
+# Authored HTML design review
 
 ## LOADS
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@manifest-schema` | `publication/design-review-preview/schema.json` | file | validate cache review graph |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | publish draft review và accepted bundle bất biến |
+| `@manifest-schema` | `publication/design-review-preview/schema.json` | file | kiểm tra review graph chỉ sống trong phiên |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | render authored candidate dưới project cache |
 
-## Bản ghi
+## Record
 
-Module này chỉ hiển thị lựa chọn layout/block, không tự thiết kế. Draft review là cache có thể build lại;
-accepted composition là HTML bền vững bind vào một revision bất biến.
+Module này hiển thị lựa chọn layout và block nhưng không trở thành product authority. Mọi candidate, selected composition, screenshot và manifest đều là session evidence tạm thời. Skill nhận owner approval phải triển khai kết quả đã chọn vào frontend source trước khi cùng invocation kết thúc.
 
-## Thẩm quyền
+## Authority
 
-JSON và HTML cùng có thẩm quyền nhưng sở hữu hai việc khác nhau:
+Business authority, routed grammar, contract và current source ràng buộc design. Cache review pack chứng minh owner đã xem gì trong invocation nhưng không trở thành durable head hay input cho task khác.
 
-- `design.json` sở hữu identity, parent binding, business/contract ownership, grammar fact/decision/receipt đã route, accepted artifact,
-  `principleObligations` sau sáng tạo, business-content matrix theo state, UI-condition inventory, transition graph và state viewport manifest.
-- `preview.html` sở hữu composition, hierarchy, surfaces, responsive behavior và executable authored rendering
-  của mọi state đã khai báo.
+Trong một session:
 
-Một accepted revision có đúng hai file:
+- `design.json` sở hữu task binding, business/contract ownership, grammar facts và receipt, candidate metadata, principle obligations, UI-condition inventory, transition graph và viewport obligations.
+- authored HTML sở hữu composition, hierarchy, responsive behavior và executable rendering cho từng state.
+
+Mọi material nằm dưới:
 
 ```text
-registries/revisions/<revisionHash>/design.json
-registries/revisions/<revisionHash>/preview.html
+.worktrees/<project>/cache/design/<session-id>/
 ```
 
-`design.json` mang `schemaVersion`, `kind`, `layoutId`, `blockId`/`layoutHash` khi có, accepted artifact, state
-viewport manifest và `previewSha256`. `revisionHash` bind canonical design metadata cộng preview digest. Registry
-ghi revisions và trỏ stable heads tới chúng. Legacy object chỉ đọc để tương thích, không phải authority cho
-approval/execute mới.
+Không có accepted bundle, revision map, layout head, block head hoặc design branch. Candidate digest chỉ là cache key.
 
-Candidate chưa accepted và review manifest chỉ ở `.worktrees/<project>/cache`. Candidate thua không được copy vào
-registry.
-
-## Luồng review
+## Review flow
 
 ### Layout
 
-Hiển thị các page set HTML/CSS độc lập, hoàn chỉnh, cùng product-backed content và viewport. Review từ ảnh chụp
-compose mọi nested layout, page và overlay đang nhìn thấy; review flow gồm mọi page/step được nêu rõ. Node
-`existing` bind source/hash và giống hệt giữa các phương án. Hiển thị 3–4 phương án khác biệt đáng kể, ranking
-của model và recommendation model tự chọn. Owner có thể override nhưng không phải vận hành candidate gate. Sau
-lựa chọn đó, các state tất định của layout đã chọn được
-render mà không hỏi approval lần hai; chỉ product decision mới phát hiện mới mở round mới.
+Hiển thị ba hoặc bốn candidate page/page-flow authored đầy đủ, dùng cùng product-backed content và viewport set. Existing source-bound node giữ nguyên giữa các lựa chọn. Rank và recommend một candidate. Sau approval, cùng skill invocation implement composition được chọn và prove trong product.
 
 ### Block
 
-Hiển thị ba hoặc bốn block khác biệt đáng kể trong exact accepted parent `preview.html`, đúng region geometry và
-cùng representative data, kèm ranking và recommendation model tự chọn. Parent luôn nhìn thấy để đánh giá
-composition trong ngữ cảnh. Owner có thể override nhưng không phải chọn; state tất
-định của block đã chọn được render tiếp mà không approval lần hai.
+Hiển thị ba hoặc bốn block candidate khác biệt đáng kể bên trong exact current parent page và region geometry. Parent đến từ current routed source hoặc parent preview tạo trước đó trong cùng invocation. Sau approval, cùng skill invocation cập nhật frontend source sở hữu block và prove toàn trang.
 
-## Luật canvas
+## Canvas law
 
-Product canvas chỉ hiển thị authored product HTML. Nó không suy composition từ JSON và không chèn generic
-template, rough child, anatomy/part card nét đứt, placeholder skeleton, schema/debug label, evidence hay hash.
-Review navigation, candidate names, evidence và help nằm ngoài canvas.
+Product canvas chỉ chứa authored product HTML. Nó không chèn generic template, rough card, schema label, hash hoặc evidence chrome. Review control nằm ngoài canvas.
 
-Thiếu candidate HTML, exact-parent embedding, accepted state HTML hay declared viewport là lỗi chặn. Warning của
-viewer hoặc fallback tự sinh không thể làm review đủ điều kiện approval.
+Mỗi candidate là HTML document tự chứa với deterministic in-memory behavior. Nó phủ mọi evidenced viewport, overlay, disclosure, async, data, permission và interaction condition. Condition family không liên quan được khai `not-applicable`. Product control, không phải QA-only switcher, đi tới declared transition. Cấm network access và backend mutation.
 
-### Luật canvas functional
+Representative content phải trung thực với business và có production-like density. Lorem, generic card, toy count, filler lặp và partial owned surface là blocking defect.
 
-Mọi candidate và accepted preview là một tài liệu HTML self-contained với behavior in-memory tất định. Nó expose
-product control cho mọi transition đã khai báo và đại diện mọi UI condition có evidence: desktop/mobile, modal,
-drawer, menu/popover, expanded/collapsed, loading, empty, partial, error, success, locked và disabled. Condition
-family không liên quan phải khai `not-applicable` cùng evidence. Resize viewport thật phải điều khiển responsive;
-một narrow state được vẽ riêng chưa đủ. QA state switcher nằm ngoài canvas và không tính là interaction proof.
-Preview cấm `fetch`, XHR, WebSocket và backend mutation.
+## Quality proof
 
-Mọi state còn phải bám business: render production-like representative density, đúng entity kind, value, count,
-status, metadata, action và consequence từ business surface đã bind. Canvas phải tự giải thích được sản phẩm mà
-không dựa vào evidence text bên ngoài. Lorem, placeholder, generic card, toy row count, filler lặp và owned
-surface bị render thiếu đều là lỗi chặn.
+Review mọi candidate và selected product result ở desktop và narrow viewport. Prove hierarchy, readable measure, boundary ownership, một scroll owner mỗi axis, breakpoint exclusivity, state coverage đầy đủ, keyboard-operable transition, clean console và không có preview network request. Sau source implementation, lặp critical interaction và viewport proof trên product thật.
 
-## Bằng chứng chất lượng
+Creativity đi trước principles review. Chỉ selected candidate được audit thành class-free `principleObligations`; source implementation resolve obligation qua current principles và patterns.
 
-QA mọi candidate và accepted state ở desktop cùng ít nhất một narrow viewport:
+## Rules
 
-1. Desktop/mobile navigation hoặc chrome loại trừ nhau tại breakpoint.
-2. Heading, primary action, data và supporting content có hierarchy chủ ý.
-3. Reading/repeated content có measure chủ ý.
-4. Mỗi divider/boundary thuộc region hoặc grouping mà nó phân tách; không có boundary thì không bắt buộc divider.
-5. Mỗi trục scroll có đúng một owner; nested scrolling cần independent viewport có evidence.
-6. Mọi reachable state trong manifest có authored HTML đúng viewport.
-7. Mọi value trong condition inventory map tới rendered state và mọi transition reachable từ in-page control
-   visible, keyboard-operable.
-8. Browser proof chạy critical transition graph ở desktop và narrow, gồm mọi modal, drawer, popover/menu cùng
-   nhánh async/error reachable, console sạch và không có network request.
-9. Mỗi state khớp business-content matrix đủ để entity, status, action và consequence hiểu được bằng thị giác ở
-   production-like density.
+1. Mọi review artifact là ignored project cache.
+2. Candidate digest chỉ định danh cache entry, không trở thành durable design identity.
+3. Layout/block approval và source implementation xảy ra trong cùng skill invocation.
+4. Task khác phải dựng lại design evidence từ current authority; không được resume từ cache.
+5. Block luôn được review trong exact current parent page và region.
+6. Preview navigation không ghi state và không tính là approval.
+7. Source code, test và browser proof là accepted outcome bền vững.
+8. Creativity đi trước principles review; implementation theo source patterns và gates.
 
-`ScrollBranch`, `SurfaceListCard` và divider là ví dụ theo tình huống, không phải yêu cầu chung của preview hay
-product.
+## Stops
 
-Model tạo và rank 3–4 candidate trước principles review. Chỉ candidate được chọn mới được audit qua principles;
-mọi resolution được lưu class-free với target, principle module, canonical situation và reason. Accepted
-revision thiếu obligations này là invalid.
+- Từ chối output ngoài exact project cache.
+- Từ chối khi thiếu authored candidate/state HTML, condition coverage, executable interaction hoặc viewport coverage.
+- Từ chối block không có current parent page hoặc same-session parent preview.
+- Task không thể tiếp tục tới source implementation có thể hiển thị design-only evidence, nhưng phải báo kết quả hết hiệu lực và không phải accepted authority.
+- Post-choice state cần product truth mới phải quay lại owner approval.
 
-## Quy tắc
+## Output and proof
 
-1. Draft chỉ ở project cache; accepted bundle chỉ dưới `registries/revisions`.
-2. Layout và block mỗi phase có một recommendation do model tự chọn; chỉ cần owner approval khi product truth
-   hoặc write authority còn chưa resolve.
-3. Block review bind exact `layoutId`, parent `layoutHash` và declared `blockId`.
-4. Block luôn được review trong exact parent layout và region bounds.
-5. Accepted selected states là deterministic completion, không phải approval checkpoint thứ hai.
-6. Preview navigation không mutate registry và không tính là approval.
-7. Mọi accepted `preview.html` digest và `revisionHash` phải validate lại trước execute.
-8. Layout schema 4 bind `scope`, `pages` đã compose, ownership nodes có thứ tự và regions thuộc page.
-9. Sáng tạo đi trước principles review; execute resolve accepted obligations trước source patterns.
-
-## Điểm dừng
-
-- Từ chối draft output ngoài project cache hoặc accepted output ngoài exact revision bundle.
-- Từ chối thiếu authored candidate/state HTML, condition coverage, executable interaction hoặc viewport coverage.
-- Từ chối render-only page hay page có state chỉ reachable qua review chrome.
-- Từ chối block bind parent hash khác hoặc không nằm trong parent regions.
-- Proposed/legacy-only object không được hiển thị như current accepted authority.
-- State sau lựa chọn cần route, owner, action hay outcome mới phải quay lại product approval.
-
-## Đầu ra và proof
-
-Publish một cache review application cho draft và một bundle hai file cho accepted revision. Chạy manifest
-validation, preview digest/revision validation, Vite typecheck/build và browser QA cho mọi viewport/state với
-console sạch.
+Publish một cache review application, nêu recommended candidate và exact source boundary, xin approval một lần, implement trong cùng invocation, rồi báo changed source paths và real-product proof. Không báo revision hash hoặc registry head.

@@ -18,7 +18,7 @@ Visual taste is a product decision. The machine can refuse an invented token, a 
 a recommendation that cannot be traced to evidence; it cannot declare one valid option beautiful. This
 stage selects one exact object as a provisional recommendation so structural design can continue without
 a separate owner checkpoint. The owner approves or challenges that direction only when it is embedded in
-the later layout candidate under the single layout hash.
+the later cache candidate whose result is implemented in the same invocation.
 
 External style libraries are recommendation sources only. A recommendation becomes a candidate only
 after it is expressed through this project's vocabulary or names every new token it would require.
@@ -31,13 +31,12 @@ not a candidate axis. Every direction carries the same `lockedTokens`; only comp
 |---|---|---|
 | 1 | Request, audience, task and desired feeling | decoration replaces product intent |
 | 2 | Generated inventory of CSS custom properties | a candidate names values the product cannot express |
-| 3 | Approved screens and brand evidence for this project | the product's own visual history is ignored |
+| 3 | Current source screens and brand evidence for this project | the product's shipped visual language is ignored |
 | 4 | Vendor design-system guidance already used by the frontend | component semantics and visual intent disagree |
 | 5 | The closed direction axes | four names conceal one visual choice |
-| 6 | Accepted direction precedents and their rejections | rejected taste returns under a new label |
 
 Public catalogues, named styles, palettes and font pairings may widen the search. They never outrank
-the six inputs and are never copied into the tree as canon.
+the five inputs and are never copied into the tree as canon.
 
 ## Reading the evidence
 
@@ -79,7 +78,7 @@ A role has exactly one verdict:
 | `none` | an optional radius, elevation or motion role is deliberately absent | why absence is part of the direction |
 
 A reused token name is anchored to the source state in `vocabularyAt`. A new token carries its exact
-CSS value because the preview and the later layout hash must bind to the same decision. Utility classes, font downloads
+CSS value because the preview and same-session source implementation must bind to the same decision. Utility classes, font downloads
 and copied vendor variables remain outside this artifact; a dependency installation needs its own
 approval.
 
@@ -90,9 +89,9 @@ approval.
 3. Every direction maps all thirteen roles; `none` is legal only for radius, elevation, duration and easing.
 4. Every direction names three to five personality words and one to five explicit rejections.
 5. No two directions in a batch share their whole axis set or their whole role-to-token mapping.
-6. At least one direction departs from the nearest precedent when a precedent exists.
+6. At least one direction materially departs from the nearest current-source precedent when source contains one.
 7. Return fewer than three only when the evidence permits fewer, and state why; never pad a batch.
-8. Feedback opens a new round. An accepted direction is never edited in place.
+8. Feedback replaces the cache round; no direction becomes durable authority outside the invocation.
 9. Every schema-2 batch recommends exactly one candidate and states the evidence-backed reason.
 10. A grammar visual contract is copied byte-for-byte into `lockedTokens`; changing its axes, role token or value refuses the direction.
 
@@ -103,7 +102,7 @@ text, action, form control, repeated row, bounded surface, overlay, and settled 
 may resolve tokens from the inventory, but it must not introduce a value absent from the JSON decision.
 
 Equal content is the control. Changing layout or copy between candidates makes the owner compare two
-products rather than two directions. The HTML is disposable evidence; approval binds to JSON.
+products rather than two directions. HTML and JSON are disposable session evidence; approval binds the selected candidate to the disclosed source boundary.
 
 ## Refusal
 
@@ -124,6 +123,6 @@ node @artifact-validator \
 ```
 
 The direction round has no approval hash and no separate owner checkpoint. The recommended direction
-object is copied unchanged into every layout candidate in the same layout round, where one `OK` on the
-layout hash approves visual intent and skeleton together.
+object is copied unchanged into every layout candidate in the same cache round, where one `OK` approves
+visual intent, composition and the disclosed source boundary together.
 The vocabulary snapshot conforms to `@visual-vocabulary-schema`.

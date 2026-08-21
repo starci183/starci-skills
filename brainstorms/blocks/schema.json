@@ -21,12 +21,12 @@
     "envelope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["round", "project", "region", "layoutHash"],
+      "required": ["round", "project", "region", "parentAt"],
       "properties": {
         "round": {"type": "integer", "minimum": 1},
         "project": {"$ref": "#/$defs/slug"},
         "region": {"$ref": "#/$defs/slug"},
-        "layoutHash": {"$ref": "#/$defs/hash", "description": "The ACCEPTED layout hash this region came from. A proposed hash is not a starting point."},
+        "parentAt": {"$ref": "#/$defs/hash", "description": "Session-local digest of the current source parent page used for this review."},
         "contractAt": {"type": "string", "minLength": 1}
       }
     },

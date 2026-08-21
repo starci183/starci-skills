@@ -14,7 +14,7 @@ title: Blocks
 
 ## Record
 
-You are given one region of an accepted layout and its accepted visual direction, and you return 3–4 materially
+You are given one region of the current source page and its routed visual vocabulary, and you return 3–4 materially
 distinct block anatomies inside the complete parent page, rank them and select the strongest — or one refusal
 naming missing product truth. The model owns visual and compositional judgment; JSON records and proves it.
 
@@ -44,13 +44,13 @@ Eight, and no more.
 
 **Input 6 exists because the contract cannot answer it.** `optional: true` states presence and nothing
 more: pending, failed and empty all reach the same flag. Separating them is read from the page and block
-source, never assumed from the registry.
+source, never assumed from cached review state.
 
 Not read at this stage: class arrays, unaccepted theme choices, locale copy, lints.
 
-## Reading an accepted region
+## Reading a current region
 
-1. **Require an accepted layout hash and resolve its direction.** A proposed layout is not a starting point, and its bound direction is not restated as a second hash here.
+1. **Require the current source parent and bind its digest as `parentAt`.** Cached review output from another task is not a starting point.
 2. **Enumerate the conditions and states first.** Viewport, overlay, disclosure, async, data, permission and
    interaction conditions come before anatomy. Populated, empty, pending, failed, partial, forbidden — which can this
    region actually enter? Read it from source; do not infer it from `optional`.
@@ -144,9 +144,8 @@ blocked: <which parts cannot be resolved without it>
 ## Output
 
 The output **is** JSON, and its authority is `@schema` beside this record. `envelope`
-holds what varies between runs — including the accepted `layoutHash` this region came from. That layout
-already binds its direction, so the block never carries a second dependency hash — and the anatomy hash
-covers an anatomy only.
+holds what varies between runs — including the session-local `parentAt` digest of the current source page.
+The anatomy hash is a cache key only and covers one anatomy.
 
 ```json
 {
@@ -155,7 +154,7 @@ covers an anatomy only.
     "round": 1,
     "project": "example-app",
     "region": "criteria",
-    "layoutHash": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
+    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
   },
   "anatomies": [
     {

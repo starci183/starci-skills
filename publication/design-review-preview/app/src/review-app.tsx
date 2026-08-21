@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useState } from "react"
-import { BlockRenderer } from "./block-renderer"
-import { LayoutRenderer } from "./layout-renderer"
-import type { LayoutReview, ReviewManifest, ReviewRoute } from "./types"
+import {useEffect, useMemo, useState} from "react"
+import {LayoutRenderer} from "./layout-renderer"
+import type {LayoutReview, ReviewManifest, ReviewRoute} from "./types"
 
 type ReviewAppProps = {readonly manifest: ReviewManifest}
 
 const parseRoute = (hash: string, fallback: string): ReviewRoute => {
   const path = (hash || fallback).replace(/^#/, "")
-  const match = path.match(/^\/layouts\/([^/]+)\/([0-9a-f]{64})(?:\/blocks\/([^/]+))?$/)
-  if (!match) throw new Error(`Invalid design review route: ${path}`)
-  return {layoutId: match[1], layoutHash: match[2], ...(match[3] ? {blockId: match[3]} : {})}
+  const match = path.match(/^\/reviews\/([^/]+)\/([0-9a-f]{64})$/)
+  if (!match) throw new Error(`Invalid session review route: ${path}`)
+  return {layoutId: match[1], candidateKey: match[2]}
 }
 
 const navigate = (route: string) => {
@@ -17,8 +16,7 @@ const navigate = (route: string) => {
   else window.location.hash = route
 }
 
-const layoutRoute = (layoutId: string, layoutHash: string) => `#/layouts/${layoutId}/${layoutHash}`
-const blockRoute = (layoutId: string, layoutHash: string, blockId: string) => `${layoutRoute(layoutId, layoutHash)}/blocks/${blockId}`
+const reviewRoute = (layoutId: string, candidateKey: string) => `#/reviews/${layoutId}/${candidateKey}`
 
 const themeStyle = (layout: LayoutReview) => ({
   "--review-ground": layout.theme.ground?.value ?? "#f6f6f7",
@@ -43,53 +41,29 @@ export const ReviewApp = ({manifest}: ReviewAppProps) => {
   }, [manifest.entryRoute])
 
   const layout = useMemo(() => manifest.layouts.find((item) => item.layoutId === route.layoutId) ?? manifest.layouts[0], [manifest.layouts, route.layoutId])
-  const candidate = useMemo(() => layout?.candidates.find((item) => item.hash === route.layoutHash) ?? layout?.candidates.find((item) => item.id === layout.recommendedId) ?? layout?.candidates[0], [layout, route.layoutHash])
-  const region = route.blockId ? candidate?.regions.find((item) => item.name === route.blockId) : undefined
-  const layoutState = candidate?.preview?.states.find((item) => item.id === stateId) ?? candidate?.preview?.states[0]
+  const candidate = useMemo(() => layout?.candidates.find((item) => item.hash === route.candidateKey) ?? layout?.candidates.find((item) => item.id === layout.recommendedId) ?? layout?.candidates[0], [layout, route.candidateKey])
+  const state = candidate?.preview.states.find((item) => item.id === stateId) ?? candidate?.preview.states[0]
 
-  useEffect(() => setStateId(candidate?.preview?.states[0]?.id), [candidate])
+  useEffect(() => setStateId(candidate?.preview.states[0]?.id), [candidate])
 
-  if (!layout || !candidate) return <main className="fatal"><h1>Review route unavailable</h1><p>The manifest does not contain the requested layout version.</p></main>
+  if (!layout || !candidate) return <main className="fatal"><h1>Review unavailable</h1><p>The session cache does not contain this candidate.</p></main>
 
   return (
     <div className="review-app" style={themeStyle(layout)}>
       <header className="review-header">
-        <div><span className="phase-pill">{route.blockId ? "block" : "layout"}</span><strong>{manifest.project}</strong><h1>{route.blockId ? `${layout.layoutId} / ${route.blockId}` : layout.layoutId}</h1></div>
-        <div className="header-actions">
-          <details className="evidence-details"><summary>Evidence</summary><pre>{JSON.stringify(manifest.evidence, null, 2)}</pre></details>
-        </div>
+        <div><span className="phase-pill">{manifest.phase}</span><strong>{manifest.project}</strong><h1>{layout.layoutId}</h1></div>
+        <div className="header-actions"><details className="evidence-details"><summary>Session evidence</summary><pre>{JSON.stringify(manifest.evidence, null, 2)}</pre></details></div>
       </header>
       <aside className="review-sidebar">
-        <span className="sidebar-label">Layouts</span>
-        {manifest.layouts.map((item) => {
-          const selected = item.layoutId === layout.layoutId
-          const target = item.candidates.find((candidate) => candidate.id === item.recommendedId) ?? item.candidates[0]
-          return <button className={selected ? "active" : ""} type="button" key={item.layoutId} onClick={() => target && navigate(layoutRoute(item.layoutId, target.hash))}><strong>{item.layoutId}</strong><small>{item.currentHead ? "accepted head" : "review"}</small></button>
-        })}
-        {manifest.flows?.length ? <span className="sidebar-label">Flows</span> : null}
-        {manifest.flows?.map((flow) => <div className="review-flow" key={flow.id}>
-          <strong>{flow.label}</strong>
-          <ol>{flow.nodes.map((node) => <li key={node.id}><button className={node.layoutId === route.layoutId && node.blockId === route.blockId ? "active" : ""} type="button" onClick={() => navigate(node.route)}><span>{node.order}</span>{node.label}</button></li>)}</ol>
-        </div>)}
-        {!route.blockId ? (
-          <>
-            <span className="sidebar-label">Candidates</span>
-            {layout.candidates.map((item) => <button className={item.hash === candidate.hash ? "active" : ""} type="button" key={item.id} onClick={() => navigate(layoutRoute(layout.layoutId, item.hash))}><strong>{item.id}</strong><small>{item.status}</small></button>)}
-            <span className="sidebar-label">Authored states</span>
-            <div className="state-switcher">{candidate.preview?.states.map((item) => <button className={item.id === layoutState?.id ? "active" : ""} type="button" key={item.id} onClick={() => setStateId(item.id)}><strong>{item.id}</strong><small>{item.viewport.width} × {item.viewport.height}</small></button>)}</div>
-            <details className="candidate-detail"><summary>Candidate details</summary><pre>{JSON.stringify({id: candidate.id, hash: candidate.hash, axes: candidate.axes, reason: candidate.reason}, null, 2)}</pre></details>
-          </>
-        ) : null}
+        <span className="sidebar-label">Candidates</span>
+        {layout.candidates.map((item) => <button className={item.hash === candidate.hash ? "active" : ""} type="button" key={item.id} onClick={() => navigate(reviewRoute(layout.layoutId, item.hash))}><strong>{item.id}</strong><small>{item.id === layout.recommendedId ? "recommended" : "alternative"}</small></button>)}
+        <span className="sidebar-label">Authored states</span>
+        <div className="state-switcher">{candidate.preview.states.map((item) => <button className={item.id === state?.id ? "active" : ""} type="button" key={item.id} onClick={() => setStateId(item.id)}><strong>{item.id}</strong><small>{item.viewport.width} × {item.viewport.height}</small></button>)}</div>
+        <details className="candidate-detail"><summary>Candidate details</summary><pre>{JSON.stringify({id: candidate.id, cacheKey: candidate.hash, axes: candidate.axes, reason: candidate.reason, sessionId: manifest.sessionId}, null, 2)}</pre></details>
       </aside>
       <main className="review-stage">
-        <div className="viewport-frame" style={!route.blockId && layoutState ? {width: `min(100%, ${layoutState.viewport.width}px)`} : undefined}>
-          {route.blockId ? (
-            region ? <BlockRenderer key={`${layout.layoutId}:${candidate.hash}:${region.name}`} region={region} back={() => navigate(layoutRoute(layout.layoutId, candidate.hash))} /> : <main className="fatal"><h1>Block not declared</h1><p>{route.blockId} is not a child of this layout version.</p></main>
-          ) : layoutState ? (
-            <LayoutRenderer candidate={candidate} state={layoutState} />
-          ) : (
-            <main className="fatal"><h1>Authored state unavailable</h1></main>
-          )}
+        <div className="viewport-frame" style={state ? {width: `min(100%, ${state.viewport.width}px)`} : undefined}>
+          {state ? <LayoutRenderer candidate={candidate} state={state} /> : <main className="fatal"><h1>Authored state unavailable</h1></main>}
         </div>
       </main>
     </div>

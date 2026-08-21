@@ -23,8 +23,8 @@ None.
 
 ## Run
 
-This skill records provenance, not authority. FE layout/block and BE capability/operation heads remain
-owned by their registries. Conversation snapshots cite exact hashes but cannot advance them.
+This skill records provenance, not authority. Frontend design cache is transient; durable FE provenance binds
+implemented source commits and paths. BE capability/operation authority remains separately owned.
 
 ### 1 — Resolve scope
 

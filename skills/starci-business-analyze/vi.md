@@ -26,7 +26,7 @@ immutable machine model cùng `CONTEXT.md` gọn, module route theo task và evi
 ## Biên
 
 Skill đọc product source/test đã route và chỉ ghi business worktree của project. Nó không sửa product
-source, design registry, workspace route, deployment state hay imported example. Claim chưa được chứng
+source, design preview cache, workspace route, deployment state hay imported example. Claim chưa được chứng
 minh trở thành unknown rõ ràng.
 
 ## Chạy

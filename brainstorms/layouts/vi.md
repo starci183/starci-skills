@@ -27,8 +27,8 @@ region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `al
 (`kind`, title, summary, labels, values và actions đại diện). Wireframe giúp hình dung purpose, density và reading
 order nhưng không phê duyệt exact parts, fields, copy, actions, states hoặc data ownership. Mỗi node là
 `existing`, `proposed` hoặc `new`; `existing` phải trích source thật cùng SHA-256 source hash và không được khác
-giữa các phương án. Schema 1–3 chỉ còn hợp lệ cho lịch sử accepted bất biến. Phương án **không bao giờ** gọi tên
-class; class được quyết sau từ hình đã chấp nhận.
+giữa các phương án. New session artifact dùng schema 4; schema cũ không còn là input được hỗ trợ. Phương án
+**không bao giờ** gọi tên class; class được quyết sau selection trong cùng invocation.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
 một entry mới và vì sao. Region không trích gì cả là một thành phần bịa ra đang khoác cấu trúc JSON.
@@ -51,7 +51,7 @@ Bảy, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuy�
 truy vấn qua `@contract-search`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
 để tiết kiệm. Một tầng **không thấy** class thì không thể ghi class vào đầu ra của nó, nên "JSON không có
 class" đứng vững vì **giá trị đó không bao giờ tới nơi**, chứ không vì một lời nhắc phải tuân theo. Đo
-trên một registry 299 entry: 192KB nằm trên đĩa, 69KB là mức được phép, và một truy vấn trả lời trong
+trên một contract vocabulary 299 entry: 192KB nằm trên đĩa, 69KB là mức được phép, và một truy vấn trả lời trong
 dưới 2KB.
 
 Không đọc ở tầng này: mảng class, lựa chọn theme chưa được chọn, cài đặt của leaf và composite, dữ liệu và query, chữ theo
@@ -131,9 +131,9 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 | `LAYOUT-9` | Region được ghim nghỉ **dưới chrome của trang nó đang đứng trên**, đo từ frame của chính trang đó, và khai **mức trần chiều cao trong cùng một quyết định** với offset. | offset bê từ trang khác sang, hoặc offset không có trần |
 | `LAYOUT-10` | Chiều rộng của một region do **contract ghép cái hàng** mà region đó nằm trong viết ra, nhắm vào **danh tính** của con chứ không vào vị trí của nó, lấy từ union class đóng, và mọi số đo cố định đi kèm việc **từ chối co lại**. | region tự quyết chiều rộng của mình, hoặc chiều rộng nhắm theo số thứ tự anh em |
 | `LAYOUT-11` | Luật này trả về một **phân loại** — chạy hết chiều ngang, hay control gọn — **không bao giờ** trả về một chiều rộng. Cả hai phán quyết của người chủ trên cùng một control đều còn giá trị. | chọn một trong hai phán quyết làm mặc định |
-| `LAYOUT-12` | Mỗi region phải có impressionistic child brief trước layout review: block có tồn tại chưa, phương án có dùng không, mục đích, content đại diện, mật độ và reading order xấp xỉ, cùng verdict reuse/generalize/new. Nó phải nhận diện được thay vì là hộp trắng; exact parts, fields, states, data ownership và copy chỉ thuộc block round sau. | hộp trắng hoặc final block anatomy khi parent layout vẫn còn proposed |
+| `LAYOUT-12` | Mỗi region phải nhận diện được và functionally complete trong từng page candidate: purpose, representative content, production-like density, reading order, reachable states và current contract ownership đều visible. Layout được implement sau chính review này; không có block-head completion phase ở task sau. | hộp trắng, toy summary hoặc page cần task khác mới implement được |
 | `LAYOUT-13` | Chỉ product surface được yêu cầu rõ mới được thành layout identity hoặc flow node. Ví dụ dùng để giải thích năng lực vẫn chỉ là evidence cho tới khi owner đưa nó vào scope rõ ràng. | biến “ví dụ create order” thành product page |
-| `LAYOUT-14` | Các mode dùng chung một route và một page owner là block states. Layout preview chỉ render state mặc định có evidence; block review sau đó mới liệt kê các mode còn lại. | sinh sign-in, sign-up và recovery thành layout hay layout variant riêng |
+| `LAYOUT-14` | Các mode dùng chung một route và một page owner là state của page đó. Layout candidate render mọi mode có evidence trước implementation. | sinh sign-in, sign-up và recovery thành layout riêng hoặc đẩy state sang task khác |
 
 ## Quy tắc
 
@@ -146,7 +146,7 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 6. Quyết định sản phẩm còn thiếu thì trả về cho người chủ. Không bao giờ đoán để lô cho đủ.
 7. JSON của phương án là dạng chuẩn hoá — thứ tự khoá cố định, không timestamp, không id theo lượt — vì
    **hash của nó** là thứ lời chấp thuận gắn vào.
-8. Feedback mở một lượt mới. Phương án đã chấp nhận không bao giờ bị sửa tại chỗ.
+8. Feedback thay cache round. Candidate không sống như durable authority sau invocation.
 
 ## Preview
 
@@ -197,7 +197,7 @@ không phải cái trích đoạn dưới đây. `envelope` giữ những thứ 
 
 Work mới dùng schema 4: `envelope.scope` khai screenshot `page` hoặc `flow` được mô tả; mọi candidate mang cùng
 danh sách `pages` có thứ tự, mỗi page mang nested `nodes` và tên region nó sở hữu, mỗi region bind `pageId` cùng
-`change`. Ví dụ schema 1 bên dưới chỉ ghi lại immutable history còn đọc được.
+`change`. New session artifact dùng schema 4; schema cũ không còn là input được hỗ trợ.
 
 ```json
 {

@@ -57,7 +57,7 @@ API, caller, query/mutation, cache, async-owner, new-state, or multi-component w
 - Suppression, unknown lint rule, or required outside path.
 - Block anatomy or states — larger owner: `starci-fe-design-block`.
 - Persistent geometry or address ownership — larger owner: `starci-fe-design-layout`.
-- Accepted multi-region implementation — larger owner: `starci-fe-design-execute`.
+- Multi-region or page-level redesign — larger owner: `starci-fe-design-layout`.
 - Broad quality repair — larger owner: `starci-repair`.
 - Public API or data ownership — larger owner: a normal planned coding task.
 

@@ -84,7 +84,7 @@ Invocation: `/starci-diagnose <skill>  render the settings page at second-app`.
 |---|---|---|---|
 | 1 lập context lock | — | — | `pass` |
 | 2 resolve + xác minh route `fe` | `.workspace/second-app/fe/config.json` | `.workspace/` chỉ có `example-app`; không có `second-app` | **`would-stop`** — `WORKSPACE-2` |
-| 3 các root worktree | `.worktrees/second-app/{registries,cache}` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
+| 3 các root worktree | `.worktrees/second-app/{businesses,cache}` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
 | 4 mở hoặc tiếp review work | registry | không thể đi tới | `blocked` sau bước 3 |
 | 5 đọc sáu input | contract tại `context.contract` | **checkout đó không có thư mục `components/contracts`** | `defect` trong *environment*, không phải skill |
 | 6 verdict theo từng region | contract key theo `why` | không có contract để search, nên mọi region sẽ resolve thành `new` | `blocked` bởi bước 5 |
@@ -117,16 +117,15 @@ settled-by: owner gọi tên app hay package chứa nó, hoặc xác nhận nó 
 ```
 
 ```text
-finding: project không có decision registry, nên không thể ghi thứ gì gắn với hash
+finding: design task cố resume cache pack đã hết hiệu lực của task khác
 label: blocked
-evidence: không có registry dưới <Source>/.worktrees/<project>/registries/decisions/
-cleared-by: khôi phục registry root đã khai; design record là
-  registries/decisions/<surface>.json
+evidence: không có session pack dưới <Source>/.worktrees/<project>/cache/design/
+cleared-by: dựng lại candidate từ current business authority, grammar, contract và source trong invocation mới
 ```
 
 ### Trace không làm gì
 
-Không tạo route, không mở review work, không ghi registry và không sinh một candidate nào — dù cách sửa bước 2
+Không tạo route, không mở review work, không ghi authority và không sinh một candidate nào — dù cách sửa bước 2
 chỉ cách một skill, chính cám dỗ “tiện thể setup luôn” là thứ biến diagnosis thành một lượt chạy chưa được
 duyệt.
 

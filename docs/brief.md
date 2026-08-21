@@ -21,10 +21,11 @@ StarCi separates work by what each stage may return:
 | Compiler | one deterministic answer from an accepted shape | alternatives |
 | Gate | pass or a refusal with exact evidence | advice |
 
-The result is not merely a suggested design or plan. Accepted decisions remain traceable to the source
-state they were made against, and execution stops when that evidence is stale or incomplete.
+The result is not merely a suggested design or plan. Selected decisions remain traceable inside the current
+session to the source state they were made against; the same invocation implements them, and execution stops
+when that evidence is stale or incomplete.
 
-## The fourteen skills
+## The eighteen skills
 
 ### Environment and trust
 
@@ -43,26 +44,26 @@ state they were made against, and execution stops when that evidence is stale or
 
 | Skill | Use it for | Approval boundary |
 |---|---|---|
-| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Recommend one of 3–4 visual directions, then generate structural layouts without pausing | one `layoutHash` approval binds the recommended direction and skeleton |
-| [`starci-fe-design-block`](./skills/starci-fe-design-block) | Design or revise one region's anatomy, states, repetition, and data ownership | an independent `blockHash`, linked to its accepted `layoutHash` |
-| [`starci-fe-design-execute`](./skills/starci-fe-design-execute) | Implement the accepted design in real frontend source | starts only when every currently reachable hash is accepted |
+| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Design, review, approve, implement and prove one complete page/page flow | one `OK` binds the selected cache candidate to exact source paths in the same invocation |
+| [`starci-fe-design-block`](./skills/starci-fe-design-block) | Design, review, approve, implement and prove one region inside its current source page | one `OK` binds the selected cache candidate to the owning block paths in the same invocation |
 | [`starci-grammar-refresh-references`](./skills/starci-grammar-refresh-references) | Refresh stale optional immutable grammar provenance without changing durable authority | routed grammar reference sidecar only |
 | [`starci-fe-minor-fix`](./skills/starci-fe-minor-fix) | Correct one existing block, composite, or leaf without changing its contract, ownership, or public shape | one clean component folder, at most two production files, two tests, and 40 production changed lines |
 
-Frontend design keeps the page skeleton and block detail separate:
+Frontend design keeps review evidence temporary and makes source the durable result:
 
 ```text
-3–4 directions → evidence-backed recommendation → 3–4 layouts
-                                                    ↓ one OK accepts layoutHash + embedded direction
-                               design each region → accept blockHash
-                                                    ↓
-                               verify current graph → execute source
+business + grammar + contract + current source
+                    ↓
+       3–4 functional cache candidates
+                    ↓ one OK selects candidate + exact source boundary
+          implement source in the same invocation
+                    ↓
+             gates + browser proof
 ```
 
-A direction has no separate approval hash or approval checkpoint. The evidence-backed recommended object
-is embedded unchanged in each layout candidate; one `OK` accepts the layout hash and both decisions it
-binds. A block remains independently hashable so one block can be redesigned without reopening
-the page layout; the block head records which accepted layout makes that block reachable.
+A direction has no separate approval hash or durable identity. Candidate digests are cache keys only. A page
+or block skill implements the selected result immediately; another task regenerates from current business,
+grammar, contract and source rather than reading a design registry.
 
 ### Backend change
 
@@ -75,10 +76,10 @@ the page layout; the block head records which accepted layout makes that block r
 
 - a stale or unresolved workspace route;
 - a visual direction that invents a reused token or hides a fake duplicate behind different labels;
-- a separate `directionHash`;
+- a durable `directionHash` or design head;
 - layout candidates that embed different recommended directions;
-- a block decision without its parent `layoutHash` dependency;
-- execution while a currently reachable layout or block is unaccepted;
+- a block review that is not embedded in its exact current source parent;
+- a design invocation that ends after approval without implementing and proving source;
 - classes outside the closed contract vocabulary;
 - a finding made green by disabling or weakening the gate.
 

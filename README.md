@@ -105,7 +105,7 @@ The skill presents three independent write boundaries for approval:
 
 1. `AGENTS.md` and `CLAUDE.md` — entry into the trust tree.
 2. `.workspace/` — machine-local routes to each target checkout.
-3. `.worktrees/<project>/` — durable registries and rebuildable cache.
+3. `.worktrees/<project>/` — durable business/conversation authority and rebuildable design cache.
 
 Review the exact paths shown by the skill and approve only the boundaries you want initialized.
 
@@ -126,10 +126,12 @@ One Source can manage many projects, and each project can expose several roles. 
       be/config.json
   .worktrees/
     academy/
-      registries/
+      businesses/
+      conversations/
       cache/
     payments/
-      registries/
+      businesses/
+      conversations/
       cache/
 ```
 
@@ -155,9 +157,11 @@ Conversation provenance is project-scoped and provider-neutral:
 
 ```text
 .worktrees/<project>/
-  registries/conversations/
+  conversations/
     conversation-registry-v1.json
     objects/sha256/
+  businesses/
+    business-registry-v1.json
   cache/conversations/
     transcripts/
     search.sqlite

@@ -1,337 +1,112 @@
----
-title: Worktrees
----
-
 # Worktrees
 
 ## LOADS
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@schema` | `contexts/worktrees/schema.json` | file | validate the record's JSON shape |
-
+| `@schema` | `contexts/worktrees/schema.json` | file | validate project-local cache and durable business roots |
 
 ## Record
 
-You are given a run that is about to write something, and you return where each write goes: a durable
-registry that is versioned, local progress that is disposable, or nothing at all because the run needs
-no isolation. This module decides **where in-progress state is written**. It is the twin of the
-workspace question and it fails the opposite way: a wrong workspace makes an agent read the wrong
-repository and answer confidently; a wrong worktree makes an agent write where writes were forbidden,
-so the damage is loud but it lands in someone else's source.
+This module decides where run state belongs. Product truth that must survive is versioned in the project business worktree. Design candidates, authored previews, review manifests and selected compositions are session-local cache. The accepted product outcome becomes durable only when the same skill invocation writes and proves frontend source.
 
 ## Law
 
-State is placed by what it is worth, not by what is convenient. Something that must survive and be
-reviewable is versioned on its own branch; something rebuildable is local and ignored; a target
-repository is neither and receives nothing from a run's bookkeeping.
+State is placed by what must survive. Evidence-backed business truth lives on its own branch. Rebuildable design and review material lives below the project cache and never becomes a second product authority. A design skill that asks the owner to choose a candidate must implement that choice in the same invocation; another task never resumes from cached design state.
 
-The project segment is mandatory. State that is not filed under a project is state that another project
-will read as its own.
-
-`.claude` is a trust tree, never a runtime storage root. A tree that stores the work also stores the
-mess, and a rule tree with run debris in it stops reading as authority.
+The project segment is mandatory. `.claude` is a trust tree, never runtime storage. Target repositories receive product source only after their disclosed write boundary is approved; run bookkeeping never enters them.
 
 ## Situation codes
 
 | Code | Situation | Where it goes |
 |---|---|---|
-| `WORKTREE-1` | State must survive and be reviewable | `<Source>/.worktrees/<project>/registries`, locked linked worktree on its own branch |
-| `WORKTREE-2` | Draft progress or a rebuildable pack | `<Source>/.worktrees/<project>/cache`, ignored |
-| `WORKTREE-3` | A path without the project segment, or under `.claude` | rejected; migrate behind `<project>` |
-| `WORKTREE-4` | A registry worktree owned by another Git common directory | rejected; it is not this Source's state |
-| `WORKTREE-5` | Parallel agents about to write | isolate only when two of them mutate one file |
-| `WORKTREE-6` | A worktree is stale, prunable or in the way | pruned deliberately; never force-removed as a directory |
-| `WORKTREE-7` | A design identity needs a durable accepted version | stable `layoutId`/`blockId` heads plus immutable `revisions/<revisionHash>/{design.json,preview.html}` bundles |
-| `WORKTREE-8` | Evidence-backed product truth must serve FE, BE and design | stable `featureId` heads in `businesses`, locked on `codex/businesses/<project>` |
+| `WORKTREE-1` | Evidence-backed product truth must survive and be reviewed | `<Source>/.worktrees/<project>/businesses`, locked linked worktree on `codex/businesses/<project>` |
+| `WORKTREE-2` | Draft, candidate, preview, review manifest or selected design awaiting same-session execution | `<Source>/.worktrees/<project>/cache`, ignored |
+| `WORKTREE-3` | A path lacks the project segment or sits under `.claude` | rejected |
+| `WORKTREE-4` | A durable business worktree is foreign, unlocked, dirty or on the wrong branch | rejected |
+| `WORKTREE-5` | Parallel agents will mutate one file or one target source boundary | isolate or run sequentially |
+| `WORKTREE-6` | A linked worktree is stale or prunable | prune deliberately through Git |
+| `WORKTREE-7` | A frontend design is reviewed before implementation | keep its complete session pack in cache and execute the selected candidate before the invocation ends |
+| `WORKTREE-8` | Product truth must serve FE, BE and design | stable `featureId` heads in `businesses` |
 
 ## Reading a run
 
-1. **Name what the run produces**, then ask of each output: must it survive review, or can it be
-   rebuilt? That single question separates `WORKTREE-1` from `WORKTREE-2`.
-2. **Never place state without the project segment.** A path is checked for `<project>` before it is
-   written — `WORKTREE-3`.
-3. **Check ownership before trusting a registry.** Locked, clean, on the project branch, owned by this
-   Source's Git common directory — `WORKTREE-4`.
-4. **Decide isolation by collision, not by parallelism.** Many agents writing many different files need
-   no worktree at all — `WORKTREE-5`.
-5. **Leave the target repository alone.** A run's bookkeeping never lands in the repository being worked
-   on; durable product records belong to that repository through its own review, not through this state.
-6. **Separate authority from rebuildable progress.** Layout and block IDs resolve accepted revision heads
-   directly from `registries`; losing candidates and unfinished drafts live under `cache/drafts` — `WORKTREE-7`.
-7. **Separate product truth from design decisions.** Business feature heads and evidence live in
-   `businesses`; layout/block heads remain in `registries` — `WORKTREE-8`.
+1. Name every output and whether another task must read it. Business truth is durable; design review material is rebuildable and session-local.
+2. Require `.worktrees/<project>/` before any state path.
+3. Verify Git ownership only for durable business worktrees.
+4. Isolate actual file collisions, not mere parallelism.
+5. Keep candidates under `cache/design/<session-id>/`. The pack may contain artifacts, `preview.html`, preview indexes, screenshots and `review-manifest.json`.
+6. After owner approval, retain the selected pack only long enough to implement and prove the source in the same invocation. Source history, tests and browser proof are the durable record.
+7. Never create layout heads, block heads, immutable design revisions or design-registry branches.
 
-## `WORKTREE-1` — state that must survive
+## `WORKTREE-1` — durable business truth
 
-**Situation.** The run produces something a person will read later and may disagree with: a design
-registry, an accepted candidate, a decision record.
+Business feature decisions are not reproducible from code alone, so they remain versioned under `businesses`. This situation does not authorize any design registry or accepted-preview store.
 
-**Recognition signs**
+## `WORKTREE-2` — rebuildable session state
 
-- Losing it would lose a decision, not just time.
-- Someone may need to see how it changed.
-- It is not derivable from anything else on disk.
+Candidates, render output, screenshots, indexes and selected design metadata can be rebuilt from business authority, grammar, contracts and source. They remain ignored cache even when expensive to produce.
 
-**Ask yourself.** If this were deleted, would a decision have to be made again?
+## `WORKTREE-3` — invalid state path
 
-**Boundary**
+State without a project segment can mix projects. State under `.claude` contaminates the trust tree. Both are refused.
 
-- `WORKTREE-2`: anything rebuildable from source or from a run belongs there instead, however expensive
-  it was to produce.
+## `WORKTREE-4` — foreign or invalid durable worktree
 
-**How it fails.** Durable state is written into an ignored folder, so the history that justified a
-decision is gone the first time the folder is cleaned.
+Only business authority requires a linked durable worktree. It must be owned by this Source, locked, clean and on the declared project branch.
 
-## `WORKTREE-2` — progress and rebuildable packs
+## `WORKTREE-5` — parallel writes
 
-**Situation.** The run produces its own footprints: partial progress, an index, a preview build, a
-memory pack.
+Parallel readers and disjoint writers need no extra isolation. Agents that mutate the same source file or shared authority file run sequentially or in separate target worktrees.
 
-**Recognition signs**
+## `WORKTREE-6` — stale linked worktree
 
-- It can be produced again by running the same thing.
-- Nobody will review it.
-- It grows without bound if nothing removes it.
+Prune through Git after proving the exact target. Never delete a linked worktree directory by hand.
 
-**Ask yourself.** Can this be rebuilt by re-running the work?
+## `WORKTREE-7` — same-session design and execution
 
-**Boundary**
+A design candidate has no durable head. The review pack binds the current task, routed source baseline, business head, grammar/profile receipt, contract evidence, candidate key, UI-condition inventory, transitions and viewport proof. Approval authorizes the selected candidate and exact source boundary once. That same invocation implements, tests and visually proves the result. If execution cannot continue, the next task regenerates from current authority rather than treating cache as accepted truth.
 
-- `WORKTREE-1`: if a reviewer would ever cite it, it is not disposable.
+## `WORKTREE-8` — product truth
 
-**How it fails.** A cache is committed, and from then on the repository carries a snapshot that contradicts
-the source it was derived from.
-
-## `WORKTREE-3` — a path that skips the project, or hides under `.claude`
-
-**Situation.** State is about to be written to `<Source>/.worktrees/registries`, or anywhere under
-`<Source>/.claude/`.
-
-**Recognition signs**
-
-- No project segment in the path.
-- The path lies inside the trust tree.
-- Two projects on this machine would collide in that location.
-
-**Ask yourself.** Would a second project write to this exact path?
-
-**Boundary**
-
-- `WORKTREE-4`: this is about the path; ownership is about which Git directory the worktree belongs to.
-
-**How it fails.** It works perfectly for the first project and silently mixes state for the second, and
-the trust tree accumulates run debris that makes its own rules look provisional.
-
-## `WORKTREE-4` — the registry belongs to another Git
-
-**Situation.** A registry worktree exists at the right path but is administered by a different Git common
-directory, or it is unlocked, dirty, or on the wrong branch.
-
-**Recognition signs**
-
-- `git worktree list` from this Source does not account for it.
-- The branch is not the project's registry branch.
-- It has uncommitted changes nobody in this run made.
-
-**Ask yourself.** Does this Source's Git actually own this worktree?
-
-**Boundary**
-
-- `WORKTREE-6`: a worktree this Source owns but no longer needs is pruned. One it never owned is refused.
-
-**How it fails.** The run commits into a branch another checkout is standing on, and two histories start
-disagreeing about the same registry.
-
-## `WORKTREE-5` — parallel agents about to write
-
-**Situation.** Several agents run at once and each will write files.
-
-**Recognition signs**
-
-- Each agent's output path is known before it starts.
-- Either those paths are disjoint, or two agents will touch one file.
-
-**Ask yourself.** Will two agents write the same file, or merely write at the same time?
-
-**Boundary**
-
-- `WORKTREE-1`: isolation is about collision during the run; durability is a separate question answered
-  separately.
-
-**How it fails.** Isolation is bought for every agent by reflex — it costs setup time and disk each —
-or, worse, agents share one worktree and run in parallel, and the last writer erases the others. Agents
-that must share a worktree run one at a time.
-
-## `WORKTREE-6` — a worktree is stale
-
-**Situation.** A worktree is prunable, abandoned, or standing where new state must go.
-
-**Recognition signs**
-
-- Git reports it as prunable.
-- Its branch is merged, gone, or was never pushed.
-- Its directory is missing while the administrative record remains.
-
-**Ask yourself.** Is the record stale, or is the work in it unfinished?
-
-**Boundary**
-
-- `WORKTREE-4`: refuse what this Source does not own; prune only what it does.
-
-**How it fails.** The directory is deleted by hand, so Git keeps an administrative record of a worktree
-that is not there, and the next run inherits an error nobody caused. Destructive Git is never run from a
-background agent, where nobody is watching the branch it stands on.
-
-## `WORKTREE-7` — design identity is stable; versions are hashed
-
-**Situation.** A layout or block must be found again after the review run that created it has ended.
-
-**Recognition signs**
-
-- A route/surface has one stable semantic `layoutId` independent of locale, runtime parameters or prompt.
-- A region has one stable `blockId`, scoped by its `layoutId`.
-- An accepted design needs immutable metadata and the exact HTML that was approved.
-
-**Ask yourself.** Can an executor resolve the current accepted design from `layoutId` alone, without
-knowing a review id or scanning review history?
-
-**Boundary**
-
-- `WORKTREE-1`: accepted heads and their two-file revision bundles are durable registry state.
-- `WORKTREE-2`: a partial prompt and every unaccepted candidate preview remain rebuildable progress.
-
-**What it emits.** `design-registry-v2.json` maps stable layout and block identities directly to accepted
-revision hashes. Each `revisions/<revisionHash>/` contains only `design.json` and `preview.html`;
-`design.json` binds identity, state viewports and the preview digest, while a block also binds the exact
-parent `layoutHash`. The revision hash binds canonical design metadata plus that preview digest. Legacy
-`objects/sha256` records remain readable during migration, but new acceptance never requires by-id
-projections or review records as a second authority.
-
-**How it fails.** A skill searches an old review record, so a valid block becomes unreachable when the
-caller does not know which review happened to contain it. Review history silently becomes a second
-current-state database.
-
-## `WORKTREE-8` — business identity is stable; evidence is versioned
-
-**Situation.** FE, BE and design need one current account of an actor, flow, rule, state, entity,
-operation or surface, including what remains unknown.
-
-**Recognition signs**
-
-- A later skill must cite the same product fact without reinterpreting source.
-- The fact is source-derived but its grouping and explicit unknowns are reviewable decisions.
-- A design preview needs representative identities, statuses and actions without inventing them.
-
-**Ask yourself.** Can a consumer resolve current product truth from `featureId`, prove its FE/BE heads,
-and inspect every claim's evidence?
-
-**Boundary**
-
-- `WORKTREE-1`: immutable feature objects and accepted feature heads are durable state.
-- `WORKTREE-2`: draft analysis and generated prototype packs remain rebuildable progress.
-- `WORKTREE-4`: the business worktree must be Source-owned, locked, clean and on its project branch.
-
-**What it emits.** `.worktrees/<project>/businesses` is a locked linked worktree on
-`codex/businesses/<project>`. `business-registry-v1.json` maps stable feature IDs to immutable objects;
-`features/<featureId>/CONTEXT.md` routes LLM context, while `model.json`, modular Markdown and
-`evidence.json` are generated current views.
-
-**How it fails.** Business lives in cache and disappears, shares the design registry and confuses intent
-with truth, or becomes a hand-written document whose claims no longer match either routed repository.
+Business feature heads remain durable because FE, BE and design must share the same actors, flows, rules, states and outcomes. Design choices do not enter that registry.
 
 ## Inputs
 
 | Input | Evidence required |
 |---|---|
-| roots | The durable `registries` and `businesses` worktrees plus ignored `cache`, valid against `@schema` |
-| project | A declared project name, never inferred from a folder |
-| source | The repository holding the trust tree |
-| outputs | Each thing the run will write, and whether it is rebuildable |
-| worktree list | Git's own account of worktrees, with lock and prunable status |
-| ignore proof | That `cache` is ignored by Source |
+| project | explicitly declared project |
+| source | Source repository owning trust and local state |
+| business root | Git-owned, locked, clean project business worktree |
+| cache root | ignored project cache path |
+| design session | one invocation identity and routed source baseline |
+| target source | approved exact frontend write boundary |
 
 ## Rules
 
-1. Durable state is versioned on its own branch; rebuildable state is ignored. Nothing durable lives in
-   an ignored folder.
-2. The project segment is mandatory in every state path.
-3. `.claude` is never a runtime storage root.
-4. A registry worktree must be locked, clean, on the project branch, and owned by this Source's Git.
-5. Isolation is decided by file collision, not by the number of agents.
-6. Agents sharing one worktree run sequentially.
-7. A run's bookkeeping never writes into the target repository.
-8. Stale worktrees are pruned through Git, never by deleting a directory, and never from a background
-   agent.
-9. Design identity is `layoutId` or `(layoutId, blockId)`; a content hash is a version, never the identity.
-10. Accepted heads resolve directly from stable identities to immutable two-file revision bundles; drafts are rebuildable cache.
-11. A block head names the parent `layoutHash`; a block accepted under an older layout is stale, not current.
-12. Business feature identity is `featureId`; every head binds routed source commits and immutable evidence.
+1. Business truth is durable; design review material is cache.
+2. Design approval and source execution happen in one skill invocation.
+3. No task may consume another task's cached design as authority.
+4. The project segment is mandatory.
+5. `.claude` never stores runtime state.
+6. Durable business worktrees must be Source-owned, locked and clean.
+7. Isolation follows actual write collisions.
+8. Stale linked worktrees are pruned through Git.
+9. Frontend source plus executable proof is the durable accepted design outcome.
+10. No design registry, layout head, block head or immutable preview revision is created.
 
 ## Exceptions
 
-- **Reuse over creation.** An existing project root that already satisfies ownership is reused; a second
-  root for the same project is a collision, not a convenience.
-- **Legacy migration.** State already sitting at a rejected path is migrated behind `<project>` once it
-  is verified clean. A dirty legacy registry stops the migration instead of being copied over.
-- **A branch that is only local.** A registry branch that was never pushed is still valid state. It is
-  reported as local-only rather than treated as missing.
+- A cache pack may remain after completion for local debugging, but it stays ignored and has no authority.
+- Conversation provenance and business authority may use their own explicitly routed durable stores; they are not design registries.
+- A design-only request that explicitly forbids implementation may render candidates, but the result expires with the invocation and cannot be called accepted authority.
 
 ## Output
 
-One block per thing the run writes:
-
 ```text
-output: <what is being written>
-durability: <durable | rebuildable>
-path: <.worktrees/<project>/registries | cache>
-isolation: <required | not required>
-ownership: <locked, clean, branch, owning git dir>
-situation: <WORKTREE-1 | WORKTREE-2 | WORKTREE-3 | WORKTREE-4 | WORKTREE-5 | WORKTREE-6 | WORKTREE-7 | WORKTREE-8>
-reason: <the fact that decided the placement>
+output: <business authority | design session | source implementation>
+durability: <durable | rebuildable | product source>
+path: <business worktree | project cache | routed frontend>
+session: <same invocation identity when design is involved>
+reason: <fact deciding placement>
 ```
-
-## Worked example
-
-**Run.** "Fourteen agents each write one new module directory under the trust tree, and the run records
-which candidate was accepted."
-
-```text
-output: the fourteen module directories
-durability: durable, but they belong to the trust tree itself, not to run state
-path: none — written in place
-isolation: not required
-ownership: n/a
-situation: WORKTREE-5
-reason: every agent's output path is known in advance and no two agents touch one file, so a worktree per agent would buy setup time and disk for a collision that cannot happen
-```
-
-```text
-output: the accepted-candidate record
-durability: durable
-path: .worktrees/example-app/registries
-isolation: required if a second run writes it at the same time
-ownership: locked, clean, on the project registry branch, owned by this Source's git
-situation: WORKTREE-1
-reason: losing it would lose a decision rather than time, and a reviewer may need to see how it changed
-```
-
-The same run, audited against the machine, also reports a violation it did not create:
-
-```text
-output: pre-existing worktree state
-durability: n/a
-path: .claude/worktrees/ — 10 worktrees, 9 of them prunable
-isolation: n/a
-ownership: owned by this Source's git
-situation: WORKTREE-3
-reason: the trust tree is holding runtime state, which the project-scoped root exists to replace; the nine prunable records are pruned through git, and the live one is migrated behind the project segment
-```
-
-Note what the third block does not do: it does not delete a directory. Nine stale records are a `git`
-matter, and doing it by hand is how the tenth becomes an error nobody caused.
-
-## Scope
-
-This module decides where in-progress state is written. It does not decide which repository is read —
-that is the workspace question — and it does not decide what the state means or who may review it.

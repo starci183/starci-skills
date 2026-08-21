@@ -28,7 +28,7 @@ Markdown is its human view.
 ## Boundary
 
 This skill may read routed FE/BE source and tests, and may write only the project's business worktree.
-It never edits FE, BE, design registry, workspace route, deployment state or imported reference files.
+It never edits FE, BE, design preview cache, workspace route, deployment state or imported reference files.
 A reference specification contributes headings and granularity only. Claims not proven by current
 source become explicit `unknowns`.
 

@@ -52,8 +52,8 @@ work and visual changes requiring a new anatomy are not minor fixes.
 3. Name the exact component folder and run `@scope-check` without `--base`. Its printed HEAD is the scope
    baseline. A dirty target or invalid tier is `MINOR-FIX-REJECTED`.
 4. Read the component, its colocated tests, its current callers only when needed to understand the defect,
-   and the contract entries it already cites. Do not open a design registry: this skill cannot change a
-   design decision.
+   and the contract entries it already cites. Do not create a design-review cache round: this skill cannot
+   broaden into a design decision.
 5. For a visual correction, resolve the existing situation through `@principles`; then read `@patterns-fe` and
    load only reached child contexts before the first line. Keep the existing tier,
    export family, connected/pure split, contract keys, tokens, copy ownership, and vendor boundary.
@@ -76,7 +76,7 @@ work and visual changes requiring a new anatomy are not minor fixes.
 - A gate requires suppression, an unknown lint rule, or a path outside the target folder.
 - Block internals, states, or visual anatomy change — larger owner: `starci-fe-design-block`.
 - Persistent page geometry or address ownership change — larger owner: `starci-fe-design-layout`.
-- Already accepted multi-region implementation — larger owner: `starci-fe-design-execute`.
+- Multi-region or page-level redesign — larger owner: `starci-fe-design-layout`.
 - Multi-file quality repair or assurance work — larger owner: `starci-repair`.
 - Public API or data-ownership change — larger owner: a normal planned coding task.
 

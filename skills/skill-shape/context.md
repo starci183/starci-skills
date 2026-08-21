@@ -65,9 +65,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The nineteen capabilities
+## The eighteen capabilities
 
-Seventeen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Sixteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -83,19 +83,16 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-diagnose` | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
-| `starci-fe-design-layout` | challenge and compose complete source-bound page/page-flow previews; expose only alternatives that materially improve the decision |
-| `starci-fe-design-block` | judge a region inside its complete accepted page and expose only materially distinct anatomies, hash-bound |
-| `starci-fe-design-execute` | frontend source, only after every reachable hash is accepted |
-| `starci-fe-feedback-evolve` | turn proven owner feedback into the smallest durable authority improvement, superseding design revision and source correction |
+| `starci-fe-design-layout` | challenge, preview, approve and implement one complete source-bound page/page flow in one invocation |
+| `starci-fe-design-block` | judge, preview, approve and implement one region inside its current complete page in one invocation |
+| `starci-fe-feedback-evolve` | turn proven owner feedback into the smallest durable authority improvement and source correction |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |
 | `starci-fe-minor-fix` | one small contract-preserving correction inside one clean existing block, composite or leaf folder, machine-rejected when its scope grows |
 | `starci-conversation-record` | provider-neutral conversation provenance snapshots and exact FE/BE artifact links without raw transcript Git storage |
 | `starci-be-plan` | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approval, then backend source |
 
-Layout resolves or creates a stable `layoutId` for a composed page set, reusing source-bound existing nested layouts. Execute still refuses to write while any region under its
-accepted head lacks a current accepted block. `OK`
-authorizes the displayed boundary only; no skill assumes another capability was requested.
+Layout and block design use session-local candidate identities, reuse source-bound existing composition and implement the approved result before the same invocation ends. `OK` authorizes the displayed source boundary only; no skill assumes another capability was requested.
 
 ## Context lock
 
@@ -128,12 +125,10 @@ scope. Silence and every word other than `OK` are not approval signals.
 
 ## Decisions and execution
 
-**Design rounds** are optional review evidence. Direction choices support a layout review and have no approval
-hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in
-that layout round's `directionReview`, and the recommended object is embedded in every layout candidate.
-The owner sees both decisions together; one `OK` accepts the recommended layout hash and therefore its
-embedded direction. Each recorded round keeps the exact prompt, candidates, feedback and owner verdict.
-Feedback on either direction or structure opens a new round; it never edits an accepted round.
+**Design rounds** are optional session evidence. Direction choices support a layout review and have no durable
+hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in the
+project cache for the current invocation. One `OK` selects the recommendation and authorizes its disclosed
+source boundary. Feedback opens another cache round; after approval the same invocation implements the result.
 
 Every frontend design candidate is a self-contained functional HTML page at production-like representative
 business density. Before drawing, inventory viewport, overlay, disclosure, async, data, permission and interaction
@@ -166,11 +161,11 @@ it, the recommended/default answer and the exact scope `OK` authorises.
 
 ## The record
 
-There is no separate report file. Durable design authority lives under
-`<Source>/.worktrees/<project>/registries`: stable layout/block IDs point to accepted hashes, immutable
-objects hold candidate bodies, and optional `reviews/` preserve prompts, feedback and verdicts.
-Rebuildable in-progress work lives below `cache/drafts`. A repair records through commits/diffs; a read-only run writes no
-file unless explicitly requested.
+There is no separate report file or durable design registry. Design candidates, selected previews and review
+manifests live below `<Source>/.worktrees/<project>/cache/design/<session-id>` and expire with the invocation.
+Frontend source, tests and browser proof are the durable accepted design outcome. Business and conversation
+authorities keep their own explicitly routed stores. A repair records through commits/diffs; a read-only run
+writes no file unless explicitly requested.
 
 An approved boundary names its `Approved revision: <identity>` and cites that same identity plus its
 baseline commit. That pairing proves what changed after authorization and survives wherever the work
@@ -189,8 +184,8 @@ appended.
 2. Continue every `own` action without asking; a turn cannot end while `own > 0`.
 3. Ask only for genuine `need approval`, with one displayed default.
 4. Only `OK` consumes displayed approvals and resumes work immediately.
-5. One stable layout/block ID has one accepted head; replacing it appends history and never edits a hashed object.
-6. Execute runs only when every reachable hash is accepted.
+5. Design approval and source implementation happen in the same invocation; cached candidate keys are never durable authority.
+6. Another task regenerates design evidence from current source, contract, grammar and business truth.
 7. A baseline is taken after `OK` and before the first production write.
 8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
 9. For safely partitionable work, target ten non-overlapping agent assignments; one coordinator owns

@@ -1,152 +1,66 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v2/publication/design-review-preview/schema.json",
-  "title": "Universal parent-child design review manifest",
+  "$id": "starci-v3/publication/design-review-preview/schema.json",
+  "title": "Session-local authored design review manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "project", "entryRoute", "layouts", "evidence"],
+  "required": ["schemaVersion", "project", "sessionId", "phase", "entryRoute", "layouts", "evidence"],
   "properties": {
-    "schemaVersion": {"const": 2},
+    "schemaVersion": {"const": 3},
     "project": {"$ref": "#/$defs/slug"},
-    "entryRoute": {"type": "string", "pattern": "^#/layouts/[a-z0-9-]+/[0-9a-f]{64}(?:/blocks/[a-z0-9-]+)?$"},
+    "sessionId": {"type": "string", "minLength": 1},
+    "phase": {"enum": ["layout", "block"]},
+    "entryRoute": {"type": "string", "pattern": "^#/reviews/[a-z0-9-]+/[0-9a-f]{64}$"},
     "layouts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/layoutReview"}},
-    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
     "evidence": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["label", "value"],
-        "properties": {"label": {"type": "string", "minLength": 1}, "value": {"type": "string", "minLength": 1}}
+        "properties": {
+          "label": {"type": "string", "minLength": 1},
+          "value": {"type": "string", "minLength": 1}
+        }
       }
     }
   },
   "$defs": {
     "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "flow": {
+    "viewport": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "label", "nodes", "edges"],
+      "required": ["width", "height"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      }
+    },
+    "previewState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "html", "viewport"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
-        "label": {"type": "string", "minLength": 1},
-        "nodes": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "label", "layoutId", "order", "route"],
-            "properties": {
-              "id": {"$ref": "#/$defs/slug"},
-              "label": {"type": "string", "minLength": 1},
-              "layoutId": {"$ref": "#/$defs/slug"},
-              "blockId": {"$ref": "#/$defs/slug"},
-              "order": {"type": "integer", "minimum": 1},
-              "route": {"type": "string", "pattern": "^#/layouts/[a-z0-9-]+/[0-9a-f]{64}(?:/blocks/[a-z0-9-]+)?$"}
-            }
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["from", "to"],
-            "properties": {
-              "from": {"$ref": "#/$defs/slug"},
-              "to": {"$ref": "#/$defs/slug"},
-              "label": {"type": "string", "minLength": 1}
-            }
-          }
-        }
+        "html": {"type": "string", "minLength": 1},
+        "viewport": {"$ref": "#/$defs/viewport"}
       }
     },
-    "themeRole": {
+    "preview": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["verdict"],
+      "required": ["html", "states"],
       "properties": {
-        "verdict": {"enum": ["reuse", "new", "none"]},
-        "token": {"type": "string"},
-        "value": {"type": ["string", "null"]}
-      }
-    },
-    "content": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["eyebrow", "title", "description", "primaryAction", "rows"],
-      "properties": {
-        "eyebrow": {"type": "string"},
-        "title": {"type": "string", "minLength": 1},
-        "description": {"type": "string", "minLength": 1},
-        "primaryAction": {"type": "string", "minLength": 1},
-        "rows": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["title", "description"],
-            "properties": {"title": {"type": "string"}, "description": {"type": "string"}, "meta": {"type": "string"}}
-          }
-        }
-      }
-    },
-    "shell": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["product", "navigation"],
-      "properties": {
-        "product": {"type": "string", "minLength": 1},
-        "activeItem": {"type": "string"},
-        "navigation": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "label"],
-            "properties": {"id": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}
-          }
-        }
-      }
-    },
-    "blockCandidate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "hash", "status", "reason", "axes", "states", "parts"],
-      "properties": {
-        "id": {"$ref": "#/$defs/slug"},
-        "hash": {"$ref": "#/$defs/hash"},
-        "status": {"enum": ["accepted", "proposed", "superseded"]},
-        "reason": {"type": "string"},
-        "axes": {"type": "object", "additionalProperties": {"type": "string"}},
-        "states": {"type": "array", "items": {"type": "string"}},
-        "parts": {"type": "array", "items": {"type": "object"}},
-        "restingCount": {"type": "integer", "minimum": 1}
-      }
-    },
-    "childBlock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["layoutId", "layoutHash", "blockId", "status", "candidates"],
-      "properties": {
-        "layoutId": {"$ref": "#/$defs/slug"},
-        "layoutHash": {"$ref": "#/$defs/hash"},
-        "blockId": {"$ref": "#/$defs/slug"},
-        "status": {"enum": ["accepted", "missing", "stale"]},
-        "currentHead": {"$ref": "#/$defs/hash"},
-        "recommendedId": {"$ref": "#/$defs/slug"},
-        "renderedId": {"$ref": "#/$defs/slug"},
-        "content": {"$ref": "#/$defs/content"},
-        "candidates": {"type": "array", "items": {"$ref": "#/$defs/blockCandidate"}}
+        "html": {"type": "string", "minLength": 1},
+        "states": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/previewState"}}
       }
     },
     "region": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "entry", "assembler", "mount", "whyMatch", "block"],
+      "required": ["name", "entry", "assembler", "mount", "whyMatch"],
       "properties": {
         "name": {"$ref": "#/$defs/slug"},
         "pageId": {"$ref": "#/$defs/slug"},
@@ -155,85 +69,30 @@
         "assembler": {"type": "string", "minLength": 1},
         "mount": {"type": "string", "minLength": 1},
         "whyMatch": {"type": "string", "minLength": 1},
-        "geometry": {"$ref": "#/$defs/geometry"},
-        "brief": {"$ref": "#/$defs/brief"},
-        "block": {"$ref": "#/$defs/childBlock"}
+        "geometry": {"type": "object"},
+        "brief": {"type": "object"}
       }
     },
-    "geometry": {
+    "page": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["placement", "width", "height", "align"],
-      "properties": {
-        "placement": {"enum": ["header", "navbar", "rail", "main", "aside", "center", "footer", "overlay"]},
-        "width": {"enum": ["intrinsic", "narrow", "medium", "wide", "full"]},
-        "height": {"enum": ["content", "fill", "viewport"]},
-        "align": {"enum": ["start", "center", "end", "stretch"]}
-      }
+      "additionalProperties": true
     },
-    "brief": {
+    "candidate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "title", "summary", "items"],
-      "properties": {
-        "kind": {"enum": ["form", "navigation", "summary", "flow", "content"]},
-        "title": {"type": "string", "minLength": 1},
-        "summary": {"type": "string", "minLength": 1},
-        "items": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["role", "label"],
-            "properties": {
-              "role": {"enum": ["shortcut", "divider", "field", "choice", "link", "fact", "status", "step", "navigation", "text"]},
-              "label": {"type": "string", "minLength": 1},
-              "value": {"type": "string", "minLength": 1}
-            }
-          }
-        },
-        "primaryAction": {"type": "string", "minLength": 1},
-        "secondaryAction": {"type": "string", "minLength": 1}
-      }
-    },
-    "layoutCandidate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "hash", "status", "reason", "axes", "regions"],
+      "required": ["id", "hash", "status", "reason", "axes", "regions", "preview"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
         "hash": {"$ref": "#/$defs/hash"},
-        "status": {"enum": ["accepted", "proposed", "superseded"]},
-        "reason": {"type": "string"},
+        "status": {"const": "proposed"},
+        "reason": {"type": "string", "minLength": 1},
         "axes": {"type": "object", "additionalProperties": {"type": "string"}},
-        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/composedPage"}},
-        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}}
-      }
-    },
-    "compositionNode": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "kind", "change"],
-      "properties": {
-        "id": {"$ref": "#/$defs/slug"},
-        "kind": {"enum": ["root-layout", "app-layout", "feature-layout", "page", "modal", "drawer", "popover", "floating-action", "panel"]},
-        "change": {"enum": ["existing", "proposed", "new"]},
-        "parentId": {"$ref": "#/$defs/slug"},
-        "source": {"type": "string"},
-        "sourceHash": {"$ref": "#/$defs/hash"}
-      }
-    },
-    "composedPage": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "route", "state", "nodes", "regions"],
-      "properties": {
-        "id": {"$ref": "#/$defs/slug"},
-        "route": {"type": "string", "minLength": 1},
-        "state": {"$ref": "#/$defs/slug"},
-        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/compositionNode"}},
-        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/slug"}}
+        "direction": {"type": "object"},
+        "states": {"type": "array", "items": {"type": "string"}},
+        "parts": {"type": "array", "items": {"type": "object"}},
+        "pages": {"type": "array", "items": {"$ref": "#/$defs/page"}},
+        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}},
+        "preview": {"$ref": "#/$defs/preview"}
       }
     },
     "layoutReview": {
@@ -242,29 +101,10 @@
       "required": ["layoutId", "recommendedId", "theme", "candidates"],
       "properties": {
         "layoutId": {"$ref": "#/$defs/slug"},
-        "routePattern": {"type": "string"},
-        "currentHead": {"$ref": "#/$defs/hash"},
         "recommendedId": {"$ref": "#/$defs/slug"},
-        "scope": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["kind", "source"],
-          "properties": {
-            "kind": {"enum": ["page", "flow"]},
-            "source": {"enum": ["screenshot", "description"]}
-          }
-        },
-        "theme": {"type": "object", "additionalProperties": {"$ref": "#/$defs/themeRole"}},
-        "candidates": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/layoutCandidate"}},
-        "visualDirections": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "object"}},
-        "visualDirectionRecommendation": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["id", "reason"],
-          "properties": {"id": {"$ref": "#/$defs/slug"}, "reason": {"type": "string"}}
-        },
-        "shell": {"$ref": "#/$defs/shell"},
-        "content": {"$ref": "#/$defs/content"}
+        "scope": {"type": "object"},
+        "theme": {"type": "object"},
+        "candidates": {"type": "array", "minItems": 3, "maxItems": 4, "items": {"$ref": "#/$defs/candidate"}}
       }
     }
   }

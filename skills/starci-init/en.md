@@ -36,9 +36,8 @@ adds no write. Execute requested local actions in registry order:
    `.workspace/ports/config.json` plus one `.workspace/ports/<project>.json`; init never copies allocation
    ownership into a product. For every role, write `grammar` and `grammarProfile` as both null or an
    explicitly declared pair whose grammar authority package and profile exist; never infer them from identity.
-4. **Worktrees** — verify the project design registry, business authority and cache roots against Git's
-   own worktree account and path policy. Create or reuse `businesses` independently on
-   `codex/businesses/<project>`; never place it in the design-registry worktree or disposable cache.
+4. **Worktrees** — verify the project business authority and ignored cache root against Git's worktree
+   account and path policy. Create or reuse `businesses` on `codex/businesses/<project>`; create no design registry.
 
 State the evidence and exact action per boundary before changing it. A direct init instruction naming
 the needed Source and Project authorises these bounded local writes; do not add a generic approval stop.
@@ -55,5 +54,5 @@ action or its proof remains.
 - Existing ciphertext with no original identity available, or an identity that cannot decrypt its sample.
 - A project/role required by the requested boundary was not declared by the owner.
 - A stale route is never silently repointed; show the replacement.
-- Foreign Git ownership, a dirty legacy registry, or a registry branch collision.
+- Foreign Git ownership or a business-authority branch collision.
 - Any requested product-repository edit; init describes targets and owns Source-local state only.

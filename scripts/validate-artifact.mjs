@@ -275,69 +275,6 @@ function directionLaws(data, vocabulary) {
   return found;
 }
 
-function sessionLaws(data) {
-  if (!Array.isArray(data.rounds) || !Array.isArray(data.queue)) return [];
-  const found = [];
-  for (const [index, round] of data.rounds.entries()) {
-    if (round.phase === "block" && !round.layoutHash) {
-      found.push(`rounds[${index}].layoutHash: a block round must name its accepted parent layout`);
-    }
-    const review = round.directionReview;
-    if (review?.state === "selected") {
-      if (!review.selectedId) found.push(`rounds[${index}].directionReview.selectedId: selected review must name the exact direction`);
-      else if (!review.candidates?.some((candidate) => candidate.id === review.selectedId)) {
-        found.push(`rounds[${index}].directionReview.selectedId: does not name a candidate in this review`);
-      }
-    }
-    if (review?.state === "recommended") {
-      if (!review.recommendedId) found.push(`rounds[${index}].directionReview.recommendedId: recommended review must name the exact direction`);
-      else if (!review.candidates?.some((candidate) => candidate.id === review.recommendedId)) {
-        found.push(`rounds[${index}].directionReview.recommendedId: does not name a candidate in this review`);
-      }
-      if (review.selectionSource !== "evidence") {
-        found.push(`rounds[${index}].directionReview.selectionSource: combined review recommendation must come from evidence`);
-      }
-      if (!review.selectionReason) {
-        found.push(`rounds[${index}].directionReview.selectionReason: combined review must preserve why this direction is recommended`);
-      }
-    }
-    if (data.schema === 2 && round.phase === "layout" && (round.produced?.length ?? 0) > 0 && review?.state !== "recommended") {
-      found.push(`rounds[${index}].directionReview.state: schema 2 layout candidates require one evidence-backed recommendation before combined approval`);
-    }
-    if (review?.state === "feedback" && !review.feedback) {
-      found.push(`rounds[${index}].directionReview.feedback: feedback state must preserve the owner's words`);
-    }
-  }
-
-  const acceptedLayouts = data.queue.filter((entry) => entry.phase === "layout" && entry.state === "accepted");
-  if (acceptedLayouts.length > 1) found.push("queue: more than one current layout is accepted; supersede the old layout before execution");
-  const produced = new Set(data.rounds.flatMap((round) => (round.produced ?? []).map((item) => item.hash)));
-  const queued = new Set(data.queue.map((entry) => entry.hash));
-  const layoutDecisions = new Set(data.queue.filter((entry) => entry.phase === "layout").map((entry) => entry.hash));
-  const acceptedBlocks = new Map();
-  for (const [index, entry] of data.queue.entries()) {
-    if (!produced.has(entry.hash)) found.push(`queue[${index}].hash: no round produced this decision object`);
-    if (entry.phase === "block" && !entry.layoutHash) {
-      found.push(`queue[${index}].layoutHash: a block decision must name its parent layout`);
-    }
-    if (entry.phase === "block" && entry.layoutHash && !layoutDecisions.has(entry.layoutHash)) {
-      found.push(`queue[${index}].layoutHash: parent layout is absent from the session queue`);
-    }
-    if (entry.state === "superseded" && !entry.supersededBy) {
-      found.push(`queue[${index}].supersededBy: a superseded decision must name its replacement`);
-    }
-    if (entry.supersededBy && !queued.has(entry.supersededBy)) {
-      found.push(`queue[${index}].supersededBy: replacement is absent from the session queue`);
-    }
-    if (entry.phase === "block" && entry.state === "accepted") {
-      const key = `${entry.layoutHash}/${entry.region}`;
-      if (acceptedBlocks.has(key)) found.push(`queue[${index}]: two current blocks are accepted for ${key}; supersede the older one`);
-      else acceptedBlocks.set(key, index);
-    }
-  }
-  return found;
-}
-
 function layoutRegionLaws(data) {
   if (data.schema < 2 || !Array.isArray(data.candidates)) return [];
   const found = [];
@@ -435,10 +372,7 @@ if (vocabulary && (Array.isArray(data.directions) || data.candidates?.some((cand
   await check(vocabularySchema, vocabulary, "$vocabulary", {doc: vocabularySchema, dir: dirname(vocabularySchemaPath)}, errors);
 }
 
-const broken = [...laws(data), ...directionLaws(data, vocabulary), ...sessionLaws(data), ...layoutRegionLaws(data), ...pageSetLaws(data)];
-if (wantHash && Array.isArray(data.directions)) {
-  broken.push("directions: recommendation has no approval hash; embed the recommended object in a layout candidate and hash that layout");
-}
+const broken = [...laws(data), ...directionLaws(data, vocabulary), ...layoutRegionLaws(data), ...pageSetLaws(data)];
 
 if (errors.length) {
   console.error(`SCHEMA (${errors.length})`);

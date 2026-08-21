@@ -4,131 +4,73 @@
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@manifest-schema` | `publication/design-review-preview/schema.json` | file | validate the cache review graph |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | publish draft reviews and immutable accepted bundles |
+| `@manifest-schema` | `publication/design-review-preview/schema.json` | file | validate the session-local review graph |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | render authored candidates below project cache |
 
 ## Record
 
-This module displays layout and block choices without designing them. Draft reviews are rebuildable cache;
-accepted composition is durable HTML bound to one immutable revision.
+This module displays layout and block choices without becoming product authority. Every candidate, selected composition, screenshot and manifest is disposable session evidence. The skill that obtains owner approval implements the selected outcome in frontend source before the same invocation ends.
 
 ## Authority
 
-JSON and HTML are co-authorities with disjoint responsibilities:
+Business authority, routed grammar, contracts and current source constrain the design. The cache review pack proves what the owner saw during the invocation but never becomes a durable head or an input to another task.
 
-- `design.json` owns identity, parent binding, business/contract ownership, routed grammar facts/decisions/receipt, accepted artifact, post-creative
-  `principleObligations`, UI-condition inventory, transition graph and the state viewport manifest.
-- `preview.html` owns composition, hierarchy, surfaces, responsive behavior and the executable authored rendering
-  of every declared state.
+Within one session:
 
-An accepted revision is exactly:
+- `design.json` owns the task binding, business/contract ownership, grammar facts and receipt, candidate metadata, principle obligations, UI-condition inventory, transition graph and viewport obligations.
+- authored HTML owns composition, hierarchy, responsive behavior and executable rendering for each declared state.
+
+All material lives below:
 
 ```text
-registries/revisions/<revisionHash>/design.json
-registries/revisions/<revisionHash>/preview.html
+.worktrees/<project>/cache/design/<session-id>/
 ```
 
-`design.json` carries `schemaVersion`, `kind`, `layoutId`, optional `blockId` and `layoutHash`, accepted artifact,
-state viewport manifest and `previewSha256`. `revisionHash` binds canonical design metadata plus the preview
-digest. The registry records revisions and points stable heads to them. Legacy objects are read-only
-compatibility, not authority for new approval or execution.
-
-Unaccepted candidates and their review manifest remain below `.worktrees/<project>/cache`. Losing candidates are
-never copied into the registry.
+No accepted bundle, revision map, layout head, block head or design branch exists. Candidate digests are cache keys only.
 
 ## Review flow
 
 ### Layout
 
-Display complete standalone authored HTML/CSS page sets with the same product-backed content and viewport set.
-A screenshot review composes every visible nested layout, page and overlay. A flow review includes every explicit
-page or step. Existing nodes are source/hash-bound and identical between choices. Display three or four
-materially distinct choices, the model's ranking and its selected recommendation. The owner may override but
-does not operate a mandatory candidate gate. After selection, deterministic
-states of the selected layout are rendered without another approval; only a newly discovered product decision
-opens a new round.
+Display three or four complete standalone authored page/page-flow candidates using the same product-backed content and viewport set. Existing source-bound nodes remain unchanged between choices. Rank candidates and recommend one. After approval, the same skill invocation implements the selected composition and proves it in the product.
 
 ### Block
 
-Display three or four materially distinct authored block choices inside the exact accepted parent
-`preview.html`, exact region geometry and representative data, plus the model's ranking and selected
-recommendation. The parent remains visible so composition is judged in context. The owner may override without
-being required to choose. Deterministic selected-block states are then rendered without another approval; only
-a new product decision opens a new round.
+Display three or four materially different block candidates inside the exact current parent page and region geometry. The parent comes from current routed source or a parent preview created earlier in the same invocation. After approval, the same skill invocation updates the owning frontend source and proves the complete page.
 
 ## Canvas law
 
-The product canvas displays authored product HTML only. It never derives composition from JSON and never inserts
-a generic template, rough child, dashed anatomy/part card, placeholder skeleton, schema/debug label, evidence or
-hash. Review navigation, candidate names, evidence and approval help stay outside the product canvas.
+The product canvas contains authored product HTML only. It never inserts generic templates, rough cards, schema labels, hashes or evidence chrome. Review controls remain outside the canvas.
 
-Missing candidate HTML, exact-parent embedding, accepted state HTML or declared viewport is a blocking error. A
-viewer warning or fabricated fallback cannot make the review approvable.
+Every candidate is a self-contained HTML document with deterministic in-memory behavior. It covers every evidenced viewport, overlay, disclosure, async, data, permission and interaction condition. Irrelevant condition families are explicitly `not-applicable`. Product controls, not a QA-only switcher, reach declared transitions. Network access and backend mutation are forbidden.
 
-### Functional canvas law
-
-Every candidate and accepted preview is one self-contained HTML document with deterministic in-memory behavior.
-It exposes product controls for every declared transition and represents every evidenced UI condition: desktop
-and mobile, modal, drawer, menu/popover, expanded/collapsed, loading, empty, partial, error, success, locked and
-disabled. Irrelevant condition families are declared `not-applicable` with evidence. Actual viewport resize drives
-responsive behavior; a separately painted narrow state is not sufficient. A QA state switcher lives outside the
-canvas and never counts as interaction proof. `fetch`, XHR, WebSocket and backend mutation are forbidden in
-preview code.
-
-Every state is also business-faithful: it renders production-like representative density, real entity kinds,
-meaningful values, counts, statuses, metadata, actions and consequences from the bound business surface. The
-canvas must explain the product without relying on evidence text outside it. Lorem, placeholders, generic cards,
-toy row counts, repeated filler and visibly partial owned surfaces are blocking defects.
+Representative content must be business-faithful and production-like. Lorem, generic cards, toy counts, repeated filler and partial owned surfaces are blocking defects.
 
 ## Quality proof
 
-Review every candidate and accepted state at desktop and at least one narrow viewport. Prove:
+Review every candidate and the selected product result at desktop and narrow viewports. Prove hierarchy, readable measure, boundary ownership, one scroll owner per axis, breakpoint exclusivity, complete state coverage, keyboard-operable transitions, clean console and no preview network requests. After source implementation, repeat the critical interaction and viewport proof against the real product.
 
-1. Desktop and mobile navigation/chrome are mutually exclusive at their breakpoints.
-2. Heading, primary action, data and supporting content have intentional hierarchy.
-3. Reading and repeated content have intentional measure.
-4. Each divider/boundary belongs to the region or grouping it separates; no divider is required without that
-   boundary.
-5. Each scrolling axis has exactly one owner; nested scrolling requires an evidenced independent viewport.
-6. Every reachable state in the manifest has matching authored HTML at the declared viewport.
-7. Every condition-inventory value maps to a rendered state and every transition is reachable from a visible,
-   keyboard-operable in-page control.
-8. Browser proof executes the critical transition graph at desktop and narrow widths, including every reachable
-   modal, drawer, popover/menu and async/error branch, with a clean console and no network requests.
-9. Each rendered state matches its business-content matrix closely enough that the entity, status, possible
-   action and consequence are visually understandable at production-like density.
-
-`ScrollBranch`, `SurfaceListCard` and dividers are examples of situation-specific resolutions, never universal
-preview or product requirements.
-
-The model creates and ranks three or four candidates before principles review. Only the selected candidate is
-then audited against principles, and every resolution is persisted as a class-free obligation naming target,
-principle module, canonical situation and reason. An accepted revision without those obligations is invalid.
+Creativity precedes principles review. Only the selected candidate is audited into class-free `principleObligations`; source implementation resolves those obligations through current principles and patterns.
 
 ## Rules
 
-1. Draft candidates live only in project cache; accepted bundles live only under `registries/revisions`.
-2. Layout and block phases each carry one model-selected recommendation; owner approval is required only when
-   product truth or write authority remains unresolved.
-3. A block review binds exact `layoutId`, parent `layoutHash` and declared `blockId`.
-4. A block is always reviewed inside its exact parent layout and region bounds.
-5. Accepted selected states are deterministic completion, not a second approval checkpoint.
-6. Preview navigation never mutates registry state or counts as approval.
-7. Every accepted `preview.html` digest and `revisionHash` are revalidated before execution.
-8. Layout schema 4 binds `scope`, composed `pages`, ordered ownership nodes and page-owned regions.
-9. Creativity precedes principles review; execution resolves the accepted obligations before source patterns.
+1. Every review artifact is ignored project cache.
+2. Candidate digests identify cache entries only and never become durable design identity.
+3. Layout/block approval and source implementation occur in the same skill invocation.
+4. Another task must regenerate design evidence from current authority; it cannot resume from cache.
+5. A block is reviewed inside the exact current parent page and region.
+6. Preview navigation never writes state or counts as approval.
+7. Source code, tests and browser proof are the durable accepted outcome.
+8. Creativity precedes principles review; implementation follows source patterns and gates.
 
 ## Stops
 
-- Output outside project cache for drafts or outside the exact revision bundle for acceptance is refused.
+- Output outside the exact project cache is refused.
 - Missing authored candidate/state HTML, condition coverage, executable interaction or viewport coverage is refused.
-- A render-only page, or a page whose states are reachable only through review chrome, is refused.
-- A block bound to another parent hash or absent from parent regions is refused.
-- A proposed or legacy-only object cannot be shown as current accepted authority.
-- A post-choice state requiring a new route, owner, action or outcome returns to product approval.
+- A block without a current parent page or same-session parent preview is refused.
+- A task that cannot continue through source implementation may show design-only evidence, but it must report that the result expired and is not accepted authority.
+- A post-choice state requiring new product truth returns to owner approval.
 
 ## Output and proof
 
-Publish one cache review application for drafts and one two-file bundle for the accepted revision. Run manifest
-validation, preview digest/revision validation, Vite typecheck/build and browser QA over every declared viewport
-and state with a clean console.
+Publish one cache review application, identify the recommended candidate and exact source boundary, obtain approval once, implement in the same invocation, then report changed source paths and real-product proof. Do not report revision hashes or registry heads.

@@ -56,7 +56,7 @@ dependency/config, public API, caller, query/mutation, cache, async owner, state
 - Cần suppression, gặp unknown lint rule hoặc cần path ngoài target.
 - Anatomy hoặc state của block — owner lớn hơn: `starci-fe-design-block`.
 - Persistent geometry hoặc address ownership — owner lớn hơn: `starci-fe-design-layout`.
-- Design nhiều region đã accepted — owner lớn hơn: `starci-fe-design-execute`.
+- Redesign nhiều region hoặc page-level — owner lớn hơn: `starci-fe-design-layout`.
 - Quality repair rộng — owner lớn hơn: `starci-repair`.
 - Public API hoặc data ownership — owner lớn hơn: task coding có plan bình thường.
 

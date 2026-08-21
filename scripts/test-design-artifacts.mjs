@@ -162,7 +162,7 @@ const briefedLayouts = write("briefed-layouts.json", {
 
 const blocks = write("blocks.json", {
   schema: 1,
-  envelope: {round: 2, project: "example-app", region: "results", layoutHash: hash},
+  envelope: {round: 2, project: "example-app", region: "results", parentAt: hash},
   anatomies: [{
     id: "a",
     axes: {dataOwner: "parent", repetition: "repeats", weight: "populated", composition: "label-value"},
@@ -178,12 +178,6 @@ const worktreeRoots = write("worktree-roots.json", {
   project: "example-app",
   source: root,
   roots: {
-    registries: {
-      path: ".worktrees/example-app/registries",
-      durability: "durable",
-      ignored: false,
-      ownership: {locked: true, clean: true, branch: "registry/example-app", owningGit: root},
-    },
     businesses: {
       path: ".worktrees/example-app/businesses",
       durability: "durable",
@@ -219,9 +213,7 @@ try {
   if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", fakeDirections, "--vocabulary", vocabulary).includes("same render-affecting token decisions")) {
     throw new Error("fake direction choices failed for the wrong reason");
   }
-  if (!mustFail("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary, "--hash").includes("recommendation has no approval hash")) {
-    throw new Error("direction --hash failed for the wrong reason");
-  }
+  run("--schema", join(root, "brainstorms", "directions", "schema.json"), "--data", directionBatch, "--vocabulary", vocabulary, "--hash");
   run("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", layouts, "--vocabulary", vocabulary, "--hash");
   if (!mustFail("--schema", join(root, "brainstorms", "layouts", "schema.json"), "--data", geometryLayouts, "--vocabulary", vocabulary, "--hash").includes("geometry")) {
     throw new Error("schema 2 layout without child geometry failed for the wrong reason");
@@ -236,7 +228,7 @@ try {
   }
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", blocks, "--hash");
   run("--schema", join(root, "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
-  console.log("ok  evidence recommendation, one combined layout approval hash, independent block hash, and dependency edge hold");
+  console.log("ok  evidence recommendation, session-local candidate keys, current-parent block binding, and cache-only design roots hold");
 } finally {
   rmSync(temp, {recursive: true, force: true});
 }

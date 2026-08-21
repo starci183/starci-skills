@@ -23,8 +23,8 @@ per route. Every region hashes its minimum child bounding geometry (`placement`,
 and one impressionistic child brief (`kind`, title, summary, representative labels, values and actions). The
 full-page composition makes purpose, density and reading order imaginable without approving exact parts,
 fields, copy, actions, states or data ownership. Each node is `existing`, `proposed` or `new`; `existing` cites
-the real source and SHA-256 source hash and cannot differ between choices. Schema 1–3 remain valid only
-for immutable accepted history. It never names a class. Classes are decided later from the accepted shape;
+the real source and SHA-256 source hash and cannot differ between choices. New session artifacts use schema 4;
+older schemas are unsupported input. It never names a class. Classes are decided after selection in the same invocation;
 a candidate that carries one has spent a decision that was not its to spend.
 
 Every region cites something that exists: an entry in the contract, or an explicit statement that a
@@ -128,9 +128,9 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 | `LAYOUT-9` | A pinned region rests below the chrome of the page it stands on, measured from that page's own frame, and declares a height cap in the same decision as the offset. | an offset carried over from another page, or an offset with no cap |
 | `LAYOUT-10` | A region's width is written by the contract composing the row it sits in, aimed at the child's identity rather than its position, taken from the closed class union, with every fixed measure paired against shrinking. | a region deciding its own width, or a width aimed at a sibling index |
 | `LAYOUT-11` | This law returns a classification — full-width run or compact control — never a width. Both owner rulings on the same control stand. | picking one of the two rulings as a default |
-| `LAYOUT-12` | Every region gets an impressionistic child brief before layout review: whether the block exists, whether this candidate uses it, its purpose, representative content, approximate density and reading order, and whether the registry is reused, extended or missing. It must be recognizable rather than blank, while exact parts, fields, states, data ownership and copy belong only to the later block round. | either blank boxes or final block anatomy while the parent layout is still proposed |
+| `LAYOUT-12` | Every region is recognizable and functionally complete in each page candidate: purpose, representative content, production-like density, reading order, reachable states and current contract ownership are visible. Layout implementation happens after this same review; there is no deferred block-head completion phase. | blank boxes, toy summaries or a page that requires another task to become implementable |
 | `LAYOUT-13` | Only an explicitly requested product surface may become a layout identity or flow node. An example introduced to explain capability remains evidence until the owner explicitly promotes it into scope. | turning “for example create order” into a product page |
-| `LAYOUT-14` | Modes that share one route and one page owner are block states. Layout preview renders the evidenced default state only; later block review enumerates the remaining modes. | generating sign-in, sign-up and recovery as separate layouts or layout variants |
+| `LAYOUT-14` | Modes that share one route and one page owner are states of that page. The layout candidate renders every evidenced mode before implementation. | generating sign-in, sign-up and recovery as separate layouts, or deferring their states to another task |
 
 ## Rules
 
@@ -143,7 +143,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 6. A missing product decision is returned to the owner. It is never guessed to complete a batch.
 7. A candidate's JSON is canonical — fixed key order, no timestamps, no per-run ids — because its hash
    is what the owner's approval attaches to.
-8. Feedback opens a new round. An accepted candidate is never edited in place.
+8. Feedback replaces the cache round. No candidate survives as durable authority after the invocation.
 
 ## Preview
 
@@ -159,7 +159,7 @@ must map to authored HTML and each irrelevant family is explicitly `not-applicab
 Content inside a region is rendered as authored product HTML from its hashed brief. Representative names, values
 and actions make the block's purpose, density and reading order imaginable; review/schema/debug labels stay
 outside the product canvas. A login region may therefore show
-credential-shaped examples, while sign-up and recovery remain later block states. A flow cue appears only when
+credential-shaped examples, while sign-up and recovery remain states in the same page candidate. A flow cue appears only when
 that flow is explicitly in product scope and renders as its complete page set.
 Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
 when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated

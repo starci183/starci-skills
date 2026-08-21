@@ -34,9 +34,8 @@ local action đã yêu cầu theo thứ tự registry:
    `.workspace/ports/<project>.json`; init không copy ownership đó vào product. Với mỗi role, ghi
    `grammar` và `grammarProfile` cùng null hoặc thành cặp đã khai rõ, có grammar authority package/profile thật;
    không suy ra chúng từ identity.
-4. **Worktrees** — verify design registry, business authority và cache root của project bằng account
-   worktree của Git cùng path policy. Tạo hoặc reuse `businesses` độc lập trên
-   `codex/businesses/<project>`; không đặt nó trong design-registry worktree hay cache dùng một lần.
+4. **Worktrees** — verify business authority và ignored cache root của project bằng account worktree của Git
+   cùng path policy. Tạo hoặc reuse `businesses` trên `codex/businesses/<project>`; không tạo design registry.
 
 Nêu evidence và action chính xác của từng boundary trước khi đổi. Chỉ thị init trực tiếp đã nêu Source và
 Project cần thiết cho phép các local write có giới hạn này; không thêm approval stop chung. Chỉ hỏi nếu
@@ -53,5 +52,5 @@ yêu cầu hoặc proof của nó.
 - Đã có ciphertext nhưng không có identity gốc, hoặc identity không decrypt được sample.
 - Project/role cần cho boundary chưa được owner khai.
 - Route stale không được repoint âm thầm; phải trình replacement.
-- Git owner lạ, legacy registry dirty, hoặc registry branch collision.
+- Git owner lạ hoặc business-authority branch collision.
 - Yêu cầu sửa product repository; init chỉ mô tả target và sở hữu Source-local state.

@@ -1,4 +1,4 @@
-// Scan this machine's workspace routes and design registries, and write what the console
+// Scan this machine's workspace routes and project-local state roots, and write what the console
 // renders. Read-only: it opens no editor, writes no route, prunes nothing.
 //
 //   node .claude/scripts/export-console-state.mjs --out <console-checkout>/public/state.json
@@ -350,13 +350,13 @@ function readWorkspaces() {
         reason = `route records branch ${branch}; the checkout is on ${liveBranch}`;
       } else if (!contract && role === "fe" && !/^discovered:none\b/.test(config.context?.contractSource ?? "")) {
         // A null contract on a frontend role is a finding by default — most of the time it means
-        // nobody has looked yet, and a monorepo hides the registry from a one-app convention. But a
+        // nobody has looked yet, and a monorepo hides the contract vocabulary from a one-app convention. But a
         // search that genuinely found nothing is a different fact from a search that never ran, and
         // this route has no way to say which unless contractSource records it. `discovered:none` is
         // that record: it names the search as done, not skipped, so this project stops being flagged
-        // every scan while a registry that doesn't exist keeps not existing.
+        // every scan while a contract vocabulary that doesn't exist keeps not existing.
         verdict = "stale";
-        reason = "frontend role with no contract recorded — look for the registry before trusting this";
+        reason = "frontend role with no contract recorded — look for the contract vocabulary before trusting this";
       }
 
       const remnant = diskPathExists ? readRemnant(diskPath) : null;
@@ -372,90 +372,13 @@ function readWorkspaces() {
   return rows;
 }
 
-// One row per artifact actually on disk. A count answers "is there anything?"; a reader opening a
-// registry is asking "what, exactly?" — and the answer has to be files, not a number.
-function readEntries(registries) {
-  const rows = [];
-  for (const kind of ["layouts", "blocks"]) {
-    for (const state of ["queued", "approved", "rejected"]) {
-      const dir = join(registries, kind, state);
-      if (!existsSync(dir)) continue;
-      for (const name of readdirSync(dir)) {
-        if (!name.endsWith(".json")) continue;
-        const path = join(dir, name);
-        let hash = null;
-        let surface = null;
-        let members = null;
-        try {
-          const data = JSON.parse(readFileSync(path, "utf8"));
-          hash = data.hash ?? data.chosen?.hash ?? null;
-          surface = data.envelope?.surface ?? data.envelope?.region ?? data.surface ?? null;
-          members = Array.isArray(data.candidates) ? data.candidates.length : Array.isArray(data.anatomies) ? data.anatomies.length : null;
-        } catch {
-          warnings.push(`unreadable artifact in the registry: ${path}`);
-        }
-        rows.push({kind, state, file: name, hash, surface, members, bytes: statSync(path).size, changedAt: statSync(path).mtime.toISOString()});
-      }
-    }
-  }
-  return rows;
-}
-
-// The map files are the registry's own index. Reading them raw is deliberate: a console that
-// summarises an index can disagree with it, and then two things claim to know the current head.
-function readMaps(registries) {
-  const maps = [];
-  for (const kind of ["layouts", "blocks"]) {
-    const dir = join(registries, kind, "map");
-    if (!existsSync(dir)) continue;
-    for (const name of readdirSync(dir)) {
-      if (!name.endsWith(".json")) continue;
-      try {
-        maps.push({kind, file: name, content: JSON.parse(readFileSync(join(dir, name), "utf8"))});
-      } catch {
-        warnings.push(`unreadable map in the registry: ${join(dir, name)}`);
-      }
-    }
-  }
-  return maps;
-}
-
-function readRegistry(project, root) {
-  const registries = join(root, "registries");
-  if (!existsSync(registries)) return null;
-  const list = git(source, "worktree", "list") ?? "";
-  const line = list.split("\n").find((l) => l.replaceAll("\\", "/").includes(`worktrees/${project}/registries`)) ?? "";
-  const entries = readEntries(registries);
-  const count = (kind, state) => entries.filter((e) => e.kind === kind && e.state === state).length;
-  return {
-    branch: line.match(/\[([^\]]+)\]/)?.[1] ?? null,
-    locked: line.includes("locked"),
-    clean: (git(registries, "status", "--porcelain") ?? "") === "",
-    ownedHere: line !== "",
-    head: git(registries, "rev-parse", "--short=12", "HEAD"),
-    lastCommit: git(registries, "log", "-1", "--pretty=%s") ?? null,
-    counts: {
-      layoutsQueued: count("layouts", "queued"),
-      layoutsApproved: count("layouts", "approved"),
-      layoutsRejected: count("layouts", "rejected"),
-      blocksQueued: count("blocks", "queued"),
-      blocksApproved: count("blocks", "approved"),
-      blocksRejected: count("blocks", "rejected"),
-    },
-    entries,
-    maps: readMaps(registries),
-    decisions: existsSync(join(registries, "decisions")) ? readdirSync(join(registries, "decisions")).filter((n) => n.endsWith(".json") || n.endsWith(".md")) : [],
-    rejections: existsSync(join(registries, "rejections")) ? readdirSync(join(registries, "rejections")).filter((n) => n.endsWith(".json") || n.endsWith(".md")) : [],
-  };
-}
-
 const projects = dirs(join(source, ".worktrees")).map((project) => {
   const root = join(source, ".worktrees", project);
   const roots = {
-    registries: existsSync(join(root, "registries")),
+    businesses: existsSync(join(root, "businesses")),
     cache: existsSync(join(root, "cache")),
   };
-  return {project, root, roots, registry: readRegistry(project, root)};
+  return {project, root, roots};
 });
 
 const workspaces = readWorkspaces();

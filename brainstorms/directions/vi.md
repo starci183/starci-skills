@@ -21,7 +21,7 @@ không quyết định layout, giải phẫu block hay class.
 Gu thị giác là một quyết định sản phẩm. Máy có thể từ chối token bịa, phương án trùng hay recommendation
 không truy được về bằng chứng; máy không thể tuyên bố một phương án hợp lệ là đẹp. Tầng này chọn đúng một
 object làm recommendation tạm thời để thiết kế cấu trúc tiếp tục mà không mở checkpoint owner riêng.
-Owner duyệt hoặc phản biện direction đó khi nó đã nằm trong candidate layout dưới layout hash duy nhất.
+Owner duyệt hoặc phản biện direction đó khi nó đã nằm trong cache candidate và kết quả được implement trong cùng invocation.
 
 Kho style bên ngoài chỉ là nguồn đề xuất. Một đề xuất chỉ thành candidate sau khi được phát biểu bằng
 vốn của project này, hoặc gọi tên mọi token mới mà nó sẽ cần.
@@ -34,13 +34,12 @@ cố định, không phải trục candidate. Mọi direction mang cùng `locked
 |---|---|---|
 | 1 | Yêu cầu, đối tượng, tác vụ và cảm giác mong muốn | trang trí thay chỗ cho ý định sản phẩm |
 | 2 | Bản kiểm kê CSS custom property được sinh từ source | candidate gọi tên giá trị sản phẩm không biểu đạt được |
-| 3 | Màn hình đã duyệt và bằng chứng thương hiệu của project này | lịch sử thị giác của chính sản phẩm bị bỏ qua |
+| 3 | Current source screen và bằng chứng thương hiệu của project này | ngôn ngữ thị giác đang ship bị bỏ qua |
 | 4 | Hướng dẫn design system vendor mà frontend đang dùng | ngữ nghĩa component và ý định thị giác mâu thuẫn |
 | 5 | Bộ trục direction đóng | bốn cái tên che một lựa chọn thị giác |
-| 6 | Tiền lệ direction đã chấp nhận cùng những cái bị từ chối | gu đã bị từ chối quay lại dưới tên mới |
 
 Kho công khai, tên style, palette và cặp font có thể mở rộng vùng tìm kiếm. Chúng không bao giờ đứng
-trên sáu đầu vào và không được chép vào cây làm canon.
+trên năm đầu vào và không được chép vào cây làm canon.
 
 ## Đọc bằng chứng
 
@@ -83,7 +82,7 @@ Một vai trò có đúng một phán quyết:
 | `none` | một vai trò radius, elevation hay motion tuỳ chọn được chủ ý bỏ | vì sao sự vắng mặt thuộc direction |
 
 Tên token dùng lại được neo vào trạng thái source trong `vocabularyAt`. Token mới mang giá trị CSS chính
-xác vì preview và layout hash về sau phải buộc vào cùng một quyết định. Utility class, font tải về và biến vendor sao
+xác vì preview và same-session source implementation phải buộc vào cùng một quyết định. Utility class, font tải về và biến vendor sao
 chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt riêng.
 
 ## Quy tắc
@@ -93,9 +92,9 @@ chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt ri�
 3. Mọi direction ánh xạ đủ mười ba vai trò; `none` chỉ hợp lệ với radius, elevation, duration và easing.
 4. Mọi direction gọi tên ba đến năm từ tính cách và một đến năm điều từ chối rõ ràng.
 5. Không hai direction nào trong một lô trùng cả bộ trục hoặc toàn bộ ánh xạ vai trò sang token.
-6. Có ít nhất một direction rời tiền lệ gần nhất khi tiền lệ tồn tại.
+6. Có ít nhất một direction khác đáng kể current-source precedent gần nhất khi source có precedent.
 7. Chỉ trả ít hơn ba khi bằng chứng chỉ cho phép ít hơn, và nói lý do; không bao giờ nhồi cho đủ.
-8. Feedback mở một lượt mới. Direction đã chấp nhận không bao giờ bị sửa tại chỗ.
+8. Feedback thay cache round; direction không trở thành durable authority ngoài invocation.
 9. Mọi batch schema 2 đề xuất đúng một candidate và ghi lý do dựa trên evidence.
 10. Visual contract của grammar được chép byte-for-byte vào `lockedTokens`; đổi trục, role token hay giá trị đều làm direction bị từ chối.
 
@@ -106,7 +105,7 @@ text, action, form control, hàng lặp, bề mặt có biên, overlay và lỗi
 từ kiểm kê, nhưng không được đưa vào giá trị vắng mặt trong quyết định JSON.
 
 Cùng nội dung là mẫu đối chứng. Đổi layout hay copy giữa các candidate khiến người chủ so hai sản phẩm
-thay vì hai direction. HTML là bằng chứng có thể dựng lại; lời duyệt gắn vào JSON.
+thay vì hai direction. HTML và JSON là session evidence dựng lại được; approval bind selected candidate với disclosed source boundary.
 
 ## Từ chối
 
@@ -126,8 +125,8 @@ node @artifact-validator \
 ```
 
 Vòng direction không có approval hash và không có checkpoint owner riêng. Object direction được đề xuất
-được chép nguyên vào mọi candidate layout trong cùng layout round, nơi một `OK` trên layout hash duyệt
-đồng thời ý định thị giác với sườn. Snapshot vốn khớp `@visual-vocabulary-schema`.
+được chép nguyên vào mọi candidate layout trong cùng cache round, nơi một `OK` duyệt đồng thời ý định thị giác,
+composition và disclosed source boundary. Snapshot vốn khớp `@visual-vocabulary-schema`.
 
 ## Ví dụ đã giải
 

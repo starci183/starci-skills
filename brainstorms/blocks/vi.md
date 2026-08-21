@@ -45,7 +45,7 @@ Tám, không hơn.
 
 **Đầu vào số 6 tồn tại vì contract không trả lời được nó.** `optional: true` khai **sự hiện diện** và
 không gì hơn: đang tải, thất bại và rỗng đều rơi vào cùng một cờ đó. Tách chúng ra thì phải đọc từ source
-của page và block, không bao giờ được suy từ registry.
+của page và block, không bao giờ được suy từ cached review state.
 
 Không đọc ở tầng này: mảng class, lựa chọn theme chưa duyệt, chữ theo locale, lint.
 
@@ -144,8 +144,8 @@ blocked: <những phần không giải được nếu thiếu nó>
 ## Đầu ra
 
 Đầu ra **chính là** JSON, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này.
-`envelope` giữ những thứ đổi theo lượt — kể cả `layoutHash` đã được chấp nhận mà region này đến từ.
-Layout đó đã buộc direction, nên block không mang hash phụ thuộc thứ hai — và hash chỉ phủ **một giải phẫu**.
+`envelope` giữ những thứ đổi theo lượt — gồm `parentAt`, digest chỉ sống trong phiên của current source page.
+Anatomy hash chỉ là cache key và chỉ phủ **một giải phẫu**.
 
 ```json
 {
@@ -154,7 +154,7 @@ Layout đó đã buộc direction, nên block không mang hash phụ thuộc th�
     "round": 1,
     "project": "example-app",
     "region": "criteria",
-    "layoutHash": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
+    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
   },
   "anatomies": [
     {

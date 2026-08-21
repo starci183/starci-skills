@@ -46,8 +46,8 @@ thời gian dựng lại, không mất authority.
 
 ## Placement
 
-Metadata bền nằm dưới `<Source>/.worktrees/<project>/registries/conversations`. Immutable snapshot object
-nằm dưới `conversations/objects/sha256`; `conversation-registry-v1.json` giữ current heads. Transcript đã
+Metadata bền nằm dưới worktree được route riêng `<Source>/.worktrees/<project>/conversations`. Immutable snapshot
+object nằm dưới `objects/sha256`; `conversation-registry-v1.json` giữ current heads. Transcript đã
 decrypt, SQLite index và vectors nằm dưới `<Source>/.worktrees/<project>/cache/conversations`.
 
 External ciphertext reference phải ổn định, không chứa query string, temporary signature, credential hay
@@ -62,7 +62,7 @@ bearer value. Encryption credential ở Source credential authority, không ở 
 5. Redacted summary không chứa credential/private tool output.
 6. Search projection là cache, dựng lại được.
 7. Ghi provider history cần explicit access; không có thì báo, không bịa.
-8. Conversation provenance không advance FE layout/block head hay BE capability/operation head.
+8. Conversation provenance không biến cached frontend preview thành authority hay advance BE capability/operation head.
 
 ## Output
 

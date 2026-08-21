@@ -42,8 +42,8 @@ them loses time, not authority.
 
 ## Placement
 
-Durable metadata lives below `<Source>/.worktrees/<project>/registries/conversations`. Immutable snapshot
-objects live below `conversations/objects/sha256`; `conversation-registry-v1.json` owns current heads.
+Durable metadata lives below the independently routed `<Source>/.worktrees/<project>/conversations` worktree.
+Immutable snapshot objects live below `objects/sha256`; `conversation-registry-v1.json` owns current heads.
 Decrypted transcripts, SQLite indexes and vectors live below `<Source>/.worktrees/<project>/cache/conversations`.
 
 An external ciphertext reference must be stable and must not contain a query string, temporary signature,
@@ -59,7 +59,7 @@ conversation metadata.
 5. Redacted summaries contain no credential or private tool output.
 6. Search projections are cache and can be rebuilt.
 7. Recording provider history requires explicit access; absence is reported, never fabricated.
-8. Conversation provenance never advances FE layout/block heads or BE capability/operation heads.
+8. Conversation provenance never turns cached frontend previews into authority or advances BE capability/operation heads.
 
 ## Output
 

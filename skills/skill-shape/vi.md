@@ -70,9 +70,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười chín năng lực
+## Mười tám năng lực
 
-Mười bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười sáu capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -89,19 +89,16 @@ thể ngay từ đầu nó đã đúng.
 | `starci-diagnose` | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
-| `starci-fe-design-layout` | chất vấn và compose preview page/page-flow nguyên vẹn đã bind source; chỉ đưa ra alternative thực sự cải thiện quyết định |
-| `starci-fe-design-block` | đánh giá region trong toàn accepted page và chỉ đưa ra anatomy khác biệt đáng kể, buộc theo hash |
-| `starci-fe-design-execute` | source frontend, chỉ sau khi mọi hash đạt tới được đã được chấp nhận |
-| `starci-fe-feedback-evolve` | biến feedback owner đã chứng minh thành cải tiến authority bền vững nhỏ nhất, design revision thay thế và source correction |
+| `starci-fe-design-layout` | chất vấn, preview, duyệt và implement một page/page flow đã bind source trong cùng invocation |
+| `starci-fe-design-block` | đánh giá, preview, duyệt và implement một region trong current complete page ở cùng invocation |
+| `starci-fe-feedback-evolve` | biến feedback owner đã chứng minh thành cải tiến authority bền vững nhỏ nhất và source correction |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |
 | `starci-fe-minor-fix` | một correction nhỏ giữ nguyên contract trong một folder block, composite hoặc leaf hiện hữu và sạch; machine reject khi scope lớn lên |
 | `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | sự chấp thuận, rồi source backend |
 
-Layout resolve hoặc tạo stable `layoutId` cho page set đã compose và tái dùng nested layout existing có source binding. Execute vẫn từ chối ghi khi còn region dưới accepted head chưa
-có current accepted block. `OK` chỉ cấp quyền cho
-boundary đã hiển thị; không skill nào tự cho rằng capability khác đã được yêu cầu.
+Layout và block design dùng candidate identity chỉ sống trong phiên, tái dùng composition existing đã bind source và implement kết quả được duyệt trước khi cùng invocation kết thúc. `OK` chỉ cấp quyền cho source boundary đã hiển thị; không skill nào tự cho rằng capability khác đã được yêu cầu.
 
 ## Khóa ngữ cảnh
 
@@ -133,12 +130,10 @@ phải tín hiệu approval.
 
 ## Quyết định và thi hành
 
-**Các lượt design** chính là mặt để rà soát. Lựa chọn direction hỗ trợ một lượt layout và không có
-approval hash hay checkpoint owner riêng. Candidate chính xác cùng recommendation dựa trên evidence nằm
-trong `directionReview`, còn object được đề xuất nằm trong mọi candidate layout. Owner xem hai quyết định
-cùng lúc; một `OK` chấp nhận layout hash mặc định và vì vậy chấp nhận direction được nhúng. Mỗi lượt giữ
-đúng prompt, candidate, feedback và phán quyết của owner. Phản hồi về direction hoặc structure mở lượt
-mới; nó không bao giờ sửa lượt đã được chấp nhận.
+**Các lượt design** là session evidence tùy chọn. Lựa chọn direction hỗ trợ một lượt layout và không có
+durable hash hay checkpoint owner riêng. Candidate chính xác cùng recommendation dựa trên evidence nằm
+trong project cache của invocation hiện tại. Một `OK` chọn recommendation và cấp quyền cho source boundary
+đã công bố. Feedback mở cache round mới; sau approval cùng invocation implement kết quả.
 
 Mọi frontend design candidate phải là trang HTML functional, self-contained với representative business density
 gần production. Trước khi vẽ phải inventory condition viewport, overlay, disclosure, async, data, permission và
@@ -169,10 +164,10 @@ quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agen
 
 ## Bản ghi
 
-Không có report file riêng. Design authority bền nằm dưới
-`<Source>/.worktrees/<project>/registries`: stable layout/block IDs trỏ tới accepted hashes, immutable
-objects giữ candidate bodies, và `reviews/` tùy chọn giữ prompt, feedback, verdict. Progress dựng lại được
-nằm dưới `cache/drafts`; repair ở commit/diff; lượt chỉ đọc không ghi file trừ khi được yêu cầu rõ.
+Không có report file riêng hay design registry bền vững. Design candidate, selected preview và review manifest
+nằm dưới `<Source>/.worktrees/<project>/cache/design/<session-id>` và hết hiệu lực cùng invocation. Frontend
+source, test và browser proof là accepted design outcome bền vững. Business và conversation authority giữ store
+được route riêng. Repair ghi bằng commit/diff; lượt chỉ đọc không ghi file trừ khi được yêu cầu rõ.
 
 Một boundary được duyệt gọi tên `Approved revision: <identity>` và trích đúng identity đó cùng baseline
 commit. Chính cặp đó chứng minh cái gì đã đổi sau khi được cấp quyền, và nó sống sót ở bất cứ nơi nào
@@ -191,8 +186,8 @@ thêm**.
 2. Mọi hành động `own` tiếp tục không hỏi; không được kết thúc khi `own > 0`.
 3. Chỉ hỏi `need approval` thật, với một default đang hiển thị.
 4. Chỉ `OK` consume approval đang hiển thị và resume ngay.
-5. Một stable layout/block ID có một accepted head; thay head thì append history, không sửa hashed object.
-6. Execute chỉ chạy khi mọi hash reachable đã accepted.
+5. Design approval và source implementation xảy ra trong cùng invocation; cached candidate key không bao giờ là durable authority.
+6. Task khác dựng lại design evidence từ current source, contract, grammar và business truth.
 7. Baseline lấy sau `OK` và trước production write đầu tiên.
 8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
 9. Việc chia an toàn được thì nhắm mười assignment không chồng lấn; một coordinator giữ gate shared-state.

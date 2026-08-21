@@ -115,8 +115,8 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Nineteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. Seventeen do the work; two only look — one at the machine, one at the other skills.
+Eighteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+record. Sixteen do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
 |---|---|
@@ -130,10 +130,9 @@ record. Seventeen do the work; two only look — one at the machine, one at the 
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
-| `starci-fe-design-layout` | one stable `layoutId` whose accepted head binds a complete source-aware page/page-flow composition selected by visual judgment and evidence |
-| `starci-fe-design-block` | one stable `(layoutId, blockId)` head whose accepted anatomy is judged inside its complete current page |
-| `starci-fe-design-execute` | frontend source, only from one layout head whose every declared region has a current accepted block head |
-| `starci-fe-feedback-evolve` | proven owner feedback evolved through the correct durable authority layer, superseding design revisions and affected frontend source |
+| `starci-fe-design-layout` | one complete source-aware page/page flow designed, reviewed, implemented and proved in one invocation; previews remain cache |
+| `starci-fe-design-block` | one block judged, reviewed, implemented and proved inside its current complete page in one invocation |
+| `starci-fe-feedback-evolve` | proven owner feedback evolved through the correct durable authority layer and affected frontend source |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
 | `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
 | `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |

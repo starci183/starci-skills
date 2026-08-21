@@ -26,7 +26,7 @@ result is an immutable machine model plus a compact `CONTEXT.md`, task-routed mo
 ## Boundary
 
 The skill reads routed product source and tests, and writes only the project's business worktree. It
-never edits product source, design registry, workspace routes, deployment state or imported examples.
+never edits product source, design preview cache, workspace routes, deployment state or imported examples.
 Unproved claims become explicit unknowns.
 
 ## Run
