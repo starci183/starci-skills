@@ -55,6 +55,7 @@
       },
       "reason": "Nivo reuses the strict StarCi console topology while this profile owns its unicorn-red accent and soft selected surface; Academy rose is invalid here."
     },
+    "continuation-highlight": { "decision": "new-required", "component": "ContinuationHighlightCard", "primitive": "SurfaceCard", "principleMode": "delta", "principleConcerns": ["colour", "gap", "state", "surface-in-surface"], "capsuleRefs": ["continuation-highlight"], "reason": "The shared grammar reserves one owner if a Nivo surface ever proves the same singular continuation facts." },
     "surface-list": { "decision": "reuse", "component": "SurfaceListCard", "primitive": "HeroUI Card", "principleMode": "inherit", "principleConcerns": [], "capsuleRefs": ["surface-list"] },
     "surface-accordion": { "decision": "reuse", "component": "SurfaceAccordionCard", "primitive": "HeroUI Accordion", "principleMode": "inherit", "principleConcerns": [], "capsuleRefs": ["hierarchical-disclosure"] },
     "selection-listbox": { "decision": "extend", "component": "SelectionList", "primitive": "HeroUI ListBox", "principleMode": "delta", "principleConcerns": ["focus-order", "state", "target-size"], "capsuleRefs": ["selection-listbox"], "reason": "Destination navigation extends the closed ListBox owner instead of assembling mechanics locally." },

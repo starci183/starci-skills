@@ -5,7 +5,14 @@
   "kind": "golden",
   "because": "Authored milestone labels live in a resizable content rail whose long groups scroll below pinned controls.",
   "facts": [
+    "collection-hierarchical",
     "collection-navigation",
+    "interaction-local-disclosure",
+    "selection-single",
+    "active-item-present",
+    "keyboard-navigation-required",
+    "filter-local",
+    "group-progress-present",
     "region-adjacent",
     "region-persistent",
     "region-independent-scroll",
@@ -16,6 +23,11 @@
     "scroll-internal"
   ],
   "expectedOutcomes": [
+    "surface-accordion",
+    "selection-listbox",
+    "active-descendant-follow",
+    "search-reveals-matches",
+    "adaptive-group-summary",
     "resizable-rail",
     "rail-content-spacing",
     "navigation-groups-scroll-viewport"

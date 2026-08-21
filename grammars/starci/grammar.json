@@ -3,10 +3,25 @@
   "schemaVersion": 1,
   "grammar": "starci",
   "grammarId": "starci-ui",
-  "version": 17,
+  "version": 18,
   "factCatalog": "./facts.json",
   "evidenceCatalog": "./capsules.json",
   "rules": [
+    {
+      "id": "single-primary-continuation-highlight",
+      "slot": "continuation-presentation",
+      "priority": 300,
+      "when": {
+        "all": ["continuation-target-present", "continuation-target-singular", "continuation-target-primary"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "continuation-highlight",
+        "obligations": ["exactly-one-highlighted-continuation", "accent-soft-highlight-ground", "single-primary-continuation-action", "identity-progress-action-order", "secondary-destinations-remain-ordinary"]
+      },
+      "capsuleRefs": ["continuation-highlight"]
+    },
     {
       "id": "authenticated-dashboard-uses-starci-theme",
       "slot": "dashboard-visual-theme",

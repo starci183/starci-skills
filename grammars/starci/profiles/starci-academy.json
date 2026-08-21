@@ -55,6 +55,7 @@
       },
       "reason": "Dashboard and console surfaces reuse StarCi topology while this Academy profile alone owns the exact rose accent; another product must declare its own profile."
     },
+    "continuation-highlight": { "decision": "new-required", "component": "ContinuationHighlightCard", "primitive": "SurfaceCard", "principleMode": "delta", "principleConcerns": ["colour", "gap", "state", "surface-in-surface"], "capsuleRefs": ["continuation-highlight"], "reason": "Academy continuation surfaces share one semantic highlight owner instead of rebuilding next-task emphasis per page." },
     "surface-list": { "decision": "reuse", "component": "SurfaceListCard", "primitive": "HeroUI Card", "principleMode": "inherit", "principleConcerns": [], "capsuleRefs": ["surface-list"] },
     "surface-accordion": { "decision": "reuse", "component": "SurfaceAccordionCard", "primitive": "HeroUI Accordion", "principleMode": "inherit", "principleConcerns": [], "capsuleRefs": ["hierarchical-disclosure"] },
     "selection-listbox": { "decision": "extend", "component": "SelectionList", "primitive": "HeroUI ListBox", "principleMode": "delta", "principleConcerns": ["focus-order", "state", "target-size"], "capsuleRefs": ["selection-listbox"], "reason": "Destination navigation extends the closed ListBox owner instead of assembling mechanics locally." },

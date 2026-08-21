@@ -53,7 +53,7 @@
       "templateRef": "./templates/hierarchical-disclosure.template.tsx",
       "templateHash": "sha256:d946cb527e92d828e40c93e4bad7fc169a3ddd49b174086a3f7f58f1fde844f9",
       "rulings": ["founder-feedback:2026-08-21:long-hierarchy-renders-as-accordion"],
-      "goldenCaseRefs": ["course-content-map"]
+      "goldenCaseRefs": ["course-content-map", "personal-project-milestone-rail"]
     },
     {
       "id": "selection-listbox",
@@ -266,6 +266,23 @@
       "templateHash": "sha256:a2a57036d3c2ec3b54eff48e65b8f60891d2fd9cec8130c6cd4d88527a8f6273",
       "rulings": ["founder-feedback:2026-08-21:grammar-must-know-markdown-content"],
       "goldenCaseRefs": ["authored-markdown-document", "markdown-outline-from-document-model"]
+    },
+    {
+      "id": "continuation-highlight",
+      "intent": "Give exactly one persisted next or resume destination the highlighted continuation surface while every secondary destination remains ordinary.",
+      "triggerFacts": ["continuation-target-present", "continuation-target-singular", "continuation-target-primary"],
+      "decisionQuestions": ["Is exactly one destination the learner's persisted next decision?", "Would highlighting more than one destination destroy the primary continuation hierarchy?"],
+      "variableAxes": ["continuation-progress", "secondary-destinations"],
+      "invariants": ["exactly-one-highlighted-continuation", "accent-soft-highlight-ground", "single-primary-continuation-action", "identity-progress-action-order", "secondary-destinations-remain-ordinary"],
+      "interactionProof": [
+        { "id": "one-highlight-only", "kind": "dom", "assertion": "Exactly one continuation surface carries highlighted emphasis in the addressed section." },
+        { "id": "primary-action-continues", "kind": "interaction", "assertion": "The highlighted surface exposes one keyboard-operable action that opens the persisted continuation target." }
+      ],
+      "counterexampleCaseRefs": ["continuation-collection-not-highlight"],
+      "templateRef": "./templates/continuation-highlight.template.tsx",
+      "templateHash": "sha256:1eef4f0f5b40553a8536c13f2bbbd74a94fad9022f773ae7bb8ef2feb008e52a",
+      "rulings": ["founder-feedback:2026-08-21:continue-learning-uses-one-legacy-highlight-card"],
+      "goldenCaseRefs": ["single-continuation-highlight"]
     },
     {
       "id": "heroicons-extension",
