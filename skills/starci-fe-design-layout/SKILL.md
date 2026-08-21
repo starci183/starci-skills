@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Challenge, design or revise one composed frontend page or flow using GPT‑5.6 visual judgment, source precedent and StarCi truth/proof boundaries. Renders a functional authored HTML prototype covering every evidenced UI condition and publishes one accepted immutable revision; never writes frontend source.
+description: Confirm whether the owner wants one composed page or an end-to-end page flow, then challenge, design or revise that exact frontend scope using GPT‑5.6 visual judgment, source precedent and StarCi truth/proof boundaries. Renders functional authored HTML covering every evidenced UI condition and publishes one accepted immutable revision; never writes frontend source.
 ---
 
 # starci-fe-design-layout
@@ -36,6 +36,19 @@ Read `@skill-shape` first. The caller supplies one stable `layoutId`; that ident
 not one framework layout component. The input is either one screenshot/current page or an explicitly requested
 multi-page flow. This skill renders the complete visible experience and does not write frontend source.
 
+Before reading the request as either mode, open one mandatory **scope checkpoint**. State the evidence-backed
+recommendation and ask the owner to confirm exactly one boundary:
+
+- `page` — the photographed/current composed page, including every reachable modal, drawer, popover, menu,
+  responsive form, async/data/permission state and floating surface owned by that page;
+- `flow` — every route/page/step from an explicit start to an explicit end, with shared layouts reused and each
+  page carrying its own reachable overlays and states.
+
+A screenshot never silently authorizes following its primary action into another page. A phrase such as “the
+whole journey”, “enter the exam”, “submit”, “result”, or an ordered sequence recommends `flow`, but the agent
+still confirms the start/end boundary. This checkpoint is the scope decision for the layout round, not an extra
+visual-direction approval. Once confirmed, do not ask again unless new evidence would add a page outside it.
+
 A composed page is the ordered nested layout chain plus its routed page, current state and every visible modal,
 drawer, popover, panel or floating action. Decomposition is internal evidence; the owner reviews full viewports.
 Every composition node is classified `existing`, `proposed` or `new`. An `existing` node is bound to its source
@@ -66,9 +79,10 @@ registry's revision map and layout head are lookup authority; legacy objects are
    current business surface and visual vocabulary. Validate the grammar package before drawing. Inventory the real route tree and emit a compact pattern sheet naming every nested
    layout, page, active overlay, region, breakpoint and scroll owner. `Touching` names only the project registry
    and disposable cache.
-2. Convert the request into one page set. A screenshot produces exactly the visible page/state. A described flow
-   produces every explicitly requested page in order, with shared layouts represented once and reused. Examples
-   remain evidence unless the owner explicitly put them in scope.
+2. Run the scope checkpoint before converting the request into a page set. For `page`, include the whole composed
+   page and every reachable overlay/state without following route-changing actions. For `flow`, enumerate the
+   confirmed start page, every intermediate route/page/step, and the end/result page in order; shared layouts are
+   represented once and reused. Examples remain evidence unless the owner explicitly puts them in scope.
 3. Read `@directions` and `@layouts`, then run a short design challenge before drawing: identify the first visual
    focus, competing regions, navigation/content/evidence roles, reusable precedents, and the owner of width,
    divider, sticky and scroll behavior. Reject a composition that is only schema-complete. Evidence-select one
@@ -141,6 +155,8 @@ requirements. Choose them only when the accepted situation calls for them.
 - Missing/stale route, grammar/profile, grammar receipt, business truth, vocabulary or registry ownership → stop with exact evidence.
 - Missing stable `layoutId`, page-set decomposition, source evidence for an `existing` node, duplicate candidate
   axes or fabricated product content → refuse the draft.
+- Missing owner confirmation of `page` versus `flow`, or a flow without confirmed start/end boundaries → stop
+  before candidate generation.
 - Lorem ipsum, placeholder labels, generic cards, toy row counts, repeated filler or a visibly partial business
   surface → refuse the draft even when schema and interactions pass.
 - Fewer than 3 or more than 4 valid candidates, or candidates differing only by decoration → refuse the draft.

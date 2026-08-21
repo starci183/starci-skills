@@ -37,6 +37,14 @@ action, geometry, divider and scroll owner. A described flow means every explici
 consumes one owner choice, completes deterministic states and publishes one immutable accepted revision. It
 writes design records and review HTML, never frontend source.
 
+Before candidate work, always present one scope checkpoint with a recommendation and ask the owner to confirm:
+
+- `page`: this composed page plus every reachable modal, drawer, popover, menu, responsive form and state it owns;
+- `flow`: every route/page/step from a confirmed start through a confirmed end/result, with shared layouts reused.
+
+A screenshot does not authorize following a route-changing action. Journey language recommends `flow`, but the
+agent still confirms its start and end. This is the layout round's scope decision, not a second direction gate.
+
 **Authority.**
 
 JSON and HTML answer different questions:
@@ -68,7 +76,8 @@ Read `@skill-shape`, resolve the caller-supplied `layoutId`, verify the `fe` rou
 state, current business feature/surface and current visual vocabulary. First write a pattern sheet from the real
 route tree: ordered root/app/feature layouts, routed pages, overlays and regions. Mark every node `existing`,
 `proposed` or `new`. An `existing` node cites its source and source hash and is reused unchanged in every choice.
-`Touching` names only the project registry and disposable cache.
+`Touching` names only the project registry and disposable cache. Then run the mandatory scope checkpoint. A
+`page` stops at route-changing controls; a `flow` enumerates its confirmed start, intermediate pages and end.
 
 **2. Author the choices.**
 

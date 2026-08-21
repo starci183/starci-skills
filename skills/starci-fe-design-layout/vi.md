@@ -37,6 +37,14 @@ hiện, geometry, divider và scroll owner. Một flow được mô tả nghĩa 
 Nó nhận đúng một lựa chọn, hoàn tất state tất định rồi publish một accepted revision bất biến; không ghi frontend
 source.
 
+Trước khi tạo candidate, luôn mở đúng một scope checkpoint, đưa recommendation rồi yêu cầu owner xác nhận:
+
+- `page`: composed page hiện tại cùng mọi modal, drawer, popover, menu, responsive form và state reachable do page sở hữu;
+- `flow`: mọi route/page/step từ điểm bắt đầu đã xác nhận đến điểm kết thúc/result đã xác nhận, tái dùng shared layout.
+
+Một screenshot không tự cho phép đi theo action đổi route. Câu chữ mô tả hành trình khiến agent đề xuất `flow`,
+nhưng vẫn phải xác nhận start/end. Đây là quyết định scope của layout round, không phải direction gate thứ hai.
+
 **Thẩm quyền.**
 
 - `design.json` sở hữu identity, ownership nghiệp vụ/contract, grammar fact/decision/receipt, regions, accepted artifact, state IDs và viewport.
@@ -61,7 +69,8 @@ layout chấp thuận cả direction lẫn composition.
 1. Đọc `@skill-shape`; resolve `layoutId`, kiểm tra route `fe`, registry sạch/đúng owner, business surface và
    visual vocabulary hiện hành. Trước khi vẽ, lập pattern sheet từ route tree thật: root/app/feature layouts,
    routed pages, overlays và regions theo thứ tự lồng. Gắn mỗi node là `existing`, `proposed` hoặc `new`;
-   `existing` phải có source + source hash và được tái dùng nguyên trạng trong mọi phương án.
+   `existing` phải có source + source hash và được tái dùng nguyên trạng trong mọi phương án. Sau đó bắt buộc mở
+   scope checkpoint: `page` dừng trước control đổi route; `flow` liệt kê start, mọi page trung gian và end/result.
 2. Validate cặp grammar/profile được route khai rõ. Đọc `@directions` và `@layouts`, phân loại chỉ tình huống có
    bằng chứng thành closed fact rồi chạy `@resolve-grammar`. Outcome/owner emit ra là semantic constraint bắt buộc;
    thiếu fact hoặc owner `new-required` thì trả decision. Chọn một direction recommendation có bằng chứng, resolve region theo lý do
