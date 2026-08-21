@@ -5,20 +5,20 @@
   "capsules": [
     {
       "id": "dashboard-theme",
-      "intent": "Keep every authenticated StarCi dashboard and operational console inside one exact visual theme across chrome, navigation, content and responsive forms.",
+      "intent": "Keep every authenticated StarCi dashboard and operational console inside one exact profile-owned visual theme across chrome, navigation, content and responsive forms.",
       "triggerFacts": ["surface-dashboard-console"],
       "decisionQuestions": ["Is the addressed surface an authenticated dashboard or operational console?", "Does every viewport and navigation state preserve the same routed StarCi visual identity?"],
       "variableAxes": ["viewport-state", "navigation-state", "content-state"],
-      "invariants": ["exact-semantic-theme-tokens", "rose-accent-primary", "soft-rose-selected-surface", "warm-neutral-ground", "white-primary-surface", "eclipse-foreground", "neutral-separators", "starci-sans-typeset", "soft-rounded-surfaces", "measured-surface-shadow", "same-theme-all-viewports", "no-project-local-theme-substitution"],
+      "invariants": ["exact-semantic-theme-tokens", "profile-accent-primary", "soft-profile-accent-selected-surface", "warm-neutral-ground", "white-primary-surface", "eclipse-foreground", "neutral-separators", "starci-sans-typeset", "soft-rounded-surfaces", "measured-surface-shadow", "same-theme-all-viewports", "no-project-local-theme-substitution"],
       "interactionProof": [
         { "id": "exact-theme-token-values", "kind": "computed-style", "assertion": "Ground, surface, foreground, muted, accent, separator, typography, radius and elevation resolve to the exact grammar-locked token values." },
-        { "id": "selected-navigation-soft-rose", "kind": "computed-style", "assertion": "The selected navigation destination uses the soft rose surface derived from the locked StarCi accent." },
+        { "id": "selected-navigation-soft-profile-accent", "kind": "computed-style", "assertion": "The selected navigation destination uses the soft surface derived from the exact accent owned by the routed profile." },
         { "id": "theme-survives-layout-state", "kind": "state", "assertion": "Expanded rail, collapsed rail, mobile chrome and drawer keep the same locked theme contract." }
       ],
       "counterexampleCaseRefs": ["ordinary-surface-without-dashboard-theme"],
       "templateRef": "./templates/dashboard-theme.template.tsx",
-      "templateHash": "sha256:449f3ba4a4d1401211cdda5e81673d21a7a60fc8803c956cf50e4608a0626385",
-      "rulings": ["founder-feedback:2026-08-21:dashboard-has-one-strict-starci-theme"],
+      "templateHash": "sha256:4f4bbf2759240f4d34084216850e4252a6f2b3c2dc7204b7ec2e3f09d00c6c36",
+      "rulings": ["founder-feedback:2026-08-21:dashboard-has-one-strict-starci-theme", "founder-feedback:2026-08-21:nivo-console-keeps-starci-topology-with-unicorn-red-profile-accent"],
       "goldenCaseRefs": ["strict-starci-dashboard-theme"]
     },
     {

@@ -3,7 +3,7 @@
   "grammar": "starci",
   "caseId": "strict-starci-dashboard-theme",
   "kind": "golden",
-  "because": "An authenticated product dashboard has one routed StarCi Academy theme rather than a project-local visual alternative.",
+  "because": "An authenticated product dashboard has one routed StarCi theme whose exact accent belongs to its declared profile rather than to another product or a project-local substitution.",
   "facts": ["surface-dashboard-console"],
   "expectedOutcomes": ["starci-dashboard-theme"],
   "rejectedOutcomes": []
