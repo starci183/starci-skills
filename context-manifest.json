@@ -488,13 +488,13 @@
     "gates/be/lints/cdc/context.md": {
       "kind": "module",
       "source": "gates/be/lints/cdc/en.md",
-      "sourceHash": "62a3bf93c3146a3279930c9940fe9bade70db18575f6c411dfea0e34265994a5",
+      "sourceHash": "e2dedb1d7a335da8bd983f4b18c0e4527a33c072aa4d7053659bffce3e4fb965",
       "contextVersion": 1
     },
     "gates/be/lints/comments/context.md": {
       "kind": "module",
       "source": "gates/be/lints/comments/en.md",
-      "sourceHash": "c2f2ca02ca8ea5e96b4fd791dd3d0c7ab52b585f569f16893ea2da7f3bf53029",
+      "sourceHash": "ff67d8099d703008717ec57d6907e8cc2b2d8a241c8ec97a539ba7ee283a3bb2",
       "contextVersion": 1
     },
     "gates/be/lints/context.md": {
@@ -504,25 +504,25 @@
     "gates/be/lints/cqrs/context.md": {
       "kind": "module",
       "source": "gates/be/lints/cqrs/en.md",
-      "sourceHash": "f41cb92c31cbd0ae139a1edb0bebb7e76fd94dafc8e1d478a77222b5dfd2855e",
+      "sourceHash": "1f6bd0d49e1e476c0df8b6bb3ce2287b18146d6180ed00ec94816f3c1ebc3b1b",
       "contextVersion": 1
     },
     "gates/be/lints/data-access/context.md": {
       "kind": "module",
       "source": "gates/be/lints/data-access/en.md",
-      "sourceHash": "21c7996550a4976fbf36fd810bd853fc87652fcd4e944982db96b215b58ec242",
+      "sourceHash": "d5d3b654cb91503202055a4d697afa5fb21b1308af0766291d597a9ea6133030",
       "contextVersion": 1
     },
     "gates/be/lints/e2e-flow/context.md": {
       "kind": "module",
       "source": "gates/be/lints/e2e-flow/en.md",
-      "sourceHash": "5e9750ec22bc35e6eaabafbebb999de96a5df274d20d6e587caad2d92f4d9a6e",
+      "sourceHash": "5e2b764b96ed0afc85944bf7f0243b8edfd3e29879863521c7c3f93ab46c3ebc",
       "contextVersion": 1
     },
     "gates/be/lints/event-delivery/context.md": {
       "kind": "module",
       "source": "gates/be/lints/event-delivery/en.md",
-      "sourceHash": "4442b1d725c6d265336ad464d9c55ce6d53458fc0d68f89f002a5669dcdf7d85",
+      "sourceHash": "ac46b6ebf4ed47e4e9658d70ac5ac263667b3a3a7578f1900d94adc3f2b277a0",
       "contextVersion": 1
     },
     "gates/be/lints/exception-identity/context.md": {
@@ -540,37 +540,37 @@
     "gates/be/lints/module-layering/context.md": {
       "kind": "module",
       "source": "gates/be/lints/module-layering/en.md",
-      "sourceHash": "9f0a28679defa02a87935bd80281dd04166217d819e74c13dcd2f6954ad87bae",
+      "sourceHash": "cf2fc4c3d271e2415cd9e54dfb26fac1019d5902114213fcf1f4b6b4037c2b54",
       "contextVersion": 1
     },
     "gates/be/lints/naming/context.md": {
       "kind": "module",
       "source": "gates/be/lints/naming/en.md",
-      "sourceHash": "3f5fe06112d23374f13a59c5a1819c386c79ba0dd39ff65e0551cd86efcd9ee7",
+      "sourceHash": "151330c1c13d260a957720b319c820253d334d21c88d3f5e580832746fa39f3e",
       "contextVersion": 1
     },
     "gates/be/lints/observability/context.md": {
       "kind": "module",
       "source": "gates/be/lints/observability/en.md",
-      "sourceHash": "8aa9b0e6feb082c9358aa3745f529d573a205b1445f8e72eb0c5290b14aa1ac0",
+      "sourceHash": "4745997c3a571a74f3038f75f4d47bde559431365db272ea9b035f2952e3310a",
       "contextVersion": 1
     },
     "gates/be/lints/testing/context.md": {
       "kind": "module",
       "source": "gates/be/lints/testing/en.md",
-      "sourceHash": "4ff2fda1fb171f9739225e2749a7caa634b205b00903b24edb69c3221504ad09",
+      "sourceHash": "56851e4be68c2256d0375a13dc29c5217c99104db201ef0b6b9f196f75ff6c40",
       "contextVersion": 1
     },
     "gates/be/lints/transport/context.md": {
       "kind": "module",
       "source": "gates/be/lints/transport/en.md",
-      "sourceHash": "15466a1c0f768f352290f4c0e28bf895b8995f3e3f3cd1b89b26967bdfc13a20",
+      "sourceHash": "aacfc4085c4744e24d83083060685cce90c31d53a04e1bebcb76b61ec668e18f",
       "contextVersion": 1
     },
     "gates/be/lints/type-safety/context.md": {
       "kind": "module",
       "source": "gates/be/lints/type-safety/en.md",
-      "sourceHash": "f7f3ebc759d21d9c334851bf53efbc640194418970f108d514f224f1d4ffa217",
+      "sourceHash": "950d4d3833a39a922ae1c3508b76d02308443dfdde20f0352262ccf7b61a76d2",
       "contextVersion": 1
     },
     "gates/context.md": {

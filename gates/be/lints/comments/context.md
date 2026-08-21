@@ -18,7 +18,7 @@ no comment and writes none. It refuses, and it must be able to point at the char
 A comment answers the one question the code cannot: **why**. The law that states this lives in
 `canon/patterns/comments.md` and carries five codes, `COMMENT-1` through `COMMENT-5`.
 
-The law states five codes. **Three rules ship.** The gap is not an oversight to be tidied away — one of
+The law states five codes. **Five rules ship.** The remaining semantic gap is not an oversight — one of
 the codes cannot be checked by any program, and one of the rules holds only half of the code it is
 named for. Both facts are stated below rather than rounded off, because **a leaky rule believed to be
 closed is more dangerous than a law known to be unenforced.** A law is a sentence a reader obeys; a rule
@@ -27,7 +27,7 @@ here.
 
 ## Published rules
 
-Three rules are published, from the module's `rules` export, at `error` in its `recommended` export.
+Five rules are published from the module's `rules` export in its `recommended` export.
 They ship in the package `@canon-be` under the plugin prefix `starci-be/`.
 
 | Rule | Code | What it reports |
@@ -35,15 +35,14 @@ They ship in the package `@canon-be` under the plugin prefix `starci-be/`.
 | `require-export-jsdoc` | `COMMENT-1` | An exported class, interface, type alias, enum, function declaration, or `const` bound to a literal function expression, with no `/** … */` block before it |
 | `require-enum-member-jsdoc` | `COMMENT-2`, existence half only | A member of an exported enum with no `/** … */` block before it |
 | `no-non-ascii-source` | `COMMENT-4`, with `COMMENT-5` as its marker | A source line carrying a Vietnamese letter, an emoji, or one of twelve listed ornamental symbols |
+| `no-restated-name-jsdoc` | `COMMENT-3` | A JSDoc block contains only the declared name split back into words, adding no purpose or consequence. |
+| `require-vn-ok-reason` | `COMMENT-5` | A line carries a bare `vn-ok` marker without `: <reason>` explaining what the exemption protects. |
 
-**`COMMENT-3` has no rule.** "The comment says why, and the code says what" is enforced by nobody. This
-is not a missing rule to be written; it is a code no program can hold, because deciding whether a
-sentence restates the line beneath it requires understanding both. It is unenforced, not covered, and
-nobody may read a green build as evidence that `COMMENT-3` is satisfied.
+**`COMMENT-3` has a narrow exact rule.** `no-restated-name-jsdoc` refuses only a doc block whose content
+words exactly restate the declared name. Whether any other sentence truly explains why remains human-held.
 
-**`COMMENT-5` is not a rule either; it is the escape hatch of `no-non-ascii-source`.** Text a program
-matches on or emits stays, marked `vn-ok`. The marker is what makes the third rule survivable, and it is
-also that rule's widest open door.
+**`COMMENT-5` is both the escape hatch and a checked contract.** Text a program matches on or emits may
+stay with `vn-ok: <reason>`; `require-vn-ok-reason` refuses a bare marker.
 
 **`COMMENT-2` is enforced at half strength, and the rule says so in its own message.** The code demands
 that a member state the CONSEQUENCE of choosing it. A rule can see that a doc block exists and never
@@ -211,7 +210,7 @@ requires bad faith to reach — most are what tidying up looks like.
 | `require-enum-member-jsdoc` | `enum State { … }` then `export { State }` on the next line — the parent is the program body and every member requirement disappears |
 | both JSDoc rules | `/** */` — the value is `* `, so an empty doc block satisfies either rule |
 | both JSDoc rules | `export const State = { Pending: "pending" } as const`, and `export type State = "pending" \| "settled"` — the constructs reached for in place of an enum are the ones neither rule covers |
-| both JSDoc rules | A doc block whose sentence restates the name. This is `COMMENT-3` and half of `COMMENT-2`, and no rule holds either |
+| both JSDoc existence rules | A doc block whose sentence is not an exact name restatement but still says nothing useful. `no-restated-name-jsdoc` holds the exact-match slice; broader usefulness remains human-held. |
 | `no-non-ascii-source` | Unaccented prose in a second language — the class matches diacritics, so the rule detects one orthography, not one language |
 | `no-non-ascii-source` | Prose in Russian, Chinese, Japanese, Korean, Thai or Greek — none of those scripts is in any of the three classes |
 | `no-non-ascii-source` | `→` (`U+2192`), `⇒`, `●`, `⬛`, `⭕` (`U+2B55`), box-drawing runs — the ornament set is twelve hand-written characters |
@@ -220,6 +219,16 @@ requires bad faith to reach — most are what tidying up looks like.
 | `no-non-ascii-source` | Renaming a spec, and extracting fixtures out of a spec into a helper module — the lane is a filename, not a purpose |
 | `no-non-ascii-source` | `// vn-ok` with no reason anywhere on the line, a marked line that also carries untranslated prose, and the marker itself — `COMMENT-5`'s boundary is entirely on the honour system |
 | no rule | Everything `COMMENT-3` forbids, and the consequence half of `COMMENT-2` |
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| rule | The published name, verbatim, as it appears in a build log |
+| code | The `COMMENT-<n>` it enforces, or an explicit `none` |
+| file | The path as `context.filename` sees it, forward-slashed |
+| construct | The AST node or raw line the mechanism actually matches |
+| lane | Whether the path falls in a locale folder, the fixture lane, or ordinary source |
 
 ## Rules
 
@@ -247,7 +256,7 @@ Exceptions here are properties of the rules, not relief from the law.
   system, while a comment in a spec is prose, and is still refused.
 - **The data constant.** `export const MAX_ATTEMPTS = 3` is exempt from `require-export-jsdoc` by design,
   releasing `COMMENT-1` for data, because demanding a sentence there produces sentences that restate the
-  name — which `COMMENT-3` forbids and no rule can catch.
+  name without an exact word match — broader `COMMENT-3` reasoning remains human-held.
 - **The endonym.** The string `Tiếng Việt` is stripped once per line before the letter test, being a
   label rather than prose. The strip is non-global, so a line carrying it twice still reports.
 

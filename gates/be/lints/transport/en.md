@@ -28,9 +28,9 @@ This module does not restate that law. It records **enforcement**: which of thos
 can hold, by what mechanism, and — the part nobody writes down — which ways of writing walk past the
 machine untouched.
 
-The law states **three** codes. **Two of them have a rule.** The source publishes exactly two rules in
-its `rules` export and exactly two in its `recommended` export, and the two lists agree. The third
-code is held by nothing, and that gap is recorded here rather than papered over.
+The transport law now includes `TRANSPORT-6`. **Three rules are published.** Two govern REST doors;
+`no-capability-imports-features` holds the dependency direction between capability and door. The
+default-door judgement in `TRANSPORT-1` remains human-held.
 
 The design worth naming is that **neither rule reads a registry.** The reason a REST door is permitted
 is read off the route string, the file path and the file's own text — the same evidence a human reader
@@ -44,11 +44,12 @@ exactly as well as an interceptor does.
 |---|---|---|
 | `rest-door-needs-a-reason` | `TRANSPORT-2` | `unjustified` on every `@Controller` decorator in a file that shows none of the five accepted reasons — probe, external, bytes, machine, operator |
 | `door-lives-in-features` | `TRANSPORT-3` | `wrongTree` on every `@Controller` decorator in a file whose normalized path contains `/src/modules/` |
+| `no-capability-imports-features` | `TRANSPORT-6` | An import in `modules/` reaches into `features/`, reversing the dependency so a capability knows its transport door. |
 
 `TRANSPORT-1` — the default door is GraphQL — is enforced by **no rule**. Nothing reports a door that
 should have been a query; `rest-door-needs-a-reason` only asks a door that already exists to show a
 reason, and it recognises exactly one decorator. A socket gateway or a broker consumer — doors by the
-law's own definition — is invisible to both rules. `TRANSPORT-1` is unenforced, not covered, and a
+law's own definition — is invisible to the two door rules. `TRANSPORT-1` is unenforced, not covered, and a
 green run says nothing whatever about it.
 
 ## Reading a diff

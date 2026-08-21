@@ -23,9 +23,9 @@ Luật nói về **đường nối giữa các năng lực**: một lần import
 thư mục tái xuất hộ; và bên trong một năng lực, import đi bằng đường tương đối chứ không vòng qua
 alias công khai của chính năng lực đó.
 
-Luật có **năm** mã. **Hai mã có quy tắc giữ.** Nguồn xuất đúng hai quy tắc trong `rules` và đúng hai
-trong `recommended`, hai danh sách khớp nhau, và cả hai đều đòi mức `error`. Ba mã còn lại không có
-gì giữ.
+Mô-đun đã xuất bản **năm quy tắc chính xác**. Ngoài hai import rule, nó từ chối index barrel,
+`@Global()` do capability tự khai, và relative import thoát khỏi capability. Cả năm ở mức `error`;
+phán đoán capability anh em trên module graph vẫn nằm ngoài một quy tắc đọc một tệp.
 
 Một trong ba mã đó bị bỏ ra **một cách cố ý và nguồn nói thẳng điều đó**: muốn biết một mô-đun được
 import là năng lực anh em hay là con lồng bên trong thì phải có đồ thị mô-đun, mà quy tắc đọc từng tệp
@@ -39,11 +39,13 @@ vừa là lý do mọi thứ cần tới tệp thứ hai đều nằm ngoài t�
 |---|---|---|
 | `must-deep-module-import` | `LAYERING-1` | `barrel` trên một specifier có alias mà không còn đoạn nào sau tên năng lực — `@modules/<tên>`, `@features/<tên>`, `@tests/<tên>`, chỉ mỗi tiền tố, và `@modules/<thư mục nhóm>/<tên>` với thư mục nhóm là một trong ba tên có trong danh sách |
 | `no-self-module-alias` | `LAYERING-2` | `self` trên một specifier với về **chính** năng lực của tệp đang import, đi qua alias công khai của năng lực đó; "chính nó" được suy ra từ đường dẫn tệp |
+| `no-self-global-module` | `LAYERING-4` / Luật 6 | Capability module tự khai `@Global()` thay vì để composition root quyết wiring toàn ứng dụng. |
+| `no-folder-reexport` | `LAYERING-5` / Luật 7 | Specifier gọi tên thư mục trần, hoặc một tệp `index.*` chỉ chứa các câu re-export. |
+| `no-relative-capability-escape` | Luật 8 | Relative specifier đi ra ngoài capability hiện tại thay vì qua public alias. |
 
-`LAYERING-3` (một mô-đun năng lực import mô-đun của năng lực anh em thay vì nối dây ở composition
-root), `LAYERING-4` (composition root là nơi duy nhất biết toàn cục) và `LAYERING-5` (bề mặt công
-khai của một năng lực là những tệp nó có ý cho người khác import) **không có quy tắc nào giữ**. Chúng
-là chưa được cưỡng chế chứ không phải đã được bao phủ, và một lần chạy xanh không nói gì về cả ba.
+`LAYERING-3` (phân biệt capability anh em với child lồng trong module graph) vẫn chưa được máy giữ.
+Các quy tắc mới giữ lát cắt per-file chính xác của những ranh giới còn lại, không nhận là chứng minh
+được toàn bộ application graph.
 
 `LAYERING-5` đáng được ghi chú gắt nhất, vì nó trông như đã được giữ mà thật ra không.
 `must-deep-module-import` giữ **nửa bên gọi**: không ai được *import* một barrel qua alias. Không gì

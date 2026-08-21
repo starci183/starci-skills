@@ -23,13 +23,13 @@ thân hàm, kiểm thử — đều bắt người ta trả giá bằng một l�
 hỏi: đây là cái gì, với người chưa biết gì về nó? Không phải nó được hiện thực bằng gì, không phải nó
 được viết cho thế hệ định dạng nào, cũng không phải nó nằm ở thư mục nào lúc mới sinh ra.
 
-Luật có **bảy điều. Hai điều có quy tắc giữ.** Con số nhỏ đó mới là con số trung thực: nguồn lập luận
+Luật có **bảy điều. Ba quy tắc đã xuất bản giữ các hình dạng đặt tên chính xác.** Con số nhỏ đó vẫn trung thực: nguồn lập luận
 dài dòng và có kèm số đo rằng năm điều còn lại đòi biết **thứ đó thực sự là gì**, mà không bộ phân tích
 cú pháp nào biết. Một điều luật không có quy tắc thì được biết là chưa được cưỡng chế, và người đọc tự
 bù vào. Một quy tắc bị tin là đã đóng mà thực ra rò thì tệ hơn, vì nó mua sự chú ý của người đọc rồi
 tiêu vào chỗ trống.
 
-Cả hai quy tắc đều chạy ở mức **`warn`, không phải `error`**, trong chính cấu hình khuyến nghị của
+Các quy tắc naming chạy ở mức **`warn`, không phải `error`**, trong chính cấu hình khuyến nghị của
 nguồn — và đó là quyết định có lý do: luật đặt tên rơi xuống một cây mã đã trưởng thành và có nợ thật.
 Một quy tắc đặt tên bật `error` ngay ngày đầu sẽ chặn mọi commit chạm vào tệp cũ, và điều đó dạy người
 ta cách tắt quy tắc. Build vẫn xanh trong lúc cả hai đang bắn. "Cổng đã qua" và "quy tắc không thấy gì"
@@ -41,13 +41,14 @@ là hai câu khác nhau ở đây, và chỉ một trong hai câu là bằng ch�
 |---|---|---|
 | `no-version-in-name` | `NAME-2` | `versioned` — một hàm, lớp, interface, type alias hoặc phương thức **khai báo** có tên nướng sẵn một thế hệ lược đồ vào trong |
 | `no-bare-verb-export` | `NAME-5` | `bareVerb` — một export có tên đúng bằng một trong mười tám động từ trơ đã liệt kê |
+| `no-vendor-module-factory-name` | `NAME-1` (lát cắt module factory) | Một class `.module.ts` của source tự khai factory tĩnh `forRoot`, `forRootAsync`, `forFeature` hoặc `forFeatureAsync` thay vì `register`/`registerAsync`. |
 
-Con số đúng bằng hai. Bản `rules` mà nguồn xuất ra công bố `no-version-in-name` và
-`no-bare-verb-export`, không có gì khác, và dòng đầu phần header của nó nói đúng như vậy.
+Package công bố ba naming rule này; module-factory rule cố ý chỉ xét declaration source sở hữu và không
+bao giờ báo lời gọi vào vendor module.
 
-`NAME-1`, `NAME-3`, `NAME-4`, `NAME-6` và `NAME-7` **không có quy tắc nào giữ**. Chúng do review giữ,
+Phần còn lại của `NAME-1`, cùng `NAME-3`, `NAME-4`, `NAME-6` và `NAME-7`, do review giữ,
 tức là chưa được cưỡng chế chứ không phải đã được phủ, và một lần chạy xanh không nói được gì về bất kỳ
-điều nào trong số đó. Có hai chỗ vắng đáng gọi tên cho chính xác. `NAME-1` từng có hình hài một quy tắc,
+điều nào trong số đó. Phép thử filename rộng hơn của `NAME-1` từng có hình hài một quy tắc,
 đã được đo, và đã bị xoá: bản đầu tiên đòi tên tệp phải đánh vần ra lớp mà nó khai báo, rồi tìm thấy 616
 chỗ vi phạm trên 4430 tệp — vì quy ước của cây mã ngược hẳn với giả định của nó, và mười bốn phần trăm
 một cây mã là một quy ước, không phải nợ. Còn `NAME-6` trông như được giữ một nửa mà thật ra không: điều
@@ -195,7 +196,7 @@ dưới đều suy ra từ hai câu đó.
 | `no-bare-verb-export` | **Danh sách specifier** — `export { generate }`, và mọi tệp barrel — cùng với **tái xuất có bí danh**, `export * from`, và `export default function generate` |
 | `no-bare-verb-export` | **`init` bị bọc** — `memoize(buildContent)` — **phương thức trên một lớp được export**, **thuộc tính object chứa hàm**, và `export declare function` |
 | `no-bare-verb-export` | **Mọi động từ ngoài mười tám từ** — `execute`, `emit`, `read`, `write`, `sync`, `init`, `start`, `render`, `validate`, `find`, `save`, `list`, `format`, `merge`, `serialize` — và mọi cách viết trượt một ly: `Generate`, `generate_`, `doGenerate` |
-| cả hai | **Bất kỳ tên tệp nào** — `content-v2.service.ts`, `generate.ts`. Không quy tắc nào đọc `context.filename`, và `NAME-1`, tức điều luật về tên tệp, thì không có quy tắc |
+| các rule tên declaration | **Bất kỳ tên tệp nào** — `content-v2.service.ts`, `generate.ts`. Module-factory rule chỉ đọc `.module.ts` để scope factory declaration; chất lượng tên tệp rộng hơn vẫn do review giữ. |
 | không quy tắc nào | **Toàn bộ những gì `NAME-1`, `NAME-3`, `NAME-4`, `NAME-6` và `NAME-7` cấm** — một cái tên lấy theo thư mục, theo cơ chế, theo người gọi đầu tiên, và hình dạng boolean `checkVerified` mà `NAME-6` thực sự cấm |
 
 Cái khuôn nằm dưới phần lớn những dòng đó gói trong một câu: **mỗi quy tắc chỉ nhận ra đúng một vị trí cú

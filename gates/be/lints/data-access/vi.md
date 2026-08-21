@@ -24,7 +24,7 @@ Một thực thể phải đặt tên bảng của nó (`DATA-3`). Một giao d�
 chạy bên trong nó (`DATA-4`). Một truy vấn phải nói rõ nó cần gì, và thực thể không được quyết thay
 (`DATA-5`).
 
-Luật nêu **năm mã. Ba mã có quy tắc máy.** Trang này không kể lại luật; nó ghi lại phần THỰC THI — đúng
+Luật nêu **năm mã. Cả năm nay đều có một lát cắt máy kiểm được.** Trang này không kể lại luật; nó ghi lại phần THỰC THI — đúng
 cái nút mà máy nhìn vào, và những cách viết đi ngang qua nó mà không hề bị chạm. Một điều luật không có
 quy tắc nào giữ thì ai cũng biết là chưa được giữ, nên vẫn còn người đọc lại. Một quy tắc **thủng** thì
 mọi người TIN là cửa đã đóng nên không ai đọc lại nữa — vì vậy bảng cửa còn mở bên dưới mới là lý do
@@ -41,13 +41,13 @@ chuỗi ký tự hiện trong log build, trong dòng chú thích tắt quy tắc
 | `must-inject-entity-manager` | `DATA-1` | Một tham số hàm dựng có chú thích kiểu `EntityManager` mà không mang decorator nào thuộc họ đặt tên nguồn dữ liệu, báo ngay tại chính tham số đó |
 | `no-injected-repository` | `DATA-2` | Một tham số hàm dựng hoặc mang decorator `InjectRepository`, hoặc có chú thích kiểu trùng một trong ba tên kho lưu trữ, báo tại tham số |
 | `require-entity-table-name` | `DATA-3` | Một lời gọi `@Entity(...)` mà trong danh sách đối số không có chuỗi ký tự nào đặt tên bảng, báo tại cả decorator |
+| `no-outer-manager-in-transaction` | `DATA-4` | Bên trong `this.<field>.transaction(async (tx) => ...)`, callback lại dùng `this.<field>` thay vì `tx`. |
+| `no-eager-relation` | `DATA-5` | Relation decorator viết `eager: true`, để entity quyết relation loading thay mọi caller. |
 
-Mỗi quy tắc đã công bố đều ứng với một mã, và ánh xạ là một-một. `DATA-4` (giao dịch phải được truyền
-cho mọi thứ bắt buộc chạy bên trong nó) và `DATA-5` (truy vấn phải nói rõ nó cần gì) **không có quy tắc
-nào cả**: muốn biết một hàm phụ trợ có được trao đúng bộ quản lý đang trong giao dịch hay không thì
-phải có đồ thị lời gọi, còn muốn biết một quan hệ có đáng được hỏi ở nơi gọi hay không thì phải biết
-câu trả lời dùng để làm gì. Cả hai là **chưa được thực thi**, chứ không phải được phủ, và một lần chạy
-xanh không nói được gì hết về cả hai.
+Mỗi quy tắc đã công bố đều ứng với một mã. Hai quy tắc mới cố ý hẹp: chúng từ chối outer manager nhìn
+thấy ngay trong callback transaction và `eager: true` viết trên relation. Chúng không chứng minh được
+helper ở tệp khác đã nhận `tx`, cũng không chứng minh mọi caller chỉ hỏi đúng relation cần dùng; các nửa
+ngữ nghĩa ấy vẫn do người giữ.
 
 ## Đọc một diff
 

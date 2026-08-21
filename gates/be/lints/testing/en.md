@@ -26,10 +26,10 @@ No rule can tell whether a file represents a business flow, whether an unhappy p
 flow behind it, whether the decision branches are covered, or whether a stub returns a payload a parser
 would accept. Those are read by a person.
 
-The law states eleven codes. **Five of them have a rule.** This module documents the other half only
+The law states eleven codes. **Eight published rules hold machine-checkable slices of eight codes.** This module documents the other half only
 where a shape is wrong on its face regardless of intent: what a rule inspects in order to see it, and —
-the part nobody writes down — what it does not see. Six law codes have no rule at all, and that gap is
-recorded here rather than papered over.
+the part nobody writes down — what it does not see. The semantic portions outside the eight closed
+machine shapes are recorded here rather than papered over.
 
 ## Published rules
 
@@ -43,13 +43,16 @@ The testing rules below are published. Each maps to exactly one law code; none i
 | `no-model-call-in-e2e` | `TESTING-9` | An end-to-end spec importing a model provider package, or a house model helper. Message names the import source. |
 | `e2e-uses-production-transport` | `TESTING-3` | Two things: importing an application dispatcher from the framework's CQRS package, and any non-computed `.execute()` or `.process()` call. |
 | `harness-calls-provider-directly` | `TESTING-10` | Four things in a model-quality harness: no approved provider SDK import at all, a symbol or provider override that impersonates the production gateway, a house helper hiding the call, and a consumer or CLI credential string. |
+| `no-api-shaped-e2e-filename` | `TESTING-1` and `E2E-1` | An e2e filename ends in a closed API-surface noun instead of naming the business flow it proves. |
+| `no-marker-model-stub` | `TESTING-7` | Test infrastructure resolves a model call to a bare marker string rather than a payload the production parser can consume. |
 
-`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-8` and `TESTING-11` have documented portions no rule can
-fully certify. `TESTING-7` is now held for unit suffix and bucket placement by `unit-test-colocated`.
+`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-8` and `TESTING-11` still have documented portions no rule can
+fully certify. `TESTING-7` is held both for unit placement and for the closed marker-stub shape; neither rule claims to prove arbitrary stub payload correctness.
 
 The identity of a rule is its published name. The plugin exposes them under the `starci-be/` prefix,
-which is the string a build log prints and the string a disable comment must spell. All five ship at
-`error`. Two carry a burn-down note in the source: the call-only rule went to zero from one finding,
+which is the string a build log prints and the string a disable comment must spell. Severity comes from
+the package's recommended config; `no-api-shaped-e2e-filename` remains a warning while its measured debt exists.
+Two earlier rules carry a burn-down note in the source: the call-only rule went to zero from one finding,
 and the persisted-state rule from one finding.
 
 ## Reading a diff
@@ -68,7 +71,7 @@ and the persisted-state rule from one finding.
 5. **Write the `hatch` line whenever an open hatch would have hidden the same failure.** A silent rule
    is not evidence the file is correct; it is evidence the file did not present the one shape the rule
    can see.
-6. **Do not report what no rule watches.** Six of the eleven codes have no machine; a verdict that
+6. **Do not report what no rule watches.** Several codes still have semantic portions with no machine; a verdict that
    claims otherwise is wrong about the module.
 
 ## `no-call-only-spec` — TESTING-6
@@ -256,7 +259,7 @@ opposite, and that is `TESTING-9`.
 
 | Rule | What slips through | What it costs |
 |---|---|---|
-| all five | **Renaming the file.** Lane membership is a filename suffix, so a rename is the cheapest way to make a rule stop existing for a file | Every check on this shelf, silently |
+| all eight | **Renaming the file.** Lane membership is a filename suffix, so a rename is the cheapest way to make a rule stop existing for a file | Every check on this shelf, silently |
 | `no-call-only-spec` | **One alibi assertion disarms the whole file.** Thirty call-only cases plus a single `expect(result).toBeDefined()` anywhere report nothing | The counters are file-wide; the rule has no notion of a test case |
 | `no-call-only-spec` | **A matcher name that was never invoked still counts.** `expect(result).toEqual` — parentheses forgotten — asserts nothing at runtime and silences the file | Whether the chain ends in a call is never checked |
 | `no-call-only-spec` | **A call assertion the set does not list.** `toHaveBeenCalledOnce`, `toHaveBeenCalledExactlyOnceWith`, `toHaveReturnedWith`, `toHaveReturnedTimes` | It leaks twice: uncounted as a call assertion, and it makes the counters differ, sparing every real call assertion in the file |
@@ -280,7 +283,7 @@ opposite, and that is `TESTING-9`.
 | `harness-calls-provider-directly` | **The gateway wearing a different type or token.** `Partial<AiInvokeService>`, `Omit<AiInvokeService, "x">`, a hand-written interface, `provide: AI_INVOKE_TOKEN`, `overrideProvider(AI_INVOKE_TOKEN)`, a renamed default import | One exact three-token sequence, one literal class name |
 | `harness-calls-provider-directly` | **A helper renamed out of the ban.** The house model helper moved to `./judge-client` | The helper pattern lists two names |
 | `harness-calls-provider-directly` | **A helper outside the one folder.** `test/helpers/`, `test/helpers/`, any nested `helpers/` under another root | The helper gate is a literal path fragment, and out of scope means every check including the credential check |
-| none | **Everything `TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` and `TESTING-11` require** | Six of eleven codes have no machine; a green run is silence about all of them |
+| none | **The semantic portions of `TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` and `TESTING-11` beyond the closed shapes above** | A green run is silence about those unheld portions |
 
 ## Inputs
 
@@ -308,7 +311,7 @@ report, no runtime observation.
 5. No rule is type-aware, so every check is a comparison against a spelled name.
 6. Two rules read the file whole and speak once at the end. A single added line changes the verdict for
    the entire file.
-7. A rule that cannot be pointed at is a proposal. Six law codes have no rule; they are unenforced and
+7. A rule that cannot be pointed at is a proposal. Unheld semantic portions are recorded as such and
    recorded as such.
 
 ## Exceptions

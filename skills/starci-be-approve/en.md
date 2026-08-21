@@ -17,7 +17,7 @@ title: starci-be-approve · English
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate the complete compiler boundary being approved |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | refuse a malformed brief before the approval loop |
 | `@plan-check` | `machines/backend-plan/check.mjs` | script | refuse stale identity, invented situations and uncovered files |
-| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | refuse writes without exact in-progress intent |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | refuse writes without the exact business-impact binding |
 
 ## NESTED SKILLS
 
@@ -65,9 +65,11 @@ State `Approved revision: <identity>` in the phase output. Nothing below this li
 
 ### 4 — Hard stop, then baseline
 
-This is the boundary. Confirm the repository, branch and `Touching` with the owner, then commit the
-current target state and record `Baseline commit: <sha>` — taken before the first change, so
-`git diff <baseline>` is an honest account.
+This is the boundary. Confirm the repository, branch and `Touching` with the owner. An approved
+`businessImpact: affects` plan advances its exact `pending` feature head to `in-progress` before
+`@business-boundary` runs. An approved `businessImpact: none` plan binds the exact existing
+`implemented` feature head and does not reopen it. Then commit the current target state and record
+`Baseline commit: <sha>` before the first change, so `git diff <baseline>` is an honest account.
 
 ### 5 — Implement exactly the approved revision
 
@@ -92,12 +94,17 @@ Do not omit E2E or Sonar: they are mandatory parts of the backend delivery fence
 
 ### 7 — Close the phase
 
-Append `Applied revision: <same identity>`, the baseline commit and the tracked diff. The diff must list
+For `businessImpact: affects`, reconcile the exact in-progress feature to `implemented`; for
+`businessImpact: none`, leave its implemented authority unchanged. Run the business registry check in
+both routes. Append `Applied revision: <same identity>`, business impact, business head/status, the baseline
+commit and the tracked diff. The diff must list
 every production path and match the approved boundary exactly.
 
 ## Stops
 
 - No `Approved revision` recorded → the implementation does not begin, whatever the plan says.
+- The approved business-impact route does not match its authority head (`affects` without exact
+  `in-progress`, or `none` without exact `implemented`) → product source remains read-only.
 - Approval is attached to an older revision, or no default exists and `OK` cannot identify one → ask
   once; `OK` for the displayed default is not ambiguous.
 - The tree is already dirty with unrelated work → stop; a baseline from mixed state proves nothing.

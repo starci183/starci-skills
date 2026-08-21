@@ -27,9 +27,9 @@ Tài liệu này không nhắc lại luật. Nó ghi lại **phần cưỡng ch�
 giữ bằng cơ chế nào, và — phần thường không ai viết ra — cách viết nào đi lọt qua máy mà không bị
 chạm tới.
 
-Luật nêu **ba** mã. **Hai trong số đó có luật máy.** Nguồn xuất bản đúng hai quy tắc trong `rules` và
-đúng hai trong `recommended`, và hai danh sách khớp nhau. Mã thứ ba không có gì giữ, và khoảng trống
-đó được ghi thẳng ra đây chứ không được phủ lấp.
+Luật transport nay có thêm `TRANSPORT-6`. **Ba quy tắc đã được xuất bản.** Hai quy tắc giữ REST door;
+`no-capability-imports-features` giữ chiều phụ thuộc giữa capability và door. Phán đoán cửa mặc định ở
+`TRANSPORT-1` vẫn do người giữ.
 
 Điểm thiết kế đáng nói: **không quy tắc nào tra một danh sách.** Lý do một cửa REST được phép được đọc
 thẳng từ chuỗi route, từ đường dẫn tệp và từ chính văn bản của tệp — đúng thứ bằng chứng mà một người
@@ -43,11 +43,12 @@ minh cho một cửa hệt như một interceptor thật.
 |---|---|---|
 | `rest-door-needs-a-reason` | `TRANSPORT-2` | `unjustified` trên mọi decorator `@Controller` trong một tệp không cho thấy dấu hiệu nào của năm lý do được chấp nhận — probe, hệ thống ngoài, byte, máy, danh tính vận hành |
 | `door-lives-in-features` | `TRANSPORT-3` | `wrongTree` trên mọi decorator `@Controller` trong một tệp có đường dẫn chuẩn hoá chứa `/src/modules/` |
+| `no-capability-imports-features` | `TRANSPORT-6` | Một import trong `modules/` đi ngược vào `features/`, làm capability biết transport door gọi nó. |
 
 `TRANSPORT-1` — cửa mặc định là GraphQL — **không có quy tắc nào giữ**. Không có gì báo động khi một
 thao tác lẽ ra là một query lại được viết thành một route; `rest-door-needs-a-reason` chỉ đòi một cửa
 đã tồn tại phải cho thấy lý do, và nó nhận đúng một decorator. Một socket gateway hay một consumer
-hàng đợi — vốn cũng là cửa theo đúng định nghĩa của luật — hoàn toàn vô hình với cả hai quy tắc.
+hàng đợi — vốn cũng là cửa theo đúng định nghĩa của luật — hoàn toàn vô hình với hai quy tắc door.
 `TRANSPORT-1` là **không được cưỡng chế**, không phải là được phủ, và một lần chạy sạch không nói gì
 về nó cả.
 

@@ -18,7 +18,7 @@ description: Challenge a backend plan against real schema and sibling code, loop
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate that the revision being approved carries the complete compiler boundary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | refuse a malformed or incomplete brief before the approval loop |
 | `@plan-check` | `machines/backend-plan/check.mjs` | script | refuse stale content identity, invented situations or uncovered files |
-| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | refuse source writes without exact in-progress intent |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | refuse source writes without the exact business-impact binding |
 
 ## NESTED SKILLS
 
@@ -69,12 +69,18 @@ State `Approved revision: <identity>` in the phase output. Nothing below this li
 
 ### 4 — Hard stop, then baseline
 
-This is the boundary. Confirm the repository, branch and `Touching` with the owner. The approved plan must
-name a `pending` business feature head. Advance that exact head to `in-progress`, then run
-`@business-boundary` with `businessImpact: affects`, backend role and clean baseline; `pending` or `rejected`
-cannot cross the write boundary. Then commit the
-current target state and record `Baseline commit: <sha>` — taken before the first change, so
-`git diff <baseline>` is an honest account.
+This is the boundary. Confirm the repository, branch and `Touching` with the owner, then follow the
+approved plan's business-impact route exactly:
+
+- `businessImpact: affects` requires the named feature head to be `pending`; advance that exact head to
+  `in-progress`, then run `@business-boundary` with `businessImpact: affects`, backend role and clean baseline.
+- `businessImpact: none` requires the named technical authority to be an existing `implemented` feature
+  head; do not reopen or advance it. Run `@business-boundary` with `businessImpact: none`, backend role and
+  that exact implemented head.
+
+`pending` or `rejected` cannot authorize the technical-only route, and `implemented` cannot be silently
+reopened for a plan that claims no business impact. Then commit the current target state and record
+`Baseline commit: <sha>` — taken before the first change, so `git diff <baseline>` is an honest account.
 
 ### 5 — Implement exactly the approved revision
 
@@ -100,14 +106,17 @@ Do not omit E2E or Sonar: they are mandatory parts of the backend delivery fence
 
 ### 7 — Close the phase
 
-Commit final source, reconcile the exact in-progress feature to `implemented` against final committed heads,
-and run the business registry check. Append `Applied revision: <same identity>`, business head/status, the baseline commit and the tracked diff. The diff must list
+Commit final source. For `businessImpact: affects`, reconcile the exact in-progress feature to `implemented`
+against final committed heads; for `businessImpact: none`, leave the implemented authority unchanged. Run the
+business registry check in both routes. Append `Applied revision: <same identity>`, business impact, business
+head/status, the baseline commit and the tracked diff. The diff must list
 every production path and match the approved boundary exactly.
 
 ## Stops
 
 - No `Approved revision` recorded → the implementation does not begin, whatever the plan says.
-- No exact `in-progress` business head at the baseline → product source remains read-only.
+- The approved business-impact route does not match its authority head (`affects` without exact
+  `in-progress`, or `none` without exact `implemented`) → product source remains read-only.
 - Approval is attached to an older revision, or no default exists and `OK` cannot identify one → ask
   once; `OK` for the displayed default is not ambiguous.
 - The tree is already dirty with unrelated work → stop; a baseline from mixed state proves nothing.

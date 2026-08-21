@@ -23,10 +23,8 @@ một phong bì có được phép quay về chính nơi sinh ra nó, hay tới 
 ra hai lần hay không?** Cây cầu phải bỏ phong bì tự vọng về và phải nhận dấu vân tay chuyển phát
 **trước** khi trao bất cứ thứ gì cho bộ phát sự kiện trong tiến trình.
 
-Luật nêu sáu mã. **Có đúng một luật máy, và nó gánh hai mã trong số đó.** Tệp nguồn công bố đúng một
-mục ở `rules` và đúng một mục ở `recommended`, hai chỗ khớp nhau; con số dự kiến là một, và thực tế
-đúng một. Luật máy duy nhất ấy mang hai định danh thông điệp, nên giữ hai mã cùng lúc. Bốn mã còn lại
-không được gì ở đây giữ cả.
+Luật nêu sáu mã. **Có hai luật máy, cùng giữ ba mã.** Luật hợp đồng bridge mang hai định danh thông điệp;
+luật cấm override tại call site giữ `DELIVERY-2`. Ba mã còn lại không được gì ở đây giữ cả.
 
 Điều đáng nói ngay từ đầu là **luật máy này không đọc cây cú pháp.** Nó chặn ở đúng một đường dẫn tệp,
 rồi so ba vị trí ký tự bên trong văn bản thô của tệp. Không gì được phân tích, không gì được giải, và
@@ -39,15 +37,15 @@ bên dưới, vì văn bản không phân biệt được một câu chặn vớ
 | Tên luật máy | Mã luật | Bắt gì |
 |---|---|---|
 | `nats-bridge-delivery-contract` | `DELIVERY-3` (thông điệp `origin`) và `DELIVERY-4` (thông điệp `digest`) | `origin` khi phép so danh tính nơi sinh không có, hoặc nằm sau lời gọi phát sự kiện đầu tiên tính theo vị trí ký tự trong văn bản tệp; `digest` khi chuỗi `parsed.digest` không có, hoặc nằm sau lời gọi ấy. Cả hai đều báo lên nút `Program` |
+| `no-call-site-transport-override` | `DELIVERY-2` | Lời gọi `eventEmitterService.emit(...)` truyền `options.useLocal` hoặc `options.useNats`, tự chọn transport tại call site thay vì khai trong cấu hình event trung tâm. |
 
 Một luật máy gánh hai mã không phải là lỗi, nhưng là dữ kiện người đọc phải mang theo: nhật ký dựng in
 ra **tên luật**, mà tên ấy là cùng một chuỗi cho cả trường hợp thiếu câu chặn tự vọng lẫn trường hợp
 thiếu phép nhận dấu vân tay. Chỉ câu thông điệp mới tách chúng ra.
 
-`DELIVERY-1` (mọi phong bì mang danh tính nơi sinh và dấu vân tay), `DELIVERY-2` (`useLocal` và
-`useNats` khai theo từng sự kiện), `DELIVERY-5` (bên nhận khẳng định người nhận và nội dung, không
+`DELIVERY-1` (mọi phong bì mang danh tính nơi sinh và dấu vân tay), `DELIVERY-5` (bên nhận khẳng định người nhận và nội dung, không
 phải số bộ lắng nghe) và `DELIVERY-6` (hành vi xuyên bản chạy được chứng minh bằng hai bản chạy thật)
-**không có luật máy nào** trong tệp nguồn này. Bốn trên sáu mã là **chưa được giữ**, chứ không phải đã
+**không có luật máy nào** trong tệp nguồn này. Ba trên sáu mã là **chưa được giữ**, chứ không phải đã
 được phủ, và một lần chạy xanh không nói gì về chúng cả.
 
 ## Đọc một diff
@@ -65,7 +63,7 @@ phải số bộ lắng nghe) và `DELIVERY-6` (hành vi xuyên bản chạy đ�
 5. **Mỗi phát hiện một khối.** Hai thông điệp được tính độc lập nên có thể cùng nổ trên một tệp.
 6. **Viết dòng `hatch` mỗi khi một cửa còn mở lẽ ra đã che đúng cái hỏng ấy**, và ghi ở dòng `evidence`
    rằng một câu lệnh sống, một chú thích, một chuỗi ký tự và mã chết là không phân biệt được ở đây.
-7. **Không báo cái mà không luật máy nào canh.** Bốn trong sáu mã không có máy nào; một phán quyết nói
+7. **Không báo cái mà không luật máy nào canh.** Ba trong sáu mã không có máy nào; một phán quyết nói
    khác đi là nói sai về mô-đun.
 
 ## `nats-bridge-delivery-contract` — DELIVERY-3 và DELIVERY-4

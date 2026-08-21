@@ -22,7 +22,7 @@ Mọi dòng log rời tiến trình đều đi qua một đường ống gắn m
 dòng log đều mang một cái tên đếm được, nhóm được, lọc được. Luật gọi tên ba lối một dòng log thoát ra
 khỏi đường ống ấy — logger của khung, `console`, và một cái tên đã hợp nhất với dữ liệu của nó.
 
-Luật nêu tám mã, `OBSERVABILITY-1` đến `OBSERVABILITY-8`. **Chỉ hai mã có quy tắc.** Thêm một mã nữa,
+Luật nêu tám mã, `OBSERVABILITY-1` đến `OBSERVABILITY-8`. **Ba mã có quy tắc.** Thêm một mã nữa,
 `OBSERVABILITY-6`, được giữ bằng một danh sách đường dẫn trong cấu hình chứ không phải bằng quy tắc.
 Năm mã còn lại không có máy nào giữ. Đó không phải chỗ bỏ sót: phần còn lại của luật là **phán đoán**.
 Log ghi lại một quyết định hay chỉ ghi lại một lần đi qua, thất bại mang theo danh tính hay mang theo
@@ -31,8 +31,8 @@ trong đó là một hình dạng. Bộ phân tích cú pháp thấy được r�
 được đoạn mã ấy **để làm gì**. Một quy tắc đoán mò sẽ nổ trên mã đúng đủ nhiều để ai cũng học cách tắt
 nó đi, mà một quy tắc ai cũng tắt thì chẳng giữ gì cả trong khi trông như đang giữ.
 
-Vậy lời khai trung thực về mức enforcement là: **hai mã có máy giữ và cái máy ấy có những lỗ đã biết,
-một mã được giữ bằng danh sách cấu hình chứ không phải quy tắc, năm mã không có máy nào.** Một mã không
+Vậy lời khai trung thực về mức enforcement là: **ba mã có máy giữ và cái máy ấy có những lỗ đã biết,
+một mã được giữ bằng danh sách cấu hình chứ không phải quy tắc, bốn mã không có máy nào.** Một mã không
 có quy tắc thì ai cũng biết là chưa ai giữ, nên vẫn còn được đọc bằng mắt. Một quy tắc bị tin là kín mà
 thật ra hở thì mua sự im lặng và trả bằng cảm giác đã được che.
 
@@ -42,17 +42,17 @@ thật ra hở thì mua sự im lặng và trả bằng cảm giác đã đượ
 |---|---|---|
 | `no-framework-logger` | `OBSERVABILITY-1` (một nửa) | `imported` — một câu nhập lấy tên `Logger` từ đúng chuỗi nguồn `@nestjs/common`; `constructed` — mọi `new Logger(...)` mà callee là định danh trần |
 | `no-interpolated-log-message` | `OBSERVABILITY-2` | `built` — đối số thứ nhất của một phương thức log trên dịch vụ ghi log của nhà, khi đối số đó là chuỗi mẫu, phép nối `+`, hoặc chữ chuỗi |
+| `no-error-wording-as-log-identity` | `OBSERVABILITY-5` | Failure log mang wording của exception trong data nhưng thiếu danh tính ổn định `error.code`. |
 
-Cả hai quy tắc đã công bố đều có mã để giữ. Chiều ngược lại mới là chỗ trống, và chỗ trống rất rộng.
+Cả ba quy tắc đã công bố đều có mã để giữ. Chiều ngược lại mới là chỗ trống, và chỗ trống rất rộng.
 `OBSERVABILITY-3` (một cái tên không có dữ liệu bên cạnh) **không có quy tắc nào**: không ai đọc đối số
 thứ hai. `OBSERVABILITY-4` ("quyết định, không phải lần đi qua") **không có quy tắc nào**: nó cần biết
-đoạn mã để làm gì. `OBSERVABILITY-5` (câu lỗi đã dựng nằm trong đối tượng dữ liệu) **không có quy tắc
-nào**: đó là một giá trị, không phải một hình dạng. `OBSERVABILITY-7` (ranh giới thay đổi) **không có
+đoạn mã để làm gì. `OBSERVABILITY-5` nay có quy tắc hẹp cho hình dạng failure log nhìn thấy được:
+wording mà thiếu `error.code`. `OBSERVABILITY-7` (ranh giới thay đổi) **không có
 quy tắc nào**: đó là việc của bản duyệt. `OBSERVABILITY-8` (ngân sách vòng đời) **không có quy tắc
 nào**: đó là một bản mô tả, không phải một loại nút. `OBSERVABILITY-6` được giữ bằng
 `standaloneProgramGlobs`, một danh sách đường dẫn được xuất ra — là giá trị cấu hình, không phải quy
-tắc, và phạm vi của nó là thư mục. Sáu mã ấy là **chưa ai giữ**, không phải đã được che, và một lần
-chạy xanh không nói được gì về bất kỳ mã nào trong số đó.
+tắc, và phạm vi của nó là thư mục. Các phần ngữ nghĩa còn lại là **chưa ai giữ**, không phải đã được che.
 
 Chỗ cần nói thẳng nhất trên trang này là `OBSERVABILITY-2`. Luật nói tên sự kiện **là một thành viên
 enum**. Quy tắc cấm ba cách viết một chuỗi được dựng ra. Hai câu đó không cùng một nghĩa: quy tắc giữ
@@ -79,7 +79,7 @@ lối ra thứ ba, và là lối rẻ nhất để với tới.
 4. **Mỗi phát hiện xuất đúng một khối.**
 5. **Viết dòng `hatch` mỗi khi có một cửa mở đủ sức che đúng cái sai ấy** — một câu nhập theo không
    gian tên, một lớp bọc, một bên nhận đã đổi tên, một hằng số giặt chữ, một ô dịch sang phải.
-6. **Không báo thứ không quy tắc nào canh.** Sáu trong tám mã không có quy tắc; một phán quyết nói khác
+6. **Không báo thứ không quy tắc nào canh.** Bốn trong tám mã không có quy tắc; một phán quyết nói khác
    đi là nói sai về mô-đun này.
 
 ## `no-framework-logger` — OBSERVABILITY-1

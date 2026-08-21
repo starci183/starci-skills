@@ -25,10 +25,10 @@ nào biết một tệp có đại diện cho một luồng nghiệp vụ hay kh
 luồng trọng yếu hay không, các nhánh quyết định đã phủ chưa, hay một bản giả có trả về đúng hình dạng
 mà bộ phân tích cú pháp chờ đợi hay không. Những thứ đó do người đọc.
 
-Luật nêu mười một mã. **Năm mã trong đó có quy tắc.** Mô-đun này chỉ ghi lại nửa còn lại ở chỗ một hình
+Luật nêu mười một mã. **Tám quy tắc đã xuất bản giữ các lát cắt máy kiểm được của tám mã.** Mô-đun này chỉ ghi lại nửa còn lại ở chỗ một hình
 dạng sai ngay trên mặt chữ bất kể ý định: quy tắc nhìn vào cái gì để thấy nó, và — phần không ai chịu
-viết ra — nó không nhìn thấy cái gì. Sáu mã luật hoàn toàn không có quy tắc nào, và khoảng trống đó
-được ghi ở đây chứ không được che đi.
+viết ra — nó không nhìn thấy cái gì. Các phần ngữ nghĩa nằm ngoài tám hình dạng máy đóng được ghi ở
+đây chứ không được che đi.
 
 ## Luật máy đã xuất bản
 
@@ -42,13 +42,16 @@ Các quy tắc testing dưới đây đã được công bố. Mỗi quy tắc g
 | `no-model-call-in-e2e` | `TESTING-9` | Một e2e nhập khẩu gói SDK của nhà cung cấp mô hình, hoặc trợ giúp mô hình nội bộ. Thông báo nêu nguồn nhập khẩu. |
 | `e2e-uses-production-transport` | `TESTING-3` | Hai thứ: nhập khẩu một bộ điều phối ứng dụng từ gói CQRS của khung, và bất kỳ lời gọi `.execute()` hay `.process()` nào không tính toán. |
 | `harness-calls-provider-directly` | `TESTING-10` | Bốn thứ trong một harness chất lượng mô hình: không có dòng nhập khẩu SDK nhà cung cấp được chấp nhận nào, một ký hiệu hoặc một lần ghi đè nhà cung cấp giả trang cổng sản xuất, một trợ giúp nội bộ giấu lời gọi, và một chuỗi chứng thư người dùng cuối hoặc dòng lệnh. |
+| `no-api-shaped-e2e-filename` | `TESTING-1` và `E2E-1` | Tên tệp e2e kết thúc bằng một danh từ bề mặt API đóng thay vì gọi tên luồng nghiệp vụ mà nó chứng minh. |
+| `no-marker-model-stub` | `TESTING-7` | Hạ tầng test trả về một chuỗi đánh dấu trơ cho model thay vì payload mà parser production đọc được. |
 
-`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-8` và `TESTING-11` còn phần documented mà máy không thể
-chứng nhận trọn vẹn. `TESTING-7` nay được `unit-test-colocated` giữ suffix và bucket placement của unit.
+`TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-8` và `TESTING-11` vẫn còn phần documented mà máy không thể
+chứng nhận trọn vẹn. `TESTING-7` được giữ cả ở placement của unit lẫn hình dạng marker-stub đóng; không quy tắc nào nhận là chứng minh được payload stub bất kỳ.
 
 Định danh của một quy tắc là cái tên nó công bố. Plugin phơi chúng dưới tiền tố `starci-be/`, đó là
-chuỗi in ra trong log build và là chuỗi phải viết đúng trong một dòng vô hiệu hoá. Cả năm chạy ở mức
-`error`. Hai quy tắc mang ghi chú đốt nợ trong nguồn: quy tắc call-only về 0 từ một phát hiện, và quy
+chuỗi in ra trong log build và là chuỗi phải viết đúng trong một dòng vô hiệu hoá. Mức nghiêm lấy từ
+recommended config của package; `no-api-shaped-e2e-filename` vẫn là warning khi nợ đã đo còn tồn tại.
+Hai quy tắc trước đó mang ghi chú đốt nợ trong nguồn: quy tắc call-only về 0 từ một phát hiện, và quy
 tắc đọc trạng thái về 0 từ một phát hiện.
 
 ## Đọc một diff
@@ -67,7 +70,7 @@ tắc đọc trạng thái về 0 từ một phát hiện.
 5. **Viết dòng `hatch` mỗi khi một cửa còn mở đủ sức che chính thất bại ấy.** Một quy tắc im lặng không
    chứng minh tệp đúng; nó chỉ chứng minh tệp không trình ra đúng cái hình dạng duy nhất quy tắc nhìn
    được.
-6. **Không báo cái mà không quy tắc nào canh.** Sáu trong mười một mã không có máy; một phán quyết nói
+6. **Không báo cái mà không quy tắc nào canh.** Nhiều mã vẫn có phần ngữ nghĩa chưa có máy; một phán quyết nói
    khác là nói sai về mô-đun này.
 
 ## `no-call-only-spec` — TESTING-6
@@ -250,7 +253,7 @@ ngược lại, và đó là `TESTING-9`.
 
 | Quy tắc | Cái lọt qua | Cái giá phải trả |
 |---|---|---|
-| cả năm | **Đổi tên tệp.** Làn là một hậu tố tên tệp, nên đổi tên là cách rẻ nhất để một quy tắc thôi tồn tại với tệp đó | Mọi phép kiểm trên kệ này, một cách lặng lẽ |
+| cả tám | **Đổi tên tệp.** Làn là một hậu tố tên tệp, nên đổi tên là cách rẻ nhất để một quy tắc thôi tồn tại với tệp đó | Mọi phép kiểm trên kệ này, một cách lặng lẽ |
 | `no-call-only-spec` | **Một khẳng định ngoại phạm gỡ ngòi cả tệp.** Ba mươi ca call-only cộng một `expect(result).toBeDefined()` ở bất kỳ đâu là im lặng | Bộ đếm tính theo tệp; quy tắc không có khái niệm một ca kiểm thử |
 | `no-call-only-spec` | **Một tên matcher chưa từng được gọi vẫn được đếm.** `expect(result).toEqual` — quên cặp ngoặc — lúc chạy không khẳng định gì mà làm cả tệp im | Chuỗi có kết thúc bằng một lời gọi hay không thì không ai kiểm |
 | `no-call-only-spec` | **Một khẳng định lời gọi ngoài tập.** `toHaveBeenCalledOnce`, `toHaveBeenCalledExactlyOnceWith`, `toHaveReturnedWith`, `toHaveReturnedTimes` | Rò hai lần: không bị tính là khẳng định lời gọi, và làm hai bộ đếm lệch nhau nên tha luôn mọi khẳng định lời gọi thật trong tệp |
@@ -274,7 +277,7 @@ ngược lại, và đó là `TESTING-9`.
 | `harness-calls-provider-directly` | **Cổng khoác kiểu hoặc mã thông báo khác.** `Partial<AiInvokeService>`, `Omit<AiInvokeService, "x">`, một interface tự viết, `provide: AI_INVOKE_TOKEN`, `overrideProvider(AI_INVOKE_TOKEN)`, một nhập khẩu mặc định đổi tên | Đúng một chuỗi ba token, đúng một tên lớp |
 | `harness-calls-provider-directly` | **Trợ giúp đổi tên ra khỏi lệnh cấm.** Trợ giúp mô hình nội bộ dời sang `./judge-client` | Mẫu chỉ liệt kê hai tên |
 | `harness-calls-provider-directly` | **Trợ giúp nằm ngoài đúng một thư mục.** `test/helpers/`, `test/helpers/`, bất kỳ `helpers/` lồng nào dưới gốc khác | Cổng trợ giúp là một mảnh đường dẫn viết cứng, và ngoài tầm nghĩa là mọi phép kiểm, kể cả phép kiểm chứng thư |
-| không quy tắc nào | **Mọi điều `TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` và `TESTING-11` đòi hỏi** | Sáu trong mười một mã không có máy; một lần chạy xanh là im lặng về tất cả chúng |
+| không quy tắc nào | **Các phần ngữ nghĩa của `TESTING-1`, `TESTING-4`, `TESTING-5`, `TESTING-7`, `TESTING-8` và `TESTING-11` nằm ngoài các hình dạng đóng ở trên** | Một lần chạy xanh là im lặng về các phần chưa được giữ ấy |
 
 ## Đầu vào
 
@@ -302,7 +305,7 @@ báo cáo độ phủ, không quan sát lúc chạy.
 5. Không quy tắc nào biết kiểu, nên mọi phép kiểm đều là so với một cái tên đã viết ra.
 6. Hai quy tắc đọc cả tệp rồi mới nói một lần ở cuối. Thêm một dòng ở bất kỳ đâu là đổi kết luận cho
    toàn tệp.
-7. Một quy tắc không chỉ ra được thì là một đề xuất. Sáu mã luật không có quy tắc nào; chúng không được
+7. Một quy tắc không chỉ ra được thì là một đề xuất. Các phần ngữ nghĩa chưa có máy được ghi đúng như vậy; chúng không được
    canh và được ghi lại đúng như vậy.
 
 ## Ngoại lệ

@@ -23,7 +23,7 @@ chỉ từ chối, và khi từ chối thì phải chỉ được vào đúng k�
 Chú thích trả lời câu hỏi duy nhất mà mã nguồn không trả lời được: **vì sao**. Luật nói điều đó nằm ở
 `canon/patterns/comments.md` và mang năm mã, từ `COMMENT-1` đến `COMMENT-5`.
 
-Luật có năm mã. **Bộ quy tắc chỉ có ba.** Khoảng chênh đó không phải thiếu sót cần lấp cho tròn — một mã
+Luật có năm mã. **Bộ quy tắc có năm rule.** Khoảng ngữ nghĩa còn lại không phải thiếu sót cần lấp cho tròn — một mã
 không chương trình nào kiểm được, và một quy tắc chỉ giữ được nửa cái mã mà nó mang tên. Cả hai sự thật
 đều được ghi thẳng ra thay vì làm tròn, vì **một quy tắc hở mà người ta tưởng đã kín thì nguy hiểm hơn
 một luật ai cũng biết là chưa có máy giữ.** Một luật là câu mà người đọc tuân theo; một quy tắc là khuôn
@@ -32,7 +32,7 @@ mà chương trình khớp. Hai thứ không bao giờ bằng nhau, và toàn b�
 
 ## Luật máy đã xuất bản
 
-Ba quy tắc được xuất bản, từ bản `rules` của mô-đun, ở mức `error` trong bản `recommended`. Chúng đi kèm
+Năm quy tắc được xuất bản từ bản `rules` của mô-đun trong bản `recommended`. Chúng đi kèm
 gói `@canon-be` dưới tiền tố trình cắm `starci-be/`.
 
 | Quy tắc | Mã luật | Bắt gì |
@@ -40,15 +40,14 @@ gói `@canon-be` dưới tiền tố trình cắm `starci-be/`.
 | `require-export-jsdoc` | `COMMENT-1` | Một lớp, giao diện, bí danh kiểu, enum, hàm khai báo, hoặc `const` gán thẳng vào một biểu thức hàm, được xuất ra mà không có khối `/** … */` đứng trước |
 | `require-enum-member-jsdoc` | `COMMENT-2`, chỉ nửa "có tồn tại" | Một thành viên của enum được xuất ra mà không có khối `/** … */` đứng trước |
 | `no-non-ascii-source` | `COMMENT-4`, mang theo `COMMENT-5` làm dấu miễn | Một dòng mã nguồn mang chữ cái tiếng Việt có dấu, biểu tượng cảm xúc, hoặc một trong mười hai ký hiệu trang trí được liệt kê |
+| `no-restated-name-jsdoc` | `COMMENT-3` | Khối JSDoc chỉ tách tên khai báo trở lại thành các từ, không thêm mục đích hay hệ quả. |
+| `require-vn-ok-reason` | `COMMENT-5` | Một dòng mang marker `vn-ok` trần, thiếu `: <reason>` giải thích exemption đang bảo vệ gì. |
 
-**`COMMENT-3` không có quy tắc nào giữ.** "Chú thích nói *vì sao*, mã nguồn nói *cái gì*" hiện không ai
-kiểm. Đây không phải một quy tắc còn thiếu chờ viết: muốn biết một câu có đang chép lại dòng lệnh ngay
-dưới nó hay không thì phải hiểu cả hai. Nó **chưa có máy giữ**, chứ không phải đã được phủ, và không ai
-được đọc một bản dựng xanh thành bằng chứng rằng `COMMENT-3` đã được tuân thủ.
+**`COMMENT-3` có một quy tắc hẹp và chính xác.** `no-restated-name-jsdoc` chỉ từ chối doc block mà các từ
+nội dung khớp đúng với tên khai báo. Câu khác có thật sự giải thích vì sao hay không vẫn do người giữ.
 
-**`COMMENT-5` cũng không phải quy tắc; nó là cửa miễn của `no-non-ascii-source`.** Chuỗi mà chương trình
-**so khớp** hoặc **phát ra** thì được giữ nguyên, kèm dấu `vn-ok`. Chính dấu đó làm quy tắc thứ ba sống
-nổi, và cũng chính nó là cánh cửa rộng nhất còn mở của quy tắc ấy.
+**`COMMENT-5` vừa là cửa miễn vừa là contract được kiểm.** Chuỗi chương trình so khớp hoặc phát ra được
+giữ với `vn-ok: <reason>`; `require-vn-ok-reason` từ chối marker trần.
 
 **`COMMENT-2` chỉ được giữ ở nửa sức, và thông điệp lỗi tự nói ra điều đó.** Mã luật đòi thành viên nói
 ra HỆ QUẢ của việc chọn nó. Một quy tắc chỉ thấy được khối tài liệu có tồn tại, không bao giờ thấy nó nói
@@ -213,7 +212,7 @@ cho gọn.
 | `require-enum-member-jsdoc` | `enum State { … }` rồi `export { State }` ở dòng sau — `parent` là thân chương trình và mọi yêu cầu với thành viên biến mất |
 | cả hai quy tắc JSDoc | `/** */` — `value` là `* `, nên một khối tài liệu rỗng thoả cả hai |
 | cả hai quy tắc JSDoc | `export const State = { Pending: "pending" } as const`, và `export type State = "pending" \| "settled"` — cấu trúc hay được dùng thay enum nhất lại đúng là cấu trúc không quy tắc nào phủ |
-| cả hai quy tắc JSDoc | Một khối tài liệu chỉ chép lại cái tên. Đó là `COMMENT-3` và nửa của `COMMENT-2`, và không quy tắc nào giữ được cái nào |
+| hai quy tắc tồn tại JSDoc | Một khối tài liệu không khớp chính xác tên nhưng vẫn không nói điều hữu ích. `no-restated-name-jsdoc` giữ lát cắt exact-match; tính hữu ích rộng hơn vẫn do người giữ. |
 | `no-non-ascii-source` | Văn xuôi không dấu ở một ngôn ngữ khác — lớp ký tự khớp dấu phụ, nên quy tắc nhận diện một lối viết, không nhận diện một ngôn ngữ |
 | `no-non-ascii-source` | Văn xuôi tiếng Nga, Trung, Nhật, Hàn, Thái hay Hy Lạp — không chữ nào thuộc ba lớp |
 | `no-non-ascii-source` | `→` (`U+2192`), `⇒`, `●`, `⬛`, `⭕` (`U+2B55`), các đoạn ký tự vẽ khung — danh sách trang trí là mười hai ký tự viết tay |

@@ -18,10 +18,9 @@ envelope come back to its own producer, or arrive twice, without the local conse
 twice?** The bridge must drop a self-origin envelope and claim the delivery digest before it hands
 anything to the in-process emitter.
 
-The law states six codes. **One rule exists, and it holds two of them.** The source publishes exactly
-one entry in its `rules` export and exactly one in its `recommended` export, and the two agree; the
-expected count of one is confirmed. That single rule carries two message identifiers and therefore
-holds two codes at once. The remaining four codes are held by nothing here.
+The law states six codes. **Two rules exist and together hold three codes.** The bridge contract rule
+carries two message identifiers; the call-site override rule holds `DELIVERY-2`. The remaining three
+codes are held by nothing here.
 
 The design worth naming up front is that **this rule reads no syntax tree.** It gates on one exact
 file path, then compares three character offsets inside the raw file text. Nothing is parsed, nothing
@@ -34,15 +33,15 @@ origin of every open hatch below, because text cannot tell a guard from a commen
 | Rule | Code | What it reports |
 |---|---|---|
 | `nats-bridge-delivery-contract` | `DELIVERY-3` (message `origin`) and `DELIVERY-4` (message `digest`) | `origin` when the producer-identity comparison is absent, or sits later in the file text than the first emitter call; `digest` when the token `parsed.digest` is absent, or sits later in the file text than the first emitter call. Both are reported on the `Program` node |
+| `no-call-site-transport-override` | `DELIVERY-2` | An `eventEmitterService.emit(...)` call passes `options.useLocal` or `options.useNats`, choosing transport at the call site instead of in central event configuration. |
 
 One rule holding two codes is not an error, but it is a fact a reader must carry: a build log prints
 the rule **name**, and that name is the same string for a missing self-origin guard and for a missing
 idempotency claim. Only the message text separates them.
 
-`DELIVERY-1` (every envelope carries producer identity and digest), `DELIVERY-2` (`useLocal` and
-`useNats` declared per event), `DELIVERY-5` (a consumer asserts recipient and content, not listener
+`DELIVERY-1` (every envelope carries producer identity and digest), `DELIVERY-5` (a consumer asserts recipient and content, not listener
 count) and `DELIVERY-6` (cross-instance behaviour proved with two real instances) have **no rule at
-all** in this source. Four of six codes are unenforced rather than covered, and a green run says
+all** in this source. Three of six codes are unenforced rather than covered, and a green run says
 nothing about any of them.
 
 ## Reading a diff
@@ -61,7 +60,7 @@ nothing about any of them.
 6. **Write the `hatch` line whenever an open hatch would have hidden the same failure**, and record on
    the `evidence` line that a live statement, a comment, a string and dead code are indistinguishable
    here.
-7. **Do not report what no rule watches.** Four of the six codes have no machine; a verdict that
+7. **Do not report what no rule watches.** Three of the six codes have no machine; a verdict that
    claims otherwise is wrong about the module.
 
 ## `nats-bridge-delivery-contract` — DELIVERY-3 and DELIVERY-4
@@ -158,6 +157,22 @@ declares no `fixable` and no `hasSuggestions`, so it offers no repair.
 Twelve open rows of writing, and eleven of them share one shape: the rule sees **tokens in an order**,
 while the law is about **a consequence that must not happen twice**. A token can be written without
 the consequence being guarded, and a guard can be written without the token.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| `context.filename` | The path as the rule sees it, backslashes normalized to `/`, then suffix-matched against `/event/nats/nats-bridge.service.ts`. Falls back to `context.getFilename()` when falsy |
+| gate decision | Whether the suffix matched, or that an empty visitor was returned |
+| `sourceCode.getText()` | The complete file text, as one string, for all three offsets. Falls back to `context.getSourceCode()` |
+| `originIndex` | The offset of the regex match, or absent |
+| `digestIndex` | The offset of the `parsed.digest` substring, or absent |
+| `emitIndex` | The offset of the FIRST `this.eventEmitter.emit`, or absent |
+| provenance | Whether each matched token is a live statement, a comment, a string or dead code — and the fact that the rule cannot tell |
+| `Program` node | Used **only** as the report anchor. No property of it is inspected |
+
+Nothing else is read. No child node, no type information, no import graph, no second file, no
+configuration, no list of blessed events.
 
 ## Rules
 

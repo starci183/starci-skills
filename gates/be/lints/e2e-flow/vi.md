@@ -25,8 +25,8 @@ vào lúc nào khác. Luật nói điều đó mang **mười hai** mã dưới 
 thuộc vào ý nghĩa — một cái tên nói gì, cái gì đang được khẳng định, ai đang hành động — mà một luật nổ
 vào phán đoán là luật người viết học cách tắt đi, và lúc đó luật còn tệ hơn khi chẳng có gì giữ cả.
 
-**Năm mã có máy giữ**: `E2E-3`, `E2E-4`, `E2E-7`, `E2E-11`, `E2E-12`. Mô-đun luật công bố năm luật máy
-và tài liệu này ghi đúng năm — trùng với con số mà chính văn bản luật tự nhận. Danh tính của một luật
+**Bảy mã có lát cắt máy giữ**: `E2E-1`, `E2E-3`, `E2E-4`, `E2E-7`, `E2E-8`, `E2E-11`, `E2E-12`.
+Mô-đun công bố bảy quy tắc tập trung. Danh tính của một luật
 máy là **tên công bố** của nó: chuỗi in ra trong log build và chuỗi viết trong dòng tắt luật. Ở đây
 không đặt thêm số cho luật nào cả.
 
@@ -42,11 +42,13 @@ không ai chịu viết ra — viết kiểu gì thì cùng một lỗi ấy ho�
 | `no-model-call-in-e2e` | `E2E-12` (chỉ nửa "nhập gói nhà cung cấp") | Một câu `import` có chuỗi nguồn khớp một trong sáu mẫu gói nhà cung cấp mô hình. |
 | `no-sleep-in-flow` | `E2E-3` (chỉ nửa "đừng ngủ") | Một lời gọi tới một trong năm định danh ngủ trần, hoặc một `new Promise` mà văn bản nguồn thô có chứa `setTimeout`. |
 | `no-branch-in-flow-step` | `E2E-7` | `if`, toán tử ba ngôi, `switch`, hoặc toán tử logic đứng thành nguyên một câu lệnh, nằm về mặt văn bản trong thân một lời gọi `it` hay `test`. |
+| `no-api-shaped-e2e-filename` | `E2E-1` và `TESTING-1` | Tên tệp kết thúc bằng danh từ API đóng thay vì gọi tên business flow mà nó chứng minh. |
+| `no-wiring-in-flow-spec` | `E2E-8` | Spec gọi `Test.createTestingModule(...)` thay vì boot qua shared world helper. |
 
-Cả năm đều ánh xạ được vào một mã mà luật thật sự công bố, nên ở đây không có luật máy nào thực thi một
+Cả bảy đều ánh xạ được vào một mã mà luật thật sự công bố, nên ở đây không có luật máy nào thực thi một
 quyết định chưa được viết ra.
 
-**Bảy mã còn lại** dưới tiền tố `E2E-` không có luật máy nào cả. Nguồn của mô-đun này không gọi tên
+**Năm mã còn lại** dưới tiền tố `E2E-` chưa có luật máy đầy đủ. Nguồn của mô-đun này không gọi tên
 chúng, nên ở đây cũng không thể gọi tên — nhưng chúng là **không được thực thi** chứ không phải đã được
 phủ, và một lần chạy xanh không nói gì về bất kỳ mã nào trong số đó. Các nửa mã cũng vậy: nửa "bài kiểm
 thử có **đi vào bằng cổng sản xuất** hay không" của `E2E-11`, nửa "hệ quả được khẳng định có đúng là hệ
@@ -57,7 +59,7 @@ giữ. Mỗi luật máy ở đây giữ nhiều nhất **một nửa** mã củ
 ## Đọc một diff
 
 1. **Quyết định phạm vi trước mọi thứ khác, và ghi lại.** Ngoài phạm vi ở đây không có nghĩa là tệp đã
-   qua — nghĩa là không có bộ duyệt nào được cài và cả năm luật đều không tồn tại với tệp đó.
+   qua — nghĩa là không có bộ duyệt nào được cài và cả bảy luật đều không tồn tại với tệp đó.
 2. **Phạm vi là đúng một cái đuôi tên tệp.** `isE2eSpec` thử đường dẫn đã chuẩn hoá với
    `/\.e2e-spec\.ts$/`. `*.spec.ts`, `*.e2e.spec.ts` và `*.e2e-spec.mts` không nhận luật nào.
 3. **Không có miễn trừ nào để kiểm** — không allow-list, không thư mục được tha, không lối tắt theo
@@ -208,7 +210,7 @@ một hàm phụ trợ khai báo cách đó mười dòng là xoá luật mà kh
 
 | Bộ phận | Cơ chế |
 |---|---|
-| cổng tên tệp, cả năm luật | `isE2eSpec(context.filename \|\| context.getFilename())`: tên tệp được ép bằng `String(… \|\| "")`, dấu chéo ngược đổi thành chéo xuôi, rồi thử với `/\.e2e-spec\.ts$/`. Tệp trượt phép thử này không bao giờ được cài bộ duyệt — đối tượng luật trả về `{}`. |
+| cổng tên tệp, cả bảy luật | `isE2eSpec(context.filename \|\| context.getFilename())`: tên tệp được ép bằng `String(… \|\| "")`, dấu chéo ngược đổi thành chéo xuôi, rồi thử với `/\.e2e-spec\.ts$/`. Tệp trượt phép thử này không bao giờ được cài bộ duyệt — đối tượng luật trả về `{}`. |
 | chuẩn hoá dấu phân cách | Dấu chéo ngược thành chéo xuôi trước phép thử đuôi. Cái đuôi không mang dấu chéo nào, nên ở đây phép chuẩn hoá là trơ chứ không gánh việc gì. |
 | phép thử nguồn nhập | `node.source.value` — so bằng **đúng chuỗi** cho luật vận chuyển, một regex tiền tố cho luật nhà cung cấp. |
 | tên được nhập | `specifier.imported.name \|\| specifier.imported.value`, nên dạng nhập bằng chuỗi ký tự cũng được phủ, còn tên cục bộ thì không bao giờ được đọc. |
@@ -240,8 +242,8 @@ một hàm phụ trợ khai báo cách đó mười dòng là xoá luật mà kh
 
 | Phạm vi | Cái gì lọt |
 |---|---|
-| cả năm luật | **Tên tệp.** Toàn bộ chỗ này chỉ tồn tại cho các tệp kết thúc bằng `.e2e-spec.ts`. Một bộ mà tệp luồng đặt tên `*.spec.ts`, `*.e2e.spec.ts`, `*.e2e-spec.mts` hay bất cứ gì khác đều không nhận một luật nào trong năm luật, và không cần một dòng diff nào vào luật để dựng ra chuyện đó. Được giữ một phần ở nơi khác: bài kiểm thử đi kèm của chính bộ luật khẳng định rằng một danh mục tệp luồng có tên tồn tại ở một đường dẫn cố định với cái đuôi này, nên đổi tên một luồng **có trong danh mục** sẽ đỏ — nhưng cổng đó là một bài kiểm thử, không phải một luật, và một luồng nó không gọi tên thì nằm ngoài. |
-| cả năm luật | **Một tệp phụ trợ.** Mọi cổng đều theo từng tệp. Chuyển lời gọi bus, giấc ngủ, cái nhánh hay câu nhập nhà cung cấp sang một thư mục bên cạnh, vào `world.ts` hay `flow-helpers.ts`, rồi nhập lại từ spec, thì cả năm luật thôi tồn tại với đoạn mã ấy. Đây không phải phá hoại — đó chính là điều `E2E-8` của luật ("một nơi dựng thế giới lên") bảo người viết làm. |
+| cả bảy luật | **Tên tệp.** Toàn bộ chỗ này chỉ tồn tại cho các tệp kết thúc bằng `.e2e-spec.ts`; đặt suffix khác làm cả bảy rule không được cài visitor. |
+| cả bảy luật | **Một tệp phụ trợ.** Chuyển bus call, sleep, branch hay provider import sang helper làm rule per-spec tương ứng thôi thấy code đó; riêng shared-world wiring vẫn do `no-wiring-in-flow-spec` canh trong spec. |
 | `e2e-uses-production-transport` | **Một bên nhận không phải định danh trần**, **một bên nhận đặt tên khác**, **mọi phương thức nội bộ ngoài `execute` và `process`**, **một lời gọi bằng ngoặc vuông**, và **mọi bộ điều phối lấy về không qua phép nhập có tên**. |
 | `e2e-uses-production-transport` | Khiếm khuyết ngược: `builder.execute()` trên một trình dựng truy vấn, `stream.process()` trên một bộ phân tích, và mọi phương thức không liên quan mà tình cờ viết là `execute` hay `process` đều bị báo dù chẳng có gì bị đi tắt. |
 | `e2e-asserts-persisted-state` | **Một câu nhập không dùng tới rửa sạch cả tệp**, **một lần đọc trạng thái qua bộ khung dùng chung**, **mọi kho không phải kho quan hệ**, và **đường dựng cảnh**, thứ mà luật không phân biệt được với một phép khẳng định vì nó không hề nhìn xem định danh nằm ở đâu. |
@@ -276,7 +278,7 @@ chỉ giữ được một nửa, và toàn bộ kệ này được khoanh phạ
    như đã phủ kín.
 5. Hai luật ở đây có thể mâu thuẫn nhau trên cùng một dòng, và đó là mâu thuẫn thật chứ không phải lỗi
    cấu hình.
-6. Mức nghiêm mà mô-đun tự đề nghị là `error` cho cả năm; cấu hình của kho tiêu thụ mới là nơi quyết
+6. Mức nghiêm do package định nghĩa cho cả bảy; cấu hình của kho tiêu thụ mới là nơi quyết
    định thật sự bật cái gì.
 
 ## Ngoại lệ
@@ -331,7 +333,7 @@ describe("checkout", () => {
 })
 ```
 
-Tên tệp kết thúc bằng `.e2e-spec.ts`, nên cả năm luật đều có bộ duyệt. Sáu phát hiện:
+Tên tệp kết thúc bằng `.e2e-spec.ts`, nên cả bảy luật đều có bộ duyệt. Sáu phát hiện của ví dụ:
 
 ```text
 rule:    e2e-uses-production-transport
@@ -437,5 +439,5 @@ là một đề xuất, mà ở đây ghi phán quyết chứ không ghi đề x
 
 Nó không xét mười hai mã của luật — luật sở hữu chúng, và bảy mã trong đó không có máy nào ở bất kỳ
 đâu. Nó không xét bộ khung dùng chung làm gì, vì bộ khung sống trong một tệp khác còn mọi cổng ở đây
-đều theo từng tệp. Nó cũng không xét kho chạy ở mức nghiêm nào: mô-đun tự đề nghị `error` cho cả năm,
+đều theo từng tệp. Nó cũng không xét kho chạy ở mức nghiêm nào: package định nghĩa mức cho cả bảy,
 còn cấu hình của kho tiêu thụ mới quyết định thật sự bật cái gì.

@@ -21,14 +21,14 @@ thiết kế, và nó phải chỉ được ra đúng cái nút mà nó từ ch�
 Luật mang bảy mã, `CQRS-1` đến `CQRS-7`. Tài liệu này ghi một chuyện hẹp hơn mà hữu dụng hơn: **máy
 giữ được mã nào, giữ bằng cơ chế gì, và cơ chế đó hết tác dụng từ chỗ nào.**
 
-Ba trong bảy mã là hình dạng mà một bộ phân tích cú pháp nhìn thấy được. Bốn mã còn lại — công việc
-nằm ở đâu, lớp điều phối mỏng đến mức nào, thất bại được ném ra hay trả về, người gọi có đang đợi một
+Bốn trong bảy mã nay có lát cắt mà parser nhìn thấy được. Các phán đoán còn lại — công việc
+nằm ở đâu, lớp điều phối mỏng đến mức nào, người gọi có đang đợi một
 sự kiện hay không — là **phán đoán**. Một quy tắc đoán mò mấy thứ đó sẽ báo nhầm trên code đúng đủ
 nhiều lần để mọi người học được cách tắt nó đi, và một quy tắc bị tắt thì không giữ gì cả trong khi
 trông vẫn như đang giữ.
 
-Nên câu nói trung thực về mức thực thi là: luật nêu bảy mã, **ba mã có quy tắc còn bốn mã không có máy
-nào cả — và ba mã có quy tắc thì bản thân quy tắc vẫn hở những chỗ đã biết.** Cả hai nửa của câu đó
+Nên câu nói trung thực về mức thực thi là: luật nêu bảy mã, **bốn mã có quy tắc còn ba mã chưa có proof
+máy đầy đủ — và bốn mã có quy tắc thì bản thân quy tắc vẫn hở những chỗ đã biết.** Cả hai nửa của câu đó
 đều quan trọng. Một mã không có quy tắc thì ai cũng biết là chưa có ai giữ, nên vẫn còn được đọc bằng
 mắt. Một quy tắc bị tin là kín mà thật ra hở thì tệ hơn: nó mua sự im lặng và trả bằng cảm giác đã
 được che.
@@ -40,10 +40,11 @@ mắt. Một quy tắc bị tin là kín mà thật ra hở thì tệ hơn: nó 
 | `handler-overrides-process` | `CQRS-3` | Lớp xử lý có decorator mà khai báo `execute` (`overridesExecute`), hoặc lớp xử lý có decorator, không kế thừa ai, mà không khai cả `execute` lẫn `process` (`noProcess`) |
 | `message-carries-params-only` | `CQRS-2` | Lớp không decorator trong tệp thông điệp khai một phương thức ngoài hàm dựng (`method`), hoặc hàm dựng của nó không nhận đúng một tham số tên `params` (`shape`) |
 | `handler-has-twin-spec` | `CQRS-7` | Tệp lớp xử lý mà tên thao tác của nó không có `<operation>.handler.spec.ts` tương ứng trong danh sách do cấu hình đưa vào (`missing`) |
+| `no-handler-encoded-failure` | `CQRS-5` | `process` của handler trả object mang `success: false` hoặc `error` thay vì ném domain exception gọi tên thất bại. |
 
-Mọi quy tắc đã xuất bản đều ứng với một mã luật. Chỗ trống nằm ở chiều ngược lại: `CQRS-1`, `CQRS-4`,
-`CQRS-5` và `CQRS-6` **không có quy tắc nào cả**. Chúng là chưa có ai giữ chứ không phải đã được che,
-và không quy tắc nào ở đây nhận vơ chúng. Một lượt chạy xanh không nói được gì về cả bốn mã ấy.
+Mọi quy tắc đã xuất bản đều ứng với một mã luật. `CQRS-1`, `CQRS-4` và `CQRS-6` chưa có proof máy đầy
+đủ. `no-handler-encoded-failure` chỉ giữ các hình dạng object trả về đóng mà nó gọi tên; nó không chứng
+minh mọi nhánh failure đều ném đúng exception.
 
 Mức nghiêm trọng mà mô-đun đề nghị, đúng như đang phát hành: `handler-overrides-process` ở `error` và
 `message-carries-params-only` ở `error`, vì nợ đo được của mỗi quy tắc đã trả về không;
@@ -387,5 +388,5 @@ mã nào hay thư viện thành phần nào. Tên các quy tắc và không gian
 dưới đó là những định danh xuất hiện trong nhật ký dựng, nên chúng được chép nguyên văn; đó là miễn
 trừ duy nhất, và nó không lan sang phần văn xuôi. Công việc có nằm đúng chỗ không, lớp điều phối mỏng
 đến mức nào, thất bại được ném ra hay trả về, và người gọi có đang đợi một sự kiện hay không đều thuộc
-về `CQRS-1`, `CQRS-4`, `CQRS-5` và `CQRS-6` — đọc bằng mắt người, vì không quy tắc nào ở đây sở hữu
+về `CQRS-1`, `CQRS-4`, phần ngữ nghĩa của `CQRS-5` và `CQRS-6` — đọc bằng mắt người ngoài các hình dạng đóng mà encoded-failure rule sở hữu
 chúng.

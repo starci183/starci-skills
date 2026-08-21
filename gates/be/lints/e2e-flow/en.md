@@ -26,8 +26,8 @@ other time. The law that says so carries **twelve** codes under the prefix `E2E-
 on what a name means, what is being asserted, or who is acting — and a rule that fires on a judgement
 is one authors learn to disable, which leaves the law worse off than when nothing enforced it.
 
-**Five codes have a rule**: `E2E-3`, `E2E-4`, `E2E-7`, `E2E-11`, `E2E-12`. The rule module publishes
-five rules and this file documents five, which matches the count the law itself claims. Their identity
+**Seven codes have a machine-checkable slice**: `E2E-1`, `E2E-3`, `E2E-4`, `E2E-7`, `E2E-8`, `E2E-11`, `E2E-12`.
+The module publishes seven focused rules. Their identity
 is the published name — the string that appears in a build log and in a disable comment. No numeric
 code is invented for a rule here.
 
@@ -44,11 +44,13 @@ does not watch at all.
 | `no-model-call-in-e2e` | `E2E-12` (provider-import half) | An `import` declaration whose source string matches one of six model-provider package patterns. |
 | `no-sleep-in-flow` | `E2E-3` (the sleep half only) | A call to one of five bare sleeping identifiers, or a `new Promise` whose raw source text contains `setTimeout`. |
 | `no-branch-in-flow-step` | `E2E-7` | `if`, a ternary, `switch`, or a logical operator used as a whole statement, lexically inside an `it` or `test` callback. |
+| `no-api-shaped-e2e-filename` | `E2E-1` and `TESTING-1` | The filename ends in a closed API noun instead of naming the business flow it proves. |
+| `no-wiring-in-flow-spec` | `E2E-8` | The spec calls `Test.createTestingModule(...)` instead of booting through the shared world helper. |
 
-All five map to a code the law publishes, so this module records no rule enforcing an unpublished
+All seven map to a code the law publishes, so this module records no rule enforcing an unpublished
 decision.
 
-The **other seven codes** under the `E2E-` prefix have no rule at all. This module's source names none
+The **other five codes** under the `E2E-` prefix have no complete rule. This module's source names none
 of them, so they cannot be named here either — but they are unenforced rather than covered, and a
 green run says nothing about any of them. The same is true of the half-codes: `E2E-11`'s "did the test
 enter through the production gate" half, `E2E-4`'s "is the consequence asserted a business
@@ -59,7 +61,7 @@ one half of its code.
 ## Reading a diff
 
 1. **Decide scope before anything else, and record it.** Out of scope here does not mean the file
-   passed — it means no visitor was installed and none of the five rules existed for that file.
+   passed — it means no visitor was installed and none of the seven rules existed for that file.
 2. **Scope is one filename suffix.** `isE2eSpec` tests the normalised path against `/\.e2e-spec\.ts$/`.
    `*.spec.ts`, `*.e2e.spec.ts` and `*.e2e-spec.mts` receive no rule at all.
 3. **There are no exemptions to check** — no allow-list, no exempt directory, no per-file opt-out. The
@@ -214,7 +216,7 @@ declared ten lines above deletes the rule with no diff to it.
 
 | Part | Mechanism |
 |---|---|
-| file gate, all five | `isE2eSpec(context.filename \|\| context.getFilename())`: the filename is coerced with `String(… \|\| "")`, back-slashes are replaced by forward slashes, and the result is tested against `/\.e2e-spec\.ts$/`. A file that fails this test never has a visitor installed — the rule object returns `{}`. |
+| file gate, all seven | `isE2eSpec(context.filename \|\| context.getFilename())`: the filename is coerced with `String(… \|\| "")`, back-slashes are replaced by forward slashes, and the result is tested against `/\.e2e-spec\.ts$/`. A file that fails this test never has a visitor installed — the rule object returns `{}`. |
 | separator normalisation | Back-slashes become forward slashes before the suffix test. The suffix carries no slash, so the normalisation is inert here rather than load-bearing. |
 | import source test | `node.source.value` — an **exact** string match for the transport rule, a prefix regex for the provider rule. |
 | imported name | `specifier.imported.name \|\| specifier.imported.value`, so the string-literal import form is covered and the local name is never read. |
@@ -246,8 +248,8 @@ declared ten lines above deletes the rule with no diff to it.
 
 | Scope | What passes |
 |---|---|
-| all five | **The filename.** Everything here exists only for files ending `.e2e-spec.ts`. A suite whose flow files are named `*.spec.ts`, `*.e2e.spec.ts`, `*.e2e-spec.mts` or anything else receives none of these five rules, and no diff to any rule is needed to arrange it. Partly held elsewhere: the rules' own twin test asserts that a named inventory of flow files exists at a fixed path with this suffix, so renaming a **listed** flow goes red — but that gate is a test, not a rule, and a flow it does not name is outside it. |
-| all five | **A helper file.** Every gate is per-file. Move the bus call, the sleep, the branch or the provider import one directory over into `world.ts` or `flow-helpers.ts`, import it from the spec, and all five rules stop existing for that code. This is not sabotage — it is what the law's own `E2E-8` ("one place stands the world up") tells an author to do. |
+| all seven | **The filename.** Everything here exists only for files ending `.e2e-spec.ts`. A suite whose flow files are named `*.spec.ts`, `*.e2e.spec.ts`, `*.e2e-spec.mts` or anything else receives none of these seven rules. |
+| all seven | **A helper file.** Every gate is per-file. Moving a bus call, sleep, branch or provider import into a helper makes the corresponding per-spec rule stop seeing that code; shared-world wiring itself remains visible to `no-wiring-in-flow-spec`. |
 | `e2e-uses-production-transport` | **A receiver that is not a bare identifier**, **a receiver named anything else**, **any internal method except `execute` and `process`**, **a computed member call**, and **any dispatcher acquired without a named import**. |
 | `e2e-uses-production-transport` | The mirror-image defect: `builder.execute()` on a query builder, `stream.process()` on a parser, and every unrelated method spelled `execute` or `process` are reported although nothing was bypassed. |
 | `e2e-asserts-persisted-state` | **An unused import launders the whole file**, **a state read through the shared harness**, **every store that is not the relational one**, and **the seeding path**, which the rule cannot distinguish from an assertion because it never looks at where the identifier sits. |
@@ -281,7 +283,7 @@ the whole shelf is scoped by a filename suffix that anyone can change.
    than presenting the coverage as complete.
 5. Two rules here can disagree about the same line, and the disagreement is real rather than a
    configuration mistake.
-6. The module's own severity opinion is `error` for all five; the consuming configuration remains the
+6. The module's own severity opinion is package-defined for all seven; the consuming configuration remains the
    authority on what is actually switched on.
 
 ## Exceptions
@@ -335,7 +337,7 @@ describe("checkout", () => {
 })
 ```
 
-The filename ends `.e2e-spec.ts`, so all five rules have visitors. Six findings:
+The filename ends `.e2e-spec.ts`, so all seven rules have visitors. The example's six findings are:
 
 ```text
 rule:    e2e-uses-production-transport
@@ -441,4 +443,4 @@ is a proposal, and this module records verdicts, not proposals.
 It does not judge the law's twelve codes — the law owns those, and seven of them have no machine
 anywhere. It does not judge what the shared harness does, because the harness lives in another file
 and every gate here is per-file. It does not judge which severity a repository runs: the module's
-opinion is `error` for all five, and the consuming configuration decides what is actually switched on.
+opinion is package-defined for all seven, and the consuming configuration decides what is actually switched on.

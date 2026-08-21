@@ -14,8 +14,9 @@ at the identifier it refuses on.
 
 ## Law
 
-The law carries seven codes, `CDC-1` through `CDC-7`. **Three of them have a rule**, and all three are
-held by a single published rule. That rule reads a filename, then reads the names of the members a
+The law carries seven codes, `CDC-1` through `CDC-7`. **Four codes have machine coverage through three
+published rules.** The listener contract reads a filename and member names; two focused rules also
+inspect the `groupId` value and the recompute body. The listener contract reads the names of the members a
 class declares. That is the whole of it. Names are the only thing about a change-data-capture listener
 that a single-file parser can see with certainty: whether a class *extends* the shared base, whether it
 *declares* a consumer group, a topic list, a mapping method and a recompute method, and whether it
@@ -38,6 +39,8 @@ projection.
 | Rule | Code | What it reports |
 |---|---|---|
 | `projection-listener-contract` | `CDC-1`, `CDC-2`, `CDC-3` | A class in a listener file does not extend `AbstractProjectionListener` (`base`); it does not declare one of `groupId`, `topics`, `deriveTargets`, `recomputeTarget` (`member`, once per missing name); it declares `onModuleInit` (`lifecycle`) |
+| `no-dynamic-projection-group-id` | `CDC-2` | A listener `groupId` is computed at boot instead of being a stable string literal. |
+| `projection-recompute-must-upsert` | `CDC-4` | A recompute accepts delta-like input or a projection recompute service does not write through `ON CONFLICT` upsert. |
 
 The source publishes **exactly one** rule. One rule carrying three codes is worth stating plainly
 rather than smoothing over: the three checks inside it are independent, they fire independently, and a
@@ -45,7 +48,7 @@ reader who sees `projection-listener-contract` in a build log has to read the me
 code was broken. `CDC-1` covers `base` and `lifecycle`; `CDC-2` covers the names `groupId` and
 `topics`; `CDC-3` covers the names `deriveTargets` and `recomputeTarget`.
 
-`CDC-4`, `CDC-5`, `CDC-6` and `CDC-7` have **no rule at all**, and no rule here claims them. They are
+The remaining semantic portions of `CDC-2` and `CDC-4`, plus `CDC-5`, `CDC-6` and `CDC-7`, have no complete machine proof. They are
 unenforced rather than covered, and a green run says nothing about a recompute that adds a delta, a
 tombstone turned into an empty current row, a failure that stops the consumer, or a delivery path never
 exercised through a broker.
@@ -108,7 +111,7 @@ same-file shim named `AbstractProjectionListener` produces silence. A wiring gra
 listener that no module lists in its providers reports nothing and projects nothing.
 
 **Boundary.** This rule judges declarations inside one file. Whether the projection those declarations
-name is correct at runtime is `CDC-4` through `CDC-7`, and no rule holds any of them.
+name is correct at runtime is partly held by the focused `CDC-2` and `CDC-4` rules; `CDC-5` through `CDC-7` remain human-held.
 
 ## Detection
 
@@ -174,6 +177,19 @@ declaration and never value or body**, which is why every semantic code in the l
 superclass is compared as a local spelling in one file**, which makes the rule both over-fire on a
 legitimate intermediate base and stay silent for a same-file shim. Neither is sabotage. Both are what
 ordinary refactoring looks like.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | The path as the linter reports it, normalised to forward slashes; the sole gate on whether the rule exists |
+| scope decision | Which filename test matched, or that none did, or that the exclusion fired |
+| superclass identifier | The name as spelled at `extends`, not as imported and not as resolved |
+| class members | The `key` of every member node — kind, modifiers and static-ness are not evidence here |
+| member names | The four literal strings `groupId`, `topics`, `deriveTargets`, `recomputeTarget`, plus `onModuleInit` |
+
+Values, bodies, types, imports, other files and the module graph are **not** inputs. Stating that as an
+input list rather than a footnote is the point of this record.
 
 ## Rules
 

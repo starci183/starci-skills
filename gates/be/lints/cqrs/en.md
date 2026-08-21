@@ -21,14 +21,14 @@ module chooses no design. It refuses one, and it must be able to point at the no
 The law carries seven codes, `CQRS-1` through `CQRS-7`. This module documents something narrower and
 more useful: **which of those codes a machine holds, by what mechanism, and where the mechanism ends.**
 
-Three of the seven codes are shapes a parser can see. The other four — where the work lives, how thin
-a dispatching service is, whether a failure is thrown or returned, whether the caller is waiting on an
+Four of the seven codes now have a parser-visible slice. The other judgements — where the work lives, how thin
+a dispatching service is, and whether the caller is waiting on an
 event — are judgements. A rule that guessed at them would fire on correct code often enough that
 everybody would learn to disable it, and a rule everybody disables enforces nothing while looking like
 it does.
 
-So the honest statement of enforcement is: the law states seven codes, **three have a rule and four
-have no machine at all — and the three that do have known holes in them.** Both halves of that
+So the honest statement of enforcement is: the law states seven codes, **four have a rule and three
+have no complete machine proof — and the four that do have known holes in them.** Both halves of that
 sentence matter. A code with no rule is known to be unenforced and gets read by a human. A rule
 believed to be airtight, that is not, is worse — it buys silence and pays for it with a false sense of
 coverage.
@@ -40,10 +40,11 @@ coverage.
 | `handler-overrides-process` | `CQRS-3` | A decorated handler declares `execute` (`overridesExecute`), or a decorated handler with no superclass declares neither `execute` nor `process` (`noProcess`) |
 | `message-carries-params-only` | `CQRS-2` | An undecorated class in a message file declares a non-constructor method (`method`), or its constructor does not take exactly one parameter named `params` (`shape`) |
 | `handler-has-twin-spec` | `CQRS-7` | A handler file whose operation name has no matching `<operation>.handler.spec.ts` in the listing the config supplied (`missing`) |
+| `no-handler-encoded-failure` | `CQRS-5` | A handler `process` returns an object carrying `success: false` or `error` instead of throwing the domain exception naming the failure. |
 
-Every published rule maps to a code. The gap runs the other way: `CQRS-1`, `CQRS-4`, `CQRS-5` and
-`CQRS-6` have **no rule at all**. They are unenforced rather than covered, and no rule here claims
-them. A green run says nothing about any of the four.
+Every published rule maps to a code. The gap runs the other way: `CQRS-1`, `CQRS-4` and `CQRS-6` have
+no complete machine proof. `no-handler-encoded-failure` holds only the closed returned-object shapes
+it names; it does not prove every failure branch throws the right exception.
 
 The severity the module asks for, as shipped: `handler-overrides-process` at `error` and
 `message-carries-params-only` at `error`, each because its measured debt was burned down to zero;
@@ -389,4 +390,4 @@ component library. The rule names and the plugin namespace they ship under are i
 in build output, so they are reproduced verbatim; that is the one exemption, and it does not extend to
 prose. Whether the work lives in the right place, how thin a dispatching service is, whether a failure
 is thrown or returned, and whether the caller is waiting on an event belong to `CQRS-1`, `CQRS-4`,
-`CQRS-5` and `CQRS-6` — read by a human, because no rule here owns them.
+the semantic portions of `CQRS-5` and all of `CQRS-6` — read by a human beyond the encoded-failure rule's closed shapes.

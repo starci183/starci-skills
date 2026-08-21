@@ -17,7 +17,7 @@ Every log leaves the process through a pipeline that attaches a correlation id a
 every log carries a name that can be counted, grouped and filtered. The law names three ways a log
 escapes that pipeline — the framework's own logger, `console`, and a name fused with its data.
 
-The law states eight codes, `OBSERVABILITY-1` through `OBSERVABILITY-8`. **Two of them have a rule.**
+The law states eight codes, `OBSERVABILITY-1` through `OBSERVABILITY-8`. **Three of them have a rule.**
 One more, `OBSERVABILITY-6`, is held by a config list rather than by a rule. Five have no machine at
 all. That is not an accident of coverage: the rest of the law is judgement. Whether a log records a
 decision or merely an arrival, whether a failure carried its identity or its rendered English, whether
@@ -26,8 +26,8 @@ happened; it cannot see what the code is FOR. A rule that guessed would fire on 
 enough that everybody would learn to switch it off, and a rule everybody switches off enforces nothing
 while looking like it does.
 
-So the honest statement of enforcement is: **two codes have a machine with known holes in it, one code
-is held by a config list rather than a rule, and five codes have no machine at all.** A code with no
+So the honest statement of enforcement is: **three codes have a machine with known holes in it, one code
+is held by a config list rather than a rule, and four codes have no machine at all.** A code with no
 rule is known to be unenforced and gets read by a human. A rule believed to be airtight, that is not,
 buys silence and pays for it with false coverage.
 
@@ -37,15 +37,16 @@ buys silence and pays for it with false coverage.
 |---|---|---|
 | `no-framework-logger` | `OBSERVABILITY-1` (one half) | `imported` — a named import of `Logger` from the exact source string `@nestjs/common`; `constructed` — any `new Logger(...)` where the callee is the bare identifier |
 | `no-interpolated-log-message` | `OBSERVABILITY-2` | `built` — the first argument of a log method on the house logging service when that argument is a template literal, a `+` concatenation, or a string literal |
+| `no-error-wording-as-log-identity` | `OBSERVABILITY-5` | A failure log carries exception wording in its data but omits the exception's stable `code` identity. |
 
-Both published rules map to a code. The gap runs the other way, and it is large. `OBSERVABILITY-3` (a
+All three published rules map to a code. The gap runs the other way, and it is large. `OBSERVABILITY-3` (a
 name with no data beside it) has **no rule**: nothing inspects the second argument. `OBSERVABILITY-4`
-("decision, not arrival") has **no rule**: it needs to know what the code is for. `OBSERVABILITY-5` (a
-rendered exception message inside the data object) has **no rule**: that is a value, not a shape.
+("decision, not arrival") has **no rule**: it needs to know what the code is for. `OBSERVABILITY-5`
+now has a narrow rule for the visible failure-log shape: wording without `error.code`.
 `OBSERVABILITY-7` (a change boundary) has **no rule**: it is a review artifact. `OBSERVABILITY-8` (a
 lifecycle budget) has **no rule**: it is a brief, not a node type. `OBSERVABILITY-6` is held by
-`standaloneProgramGlobs`, an exported path list — a config value, not a rule, scoped by folder. Those
-six are unenforced rather than covered, and a green run says nothing about any of them.
+`standaloneProgramGlobs`, an exported path list — a config value, not a rule, scoped by folder. The
+remaining semantic portions are unenforced rather than covered, and a green run says nothing about them.
 
 `OBSERVABILITY-2` deserves the sharpest statement on this page. The code says the event name **is an
 enum member**. The rule bans three spellings of a built string. Those are not the same claim: the rule
@@ -71,7 +72,7 @@ the third exit, and the cheapest one to reach.
 4. **Emit one block per finding.**
 5. **Write the `hatch` line whenever an open hatch would have hidden the same failure** — a namespace
    import, a wrapper class, a renamed receiver, a laundering constant, a slot to the right.
-6. **Do not report what no rule watches.** Six of the eight codes have no rule; a verdict that claims
+6. **Do not report what no rule watches.** Four of the eight codes have no rule; a verdict that claims
    otherwise is wrong about the module.
 
 ## `no-framework-logger` — OBSERVABILITY-1
@@ -205,6 +206,18 @@ nothing** — a rename, an alias, a namespace or a wrapper removes the rule; **o
 reads is guarded**, so a violation moves one slot right and disappears; and **a folder is not a file**,
 so a path-scoped exemption is wider than the exception it was bought for. None of these is sabotage.
 All three are what tidying up looks like.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| import source | The literal string as written in the file, compared for exact equality — not the resolved module |
+| import specifier | The name at the source (`imported.name`), and the specifier's node type |
+| construction callee | The node type first, then the identifier's spelling |
+| call receiver | The last property name in the member chain, or the identifier itself. Never the type |
+| call method | The property name, against a closed set of six |
+| first argument | Its node type, and for a `Literal` the `typeof` of its value |
+| path scope | For the sanctioned exit, the glob list the source exports so a config and a measuring gate read the same one |
 
 ## Rules
 

@@ -25,8 +25,8 @@ switch it off. Every way of switching it off looks locally reasonable — a cast
 green, an object type written where it is used, an enum spelled the cheap way — and every one of them
 is invisible the day after it lands.
 
-The law runs `TYPE-1` through `TYPE-6`: **six codes**. The rule module publishes **three** rules,
-which is the number expected, and three codes are actually held by a rule of this module's own.
+The law runs `TYPE-1` through `TYPE-6`: **six codes**. The rule module publishes **six house rules**,
+with focused slices of `TYPE-1`, `TYPE-2`, `TYPE-3`, `TYPE-4` and `TYPE-6`.
 A rule's identity is its published name — the string that appears in a build log and in a disable
 comment — and no numeric identifier is invented for a rule here.
 
@@ -42,15 +42,15 @@ internals of.
 | `no-double-cast` | `TYPE-2` (and the test half of `TYPE-6`) | A cast whose operand is itself a cast to `unknown` — the `x as unknown as T` spelling exactly — in any file that is not in the spec family or the test tree |
 | `no-inline-param-type` | `TYPE-3` | A **destructured** parameter whose type annotation is a bare object type literal, on a function declaration, a function expression or an arrow |
 | `no-const-enum` | `TYPE-4` | An enum declaration carrying the `const` modifier, anywhere, with the enum's name interpolated into the message |
+| `no-inline-object-type` | `TYPE-3` | An object type literal is written inline in a property, return, variable or other non-parameter position. |
+| `no-unguarded-unknown-cast` | `TYPE-1` | A value declared `unknown` is cast to a concrete type before a visible `typeof`, `instanceof`, `in` or null guard. |
+| `no-line-suppression` | `TYPE-6` | A line disables a StarCi type-safety rule instead of declaring the sanctioned exit once at the lane. |
 
 All three map to a code the law actually carries. The findings are the codes around them.
 
-`TYPE-1` — no `any` — has **no rule published here**. It is held by
-`@typescript-eslint/no-explicit-any`, named in the recommended block. Reimplementing a rule everybody
-already has would be a maintenance cost with no gain, so the decision is sound; the consequence is
-that the loudest code in the law is held by a rule this module cannot describe, cannot version and
-cannot guarantee is registered. If the TypeScript plugin is absent from the consuming configuration,
-that entry does not silently do nothing — the configuration fails to resolve it.
+`TYPE-1` has two separate machine slices: `@typescript-eslint/no-explicit-any` refuses explicit `any`,
+while `no-unguarded-unknown-cast` refuses a visible cast out of `unknown` without an earlier guard.
+Neither rule claims to infer runtime validity beyond those closed shapes.
 
 `TYPE-5` — a discriminated union beats a bag of booleans — has **no rule at all**, by an argued
 decision recorded in the rule module's header: whether a set of booleans describes one situation or
@@ -58,8 +58,8 @@ several genuinely independent ones needs to know what the code means, and a rule
 fire on every record with two flags in it. It is unenforced, not covered, and a green run says
 nothing about it.
 
-`TYPE-6` is held only in half. Its test exit is implemented inside `no-double-cast`; nothing else of
-it has a rule.
+`TYPE-6` is held by the test-lane exit in `no-double-cast` and by `no-line-suppression`, which refuses
+the closed per-line escape-hatch shape.
 
 There is also enforcement running with no code at all: the recommended block switches on
 `@typescript-eslint/array-type` with `default: "generic"` and `readonly: "generic"`, mandating one
@@ -253,7 +253,7 @@ borrowed, one is unenforced by decision, and one is held only in its test half.
 5. The one exemption on the shelf is a **whole-file** exit, not a file-plus-value pair.
 6. Every rule reports the node that carries the defect: the outer cast, the annotation, the
    declaration. Only the enum rule carries data in its message.
-7. The module's own severity opinion is `error` for all five entries; the consuming configuration
+7. The module's own severity opinion is package-defined for all house and delegated entries; the consuming configuration
    remains the authority on what is actually switched on.
 
 ## Exceptions

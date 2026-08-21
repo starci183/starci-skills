@@ -18,8 +18,8 @@ một projection. Nó chỉ từ chối, và nó phải chỉ được vào đú
 
 ## Luật
 
-Luật có bảy mã, `CDC-1` đến `CDC-7`. **Ba mã có quy tắc**, và cả ba đều do đúng một quy tắc công bố
-giữ. Quy tắc đó đọc một tên tệp, rồi đọc tên các thành viên mà một lớp khai báo. Hết. Tên là thứ duy
+Luật có bảy mã, `CDC-1` đến `CDC-7`. **Bốn mã có phần máy giữ qua ba quy tắc đã xuất bản.** Luật contract
+đọc tên tệp và tên thành viên; hai quy tắc tập trung còn đọc giá trị `groupId` và thân recompute. Tên là thứ duy
 nhất về một bộ lắng nghe thay đổi dữ liệu mà một bộ phân tích cú pháp đọc **một tệp** có thể khẳng định
 chắc chắn: lớp này có *kế thừa* lớp cơ sở chung không, có *khai* một nhóm tiêu thụ, một danh sách chủ
 đề, một phương thức ánh xạ và một phương thức tính lại không, và có *khai* cái móc vòng đời mà nó không
@@ -42,6 +42,8 @@ projection đúng.
 | Quy tắc | Mã | Nó báo gì |
 |---|---|---|
 | `projection-listener-contract` | `CDC-1`, `CDC-2`, `CDC-3` | Một lớp trong tệp bộ lắng nghe không kế thừa `AbstractProjectionListener` (`base`); thiếu một trong bốn tên `groupId`, `topics`, `deriveTargets`, `recomputeTarget` (`member`, mỗi tên thiếu một báo cáo); tự khai `onModuleInit` (`lifecycle`) |
+| `no-dynamic-projection-group-id` | `CDC-2` | `groupId` của listener được tính lúc boot thay vì là string literal ổn định. |
+| `projection-recompute-must-upsert` | `CDC-4` | Recompute nhận đầu vào giống delta hoặc projection service ghi recompute mà không dùng upsert `ON CONFLICT`. |
 
 Nguồn công bố **đúng một** quy tắc. Một quy tắc giữ ba mã là chuyện cần nói thẳng thay vì làm cho bảng
 trông cân đối giả tạo: ba phép kiểm bên trong nó độc lập, chúng báo độc lập, và người đọc nhật ký dựng
@@ -49,7 +51,7 @@ thấy `projection-listener-contract` vẫn phải đọc thông báo mới bi�
 `base` và `lifecycle`; `CDC-2` cho hai tên `groupId` và `topics`; `CDC-3` cho hai tên `deriveTargets`
 và `recomputeTarget`.
 
-`CDC-4`, `CDC-5`, `CDC-6` và `CDC-7` **không có quy tắc nào**, và quy tắc ở đây không nhận vơ chúng.
+Phần ngữ nghĩa còn lại của `CDC-2`, `CDC-4`, cùng `CDC-5`, `CDC-6` và `CDC-7` chưa có proof máy đầy đủ.
 Chúng là chưa có ai giữ chứ không phải đã được phủ, và một lần chạy xanh không nói gì về một
 `recomputeTarget` cộng thêm lượng chênh lệch, một bia mộ bị bịa thành hàng rỗng, một lỗi làm đứng
 consumer, hay một đường giao nhận chưa bao giờ chạy qua broker thật.
@@ -111,7 +113,7 @@ cùng tệp đặt tên `AbstractProjectionListener` thì làm quy tắc im. Đ�
 dạng hoàn hảo mà không mô-đun nào khai trong providers thì không báo gì và cũng không chiếu gì.
 
 **Ranh giới.** Quy tắc này xét các khai báo bên trong đúng một tệp. Còn projection mà mấy khai báo đó
-đặt tên có đúng lúc chạy hay không là `CDC-4` đến `CDC-7`, và không quy tắc nào giữ mã nào trong số đó.
+đặt tên có đúng lúc chạy hay không được hai quy tắc tập trung giữ một phần ở `CDC-2` và `CDC-4`; `CDC-5` đến `CDC-7` vẫn do người giữ.
 
 ## Cách phát hiện
 
@@ -321,7 +323,7 @@ message: none
 mechanism: member name
 verdict: silent
 report: none
-hatch: groupId is read as a name and never as a value, so a per-process group replays history on every boot; recomputeTarget's body is never visited, so an increment instead of a rebuild from source rows is CDC-4 and no rule holds CDC-4
+hatch: listener-contract chỉ đọc tên; hai quy tắc tập trung còn từ chối group id động và recompute dạng delta/không upsert, nhưng các tương đương ngữ nghĩa khác vẫn có thể lọt
 ```
 
 Tệp đã sửa tuân thủ đúng mọi thứ mà máy giữ được, và vẫn phá `CDC-2` lẫn `CDC-4`. Sự im lặng ở đây là

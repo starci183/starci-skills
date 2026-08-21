@@ -17,7 +17,7 @@ title: Backend approve · Vietnamese
 | `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate compiler boundary đầy đủ đang được duyệt |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | từ chối brief malformed trước approval loop |
 | `@plan-check` | `machines/backend-plan/check.mjs` | script | từ chối stale identity, situation giả và file chưa bind |
-| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | chặn write thiếu exact in-progress intent |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | chặn write thiếu business-impact binding chính xác |
 
 ## NESTED SKILLS
 
@@ -62,8 +62,10 @@ In `Approved revision: <identity>`. Không có dòng này thì không bước n�
 
 ### 4 — Hard stop, rồi lấy baseline
 
-Xác nhận repository, branch và `Touching` với owner. Sau đó commit trạng thái hiện tại của target và ghi
-`Baseline commit: <sha>` trước thay đổi đầu tiên, để `git diff <baseline>` là bản kê trung thực.
+Xác nhận repository, branch và `Touching` với owner. Plan `businessImpact: affects` phải chuyển đúng feature
+head `pending` sang `in-progress` trước khi chạy `@business-boundary`. Plan `businessImpact: none` phải bind
+đúng feature head `implemented` đang có và không được mở lại head đó. Sau đó commit trạng thái hiện tại của
+target và ghi `Baseline commit: <sha>` trước thay đổi đầu tiên, để `git diff <baseline>` là bản kê trung thực.
 
 ### 5 — Triển khai đúng revision đã duyệt
 
@@ -88,12 +90,16 @@ Không được bỏ E2E hoặc Sonar: đây là phần bắt buộc của backe
 
 ### 7 — Đóng phase
 
-Ghi `Applied revision: <same identity>`, baseline commit và tracked diff. Diff phải liệt kê đủ các
+Với `businessImpact: affects`, reconcile đúng feature đang `in-progress` sang `implemented`; với
+`businessImpact: none`, giữ nguyên authority `implemented`. Chạy business registry check ở cả hai đường.
+Ghi `Applied revision: <same identity>`, business impact, business head/status, baseline commit và tracked diff. Diff phải liệt kê đủ các
 production path và khớp tuyệt đối với ranh giới đã duyệt.
 
 ## Điểm dừng
 
 - Chưa có `Approved revision` → không bắt đầu triển khai.
+- Business-impact route đã duyệt không khớp authority head (`affects` thiếu exact `in-progress`, hoặc `none`
+  thiếu exact `implemented`) → product source vẫn read-only.
 - Approval gắn với revision cũ, hoặc không có default nên `OK` không nhận diện được phương án → hỏi một
   lần; `OK` cho default đang hiển thị không mơ hồ.
 - Tree đã dirty bởi công việc không liên quan → dừng; baseline trộn nhiều việc không chứng minh được gì.

@@ -23,7 +23,7 @@ it belongs to (`DATA-1`). Persistence never arrives as a repository (`DATA-2`). 
 table (`DATA-3`). A transaction is passed to everything that must run inside it (`DATA-4`). A query
 states what it needs, and the entity does not decide it (`DATA-5`).
 
-The law states **five codes. Three of them have a rule.** This module does not restate the law; it
+The law states **five codes. All five now have an exact machine-checkable slice.** This module does not restate the law; it
 records ENFORCEMENT — the exact node a machine looks at, and the ways of writing that walk past it
 untouched. A law with no rule is known to be unenforced and gets read by a person. A leaky rule is
 BELIEVED to be closed, and nobody reads it at all, so the open table below is the reason this document
@@ -40,13 +40,13 @@ the failure.
 | `must-inject-entity-manager` | `DATA-1` | A constructor parameter annotated `EntityManager` that carries no decorator whose name matches the datasource-naming family, reported at the parameter itself |
 | `no-injected-repository` | `DATA-2` | A constructor parameter that either carries an `InjectRepository` decorator or is annotated with one of three repository type names, reported at the parameter |
 | `require-entity-table-name` | `DATA-3` | An `@Entity(...)` call whose arguments contain no string table name, reported at the whole decorator |
+| `no-outer-manager-in-transaction` | `DATA-4` | Inside `this.<field>.transaction(async (tx) => ...)`, the callback reaches for `this.<field>` again instead of `tx`. |
+| `no-eager-relation` | `DATA-5` | A relation decorator writes `eager: true`, making the entity choose relation loading for every caller. |
 
-Every published rule maps to a code, and the mapping is one-to-one. `DATA-4` (a transaction is passed
-to everything that must run inside it) and `DATA-5` (a query states what it needs) have **no rule at
-all**: whether a helper was handed the caller's transactional manager needs the call graph, and
-whether a relation should have been asked for at the call site needs to know what the answer is for.
-Both are deliberately unenforced rather than covered, and a green run says nothing whatever about
-either of them.
+Every published rule maps to a code. The two newer rules are deliberately narrow: they refuse an outer
+manager visibly reused inside its own transaction callback and `eager: true` written on a relation.
+They do not prove an inter-file helper received `tx`, nor that every call site requested exactly the
+relations its answer needs; those semantic halves remain human-held.
 
 ## Reading a diff
 

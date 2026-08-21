@@ -18,9 +18,9 @@ may say about itself. An import names the file that declares the symbol, never a
 re-exports one; and inside a capability, imports are relative rather than routed through the
 capability's own public alias.
 
-The law states **five** codes. **Two of them have a rule.** The source publishes exactly two rules in
-its `rules` export and exactly two in its `recommended` export, the two lists agree, and both ask for
-`error`. Three codes are held by nothing.
+The published module now exposes **five exact rules**. Alongside the two import rules, it refuses index
+barrels, capability-owned `@Global()`, and relative imports that escape their capability. All five ask
+for `error`; graph-level sibling-capability judgement remains outside a single-file rule.
 
 One of the three is unenforced **on purpose and says so in the source**: deciding whether an imported
 module is a sibling capability or a nested child needs the module graph, and a rule reading one file
@@ -34,18 +34,16 @@ exactly why everything requiring a second file is out of reach.
 |---|---|---|
 | `must-deep-module-import` | `LAYERING-1` | `barrel` on an aliased specifier with no segment after the capability name — `@modules/<name>`, `@features/<name>`, `@tests/<name>`, the bare prefix alone, and `@modules/<meta root>/<name>` where the meta root is one of three listed category folders |
 | `no-self-module-alias` | `LAYERING-2` | `self` on a specifier that reaches the importing file's **own** capability through that capability's public alias, where "own" is derived from the file's path |
+| `no-self-global-module` | `LAYERING-4` / Law 6 | A capability module declares itself `@Global()` instead of leaving application-wide wiring to the composition root. |
+| `no-folder-reexport` | `LAYERING-5` / Law 7 | A source specifier names a bare directory, or an `index.*` file contains only re-export statements. |
+| `no-relative-capability-escape` | Law 8 | A relative specifier walks out of the current capability rather than crossing through its public alias. |
 
-`LAYERING-3` (a capability module importing a sibling capability's module rather than wiring it at
-the composition root), `LAYERING-4` (the composition root is the only place that knows the whole) and
-`LAYERING-5` (a capability's public surface is the files it means to be imported) are enforced by
-**no rule**. They are unenforced rather than covered, and a green run says nothing about any of them.
+`LAYERING-3` (distinguishing a sibling capability from a nested child in the module graph) remains
+unenforced. The new rules hold exact per-file slices of the other boundaries and do not claim to prove
+application graph correctness.
 
-`LAYERING-5` deserves the sharpest note, because it looks held and is not. `must-deep-module-import`
-polices the **calling** half — nobody may *import* a barrel through an alias. Nothing polices the
-**declaring** half: writing an `index.ts` that re-exports a folder is unreported, and once it exists
-every relative and unaliased path to it is legal. The rules make barrels inconvenient to reach; they
-do not make them impossible to write. A reader who concludes from the table above that barrels are
-forbidden has read one level wrong.
+`LAYERING-5` now has both visible sides covered: `must-deep-module-import` refuses a bare aliased import,
+while `no-folder-reexport` refuses bare-directory exports and pure index barrels.
 
 ## Reading a diff
 
@@ -185,6 +183,18 @@ type, or knows whether the last segment of a specifier is a file, a folder, or n
 
 Every open hatch above is a hatch in the *rule*, never a permission in the *law*. Code that slips
 through is still wrong.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| `node.source.value` | The specifier as a `string`. A template literal or a computed source is skipped, and the verdict must say so rather than call it clean |
+| `context.filename` | `no-self-module-alias` only. The path with `\` normalized to `/`, and which of the three roots `lastIndexOf` found — or that none did |
+| `ALIASES` | Which of the three `{ prefix, root, metaAware }` entries matched, in declaration order, or `none matched` |
+| `META_ROOTS` | Whether `parts[0]` was in the closed 3-entry `Set`, because it decides the `barrelDepth` and the self keys |
+
+Nothing else is read. Both rules declare `schema: []` and therefore take no options; there is no
+configuration by which a repository can add an alias, add a meta root, or move a root.
 
 ## Rules
 

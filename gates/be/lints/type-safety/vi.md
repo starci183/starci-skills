@@ -25,8 +25,8 @@ Trình kiểm kiểu là người review rẻ nhất mà một kho mã có, và 
 kiểu object viết ngay chỗ dùng, một enum viết theo lối rẻ tiền — và mọi cách đều tàng hình kể từ hôm
 sau.
 
-Văn bản luật chạy từ `TYPE-1` tới `TYPE-6`: **sáu mã**. Mô-đun luật công bố **ba** luật, đúng bằng con
-số dự kiến, và ba mã thật sự được giữ bằng một luật của chính mô-đun này. Danh tính của một luật chính
+Văn bản luật chạy từ `TYPE-1` tới `TYPE-6`: **sáu mã**. Mô-đun công bố **sáu house rule**, giữ các lát
+cắt tập trung của `TYPE-1`, `TYPE-2`, `TYPE-3`, `TYPE-4` và `TYPE-6`. Danh tính của một luật chính
 là **tên công bố** của nó — chuỗi in ra trong log build và chuỗi viết trong dòng tắt luật — nên ở đây
 không đặt thêm số cho luật nào cả.
 
@@ -41,15 +41,15 @@ luật mô-đun này không sở hữu là một luật mô-đun này không th�
 | `no-double-cast` | `TYPE-2` (và nửa phần kiểm thử của `TYPE-6`) | Một phép ép kiểu mà toán hạng của nó cũng là một phép ép kiểu về `unknown` — đúng lối viết `x as unknown as T` — trong mọi tệp không thuộc họ spec và cây kiểm thử |
 | `no-inline-param-type` | `TYPE-3` | Một tham số **được rã cấu trúc** mang chú thích kiểu là một object type literal trần, trên hàm khai báo, hàm biểu thức hoặc arrow |
 | `no-const-enum` | `TYPE-4` | Một khai báo enum mang từ khoá `const`, ở bất kỳ đâu, kèm tên enum chèn vào thông điệp |
+| `no-inline-object-type` | `TYPE-3` | Object type literal được viết inline ở property, return, variable hoặc vị trí không phải parameter. |
+| `no-unguarded-unknown-cast` | `TYPE-1` | Giá trị khai là `unknown` bị cast sang kiểu cụ thể trước một guard `typeof`, `instanceof`, `in` hoặc null nhìn thấy được. |
+| `no-line-suppression` | `TYPE-6` | Một dòng tắt StarCi type-safety rule thay vì khai lối thoát hợp lệ một lần ở cấp lane. |
 
 Cả ba đều ánh xạ được vào một mã mà văn bản luật thật sự có. Phát hiện nằm ở những mã xung quanh chúng.
 
-`TYPE-1` — không dùng `any` — **không có luật nào công bố ở đây**. Nó do
-`@typescript-eslint/no-explicit-any` giữ, được gọi tên trong khối đề nghị. Viết lại một luật mà ai
-cũng đã có sẵn chỉ tốn chi phí bảo trì mà không được gì, nên quyết định là đúng; hệ quả là mã ồn ào
-nhất trong luật lại do một luật mà mô-đun này không tả được, không đánh phiên bản được và không bảo
-đảm được là có đăng ký hay không. Nếu plugin TypeScript vắng mặt trong cấu hình của kho tiêu thụ thì
-mục đó không im lặng không làm gì — cấu hình sẽ không phân giải nổi nó.
+`TYPE-1` có hai lát cắt máy riêng: `@typescript-eslint/no-explicit-any` từ chối explicit `any`, còn
+`no-unguarded-unknown-cast` từ chối cast nhìn thấy được ra khỏi `unknown` khi chưa có guard trước đó.
+Không quy tắc nào nhận là suy ra runtime validity ngoài các hình dạng đóng ấy.
 
 `TYPE-5` — một union có nhãn phân biệt hơn hẳn một mớ boolean — **hoàn toàn không có luật nào**, theo
 một quyết định có lập luận ghi ngay ở đầu mô-đun luật: muốn biết một tập boolean đang tả **một** tình
@@ -57,8 +57,8 @@ huống hay nhiều tình huống độc lập thật sự thì phải hiểu m�
 trên mọi bản ghi có hai lá cờ. Nó không được thực thi, chứ không phải được phủ, và một lần chạy xanh
 không nói gì về nó cả.
 
-`TYPE-6` chỉ được giữ một nửa. Lối ra dành cho kiểm thử của nó nằm bên trong `no-double-cast`; phần
-còn lại của nó không có luật nào.
+`TYPE-6` được giữ bằng test-lane exit trong `no-double-cast` và bằng `no-line-suppression`, quy tắc từ
+chối hình dạng escape hatch từng dòng đã đóng.
 
 Còn một thứ đang được thực thi mà chẳng có mã nào: khối đề nghị bật
 `@typescript-eslint/array-type` với `default: "generic"` và `readonly: "generic"`, tức là ép một lối
@@ -250,7 +250,7 @@ một mã đi mượn, một mã cố ý không thực thi, và một mã chỉ 
 5. Miễn trừ duy nhất trên kệ là lối ra **cho cả tệp**, không phải một cặp tệp-cộng-giá-trị.
 6. Mọi luật đều báo trên đúng nút mang khuyết tật: phép ép bên ngoài, chú thích kiểu, khai báo enum.
    Chỉ luật enum mang dữ liệu trong thông điệp.
-7. Mức nghiêm mà mô-đun tự đề nghị là `error` cho cả năm mục; cấu hình của kho tiêu thụ mới là nơi
+7. Mức nghiêm do package định nghĩa cho toàn bộ house rule và delegated entry; cấu hình của kho tiêu thụ mới là nơi
    quyết định thật sự bật cái gì.
 
 ## Ngoại lệ

@@ -23,13 +23,13 @@ signature, the body, the tests — costs a file to consult. So a name answers on
 thing, to somebody who does not already know? Not what it is implemented with, not which version of a
 format it was written for, not which folder it lived in when it was created.
 
-The law states **seven codes. Two of them have a rule.** That small number is the honest one: the
+The law states **seven codes. Three published rules hold exact naming shapes.** That small number remains honest: the
 source argues, at length and with a measurement, that the other five need to know what the thing IS,
 which no parser knows. A ruling with no rule is known to be unenforced, and the reader compensates. A
 rule believed to be closed and in fact leaky is worse, because it buys the reader's attention and
 spends it on nothing.
 
-Both shipped rules sit at **`warn`, not `error`**, in the source's own recommended configuration —
+The shipped naming rules sit at **`warn`, not `error`**, in the source's own recommended configuration —
 deliberately: naming rules land on a mature tree with real debt, and a naming rule at `error` on day
 one blocks every commit that touches an old file, which teaches people to disable it. A build stays
 green with both firing. "The gate passed" and "the rules found nothing" are different sentences here,
@@ -41,13 +41,14 @@ and only one of them is evidence.
 |---|---|---|
 | `no-version-in-name` | `NAME-2` | `versioned` — a declared function, class, interface, type alias or method whose name bakes a schema generation into it |
 | `no-bare-verb-export` | `NAME-5` | `bareVerb` — a named export whose identifier is one of eighteen listed bare verbs |
+| `no-vendor-module-factory-name` | `NAME-1` (module-factory slice) | A house `.module.ts` class declares a static `forRoot`, `forRootAsync`, `forFeature` or `forFeatureAsync` factory instead of `register`/`registerAsync`. |
 
-The count is exactly two. The source's `rules` export publishes `no-version-in-name` and
-`no-bare-verb-export` and nothing else, and its header says so in the first sentence.
+The package publishes these three naming rules; the module-factory rule remains deliberately narrow
+to declarations owned by this repository and never reports calls into vendor modules.
 
-`NAME-1`, `NAME-3`, `NAME-4`, `NAME-6` and `NAME-7` have **no rule at all**. They are review-held, not
+The remaining portions of `NAME-1`, plus `NAME-3`, `NAME-4`, `NAME-6` and `NAME-7`, are review-held, not
 covered, and a green run says nothing about any of them. Two of those absences are worth naming
-precisely. `NAME-1` was rule-shaped, measured, and deleted: a first version demanded the file name
+precisely. The broader `NAME-1` file-name experiment was measured and deleted: it demanded the file name
 spell out the class it declares and found 616 offenders in 4430 files, because the convention is the
 opposite of what it assumed — fourteen percent of a tree is a convention, not debt. And `NAME-6` looks
 half-held and is not: the boolean ruling bans `checkX`, and because the verb `check` is in the
@@ -193,7 +194,7 @@ Every open hatch below follows from those two sentences.
 | `no-bare-verb-export` | **A specifier list** — `export { generate }`, and every barrel file — plus **an aliased re-export**, `export * from`, and `export default function generate` |
 | `no-bare-verb-export` | **A wrapped initializer** — `memoize(buildContent)` — **a method on an exported class**, **an object property holding a function**, and `export declare function` |
 | `no-bare-verb-export` | **Any verb outside the eighteen** — `execute`, `emit`, `read`, `write`, `sync`, `init`, `start`, `render`, `validate`, `find`, `save`, `list`, `format`, `merge`, `serialize` — and any near-miss spelling: `Generate`, `generate_`, `doGenerate` |
-| both | **Any file name at all** — `content-v2.service.ts`, `generate.ts`. Neither rule reads `context.filename`, and `NAME-1`, which is about file names, has no rule |
+| declaration-name rules | **Any file name at all** — `content-v2.service.ts`, `generate.ts`. The module-factory rule reads `.module.ts` only to scope factory declarations; broader file-name quality remains review-held. |
 | neither | **Everything `NAME-1`, `NAME-3`, `NAME-4`, `NAME-6` and `NAME-7` forbid** — a name taken from a folder, from a mechanism, from its first caller, and the boolean shape `checkVerified` that `NAME-6` actually bans |
 
 The pattern behind most of those rows is one sentence: **each rule recognises one exact syntactic
