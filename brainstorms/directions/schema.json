@@ -51,6 +51,13 @@
           "items": {"$ref": "#/$defs/slug"}
         },
         "roles": {"$ref": "#/$defs/roles"},
+        "lockedTokens": {
+          "description": "Exact semantic token values imposed by a routed grammar visual contract. Omitted when the grammar leaves visual theme open.",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"$ref": "#/$defs/token"},
+          "additionalProperties": {"type": "string", "minLength": 1}
+        },
         "rejects": {
           "type": "array",
           "minItems": 1,

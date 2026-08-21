@@ -71,6 +71,7 @@
     { "id": "content-headings-present", "category": "content", "definition": "The authored document contains section headings that form an outline.", "proofKinds": ["business-input", "contract"] },
     { "id": "content-outline-requested", "category": "interaction", "definition": "A secondary navigation surface must expose authored section destinations.", "proofKinds": ["business-input", "contract"] },
     { "id": "selection-grounding-requested", "category": "interaction", "definition": "The exact authored passages may be selected as grounded assistant context.", "proofKinds": ["business-input", "contract"] },
-    { "id": "selection-grounding-not-requested", "category": "interaction", "definition": "The prose surface must not participate in assistant selection grounding.", "proofKinds": ["business-input", "contract"] }
+    { "id": "selection-grounding-not-requested", "category": "interaction", "definition": "The prose surface must not participate in assistant selection grounding.", "proofKinds": ["business-input", "contract"] },
+    { "id": "surface-dashboard-console", "category": "surface", "definition": "The addressed authenticated surface is a product dashboard or operational console with persistent application chrome.", "proofKinds": ["business-input", "founder-ruling", "runtime-observation"] }
   ]
 }

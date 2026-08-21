@@ -22,6 +22,8 @@ the later layout candidate under the single layout hash.
 
 External style libraries are recommendation sources only. A recommendation becomes a candidate only
 after it is expressed through this project's vocabulary or names every new token it would require.
+When the routed grammar emits a visual contract, its axes, role tokens and exact values are fixed input,
+not a candidate axis. Every direction carries the same `lockedTokens`; only composition may vary.
 
 ## Inputs
 
@@ -83,7 +85,7 @@ approval.
 
 ## Rules
 
-1. A direction carries no class. A raw visual value appears only inside a `new` token decision.
+1. A direction carries no class. A raw visual value appears only inside a `new` token decision or the grammar-owned `lockedTokens` map.
 2. Every direction carries the inventory digest as `vocabularyAt`; every `reuse` token exists there and every `new` token is absent.
 3. Every direction maps all thirteen roles; `none` is legal only for radius, elevation, duration and easing.
 4. Every direction names three to five personality words and one to five explicit rejections.
@@ -92,6 +94,7 @@ approval.
 7. Return fewer than three only when the evidence permits fewer, and state why; never pad a batch.
 8. Feedback opens a new round. An accepted direction is never edited in place.
 9. Every schema-2 batch recommends exactly one candidate and states the evidence-backed reason.
+10. A grammar visual contract is copied byte-for-byte into `lockedTokens`; changing its axes, role token or value refuses the direction.
 
 ## Preview
 

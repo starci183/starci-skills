@@ -30,12 +30,14 @@ the promoted package.
 5. `GRAMMAR-5` — A missing route, owner or fact stops; it never authorizes hand-built fallback JSX.
 6. `GRAMMAR-6` — Repository remotes, revisions, paths, symbols, blobs and source-origin records are forbidden.
 7. `GRAMMAR-7` — Resolution returns only selected facts, capsules, templates and principle concerns.
+8. `GRAMMAR-8` — A profile visual contract locks direction axes, semantic role tokens and exact token values; design and execution refuse substitutions.
 
 ## Routing
 
 Layout and block design classify evidenced situations into fact ids, run `@resolve-grammar`, and bind
 the resulting receipt into their accepted design revision. Outcomes constrain which semantic owner is
-reused, extended or reported as `new-required`; they do not choose visual classes.
+reused, extended or reported as `new-required`; they do not choose visual classes. A selected owner may
+also carry a visual contract, which fixes semantic theme tokens and values before direction comparison.
 
 Execute recomputes the same receipt from accepted facts and the current declared profile. A hash drift,
 missing capsule, changed template or absent owner returns to design. It loads only the emitted compact
@@ -50,6 +52,7 @@ context pack, then resolves the emitted `principleConcerns` through the principl
 5. Templates preserve owner boundaries and state transitions; they are references, not source to paste blindly.
 6. Optional immutable refs are provenance only and may never change durable authority.
 7. Design skills record grammar/profile ids and receipt hashes so execution can detect drift.
+8. Grammar-locked visual contracts are invariant across candidate composition, viewport and interaction state.
 
 ## Stops
 

@@ -9,6 +9,32 @@ import { loadAndValidateGrammar } from "./validate-fe-grammar.mjs"
 const readJson = (path) => JSON.parse(readFileSync(resolve(path), "utf8"))
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
 
+const verifyVisualContract = (design, decisions) => {
+  const contracts = decisions
+    .map((decision) => decision.owner.visualContract)
+    .filter((contract) => contract !== undefined)
+  if (contracts.length === 0) return
+  const direction = design.artifact?.direction
+  if (direction === undefined) throw new Error("accepted design omits its grammar-locked visual direction")
+  for (const contract of contracts) {
+    if (!same(direction.axes, contract.axes)) {
+      throw new Error("accepted visual direction axes differ from the grammar-locked theme")
+    }
+    if (!same(direction.lockedTokens, contract.tokens)) {
+      throw new Error("accepted visual direction token values differ from the grammar-locked theme")
+    }
+    for (const [role, token] of Object.entries(contract.roles)) {
+      const decision = direction.roles?.[role]
+      if (decision?.token !== token || decision.verdict === "none") {
+        throw new Error(`accepted visual direction role ${role} differs from the grammar-locked theme`)
+      }
+      if (decision.verdict === "new" && decision.value !== contract.tokens[token]) {
+        throw new Error(`accepted visual direction role ${role} carries a non-locked token value`)
+      }
+    }
+  }
+}
+
 /** Prove an accepted design still resolves to its recorded deterministic grammar authority. */
 export function verifyDesignGrammar({ design, grammarRoot, profilePath }) {
   const loaded = loadAndValidateGrammar(grammarRoot)
@@ -25,6 +51,7 @@ export function verifyDesignGrammar({ design, grammarRoot, profilePath }) {
   })
   if (!same(design.grammarDecisions, resolved.decisions)) throw new Error("accepted grammar decisions are stale")
   if (!same(design.grammarReceipt, resolved.receipt)) throw new Error("accepted grammar receipt is stale")
+  verifyVisualContract(design, resolved.decisions)
   return resolved
 }
 

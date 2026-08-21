@@ -199,7 +199,8 @@ function directionLaws(data, vocabulary) {
   }
   if (!vocabulary) return [...found, "direction evidence: --vocabulary is required so token verdicts are evidence-backed"];
 
-  const known = new Set((vocabulary.tokens ?? []).map((token) => token.name));
+  const vocabularyByName = new Map((vocabulary.tokens ?? []).map((token) => [token.name, token]));
+  const known = new Set(vocabularyByName.keys());
   const RAW_VALUE = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|hsl|oklch|lab|lch)\s*\()/i;
   for (const {direction, at: directionAt} of selected) {
     if (Array.isArray(data.directions) && direction.vocabularyAt !== data.envelope?.vocabularyAt) {
@@ -223,11 +224,21 @@ function directionLaws(data, vocabulary) {
       if (decision?.verdict === "new" && known.has(decision.token)) {
         found.push(`${directionAt}.roles.${role}: declares ${decision.token} new, but it already exists`);
       }
+      const lockedValue = direction.lockedTokens?.[decision?.token];
+      if (lockedValue !== undefined && decision?.verdict === "new" && decision.value !== lockedValue) {
+        found.push(`${directionAt}.roles.${role}: new value for ${decision.token} differs from its grammar-locked value`);
+      }
+    }
+    for (const [token, lockedValue] of Object.entries(direction.lockedTokens ?? {})) {
+      const declarations = vocabularyByName.get(token)?.declarations ?? [];
+      if (declarations.length > 0 && !declarations.some((declaration) => declaration.value === lockedValue)) {
+        found.push(`${directionAt}.lockedTokens.${token}: vocabulary declarations differ from the grammar-locked value`);
+      }
     }
     walkStrings(direction, directionAt, (text, at) => {
       const match = text.match(RAW_VALUE);
-      if (match && !/\.roles\.[^.]+\.value$/.test(at)) {
-        found.push(`${at}: carries raw visual value ${match[0]}; only a new token's value may carry one`);
+      if (match && !/\.roles\.[^.]+\.value$/.test(at) && !/\.lockedTokens\.[^.]+$/.test(at)) {
+        found.push(`${at}: carries raw visual value ${match[0]}; only a new or grammar-locked token value may carry one`);
       }
     });
 

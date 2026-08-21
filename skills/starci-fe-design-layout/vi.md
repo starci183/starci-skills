@@ -20,6 +20,7 @@ title: starci-fe-design-layout · Vietnamese
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract theo lý do mà không lộ class |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit grammar decision tất định và context gọn đã chọn |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh grammar package trước khi tạo candidate |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | từ chối theme hoặc receipt drift trước khi publish |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind lựa chọn vào vocabulary frontend hiện hành |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate và hash design artifact |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | kiểm tra head và accepted revision hiện hành |
@@ -73,7 +74,8 @@ layout chấp thuận cả direction lẫn composition.
    scope checkpoint: `page` dừng trước control đổi route; `flow` liệt kê start, mọi page trung gian và end/result.
 2. Validate cặp grammar/profile được route khai rõ. Đọc `@directions` và `@layouts`, phân loại chỉ tình huống có
    bằng chứng thành closed fact rồi chạy `@resolve-grammar`. Outcome/owner emit ra là semantic constraint bắt buộc;
-   thiếu fact hoặc owner `new-required` thì trả decision. Chọn một direction recommendation có bằng chứng, resolve region theo lý do
+   thiếu fact hoặc owner `new-required` thì trả decision. Nếu owner mang `visualContract`, chép trục, role token
+   và `lockedTokens` chính xác vào mọi direction; theme không còn là trục candidate. Chọn một direction recommendation có bằng chứng, resolve region theo lý do
    nghiệp vụ rồi viết **3–4 page-set HTML/CSS độc lập và hoàn chỉnh** với cùng content và viewport. Xếp hạng theo
    business fit, precedent, hierarchy, reuse, accessibility và boundary ownership rồi tự chọn phương án mạnh
    nhất. Candidate phải khác thật ở
@@ -88,7 +90,7 @@ layout chấp thuận cả direction lẫn composition.
 6. Sau `OK`, render mọi state tất định mà layout thực sự có. Responsive/collapsed state chỉ có khi reachable.
    Không hỏi approval lần hai. Nếu state cần quyết định mới về route, owner, action hay outcome, mở một product
    decision round mới thay vì đoán.
-7. Validate base và mọi state/viewport, tính digest/hash, ghi bundle hai file bất biến, đăng ký revision, nâng
+7. Validate base và mọi state/viewport, chạy `@verify-design-grammar`, tính digest/hash, ghi bundle hai file bất biến, đăng ký revision, nâng
    layout head, build lại review graph và chạy registry check. Candidate thua chỉ ở cache.
 
 ## Visual quality

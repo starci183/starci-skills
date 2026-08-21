@@ -20,6 +20,7 @@ title: starci-fe-design-layout · English
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit deterministic selected grammar decisions and compact context |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package before candidate work |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | refuse accepted theme or receipt drift before publication |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind choices to the current frontend vocabulary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify current heads and accepted revisions |
@@ -83,7 +84,9 @@ route tree: ordered root/app/feature layouts, routed pages, overlays and regions
 
 Validate the explicit grammar/profile pair from the route. Read `@directions` and `@layouts`, classify only
 evidenced situations into closed facts, and run `@resolve-grammar`. Its outcomes and owners are binding semantic
-constraints; missing facts or `new-required` owners return the decision. Evidence-select one recommended direction, resolve every region against the
+constraints; missing facts or `new-required` owners return the decision. If an owner carries `visualContract`,
+copy its axes, role tokens and exact `lockedTokens` into every direction; theme is not a candidate axis.
+Evidence-select one recommended direction, resolve every region against the
 contract by business reason, and author complete standalone HTML/CSS page-set candidates over the same
 business-backed content and viewport set. Author three or four materially distinct choices, rank them against
 business fit, precedent, hierarchy, reuse, accessibility and boundary ownership, then select the strongest.
@@ -117,7 +120,7 @@ create a second approval checkpoint.
 If a state cannot be derived without choosing a new route, owner, action or outcome, stop and open a new product
 decision round. Do not disguise a product choice as state completion.
 
-Validate the base and every state viewport, calculate `previewSha256` and `revisionHash`, write the two immutable
+Validate the base and every state viewport, run `@verify-design-grammar`, calculate `previewSha256` and `revisionHash`, write the two immutable
 files, register the revision and advance the stable layout head. Rebuild the review graph and run the registry
 check. Losing candidates stay in cache and may be discarded.
 

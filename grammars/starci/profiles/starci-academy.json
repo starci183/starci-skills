@@ -4,6 +4,48 @@
   "grammar": "starci",
   "profileId": "starci-academy",
   "owners": {
+    "starci-dashboard-theme": {
+      "decision": "reuse",
+      "component": "StarCiDashboardThemeBoundary",
+      "primitive": "grammar-locked semantic theme tokens",
+      "principleMode": "inherit",
+      "principleConcerns": [],
+      "capsuleRefs": ["dashboard-theme"],
+      "visualContract": {
+        "axes": { "contrast": "balanced", "density": "compact", "shape": "soft", "depth": "layered", "motion": "measured" },
+        "roles": {
+          "ground": "--starci-background",
+          "surface": "--starci-surface",
+          "content": "--starci-foreground",
+          "mutedContent": "--starci-muted",
+          "accent": "--starci-accent",
+          "separator": "--starci-separator",
+          "display": "--starci-font-sans",
+          "body": "--starci-font-sans",
+          "label": "--starci-font-sans",
+          "radius": "--starci-radius-3xl",
+          "elevation": "--starci-surface-shadow",
+          "duration": "--starci-duration",
+          "easing": "--starci-easing"
+        },
+        "tokens": {
+          "--starci-background": "oklch(97.02% 0.0015 354.13)",
+          "--starci-surface": "oklch(100% 0.0008 354.13)",
+          "--starci-foreground": "oklch(21.03% 0.0015 354.13)",
+          "--starci-muted": "oklch(55.17% 0.0030 354.13)",
+          "--starci-accent": "oklch(70.03% 0.2092 354.13)",
+          "--starci-accent-foreground": "oklch(100% 0 0)",
+          "--starci-accent-soft": "color-mix(in oklab, var(--starci-accent) 15%, transparent)",
+          "--starci-separator": "oklch(92% 0.0015 354.13)",
+          "--starci-font-sans": "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
+          "--starci-radius-3xl": "1.5rem",
+          "--starci-surface-shadow": "0 2px 4px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.06), 0 0 1px 0 rgba(0, 0, 0, 0.06)",
+          "--starci-duration": "150ms",
+          "--starci-easing": "cubic-bezier(0.4, 0, 0.2, 1)"
+        }
+      },
+      "reason": "Dashboard and console surfaces have one StarCi Academy visual identity; project-local palette substitutions are invalid."
+    },
     "surface-list": { "decision": "reuse", "component": "SurfaceListCard", "primitive": "HeroUI Card", "principleMode": "inherit", "principleConcerns": [], "capsuleRefs": ["surface-list"] },
     "surface-accordion": { "decision": "reuse", "component": "SurfaceAccordionCard", "primitive": "HeroUI Accordion", "principleMode": "inherit", "principleConcerns": [], "capsuleRefs": ["hierarchical-disclosure"] },
     "selection-listbox": { "decision": "extend", "component": "SelectionList", "primitive": "HeroUI ListBox", "principleMode": "delta", "principleConcerns": ["focus-order", "state", "target-size"], "capsuleRefs": ["selection-listbox"], "reason": "Destination navigation extends the closed ListBox owner instead of assembling mechanics locally." },

@@ -3,10 +3,25 @@
   "schemaVersion": 1,
   "grammar": "starci",
   "grammarId": "starci-ui",
-  "version": 10,
+  "version": 11,
   "factCatalog": "./facts.json",
   "evidenceCatalog": "./capsules.json",
   "rules": [
+    {
+      "id": "authenticated-dashboard-uses-starci-theme",
+      "slot": "dashboard-visual-theme",
+      "priority": 400,
+      "when": {
+        "all": ["surface-dashboard-console"],
+        "any": [],
+        "none": []
+      },
+      "emit": {
+        "outcome": "starci-dashboard-theme",
+        "obligations": ["exact-semantic-theme-tokens", "rose-accent-primary", "soft-rose-selected-surface", "warm-neutral-ground", "white-primary-surface", "eclipse-foreground", "neutral-separators", "starci-sans-typeset", "soft-rounded-surfaces", "measured-surface-shadow", "same-theme-all-viewports", "no-project-local-theme-substitution"]
+      },
+      "capsuleRefs": ["dashboard-theme"]
+    },
     {
       "id": "joined-peer-list",
       "slot": "collection-surface",

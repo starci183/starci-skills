@@ -166,6 +166,22 @@ export const loadAndValidateGrammar = (grammarRoot) => {
       for (const evidenceRef of owner.capsuleRefs) {
         if (!evidenceById.has(evidenceRef)) throw new Error(`unknown owner behavior capsule ${evidenceRef} for ${outcome}`)
       }
+      if (owner.visualContract !== undefined) {
+        const roleNames = ["ground", "surface", "content", "mutedContent", "accent", "separator", "display", "body", "label", "radius", "elevation", "duration", "easing"]
+        const axisNames = ["contrast", "density", "shape", "depth", "motion"]
+        if (!outcomeIds.has(outcome)) throw new Error(`visual contract owner does not map a grammar outcome: ${outcome}`)
+        if (JSON.stringify(Object.keys(owner.visualContract.axes).sort()) !== JSON.stringify(axisNames.sort())) {
+          throw new Error(`visual contract must lock every direction axis: ${outcome}`)
+        }
+        if (JSON.stringify(Object.keys(owner.visualContract.roles).sort()) !== JSON.stringify(roleNames.sort())) {
+          throw new Error(`visual contract must lock every semantic role: ${outcome}`)
+        }
+        for (const [role, token] of Object.entries(owner.visualContract.roles)) {
+          if (owner.visualContract.tokens[token] === undefined) {
+            throw new Error(`visual contract role ${role} references an unlocked token for ${outcome}`)
+          }
+        }
+      }
     }
   }
 

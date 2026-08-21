@@ -4,6 +4,24 @@
   "grammar": "starci",
   "capsules": [
     {
+      "id": "dashboard-theme",
+      "intent": "Keep every authenticated StarCi dashboard and operational console inside one exact visual theme across chrome, navigation, content and responsive forms.",
+      "triggerFacts": ["surface-dashboard-console"],
+      "decisionQuestions": ["Is the addressed surface an authenticated dashboard or operational console?", "Does every viewport and navigation state preserve the same routed StarCi visual identity?"],
+      "variableAxes": ["viewport-state", "navigation-state", "content-state"],
+      "invariants": ["exact-semantic-theme-tokens", "rose-accent-primary", "soft-rose-selected-surface", "warm-neutral-ground", "white-primary-surface", "eclipse-foreground", "neutral-separators", "starci-sans-typeset", "soft-rounded-surfaces", "measured-surface-shadow", "same-theme-all-viewports", "no-project-local-theme-substitution"],
+      "interactionProof": [
+        { "id": "exact-theme-token-values", "kind": "computed-style", "assertion": "Ground, surface, foreground, muted, accent, separator, typography, radius and elevation resolve to the exact grammar-locked token values." },
+        { "id": "selected-navigation-soft-rose", "kind": "computed-style", "assertion": "The selected navigation destination uses the soft rose surface derived from the locked StarCi accent." },
+        { "id": "theme-survives-layout-state", "kind": "state", "assertion": "Expanded rail, collapsed rail, mobile chrome and drawer keep the same locked theme contract." }
+      ],
+      "counterexampleCaseRefs": ["ordinary-surface-without-dashboard-theme"],
+      "templateRef": "./templates/dashboard-theme.template.tsx",
+      "templateHash": "sha256:46f83823475b3d9337bc0b51f4d443d1fb1da853b4366b7ad0a8687da78f1b5c",
+      "rulings": ["founder-feedback:2026-08-21:dashboard-has-one-strict-starci-theme"],
+      "goldenCaseRefs": ["strict-starci-dashboard-theme"]
+    },
+    {
       "id": "surface-list",
       "intent": "Render comparable peer rows as one bounded collection with shared edge-to-edge separators.",
       "triggerFacts": ["collection-peer", "boundary-shared"],

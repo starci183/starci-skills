@@ -33,12 +33,14 @@ khám phá rule, nhưng source origin bị cấm trong package đã promote.
 5. `GRAMMAR-5` — Thiếu route, owner hoặc fact thì dừng; không được hand-build JSX fallback.
 6. `GRAMMAR-6` — Remote, revision, path, symbol, blob và source-origin record của repository bị cấm.
 7. `GRAMMAR-7` — Resolution chỉ trả fact, capsule, template và principle concern đã chọn.
+8. `GRAMMAR-8` — Visual contract của profile khóa trục direction, semantic role token và giá trị token chính xác; design cùng execute từ chối mọi thay thế.
 
 ## Routing
 
 Layout và block design phân loại tình huống có bằng chứng thành fact id, chạy `@resolve-grammar`, rồi
 bind receipt vào accepted design revision. Outcome giới hạn semantic owner nào được reuse, extend hay
-báo `new-required`; outcome không chọn visual class.
+báo `new-required`; outcome không chọn visual class. Owner đã chọn có thể mang thêm visual contract,
+khóa semantic theme token và giá trị trước khi so direction.
 
 Execute tính lại đúng receipt từ fact đã accept và profile hiện hành đã khai báo. Hash drift, capsule
 thiếu, template đổi hoặc owner vắng mặt đều trả về design. Nó chỉ load compact context pack đã emit,
@@ -53,6 +55,7 @@ sau đó resolve `principleConcerns` qua principle compiler.
 5. Template giữ owner boundary và state transition; đó là reference, không phải source để paste mù.
 6. Optional immutable ref chỉ là provenance và không được thay đổi durable authority.
 7. Design skill ghi grammar/profile id cùng receipt hash để execution phát hiện drift.
+8. Visual contract do grammar khóa là bất biến giữa candidate composition, viewport và interaction state.
 
 ## Stops
 

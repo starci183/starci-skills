@@ -82,6 +82,14 @@ test("schema 4 accepts three complete single-page choices with source-bound exis
     assert.equal(result.status, 0, result.stderr)
 })
 
+test("grammar-locked token values must match an existing vocabulary declaration", () => {
+    const candidates = axes.map((axis, index) => pageCandidate(["one", "two", "three"][index], axis))
+    for (const candidate of candidates) candidate.direction = { ...candidate.direction, lockedTokens: { "--accent": "rose" } }
+    const result = runArtifact(batch(candidates))
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /vocabulary declarations differ from the grammar-locked value/)
+})
+
 test("schema 4 refuses an existing nested layout that drifts between choices", () => {
     const candidates = axes.map((axis, index) => pageCandidate(["one", "two", "three"][index], axis, index === 1 ? "c".repeat(64) : existingShell.sourceHash))
     const result = runArtifact(batch(candidates))

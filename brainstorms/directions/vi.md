@@ -25,6 +25,8 @@ Owner duyệt hoặc phản biện direction đó khi nó đã nằm trong candi
 
 Kho style bên ngoài chỉ là nguồn đề xuất. Một đề xuất chỉ thành candidate sau khi được phát biểu bằng
 vốn của project này, hoặc gọi tên mọi token mới mà nó sẽ cần.
+Khi grammar đã route emit visual contract, trục, role token và giá trị chính xác của contract là đầu vào
+cố định, không phải trục candidate. Mọi direction mang cùng `lockedTokens`; chỉ composition được phép đổi.
 
 ## Đầu vào
 
@@ -86,7 +88,7 @@ chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt ri�
 
 ## Quy tắc
 
-1. Direction không mang class. Raw visual value chỉ xuất hiện bên trong quyết định token `new`.
+1. Direction không mang class. Raw visual value chỉ xuất hiện trong quyết định token `new` hoặc map `lockedTokens` do grammar sở hữu.
 2. Mọi direction mang digest kiểm kê trong `vocabularyAt`; mọi token `reuse` có ở đó và mọi token `new` vắng mặt.
 3. Mọi direction ánh xạ đủ mười ba vai trò; `none` chỉ hợp lệ với radius, elevation, duration và easing.
 4. Mọi direction gọi tên ba đến năm từ tính cách và một đến năm điều từ chối rõ ràng.
@@ -95,6 +97,7 @@ chép vẫn nằm ngoài artifact; cài dependency cần một lần duyệt ri�
 7. Chỉ trả ít hơn ba khi bằng chứng chỉ cho phép ít hơn, và nói lý do; không bao giờ nhồi cho đủ.
 8. Feedback mở một lượt mới. Direction đã chấp nhận không bao giờ bị sửa tại chỗ.
 9. Mọi batch schema 2 đề xuất đúng một candidate và ghi lý do dựa trên evidence.
+10. Visual contract của grammar được chép byte-for-byte vào `lockedTokens`; đổi trục, role token hay giá trị đều làm direction bị từ chối.
 
 ## Preview
 

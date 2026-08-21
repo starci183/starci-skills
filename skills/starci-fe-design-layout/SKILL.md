@@ -21,6 +21,7 @@ description: Confirm whether the owner wants one composed page or an end-to-end 
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit deterministic selected grammar decisions and compact context |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package before candidate work |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | refuse accepted theme or receipt drift before publication |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind choices to the current frontend vocabulary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash design artifacts |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | verify current heads and accepted revisions |
@@ -88,7 +89,9 @@ registry's revision map and layout head are lookup authority; legacy objects are
    divider, sticky and scroll behavior. Reject a composition that is only schema-complete. Evidence-select one
    direction without a separate approval. Classify only evidenced situations into closed grammar facts, run
    `@resolve-grammar`, and treat every emitted owner/outcome as a binding semantic constraint. Missing facts or
-   `new-required` owners return the decision instead of producing generic markup.
+   `new-required` owners return the decision instead of producing generic markup. When an emitted owner carries
+   `visualContract`, copy its axes, role tokens and exact `lockedTokens` into every direction; theme is no longer
+   a candidate axis and any substitution is invalid.
 4. Keep JSON free of classes. Schema 4 records each page's route, preview state, ordered composition nodes and
    regions. Bind every `existing` node to source path/hash and keep it identical across candidates. Resolve only
    target regions by business reason as `reuse`, measured `generalize`, or `new`; refuse unresolved ownership.
@@ -120,7 +123,8 @@ registry's revision map and layout head are lookup authority; legacy objects are
    behavior. This is owned completion and has no
    second approval. If a state requires a new route, owner, action or other product decision, stop and open one
    new approval round instead of guessing.
-9. Validate the selected base and all page/state viewports, write the immutable two-file revision bundle, advance the
+9. Validate the selected base and all page/state viewports, run `@verify-design-grammar` on the selected artifact,
+   write the immutable two-file revision bundle, advance the
    layout head to `revisionHash`, rebuild the review graph and run the registry check. Never persist losing
    candidates outside cache.
 

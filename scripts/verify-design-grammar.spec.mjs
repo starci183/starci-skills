@@ -40,3 +40,40 @@ test("decision drift is refused before source execution", () => {
   design.grammarDecisions[0].outcome = "invented-owner"
   assert.throws(() => verifyDesignGrammar({design, grammarRoot, profilePath}), /decisions are stale/)
 })
+
+function dashboardFixture() {
+  const resolved = resolveGrammar({
+    grammar: loaded.grammar,
+    profile,
+    factCatalog: loaded.factCatalog,
+    evidenceCatalog: loaded.evidenceCatalog,
+    templateCatalog: loaded.templateCatalog,
+    facts: ["surface-dashboard-console"],
+  })
+  const contract = resolved.decisions[0].owner.visualContract
+  const roles = Object.fromEntries(Object.entries(contract.roles).map(([role, token]) => [role, {
+    verdict: "new",
+    token,
+    value: contract.tokens[token],
+    why: "The routed grammar locks this dashboard theme token.",
+  }]))
+  return {
+    grammar: "starci",
+    grammarProfile: "starci-academy",
+    grammarFacts: resolved.facts,
+    grammarDecisions: resolved.decisions,
+    grammarReceipt: resolved.receipt,
+    artifact: { direction: { axes: structuredClone(contract.axes), roles, lockedTokens: structuredClone(contract.tokens) } },
+  }
+}
+
+test("dashboard visual contract accepts only its exact StarCi theme", () => {
+  const design = dashboardFixture()
+  assert.equal(verifyDesignGrammar({design, grammarRoot, profilePath}).decisions.length, 1)
+})
+
+test("dashboard visual contract refuses a project-local accent substitution", () => {
+  const design = dashboardFixture()
+  design.artifact.direction.lockedTokens["--starci-accent"] = "oklch(62% 0.2 253)"
+  assert.throws(() => verifyDesignGrammar({design, grammarRoot, profilePath}), /token values differ/)
+})
