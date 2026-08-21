@@ -46,6 +46,7 @@ state they were made against, and execution stops when that evidence is stale or
 | [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Recommend one of 3–4 visual directions, then generate structural layouts without pausing | one `layoutHash` approval binds the recommended direction and skeleton |
 | [`starci-fe-design-block`](./skills/starci-fe-design-block) | Design or revise one region's anatomy, states, repetition, and data ownership | an independent `blockHash`, linked to its accepted `layoutHash` |
 | [`starci-fe-design-execute`](./skills/starci-fe-design-execute) | Implement the accepted design in real frontend source | starts only when every currently reachable hash is accepted |
+| [`starci-grammar-refresh-references`](./skills/starci-grammar-refresh-references) | Refresh stale optional immutable grammar provenance without changing durable authority | routed grammar reference sidecar only |
 | [`starci-fe-minor-fix`](./skills/starci-fe-minor-fix) | Correct one existing block, composite, or leaf without changing its contract, ownership, or public shape | one clean component folder, at most two production files, two tests, and 40 production changed lines |
 
 Frontend design keeps the page skeleton and block detail separate:

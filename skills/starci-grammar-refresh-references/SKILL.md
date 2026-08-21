@@ -11,7 +11,7 @@ description: Audit and immediately refresh stale optional immutable Git referenc
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared execution and reporting boundary |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve the exact grammar/profile selected by the project role |
-| `@grammar` | `compilers/grammars/context.md` | context | durable grammar authority that optional refs may not change |
+| `@grammar` | `grammars/context.md` | context | durable grammar authority that optional refs may not change |
 | `@audit-references` | `skills/starci-grammar-refresh-references/scripts/audit-reference-sidecar.mjs` | script | verify optional reference identity and immutability |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove durable grammar authority stayed byte-identical and valid |
 

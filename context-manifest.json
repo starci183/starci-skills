@@ -45,16 +45,6 @@
       "kind": "router",
       "contextVersion": 1
     },
-    "compilers/grammars/context.md": {
-      "kind": "router",
-      "contextVersion": 1
-    },
-    "compilers/grammars/starci/context.md": {
-      "kind": "module",
-      "source": "compilers/grammars/starci/en.md",
-      "sourceHash": "6855bc99365f1c147644a8de5f07cb2feb3200a7f9b14e694e91e677c9bb6f4c",
-      "contextVersion": 1
-    },
     "compilers/patterns/be/api-evolution/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/api-evolution/en.md",
@@ -474,7 +464,7 @@
     "contexts/workspaces/context.md": {
       "kind": "module",
       "source": "contexts/workspaces/en.md",
-      "sourceHash": "d24db7cc27b84d89a2a94b2f3530af369eb9a918f9fd2a11bf615a0eb7a15aa3",
+      "sourceHash": "7fb2f984e8d25fad9feb5f359ac2fd637963f3f998737c89dfd68630c39e8472",
       "contextVersion": 1
     },
     "contexts/worktrees/context.md": {
@@ -687,6 +677,16 @@
       "sourceHash": "0213b22749e61b95da21e41407dd5f74d0d728055dd3fc101f682be7edfa8d4f",
       "contextVersion": 1
     },
+    "grammars/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "grammars/starci/context.md": {
+      "kind": "module",
+      "source": "grammars/starci/en.md",
+      "sourceHash": "24d4d62f2cfd386f74d15c28b6af0c2d0593a5f2e24304408417b39f7a6a3faf",
+      "contextVersion": 1
+    },
     "kernel/context.md": {
       "kind": "router",
       "contextVersion": 1
@@ -790,7 +790,7 @@
     "readiness/initialization/workspaces/context.md": {
       "kind": "module",
       "source": "readiness/initialization/workspaces/en.md",
-      "sourceHash": "480fc5fe4ec90766e4cd1c2777d22efee0bee35aa1fb139a548f2148ac3e9c48",
+      "sourceHash": "1595b1aec08be23c58f2192607a066f55f02829d5957bdf056533b1d1327b449",
       "contextVersion": 1
     },
     "readiness/initialization/worktrees/context.md": {

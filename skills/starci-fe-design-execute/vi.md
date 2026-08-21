@@ -12,7 +12,7 @@ title: starci-fe-design-execute · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra frontend checkout |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | kiểm tra accepted revision authority |
 | `@business` | `contexts/business/vi.md` | vi | chứng minh behavior accepted còn khớp product truth |
-| `@grammar` | `compilers/grammars` | module | tính lại và verify product-family outcome/owner đã accept |
+| `@grammar` | `grammars` | module | load product-family fact/outcome/owner đã accept để verify |
 | `@principles` | `compilers/principles` | module | resolve accepted principle obligations |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | hợp đồng accepted bundle và screenshot parity |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve product files, exports và boundary trước write |

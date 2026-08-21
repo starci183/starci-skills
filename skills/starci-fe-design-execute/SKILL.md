@@ -13,7 +13,7 @@ description: Implement one accepted composed page or page flow from immutable de
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/context.md` | context | verify accepted revision authority |
 | `@business` | `contexts/business/context.md` | context | prove accepted behavior still matches product truth |
-| `@grammar` | `compilers/grammars/context.md` | context | recompute and verify accepted product-family outcomes and owners |
+| `@grammar` | `grammars/context.md` | context | load accepted product-family facts, outcomes and owners for verification |
 | `@principles` | `compilers/principles/context.md` | context | resolve accepted principle obligations to current classes |
 | `@design-review` | `publication/design-review-preview/context.md` | context | accepted bundle and screenshot parity contract |
 | `@patterns-fe` | `compilers/patterns/fe/context.md` | context | resolve product files, exports and boundaries before writing |

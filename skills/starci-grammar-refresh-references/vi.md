@@ -10,7 +10,7 @@ title: starci-grammar-refresh-references · Vietnamese
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | execution và reporting boundary dùng chung |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve đúng grammar/profile role project đã chọn |
-| `@grammar` | `compilers/grammars` | module | durable grammar authority mà optional ref không được đổi |
+| `@grammar` | `grammars` | module | durable grammar authority mà optional ref không được đổi |
 | `@audit-references` | `skills/starci-grammar-refresh-references/scripts/audit-reference-sidecar.mjs` | script | verify identity và immutability của optional ref |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh durable grammar authority vẫn nguyên byte và hợp lệ |
 

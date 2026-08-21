@@ -9,7 +9,7 @@ import { resolveGrammar } from "../scripts/resolve-fe-grammar.mjs"
 import { loadAndValidateGrammar } from "../scripts/validate-fe-grammar.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
-const GRAMMAR_ROOT = join(ROOT, "compilers", "grammars", "starci")
+const GRAMMAR_ROOT = join(ROOT, "grammars", "starci")
 const PROFILE = JSON.parse(readFileSync(join(GRAMMAR_ROOT, "profiles", "starci-academy.json"), "utf8"))
 const sha256 = (value) => `sha256:${createHash("sha256").update(value).digest("hex")}`
 

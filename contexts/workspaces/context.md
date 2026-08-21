@@ -59,7 +59,7 @@ missing forces a question, stale invites a confident wrong answer.
    `WORKSPACE-5` — and setup refreshes configuration only; it never clones, links, copies or edits a
    target repository.
 7. **Resolve grammar explicitly.** When `context.grammar` is non-null, verify
-   `compilers/grammars/<grammar>/grammar.json` and the declared profile before design — `WORKSPACE-8`.
+   `grammars/<grammar>/grammar.json` and the declared profile before design — `WORKSPACE-8`.
 
 ## `WORKSPACE-1` — a start request names project and roles
 
@@ -217,7 +217,7 @@ the next silently returns to English even though both use the same Source.
 **Recognition signs**
 
 - `context.grammar` and `context.grammarProfile` are both non-null.
-- The compiler package and profile exist under the trust tree.
+- The grammar authority package and profile exist under the trust tree.
 
 **Ask yourself.** Did the route state this identity, or did the project/repository name merely resemble it?
 

@@ -8,16 +8,16 @@ title: StarCi deterministic frontend grammar · English
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@grammar` | `compilers/grammars/starci/grammar.json` | file | closed fact-to-outcome rules |
-| `@facts` | `compilers/grammars/starci/facts.json` | file | closed observable fact catalog |
-| `@capsules` | `compilers/grammars/starci/capsules.json` | file | durable behavior, rulings and case/template bindings |
+| `@grammar` | `grammars/starci/grammar.json` | file | closed fact-to-outcome rules |
+| `@facts` | `grammars/starci/facts.json` | file | closed observable fact catalog |
+| `@capsules` | `grammars/starci/capsules.json` | file | durable behavior, rulings and case/template bindings |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | select one deterministic winner per slot and emit a compact context pack |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove package identity, cases, hashes, templates and forbidden provenance |
 
 ## Record
 
-This compiler turns closed product-family UI facts into one deterministic set of semantic outcomes,
-behavior obligations, project owners and principle concerns. It is loaded only when the workspace
+This authority package defines the closed product-family UI facts, deterministic semantic outcomes,
+behavior obligations, project owners and principle concerns consumed by the resolver. It is loaded only when the workspace
 route explicitly declares grammar `starci` and a concrete profile such as `starci-academy`.
 
 The package is self-contained: founder rulings, durable capsules, golden and counterexample cases,
@@ -57,7 +57,7 @@ context pack, then resolves the emitted `principleConcerns` through the principl
 
 ## Stops
 
-- The workspace route omits grammar/profile, or names a package/profile that does not exist.
+- The workspace route omits grammar/profile, or names an authority package/profile that does not exist.
 - A required situation cannot be expressed by the closed fact catalog.
 - Two rules tie outside the deterministic ordering or an emitted owner is absent.
 - Capsule/case/template validation or any receipt hash fails.

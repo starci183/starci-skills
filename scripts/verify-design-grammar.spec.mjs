@@ -8,7 +8,7 @@ import { loadAndValidateGrammar } from "./validate-fe-grammar.mjs"
 import { verifyDesignGrammar } from "./verify-design-grammar.mjs"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
-const grammarRoot = join(root, "compilers", "grammars", "starci")
+const grammarRoot = join(root, "grammars", "starci")
 const profilePath = join(grammarRoot, "profiles", "starci-academy.json")
 const loaded = loadAndValidateGrammar(grammarRoot)
 const profile = JSON.parse(readFileSync(profilePath, "utf8"))

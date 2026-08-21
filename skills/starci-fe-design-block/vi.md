@@ -12,7 +12,7 @@ title: starci-fe-design-block · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra route frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | tách revision bền vững khỏi draft tạm |
 | `@business` | `contexts/business/vi.md` | vi | resolve data, action và state reachable thật |
-| `@grammar` | `compilers/grammars` | module | resolve product-family fact đã route thành block outcome và owner |
+| `@grammar` | `grammars` | module | load product-family fact, block outcome và owner đã route |
 | `@principles` | `compilers/principles` | module | audit anatomy được chọn sau sáng tạo |
 | `@blocks` | `brainstorms/blocks/vi.md` | vi | luật ownership, anatomy, state và contract của block |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | review HTML trong exact parent và hợp đồng bundle bất biến |

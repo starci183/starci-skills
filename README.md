@@ -29,6 +29,7 @@ The installation is intentionally kept together:
   .claude/
     INDEX.md
     contexts/
+    grammars/
     brainstorms/
     compilers/
     gates/
@@ -43,7 +44,7 @@ The installation is intentionally kept together:
 ```
 
 Do not copy individual skills into a second directory. A skill can depend on schemas, scripts,
-compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
+grammars, compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
 that can drift from its dependencies.
 
 The original stage trees remain the detailed authorities. The v4 roots are stable process routers:
@@ -212,6 +213,7 @@ StarCi separates capabilities by what each stage may return:
 | Tree | Species | Returns |
 | --- | --- | --- |
 | `contexts` | location | verified read and write locations |
+| `grammars` | product-family authority | closed facts, outcomes, owners, capsules, cases and templates selected explicitly by workspace route |
 | `brainstorms` | creation | 3–4 candidates for the owner to choose from |
 | `compilers` | execution | one deterministic answer from an accepted shape |
 | `gates` | refusal | pass, or reject with exact evidence |

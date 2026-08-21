@@ -64,7 +64,7 @@ thì buộc phải hỏi, cũ thì mời người ta trả lời sai một cách
    `WORKSPACE-5` — và setup chỉ làm mới cấu hình; nó không clone, không link, không copy, không sửa
    repository đích.
 7. **Resolve grammar rõ ràng.** Khi `context.grammar` khác null, verify
-   `compilers/grammars/<grammar>/grammar.json` và profile đã khai báo trước design — `WORKSPACE-8`.
+   `grammars/<grammar>/grammar.json` và profile đã khai báo trước design — `WORKSPACE-8`.
 
 ## `WORKSPACE-1` — lệnh khởi động gọi tên project và vai trò
 
@@ -223,7 +223,7 @@ sau âm thầm quay về tiếng Anh dù cả hai dùng cùng Source.
 **Cách nhận ra**
 
 - `context.grammar` và `context.grammarProfile` đều khác null.
-- Compiler package và profile tồn tại trong trust tree.
+- Grammar authority package và profile tồn tại trong trust tree.
 
 **Tự hỏi.** Route đã nêu identity này, hay tên project/repository chỉ trông giống nó?
 

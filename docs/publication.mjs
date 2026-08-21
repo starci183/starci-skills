@@ -51,6 +51,11 @@ export const groups = [
     description: "Stable v4 accountability between frontend design/source patterns, gates and the published lint canon.",
   },
   {
+    source: "grammars",
+    title: "Grammars",
+    description: "Explicit product-family authority: closed facts, deterministic outcomes, owner profiles, durable capsules, cases and templates.",
+  },
+  {
     source: "compilers/principles",
     title: "Principles",
     description: "Ground rules: each module decides one className from a business relationship, never from how it looks.",
@@ -58,7 +63,7 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all thirteen capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all eighteen capabilities share.",
   },
   {
     source: "contexts",

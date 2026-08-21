@@ -13,7 +13,7 @@ description: Challenge and design one declared block inside its exact accepted c
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/context.md` | context | resolve real data, actions and reachable states |
-| `@grammar` | `compilers/grammars/context.md` | context | resolve routed product-family facts into block outcomes and owners |
+| `@grammar` | `grammars/context.md` | context | load routed product-family facts, block outcomes and owners |
 | `@principles` | `compilers/principles/context.md` | context | audit the model-selected anatomy after creativity |
 | `@blocks` | `brainstorms/blocks/context.md` | context | block ownership, anatomy, state and contract law |
 | `@design-review` | `publication/design-review-preview/context.md` | context | exact-parent HTML review and immutable bundle contract |

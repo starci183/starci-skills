@@ -13,7 +13,7 @@ description: Challenge, design or revise one composed frontend page or flow usin
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/context.md` | context | bind the page to current product truth |
-| `@grammar` | `compilers/grammars/context.md` | context | resolve explicitly routed product-family facts into outcomes and owners |
+| `@grammar` | `grammars/context.md` | context | load explicitly routed product-family facts, outcomes and owners |
 | `@principles` | `compilers/principles/context.md` | context | review model-selected visual decisions after creativity |
 | `@directions` | `brainstorms/directions/context.md` | context | evidence-select the visual direction embedded in the layout |
 | `@layouts` | `brainstorms/layouts/context.md` | context | layout regions, axes, ownership and contract verdicts |

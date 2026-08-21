@@ -8,16 +8,16 @@ title: StarCi deterministic frontend grammar · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@grammar` | `compilers/grammars/starci/grammar.json` | file | luật đóng từ fact sang outcome |
-| `@facts` | `compilers/grammars/starci/facts.json` | file | catalog fact quan sát được và đóng |
-| `@capsules` | `compilers/grammars/starci/capsules.json` | file | behavior bền vững, ruling và binding case/template |
+| `@grammar` | `grammars/starci/grammar.json` | file | luật đóng từ fact sang outcome |
+| `@facts` | `grammars/starci/facts.json` | file | catalog fact quan sát được và đóng |
+| `@capsules` | `grammars/starci/capsules.json` | file | behavior bền vững, ruling và binding case/template |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | chọn một winner tất định mỗi slot và emit context pack gọn |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh identity, case, hash, template và provenance bị cấm |
 
 ## Record
 
-Compiler này biến các fact UI đóng của product family thành một tập outcome ngữ nghĩa, nghĩa vụ
-behavior, owner theo project và principle concern tất định. Nó chỉ được load khi workspace route khai
+Authority package này định nghĩa fact UI đóng của product family, outcome ngữ nghĩa, nghĩa vụ behavior,
+owner theo project và principle concern tất định để resolver sử dụng. Nó chỉ được load khi workspace route khai
 báo rõ grammar `starci` và một profile cụ thể như `starci-academy`.
 
 Package tự chứa founder ruling, durable capsule, golden/counterexample case và file `.template.tsx`
@@ -56,7 +56,7 @@ sau đó resolve `principleConcerns` qua principle compiler.
 
 ## Stops
 
-- Workspace route thiếu grammar/profile hoặc trỏ package/profile không tồn tại.
+- Workspace route thiếu grammar/profile hoặc trỏ authority package/profile không tồn tại.
 - Tình huống bắt buộc không thể biểu diễn bằng closed fact catalog.
 - Hai rule hòa ngoài thứ tự tất định hoặc outcome không có owner.
 - Validation capsule/case/template hoặc bất kỳ receipt hash nào fail.

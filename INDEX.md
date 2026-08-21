@@ -21,7 +21,7 @@ title: Docs
 | `@design-review` | `publication/design-review-preview/context.md` | context | render layout and block artifacts through one project-neutral Vite review application |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates/context.md` | context | judge existing code with evidence |
-| `@grammars` | `compilers/grammars/context.md` | context | resolve explicitly selected product-family UI facts into deterministic outcomes and owners |
+| `@grammars` | `grammars/context.md` | context | load explicitly selected product-family UI facts, outcomes, owners and durable behavior authority |
 | `@initialization` | `readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
 | `@kernel` | `kernel/context.md` | context | resolve route, state, approval identity and evidence before role law |
 | `@machines` | `machines/context.md` | context | locate deterministic dependency, parity, quality, artifact and secret machines |
@@ -51,8 +51,9 @@ order follows from it rather than defining it.
 | Tree | Returns | Read it when |
 |---|---|---|
 | `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
+| `@grammars` | deterministic product-family facts, outcomes, owners and durable behavior | a verified workspace route explicitly selects a grammar/profile |
 | `@brainstorms` | 3–4 evidence-backed alternatives that the model challenges, ranks and selects | a page/page-flow or block is not yet decided |
-| `@compilers` | exactly one answer, no candidates | product facts or an accepted shape need one answer — grammar decides outcomes/owners, `@principles` decide classes, and `@patterns` decide files/imports |
+| `@compilers` | exactly one answer, no candidates | an accepted shape needs execution detail — `@principles` decide classes and `@patterns` decide files/imports |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
 Frontend design alternatives are functional, business-faithful HTML pages, never static render cards. Each round
@@ -96,8 +97,8 @@ loading a stage the skill did not ask for is paying for a tree you are not using
    `in-progress`; technical-only work declares `none` and binds current `implemented` truth. `pending` and
    `rejected` are read-only for product source.
 3. `@worktrees` — only if the work writes state that must survive.
-4. `@compilers` — **before the first line**: resolve an explicitly routed product grammar first,
-   then use `@principles` for every class and `@patterns` for which file holds the code and what it may import.
+4. `@grammars`, then `@compilers` — resolve the explicitly routed product grammar first. Before the first
+   source line, use `@principles` for every class and `@patterns` for which file holds the code and what it may import.
    Both answer a shape already accepted, so reading them afterwards leaves only one move — moving code
    that is already written.
 5. `@gates` — last, on code that exists. Business-affecting work closes only after final committed source

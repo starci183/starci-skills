@@ -12,7 +12,7 @@ title: starci-fe-design-layout · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/en.md` | en | bind the page to current product truth |
-| `@grammar` | `compilers/grammars` | module | resolve explicitly routed product-family facts into outcomes and owners |
+| `@grammar` | `grammars` | module | load explicitly routed product-family facts, outcomes and owners |
 | `@principles` | `compilers/principles` | module | review selected visual decisions after creativity |
 | `@directions` | `brainstorms/directions/en.md` | en | evidence-select the visual direction embedded in the layout |
 | `@layouts` | `brainstorms/layouts/en.md` | en | layout regions, axes, ownership and contract verdicts |

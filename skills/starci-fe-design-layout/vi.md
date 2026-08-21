@@ -12,7 +12,7 @@ title: starci-fe-design-layout · Vietnamese
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và kiểm tra route frontend |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | tách revision bền vững khỏi draft tạm |
 | `@business` | `contexts/business/vi.md` | vi | bind trang vào product truth hiện hành |
-| `@grammar` | `compilers/grammars` | module | resolve product-family fact được route rõ thành outcome và owner |
+| `@grammar` | `grammars` | module | load product-family fact, outcome và owner được route rõ |
 | `@principles` | `compilers/principles` | module | review quyết định thị giác sau sáng tạo |
 | `@directions` | `brainstorms/directions/vi.md` | vi | chọn direction có bằng chứng để nhúng vào layout |
 | `@layouts` | `brainstorms/layouts/vi.md` | vi | region, axis, ownership và contract verdict của layout |

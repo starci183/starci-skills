@@ -12,7 +12,7 @@ title: starci-fe-design-execute · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend checkout |
 | `@worktrees` | `contexts/worktrees/en.md` | en | verify accepted revision authority |
 | `@business` | `contexts/business/en.md` | en | prove accepted behavior still matches product truth |
-| `@grammar` | `compilers/grammars` | module | recompute and verify accepted product-family outcomes and owners |
+| `@grammar` | `grammars` | module | load accepted product-family facts, outcomes and owners for verification |
 | `@principles` | `compilers/principles` | module | resolve accepted principle obligations |
 | `@design-review` | `publication/design-review-preview/en.md` | en | accepted bundle and screenshot parity contract |
 | `@patterns-fe` | `compilers/patterns/fe` | module | resolve product files, exports and boundaries before writing |

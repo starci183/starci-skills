@@ -12,7 +12,7 @@ title: starci-fe-design-block · English
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | separate durable revisions from disposable drafts |
 | `@business` | `contexts/business/en.md` | en | resolve real data, actions and reachable states |
-| `@grammar` | `compilers/grammars` | module | resolve routed product-family facts into block outcomes and owners |
+| `@grammar` | `grammars` | module | load routed product-family facts, block outcomes and owners |
 | `@principles` | `compilers/principles` | module | audit selected anatomy after creativity |
 | `@blocks` | `brainstorms/blocks/en.md` | en | block ownership, anatomy, state and contract law |
 | `@design-review` | `publication/design-review-preview/en.md` | en | exact-parent HTML review and immutable bundle contract |

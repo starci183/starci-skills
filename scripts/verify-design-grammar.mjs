@@ -13,7 +13,7 @@ const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
 export function verifyDesignGrammar({ design, grammarRoot, profilePath }) {
   const loaded = loadAndValidateGrammar(grammarRoot)
   const profile = readJson(profilePath)
-  if (design.grammar !== loaded.grammar.grammar) throw new Error("design grammar differs from compiler package")
+  if (design.grammar !== loaded.grammar.grammar) throw new Error("design grammar differs from authority package")
   if (design.grammarProfile !== profile.profileId) throw new Error("design grammar profile differs from routed profile")
   const resolved = resolveGrammar({
     grammar: loaded.grammar,

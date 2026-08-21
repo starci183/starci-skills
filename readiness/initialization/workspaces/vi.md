@@ -19,7 +19,7 @@ reuse. Nó không copy offset vào target repository và không sửa target.
 
 Verify checkout, repository, branch/head, manifest và vị trí contract thật trước khi phân loại route là
 `create`, `reuse`, hoặc `refresh`. Contract chỉ là `null` khi repository thật sự không có. Ghi `grammar`
-và `grammarProfile` thành một cặp rõ ràng: cùng `null`, hoặc cùng resolve tới đúng compiler package và
+và `grammarProfile` thành một cặp rõ ràng: cùng `null`, hoặc cùng resolve tới đúng grammar authority package và
 profile. Không suy ra chúng từ tên project hay repository. Route là mô tả
 machine-local: không clone, mirror, mount hay sửa target, và không chứa credential hoặc environment value.
 

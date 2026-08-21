@@ -10,7 +10,7 @@ title: starci-grammar-refresh-references · English
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared execution and reporting boundary |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve the exact grammar/profile selected by the project role |
-| `@grammar` | `compilers/grammars` | module | durable grammar authority that optional refs may not change |
+| `@grammar` | `grammars` | module | durable grammar authority that optional refs may not change |
 | `@audit-references` | `skills/starci-grammar-refresh-references/scripts/audit-reference-sidecar.mjs` | script | verify optional reference identity and immutability |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove durable grammar authority stayed byte-identical and valid |
 
