@@ -225,6 +225,10 @@ is NOT enough: two lines at the same size still claim the same rank even when on
 card whose largest element is the category label is a card whose name nobody reads, and that is an
 error, not a successful emphasis.
 
+**Metadata owner.** Source exposes one optional semantic status and one facts array. The shared
+metadata-line composite owns the single chip, joins facts with ` · `, and renders those facts through
+one ordinary text leaf. A repeated badge slot or caller-built separator is outside this pattern.
+
 **Common business situations.** Category above a course name · "12 lessons" under a chapter name ·
 author name under an article title · "3 days left" beside a task name · a unit under a number.
 

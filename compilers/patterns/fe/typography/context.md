@@ -170,6 +170,10 @@ is NOT enough: two lines at the same size still claim the same rank even when on
 card whose largest element is the category label is a card whose name nobody reads, and that is an
 error, not a successful emphasis.
 
+**Metadata owner.** Source exposes one optional semantic status and one facts array. The shared
+metadata-line composite owns the single chip, joins facts with ` · `, and renders those facts through
+one ordinary text leaf. A repeated badge slot or caller-built separator is outside this pattern.
+
 ## `TYPESET-6` — weight is body text's axis; a heading takes no second axis
 
 **Situation.** A heading does not look strong enough, so the writer adds a weight class, or wishes the

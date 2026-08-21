@@ -407,7 +407,9 @@ mã nó áp dụng vào.
   không khai báo luồng mà dữ liệu hôm nay tình cờ cho phép.
 - **Câu có chèn nhãn nhỏ, liên kết hay biểu tượng vẫn là `FLOW-1`.** Con nội tuyến không tạo thành
   hàng. Bọc chúng trong `flex` là lấy đi khả năng ngắt dòng giữa các chữ, thứ duy nhất mà văn bản
-  không được phép mất.
+  không được phép mất. Một câu metadata chỉ được nâng tối đa một status có nghĩa thành chip; mọi fact
+  còn lại giữ plain text trong một run và ngăn cách bằng dấu chấm giữa. Không có status thì không có
+  chip. Hai chip đã là một chip collection, không còn là câu.
 - **Hai phần tử lúc nào cũng vừa vẫn là `FLOW-4`** nếu một bản dịch dài hơn, một tên dài hơn hay một
   cỡ chữ lớn hơn có thể làm chúng không vừa. "Trong bản thiết kế thì vừa" là một phát biểu về bản
   thiết kế.

@@ -225,6 +225,10 @@ là `TYPESET-7`. Không phải `TYPESET-9`: `TYPESET-9` chọn bậc cho **title
 một thứ bậc kể cả khi một dòng đã xám. Một card mà phần tử to nhất là cái nhãn category là một card
 **không ai đọc tên**, và đó là lỗi chứ không phải một cách nhấn mạnh thành công.
 
+**Owner metadata.** Source lộ đúng một status ngữ nghĩa tuỳ chọn và một mảng facts. Composite
+metadata-line dùng chung sở hữu chip duy nhất, nối facts bằng ` · ` và render chúng qua đúng một text
+leaf thường. Slot badge lặp hoặc separator do caller tự ghép nằm ngoài pattern này.
+
 **Tình huống nghiệp vụ hay gặp.** Category trên tên khoá học · "12 bài" dưới tên chương · tên tác giả
 dưới tiêu đề bài viết · "còn 3 ngày" cạnh tên nhiệm vụ · đơn vị dưới một con số.
 

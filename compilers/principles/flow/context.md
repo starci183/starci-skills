@@ -306,7 +306,9 @@ applies to.
   data happens to permit.
 - **A sentence that contains a chip, a link or an icon is still `FLOW-1`.** Inline children do not
   make a row. Wrapping them in `flex` removes the ability to break between words, which is the one
-  behaviour prose cannot lose.
+  behaviour prose cannot lose. A metadata sentence may promote at most one semantic status into a
+  chip; every remaining fact stays plain text in one run, separated by middle dots. Without a status
+  there is no chip. Two chips are a chip collection, not a sentence.
 - **Two items that always fit are still `FLOW-4`** when a longer translation, a longer name or a
   larger text setting can make them not fit. "It fits in the mockup" is a statement about the
   mockup.
