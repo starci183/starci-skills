@@ -21,7 +21,7 @@ description: Implement one accepted composed page or page flow from immutable de
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify tokens bound by the accepted layout |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | compare the current receipt with accepted design authority |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove capsule, case and template authority before source writes |
-| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | recompute accepted facts and refuse decision or receipt drift |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | recompute accepted facts and refuse receipt, locked-token or preview palette drift |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve and validate current layout/block revision heads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | verify accepted design metadata and preview digest |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove business authority before the first source write |
@@ -52,7 +52,8 @@ execution by themselves.
 
 1. Run the registry check. Resolve the current page-set revision and every declared block revision; require exact
    parent `layoutHash`, owning page, accepted artifacts, complete preview HTML and complete page/state manifests.
-   Validate the explicit grammar/profile route, recompute every accepted receipt from its facts, and require byte-identical decisions/context hashes.
+   Validate the explicit grammar/profile route, recompute every accepted receipt from its facts, and pass each accepted
+   `preview.html` to `@verify-design-grammar`; require byte-identical decisions/context hashes and exact visual-contract proof.
 2. Verify the routed frontend, current business heads and visual vocabulary. Classify `businessImpact`.
    Business-affecting execution requires the exact feature head at `in-progress` before the first source write;
    technical-only execution declares `none` and binds current `implemented` truth. Run

@@ -67,13 +67,26 @@ function dashboardFixture() {
   }
 }
 
+function dashboardPreview(design) {
+  const tokens = design.artifact.direction.lockedTokens
+  const declarations = Object.entries(tokens).map(([token, value]) => `${token}:${value};`).join("")
+  const uses = Object.keys(tokens).map((token) => `var(${token})`).join(" ")
+  return `<html><head><style>:root{${declarations}}.theme-proof{--grammar-token-uses:${uses};}</style></head><body><template data-state="dashboard"><main data-visual-contract="starci-dashboard-theme"><div class="theme-proof" data-theme-role="selected">Dashboard</div></main></template></body></html>`
+}
+
 test("dashboard visual contract accepts only its exact StarCi theme", () => {
   const design = dashboardFixture()
-  assert.equal(verifyDesignGrammar({design, grammarRoot, profilePath}).decisions.length, 1)
+  assert.equal(verifyDesignGrammar({design, grammarRoot, profilePath, preview: dashboardPreview(design)}).decisions.length, 1)
 })
 
 test("dashboard visual contract refuses a project-local accent substitution", () => {
   const design = dashboardFixture()
   design.artifact.direction.lockedTokens["--starci-accent"] = "oklch(62% 0.2 253)"
-  assert.throws(() => verifyDesignGrammar({design, grammarRoot, profilePath}), /token values differ/)
+  assert.throws(() => verifyDesignGrammar({design, grammarRoot, profilePath, preview: dashboardPreview(design)}), /token values differ/)
+})
+
+test("dashboard visual contract refuses cobalt CSS even when metadata is exact", () => {
+  const design = dashboardFixture()
+  const preview = dashboardPreview(design).replace("</style>", ".bypass{color:#176bd6}</style>")
+  assert.throws(() => verifyDesignGrammar({design, grammarRoot, profilePath, preview}), /raw palette value outside/)
 })

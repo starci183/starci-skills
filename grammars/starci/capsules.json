@@ -17,7 +17,7 @@
       ],
       "counterexampleCaseRefs": ["ordinary-surface-without-dashboard-theme"],
       "templateRef": "./templates/dashboard-theme.template.tsx",
-      "templateHash": "sha256:46f83823475b3d9337bc0b51f4d443d1fb1da853b4366b7ad0a8687da78f1b5c",
+      "templateHash": "sha256:5f1bf5bf06131058c72cab4585c6a2d2b3a94173311bb1e6e970534c8238a0f8",
       "rulings": ["founder-feedback:2026-08-21:dashboard-has-one-strict-starci-theme"],
       "goldenCaseRefs": ["strict-starci-dashboard-theme"]
     },

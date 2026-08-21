@@ -46,6 +46,8 @@ also carry a visual contract, which fixes semantic theme tokens and values befor
 Execute recomputes the same receipt from accepted facts and the current declared profile. A hash drift,
 missing capsule, changed template or absent owner returns to design. It loads only the emitted compact
 context pack, then resolves the emitted `principleConcerns` through the principle compiler.
+A visual contract additionally requires every preview state to mount its boundary, declare and use every
+locked token exactly, and carry no raw palette value outside that contract.
 
 ## Rules
 
@@ -57,6 +59,7 @@ context pack, then resolves the emitted `principleConcerns` through the principl
 6. Optional immutable refs are provenance only and may never change durable authority.
 7. Design skills record grammar/profile ids and receipt hashes so execution can detect drift.
 8. Grammar-locked visual contracts are invariant across candidate composition, viewport and interaction state.
+9. A visual-contract receipt is incomplete without its matching `preview.html` proof.
 
 ## Stops
 

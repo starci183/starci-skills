@@ -20,7 +20,7 @@ title: starci-fe-design-execute · Vietnamese
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | kiểm tra token đã bind bởi accepted layout |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | so receipt hiện hành với design authority đã accept |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | chứng minh capsule, case, template trước khi ghi source |
-| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | tính lại fact đã accept và từ chối decision/receipt drift |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | tính lại fact đã accept và từ chối receipt, locked-token hay preview palette drift |
 | `@design-registry-check` | `scripts/check-design-registry.mjs` | script | resolve và validate current revision heads |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra accepted metadata và preview digest |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | prove authority trước source write |

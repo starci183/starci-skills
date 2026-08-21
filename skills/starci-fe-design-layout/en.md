@@ -120,7 +120,7 @@ create a second approval checkpoint.
 If a state cannot be derived without choosing a new route, owner, action or outcome, stop and open a new product
 decision round. Do not disguise a product choice as state completion.
 
-Validate the base and every state viewport, run `@verify-design-grammar`, calculate `previewSha256` and `revisionHash`, write the two immutable
+Validate the base and every state viewport, run `@verify-design-grammar` with the selected `preview.html`, calculate `previewSha256` and `revisionHash`, write the two immutable
 files, register the revision and advance the stable layout head. Rebuild the review graph and run the registry
 check. Losing candidates stay in cache and may be discarded.
 

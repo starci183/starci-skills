@@ -123,7 +123,7 @@ registry's revision map and layout head are lookup authority; legacy objects are
    behavior. This is owned completion and has no
    second approval. If a state requires a new route, owner, action or other product decision, stop and open one
    new approval round instead of guessing.
-9. Validate the selected base and all page/state viewports, run `@verify-design-grammar` on the selected artifact,
+9. Validate the selected base and all page/state viewports, run `@verify-design-grammar` on the selected artifact plus its `preview.html`,
    write the immutable two-file revision bundle, advance the
    layout head to `revisionHash`, rebuild the review graph and run the registry check. Never persist losing
    candidates outside cache.

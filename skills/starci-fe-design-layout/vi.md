@@ -90,7 +90,7 @@ layout chấp thuận cả direction lẫn composition.
 6. Sau `OK`, render mọi state tất định mà layout thực sự có. Responsive/collapsed state chỉ có khi reachable.
    Không hỏi approval lần hai. Nếu state cần quyết định mới về route, owner, action hay outcome, mở một product
    decision round mới thay vì đoán.
-7. Validate base và mọi state/viewport, chạy `@verify-design-grammar`, tính digest/hash, ghi bundle hai file bất biến, đăng ký revision, nâng
+7. Validate base và mọi state/viewport, chạy `@verify-design-grammar` cùng `preview.html` đã chọn, tính digest/hash, ghi bundle hai file bất biến, đăng ký revision, nâng
    layout head, build lại review graph và chạy registry check. Candidate thua chỉ ở cache.
 
 ## Visual quality

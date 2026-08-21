@@ -684,7 +684,7 @@
     "grammars/starci/context.md": {
       "kind": "module",
       "source": "grammars/starci/en.md",
-      "sourceHash": "c876abffe68e7a82b7e8a9920444e961a7ab018f3f7b4213701eead2db51c68f",
+      "sourceHash": "72473b77680bc29d4c8d186490c40c447bcf599a71c80b796374de766d751ced",
       "contextVersion": 1
     },
     "kernel/context.md": {

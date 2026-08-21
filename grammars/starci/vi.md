@@ -45,6 +45,8 @@ khóa semantic theme token và giá trị trước khi so direction.
 Execute tính lại đúng receipt từ fact đã accept và profile hiện hành đã khai báo. Hash drift, capsule
 thiếu, template đổi hoặc owner vắng mặt đều trả về design. Nó chỉ load compact context pack đã emit,
 sau đó resolve `principleConcerns` qua principle compiler.
+Visual contract còn bắt buộc mọi preview state mount boundary, khai báo và dùng chính xác mọi locked token,
+đồng thời không mang raw palette value nằm ngoài contract.
 
 ## Rules
 
@@ -56,6 +58,7 @@ sau đó resolve `principleConcerns` qua principle compiler.
 6. Optional immutable ref chỉ là provenance và không được thay đổi durable authority.
 7. Design skill ghi grammar/profile id cùng receipt hash để execution phát hiện drift.
 8. Visual contract do grammar khóa là bất biến giữa candidate composition, viewport và interaction state.
+9. Receipt có visual contract chưa hoàn chỉnh nếu thiếu `preview.html` proof tương ứng.
 
 ## Stops
 
