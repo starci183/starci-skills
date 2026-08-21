@@ -112,15 +112,16 @@
       "triggerFacts": ["region-adjacent", "region-persistent", "width-user-collapsible"],
       "decisionQuestions": ["Are there exactly two meaningful navigation presentations rather than a continuously chosen width?", "Can compact destinations retain meaning through stable glyphs and accessible labels?"],
       "variableAxes": ["width", "visible-copy"],
-      "invariants": ["stable-host", "inset", "scroll-owner", "boundary-height", "destination-order"],
+      "invariants": ["stable-host", "visible-collapse-control", "keyboard-operable-collapse-control", "collapse-state-exposed", "inset", "scroll-owner", "boundary-height", "destination-order"],
       "interactionProof": [
+        {"id": "collapse-control", "kind": "interaction", "assertion": "A visible keyboard-operable control toggles the two rail presentations and exposes the current collapsed state."},
         { "id": "stable-motion-host", "kind": "dom", "assertion": "Collapse and expand preserve the same motion host identity." },
         { "id": "reduced-motion", "kind": "interaction", "assertion": "Reduced-motion preference changes width immediately without interpolation." },
         { "id": "body-reflow", "kind": "computed-style", "assertion": "The adjacent body reflows beside the changed rail width." }
       ],
       "counterexampleCaseRefs": ["resizable-content-rail-not-collapsible"],
       "templateRef": "./templates/collapsible-rail.template.tsx",
-      "templateHash": "sha256:c931bcee28e63d74632d552e6c807e8cfd28eef8cf8e6d556dbf569ece86459a",
+      "templateHash": "sha256:b86414ad602ead42434dc5fa4fb81e689e05f2efc4852ad4b5e09bbae8b5a583",
       "rulings": ["founder-feedback:2026-08-21:collapsed-rail-keeps-legacy-motion", "founder-feedback:2026-08-21:course-sidebar-uses-px-3-py-6"],
       "goldenCaseRefs": ["collapsible-navigation-rail"]
     },

@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "grammar": "starci",
   "grammarId": "starci-ui",
-  "version": 9,
+  "version": 10,
   "factCatalog": "./facts.json",
   "evidenceCatalog": "./capsules.json",
   "rules": [
@@ -168,7 +168,7 @@
       },
       "emit": {
         "outcome": "collapsible-rail-transition",
-        "obligations": ["stable-host-across-states", "animate-width-geometry", "spring-when-motion-safe", "instant-under-reduced-motion", "persisted-collapse-state", "surrounding-body-reflows", "shares-band-offset-with-adjacent-boundary", "full-height-boundary-to-viewport-edge", "block-inset-6", "inline-inset-3-in-all-states"]
+        "obligations": ["stable-host-across-states", "animate-width-geometry", "spring-when-motion-safe", "instant-under-reduced-motion", "persisted-collapse-state", "visible-collapse-control", "keyboard-operable-collapse-control", "collapse-state-exposed", "surrounding-body-reflows", "shares-band-offset-with-adjacent-boundary", "full-height-boundary-to-viewport-edge", "block-inset-6", "inline-inset-3-in-all-states"]
       },
       "capsuleRefs": ["collapsible-rail", "rail-planes"]
     },
