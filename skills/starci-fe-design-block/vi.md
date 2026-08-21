@@ -58,6 +58,9 @@ và scoped block head là authority; legacy object chỉ để đọc lịch s�
    phải dừng.
 2. Đọc đúng business surface/flow chạm region và liệt kê mọi state reachable trước khi vẽ. `optional` không phân
    biệt pending, empty và failed. Ownership/action/outcome chưa rõ là product decision phải trả owner.
+   Với block parity theo current/legacy, cũng phải inventory mọi visible direct owner trong đúng source subtree:
+   path/header content, identity/persona/media, surface branch, controls cùng intrinsic/fill behavior, actions,
+   overlays và local scroll. Mọi candidate giữ inventory này trừ khi feedback yêu cầu bỏ một item rõ ràng.
 3. Validate cặp grammar/profile và parent grammar receipt. Đọc `@blocks`, phân loại tình huống block có bằng chứng
    thành closed fact, chạy `@resolve-grammar`, bind outcome/owner rồi resolve parts theo business reason và viết **3–4 block HTML/CSS hoàn chỉnh** trong exact parent
    `preview.html`, exact region bounds, cùng data và viewport. Candidate phải khác thật về anatomy/composition;

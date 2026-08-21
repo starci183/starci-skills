@@ -72,6 +72,10 @@ layout chấp thuận cả direction lẫn composition.
    routed pages, overlays và regions theo thứ tự lồng. Gắn mỗi node là `existing`, `proposed` hoặc `new`;
    `existing` phải có source + source hash và được tái dùng nguyên trạng trong mọi phương án. Sau đó bắt buộc mở
    scope checkpoint: `page` dừng trước control đổi route; `flow` liệt kê start, mọi page trung gian và end/result.
+   Khi current hoặc legacy source là parity target, phải inventory mọi visible direct owner trước candidate work:
+   path navigation, title/subtitle, identity/persona/media, surface primitive, sizing của choice control, actions,
+   overlays và responsive/scroll owner. Bind từng item được giữ vào source path và hash. Candidate làm rơi một
+   item là invalid trừ khi owner feedback yêu cầu bỏ rõ ràng; screenshot bóng bẩy không phải parity proof.
 2. Validate cặp grammar/profile được route khai rõ. Đọc `@directions` và `@layouts`, phân loại chỉ tình huống có
    bằng chứng thành closed fact rồi chạy `@resolve-grammar`. Outcome/owner emit ra là semantic constraint bắt buộc;
    thiếu fact hoặc owner `new-required` thì trả decision. Nếu owner mang `visualContract`, chép trục, role token

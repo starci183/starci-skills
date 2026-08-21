@@ -84,6 +84,10 @@ registry's revision map and layout head are lookup authority; legacy objects are
    page and every reachable overlay/state without following route-changing actions. For `flow`, enumerate the
    confirmed start page, every intermediate route/page/step, and the end/result page in order; shared layouts are
    represented once and reused. Examples remain evidence unless the owner explicitly puts them in scope.
+   When current or legacy source is the parity target, inventory every visible direct owner before candidate work:
+   path navigation, title/subtitle, identity/persona/media, surface primitive, choice-control sizing, actions,
+   overlays and responsive/scroll owner. Bind each retained item to its source path and hash. A candidate that
+   drops one is invalid unless owner feedback explicitly removes it; a polished screenshot is not parity proof.
 3. Read `@directions` and `@layouts`, then run a short design challenge before drawing: identify the first visual
    focus, competing regions, navigation/content/evidence roles, reusable precedents, and the owner of width,
    divider, sticky and scroll behavior. Reject a composition that is only schema-complete. Evidence-select one

@@ -66,6 +66,10 @@ Read only the business surface and flows that touch the region. Enumerate every 
 the candidates. `optional` describes presence; it cannot tell pending, empty and failed apart. Unknown ownership,
 actions or outcomes are product decisions and are returned to the owner.
 
+For a current/legacy parity block, also inventory every visible direct owner inside the exact source subtree:
+path/header content, identity/persona/media, surface branch, controls and their intrinsic/fill behavior, actions,
+overlays and local scroll. Every candidate preserves that inventory unless feedback explicitly removes an item.
+
 Validate the explicit grammar/profile pair and require the accepted parent's grammar receipt. Read `@blocks`,
 classify evidenced block situations into closed facts, run `@resolve-grammar`, resolve every part by business reason,
 and keep JSON class-free. Existing vocabulary must support

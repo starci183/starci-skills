@@ -41,7 +41,7 @@ thing, and one of them emits nothing.
 
 | Code | Situation | className |
 |---|---|---|
-| `SIZE-0` | Content measures itself; the box is exactly what it holds | *no size class* |
+| `SIZE-0` | Content measures itself; the box is exactly what it holds | *no size class* · `w-fit` only when a vendor default must be neutralized |
 | `SIZE-1` | The box takes everything the parent offers | `w-full` · `h-full` · `flex-1` |
 | `SIZE-2` | A ceiling caps growth: reading measure, shell, overlay | `max-w-[65ch]` · `max-w-5xl` · `max-h-[80vh]` |
 | `SIZE-3` | A floor reserves extent so nothing collapses or jumps | `min-h-32` · `min-w-24` · `min-h-screen` |
@@ -55,6 +55,12 @@ thing, and one of them emits nothing.
 while `SIZE-0` is the absence of any decision but the content's. The code exists because a box that
 measures itself is a claim a reader must be able to recognise, cite and be corrected against — an
 unnamed situation is one nobody can be shown to have got wrong.
+
+**One closed reset belongs to this situation.** A replaced or vendor primitive may impose `w-full`
+before product code sees it. When source inspection and computed style prove that imposed fill is the
+only thing preventing an already-established intrinsic control from measuring its content, the owner
+emits `w-fit` to restore `SIZE-0`. This removes the vendor's choice rather than adding a second width.
+Without measured vendor fill, the normal emission remains no class.
 
 The indices are not a scale, and a larger index is not a larger box. They are eight distinct answers
 to one question, and when more than one appears on the same axis the axis resolves in this fixed
@@ -97,6 +103,10 @@ the box shrinks, add text and it grows, and that is what is wanted.
 - Forcing it wider would turn the leftover space inside it into a lie about the content.
 
 **Ask yourself.** With all content removed, should this box collapse to zero on this axis?
+
+**Vendor-default reset.** If the answer is yes but computed style shows vendor-owned `width: 100%`,
+the semantic owner writes `w-fit`. A page-level navigation axis whose full measure carries meaning is
+the counterexample and remains `SIZE-1`. Callers never own this reset.
 
 **Boundary**
 
@@ -346,6 +356,7 @@ grid.
 8. Skeleton, empty, error and loaded states share one code per axis.
 9. No className serves two codes, and no code is chosen because it made the current screenshot look
    right.
+10. `w-fit` is the sole `SIZE-0` reset and requires measured vendor fill on the semantic owner.
 
 ## Exceptions
 
@@ -365,6 +376,9 @@ to.
   becomes a stacked band genuinely changes owner; the same rail merely getting narrower does not.
 - **Replaced and form elements.** These carry an intrinsic extent the platform chose. Stating `SIZE-1`
   on them is a real decision even in normal flow, because their default is `SIZE-0`.
+- **Vendor fill neutralization.** A vendor primitive may emit `w-fit` under `SIZE-0` only for an
+  evidenced intrinsic product control whose computed default is full width. Full-width navigation and
+  caller-specific appearance requests are excluded.
 - **Viewport-measured bounds.** `min-h-screen` and `max-h-[80vh]` remain `SIZE-3` and `SIZE-2`. The
   viewport is where the number came from, not who owns the axis.
 
@@ -377,7 +391,7 @@ block axis:
 box: <element>
 axis: <inline | block>
 situation: <SIZE-0 | SIZE-1 | SIZE-2 | SIZE-3 | SIZE-4 | SIZE-5 | SIZE-6 | SIZE-7>
-className: <no class | w-full | max-w-[65ch] | min-h-32 | size-10 | basis-1/3 | min-w-0 | aspect-video>
+className: <no class | w-fit vendor reset | w-full | max-w-[65ch] | min-h-32 | size-10 | basis-1/3 | min-w-0 | aspect-video>
 reason: <who owns this axis, and what excludes the code next to it in the resolution order>
 ```
 

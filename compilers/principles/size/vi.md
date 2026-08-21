@@ -41,7 +41,7 @@ có một mã không phát ra gì cả.
 
 | Mã | Tình huống | className |
 |---|---|---|
-| `SIZE-0` | Nội dung tự đo; hộp đúng bằng thứ nó chứa | *không khai báo class kích thước* |
+| `SIZE-0` | Nội dung tự đo; hộp đúng bằng thứ nó chứa | *không khai báo class kích thước* · chỉ dùng `w-fit` khi phải neutralize default của vendor |
 | `SIZE-1` | Hộp nhận trọn phần chỗ mà cha mời | `w-full` · `h-full` · `flex-1` |
 | `SIZE-2` | Một **trần** chặn đà nở: dòng đọc, khung trang, phần tử chồng lớp | `max-w-[65ch]` · `max-w-5xl` · `max-h-[80vh]` |
 | `SIZE-3` | Một **sàn** giữ chỗ để không sụp, không nhảy | `min-h-32` · `min-w-24` · `min-h-screen` |
@@ -55,6 +55,12 @@ lấy `w-auto` để nói điều đó là đổi luật chứ không phải đi
 thừa hưởng, còn `SIZE-0` là **vắng mặt** mọi quyết định trừ quyết định của nội dung. Mã này tồn tại vì
 một hộp tự đo là một tuyên bố người đọc phải nhận ra, trích dẫn được và bị bắt lỗi được — một tình
 huống không có tên là một tình huống không ai chứng minh được là đã làm sai.
+
+**Tình huống này có đúng một reset đóng.** Replaced primitive hoặc vendor primitive có thể áp
+`w-full` trước khi product code nhận nó. Khi source inspection và computed style chứng minh imposed
+fill đó là thứ duy nhất ngăn một control vốn đã được xác định là intrinsic tự đo nội dung, owner emit
+`w-fit` để khôi phục `SIZE-0`. Đây là bỏ lựa chọn của vendor, không phải thêm width choice thứ hai.
+Không có measured vendor fill thì emission bình thường vẫn là không class.
 
 Các chỉ số **không phải một thang**, và chỉ số lớn hơn không có nghĩa là hộp to hơn. Đó là tám câu trả
 lời khác nhau cho cùng một câu hỏi, và khi nhiều mã cùng khớp trên **một** trục thì trục ấy phân giải
@@ -97,6 +103,10 @@ chữ vào thì hộp nở ra, và đó chính là điều mong muốn.
 - Nếu ép nó rộng ra, khoảng trống thừa bên trong sẽ trở thành một lời nói dối về nội dung.
 
 **Tự hỏi.** Bỏ hết nội dung ra thì hộp này có nên biến mất về chiều dài bằng không trên trục này không?
+
+**Reset default của vendor.** Nếu câu trả lời là có nhưng computed style cho thấy `width: 100%` do
+vendor sở hữu, semantic owner ghi `w-fit`. Counterexample gần nhất là navigation tab strip mà full
+measure biểu đạt page-level axis: nó vẫn là `SIZE-1`. Caller không bao giờ sở hữu reset này.
 
 **Ranh giới**
 
@@ -340,6 +350,7 @@ thành viên · bản đồ nhúng · khung video · ảnh gợi ý giữ chỗ 
    còn lại chỉ là bản sao.
 8. Khung chờ, rỗng, lỗi và có dữ liệu dùng chung một mã trên cùng một trục.
 9. Không className nào phục vụ hai mã, và không mã nào được chọn vì nó làm ảnh chụp hiện tại trông cân.
+10. `w-fit` là reset duy nhất của `SIZE-0`, cần measured vendor fill và phải nằm trên semantic owner.
 
 ## Ngoại lệ
 
@@ -360,6 +371,9 @@ nó áp dụng vào.
 - **Phần tử biểu mẫu và phần tử thay thế.** Chúng mang sẵn một kích thước do nền tảng chọn. Khai
   `SIZE-1` cho chúng là một quyết định thật, kể cả trong luồng thường, vì mặc định của chúng là
   `SIZE-0`.
+- **Neutralize vendor fill.** Vendor primitive chỉ được emit `w-fit` dưới `SIZE-0` khi product outcome
+  intrinsic đã có evidence và computed default là full width. Full-width navigation axis và appearance
+  request riêng của caller đều bị loại.
 - **Mức chặn đo theo khung nhìn.** `min-h-screen` và `max-h-[80vh]` vẫn là `SIZE-3` và `SIZE-2`. Khung
   nhìn là nơi con số đến, không phải người sở hữu trục.
 
@@ -372,7 +386,7 @@ dọc:
 box: <phần tử>
 axis: <inline | block>
 situation: <SIZE-0 | SIZE-1 | SIZE-2 | SIZE-3 | SIZE-4 | SIZE-5 | SIZE-6 | SIZE-7>
-className: <không class | w-full | max-w-[65ch] | min-h-32 | size-10 | basis-1/3 | min-w-0 | aspect-video>
+className: <không class | w-fit vendor reset | w-full | max-w-[65ch] | min-h-32 | size-10 | basis-1/3 | min-w-0 | aspect-video>
 reason: <ai sở hữu trục này, và điều gì loại trừ mã đứng cạnh nó trong thứ tự phân giải>
 ```
 

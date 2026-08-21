@@ -64,6 +64,9 @@ compatibility.
    representative entities, fields, counts, statuses, actions, consequences and density owed by each state.
    Enumerate every reachable state before drawing
    candidates; contract `optional` never substitutes for source evidence about pending, empty or failed states.
+   For a current/legacy parity block, also inventory every visible direct owner inside the exact source subtree:
+   path/header content, identity/persona/media, surface branch, controls and their intrinsic/fill behavior, actions,
+   overlays and local scroll. Every candidate preserves that inventory unless feedback explicitly removes an item.
 3. Read `@blocks`, then challenge the region before drawing: identify its visual job, what the eye should read
    first, whether an existing ListBox/list surface/card/branch already solves grouping, and who owns its boundary
    and scroll. Classify evidenced block situations into closed grammar facts, run `@resolve-grammar`, and bind

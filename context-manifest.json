@@ -424,7 +424,7 @@
     "compilers/principles/size/context.md": {
       "kind": "module",
       "source": "compilers/principles/size/en.md",
-      "sourceHash": "db82bfaabc82811fa5b2540e2180bc7ccb652e1b11cefc8b4fee9514c71bba46",
+      "sourceHash": "57dc40111e0c619417bf5e8ef47d2354a4272a08283d2ce45a8630601b31f97d",
       "contextVersion": 1
     },
     "compilers/principles/state/context.md": {

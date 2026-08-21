@@ -79,6 +79,10 @@ route tree: ordered root/app/feature layouts, routed pages, overlays and regions
 `proposed` or `new`. An `existing` node cites its source and source hash and is reused unchanged in every choice.
 `Touching` names only the project registry and disposable cache. Then run the mandatory scope checkpoint. A
 `page` stops at route-changing controls; a `flow` enumerates its confirmed start, intermediate pages and end.
+When current or legacy source is the parity target, inventory every visible direct owner before candidate work:
+path navigation, title/subtitle, identity/persona/media, surface primitive, choice-control sizing, actions,
+overlays and responsive/scroll owner. Bind each retained item to its source path and hash. A candidate that drops
+one is invalid unless owner feedback explicitly removes it; a polished screenshot is not parity proof.
 
 **2. Author the choices.**
 
