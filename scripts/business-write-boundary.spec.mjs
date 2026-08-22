@@ -13,6 +13,16 @@ test("accepts an exact in-progress write boundary", () => {
   assert.deepEqual(boundaryFailures({featureId: "course-learning", entry, model, businessImpact: "affects", expectedStatus: "in-progress", role: "fe", baseline: sourceHead}), []);
 });
 
+test("accepts a new feature lineage without an implemented base head", () => {
+  const newFeature = {...model, authority: {status: "in-progress", previousHead: previous}};
+  assert.deepEqual(boundaryFailures({featureId: "course-learning", entry, model: newFeature, businessImpact: "affects", expectedStatus: "in-progress", role: "fe", baseline: sourceHead}), []);
+});
+
+test("rejects a business-affecting write without its immediate predecessor", () => {
+  const unbound = {...model, authority: {status: "in-progress"}};
+  assert.ok(boundaryFailures({featureId: "course-learning", entry, model: unbound, businessImpact: "affects"}).some((failure) => failure.includes("previousHead")));
+});
+
 test("rejects pending and rejected source writes", () => {
   for (const status of ["pending", "rejected"]) {
     const failures = boundaryFailures({featureId: "course-learning", entry: {...entry, authorityStatus: status}, model: {...model, authority: {...model.authority, status}}, businessImpact: "affects", role: "fe", baseline: sourceHead});

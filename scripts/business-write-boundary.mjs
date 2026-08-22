@@ -15,7 +15,7 @@ export function boundaryFailures({featureId, entry, model, businessImpact, expec
   } else {
     if (status === "rejected") failures.push("rejected business intent never authorizes source writes");
     if (status !== (expectedStatus ?? "in-progress")) failures.push(`business-affecting write requires ${expectedStatus ?? "in-progress"}, got ${status}`);
-    if (model.schemaVersion !== 2 || !model.authority?.baseHead || !model.authority?.previousHead) failures.push("business-affecting write requires schema-v2 baseHead and previousHead");
+    if (model.schemaVersion !== 2 || !model.authority?.previousHead) failures.push("business-affecting write requires schema-v2 previousHead");
   }
   if (role) {
     const source = model.sources?.find((item) => item.role === role);
