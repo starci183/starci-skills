@@ -6,6 +6,6 @@ None.
 
 ## Routes
 
-Resolve only the grammar id and profile declared by the verified frontend workspace route. The
-current shared product-family grammar is `starci/context.md`. Absence is a stop; a repository or
-project name is never a fallback selector.
+Resolve only the grammar id and profile declared by the verified frontend workspace route. Available
+product-family packages are `starci/context.md` and `tayson/context.md`. Absence is a stop; a repository,
+project name or sibling package is never a fallback selector.

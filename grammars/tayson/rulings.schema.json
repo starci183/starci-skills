@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/schema/grammars/tayson/rulings.schema.json",
+  "title": "Tây Sơn normalized owner rulings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "grammar", "rulings"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"const": 1},
+    "grammar": {"const": "tayson"},
+    "rulings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/Ruling"}}
+  },
+  "$defs": {
+    "RulingId": {"type": "string", "pattern": "^founder-(?:feedback|ruling):[a-zA-Z0-9:._-]+$"},
+    "Scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level"],
+      "properties": {
+        "level": {"enum": ["tayson-family", "profile", "surface"]},
+        "profileId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "surfaceId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}
+      },
+      "allOf": [
+        {"if": {"properties": {"level": {"const": "profile"}}}, "then": {"required": ["profileId"]}},
+        {"if": {"properties": {"level": {"const": "surface"}}}, "then": {"required": ["surfaceId"]}}
+      ]
+    },
+    "Provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {"enum": ["owner-summary", "conversation-snapshot"]},
+        "ref": {"type": "string", "minLength": 8}
+      }
+    },
+    "Ruling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "scope", "statement", "appliesWhen", "doesNotApplyWhen", "provenance"],
+      "properties": {
+        "id": {"$ref": "#/$defs/RulingId"},
+        "kind": {"enum": ["invariant", "example", "correction", "local-preference"]},
+        "scope": {"$ref": "#/$defs/Scope"},
+        "statement": {"type": "string", "minLength": 20},
+        "appliesWhen": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 8}},
+        "doesNotApplyWhen": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 8}},
+        "provenance": {"$ref": "#/$defs/Provenance"}
+      }
+    }
+  }
+}

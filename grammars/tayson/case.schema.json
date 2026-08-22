@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/schema/grammars/tayson/case.schema.json",
+  "title": "Tây Sơn product-family grammar golden or counterexample case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grammar", "caseId", "kind", "because", "facts", "expectedOutcomes", "rejectedOutcomes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "grammar": { "const": "tayson" },
+    "caseId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "kind": { "enum": ["golden", "counterexample"] },
+    "because": { "type": "string", "minLength": 20 },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" } },
+    "expectedOutcomes": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" } },
+    "rejectedOutcomes": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" } }
+  }
+}

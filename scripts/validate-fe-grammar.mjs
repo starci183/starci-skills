@@ -82,8 +82,13 @@ export const loadAndValidateGrammar = (grammarRoot) => {
   if (grammar.grammar !== factCatalog.grammar || grammar.grammar !== evidenceCatalog.grammar || grammar.grammar !== rulingCatalog.grammar || grammar.grammar !== designSystem.grammar) {
     throw new Error("grammar, fact, evidence, ruling and design-system identities must match")
   }
-  if (designSystem.systemId !== "starci-master") throw new Error("grammar requires starci-master design system")
-  if (JSON.stringify(designSystem.spacingRungs) !== JSON.stringify([1, 2, 3, 4, 6, 8])) throw new Error("MASTER spacing rungs differ from StarCi closed rhythm")
+  if (!/^[a-z][a-z0-9-]*$/.test(designSystem.systemId ?? "")) throw new Error("grammar requires a slug MASTER design-system id")
+  if (!Array.isArray(designSystem.spacingRungs)
+    || designSystem.spacingRungs.length < 3
+    || designSystem.spacingRungs.some((rung) => !Number.isInteger(rung) || rung <= 0)
+    || designSystem.spacingRungs.some((rung, index, rungs) => index > 0 && rung <= rungs[index - 1])) {
+    throw new Error("MASTER spacing rungs must be positive, unique and strictly increasing")
+  }
   if (!designSystem.componentLanguage?.length || !designSystem.antiPatterns?.length) throw new Error("MASTER requires component language and anti-patterns")
   if (designSystem.legacyPolicy?.precedence !== "legacy-baseline-before-master" || designSystem.legacyPolicy?.preserveOutsideTarget !== true || designSystem.legacyPolicy?.pageOverrideMode !== "deviations-only") {
     throw new Error("MASTER legacy and page-override policy is invalid")
@@ -127,7 +132,8 @@ export const loadAndValidateGrammar = (grammarRoot) => {
       if (!record) throw new Error(`behavior capsule references an unknown founder ruling: ${capsule.id} -> ${ruling}`)
       return record
     })
-    if (!capsuleRulings.some((ruling) => ["invariant", "correction"].includes(ruling.kind) && ruling.scope.level === "starci-family")) {
+    const familyScope = `${grammar.grammar}-family`
+    if (!capsuleRulings.some((ruling) => ["invariant", "correction"].includes(ruling.kind) && ruling.scope.level === familyScope)) {
       throw new Error(`behavior capsule lacks a promotable family ruling: ${capsule.id}`)
     }
     if (!Array.isArray(capsule.goldenCaseRefs) || capsule.goldenCaseRefs.length === 0) {
@@ -209,14 +215,12 @@ export const loadAndValidateGrammar = (grammarRoot) => {
     }
     const masterOverride = designSystem.profileOverrides[profile.profileId]
     if (!masterOverride) throw new Error(`MASTER design system has no override for profile ${profile.profileId}`)
-    const themeOwner = profile.owners["starci-dashboard-theme"]
-    if (!themeOwner?.visualContract) throw new Error(`profile ${profile.profileId} has no dashboard visual contract`)
-    if (themeOwner.visualContract.roles.accent !== masterOverride.accent) {
-      throw new Error(`profile ${profile.profileId} accent differs from MASTER override`)
-    }
-    for (const [role, token] of Object.entries(designSystem.roles)) {
-      if (themeOwner.visualContract.roles[role] !== token) throw new Error(`profile ${profile.profileId} changes MASTER role ${role}`)
-    }
+    const themeOwners = Object.entries(profile.owners).filter(([outcome, owner]) => {
+      if (!outcomeIds.has(outcome) || !owner.visualContract) return false
+      if (owner.visualContract.roles.accent !== masterOverride.accent) return false
+      return Object.entries(designSystem.roles).every(([role, token]) => owner.visualContract.roles[role] === token)
+    })
+    if (themeOwners.length !== 1) throw new Error(`profile ${profile.profileId} requires exactly one MASTER visual-contract owner`)
   }
 
   return { grammar, factCatalog, evidenceCatalog, rulingCatalog, designSystem, cases, profiles, templateCatalog }

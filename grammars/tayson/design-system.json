@@ -1,0 +1,31 @@
+{
+  "$schema": "./design-system.schema.json",
+  "schemaVersion": 1,
+  "grammar": "tayson",
+  "systemId": "tayson-master",
+  "axes": {"contrast":"balanced","density":"adaptive","shape":"editorial-crisp","depth":"restrained","motion":"measured"},
+  "roles": {
+    "ground":"--tayson-background","surface":"--tayson-surface","content":"--tayson-foreground","mutedContent":"--tayson-muted","separator":"--tayson-separator","display":"--tayson-font-display","body":"--tayson-font-sans","label":"--tayson-font-sans","radius":"--tayson-radius","elevation":"--tayson-shadow","duration":"--tayson-duration","easing":"--tayson-easing"
+  },
+  "spacingRungs": [1,2,3,4,6,8,12],
+  "componentLanguage": [
+    "deep Tây Sơn green and warm ivory establish shared identity",
+    "public pages use editorial hierarchy and serif display type",
+    "CRM pages use dense sans operational hierarchy",
+    "HeroUI owns accessible controls and Heroicons owns interface glyphs",
+    "Page composes PageBase, Block owns state, and BlockBase draws",
+    "permission denial is a first-class CRM state"
+  ],
+  "antiPatterns": [
+    "routing Tây Sơn through a StarCi product profile",
+    "painting CRM screens as public editorial landing sections",
+    "putting public marketing anatomy inside authenticated operations",
+    "placing product request state inside packages/ui",
+    "inventing member portal, sales pipeline, payment or ticket behavior",
+    "using raw vendor accent colours instead of Tây Sơn tokens"
+  ],
+  "legacyPolicy": {"precedence":"legacy-baseline-before-master","preserveOutsideTarget":true,"pageOverrideMode":"deviations-only"},
+  "profileOverrides": {
+    "tayson": {"accent":"--tayson-accent","deviations":["Public and CRM surfaces share the Tây Sơn green brand role while each outcome owns its surface-specific density and typography."]}
+  }
+}

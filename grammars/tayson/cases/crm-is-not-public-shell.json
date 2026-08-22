@@ -1,0 +1,1 @@
+{"$schema":"../case.schema.json","grammar":"tayson","caseId":"crm-is-not-public-shell","kind":"counterexample","because":"An authenticated internal operation must not receive the public editorial shell.","facts":["surface-tayson-product","surface-authenticated-crm"],"expectedOutcomes":["tayson-brand-theme","crm-operational-shell"],"rejectedOutcomes":["public-site-shell"]}

@@ -1,0 +1,1 @@
+{"$schema":"../case.schema.json","grammar":"tayson","caseId":"public-site-shell","kind":"golden","because":"A public Tây Sơn route needs editorial public chrome and no authenticated shell.","facts":["surface-tayson-product","surface-public-site"],"expectedOutcomes":["tayson-brand-theme","public-site-shell"],"rejectedOutcomes":["crm-operational-shell"]}
