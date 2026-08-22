@@ -4,6 +4,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {authorityStatus, proveBusinessTransition} from "./business-authority.mjs";
+import {isCandidateOnlyDirtyStatus} from "./business-worktree-status.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -44,6 +45,7 @@ const writeJson = (path, value) => {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 };
 const git = (cwd, ...command) => execFileSync("git", ["-C", cwd, ...command], {encoding: "utf8"}).trim();
+const gitStatus = (cwd) => execFileSync("git", ["-C", cwd, "status", "--porcelain=v1", "--untracked-files=all"], {encoding: "utf8"}).trimEnd();
 const validate = (schema, data) => execFileSync(process.execPath, [validator, "--schema", schema, "--data", data], {encoding: "utf8"});
 const normalized = (path) => path.replaceAll("\\", "/");
 
@@ -63,7 +65,7 @@ function workspaceRoute(role) {
 }
 
 function dirtyPaths(repo) {
-  const output = git(repo, "status", "--porcelain=v1", "--untracked-files=all");
+  const output = gitStatus(repo);
   if (!output) return [];
   return output.split(/\r?\n/).map((line) => normalized(line.slice(3).split(" -> ").at(-1)));
 }
@@ -222,15 +224,17 @@ function writeFeatureViews(featureRoot, model, hash) {
   for (const [path, content] of views) writeFileSync(join(featureRoot, path), content, "utf8");
 }
 
-function assertBusinessWorktree() {
+function assertBusinessWorktree(allowedInputPath) {
   if (!existsSync(businessRoot)) throw new Error(`business root is absent: ${relative(source, businessRoot)}; initialize it with starci-init`);
   const common = normalized(git(source, "rev-parse", "--git-common-dir"));
   const owned = git(source, "worktree", "list", "--porcelain").split(/\r?\n\r?\n/).find((entry) => entry.split(/\r?\n/)[0] === `worktree ${normalized(businessRoot)}` || entry.split(/\r?\n/)[0] === `worktree ${businessRoot}`);
   if (!owned) throw new Error(`business root is not owned by Source git: ${businessRoot}`);
   const branch = git(businessRoot, "branch", "--show-current");
   if (branch !== `codex/businesses/${project}`) throw new Error(`business root branch must be codex/businesses/${project}, got ${branch}`);
-  const status = git(businessRoot, "status", "--porcelain");
-  if (status) throw new Error(`business worktree must be clean before publication:\n${status}`);
+  const status = gitStatus(businessRoot);
+  if (status && !isCandidateOnlyDirtyStatus(status, businessRoot, allowedInputPath)) {
+    throw new Error(`business worktree must be clean except for the exact input model candidate:\n${status}`);
+  }
   return common;
 }
 
@@ -259,7 +263,7 @@ function checkRegistry() {
 if (check) {
   checkRegistry();
 } else {
-  assertBusinessWorktree();
+  assertBusinessWorktree(inputPath);
   validate(featureSchema, inputPath);
   const model = readJson(inputPath);
   proveModel(model);

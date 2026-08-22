@@ -37,9 +37,10 @@ test("preserves baseHead and immediate predecessor", () => {
   assert.throws(() => proveBusinessTransition(pendingHead, pending, model("in-progress", pendingHead, "e".repeat(64))), /baseHead/);
 });
 
-test("accepts implemented technical reconciliation when only source heads and evidence lines move", () => {
+test("accepts implemented technical reconciliation when only source heads and evidence locations move", () => {
   const previous = implemented("1".repeat(40), "Same business claim", 1);
   const next = implemented("2".repeat(40), "Same business claim", 8);
+  next.evidence[0].path = "src/blocks/page.tsx";
   assert.doesNotThrow(() => proveBusinessTransition(implementedHead, previous, next));
 });
 
@@ -52,6 +53,9 @@ test("rejects implemented technical reconciliation that changes business or evid
   const changedRule = implemented("2".repeat(40));
   changedRule.rules[0].statement = "Changed business rule";
   assert.throws(() => proveBusinessTransition(implementedHead, previous, changedRule), /cannot change business claims/);
+  const changedRole = implemented("2".repeat(40));
+  changedRole.evidence[0].role = "be";
+  assert.throws(() => proveBusinessTransition(implementedHead, previous, changedRole), /cannot change business claims/);
 });
 
 test("rejects technical reconciliation with an unbound predecessor", () => {

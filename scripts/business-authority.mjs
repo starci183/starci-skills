@@ -5,7 +5,7 @@ const technicalReconciliationBody = (model) => {
   return {
     business,
     sources: sources.map(({head: _head, ...identity}) => identity),
-    evidence: evidence.map(({startLine: _startLine, endLine: _endLine, ...claim}) => claim),
+    evidence: evidence.map(({path: _path, startLine: _startLine, endLine: _endLine, ...claim}) => claim),
   };
 };
 
