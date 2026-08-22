@@ -68,8 +68,9 @@ inputs, allowed reads, exact writes, forbidden decisions, required proof and sto
 `taskId`, status, input hashes, observations with provenance, changed paths, commands/proof, unresolved findings
 and a boundary-drift flag.
 
-The receipt is revalidated and append-only refreshed at each coordinator phase gate. Cache tasks bind the exact
-frozen contract hash. Source tasks bind `OK #2:<source-boundary-hash>`, the complete approved path set and, when
+The receipt is revalidated and append-only refreshed at each coordinator phase gate. Cache tasks bind both the
+exact frozen contract hash and the validated target-matched `qualityReviewAt` hash, and depend on passed
+`contract-freeze` plus `quality-review` events. Source tasks bind `OK #2:<source-boundary-hash>`, the complete approved path set and, when
 Refactor evolves authority, the compiled authority-proof hash. Proof tasks bind the stable-build and selected
 proof-target hashes and depend on every source task. A future task is not dispatchable while its gate identity is
 absent.

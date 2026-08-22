@@ -21,6 +21,7 @@ description: Correct or restructure an exact Layout- or Block-rendered frontend 
 | `@lints-fe` | `gates/fe/lints` | module | frontend proof |
 | `@standards` | `standards` | module | law-to-proof accountability |
 | `@design-review` | `publication/design-review-preview/en.md` | en | cache reviews |
+| `@frontend-quality` | `brainstorms/frontend-quality/en.md` | en | integrated craft, UX, accessibility, engineering and detector review |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | semantic outcome and owner receipt |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
 | `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | routed receipt proof |
@@ -47,7 +48,7 @@ Topology: `reconciliation` through authority classification, then `linear` corre
 |---|---|---|---|---|---|
 | bind-classify | shared | rendered scope, routed FE, source and feedback/objective | freeze product truth, reproduce mismatch and locate highest failed layer | correction envelope, owner chain and verdict | rendered scope and evidence resolve |
 | orchestration | coordination | correction envelope and measured runtime | apply the Refactor dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; `.claude` remains coordinator-only |
-| direction | reconciliation | envelope, grammar and correction objective | print one UI direction by default, or 3–4 after explicit brainstorm | complete-context desktop/narrow review | `OK #1` selects cache direction |
+| direction | reconciliation | envelope, grammar and correction objective | print direction, run integrated quality review, then render one by default or 3–4 after explicit brainstorm | complete-context review plus standalone refactor quality receipt | required lenses/detectors pass; `OK #1` selects cache direction |
 | authority-state-boundary | execution | selected direction, state truth and verdict | ensure up to five complete-page views and bind authority, impact cone and FE owners | authority-to-write map and exact batch | `OK #2` authorizes the batch once |
 | evolve-refactor | execution | approved authority/source batch | evolve authority first when required, compile it, then correct every consumer | authority receipts and bounded green FE diff | no lower-layer patch hides an upper-layer failure |
 | parity | proof | approved views, existing seeds and product | compare identical states and viewports | final views and `visual-proof.json` | zero mismatch |
@@ -68,15 +69,18 @@ to resolve, apply or enforce governing authority. Reproduce it and classify the 
 assertion that allowed the bad output. Product-truth feedback returns to business authority.
 
 Now display the mandatory orchestration receipt. The coordinator owns failed-layer classification, every
-`.claude` write, UI direction, approvals and integration. Workers audit evidence/impact cones, generate HTML only
-from a frozen direction, implement disjoint FE paths only after `OK #2`, test and capture proof. Dependent product
+`.claude` write, UI direction, integrated quality verdict, approvals and integration. Workers may audit
+evidence/impact cones and lens/detector facts, generate HTML only from an eligible frozen direction, implement
+disjoint FE paths only after `OK #2`, test and capture proof. Dependent product
 work waits for authority compilation and dependency proof.
 
 ### 2. Print and render the UI direction
 
-Print one complete-context UI direction. The journey and product truth remain frozen. One direction is default;
-three or four materially distinct alternatives require an explicit brainstorm request before `OK #1`. `OK #1`
-is cache-only.
+Print one complete-context UI direction. The journey and product truth remain frozen. Before HTML, run
+`@frontend-quality` and write a standalone `scope: refactor` receipt resolving all ten lenses and six detector
+families. External UX/UI sources are digest-pinned advisory only and cannot widen scope or authority. One direction
+is default; three or four materially distinct alternatives require an explicit brainstorm request before `OK #1`
+and each is reviewed independently against identical facts. `OK #1` binds direction plus receipt in cache only.
 
 ### 3. Ensure states and approve the authority/source boundary
 
@@ -109,6 +113,8 @@ Prove the real connected product at the same states and viewports.
 7. One direction is default; 3–4 require explicit brainstorming. State proof is capped at five complete-page views.
 8. `OK #1` is cache-only. Only `OK #2` authorizes the exact authority/state/source/proof batch.
 9. Completion requires green authority and FE gates plus same-state, same-viewport real-product parity.
+10. Every direction passes the shared quality review before HTML; external UX/UI evidence is advisory only.
+11. Quality review may expose the failed layer but cannot override classification or expand product truth.
 
 ## Stops
 
@@ -120,10 +126,12 @@ Prove the real connected product at the same states and viewports.
   application/enforcement failure is not classified.
 - The approved impact cone cannot include every affected consumer, target dirt is unsafe, more than five views are
   required, or a gate/parity defect cannot be repaired inside the approved boundary.
+- Missing quality lens/detector closure, target mismatch or advisory evidence presented as authority.
 
 ## OUTPUT
 
-At direction review, print the feedback verdict, governing Grammar/Principles chain and UI direction, then show one
-complete-context desktop/narrow candidate by default or 3–4 after explicit brainstorming. Under `OK #2`, show up
+At direction review, print the feedback verdict, governing Grammar/Principles chain, quality verdict and UI
+direction, then show one complete-context desktop/narrow candidate by default or 3–4 independently reviewed
+candidates after explicit brainstorming. Under `OK #2`, show up
 to five complete-page views and the exact authority-to-write batch. On completion, distinguish authority gaps from
 application/enforcement failures and report strengthened authority, affected owners, tests and real-product parity.

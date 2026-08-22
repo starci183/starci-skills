@@ -20,6 +20,7 @@ description: Reconcile one Layout-generated block through a mandatory UI-directi
 | `@patterns-fe` | `compilers/patterns/fe` | module | choose owning source files and imports |
 | `@lints-fe` | `gates/fe/lints` | module | prove implemented source |
 | `@blocks` | `brainstorms/blocks/en.md` | en | block ownership, anatomy, state and contract law |
+| `@frontend-quality` | `brainstorms/frontend-quality/en.md` | en | integrated craft, UX, accessibility, engineering and detector review |
 | `@design-review` | `publication/design-review-preview/en.md` | en | exact-parent authored HTML review in cache |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify current vocabulary |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
@@ -43,24 +44,29 @@ Topology: `reconciliation` inside one accepted complete page.
 |---|---|---|---|---|---|
 | bind | shared | accepted page contract, exact block boundary and owner request | freeze parent geometry, state and proof viewport | block audit context | one block and complete parent page resolve |
 | orchestration | coordination | block audit context and measured runtime | apply the Block dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval and no page recomposition |
-| direction | reconciliation | block contract, grammar, source and rendered parent page | audit current anatomy, then print one UI direction by default or 3–4 after explicit owner brainstorm | complete-parent direction review and correction contract | `OK #1` selects cache direction without page drift |
+| direction | reconciliation | block contract, grammar, source and rendered parent page | audit anatomy, print direction, run integrated quality review, then render one by default or 3–4 after explicit owner brainstorm | schema 3 complete-parent direction review, quality receipt and correction contract | required lenses/detectors pass; `OK #1` selects cache direction without page drift |
 | state-boundary | execution | selected direction and block state truth | ensure up to five complete-page state views and bind exact FE owners | state review and exact FE boundary | `OK #2` authorizes exact files |
 | implement | execution | approved direction and exact files | change only proven owners and affected tests | implementation receipt | parent contract and block ownership preserved |
 | parity | proof | approved preview/source at identical state and viewport | compare the block in context | bounded state views and visual proof | zero known mismatch |
 
 ## Run
 
-Read `@skill-shape` and `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract and source. Write a four-lock baseline; a highlighted region must name one parent containing every enclosed direct child. Then display the orchestration receipt. The coordinator owns state/anatomy classification, UI direction, approvals and integration. Workers generate complete-parent HTML only from frozen anatomy and write disjoint source only after `OK #2`.
+Read `@skill-shape` and `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract and source. Write a four-lock baseline; a highlighted region must name one parent containing every enclosed direct child. Bind exact `parentPageId` and current drawing/compositor/entry/test `sourceOwners`. Then display the orchestration receipt. The coordinator owns state/anatomy classification, UI direction, integrated quality verdict, approvals and integration. Workers may collect lens/detector evidence, generate complete-parent HTML only from eligible frozen anatomy and write disjoint source only after `OK #2`.
 
 Audit the single generated block, return pass or exact findings and synthesize its UI direction while preserving
-the page. Direction is mandatory inside the workflow. Default is one complete desktop/narrow direction in the
-exact parent. Only explicit owner brainstorm before `OK #1` emits 3–4 targeted anatomies inside that geometry.
+the page. Direction is mandatory inside the workflow. Emit schema 3 `stage: direction`; before HTML, run
+`@frontend-quality` across ten lenses and
+six detector families; external UX/UI sources are digest-pinned advisory only. Default is one complete
+desktop/narrow direction in the exact parent. Only explicit owner brainstorm before `OK #1` emits 3–4 targeted,
+independently reviewed anatomies inside that geometry.
 Journey direction is inherited and frozen. Exact `OK #1` selects the single direction, or names `A`–`D` in
 brainstorm mode, and remains cache-only.
 
-After `OK #1`, ensure at most five complete-page view families, prioritizing distinct block states and transitions;
-desktop/narrow captures prove responsiveness and isolated block crops never count. Publish the exact FE source/test
-boundary under `OK #2`; only exact `OK #2` authorizes implementation. Then implement and prove the same full-page
+After `OK #1`, emit schema 3 `stage: states` with machine-validated `stateReview`: at most five complete-page view
+families bound to the exact parent and reachable states plus a source boundary containing every proven owner/test
+path, prioritizing distinct block states and transitions. Desktop/narrow
+captures prove responsiveness and isolated block crops never count. Publish it under `OK #2`; only exact `OK #2`
+authorizes implementation. Then implement and prove the same full-page
 views. Split scope if five views cannot ensure it. Known defects or unmet delivery forbid completion.
 
 ## Rules
@@ -77,11 +83,13 @@ views. Split scope if five views cannot ensure it. Known defects or unmet delive
 10. State assurance uses at most five complete-page view families and never substitutes block-only crops.
 11. Block owns first synthesis. Concrete owner feedback that rejects emitted or implemented output as wrong
     Grammar/Principles leaves first-synthesis scope and enters the correction owner.
+12. New work emits Block schema 3 with one target-matched quality review per anatomy.
 
 ## Stops
 
 - Missing parent, route, grammar/profile, business truth or exact ownership.
 - Unknown product behavior, incomplete states, non-functional preview or an explicit brainstorm batch with fewer than three real alternatives.
+- Missing quality lens/detector closure or advisory evidence presented as authority.
 - Required work outside the approved source boundary.
 - More than one block or whole-page restructuring — owner: `starci-fe-layout-refactor`.
 - More than five complete-page state views are needed.
@@ -89,6 +97,7 @@ views. Split scope if five views cannot ensure it. Known defects or unmet delive
 
 ## OUTPUT
 
-At direction review, print one UI direction by default or 3–4 only after explicit brainstorm. After `OK #1`,
+At direction review, print the quality verdict and one UI direction by default or 3–4 independently reviewed
+directions only after explicit brainstorm. After `OK #1`,
 report up to five complete-page state views and exact FE paths under `OK #2`; after implementation report changed
 paths and the same labeled views with proof. Never report registry identities.

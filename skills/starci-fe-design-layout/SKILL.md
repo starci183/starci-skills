@@ -20,6 +20,7 @@ description: Design, stage-approve, implement, seed and visually prove one produ
 | `@patterns-fe` | `compilers/patterns/fe/context.md` | context | choose source ownership before writing |
 | `@lints-fe` | `gates/fe/lints/context.md` | context | prove implemented source |
 | `@layouts` | `brainstorms/layouts/context.md` | context | validate journey/business/component synthesis and staged contracts |
+| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | run the integrated craft, UX, accessibility, engineering and detector review before HTML |
 | `@design-review` | `publication/design-review-preview/context.md` | context | publish page and state reviews in cache |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit selected grammar decisions and compact context |
@@ -27,7 +28,7 @@ description: Design, stage-approve, implement, seed and visually prove one produ
 | `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | refuse theme or receipt drift |
 | `@validate-layout-grammar` | `scripts/validate-layout-grammar.mjs` | script | bind every render child target to its exact resolved semantic owner |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | bind design to current frontend vocabulary |
-| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | enforce schema 8 page/state and capability-proof boundaries |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | enforce schema 9 page/state, quality-review and capability-proof boundaries |
 | `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | refuse wrong parent or missing full-page proof |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | refuse phantom principle concerns |
 | `@maturity-schema` | `publication/design-review-preview/maturity.schema.json` | file | bind page-stage and state-stage maturity to captures |
@@ -51,19 +52,27 @@ only gate-passed outputs, owns every decision and shared artifact, and delegates
 |---|---|---|---|---|---|
 | evidence | shared | request, routed authorities, current baseline | normalize facts, owner constraints, examples and unknowns | evidence pack plus immutable context envelope | every claim has provenance and scope |
 | orchestration | coordination | immutable evidence envelope and measured runtime | apply the Layout phase map, dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; every task is bounded and every dependency is explicit |
-| page-synthesis | join | evidence pack, business head, source baseline, components, contracts, grammar and MASTER | run isolated journey and capability subphases, print journey and UI directions, join them and author complete desktop/narrow anatomy | page map, capability obligations, binding matrix, direction receipt, schema 8 page contract and maturity evidence | both origins pass, nothing remains unbound, then `OK #1`; no source authority |
-| states | execution | approved direction-plus-page hash, complete state truth | expand states, owners, transitions, seeds and boundary without direction/page drift | schema 8 render contract, canonical prompt, source/seed matrices | `OK #2`; exact files cover every required change |
+| page-synthesis | join | evidence pack, business head, source baseline, components, contracts, grammar and MASTER | run isolated journey and capability subphases, print directions, join them, run integrated frontend-quality review, then author complete desktop/narrow anatomy | page map, capability obligations, binding matrix, direction receipt, quality review, schema 9 page contract and maturity evidence | both origins and all required quality lenses/detectors pass, nothing remains unbound, then `OK #1`; no source authority |
+| states | execution | approved direction-quality-page hash, complete state truth | expand states, owners, transitions, seeds and boundary without direction, quality or page drift | schema 9 render contract, canonical prompt, source/seed matrices | `OK #2`; exact files cover every required change |
 | implementation | execution | approved canonical prompt | implement without reinterpretation, run source gates and seed real local data | implementation receipts, green gates and seed receipts | every approved obligation maps to source and product read-path evidence |
 | parity | proof | approved previews and seeded product | capture the same state at the same viewport and repair in-boundary defects | `visual-proof.json` | `parity: passed`, `mismatches: []`, requested delivery reached |
 
 ## Run
 
-Read `@skill-shape` and `@orchestration` first. Confirm exactly one scope: `page` for one complete composed route, or `flow` for explicit start and terminal endpoints. A screenshot authorizes only what it shows. Create one ignored session root at `.worktrees/<project>/cache/design/<session-id>` and validate the four-lock composition baseline. Then execute and display the mandatory `orchestration` step from the frontend map. The coordinator authors journey/UI decisions and approvals; workers inventory evidence, project frozen contracts into cache HTML, implement disjoint approved paths, seed, test and capture proof. Cache HTML may start only after its direction/page contract is frozen; source work may start only after `OK #2`.
+Read `@skill-shape` and `@orchestration` first. Confirm exactly one scope: `page` for one complete composed route,
+or `flow` for explicit start and terminal endpoints. A screenshot authorizes only what it shows. Create one ignored
+session root at `.worktrees/<project>/cache/design/<session-id>` and validate the four-lock composition baseline.
+Then execute and display the mandatory `orchestration` step from the frontend map. The coordinator authors
+journey/UI decisions, the integrated quality verdict and approvals; workers may inventory lens/detector evidence,
+project only an eligible frozen contract into cache HTML, implement disjoint approved paths, seed, test and capture
+proof. Cache HTML may start only after the direction, quality review and page contract are frozen; source work may
+start only after `OK #2`.
 
 The user-facing execution table exposes sections 1–3 below as one `page-synthesis` step. Page mapping, the two
 isolated tracks, direction declaration, their join and desktop/narrow page rendering are internal subphases of
 that one step; no intermediate `OK` may split them. Direction is always produced inside synthesis, never invoked
-as a separate mode. The next approval is `OK #1` on the completed page anatomy and its printed directions.
+as a separate mode. The next approval is `OK #1` on the completed page anatomy, its printed directions and
+integrated quality review.
 
 ### 1. Map pages before drawing
 
@@ -113,14 +122,21 @@ behavior and emphasis. Then print one direction receipt containing the journey d
 separate fields before rendering their joined complete anatomy. The UI direction may not weaken a journey
 obligation because current source lacks a component; that gap remains a `generalize` or `new-required` capability.
 
+Before generating HTML, run `@frontend-quality` against the joined receipt, unchanged facts/content, detected
+stack, current source and MASTER. External design skills, catalogues and guidelines may appear only as optional
+digest-pinned advisory sources; they never add product truth or become binding. Resolve all ten lenses, name one
+product-specific character move and close all six detector families. Revise or remove an ineligible draft rather
+than present it. The coordinator owns the decision; workers may collect bounded evidence only.
+
 The default direction count is exactly one receipt for the whole scope. When the owner explicitly requests
 brainstorming before direction approval, synthesize three or four materially distinct complete receipts and
-render their complete page/flow anatomies. Each alternative contains both a journey direction and a UI direction.
+review each independently against identical facts before rendering their complete page/flow anatomies. Each
+alternative contains both a journey direction and a UI direction plus its own quality review.
 For a multi-page flow these remain three or four flow-level alternatives, never alternatives multiplied per page.
 
 ### 3. Pages stage — complete anatomy before states
 
-Emit schema 8 with `stage: pages`. In default `generate` mode, author the complete long page or flow for the one
+Emit schema 9 with `stage: pages`. In default `generate` mode, author the complete long page or flow for the one
 direction receipt. In explicit brainstorm mode, author three or four complete candidates and recommend one. Use
 one representative populated state per page to judge the whole composition. Include full chrome, navigation,
 content hierarchy, every major region, meaningful representative content, intentional density and desktop plus
@@ -135,20 +151,26 @@ The page contract must bind:
 - the complete state inventory that will be expanded after approval;
 - representative full-viewport renders at every reference viewport.
 
-At this stage `renderContract` and `executionPrompt` are forbidden. Run `@validate-artifact`. Inspect the authored page captures and write schema 2 maturity evidence with `reviewStage: pages` and `authorityId` equal to the page-contract id. Run `@validate-maturity`. Reject wireframes, generic admin templates, enlarged primitive demos, sparse scaffolds, unjustified dead space, unanchored controls, weak type rank or unfinished component anatomy.
+At this stage `renderContract` and `executionPrompt` are forbidden. The candidate binds its validated
+`qualityReview`. Run `@validate-artifact`. Inspect the authored page captures and write schema 2 maturity evidence
+with `reviewStage: pages` and `authorityId` equal to the page-contract id. Run `@validate-maturity`. Reject
+wireframes, generic admin templates, enlarged primitive demos, sparse scaffolds, unjustified dead space,
+unanchored controls, weak type rank, unfinished component anatomy or a quality receipt that is incomplete,
+advisory-led or target-mismatched.
 
 Render a review explicitly labeled `pages`. Print the journey direction and UI direction for every candidate.
-Disclose `### NEED APPROVALS — OK #1: DIRECTION + PAGE ANATOMY`, the recommended candidate, direction-plus-page hash,
+Disclose `### NEED APPROVALS — OK #1: DIRECTION + QUALITY + PAGE ANATOMY`, the recommended candidate,
+direction-quality-page hash,
 routes and the fact that this approval is cache-only. With one direction, exact `OK #1` selects it. With explicit
-brainstorming, `OK #1` also names `A`, `B`, `C` or `D`. Approval freezes the selected direction receipt and exact
-page contract, then opens state expansion. It does not authorize any source write. “80%” is qualitative owner
+brainstorming, `OK #1` also names `A`, `B`, `C` or `D`. Approval freezes the selected direction receipt,
+quality review and exact page contract, then opens state expansion. It does not authorize any source write. “80%” is qualitative owner
 feedback, not a numeric threshold.
 
 ### 4. States stage — expand inside the approved pages
 
-After `OK #1`, emit schema 8 with `stage: states`, `mode: expand-states` and `approvedPageAt` equal to the SHA-256
-of the canonical selected `directionReceipt` plus `pageContract`. Keep both values byte-for-byte equivalent under
-canonical hashing.
+After `OK #1`, emit schema 9 with `stage: states`, `mode: expand-states` and `approvedPageAt` equal to the SHA-256
+of canonical selected `{directionReceipt, qualityReview, pageContract}`. Keep all three values byte-for-byte
+equivalent under canonical hashing; state expansion cannot reopen or silently improve the approved quality review.
 
 Expand every declared loading, empty, ready, error, permission, disabled, unavailable, success and overlay condition in the contract and executable in-memory behavior. Add all transitions and data mappings. Select no more than five representative page/state pairs across the whole flow for state review, prioritizing distinct high-risk condition and transition families. Every newly introduced route and every distinct `generalize`/`new-required` capability family must appear in at least one selected target. If that cannot fit the five-target ceiling, stop before `OK #2` and split the scope; never leave the riskiest new anatomy outside source parity proof. Render every selected state at every reference viewport with all of its regions. Then emit the exact `renderContract` and canonical `executionPrompt`; they keep complete page, region, state and transition implementation authority while `renders` records only that bounded visual-evidence sample. Preview values remain `representative-fixture`; runtime truth remains `source-owned`.
 
@@ -156,14 +178,23 @@ Before composing each complete render region, decompose it into closed child tar
 
 Classify state at its real owner before inventory or rendering. A **page state** exists only when the page's region arrangement, hierarchy or active page-level composition changes, such as selecting a tab that replaces the main region. Loading, refusal, answered data, payment phase, launch connection and similar changes confined to one owned subtree are **block states** even when the complete page is captured around them. The evidence limit is no more than five complete-page render targets across the flow; each target names its page state when one exists and the seeded block states visible in that capture. Never promote a block state into a page state merely because proof renders the whole page.
 
+In schema 9, every viewport row for one selected target carries the identical `visibleBlockStates` set, and every name resolves under a render-region data owner. The matching `renderContract.seedOwners.requiredStates` is exactly the selected page/state identity plus that visible block-state set; an omitted, invented or viewport-dependent state fails before `OK #2`.
+
 Before `OK #2`, publish a source-owner matrix for every stateful region: state owner; drawing `ComponentBase` and exact `component.tsx`; optional connected `Component` and exact sibling `index.tsx`; compositor kind and exact `PageBase`, `LayoutBase` or `OverlayBase`; connected `Page`, `Layout` or `Overlay` entry; and whether the parent composes the connected or drawing child. A block state requires a distinct child drawing owner. Moving state or child request data under `PageProps`, `LayoutProps` or `OverlayProps` while the outer Base still resolves and renders it is not extraction and must fail the render contract. Layouts and overlays add nested Block chains only for independently stateful subtrees; do not invent a dummy layer for a terminal surface. The exact source boundary includes every real child and outer-surface file in the chain plus every `requiredPath` from a missing capability obligation. A boundary containing only a consumer while omitting the contract, branch, leaf or data owner required to express the approved anatomy is invalid.
 
-For every selected render target, also publish a seed-owner row before `OK #2`: the exact development/test identity; required page state and block states; product-native seed owner; exact seed source files or an already-existing seed command; idempotency key; runtime dependencies; and cleanup or safe-repeat behavior. Any new seed file belongs to the exact source boundary. Cache HTML fixtures may explain the design but may not satisfy this seed contract.
+For every selected render target, also publish one machine-validated `renderContract.seedOwners` row before
+`OK #2`: the exact development/test identity; required page state and block states; product-native seed owner;
+exact seed source files or an already-existing seed command; idempotency key; runtime dependencies; safe-repeat
+behavior; and product read path. Any new seed file belongs to the exact source boundary. Cache HTML fixtures may
+explain the design but may not satisfy this seed contract.
 
-Run `@validate-artifact`, `@validate-layout-grammar` and the schema 2 maturity review with `reviewStage: states`. If a state cannot fit the approved hierarchy, regions or responsive behavior, invalidate page approval and return to the pages stage. If owner feedback changes only state expression, preserve the approved page contract and repeat only the states stage.
+Run `@validate-artifact`, `@validate-layout-grammar` and the schema 2 maturity review with `reviewStage: states`.
+The embedded quality review must be byte-identical to the approved pages artifact. If a state cannot fit the
+approved hierarchy, regions or responsive behavior, invalidate page approval and return to the pages stage. If
+owner feedback changes only state expression, preserve the approved page contract and repeat only the states stage.
 
 Render a review explicitly labeled `states`. Disclose `### NEED APPROVALS — OK #2: STATES + SOURCE BOUNDARY`, the
-approved direction-plus-page hash, selected render contract, exact source paths and any product decision. `OK #2`
+approved direction-quality-page hash, selected render contract, exact source paths and any product decision. `OK #2`
 authorizes that candidate and those exact files once.
 
 ### 5. Code the approved source
@@ -205,13 +236,17 @@ Run browser proof against the real connected product for every selected render t
 17. Journey obligations, FE capability, both printed directions, their join and page anatomy are one displayed `page-synthesis` step; their internal gates remain mandatory but never become separate owner approvals.
 18. Layout owns first synthesis. Concrete owner feedback that rejects an emitted or implemented result as wrong
     Grammar/Principles leaves first-synthesis scope and enters the correction owner.
+19. Every candidate passes the shared frontend-quality review before HTML. External UX/UI sources are optional,
+    digest-pinned advisory evidence only; adopted decisions resolve to a StarCi owner.
+20. Schema-9 state expansion preserves the approved quality review byte-for-byte; quality revision reopens pages.
 
 ## Stops
 
 - Missing/stale route, business head, grammar/profile, contract vocabulary, source baseline or scope endpoint.
 - A journey step without business authority, page ownership or an implementable component capability.
 - Fabricated product content, incomplete state inventory or non-functional HTML.
-- Generic or juvenile page character, weak hierarchy, unjustified dead space, unanchored chrome, unfinished component anatomy or failed maturity evidence.
+- Generic or juvenile page character, weak hierarchy, unjustified dead space, unanchored chrome, unfinished
+  component anatomy, failed maturity evidence, incomplete quality lenses/detectors or advisory evidence presented as authority.
 - Ordered progress with three or more stages but no connected stepper owner.
 - `OK #1` treated as write authority, or `OK #2` without exact source files.
 - Page-contract drift hidden inside state work.
@@ -221,8 +256,8 @@ Run browser proof against the real connected product for every selected render t
 
 ## OUTPUT
 
-At page review, print the journey direction and UI direction separately for every candidate, then report their
-joined complete page/flow URL, business/component synthesis, page maturity verdict and cache-only `OK #1`
-boundary. At state review, report complete state coverage, unchanged direction-plus-page hash, state maturity verdict, exact
+At page review, print the journey direction and UI direction separately for every candidate, then report its
+integrated quality verdict, joined complete page/flow URL, business/component synthesis, page maturity verdict and
+cache-only `OK #1` boundary. At state review, report complete state coverage, unchanged direction-quality-page hash, state maturity verdict, exact
 source files and seed-owner rows under `OK #2`. After implementation, report changed source files, tests, seed
 command/identity/observed data and real-product parity proof.

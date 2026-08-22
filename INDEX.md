@@ -10,6 +10,7 @@ title: Docs
 |---|---|---|---|
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
 | `@brainstorms` | `brainstorms/context.md` | context | challenge a design and expose only materially useful alternatives before a shape is accepted |
+| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge one frontend direction through integrated craft, UX, accessibility, engineering and detector lenses |
 | `@business` | `contexts/business/context.md` | context | resolve evidence-backed actors, flows, rules, states, operations and prototype surfaces |
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
@@ -68,8 +69,12 @@ direction only. The QA viewer may
 inspect states but may not substitute for product interaction.
 
 Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
-then applies one routed StarCi MASTER visual system. Profiles override declared roles only, pages record deviations
-only, grammar selects semantic owners, and principles resolve visual deltas left unanswered by those authorities.
+then applies one routed StarCi MASTER visual system. Every candidate passes the shared `@frontend-quality` review:
+external taste/catalogue/guideline sources stay digest-bound advisory evidence while product fit, visual character,
+design-system fit, accessibility, interaction, responsive content, performance/motion, component composition,
+state resilience and copy/localization resolve to StarCi owners and detector proof. Profiles override declared roles
+only, pages record deviations only, grammar selects semantic owners, and principles resolve visual deltas left
+unanswered by those authorities.
 
 ## V4 authority route
 

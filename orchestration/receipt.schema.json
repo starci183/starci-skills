@@ -27,6 +27,7 @@
         "authorityMode": {"enum": ["preserve", "evolve"]},
         "cacheRoots": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "frozenContractAt": {"$ref": "#/$defs/hash"},
+        "qualityReviewAt": {"$ref": "#/$defs/hash"},
         "sourceBoundaryAt": {"$ref": "#/$defs/hash"},
         "sourceApprovalAt": {"type": "string", "pattern": "^OK #2:[0-9a-f]{64}$"},
         "approvedSourcePaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
@@ -76,6 +77,7 @@
         "reads": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "writes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "frozenContractAt": {"$ref": "#/$defs/hash"},
+        "qualityReviewAt": {"$ref": "#/$defs/hash"},
         "sourceApprovalAt": {"type": "string", "pattern": "^OK #2:[0-9a-f]{64}$"},
         "authorityProofAt": {"$ref": "#/$defs/hash"},
         "stableBuildAt": {"$ref": "#/$defs/hash"},
@@ -86,7 +88,7 @@
         "stopConditions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
       },
       "allOf": [
-        {"if": {"properties": {"kind": {"const": "cache-write"}}, "required": ["kind"]}, "then": {"required": ["frozenContractAt"]}},
+        {"if": {"properties": {"kind": {"const": "cache-write"}}, "required": ["kind"]}, "then": {"required": ["frozenContractAt", "qualityReviewAt"]}},
         {"if": {"properties": {"kind": {"const": "source-write"}}, "required": ["kind"]}, "then": {"required": ["sourceApprovalAt"]}},
         {"if": {"properties": {"kind": {"const": "proof"}}, "required": ["kind"]}, "then": {"required": ["stableBuildAt", "proofTargetsAt"]}}
       ]
@@ -96,7 +98,7 @@
       "required": ["id", "kind", "at", "status", "dependsOn"],
       "properties": {
         "id": {"$ref": "#/$defs/slug"},
-        "kind": {"enum": ["contract-freeze", "source-approval", "impact-cone", "authority-proof", "stable-build", "proof-targets"]},
+        "kind": {"enum": ["contract-freeze", "quality-review", "source-approval", "impact-cone", "authority-proof", "stable-build", "proof-targets"]},
         "at": {"type": "string", "minLength": 1},
         "status": {"const": "passed"},
         "dependsOn": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}

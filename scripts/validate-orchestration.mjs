@@ -113,6 +113,7 @@ export function validateReceipt(receipt, profiles) {
       return gate?.kind === kind && gate?.at === at && gate?.status === "passed";
     });
     if (task.kind === "cache-write" && (!task.frozenContractAt || task.frozenContractAt !== receipt?.phaseGates?.frozenContractAt || !hasPassedGate("contract-freeze", task.frozenContractAt))) failures.push(`${task.id} writes cache HTML without the passed coordinator freeze gate`);
+    if (task.kind === "cache-write" && (!task.qualityReviewAt || task.qualityReviewAt !== receipt?.phaseGates?.qualityReviewAt || !hasPassedGate("quality-review", task.qualityReviewAt))) failures.push(`${task.id} writes cache HTML without the passed integrated quality-review gate`);
     if (task.kind === "read" && task.writes?.length) failures.push(`${task.id} is read-only but declares writes`);
     if (task.kind === "cache-write" && (!(task.writes?.length) || task.writes.some((target) => !insideAnyRoot(target, receipt?.phaseGates?.cacheRoots)))) failures.push(`${task.id} writes outside declared cacheRoots`);
     if (task.kind === "source-write") {

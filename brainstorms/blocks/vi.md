@@ -10,6 +10,7 @@ title: Blocks · Vietnamese
 |---|---|---|---|
 | `@schema` | `brainstorms/blocks/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra và băm artifact ứng viên |
+| `@frontend-quality` | `brainstorms/frontend-quality/vi.md` | vi | phản biện mỗi direction bằng review craft, UX, accessibility, engineering và detector dùng chung |
 
 
 ## Bản ghi
@@ -17,7 +18,8 @@ title: Blocks · Vietnamese
 Mô-đun này nhận một Layout-generated region trong complete current page. Direction bắt buộc nằm trong block
 workflow. Default `audit` in một audited/corrected UI direction cùng pass/exact findings. Chỉ owner explicit
 `brainstorm` trước direction approval mới trả 3–4 targeted UI direction trong cùng parent geometry. Parent page
-và Layout journey direction được giữ nguyên.
+và Layout journey direction được giữ nguyên. Mỗi anatomy mang `qualityReview` tích hợp của riêng nó; draft
+không eligible phải được sửa hoặc loại trước khi sinh HTML.
 
 ## Luật
 
@@ -30,7 +32,7 @@ có dữ liệu thì lúc trường hợp rỗng xuất hiện là phải **thi�
 
 ## Đầu vào
 
-Bảy, không hơn.
+Tám, không hơn.
 
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
@@ -41,6 +43,7 @@ Bảy, không hơn.
 | 5 | Từ vựng: tên leaf mà contract gọi, tên composite, những block đang có | một phần trích một thành phần không tồn tại |
 | 6 | Dữ liệu của region **thật sự hỏng thế nào**, đọc từ source của page và block | `optional` bị hiểu lầm là đủ bộ trạng thái |
 | 7 | Trong brainstorm mode, requested anatomy axis | alternative drift ngoài yêu cầu owner |
+| 8 | Frontend stack đã phát hiện cùng advisory source thật sự dùng và digest của nó | engineering check thành generic hoặc external taste âm thầm thành authority |
 
 **Đầu vào số 6 tồn tại vì contract không trả lời được nó.** `optional: true` khai **sự hiện diện** và
 không gì hơn: đang tải, thất bại và rỗng đều rơi vào cùng một cờ đó. Tách chúng ra thì phải đọc từ source
@@ -60,6 +63,9 @@ Không đọc ở tầng này: mảng class, lựa chọn theme chưa duyệt, c
    hai cách viết của một thứ.
 6. **Từ chối thay vì bịa.** Region rỗng có phải một kết cục thật hay không là quyết định của người chủ,
    không phải một giá trị mặc định.
+7. **Phản biện direction trước khi render.** Chạy `@frontend-quality` trong đúng complete parent không đổi.
+   Tách binding evidence StarCi khỏi optional external advisory evidence, giải đủ mười lens và sáu detector family,
+   rồi loại draft có character move chỉ là trang trí.
 
 ## Trục giải phẫu
 
@@ -87,7 +93,7 @@ Một lời trích không kiểm được với từ vựng là **một cái tê
 
 ## Luật cho giải phẫu
 
-Mười bốn luật mà **mọi** giải phẫu phải thoả. Giải phẫu phạm một luật không phải là phương án yếu hơn — nó
+Mười lăm luật mà **mọi** giải phẫu phải thoả. Giải phẫu phạm một luật không phải là phương án yếu hơn — nó
 **không phải một giải phẫu**.
 
 | Mã | Luật | Nó từ chối |
@@ -106,6 +112,7 @@ Mười bốn luật mà **mọi** giải phẫu phải thoả. Giải phẫu ph
 | `BLOCK-12` | Thất bại có **owner nhìn thấy được trong mọi bố cục**. Thất bại là một **câu trả lời đã ngã ngũ**, không phải một lần chờ. | vẽ lỗi thành một spinner không bao giờ dứt |
 | `BLOCK-13` | Khối nhận **dữ liệu đóng**. Nó không nhận nội dung tuỳ ý và không bao giờ để caller quyết cái gì hiện bên trong nó. | nội dung tuỳ ý, thứ biến khối thành một branch |
 | `BLOCK-14` | **Phương án tính theo từng khối.** Một bề mặt có `N` khối được đánh giá từng region; alternative nằm trong region sở hữu nó. | biến nhiều quyết định block thành tổ hợp cấp-trang |
+| `BLOCK-15` | Mọi anatomy phải pass integrated frontend-quality review trong đúng complete parent trước HTML: binding source thắng advisory source, đủ mười lens, character move thuộc product và mọi detector áp dụng được đều pass. | block bóng bẩy nhưng generic, inaccessible, mù stack, mong manh hoặc chỉ được biện minh bằng external catalogue |
 
 ## Quy tắc
 
@@ -123,6 +130,11 @@ Mười bốn luật mà **mọi** giải phẫu phải thoả. Giải phẫu ph
 7. Quyết định sản phẩm còn thiếu thì trả về cho người chủ.
 8. JSON là dạng chuẩn hoá, và **hash của nó** là thứ lời chấp thuận gắn vào.
 9. Feedback mở một lượt mới; giải phẫu đã chấp nhận không bao giờ bị sửa tại chỗ.
+10. New work emit schema 3 và bind đúng một `qualityReview` cho mỗi anatomy. External design intelligence chỉ là
+    digest-pinned advisory evidence. Mỗi adopted decision gọi tên StarCi owner; mọi alternative trong explicit
+    brainstorm mode được review riêng trên cùng facts và content.
+11. Schema 3 bind `parentPageId` cùng current drawing/compositor/entry/test `sourceOwners` trước approval. State
+    view phải dùng đúng parent đó, chỉ gọi anatomy-reachable state và chứa mọi owner path trong exact source boundary.
 
 ## Từ chối
 
@@ -142,46 +154,18 @@ blocked: <những phần không giải được nếu thiếu nó>
 
 ## Đầu ra
 
-Đầu ra **chính là** JSON, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này.
+Đầu ra **chính là** canonical JSON schema 3, và thẩm quyền của nó là `@schema` nằm cạnh bản ghi này.
 `envelope` giữ những thứ đổi theo lượt — gồm `parentAt`, digest chỉ sống trong phiên của current source page.
-Anatomy hash chỉ là cache key và chỉ phủ **một giải phẫu**.
+Anatomy hash chỉ là cache key và chỉ phủ **một giải phẫu**. Mỗi anatomy chứa `uiDirection` cùng complete
+schema-1 `qualityReview` từ `@frontend-quality`. Schema 1 và 2 chỉ còn được nhận để tương thích cache cũ;
+không phải publication target cho new work. Schema là canonical example duy nhất; không thay closed lens hay
+detector array bằng dấu ba chấm trong prose.
 
-```json
-{
-  "schema": 2,
-  "envelope": {
-    "round": 1,
-    "project": "example-app",
-    "region": "criteria",
-    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c",
-    "mode": "audit"
-  },
-  "anatomies": [
-    {
-      "id": "a",
-      "axes": {"dataOwner": "parent", "repetition": "repeats", "weight": "populated", "composition": "label-value"},
-      "citesPrecedent": "none",
-      "states": ["populated", "empty", "pending"],
-      "uiDirection": {
-        "summary": "Giữ criteria dễ so sánh trong complete parent không đổi",
-        "hierarchy": ["Criterion label đứng trước stored value"],
-        "responsive": ["Các row giữ reading order khi parent thu hẹp"],
-        "emphasis": ["Compared value vẫn là dominant fact"]
-      },
-      "restingCount": 4,
-      "parts": [
-        {
-          "name": "criterion-row",
-          "cites": {"kind": "entry", "verdict": "generalize", "from": "flashcard-result-fact-row", "to": "fact-row", "callSites": 1, "why": "if you need a row comparing a name with one stored value on a shared baseline"},
-          "whyMatch": "a name read against one stored value, repeated as rows on a shared baseline"
-        }
-      ],
-      "reason": "vì sao giải phẫu này đáng để người chủ đọc"
-    }
-  ],
-  "audit": {"verdict": "pass", "findings": []}
-}
-```
+Trước `OK #1`, emit `envelope.stage: direction` và bỏ `stateReview`. Sau selection, emit
+`envelope.stage: states` với đúng một selected anatomy cùng `stateReview`: một tới năm complete-page state family
+bind `parentPageId` cùng reachable anatomy state, ít nhất desktop và narrow viewport mỗi family, cùng exact
+source/test boundary chứa mọi proven `sourceOwners` path. Isolated block crop hay prose claim
+không thể thay machine boundary đó.
 
 Validate trước khi ghi và trước khi hash:
 
@@ -190,7 +174,8 @@ node @validate-artifact --schema @schema --data <batch.json> --hash
 ```
 
 Ngoài hình dạng, validator còn từ chối class token ở bất cứ đâu trong lô, hai giải phẫu trùng bộ trục, một
-giải phẫu `repeats` mà thiếu `restingCount`, và một lô không có giải phẫu nào trích `none`.
+giải phẫu `repeats` thiếu `restingCount`, batch không có anatomy trích `none`, lens/detector coverage thiếu,
+external advisory bị trình bày như binding, hoặc quality receipt có target không khớp anatomy.
 
 ## Ví dụ đã giải
 
@@ -211,6 +196,6 @@ người chủ được xem một giải phẫu hai lần.
 ## Phạm vi
 
 Tầng này quyết định một khối gồm những gì và nó nợ những trạng thái nào. Nó không quyết định region nằm ở
-đâu — đó là layout — và không quyết định một class, đó là việc của luật. Mười bốn luật mà một giải phẫu
+đâu — đó là layout — và không quyết định một class, đó là việc của luật. Mười lăm luật mà một giải phẫu
 phải thoả được phát biểu ở trên dưới dạng mã `BLOCK-n`, nên giải phẫu được đối chiếu với **một mã trích
 dẫn được**, không phải với trí nhớ của người đọc về cây legacy.

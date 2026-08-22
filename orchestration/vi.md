@@ -70,8 +70,9 @@ input hash, observation có provenance, changed path, command/proof, unresolved 
 Coordinator từ chối receipt khi envelope stale, evidence chưa chứng minh, write ngoài boundary, worker đã tự đưa
 decision hoặc task khác sở hữu cùng path. Work bị từ chối không được integrate ngầm.
 
-Receipt được revalidate và append-only refresh tại mỗi coordinator phase gate. Cache task bind exact frozen
-contract hash. Source task bind `OK #2:<source-boundary-hash>`, complete approved path set và, khi Refactor evolve
+Receipt được revalidate và append-only refresh tại mỗi coordinator phase gate. Cache task bind cả exact frozen
+contract hash lẫn validated target-matched `qualityReviewAt` hash, và phụ thuộc event `contract-freeze` cùng
+`quality-review` đã pass. Source task bind `OK #2:<source-boundary-hash>`, complete approved path set và, khi Refactor evolve
 authority, compiled authority-proof hash. Proof task bind stable-build/proof-target hash và phụ thuộc mọi source
 task. Future task không được dispatch khi gate identity của nó còn thiếu.
 

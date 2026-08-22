@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"enum": [1, 2, 3, 4, 5, 6, 7, 8], "description": "Schema 8 adds separately printed journey/UI directions, obligation-level capability proof and required-path coverage to the staged page/state contract. Schema 7 remains compatibility input."},
+    "schema": {"enum": [1, 2, 3, 4, 5, 6, 7, 8, 9], "description": "Schema 9 binds the integrated frontend-quality review into the approved direction-quality-page hash. Schema 8 remains compatibility input for separately printed directions and capability proof."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -80,7 +80,7 @@
       }
     },
     {
-      "if": {"properties": {"schema": {"enum": [7, 8]}}, "required": ["schema"]},
+      "if": {"properties": {"schema": {"enum": [7, 8, 9]}}, "required": ["schema"]},
       "then": {
         "properties": {
           "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope", "mode", "stage"]}]},
@@ -114,7 +114,7 @@
       }
     },
     {
-      "if": {"properties": {"schema": {"const": 8}}, "required": ["schema"]},
+      "if": {"properties": {"schema": {"enum": [8, 9]}}, "required": ["schema"]},
       "then": {
         "properties": {
           "candidates": {
@@ -146,6 +146,22 @@
           }
         }
       }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 9}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "properties": {
+                "synthesis": {
+                  "required": ["qualityReview"]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -164,7 +180,7 @@
         "mode": {"enum": ["generate", "brainstorm", "expand-states"]},
         "stage": {"enum": ["pages", "states"], "description": "Pages is the cache-only page-anatomy review. States is the post-page-approval expansion and exact source-boundary review."},
         "baselineCandidateAt": {"$ref": "#/$defs/hash", "description": "Optional provenance when an explicit brainstorm was requested against an already rendered direction. Direct page-synthesis brainstorming does not require an earlier baseline."},
-        "approvedPageAt": {"$ref": "#/$defs/hash", "description": "Required in the states stage. For schema 8, SHA-256 of the canonical selected directionReceipt plus pageContract approved at the pages stage; schema 7 retains the pageContract-only compatibility hash."}
+        "approvedPageAt": {"$ref": "#/$defs/hash", "description": "Required in the states stage. Schema 9 hashes canonical {directionReceipt, qualityReview, pageContract}; schema 8 hashes directionReceipt plus pageContract; schema 7 retains the pageContract-only compatibility hash."}
       }
     },
     "scope": {
@@ -212,6 +228,7 @@
       "required": ["pageIntents", "customerJourneys", "business", "capabilities", "intersections"],
       "properties": {
         "directionReceipt": {"$ref": "#/$defs/directionReceipt"},
+        "qualityReview": {"$ref": "../frontend-quality/schema.json"},
         "pageIntents": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pageIntent"}},
         "customerJourneys": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/customerJourney"}},
         "business": {"$ref": "#/$defs/businessTruth"},
@@ -393,7 +410,7 @@
       }
     },
     "renderContract": {
-      "description": "The complete implementation authority for the selected preview. Pages, regions, page states, block states and transitions stay exhaustive; renders select at most five complete-page targets and cover every reference viewport for each selection.",
+      "description": "The complete implementation authority for the selected preview. Pages, regions, states and transitions stay exhaustive; renders select at most five complete-page targets, and schema-9 states bind one product-native seed owner per selected target.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "candidateId", "sourceBoundary", "viewports", "pages", "renders"],
@@ -403,7 +420,30 @@
         "sourceBoundary": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "viewports": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderViewport"}},
         "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderPage"}},
-        "renders": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderCoverage"}}
+        "renders": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderCoverage"}},
+        "seedOwners": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/seedOwner"}}
+      }
+    },
+    "seedOwner": {
+      "description": "One product-native deterministic seed contract for one selected page/state target, independent of viewport.",
+      "type": "object", "additionalProperties": false,
+      "required": ["pageId", "stateId", "identity", "requiredStates", "owner", "provision", "idempotencyKey", "runtimeDependencies", "safeRepeat", "readPath"],
+      "properties": {
+        "pageId": {"$ref": "#/$defs/slug"},
+        "stateId": {"$ref": "#/$defs/slug"},
+        "identity": {"type": "string", "minLength": 1},
+        "requiredStates": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "owner": {"type": "string", "minLength": 1},
+        "provision": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["kind", "files"], "properties": {"kind": {"const": "source-files"}, "files": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+            {"type": "object", "additionalProperties": false, "required": ["kind", "command"], "properties": {"kind": {"const": "existing-command"}, "command": {"type": "string", "minLength": 1}}}
+          ]
+        },
+        "idempotencyKey": {"type": "string", "minLength": 1},
+        "runtimeDependencies": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "safeRepeat": {"type": "string", "minLength": 12},
+        "readPath": {"type": "string", "minLength": 1}
       }
     },
     "renderViewport": {
@@ -491,7 +531,7 @@
     },
     "renderCoverage": {
       "type": "object", "additionalProperties": false, "required": ["pageId", "stateId", "viewportId", "regions"],
-      "properties": {"pageId": {"$ref": "#/$defs/slug"}, "stateId": {"$ref": "#/$defs/slug"}, "viewportId": {"$ref": "#/$defs/slug"}, "regions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}}
+      "properties": {"pageId": {"$ref": "#/$defs/slug"}, "stateId": {"$ref": "#/$defs/slug"}, "viewportId": {"$ref": "#/$defs/slug"}, "regions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}, "visibleBlockStates": {"description": "Block-owned states visible in this complete-page target. Schema 9 requires the same set at every viewport for the target.", "type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}}
     },
     "executionPrompt": {
       "description": "Canonical machine-readable handoff. Its identities and source boundary must equal the selected candidate and render contract.",

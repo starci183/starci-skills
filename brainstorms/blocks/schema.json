@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v4/brainstorms/blocks/schema.json",
   "title": "Block UI direction audit or explicit anatomy brainstorm",
-  "description": "Schema 2 prints one audited/corrected block UI direction by default. Three or four UI-direction anatomies are legal only in explicit owner brainstorm mode.",
+  "description": "Schema 3 binds the integrated frontend-quality review to each audited/corrected block UI direction. Three or four UI-direction anatomies are legal only in explicit owner brainstorm mode.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "envelope", "anatomies"],
   "properties": {
-    "schema": {"enum": [1, 2]},
+    "schema": {"enum": [1, 2, 3]},
     "envelope": {"$ref": "#/$defs/envelope"},
     "anatomies": {
       "type": "array",
@@ -15,12 +15,13 @@
       "maxItems": 4,
       "items": {"$ref": "#/$defs/anatomy"}
     },
+    "stateReview": {"$ref": "#/$defs/stateReview"},
     "audit": {"$ref": "#/$defs/audit"},
     "refusal": {"$ref": "#/$defs/refusal"}
   },
   "allOf": [
     {
-      "if": {"properties": {"schema": {"const": 2}}, "required": ["schema"]},
+      "if": {"properties": {"schema": {"enum": [2, 3]}}, "required": ["schema"]},
       "then": {
         "properties": {
           "anatomies": {
@@ -28,6 +29,21 @@
               "allOf": [
                 {"$ref": "#/$defs/anatomy"},
                 {"required": ["uiDirection"]}
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 3}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "anatomies": {
+            "items": {
+              "allOf": [
+                {"$ref": "#/$defs/anatomy"},
+                {"required": ["qualityReview"]}
               ]
             }
           }
@@ -45,8 +61,10 @@
         "project": {"$ref": "#/$defs/slug"},
         "region": {"$ref": "#/$defs/slug"},
         "parentAt": {"$ref": "#/$defs/hash", "description": "Session-local digest of the current source parent page used for this review."},
+        "parentPageId": {"$ref": "#/$defs/slug", "description": "The exact complete parent page identity used by every state-review view."},
         "contractAt": {"type": "string", "minLength": 1},
         "mode": {"enum": ["audit", "brainstorm"]},
+        "stage": {"enum": ["direction", "states"]},
         "explicitRequest": {"type": "string", "minLength": 8, "description": "Required only for owner-requested brainstorm mode."}
       }
     },
@@ -77,6 +95,8 @@
           "items": {"enum": ["populated", "empty", "pending", "failed", "partial", "forbidden"]}
         },
         "uiDirection": {"$ref": "#/$defs/uiDirection"},
+        "qualityReview": {"$ref": "../frontend-quality/schema.json"},
+        "sourceOwners": {"type": "array", "minItems": 4, "items": {"$ref": "#/$defs/sourceOwner"}},
         "restingCount": {"type": "integer", "minimum": 1, "description": "Required when axes.repetition is `repeats`."},
         "parts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/part"}},
         "reason": {"type": "string", "minLength": 12}
@@ -92,6 +112,36 @@
         "hierarchy": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
         "responsive": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
         "emphasis": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "stateReview": {
+      "description": "The selected post-OK-#1 block state assurance and exact FE boundary. Each view is a complete-page family; its viewport captures do not multiply the family count.",
+      "type": "object", "additionalProperties": false,
+      "required": ["candidateId", "views", "sourceBoundary"],
+      "properties": {
+        "candidateId": {"$ref": "#/$defs/slug"},
+        "views": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"$ref": "#/$defs/stateView"}},
+        "sourceBoundary": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "stateView": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "pageId", "visibleStates", "viewports", "completePage"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "pageId": {"$ref": "#/$defs/slug"},
+        "visibleStates": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "viewports": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "completePage": {"const": true}
+      }
+    },
+    "sourceOwner": {
+      "description": "One exact member of the current block ownership/test chain that the post-approval source boundary must contain.",
+      "type": "object", "additionalProperties": false, "required": ["role", "component", "path"],
+      "properties": {
+        "role": {"enum": ["drawing", "connected", "compositor", "entry", "contract", "test"]},
+        "component": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1}
       }
     },
     "axes": {

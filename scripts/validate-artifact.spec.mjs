@@ -90,6 +90,44 @@ const canonical = (value) => {
     return JSON.stringify(value)
 }
 
+const qualityReview = (scope, targetId) => ({
+    schema: 1,
+    scope,
+    targetId,
+    evidenceAt: digest,
+    sources: [{
+        id: "current-product",
+        kind: "current-source",
+        locator: "src/components/current.tsx",
+        digest,
+        use: "binding",
+        lenses: ["product-fit", "visual-character", "design-system", "accessibility", "interaction", "responsive-content", "performance-motion", "component-composition", "state-resilience", "copy-localization"],
+    }],
+    lenses: [
+        "product-fit", "visual-character", "design-system", "accessibility", "interaction",
+        "responsive-content", "performance-motion", "component-composition", "state-resilience", "copy-localization",
+    ].map((id) => ({
+        id,
+        verdict: "pass",
+        evidence: [`Current product evidence closes ${id}`],
+        decision: `Preserve the product-specific ${id} obligation`,
+        owner: id === "product-fit" ? "business" : id === "component-composition" ? "pattern" : "grammar",
+        proof: `The complete candidate visibly proves ${id}`,
+    })),
+    signature: {
+        move: "Make the learner decision visibly anchor the composition",
+        productReason: "The learner must judge whether the lesson is sufficient",
+        authority: scope === "block" ? "inherited-parent" : "master",
+        decorativeOnly: false,
+    },
+    rejections: ["Reject generic dashboard composition with no learner-specific decision"],
+    detectors: [
+        "semantics-a11y", "interaction-feedback", "responsive-overflow",
+        "motion-performance", "react-composition", "state-content",
+    ].map((id) => ({id, verdict: "pass", evidence: `Deterministic evidence passes ${id}`})),
+    verdict: "eligible",
+})
+
 const addPageSynthesis = (candidate) => {
     const page = candidate.pages[0]
     candidate.synthesis = {
@@ -168,10 +206,14 @@ const addSchema8CapabilityProof = (candidate, routeStatus = "existing") => {
 }
 
 const pageHash = (candidate, schema = 7) => createHash("sha256")
-    .update(canonical(schema === 8 ? {directionReceipt: candidate.synthesis.directionReceipt, pageContract: candidate.pageContract} : candidate.pageContract))
+    .update(canonical(schema === 9
+        ? {directionReceipt: candidate.synthesis.directionReceipt, qualityReview: candidate.synthesis.qualityReview, pageContract: candidate.pageContract}
+        : schema === 8
+            ? {directionReceipt: candidate.synthesis.directionReceipt, pageContract: candidate.pageContract}
+            : candidate.pageContract))
     .digest("hex")
 
-function runArtifact(artifact) {
+function runArtifact(artifact, schemaFile = "brainstorms/layouts/schema.json") {
     const root = mkdtempSync(join(tmpdir(), "validate-page-set-"))
     const artifactPath = join(root, "artifact.json")
     const vocabularyPath = join(root, "vocabulary.json")
@@ -181,7 +223,7 @@ function runArtifact(artifact) {
         tokens: tokens.map((name) => ({ name: `--${name}`, declarations: [{ source: "tokens.css", value: name }] })),
     }))
     const result = spawnSync(process.execPath, [
-        resolve("scripts/validate-artifact.mjs"), "--schema", resolve("brainstorms/layouts/schema.json"),
+        resolve("scripts/validate-artifact.mjs"), "--schema", resolve(schemaFile),
         "--data", artifactPath, "--vocabulary", vocabularyPath,
     ], { cwd: resolve("."), encoding: "utf8" })
     rmSync(root, { recursive: true, force: true })
@@ -201,7 +243,8 @@ const statesArtifact = (schema = 8) => {
     candidate.systemId = "starci-master"
     candidate.pageOverride = {deviations: []}
     addPageSynthesis(candidate)
-    if (schema === 8) addSchema8CapabilityProof(candidate)
+    if (schema >= 8) addSchema8CapabilityProof(candidate)
+    if (schema === 9) candidate.synthesis.qualityReview = qualityReview("layout", candidate.id)
     const approvedPageAt = pageHash(candidate, schema)
     addRenderContract(candidate)
     const states = candidate.pageContract.stateInventory[0].states
@@ -221,7 +264,20 @@ const statesArtifact = (schema = 8) => {
     candidate.renderContract.sourceBoundary.push(...blockPaths)
     candidate.renderContract.renders = candidate.renderContract.viewports.map((viewport) => ({
         pageId: "lesson", stateId: "lesson-error", viewportId: viewport.id, regions: ["lesson-content"],
+        ...(schema === 9 ? {visibleBlockStates: ["lesson-error"]} : {}),
     }))
+    if (schema === 9) candidate.renderContract.seedOwners = [{
+        pageId: "lesson",
+        stateId: "lesson-error",
+        identity: "learner@example.test",
+        requiredStates: ["lesson-error"],
+        owner: "course development seeder",
+        provision: {kind: "existing-command", command: "npm run seed:development -- --identity learner@example.test"},
+        idempotencyKey: "lesson-error-learner",
+        runtimeDependencies: ["local database"],
+        safeRepeat: "Upsert the same test identity and lesson error fixture",
+        readPath: "/courses/course/learn/lesson",
+    }]
     const artifact = {...batch([candidate]), schema}
     artifact.envelope.mode = "expand-states"
     artifact.envelope.stage = "states"
@@ -288,6 +344,52 @@ test("schema 8 pages stage accepts obligation-level capability evidence while sc
     artifact.envelope.stage = "pages"
     const result = runArtifact(artifact)
     assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 9 pages stage binds one target-matched integrated quality review", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    candidate.synthesis.qualityReview = qualityReview("layout", candidate.id)
+    const artifact = {...batch([candidate]), schema: 9}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 9 pages stage refuses a quality receipt for another candidate", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    candidate.synthesis.qualityReview = qualityReview("layout", "another-candidate")
+    const artifact = {...batch([candidate]), schema: 9}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /targetId: must equal one/)
+})
+
+test("schema 9 pages stage refuses HTML eligibility without a quality review", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    const artifact = {...batch([candidate]), schema: 9}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /schema 9 requires an integrated quality review before HTML/)
 })
 
 test("schema 8 pages stage requires separately printed journey and UI directions for the complete scope", () => {
@@ -409,6 +511,36 @@ test("schema 8 states stage accepts a fully supported capability proof", () => {
     const {artifact} = statesArtifact()
     const result = runArtifact(artifact)
     assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 9 states stage preserves direction, quality review and page contract after OK #1", () => {
+    const {artifact} = statesArtifact(9)
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 9 states stage refuses OK #2 without one product-native seed owner per selected target", () => {
+    const {artifact, candidate} = statesArtifact(9)
+    delete candidate.renderContract.seedOwners
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /one product-native seed owner per selected render target/)
+})
+
+test("schema 9 seed owner must cover every block state visible in the selected complete-page target", () => {
+    const {artifact, candidate} = statesArtifact(9)
+    for (const render of candidate.renderContract.renders) render.visibleBlockStates = ["lesson-error", "lesson-loading"]
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must exactly cover selected state plus every visible block state/)
+})
+
+test("schema 9 states stage refuses quality-review drift after OK #1", () => {
+    const {artifact, candidate} = statesArtifact(9)
+    candidate.synthesis.qualityReview.signature.move = "A changed character move after approval is forbidden"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /quality review or page anatomy drifted/)
 })
 
 test("schema 8 states stage refuses direction drift after OK #1", () => {
@@ -830,4 +962,133 @@ test("schema 4 requires 3-4 complete candidates when a flow renders three pages"
     const one = runArtifact(batch([makeFlow("one", axes[0])], { kind: "flow", source: "description" }))
     assert.notEqual(one.status, 0)
     assert.match(one.stderr, /requires 3-4 complete page-set choices/)
+})
+
+test("frontend quality receipt accepts closed lenses and detector families with binding StarCi evidence", () => {
+    const result = runArtifact(qualityReview("refactor", "lesson-page"), "brainstorms/frontend-quality/schema.json")
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("frontend quality receipt refuses external advisory evidence presented as binding", () => {
+    const receipt = qualityReview("refactor", "lesson-page")
+    receipt.sources[0].kind = "external-advisory"
+    const result = runArtifact(receipt, "brainstorms/frontend-quality/schema.json")
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /external design intelligence is advisory|at least one routed authority/)
+})
+
+test("frontend quality receipt refuses duplicate lens coverage even when array length stays ten", () => {
+    const receipt = qualityReview("refactor", "lesson-page")
+    receipt.lenses[9] = {...receipt.lenses[0]}
+    const result = runArtifact(receipt, "brainstorms/frontend-quality/schema.json")
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /closed frontend-quality lens exactly once/)
+})
+
+const blockSourceBoundary = [
+    "src/components/blocks/Criteria/component.tsx",
+    "src/components/blocks/Criteria/index.tsx",
+    "src/components/pages/LessonPage/component.tsx",
+    "src/components/blocks/Criteria/component.spec.tsx",
+]
+
+const blockArtifact = () => ({
+        schema: 3,
+        envelope: {round: 1, project: "sample", region: "criteria", parentAt: digest, parentPageId: "lesson", mode: "audit", stage: "direction"},
+        anatomies: [{
+            id: "criteria",
+            axes: {dataOwner: "parent", repetition: "repeats", weight: "populated", composition: "label-value"},
+            citesPrecedent: "none",
+            states: ["populated", "empty"],
+            uiDirection: {
+                summary: "Keep criteria comparable inside the unchanged complete parent",
+                hierarchy: ["Criterion label precedes its stored value"],
+                responsive: ["Rows retain their reading order when the parent narrows"],
+                emphasis: ["The compared value remains the dominant fact"],
+            },
+            qualityReview: qualityReview("block", "criteria"),
+            sourceOwners: [
+                {role: "drawing", component: "CriteriaBase", path: blockSourceBoundary[0]},
+                {role: "entry", component: "Criteria", path: blockSourceBoundary[1]},
+                {role: "compositor", component: "LessonPageBase", path: blockSourceBoundary[2]},
+                {role: "test", component: "CriteriaBase tests", path: blockSourceBoundary[3]},
+            ],
+            restingCount: 4,
+            parts: [{
+                name: "criterion-row",
+                cites: {kind: "entry", verdict: "reuse", key: "content-panel"},
+                whyMatch: "A name is read against one stored value on a shared baseline",
+            }],
+            reason: "Keep repeated criteria comparable without changing the parent page",
+        }],
+        audit: {verdict: "pass", findings: []},
+    })
+
+test("block schema 3 binds one target-matched quality review before HTML", () => {
+    const artifact = blockArtifact()
+    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("block schema 3 states stage accepts a selected direction with bounded complete-page proof", () => {
+    const artifact = blockArtifact()
+    artifact.envelope.stage = "states"
+    artifact.stateReview = {
+        candidateId: "criteria",
+        views: [{
+            id: "criteria-empty",
+            pageId: "lesson",
+            visibleStates: ["empty"],
+            viewports: ["desktop", "narrow"],
+            completePage: true,
+        }],
+        sourceBoundary: blockSourceBoundary,
+    }
+    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("block schema 3 state views must bind the parent page and reachable block states", () => {
+    const artifact = blockArtifact()
+    artifact.envelope.stage = "states"
+    artifact.stateReview = {
+        candidateId: "criteria",
+        views: [{id: "invented-state", pageId: "another-page", visibleStates: ["invented"], viewports: ["desktop", "narrow"], completePage: true}],
+        sourceBoundary: blockSourceBoundary,
+    }
+    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must equal bound parent page|unknown block states/)
+})
+
+test("block schema 3 source boundary must contain the proven owner and test chain", () => {
+    const artifact = blockArtifact()
+    artifact.envelope.stage = "states"
+    artifact.stateReview = {
+        candidateId: "criteria",
+        views: [{id: "criteria-empty", pageId: "lesson", visibleStates: ["empty"], viewports: ["desktop", "narrow"], completePage: true}],
+        sourceBoundary: ["src/unrelated.tsx"],
+    }
+    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /missing drawing owner path|missing test owner path/)
+})
+
+test("block schema 3 states stage enforces no more than five complete-page state families", () => {
+    const artifact = blockArtifact()
+    artifact.envelope.stage = "states"
+    artifact.stateReview = {
+        candidateId: "criteria",
+        views: Array.from({length: 6}, (_, index) => ({
+            id: `criteria-state-${index + 1}`,
+            pageId: "lesson",
+            visibleStates: [index === 0 ? "empty" : "populated"],
+            viewports: ["desktop", "narrow"],
+            completePage: true,
+        })),
+        sourceBoundary: blockSourceBoundary,
+    }
+    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /no more than 5 complete-page state families|more than 5 items/)
 })

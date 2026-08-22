@@ -21,6 +21,7 @@ description: Correct or restructure an exact Layout- or Block-rendered frontend 
 | `@lints-fe` | `gates/fe/lints/context.md` | context | prove implemented frontend source |
 | `@standards` | `standards/context.md` | context | keep authority changes accountable to executable proof |
 | `@design-review` | `publication/design-review-preview/context.md` | context | publish complete direction and state reviews in cache |
+| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge the corrected direction through shared craft, UX, accessibility, engineering and detectors |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit routed semantic outcomes and owners |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove grammar authority before and after evolution |
 | `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | bind the correction to the routed grammar receipt |
@@ -47,7 +48,7 @@ Topology: `reconciliation` through authority classification, then `linear` corre
 |---|---|---|---|---|---|
 | bind-classify | shared | exact Layout/Block-rendered scope, routed FE, source and concrete owner feedback or restructuring objective | freeze product truth, reproduce the mismatch and locate the highest failed authority/application layer | correction envelope, owner chain and feedback verdict | every observation is reproducible; rendered scope only |
 | orchestration | coordination | correction envelope, failed-layer evidence and measured runtime | apply the Refactor phase map, dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; `.claude` and decision ownership remain coordinator-only |
-| direction | reconciliation | envelope, grammar, MASTER and correction objective | print one UI direction by default, or 3–4 only after an explicit owner brainstorm request | complete-context desktop/narrow direction review | functional direction selected under `OK #1`; cache only |
+| direction | reconciliation | envelope, grammar, MASTER and correction objective | print direction, run integrated quality review, then render one UI direction by default or 3–4 only after an explicit owner brainstorm request | complete-context desktop/narrow review plus standalone refactor quality receipt | functional direction and required lenses/detectors selected under `OK #1`; cache only |
 | authority-state-boundary | execution | selected direction, state truth and failure verdict | ensure at most five complete-page state views and bind the smallest authority, impact-cone, FE and proof boundary | authority-to-write map, state review and exact batch | every risky family and affected consumer is covered; exact `OK #2` authorizes the batch |
 | evolve-refactor | execution | approved authority-to-write map and exact files | evolve authority first when needed, compile it, then correct every affected FE consumer | authority receipts, bounded FE diff and green gates | no lower-layer patch hides an upper-layer failure; product truth stays fixed |
 | parity | proof | approved state views, existing seeds and product | compare the same complete page states and viewports | up to five final state views and `visual-proof.json` | `parity: passed`, `mismatches: []` |
@@ -60,8 +61,9 @@ restructuring objective. A closed declared set of already-rendered equivalent su
 invocation authorizes read-only classification and direction review; neither authorizes authority or product source.
 
 After `bind-classify`, execute and display the mandatory `orchestration` step. The coordinator classifies the
-highest failed layer, owns every `.claude` write, authors UI direction, consumes approvals and integrates. Workers
-may audit counterexamples and impact cones, generate HTML only from a frozen direction, implement disjoint approved
+highest failed layer, owns every `.claude` write, authors UI direction and integrated quality verdict, consumes
+approvals and integrates. Workers may audit counterexamples, impact cones and lens/detector evidence, generate HTML
+only from an eligible frozen direction, implement disjoint approved
 FE paths after `OK #2`, test and capture proof. Product tasks that depend on evolved authority wait until authority
 compilation and dependency gates pass.
 
@@ -95,9 +97,13 @@ or data capability. Journey direction is inherited and frozen; Refactor never pu
 By default emit exactly one functional, production-mature complete direction at desktop and narrow. Only an
 explicit owner brainstorm request made before direction approval opens three or four materially distinct complete
 UI directions. Token, colour, radius or spacing-only variants do not count. For a multi-page flow, each direction
-is one coherent flow-level UI system; never multiply alternatives per page. Validate grammar and maturity, publish
-the cache review and recommend one. Exact `OK #1` selects the single direction; in brainstorm mode it also names
-`A`, `B`, `C` or `D`. Direction approval is cache-only and never authorizes source.
+is one coherent flow-level UI system; never multiply alternatives per page. Before HTML, run `@frontend-quality`
+and write a standalone receipt with `scope: refactor` for each candidate. Resolve all ten lenses and six detector
+families against the frozen correction envelope. External UX/UI sources are optional digest-pinned advisory
+evidence only and cannot expand business truth, re-decide MASTER or widen the rendered scope. Review each
+alternative independently against identical facts; revise or remove ineligible drafts. Validate grammar and
+maturity, publish the cache review and recommend one. Exact `OK #1` selects the single direction and its receipt;
+in brainstorm mode it also names `A`, `B`, `C` or `D`. Direction approval is cache-only and never authorizes source.
 
 ### 3. Ensure states and approve the authority/source boundary
 
@@ -152,6 +158,8 @@ Hand off at most five labeled complete-page state views; each names its page sta
     executable regression proof. Sound law is preserved rather than copied.
 12. Refactor owns corrections of any size inside an exact Layout/Block-rendered block, page, flow or declared
     surface set. There is no minor-fix, UI-align or separate feedback lane.
+13. Every direction passes the shared quality review before HTML; external UX/UI evidence is advisory only.
+14. Quality review may expose the failed layer but may not override `bind-classify` or expand product truth.
 
 ## Stops
 
@@ -162,13 +170,15 @@ Hand off at most five labeled complete-page state views; each names its page sta
 - A claimed grammar/principle misruling has no counterexample, or the current law already expresses the case and
   the run refuses to classify the real application/enforcement failure.
 - An explicit brainstorm batch with fewer than three materially distinct complete directions, or more than five state views required for assurance.
+- Missing quality lens/detector closure, receipt target mismatch or advisory evidence presented as authority.
 - Pre-existing target changes cannot be attributed and preserved safely.
 - A gate or parity defect cannot be repaired inside the approved FE boundary.
 
 ## OUTPUT
 
-At direction review, print the failure verdict, governing Grammar/Principles chain and UI direction, then show one
-complete-context desktop/narrow candidate by default, or 3–4 only after an explicit brainstorm request. At
+At direction review, print the failure verdict, governing Grammar/Principles chain, quality verdict and UI
+direction, then show one complete-context desktop/narrow candidate by default, or 3–4 independently reviewed
+candidates only after an explicit brainstorm request. At
 authority/state/source review, show up to five complete-page state views and the exact authority-to-write batch
 under `OK #2`. After implementation, distinguish authority gaps from application/enforcement failures and report
 strengthened authority, affected owners, tests and up to five labeled real-product state views with parity proof.

@@ -153,8 +153,110 @@ function walkStrings(value, at, visit) {
   }
 }
 
-function laws(data) {
+const QUALITY_LENSES = [
+  "product-fit",
+  "visual-character",
+  "design-system",
+  "accessibility",
+  "interaction",
+  "responsive-content",
+  "performance-motion",
+  "component-composition",
+  "state-resilience",
+  "copy-localization",
+];
+const REQUIRED_QUALITY_LENSES = new Set([
+  "product-fit",
+  "visual-character",
+  "design-system",
+  "accessibility",
+  "responsive-content",
+  "state-resilience",
+]);
+const QUALITY_DETECTORS = [
+  "semantics-a11y",
+  "interaction-feedback",
+  "responsive-overflow",
+  "motion-performance",
+  "react-composition",
+  "state-content",
+];
+const REQUIRED_QUALITY_DETECTORS = new Set(["semantics-a11y", "responsive-overflow", "state-content"]);
+
+function checkQualityReview(review, at, expectedScope, expectedTarget) {
   const found = [];
+  if (!review) return found;
+  if (expectedScope && review.scope !== expectedScope) found.push(`${at}.scope: must be ${expectedScope}`);
+  if (expectedTarget && review.targetId !== expectedTarget) found.push(`${at}.targetId: must equal ${expectedTarget}`);
+
+  const sourceIds = new Set();
+  let bindingSources = 0;
+  for (const [index, source] of (review.sources ?? []).entries()) {
+    const sourceAt = `${at}.sources[${index}]`;
+    if (sourceIds.has(source.id)) found.push(`${sourceAt}.id: duplicate evidence source ${source.id}`);
+    sourceIds.add(source.id);
+    if (source.kind === "external-advisory" && source.use !== "advisory") {
+      found.push(`${sourceAt}.use: external design intelligence is advisory and cannot become product authority`);
+    }
+    if (source.kind !== "external-advisory" && source.use === "binding") bindingSources += 1;
+  }
+  if (bindingSources === 0) found.push(`${at}.sources: at least one routed authority, current source or rendered evidence source must be binding`);
+
+  const lensIds = (review.lenses ?? []).map((lens) => lens.id);
+  if (canonical([...lensIds].sort()) !== canonical([...QUALITY_LENSES].sort())) {
+    found.push(`${at}.lenses: must cover each closed frontend-quality lens exactly once`);
+  }
+  for (const [index, lens] of (review.lenses ?? []).entries()) {
+    const lensAt = `${at}.lenses[${index}]`;
+    if (REQUIRED_QUALITY_LENSES.has(lens.id) && lens.verdict !== "pass") {
+      found.push(`${lensAt}.verdict: ${lens.id} is always applicable and must pass before candidate review`);
+    }
+    if (lens.verdict === "not-applicable" && lens.owner !== "none") {
+      found.push(`${lensAt}.owner: not-applicable lens must use none`);
+    }
+    if (lens.verdict === "pass" && lens.owner === "none") {
+      found.push(`${lensAt}.owner: passing decision must name its StarCi owner`);
+    }
+  }
+
+  const detectorIds = (review.detectors ?? []).map((detector) => detector.id);
+  if (canonical([...detectorIds].sort()) !== canonical([...QUALITY_DETECTORS].sort())) {
+    found.push(`${at}.detectors: must cover each closed detector family exactly once`);
+  }
+  for (const [index, detector] of (review.detectors ?? []).entries()) {
+    if (REQUIRED_QUALITY_DETECTORS.has(detector.id) && detector.verdict !== "pass") {
+      found.push(`${at}.detectors[${index}].verdict: ${detector.id} is always applicable and must pass`);
+    }
+  }
+  return found;
+}
+
+function qualityReviewLaws(data) {
+  const reviews = [];
+  if (data?.schema === 1 && data?.targetId && Array.isArray(data?.lenses)) {
+    reviews.push({review: data, at: "qualityReview"});
+  }
+  for (const [index, candidate] of (data.candidates ?? []).entries()) {
+    if (data.schema === 9 && !candidate.synthesis?.qualityReview) {
+      reviews.push({missing: `candidates[${index}].synthesis.qualityReview: schema 9 requires an integrated quality review before HTML`});
+    }
+    if (candidate.synthesis?.qualityReview) {
+      reviews.push({review: candidate.synthesis.qualityReview, at: `candidates[${index}].synthesis.qualityReview`, scope: "layout", target: candidate.id});
+    }
+  }
+  for (const [index, anatomy] of (data.anatomies ?? []).entries()) {
+    if (data.schema === 3 && !anatomy.qualityReview) {
+      reviews.push({missing: `anatomies[${index}].qualityReview: schema 3 requires an integrated quality review before HTML`});
+    }
+    if (anatomy.qualityReview) {
+      reviews.push({review: anatomy.qualityReview, at: `anatomies[${index}].qualityReview`, scope: "block", target: anatomy.id});
+    }
+  }
+  return reviews.flatMap(({review, at, scope, target, missing}) => missing ? [missing] : checkQualityReview(review, at, scope, target));
+}
+
+function laws(data) {
+  const found = qualityReviewLaws(data);
   const members = data.candidates ?? data.anatomies ?? data.directions;
   if (!Array.isArray(members)) return found;
 
@@ -288,7 +390,7 @@ function layoutRegionLaws(data) {
 }
 
 function renderContractLaws(data) {
-  const stagedSchema = data.schema === 7 || data.schema === 8;
+  const stagedSchema = data.schema === 7 || data.schema === 8 || data.schema === 9;
   const requiresExecutionAuthority = data.schema === 6 || (stagedSchema && data.envelope?.stage === "states");
   if (!requiresExecutionAuthority || !Array.isArray(data.candidates)) return [];
   const found = [];
@@ -325,6 +427,7 @@ function renderContractLaws(data) {
     if (new Set(viewportIds).size !== viewportIds.length) found.push(`${at}.renderContract.viewports: duplicate viewport identity`);
     const coverageKeys = new Set();
     const selectedTargetKeys = new Set();
+    const visibleBlockStatesByTarget = new Map();
     const allTransitionIds = new Set();
     for (const [renderIndex, render] of (contract.renders ?? []).entries()) {
       const key = `${render.pageId}/${render.stateId}/${render.viewportId}`;
@@ -337,9 +440,45 @@ function renderContractLaws(data) {
       else {
         if (!(page.states ?? []).includes(render.stateId)) found.push(`${at}.renderContract.renders[${renderIndex}].stateId: unknown state ${render.stateId}`);
         if (canonical(asSet(render.regions ?? [])) !== canonical(asSet((page.regions ?? []).map((region) => region.id)))) found.push(`${at}.renderContract.renders[${renderIndex}].regions: must cover every region of ${render.pageId}`);
+        if (data.schema === 9) {
+          if (!Array.isArray(render.visibleBlockStates)) found.push(`${at}.renderContract.renders[${renderIndex}].visibleBlockStates: schema 9 must name the block states visible in this complete-page target`);
+          else {
+            const declaredBlockStates = new Set((page.regions ?? []).flatMap((region) => region.data?.states ?? []));
+            for (const state of render.visibleBlockStates) if (!declaredBlockStates.has(state)) found.push(`${at}.renderContract.renders[${renderIndex}].visibleBlockStates: unknown block state ${state}`);
+            const target = `${render.pageId}/${render.stateId}`;
+            const signature = canonical(asSet(render.visibleBlockStates));
+            if (visibleBlockStatesByTarget.has(target) && visibleBlockStatesByTarget.get(target) !== signature) found.push(`${at}.renderContract.renders[${renderIndex}].visibleBlockStates: must stay identical across viewports for ${target}`);
+            visibleBlockStatesByTarget.set(target, signature);
+          }
+        }
       }
     }
     if (selectedTargetKeys.size > 5) found.push(`${at}.renderContract.renders: must select no more than 5 complete-page render targets, received ${selectedTargetKeys.size}`);
+    if (data.schema === 9) {
+      const seedOwners = contract.seedOwners ?? [];
+      if (seedOwners.length === 0) found.push(`${at}.renderContract.seedOwners: schema 9 states require one product-native seed owner per selected render target`);
+      const seedTargetKeys = new Set();
+      const sourceBoundary = new Set(contract.sourceBoundary ?? []);
+      for (const [seedIndex, seed] of seedOwners.entries()) {
+        const seedAt = `${at}.renderContract.seedOwners[${seedIndex}]`;
+        const key = `${seed.pageId}/${seed.stateId}`;
+        if (seedTargetKeys.has(key)) found.push(`${seedAt}: duplicate seed owner for ${key}`);
+        seedTargetKeys.add(key);
+        if (!selectedTargetKeys.has(key)) found.push(`${seedAt}: seed target ${key} is not a selected complete-page render target`);
+        const visibleBlockStates = JSON.parse(visibleBlockStatesByTarget.get(key) ?? "[]");
+        const requiredStates = asSet([seed.stateId, ...visibleBlockStates]);
+        if (canonical(asSet(seed.requiredStates ?? [])) !== canonical(requiredStates)) found.push(`${seedAt}.requiredStates: must exactly cover selected state plus every visible block state (${requiredStates.join(", ")})`);
+        if (seed.provision?.kind === "source-files") {
+          for (const file of seed.provision.files ?? []) {
+            if (!sourceBoundary.has(file)) found.push(`${seedAt}.provision.files: new seed source ${file} is absent from renderContract.sourceBoundary`);
+            if (/[*?]/.test(file) || /[\\/]$/.test(file)) found.push(`${seedAt}.provision.files: ${file} must be one exact file`);
+          }
+        }
+      }
+      if (canonical([...seedTargetKeys].sort()) !== canonical([...selectedTargetKeys].sort())) {
+        found.push(`${at}.renderContract.seedOwners: must cover every selected page/state target exactly once`);
+      }
+    }
     for (const page of contract.pages ?? []) {
       const candidatePage = candidatePages.get(page.id);
       if (candidatePage?.route !== page.route) found.push(`${at}.renderContract.pages.${page.id}.route: must equal candidate route`);
@@ -400,7 +539,7 @@ function renderContractLaws(data) {
 }
 
 function stagedLayoutLaws(data) {
-  if (![7, 8].includes(data.schema) || !Array.isArray(data.candidates)) return [];
+  if (![7, 8, 9].includes(data.schema) || !Array.isArray(data.candidates)) return [];
   const found = [];
   const stage = data.envelope?.stage;
   const asSet = (values) => [...new Set(values)].sort();
@@ -427,17 +566,28 @@ function stagedLayoutLaws(data) {
     if (!synthesis || !pageContract) continue;
     if (pageContract.candidateId !== candidate.id) found.push(`${at}.pageContract.candidateId: must equal candidate id ${candidate.id}`);
     if (stage === "states") {
-      const approvedSelection = data.schema === 8 ? {directionReceipt: synthesis.directionReceipt, pageContract} : pageContract;
+      const approvedSelection = data.schema === 9
+        ? {directionReceipt: synthesis.directionReceipt, qualityReview: synthesis.qualityReview, pageContract}
+        : data.schema === 8
+          ? {directionReceipt: synthesis.directionReceipt, pageContract}
+          : pageContract;
       const pageHash = createHash("sha256").update(canonical(approvedSelection)).digest("hex");
-      if (pageHash !== data.envelope?.approvedPageAt) found.push(`${at}.pageContract: direction or page anatomy drifted after page approval; return to the pages stage`);
+      if (pageHash !== data.envelope?.approvedPageAt) {
+        const drift = data.schema === 9
+          ? "direction, quality review or page anatomy drifted after page approval"
+          : data.schema === 8
+            ? "direction or page anatomy drifted after page approval"
+            : "page anatomy drifted after page approval";
+        found.push(`${at}.pageContract: ${drift}; return to the pages stage`);
+      }
     }
 
     const candidatePages = new Map((candidate.pages ?? []).map((page) => [page.id, page]));
     const candidateRegions = new Map((candidate.regions ?? []).map((region) => [region.name, region]));
-    if (data.schema === 8) {
+    if (data.schema >= 8) {
       const receipt = synthesis.directionReceipt;
       if (!receipt) {
-        found.push(`${at}.synthesis.directionReceipt: schema 8 must print journey and UI directions separately`);
+          found.push(`${at}.synthesis.directionReceipt: schema ${data.schema} must print journey and UI directions separately`);
       } else {
       const pageIds = asSet(candidatePages.keys());
       for (const [kind, direction] of Object.entries({journey: receipt.journey, ui: receipt.ui})) {
@@ -480,7 +630,7 @@ function stagedLayoutLaws(data) {
       if (capabilities.has(capability.regionId)) found.push(`${at}.synthesis.capabilities: duplicate region capability ${capability.regionId}`);
       capabilities.set(capability.regionId, capability);
       if (!candidateRegions.has(capability.regionId)) found.push(`${at}.synthesis.capabilities.${capability.regionId}: unknown candidate region`);
-      if (data.schema === 8) {
+      if (data.schema >= 8) {
         const obligations = capability.obligations ?? [];
         const missing = obligations.filter((obligation) => obligation.verdict === "missing");
         if (capability.verdict === "reuse" && missing.length > 0) {
@@ -537,7 +687,7 @@ function stagedLayoutLaws(data) {
         for (const regionId of binding.regionIds ?? []) {
           if (!page?.regions?.includes(regionId)) found.push(`${bindingAt}.regionIds: ${regionId} is not owned by page ${intersection.pageId}`);
           if (!capabilities.has(regionId)) found.push(`${bindingAt}.regionIds: ${regionId} has no contract-first capability`);
-          if (data.schema === 8 && !(capabilities.get(regionId)?.obligations ?? []).some((obligation) => obligation.renderIntentId === binding.renderIntentId)) {
+          if (data.schema >= 8 && !(capabilities.get(regionId)?.obligations ?? []).some((obligation) => obligation.renderIntentId === binding.renderIntentId)) {
             found.push(`${bindingAt}.regionIds: ${regionId} has no obligation proof for render intent ${binding.renderIntentId}`);
           }
           boundRegionIds.add(regionId);
@@ -552,7 +702,7 @@ function stagedLayoutLaws(data) {
     }
     if (canonical(asSet(intersections.keys())) !== canonical(asSet(candidatePages.keys()))) found.push(`${at}.synthesis.intersections: must synthesize every candidate page exactly`);
 
-    if (data.schema === 8 && stage === "states") {
+    if (data.schema >= 8 && stage === "states") {
       const selectedPageIds = new Set((candidate.renderContract?.renders ?? []).map((render) => render.pageId));
       const riskPageIds = new Set((synthesis.pageIntents ?? [])
         .filter((pageIntent) => pageIntent.routeStatus !== "existing")
@@ -628,7 +778,7 @@ function pageSetLaws(data) {
   const found = [];
   const candidates = data.candidates;
   const first = candidates[0];
-  const stagedSchema = data.schema === 7 || data.schema === 8;
+  const stagedSchema = data.schema === 7 || data.schema === 8 || data.schema === 9;
   if (stagedSchema && data.envelope?.stage === "states" && candidates.length !== 1) found.push("candidates: states stage requires exactly one approved complete long-page/full-flow result");
   else if (data.schema >= 5 && data.envelope?.mode === "generate" && candidates.length !== 1) found.push("candidates: generate mode requires exactly one complete long-page/full-flow result");
   else if (data.schema >= 5 && data.envelope?.mode === "brainstorm" && (candidates.length < 3 || candidates.length > 4)) found.push("candidates: explicit brainstorm mode requires 3-4 targeted alternatives");
@@ -693,11 +843,52 @@ function pageSetLaws(data) {
 }
 
 function blockModeLaws(data) {
-  if (data.schema !== 2 || !Array.isArray(data.anatomies)) return [];
+  if (![2, 3].includes(data.schema) || !Array.isArray(data.anatomies)) return [];
   const found = [];
+  if (data.schema === 3) {
+    const stage = data.envelope?.stage;
+    if (!["direction", "states"].includes(stage)) found.push("envelope.stage: schema 3 block work requires direction or states");
+    if (!data.envelope?.parentPageId) found.push("envelope.parentPageId: schema 3 must bind the exact complete parent page identity");
+    for (const [anatomyIndex, anatomy] of data.anatomies.entries()) {
+      const ownerAt = `anatomies[${anatomyIndex}].sourceOwners`;
+      const owners = anatomy.sourceOwners ?? [];
+      const roles = new Set();
+      for (const [ownerIndex, owner] of owners.entries()) {
+        if (roles.has(owner.role)) found.push(`${ownerAt}[${ownerIndex}].role: duplicate source-owner role ${owner.role}`);
+        roles.add(owner.role);
+        if (/[*?]/.test(owner.path ?? "") || /[\\/]$/.test(owner.path ?? "")) found.push(`${ownerAt}[${ownerIndex}].path: must name one exact file`);
+      }
+      for (const role of ["drawing", "compositor", "entry", "test"]) if (!roles.has(role)) found.push(`${ownerAt}: must include exact ${role} ownership`);
+    }
+    if (stage === "direction" && data.stateReview !== undefined) found.push("stateReview: direction stage stops before post-OK-#1 state/source assurance");
+    if (stage === "states") {
+      if (data.anatomies.length !== 1) found.push("anatomies: states stage requires exactly one selected block direction");
+      if (!data.stateReview) found.push("stateReview: schema 3 states stage requires complete-page state assurance and exact FE boundary");
+      else {
+        if (data.stateReview.candidateId !== data.anatomies[0]?.id) found.push("stateReview.candidateId: must equal the selected anatomy id");
+        if ((data.stateReview.views ?? []).length > 5) found.push(`stateReview.views: must contain no more than 5 complete-page state families, received ${data.stateReview.views.length}`);
+        const viewIds = new Set();
+        const selectedAnatomy = data.anatomies[0];
+        for (const [index, view] of (data.stateReview.views ?? []).entries()) {
+          if (viewIds.has(view.id)) found.push(`stateReview.views[${index}].id: duplicate state-view family ${view.id}`);
+          viewIds.add(view.id);
+          if (view.completePage !== true) found.push(`stateReview.views[${index}].completePage: block crops never satisfy state assurance`);
+          if ((view.viewports ?? []).length < 2) found.push(`stateReview.views[${index}].viewports: desktop and narrow proof are both required`);
+          if (view.pageId !== data.envelope?.parentPageId) found.push(`stateReview.views[${index}].pageId: must equal bound parent page ${data.envelope?.parentPageId}`);
+          const unknownStates = (view.visibleStates ?? []).filter((state) => !(selectedAnatomy?.states ?? []).includes(state));
+          if (unknownStates.length > 0) found.push(`stateReview.views[${index}].visibleStates: unknown block states ${unknownStates.join(", ")}`);
+        }
+        const sourceBoundary = new Set(data.stateReview.sourceBoundary ?? []);
+        for (const owner of selectedAnatomy?.sourceOwners ?? []) if (!sourceBoundary.has(owner.path)) found.push(`stateReview.sourceBoundary: missing ${owner.role} owner path ${owner.path}`);
+        for (const [index, file] of (data.stateReview.sourceBoundary ?? []).entries()) {
+          if (/[*?]/.test(file) || /[\\/]$/.test(file)) found.push(`stateReview.sourceBoundary[${index}]: must name one exact file`);
+        }
+      }
+    }
+  }
   const uiDirections = new Map();
   for (const [index, anatomy] of data.anatomies.entries()) {
-    if (!anatomy.uiDirection) found.push(`anatomies[${index}].uiDirection: schema 2 block work must print one UI direction`);
+    if (!anatomy.uiDirection) found.push(`anatomies[${index}].uiDirection: schema ${data.schema} block work must print one UI direction`);
     else if (data.envelope?.mode === "brainstorm") {
       const signature = canonical(anatomy.uiDirection);
       if (uiDirections.has(signature)) found.push(`anatomies[${index}].uiDirection: duplicates anatomies[${uiDirections.get(signature)}]; brainstorm UI directions must be materially distinct`);
@@ -712,7 +903,7 @@ function blockModeLaws(data) {
     if (data.anatomies.length < 3 || data.anatomies.length > 4) found.push("anatomies: explicit block brainstorm requires 3-4 alternatives");
     if (!data.envelope.explicitRequest) found.push("envelope.explicitRequest: block brainstorm requires the owner's request");
     if (data.audit !== undefined) found.push("audit: brainstorm mode cannot masquerade as audit");
-  } else found.push("envelope.mode: schema 2 block work requires audit or brainstorm");
+  } else found.push(`envelope.mode: schema ${data.schema} block work requires audit or brainstorm`);
   return found;
 }
 

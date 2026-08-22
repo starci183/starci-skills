@@ -7,6 +7,7 @@
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
 | `@schema` | `brainstorms/layouts/schema.json` | file | validate the record's JSON shape |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge every joined direction through integrated craft, UX, accessibility, engineering and detector lenses |
 
 ## Record
 
@@ -16,11 +17,12 @@ routed business truth from the top down, and component, contract, current/legacy
 capability from the bottom up. Their explicit merge bindings produce complete pages. Synthesis prints the
 journey direction and UI direction separately before joining them into anatomy. Default `generate` returns one
 direction; an explicit owner `brainstorm` request before direction approval returns 3–4 complete alternatives
-without requiring a separately reviewed baseline.
+without requiring a separately reviewed baseline. Every joined direction then carries one integrated
+`qualityReview`; invalid drafts are revised or removed before HTML generation rather than presented as alternatives.
 
 ## Law
 
-A schema 8 candidate names its `page` or `flow` scope, stage, MASTER system id, deviations-only page override,
+A schema 9 candidate names its `page` or `flow` scope, stage, MASTER system id, deviations-only page override,
 every composed page, ordered nested ownership nodes and owned regions. `synthesis.pageIntents` records what
 each page must visibly render before either track; customer journeys and component capabilities are authored
 independently; every page-level intersection contains binding rows joining each render intent to journey,
@@ -29,17 +31,20 @@ business and contract-backed regions. Each page intent declares whether its rout
 source evidence and a `supported` or `missing` verdict. `reuse` is legal only when every obligation is supported;
 each missing obligation names the exact required source paths. `synthesis.directionReceipt` prints one
 flow-level journey direction and one flow-level UI direction as separate fields. Each direction names the exact
-complete candidate page set, preventing a multi-page flow from multiplying alternatives per page. Every
+complete candidate page set, preventing a multi-page flow from multiplying alternatives per page. Every schema-9
+synthesis also carries the candidate's `qualityReview`: binding StarCi evidence, optional digest-pinned external
+advisory evidence, ten closed quality lenses, one product-specific character move and six detector families. It
+may challenge the joined direction but may not expand product truth or reselect MASTER. Every
 region still hashes its minimum child geometry and representative anatomy. Each node is `existing`, `proposed`
 or `new`; `existing` cites real source plus SHA-256 and cannot drift between choices. Older schemas remain
 compatibility input. Candidates never name classes; MASTER fixes macro taste once.
 
 The `pages` stage carries a `pageContract`, one representative populated state per page, the full future state
 inventory and full-viewport coverage at every reference viewport. It carries no `renderContract` or
-`executionPrompt`, therefore its approval is cache-only. `OK #1` binds the canonical selected direction receipt
-plus page-contract hash.
+`executionPrompt`, therefore its approval is cache-only. `OK #1` binds the canonical selected direction receipt,
+quality review and page-contract hash.
 
-The `states` stage carries that exact approved direction receipt and page contract, `mode: expand-states` and `approvedPageAt`.
+The `states` stage carries that exact approved direction receipt, quality review and page contract, `mode: expand-states` and `approvedPageAt`.
 It expands every state and transition, then adds the hashed `renderContract` that fixes exact source files and
 complete page, region, state and transition obligations. State is classified at its real owner: a page state
 exists only when region arrangement, hierarchy or active page-level composition changes; a loading, refusal,
@@ -48,7 +53,12 @@ shows it. Its `renders` select no more than five complete-page render targets ac
 the page state when one exists plus the seeded block states visible in that capture, and cover every reference
 viewport for each target. Selection prioritizes distinct high-risk condition and transition families; it does not
 remove unrendered implementation or test obligations. Each region fixes owner, component, contract, anatomy,
-data mapping and visual obligations. Page-contract drift is a return to page approval, not a hidden state change.
+data, visual behavior and SPLIT-6 source ownership. Schema 9 also requires one `renderContract.seedOwners` row per
+selected page/state target, binding test identity, required states, product-native owner, exact source files or
+existing command, idempotency, local dependencies, safe repeat and product read path. Page-contract drift is a
+return to page approval. Every viewport row for one target records the same `visibleBlockStates`; those names must
+resolve under render-region data owners, and the target's seed `requiredStates` must equal its selected state plus
+that visible block-state set. Seed/state drift is a pre-`OK #2` failure rather than a visual-proof exception.
 
 Every complete render region also carries `grammarScopes`. Each scope names one closed child target, the
 observable facts for that child and the exact slot/outcome/component decisions recomputed from the routed
@@ -84,7 +94,7 @@ structure.
 
 ## Inputs
 
-Seven, and no more. Each is here because something specific breaks without it.
+Eight, and no more. Each is here because something specific breaks without it.
 
 | # | Input | Without it |
 |---|---|---|
@@ -95,6 +105,7 @@ Seven, and no more. Each is here because something specific breaks without it.
 | 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
 | 6 | In brainstorm mode only, the requested diversity axis | alternatives drift across unrelated parts of the shared synthesis scope |
 | 7 | Current source and legacy baseline for this project | every request is answered as if it were the first |
+| 8 | Detected frontend stack plus any advisory source actually consulted, with locator and digest | generic advice is applied to the wrong runtime or an unpinned external rule silently becomes authority |
 
 **Input 3 is queried, not read, and the class arrays are never extracted.** One need per region through
 `@contract-search`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
@@ -123,6 +134,9 @@ queries, locale copy, lints. Those belong to the stages that come after.
    open as an overlay?
 6. **Refuse rather than invent.** A decision the request does not state and the tree cannot derive is
    returned to the owner.
+7. **Challenge the joined direction before rendering.** Run `@frontend-quality` against identical content,
+   facts and viewports. Revise or drop drafts with unresolved lens or detector findings; never pad a batch with a
+   candidate that already fails the quality floor.
 
 ## Diversity axes
 
@@ -163,7 +177,7 @@ than the feature it came from.
 
 ## Candidate laws
 
-Fourteen laws every candidate must satisfy. A candidate that breaks one is not a weaker option — it is not
+Fifteen laws every candidate must satisfy. A candidate that breaks one is not a weaker option — it is not
 a candidate, and shipping it as one of the 3–4 spends the owner's attention on something already refused.
 
 | Code | Law | What it rejects |
@@ -182,6 +196,7 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 | `LAYOUT-12` | Every region is recognizable and functionally complete in each page candidate: purpose, representative content, production-like density, reading order, reachable states and current contract ownership are visible. Layout implementation happens after this same review; there is no deferred block-head completion phase. | blank boxes, toy summaries or a page that requires another task to become implementable |
 | `LAYOUT-13` | Only an explicitly requested product surface may become a layout identity or flow node. An example introduced to explain capability remains evidence until the owner explicitly promotes it into scope. | turning “for example create order” into a product page |
 | `LAYOUT-14` | Modes that share one route and one page owner are states of that page. The layout candidate contracts and makes every evidenced mode executable before implementation, while visual review samples no more than five representative states across the flow. | generating sign-in, sign-up and recovery as separate layouts, deferring their states to another task, or rendering an unbounded screenshot matrix |
+| `LAYOUT-15` | Every joined direction passes the integrated frontend-quality review before HTML: binding sources outrank advisory sources; all ten lenses resolve; the character move is product-specific; and every applicable detector passes. | a polished candidate that is generic, inaccessible, stack-blind, structurally brittle or justified only by an external style catalogue |
 
 ## Rules
 
@@ -198,11 +213,13 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 9. Every candidate page has exactly one pre-track page intent record, and every render intent is bound exactly once.
 10. Journey and contract-first tracks are completed independently; synthesis prints the journey direction and UI
     direction separately, and anatomy is generated only from their merge bindings.
-11. Each schema 8 direction receipt covers the complete candidate page set; alternatives are flow-level and never multiplied per page.
+11. Each schema 9 direction receipt covers the complete candidate page set; alternatives are flow-level and never multiplied per page.
 12. Every merged region has a contract-first capability, and every journey step, business obligation and page region appears in the binding matrix.
 13. Every states-stage render region passes the layout-grammar gate; a missing scope, stale decision or mismatched component owner is not an approvable candidate.
 14. Data ownership, state ownership or a similarly named component does not prove visual anatomy, responsive behavior, spacing, typography, surface or icon capability; each bound observable requires source evidence.
 15. Every `new`/`changed` route and every page using a `generalize`/`new-required` capability appears in the selected visual-proof renders. Every missing obligation's `requiredPaths` appears in `renderContract.sourceBoundary`.
+16. Schema 9 binds one `qualityReview` per candidate. External design intelligence is digest-pinned advisory
+    evidence only; every adopted decision maps to a StarCi owner, and state expansion preserves the review unchanged.
 
 ## Preview
 
@@ -223,6 +240,10 @@ that flow is explicitly in product scope and renders as its complete page set.
 Existing or legacy-backed imagery is preferred; a disposable inline SVG may stand in
 when no reusable asset exists, and is never promoted into source or JSON. A blank-box page and an unannotated
 polished mockup are both invalid previews.
+
+Before publication, the frozen HTML is checked against the review's semantics/accessibility,
+interaction-feedback, responsive-overflow, motion-performance, stack composition and state-content detector
+families. A candidate with an unresolved applicable finding does not reach `OK #1`.
 
 Representative does not mean abbreviated. Build a page/state content matrix from business truth and render the
 real entity types, meaningful values, counts, statuses, metadata, actions, consequences and production-like
@@ -252,11 +273,11 @@ The output **is** JSON, and its authority is `@schema` beside this record — no
 excerpt. `envelope` holds what varies between runs; the hash covers a candidate only, so the same
 decision re-run in a later round produces the same hash.
 
-New work uses schema 8. `envelope.scope` declares screenshot `page` or described `flow`; `stage: pages` requires
-`synthesis.directionReceipt` and `pageContract` and forbids source authority. After `OK #1`, `stage: states`
-preserves the approved direction-plus-page hash, expands the complete state inventory and adds `renderContract`
+New work uses schema 9. `envelope.scope` declares screenshot `page` or described `flow`; `stage: pages` requires
+`synthesis.directionReceipt`, `synthesis.qualityReview` and `pageContract` and forbids source authority. After `OK #1`, `stage: states`
+preserves the approved direction-plus-quality-review-plus-page hash, expands the complete state inventory and adds `renderContract`
 plus canonical `executionPrompt`.
-Schema 7 remains accepted compatibility input; older examples are compatibility documentation only.
+Schemas 7 and 8 remain accepted compatibility input; older examples are compatibility documentation only.
 
 ```json
 {
@@ -297,5 +318,6 @@ argue about — it is invalid. Validate before writing and before hashing:
 node @validate-artifact --schema @schema --data <batch.json> --vocabulary <visual-vocabulary.json> --hash
 ```
 
-The validator also enforces the three batch laws no schema can state: no class token anywhere in the
-batch, no two candidates sharing an axis set, and at least one candidate citing `none`.
+The validator also enforces the batch laws no schema can state: no class token anywhere in the batch, no two
+candidates sharing an axis set, at least one candidate citing `none`, exact lens/detector coverage, a binding
+StarCi evidence source and the advisory-only boundary for external design intelligence.

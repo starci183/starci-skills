@@ -4,7 +4,7 @@
     "brainstorms/blocks/context.md": {
       "kind": "module",
       "source": "brainstorms/blocks/en.md",
-      "sourceHash": "544f0f7da4768883202cf35c43190a6b6c157fb5e3abdd7186469b42de06fc1d",
+      "sourceHash": "359fcf3c5b9a781724daa62f5c246125882f9cba4cdb080c0df2e90ae83454a7",
       "contextVersion": 1
     },
     "brainstorms/composition/context.md": {
@@ -23,10 +23,16 @@
       "sourceHash": "2425899eb0f0e813b93595ca94141f559ca551f4ef3b3b996333b72400826e9f",
       "contextVersion": 1
     },
+    "brainstorms/frontend-quality/context.md": {
+      "kind": "module",
+      "source": "brainstorms/frontend-quality/en.md",
+      "sourceHash": "fcc753c2520e4d27660e8dd1ea7a278a43d6c72dfc6a23cfd925323f34aa793d",
+      "contextVersion": 1
+    },
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "9f47dff101db32068fe3c904305e72da3599ffc0165c3b3148d0d4f622510846",
+      "sourceHash": "5901b02fa4484f67144a2f5caec9087aee402f4b5789041a2558a56d8b02bbb2",
       "contextVersion": 1
     },
     "compilers/context.md": {
@@ -768,13 +774,13 @@
     "orchestration/context.md": {
       "kind": "module",
       "source": "orchestration/en.md",
-      "sourceHash": "d12c399626a48d17839d507fa26eac5eed3e635984b1d7d4e24c1d1c41608960",
+      "sourceHash": "e453618396e31d2cb54543347ae11b725c092fdf7ee5438b87969886cb2916ef",
       "contextVersion": 1
     },
     "orchestration/frontend/context.md": {
       "kind": "module",
       "source": "orchestration/frontend/en.md",
-      "sourceHash": "fb08d89bdd6570b5a83522b4ec205f8362575dfbf2633eeb2401a23f9de196fd",
+      "sourceHash": "638f9b857920b0fd2a7fb6380da44d1c8b5e356a2b8bf2a424b2673ab6c5b7ec",
       "contextVersion": 1
     },
     "publication/context.md": {

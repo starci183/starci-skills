@@ -21,14 +21,15 @@ const receipt = () => {
   skill: "starci-fe-design-layout",
   envelopeAt: hash,
   coordinator: {model: "gpt-5.6-sol", owns: decisions},
-  phaseGates: {authorityMode: "preserve", cacheRoots: ["review"], frozenContractAt: hash, sourceBoundaryAt: boundaryHash, sourceApprovalAt: `OK #2:${boundaryHash}`, approvedSourcePaths: ["src/Page.tsx"], impactConeAt, impactCone, proofRoots: ["proof"]},
+  phaseGates: {authorityMode: "preserve", cacheRoots: ["review"], frozenContractAt: hash, qualityReviewAt: boundaryHash, sourceBoundaryAt: boundaryHash, sourceApprovalAt: `OK #2:${boundaryHash}`, approvedSourcePaths: ["src/Page.tsx"], impactConeAt, impactCone, proofRoots: ["proof"]},
   gateEvents: [
     {id: "pages-frozen", kind: "contract-freeze", at: hash, status: "passed", dependsOn: []},
-    {id: "impact-locked", kind: "impact-cone", at: impactConeAt, status: "passed", dependsOn: ["pages-frozen"]},
+    {id: "quality-passed", kind: "quality-review", at: boundaryHash, status: "passed", dependsOn: ["pages-frozen"]},
+    {id: "impact-locked", kind: "impact-cone", at: impactConeAt, status: "passed", dependsOn: ["quality-passed"]},
     {id: "source-approved", kind: "source-approval", at: `OK #2:${boundaryHash}`, status: "passed", dependsOn: ["impact-locked"]}
   ],
   tasks: [
-    {id: "render-pages", skill: "starci-fe-design-layout", envelopeAt: hash, step: "page-synthesis", kind: "cache-write", model: "gpt-5.6-luna", objective: "Render the frozen page contract exactly.", requiredInputs: ["pages.json"], dependsOn: [], dependsOnGates: ["pages-frozen"], reads: ["pages.json"], writes: ["review/index.html"], frozenContractAt: hash, forbiddenDecisions: decisions, output: "complete HTML", requiredProof: ["desktop and narrow captures"], stopConditions: ["contract drift"]},
+    {id: "render-pages", skill: "starci-fe-design-layout", envelopeAt: hash, step: "page-synthesis", kind: "cache-write", model: "gpt-5.6-luna", objective: "Render the frozen page contract exactly.", requiredInputs: ["pages.json", "quality-review.json"], dependsOn: [], dependsOnGates: ["pages-frozen", "quality-passed"], reads: ["pages.json", "quality-review.json"], writes: ["review/index.html"], frozenContractAt: hash, qualityReviewAt: boundaryHash, forbiddenDecisions: decisions, output: "complete HTML", requiredProof: ["desktop and narrow captures"], stopConditions: ["contract drift"]},
     {id: "code-page", skill: "starci-fe-design-layout", envelopeAt: hash, step: "implementation", kind: "source-write", model: "gpt-5.6-luna", objective: "Implement the approved render contract exactly.", requiredInputs: ["render-contract.json"], dependsOn: ["render-pages"], dependsOnGates: ["source-approved", "impact-locked"], reads: ["render-contract.json"], writes: ["src/Page.tsx"], sourceApprovalAt: `OK #2:${boundaryHash}`, forbiddenDecisions: decisions, output: "page diff", requiredProof: ["targeted tests"], stopConditions: ["outside boundary"]}
   ],
   batches: [["render-pages"], ["code-page"]],
@@ -67,6 +68,12 @@ test("copying a frozen hash without depending on its passed gate is rejected", (
   const value = receipt();
   value.tasks[0].dependsOnGates = [];
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without the passed coordinator freeze gate/);
+});
+
+test("cache HTML requires a passed target-matched integrated quality-review gate", () => {
+  const value = receipt();
+  value.tasks[0].dependsOnGates = ["pages-frozen"];
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without the passed integrated quality-review gate/);
 });
 
 test("source work without OK #2 is rejected", () => {

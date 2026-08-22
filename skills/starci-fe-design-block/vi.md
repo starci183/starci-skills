@@ -20,6 +20,7 @@ description: Reconcile một block đã được Layout generate qua bước UI-
 | `@patterns-fe` | `compilers/patterns/fe` | module | chọn owning source file và import |
 | `@lints-fe` | `gates/fe/lints` | module | prove implemented source |
 | `@blocks` | `brainstorms/blocks/vi.md` | vi | block ownership, anatomy, state và contract law |
+| `@frontend-quality` | `brainstorms/frontend-quality/vi.md` | vi | integrated review craft, UX, accessibility, engineering và detector |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | exact-parent authored HTML review trong cache |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify current vocabulary |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
@@ -43,23 +44,28 @@ Topology: `reconciliation` trong một complete page đã nhận.
 |---|---|---|---|---|---|
 | ràng buộc | dùng chung | accepted page contract, exact block boundary và owner request | khóa parent geometry, state và proof viewport | block audit context | resolve đúng một block và complete parent page |
 | orchestration | coordination | block audit context và measured runtime | áp dụng Block dependency graph cùng one-writer registry | runtime adapter, task batch, coordinator reservation và sequential fallback | không approval, không recompose page |
-| direction | đối chiếu | block contract, grammar, source và rendered parent page | audit current anatomy rồi in một UI direction mặc định hoặc 3–4 sau owner explicit brainstorm | complete-parent direction review và correction contract | `OK #1` select cache direction, không page drift |
+| direction | đối chiếu | block contract, grammar, source và rendered parent page | audit anatomy, in direction, chạy integrated quality review rồi render một direction mặc định hoặc 3–4 sau owner explicit brainstorm | schema 3 complete-parent direction review, quality receipt và correction contract | required lens/detector pass; `OK #1` select cache direction, không page drift |
 | state-boundary | execution | selected direction và block state truth | ensure tối đa năm complete-page state view và bind exact FE owners | state review và exact FE boundary | `OK #2` authorize exact files |
 | implement | execution | approved direction và exact files | chỉ sửa proven owners và affected tests | implementation receipt | giữ parent contract và block ownership |
 | parity | proof | approved preview/source cùng state và viewport | so block trong context | bounded state views và visual proof | zero known mismatch |
 
 ## Run
 
-Đọc `@skill-shape` và `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng. Sau đó hiển thị orchestration receipt. Coordinator sở hữu state/anatomy classification, UI direction, approval và integration. Worker chỉ sinh complete-parent HTML từ anatomy đã freeze và chỉ ghi source tách rời sau `OK #2`.
+Đọc `@skill-shape` và `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng. Bind exact `parentPageId` cùng current drawing/compositor/entry/test `sourceOwners`. Sau đó hiển thị orchestration receipt. Coordinator sở hữu state/anatomy classification, UI direction, integrated quality verdict, approval và integration. Worker có thể thu lens/detector evidence, chỉ sinh complete-parent HTML từ eligible frozen anatomy và chỉ ghi source tách rời sau `OK #2`.
 
 Audit một generated block, trả pass hoặc exact findings rồi synthesize UI direction trong khi giữ nguyên page.
-Direction bắt buộc nằm trong workflow. Mặc định một complete desktop/narrow direction trong exact parent. Chỉ
-owner explicit brainstorm trước `OK #1` mới emit 3–4 targeted anatomy trong geometry đó. Journey direction được
+Direction bắt buộc nằm trong workflow. Emit schema 3 `stage: direction`; trước HTML phải chạy `@frontend-quality`
+qua mười lens và sáu detector
+family; external UX/UI source chỉ là digest-pinned advisory. Mặc định một complete desktop/narrow direction trong
+exact parent. Chỉ owner explicit brainstorm trước `OK #1` mới emit 3–4 targeted anatomy đã review riêng trong
+geometry đó. Journey direction được
 inherit và freeze. Exact `OK #1` select direction duy nhất, hoặc gọi tên `A`–`D`, và chỉ tác động cache.
 
-Sau `OK #1`, ensure tối đa năm complete-page view family, ưu tiên block state và transition khác nhau;
-desktop/narrow capture prove responsive còn isolated block crop không được tính. Publish exact FE source/test
-boundary dưới `OK #2`; chỉ exact `OK #2` authorize implementation. Sau đó implement và prove cùng các full-page
+Sau `OK #1`, emit schema 3 `stage: states` cùng machine-validated `stateReview`: tối đa năm complete-page view
+family bind exact parent cùng reachable states và source boundary chứa mọi proven owner/test path, ưu tiên block
+state cùng transition khác nhau. Desktop/narrow capture prove
+responsive còn isolated block crop không được tính. Publish nó dưới `OK #2`; chỉ exact `OK #2` authorize
+implementation. Sau đó implement và prove cùng các full-page
 view. Split scope nếu năm view không đủ ensure. Known defect hoặc delivery chưa đạt cấm nói hoàn tất.
 
 ## Rules
@@ -76,11 +82,13 @@ view. Split scope nếu năm view không đủ ensure. Known defect hoặc deliv
 10. State assurance dùng tối đa năm complete-page view family và không thay bằng block-only crop.
 11. Block sở hữu first synthesis. Concrete owner feedback từ chối emitted/implemented output vì sai
     Grammar/Principles thì rời first-synthesis scope và vào correction owner.
+12. New work emit Block schema 3 với một target-matched quality review cho mỗi anatomy.
 
 ## Stops
 
 - Thiếu parent, route, grammar/profile, business truth hoặc exact ownership.
 - Product behavior chưa rõ, state thiếu, preview không functional hoặc explicit brainstorm batch có ít hơn ba alternative thật.
+- Thiếu quality lens/detector closure hoặc advisory evidence bị trình bày như authority.
 - Work bắt buộc nằm ngoài approved source boundary.
 - Nhiều hơn một block hoặc whole-page restructuring — owner: `starci-fe-layout-refactor`.
 - Cần hơn năm complete-page state view.
@@ -88,6 +96,6 @@ view. Split scope nếu năm view không đủ ensure. Known defect hoặc deliv
 
 ## OUTPUT
 
-Ở direction review, in một UI direction mặc định hoặc 3–4 chỉ sau explicit brainstorm. Sau `OK #1`, báo tối đa
+Ở direction review, in quality verdict cùng một UI direction mặc định hoặc 3–4 direction đã review riêng chỉ sau explicit brainstorm. Sau `OK #1`, báo tối đa
 năm complete-page state view cùng exact FE paths dưới `OK #2`; sau implementation báo changed paths và cùng các
 labeled view kèm proof. Không báo registry identity.

@@ -6,13 +6,15 @@
 |---|---|---|---|
 | `@schema` | `brainstorms/blocks/schema.json` | file | validate the record's JSON shape |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
+| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge each direction through the shared craft, UX, accessibility, engineering and detector review |
 
 ## Record
 
 You are given one Layout-generated region inside its complete current page. Direction is mandatory inside the
 block workflow. Default `audit` prints one audited/corrected UI direction plus pass/exact findings. Explicit owner
 `brainstorm` before direction approval returns 3–4 targeted UI directions inside the same parent geometry. The
-parent page and Layout journey direction stay fixed.
+parent page and Layout journey direction stay fixed. Every anatomy carries its own integrated `qualityReview`;
+an ineligible draft is revised or removed before HTML generation.
 
 ## Law
 
@@ -25,7 +27,7 @@ be redesigned rather than extended when the empty case arrives.
 
 ## Inputs
 
-Seven, and no more.
+Eight, and no more.
 
 | # | Input | Without it |
 |---|---|---|
@@ -36,6 +38,7 @@ Seven, and no more.
 | 5 | Vocabulary: leaf names the contract cites, composite names, blocks that exist | a part cites a component that does not exist |
 | 6 | How the region's data actually fails, read from page and block source | `optional` gets mistaken for a full state set |
 | 7 | The closed list of anatomy axes | the 3–4 anatomies differ by decoration |
+| 8 | Detected frontend stack plus any digest-pinned advisory source actually consulted | engineering checks become generic or external taste quietly becomes authority |
 
 **Input 6 exists because the contract cannot answer it.** `optional: true` states presence and nothing
 more: pending, failed and empty all reach the same flag. Separating them is read from the page and block
@@ -56,6 +59,9 @@ Not read at this stage: class arrays, unaccepted theme choices, locale copy, lin
    products, not two spellings of one.
 6. **Refuse rather than invent.** Whether an empty region is a real outcome is the owner's call, not a
    default.
+7. **Challenge the direction before rendering.** Run `@frontend-quality` inside the unchanged complete parent.
+   Keep binding StarCi evidence separate from optional external advisory evidence, resolve all ten lenses and all
+   six detector families, and remove any draft whose product-specific character move is decoration-only.
 
 ## Anatomy axes
 
@@ -83,7 +89,7 @@ A citation that cannot be checked against the vocabulary is an invented name, wh
 
 ## Anatomy laws
 
-Fourteen laws every anatomy must satisfy. An anatomy that breaks one is not a weaker option — it is not
+Fifteen laws every anatomy must satisfy. An anatomy that breaks one is not a weaker option — it is not
 an anatomy.
 
 | Code | Law | What it rejects |
@@ -102,6 +108,7 @@ an anatomy.
 | `BLOCK-12` | A failure has a visible owner in every layout. A failure is a settled answer, not a wait. | an error rendered as a spinner that never resolves |
 | `BLOCK-13` | A block accepts closed data. It never accepts arbitrary content and never lets the caller decide what appears inside it. | arbitrary content, which makes the block a branch |
 | `BLOCK-14` | Proposals are per block. A surface with `N` blocks is judged region by region; alternatives stay inside their owning region. | turning several block decisions into page-wide combinations |
+| `BLOCK-15` | Every anatomy passes the integrated frontend-quality review inside its exact complete parent before HTML: binding sources outrank advisory sources, all ten lenses resolve, the character move belongs to the product, and every applicable detector passes. | a polished block that is generic, inaccessible, stack-blind, brittle or justified only by an external catalogue |
 
 ## Rules
 
@@ -119,6 +126,12 @@ an anatomy.
 7. A missing product decision is returned to the owner.
 8. The JSON is canonical, and its hash is what approval attaches to.
 9. Feedback opens a new round; an accepted anatomy is never edited in place.
+10. New work emits schema 3 and binds one `qualityReview` to each anatomy. External design intelligence is
+    digest-pinned advisory evidence only. Each adopted decision names its StarCi owner, and every alternative in
+    explicit brainstorm mode is reviewed independently against identical facts and content.
+11. Schema 3 binds `parentPageId` and the current drawing/compositor/entry/test `sourceOwners` before approval.
+    State views must use that parent, name only anatomy-reachable states and include every owner path in the exact
+    source boundary.
 
 ## Refusal
 
@@ -138,46 +151,18 @@ blocked: <which parts cannot be resolved without it>
 
 ## Output
 
-The output **is** JSON, and its authority is `@schema` beside this record. `envelope`
+The output **is** canonical schema-3 JSON, and its authority is `@schema` beside this record. `envelope`
 holds what varies between runs — including the session-local `parentAt` digest of the current source page.
-The anatomy hash is a cache key only and covers one anatomy.
+The anatomy hash is a cache key only and covers one anatomy. Each anatomy includes `uiDirection` and the complete
+schema-1 `qualityReview` from `@frontend-quality`. Schema 1 and 2 remain accepted only for old-cache compatibility;
+they are not valid publication targets for new work. The schema is the only canonical example; never replace its
+closed lens or detector arrays with prose ellipses.
 
-```json
-{
-  "schema": 2,
-  "envelope": {
-    "round": 1,
-    "project": "example-app",
-    "region": "criteria",
-    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c",
-    "mode": "audit"
-  },
-  "anatomies": [
-    {
-      "id": "a",
-      "axes": {"dataOwner": "parent", "repetition": "repeats", "weight": "populated", "composition": "label-value"},
-      "citesPrecedent": "none",
-      "states": ["populated", "empty", "pending"],
-      "uiDirection": {
-        "summary": "Keep criteria comparable inside the unchanged complete parent",
-        "hierarchy": ["Criterion label precedes its stored value"],
-        "responsive": ["Rows retain reading order when the parent narrows"],
-        "emphasis": ["The compared value remains the dominant fact"]
-      },
-      "restingCount": 4,
-      "parts": [
-        {
-          "name": "criterion-row",
-          "cites": {"kind": "entry", "verdict": "generalize", "from": "flashcard-result-fact-row", "to": "fact-row", "callSites": 1, "why": "if you need a row comparing a name with one stored value on a shared baseline"},
-          "whyMatch": "a name read against one stored value, repeated as rows on a shared baseline"
-        }
-      ],
-      "reason": "why this anatomy is worth the owner's attention"
-    }
-  ],
-  "audit": {"verdict": "pass", "findings": []}
-}
-```
+Before `OK #1`, emit `envelope.stage: direction` and omit `stateReview`. After selection, emit
+`envelope.stage: states` with exactly one selected anatomy and `stateReview`: one to five complete-page state
+families bound to `parentPageId` and reachable anatomy states, at least desktop and narrow viewports per family,
+and the exact source/test boundary containing every proven `sourceOwners` path. Isolated block crops
+or prose claims cannot satisfy that machine boundary.
 
 Validate before writing and before hashing:
 
@@ -186,4 +171,5 @@ node @validate-artifact --schema @schema --data <batch.json> --hash
 ```
 
 Beyond the shape, the validator refuses a class token anywhere in the batch, two anatomies sharing an axis
-set, a `repeats` anatomy with no `restingCount`, and a batch where no anatomy cites `none`.
+set, a `repeats` anatomy with no `restingCount`, a batch where no anatomy cites `none`, incomplete lens or detector
+coverage, external advisory evidence presented as binding, or a quality receipt whose target does not match its anatomy.

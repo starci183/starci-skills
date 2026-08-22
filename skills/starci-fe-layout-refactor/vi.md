@@ -21,6 +21,7 @@ description: Sửa hoặc tái cấu trúc exact frontend scope đã được La
 | `@lints-fe` | `gates/fe/lints` | module | frontend proof |
 | `@standards` | `standards` | module | law-to-proof accountability |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | cache review |
+| `@frontend-quality` | `brainstorms/frontend-quality/vi.md` | vi | integrated review craft, UX, accessibility, engineering và detector |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | semantic outcome/owner receipt |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
 | `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | routed receipt proof |
@@ -47,7 +48,7 @@ Topology: `reconciliation` qua authority classification, rồi `linear` correcti
 |---|---|---|---|---|---|
 | bind-classify | shared | rendered scope, routed FE, source và feedback/objective | freeze product truth, reproduce mismatch và tìm tầng cao nhất đã fail | correction envelope, owner chain và verdict | rendered scope cùng evidence resolve |
 | orchestration | coordination | correction envelope và measured runtime | áp dụng Refactor dependency graph cùng one-writer registry | runtime adapter, task batch, coordinator reservation và sequential fallback | không approval; `.claude` chỉ coordinator |
-| direction | reconciliation | envelope, grammar và correction objective | in một UI direction mặc định, hoặc 3–4 sau explicit brainstorm | complete-context desktop/narrow review | `OK #1` select cache direction |
+| direction | reconciliation | envelope, grammar và correction objective | in direction, chạy integrated quality review rồi render một direction mặc định hoặc 3–4 sau explicit brainstorm | complete-context review cùng standalone refactor quality receipt | required lens/detector pass; `OK #1` select cache direction |
 | authority-state-boundary | execution | selected direction, state truth và verdict | ensure tối đa năm complete-page view, bind authority, impact cone và FE owner | authority-to-write map và exact batch | `OK #2` authorize batch một lần |
 | evolve-refactor | execution | approved authority/source batch | evolve authority trước khi cần, compile rồi sửa mọi consumer | authority receipt và bounded green FE diff | không dùng lower-layer patch để che upper-layer failure |
 | parity | proof | approved views, existing seed và product | so đúng state và viewport | final views cùng `visual-proof.json` | zero mismatch |
@@ -68,14 +69,18 @@ hoặc enforce đúng authority. Reproduce feedback và classify tầng cao nh�
 phép output sai xuất hiện. Feedback đổi product truth phải quay về business authority.
 
 Tiếp theo hiển thị orchestration receipt bắt buộc. Coordinator sở hữu failed-layer classification, mọi `.claude`
-write, UI direction, approval và integration. Worker audit evidence/impact cone, chỉ sinh HTML từ direction đã
-freeze, chỉ implement FE path tách rời sau `OK #2`, rồi test/capture proof. Product work phụ thuộc authority phải
+write, UI direction, integrated quality verdict, approval và integration. Worker có thể audit evidence/impact cone
+cùng lens/detector fact, chỉ sinh HTML từ eligible frozen direction, chỉ implement FE path tách rời sau `OK #2`,
+rồi test/capture proof. Product work phụ thuộc authority phải
 đợi compile authority và dependency proof.
 
 ### 2. In và render UI direction
 
-In một complete-context UI direction. Journey và product truth bị freeze. Mặc định một direction; ba hoặc bốn
-alternative khác biệt thật sự chỉ khi owner explicit brainstorm trước `OK #1`. `OK #1` chỉ bind cache.
+In một complete-context UI direction. Journey và product truth bị freeze. Trước HTML, chạy `@frontend-quality`
+và viết standalone receipt `scope: refactor` giải đủ mười lens cùng sáu detector family. External UX/UI source chỉ
+là digest-pinned advisory, không được mở scope hay authority. Mặc định một direction; ba hoặc bốn alternative khác
+biệt thật sự chỉ khi owner explicit brainstorm trước `OK #1`, và mỗi cái được review riêng trên cùng facts. `OK #1`
+bind direction cùng receipt trong cache duy nhất.
 
 ### 3. Ensure states và duyệt authority/source boundary
 
@@ -108,6 +113,8 @@ Prove real connected product ở cùng state và viewport.
 7. Mặc định một direction; 3–4 cần explicit brainstorm. State proof tối đa năm complete-page view.
 8. `OK #1` chỉ ở cache. Chỉ `OK #2` authorize exact authority/state/source/proof batch.
 9. Completion cần green authority/FE gates và same-state, same-viewport real-product parity.
+10. Mọi direction pass shared quality review trước HTML; external UX/UI evidence chỉ là advisory.
+11. Quality review có thể expose failed layer nhưng không override classification hoặc mở product truth.
 
 ## Stops
 
@@ -119,10 +126,12 @@ Prove real connected product ở cùng state và viewport.
   application/enforcement failure.
 - Approved impact cone không chứa hết affected consumer, target dirt không an toàn, cần hơn năm view, hoặc
   gate/parity defect không thể repair trong approved boundary.
+- Thiếu quality lens/detector closure, target mismatch hoặc advisory evidence bị trình bày như authority.
 
 ## OUTPUT
 
-Ở direction review, in feedback verdict, governing Grammar/Principles chain và UI direction; show một
-complete-context desktop/narrow candidate mặc định hoặc 3–4 sau explicit brainstorm. Dưới `OK #2`, show tối đa năm
+Ở direction review, in feedback verdict, governing Grammar/Principles chain, quality verdict và UI direction; show
+một complete-context desktop/narrow candidate mặc định hoặc 3–4 candidate đã review riêng sau explicit brainstorm.
+Dưới `OK #2`, show tối đa năm
 complete-page view cùng exact authority-to-write batch. Khi hoàn tất, phân biệt authority gap với
 application/enforcement failure và report strengthened authority, affected owner, tests cùng real-product parity.
