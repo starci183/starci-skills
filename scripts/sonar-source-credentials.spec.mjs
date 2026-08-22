@@ -1,16 +1,38 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import test from "node:test"
-import { resolve } from "node:path"
+import { join } from "node:path"
 import { inventorySonarRoutes, reconcileSonarBadgeMarkdown } from "./sonar-source-credentials.mjs"
 
 test("inventories one distinct project-analysis identity for every routed source role", () => {
-    const sourceRoot = resolve(import.meta.dirname, "../..")
-    const rows = inventorySonarRoutes(sourceRoot)
-    assert.equal(rows.length, 8)
-    assert.deepEqual(new Set(rows.map((row) => row.key)).size, rows.length)
-    assert(rows.every((row) => row.github.startsWith("starci-lab/")))
-    assert(rows.every((row) => row.record.endsWith(".key")))
+    const sourceRoot = mkdtempSync(join(tmpdir(), "sonar-routes-"))
+    try {
+        const routes = [
+            { project: "alpha", role: "be", key: "alpha-backend", repository: "alpha-backend" },
+            { project: "beta", role: "fe", key: "beta-frontend", repository: "beta-frontend" },
+        ]
+        for (const route of routes) {
+            const repo = join(sourceRoot, "repositories", route.repository)
+            const routeRoot = join(sourceRoot, ".workspace", route.project, route.role)
+            mkdirSync(repo, { recursive: true })
+            mkdirSync(routeRoot, { recursive: true })
+            execFileSync("git", ["init", repo], { windowsHide: true })
+            execFileSync("git", ["-C", repo, "remote", "add", "origin", `https://github.com/starci-lab/${route.repository}.git`], { windowsHide: true })
+            writeFileSync(join(repo, "package.json"), JSON.stringify({ scripts: {} }))
+            writeFileSync(join(repo, "sonar-project.properties"), `sonar.projectKey=${route.key}\n`)
+            writeFileSync(join(routeRoot, "config.json"), JSON.stringify({ repository: { diskPath: repo, gitRoot: repo } }))
+        }
+
+        const rows = inventorySonarRoutes(sourceRoot)
+        assert.equal(rows.length, routes.length)
+        assert.deepEqual(new Set(rows.map((row) => row.key)).size, rows.length)
+        assert(rows.every((row) => row.github.startsWith("starci-lab/")))
+        assert(rows.every((row) => row.record.endsWith(".key")))
+    } finally {
+        rmSync(sourceRoot, { recursive: true, force: true })
+    }
 })
 
 test("reconciles a complete private-project Sonar badge block without touching Codecov", () => {

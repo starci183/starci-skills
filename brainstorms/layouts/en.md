@@ -15,21 +15,66 @@ title: Layouts
 
 ## Record
 
-You are given a screenshot of one page or a prose description of a page flow. Default `generate` returns one
-complete long page or full start-to-end flow, including every block, page/step, state and transition needed for
-implementation. Explicit `brainstorm` alone returns 3–4 targeted alternatives against the reviewed baseline.
+You are given a screenshot of one page or a prose description of a page flow. Identify every page and its
+closed visible intent before composing. Then resolve two independent evidence tracks: customer journey plus
+routed business truth from the top down, and component, contract, current/legacy composition plus source
+capability from the bottom up. Their explicit merge bindings produce complete pages.
+Default `generate` returns one result; explicit `brainstorm` alone returns 3–4 targeted alternatives after the
+owner reviews that baseline.
 
 ## Law
 
-A schema 5 candidate names its `page` or `flow` scope, MASTER system id, deviations-only page override, every composed page, ordered nested ownership nodes,
-regions, who owns each region's geometry, what mounts once and what changes
-per route. Every region hashes its minimum child bounding geometry (`placement`, `width`, `height`, `align`)
-and one impressionistic child brief (`kind`, title, summary, representative labels, values and actions). The
-full-page composition makes purpose, density and reading order imaginable without approving exact parts,
-fields, copy, actions, states or data ownership. Each node is `existing`, `proposed` or `new`; `existing` cites
-the real source and SHA-256 source hash and cannot differ between choices. New session artifacts use schema 5;
-older schemas are compatibility input. It never names a class. MASTER fixes macro taste once; classes are decided only for unresolved deltas;
-a candidate that carries one has spent a decision that was not its to spend.
+A schema 7 candidate names its `page` or `flow` scope, stage, MASTER system id, deviations-only page override,
+every composed page, ordered nested ownership nodes and owned regions. `synthesis.pageIntents` records what
+each page must visibly render before either track; customer journeys and component capabilities are authored
+independently; every page-level intersection contains binding rows joining each render intent to journey,
+business and contract-backed regions. Every
+region still hashes its minimum child geometry and representative anatomy. Each node is `existing`, `proposed`
+or `new`; `existing` cites real source plus SHA-256 and cannot drift between choices. Older schemas remain
+compatibility input. Candidates never name classes; MASTER fixes macro taste once.
+
+The `pages` stage carries a `pageContract`, one representative populated state per page, the full future state
+inventory and full-viewport coverage at every reference viewport. It carries no `renderContract` or
+`executionPrompt`, therefore its approval is cache-only. `OK #1` binds the canonical page-contract hash.
+
+The `states` stage carries that exact approved page contract, `mode: expand-states` and `approvedPageAt`.
+It expands every state and transition, then adds the hashed `renderContract` that fixes exact source files and
+complete page, region, state and transition obligations. State is classified at its real owner: a page state
+exists only when region arrangement, hierarchy or active page-level composition changes; a loading, refusal,
+answered or interaction condition confined to one subtree remains a block state even when a full-page capture
+shows it. Its `renders` select no more than five complete-page render targets across the whole flow, each binding
+the page state when one exists plus the seeded block states visible in that capture, and cover every reference
+viewport for each target. Selection prioritizes distinct high-risk condition and transition families; it does not
+remove unrendered implementation or test obligations. Each region fixes owner, component, contract, anatomy,
+data mapping and visual obligations. Page-contract drift is a return to page approval, not a hidden state change.
+
+Every complete render region also carries `grammarScopes`. Each scope names one closed child target, the
+observable facts for that child and the exact slot/outcome/component decisions recomputed from the routed
+grammar profile. A region block may compose those owners, but may not replace a resolved list, accordion, form
+or body surface with a generic visual wrapper.
+
+Every stateful region also fixes its exact SPLIT-6 source ownership chain: the drawing `ComponentBase`, the
+optional connected `Component` that reads the world, the composing `PageBase`, `LayoutBase` or `OverlayBase`,
+its connected `Page`, `Layout` or `Overlay` entry, and whether the parent uses the connected or drawing child.
+Moving a block condition into `PageProps`, `LayoutProps` or `OverlayProps` is not an ownership transfer. A block
+condition requires a distinct child drawing owner; the outer Base composes that child and does not proxy its
+state or data. An overlay or layout needs another Block chain only when it composes an independently stateful
+subtree; no dummy layer is created for a terminal surface. Every file in the real chain is an exact member of
+`renderContract.sourceBoundary`.
+
+Transitions name both page and state at each endpoint, so one shape covers in-page changes and cross-page flows
+such as Overview → Apps. Every region data obligation declares preview content
+`representative-fixture` and runtime truth `source-owned`; representative names and values prove density only and
+may never be hardcoded as runtime data.
+
+Only the states-stage candidate emits one canonical machine-readable `executionPrompt`. It repeats the candidate id,
+render-contract id and exact source boundary, sets implementation to `exact-render-contract`, forbids
+reinterpretation and requires `same-state-same-viewport-parity`. `OK #2` binds the candidate, complete states
+and exact source boundary. A later executor receives this prompt, not a fresh design brief.
+Its ordered `instructions` are fixed: `read-exact-render-contract`,
+`implement-every-page-region-state-viewport-transition-obligation`, `touch-only-source-boundary`,
+`do-not-reinterpret-preview`, `stop-if-obligation-is-unrepresentable`, then
+`prove-preview-source-same-state-same-viewport-with-zero-mismatches`.
 
 Every region cites something that exists: an entry in the contract, or an explicit statement that a
 new entry is required and why. A region citing nothing is an invented component wearing a JSON
@@ -134,11 +179,11 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 | `LAYOUT-11` | This law returns a classification — full-width run or compact control — never a width. Both owner rulings on the same control stand. | picking one of the two rulings as a default |
 | `LAYOUT-12` | Every region is recognizable and functionally complete in each page candidate: purpose, representative content, production-like density, reading order, reachable states and current contract ownership are visible. Layout implementation happens after this same review; there is no deferred block-head completion phase. | blank boxes, toy summaries or a page that requires another task to become implementable |
 | `LAYOUT-13` | Only an explicitly requested product surface may become a layout identity or flow node. An example introduced to explain capability remains evidence until the owner explicitly promotes it into scope. | turning “for example create order” into a product page |
-| `LAYOUT-14` | Modes that share one route and one page owner are states of that page. The layout candidate renders every evidenced mode before implementation. | generating sign-in, sign-up and recovery as separate layouts, or deferring their states to another task |
+| `LAYOUT-14` | Modes that share one route and one page owner are states of that page. The layout candidate contracts and makes every evidenced mode executable before implementation, while visual review samples no more than five representative states across the flow. | generating sign-in, sign-up and recovery as separate layouts, deferring their states to another task, or rendering an unbounded screenshot matrix |
 
 ## Rules
 
-1. A candidate carries no class. Schema 5 candidates share `starci-master`; page overrides list deviations only.
+1. A candidate carries no class. Schema 6 candidates share `starci-master`; page overrides list deviations only.
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.
@@ -147,6 +192,10 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 7. A candidate's JSON is canonical — fixed key order, no timestamps, no per-run ids — because its hash
    is what the owner's approval attaches to.
 8. Feedback replaces the cache round. No candidate survives as durable authority after the invocation.
+9. Every candidate page has exactly one pre-track page intent record, and every render intent is bound exactly once.
+10. Journey and contract-first tracks are completed independently; anatomy is generated only from their merge bindings.
+11. Every merged region has a contract-first capability, and every journey step, business obligation and page region appears in the binding matrix.
+12. Every states-stage render region passes the layout-grammar gate; a missing scope, stale decision or mismatched component owner is not an approvable candidate.
 
 ## Preview
 
@@ -196,9 +245,10 @@ The output **is** JSON, and its authority is `@schema` beside this record — no
 excerpt. `envelope` holds what varies between runs; the hash covers a candidate only, so the same
 decision re-run in a later round produces the same hash.
 
-New work uses schema 5: `envelope.scope` declares screenshot `page` or described `flow`; every candidate carries `systemId: starci-master`, deviations-only `pageOverride`,
-the same ordered `pages`, each page carries its nested `nodes` and owned region names, and each region binds its
-`pageId` plus `change`. Older examples are compatibility documentation only.
+New work uses schema 7. `envelope.scope` declares screenshot `page` or described `flow`; `stage: pages` requires
+`synthesis` and `pageContract` and forbids source authority. After `OK #1`, `stage: states` preserves the approved
+page hash, expands the complete state inventory and adds `renderContract` plus canonical `executionPrompt`.
+Older examples are compatibility documentation only.
 
 ```json
 {

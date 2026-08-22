@@ -56,11 +56,13 @@ order follows from it rather than defining it.
 | `@compilers` | exactly one answer, no candidates | an accepted shape needs execution detail — `@principles` decide classes and `@patterns` decide files/imports |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
-Frontend layout generation produces one functional, business-faithful complete long page or full flow by default, never a static render card. It owns every block, page/step, state and transition required for implementation. Three or four alternatives appear only after the owner explicitly asks to brainstorm against that baseline. Each round
-inventories every evidenced viewport, overlay, disclosure, async, data, permission and interaction condition;
-renders production-like representative content; and proves reachable transitions through in-page controls.
-Desktop/mobile, modal, drawer, menu/popover, loading, empty, error, locked and disabled states are represented
-when reachable. The QA viewer may inspect states but may not substitute for product interaction.
+Frontend layout generation starts top-down from customer journey plus routed business truth and bottom-up from
+component, contract plus source capability. Their explicit intersection produces one functional,
+business-faithful complete long page or flow by default. Page anatomy is rendered first at representative
+desktop/narrow states and receives cache-only `OK #1`; only then are all evidenced conditions expanded under the
+unchanged page hash. `OK #2` binds complete states and exact source files before implementation. Three or four
+page alternatives appear only after an explicit brainstorm request against the baseline. The QA viewer may
+inspect states but may not substitute for product interaction.
 
 Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
 then applies one routed StarCi MASTER visual system. Profiles override declared roles only, pages record deviations
@@ -119,7 +121,7 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Eighteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Nineteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. Sixteen do the work; two only look — one at the machine, one at the other skills.
 
 | Skill | Owns |
@@ -134,8 +136,9 @@ record. Sixteen do the work; two only look — one at the machine, one at the ot
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
-| `starci-fe-design-layout` | one complete long page/full flow generated with all blocks and states, then reviewed, implemented and proved; targeted alternatives are opt-in |
+| `starci-fe-design-layout` | journey/business and component/source synthesis into complete pages; cache-only page approval, state/source approval, implementation and proof; alternatives are opt-in |
 | `starci-fe-design-block` | audit/correct one Layout-generated block in its complete page; anatomy brainstorming is opt-in |
+| `starci-fe-ui-align` | proactive cross-surface UI consistency audit, evidence-backed convergence, authority evolution when proven necessary, source correction and proof |
 | `starci-fe-feedback-evolve` | proven owner feedback evolved through the correct durable authority layer and affected frontend source |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
 | `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
@@ -162,7 +165,7 @@ under pressure:
   `@canon-fe` and `@canon-be`, each rule shipped with the test that fires it.
   **This tree is the law; that repository is the machine.** A rule there with no law here is
   unaccountable; a law here with no rule there only advises;
-- approval binds one selected cache candidate plus its disclosed source boundary for the same invocation.
+- layout page approval binds only the canonical cache page contract; its second approval binds complete states plus exact source files for the same invocation.
 
 ## Authoring
 

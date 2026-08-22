@@ -555,6 +555,17 @@ Exceptions are part of the rule, not relief from it. Each is closed and cites th
   what does not look structural in source.
 - **A named surface branch owns its fixed vendor wrapper.** `CONTRACT-10`. The seam cannot vary by
   caller, cannot admit children and never receives contract markers.
+- **An authored-document branch draws content it did not design.** `CONTRACT-1`, `CONTRACT-2`,
+  `CONTRACT-7` and `CONTRACT-11`, for `Article`, `MarkdownCodeBlock` and `MermaidDiagram` only. An
+  entry declares every slot inside it by name, and a document has no such list: the children of one
+  authored list are whichever of a dozen node kinds the writer typed, in whichever order, nested
+  however deep. A `children` record written for that is a guess, and a guess in the table is worse
+  than no entry, because the next reader takes it for a rule somebody checked. The same holds one
+  level down, where a highlighted code region and a rendered diagram are strings of markup produced
+  at runtime with no slots to name. Like the leaf exemption this is a FOLDER, and the question that
+  keeps a file out is asked by a person: does this component receive its children as PARSED CONTENT
+  rather than as a designed arrangement? Many children is not the fact; a shape somebody chose is
+  exactly what the table is for.
 - **A semantic element opened for MEANING, carrying no class, is not a node.** `CONTRACT-7`. A `form`
   submits and a `ul` is a list; wrapping a contract node in one decides no shape at all. The moment
   it carries a class it has become a node with no key.

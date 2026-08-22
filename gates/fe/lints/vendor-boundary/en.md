@@ -49,6 +49,7 @@ sentence of it that no rule below names is unenforced.
 | `auth-overlay-owns-single-content-host` | none | `requires` ContractContent, and `rejects` a duplicate host/inset |
 | `checkbox-keeps-compound-anatomy` | none | `rejects` — a break in Content → Control → Indicator nesting |
 | `no-internal-starci-href` | none | `rejects` — internal href ownership in a governed component |
+| `tables-go-through-table-branch` | none | `rejects` — a raw table element or a hand-built grid standing in for TableBranch |
 
 No code is left without a rule, because the gate publishes no codes at all. That cuts the other way
 too: nothing in a verdict from this module can be traced to a numbered clause of the product law, and
@@ -211,6 +212,24 @@ href rather than whether the destination is correct.
 **Boundary.** Href ownership inside governed components. That the element is a HeroUI Link at all is
 `text-link-uses-hero-link`.
 
+## `tables-go-through-table-branch` — none
+
+**What it reports.** `rejects` — a `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>` or `<td>` written
+in the component tier, and a container carrying `role="table"`, `role="row"` or `role="columnheader"`
+that is not `TableBranch`.
+
+**How it detects.** By path plus JSX element name and role attribute. Every file under
+`src/components/` is governed except `TableBranch` itself, which is the one owner permitted to
+render the vendor's compound parts.
+
+**What it cannot see.** A table assembled at runtime from a variable element name, a grid built from
+plain `div`s with no `role`, and a table reached through a re-export under another name. It reads the
+element and the role that are written; a hand-built grid that declares neither is invisible to it,
+which is the same blind spot every anatomy rule in this module carries.
+
+**Boundary.** Which element a table is made of. That a vendor import sits in the wrong file is
+`vendor-boundary`; this rule fires precisely where there is no import to see.
+
 ## Detection
 
 | Part | Mechanism |
@@ -247,6 +266,7 @@ href rather than whether the destination is correct.
 | `field-input-uses-secondary-variant`, `field-label-is-text-only`, `no-internal-starci-href` | **Anything outside the governed component.** The house Field, the house Icon and the governed set are named; a substitute of another name is not watched |
 | `no-surface-branch-in-overlay` | **A SurfaceCard reached through an alias, a re-export or a wrapper**, and **a surface rebuilt by hand inside the overlay** |
 | `text-link-uses-hero-link` | **A handmade link written some other way**, or one hidden a component away |
+| `tables-go-through-table-branch` | **A grid of plain `div`s carrying no role**, **an element name resolved at runtime**, and **a table reached through a re-export under another name** |
 | `account-control-owns-dropdown`, `checkbox-keeps-compound-anatomy`, `auth-overlay-owns-single-content-host` | **Anatomy expressed through a wrapper**, **a namespaced tag**, and **a rename of any named link in the chain** — all three read names and nesting in one file |
 | all | **Design itself.** The gate deliberately does not measure design by regex; the contract remains the source of shape and nothing here judges it |
 | all | **Every sentence of the product law that no rule above names.** Ten rules ship; the prose law is longer than they are, and a green run says nothing about the rest |
@@ -279,8 +299,10 @@ rename or one indirection defeats.
 6. Design is not measured by regex. The contract stays the source of shape.
 7. Every rule is recommended at `error`.
 8. No warning adoption and no suppression is valid.
-9. The twin test `node --test @canon-fe` is the proof that the rules still
-   behave as published.
+9. A rule may refuse an absence as well as a presence: where a named owner holds a vendor, rebuilding that
+   vendor by hand is the finding, and no import is required for the rule to fire.
+10. The twin test `node --test @canon-fe` is the proof that the rules still
+    behave as published.
 
 ## Exceptions
 

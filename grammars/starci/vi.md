@@ -35,15 +35,22 @@ khám phá rule, nhưng source origin bị cấm trong package đã promote.
 5. `GRAMMAR-5` — Thiếu route, owner hoặc fact thì dừng; không được hand-build JSX fallback.
 6. `GRAMMAR-6` — Remote, revision, path, symbol, blob và source-origin record của repository bị cấm.
 7. `GRAMMAR-7` — Resolution chỉ trả fact, capsule, template và principle concern đã chọn.
-8. `GRAMMAR-8` — Visual contract của profile khóa trục direction, semantic role token và giá trị token chính xác; design cùng execute từ chối mọi thay thế.
+8. `GRAMMAR-8` — Visual contract của profile khóa trục direction, semantic role token và giá trị token chính xác; các role đó phải phủ mọi theme mode được hỗ trợ cùng renderer-owned portal, còn design và execute từ chối mọi thay thế hay vendor fallback.
 9. `GRAMMAR-9` — MASTER khóa visual language một lần; profile chỉ override role đã khai và page chỉ ghi deviation.
+10. `GRAMMAR-10` — Khi một fact quan sát được loại trừ outcome lân cận, phải encode negative boundary đó trong rule và counterexample; chỉ thiếu positive fact không phải refusal evidence bền vững.
+11. `GRAMMAR-11` — Phân rã mọi feature section có label thành một grammar scope trước khi compose. Một body, peer list, disclosure hierarchy và bounded form phải resolve về semantic surface owner tương ứng; label của section nằm ngoài surface đó.
 
 ## Routing
 
 Layout và block design phân loại tình huống có bằng chứng thành fact id, chạy `@resolve-grammar`, rồi
 bind receipt cùng MASTER vào session baseline hiện tại. Outcome giới hạn semantic owner nào được reuse, extend hay
 báo `new-required`; outcome không chọn visual class. Owner đã chọn có thể mang thêm visual contract,
-khóa semantic theme token và giá trị trước khi so direction.
+khóa semantic theme token và giá trị trước khi so direction, đồng thời giữ role mapping tại document theme owner
+chung cho routed content và renderer-owned portal.
+
+Mỗi render region ghi các child target đóng thành grammar scope. Mỗi scope mang facts riêng và đúng
+slot/outcome/component owner do resolver tính lại. Tên block ở cấp region không cho phép bọc card chung quanh
+những child có fact peer, disclosure hoặc form đã resolve về surface owner cụ thể hơn.
 
 Cùng skill invocation tính lại receipt trước source write. Hash drift, capsule thiếu, template đổi hoặc owner
 vắng mặt đều trả về candidate work. Nó chỉ resolve `principleConcerns` còn là delta sau khi MASTER, legacy và

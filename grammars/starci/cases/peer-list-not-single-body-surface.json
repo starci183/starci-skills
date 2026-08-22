@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "peer-list-not-single-body-surface",
+  "kind": "counterexample",
+  "because": "Comparable peer rows sharing one boundary are a joined list, not one undifferentiated body card.",
+  "facts": ["surface-section-labelled", "collection-peer", "boundary-shared"],
+  "expectedOutcomes": ["surface-list"],
+  "rejectedOutcomes": ["surface-card"]
+}

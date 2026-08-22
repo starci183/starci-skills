@@ -63,7 +63,7 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all eighteen capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all nineteen capabilities share.",
   },
   {
     source: "contexts",

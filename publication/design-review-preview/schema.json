@@ -4,15 +4,16 @@
   "title": "Session-local authored design review manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "project", "sessionId", "systemId", "baselineAt", "phase", "mode", "entryRoute", "layouts", "evidence"],
+  "required": ["schemaVersion", "project", "sessionId", "systemId", "baselineAt", "phase", "reviewStage", "mode", "entryRoute", "layouts", "evidence"],
   "properties": {
-    "schemaVersion": {"const": 3},
+    "schemaVersion": {"const": 4},
     "project": {"$ref": "#/$defs/slug"},
     "sessionId": {"type": "string", "minLength": 1},
     "systemId": {"const": "starci-master"},
     "baselineAt": {"$ref": "#/$defs/hash"},
     "phase": {"enum": ["layout", "block"]},
-    "mode": {"enum": ["generate", "audit", "brainstorm"]},
+    "reviewStage": {"enum": ["pages", "states", "full"]},
+    "mode": {"enum": ["generate", "audit", "brainstorm", "expand-states"]},
     "entryRoute": {"type": "string", "pattern": "^previews/[a-z0-9-]+--[a-z0-9-]+\\.html$"},
     "layouts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/layoutReview"}},
     "evidence": {
@@ -29,6 +30,16 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"phase": {"const": "layout"}, "reviewStage": {"const": "pages"}}, "required": ["phase", "reviewStage"]},
+      "then": {"properties": {"layouts": {"items": {"properties": {"candidates": {"items": {"required": ["synthesis", "pageContract"]}}}}}}}
+    },
+    {
+      "if": {"properties": {"phase": {"const": "layout"}, "reviewStage": {"const": "states"}}, "required": ["phase", "reviewStage"]},
+      "then": {"properties": {"layouts": {"items": {"properties": {"candidates": {"items": {"required": ["synthesis", "pageContract", "renderContract", "executionPrompt"]}}}}}}}
+    }
+  ],
   "$defs": {
     "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -91,10 +102,16 @@
         "reason": {"type": "string", "minLength": 1},
         "axes": {"type": "object", "additionalProperties": {"type": "string"}},
         "direction": {"type": "object"},
+        "systemId": {"type": "string"},
+        "pageOverride": {"type": "object"},
         "states": {"type": "array", "items": {"type": "string"}},
         "parts": {"type": "array", "items": {"type": "object"}},
         "pages": {"type": "array", "items": {"$ref": "#/$defs/page"}},
         "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}},
+        "synthesis": {"$ref": "../../brainstorms/layouts/schema.json#/$defs/synthesis"},
+        "pageContract": {"$ref": "../../brainstorms/layouts/schema.json#/$defs/pageContract"},
+        "renderContract": {"$ref": "../../brainstorms/layouts/schema.json#/$defs/renderContract"},
+        "executionPrompt": {"$ref": "../../brainstorms/layouts/schema.json#/$defs/executionPrompt"},
         "preview": {"$ref": "#/$defs/preview"}
       }
     },

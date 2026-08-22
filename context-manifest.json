@@ -26,7 +26,7 @@
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "3ec982a14f10c44d7c6f88fd0901f168b837de4e9fa3989facb584e6cf43702a",
+      "sourceHash": "1d9d5ae55d29e0cb69538782479ee805f68fa78eb95312468ec86824b8906787",
       "contextVersion": 1
     },
     "compilers/context.md": {
@@ -240,7 +240,7 @@
     "compilers/patterns/fe/contract/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/contract/en.md",
-      "sourceHash": "75ebc46e2735179308b4658364637e2eda357d73e4332e83c84b6eb6331fc042",
+      "sourceHash": "5f5fc728d9ccd677413f69ada77d2732e68579098cf3a5b36348136b516bee3c",
       "contextVersion": 1
     },
     "compilers/patterns/fe/delivery-assurance/context.md": {
@@ -312,7 +312,7 @@
     "compilers/patterns/fe/tokens/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/tokens/en.md",
-      "sourceHash": "0f3d86006b3a2101b64e1162e8077ce916a8ed653323e88aff23be8870ff2520",
+      "sourceHash": "722dcae475148048bb68ecbf47a45b8735c65c624ae7d3906aeeb7950cd8e4f2",
       "contextVersion": 1
     },
     "compilers/patterns/fe/translation/context.md": {
@@ -330,13 +330,13 @@
     "compilers/patterns/fe/typography/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/typography/en.md",
-      "sourceHash": "e632da014ccd257147b86d126e97fe6716989283c5ba3d75723e4c21610e20b4",
+      "sourceHash": "8b75bf434986f6de2e77ac6e67c0b28bbc20d765e9aea9d913fe799db9898773",
       "contextVersion": 1
     },
     "compilers/patterns/fe/vendor-boundary/context.md": {
       "kind": "module",
       "source": "compilers/patterns/fe/vendor-boundary/en.md",
-      "sourceHash": "478b2bf6f17e8bfa251f747537699e268cacccb6363b06b99c2c004a9ebb24fe",
+      "sourceHash": "0221202a80846b029e6acbd88ef8f594b3c6564b7b9b529c03c2affeec4069f6",
       "contextVersion": 1
     },
     "compilers/principles/alignment/context.md": {
@@ -348,7 +348,7 @@
     "compilers/principles/colour/context.md": {
       "kind": "module",
       "source": "compilers/principles/colour/en.md",
-      "sourceHash": "3e466e9039d1c7761f1158efa0e76b8b26f3f43c0b307346e3e422bc23af020a",
+      "sourceHash": "a81040746cdc732adc94bd02eb2c385782fb564c330bdb9c47af2a03aed44a0e",
       "contextVersion": 1
     },
     "compilers/principles/context.md": {
@@ -412,7 +412,7 @@
     "compilers/principles/size/context.md": {
       "kind": "module",
       "source": "compilers/principles/size/en.md",
-      "sourceHash": "57dc40111e0c619417bf5e8ef47d2354a4272a08283d2ce45a8630601b31f97d",
+      "sourceHash": "ae6a1dd97e01c34b51857cd9727619928cbda6e7268c64d3b4e50bfe9315d746",
       "contextVersion": 1
     },
     "compilers/principles/state/context.md": {
@@ -424,13 +424,13 @@
     "compilers/principles/surface-in-surface/context.md": {
       "kind": "module",
       "source": "compilers/principles/surface-in-surface/en.md",
-      "sourceHash": "4caa008452619b6ef2eec0c9cbfe5868e333e8aafdaa338e7f8b65d437d83698",
+      "sourceHash": "521c1b435b56de1f22c03af043f1045e645e493837c8488a0e7ee4d01e56092d",
       "contextVersion": 1
     },
     "compilers/principles/typography/context.md": {
       "kind": "module",
       "source": "compilers/principles/typography/en.md",
-      "sourceHash": "3facef03a385bc963023f6c8bc600ae6000630159a738ed0cbb5a05e5a4f9c46",
+      "sourceHash": "94d9ab7a1fa1f5e0f834a1b16151396e8ccd16f7a56c6730319f252ec57445a4",
       "contextVersion": 1
     },
     "contexts/business/context.md": {
@@ -662,7 +662,7 @@
     "gates/fe/lints/vendor-boundary/context.md": {
       "kind": "module",
       "source": "gates/fe/lints/vendor-boundary/en.md",
-      "sourceHash": "0213b22749e61b95da21e41407dd5f74d0d728055dd3fc101f682be7edfa8d4f",
+      "sourceHash": "e19a35f2fc3c860693b37105b9b1e67aed9bdb14f03b2091ee22f260f0b9be7e",
       "contextVersion": 1
     },
     "grammars/context.md": {
@@ -672,7 +672,7 @@
     "grammars/starci/context.md": {
       "kind": "module",
       "source": "grammars/starci/en.md",
-      "sourceHash": "b945fef3e2b5e52ed07895a08b95c165ca1d76cf41ee4b70dccea0ec85f663bb",
+      "sourceHash": "d513af87e043c6e9be788d65ee6f73fb530523d368878f4776408c3e74404824",
       "contextVersion": 1
     },
     "kernel/context.md": {
@@ -754,7 +754,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "017025acc6bc01f91108c8ed9714d7035e344e0b3c8c4b3a6ef788146fedf2ab",
+      "sourceHash": "dba8aff000133297e433e9bdd1ba5a06897c938e9ec00898a97c7c55c0bf1976",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {
@@ -896,7 +896,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "299a29e7770d63f341740fe49de962b80e2cf0fd59a357884fe5c52c57cc785c",
+      "sourceHash": "2e4042808219f350df40e93f49de19e2b5c42361f9098bcc0d073b6e82fe78ff",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

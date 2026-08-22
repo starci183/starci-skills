@@ -39,7 +39,7 @@ Find whether feedback exposes a law, evidence, application, pattern, gate or sou
 
 ## Process
 
-Run authority gates and the four-lock baseline before classification; require a counterexample for `misdrawn`. Apply MASTER once, record only page deviations, and route only unresolved deltas to principles. Correct and prove the same-viewport full page in the same invocation.
+Print the shared two-row execution table: read-only audit, then one approved authority/source/proof batch. Run authority gates and the four-lock baseline before classification; require a counterexample for `misdrawn`. For every owner observation, state `correct`, `incorrect` or `partly-correct`, explain why, and name why the AI has not executed it; `Waiting for OK` alone is not an explanation. Build one authority-to-write map in which one decision has one semantic owner, each path belongs to one write batch, and already-sound owners are preserved. For state/data ownership feedback, begin at the smallest changing surface and trace the concrete `ComponentBase → Component → PageBase/LayoutBase/OverlayBase → Page/Layout/Overlay` chain. Nested child state or request data under outer props is still a proxy, not extraction; nested Block chains exist only for independently stateful subtrees and the impact cone includes every exact owner file. Apply MASTER once, record only page deviations, and route only unresolved deltas to principles. Write changed authority before source inside the same approved batch, then correct and prove the same-viewport full page without opening a duplicate second pass.
 
 ## Rules
 
@@ -47,6 +47,7 @@ Run authority gates and the four-lock baseline before classification; require a 
 2. Preview, correction and QA happen in one invocation.
 3. No design registry or durable preview identity exists.
 4. Source plus proof is the durable design outcome.
+5. One feedback chain produces one verdict table and one authority-to-write batch; explanation, durable correction and source consequence are not split into duplicate passes.
 
 ## Stops
 
@@ -55,4 +56,4 @@ Run authority gates and the four-lock baseline before classification; require a 
 
 ## OUTPUT
 
-Report classification, authority changes, source paths and executable proof. Never report design heads.
+Render one table with `Observation`, `Verdict`, `Why`, `Why not executed`, `Authority correction`, `Source correction` and `Proof`. Report the one-pass authority-to-write map, preserved sound owners, authority changes, source paths and executable proof. Never report design heads.

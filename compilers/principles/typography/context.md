@@ -90,6 +90,13 @@ taste re-entering through arithmetic.
 **Situation.** This line answers "where am I?". It is the root of the document outline and each route
 has exactly ONE of them.
 
+**Recognition signs**
+
+- Delete it and the user no longer knows what the page is about.
+- It matches or nearly matches the last breadcrumb, the browser tab title, the route name.
+- Everything else on the page sits BELOW it in the outline, including things that look larger.
+- On a detail route, the object's own name IS the page name.
+
 **Ask yourself.** Is this line the outline root of the current route?
 
 **Boundary**
@@ -104,6 +111,12 @@ has exactly ONE of them.
 
 **Situation.** A part of the page with its own purpose and its own content, which MUST appear in the
 outline so a screen-reader user can jump to it.
+
+**Recognition signs**
+
+- People call it by name when they talk: "the reviews section", "the recent activity section".
+- It can be empty on its own, error on its own, load on its own.
+- It is a direct child of the page in the outline, not a child of another section.
 
 **Ask yourself.** Is this a first-level part of the page a user needs to jump straight to?
 
@@ -121,6 +134,12 @@ outline so a screen-reader user can jump to it.
 **Situation.** A small group INSIDE a section, independent enough to need a name, but not large
 enough to be a first-level part of the page.
 
+**Recognition signs**
+
+- There is always an `h2` above it in the same tree.
+- It gathers a few lines into one small topic.
+- Remove it and the section still has content, only the group loses its name.
+
 **Ask yourself.** Does this group sit inside an already-named section, and does it need a name of its
 own?
 
@@ -136,6 +155,12 @@ own?
 
 **Situation.** The fourth outline depth, and the last. At this depth the name is nearly a label: it
 still has to be present in the outline, but it must no longer compete for the eye.
+
+**Recognition signs**
+
+- A full `h1 → h2 → h3` chain sits above it.
+- It names a criterion, a sub-item of a sub-item.
+- A keyboard user still needs to jump to it.
 
 **Ask yourself.** Does this line truly need to be in the outline, or is it only qualifying copy?
 
@@ -154,6 +179,12 @@ still has to be present in the outline, but it must no longer compete for the ey
 name leads the whole region but does NOT enter the document outline, because it is data, not
 structure.
 
+**Recognition signs**
+
+- There is exactly ONE such title in the region, with no second one beside it.
+- The string is short, and stably short — not "short at the moment".
+- Every other line in the region is describing this object.
+
 **Ask yourself.** Does this region hold exactly ONE object, and is its name stably short? Missing ONE
 of the two facts drops it to `TYPOGRAPHY-6`.
 
@@ -163,11 +194,19 @@ of the two facts drops it to `TYPOGRAPHY-6`.
   because it is the largest line in the region.
 - `TYPOGRAPHY-6`: BOTH facts — single and short — are required. Repeated, compact, long, or liable to
   grow under localization is always `TYPOGRAPHY-6`. The safe default is `TYPOGRAPHY-6`.
+- `TYPOGRAPHY-7`: a phase, request or next-action sentence STATES what happens; it does not become
+  an outline heading or outrank the one dominant object merely because it introduces the action.
 
 ## `TYPOGRAPHY-6` — title of a peer object
 
 **Situation.** The name of an object standing AMONG MANY OF ITS KIND, or a name that can grow long.
 The scanning rhythm must be even across the lines, so no line may be larger than another.
+
+**Recognition signs**
+
+- It comes from a loop, or will come from a loop in the near future.
+- It can be long, it can wrap, it can grow after translation.
+- Its container is a list, a grid, a table.
 
 **Ask yourself.** Is this name one of many peer names, or does it carry a length risk?
 
@@ -183,6 +222,12 @@ The scanning rhythm must be even across the lines, so no line may be larger than
 
 **Situation.** A line that STATES A FACT: a short description, metadata, a value, a textual status.
 The user SCANS it rather than READS it.
+
+**Recognition signs**
+
+- It still means something on its own — it does not need a line above it in order to exist.
+- It is data, or a description of data, not the name of the data.
+- The user glances and takes the information away, without stopping to read sentence by sentence.
 
 **Ask yourself.** Does this line stand on its own as a fact, and is the reader's job to scan rather
 than to read continuously?
@@ -202,6 +247,12 @@ than to read continuously?
 FINISH. The larger size and looser line height are not because the paragraph matters more, but
 because the eye has to run the whole length of every line.
 
+**Recognition signs**
+
+- Several paragraphs or more, or article / documentation / long explanation content.
+- The user stops here rather than skimming past.
+- Delete a paragraph and meaning is lost, not a detached fact.
+
 **Ask yourself.** Must the reader read continuously across many sentences to understand?
 
 **Boundary**
@@ -214,6 +265,12 @@ because the eye has to run the whole length of every line.
 
 **Situation.** This line EXISTS ONLY BECAUSE of another line or another surface. Pull it away from
 the primary line and it says nothing.
+
+**Recognition signs**
+
+- There is always a primary line directly above it or directly beside it.
+- Read alone, the question "what is this about?" has no answer.
+- It is a timestamp, a unit, a handle, a provenance, a caption, a secondary count.
 
 **Ask yourself.** If the line above were deleted, would this line still say anything? If not —
 `TYPOGRAPHY-9`.
@@ -235,6 +292,12 @@ foreground-toned supporting copy, and no un-muted `text-xs` — except exactly `
 `August` — but those landmarks do NOT create additional sections in the document. They divide time,
 not structure.
 
+**Recognition signs**
+
+- Generated by DATA, not by the page design: as many days as there are, that many markers.
+- No table of contents should list them.
+- Remove all the markers and the list is still correct, only harder to scan.
+
 **Ask yourself.** Does this marker add an entry to the document outline? If not — `TYPOGRAPHY-10`.
 
 **Boundary**
@@ -248,6 +311,12 @@ not structure.
 
 **Situation.** The string lives INSIDE a control: a button label, badge text, link text, a field
 placeholder, status chip text. That control already settled its own typography.
+
+**Recognition signs**
+
+- The string sits inside a `button`, an `a`, an `input`, or an element with a control / status role.
+- Change that text and behaviour changes, not only content.
+- The same control appears in many other places and must look identical everywhere.
 
 **Ask yourself.** Does this string sit inside a control that already set its own typography?
 
@@ -267,6 +336,12 @@ the day the control changes and one call site drifts away from every other.
 **Situation.** The request genuinely states NO outline depth and NO content owner, and no heading or
 supporting semantics can be inferred either. A readable answer is needed rather than a refusal.
 
+**Recognition signs**
+
+- The request speaks only about appearance: "make it stand out", "make this a bit bigger".
+- It cannot be determined whom this line belongs to, and there is no surrounding line to compare
+  against.
+
 **Ask yourself.** Is the owner genuinely un-inferable, or has the question simply not been asked?
 
 **Boundary**
@@ -276,6 +351,29 @@ supporting semantics can be inferred either. A readable answer is needed rather 
 
 **No self-promotion by number.** A numeric value does NOT become the leading line merely because it
 is a number. For it to lead, a content decision must say that it leads.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| outline | `none · 1 · 2 · 3 · 4` — whether the line is a rung of the document outline, and which |
+| owner | `page · section · dominant-object · repeated-peer · ui-copy · reading-prose · control · partition` |
+| relationship | `independent · qualifies-primary · partitions-results` |
+| repetition | Whether the line appears once in the region or repeats as one of many peers |
+| length risk | Whether the string can grow long, wrap, or grow under localization |
+| state | `ready · loading · empty · error` — recorded to prove parity, never to change the answer |
+
+`outline` and `owner` are required. `relationship`, `repetition` and length risk are required
+whenever they are what separates two adjacent codes.
+
+## Render-contract opt-in scales
+
+The default recipes above remain unchanged. A schema 6 render contract may explicitly select exactly two local
+display scales when the reviewed preview requires them: `Heading.scale="display"` for the one page-root `h1`,
+and `Text size="metric-lead"` for the one leading metric value in a metric surface. They preserve the existing
+semantic owner and element; they do not promote peer titles, ordinary values or repeated rows. Absence from the
+render contract means the default `TYPOGRAPHY-1` or `TYPOGRAPHY-7` recipe. Call sites may not reconstruct either
+scale with classes.
 
 ## Rules
 
@@ -298,6 +396,9 @@ is a number. For it to lead, a content decision must say that it leads.
 12. If two adjacent codes both remain reasonable, choose the one that claims LESS ownership — the
     peer over the dominant, the support over the section, the UI copy over the reading prose. Ask
     only when the request requires the larger claim.
+13. In an action region with one dominant object, the object keeps `TYPOGRAPHY-5` and a phase or
+    request sentence resolves independently to `TYPOGRAPHY-7`; the prompt never borrows heading
+    semantics to overtake the object.
 
 Beyond these: a situation code maps to exactly one recipe, no recipe serves two codes, and every
 rendered line resolves to exactly one code. No text is out of scope.

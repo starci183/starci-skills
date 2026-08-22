@@ -235,6 +235,13 @@ exactly the room for something that has not arrived, or whose real extent is unk
 **Required, not optional.** Anywhere late-arriving content could move what is already displayed,
 reserving the room by ratio is the rule.
 
+## Render-contract opt-in control scale
+
+The default control scale remains unchanged. `Button size="lg"` is a local opt-in only when schema 6
+`renderContract` names a large standalone primary CTA that anchors the page-root action region. It is never
+selected by visual priority alone, never applies to row/card/toolbar actions, and absence from the contract keeps
+the existing `sm`/`md` placement rule.
+
 ## Rules
 
 1. One axis resolves to exactly one code. A box carries two codes, not one.

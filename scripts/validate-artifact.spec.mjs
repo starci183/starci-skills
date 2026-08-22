@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import test from "node:test"
 
 const digest = "a".repeat(64)
@@ -54,6 +55,86 @@ const pageCandidate = (id, axis, sourceHash = existingShell.sourceHash) => ({
     reason: `Complete composed lesson choice ${id}.`,
 })
 
+const addRenderContract = (candidate) => {
+    const sourceBoundary = ["src/components/pages/LessonPage/component.tsx", "src/components/pages/LessonPage/index.tsx"]
+    const page = candidate.pages[0]
+    candidate.renderContract = {
+        id: `${candidate.id}-render`, candidateId: candidate.id, sourceBoundary,
+        viewports: [{id: "desktop", width: 1440, height: 900}, {id: "mobile", width: 390, height: 844}],
+        pages: [{
+            id: page.id, route: page.route, states: [page.state], pageStates: [page.state], transitions: [],
+            regions: page.regions.map((id) => ({
+                id, owner: "LessonPage", component: "LessonContent", contract: "content-panel",
+                anatomy: ["title", "body"],
+                data: {owner: "LessonPage", source: "lesson query", mapping: ["lesson.title -> title"], states: [page.state], previewContent: "representative-fixture", runtimeTruth: "source-owned"},
+                sourceOwnership: {stateOwner: "page", drawing: {component: "LessonPageBase", path: "src/components/pages/LessonPage/component.tsx"}, connected: {component: "LessonPage", path: "src/components/pages/LessonPage/index.tsx"}, compositorKind: "page", compositor: {component: "LessonPageBase", path: "src/components/pages/LessonPage/component.tsx"}, entry: {component: "LessonPage", path: "src/components/pages/LessonPage/index.tsx"}, parentUses: "connected-component"},
+                visual: {typography: ["Heading scale display is locally opt-in at the page root"], controls: [], surface: ["content panel"], geometry: ["wide main region"]},
+            })),
+        }],
+        renders: [
+            {pageId: page.id, stateId: page.state, viewportId: "desktop", regions: page.regions},
+            {pageId: page.id, stateId: page.state, viewportId: "mobile", regions: page.regions},
+        ],
+    }
+    candidate.executionPrompt = {
+        candidateId: candidate.id, renderContractId: candidate.renderContract.id, sourceBoundary,
+        implementationMode: "exact-render-contract", reinterpretation: "forbidden", proofMode: "same-state-same-viewport-parity",
+        instructions: ["read-exact-render-contract", "implement-every-page-region-state-viewport-transition-obligation", "touch-only-source-boundary", "do-not-reinterpret-preview", "stop-if-obligation-is-unrepresentable", "prove-preview-source-same-state-same-viewport-with-zero-mismatches"],
+    }
+    return candidate
+}
+
+const canonical = (value) => {
+    if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`
+    if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`
+    return JSON.stringify(value)
+}
+
+const addPageSynthesis = (candidate) => {
+    const page = candidate.pages[0]
+    candidate.synthesis = {
+        pageIntents: [{
+            pageId: page.id, route: page.route, actor: "Learner", entry: "Open a course lesson",
+            intent: "Understand the addressed lesson", decision: "Whether the explanation is sufficient",
+            outcome: "Continue with confidence", failureConsequence: "Show a recoverable lesson error",
+            renderIntents: [{id: "lesson-reading", mustRender: "Authorized lesson content in a readable region", evidence: ["learner journey", "course content contract"]}],
+        }],
+        customerJourneys: [{
+            id: "learner-journey", actor: "Learner", goal: "Understand the lesson", entry: "Open a course lesson", outcome: "Continue with confidence",
+            steps: [{id: "read-lesson", intent: "Understand one concept", decision: "Whether the explanation is sufficient", action: "Read the lesson", consequence: "The learner can continue", pageId: page.id}],
+        }],
+        business: {
+            feature: "Course learning", head: "implemented/course-learning", objective: "Help a learner finish useful material",
+            rules: ["Only enrolled learners can read protected content"], operations: ["Read a lesson"], dataOwners: ["Course content service"],
+        },
+        capabilities: page.regions.map((regionId) => ({
+            regionId, verdict: "reuse", owner: "LessonPage", component: "LessonContent", contract: "content-panel",
+            sourcePaths: ["src/components/pages/LessonPage/component.tsx"], why: "The existing content owner already serves this journey obligation.",
+        })),
+        intersections: [{
+            pageId: page.id, journeyStepIds: ["read-lesson"], businessObligations: ["Render authorized lesson content"], regionIds: page.regions,
+            bindings: [{renderIntentId: "lesson-reading", journeyStepIds: ["read-lesson"], businessObligations: ["Render authorized lesson content"], regionIds: page.regions}],
+        }],
+    }
+    candidate.pageContract = {
+        id: `${candidate.id}-pages`, candidateId: candidate.id,
+        viewports: [{id: "desktop", width: 1440, height: 900}, {id: "mobile", width: 390, height: 844}],
+        pages: [{
+            pageId: page.id, route: page.route, representativeState: page.state, journeyStepIds: ["read-lesson"], regions: page.regions,
+            hierarchy: ["Lesson purpose precedes lesson body"], density: ["One primary reading column"], responsive: ["Rail collapses before content narrows"],
+            visualPrecedent: "StarCi course learning page", sourceFeasibility: "passed",
+        }],
+        stateInventory: [{pageId: page.id, states: [page.state, "lesson-loading", "lesson-error"], pageStates: [page.state], conditions: ["Ready after authorized content resolves", "Loading while the query is pending", "Error when the query fails"]}],
+        renders: [
+            {pageId: page.id, stateId: page.state, viewportId: "desktop", regions: page.regions},
+            {pageId: page.id, stateId: page.state, viewportId: "mobile", regions: page.regions},
+        ],
+    }
+    return candidate
+}
+
+const pageHash = (candidate) => createHash("sha256").update(canonical(candidate.pageContract)).digest("hex")
+
 function runArtifact(artifact) {
     const root = mkdtempSync(join(tmpdir(), "validate-page-set-"))
     const artifactPath = join(root, "artifact.json")
@@ -95,6 +176,380 @@ test("schema 5 generate emits one complete result under StarCi MASTER", () => {
     artifact.envelope.mode = "generate"
     const result = runArtifact(artifact)
     assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 6 accepts a complete render contract and canonical execution prompt", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 7 pages stage accepts journey-business and component synthesis without source authority", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    const artifact = {...batch([candidate]), schema: 7}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 7 pages stage refuses a source handoff before page approval", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    addRenderContract(candidate)
+    const artifact = {...batch([candidate]), schema: 7}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /pages stage stops before state expansion|cannot carry a source-write handoff/)
+})
+
+test("schema 7 states stage preserves the approved page contract, expands every state and bounds visual evidence", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    const approvedPageAt = pageHash(candidate)
+    addRenderContract(candidate)
+    const states = candidate.pageContract.stateInventory[0].states
+    candidate.renderContract.pages[0].states = states
+    const lessonRegion = candidate.renderContract.pages[0].regions[0]
+    lessonRegion.data.states = states
+    lessonRegion.sourceOwnership = {
+        stateOwner: "block",
+        drawing: {component: "LessonContentBase", path: "src/components/blocks/LessonContent/component.tsx"},
+        connected: {component: "LessonContent", path: "src/components/blocks/LessonContent/index.tsx"},
+        compositorKind: "page",
+        compositor: {component: "LessonPageBase", path: "src/components/pages/LessonPage/component.tsx"},
+        entry: {component: "LessonPage", path: "src/components/pages/LessonPage/index.tsx"},
+        parentUses: "connected-component",
+    }
+    candidate.renderContract.sourceBoundary.push("src/components/blocks/LessonContent/component.tsx", "src/components/blocks/LessonContent/index.tsx")
+    candidate.renderContract.renders = candidate.renderContract.viewports.map((viewport) => ({
+        pageId: "lesson", stateId: "lesson-error", viewportId: viewport.id, regions: ["lesson-content"],
+    }))
+    const artifact = {...batch([candidate]), schema: 7}
+    artifact.envelope.mode = "expand-states"
+    artifact.envelope.stage = "states"
+    artifact.envelope.approvedPageAt = approvedPageAt
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 7 states stage refuses page drift and incomplete approved states", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    const approvedPageAt = pageHash(candidate)
+    candidate.pageContract.pages[0].hierarchy.push("Unapproved new hierarchy")
+    addRenderContract(candidate)
+    const artifact = {...batch([candidate]), schema: 7}
+    artifact.envelope.mode = "expand-states"
+    artifact.envelope.stage = "states"
+    artifact.envelope.approvedPageAt = approvedPageAt
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /drifted after page approval|must expand the complete approved state inventory/)
+})
+
+test("schema 7 forward test composes the Nivo AgentOS journey into a complete page before states", () => {
+    const page = {
+        id: "agentos", route: "/agentos", state: "agentos-ready",
+        nodes: [existingShell, {id: "agentos-page", kind: "page", change: "proposed", parentId: "app-shell"}],
+        regions: ["workspace-list", "provisioning-journey"],
+    }
+    const candidate = {
+        id: "agentos-customer-journey", systemId: "starci-master", pageOverride: {deviations: []}, axes: axes[0], pages: [page],
+        regions: [region("agentos", "workspace-list"), region("agentos", "provisioning-journey")],
+        synthesis: {
+            pageIntents: [{
+                pageId: "agentos", route: "/agentos", actor: "Nivo account owner", entry: "Open AgentOS from console navigation",
+                intent: "Manage an existing workspace or request another", decision: "Open owned capacity or enter provisioning",
+                outcome: "Reach the workspace or its next provisioning action", failureConsequence: "Keep ownership visible with an actionable provisioning failure",
+                renderIntents: [
+                    {id: "owned-workspaces-first", mustRender: "Stable owned workspaces before creation", evidence: ["owner journey", "workspace-list contract"]},
+                    {id: "connected-provisioning", mustRender: "One connected five-stage provisioning lifecycle", evidence: ["owner journey", "provisioning contract"]},
+                ],
+            }],
+            customerJourneys: [{
+                id: "agentos-owner-journey", actor: "Nivo account owner", goal: "Manage or request an AgentOS workspace", entry: "Open AgentOS from console navigation", outcome: "Reach the existing workspace or a clear provisioning next step",
+                steps: [
+                    {id: "review-owned-workspaces", intent: "See stable owned workspaces first", decision: "Open an existing workspace or continue to creation", action: "Review workspace identities and lifecycle", consequence: "Existing ownership remains the primary surface", pageId: "agentos"},
+                    {id: "request-new-workspace", intent: "Create another workspace", decision: "Whether to submit or resume the order", action: "Follow the five-stage provisioning journey", consequence: "Payment and live provisioning status remain attached to one order", pageId: "agentos"},
+                ],
+            }],
+            business: {
+                feature: "AgentOS workspace provisioning", head: "current-source/AgentOSPage", objective: "Compose management before creation and keep one order attached to its live workspace status",
+                rules: ["Owned workspaces are the stable AgentOS surface", "New and resumed orders share one page owner"],
+                operations: ["Open an owned workspace", "Request or resume workspace provisioning"], dataOwners: ["Agent workspace query", "Catalog order and provisioning status"],
+            },
+            capabilities: [
+                {regionId: "workspace-list", verdict: "reuse", owner: "AgentOSWorkspaceList", component: "AgentOSWorkspaceList", contract: "label-row-over-card", sourcePaths: ["apps/app/src/components/blocks/agentos/AgentOSWorkspaceList/index.tsx"], why: "The current owner already presents stable workspaces before the creation task."},
+                {regionId: "provisioning-journey", verdict: "reuse", owner: "AgentOSProvisioning", component: "AgentOSProvisioning", contract: "request-beside-live-status", sourcePaths: ["apps/app/src/components/blocks/provisioning/AgentOSProvisioning/component.tsx"], why: "The current owner already binds five lifecycle stages, request identity and live status."},
+            ],
+            intersections: [{
+                pageId: "agentos", journeyStepIds: ["review-owned-workspaces", "request-new-workspace"], businessObligations: ["Management precedes creation", "Five stages read as one connected lifecycle"], regionIds: page.regions,
+                bindings: [
+                    {renderIntentId: "owned-workspaces-first", journeyStepIds: ["review-owned-workspaces"], businessObligations: ["Management precedes creation"], regionIds: ["workspace-list"]},
+                    {renderIntentId: "connected-provisioning", journeyStepIds: ["request-new-workspace"], businessObligations: ["Five stages read as one connected lifecycle"], regionIds: ["provisioning-journey"]},
+                ],
+            }],
+        },
+        pageContract: {
+            id: "agentos-pages", candidateId: "agentos-customer-journey",
+            viewports: [{id: "desktop", width: 1440, height: 900}, {id: "mobile", width: 390, height: 844}],
+            pages: [{
+                pageId: "agentos", route: "/agentos", representativeState: "agentos-ready", journeyStepIds: ["review-owned-workspaces", "request-new-workspace"], regions: page.regions,
+                hierarchy: ["AgentOS title", "Owned workspace management", "Connected five-stage provisioning journey", "Request identity beside live status"],
+                density: ["Workspace rows remain scannable above one dense provisioning surface"], responsive: ["Lifecycle becomes an ordered vertical sequence on narrow screens"],
+                visualPrecedent: "Nivo console topology with unicorn-red profile accent", sourceFeasibility: "passed",
+            }],
+            stateInventory: [{pageId: "agentos", states: ["agentos-ready", "catalog-loading", "request", "submitting", "awaiting-payment", "accepted", "preparing", "ready", "failed"], pageStates: ["agentos-ready"], conditions: ["Representative ready composition", "Catalog pending", "Request available", "Mutation pending", "Invoice required", "Order accepted", "Infrastructure preparing", "Workspace ready", "Provisioning failed"]}],
+            renders: [
+                {pageId: "agentos", stateId: "agentos-ready", viewportId: "desktop", regions: page.regions},
+                {pageId: "agentos", stateId: "agentos-ready", viewportId: "mobile", regions: page.regions},
+            ],
+        },
+        reason: "The complete AgentOS page intersects workspace management and provisioning business journeys with the existing source owners.",
+    }
+    const artifact = {...batch([candidate], {kind: "page", source: "screenshot"}), schema: 7}
+    artifact.envelope.surface = "agentos"
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(candidate.renderContract, undefined)
+    assert.equal(candidate.executionPrompt, undefined)
+})
+
+test("schema 7 refuses anatomy assembled before every page render intent is merged", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    candidate.synthesis.pageIntents[0].renderIntents.push({id: "legacy-section-cards", mustRender: "Legacy-backed reading sections remain distinct surfaces", evidence: ["legacy screenshot"]})
+    const artifact = {...batch([candidate]), schema: 7}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must bind every page render intent exactly/)
+})
+
+test("schema 7 refuses a merge row without a contract-first region capability", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    candidate.synthesis.intersections[0].bindings[0].regionIds = ["invented-region"]
+    const artifact = {...batch([candidate]), schema: 7}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /not owned by page|has no contract-first capability/)
+})
+
+test("schema 6 refuses a layout candidate with no render contract or execution prompt", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /requires complete implementation authority|requires the canonical execution prompt/)
+})
+
+test("schema 6 refuses incomplete viewport coverage and execution reinterpretation", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    candidate.renderContract.renders.pop()
+    candidate.executionPrompt.reinterpretation = "allowed"
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /selected state lesson\/lesson-ready must cover viewport mobile|expected "forbidden"/)
+})
+
+test("schema 6 refuses more than five distinct state-review selections", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    const states = ["s1", "s2", "s3", "s4", "s5", "s6"]
+    candidate.renderContract.pages[0].states = states
+    candidate.renderContract.pages[0].regions[0].data.states = states
+    candidate.renderContract.renders = candidate.renderContract.viewports.flatMap((viewport) => states.map((stateId) => ({
+        pageId: "lesson", stateId, viewportId: viewport.id, regions: ["lesson-content"],
+    })))
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must select no more than 5 complete-page render targets, received 6/)
+})
+
+test("schema 6 refuses a prompt whose identity or source boundary drifts", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    candidate.executionPrompt.renderContractId = "other-render"
+    candidate.executionPrompt.sourceBoundary = ["src/other.tsx"]
+    candidate.executionPrompt.instructions.reverse()
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must equal render contract id|must exactly equal|canonical ordered execution instructions/)
+})
+
+test("schema 6 requires an explicit ComponentBase to Page source ownership chain", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    delete candidate.renderContract.pages[0].regions[0].sourceOwnership
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /sourceOwnership/)
+})
+
+test("schema 6 refuses PageProps proxying a block state and a block drawing owned by PageBase", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    const page = candidate.renderContract.pages[0]
+    const region = page.regions[0]
+    page.states = ["lesson-ready", "lesson-loading"]
+    region.data.states = ["lesson-ready", "lesson-loading"]
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const proxied = runArtifact(artifact)
+    assert.notEqual(proxied.status, 0)
+    assert.match(proxied.stderr, /local states lesson-loading require a block owner|PageProps, LayoutProps or OverlayProps may not proxy block state/)
+    region.sourceOwnership.stateOwner = "block"
+    const pageOwnedDrawing = runArtifact(artifact)
+    assert.notEqual(pageOwnedDrawing.status, 0)
+    assert.match(pageOwnedDrawing.stderr, /block ComponentBase drawing must be distinct from its PageBase, LayoutBase or OverlayBase compositor/)
+})
+
+test("schema 6 requires every ownership path in the exact boundary and PageBase to use a connected child", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    const ownership = candidate.renderContract.pages[0].regions[0].sourceOwnership
+    ownership.drawing.path = "src/components/blocks/LessonContent/component.tsx"
+    ownership.parentUses = "drawing-component"
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must be present in renderContract.sourceBoundary/)
+    assert.match(result.stderr, /outer Base must compose the connected Component/)
+})
+
+test("schema 6 encodes and validates a cross-page Overview to Apps transition", () => {
+    const candidate = pageCandidate("operations-flow", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    candidate.pages = [
+        {id: "overview", route: "/", state: "overview-ready", nodes: [existingShell, {id: "overview-page", kind: "page", change: "proposed", parentId: "app-shell"}], regions: ["overview-content"]},
+        {id: "apps", route: "/apps", state: "apps-ready", nodes: [existingShell, {id: "apps-page", kind: "page", change: "proposed", parentId: "app-shell"}], regions: ["apps-content"]},
+    ]
+    candidate.regions = [region("overview", "overview-content"), region("apps", "apps-content")]
+    const sourceBoundary = ["src/components/pages/OverviewPage/component.tsx", "src/components/pages/OverviewPage/index.tsx", "src/components/pages/AppsPage/component.tsx", "src/components/pages/AppsPage/index.tsx"]
+    const renderRegion = (id, owner, state) => ({
+        id, owner, component: owner, contract: "content-panel", anatomy: ["title", "body"],
+        data: {owner, source: `${owner} query`, mapping: ["runtime entity -> rendered row"], states: [state], previewContent: "representative-fixture", runtimeTruth: "source-owned"},
+        sourceOwnership: {stateOwner: "page", drawing: {component: `${owner}Base`, path: `src/components/pages/${owner}/component.tsx`}, connected: {component: owner, path: `src/components/pages/${owner}/index.tsx`}, compositorKind: "page", compositor: {component: `${owner}Base`, path: `src/components/pages/${owner}/component.tsx`}, entry: {component: owner, path: `src/components/pages/${owner}/index.tsx`}, parentUses: "connected-component"},
+        visual: {typography: ["page hierarchy"], controls: ["route action"], surface: ["content panel"], geometry: ["main region"]},
+    })
+    candidate.renderContract = {
+        id: "operations-flow-render", candidateId: candidate.id, sourceBoundary,
+        viewports: [{id: "desktop", width: 1440, height: 900}],
+        pages: [
+            {id: "overview", route: "/", states: ["overview-ready"], pageStates: ["overview-ready"], regions: [renderRegion("overview-content", "OverviewPage", "overview-ready")], transitions: [{id: "open-apps", fromPageId: "overview", fromStateId: "overview-ready", toPageId: "apps", toStateId: "apps-ready", trigger: "Activate Apps navigation", owner: "ConsoleNavigation"}]},
+            {id: "apps", route: "/apps", states: ["apps-ready"], pageStates: ["apps-ready"], regions: [renderRegion("apps-content", "AppsPage", "apps-ready")], transitions: []},
+        ],
+        renders: [
+            {pageId: "overview", stateId: "overview-ready", viewportId: "desktop", regions: ["overview-content"]},
+            {pageId: "apps", stateId: "apps-ready", viewportId: "desktop", regions: ["apps-content"]},
+        ],
+    }
+    candidate.executionPrompt = {candidateId: candidate.id, renderContractId: candidate.renderContract.id, sourceBoundary, implementationMode: "exact-render-contract", reinterpretation: "forbidden", proofMode: "same-state-same-viewport-parity", instructions: ["read-exact-render-contract", "implement-every-page-region-state-viewport-transition-obligation", "touch-only-source-boundary", "do-not-reinterpret-preview", "stop-if-obligation-is-unrepresentable", "prove-preview-source-same-state-same-viewport-with-zero-mismatches"]}
+    const artifact = {...batch([candidate], {kind: "flow", source: "description"}), schema: 6}
+    artifact.envelope.mode = "generate"
+    assert.equal(runArtifact(artifact).status, 0)
+    candidate.renderContract.pages[0].transitions[0].toStateId = "missing-state"
+    const invalid = runArtifact(artifact)
+    assert.notEqual(invalid.status, 0)
+    assert.match(invalid.stderr, /to endpoint must name a declared render state/)
+})
+
+test("schema 6 refuses preview fixture values masquerading as runtime truth", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addRenderContract(candidate)
+    candidate.renderContract.pages[0].regions[0].data.runtimeTruth = "preview-owned"
+    const artifact = {...batch([candidate]), schema: 6}
+    artifact.envelope.mode = "generate"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /expected "source-owned"/)
 })
 
 test("schema 5 refuses a candidate that silently omits MASTER", () => {

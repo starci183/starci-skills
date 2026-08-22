@@ -4,22 +4,75 @@
   "grammar": "starci",
   "capsules": [
     {
+      "id": "global-navbar",
+      "intent": "Give every authenticated StarCi dashboard or operational console one persistent global navigation landmark whose identity and tools reflect only real product capabilities.",
+      "triggerFacts": ["surface-dashboard-console"],
+      "decisionQuestions": ["Is the addressed surface an authenticated dashboard or operational console?", "Which product-wide actions have real behavior on this routed source?"],
+      "variableAxes": ["product-capabilities", "viewport-state", "session-state"],
+      "invariants": ["one-global-navbar-all-viewports", "brand-and-product-context-left", "evidenced-global-tools-right", "unsupported-global-actions-absent", "mobile-navigation-trigger-joins-global-tools", "persistent-rail-destinations-not-duplicated"],
+      "interactionProof": [
+        { "id": "global-tools-are-operable", "kind": "interaction", "assertion": "Every rendered global tool completes its declared product behavior; no visual precedent manufactures an inert action." },
+        { "id": "navbar-survives-viewport-change", "kind": "state", "assertion": "Wide and narrow layouts retain one global navbar owner, with the narrow destination trigger joining its tool row." },
+        { "id": "rail-and-navbar-do-not-repeat-destinations", "kind": "dom", "assertion": "Persistent destination collections remain owned by the rail or drawer and are not duplicated in the global navbar." }
+      ],
+      "counterexampleCaseRefs": ["ordinary-surface-without-global-navbar"],
+      "templateRef": "./templates/global-navbar.template.tsx",
+      "templateHash": "sha256:9ef1f4dd2238fa5d5f40ec0c1b32c6f018de627213a51a452df4a419e35e4a0e",
+      "rulings": ["founder-feedback:2026-08-22:authenticated-console-has-one-capability-backed-global-navbar"],
+      "goldenCaseRefs": ["authenticated-dashboard-global-navbar"]
+    },
+    {
       "id": "dashboard-theme",
       "intent": "Keep every authenticated StarCi dashboard and operational console inside one exact profile-owned visual theme across chrome, navigation, content and responsive forms.",
       "triggerFacts": ["surface-dashboard-console"],
       "decisionQuestions": ["Is the addressed surface an authenticated dashboard or operational console?", "Does every viewport and navigation state preserve the same routed StarCi visual identity?"],
-      "variableAxes": ["viewport-state", "navigation-state", "content-state"],
-      "invariants": ["exact-semantic-theme-tokens", "profile-accent-primary", "soft-profile-accent-selected-surface", "warm-neutral-ground", "white-primary-surface", "eclipse-foreground", "neutral-separators", "starci-sans-typeset", "soft-rounded-surfaces", "measured-surface-shadow", "same-theme-all-viewports", "no-project-local-theme-substitution"],
+      "variableAxes": ["viewport-state", "navigation-state", "content-state", "theme-mode", "renderer-boundary"],
+      "invariants": ["exact-semantic-theme-tokens", "profile-accent-primary", "soft-profile-accent-selected-surface", "warm-neutral-ground", "white-primary-surface", "eclipse-foreground", "neutral-separators", "starci-sans-typeset", "soft-rounded-surfaces", "measured-surface-shadow", "same-theme-all-viewports", "same-semantic-roles-all-theme-modes", "theme-reaches-renderer-owned-portals", "profile-accent-reaches-renderer-owned-portals", "no-project-local-theme-substitution"],
       "interactionProof": [
         { "id": "exact-theme-token-values", "kind": "computed-style", "assertion": "Ground, surface, foreground, muted, accent, separator, typography, radius and elevation resolve to the exact grammar-locked token values." },
         { "id": "selected-navigation-soft-profile-accent", "kind": "computed-style", "assertion": "The selected navigation destination uses the soft surface derived from the exact accent owned by the routed profile." },
-        { "id": "theme-survives-layout-state", "kind": "state", "assertion": "Expanded rail, collapsed rail, mobile chrome and drawer keep the same locked theme contract." }
+        { "id": "theme-survives-layout-state", "kind": "state", "assertion": "Expanded rail, collapsed rail, mobile chrome and drawer keep the same locked theme contract." },
+        { "id": "theme-survives-mode-and-renderer-boundary", "kind": "computed-style", "assertion": "Light and dark routed content plus renderer-owned menus, drawers, popovers and overlays resolve matching ground/content roles and the exact profile accent without vendor fallback." }
       ],
       "counterexampleCaseRefs": ["ordinary-surface-without-dashboard-theme"],
       "templateRef": "./templates/dashboard-theme.template.tsx",
-      "templateHash": "sha256:4f4bbf2759240f4d34084216850e4252a6f2b3c2dc7204b7ec2e3f09d00c6c36",
-      "rulings": ["founder-feedback:2026-08-21:dashboard-has-one-strict-starci-theme", "founder-feedback:2026-08-21:nivo-console-keeps-starci-topology-with-unicorn-red-profile-accent"],
-      "goldenCaseRefs": ["strict-starci-dashboard-theme"]
+      "templateHash": "sha256:0f9ae1c9f13b493b81e8b92207009007f365bb4d1a978181c429fd6508592073",
+      "rulings": ["founder-feedback:2026-08-21:dashboard-has-one-strict-starci-theme", "founder-feedback:2026-08-21:nivo-console-keeps-starci-topology-with-unicorn-red-profile-accent", "founder-feedback:2026-08-22:dashboard-theme-reaches-renderer-boundaries"],
+      "goldenCaseRefs": ["strict-starci-dashboard-theme", "dashboard-theme-reaches-renderer-boundaries"]
+    },
+    {
+      "id": "surface-card",
+      "intent": "Render one labelled read-only body inside one bounded surface while its section label remains outside.",
+      "triggerFacts": ["surface-section-labelled", "content-single-body"],
+      "decisionQuestions": ["Does the section own one body rather than a collection or form?", "Does the label name the following surface from outside?"],
+      "variableAxes": ["body-content", "body-state"],
+      "invariants": ["one-bounded-surface", "section-label-outside-surface", "body-owns-content"],
+      "interactionProof": [
+        { "id": "card-label-precedes-boundary", "kind": "dom", "assertion": "The semantic section label precedes and sits outside the one card boundary." },
+        { "id": "one-body-owner", "kind": "dom", "assertion": "Exactly one body owner renders inside the card without peer-row or form semantics." }
+      ],
+      "counterexampleCaseRefs": ["peer-list-not-single-body-surface"],
+      "templateRef": "./templates/surface-card.template.tsx",
+      "templateHash": "sha256:4be4560145123c50d9df34234d4259e4654c679749ed432558e31a1e508d17d9",
+      "rulings": ["founder-feedback:2026-08-22:labelled-section-resolves-semantic-surface-owner"],
+      "goldenCaseRefs": ["labelled-single-body-surface"]
+    },
+    {
+      "id": "surface-form",
+      "intent": "Render one labelled operation as a bounded form surface owning fields, status and actions.",
+      "triggerFacts": ["surface-section-labelled", "interaction-bounded-form"],
+      "decisionQuestions": ["Do these fields, status messages and actions belong to one operation?", "Does the section label name the form surface from outside?"],
+      "variableAxes": ["field-values", "validation-state", "submission-state", "result-state"],
+      "invariants": ["one-bounded-surface", "section-label-outside-surface", "form-owns-fields-status-actions"],
+      "interactionProof": [
+        { "id": "form-label-precedes-boundary", "kind": "dom", "assertion": "The semantic section label precedes and sits outside the one form card boundary." },
+        { "id": "one-form-owner", "kind": "interaction", "assertion": "Fields, validation, pending, result and recovery actions remain inside one form owner." }
+      ],
+      "counterexampleCaseRefs": ["non-form-content-not-form-surface"],
+      "templateRef": "./templates/surface-form.template.tsx",
+      "templateHash": "sha256:b94a68aa4115c9bf69479ae25145b3cd3b04e7c36d06996f56e8bb9368c66a3c",
+      "rulings": ["founder-feedback:2026-08-22:labelled-section-resolves-semantic-surface-owner"],
+      "goldenCaseRefs": ["labelled-bounded-form-surface"]
     },
     {
       "id": "surface-list",
@@ -35,7 +88,7 @@
       "counterexampleCaseRefs": ["hierarchical-collection-not-peer-list"],
       "templateRef": "./templates/surface-list.template.tsx",
       "templateHash": "sha256:1f07ef7c32b107015c036a364a1033c7a58265011a3bd02083f984dcd0c36f59",
-      "rulings": ["founder-feedback:2026-08-21:list-renders-as-surface-list"],
+      "rulings": ["founder-feedback:2026-08-21:list-renders-as-surface-list", "founder-feedback:2026-08-22:labelled-section-resolves-semantic-surface-owner"],
       "goldenCaseRefs": ["joined-peer-list"]
     },
     {

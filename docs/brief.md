@@ -25,7 +25,7 @@ The result is not merely a suggested design or plan. Selected decisions remain t
 session to the source state they were made against; the same invocation implements them, and execution stops
 when that evidence is stale or incomplete.
 
-## The eighteen skills
+## The nineteen skills
 
 ### Environment and trust
 
@@ -46,6 +46,7 @@ when that evidence is stale or incomplete.
 |---|---|---|
 | [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Generate one complete long page/full flow with every block and state; brainstorm alternatives only on request | one `OK` binds the complete baseline to exact source paths |
 | [`starci-fe-design-block`](./skills/starci-fe-design-block) | Audit/correct a Layout-generated block in its full page; brainstorm anatomies only on request | audit findings and correction stay inside the owning block paths |
+| [`starci-fe-ui-align`](./skills/starci-fe-ui-align) | Audit equivalent UI responsibilities across existing surfaces and converge them on evidence-backed authority | the complete authority/source impact cone and same-state/same-viewport proof plan |
 | [`starci-grammar-refresh-references`](./skills/starci-grammar-refresh-references) | Refresh stale optional immutable grammar provenance without changing durable authority | routed grammar reference sidecar only |
 | [`starci-fe-minor-fix`](./skills/starci-fe-minor-fix) | Correct one existing block, composite, or leaf without changing its contract, ownership, or public shape | one clean component folder, at most two production files, two tests, and 40 production changed lines |
 

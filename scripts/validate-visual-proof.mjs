@@ -8,6 +8,9 @@ const rank = new Map([["working-tree", 0], ["verified-local", 1], ["committed", 
 
 export function validateVisualProof(baseline, proof) {
   const failures = [];
+  if (proof.schemaVersion !== 2) failures.push("visual proof schemaVersion must be 2");
+  if (!/^[a-f0-9]{64}$/.test(proof.candidateAt ?? "")) failures.push("candidateAt must bind the selected candidate hash");
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(proof.renderContractId ?? "")) failures.push("renderContractId must bind the selected render contract");
   if ((proof.knownDefects ?? []).length) failures.push("known visual defects remain");
   if ((rank.get(proof.actualTerminalState) ?? -1) < (rank.get(proof.requestedTerminalState) ?? 99)) failures.push(`delivery stopped at ${proof.actualTerminalState} before requested ${proof.requestedTerminalState}`);
   for (const name of ["build", "lint", "tests", "browser"]) if (proof.checks?.[name] !== "passed") failures.push(`${name} is not passed`);
@@ -15,7 +18,11 @@ export function validateVisualProof(baseline, proof) {
   for (const reference of baseline.references ?? []) {
     const match = comparisons.find((item) => item.referenceId === reference.id && item.state === reference.state && item.viewport?.width === reference.viewport.width && item.viewport?.height === reference.viewport.height);
     if (!match) failures.push(`missing same-viewport comparison for ${reference.id}`);
-    else if (match.fullViewport !== "passed" || match.targetRegion !== "passed" || match.preservedRegions !== "passed" || match.consoleClean !== true) failures.push(`comparison is incomplete for ${reference.id}`);
+    else {
+      const capture = /\.(?:png|jpe?g|webp)$/i;
+      if (!capture.test(match.previewCapture ?? "") || !capture.test(match.sourceCapture ?? "") || match.previewCapture === match.sourceCapture) failures.push(`comparison must carry distinct real preview/source captures for ${reference.id}`);
+      if (match.fullViewport !== "passed" || match.targetRegion !== "passed" || match.preservedRegions !== "passed" || match.parity !== "passed" || (match.mismatches ?? ["missing"]).length !== 0 || match.consoleClean !== true) failures.push(`comparison is incomplete for ${reference.id}`);
+    }
   }
   return {ok: failures.length === 0, failures};
 }

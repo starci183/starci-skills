@@ -222,6 +222,11 @@ condition been stated anywhere?
 - `COLOUR-10`: the page background must NOT be written with `bg-card`. If everything is a card,
   nothing can rise above anything.
 
+**Renderer boundary.** The page and any menu, drawer, popover or overlay rendered as its document
+sibling must resolve their semantic roles from one common theme ancestor. A local visual boundary may
+consume or alias those roles, but it cannot be their only owner when the same experience renders
+outside it. An intentionally isolated embed with its own declared theme owner is the negative boundary.
+
 ## `COLOUR-10` — raised surface
 
 **Situation.** A SELF-CONTAINED block sitting on the page background: it gathers a group of content
@@ -316,8 +321,9 @@ brand, not by this module.
 4. Every `COLOUR-4`, `COLOUR-5` and `COLOUR-6` carries a matching text, icon or accessible label.
 5. Selection (`COLOUR-3`) and focus (`COLOUR-7`) are different states and stay distinguishable when
    both are present on one element.
-6. The same semantic role holds across light, dark and forced-colour themes. A theme changes token
-   VALUES; it never changes which code applies.
+6. The same semantic role holds across light, dark and forced-colour themes and across renderer-owned
+   portals. A theme changes token VALUES; it never changes which code applies, and every rendered root
+   in the same experience receives the matching ground/content pair.
 7. The shared surface vocabulary is `bg-background`, `bg-card`, `bg-muted`, `border-border` and
    `ring-ring`. No module invents a parallel surface token name.
 8. One element, one role. A surface node does not also carry a status colour.

@@ -34,8 +34,9 @@ where that ownership can be named and tested.
 | `VENDOR-12` | An accepted auth overlay must host content | Auth overlays project one named content contract into zero-inset `ModalBranch` mechanics. No duplicate Tree/content hosts and no second vertical inset |
 | `VENDOR-13` | A checkbox carries a label | Checkbox Control and Indicator remain inside Checkbox Content. No visible label outside the checkbox press target |
 | `VENDOR-14` | The shape navigates inside StarCi | Internal navigation reports an action to connected routing code. No internal StarCi `href` values in leaves or components |
+| `VENDOR-15` | The shape presents rows and columns as a table | `TableBranch` owns HeroUI `Table` and its compound parts and projects validated cells. No raw `<table>` in the component tier and no second hand-built grid standing in for one |
 
-This module publishes eleven codes. The numbers `VENDOR-3`, `VENDOR-4` and `VENDOR-5` are not
+This module publishes twelve codes. The numbers `VENDOR-3`, `VENDOR-4` and `VENDOR-5` are not
 published here; do not invent them to fill the gap.
 
 ## Reading an accepted shape
@@ -62,6 +63,9 @@ published here; do not invent them to fill the gap.
 branches, or in the named SurfaceCard family — nowhere else. Every other file in the shape receives
 the result of those owners, not the vendor anatomy.
 
+**Recognition signs.** A `@heroui/react` import inside a block, layout, overlay, page, composite, or a
+branch that is not a named mechanics owner.
+
 **Boundary.** This is not `VENDOR-2`. `VENDOR-1` asks where a vendor import may live at all;
 `VENDOR-2` asks whether a file that claims mechanics ownership actually owns a mechanic.
 
@@ -74,6 +78,9 @@ wrapper tier for it.
 vendor interaction primitive. No empty mechanics branch, and no `components/shells` directory — every
 such directory is drift and is deleted.
 
+**Recognition signs.** A branch in the mechanics position with no vendor import; a new folder created
+to hold "wrappers"; a `components/shells` path reappearing.
+
 **Boundary.** This is not `VENDOR-1`. `VENDOR-1` polices files that import vendor without the right;
 `VENDOR-2` polices files that hold the right and import nothing — the privilege without the mechanic.
 
@@ -85,6 +92,9 @@ such directory is drift and is deleted.
 inset; the padding stays in the contract. Neither a missing body nor stacked body-and-contract padding
 is acceptable.
 
+**Recognition signs.** Two scroll regions in one overlay; `className="p-4"` on `Modal.Body`; content
+placed directly in `Modal` with no body.
+
 **Boundary.** This is not `VENDOR-12`. `VENDOR-6` binds the mechanics file's body and inset;
 `VENDOR-12` binds what an auth overlay projects into that body.
 
@@ -94,6 +104,9 @@ is acceptable.
 
 **What it emits in source.** The house `Field`, using HeroUI Input `variant="secondary"`. No competing
 default input surface is introduced beside it.
+
+**Recognition signs.** A second input component with its own default surface; a HeroUI Input used at a
+different variant to get a different look.
 
 **Boundary.** This is not `VENDOR-9`. `VENDOR-7` binds the input surface; `VENDOR-9` binds what the
 label may show.
@@ -105,6 +118,9 @@ label may show.
 **What it emits in source.** The overlay uses headings, rows, spacing, and controls directly. No
 second named SurfaceCard branch is placed inside an overlay that is already bounded.
 
+**Recognition signs.** A `SurfaceCard` rendered inside a modal or drawer; a visible border inside a
+surface that already has one.
+
 **Boundary.** This is not `VENDOR-1`. `VENDOR-1` would allow the SurfaceCard family to import vendor;
 `VENDOR-8` says that even a legal owner does not belong inside an already bounded overlay.
 
@@ -115,6 +131,9 @@ second named SurfaceCard branch is placed inside an overlay that is already boun
 **What it emits in source.** The label stays textual. No decorative kind icon is inferred from the
 input type.
 
+**Recognition signs.** A mail glyph beside an email field; a lock glyph beside a password field, added
+by type rather than by meaning.
+
 **Boundary.** This is not `VENDOR-7`. `VENDOR-7` binds the input surface itself; `VENDOR-9` binds the
 label beside it.
 
@@ -124,6 +143,9 @@ label beside it.
 
 **What it emits in source.** `TextLink`, wrapping HeroUI `Link`. No raw-button link behaviour and no
 local recreation of hover or underline.
+
+**Recognition signs.** A button styled to look like a link; a local `hover:underline` on an anchor; an
+anchor that reimplements the link's visited and hover treatment.
 
 **Boundary.** This is not `VENDOR-14`. `VENDOR-10` binds what a link is made of; `VENDOR-14` binds
 whether an internal destination may appear as an `href` at all.
@@ -136,6 +158,9 @@ whether an internal destination may appear as an `href` at all.
 `AccountMenu` owns the choices, `ShellNav` composes the block. Vendor anatomy does not leak into the
 block, and navigation performs no direct account action.
 
+**Recognition signs.** Dropdown item anatomy written inside `ShellNav`; a sign-out call made directly
+from the navigation layout.
+
 **Boundary.** This is not `VENDOR-2`. `VENDOR-2` only requires that `DropdownBranch` own a mechanic;
 `VENDOR-11` additionally splits choices and composition into their own files.
 
@@ -145,6 +170,9 @@ block, and navigation performs no direct account action.
 
 **What it emits in source.** One named content contract, projected into zero-inset `ModalBranch`
 mechanics. No duplicate Tree or content hosts, and no second vertical inset.
+
+**Recognition signs.** Two content hosts in one auth overlay; a wrapper `div` adding vertical padding
+on top of the contract's own.
 
 **Boundary.** This is not `VENDOR-6`. `VENDOR-6` binds the body and its inset in the mechanics file;
 `VENDOR-12` binds the auth overlay's content to a single named contract projection.
@@ -156,6 +184,9 @@ mechanics. No duplicate Tree or content hosts, and no second vertical inset.
 **What it emits in source.** Checkbox Control and Indicator remain inside Checkbox Content. The
 visible label is never placed outside the checkbox press target.
 
+**Recognition signs.** A label rendered as a sibling of the checkbox; a row where only the small box
+responds to a press.
+
 **Boundary.** This is not `VENDOR-9`. `VENDOR-9` concerns what a field label may show; `VENDOR-13`
 concerns where a checkbox label physically sits relative to the press target.
 
@@ -166,8 +197,46 @@ concerns where a checkbox label physically sits relative to the press target.
 **What it emits in source.** The component reports an action to connected routing code. Internal
 StarCi `href` values do not appear in leaves or components.
 
+**Recognition signs.** A hardcoded internal path in a leaf; a component importing a router to build an
+internal URL string.
+
 **Boundary.** This is not `VENDOR-10`. `VENDOR-10` says what a link is built from; `VENDOR-14` says an
 internal destination is not the component's to hold.
+
+## `VENDOR-15` — Tables go through TableBranch
+
+**Situation.** The accepted shape presents rows and columns as a table — a comparison in an authored
+document, a result grid, a schema listing.
+
+**What it emits in source.** `TableBranch`, wrapping HeroUI `Table` with its compound parts:
+`Table.Header`, `Table.Column` carrying `isRowHeader` on the first column, `Table.Row`, `Table.Cell`,
+and one `Table.Content` that owns the accessible name. Callers supply cells and arrange rows; they
+never reach past the branch for a part. No raw `<table>`, `<thead>` or `<tbody>` anywhere in the
+component tier.
+
+**It is a branch, and the tier is forced rather than chosen.** A leaf takes `ComponentData`, which is
+JSON to the bottom — string, number, boolean, null, and arrays and objects of those. A table cell
+carries inline content: a link mid-phrase, a file path set in code, an emphasised word. None of that
+survives a JSON slot, so a leaf could only accept cells already flattened to text, and flattening is
+exactly the loss the table exists to prevent. `CompositeProps` states the same conclusion from the
+other side — where a caller may supply the content, the component is a branch. `TableBranch` therefore
+joins the closed HeroUI owner list beside the SurfaceCard family, and projects contract-validated
+cells the way that family already projects a validated body.
+
+**Recognition signs.** A `<table>` element carrying layout classes; a header row built from `<th>`
+with hand-written borders; a grid of `<div>`s with `role="table"`; column alignment recreated with
+`min-w-max` because the vendor's own scroll container was never used.
+
+**Boundary.** This is not `VENDOR-1`. `VENDOR-1` refuses a vendor import written in the wrong file,
+and it can only see imports that exist — a hand-built table imports nothing, so `VENDOR-1` is silent
+on the one case that most needs saying. `VENDOR-15` names the absence itself: where a table is what
+the shape means, the branch is the only way to write it.
+
+**A table that overflows is two decisions, not one.** The leaf owns the vendor; the frame around it is
+`SURFACE-IN-SURFACE-7` and the sideways scroll is `OVERFLOW-5`. The vendor's own root is a grid whose
+inner scroll container does not propagate `min-width`, so a wide table left unframed pushes the whole
+reading column past the viewport. The plain block frame is what lets the column shrink — it is
+required by those two codes, and it is not this module's to emit.
 
 ## Layer held
 
@@ -175,7 +244,15 @@ Contracts hold visible shape. Mechanics branches hold only lifecycle, focus, por
 placement and the HeroUI scroll region — they are three named owners, `ModalBranch`, `DrawerBranch`,
 `DropdownBranch`, and they do not constitute an architectural tier of their own. Blocks, layouts,
 overlays, pages and composites stay ignorant of vendor anatomy entirely: they receive results, never
-imports. `ShellNav` is a product name, not an exemption from any ownership rule.
+imports. `ShellNav` is a product name, not an exemption from any ownership rule. `TableBranch` sits
+with the SurfaceCard family rather than with the leaves, because its cells arrive from the caller and
+a leaf slot cannot carry them.
+
+A vendor boundary is crossed in two directions and this module holds both. A file may reach for
+vendor anatomy it has no right to — that is `VENDOR-1`, and an import makes it visible. A file may
+also rebuild by hand what a leaf already owns, importing nothing at all: the raw `<table>` that
+`VENDOR-15` refuses. The second is the quieter failure, because nothing in the file names the vendor
+it is standing in for.
 
 ## Inputs
 
@@ -211,7 +288,9 @@ imports. `ShellNav` is a product name, not an exemption from any ownership rule.
     press target is forbidden.
 11. Internal navigation reports an action to connected routing code; internal StarCi `href` values in
     leaves or components are forbidden.
-12. Do not create a generic wrapper tier, re-export vendor anatomy, pass raw markup through component
+12. `TableBranch` owns HeroUI `Table` and its compound parts and projects validated cells; a raw
+    `<table>` in the component tier and a hand-built grid standing in for one are both forbidden.
+13. Do not create a generic wrapper tier, re-export vendor anatomy, pass raw markup through component
     containers, or move visible classes out of the contract to make mechanics convenient.
 
 ## Exceptions

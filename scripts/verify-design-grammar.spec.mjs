@@ -80,7 +80,8 @@ function dashboardPreview(design) {
 
 test("dashboard visual contract accepts only its exact StarCi theme", () => {
   const design = dashboardFixture()
-  assert.equal(verifyDesignGrammar({design, grammarRoot, profilePath, preview: dashboardPreview(design)}).decisions.length, 1)
+  const outcomes = verifyDesignGrammar({design, grammarRoot, profilePath, preview: dashboardPreview(design)}).decisions.map((decision) => decision.outcome)
+  assert.deepEqual(outcomes, ["starci-dashboard-theme", "authenticated-global-navbar"])
 })
 
 test("dashboard visual contract refuses a project-local accent substitution", () => {

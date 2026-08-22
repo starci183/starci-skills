@@ -363,6 +363,9 @@ for (const [file, en] of parsed) {
 
 for (const [file, skill] of parsed) {
   if (!/[\\/]skills[\\/]starci-[^\\/]+[\\/]SKILL\.md$/.test(file)) continue;
+  if (!skill.loads.rows.some(({alias}) => alias === "@skill-shape")) {
+    report(file, Math.max(skill.loads.start + 1, 1), "every StarCi skill must load @skill-shape for shared step-table and approval control");
+  }
   const viPath = join(dirname(file), "vi.md");
   const vi = parsed.get(viPath);
   if (!vi) {

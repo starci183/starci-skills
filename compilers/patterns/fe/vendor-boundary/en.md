@@ -39,8 +39,9 @@ where that ownership can be named and tested.
 | `VENDOR-12` | An accepted auth overlay must host content | Auth overlays project one named content contract into zero-inset `ModalBranch` mechanics. No duplicate Tree/content hosts and no second vertical inset |
 | `VENDOR-13` | A checkbox carries a label | Checkbox Control and Indicator remain inside Checkbox Content. No visible label outside the checkbox press target |
 | `VENDOR-14` | The shape navigates inside StarCi | Internal navigation reports an action to connected routing code. No internal StarCi `href` values in leaves or components |
+| `VENDOR-15` | The shape presents rows and columns as a table | `TableBranch` owns HeroUI `Table` and its compound parts and projects validated cells. No raw `<table>` in the component tier and no second hand-built grid standing in for one |
 
-This module publishes eleven codes. The numbers `VENDOR-3`, `VENDOR-4` and `VENDOR-5` are not
+This module publishes twelve codes. The numbers `VENDOR-3`, `VENDOR-4` and `VENDOR-5` are not
 published here; do not invent them to fill the gap.
 
 ## Reading an accepted shape
@@ -241,20 +242,67 @@ internal destination is not the component's to hold.
 **Common business situations.** A card that opens a course page; a breadcrumb inside a dashboard; a
 CTA that moves the reader to pricing.
 
+## `VENDOR-15` — Tables go through TableBranch
+
+**Situation.** The accepted shape presents rows and columns as a table — a comparison in an authored
+document, a result grid, a schema listing.
+
+**What it emits in source.** `TableBranch`, wrapping HeroUI `Table` with its compound parts:
+`Table.Header`, `Table.Column` carrying `isRowHeader` on the first column, `Table.Row`, `Table.Cell`,
+and one `Table.Content` that owns the accessible name. Callers supply cells and arrange rows; they
+never reach past the branch for a part. No raw `<table>`, `<thead>` or `<tbody>` anywhere in the
+component tier.
+
+**It is a branch, and the tier is forced rather than chosen.** A leaf takes `ComponentData`, which is
+JSON to the bottom — string, number, boolean, null, and arrays and objects of those. A table cell
+carries inline content: a link mid-phrase, a file path set in code, an emphasised word. None of that
+survives a JSON slot, so a leaf could only accept cells already flattened to text, and flattening is
+exactly the loss the table exists to prevent. `CompositeProps` states the same conclusion from the
+other side — where a caller may supply the content, the component is a branch. `TableBranch` therefore
+joins the closed HeroUI owner list beside the SurfaceCard family, and projects contract-validated
+cells the way that family already projects a validated body.
+
+**Recognition signs.** A `<table>` element carrying layout classes; a header row built from `<th>`
+with hand-written borders; a grid of `<div>`s with `role="table"`; column alignment recreated with
+`min-w-max` because the vendor's own scroll container was never used.
+
+**Boundary.** This is not `VENDOR-1`. `VENDOR-1` refuses a vendor import written in the wrong file,
+and it can only see imports that exist — a hand-built table imports nothing, so `VENDOR-1` is silent
+on the one case that most needs saying. `VENDOR-15` names the absence itself: where a table is what
+the shape means, the branch is the only way to write it.
+
+**A table that overflows is two decisions, not one.** The leaf owns the vendor; the frame around it is
+`SURFACE-IN-SURFACE-7` and the sideways scroll is `OVERFLOW-5`. The vendor's own root is a grid whose
+inner scroll container does not propagate `min-width`, so a wide table left unframed pushes the whole
+reading column past the viewport. The plain block frame is what lets the column shrink — it is
+required by those two codes, and it is not this module's to emit.
+
+**Common business situations.** A comparison table inside a lesson; a pricing matrix on a marketing
+page; a run history in an operations console; a field reference in documentation.
+
 ## Layer held
 
 Contracts hold visible shape. Mechanics branches hold only lifecycle, focus, portal, dismiss,
 placement and the HeroUI scroll region — they are three named owners, `ModalBranch`, `DrawerBranch`,
 `DropdownBranch`, and they do not constitute an architectural tier of their own. Blocks, layouts,
 overlays, pages and composites stay ignorant of vendor anatomy entirely: they receive results, never
-imports. `ShellNav` is a product name, not an exemption from any ownership rule.
+imports. `ShellNav` is a product name, not an exemption from any ownership rule. `TableBranch` sits
+with the SurfaceCard family rather than with the leaves, because its cells arrive from the caller and
+a leaf slot cannot carry them.
+
+A vendor boundary is crossed in two directions and this module holds both. A file may reach for
+vendor anatomy it has no right to — that is `VENDOR-1`, and an import makes it visible. A file may
+also rebuild by hand what a leaf already owns, importing nothing at all: the raw `<table>` that
+`VENDOR-15` refuses. The second is the quieter failure, because nothing in the file names the vendor
+it is standing in for.
 
 ## Anchor
 
 The rules live in `@canon-fe` with their twin tests in
 `@canon-fe`. Product anchors are `components/branches/ModalBranch`,
 `DrawerBranch`, `DropdownBranch`, the SurfaceCard family, `components/leaves/Field`, `TextLink`,
-`Checkbox`, `components/blocks/auth/AccountMenu`, and `components/layouts/ShellNav`.
+`Checkbox`, `components/branches/TableBranch`, `components/blocks/auth/AccountMenu`, and
+`components/layouts/ShellNav`.
 
 ## Inputs
 
@@ -290,7 +338,9 @@ The rules live in `@canon-fe` with their twin tests in
     press target is forbidden.
 11. Internal navigation reports an action to connected routing code; internal StarCi `href` values in
     leaves or components are forbidden.
-12. Do not create a generic wrapper tier, re-export vendor anatomy, pass raw markup through component
+12. `TableBranch` owns HeroUI `Table` and its compound parts and projects validated cells; a raw
+    `<table>` in the component tier and a hand-built grid standing in for one are both forbidden.
+13. Do not create a generic wrapper tier, re-export vendor anatomy, pass raw markup through component
     containers, or move visible classes out of the contract to make mechanics convenient.
 
 ## Exceptions

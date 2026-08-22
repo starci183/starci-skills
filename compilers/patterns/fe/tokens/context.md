@@ -95,6 +95,7 @@ around it changes.
 | `TOKEN-7` | A semantic colour is needed: bare mark, soft plate, or solid plate | A bare mark uses `text-*`; a plate pairs `bg-*-soft` with `text-*-soft-foreground`, or `bg-*` with `text-*-foreground`. Never a `*-soft` background token used as an ink colour |
 | `TOKEN-8` | A height must be chosen for a control | Size selected from placement, variant selected from priority. Never height inferred from variant, word count, or how loud the control feels; never custom padding used to shrink a control |
 | `TOKEN-9` | A class names a token the theme has not defined | The name is a union member AND the variable it requests exists in the stylesheet. Never reporting names the framework resolves itself — `screen`, `full`, `fit`, the viewport units |
+| `TOKEN-10` | One experience renders both inside a local app boundary and through document-level portals | Semantic theme variables live at the common document theme hook in the app-owned global stylesheet. A local boundary may alias or consume them, never remain their only definition |
 
 ## Reading an accepted shape
 
@@ -113,7 +114,8 @@ around it changes.
    list (`TOKEN-2`), a fractional step (`TOKEN-3`), an arbitrary length or raw colour (`TOKEN-4`), a
    hand-rolled heading (`TOKEN-5`), a string in the folder the union cannot see (`TOKEN-6`), a colour
    used in the wrong role (`TOKEN-7`), a control height (`TOKEN-8`), or a token name whose variable
-   may not exist (`TOKEN-9`)?
+   may not exist (`TOKEN-9`), or a semantic variable exists only below a renderer sibling that also
+   consumes it (`TOKEN-10`)?
 5. **When two codes both match, the tier and the failure mode separate them.** The same `[13px]` is
    `TOKEN-1` inside a typed entry, where the compiler refuses it, and `TOKEN-4` inside a leaf, where
    a rule catches it. A shrunk control that also carries custom padding is both `TOKEN-8` and
@@ -251,6 +253,22 @@ system while this one looks correct. Names the framework resolves itself are out
 about this theme, and reporting them sends an author to define a variable nothing reads — measured
 across two repositories on the first run: two findings, both wrong, both from this list.
 
+## `TOKEN-10` — one theme owner must reach every renderer root in the experience
+
+**Situation.** The app places semantic colour variables under a local visual boundary while a vendor
+menu, drawer, popover or overlay is rendered as that boundary's document sibling. The variable exists,
+so `TOKEN-9` is satisfied inside the app, but the portalled surface falls back to vendor colour.
+
+**What it emits in source.** Define the semantic palette and light/dark hooks in the app-owned global
+stylesheet at the nearest document ancestor shared by routed content and renderer-owned portals. A local
+theme boundary may alias grammar roles, set typography or consume the palette; components and mechanics
+branches never duplicate raw colours to repair one portal.
+
+**Boundary.** Not `TOKEN-9`: every variable may exist and still be scoped below one consumer, so the
+unresolved-token gate stays green. Not `VENDOR-2`: the mechanics branch may correctly own portal lifecycle;
+`TOKEN-10` owns where the semantic variables it consumes must be reachable. An intentionally isolated embed
+with its own declared theme owner is outside this code.
+
 ## Layer held
 
 Which tier actually holds each code. A rule is named only where one was found in `tokens.mjs` and
@@ -267,8 +285,9 @@ read; everything else is `documented`, and that gap is a measurement, not a fail
 | `TOKEN-7` | `documented` | Nothing mechanical. Pairing is a two-class relationship no rule in `tokens.mjs` looks for |
 | `TOKEN-8` | `documented` | The size union closes the set to two, so a third height is unrepresentable — but WHICH of the two is right is a placement judgement nothing checks |
 | `TOKEN-9` | `enforced` | `no-unresolved-token-class` |
+| `TOKEN-10` | `documented` | Browser computed-style proof across routed content and one renderer-owned portal; no published static rule proves cascade reach |
 
-Four codes are `enforced`, one is `unrepresentable`, four are `documented`. The vocabulary type owns
+Four codes are `enforced`, one is `unrepresentable`, five are `documented`. The vocabulary type owns
 the entry tier and the leaf folder stays outside it by policy; the rule file owns product source
 under `src/`, and tooling and configuration stay ignorant of all of it because they render nothing.
 
@@ -279,9 +298,16 @@ under `src/`, and tooling and configuration stay ignorant of all of it because t
 | class string | The literal text, whether written in markup, hoisted into a module constant, or listed in an entry array |
 | tier | Which folder the file sits in — typed entry tier, or the leaf folder that writes its own classes |
 | vocabulary | The current union members, read from the union itself and not from memory |
-| theme | The stylesheet that defines the variables a token name requests |
+| theme | The stylesheet that defines the variables a token name requests, plus every renderer root that consumes those variables |
 | placement | For a control: embedded in a row or cluster, versus standalone and owning a line |
 | role | For a colour: bare mark, soft plate, or solid plate |
+
+## Render-contract opt-in tokens
+
+The closed default scale remains unchanged. A schema 6 render contract may select the typed local variants
+`Heading.scale="display"`, `Text size="metric-lead"` and `Button size="lg"`; leaf-owned variant tables emit their
+tokens. `lg` is restricted to a standalone page-root primary CTA, while row/card/toolbar actions remain `sm` or
+`md`. Call sites may not write new utilities or arbitrary values to approximate any opt-in.
 
 ## Rules
 
@@ -298,6 +324,8 @@ under `src/`, and tooling and configuration stay ignorant of all of it because t
 9. A class naming a theme token resolves only when the stylesheet defines its variable.
 10. The edge of a surface and the seam inside it are one decision.
 11. Every emitted measurement, colour and control height resolves to exactly one code.
+12. Semantic theme variables consumed by routed content and renderer-owned portals live at their common
+    document theme hook in the app-owned global stylesheet; a local boundary is never their only owner.
 
 ## Exceptions
 
@@ -328,7 +356,7 @@ pattern resolves.
 ```text
 value: <the class or token as written>
 tier: <entry | leaf>
-code: <TOKEN-1 … TOKEN-9>
+code: <TOKEN-1 … TOKEN-10>
 holder: <unrepresentable | enforced:<rule-name> | documented>
 verdict: <member | replace with <member> | define <variable> | pair with <token>>
 reason: <the fact that excludes the adjacent code>

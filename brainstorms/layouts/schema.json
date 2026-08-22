@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"enum": [1, 2, 3, 4, 5], "description": "Schema 5 binds a composed page set to StarCi MASTER plus a deviations-only page override. Older session shapes remain compatibility input."},
+    "schema": {"enum": [1, 2, 3, 4, 5, 6, 7], "description": "Schema 7 separates page-anatomy approval from state expansion and source approval. Schema 6 remains compatibility input."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -69,6 +69,49 @@
           "candidates": {"items": {"allOf": [{"$ref": "#/$defs/candidate"}, {"required": ["systemId", "pageOverride", "pages"]}]}}
         }
       }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 6}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope", "mode"]}]},
+          "candidates": {"items": {"allOf": [{"$ref": "#/$defs/candidate"}, {"required": ["systemId", "pageOverride", "pages", "renderContract", "executionPrompt"]}]}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 7}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope", "mode", "stage"]}]},
+          "candidates": {
+            "items": {
+              "allOf": [
+                {"$ref": "#/$defs/candidate"},
+                {"required": ["systemId", "pageOverride", "pages", "synthesis", "pageContract"]},
+                {
+                  "if": {"required": ["renderContract"]},
+                  "then": {
+                    "properties": {
+                      "renderContract": {
+                        "properties": {
+                          "pages": {
+                            "items": {
+                              "properties": {
+                                "regions": {"items": {"required": ["grammarScopes"]}}
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -84,8 +127,10 @@
         "prompt": {"type": "string", "minLength": 1},
         "contractAt": {"type": "string", "minLength": 1, "description": "The contract state these candidates were resolved against."},
         "scope": {"$ref": "#/$defs/scope"},
-        "mode": {"enum": ["generate", "brainstorm"]},
-        "baselineCandidateAt": {"$ref": "#/$defs/hash", "description": "Required only for explicit brainstorm mode after the owner has reviewed a complete generated baseline."}
+        "mode": {"enum": ["generate", "brainstorm", "expand-states"]},
+        "stage": {"enum": ["pages", "states"], "description": "Pages is the cache-only page-anatomy review. States is the post-page-approval expansion and exact source-boundary review."},
+        "baselineCandidateAt": {"$ref": "#/$defs/hash", "description": "Required only for explicit brainstorm mode after the owner has reviewed a complete generated baseline."},
+        "approvedPageAt": {"$ref": "#/$defs/hash", "description": "Required in the states stage. SHA-256 of the canonical selected pageContract approved at the pages stage."}
       }
     },
     "scope": {
@@ -119,7 +164,253 @@
         },
         "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}},
         "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/page"}},
+        "synthesis": {"$ref": "#/$defs/synthesis"},
+        "pageContract": {"$ref": "#/$defs/pageContract"},
+        "renderContract": {"$ref": "#/$defs/renderContract"},
+        "executionPrompt": {"$ref": "#/$defs/executionPrompt"},
         "reason": {"type": "string", "minLength": 12}
+      }
+    },
+    "synthesis": {
+      "description": "The explicit intersection of top-down customer journey and business truth with bottom-up component, contract and source capability evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pageIntents", "customerJourneys", "business", "capabilities", "intersections"],
+      "properties": {
+        "pageIntents": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pageIntent"}},
+        "customerJourneys": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/customerJourney"}},
+        "business": {"$ref": "#/$defs/businessTruth"},
+        "capabilities": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/componentCapability"}},
+        "intersections": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/designIntersection"}}
+      }
+    },
+    "pageIntent": {
+      "description": "One page identified before either design track, including the closed visible outcomes the merged anatomy must render.",
+      "type": "object", "additionalProperties": false,
+      "required": ["pageId", "route", "actor", "entry", "intent", "decision", "outcome", "failureConsequence", "renderIntents"],
+      "properties": {
+        "pageId": {"$ref": "#/$defs/slug"}, "route": {"type": "string", "minLength": 1},
+        "actor": {"type": "string", "minLength": 1}, "entry": {"type": "string", "minLength": 1},
+        "intent": {"type": "string", "minLength": 1}, "decision": {"type": "string", "minLength": 1},
+        "outcome": {"type": "string", "minLength": 1}, "failureConsequence": {"type": "string", "minLength": 1},
+        "renderIntents": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderIntent"}}
+      }
+    },
+    "renderIntent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "mustRender", "evidence"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "mustRender": {"type": "string", "minLength": 12},
+        "evidence": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "customerJourney": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "actor", "goal", "entry", "outcome", "steps"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"}, "actor": {"type": "string", "minLength": 1}, "goal": {"type": "string", "minLength": 1},
+        "entry": {"type": "string", "minLength": 1}, "outcome": {"type": "string", "minLength": 1},
+        "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/journeyStep"}}
+      }
+    },
+    "journeyStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "intent", "decision", "action", "consequence", "pageId"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"}, "intent": {"type": "string", "minLength": 1}, "decision": {"type": "string", "minLength": 1},
+        "action": {"type": "string", "minLength": 1}, "consequence": {"type": "string", "minLength": 1}, "pageId": {"$ref": "#/$defs/slug"}
+      }
+    },
+    "businessTruth": {
+      "type": "object", "additionalProperties": false,
+      "required": ["feature", "head", "objective", "rules", "operations", "dataOwners"],
+      "properties": {
+        "feature": {"type": "string", "minLength": 1}, "head": {"type": "string", "minLength": 1}, "objective": {"type": "string", "minLength": 1},
+        "rules": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "operations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "dataOwners": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "componentCapability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["regionId", "verdict", "owner", "component", "contract", "sourcePaths", "why"],
+      "properties": {
+        "regionId": {"$ref": "#/$defs/slug"}, "verdict": {"enum": ["reuse", "generalize", "new-required"]},
+        "owner": {"type": "string", "minLength": 1}, "component": {"type": "string", "minLength": 1}, "contract": {"type": "string", "minLength": 1},
+        "sourcePaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "why": {"type": "string", "minLength": 12}
+      }
+    },
+    "designIntersection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pageId", "journeyStepIds", "businessObligations", "regionIds", "bindings"],
+      "properties": {
+        "pageId": {"$ref": "#/$defs/slug"},
+        "journeyStepIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "businessObligations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "regionIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "bindings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/mergeBinding"}}
+      }
+    },
+    "mergeBinding": {
+      "description": "One explicit merge row connecting an independently declared page render intent to journey/business demand and contract-backed regions.",
+      "type": "object", "additionalProperties": false,
+      "required": ["renderIntentId", "journeyStepIds", "businessObligations", "regionIds"],
+      "properties": {
+        "renderIntentId": {"$ref": "#/$defs/slug"},
+        "journeyStepIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "businessObligations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "regionIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}
+      }
+    },
+    "pageContract": {
+      "description": "The cache-only page anatomy approved before state expansion. Its canonical hash must remain unchanged through the states stage.",
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "candidateId", "viewports", "pages", "stateInventory", "renders"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"}, "candidateId": {"$ref": "#/$defs/slug"},
+        "viewports": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderViewport"}},
+        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pageAnatomy"}},
+        "stateInventory": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pageStateInventory"}},
+        "renders": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderCoverage"}}
+      }
+    },
+    "pageAnatomy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pageId", "route", "representativeState", "journeyStepIds", "regions", "hierarchy", "density", "responsive", "visualPrecedent", "sourceFeasibility"],
+      "properties": {
+        "pageId": {"$ref": "#/$defs/slug"}, "route": {"type": "string", "minLength": 1}, "representativeState": {"$ref": "#/$defs/slug"},
+        "journeyStepIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "regions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "hierarchy": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "density": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "responsive": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "visualPrecedent": {"type": "string", "minLength": 1}, "sourceFeasibility": {"const": "passed"}
+      }
+    },
+    "pageStateInventory": {
+      "description": "All page-visible render conditions plus the subset that changes page architecture. A local block condition is never promoted into pageStates merely because proof captures the whole page.",
+      "type": "object", "additionalProperties": false, "required": ["pageId", "states", "pageStates", "conditions"],
+      "properties": {
+        "pageId": {"$ref": "#/$defs/slug"},
+        "states": {"description": "Every declared page-visible render condition, whether page-owned or block-owned.", "type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "pageStates": {"description": "Only states that change region arrangement, hierarchy or active page-level composition; use default when no architectural page-state axis exists.", "type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "conditions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "renderContract": {
+      "description": "The complete implementation authority for the selected preview. Pages, regions, page states, block states and transitions stay exhaustive; renders select at most five complete-page targets and cover every reference viewport for each selection.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "candidateId", "sourceBoundary", "viewports", "pages", "renders"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "candidateId": {"$ref": "#/$defs/slug"},
+        "sourceBoundary": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "viewports": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderViewport"}},
+        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderPage"}},
+        "renders": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderCoverage"}}
+      }
+    },
+    "renderViewport": {
+      "type": "object", "additionalProperties": false, "required": ["id", "width", "height"],
+      "properties": {"id": {"$ref": "#/$defs/slug"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}}
+    },
+    "renderPage": {
+      "type": "object", "additionalProperties": false, "required": ["id", "route", "states", "pageStates", "regions", "transitions"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"}, "route": {"type": "string", "minLength": 1},
+        "states": {"description": "Every page-visible render condition across page and block owners.", "type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "pageStates": {"description": "The architectural page-state subset only.", "type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/renderRegion"}},
+        "transitions": {"type": "array", "items": {"$ref": "#/$defs/renderTransition"}}
+      }
+    },
+    "renderRegion": {
+      "description": "One source-bound visual owner. These obligations replace execution-time interpretation of a brief.",
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "owner", "component", "contract", "anatomy", "data", "sourceOwnership", "visual"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "owner": {"type": "string", "minLength": 1},
+        "component": {"type": "string", "minLength": 1},
+        "contract": {"type": "string", "minLength": 1},
+        "anatomy": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "grammarScopes": {
+          "description": "Closed child targets whose facts deterministically bind the exact semantic owners used by this region.",
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/grammarScope"}
+        },
+        "data": {"type": "object", "additionalProperties": false, "required": ["owner", "source", "mapping", "states", "previewContent", "runtimeTruth"], "properties": {"owner": {"type": "string", "minLength": 1}, "source": {"type": "string", "minLength": 1}, "mapping": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}, "states": {"description": "Only page-visible render conditions owned or materially affected by this region; local block states stay here rather than becoming pageStates.", "type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}, "previewContent": {"const": "representative-fixture"}, "runtimeTruth": {"const": "source-owned"}}},
+        "sourceOwnership": {"$ref": "#/$defs/sourceOwnership"},
+        "visual": {"type": "object", "additionalProperties": false, "required": ["typography", "controls", "surface", "geometry"], "properties": {"typography": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}, "controls": {"type": "array", "items": {"type": "string", "minLength": 1}}, "surface": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}, "geometry": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}}}
+      }
+    },
+    "grammarScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "facts", "decisions"],
+      "properties": {
+        "target": {"$ref": "#/$defs/slug"},
+        "facts": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "decisions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/grammarDecision"}}
+      }
+    },
+    "grammarDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "outcome", "component"],
+      "properties": {
+        "slot": {"$ref": "#/$defs/slug"},
+        "outcome": {"$ref": "#/$defs/slug"},
+        "component": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceComponent": {
+      "description": "One exact source component identity and file.",
+      "type": "object", "additionalProperties": false, "required": ["component", "path"],
+      "properties": {
+        "component": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceOwnership": {
+      "description": "The explicit SPLIT-6 ownership chain for this region. ComponentBase draws state, Component optionally reads the world, a PageBase/LayoutBase/OverlayBase composes that child, and its connected entry owns only that outer surface. Nesting child state under outer props is not an ownership transfer.",
+      "type": "object", "additionalProperties": false,
+      "required": ["stateOwner", "drawing", "connected", "compositorKind", "compositor", "entry", "parentUses"],
+      "properties": {
+        "stateOwner": {"enum": ["page", "layout", "overlay", "block"]},
+        "drawing": {"$ref": "#/$defs/sourceComponent"},
+        "connected": {"oneOf": [{"$ref": "#/$defs/sourceComponent"}, {"type": "null"}]},
+        "compositorKind": {"enum": ["page", "layout", "overlay"]},
+        "compositor": {"$ref": "#/$defs/sourceComponent"},
+        "entry": {"$ref": "#/$defs/sourceComponent"},
+        "parentUses": {"enum": ["connected-component", "drawing-component"]}
+      }
+    },
+    "renderTransition": {
+      "description": "One outgoing transition owned by its containing page. State endpoints name declared render conditions at their real page or block owner; they do not imply every endpoint is a page state.",
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "fromPageId", "fromStateId", "toPageId", "toStateId", "trigger", "owner"],
+      "properties": {"id": {"$ref": "#/$defs/slug"}, "fromPageId": {"$ref": "#/$defs/slug"}, "fromStateId": {"$ref": "#/$defs/slug"}, "toPageId": {"$ref": "#/$defs/slug"}, "toStateId": {"$ref": "#/$defs/slug"}, "trigger": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}}
+    },
+    "renderCoverage": {
+      "type": "object", "additionalProperties": false, "required": ["pageId", "stateId", "viewportId", "regions"],
+      "properties": {"pageId": {"$ref": "#/$defs/slug"}, "stateId": {"$ref": "#/$defs/slug"}, "viewportId": {"$ref": "#/$defs/slug"}, "regions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}}}
+    },
+    "executionPrompt": {
+      "description": "Canonical machine-readable handoff. Its identities and source boundary must equal the selected candidate and render contract.",
+      "type": "object", "additionalProperties": false,
+      "required": ["candidateId", "renderContractId", "sourceBoundary", "implementationMode", "reinterpretation", "proofMode", "instructions"],
+      "properties": {
+        "candidateId": {"$ref": "#/$defs/slug"}, "renderContractId": {"$ref": "#/$defs/slug"},
+        "sourceBoundary": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "implementationMode": {"const": "exact-render-contract"},
+        "reinterpretation": {"const": "forbidden"},
+        "proofMode": {"const": "same-state-same-viewport-parity"},
+        "instructions": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "string"}}
       }
     },
     "page": {
@@ -196,7 +487,7 @@
       }
     },
     "brief": {
-      "description": "Hashed impressionistic child brief owned by layout review. Representative labels, values and actions make purpose, density and reading order imaginable, but remain wireframe evidence and never authorize final anatomy, copy or states.",
+      "description": "Legacy schema 3-5 impressionistic child brief. It remains non-authoritative wireframe evidence; in schema 6 the hashed renderContract is the sole implementation authority for anatomy, copy, states and data mapping.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "title", "summary", "items"],

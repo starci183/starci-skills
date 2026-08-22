@@ -217,6 +217,8 @@ trong hai dữ kiện là rơi xuống `TYPOGRAPHY-6`.
   trong vùng.
 - `TYPOGRAPHY-6`: cần **cả hai** dữ kiện duy-nhất và ngắn. Lặp lại, gọn, dài, hoặc dễ dài sau dịch →
   luôn là `TYPOGRAPHY-6`. Mặc định an toàn là `TYPOGRAPHY-6`.
+- `TYPOGRAPHY-7`: câu chỉ phase, request hoặc next action đang **phát biểu** điều sẽ xảy ra; nó không
+  thành heading trong dàn ý hay vượt đối tượng trội duy nhất chỉ vì nó giới thiệu hành động.
 
 **Tình huống nghiệp vụ hay gặp.** Tên khoá học trong một thẻ giới thiệu lớn · tên gói dịch vụ trong
 một khung so sánh một gói · tên tệp trong một khung xem trước · tên đối tượng trong một khung bên chi
@@ -415,6 +417,14 @@ dòng chữ dán vào mà chưa gắn với cấu trúc nào · nội dung tạm
 `outline` và `owner` là bắt buộc. `relationship`, `repetition` và rủi ro độ dài là bắt buộc bất cứ khi
 nào chính chúng là thứ phân định hai mã liền kề.
 
+## Scale opt-in từ render contract
+
+Các recipe mặc định phía trên không đổi. Schema 6 render contract chỉ được chọn tường minh đúng hai local
+display scale khi preview đã duyệt yêu cầu: `Heading.scale="display"` cho page-root `h1` duy nhất và
+`Text size="metric-lead"` cho leading metric value duy nhất trong metric surface. Chúng giữ nguyên semantic owner
+và element; không promote peer title, ordinary value hay repeated row. Vắng mặt trong render contract thì dùng
+recipe `TYPOGRAPHY-1` hoặc `TYPOGRAPHY-7` mặc định. Call site không được ghép class để dựng lại các scale này.
+
 ## Quy tắc
 
 1. Cấp độ dàn ý quyết định **cả** phần tử ngữ nghĩa **lẫn** cấp bậc hiển thị. Một `h2` mang dáng phần
@@ -435,6 +445,8 @@ nào chính chúng là thứ phân định hai mã liền kề.
 12. Nếu còn hai mã liền kề cùng hợp lý, chọn mã **giành ít quyền sở hữu hơn**: phần tử ngang hàng
     trước chủ đạo, nội dung hỗ trợ trước phần nội dung, chữ giao diện trước văn bản đọc liên tục. Chỉ
     hỏi khi yêu cầu bắt buộc quyền lớn hơn.
+13. Trong action region có một đối tượng trội, đối tượng giữ `TYPOGRAPHY-5` còn câu phase hoặc request
+    resolve độc lập thành `TYPOGRAPHY-7`; prompt không được mượn heading semantics để vượt đối tượng.
 
 Ngoài ra: một mã tình huống ứng với đúng một công thức, không công thức nào phục vụ hai mã, và mọi
 dòng chữ hiển thị ra đều rơi vào đúng một mã. Không dòng chữ nào nằm ngoài phạm vi.

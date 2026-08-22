@@ -80,6 +80,7 @@ the machine emitted rules from more than one row. Bare and plugin-qualified rule
 | `auth-overlay-owns-single-content-host` | machine-only identity | an auth overlay lacks or duplicates its content host | `vendor-boundary/context.md` |
 | `checkbox-keeps-compound-anatomy` | machine-only identity | checkbox compound anatomy is broken | `vendor-boundary/context.md` |
 | `no-internal-starci-href` | machine-only identity | a governed component owns an internal StarCi href | `vendor-boundary/context.md` |
+| `tables-go-through-table-branch` | VENDOR-15 | a raw table element or hand-built grid stands in for TableBranch | `vendor-boundary/context.md` |
 
 ## Unknown findings
 

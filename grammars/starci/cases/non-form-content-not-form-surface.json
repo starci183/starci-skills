@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "non-form-content-not-form-surface",
+  "kind": "counterexample",
+  "because": "A labelled read-only body has no form operation and must not be wrapped by the form owner.",
+  "facts": ["surface-section-labelled", "content-single-body"],
+  "expectedOutcomes": ["surface-card"],
+  "rejectedOutcomes": ["surface-form"]
+}

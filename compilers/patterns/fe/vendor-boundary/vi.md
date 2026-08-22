@@ -39,8 +39,9 @@ hợp lệ ở nơi quyền sở hữu ấy gọi được tên và test đượ
 | `VENDOR-12` | Một overlay auth đã duyệt cần chỗ chứa nội dung | Overlay auth chiếu đúng một content contract có tên vào cơ chế `ModalBranch` không inset. Cấm trùng lặp Tree/content host và cấm inset dọc thứ hai |
 | `VENDOR-13` | Một checkbox có nhãn | Control và Indicator của Checkbox nằm bên trong Checkbox Content. Cấm nhãn nhìn thấy nằm ngoài vùng bấm của checkbox |
 | `VENDOR-14` | Shape điều hướng sang một chỗ khác bên trong StarCi | Điều hướng nội bộ báo một action lên code routing đã nối. Cấm giá trị `href` nội bộ StarCi trong leaf hay component |
+| `VENDOR-15` | Shape trình bày hàng và cột dưới dạng bảng | `TableBranch` sở hữu HeroUI `Table` cùng các bộ phận compound và chiếu vào những ô đã validate. Cấm `<table>` thô trong tầng component và cấm dựng tay một lưới thay thế |
 
-Module này công bố mười một mã. Các số `VENDOR-3`, `VENDOR-4` và `VENDOR-5` không được công bố ở đây;
+Module này công bố mười hai mã. Các số `VENDOR-3`, `VENDOR-4` và `VENDOR-5` không được công bố ở đây;
 đừng tự nghĩ ra chúng để lấp chỗ trống.
 
 ## Đọc một shape đã duyệt
@@ -237,19 +238,64 @@ dựng chuỗi URL nội bộ.
 **Tình huống nghiệp vụ hay gặp.** Một thẻ mở trang khóa học; một breadcrumb trong dashboard; một CTA
 đưa người đọc sang trang giá.
 
+## `VENDOR-15` — Bảng phải đi qua TableBranch
+
+**Tình huống.** Shape đã chốt trình bày hàng và cột dưới dạng một cái bảng — một bảng so sánh trong
+tài liệu, một lưới kết quả, một liệt kê schema.
+
+**Nó sinh ra gì trong source.** `TableBranch`, bọc HeroUI `Table` cùng các bộ phận compound:
+`Table.Header`, `Table.Column` mang `isRowHeader` ở cột đầu, `Table.Row`, `Table.Cell`, và một
+`Table.Content` sở hữu tên trợ năng. Bên gọi đưa ô vào và sắp xếp các hàng; không bao giờ với tay qua
+branch để lấy một bộ phận. Cấm `<table>`, `<thead>` hay `<tbody>` thô ở bất kỳ đâu trong tầng
+component.
+
+**Nó là branch, và tầng này bị ép chứ không phải được chọn.** Một leaf nhận `ComponentData`, tức JSON
+tới tận đáy — string, number, boolean, null, cùng mảng và object của chúng. Một ô bảng thì mang nội
+dung inline: một liên kết giữa câu, một đường dẫn file đặt trong code, một chữ được nhấn. Không thứ
+nào sống sót qua một slot JSON, nên leaf chỉ có thể nhận những ô đã bị ép phẳng thành chữ, mà ép phẳng
+chính là mất mát mà cái bảng sinh ra để ngăn. `CompositeProps` nói đúng kết luận ấy từ phía bên kia —
+chỗ nào bên gọi được phép đưa nội dung vào, chỗ đó là branch. Vì vậy `TableBranch` gia nhập danh sách
+owner HeroUI đóng, đứng cạnh họ SurfaceCard, và chiếu vào những ô đã validate qua contract đúng cách
+họ đó vốn đã chiếu vào một thân đã validate.
+
+**Dấu hiệu nhận ra.** Một phần tử `<table>` mang class bố cục; một hàng tiêu đề dựng bằng `<th>` với
+đường viền viết tay; một lưới `<div>` gắn `role="table"`; căn cột được dựng lại bằng `min-w-max` vì
+scroll container của chính vendor chưa bao giờ được dùng.
+
+**Ranh giới.** Đây không phải `VENDOR-1`. `VENDOR-1` từ chối một import vendor viết sai file, và nó
+chỉ nhìn thấy được những import **có tồn tại** — một cái bảng dựng tay thì không import gì cả, nên
+`VENDOR-1` im lặng đúng ở ca cần nói nhất. `VENDOR-15` gọi tên chính sự vắng mặt đó: chỗ nào cái bảng
+chính là nghĩa của shape, thì branch là cách viết duy nhất.
+
+**Một cái bảng bị tràn là hai quyết định, không phải một.** Branch sở hữu vendor; cái khung quanh nó là
+`SURFACE-IN-SURFACE-7` còn chỗ cuộn ngang là `OVERFLOW-5`. Root của vendor vốn là một grid mà scroll
+container bên trong không lan `min-width` ra ngoài, nên một cái bảng rộng để trần sẽ đẩy cả cột đọc
+vượt viewport. Khung block thuần chính là thứ cho phép cột co lại — nó do hai mã kia bắt buộc, và
+không phải thứ module này phát ra.
+
+**Tình huống nghiệp vụ hay gặp.** Bảng so sánh trong một bài học; ma trận giá trên trang marketing;
+lịch sử chạy trong console vận hành; bảng tra cứu trường dữ liệu trong tài liệu.
+
 ## Tầng giữ
 
 Contract giữ hình dạng nhìn thấy. Mechanics branch chỉ giữ vòng đời, focus, portal, dismiss, placement
 và vùng cuộn của HeroUI — chúng là ba owner có tên, `ModalBranch`, `DrawerBranch`, `DropdownBranch`, và
 chúng không tạo ra một tầng kiến trúc riêng. Block, layout, overlay, page và composite hoàn toàn không
 biết đến giải phẫu vendor: chúng nhận kết quả, không nhận import. `ShellNav` là tên sản phẩm, không
-phải giấy miễn trừ cho bất kỳ luật ownership nào.
+phải giấy miễn trừ cho bất kỳ luật ownership nào. `TableBranch` đứng cùng họ SurfaceCard chứ không
+đứng với các leaf, vì ô của nó tới từ bên gọi mà một slot leaf thì không chở nổi.
+
+Ranh giới vendor bị vượt theo hai chiều và module này giữ cả hai. Một file có thể với tay lấy giải
+phẫu vendor mà nó không có quyền — đó là `VENDOR-1`, và cái import làm chuyện đó lộ ra. Một file cũng
+có thể dựng tay lại đúng thứ mà một leaf đã sở hữu, không import gì cả: cái `<table>` thô mà
+`VENDOR-15` từ chối. Cái thứ hai mới là kiểu hỏng lặng lẽ, vì không có gì trong file gọi tên cái
+vendor mà nó đang đứng thay.
 
 ## Điểm neo
 
 Rule nằm ở `@canon-fe` cùng test song sinh ở
 `@canon-fe`. Điểm neo sản phẩm là `components/branches/ModalBranch`,
-`DrawerBranch`, `DropdownBranch`, họ SurfaceCard, `components/leaves/Field`, `TextLink`,
+`DrawerBranch`, `DropdownBranch`, họ SurfaceCard, `components/leaves/Field`, `components/branches/TableBranch`, `TextLink`,
 `Checkbox`, `components/blocks/auth/AccountMenu` và `components/layouts/ShellNav`.
 
 ## Đầu vào
@@ -285,7 +331,9 @@ Rule nằm ở `@canon-fe` cùng test song sinh ở
     bấm của checkbox.
 11. Điều hướng nội bộ báo một action lên code routing đã nối; cấm giá trị `href` nội bộ StarCi trong
     leaf hay component.
-12. Không tạo tầng wrapper chung, không re-export giải phẫu vendor, không truyền markup thô qua các
+12. `TableBranch` sở hữu HeroUI `Table` cùng các bộ phận compound và chiếu vào những ô đã validate;
+    cấm `<table>` thô trong tầng component và cấm dựng tay một lưới thay thế.
+13. Không tạo tầng wrapper chung, không re-export giải phẫu vendor, không truyền markup thô qua các
     container component, và không chuyển class nhìn thấy ra khỏi contract cho tiện phần cơ chế.
 
 ## Ngoại lệ

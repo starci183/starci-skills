@@ -334,6 +334,13 @@ thành viên · bản đồ nhúng · khung video · ảnh gợi ý giữ chỗ 
 | mức chặn | Mọi trần hoặc sàn mà yêu cầu nêu ra, và chuẩn mà nó đến từ đó |
 | tập trạng thái | Mọi trạng thái nội dung mà trục này phải giữ được mà không dịch chỗ |
 
+## Control scale opt-in từ render contract
+
+Control scale mặc định không đổi. `Button size="lg"` chỉ là local opt-in khi schema 6 `renderContract` gọi tên
+một large standalone primary CTA đang neo page-root action region. Nó không bao giờ được chọn chỉ vì visual
+priority, không áp cho action trong row/card/toolbar, và khi contract không gọi tên thì giữ rule placement
+`sm`/`md` hiện có.
+
 ## Quy tắc
 
 1. Một trục rơi vào đúng một mã. Một hộp mang hai mã, không phải một.

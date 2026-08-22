@@ -338,6 +338,13 @@ grid.
 | bound | Any ceiling or floor the request states, and the standard it comes from |
 | state set | Every content state the axis must hold without moving |
 
+## Render-contract opt-in control scale
+
+The default control scale remains unchanged. `Button size="lg"` is a local opt-in only when schema 6
+`renderContract` names a large standalone primary CTA that anchors the page-root action region. It is never
+selected by visual priority alone, never applies to row/card/toolbar actions, and absence from the contract keeps
+the existing `sm`/`md` placement rule.
+
 ## Rules
 
 1. One axis resolves to exactly one code. A box carries two codes, not one.

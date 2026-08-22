@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "labelled-single-body-surface",
+  "kind": "golden",
+  "because": "One section label names one non-collection body, so the label stays outside one SurfaceCard boundary.",
+  "facts": ["surface-section-labelled", "content-single-body"],
+  "expectedOutcomes": ["surface-card"],
+  "rejectedOutcomes": ["surface-list", "surface-form"]
+}

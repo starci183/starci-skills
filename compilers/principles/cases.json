@@ -22,6 +22,13 @@
       "invariant": "The rail and content plane have distinct roles and independently owned widths.",
       "expectedSituation": "FLOW-8", "expectedClass": "grid",
       "rejects": ["equal interchangeable columns", "flattening the rail into the content sequence"]
+    },
+    {
+      "caseId": "dominant-object-before-phase-prompt", "module": "typography", "owner": "request-action-region",
+      "directChildren": ["dominant-object", "qualifying-caption", "phase-prompt", "consequence", "primary-action"],
+      "invariant": "The single dominant object owns the region's typographic lead while the phase prompt remains ordinary UI copy outside the outline.",
+      "expectedSituation": "TYPOGRAPHY-5", "expectedClass": "text-base font-medium text-foreground",
+      "rejects": ["rendering the phase prompt as an h2", "shrinking the single dominant object below its phase prompt"]
     }
   ]
 }

@@ -40,9 +40,10 @@ test("layout generate packages one complete long-page/full-flow result", () => {
   const f = fixture();
   try {
     const manifest = buildManifest({...options(f), sessionId: "abc"});
-    assert.equal(manifest.schemaVersion, 3);
+    assert.equal(manifest.schemaVersion, 4);
     assert.equal(manifest.sessionId, "abc");
     assert.equal(manifest.mode, "generate");
+    assert.equal(manifest.reviewStage, "full");
     assert.equal(manifest.layouts[0].candidates.length, 1);
     assert.doesNotMatch(manifest.layouts[0].candidates[0].preview.states[0].html, /<template/);
     assert.equal(manifest.systemId, "starci-master");
@@ -66,11 +67,23 @@ test("renderer writes static HTML directly below project cache and refuses other
   try {
     const out = join(f.root, ".worktrees", "sample", "cache", "design", "abc", "review");
     const rendered = renderReview({...options(f), out});
-    assert.equal(JSON.parse(readFileSync(join(out, "review-manifest.json"), "utf8")).schemaVersion, 3);
+    assert.equal(JSON.parse(readFileSync(join(out, "review-manifest.json"), "utf8")).schemaVersion, 4);
     assert.match(readFileSync(join(out, "index.html"), "utf8"), /<iframe class="frame"/);
     assert.equal(rendered.entries.length, 2);
     assert.equal(existsSync(join(out, rendered.entries[0].path)), true);
     assert.throws(() => renderReview({...options(f), out: join(f.root, "unsafe")}), /must stay under/);
+  } finally { rmSync(f.root, {recursive: true, force: true}); }
+});
+
+test("layout page review is labeled as cache-only pages stage", () => {
+  const f = fixture();
+  try {
+    const artifact = JSON.parse(readFileSync(f.artifact, "utf8"));
+    artifact.envelope.stage = "pages";
+    writeFileSync(f.artifact, JSON.stringify(artifact));
+    const manifest = buildManifest(options(f));
+    assert.equal(manifest.reviewStage, "pages");
+    assert.equal(manifest.mode, "generate");
   } finally { rmSync(f.root, {recursive: true, force: true}); }
 });
 

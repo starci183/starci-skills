@@ -71,9 +71,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười tám năng lực
+## Mười chín năng lực
 
-Mười sáu capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -92,6 +92,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
 | `starci-fe-design-layout` | chất vấn, preview, duyệt và implement một page/page flow đã bind source trong cùng invocation |
 | `starci-fe-design-block` | đánh giá, preview, duyệt và implement một region trong current complete page ở cùng invocation |
+| `starci-fe-ui-align` | chủ động audit và hội tụ UI responsibility tương đương trên các surface hiện hữu, chỉ evolve authority cho gap đã chứng minh |
 | `starci-fe-feedback-evolve` | biến feedback owner đã chứng minh thành cải tiến authority bền vững nhỏ nhất và source correction |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |
 | `starci-fe-minor-fix` | một correction nhỏ giữ nguyên contract trong một folder block, composite hoặc leaf hiện hữu và sạch; machine reject khi scope lớn lên |
@@ -99,7 +100,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | sự chấp thuận, rồi source backend |
 
-Layout và block design dùng candidate identity chỉ sống trong phiên, tái dùng composition existing đã bind source và implement kết quả được duyệt trước khi cùng invocation kết thúc. `OK` chỉ cấp quyền cho source boundary đã hiển thị; không skill nào tự cho rằng capability khác đã được yêu cầu.
+Layout và block design dùng candidate identity chỉ sống trong phiên, tái dùng composition existing đã bind source và implement kết quả được duyệt trước khi cùng invocation kết thúc. `OK` chỉ cấp quyền cho exact boundary đang hiển thị. Cache-only boundary có thể freeze design evidence nhưng không cấp quyền source; chỉ boundary gọi tên exact source files mới authorize write.
 
 ## Khóa ngữ cảnh
 
@@ -107,15 +108,26 @@ Trước khi làm, resolve Workdir, Source, Project do người dùng khai, role
 nơi giữ record, write boundary chính xác, evidence đã đọc và tiền đề còn thiếu. Capability có kho bền thì
 giữ đầy đủ lock trong đó.
 
-Không bao giờ in bảng context. Nói một câu thân thiện cho người dùng biết agent đang làm ở đâu, project
-và role nào đã resolve, hành động hiện tại được chạm boundary nào. Chỉ bị chặn khi giá trị context bắt buộc
+Không bao giờ in bảng context nội bộ. Nói một câu thân thiện cho người dùng biết agent đang làm ở đâu, project
+và role nào đã resolve, hành động hiện tại được chạm boundary nào. Bảng bước bắt buộc bên dưới là execution control cho user, không phải context nội bộ. Chỉ bị chặn khi giá trị context bắt buộc
 không thể tìm từ yêu cầu, workspace route hoặc live evidence.
 
 ## Các trạng thái tiến trình
 
-`own` là mọi hành động có thể thi hành trong scope đã khai: điều tra, edit đảo được, fallback tool an toàn,
-chia agent, sinh candidate, phán đoán triển khai, baseline sau approval, gate, sửa trong scope, proof và
-proof trong skill hiện tại. Tiếp tục tới khi `own = 0`.
+Mỗi StarCi skill khi được gọi phải suy ra các bước thực thi có thứ tự từ `Run` hoặc `Process` của chính nó
+và in một bảng gọn với đúng bốn cột: `Bước`, `Việc làm`, `Kết quả bắt buộc`, `Trạng thái`. Bảng chỉ chứa
+các bước công việc thật, không chứa context values, agent assignments hoặc implementation trivia. Vocabulary
+trạng thái đóng là `đang làm`, `chờ OK`, `hoàn tất`, `blocked`; tối đa một row được `đang làm`.
+
+Lời gọi skill ban đầu authorize bước discovery read-only đầu tiên. Sau khi hoàn tất một bước, cập nhật cùng
+bảng đó, đánh dấu row kế tiếp `chờ OK`, hiển thị exact action và write boundary của bước kế tiếp, rồi dừng.
+Chỉ đi tiếp khi toàn bộ message sau trim khớp `OK` không phân biệt hoa thường (`OK`, `ok`, `Ok`, `oK`). Token
+đó chỉ authorize đúng bước kế tiếp đang hiển thị một lần. Feedback hoặc message khác giữ run ở bước hiện tại
+và có thể sửa các row còn lại mà không consume approval. Row cuối hoàn tất không cần token bổ sung.
+
+`own` là mọi executable action trong bước hiện tại đã được duyệt: điều tra, edit đảo được, fallback tool an
+toàn, chia agent, sinh candidate, phán đoán triển khai, gate, sửa trong scope và proof. Tiếp tục tới khi
+`own = 0` của bước hiện tại, rồi dừng ở row kế tiếp thay vì tự đi tiếp.
 
 `need approval` chỉ gồm quyết định sản phẩm không có default dựa trên evidence, destructive loss đáng kể,
 publish hay cam kết ra ngoài, thiếu access, hoặc mở rộng sang project, role, repository hay write boundary
@@ -125,15 +137,19 @@ Thiếu credential authority phải được đưa ra ngay khi plan read-only đ
 Không tiếp tục execute provider rồi đợi tới lúc close mới báo; phần local an toàn vẫn chạy song song trong
 khi owner hoàn thành hidden intake.
 
-Khi user trả lời `OK`, duyệt mọi default và boundary chính xác đang hiển thị. Ghi identity hoặc hash, lấy
-baseline nếu cần rồi tiếp tục ngay. `OK` không phủ scope chưa trình. Im lặng và mọi từ khác `OK` đều không
-phải tín hiệu approval.
+Khi user trả lời token `ok` exact và không phân biệt hoa thường, chỉ duyệt boundary của bước kế tiếp đang
+hiển thị cùng mọi product/source approval được đặt rõ trên chính row đó. Ghi identity hoặc hash, lấy baseline
+nếu cần rồi chạy bước ấy ngay. Approval không phủ scope chưa trình hoặc các row sau. Im lặng và message khác
+không phải tín hiệu approval.
 
 ## Quyết định và thi hành
 
 ### Control protocol
 
-`A`, hoặc candidate label đang hiển thị khác, chỉ chọn candidate đó. `OK` duyệt exact write boundary đã hiển thị và execution phải resume ngay. `continue` hoặc `tiếp tục` resume phần own còn nợ, không recap, không re-plan và không mở checkpoint khác. Nghĩa này ổn định giữa các frontend skill.
+`A`, hoặc candidate label đang hiển thị khác, chỉ chọn candidate đó. Token `ok` exact không phân biệt hoa
+thường duyệt bước kế tiếp đang hiển thị và mọi exact boundary đặt trên row đó. `continue` hoặc `tiếp tục` chỉ
+resume phần own còn nợ trong bước hiện tại đã duyệt, không được đi sang row kế tiếp. Nghĩa này ổn định giữa
+mọi StarCi skill.
 
 Mọi owner rejection rõ ràng invalidate current candidate và mọi assumption sinh từ nó. Strong negative feedback không phải yêu cầu patch incremental tiếp: dựng lại baseline bốn lock, đọc lại complete page/flow và classify failure trước khi sửa.
 
@@ -141,8 +157,10 @@ Trước implementation, khóa `Scope`, `Owner`, `Invariant`, `Proof`. Request n
 
 **Các lượt design** là session evidence tùy chọn. Lựa chọn direction hỗ trợ một lượt layout và không có
 durable hash hay checkpoint owner riêng. Candidate chính xác cùng recommendation dựa trên evidence nằm
-trong project cache của invocation hiện tại. Một `OK` chọn recommendation và cấp quyền cho source boundary
-đã công bố. Feedback mở cache round mới; sau approval cùng invocation implement kết quả.
+trong project cache của invocation hiện tại. Block dùng một displayed source boundary. Layout dùng hai
+boundary rõ ràng: `OK #1` freeze page contract trong cache và mở state expansion nhưng không có source
+authority; `OK #2` duyệt complete states cùng exact source files và mở implementation. Feedback về page
+anatomy quay lại page review; state-only feedback giữ approved page contract.
 
 Mọi frontend design candidate phải là trang HTML functional, self-contained với representative business density
 gần production. Trước khi vẽ phải inventory condition viewport, overlay, disclosure, async, data, permission và
@@ -163,9 +181,9 @@ không được lặng lẽ xuất hiện trong diff.
 
 ## Đầu ra cho người dùng
 
-Không in bảng trạng thái, section rỗng, dòng `None`, context nội bộ hay ma trận chia agent. Trước batch
-đáng kể kế tiếp, nói thân thiện: `Trước khi làm tiếp, em còn nợ: ...`, rồi trả trong cùng lượt. Một lượt
-chỉ kết thúc khi `own = 0`, hoặc đang chờ một mục `### NEED APPROVALS` thật.
+In bảng bước bắt buộc khi gọi skill, sau mỗi bước hoàn tất và khi feedback đổi phần kế hoạch còn lại. Không
+in section rỗng, dòng `None`, context nội bộ hay ma trận chia agent. Một lượt kết thúc khi `own = 0` của bước
+hiện tại và row kế tiếp đang `chờ OK`, khi chờ một mục `### NEED APPROVALS` thật khác, hoặc khi mọi row hoàn tất.
 
 Khi hoàn tất, nói gọn kết quả, path chính và proof bằng văn xuôi hoặc danh sách ngắn. Không dùng từ hoàn tất khi còn known defect, viewport/state bắt buộc thiếu full-page proof, gate đỏ, source ở sai repository hoặc requested delivery state chưa đạt. Phải nói chính xác `verified locally`, `committed`, `pushed` hoặc `merged`. Khi bị chặn bởi thẩm
 quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agent không thể tự sở hữu, default được
@@ -192,21 +210,21 @@ thêm**.
 ## Quy tắc
 
 1. Resolve context lock và `Touching` trước khi ghi; trình chúng bằng câu thân thiện.
-2. Mọi hành động `own` tiếp tục không hỏi; không được kết thúc khi `own > 0`.
+2. Tiếp tục mọi action trong bước hiện tại đã duyệt; không được vào row kế tiếp nếu chưa có approval token của row đó.
 3. Chỉ hỏi `need approval` thật, với một default đang hiển thị.
-4. Chỉ `OK` consume approval đang hiển thị và resume ngay.
+4. Chỉ toàn bộ message sau trim bằng `ok` không phân biệt hoa thường mới consume approval bước kế tiếp đang hiển thị và resume bước ấy ngay.
 5. Design approval và source implementation xảy ra trong cùng invocation; cached candidate key không bao giờ là durable authority.
 6. Task khác dựng lại design evidence từ current source, contract, grammar và business truth.
-7. Baseline lấy sau `OK` và trước production write đầu tiên.
+7. Production baseline lấy sau source-authorizing `OK` và trước production write đầu tiên.
 8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
 9. Việc chia an toàn được thì nhắm mười assignment không chồng lấn; một coordinator giữ gate shared-state.
    Runtime dưới mười slot thì lấp đầy và backfill mọi slot khả dụng.
-10. Đầu ra cho người dùng không có bảng trạng thái.
+10. Mọi StarCi skill duy trì bảng bước user-facing gọn; bảng internal context và agent assignment vẫn bị cấm.
 11. Resolve `defaultLang` từ workspace config chung của Source trước phản hồi đầu tiên cho người dùng.
 12. Credential còn thiếu kích hoạt intake owner ngay và không chứa value; value không bao giờ đi qua chat,
     argument, generated command hoặc log.
 13. Đo host OS trước khi chọn setup script; không bao giờ thử extension không tương thích.
-14. Candidate label chỉ chọn; chỉ `OK` authorize write; `continue` resume không mở checkpoint mới.
+14. Candidate label chỉ chọn; chỉ `OK` trên exact-source boundary đã hiển thị rõ mới authorize write; `continue` resume không mở checkpoint mới.
 15. Owner rejection reset baseline và assumptions trước edit tiếp theo.
 16. Completion cần zero known defect, đủ requested proof và đúng declared delivery state.
 
@@ -220,7 +238,7 @@ thêm**.
 
 **Lượt chạy.** "Thiết kế trang kết quả bài luyện coding."
 
-Lượt chạy nói exact cache/source boundary, trình page-set hoàn chỉnh dưới một MASTER system và một default dưới `NEED APPROVALS`. Sau `OK`, nó implement source, chạy full-page proof và làm hết mọi mục `own` mà không hỏi lại.
+Lượt chạy nói exact cache/source boundary và trình một complete page set dưới `OK #1: PAGE ANATOMY`. Sau cache-only approval đó, nó bung mọi state và trình `OK #2: STATES + SOURCE BOUNDARY`. Chỉ approval thứ hai mở implementation; cùng invocation sau đó hoàn tất code và proof.
 
 ## Phạm vi
 

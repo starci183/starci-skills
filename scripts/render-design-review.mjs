@@ -56,8 +56,11 @@ export function buildManifest(options) {
   const candidates = artifact.candidates ?? artifact.anatomies;
   const phase = options.phase ?? previewIndex.phase ?? (artifact.anatomies ? "block" : "layout");
   if (!["layout", "block"].includes(phase)) throw new Error("--phase must be layout or block");
+  const reviewStage = options.reviewStage ?? previewIndex.reviewStage ?? artifact.envelope?.stage ?? "full";
+  if (!["pages", "states", "full"].includes(reviewStage)) throw new Error("--review-stage must be pages, states or full");
+  if (phase === "block" && reviewStage !== "full") throw new Error("block review uses the full review stage");
   const mode = options.mode ?? previewIndex.mode ?? artifact.envelope?.mode ?? (phase === "layout" ? "generate" : "audit");
-  const allowedModes = phase === "layout" ? ["generate", "brainstorm"] : ["audit", "brainstorm"];
+  const allowedModes = phase === "layout" ? ["generate", "brainstorm", "expand-states"] : ["audit", "brainstorm"];
   if (!allowedModes.includes(mode)) throw new Error(`${phase} review does not support mode ${mode}`);
   if (!Array.isArray(candidates)) throw new Error("design artifact has no candidates");
   if (mode === "brainstorm" && (candidates.length < 3 || candidates.length > 4)) throw new Error("brainstorm mode requires 3-4 candidates");
@@ -73,14 +76,14 @@ export function buildManifest(options) {
     if (!slug.test(candidate.id ?? "")) throw new Error("every candidate requires a slug id");
     const previewEntry = previewById.get(candidate.id);
     if (!previewEntry) throw new Error(`candidate ${candidate.id} has no authored HTML`);
-    return {...candidate, hash: sha256(canonical({phase, candidate})), status: "proposed", reason: candidate.reason ?? `Session result ${candidate.id}`, axes: candidate.axes ?? {}, regions: regionsFor(candidate, phase, blockId), preview: previewFor(indexRoot, previewEntry)};
+    return {...candidate, hash: sha256(canonical({phase, reviewStage, candidate})), status: "proposed", reason: candidate.reason ?? `Session result ${candidate.id}`, axes: candidate.axes ?? {}, regions: regionsFor(candidate, phase, blockId), preview: previewFor(indexRoot, previewEntry)};
   });
   const recommendedId = options.recommendedId ?? previewIndex.recommendedId ?? packaged[0].id;
   if (!packaged.some((candidate) => candidate.id === recommendedId)) throw new Error("recommendedId is not a candidate");
   const recommended = packaged.find((candidate) => candidate.id === recommendedId);
   return {
-    schemaVersion: 3, project: options.project, sessionId: options.sessionId ?? "current-session", systemId: designSystem.systemId,
-    baselineAt: sha256(canonical(baseline)), phase, mode, entryRoute: `previews/${recommended.id}--${recommended.preview.states[0].id}.html`,
+    schemaVersion: 4, project: options.project, sessionId: options.sessionId ?? "current-session", systemId: designSystem.systemId,
+    baselineAt: sha256(canonical(baseline)), phase, reviewStage, mode, entryRoute: `previews/${recommended.id}--${recommended.preview.states[0].id}.html`,
     layouts: [{layoutId, recommendedId, scope: artifact.envelope?.scope, theme: {}, candidates: packaged}],
     evidence: [{label: "sessionArtifact", value: artifactPath}, {label: "htmlPreviewIndex", value: indexPath}, {label: "masterDesignSystem", value: designSystemPath}, {label: "compositionBaseline", value: baselinePath}, {label: "durability", value: "ignored-session-cache"}]
   };
@@ -93,7 +96,7 @@ function assertOutputPath(outDir, project) {
 
 function reviewIndex(manifest, entries) {
   const buttons = entries.map((entry, index) => `<button type="button" data-src="${escapeHtml(entry.path)}" data-width="${entry.viewport.width}" data-height="${entry.viewport.height}"${index === 0 ? ' class="active"' : ""}>${escapeHtml(entry.candidate)} · ${escapeHtml(entry.state)} · ${entry.viewport.width}×${entry.viewport.height}</button>`).join("");
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(manifest.project)} ${escapeHtml(manifest.phase)}:${escapeHtml(manifest.mode)}</title><style>*{box-sizing:border-box}body{margin:0;background:#f5f5f6;color:#202124;font:14px system-ui,sans-serif}.bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;overflow:auto;padding:10px 12px;border-bottom:1px solid #ddd;background:#fff}.bar strong{white-space:nowrap}.bar button{white-space:nowrap;border:1px solid #ddd;border-radius:8px;background:#fff;padding:7px 10px}.bar button.active{border-color:#e94f99;background:#fff0f7}.stage{display:flex;justify-content:center;padding:16px}.frame{max-width:100%;border:0;background:#fff;box-shadow:0 2px 12px #0001}</style></head><body><nav class="bar"><strong>${escapeHtml(manifest.project)} · ${escapeHtml(manifest.phase)}:${escapeHtml(manifest.mode)}</strong>${buttons}</nav><main class="stage"><iframe class="frame" src="${escapeHtml(entries[0].path)}" width="${entries[0].viewport.width}" height="${entries[0].viewport.height}" title="Product preview"></iframe></main><script>const frame=document.querySelector('.frame');document.querySelectorAll('button[data-src]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('button').forEach(x=>x.classList.remove('active'));button.classList.add('active');frame.src=button.dataset.src;frame.width=button.dataset.width;frame.height=button.dataset.height;}));</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(manifest.project)} ${escapeHtml(manifest.phase)}:${escapeHtml(manifest.reviewStage)}:${escapeHtml(manifest.mode)}</title><style>*{box-sizing:border-box}body{margin:0;background:#f5f5f6;color:#202124;font:14px system-ui,sans-serif}.bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;overflow:auto;padding:10px 12px;border-bottom:1px solid #ddd;background:#fff}.bar strong{white-space:nowrap}.bar button{white-space:nowrap;border:1px solid #ddd;border-radius:8px;background:#fff;padding:7px 10px}.bar button.active{border-color:#e94f99;background:#fff0f7}.stage{display:flex;justify-content:center;padding:16px}.frame{max-width:100%;border:0;background:#fff;box-shadow:0 2px 12px #0001}</style></head><body><nav class="bar"><strong>${escapeHtml(manifest.project)} · ${escapeHtml(manifest.phase)}:${escapeHtml(manifest.reviewStage)}:${escapeHtml(manifest.mode)}</strong>${buttons}</nav><main class="stage"><iframe class="frame" src="${escapeHtml(entries[0].path)}" width="${entries[0].viewport.width}" height="${entries[0].viewport.height}" title="Product preview"></iframe></main><script>const frame=document.querySelector('.frame');document.querySelectorAll('button[data-src]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('button').forEach(x=>x.classList.remove('active'));button.classList.add('active');frame.src=button.dataset.src;frame.width=button.dataset.width;frame.height=button.dataset.height;}));</script></body></html>`;
 }
 
 const parseArgs = (argv) => {

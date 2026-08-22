@@ -384,6 +384,13 @@ bố chứ không chứng minh một quyết định ở từng chỗ gọi.
 | quyền sở hữu surface | Một surface ghép có sẵn nhãn riêng cho đoạn chữ này hay không |
 | vai trò partition | Dòng này có đang đặt tên một mốc thời gian trên tập kết quả, thay vì một section của trang, hay không |
 
+## Source shape opt-in từ render contract
+
+Mặc định không đổi. Chỉ schema 6 render contract mới được route reviewed page-root title tới
+`Heading scale="display"` và leading metric value tới `Text size="metric-lead"`. Page-root title có trailing
+primary action dùng contract entry `display-title-with-end-action`, và entry này chỉ hợp lệ bên trong
+`console-primary-aside-page`. Call site chọn typed opt-in; không tự ghép typography class để tái tạo nó.
+
 ## Quy tắc
 
 1. Tag của heading và dáng của nó đến từ **một** prop.

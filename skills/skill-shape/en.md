@@ -71,9 +71,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The eighteen capabilities
+## The nineteen capabilities
 
-Sixteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Seventeen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -91,6 +91,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
 | `starci-fe-design-layout` | challenge, preview, approve and implement one complete source-bound page/page flow in one invocation |
 | `starci-fe-design-block` | judge, preview, approve and implement one region inside its current complete page in one invocation |
+| `starci-fe-ui-align` | proactively audit and converge equivalent UI responsibilities across existing surfaces, evolving authority only for proven gaps |
 | `starci-fe-feedback-evolve` | turn proven owner feedback into the smallest durable authority improvement and source correction |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |
 | `starci-fe-minor-fix` | one small contract-preserving correction inside one clean existing block, composite or leaf folder, machine-rejected when its scope grows |
@@ -98,7 +99,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-be-plan` | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approval, then backend source |
 
-Layout and block design use session-local candidate identities, reuse source-bound existing composition and implement the approved result before the same invocation ends. `OK` authorizes the displayed source boundary only; no skill assumes another capability was requested.
+Layout and block design use session-local candidate identities, reuse source-bound existing composition and implement the approved result before the same invocation ends. `OK` authorizes only the exact displayed boundary. A cache-only boundary may freeze design evidence without authorizing source; only a boundary explicitly naming exact source files authorizes writes.
 
 ## Context lock
 
@@ -106,15 +107,28 @@ Before acting, resolve Workdir, Source, the user-declared Project, verified role
 record location, exact write boundary, evidence read and missing prerequisites. Keep the full lock in the
 durable record when the capability has one.
 
-Never print a context table. Tell the user in one friendly sentence where the agent is working, which
-project and role are resolved, and what boundary the current action may touch. A run is blocked only when
+Never print an internal context table. Tell the user in one friendly sentence where the agent is working, which
+project and role are resolved, and what boundary the current action may touch. The required skill-step table below is user-facing execution control, not internal context. A run is blocked only when
 a required context value cannot be recovered from the request, workspace routes or live evidence.
 
 ## Process states
 
-`own` is every executable action inside the declared scope: investigation, reversible edits, safe tool
-fallback, delegation, candidate generation, implementation judgement, baseline after approval, gates,
-in-scope repairs and proof inside the current skill. Continue until `own = 0`.
+Every invoked StarCi skill first derives its ordered execution steps from its own `Run` or `Process` and
+prints one compact table with exactly these columns: `Step`, `Work`, `Required result`, `Status`. The table
+contains real task steps, not context values, agent assignments or implementation trivia. Use
+`in progress`, `waiting for OK`, `completed` and `blocked` as the closed status vocabulary; exactly one row
+may be `in progress`.
+
+The initial skill invocation authorizes the first read-only discovery step. After completing a step, update
+the same table, mark the next row `waiting for OK`, display that next step's exact action and write boundary,
+and stop. Advance only when the user's whole trimmed message matches `OK` case-insensitively (`OK`, `ok`,
+`Ok` or `oK`). That token authorizes exactly the displayed next step once. Feedback or any other message
+keeps the run on the current step and may revise the remaining rows without consuming approval. The final
+completed row needs no additional token.
+
+`own` is every executable action inside the currently approved step: investigation, reversible edits, safe
+tool fallback, delegation, candidate generation, implementation judgement, gates, in-scope repairs and proof.
+Continue until the current step's `own = 0`, then stop at the next row instead of silently entering it.
 
 `need approval` is limited to a product decision with no evidence-backed default, material destructive
 loss, an external publication or commitment, missing access, or expansion to an undisclosed project,
@@ -125,15 +139,19 @@ Missing credential authority is raised as soon as the first read-only plan prove
 continue provider execution and report it only at close; finish safe local work in parallel while the
 owner completes hidden intake.
 
-When the user replies `OK`, approve every displayed default and exact displayed boundary. Record the
-identity or hash, take the baseline if required, and continue immediately. `OK` never covers undisclosed
-scope. Silence and every word other than `OK` are not approval signals.
+When the user replies with the case-insensitive exact `ok` token, approve only the displayed next-step
+boundary and any explicitly co-located product/source approval. Record the identity or hash, take the
+baseline if required, and execute that step immediately. Approval never covers undisclosed scope or later
+rows. Silence and every other message are not approval signals.
 
 ## Decisions and execution
 
 ### Control protocol
 
-`A`, or another displayed candidate label, selects that candidate and nothing else. `OK` approves the exact displayed write boundary and resumes execution immediately. `continue` or `tiếp tục` resumes outstanding owned work without recap, re-planning or another checkpoint. These meanings are stable across frontend skills.
+`A`, or another displayed candidate label, selects that candidate and nothing else. A case-insensitive exact
+`ok` token approves the next displayed step and any exact boundary co-located on that row. `continue` or
+`tiếp tục` may resume unfinished work inside the already approved current step but never advances to the
+next row. These meanings are stable across all StarCi skills.
 
 Any explicit owner rejection invalidates the current candidate and every assumption derived from it. Strong negative feedback is not a request for another incremental patch: rebuild the four-lock baseline, reread the complete page/flow and classify the failure before editing again.
 
@@ -141,8 +159,10 @@ Before implementation, lock `Scope`, `Owner`, `Invariant` and `Proof`. A shared 
 
 **Design rounds** are optional session evidence. Direction choices support a layout review and have no durable
 hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in the
-project cache for the current invocation. One `OK` selects the recommendation and authorizes its disclosed
-source boundary. Feedback opens another cache round; after approval the same invocation implements the result.
+project cache for the current invocation. Block uses one displayed source boundary. Layout uses two explicit
+boundaries: `OK #1` freezes the page contract in cache and opens state expansion without source authority;
+`OK #2` approves complete states plus exact source files and opens implementation. Feedback on page anatomy
+returns to page review; state-only feedback preserves the approved page contract.
 
 Every frontend design candidate is a self-contained functional HTML page at production-like representative
 business density. Before drawing, inventory viewport, overlay, disclosure, async, data, permission and interaction
@@ -164,10 +184,10 @@ returns to its owner instead of arriving quietly in a diff.
 
 ## User-facing output
 
-Do not print status tables, empty sections, `None` rows, internal context or agent assignment matrices.
-Before the next meaningful batch, state outstanding work in friendly prose: `Before I continue, I still
-owe: ...`, then pay it in the same run. A turn may end only when `own = 0`, or while waiting on a genuine
-`### NEED APPROVALS` item.
+Print the required skill-step table at invocation, after each completed step and whenever feedback changes
+the remaining plan. Do not print empty sections, `None` rows, internal context or agent assignment matrices.
+A turn ends when the current step's `own = 0` and the next row is waiting for `OK`, while waiting on another
+genuine `### NEED APPROVALS` item, or after all rows are completed.
 
 On completion, state the outcome, material paths changed and proof run in compact prose or a short list.
 Never use completion wording while known defects remain, a required viewport/state lacks full-page proof, a gate is red, source is in the wrong repository, or the requested delivery state has not been reached. Say `verified locally`, `committed`, `pushed` or `merged` exactly.
@@ -196,21 +216,21 @@ appended.
 ## Rules
 
 1. Resolve the context lock and `Touching` before writing; present them as friendly prose.
-2. Continue every `own` action without asking; a turn cannot end while `own > 0`.
+2. Continue every action inside the approved current step; never enter the next displayed row without its approval token.
 3. Ask only for genuine `need approval`, with one displayed default.
-4. Only `OK` consumes displayed approvals and resumes work immediately.
+4. Only a whole trimmed message equal to `ok` case-insensitively consumes the displayed next-step approval and resumes that step immediately.
 5. Design approval and source implementation happen in the same invocation; cached candidate keys are never durable authority.
 6. Another task regenerates design evidence from current source, contract, grammar and business truth.
-7. A baseline is taken after `OK` and before the first production write.
+7. A production baseline is taken after the source-authorizing `OK` and before the first production write.
 8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
 9. For safely partitionable work, target ten non-overlapping agent assignments; one coordinator owns
    shared-state gates. Fill and backfill every available runtime slot when fewer than ten are concurrent.
-10. User-facing output contains no status tables.
+10. Every invoked StarCi skill maintains the compact user-facing step table; internal context and agent-assignment tables remain forbidden.
 11. Resolve `defaultLang` from the Source-wide workspace config before the first user-facing reply.
 12. Missing credentials trigger immediate value-free owner intake; values never enter chat, arguments,
     generated commands or logs.
 13. Host OS is measured before selecting a setup script; an incompatible extension is never attempted.
-14. Candidate labels select; only `OK` authorizes writes; `continue` resumes without a new checkpoint.
+14. Candidate labels select; only an `OK` on an explicitly displayed exact-source boundary authorizes writes; `continue` resumes without a new checkpoint.
 15. Owner rejection resets the baseline and assumptions before another edit.
 16. Completion requires zero known defects, every requested proof and the declared delivery state.
 
@@ -225,9 +245,9 @@ appended.
 **Run.** "Design the coding drill result page."
 
 The run says: `I am designing example-app against the verified frontend route; this action writes only
-the design review.` It presents the schema-enforced adaptive number of complete page-set choices and one default under `NEED APPROVALS`.
-After `OK`, it binds the hash and finishes every `own` item in Layout without asking again. Block remains
-a separate capability request.
+the design review.` It presents one complete page set under `OK #1: PAGE ANATOMY`. After that cache-only
+approval it expands every state and presents `OK #2: STATES + SOURCE BOUNDARY`. Only the second approval
+opens implementation; the same invocation then finishes code and proof. Block remains a separate capability request.
 
 ## Scope
 

@@ -47,6 +47,7 @@ mọi câu trong đó mà không luật máy nào bên dưới gọi tên đều
 | `auth-overlay-owns-single-content-host` | không có | `requires` ContractContent, và `rejects` host/inset bị trùng |
 | `checkbox-keeps-compound-anatomy` | không có | `rejects` — đứt lồng nhau Content → Control → Indicator |
 | `no-internal-starci-href` | không có | `rejects` — component được canh tự ôm href nội bộ |
+| `tables-go-through-table-branch` | không có | `rejects` — phần tử bảng thô hoặc lưới dựng tay đứng thay TableBranch |
 
 Không mã nào bị bỏ trống luật máy, đơn giản vì cổng này không xuất bản mã nào cả. Điều đó cắt cả chiều
 ngược lại: không phán quyết nào của module này truy được về một điều khoản đánh số của luật sản phẩm,
@@ -207,6 +208,24 @@ href chứ không xét đích đến có đúng hay không.
 **Ranh giới.** Quyền sở hữu href trong các component được canh. Còn phần tử đó có phải HeroUI Link hay
 không là `text-link-uses-hero-link`.
 
+## `tables-go-through-table-branch` — none
+
+**Nó báo gì.** `rejects` — một `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>` hay `<td>` viết trong
+tầng component, và một vùng chứa mang `role="table"`, `role="row"` hoặc `role="columnheader"` mà
+không phải `TableBranch`.
+
+**Nó phát hiện thế nào.** Theo đường dẫn cộng tên phần tử JSX và thuộc tính role. Mọi file dưới
+`src/components/` đều bị canh, trừ chính `TableBranch` — owner duy nhất được phép dựng các bộ phận
+compound của vendor.
+
+**Nó không thấy được gì.** Một cái bảng lắp lúc chạy từ tên phần tử là biến, một cái lưới dựng bằng
+`div` thuần không gắn role nào, và một cái bảng lấy qua re-export dưới tên khác. Nó đọc phần tử và
+role **được viết ra**; một lưới dựng tay không khai cái nào thì vô hình với nó, đúng cái điểm mù mà
+mọi luật về giải phẫu trong module này đều mang.
+
+**Ranh giới.** Cái bảng được làm bằng phần tử gì. Chuyện một import vendor nằm sai file là
+`vendor-boundary`; luật này nổ đúng chỗ **không có** import nào để mà nhìn.
+
 ## Cách phát hiện
 
 | Phần | Cơ chế |
@@ -243,6 +262,7 @@ không là `text-link-uses-hero-link`.
 | `field-input-uses-secondary-variant`, `field-label-is-text-only`, `no-internal-starci-href` | **Mọi thứ ngoài component được canh.** Field nhà, Icon nhà và tập được canh đều gọi theo tên; một bản thay thế mang tên khác không bị theo dõi |
 | `no-surface-branch-in-overlay` | **SurfaceCard vào qua alias, qua re-export hay qua lớp bọc**, và **một surface dựng lại bằng tay ngay trong overlay** |
 | `text-link-uses-hero-link` | **Một link tự chế viết theo cách khác**, hoặc giấu cách đó một component |
+| `tables-go-through-table-branch` | **Một lưới `div` thuần không gắn role nào**, **tên phần tử giải lúc chạy**, và **một cái bảng lấy qua re-export dưới tên khác** |
 | `account-control-owns-dropdown`, `checkbox-keeps-compound-anatomy`, `auth-overlay-owns-single-content-host` | **Anatomy diễn đạt qua lớp bọc**, **thẻ có namespace**, và **đổi tên bất kỳ mắt xích có tên nào** — cả ba đều chỉ đọc tên và cách lồng nhau trong một file |
 | tất cả | **Chính thiết kế.** Cổng này cố ý không đo thiết kế bằng regex; contract vẫn là nguồn hình dạng và không gì ở đây xét nó |
 | tất cả | **Mọi câu của luật sản phẩm mà không luật máy nào ở trên gọi tên.** Mười luật máy xuất xưởng; luật văn xuôi dài hơn thế, và một lần chạy xanh không nói gì về phần còn lại |
@@ -274,8 +294,10 @@ bị một lần đổi tên bình thường hoặc một lớp gián tiếp hó
 6. Thiết kế không được đo bằng regex. Contract vẫn là nguồn hình dạng.
 7. Mọi luật đều được khuyến nghị ở mức `error`.
 8. Không nhận ở mức cảnh báo và không suppression nào là hợp lệ.
-9. Twin test `node --test @canon-fe` là bằng chứng các luật vẫn hành xử đúng
-   như đã xuất bản.
+9. Một luật được phép từ chối cả sự **vắng mặt** chứ không chỉ sự có mặt: chỗ nào một owner có tên đã giữ
+   vendor, thì dựng tay lại vendor đó chính là finding, và luật nổ mà không cần import nào.
+10. Twin test `node --test @canon-fe` là bằng chứng các luật vẫn hành xử đúng
+    như đã xuất bản.
 
 ## Ngoại lệ
 

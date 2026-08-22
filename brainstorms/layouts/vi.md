@@ -15,20 +15,61 @@ title: Layouts · Vietnamese
 
 ## Bản ghi
 
-Mô-đun này nhận ảnh chụp một page hoặc mô tả page flow. Default `generate` trả một complete long page hoặc
-full flow start-to-end, gồm mọi block, page/step, state và transition cần cho implementation. Chỉ explicit
-`brainstorm` mới trả 3–4 targeted alternative trên reviewed baseline.
+Mô-đun này nhận ảnh chụp một page hoặc mô tả page flow. Trước khi compose, nó xác định mọi page cùng closed
+visible intent của page đó. Sau đó nó resolve hai evidence track độc lập: customer journey cùng routed business
+truth từ trên xuống, và component, contract, current/legacy composition cùng source capability từ dưới lên.
+Các merge binding rõ ràng giữa hai track tạo thành complete pages. Default `generate` trả một result;
+chỉ explicit `brainstorm` mới trả 3–4 targeted alternative sau khi owner đã xem baseline.
 
 ## Luật
 
-Phương án schema 5 gọi tên scope `page`/`flow`, MASTER system id, page override chỉ chứa deviation, mọi page đã compose, ownership nodes lồng theo thứ tự, region,
-ai sở hữu hình học, cái gì mount một lần và cái gì đổi theo route. Mỗi
-region hash geometry bounding tối thiểu (`placement`, `width`, `height`, `align`) và impressionistic child brief
-(`kind`, title, summary, labels, values và actions đại diện). Wireframe giúp hình dung purpose, density và reading
-order nhưng không phê duyệt exact parts, fields, copy, actions, states hoặc data ownership. Mỗi node là
-`existing`, `proposed` hoặc `new`; `existing` phải trích source thật cùng SHA-256 source hash và không được khác
-giữa các phương án. New session artifact dùng schema 5; schema cũ là compatibility input. Phương án
-**không bao giờ** gọi tên class; MASTER khóa macro taste một lần và class chỉ được quyết cho delta unresolved.
+Phương án schema 7 gọi tên scope `page`/`flow`, stage, MASTER system id, page override chỉ chứa deviation, mọi
+page đã compose, ownership node lồng theo thứ tự và owned region. `synthesis.pageIntents` ghi page phải render
+gì trước cả hai track; customer journey và component capability được author độc lập; mỗi page-level intersection
+có binding rows nối từng render intent với journey, business và contract-backed regions. Mỗi region vẫn hash
+minimum child geometry và representative anatomy. Mỗi node là `existing`, `proposed` hoặc `new`; `existing`
+trích real source cùng SHA-256 và không được drift giữa các choice. Schema cũ là compatibility input. Candidate
+không bao giờ gọi tên class; MASTER khóa macro taste một lần.
+
+Stage `pages` mang `pageContract`, một representative populated state cho mỗi page, full future state inventory
+và full-viewport coverage ở mọi reference viewport. Nó không có `renderContract` hay `executionPrompt`, vì vậy
+approval chỉ tác động cache. `OK #1` bind canonical page-contract hash.
+
+Stage `states` mang đúng approved page contract đó, `mode: expand-states` và `approvedPageAt`. Nó bung mọi state
+và transition, rồi thêm `renderContract` đã hash để khóa exact source files cùng complete page, region, state và
+transition obligation. State phải được phân loại tại đúng owner: page state chỉ tồn tại khi region arrangement,
+hierarchy hoặc active page-level composition thay đổi; loading, refusal, answered hay interaction condition chỉ
+đổi một subtree vẫn là block state dù full-page capture có hiển thị nó. `renders` chọn tối đa năm complete-page
+render target trên toàn flow; mỗi target bind page state nếu có cùng các seeded block state nhìn thấy trong capture,
+và phủ mọi reference viewport cho target đó. Việc chọn ưu tiên các condition family và transition family rủi ro
+khác nhau; nó không loại bỏ implementation hay test obligation chưa được render. Mỗi region khóa owner,
+component, contract, anatomy, data mapping và visual obligation. Page-contract drift phải quay lại page approval,
+không được giấu trong state change.
+
+Mọi complete render region còn mang `grammarScopes`. Mỗi scope gọi tên một child target đóng, các fact quan sát
+được của child đó và đúng quyết định slot/outcome/component được tính lại từ routed grammar profile. Region block
+được compose các owner này nhưng không được thay list, accordion, form hay body surface đã resolve bằng generic wrapper.
+
+Mỗi stateful region còn phải khóa exact source ownership chain theo SPLIT-6: `ComponentBase` vẽ, optional
+connected `Component` đọc world, `PageBase`, `LayoutBase` hoặc `OverlayBase` compose, connected entry tương ứng
+là `Page`, `Layout` hoặc `Overlay`, và parent dùng connected child hay drawing child. Chuyển block condition vào
+`PageProps`, `LayoutProps` hoặc `OverlayProps` không phải ownership transfer. Block condition bắt buộc có child
+drawing owner riêng; outer Base compose child đó và không proxy state hay data. Overlay hoặc layout chỉ cần thêm
+Block chain khi nó compose một subtree stateful độc lập; terminal surface không tạo tầng giả. Mọi file thật trong
+chain phải là exact member của `renderContract.sourceBoundary`.
+
+Transition gọi tên cả page và state ở mỗi endpoint, nên cùng một shape phủ in-page change lẫn cross-page flow
+như Tổng quan → Ứng dụng. Mọi region data obligation khai preview content là `representative-fixture` và runtime
+truth là `source-owned`; tên và value đại diện chỉ prove density, không bao giờ được hardcode thành runtime data.
+
+Chỉ states-stage candidate mới xuất một `executionPrompt` machine-readable chuẩn. Nó lặp candidate id,
+render-contract id và exact source boundary; đặt implementation thành `exact-render-contract`, cấm
+reinterpretation và bắt buộc `same-state-same-viewport-parity`. `OK #2` bind candidate, complete states cùng
+exact source boundary. Executor nhận prompt này, không nhận một design brief mới để tự diễn giải.
+`instructions` có thứ tự cố định: `read-exact-render-contract`,
+`implement-every-page-region-state-viewport-transition-obligation`, `touch-only-source-boundary`,
+`do-not-reinterpret-preview`, `stop-if-obligation-is-unrepresentable`, rồi
+`prove-preview-source-same-state-same-viewport-with-zero-mismatches`.
 
 Mọi region đều trích một thứ **có thật**: một entry trong contract, hoặc một lời khai tường minh rằng cần
 một entry mới và vì sao. Region không trích gì cả là một thành phần bịa ra đang khoác cấu trúc JSON.
@@ -133,7 +174,7 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 | `LAYOUT-11` | Luật này trả về một **phân loại** — chạy hết chiều ngang, hay control gọn — **không bao giờ** trả về một chiều rộng. Cả hai phán quyết của người chủ trên cùng một control đều còn giá trị. | chọn một trong hai phán quyết làm mặc định |
 | `LAYOUT-12` | Mỗi region phải nhận diện được và functionally complete trong từng page candidate: purpose, representative content, production-like density, reading order, reachable states và current contract ownership đều visible. Layout được implement sau chính review này; không có block-head completion phase ở task sau. | hộp trắng, toy summary hoặc page cần task khác mới implement được |
 | `LAYOUT-13` | Chỉ product surface được yêu cầu rõ mới được thành layout identity hoặc flow node. Ví dụ dùng để giải thích năng lực vẫn chỉ là evidence cho tới khi owner đưa nó vào scope rõ ràng. | biến “ví dụ create order” thành product page |
-| `LAYOUT-14` | Các mode dùng chung một route và một page owner là state của page đó. Layout candidate render mọi mode có evidence trước implementation. | sinh sign-in, sign-up và recovery thành layout riêng hoặc đẩy state sang task khác |
+| `LAYOUT-14` | Các mode dùng chung một route và một page owner là state của page đó. Layout candidate contract và làm mọi mode có evidence executable trước implementation, còn visual review chỉ lấy tối đa năm state đại diện trên toàn flow. | sinh sign-in, sign-up và recovery thành layout riêng, đẩy state sang task khác hoặc render một screenshot matrix không giới hạn |
 
 ## Quy tắc
 
@@ -146,6 +187,10 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 7. JSON của phương án là dạng chuẩn hoá — thứ tự khoá cố định, không timestamp, không id theo lượt — vì
    **hash của nó** là thứ lời chấp thuận gắn vào.
 8. Feedback thay cache round. Candidate không sống như durable authority sau invocation.
+9. Mỗi candidate page có đúng một pre-track page intent record, và mỗi render intent được bind đúng một lần.
+10. Journey và contract-first track hoàn tất độc lập; anatomy chỉ được sinh từ merge bindings của chúng.
+11. Mọi merged region có contract-first capability, và mọi journey step, business obligation cùng page region đều xuất hiện trong binding matrix.
+12. Mọi render region ở states stage phải qua layout-grammar gate; thiếu scope, decision stale hoặc component owner sai không phải candidate có thể duyệt.
 
 ## Preview
 
@@ -158,7 +203,7 @@ backend, nhưng QA state selector không bao giờ thay product control. Trướ
 viewport, overlay, disclosure, async, data, permission và interaction; mỗi value reachable map tới authored HTML,
 còn family không liên quan phải ghi rõ `not-applicable` cùng evidence.
 
-Content trong region render thành authored product HTML từ brief đã hash. Tên, value và action đại diện giúp
+Content trong region render thành authored product HTML từ render contract đã hash. Tên, value và action đại diện giúp
 hình dung purpose, density cùng reading order; review/schema/debug label nằm ngoài product canvas.
 Region login có thể hiện ví dụ mang dáng credential, còn sign-up và recovery vẫn là block states của vòng sau.
 Flow chỉ xuất hiện khi được đưa rõ vào product scope và render thành page set hoàn chỉnh. Ưu tiên
@@ -194,9 +239,10 @@ blocked: <những region không giải được nếu thiếu nó>
 không phải cái trích đoạn dưới đây. `envelope` giữ những thứ đổi theo lượt; hash chỉ phủ **một phương
 án**, nên cùng một quyết định chạy lại ở lượt sau vẫn ra đúng hash đó.
 
-Work mới dùng schema 5: `envelope.scope` khai screenshot `page` hoặc `flow` được mô tả; mọi candidate mang `systemId: starci-master`, page override deviations-only và cùng
-danh sách `pages` có thứ tự, mỗi page mang nested `nodes` và tên region nó sở hữu, mỗi region bind `pageId` cùng
-`change`. Schema cũ chỉ là compatibility input.
+Work mới dùng schema 7. `envelope.scope` khai screenshot `page` hoặc described `flow`; `stage: pages` bắt buộc
+`synthesis` cùng `pageContract` và cấm source authority. Sau `OK #1`, `stage: states` giữ approved page hash,
+bung complete state inventory và thêm `renderContract` cùng canonical `executionPrompt`. Example cũ chỉ là
+compatibility documentation.
 
 ```json
 {

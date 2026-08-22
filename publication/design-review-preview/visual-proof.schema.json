@@ -4,10 +4,12 @@
   "title": "Same-viewport visual delivery proof",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "project", "baselineAt", "requestedTerminalState", "actualTerminalState", "checks", "comparisons", "knownDefects"],
+  "required": ["schemaVersion", "project", "baselineAt", "candidateAt", "renderContractId", "requestedTerminalState", "actualTerminalState", "checks", "comparisons", "knownDefects"],
   "properties": {
-    "schemaVersion": {"const": 1}, "project": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "schemaVersion": {"const": 2}, "project": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "baselineAt": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "candidateAt": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "renderContractId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "requestedTerminalState": {"enum": ["verified-local", "committed", "pushed", "merged"]},
     "actualTerminalState": {"enum": ["working-tree", "verified-local", "committed", "pushed", "merged"]},
     "checks": {
@@ -16,11 +18,14 @@
     },
     "comparisons": {
       "type": "array", "minItems": 1,
-      "items": {"type": "object", "additionalProperties": false, "required": ["referenceId", "viewport", "state", "fullViewport", "targetRegion", "preservedRegions", "consoleClean"],
+      "items": {"type": "object", "additionalProperties": false, "required": ["referenceId", "viewport", "state", "previewCapture", "sourceCapture", "fullViewport", "targetRegion", "preservedRegions", "parity", "mismatches", "consoleClean"],
         "properties": {
           "referenceId": {"type": "string"}, "viewport": {"type": "object", "additionalProperties": false, "required": ["width", "height"], "properties": {"width": {"type": "integer"}, "height": {"type": "integer"}}},
+          "previewCapture": {"type": "string", "pattern": "\\.(?:png|jpe?g|webp)$"},
+          "sourceCapture": {"type": "string", "pattern": "\\.(?:png|jpe?g|webp)$"},
           "state": {"type": "string"}, "fullViewport": {"const": "passed"}, "targetRegion": {"const": "passed"},
-          "preservedRegions": {"const": "passed"}, "consoleClean": {"const": true}
+          "preservedRegions": {"const": "passed"}, "parity": {"const": "passed"},
+          "mismatches": {"type": "array", "maxItems": 0}, "consoleClean": {"const": true}
         }}
     },
     "knownDefects": {"type": "array", "maxItems": 0}

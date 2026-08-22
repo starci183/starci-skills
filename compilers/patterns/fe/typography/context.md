@@ -261,6 +261,13 @@ and most of this law is about a relationship between two lines that are each ind
 | surface ownership | Whether a joined surface already draws its own label for this text |
 | partition role | Whether the line names a time bucket over results rather than a section of the page |
 
+## Render-contract opt-in source shape
+
+Defaults remain unchanged. Only a schema 6 render contract may route the reviewed page-root title to
+`Heading scale="display"` and a leading metric value to `Text size="metric-lead"`. The page-root title with a
+trailing primary action uses contract entry `display-title-with-end-action`, and that entry is valid only inside
+`console-primary-aside-page`. Call sites select the typed opt-in; they never reproduce it with typography classes.
+
 ## Rules
 
 1. A heading's tag and its set come from one prop.

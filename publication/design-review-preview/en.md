@@ -19,8 +19,19 @@ Business authority, legacy/current baseline, MASTER, routed grammar, contracts a
 
 Within one session:
 
-- `design.json` owns the task binding, business/contract ownership, grammar facts and receipt, candidate metadata, principle obligations, UI-condition inventory, transition graph and viewport obligations.
-- authored HTML owns composition, hierarchy, responsive behavior and executable rendering for each declared state.
+- `design.json` owns task binding, journey/business/component synthesis, grammar facts and receipt, candidate metadata, page contract, UI-condition inventory and viewport obligations. States-stage design additionally owns the complete `renderContract` and canonical `executionPrompt`.
+- authored HTML owns composition, hierarchy, responsive behavior and executable in-memory behavior for each declared state; state-review captures are a bounded representative sample.
+
+Schema 7 page review binds a canonical `pageContract` only. It covers complete page anatomy, representative
+states, state inventory and reference viewports but carries no write authority. After `OK #1`, state review
+preserves that page hash and adds the `renderContract`, which covers every page/region/state/transition and exact
+source files, owner/component/contract, anatomy, data mapping and visual obligations. Its `renders` select no more
+than five representative page/state pairs across the whole flow and cover every reference viewport for each
+selected state. Its canonical prompt
+repeats identities and boundary, requires exact implementation and forbids reinterpretation. Only `OK #2`
+turns that exact contract into implementation authority.
+Transition evidence names page/state at both endpoints, including cross-page navigation. Representative preview
+content is explicitly fixture-only; runtime values remain source-owned.
 
 All material lives below:
 
@@ -34,7 +45,12 @@ No accepted bundle, revision map, layout head, block head or design branch exist
 
 ### Layout
 
-Default `generate` displays one complete long page or full start-to-end flow containing every block, page/step, state and transition needed for implementation. Only explicit `brainstorm` displays three or four targeted alternatives against that reviewed baseline.
+Layout publishes two labeled reviews. `pages` displays one complete long page or full flow at one representative
+populated state per page and every reference viewport. It proves customer journey, business obligations,
+component anatomy, hierarchy and density before states. `OK #1` is cache-only. `states` then keeps every declared
+condition executable without changing the approved page contract, displays no more than five representative
+states selected for risk and transition coverage, and discloses exact source files for `OK #2`.
+Only explicit page-stage `brainstorm` displays three or four targeted alternatives.
 
 ### Block
 
@@ -50,7 +66,13 @@ Representative content must be business-faithful and production-like. Lorem, gen
 
 ## Quality proof
 
-Review every candidate and result at the exact baseline viewport/state pairs. Prove the full viewport, target region and preserved regions; computed CSS supports but never replaces this comparison. `visual-proof.json` must record zero known defects and reach the requested delivery state.
+Before each layout approval, schema 2 maturity evidence binds either page contract (`reviewStage: pages`) or
+the render contract's bounded selected pairs (`reviewStage: states`) to real full-viewport captures and zero
+defects. After implementation, review every selected preview/source pair at the exact baseline viewport/state.
+`visual-proof.json` schema 2 binds
+the selected candidate and render-contract identities, records distinct real preview/source capture paths for
+each pair, and requires parity plus explicit `mismatches: []`, zero known defects and the requested delivery
+state. Computed CSS supports but never replaces those captures.
 
 Creativity precedes principles review. Only the selected candidate is audited into class-free `principleObligations`; source implementation resolves those obligations through current principles and patterns.
 
@@ -58,23 +80,25 @@ Creativity precedes principles review. Only the selected candidate is audited in
 
 1. Every review artifact is ignored project cache.
 2. Candidate digests identify cache entries only and never become durable design identity.
-3. Layout/block approval and source implementation occur in the same skill invocation.
+3. Layout uses cache-only page approval followed by state/source approval; block uses its displayed source approval. Implementation remains in the same invocation.
 4. Another task must regenerate design evidence from current authority; it cannot resume from cache.
 5. A block is reviewed inside the exact current parent page and region.
 6. Preview navigation never writes state or counts as approval.
 7. Source code, tests and browser proof are the durable accepted outcome.
 8. Creativity precedes principles review; implementation follows source patterns and gates.
 9. MASTER is shared by every candidate; page files record deviations only and principles inspect deltas only.
-10. Generate/audit modes contain exactly one result; 3–4 alternatives require explicit brainstorm mode and an existing reviewed baseline.
+10. Generate/audit modes contain exactly one result; 3–4 alternatives require explicit page-stage brainstorm mode and an existing reviewed baseline.
+11. Page-stage review never contains a render contract or execution prompt; state-stage review preserves the exact approved page hash.
 
 ## Stops
 
 - Output outside the exact project cache is refused.
-- Missing authored candidate/state HTML, condition coverage, executable interaction or viewport coverage is refused.
+- Page review missing journey/business/component synthesis, representative full-page HTML, maturity evidence or viewport coverage is refused.
+- State review missing condition coverage, executable interaction, exact source files or an unchanged approved page contract is refused.
 - A block without a current parent page or same-session parent preview is refused.
 - A task that cannot continue through source implementation may show design-only evidence, but it must report that the result expired and is not accepted authority.
 - A post-choice state requiring new product truth returns to owner approval.
 
 ## Output and proof
 
-Write one static cache `index.html` plus raw candidate/state files, identify the result and exact source boundary, obtain approval once, implement in the same invocation, then report changed source paths and real-product proof.
+Write one labeled static review for complete pages and obtain cache-only `OK #1`. Expand states under the unchanged page hash, write the labeled state review, disclose exact files and obtain `OK #2`. Implement in the same invocation, then report changed source paths and real-product proof.

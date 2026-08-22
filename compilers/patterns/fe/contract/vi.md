@@ -536,6 +536,16 @@ Ngoại lệ là một phần của luật, không phải chỗ để lách. M�
   không trông có vẻ cấu trúc trong source.
 - **Surface branch có tên sở hữu wrapper vendor cố định của nó.** `CONTRACT-10`. Seam đó không biến
   đổi theo caller, không nhận con, và không bao giờ nhận marker contract.
+- **Branch dựng tài liệu vẽ nội dung mà nó không thiết kế ra.** `CONTRACT-1`, `CONTRACT-2`,
+  `CONTRACT-7` và `CONTRACT-11`, chỉ cho `Article`, `MarkdownCodeBlock` và `MermaidDiagram`. Một entry
+  phải kê tên từng slot bên trong nó, mà một tài liệu thì không có danh sách ấy: con của một danh sách
+  do người viết là bất kỳ node nào trong khoảng mười hai loại, theo bất kỳ thứ tự nào, lồng sâu tuỳ ý.
+  Viết một bản `children` cho thứ đó là đoán, và một cái đoán nằm trong bảng còn tệ hơn không có entry
+  nào, vì người đọc sau sẽ tưởng đó là luật đã có người kiểm. Xuống một tầng cũng vậy: một vùng code
+  đã tô màu và một sơ đồ đã dựng đều là chuỗi markup sinh lúc chạy, không có slot nào để kê tên. Giống
+  ngoại lệ leaf, đây là một THƯ MỤC, và câu hỏi giữ một file ở ngoài do người hỏi: component này nhận
+  con của nó dưới dạng NỘI DUNG ĐÃ PARSE hay dưới dạng một bố cục có người thiết kế? Nhiều con không
+  phải dữ kiện; một hình dạng có người chọn mới đúng là thứ cái bảng sinh ra để giữ.
 - **Element ngữ nghĩa mở ra vì NGHĨA và không mang class thì không phải node.** `CONTRACT-7`. `form`
   để submit và `ul` là một danh sách; bọc một contract node trong nó không quyết định hình dạng nào
   cả. Ngay khi nó mang một class, nó đã thành node không key.

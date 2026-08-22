@@ -97,6 +97,13 @@ the look of one value. A shape decided at a call site is a shape nobody can find
 table, and the call site carries the key alone. The block, page and composite tiers contain no
 `className=` literal at all.
 
+**Recognition signs.** The class string holds at least one token from the structural family; the
+element is being opened to HOLD something rather than to display a value; you have just lifted the
+string into a module constant "to tidy it up". Ask: if tomorrow someone needs to know how wide this
+node is and how its children stack, where do they look? If the answer is "grep", it is `CONTRACT-1`.
+Hoisting to a constant rescues nothing — `const ROW = "flex items-center gap-3"` moves the decision
+up one line and makes it invisible to the table's readers and to every rule that reads JSX.
+
 **Boundary.** Not `CONTRACT-2`: this is a static string written in the wrong place, that one is a
 string assembled while the component runs — two faults, two repairs. Not `CONTRACT-3`: this asks
 *who may write this class*, that one asks *whether this class exists at all*; a `gap-[13px]` written
@@ -113,6 +120,13 @@ so with `cn(base, isCompact && "gap-2")` or with a template string.
 the node. No `cn`, `clsx`, `twMerge`, `cva` or `tv` call site anywhere in the governed tree, and no
 interpolated `className`.
 
+**Recognition signs.** `cn`, `clsx`, `twMerge`, `cva` or `tv` appears in the file; `className={`…
+`${x}` …`}` or `className={a + b}`; a boolean variable choosing between two class strings. Ask:
+after the build, can anyone read the full class string this node will wear without running the
+component? The distinction is real — only the way of expressing it is wrong. What you are branching
+on is a genuine difference in the business, and it deserves a NAME: either a second key, or a named
+prop on the component that owns the node.
+
 **Boundary.** Not `CONTRACT-1` — see above. Not `CONTRACT-9`: where the distinction is real,
 `CONTRACT-2` says *give it a name*, and `CONTRACT-9` says *only give it a name when the shape truly
 differs*; two keys differing by one `gap` are refused by `CONTRACT-9`. Not `CONTRACT-12` alone: a
@@ -127,6 +141,13 @@ differs*; two keys differing by one `gap` are refused by `CONTRACT-9`. Not `CONT
 member is added deliberately to `export type LayoutClassName` in the contract table file, as a named
 edit to a named list.
 
+**Recognition signs.** TypeScript reports red on the element inside the `classes` array; you are
+about to add `as string` or `as LayoutClassName` to get past it. Ask: is this value a new step of the
+system, or one adjustment made to please the eye on exactly one screen? This is the strongest code in
+the module precisely because it is not a rule: `gap-[13px]` is not *forbidden*, it is **unwritable**.
+There is nothing to police when the wrong value cannot be typed. Adding a member is a deliberate edit
+to a named list, not a line that slips into a diff nobody read closely.
+
 **Boundary.** Not `CONTRACT-1`: that one says who may write, this one says what can be written. Not
 `CONTRACT-9`: this widens the CLASS vocabulary, that widens the KEY vocabulary — both are inflation,
 but in two different tables.
@@ -140,6 +161,21 @@ say that.
 union, and the frame reads it — `const Host = spec.host ?? "div"`. The frame's props carry no `host`
 and no `as` for a caller to pass.
 
+**Recognition signs.** You want to add an `as` or `host` prop to the frame; you are about to spread
+an entry's node props onto an element of your own; assistive technology would read the node wrongly
+if the element changed. Ask: if two call sites of one key open two different elements, are they still
+one node? No — they are two nodes wearing one name. This is the fault with no red anywhere: the
+function that returns node props hands back classes and markers and NOT an element, so spreading them
+onto a vendor body leaves the entry saying `ol` while the document receives `div` — the list drops
+out of the accessibility tree, nothing announces how many items there are, and meanwhile the key
+still resolves, the markers still read correctly, and every gate is still green. That is why the
+entry's node stands INSIDE the vendor body, never ON it.
+
+The history of this code is worth remembering. Before entries named their element, the frame drew
+only `div`, so every shape that needed a `<ul>` had nowhere legitimate to live and was pushed down
+into the leaf tier — the one tier allowed to write its own classes. A whole tier filled up with
+arrangement because of one missing field.
+
 **Boundary.** Not `CONTRACT-7`: that one says *do not open the tag yourself*, this one says *which
 tag is the entry's decision*; a hand-written `<ul>` breaks `CONTRACT-7`, a `<ul>` chosen by the
 caller through a prop breaks `CONTRACT-4`. Not `CONTRACT-10`: a surface branch IS allowed to open its
@@ -152,6 +188,19 @@ vendor wrapper; what it may not do is wear the entry's node on that wrapper.
 **What it emits in source.** A key in the table whose name fixes a child — `label-fact-over-progress`,
 `page-header-stack`, `title-with-baseline-fact`, `weekday-run` — and never the generic
 `card`, `box`, `wrapper`, `row`, `container`, `content`, `section-inner`, `main-wrapper`.
+
+**Recognition signs.** The name you are reaching for is `card`, `box`, `wrapper`, `row`, `container`
+or `content`; you cannot write one `why` sentence that is true of EVERY place this key will be used;
+you catch yourself thinking this key "will probably work for lots of things". Ask: if somebody put
+the wrong child inside this key, would a reader see it immediately? The generic name beats its
+specific siblings at every call site, because it is the one nobody has to think about — and a key
+that draws twenty regions cannot say why ANY one of them is there.
+
+The reversal here is recorded, not silent. A child map was once dropped because it could check
+nothing while content arrived as markup: a `.map`, a ternary and an anonymous subtree look identical
+to every rule. Content now arrives as COMPONENTS, one per named slot, so the check is no longer a
+rule — it is a TYPE. The old decision was right for the shape it was made against and wrong for this
+one.
 
 **Boundary.** Not `CONTRACT-6`: the name fixes WHAT is inside, the `why` says WHY those things stand
 that way; a wrong name makes a right `why` impossible, so `CONTRACT-5` is always repaired first. Not
@@ -167,6 +216,14 @@ that asks *does this key deserve to exist*.
 **What it emits in source.** A `why:` sentence on the entry naming what breaks, wraps or overflows
 without the node — long enough to be a clause, and not a restatement of the key's own words.
 
+**Recognition signs.** The `why` reads as the key lower-cased with spaces; the `why` is shorter than
+a clause; remove the node and the `why` is still "true", because it said nothing. Ask: if this node
+is deleted, what breaks, wraps, overflows or stops being pressable? Write exactly that. This is the
+only thing that cannot be reconstructed from markup later — classes can be read back, the element can
+be read back, the child list can be read back. What cannot be read back is why somebody built this
+node. "A row of chips" costs a line and teaches nothing; "the tags wrap onto their own line before
+the title wraps" is the fact that brought the node into existence.
+
 **Boundary.** Not `CONTRACT-5` — see above. Not `CONTRACT-12`: if the real reason is "so it can be
 clicked", that is not an entry's reason at all — it is `CONTRACT-12`, and the behaviour moves to the
 branch that owns the control.
@@ -179,6 +236,18 @@ branch that owns the control.
 nowhere else. Every other file composes keys. Where no key fits, the emission is a new entry in the
 table — not a `div`.
 
+**Recognition signs.** You have just typed `<div>`, `<section>`, `<main>`, `<header>`, `<footer>`,
+`<aside>` or `<nav>` outside the frame; you have just put a `className` on a `<ul>`, `<ol>`, `<li>`
+or `<form>`. Ask: can this box be recorded anywhere — what classes it wears, which children belong to
+it, and what it exists for? If there is nowhere to record it, it is a node with no key. And "no key
+fits" is a FINDING, not a licence to open a `div`.
+
+A semantic element is a different matter, and that difference is not a loophole. A `form` exists to
+submit; a `ul` exists because its content is a list. Assistive technology reads that very element, so
+it cannot be swapped for a neutral box, and opening it around a contract node decides NO shape at
+all. What must still come from the entry is the SHAPE: the moment a semantic element carries a class,
+it stops being a wrapper and becomes a node with no key.
+
 **Boundary.** Not `CONTRACT-1`: an unkeyed element carrying NO structural class is still
 `CONTRACT-7`; the two codes catch two halves of one habit. Not `CONTRACT-4` — see above. Not
 `CONTRACT-10`: the named surface branches are a closed exception to this code.
@@ -189,6 +258,12 @@ table — not a `div`.
 
 **What it emits in source.** `data-node` and `data-why` produced in exactly one function,
 `contractNodeProps`, and applied by the frame. Product source writes neither attribute.
+
+**Recognition signs.** A hand-written `data-node="..."` or `data-why="..."` in product source. Ask:
+is this marker REPORTING an entry, or ASSERTING an entry that nothing holds? A hand-written marker is
+worse than a node with no marker. The unmarked node is at least honest. The hand-marked node makes
+every reader and every test that travels through those attributes believe an assertion that no rule
+holds.
 
 **Boundary.** Not `CONTRACT-4`: that one spreads a whole cluster of node props onto the wrong
 element, this one types the attributes out one by one. They agree at their worst: a node that reads
@@ -202,6 +277,12 @@ as contracted and is not.
 existing key is used as it stands. A new entry is written only where no existing key expresses the
 shape.
 
+**Recognition signs.** The new key differs from the old by exactly one spacing token; by exactly one
+`restingCount`; or only in its `why` and its name. Ask: apart from the name, the reason and the
+placeholder count, where do these two entries differ? If nowhere, they are ONE entry under two names.
+The vocabulary inflates one call site at a time until the keys describe CALL SITES rather than
+SHAPES, and the list is longer than the code that reads it.
+
 **Boundary.** Not `CONTRACT-3` — see above. Not `CONTRACT-13`: this one blocks a key that is
 redundant AT BIRTH, that one deletes a key that is already DEAD. Not `CONTRACT-2` — see above.
 
@@ -213,6 +294,15 @@ card body, an accordion body, a list body.
 **What it emits in source.** The fixed vendor seam written as ordinary branch code in the named
 surface branches — `SurfaceCard`, `SurfaceListCard`, `SurfaceFormCard` — with the contract node
 standing INSIDE the content body. No compound table, and no node props on `Card.Content`.
+
+**Recognition signs.** You are about to mint keys for the heading line, the outer wrapper and the
+caption just to avoid writing a branch; you are about to build a "compound" table modelling
+`Card > Card.Content`; you are about to spread node props onto `Card.Content`. Ask: does this seam
+VARY BY CALLER? Does it ACCEPT CHILDREN? If neither, it is branch mechanics, not a second vocabulary.
+
+Why there is no compound table: repeating `Card > Card.Content` costs two lines, and extracting it
+adds a layer of indirection that OWNS NO POLICY. Conversely, minting keys for the heading line, the
+outer wrapper and the caption turns ONE host into THREE contracts.
 
 **Boundary.** Not `CONTRACT-7`: the named surface branches are its exception, and no other branch is.
 Not `CONTRACT-4`: the contract node stands INSIDE the content host, not ON it — this is where the two
@@ -228,6 +318,38 @@ SIBLING rows belongs to the root contract, not to the wrapper.
 and the `ContractChildCardinality` / `ChildrenOf` union that makes `repeats: true` without
 `restingCount` unwritable.
 
+**Recognition signs.** You are about to use `children` in the React sense; to pass an array of
+children BY ORDER; to write a bare arrow directly into a slot; or you have a repeated slot and have
+not said how many placeholders are drawn while waiting. Ask: if somebody inserts an extra child in
+the MIDDLE tomorrow, does anything silently change meaning?
+
+Slots are NAMED, not COUNTED. Insert a child into a positional list and every position after it
+quietly means something else; a name survives that insertion, reads at the call site without
+counting, and gives the `why` something to refer to.
+
+`repeats: true` says the slot is an array at runtime; `restingCount` says how many placeholders are
+drawn while waiting. The real length is dynamic, so it must never be confused with the skeleton
+count. The pair is mandatory together: no `restingCount` on a scalar slot, and no repeated slot that
+leaves its resting shape blank.
+
+For a joined list: the relationship between sibling rows belongs to the root contract. The business
+name of the collection (`tasks`, `courses`, `alerts`) is a FIELD in the content component's named
+props type; a shared slot called `items` would teach the surface the caller's data model and does not
+belong to the branch vocabulary. The joined list's root is `p-0` and the rows are direct children, so
+every divider reaches both edges. The row contract gives back the card's `p-4` margin
+ASYMMETRICALLY: one row `p-4`; the first row `px-4 pt-4 pb-3`; middle rows `px-4 py-3`; the last row
+`px-4 pt-3 pb-4`. The fixed label/surface/caption cluster holds owning-and-owned units and therefore
+uses `gap-3`.
+
+The list host also owns the optional fact at the end of the label line. That fact is `xs muted`
+standing beside an `sm semibold` label and QUALIFIES the joined list itself. The caller may not
+project it out as a separate sibling, and it may not be pushed into `description`: `description` is
+the caption of the whole list, sitting below the surface.
+
+This is not React `children`, and that is exactly what makes it checkable. Markup arrives already
+built and has erased its own shape. A wrong key, wrong props, wrong identity, wrong count, a missing
+slot and an extra slot are all COMPILE ERRORS.
+
 **Boundary.** Not `CONTRACT-5` — see above. Not `CONTRACT-10`: `divide-y` sits on the content host;
 the row leaf does NOT draw its own `after` rule and does not inspect `last-child`. Not `CONTRACT-12`:
 `props` inside a slot are LITERAL CONSTRAINTS, not values injected at runtime; text returned by a
@@ -239,6 +361,27 @@ query travels through the render component's runtime `props` and NEVER enters th
 
 **What it emits in source.** An entry carrying arrangement only. Behaviour moves to the branch that
 owns the control; ground and elevation move to the surface component that already owns them.
+
+**Recognition signs.** The entry carries `cursor-*`, `hover:*`, `active:*`, `focus:*` or `group`; it
+carries a text colour, `underline` or `decoration-*`; it carries `bg-surface*` or `shadow-*`. Ask:
+does this class say HOW THE CHILDREN STAND TOGETHER, or does it say HOW THIS NODE REACTS / WHAT IT
+LOOKS LIKE?
+
+Two owners for one promise. A node given `cursor-pointer` + `hover:opacity-80` by its entry is
+CLAIMING TO BE PRESSABLE, while the thing that actually presses — the button, the link, the control
+holding the handler and the disabled state — lives somewhere else entirely. The table is the party
+that CANNOT BE TOLD the promise is off: the entry does not know this call site passes no handler, so
+it keeps drawing a cursor onto a dead thing.
+
+Ground and elevation have their own consequence. The table will hold TWO KINDS OF CARD — one drawn by
+a branch, one drawn by a key — and no key tells anybody which kind they are looking at. The next
+person reaches for whichever is nearer to hand, and on the day the house surface changes its radius
+or its elevation, only ONE of the two kinds follows.
+
+A band is a closed exception. Ground alone does not make a raised object: a landing page whose
+sections change ground so they can be counted is still not a card. A band runs the FULL WIDTH and
+draws its own boundary with the next band; an object stops short of the edge and is bounded by
+itself.
 
 **Boundary.** Not `CONTRACT-6` — see above. Not `CONTRACT-10`: a surface is a COMPONENT, not a list
 of classes; an entry that paints ground and shadow is a second way to make a thing that already has
@@ -253,6 +396,19 @@ argued in the audit record.
 **What it emits in source.** Only keys reachable from a `contract="…"`, a
 `defineContractComponent("…")` or another entry's slot survive in `CONTRACT_KEYS`. An unbuilt shape is
 emitted into a plan record instead.
+
+**Recognition signs.** No `contract="key"`, no `defineContractComponent("key")`, no slot of another
+entry calling it; the key was added "for next week"; the key survived a rename wave untouched. Ask:
+is any screen standing in the document because of this key?
+
+A dead key does not lie still. It survives every rename, because renames follow call sites and it has
+none. It is copied wholesale into the next repository, because the table travels as a block and
+nothing in the table says which member was ever drawn. And it makes the table longer than the code
+that reads it — at which point readers stop believing the table describes the product.
+
+The right home for an unbuilt shape is the plan record, where a node that does not yet exist is
+exactly what a reader expects to meet; not the vocabulary table, where everything present is read as
+being on screen.
 
 **Boundary.** Not `CONTRACT-9` — see above. Not `CONTRACT-5`: a key that died because its name was
 too generic for anyone to reach for is also an unrepaired `CONTRACT-5`.
@@ -327,6 +483,17 @@ Exceptions are part of the rule, not relief from it. Each is closed and cites th
   what does not look structural in source.
 - **A named surface branch owns its fixed vendor wrapper.** `CONTRACT-10`. The seam cannot vary by
   caller, cannot admit children and never receives contract markers.
+- **An authored-document branch draws content it did not design.** `CONTRACT-1`, `CONTRACT-2`,
+  `CONTRACT-7` and `CONTRACT-11`, for `Article`, `MarkdownCodeBlock` and `MermaidDiagram` only. An
+  entry declares every slot inside it by name, and a document has no such list: the children of one
+  authored list are whichever of a dozen node kinds the writer typed, in whichever order, nested
+  however deep. A `children` record written for that is a guess, and a guess in the table is worse
+  than no entry, because the next reader takes it for a rule somebody checked. The same holds one
+  level down, where a highlighted code region and a rendered diagram are strings of markup produced
+  at runtime with no slots to name. Like the leaf exemption this is a FOLDER, and the question that
+  keeps a file out is asked by a person: does this component receive its children as PARSED CONTENT
+  rather than as a designed arrangement? Many children is not the fact; a shape somebody chose is
+  exactly what the table is for.
 - **A semantic element opened for MEANING, carrying no class, is not a node.** `CONTRACT-7`. A `form`
   submits and a `ul` is a list; wrapping a contract node in one decides no shape at all. The moment
   it carries a class it has become a node with no key.

@@ -305,6 +305,11 @@ xong · tính năng ngoài gói cước · nút đang gửi · lựa chọn đã
 - `COLOUR-10`: nền trang **không** được viết bằng `bg-card`. Nếu mọi thứ đều là thẻ thì không còn gì
   nổi lên được nữa.
 
+**Ranh giới renderer.** Trang cùng mọi menu, drawer, popover hay overlay được renderer đặt làm sibling
+trong document phải resolve semantic role từ một theme ancestor chung. Visual boundary cục bộ được
+consume hoặc alias các role đó, nhưng không được là owner duy nhất khi cùng experience còn render bên
+ngoài nó. Một embed cố ý độc lập và đã khai theme owner riêng là negative boundary.
+
 **Tình huống nghiệp vụ hay gặp.** Thân trang · nền của một bố cục đầy màn hình · nền của một trang in
 · nền của một màn hình rỗng.
 
@@ -464,8 +469,9 @@ chữ trên biểu ngữ do người dùng tải lên · nhãn trên ảnh sản
 4. Mỗi `COLOUR-4`, `COLOUR-5` và `COLOUR-6` đều mang kèm chữ, biểu tượng hoặc nhãn trợ năng tương ứng.
 5. Trạng thái chọn (`COLOUR-3`) và tiêu điểm (`COLOUR-7`) là hai trạng thái khác nhau và phải phân
    biệt được khi cùng xuất hiện trên một phần tử.
-6. Cùng một vai trò ngữ nghĩa giữ nguyên qua chủ đề sáng, tối và forced-colour. Chủ đề đổi **giá trị**
-   của biến thiết kế; nó không bao giờ đổi mã nào được áp dụng.
+6. Cùng một vai trò ngữ nghĩa giữ nguyên qua chủ đề sáng, tối, forced-colour và renderer-owned portal.
+   Chủ đề đổi **giá trị** của biến thiết kế; nó không bao giờ đổi mã nào được áp dụng, còn mọi render
+   root của cùng experience phải nhận đúng cặp ground/content.
 7. Từ vựng bề mặt dùng chung là `bg-background`, `bg-card`, `bg-muted`, `border-border` và
    `ring-ring`. Không mô-đun nào đặt ra một tên biến thiết kế bề mặt song song.
 8. Một phần tử, một vai trò. Một nút bề mặt không mang thêm màu trạng thái.

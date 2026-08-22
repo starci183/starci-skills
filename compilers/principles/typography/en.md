@@ -214,6 +214,8 @@ of the two facts drops it to `TYPOGRAPHY-6`.
   because it is the largest line in the region.
 - `TYPOGRAPHY-6`: BOTH facts — single and short — are required. Repeated, compact, long, or liable to
   grow under localization is always `TYPOGRAPHY-6`. The safe default is `TYPOGRAPHY-6`.
+- `TYPOGRAPHY-7`: a phase, request or next-action sentence STATES what happens; it does not become
+  an outline heading or outrank the one dominant object merely because it introduces the action.
 
 **Common business situations.** A course name in a large introduction card · a plan name in a
 single-plan comparison panel · a file name in a preview pane · an object name in a detail side
@@ -414,6 +416,15 @@ a content decision is pending.
 `outline` and `owner` are required. `relationship`, `repetition` and length risk are required
 whenever they are what separates two adjacent codes.
 
+## Render-contract opt-in scales
+
+The default recipes above remain unchanged. A schema 6 render contract may explicitly select exactly two local
+display scales when the reviewed preview requires them: `Heading.scale="display"` for the one page-root `h1`,
+and `Text size="metric-lead"` for the one leading metric value in a metric surface. They preserve the existing
+semantic owner and element; they do not promote peer titles, ordinary values or repeated rows. Absence from the
+render contract means the default `TYPOGRAPHY-1` or `TYPOGRAPHY-7` recipe. Call sites may not reconstruct either
+scale with classes.
+
 ## Rules
 
 1. Outline depth decides BOTH the semantic element AND the visible rank. An `h2` styled as body, or
@@ -435,6 +446,9 @@ whenever they are what separates two adjacent codes.
 12. If two adjacent codes both remain reasonable, choose the one that claims LESS ownership — the
     peer over the dominant, the support over the section, the UI copy over the reading prose. Ask
     only when the request requires the larger claim.
+13. In an action region with one dominant object, the object keeps `TYPOGRAPHY-5` and a phase or
+    request sentence resolves independently to `TYPOGRAPHY-7`; the prompt never borrows heading
+    semantics to overtake the object.
 
 Beyond these: a situation code maps to exactly one recipe, no recipe serves two codes, and every
 rendered line resolves to exactly one code. No text is out of scope.

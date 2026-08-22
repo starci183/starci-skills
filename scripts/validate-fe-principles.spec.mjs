@@ -26,5 +26,8 @@ test("a phantom principle concern is rejected", () => {
 test("status metadata case remains one sentence, not a chip collection", () => {
   const verdict = validatePrinciples(ROOT);
   assert.equal(verdict.ok, true);
-  assert.equal(verdict.cases, 3);
+  const registry = JSON.parse(readFileSync(join(ROOT, "compilers", "principles", "cases.json"), "utf8"));
+  const metadata = registry.cases.find((item) => item.caseId === "metadata-sentence-one-status");
+  assert.equal(metadata.maxStatusChips, 1);
+  assert.match(metadata.invariant, /one plain-text sentence/i);
 });

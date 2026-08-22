@@ -39,7 +39,7 @@ Tìm xem feedback lộ ra law, evidence, application, pattern, gate hay source f
 
 ## Process
 
-Chạy authority gate và baseline bốn lock trước classification; `misdrawn` bắt buộc có counterexample. Apply MASTER một lần, chỉ ghi page deviation và chỉ route delta unresolved tới principles. Sửa và prove same-viewport full page trong cùng invocation.
+In shared execution table hai dòng: read-only audit, rồi một authority/source/proof batch đã duyệt. Chạy authority gate và baseline bốn lock trước classification; `misdrawn` bắt buộc có counterexample. Với mỗi owner observation, ghi `correct`, `incorrect` hoặc `partly-correct`, giải thích tại sao và vì sao AI chưa thi hành; chỉ ghi `Waiting for OK` không phải giải thích. Lập một authority-to-write map nơi một decision có một semantic owner, mỗi path thuộc đúng một write batch và owner đang đúng được giữ rõ. Với feedback về state/data ownership, bắt đầu từ smallest changing surface và trace concrete chain `ComponentBase → Component → PageBase/LayoutBase/OverlayBase → Page/Layout/Overlay`. Nhét child state hoặc request data dưới outer props vẫn là proxy, không phải extraction; nested Block chain chỉ tồn tại cho subtree stateful độc lập và impact cone phải gồm mọi exact owner file. Apply MASTER một lần, chỉ ghi page deviation và chỉ route delta unresolved tới principles. Ghi authority change trước source trong cùng approved batch, rồi sửa và prove same-viewport full page mà không mở duplicate pass thứ hai.
 
 ## Rules
 
@@ -47,6 +47,7 @@ Chạy authority gate và baseline bốn lock trước classification; `misdrawn
 2. Preview, correction và QA xảy ra trong cùng invocation.
 3. Không có design registry hay durable preview identity.
 4. Source cùng proof là durable design outcome.
+5. Một feedback chain sinh đúng một verdict table và một authority-to-write batch; explanation, durable correction và source consequence không bị tách thành duplicate pass.
 
 ## Stops
 
@@ -55,4 +56,4 @@ Chạy authority gate và baseline bốn lock trước classification; `misdrawn
 
 ## OUTPUT
 
-Báo classification, authority change, source path và executable proof. Không báo design head.
+Render một bảng với `Observation`, `Verdict`, `Why`, `Why not executed`, `Authority correction`, `Source correction` và `Proof`. Báo one-pass authority-to-write map, sound owner được giữ, authority change, source path và executable proof. Không báo design head.

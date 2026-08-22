@@ -49,10 +49,13 @@ vẽ ra ranh giới nhìn thấy được nào cả.
 | `SURFACE-IN-SURFACE-4` | Quan hệ nhóm trùng bề mặt chứa, tầm thường, hoặc không gọi được tên | `bg-transparent shadow-none` |
 | `SURFACE-IN-SURFACE-5` | Một tập liền mạch riêng, gọi được tên, nằm trong một bề mặt đã có | `overflow-hidden rounded-xl border border-border bg-transparent shadow-none` |
 | `SURFACE-IN-SURFACE-6` | Một hành động thường, cục bộ, nằm trong bề mặt đã có | `border border-border bg-transparent text-foreground` |
+| `SURFACE-IN-SURFACE-7` | Một khối nội dung rộng tự sở hữu khung cuộn của mình | trên bề mặt `overflow-hidden rounded-xl border border-border bg-background shadow-none` · trên nền trang `overflow-hidden rounded-xl bg-card shadow-surface` |
 
 Thứ tự mã đi đúng theo cách người đọc gặp chúng: **từ nền trang vào trong**. Mã `1`–`3` quyết định bản
 thân trang được vẽ gì; mã `4`–`6` quyết định khi đã có một bề mặt bao quanh thì bên trong còn được vẽ
-gì.
+gì. Mã `7` là tình huống duy nhất giải theo bề mặt chứa chứ không bất chấp nó, bởi dữ kiện mà nó trả
+lời — một khối rộng quá cột đang chứa nó — là dữ kiện về quan hệ giữa hai bên, không phải về riêng
+bên nào.
 
 `SURFACE-IN-SURFACE-4` LÀ MỘT TÌNH HUỐNG, KHÔNG PHẢI MỘT MÓN TRANG TRÍ. `bg-transparent shadow-none`
 là bằng chứng viết ra rằng vùng chứa đã được phân loại và kết luận là không sở hữu gì — nó không phải
@@ -60,10 +63,18 @@ thứ sót lại, và cũng không phải cùng một sự thật với "chưa a
 mà lại mang thêm đường viền là chưa theo mã này; nó đã lặng lẽ nhảy sang `SURFACE-IN-SURFACE-5` mà
 chưa chứng minh quan hệ nhóm mà mã đó đòi hỏi.
 
-Không có mã nào cho "một nhóm lồng không phải danh sách". Chỗ trống đó là cố ý, không phải sơ suất:
-quan hệ nhóm lồng duy nhất mà bộ từ vựng này thừa nhận là **một tập liền mạch gồm những thành viên so
-sánh được**. Một nhóm lồng gồm những phần không đồng dạng là `SURFACE-IN-SURFACE-4` cho tới khi có đủ
-ca thật để đề xuất đổi luật.
+Không có mã tổng quát nào cho "một nhóm lồng không phải danh sách". Chỗ trống đó là cố ý, không phải
+sơ suất: **quan hệ nhóm** lồng duy nhất mà bộ từ vựng này thừa nhận là một tập liền mạch gồm những
+thành viên so sánh được. Một nhóm lồng gồm những phần không đồng dạng là `SURFACE-IN-SURFACE-4`.
+
+`SURFACE-IN-SURFACE-7` chính là ngoại lệ mà luật đó luôn dự liệu, và nó không phải một tuyên bố quan
+hệ nhóm chút nào. Nó được thừa nhận vì những ca thật lặp lại đã tới đủ: một tài liệu do người viết
+dựng ra các khối mã, bảng và sơ đồ **rộng hơn cột đang chứa chúng**, mỗi khối là một hàng chrome đặt
+trên một vùng nội dung — những phần không đồng dạng, nên không bao giờ là tập liền mạch. Ranh giới của
+chúng không nói "những thứ này là một nhóm"; nó nói **"chỗ cuộn dừng ở đây"**. Một cái khung để chặn
+tràn đang trả lời câu hỏi khác hẳn một cái khung để tuyên bố quan hệ nhóm, và đem đáp án của cái thứ
+hai gán cho cái thứ nhất chính là thứ đã sinh ra những vùng chứa mã `4` mang đường viền mà chúng không
+biện minh nổi.
 
 ## Đọc một yêu cầu
 
@@ -232,7 +243,9 @@ trong suốt, không bóng.
   một lựa chọn.
 
 **Chỉ quan hệ nhóm liền mạch mới được lồng ranh giới.** Một nhóm lồng gồm những phần **không** đồng
-dạng chưa có mã trong bộ từ vựng này; nó là mã `4` cho tới khi có đủ ca thật để đề xuất đổi luật.
+dạng không có mã quan hệ nhóm trong bộ từ vựng này; nó là mã `4`. Nếu nó đồng thời **rộng hơn cột chứa
+và tự cuộn bên trong**, thì đó không còn là câu hỏi về quan hệ nhóm nữa — giải nó bằng
+`SURFACE-IN-SURFACE-7`, thứ ranh giới chặn tràn thay vì tuyên bố một nhóm.
 
 **Tình huống nghiệp vụ hay gặp.** Danh sách bài học bên trong thẻ khoá học · danh sách tệp đính kèm
 trong hộp thoại · các dòng chi tiết đơn hàng trong khung thanh toán · danh sách người tham gia trong
@@ -263,18 +276,72 @@ suốt, chữ màu tiền cảnh — đủ để bấm được, không đủ đ
 "Sao chép mã" trong khung · "Tải hoá đơn" trong dòng giao dịch · "Huỷ" trong phần cuối hộp thoại ·
 "Đổi ảnh" trong thẻ hồ sơ · "Xem chi tiết" trong thẻ tóm tắt.
 
+## `SURFACE-IN-SURFACE-7` — một khối nội dung rộng với khung cuộn riêng
+
+**Tình huống.** Nội dung do người viết dựng ra một khối không thể xuống dòng lại cho vừa cột đang đọc
+nó: một khối mã mà từng dòng phải nguyên vẹn, một bảng dữ liệu mà các cột phải thẳng hàng, một sơ đồ
+vẽ ở một bề ngang cố định. Khối tự cuộn ngang bên trong để cột đọc giữ được `min-w-0`, và chỗ cuộn ấy
+cần một mép nhìn thấy được — người đọc phải thấy vùng chuyển động bắt đầu ở đâu và văn xuôi nối lại
+từ đâu.
+
+Đây là mã duy nhất mà className phụ thuộc bề mặt chứa, và phụ thuộc vì một lý do vật lý chứ không
+phải lý do phân loại. Một nền lún xuống dưới bề mặt thì đọc ra là cái giếng chìm; cũng nền ấy đặt trên
+nền trang thì không đọc ra gì cả, vì nó **chính là** trang. Nên khối nhận cách xử lý giữ cho nó còn
+đọc được so với thứ thật sự nằm sau lưng nó:
+
+- **Bề mặt chứa là một surface** — giếng chìm: `overflow-hidden rounded-xl border border-border bg-background shadow-none`.
+- **Bề mặt chứa là nền trang** — thẻ nổi: `overflow-hidden rounded-xl bg-card shadow-surface`.
+
+**Dấu hiệu nhận ra**
+
+- Nội dung có một bề ngang tối thiểu nội tại mà cột không đáp ứng nổi.
+- Bẻ dòng nó sẽ phá nghĩa: một dòng lệnh đứt mất dấu nháy đóng của nó, một hàng bảng bị bẻ thì thôi
+  không còn thẳng với tiêu đề cột nữa.
+- Khối gồm những phần không đồng dạng — một hàng chrome nêu tên ngôn ngữ hoặc chú thích, đặt trên
+  chính vùng nội dung.
+- Chỗ tràn là cục bộ: khối cuộn, trang thì không.
+
+**Tự hỏi.** Bẻ dòng nội dung này có phá nghĩa của nó không, và vì thế nó có buộc phải cuộn bên trong
+khung riêng không?
+
+**Ranh giới**
+
+- `SURFACE-IN-SURFACE-5`: mã `5` đóng khung một **quan hệ nhóm** — gọi được tên, thành viên so sánh
+  được. Mã `7` đóng khung một chỗ **tràn**. Một cái bảng vào mã `7` vì nó quá rộng, không bao giờ vì
+  các hàng của nó so sánh được; một danh sách bài học vừa cột thì vẫn là mã `5`.
+- `SURFACE-IN-SURFACE-4`: nội dung vừa cột, hoặc được phép bẻ dòng thoải mái, thì không sở hữu khung
+  nào. Riêng bề rộng không phải điều kiện kích hoạt — nội dung phải **không thể** xuống dòng lại.
+- `SURFACE-IN-SURFACE-1`: dạng nổi của mã `7` không phải mã `1`. Mã `1` là một đối tượng nghiệp vụ
+  hoàn chỉnh, có tên, thành viên, trạng thái và kết quả riêng; một khối mã không có thứ nào trong số
+  đó. Hai mã dùng chung một className và không chung gì khác.
+- Không bao giờ cả hai nền. Bề mặt chứa được giải trước vùng chứa này, đúng như bước `3` của **Đọc một
+  yêu cầu** đòi hỏi, và chính nó quyết định dạng nào trong hai dạng được áp.
+
+**Cái khung và `OVERFLOW-5` là một quyết định.** Mã đó phát ra `overflow-x-auto` cho nội dung "cuộn
+ngang trong khung riêng của nó" và xưa nay vẫn giả định sẵn một cái khung mà mô-đun này chưa gọi được
+tên. Mã `7` chính là cái khung ấy. Phát cả hai hoặc không phát cái nào: một vùng cuộn không mép thì
+giấu đi chính cơ chế của nó, còn một cái mép không cuộn là đường viền đang tuyên bố một quan hệ nhóm
+mà nó không có.
+
+**Tình huống nghiệp vụ hay gặp.** Một dòng lệnh shell trong bài học · một bảng so sánh trong bài viết
+· một sơ đồ đã dựng trong tài liệu · một stack trace trong báo cáo lỗi · một lưới kết quả rộng trong
+bề mặt báo cáo · một liệt kê schema trong trang tra cứu.
+
 ## Đầu vào
 
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
 | `host` | `page` · `card` · `outlined-group` · `overlay` — thứ đã sở hữu ranh giới bao quanh vùng chứa này |
-| `child` | `ordinary-content` · `independent-group` · `peer-surfaces` · `joined-rows` · `single-control` |
-| `membership` | `same-as-host` · `distinct-and-nameable` · `unknown` |
+| `child` | `ordinary-content` · `independent-group` · `peer-surfaces` · `joined-rows` · `single-control` · `unreflowable-block` |
+| `membership` | `same-as-host` · `distinct-and-nameable` · `unknown` · `not-a-membership` |
 | `action-priority` | `ordinary-local` · `separately-proven-primary` · `unknown` |
+| `reflow` | `wraps-freely` · `cannot-reflow` — bẻ dòng nội dung có phá nghĩa của nó hay không |
 
 `host`, `child` và `membership` quyết định ranh giới. `action-priority` chỉ được tra cho
-`SURFACE-IN-SURFACE-6`, và chỉ ý định CTA mới được nâng nó lên. Không một giá trị khoảng cách, khoảng
-đệm, lề hay khoảng đệm trong nào là đầu vào hoặc đầu ra của mô-đun này.
+`SURFACE-IN-SURFACE-6`, và chỉ ý định CTA mới được nâng nó lên. `reflow` chỉ được tra cho
+`SURFACE-IN-SURFACE-7`; chính `cannot-reflow` mới cho phép một cái khung không tuyên bố quan hệ nhóm
+nào, và khi đó `host` chọn dạng nào trong hai dạng của mã ấy được áp. Không một giá trị khoảng cách,
+khoảng đệm, lề hay khoảng đệm trong nào là đầu vào hoặc đầu ra của mô-đun này.
 
 Một quan hệ nhóm chỉ **gọi được tên** khi nêu ra được tên, thành viên, trạng thái riêng và kết quả
 riêng của nó. DOM lồng nhau không phải bằng chứng quan hệ nhóm; một `div` tồn tại chỉ để đặt hướng xếp
@@ -282,7 +349,8 @@ thì không có thành viên và không có kết quả.
 
 ## Quy tắc
 
-1. Ranh giới chỉ tồn tại cho một tuyên bố quan hệ nhóm gọi được tên.
+1. Ranh giới chỉ tồn tại cho một tuyên bố quan hệ nhóm gọi được tên, hoặc cho nội dung không thể bẻ
+   dòng nên buộc phải cuộn trong khung riêng — `SURFACE-IN-SURFACE-7`, cái mép phi-quan-hệ-nhóm duy nhất.
 2. Nâng nổi cấp trang và dàn ý lồng bên trong loại trừ lẫn nhau. Độ nổi không bao giờ mang đường viền,
    và dàn ý không bao giờ mang bóng.
 3. Bề mặt cấp trang dùng `bg-card`; nền trang dùng `bg-background`.
@@ -298,6 +366,7 @@ thì không có thành viên và không có kết quả.
 11. Một vùng chứa nhiều nhất chỉ tuyên bố **một** ranh giới; hai tuyên bố về cùng một quan hệ nhóm cần
     hai cấp lồng nhau, không phải một className dài hơn.
 12. Khoảng cách, khoảng đệm trong và độ lệch ra ngoài nằm ngoài mô-đun này.
+13. Khung cuộn và chỗ cuộn `OVERFLOW-5` của nó là một quyết định; không cái nào được phát ra một mình.
 
 Ngoài ra: mọi vùng chứa được hiển thị ra đều rơi vào đúng một mã, và không bố cục nào nằm ngoài phạm
 vi.
@@ -323,7 +392,14 @@ nó áp dụng vào.
   Khung chờ làm phẳng một thẻ, hoặc trạng thái lỗi nâng một khối phẳng thành thẻ, là nói dối về quyền
   sở hữu đúng lúc người dùng ít có khả năng kiểm chứng nhất.
 - **Thiết kế đáp ứng.** Chỉ đổi mã khi **bề mặt chứa thật sự đổi**. Màn hình hẹp đi không biến một đối
-  tượng thành một phần nội dung, và cũng không biến một phần nội dung thành một thẻ.
+  tượng thành một phần nội dung, và cũng không biến một phần nội dung thành một thẻ. Một khối
+  `SURFACE-IN-SURFACE-7` giữ nguyên mã ở mọi bề ngang: nó có khung vì nội dung không bẻ dòng được, mà
+  viewport rộng ra thì cũng không làm một dòng lệnh bẻ dòng được. Chỉ có chỗ cuộn bên trong là lúc có
+  lúc không.
+- **Một khối rộng mà bề mặt chứa chính là trang.** `SURFACE-IN-SURFACE-7` ở dạng nổi, không phải
+  `SURFACE-IN-SURFACE-1`. Hai mã phát ra cùng một className và trả lời hai câu hỏi khác nhau; ghi nó
+  là `1` tức là tuyên bố một đối tượng nghiệp vụ không hề tồn tại, và đánh mất luôn lý do cái khung có
+  mặt ở đó.
 
 ## Đầu ra
 
@@ -331,10 +407,10 @@ Mỗi vùng chứa một khối, từ ngoài vào trong:
 
 ```text
 host: <page | card | outlined-group | overlay>
-child: <ordinary-content | independent-group | peer-surfaces | joined-rows | single-control>
-membership: <same-as-host | distinct-and-nameable | unknown>
-situation: <SURFACE-IN-SURFACE-1 … SURFACE-IN-SURFACE-6>
-className: <đúng className trong bảng Mã tình huống>
+child: <ordinary-content | independent-group | peer-surfaces | joined-rows | single-control | unreflowable-block>
+membership: <same-as-host | distinct-and-nameable | unknown | not-a-membership>
+situation: <SURFACE-IN-SURFACE-1 … SURFACE-IN-SURFACE-7>
+className: <đúng className trong bảng Mã tình huống; với mã 7, dạng mà bề mặt chứa chọn>
 reason: <dữ kiện về bề mặt chứa và quan hệ nhóm loại trừ mã liền kề>
 removed: <ranh giới trùng mà quyết định này xoá đi, hoặc none>
 ```

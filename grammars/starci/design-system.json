@@ -26,11 +26,13 @@
     "using several status chips where one metadata sentence has one semantic status",
     "flattening an evidenced hierarchy into peer rows",
     "rebuilding ListBox, accordion, surface-list or scroll mechanics by hand",
+    "scoping semantic theme variables below a renderer-owned portal root so overlays fall back to vendor colours",
     "proving computed CSS while ignoring the full-viewport reference hierarchy"
   ],
   "legacyPolicy": {"precedence": "legacy-baseline-before-master", "preserveOutsideTarget": true, "pageOverrideMode": "deviations-only"},
   "profileOverrides": {
     "starci-academy": {"accent": "--starci-accent", "deviations": ["Academy owns the rose accent role while the MASTER topology remains unchanged."]},
-    "nivo-console": {"accent": "--nivo-accent", "deviations": ["Nivo owns the unicorn-red accent role while the MASTER topology remains unchanged."]}
+    "nivo-console": {"accent": "--nivo-accent", "deviations": ["Nivo owns the unicorn-red accent role while the MASTER topology remains unchanged."]},
+    "tayson-community": {"accent": "--tayson-accent", "deviations": ["Tay Son owns a neutral product accent boundary until approved brand evidence replaces its value; the MASTER topology remains unchanged."]}
   }
 }

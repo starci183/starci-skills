@@ -32,15 +32,22 @@ the promoted package.
 5. `GRAMMAR-5` — A missing route, owner or fact stops; it never authorizes hand-built fallback JSX.
 6. `GRAMMAR-6` — Repository remotes, revisions, paths, symbols, blobs and source-origin records are forbidden.
 7. `GRAMMAR-7` — Resolution returns only selected facts, capsules, templates and principle concerns.
-8. `GRAMMAR-8` — A profile visual contract locks direction axes, semantic role tokens and exact token values; design and execution refuse substitutions.
+8. `GRAMMAR-8` — A profile visual contract locks direction axes, semantic role tokens and exact token values; those roles reach every supported theme mode and renderer-owned portal, and design and execution refuse substitutions or vendor fallbacks.
 9. `GRAMMAR-9` — MASTER fixes visual language once; a profile may override only declared roles and a page records deviations only.
+10. `GRAMMAR-10` — When an observable fact excludes a neighboring outcome, encode that negative boundary in the rule and a counterexample; absence of a positive fact is not durable refusal evidence.
+11. `GRAMMAR-11` — Decompose every labelled feature section into one grammar scope before composition. A single body, peer list, disclosure hierarchy and bounded form resolve to their semantic surface owners; the section label remains outside that surface.
 
 ## Routing
 
 Layout and block design classify evidenced situations into fact ids, run `@resolve-grammar`, and bind
 the resulting receipt plus MASTER into the current session baseline. Outcomes constrain which semantic owner is
 reused, extended or reported as `new-required`; they do not choose visual classes. A selected owner may
-also carry a visual contract, which fixes semantic theme tokens and values before direction comparison.
+also carry a visual contract, which fixes semantic theme tokens and values before direction comparison and
+keeps that role mapping at the common document theme owner shared by routed content and renderer-owned portals.
+
+Each render region records closed child targets as grammar scopes. Every scope carries its own facts and
+the exact slot/outcome/component owners recomputed by the resolver. A region-level block name never licenses
+generic cards around children whose peer, disclosure or form facts resolve to a more specific surface owner.
 
 The same skill invocation recomputes the receipt before source writes. A hash drift, missing capsule,
 changed template or absent owner returns to candidate work. It resolves only emitted `principleConcerns`

@@ -49,10 +49,13 @@ of them emit no visible boundary at all.
 | `SURFACE-IN-SURFACE-4` | Nested membership is the same as the host's, ordinary, or unnameable | `bg-transparent shadow-none` |
 | `SURFACE-IN-SURFACE-5` | A distinct, nameable joined set lives inside an existing surface | `overflow-hidden rounded-xl border border-border bg-transparent shadow-none` |
 | `SURFACE-IN-SURFACE-6` | An ordinary local action lives inside an existing surface | `border border-border bg-transparent text-foreground` |
+| `SURFACE-IN-SURFACE-7` | A wide authored block owns its own scroll frame | on a surface `overflow-hidden rounded-xl border border-border bg-background shadow-none` · on page ground `overflow-hidden rounded-xl bg-card shadow-surface` |
 
 The codes are ordered the way a reader meets them: from the page ground inward. Codes `1`–`3` decide
 what the page itself may draw; codes `4`–`6` decide what may be drawn once a surface already exists
-around you.
+around you. Code `7` is the one situation that resolves against its host rather than in spite of it,
+because the fact it answers — a block too wide for the column it sits in — is a fact about the
+relationship between the two, not about either alone.
 
 `SURFACE-IN-SURFACE-4` IS A SITUATION, NOT A DECORATION. `bg-transparent shadow-none` is the written
 proof that the container was classified and found to own nothing — it is not a leftover, and it is
@@ -60,9 +63,17 @@ not the same fact as "no class was considered". A flat container that also carri
 followed this code; it has silently switched to `SURFACE-IN-SURFACE-5` without proving the
 membership that code requires.
 
-There is no code for "a nested non-list group". That absence is deliberate, not an oversight: the
-only nested membership this vocabulary admits is a **joined set of comparable members**. A nested
-group of unlike parts is `SURFACE-IN-SURFACE-4` until repeated real cases justify a rule change.
+There is no general code for "a nested non-list group". That absence is deliberate, not an oversight:
+the only nested **membership** this vocabulary admits is a **joined set of comparable members**. A
+nested group of unlike parts is `SURFACE-IN-SURFACE-4`.
+
+`SURFACE-IN-SURFACE-7` is the single exception that rule always anticipated, and it is not a
+membership claim at all. It is admitted because the repeated real cases arrived: an authored document
+renders code fences, tables and diagrams that are **wider than the column holding them**, each one a
+chrome row over a content region — unlike parts, so never a joined set. Their boundary does not say
+"these things are one group"; it says **"the scroll stops here"**. A frame that contains overflow is
+answering a different question from a frame that claims membership, and giving the first one the
+second one's answer is what produced code `4` containers wearing borders they could not justify.
 
 ## Reading a request
 
@@ -232,7 +243,9 @@ border, transparent ground, no shadow.
   error, not a choice.
 
 **Only joined membership may nest a boundary.** A nested group of parts that are **not** uniform has
-no code in this vocabulary; it is code `4` until enough real cases justify a rule change.
+no membership code in this vocabulary; it is code `4`. If it is also **wider than its host column and
+scrolls inside itself**, it is not a membership question at all — resolve it as
+`SURFACE-IN-SURFACE-7`, whose boundary contains overflow rather than claiming a group.
 
 **Common business situations.** A lesson list inside a course card · an attachment list inside a
 dialog · order line items inside a checkout panel · a participant list inside an event card · a
@@ -264,18 +277,71 @@ secondary.
 card · "Copy code" inside a panel · "Download invoice" in a transaction row · "Cancel" in a dialog
 footer · "Change photo" in a profile card · "View details" in a summary card.
 
+## `SURFACE-IN-SURFACE-7` — a wide authored block with its own scroll frame
+
+**Situation.** Authored content renders a block that cannot be reflowed to fit the column reading it:
+a code fence whose lines must stay whole, a data table whose columns must stay aligned, a diagram
+drawn at a fixed measure. The block scrolls sideways inside itself so the reading column can stay
+`min-w-0`, and that scroll needs a visible edge — a reader must be able to see where the moving
+region begins and where the prose resumes.
+
+This is the only code whose className depends on the host, and it depends on it for a physical reason
+rather than a taxonomic one. Ground that recedes below a surface reads as an inset well; the same
+ground on page ground reads as nothing at all, because it *is* the page. So the block takes the
+treatment that keeps it legible against whatever is actually behind it:
+
+- **Host is a surface** — recessed well: `overflow-hidden rounded-xl border border-border bg-background shadow-none`.
+- **Host is page ground** — raised card: `overflow-hidden rounded-xl bg-card shadow-surface`.
+
+**Recognition signs**
+
+- The content has an intrinsic minimum width the column cannot honour.
+- Wrapping it would destroy meaning: a broken command line loses its closing quote, a wrapped table
+  row stops aligning with its header.
+- The block is composed of unlike parts — a chrome row naming the language or the caption, over the
+  content region itself.
+- The overflow is local: the block scrolls, the page does not.
+
+**Ask yourself.** Would wrapping this content destroy its meaning, and does it therefore have to
+scroll inside its own frame?
+
+**Boundary**
+
+- `SURFACE-IN-SURFACE-5`: code `5` frames a **membership** — nameable, comparable members. Code `7`
+  frames an **overflow**. A table qualifies under `7` because it is too wide, never because its rows
+  are comparable; a lesson list that fits its column stays `5`.
+- `SURFACE-IN-SURFACE-4`: content that fits, or that may wrap freely, owns no frame. Width alone is
+  not the trigger — the content must be **unable** to reflow.
+- `SURFACE-IN-SURFACE-1`: the raised form of code `7` is not code `1`. Code `1` is a complete business
+  object with its own name, members, state and outcome; a code fence has none of those. They share a
+  className and nothing else.
+- Never both grounds. The host is resolved before this container, exactly as step `3` of **Reading a
+  request** requires, and it decides which of the two forms applies.
+
+**The frame is one decision with `OVERFLOW-5`.** That code emits `overflow-x-auto` for content that
+"scrolls sideways in its own frame" and has always presumed a frame this module could not name. Code
+`7` is that frame. Emit them together or neither: a scroll region with no edge hides its own
+mechanism, and an edge with no scroll is a border claiming a membership it does not have.
+
+**Common business situations.** A shell command in a lesson · a comparison table inside an article ·
+a rendered diagram in documentation · a stack trace inside an error report · a wide result grid
+inside a report surface · a schema listing inside a reference page.
+
 ## Inputs
 
 | Input | Evidence required |
 |---|---|
 | `host` | `page` · `card` · `outlined-group` · `overlay` — what already owns a boundary around this container |
-| `child` | `ordinary-content` · `independent-group` · `peer-surfaces` · `joined-rows` · `single-control` |
-| `membership` | `same-as-host` · `distinct-and-nameable` · `unknown` |
+| `child` | `ordinary-content` · `independent-group` · `peer-surfaces` · `joined-rows` · `single-control` · `unreflowable-block` |
+| `membership` | `same-as-host` · `distinct-and-nameable` · `unknown` · `not-a-membership` |
 | `action-priority` | `ordinary-local` · `separately-proven-primary` · `unknown` |
+| `reflow` | `wraps-freely` · `cannot-reflow` — whether wrapping the content would destroy its meaning |
 
 `host`, `child` and `membership` decide the boundary. `action-priority` is consulted only for
-`SURFACE-IN-SURFACE-6`, and only call-to-action intent may raise it. No gap, padding, margin or
-inset value is an input or an output of this module.
+`SURFACE-IN-SURFACE-6`, and only call-to-action intent may raise it. `reflow` is consulted only for
+`SURFACE-IN-SURFACE-7`; `cannot-reflow` is what admits a frame that claims no membership, and `host`
+then selects which of that code's two forms applies. No gap, padding, margin or inset value is an
+input or an output of this module.
 
 A membership is **nameable** when you can state its name, its members, its own state and its own
 outcome. DOM nesting is not evidence of membership; a `div` that exists to hold a flex direction has
@@ -283,7 +349,8 @@ no members and no outcome.
 
 ## Rules
 
-1. A boundary exists only for a nameable membership claim.
+1. A boundary exists only for a nameable membership claim, or for content that cannot reflow and
+   must therefore scroll inside its own frame — `SURFACE-IN-SURFACE-7`, the one non-membership edge.
 2. Page elevation and nested outline are mutually exclusive. Elevation never carries a border, and
    an outline never carries a shadow.
 3. A page surface uses `bg-card`; page ground uses `bg-background`.
@@ -298,6 +365,7 @@ no members and no outcome.
 11. One container makes at most one boundary claim; two claims about one membership need nesting,
     not a longer className.
 12. Spacing, inset and external offset are outside this module.
+13. A scroll frame and its `OVERFLOW-5` scroll are one decision; neither is emitted without the other.
 
 Beyond these: every rendered container resolves to exactly one code, and no composition is out of
 scope.
@@ -322,7 +390,12 @@ applies to.
   skeleton that flattens a card, or an error state that promotes a flat block into a card, is lying
   about ownership while the user is least able to check.
 - **Responsive.** Change the code only when the host ACTUALLY changes. A narrower screen does not
-  turn an object into a section, nor a section into a card.
+  turn an object into a section, nor a section into a card. A `SURFACE-IN-SURFACE-7` block keeps its
+  code at every width: it is framed because its content cannot reflow, and a wider viewport does not
+  make a command line wrappable. Only the scroll it contains comes and goes.
+- **A wide block whose host is itself the page.** `SURFACE-IN-SURFACE-7` in its raised form, not
+  `SURFACE-IN-SURFACE-1`. The two emit the same className and answer different questions; recording
+  it as `1` claims a business object that does not exist and loses the reason the frame is there.
 
 ## Output
 
@@ -330,10 +403,10 @@ One block per container, outermost first:
 
 ```text
 host: <page | card | outlined-group | overlay>
-child: <ordinary-content | independent-group | peer-surfaces | joined-rows | single-control>
-membership: <same-as-host | distinct-and-nameable | unknown>
-situation: <SURFACE-IN-SURFACE-1 … SURFACE-IN-SURFACE-6>
-className: <exact className from the Situation codes table>
+child: <ordinary-content | independent-group | peer-surfaces | joined-rows | single-control | unreflowable-block>
+membership: <same-as-host | distinct-and-nameable | unknown | not-a-membership>
+situation: <SURFACE-IN-SURFACE-1 … SURFACE-IN-SURFACE-7>
+className: <exact className from the Situation codes table; for code 7, the form its host selects>
 reason: <host and membership fact that excludes the adjacent code>
 removed: <the duplicate boundary this decision deletes, or none>
 ```

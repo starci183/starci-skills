@@ -2,7 +2,7 @@
 title: Tokens
 module: tokens
 kind: pattern
-codes: [TOKEN-1, TOKEN-2, TOKEN-3, TOKEN-4, TOKEN-5, TOKEN-6, TOKEN-7, TOKEN-8, TOKEN-9]
+codes: [TOKEN-1, TOKEN-2, TOKEN-3, TOKEN-4, TOKEN-5, TOKEN-6, TOKEN-7, TOKEN-8, TOKEN-9, TOKEN-10]
 ---
 
 # Tokens
@@ -103,6 +103,7 @@ around it changes.
 | `TOKEN-7` | A semantic colour is needed: bare mark, soft plate, or solid plate | A bare mark uses `text-*`; a plate pairs `bg-*-soft` with `text-*-soft-foreground`, or `bg-*` with `text-*-foreground`. Never a `*-soft` background token used as an ink colour |
 | `TOKEN-8` | A height must be chosen for a control | Size selected from placement, variant selected from priority. Never height inferred from variant, word count, or how loud the control feels; never custom padding used to shrink a control |
 | `TOKEN-9` | A class names a token the theme has not defined | The name is a union member AND the variable it requests exists in the stylesheet. Never reporting names the framework resolves itself — `screen`, `full`, `fit`, the viewport units |
+| `TOKEN-10` | One experience renders both inside a local app boundary and through document-level portals | Semantic theme variables live at the common document theme hook in the app-owned global stylesheet. A local boundary may alias or consume them, never remain their only definition |
 
 ## Reading an accepted shape
 
@@ -121,7 +122,8 @@ around it changes.
    list (`TOKEN-2`), a fractional step (`TOKEN-3`), an arbitrary length or raw colour (`TOKEN-4`), a
    hand-rolled heading (`TOKEN-5`), a string in the folder the union cannot see (`TOKEN-6`), a colour
    used in the wrong role (`TOKEN-7`), a control height (`TOKEN-8`), or a token name whose variable
-   may not exist (`TOKEN-9`)?
+   may not exist (`TOKEN-9`), or a semantic variable exists only below a renderer sibling that also
+   consumes it (`TOKEN-10`)?
 5. **When two codes both match, the tier and the failure mode separate them.** The same `[13px]` is
    `TOKEN-1` inside a typed entry, where the compiler refuses it, and `TOKEN-4` inside a leaf, where
    a rule catches it. A shrunk control that also carries custom padding is both `TOKEN-8` and
@@ -321,6 +323,29 @@ across two repositories on the first run: two findings, both wrong, both from th
 unused · copying a layout entry to another app in the monorepo · standing up a new app and forgetting
 to copy the theme.
 
+## `TOKEN-10` — one theme owner must reach every renderer root in the experience
+
+**Situation.** The app places semantic colour variables under a local visual boundary while a vendor
+menu, drawer, popover or overlay is rendered as that boundary's document sibling. The variable exists,
+so `TOKEN-9` is satisfied inside the app, but the portalled surface falls back to vendor colour.
+
+**What it emits in source.** Define the semantic palette and light/dark hooks in the app-owned global
+stylesheet at the nearest document ancestor shared by routed content and renderer-owned portals. A local
+theme boundary may alias grammar roles, set typography or consume the palette; components and mechanics
+branches never duplicate raw colours to repair one portal.
+
+**Recognition signs.** Routed content has the expected accent while a dropdown or drawer is blue; dark
+mode changes the document ground but leaves a local boundary transparent or on light content roles; a
+component-level selector repairs one overlay while another portal still falls back.
+
+**Boundary.** Not `TOKEN-9`: every variable may exist and still be scoped below one consumer, so the
+unresolved-token gate stays green. Not `VENDOR-2`: the mechanics branch may correctly own portal lifecycle;
+`TOKEN-10` owns where the semantic variables it consumes must be reachable. An intentionally isolated embed
+with its own declared theme owner is outside this code.
+
+**Common business situations.** Account dropdown · locale menu · modal · drawer · tooltip · toast rendered
+outside the local app subtree · dark-mode dashboard whose body and content boundary disagree.
+
 ## Layer held
 
 Which tier actually holds each code. A rule is named only where one was found in `tokens.mjs` and
@@ -337,8 +362,9 @@ read; everything else is `documented`, and that gap is a measurement, not a fail
 | `TOKEN-7` | `documented` | Nothing mechanical. Pairing is a two-class relationship no rule in `tokens.mjs` looks for |
 | `TOKEN-8` | `documented` | The size union closes the set to two, so a third height is unrepresentable — but WHICH of the two is right is a placement judgement nothing checks |
 | `TOKEN-9` | `enforced` | `no-unresolved-token-class` |
+| `TOKEN-10` | `documented` | Browser computed-style proof across routed content and one renderer-owned portal; no published static rule proves cascade reach |
 
-Four codes are `enforced`, one is `unrepresentable`, four are `documented`. The vocabulary type owns
+Four codes are `enforced`, one is `unrepresentable`, five are `documented`. The vocabulary type owns
 the entry tier and the leaf folder stays outside it by policy; the rule file owns product source
 under `src/`, and tooling and configuration stay ignorant of all of it because they render nothing.
 
@@ -358,6 +384,7 @@ this trust tree, `src/…` is a consuming front-end repository.
 | `TOKEN-7` | `components/leaves/IconTile/index.tsx` · `components/leaves/RankDeltaCaret/index.tsx` | A tone table pairing `bg-*-soft` with `text-*-soft-foreground`; and a bare mark using plain `text-success` |
 | `TOKEN-8` | `components/leaves/Button/index.tsx` | `export type ButtonSize = "sm" \| "md"` and the comment stating size follows placement, independently of visual priority |
 | `TOKEN-9` | `@canon-fe` · `app/globals.css` | `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES`; and the `--container-app-*` variables the `max-w-app-*` names request |
+| `TOKEN-10` | `app/globals.css` · a named mechanics portal branch | Document theme hooks define the semantic palette once; computed style in routed content and the portalled surface resolves the same accent and mode pair |
 | inset pairing | `app/globals.css` · `components/branches/SurfaceListCard/index.tsx` | `.card { padding: calc(var(--spacing) * 4) !important }` beside `.card[data-component="SurfaceListCardSurface"] { padding: 0 !important }` — the equal-strength semantic exception |
 | joined-list rows | `components/contracts/index.ts` | Entries carrying `p-0`, `[&>*]:px-4`, `[&>*]:py-3`, `[&>*:first-child]:pt-4`, `[&>*:last-child]:pb-4` |
 
@@ -371,9 +398,16 @@ listed here so the decisions stay checkable; they are not new codes.
 | class string | The literal text, whether written in markup, hoisted into a module constant, or listed in an entry array |
 | tier | Which folder the file sits in — typed entry tier, or the leaf folder that writes its own classes |
 | vocabulary | The current union members, read from the union itself and not from memory |
-| theme | The stylesheet that defines the variables a token name requests |
+| theme | The stylesheet that defines the variables a token name requests, plus every renderer root that consumes those variables |
 | placement | For a control: embedded in a row or cluster, versus standalone and owning a line |
 | role | For a colour: bare mark, soft plate, or solid plate |
+
+## Render-contract opt-in tokens
+
+The closed default scale remains unchanged. A schema 6 render contract may select the typed local variants
+`Heading.scale="display"`, `Text size="metric-lead"` and `Button size="lg"`; leaf-owned variant tables emit their
+tokens. `lg` is restricted to a standalone page-root primary CTA, while row/card/toolbar actions remain `sm` or
+`md`. Call sites may not write new utilities or arbitrary values to approximate any opt-in.
 
 ## Rules
 
@@ -390,6 +424,8 @@ listed here so the decisions stay checkable; they are not new codes.
 9. A class naming a theme token resolves only when the stylesheet defines its variable.
 10. The edge of a surface and the seam inside it are one decision.
 11. Every emitted measurement, colour and control height resolves to exactly one code.
+12. Semantic theme variables consumed by routed content and renderer-owned portals live at their common
+    document theme hook in the app-owned global stylesheet; a local boundary is never their only owner.
 
 ## Exceptions
 
@@ -420,7 +456,7 @@ pattern resolves.
 ```text
 value: <the class or token as written>
 tier: <entry | leaf>
-code: <TOKEN-1 … TOKEN-9>
+code: <TOKEN-1 … TOKEN-10>
 holder: <unrepresentable | enforced:<rule-name> | documented>
 verdict: <member | replace with <member> | define <variable> | pair with <token>>
 reason: <the fact that excludes the adjacent code>
