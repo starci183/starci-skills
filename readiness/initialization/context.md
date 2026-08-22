@@ -16,10 +16,10 @@ Load `@initialization-identity`, `@initialization-bootstrap`, `@initialization-w
 
 Initialization is four bounded modules, resolved in this order:
 
-1. `identity/context.md` — prove this machine can decrypt the Source before any secret-backed setup;
-2. `bootstrap/context.md` — route both agent runtimes into the trust tree;
-3. `workspaces/context.md` — record the shared language and every declared read route;
-4. `worktrees/context.md` — install the durable and disposable write roots.
+1. [identity](identity/context.md) — prove this machine can decrypt the Source before any secret-backed setup;
+2. [bootstrap](bootstrap/context.md) — route both agent runtimes into the trust tree;
+3. [workspaces](workspaces/context.md) — record the shared language and every declared read route;
+4. [worktrees](worktrees/context.md) — install the durable and disposable write roots.
 
 Each module owns one verdict and one write surface, expressed as evidence, action, and proof. A direct
 init request authorises its bounded local action. Ask only when completing it requires an external or

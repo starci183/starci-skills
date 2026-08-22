@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "common": {
+    "maxConcurrentWorkers": 3,
+    "oneWriterPerPath": true,
+    "workersMaySpawn": false,
+    "coordinatorOwns": [
+      "journey-decision",
+      "ui-direction",
+      "state-ownership",
+      "approval",
+      "claude-authority",
+      "shared-integration",
+      "final-verdict"
+    ],
+    "workerDefaults": [
+      "evidence-inventory",
+      "cache-html",
+      "approved-disjoint-code",
+      "seed-execution",
+      "tests",
+      "browser-capture"
+    ]
+  },
+  "runtimes": {
+    "codex": {
+      "coordinatorModel": "gpt-5.6-sol",
+      "workerModel": "gpt-5.6-luna",
+      "workerReasoning": "medium",
+      "contextMode": "none-or-bounded"
+    },
+    "claude": {
+      "coordinatorModel": "opus",
+      "workerModel": "sonnet",
+      "workerReasoning": "medium",
+      "contextMode": "explicit-agent-envelope"
+    }
+  },
+  "boundSkills": [
+    "starci-fe-design-layout",
+    "starci-fe-design-block",
+    "starci-fe-layout-refactor"
+  ],
+  "stepMaps": {
+    "starci-fe-design-layout": ["evidence", "orchestration", "page-synthesis", "states", "implementation", "parity"],
+    "starci-fe-design-block": ["bind", "orchestration", "direction", "state-boundary", "implement", "parity"],
+    "starci-fe-layout-refactor": ["bind-classify", "orchestration", "direction", "authority-state-boundary", "evolve-refactor", "parity"]
+  }
+}

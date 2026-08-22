@@ -130,6 +130,9 @@ write `gap-[13px]` and move on.
 **What it emits in source.** Nothing new. The value is not written, because it is not a member of
 `LayoutClassName`. The entry takes the nearest existing rung, or the work moves to `TOKEN-2`.
 
+**Recognition signs.** The value sits in a typed entry, not in a leaf. The compiler is red before
+anyone opens the review. No rule has to say anything about it at all.
+
 **Boundary.** Not `TOKEN-4`: same value shape, different tier and different holder — in a typed
 entry the compiler refuses, in a leaf the union cannot reach and a rule catches it. Not `TOKEN-2`:
 `TOKEN-1` says the value cannot be typed; `TOKEN-2` says what to do if it must become typeable.
@@ -143,6 +146,10 @@ union but to open it deliberately, in the named list, where the diff shows it.
 the comment above it honoured: grow this list deliberately, so the addition reads as a decision. No
 change at any call site introduces the member.
 
+**Recognition signs.** The need repeats across screens, not in one place. Whoever adds it can name
+the relationship the new rung names, not only its measurement. The change lives in the vocabulary
+list, not inside a component.
+
 **Boundary.** Not `TOKEN-1`, which is the refusal itself. Not `TOKEN-3`: a half step is never a
 candidate member, because the scale is whole rungs unevenly spaced, so a half step does not sit
 between two rungs — it sits outside the scale.
@@ -154,6 +161,9 @@ between two rungs — it sits outside the scale.
 
 **What it emits in source.** A whole rung — the nearest one when in doubt. The `FRACTIONAL` pattern
 and the `noFractionalStep` rule built from it hold this in product source.
+
+**Recognition signs.** The value carries a decimal point. It is justified with "the other one was a
+touch tight". A product-wide search finds no second use of the same value.
 
 **Boundary.** Not `TOKEN-4`: `size-3.5` is a fractional step, `size-[14px]` is an arbitrary value.
 They draw the same thing and fail in two different ways, so they are two codes. Not `TOKEN-2`: a
@@ -167,6 +177,10 @@ half step is not a proposal for a new member.
 token for a colour. `ARBITRARY_LENGTH`, `RAW_COLOUR` and the two message ids in `noArbitraryValue`
 hold this — one message for `length`, one for `colour`.
 
+**Recognition signs.** `[...]` in a measuring class, or `#` in a colour class. It may be exactly
+equal to a rung today — and that is the trap. Nobody finds it by consulting the scale, and it does
+not move when the scale moves.
+
 **Boundary.** Not `TOKEN-1`: same value shape, different tier, different holder. Not `TOKEN-7`:
 `text-[#16a34a]` is a raw colour, while `text-success-soft` on a bare mark is a semantic colour used
 in the wrong role — one stands outside the palette, the other stands inside it wearing the wrong
@@ -179,6 +193,10 @@ unresolved. Both are broken, but only one looks correct.
 
 **What it emits in source.** The heading leaf, where `level` drives tag and metrics as one decision.
 `LARGE_TEXT` and `HEAVY_WEIGHT` tested together are what `noHandRolledHeading` looks for.
+
+**Recognition signs.** A `span` or `div` carrying both a large size class and a bold weight class. It
+reads as a heading by eye and does not exist in the outline. When the type scale changes, this place
+is left behind.
 
 **Boundary.** Not `TOKEN-4`: `TOKEN-5` says nothing about whether the values are on the scale —
 `text-2xl` and `font-bold` are both valid members; the fault is combining them here. Not `TOKEN-1`:
@@ -195,6 +213,10 @@ one place an off-scale value can still be typed.
 `VariableDeclarator` branch of `classTextVisitors` implement it, and `LEAF_DIR_RELATIVE` /
 `isLeafFile` name the exempt folder. Nothing reports a violation of this code — no rule can fail when
 coverage is missing, so the gap is invisible from the outside.
+
+**Recognition signs.** The file sits in the leaf folder. The class is written directly in markup, or
+hoisted into a module constant. A rule that only walks JSX attributes looks straight through that
+constant.
 
 **Boundary.** Not `TOKEN-3` and not `TOKEN-4`: those two say which value is wrong; `TOKEN-6` says
 where a rule must look to see it at all. Without `TOKEN-6` those two miss exactly the folder they
@@ -213,6 +235,9 @@ constant.
 a bare mark that uses plain `text-success`. Nothing mechanical holds this: pairing is a two-class
 relationship no rule in the token rule file looks for.
 
+**Recognition signs.** A `-soft` token standing in a text-colour position. A bare glyph borrowing a
+colour meant to be a background. Readable in one theme and losing contrast in the other.
+
 **Boundary.** Not `TOKEN-4`: `TOKEN-7` is the right palette in the wrong role, `TOKEN-4` is outside
 the palette entirely. Not `TOKEN-1`: the union can accept both names, because both are valid tokens.
 What is wrong is the pair, and a pair is not a member.
@@ -227,6 +252,9 @@ cluster; `md` is an action that stands alone, owning a line or anchoring a form.
 follows placement, independently of visual priority. The size union closes the set to two, so a
 third height is unrepresentable — but WHICH of the two is right is a placement judgement nothing
 checks.
+
+**Recognition signs.** The same role changes geometry between two screens. The height is inferred
+from "this button matters more". Custom padding appears in order to shrink a control.
 
 **Boundary.** Not `TOKEN-4`: custom padding used to shrink a control usually drags in a half step or
 a bracketed value, so two codes fire at once and the originating code is still `TOKEN-8`. Not
@@ -244,6 +272,10 @@ still renders, and nothing is red.
 variable it requests — `TOKEN_CLASS_FAMILIES` and `TAILWIND_OWN_NAMES` on the rule side, the
 `--container-app-*` variables the `max-w-app-*` names request on the theme side. Held by
 `no-unresolved-token-class`.
+
+**Recognition signs.** The class name reads like a house token, in a family whose variable name can
+be derived. The union accepts the name, so the compiler is satisfied. The page silently loses its
+measurement.
 
 **Boundary.** Not `TOKEN-1`: this is the one dead value the union cannot catch, and it is worse than
 a genuine off-scale value for that reason — an off-scale value does not compile, while this one
@@ -263,6 +295,10 @@ so `TOKEN-9` is satisfied inside the app, but the portalled surface falls back t
 stylesheet at the nearest document ancestor shared by routed content and renderer-owned portals. A local
 theme boundary may alias grammar roles, set typography or consume the palette; components and mechanics
 branches never duplicate raw colours to repair one portal.
+
+**Recognition signs.** Routed content has the expected accent while a dropdown or drawer is blue; dark
+mode changes the document ground but leaves a local boundary transparent or on light content roles; a
+component-level selector repairs one overlay while another portal still falls back.
 
 **Boundary.** Not `TOKEN-9`: every variable may exist and still be scoped below one consumer, so the
 unresolved-token gate stays green. Not `VENDOR-2`: the mechanics branch may correctly own portal lifecycle;

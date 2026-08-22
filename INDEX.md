@@ -27,6 +27,7 @@ title: Docs
 | `@machines` | `machines/context.md` | context | locate deterministic dependency, parity, quality, artifact and secret machines |
 | `@mcp` | `mcp/context.md` | context | build and expose routed source context through isolated read-only MCP services |
 | `@operations` | `operations/context.md` | context | route deployment, MCP, readiness and operator procedures without merging their outputs |
+| `@orchestration` | `orchestration/context.md` | context | map coordinator decisions and bounded worker execution across Claude and Codex |
 | `@patterns` | `compilers/patterns/context.md` | context | resolve files and import boundaries |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | prove Source family offsets, application slots, projections and local listener uniqueness |
 | `@principles` | `compilers/principles/context.md` | context | resolve classes from accepted situations |
@@ -60,8 +61,10 @@ Frontend layout generation starts top-down from customer journey plus routed bus
 component, contract plus source capability. Their explicit intersection produces one functional,
 business-faithful complete long page or flow by default. Page anatomy is rendered first at representative
 desktop/narrow states and receives cache-only `OK #1`; only then are all evidenced conditions expanded under the
-unchanged page hash. `OK #2` binds complete states and exact source files before implementation. Three or four
-page alternatives appear only after an explicit brainstorm request against the baseline. The QA viewer may
+unchanged direction-plus-page hash. `OK #2` binds complete states and exact source files before implementation. One
+direction is rendered by default and 3–4 alternatives appear only after an explicit owner brainstorm request
+before direction approval. Layout prints journey and UI direction separately; Refactor and Block print UI
+direction only. The QA viewer may
 inspect states but may not substitute for product interaction.
 
 Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
@@ -76,6 +79,7 @@ not copy those laws:
 ```text
 @kernel
   → @workflows
+  → @orchestration when a selected skill declares a validated phase map
   → @standards
   → approved source write
   → @gates
@@ -121,8 +125,8 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Nineteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. Sixteen do the work; two only look — one at the machine, one at the other skills.
+Seventeen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+record. `@orchestration` partitions only explicitly bound skills; it is policy, not another capability.
 
 | Skill | Owns |
 |---|---|
@@ -136,12 +140,10 @@ record. Sixteen do the work; two only look — one at the machine, one at the ot
 | `starci-diagnose` | a read-only trace of another skill; writes nothing it traces |
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
-| `starci-fe-design-layout` | journey/business and component/source synthesis into complete pages; cache-only page approval, state/source approval, implementation and proof; alternatives are opt-in |
-| `starci-fe-design-block` | audit/correct one Layout-generated block in its complete page; anatomy brainstorming is opt-in |
-| `starci-fe-ui-align` | proactive cross-surface UI consistency audit, evidence-backed convergence, authority evolution when proven necessary, source correction and proof |
-| `starci-fe-feedback-evolve` | proven owner feedback evolved through the correct durable authority layer and affected frontend source |
+| `starci-fe-design-layout` | mandatory journey-plus-UI direction synthesis into complete pages; one direction by default or 3–4 on explicit brainstorm, then staged source/seed implementation and proof |
+| `starci-fe-layout-refactor` | the only correction lane for exact Layout/Block-rendered output: treat owner feedback as a failed-skill signal, evolve the smallest Grammar/Principles/Patterns/gate layer, then correct every affected FE consumer and prove parity |
+| `starci-fe-design-block` | mandatory UI direction for one Layout-generated block in its complete parent; one by default or 3–4 on explicit brainstorm, then bounded implementation and proof |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
-| `starci-fe-minor-fix` | one bounded correction inside one existing frontend block, composite or leaf, rejected before write when it crosses the small-patch fence |
 | `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |
 | `starci-be-plan` | the backend brief |
 | `starci-be-approve` | approval, then backend source |

@@ -86,6 +86,11 @@ There is no second question to ask.
 **What it emits in source.** A `@Resolver` under `features/`, declaring a mutation or a query in the
 code-first schema. No controller, no second endpoint, no parallel route.
 
+**Recognition signs.** The incoming payload is structured JSON and the outgoing payload is
+structured JSON. The caller is the product client — the thing already holding the schema and the
+generated types. The identity on the request is an ordinary user session. There are no bytes, no
+machine, and nobody posting to a URL you published.
+
 **Boundary.** This is not `TRANSPORT-2`: it is the same decision read from the other side.
 `TRANSPORT-1` states the default and `TRANSPORT-2` states the list of exits from it; if no exit can
 be pointed at, there is no exit. It is not `TRANSPORT-3` either — `TRANSPORT-1` picks the
@@ -111,6 +116,15 @@ token that shows its exit:
 | **a machine registering itself** | a route beginning `pods/`, `internal/`, `agents/` | a pod calling home at startup carries no user session at all |
 | **an identity that is not a user session** | a route beginning `api/ops`, or a file using an operator guard or a service token | a platform operator or a service token is a **different subject** from a product user; hanging it on the same guard is how one tenant's administrator ends up operating the whole platform |
 
+**Recognition signs.** The evidence reads **inside the file**, not in some other document. Delete
+that line of evidence and nobody can any longer tell why this door is not GraphQL. Ask it directly:
+if the next reader opens only this file, do they see the reason? If they must ask someone else, the
+reason is not in the file, and the law treats it as no reason at all. Evidence is read from the
+file and never from a registry — an approved-route list rots the first time somebody adds a route
+and forgets to update it, and it lets a door be justified by **a document** instead of by **what it
+does**. A registry also creates a state worse than having none: a wrong route sitting in the
+registry looks exactly like a right one.
+
 **Boundary.** This is not `TRANSPORT-1`: see above — if no case can be named, the default wins. It
 is not `TRANSPORT-3` either: a REST door that is entirely correct under `TRANSPORT-2` can still be
 in the wrong place. The two codes check different things, and one file can pass one and fail the
@@ -126,6 +140,15 @@ all, and a probe that needs the feature layer alive can never report that the fe
 **What it emits in source.** The file lands under `features/`, whatever it carries: `@Controller`,
 `@Resolver`, `@WebSocketGateway` or a broker message handler. No door is written under
 `modules/**`.
+
+**Recognition signs.** The file carries `@Controller`, `@Resolver`, `@WebSocketGateway` or a handler
+receiving messages from a broker. It is where a request **begins**, not somewhere another file calls
+into. Ask it directly: can anything outside this process reach this file? If yes it is a door, and
+doors live under `features/`. A door misplaced in `modules/` is expensive because it **reads like a
+capability** and then **gets imported like one**: another module pulls it in to borrow the service
+inside, and from then on deleting that route breaks something with no relation to HTTP. Worse still
+is two door layers in two different trees with the reason written down nowhere — exactly the "looks
+like a mess" state `TRANSPORT-1` describes.
 
 **Boundary.** This is not `TRANSPORT-2`: `TRANSPORT-2` asks *may this door be REST*, `TRANSPORT-3`
 asks *where does this file live*. A perfectly legitimate webhook sitting in `modules/` still fails

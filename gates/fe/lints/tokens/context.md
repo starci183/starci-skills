@@ -189,6 +189,14 @@ Three of the four share one machine; understanding it is understanding three qua
 | all four | **Filename scoping.** Everything is gated on the path containing `/src/`, case-sensitively. A package that puts source at `lib/`, a docs or story tree, or `/Src/` on a case-insensitive filesystem is out of scope silently, with no message saying so |
 | all four | **Concatenation.** `"gap-" + step` is a `BinaryExpression` and `[wide && "p-1.5"]` is a `LogicalExpression`; both yield `null`, and in the array case the surviving members are still checked, so the file reports clean on a partial read |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | `context.filename`, normalised; must contain `/src/` |
+| class text | A static string reachable from a class attribute, a variable initialiser or a `classes` property |
+| stylesheet | For `no-unresolved-token-class` only: the text of every candidate stylesheet found above the file |
+
 ## Rules
 
 1. A rule reports what it can point at in one node's static text; it never infers across nodes.

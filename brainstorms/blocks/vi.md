@@ -14,14 +14,14 @@ title: Blocks · Vietnamese
 
 ## Bản ghi
 
-Mô-đun này nhận một Layout-generated region trong complete current page. Default `audit` trả một current
-anatomy cùng pass/exact findings và correction. Chỉ explicit owner `brainstorm` mới trả 3–4 targeted anatomy
-trong cùng parent geometry. Model sở hữu visual/composition judgment;
-**quyết định sản phẩm**, và trả về một đáp án là giả vờ rằng quyết định ấy đã được đưa ra.
+Mô-đun này nhận một Layout-generated region trong complete current page. Direction bắt buộc nằm trong block
+workflow. Default `audit` in một audited/corrected UI direction cùng pass/exact findings. Chỉ owner explicit
+`brainstorm` trước direction approval mới trả 3–4 targeted UI direction trong cùng parent geometry. Parent page
+và Layout journey direction được giữ nguyên.
 
 ## Luật
 
-Một giải phẫu gọi tên các phần, khối nghỉ ở mấy lần lặp, **mọi trạng thái** nó vẽ, và ai sở hữu dữ liệu
+Một giải phẫu in UI direction, gọi tên các phần, khối nghỉ ở mấy lần lặp, **mọi trạng thái** nó vẽ, và ai sở hữu dữ liệu
 của nó. Nó **không bao giờ** gọi tên một class.
 
 **Một trạng thái mà region có thể vào mà giải phẫu không vẽ là một khuyết tật, không phải chi tiết để
@@ -118,7 +118,8 @@ Mười bốn luật mà **mọi** giải phẫu phải thoả. Giải phẫu ph
 3. `repeats` phải mang `restingCount`.
 4. Mọi phần trích một cái tên có thật, hoặc khai một tên mới kèm `why`.
 5. Không hai giải phẫu nào trong một lô trùng cả bộ trục.
-6. `audit` trả đúng một current anatomy cùng verdict. Explicit `brainstorm` trả 3–4 anatomy chỉ đổi requested axis; chỉ đổi trang trí là trùng.
+6. Direction bắt buộc. `audit` trả đúng một audited/corrected UI direction cùng verdict. Owner explicit
+   `brainstorm` trước direction approval trả 3–4 UI direction chỉ đổi requested axis; chỉ đổi trang trí là trùng.
 7. Quyết định sản phẩm còn thiếu thì trả về cho người chủ.
 8. JSON là dạng chuẩn hoá, và **hash của nó** là thứ lời chấp thuận gắn vào.
 9. Feedback mở một lượt mới; giải phẫu đã chấp nhận không bao giờ bị sửa tại chỗ.
@@ -147,12 +148,13 @@ Anatomy hash chỉ là cache key và chỉ phủ **một giải phẫu**.
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "envelope": {
     "round": 1,
     "project": "example-app",
     "region": "criteria",
-    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
+    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c",
+    "mode": "audit"
   },
   "anatomies": [
     {
@@ -160,6 +162,12 @@ Anatomy hash chỉ là cache key và chỉ phủ **một giải phẫu**.
       "axes": {"dataOwner": "parent", "repetition": "repeats", "weight": "populated", "composition": "label-value"},
       "citesPrecedent": "none",
       "states": ["populated", "empty", "pending"],
+      "uiDirection": {
+        "summary": "Giữ criteria dễ so sánh trong complete parent không đổi",
+        "hierarchy": ["Criterion label đứng trước stored value"],
+        "responsive": ["Các row giữ reading order khi parent thu hẹp"],
+        "emphasis": ["Compared value vẫn là dominant fact"]
+      },
       "restingCount": 4,
       "parts": [
         {
@@ -170,7 +178,8 @@ Anatomy hash chỉ là cache key và chỉ phủ **một giải phẫu**.
       ],
       "reason": "vì sao giải phẫu này đáng để người chủ đọc"
     }
-  ]
+  ],
+  "audit": {"verdict": "pass", "findings": []}
 }
 ```
 

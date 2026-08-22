@@ -4,36 +4,34 @@
 
 None.
 
-## Record
+## Purpose
 
-This machine validates the Source-wide Sonar boundary for every routed `be`/backend, `fe`/frontend and
-console row. It evaluates only structured evidence and never needs a live provider in tests.
+The machine proves one shared SonarQube assurance boundary across every routed backend, frontend and
+console Source role. It is deterministic and testable with mocked provider responses.
 
-## Rules
+## Contract
 
-- A route inventory is incomplete until backend, frontend and console are all present and every row has a known role.
-- The accepted analysis SHA and quality-gate status must be present; the SHA must equal the SHA requested for proof.
-- Quality gates require OK; bugs, vulnerabilities and code smells are zero overall and new where the
-  provider supports those measures; ratings are A; reviewed hotspots are 100%; duplicated density is
-  at most 3 overall and new; native coverage is at least 80% overall and 90% new.
-- On current SonarQube, `starci-strict` uses supported new-code conditions: zero new violations, three
-  new-code A ratings, 100% new hotspots reviewed, new duplication at most 3% and new coverage at least
-  90%. Authenticated proof remains separately blocking for every required overall/new measure; server
-  condition limitations never erase overall coverage, findings, ratings, hotspots or duplication.
-- Every routed project has one distinct project-analysis token. Admin/user tokens never scan source and
-  one route never reuses another route's analysis identity.
-- Every metric in the strict profile is required. An installation that cannot expose one is incomplete,
-  never silently exempt.
-- `SONAR_TOKEN` and `SONAR_ADMIN_TOKEN` are separate authorities. Tokens may enter only via
-  environment or stdin and are never accepted as command-line values or printed.
-- Plan and dry-run output contains project identities and actions only, never credential values.
+All three roles (`be`/backend, `fe`/frontend and console) must be routed, with every row recognized.
+Evidence must identify the exact analysis SHA and return quality-gate status OK. Bugs, vulnerabilities and code smells are zero overall and new when supported; reliability,
+security and maintainability ratings are A; security hotspots reviewed is 100%; duplicated lines density
+is no more than 3 overall and new; native coverage is at least 80% overall and 90% new.
 
-## Output
+On current SonarQube, `starci-strict` uses supported new-code conditions: zero new violations, three
+new-code A ratings, 100% new hotspots reviewed, new duplication at most 3% and new coverage at least
+90%. Authenticated proof remains separately blocking for every required overall/new measure; server
+condition limitations never erase overall coverage, findings, ratings, hotspots or duplication.
 
-The check returns `{ ok, failures, analysisSha }`; each failure includes metric, expected and actual
-evidence. The quality-gate reconciler returns a value-free plan without network calls and performs API
-reads/mutations only when execution is explicit. Execution discovers or creates fixed `starci-strict`,
-reconciles only declared conditions (create/update/delete), associates every project, and sends Sonar
-Web API form-urlencoded parameters.
-Proof assembles status from `project_status`, all required measures from `measures/component`, and the
-exact latest revision from `project_analyses/search`; absence of any required evidence fails.
+Every routed project has one distinct project-analysis token. Admin/user tokens never scan source and
+one route never reuses another route's analysis identity.
+
+Scanner tokens are distinct from admin/operator authority. Analysis tokens use `SONAR_TOKEN` or
+stdin; execute authority uses `SONAR_ADMIN_TOKEN`. Missing status, SHA or any required measure
+fails. Tokens are never read from arguments or logs. Plan and dry-run modes do not contact the provider.
+Execute proof reads status, all required measures, and the latest analysis revision from their dedicated
+Web API endpoints; absent evidence fails.
+
+## Evidence
+
+The machine emits structured failures and treats an unsupported or missing required measure as incomplete,
+never as a fabricated pass.
+Tests inject fetch implementations, so no test contacts SonarQube or mutates an external service.

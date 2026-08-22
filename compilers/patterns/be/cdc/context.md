@@ -54,6 +54,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 
 **What it emits in source.** One concrete class in a `*projection.listener.ts` file extending `AbstractProjectionListener`, declaring no lifecycle method of its own and injecting no Kafka client of its own. Connection, subscription, parsing and failure isolation stay in the base.
 
+**Recognition signs.** `onModuleInit`, `consumer.run`, `subscribe` or a `JSON.parse` of a message appears inside the listener file. The listener injects a Kafka client itself instead of receiving it through the base constructor. The file contains a `try/catch` deciding what to do with a broken message.
+
 **Boundary.** Not `CDC-2`: `CDC-1` says who OWNS the connecting; `CDC-2` says what is DECLARED so that connection has an identity — inherit the right base with a randomly generated `groupId` and `CDC-1` holds while `CDC-2` breaks. Not `CDC-6`: failure isolation is a BEHAVIOUR of the base, so a listener that writes its own per-message `try/catch` has already broken `CDC-1` before `CDC-6` is even reached.
 
 ## `CDC-2` — consumer identity and source set are declared
@@ -61,6 +63,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 **Situation.** `groupId` is the durable identity of this projection's consumer; `topics` is the complete set of sources able to make the projection wrong. Both are written down, not inferred at run time.
 
 **What it emits in source.** A `groupId` string literal that names the projection, and a `topics` array assembled from an environment-scoped topic prefix plus explicit table names. The prefix may come from configuration; the table list may not.
+
+**Recognition signs.** `groupId` is a constant string you can read and know which projection it is. `topics` lists each source table one by one. No `randomUUID()`, no `Date.now()`, no instance name inside `groupId`.
 
 **Boundary.** Not `CDC-1`: see above. Not `CDC-4`: a random group PLUS idempotent recompute produces correct numbers at a horrifying resource cost; a random group PLUS delta addition produces wrong numbers on the very first restart. The two codes fail in two different ways and must be repaired separately.
 
@@ -70,6 +74,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 
 **What it emits in source.** A `deriveTargets` that only reads, branches on topic, and returns ids or an empty array; a `recomputeTarget` containing exactly one call to the projection service and nothing else; the SQL living in the service, not the listener.
 
+**Recognition signs.** No `save`, `insert`, `emit`, `sendMail` or `publish` anywhere in the listener. The recompute call carries an identity, not a payload. Branching in `deriveTargets` is on topic, and its returns are ids or `null`/`[]`.
+
 **Boundary.** Not `CDC-4`: `CDC-3` says WHO CALLS; `CDC-4` says HOW THE CALLED FUNCTION COMPUTES — delegate correctly to a service that then `increment`s and `CDC-3` holds while `CDC-4` breaks. Not `CDC-5`: returning an empty array because a parent could not be resolved is CORRECT `CDC-3`, not evasion.
 
 ## `CDC-4` — recompute from source, never add the delta
@@ -77,6 +83,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 **Situation.** The projection is rebuilt by an UPSERT from authoritative source rows. It is never updated by adding the number the event carried.
 
 **What it emits in source.** A recompute function that takes an id and no amount; SQL that aggregates over the source table — `SUM(...)` / `COUNT(...)` — and ends `ON CONFLICT ... DO UPDATE`; a function that returns the same result run three times in a row.
+
+**Recognition signs.** The recompute signature has no `amount`, `delta` or `points` parameter. The write is an UPSERT keyed by the projection identity. The value written is selected, not accumulated.
 
 **Boundary.** Not `CDC-3`: see above. Not `CDC-6`: swallowing a broken message is only SAFE because `CDC-4` holds — if recompute is not idempotent, every swallow is a permanent error and `CDC-6` turns from a self-healing mechanism into silent data loss.
 
@@ -86,6 +94,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 
 **What it emits in source.** An `unwrapRow` in the base returning `null` when there is no usable current image, and a handler returning early on that `null` — with no concrete listener re-implementing the unwrapping. Where deletes truly matter, a second retained source or a deletion stream in the `topics` set.
 
+**Recognition signs.** Code reading `payload.after` without a `null` check. A cast of a tombstone into an empty entity that is then written through. A comment along the lines of "deleted, so treat it as 0".
+
 **Boundary.** Not `CDC-3`: an empty array because "this column changed but is irrelevant" is `CDC-3`; an empty array because "there is no `after` image" is `CDC-5`. Both are right, but they are two different reasons and they break in two different ways. Not `CDC-4`: writing a zero for a deleted row is still a write DERIVED FROM THE EVENT rather than from source — it breaks both codes at once.
 
 ## `CDC-6` — one broken message does not kill the consumer
@@ -94,6 +104,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 
 **What it emits in source.** A `catch` around the handling of ONE message — not around the loop — inside the base's `handleMessage`, building a typed CDC exception, logging it with `groupId` and `topic`, and not rethrowing.
 
+**Recognition signs.** The log carries both `groupId` and `topic`; missing either makes the failure untraceable. Nothing throws back out of the handler. The `catch` scope is one message wide.
+
 **Boundary.** Not `CDC-1`: this behaviour LIVES IN THE BASE, so a listener writing its own isolation mechanism is breaking `CDC-1`. Not `CDC-4`: swallowing is only legitimate while recompute is idempotent — see above.
 
 ## `CDC-7` — prove it through a real broker
@@ -101,6 +113,8 @@ Every situation this module governs carries a code, `CDC-<n>`. The code names th
 **Situation.** An operational E2E publishes through a real Kafka and then waits for the projection in the database. Calling `deriveTargets`, `recomputeTarget` or any listener method directly proves the mapping code, not CDC.
 
 **What it emits in source.** An E2E spec whose ARRANGE writes source rows directly and does not call the projection service, whose ACT touches only the broker, and whose ASSERT polls the projection table until it is right, with a timeout.
+
+**Recognition signs.** A publish helper followed by a polling wait on the projection table. No projection-service call in the arrange step. A bounded wait rather than a fixed sleep.
 
 **Boundary.** Not `CDC-3`: a unit test on `deriveTargets` is LEGITIMATE and useful — it simply does not count as CDC evidence. Not `CDC-2`: this is the only test that can catch a `CDC-2` defect, because a wrong `groupId` or a missing topic only shows itself with a real broker in the middle.
 

@@ -19,6 +19,17 @@ description: Repay owner-approved Source debt recorded in project and role Markd
 
 None. Route initialization, new debt acceptance and provider setup remain separate owner capabilities.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | owner-approved debt record and verified project/role | freeze scope, exit criteria, expiry and owning gates | debt work contract | debt is active, explicit and in scope |
+| measure | reconciliation | debt contract and current source/gate state | compare each recorded scope with measured evidence | progress and remaining-delta matrix | no scope is assumed green from prose |
+| repay | execution | accepted delta matrix | change only debt-owned source and run its gates | implementation and measured progress receipt | no new debt, extension or unrelated write |
+| close | proof | fresh green evidence and debt record | remove only scopes whose exit criteria pass | updated or removed debt receipt | every removed scope has reproducible green proof |
+
 ## Boundary
 
 This skill repays existing debt. It never creates debt, extends expiry, adds a scope or treats the debt

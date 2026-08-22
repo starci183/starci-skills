@@ -4,7 +4,7 @@
     "brainstorms/blocks/context.md": {
       "kind": "module",
       "source": "brainstorms/blocks/en.md",
-      "sourceHash": "5ec00ea0ab4a8154407c18215d151ef9446d9ebd42fcd6a575bf274a1e40db23",
+      "sourceHash": "544f0f7da4768883202cf35c43190a6b6c157fb5e3abdd7186469b42de06fc1d",
       "contextVersion": 1
     },
     "brainstorms/composition/context.md": {
@@ -26,7 +26,7 @@
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "1d9d5ae55d29e0cb69538782479ee805f68fa78eb95312468ec86824b8906787",
+      "sourceHash": "9f47dff101db32068fe3c904305e72da3599ffc0165c3b3148d0d4f622510846",
       "contextVersion": 1
     },
     "compilers/context.md": {
@@ -672,7 +672,13 @@
     "grammars/starci/context.md": {
       "kind": "module",
       "source": "grammars/starci/en.md",
-      "sourceHash": "d513af87e043c6e9be788d65ee6f73fb530523d368878f4776408c3e74404824",
+      "sourceHash": "06d1472cad81f36ec355acc1a28ea1263e90e3d0086e512ceadd09ec87071ccd",
+      "contextVersion": 1
+    },
+    "grammars/tayson/context.md": {
+      "kind": "module",
+      "source": "grammars/tayson/en.md",
+      "sourceHash": "1d098a1f77f570063b06df5bc876b64e127f84eb88bf7c67ed2529fc960379aa",
       "contextVersion": 1
     },
     "kernel/context.md": {
@@ -747,6 +753,30 @@
       "kind": "router",
       "contextVersion": 1
     },
+    "orchestration/claude/context.md": {
+      "kind": "module",
+      "source": "orchestration/claude/en.md",
+      "sourceHash": "29ab2a5006651628928e51f273ef39afebb581dcd338bc7e956c2d31749dce3a",
+      "contextVersion": 1
+    },
+    "orchestration/codex/context.md": {
+      "kind": "module",
+      "source": "orchestration/codex/en.md",
+      "sourceHash": "51b910c8b64c7e38ab4c3f44c70b5bf0003b10ced29f26af11e9b0f15b1ae656",
+      "contextVersion": 1
+    },
+    "orchestration/context.md": {
+      "kind": "module",
+      "source": "orchestration/en.md",
+      "sourceHash": "d12c399626a48d17839d507fa26eac5eed3e635984b1d7d4e24c1d1c41608960",
+      "contextVersion": 1
+    },
+    "orchestration/frontend/context.md": {
+      "kind": "module",
+      "source": "orchestration/frontend/en.md",
+      "sourceHash": "fb08d89bdd6570b5a83522b4ec205f8362575dfbf2633eeb2401a23f9de196fd",
+      "contextVersion": 1
+    },
     "publication/context.md": {
       "kind": "router",
       "contextVersion": 1
@@ -754,7 +784,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "dba8aff000133297e433e9bdd1ba5a06897c938e9ec00898a97c7c55c0bf1976",
+      "sourceHash": "9337421a330868a096aa4f64f82808e4ee366c812e1cc5ba43acb64d5d75bc08",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {
@@ -896,7 +926,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "2e4042808219f350df40e93f49de19e2b5c42361f9098bcc0d073b6e82fe78ff",
+      "sourceHash": "fb475463b8c774e21b1b622d9790281807d5a52fc3acb83a899fcd39919d5db5",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

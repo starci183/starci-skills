@@ -15,6 +15,17 @@ title: starci-init · English
 
 None. This skill never invokes another skill.
 
+## PIPELINE
+
+Topology: `reconciliation` across four ordered readiness boundaries.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| identity | execution | machine and encrypted Source identity declarations | reconcile SOPS/age identity without touching target repositories | identity receipt | decrypt identity is available and secret-safe |
+| bootstrap | execution | identity receipt and agent bootstrap declarations | reconcile required local bootstrap state | bootstrap receipt | bootstrap reads and checks pass |
+| routes | reconciliation | workspace declarations and observed project/role locations | verify and reconcile route records | workspace receipt | every requested role resolves exactly |
+| worktrees-proof | execution | verified routes and durable worktree declarations | reconcile project worktree state and re-read all four boundaries | readiness receipt | identity, bootstrap, routes and worktrees are all green |
+
 ## Run
 
 Read `@skill-shape`, then `@initialization`. From it, load the four runtime context modules in registry order:

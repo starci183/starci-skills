@@ -109,7 +109,7 @@ holds less than the code claims.
 | `FILE-6` | The shape needs a URL, so something is being written under `app/` | A file under `app/` names which page renders at which URL, and is one of the framework's own slots. Forbidden: fetching, arrangement or a contract key in a route file; any named component file under `app/` |
 | `FILE-7` | A file states which tier it belongs to, in source, beside the path that already states it | A source marker agrees with the folder that owns it. Forbidden: a file under one tier declaring itself another |
 | `FILE-8` | A component needs a fixed vendor or native mechanic around checked content | The owner is a **named branch** that keeps the mechanic closed inside it. Forbidden: a `shells/` tier, and any tier standing in for one |
-| `FILE-9` | A frontend unit test is being placed | The unit is a colocated `.spec.` twin beside its owner. Forbidden: `.test.` names and separate frontend test trees |
+| `FILE-9` | A frontend unit test is being placed | The unit is a colocated `.spec.` twin beside its owner. Forbidden: `.test.` names and separate frontend `src/tests`, `test/unit` or `e2e` trees |
 
 `FILE-2` AND `FILE-3` ARE NOT THE SAME REFUSAL. `FILE-2` counts files in one surface folder and
 does not care what they are; `FILE-3` names four folders that are wrong anywhere under
@@ -154,6 +154,10 @@ continuing with a capital. Typed variants of the same component share the folder
 belongs to the folder's family: `Card`, `CardRoot`, `CardHeader`. What may not share it is a
 passenger: a component of another family, another name, sitting there because it was convenient.
 
+**Recognition signs.** The folder name is PascalCase but `index.tsx` does not export that name. Two
+unrelated components share one folder, one of them "just parked here". Somebody has to open the file
+to learn what the folder contains.
+
 **Boundary.** This is not `FILE-2`: `FILE-1` is about the relation between name and export and holds
 in every tier, while `FILE-2` counts files in a surface folder. A page folder whose `index.tsx`
 matches its name but which carries a third file is green on `FILE-1` and red on `FILE-2`. It is not
@@ -171,6 +175,10 @@ the twin test of each half. Nothing else.
 `component.spec.tsx` and `index.spec.tsx` where tests exist. Anything else the shape produced leaves
 for its own tier: a domain row to `blocks/<category>/<Name>/`, a formatter to `modules/utils/`, a
 response shape to `modules/types/`, a column config to `resources/`.
+
+**Recognition signs.** A `.tsx` file with its own name appears in the page folder. A `constants/`,
+`utils/`, `types/` folder or a hand-copied `shapes.ts` appears. Somebody has just said "only this page
+uses it".
 
 **Boundary.** This is not `FILE-3`: `FILE-3` forbids four helper folders everywhere under
 `components/`, including beside a block that `FILE-2` never looks at. A `utils/` in a page folder
@@ -191,6 +199,10 @@ things already has a real home, and the home is the whole point.
 → `resources/`. That a destination folder does not exist yet is not a reason to leave the file in the
 component tree — it is created, not worked around.
 
+**Recognition signs.** A folder named exactly one of those four words sits somewhere under
+`components/`. A pure function that takes no props and renders nothing sits in the component tree. A
+second person has just rewritten that same function somewhere else.
+
 **Boundary.** This is not `FILE-2`: `FILE-2` counts files inside one surface folder and does not care
 what they are, while `FILE-3` names four folder names that are wrong anywhere under `components/`,
 beside any tier. `FILE-2` never looks at a block folder; `FILE-3` does.
@@ -209,6 +221,9 @@ bundle.
 belonging to the folder's family. No `export const <Capital> = { … }` holding only capitalised
 members.
 
+**Recognition signs.** A capitalised `export const` whose value is an object literal with capitalised
+keys. Call sites written as `Card.Header`. The bundle grows and nobody can explain why.
+
 **Boundary.** This is not `FILE-1`: a namespace object still matches the folder name, so `FILE-1` does
 not catch it. The two codes look at two different things on the same line of code.
 
@@ -224,6 +239,10 @@ a block and everything below it.
 the app that owns the feature. No feature tier inside the shared package, no vocabulary tier inside
 one app, and no parallel wrapper tier invented to straddle the line.
 
+**Recognition signs.** `packages/*/src/` contains `blocks/`, `overlays/`, `layouts/` or `pages/`.
+`apps/*/src/` contains `contracts/`, `leaves/`, `composites/` or `branches/`. The package header says
+"blocks belong to the app" while the folder tree says the opposite.
+
 **Boundary.** Size, elegance and technical reusability are not the criterion; the only criterion is
 whether the tier knows a feature. This is why `FILE-5` is a code and not a packaging preference: a
 leaf, a composite, a branch and the contract table describe SHAPE, and a shape is the same shape in
@@ -231,6 +250,8 @@ every app, while a block is a domain sentence that knows what a course, an invoi
 is.
 
 The damage is double, not single: a misplaced block ships in an app that does not need the domain,
+**and** the next author reads the folder tree and reasonably concludes the line sits somewhere else —
+so they put a page there too.
 
 ## `FILE-6` — a route mounts, and `app/` holds routes only
 
@@ -243,6 +264,10 @@ at `components/pages/<Name>/`. Plus `providers` and `globals.css`, which the roo
 which have nowhere else to go. `app/api/**` is server code, `_folder` is the framework's own opt-out,
 and `.spec.` files are exempt because a test ships in no bundle and no route renders it. **Every other
 file there is a component sitting in a folder nobody will grep.**
+
+**Recognition signs.** A route file calls a hook, reads the session, assembles a layout tree. A
+named file such as `fleet-page.tsx` appears under `app/`. No screen can be found under
+`components/pages/` although that screen is plainly running.
 
 **Boundary.** This is not `FILE-2`: `FILE-6` cannot see INSIDE `page.tsx`. A `page.tsx` that draws
 still passes. Splitting the two halves is `FILE-2`'s business, not this code's.
@@ -261,8 +286,16 @@ repository calls it — while its path already declares one. Two statements abou
 declares no marker anywhere is not failing this code, it has nothing for the code to read. What it
 governs is the case where a marker exists.
 
+**Recognition signs.** A file in `blocks/` saying it is a leaf. A folder moved between tiers with the
+marker left behind. A marker copied along with a file that was duplicated from another tier.
+
 **Boundary.** Not `FILE-1`: that code compares a folder with its export NAME. This one compares a folder
 with a claim the source makes about the tier, which is a different sentence in a different place.
+
+**Why a duplicate fact is worse than no fact.** A path and a marker cannot disagree usefully. Every
+reader downstream — a rule, a script, a person — must pick one, and each picks silently, so the same
+file is a block to one and a leaf to another. The marker earns its place only while it repeats the path
+exactly; the moment it does not, it is a second classification nobody voted for.
 
 ## `FILE-8` — there is no shell tier
 
@@ -272,8 +305,16 @@ drawer, a vendor card body — and the reflex is a tier to park such things in.
 **What it emits in source.** A **named branch**, holding the mechanic closed inside it and taking typed
 contract content across its boundary. Nothing else changes; the vocabulary gains a name, not a tier.
 
+**Recognition signs.** A `shells/` folder. A tier whose members share no shape, only the fact that each
+wraps something. A name ending in `Shell` for a thing that is not one of the two the vocabulary has.
+
 **Boundary.** Not `FILE-5`: that code decides which SIDE a tier lands on. This one says the tier does not
 exist to be placed.
+
+**Why a tier here and not a name.** Every other tier answers *what shape is this*. A shell tier answers
+*whose markup is inside*, which is a different question, so its members have nothing in common to check
+and nothing to refuse. It becomes the folder anything can enter — an untyped exemption with a tidy name,
+and the one place the contract stops governing.
 
 ## Layer held
 
@@ -351,7 +392,7 @@ One block per file the shape produces.
 file: <path being placed>
 identity: <what it is, independent of who calls it>
 tier: <contracts | leaves | composites | branches | blocks | overlays | layouts | pages | route | hooks | modules | resources>
-situation: <FILE-1 | FILE-2 | FILE-3 | FILE-4 | FILE-5 | FILE-6>
+situation: <FILE-1 | FILE-2 | FILE-3 | FILE-4 | FILE-5 | FILE-6 | FILE-7 | FILE-8 | FILE-9>
 destination: <the path it belongs at>
 reason: <the fact about the file that excludes the adjacent code>
 ```

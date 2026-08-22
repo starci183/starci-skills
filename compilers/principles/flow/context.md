@@ -106,6 +106,13 @@ columns do not, the situation is a wrapping row.
 **Situation.** The container wraps exactly one thing, and no state makes it more than one. With no
 second thing there is no direction between two things at all.
 
+**Recognition signs**
+
+- One direct child in the loaded state, the empty state and the error state.
+- The container exists for another reason: a rounded corner, a background, a maximum width, or a
+  named region.
+- Remove `flex` and the screen does not change.
+
 **Ask yourself.** Is there any state of the data that makes this container grow a second child? If
 not — `FLOW-0`.
 
@@ -126,6 +133,12 @@ with consequences.
 inline axis is already there, and what arranges them is the browser's line-breaking algorithm rather
 than a class.
 
+**Recognition signs**
+
+- It reads as a sentence, not as a list.
+- There are real spaces between the parts, and those spaces carry meaning.
+- A line break is allowed to fall between any two words, not only at the boundary between parts.
+
 **Ask yourself.** If a line break fell in the MIDDLE of one part, would that be correct? If yes —
 this is a sentence, not a row.
 
@@ -143,6 +156,12 @@ ability to break mid-clause — the one behaviour prose cannot lose.
 
 **Situation.** The items run horizontally and MUST stay on one line. Wrapping here breaks meaning: a
 toolbar snaps in half, one row of a list becomes twice as tall as its neighbours.
+
+**Recognition signs**
+
+- There is a main item and one or a few secondary items at the ends.
+- The height of the row is a constant the reader's eye relies on to scan downward.
+- When space runs short, what yields is an item's WIDTH, not its position.
 
 **Ask yourself.** If the last item dropped to a second line, would this row still read correctly? If
 not — `FLOW-2`.
@@ -164,6 +183,12 @@ consequence of that promise, but it forces the author to settle it.
 the most common code and also the most often skipped, because blocks already stack and people assume
 nothing needs declaring.
 
+**Recognition signs**
+
+- Each child takes the full width and competes with no other child for width.
+- The order carries meaning: label then field, heading then content.
+- The number of children can change with state without changing how it reads.
+
 **Ask yourself.** If two children swapped places, would the reader be misled? If yes — the order
 carries meaning, and the vertical axis must be said out loud.
 
@@ -184,6 +209,12 @@ parent.
 carries meaning, but COLUMNS do not. An item that does not fit drops to the next line, and nothing
 is cut.
 
+**Recognition signs**
+
+- Each item's width comes from its own content, and the items differ in length.
+- The number of items is not known in advance: the user adds tags, filters, skills.
+- The second line does NOT need to align with the first.
+
 **Ask yourself.** Does item four need to sit directly under item one? If it does NOT — `FLOW-4`.
 
 **Boundary**
@@ -201,6 +232,12 @@ code is `FLOW-4` from the start.
 
 **Situation.** One set, two axes at two widths. When space runs out the whole set CHANGES AXIS
 rather than breaking a line: each item takes the full width and the set reads top to bottom.
+
+**Recognition signs**
+
+- The items are NOT interchangeable: one side is content, the other is an action or a figure.
+- When narrow, every item needs the full width to be read or tapped.
+- There are only two or three items, and they do not form a bag.
 
 **Ask yourself.** When narrow, should this set BREAK A LINE or CHANGE AXIS? If the items need the
 full width — change axis, `FLOW-5`.
@@ -224,6 +261,13 @@ only place `flex-row` has a reason to exist: it UNDOES `flex-col` at a breakpoin
 **Situation.** The items are INTERCHANGEABLE and must ALIGN IN COLUMNS, and the number of columns is
 a content decision: three benefits across, two fields per row, four figures on one line.
 
+**Recognition signs**
+
+- The items are the same kind with the same role, and the reader compares them with one another.
+- There is a "right" number of columns, and that number comes from the content rather than from the
+  screen width.
+- Cells in the same row should be the same height.
+
 **Ask yourself.** Does this column count come from the CONTENT (three benefits, two fields) or from
 the WIDTH (however many fit)? If from the content — `FLOW-6`.
 
@@ -242,6 +286,12 @@ sm:grid-cols-2` states plainly that the base width is one column. A bare `grid` 
 
 **Situation.** A set of UNKNOWN LENGTH, where each item has a width below which it stops being
 readable. The column count is not a product decision; it is a CONSEQUENCE of the width that remains.
+
+**Recognition signs**
+
+- The number of items comes from data and changes with filters.
+- You can say a sentence like "below 16rem the course title tangles and the image means nothing".
+- This container is reused at several widths: full page, inside a rail, inside a dialog.
 
 **Ask yourself.** Is there a width BELOW WHICH the item loses meaning? If there is, declare that
 width and let the column count follow.
@@ -262,6 +312,12 @@ was chosen — this is where the choice is most often made out of habit.
 **Situation.** The tracks are NOT interchangeable. Each has its own job and its own owned width: a
 filter rail at a fixed width, a content region taking what is left, a pinned panel on the right.
 
+**Recognition signs**
+
+- Swapping the two tracks would change what the page means.
+- At least one track's width is a layout decision, not a consequence of content.
+- One track can disappear, be pinned, or scroll independently on a large screen.
+
 **Ask yourself.** Could these two regions be swapped for each other? If NOT — `FLOW-8`.
 
 **Boundary**
@@ -276,6 +332,17 @@ track refuses to shrink below the longest thing inside it: an unbreakable file n
 block. The rail is then squeezed or the whole page scrolls sideways, and `truncate` inside silently
 stops working. This is the most time-consuming defect in the whole module, because it looks like an
 overflow defect.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| child count | How many direct children in the loaded, empty, single-item and error states |
+| interchangeability | Are the children members of one set, or parts with distinct jobs |
+| reading order | Does meaning depend on left-to-right, on top-to-bottom, or on neither |
+| cross-line alignment | Must a later item line up with an earlier one, or only fit |
+| width ownership | Does an item's width come from its content, the container, or a product decision |
+| legibility floor | Is there a width below which an item stops being readable |
 
 ## Rules
 

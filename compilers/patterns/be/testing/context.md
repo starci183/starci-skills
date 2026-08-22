@@ -48,7 +48,7 @@ somebody already made.
 | `TESTING-4` | A failure branch is looking for a lane | The happy path is the subject; an unhappy path earns an e2e only by dragging a critical flow behind it. It forbids an e2e whose whole subject is a validation error |
 | `TESTING-5` | A handler has several ways out | A unit spec covers every branch that can change the outcome, boundaries included. It forbids treating executed lines as covered decisions |
 | `TESTING-6` | A spec has run the handler and is choosing what to check | A spec asserts what came back or what changed. It forbids a spec whose every assertion is `toHaveBeenCalled*` |
-| `TESTING-7` | A test file is being placed | A unit test is colocated beside its owner as `*.spec.ts`. Only backend E2E may live in a separate test tree as `*.e2e-spec.ts`; integration and harness keep explicit suffixes. Unit buckets and generic `.test.` names are forbidden |
+| `TESTING-7` | A test file is being placed | A unit test is colocated beside its owner as `*.spec.ts`. Only backend E2E may live in a separate test tree, declared as `*.e2e-spec.ts`; integration and harness keep explicit suffixes. Unit buckets and generic `.test.` names are forbidden |
 | `TESTING-8` | A lane is configured, scripted and in CI | A configured lane has tests, or it is deleted. It forbids a scripted lane that passes because it found nothing |
 | `TESTING-9` | A flow passes through a model | A flow through a model keeps transport, orchestration, quota and persistence real, and replaces only the external provider result — with realistic JSON, by default. It forbids a real model call in an e2e; a stub returning a marker string; a stub each flow author must remember to install |
 | `TESTING-10` | The subject is the model's own answer | A harness imports one approved provider SDK, supplies a provider-issued server API key, names the model and endpoint, and calls for real — one or two cases per capability. It forbids reaching the provider through a tier, catalog, fallback chain, key pool or house wrapper; providing or overriding the production AI gateway; authenticating with a consumer or CLI credential; growing a case per edge |
@@ -95,6 +95,11 @@ next two years, because whoever comes next adds tests that the name permits.
 **What it emits in source.** One `*.e2e-spec.ts` file per business flow, under the e2e folder, whose
 basename is that flow written as a business sentence.
 
+**Recognition signs.** The honest name of the file is a *sentence* about the business: "buy a
+course", "refund", "redeem a reward". If the honest name is instead a noun phrase naming a slice of
+the API — `*-queries`, `*-mutations`, `*-resolvers` — the file has the wrong shape, not the wrong
+name. A file that runs green while nobody dares say "the business works" is the surest sign of all.
+
 **Boundary.** Not `TESTING-4`: this code says what the file **is**, `TESTING-4` says which
 **branches** it may hold, and a correctly named file can still hold the wrong branch. Not
 `TESTING-7`: that code only governs the suffix, and a correct suffix cannot rescue a wrongly shaped
@@ -108,6 +113,11 @@ the server is still alive.
 
 **What it emits in source.** A read-back inside the flow file, through `entityManager`, `dataSource`,
 `getRepository` or `queryRunner`, naming the row, balance, entitlement or event the flow produced.
+
+**Recognition signs.** The last assertion looks at `status`, `__typename`, `errors === undefined`, or
+re-reads the very response that just came back. The file never touches `entityManager`, `dataSource`,
+`getRepository` or `queryRunner`. If somebody deletes the `await repository.save(...)` line in the
+handler, this file stays green.
 
 **Boundary.** Not `TESTING-3`: that code says **which door you enter and how you wait**, this one
 says **where you look once you have arrived** — entering the right door and looking in the wrong
@@ -123,6 +133,11 @@ The test must enter through that same door.
 over the production transport — and, for every async step, a wait built from a deadline plus a
 predicate rather than a `sleep`.
 
+**Recognition signs.** The test calls `commandBus.execute(...)`, `handler.execute(...)`,
+`resolver.execute(...)` or `worker.process(...)`; all of these **begin after** routing, guards,
+validation and serialization. After an asynchronous step, the very next line already asserts. The
+flow is half HTTP and half socket, but the test only speaks HTTP.
+
 **Boundary.** Not `TESTING-2`: see above. Not the integration lane: `commandBus.execute(...)` is
 **not** itself bad — it is a legitimate citizen of `*.int-spec.ts`. The violation is using it **in
 the e2e lane**.
@@ -133,6 +148,11 @@ the e2e lane**.
 
 **What it emits in source.** Either an e2e file of its own, named for its own story, when the failure
 drags a critical flow behind it; or a case inside a unit spec when it does not.
+
+**Recognition signs.** The failure **drags** something else that must also be right: captured then
+settle fails ⇒ a refund must run; charged twice ⇒ idempotency must hold; two writers race ⇒ a
+constraint must catch it. The opposite sign: the failure returns a validation message and nothing
+runs afterwards.
 
 **Boundary.** Not `TESTING-5`: a validation error is a **decision**, and it belongs to `TESTING-5`,
 where it costs a few milliseconds instead of a database. Not `TESTING-1`: a qualifying failure branch
@@ -145,6 +165,11 @@ still has to live in a file named for its own story, not tucked into the happy-p
 **What it emits in source.** A `*.spec.ts` next to the handler holding a branch table — typically
 `it.each` — with one row per outcome-changing case rather than one case in the middle of the range.
 
+**Recognition signs.** There are boundaries: `0`, `cap`, `cap + 1`. There is an empty set. There is
+"already done". There is "not allowed". The current spec picks **one** value in the middle of the
+range and declares the branch covered. The coverage report is green while an off-by-one at the
+boundary can still ship.
+
 **Boundary.** Not `TESTING-4`: `TESTING-5` is where every failure branch that drags nothing behind it
 comes to rest. Not `TESTING-6`: `TESTING-5` says **how many cases**, `TESTING-6` says **what a case
 asserts** — enough cases that all assert calls still prove nothing.
@@ -156,6 +181,11 @@ asserts** — enough cases that all assert calls still prove nothing.
 **What it emits in source.** At least one assertion per file about a returned value or a changed
 state; a call assertion may stand beside it, never alone.
 
+**Recognition signs.** Every assertion in the file is `toHaveBeenCalled`, `toHaveBeenCalledWith`,
+`toHaveBeenCalledTimes` or a relative of theirs. Rename the collaborator's method ⇒ the file goes
+red. Make a business number wrong ⇒ the file stays green. The spec reads **exactly like** the body of
+the handler.
+
 **Boundary.** Not `TESTING-2`: same illness, different lane. Not the permitted exception: when the
 call **is itself the observable effect** — mail sent, event published — the call assertion is a
 **second** assertion standing next to one about a result.
@@ -166,8 +196,12 @@ call **is itself the observable effect** — mail sent, event published — the 
 fast.
 
 **What it emits in source.** A unit file beside its production owner named `*.spec.ts`. Integration and
-harness keep their explicit suffixes. Only backend E2E may be separated under the declared E2E tree as
-`*.e2e-spec.ts`; a unit bucket such as `src/tests` or `test/unit` is invalid.
+harness files keep `*.int-spec.ts` and `*.harness-spec.ts`. Only backend E2E may be separated under the
+declared E2E tree as `*.e2e-spec.ts`; a unit bucket such as `src/tests` or `test/unit` is invalid.
+
+**Recognition signs.** Four suffixes: `*.spec.ts`, `*.int-spec.ts`, `*.e2e-spec.ts`,
+`*.harness-spec.ts`. Lane configs exclude each other by **suffix**, not by path. If you have to open
+the file to learn its lane, the filename is not doing its job.
 
 **Boundary.** Not `TESTING-8`: `TESTING-7` says how a lane is **declared**, `TESTING-8` says how a
 declared lane must actually **exist**. Not `TESTING-1`: a correct suffix cannot fix the part of the
@@ -179,6 +213,10 @@ name in front of it.
 
 **What it emits in source.** Either files that the lane's `testRegex` actually matches, or the
 removal of the lane's script and config.
+
+**Recognition signs.** The script carries a flag that treats "no tests" as a pass. The CI report
+shows green for a lane nobody remembers running anything. Delete every test in that lane and nothing
+turns red.
 
 **Boundary.** Not `TESTING-7`: see above. And the "pass when empty" flag is **not** by itself a
 violation. The violation is that flag plus a genuinely empty lane, because then the green is a claim
@@ -193,6 +231,7 @@ summarising.
 well-formed JSON the production strict parser can actually parse, and reprogrammable per step by the
 flow — with everything else in the flow kept real.
 
+**Recognition signs.** The test really calls the provider ⇒ it costs money, takes seconds, and
 **answers differently every time**; all three are fatal in a flow suite. The assertions have to be
 loosened until they survive different phrasings, at which point they catch nothing. The stub returns
 `"stubbed"`, `"ok"`, `"test"` ⇒ the strict-JSON parser **never runs**, and the parser is exactly the
@@ -213,6 +252,9 @@ question this lane answers.
 required process-only credential per authority — no file, OAuth, key-pool or sibling-variable
 fallback — naming the model and endpoint, and holding one or two cases per capability.
 
+**Recognition signs.** Every layer between the harness and the provider is a layer that can keep the
+harness green while production is broken: a tier, a routing override, a house wrapper choosing the
+model. A harness that "fakes" the production gateway with an adapter that really calls out ⇒ it can
 **invent** metadata about provider, tokens and cost. The credential is a CLI's OAuth, a chat app's
 session, or a profile file ⇒ that is not a provider-issued server API key, and it proves no deployed
 right. The harness grows a case per edge ⇒ billed per call ⇒ eventually nobody runs it, and a stale
@@ -231,6 +273,12 @@ production's own read path**.
 **What it emits in source.** A seed script that writes source rows for a varied cohort, invalidates
 the derived projections so production read paths rebuild them, and takes the inspected account as an
 argument.
+
+**Recognition signs.** The seed creates exactly one blank account with every number at zero ⇒ nothing
+proves that lists, counts, rankings, progress or joins across several users are right. The seed
+writes JSON shaped exactly the way the screen wants it ⇒ the screen looks complete, but **no**
+production join or projection proves it. The seed assumes one hard-coded identity is the signed-in
+reader. Running it twice doubles the data.
 
 **Boundary.** Not `TESTING-2`: the same spirit of "read it back where the real state lives", but
 `TESTING-11` applies to a demo environment rather than to an assertion. And empty states **still**

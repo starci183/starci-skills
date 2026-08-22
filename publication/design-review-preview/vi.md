@@ -22,13 +22,17 @@ Trong một session:
 - `design.json` sở hữu task binding, journey/business/component synthesis, grammar facts và receipt, candidate metadata, page contract, UI-condition inventory và viewport obligations. States-stage design còn sở hữu complete `renderContract` cùng canonical `executionPrompt`.
 - authored HTML sở hữu composition, hierarchy, responsive behavior và executable in-memory behavior cho từng declared state; state-review capture là một bounded representative sample.
 
-Schema 7 page review chỉ bind canonical `pageContract`. Nó phủ complete page anatomy, representative state,
+Schema 8 page review chỉ bind canonical `pageContract`. Nó còn ghi route status và obligation-level source
+capability evidence, nên không thể gọi capability là reusable chỉ vì nó sở hữu data hay state. Nó phủ complete
+page anatomy, representative state,
 state inventory và reference viewport nhưng không có write authority. Sau `OK #1`, state review giữ page hash
 đó và thêm `renderContract`, phủ mọi page/region/state/transition cùng exact source files,
 owner/component/contract, anatomy, data mapping và visual obligation. `renders` chọn tối đa năm cặp page/state
 đại diện trên toàn flow và phủ mọi reference viewport cho mỗi state đã chọn. Canonical prompt lặp identities cùng
 boundary, bắt exact implementation và cấm reinterpretation. Chỉ `OK #2` biến exact contract đó thành
 implementation authority.
+Mọi route mới/đã đổi và mọi page dựa vào capability `generalize`/`new-required` phải vào selected parity set;
+exact paths cần cho capability còn thiếu phải vào source boundary. Schema 7 vẫn được nhận làm compatibility input.
 Transition evidence gọi tên page/state ở cả hai endpoint, gồm cross-page navigation. Representative preview
 content được đánh dấu fixture-only; runtime value vẫn do source sở hữu.
 
@@ -87,7 +91,7 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 8. Creativity đi trước principles review; implementation theo source patterns và gates.
 9. MASTER dùng chung cho mọi candidate; page file chỉ ghi deviation và principles chỉ inspect delta.
 10. Generate/audit mode có đúng một result; 3–4 alternative cần explicit page-stage brainstorm mode và reviewed baseline.
-11. Page-stage review không bao giờ chứa render contract hay execution prompt; state-stage review giữ exact approved page hash.
+11. Page-stage review không bao giờ chứa render contract hay execution prompt; schema 8 state-stage review giữ exact approved direction-plus-page hash.
 
 ## Stops
 

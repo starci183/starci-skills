@@ -12,6 +12,7 @@ title: Skill shape
 | `@credential-intake` | `runbooks/secrets/en.md` | en | acquire missing operator credentials immediately through hidden, encrypted intake |
 | `@host-os` | `scripts/check-host-os.mjs` | script | select only credential and setup entrypoints supported by this host |
 | `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset and completion transitions |
+| `@orchestration` | `orchestration/en.md` | en | partition provider-neutral coordinator and worker work without moving approval or decision ownership |
 
 
 ## Record
@@ -71,9 +72,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The nineteen capabilities
+## The seventeen capabilities
 
-Seventeen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Fifteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -89,12 +90,10 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-diagnose` | a read-only trace: where a skill would stop, and whether that stop is correct |
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
-| `starci-fe-design-layout` | challenge, preview, approve and implement one complete source-bound page/page flow in one invocation |
-| `starci-fe-design-block` | judge, preview, approve and implement one region inside its current complete page in one invocation |
-| `starci-fe-ui-align` | proactively audit and converge equivalent UI responsibilities across existing surfaces, evolving authority only for proven gaps |
-| `starci-fe-feedback-evolve` | turn proven owner feedback into the smallest durable authority improvement and source correction |
+| `starci-fe-design-layout` | print journey and UI direction, join them into one complete source-bound page/flow, then approve, seed, implement and prove it |
+| `starci-fe-layout-refactor` | own every correction of Layout/Block-rendered output, classify owner feedback as a failed-skill signal, evolve the smallest durable authority/enforcement layer, then refactor the exact impact cone and prove parity |
+| `starci-fe-design-block` | print one UI direction by default or 3–4 on explicit brainstorm for one region inside its complete parent, then approve, implement and prove it |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |
-| `starci-fe-minor-fix` | one small contract-preserving correction inside one clean existing block, composite or leaf folder, machine-rejected when its scope grows |
 | `starci-conversation-record` | provider-neutral conversation provenance snapshots and exact FE/BE artifact links without raw transcript Git storage |
 | `starci-be-plan` | the backend brief: files, boundary, test cases |
 | `starci-be-approve` | approval, then backend source |
@@ -111,11 +110,44 @@ Never print an internal context table. Tell the user in one friendly sentence wh
 project and role are resolved, and what boundary the current action may touch. The required skill-step table below is user-facing execution control, not internal context. A run is blocked only when
 a required context value cannot be recovered from the request, workspace routes or live evidence.
 
+## Pipeline contract
+
+Every capability is executed as an explicit artifact pipeline. Resolve one immutable context envelope before
+work begins: run identity, project and roles, scope endpoints, routed authorities, source baseline, allowed write
+state, approval identities, proof obligations and delivery target. Later steps append artifact references; they
+do not silently replace an envelope identity. Raw chat, an unclassified screenshot and another agent's prose are
+evidence inputs, not handoff artifacts.
+
+Each step declares five things before it runs: the context slice it may read, exact input artifacts, the
+transformation it owns, the required output artifact or receipt, and the gate that accepts or refuses that
+output. An output records provenance to its inputs. The next step consumes only an accepted output, never an
+unvalidated draft or a summary reconstructed from conversation memory. Existing durable records may carry these
+fields; do not create a duplicate pipeline file when the capability already has one canonical record.
+
+Choose the smallest honest topology:
+
+| Topology | Use when | Execution |
+|---|---|---|
+| `dual-track` | two independent authorities must intersect before a shape can exist | one isolated top-down owner, one isolated bottom-up owner, then one coordinator joins only accepted outputs |
+| `reconciliation` | declared or desired state must be compared with observed state | measure both sides independently, then reconcile their delta |
+| `linear` | one authority is transformed or recorded without a second independent origin | ordered steps with the same input/output/gate receipts; never invent a second track |
+
+For `dual-track`, give each track only its context slice. The top-down track cannot see a proposed implementation;
+the bottom-up track cannot adapt itself to proposed journey regions or a preferred answer. The coordinator sees
+both outputs only after both gates pass and emits an explicit binding matrix. An unbound obligation, capability,
+state, owner or proof target stops the join. Missing bottom-up capability becomes an exact required change; it
+never weakens the top-down outcome.
+
+Pipeline artifacts follow their authority: business truth is durable, design and review material is session
+cache, product code lives only in the routed repository after approval, provider execution state stays in its
+declared local owner, and a read-only capability writes no artifact merely to prove it ran.
+
 ## Process states
 
 Every invoked StarCi skill first derives its ordered execution steps from its own `Run` or `Process` and
-prints one compact table with exactly these columns: `Step`, `Work`, `Required result`, `Status`. The table
-contains real task steps, not context values, agent assignments or implementation trivia. Use
+prints one compact table with exactly these columns: `Step`, `Track`, `Input`, `Transform`, `Required output`,
+`Gate`, `Status`. `Track` is `shared`, `top-down`, `bottom-up`, `join`, `execution` or `proof`; it names semantic
+ownership, not an agent roster. The table contains real task steps, not context values or implementation trivia. Use
 `in progress`, `waiting for OK`, `completed` and `blocked` as the closed status vocabulary; exactly one row
 may be `in progress`.
 
@@ -223,9 +255,12 @@ appended.
 6. Another task regenerates design evidence from current source, contract, grammar and business truth.
 7. A production baseline is taken after the source-authorizing `OK` and before the first production write.
 8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
-9. For safely partitionable work, target ten non-overlapping agent assignments; one coordinator owns
-   shared-state gates. Fill and backfill every available runtime slot when fewer than ten are concurrent.
-10. Every invoked StarCi skill maintains the compact user-facing step table; internal context and agent-assignment tables remain forbidden.
+9. Delegation follows `@orchestration` and the selected skill's validated phase map. A `dual-track` synthesis uses
+   isolated evidence owners and one coordinator for the join; source partitioning is legal only with one writer per
+   path. Skills without an explicit orchestration binding remain sequential.
+10. Every invoked StarCi skill maintains the compact user-facing step table. Layout, Block and Refactor include
+    their mandatory `orchestration` row and compact receipt; raw worker prompts, hidden context and tool chatter
+    remain internal.
 11. Resolve `defaultLang` from the Source-wide workspace config before the first user-facing reply.
 12. Missing credentials trigger immediate value-free owner intake; values never enter chat, arguments,
     generated commands or logs.
@@ -233,6 +268,10 @@ appended.
 14. Candidate labels select; only an `OK` on an explicitly displayed exact-source boundary authorizes writes; `continue` resumes without a new checkpoint.
 15. Owner rejection resets the baseline and assumptions before another edit.
 16. Completion requires zero known defects, every requested proof and the declared delivery state.
+17. A downstream step consumes only gate-passed upstream artifacts with provenance; raw conversation memory is
+    never a substitute for a missing input receipt.
+18. Do not force `dual-track` onto a linear capability. When two independent origins do exist, do not collapse
+    them into one agent's blended reasoning before the join.
 
 ## Exceptions
 

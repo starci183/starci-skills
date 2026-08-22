@@ -21,6 +21,17 @@ title: starci-be-plan · English
 
 None. Planning ends with a brief; it never starts setup or approval.
 
+## PIPELINE
+
+Topology: `dual-track`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| demand | top-down | routed business head and requested capability | derive operations, outcomes, branches and test obligations without source assumptions | backend demand contract | every behavior has evidence and an owner outcome |
+| capability | bottom-up | verified route, live schema and sibling operation family | inventory entities, modules, handlers, projections and conventions | source capability matrix | every reuse claim cites an exact owner and path |
+| synthesis | join | accepted demand and capability artifacts | bind each behavior and branch to exact files and tests | complete backend brief | no unbound behavior, file, branch or test |
+| proof | proof | canonical brief | validate boundary completeness without writing product source | planning receipt | brief names every required file and remains source-write free |
+
 ## Run
 
 Read `@skill-shape` first. This phase produces a brief and nothing else.

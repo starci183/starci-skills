@@ -15,6 +15,17 @@ title: StarCi Cloudflare tunnel set
 
 Không có.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | workspace route đã verify, hostname/service đã khai và credential identity | khóa tunnel cùng DNS ownership mong muốn | desired-state contract | project, role, zone và service đều rõ |
+| kiểm kê | đối chiếu | desired state và Cloudflare read state | so tunnel, ingress và DNS records mà chưa mutation | reconciliation plan | mọi remote delta chính xác và credential-safe |
+| duyệt-thực thi | thực thi | plan đã hiển thị và approval bắt buộc | chạy mutation idempotent qua control plane | apply receipt | có authority và chỉ record đã khai thay đổi |
+| chứng minh | proof | apply receipt và fresh remote reads | đọc lại tunnel cùng DNS behavior | steady-state receipt | desired và observed state khớp, không lộ secret |
+
 ## Run
 
 Đọc `@skill-shape`, rồi `@initialization`. Resolve ngôn ngữ chung của Source cùng project và role được

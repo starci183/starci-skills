@@ -17,6 +17,17 @@ title: starci-repair
 
 Không có. Stale route được trả về initialization owner; skill này không tự chạy setup.
 
+## PIPELINE
+
+Topology: `reconciliation` với các repair pass tách biệt.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| kiểm kê | dùng chung | verified route, stale registry và current source | đo mọi category áp dụng mà không suppress gate | repair findings matrix | mỗi finding có evidence, owner và exact clearing gate |
+| lập kế hoạch | reconciliation | findings và category-owned law | nhóm non-overlapping fixes thành ordered passes, khóa boundaries | repair execution contract | approval phủ mọi proposed product/external mutation |
+| sửa | execution | approved pass | chỉ apply pass đó rồi re-measure trước khi đi tiếp | per-pass receipt | không mixed concern, gate weakening hay plaintext credential |
+| đóng | proof | mọi pass receipt và fresh full inventory | chạy complete delivery assurance và stale checks | green repair receipt | mọi in-scope finding clear qua real owner gate |
+
 ## Chạy
 
 Đọc `@skill-shape`, rồi `@staleness`. Không restate law của category ở đây. Registry sở hữu stale

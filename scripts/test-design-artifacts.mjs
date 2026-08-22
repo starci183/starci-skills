@@ -168,6 +168,12 @@ const blocks = write("blocks.json", {
     axes: {dataOwner: "parent", repetition: "repeats", weight: "populated", composition: "label-value"},
     citesPrecedent: "none",
     states: ["populated", "empty", "pending"],
+    uiDirection: {
+      summary: "Keep repeated results scannable inside the unchanged complete parent",
+      hierarchy: ["Result identity precedes its comparable value"],
+      responsive: ["Rows preserve reading order when the parent narrows"],
+      emphasis: ["The result value remains the dominant block fact"],
+    },
     restingCount: 4,
     parts: [{name: "result-row", cites: {kind: "entry", verdict: "reuse", key: "course-catalogue-card"}, whyMatch: "one course offer is compared against its peers"}],
     reason: "rows preserve comparison while every settled state keeps one owner",
@@ -187,6 +193,10 @@ const brainstormedBlock = write("brainstormed-block.json", {
     ...blockAnatomy,
     id: ["compact", "balanced", "visual"][index],
     axes: {...blockAnatomy.axes, composition},
+    uiDirection: {
+      ...blockAnatomy.uiDirection,
+      summary: `Compose the result block as the owner-requested ${composition} UI direction`,
+    },
     reason: `Owner-requested ${composition} anatomy inside the same parent geometry`,
   })),
 });
@@ -246,6 +256,11 @@ try {
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", blocks, "--hash");
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", auditedBlock, "--hash");
   run("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", brainstormedBlock, "--hash");
+  const missingBlockDirection = JSON.parse(readFileSync(auditedBlock, "utf8"));
+  delete missingBlockDirection.anatomies[0].uiDirection;
+  if (!mustFail("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", write("missing-block-direction.json", missingBlockDirection)).includes("uiDirection")) {
+    throw new Error("schema 2 block without a UI direction failed for the wrong reason");
+  }
   if (!mustFail("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", write("invalid-block-brainstorm.json", {...JSON.parse(readFileSync(brainstormedBlock, "utf8")), anatomies: [blockAnatomy]})).includes("requires 3-4 alternatives")) {
     throw new Error("block brainstorm count failed for the wrong reason");
   }

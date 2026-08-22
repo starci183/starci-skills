@@ -95,6 +95,13 @@ enclosing line is **classified and routed**, not so that it can be quietly treat
 **Situation.** Two things sit next to each other and the parent has already put space between them.
 The boundary is stated. Adding a line says the same sentence a second time.
 
+**Recognition signs**
+
+- The parent holds a `gap` running across exactly this seam.
+- Each side already has its own background, shadow or enclosing outline — they are separated already.
+- Remove the line and nobody reads the two sides as one block.
+- The only remaining reason to keep the line is "it looks clearer".
+
 **Ask yourself.** If this line were removed, would anyone read the two sides as one thing? If not —
 `DIVIDER-0`.
 
@@ -114,6 +121,13 @@ The boundary is stated. Adding a line says the same sentence a second time.
 **Situation.** Several items of the **same kind** sit flush on one surface: each item carries its own
 internal padding and there is no space between them. The boundary between one item and the next has
 only a line left to state it.
+
+**Recognition signs**
+
+- The items are **versions of the same thing** — same role, same reading, same kind of action.
+- They touch; all the padding is **inside** each item.
+- The number of items is data, not a design decision.
+- Inserting space would make them read as several detached blocks instead of one list.
 
 **Ask yourself.** Are these items versions of the **same kind**, sitting flush on one continuous
 surface?
@@ -136,6 +150,14 @@ line, and that line is an outer boundary nobody asked for.
 **Situation.** A band **names or controls** what follows it — a header, a toolbar, a tab strip, an
 action footer — and the content runs **flush** into that band. The line says: this band is **above**
 the content, not **inside** it.
+
+**Recognition signs**
+
+- The band is short; what follows is the real content.
+- The content can scroll, change, be empty or run on forever while the band stays put.
+- Remove the line and the band reads as the first row of the content.
+- The edge belongs to the **band**, not to the content: the content does not know what stands before
+  it.
 
 **Ask yourself.** Is this band controlling or naming what follows, and does what follows run flush
 into it?
@@ -160,6 +182,13 @@ scrolled. Making the line appear on scroll turns the boundary into a consequence
 share one continuous surface or because the layout leaves no room for space. There is exactly **one**
 seam, and it is declared **once**.
 
+**Recognition signs**
+
+- Each side can be named on its own; each has its own content.
+- Neither side is a "version" of the other — they are not of one kind.
+- The two sides touch; there is no space between them.
+- Exactly **one** boundary, not a repeating one.
+
 **Ask yourself.** Are the two sides peers, and do they actually **touch**, or is there already space
 between them?
 
@@ -182,6 +211,12 @@ read twice as heavy as every other rule.
 from that side"; it says "the things inside me are **one nameable group**, distinct from the group
 around them".
 
+**Recognition signs**
+
+- The line is closed, usually with a radius.
+- Remove it and no seam is lost — only a group loses its name.
+- It does not sit **between** any two things.
+
 **Ask yourself.** Is this line **separating** two things, or **gathering** one group?
 
 **Boundary**
@@ -203,6 +238,12 @@ quietly treated as a separator.
 **Situation.** The cells are comparable **down a column** and also comparable **across a row**. A cell
 means what it means because of its position on both axes, so both axes must be stated.
 
+**Recognition signs**
+
+- Reading down a column compares; reading across a row compares too.
+- The cells touch; the padding is inside each cell.
+- Columns carry their own headers, or each column is an object being compared.
+
 **Ask yourself.** Does a cell here mean what it means because of **both its row and its column**, or
 only because of its order in a list?
 
@@ -223,6 +264,12 @@ belongs to the surface holding the matrix, not to the cells.
 what lies on either side are arbitrary blocks and neither has standing to own the seam — or because
 the line must also **carry a label**.
 
+**Recognition signs**
+
+- Both sides are free-flowing content: paragraphs, data-generated blocks, unpredictable sections.
+- No container wraps either side individually for an edge to attach to.
+- Or: the line has words in the middle of it — "or", "today", "unread".
+
 **Ask yourself.** Is there any element here that could own this edge? If nobody can — `DIVIDER-6`.
 
 **Boundary**
@@ -236,6 +283,17 @@ the line must also **carry a label**.
 
 **The meaning is part of the code.** A thematic break in long text is a meaningful event, not a
 decorative stroke; it must be written with the element that carries that meaning.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| seam | What sits on each side of the boundary |
+| adjacency | Whether the two sides touch, or whether a parent already spends space across the seam |
+| membership | Members of one set · band and the content it governs · peer regions · one enclosed object · a two-axis matrix |
+| owner | Which single element can carry the rule: the set parent, the band, the later region, or none |
+| host edge | Whether a real, uninterrupted edge exists for the rule to run along |
+| repetition | Whether the boundary occurs once or between every member |
 
 ## Rules
 

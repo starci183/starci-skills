@@ -22,7 +22,9 @@ Within one session:
 - `design.json` owns task binding, journey/business/component synthesis, grammar facts and receipt, candidate metadata, page contract, UI-condition inventory and viewport obligations. States-stage design additionally owns the complete `renderContract` and canonical `executionPrompt`.
 - authored HTML owns composition, hierarchy, responsive behavior and executable in-memory behavior for each declared state; state-review captures are a bounded representative sample.
 
-Schema 7 page review binds a canonical `pageContract` only. It covers complete page anatomy, representative
+Schema 8 page review binds a canonical `pageContract` only. It also records route status and obligation-level
+source capability evidence, so a capability cannot be called reusable merely because it owns data or state.
+It covers complete page anatomy, representative
 states, state inventory and reference viewports but carries no write authority. After `OK #1`, state review
 preserves that page hash and adds the `renderContract`, which covers every page/region/state/transition and exact
 source files, owner/component/contract, anatomy, data mapping and visual obligations. Its `renders` select no more
@@ -30,6 +32,9 @@ than five representative page/state pairs across the whole flow and cover every 
 selected state. Its canonical prompt
 repeats identities and boundary, requires exact implementation and forbids reinterpretation. Only `OK #2`
 turns that exact contract into implementation authority.
+Every new or changed route and every page backed by a generalized or new-required capability enters the selected
+parity set; exact paths required by missing capabilities enter the source boundary. Schema 7 remains accepted
+compatibility input.
 Transition evidence names page/state at both endpoints, including cross-page navigation. Representative preview
 content is explicitly fixture-only; runtime values remain source-owned.
 
@@ -88,7 +93,7 @@ Creativity precedes principles review. Only the selected candidate is audited in
 8. Creativity precedes principles review; implementation follows source patterns and gates.
 9. MASTER is shared by every candidate; page files record deviations only and principles inspect deltas only.
 10. Generate/audit modes contain exactly one result; 3–4 alternatives require explicit page-stage brainstorm mode and an existing reviewed baseline.
-11. Page-stage review never contains a render contract or execution prompt; state-stage review preserves the exact approved page hash.
+11. Page-stage review never contains a render contract or execution prompt; schema 8 state-stage review preserves the exact approved direction-plus-page hash.
 
 ## Stops
 

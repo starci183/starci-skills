@@ -101,6 +101,12 @@ larger.
 content, and their total width is always less than the row. Nobody needs priority, nobody needs
 protection.
 
+**Recognition signs**
+
+- Every value in the row comes from a closed set: fixed labels, icons, numbers of known length.
+- No child needs to reach the right edge of the row.
+- No child is cut, wrapped or scrolled — because there has never been a deficit.
+
 **Ask yourself.** Is there any real data that makes the children's total width exceed the row? If
 there is none — `DIST-0`.
 
@@ -117,6 +123,12 @@ there is none — `DIST-0`.
 **Situation.** Exactly one thing in the row is real content of unpredictable length, and everything
 else is an accessory around it: avatar, icon, badge, button, timestamp. That content both takes the
 surplus and is the one that gives way to the deficit.
+
+**Recognition signs**
+
+- Exactly one child comes from user data or business data.
+- The remaining children have widths that can be predicted before the page runs.
+- If that content grows longer, the thing that *must* get smaller is it, not the accessories.
 
 **Ask yourself.** If the longest possible string lands in this row, who gives way? If there is only
 one such participant and it is also the one entitled to the leftover space — `DIST-1`.
@@ -138,6 +150,12 @@ that reports nothing: the class list still reads correctly, only the row has sto
 
 **Situation.** Nobody in the row outranks anybody. The children are **peer** items, and equal width
 is the message itself: these things can be compared with each other.
+
+**Recognition signs**
+
+- The children are of one kind, in one role, usually produced from one array of data.
+- Equal width is what the reader **relies on** to compare, not an accident of appearance.
+- Adding or removing an item is ordinary for this screen.
 
 **Ask yourself.** Is equal width here a business statement ("these things rank the same"), or does
 it merely happen to look even?
@@ -162,6 +180,13 @@ its own fraction.
 oval, a button with its word swallowed, a number cut in half. These are not allowed to be the one
 that gives way.
 
+**Recognition signs**
+
+- Reading only part of it makes the reader understand something **wrong**, not merely less.
+- It is square, round, or holds a ratio that must be kept.
+- It is something the user must be able to press — the touch target must not shrink with a sibling's
+  width.
+
 **Ask yourself.** If this got 30% smaller, would the reader be **misled**, or simply read less? If
 misled — `DIST-3`.
 
@@ -183,6 +208,13 @@ does not have to guess which half was intentional.
 **Situation.** This child **must give way** when the row is narrow, but must not swell when the row
 is wide. It takes exactly what it needs and returns space when space is demanded.
 
+**Recognition signs**
+
+- Its content is of unpredictable length.
+- If it stretched to the edge the layout would misstate itself: an identity cluster torn away from
+  its avatar, a small chip turned into a long bar.
+- Inside it there is a `truncate`, a `line-clamp` or a scroll box — and those are **not running**.
+
 **Ask yourself.** Must this get smaller when the row is narrow, and should it hold still when the
 row is wide? If both are true — `DIST-4`.
 
@@ -203,6 +235,12 @@ scrolling until its minimum height is released.
 **Situation.** This child's width is a **layout decision**, not a consequence of content. The filter
 rail is 16rem wide because that is the size chosen for the rail, not because the longest label
 inside it measures that much.
+
+**Recognition signs**
+
+- If the content inside changes, the width must stay the same.
+- The same width repeats on other screens — it is a constant of the product.
+- The other side of the row is the side that adapts.
 
 **Ask yourself.** Where does this number come from — from the longest content inside, or from a
 layout decision already settled? If from the layout decision — `DIST-5`.
@@ -226,6 +264,13 @@ content **stretches the whole grid** past its container. `minmax(0,1fr)` is the 
 full measure: one side sits hard left, the other hard right. The leftover has to go somewhere — and
 it goes into **the space between**.
 
+**Recognition signs**
+
+- There is an edge that one child is required to reach.
+- No child should swell: swelling would misstate the meaning (a title dragged long, a button widened
+  for no reason).
+- Said aloud, the request is "push this to the right", not "make that one wider".
+
 **Ask yourself.** Is the thing I want to grow a **child**, or the **seam** between children?
 
 **Boundary**
@@ -243,6 +288,17 @@ meaning, and screen readers still traverse it as an element. Surplus is claimed 
 fake child. And `justify-between` with three children answers a different question: it divides the
 surplus among **every** seam. When only one seam should open, group the children into two, or put
 `ml-auto` on exactly the child that opens that seam.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| parent | The immediate distributing parent: flex row, flex column, or grid |
+| axis | Inline (width) or block (height); each axis is a separate situation |
+| participants | Direct children, plus any seam that has been given a role |
+| surplus rule | Which participant is entitled to space left over |
+| deficit rule | Which participant gives way first, and which must never give way |
+| measure source | Whether a size comes from content or from a layout decision |
 
 ## Rules
 

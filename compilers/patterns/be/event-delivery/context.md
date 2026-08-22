@@ -92,6 +92,10 @@ this exact content?* Those two questions are the envelope's job.
 instance service and `digest` hashed from the payload, never from the subject; and an envelope type
 declaring that obligation, where `digest` being optional is visible in the interface itself.
 
+**Recognition signs.** Code wants to infer the producer from the **subject**, from the connection, or
+from receipt order. The payload has no stable field to serve as a duplicate key. Somebody says "the
+broker guarantees exactly once" without pointing at the configuration that says so.
+
 **Boundary.** Not `DELIVERY-3`: this code is about the envelope *having* producer identity, while
 `DELIVERY-3` is about *using* that identity at the right moment — without the first, the second
 cannot be correct. Not `DELIVERY-4`: this code produces the digest, while `DELIVERY-4` decides where
@@ -106,6 +110,10 @@ to the place that calls it.
 **What it emits in source.** One central event config in which every entry declares both `useLocal`
 and `useNats`, several carrying a comment naming why one is still `false`; and an emitter that reads
 exactly those two flags to choose its branches, so the config is the contract and not a hint.
+
+**Recognition signs.** A call site passes a transport option so that "this time it goes over the
+broker". A config entry is missing one of the two flags and the reader has to guess. A realtime event
+only behaves correctly while the system runs exactly one instance, and nothing records that.
 
 **Boundary.** Not `DELIVERY-1`: this code decides **whether it goes**, while `DELIVERY-1` decides
 **what it carries when it does**. Not `DELIVERY-6`: declaring `useNats: true` is a promise, while
@@ -122,6 +130,11 @@ envelope's `parsed.id` with the instance id and returning on a match — placed 
 and carrying the comment recording the bug the subject comparison caused. The rule checks that the
 comparison exists *and* precedes the emit; order is the whole content of the code.
 
+**Recognition signs.** The bug appears only for users plugged into **the pod that just wrote the
+data**. There is a comparison between `subject` and an instance id — a comparison that **never**
+matches, so it stays silent and looks like it is working. The guard exists but sits **after** the
+emit call.
+
 **Boundary.** Not `DELIVERY-4`: this code blocks the **producer's own echo**, while `DELIVERY-4`
 blocks the **broker's redelivery**; dropping either leaves a distinct hole open. Not `DELIVERY-2`: if
 the event is local only there is no envelope to drop, so this code speaks only about the broker
@@ -137,6 +150,10 @@ parallel both read "not seen" and **both** cross the business boundary.
 then emit — three statements whose order is the invariant, and the order the rule's second message is
 aimed at.
 
+**Recognition signs.** The order in the code is emit first, `set` digest after. Deduplication lives
+in the listener instead of the bridge. Somebody offers "in practice it does not redeliver" in place
+of a configuration proving it.
+
 **Boundary.** Not `DELIVERY-3`: see above. Not `DELIVERY-1`: if the envelope carries no digest there
 is nothing here to claim — the fault is then `DELIVERY-1`, and fixing it here is fixing the wrong
 place.
@@ -151,6 +168,11 @@ says none of those three things.
 the payload type, and whose own title claims the negative — the fact did not leak to another socket.
 No assertion anywhere counts listeners.
 
+**Recognition signs.** The assertion is a number: how many listeners, how many messages, how many
+sockets. The test goes red when a pod or a subscriber is added even though the business did not
+change. The test stays green while the fact is delivered to the **wrong person**, because the number
+is still right.
+
 **Boundary.** Not `DELIVERY-6`: this code says **what to assert**, while `DELIVERY-6` says **how many
 instances to run on**. A test can satisfy this code and still fail the other.
 
@@ -162,6 +184,10 @@ and A does not echo back to itself. No clause of that sentence exists inside a s
 **What it emits in source.** A cross-instance end-to-end test plus its world helper, booting two
 independent instances on a shared real broker, where the helper counts broker messages so the
 origin's "exactly one delivery" is proved after its echo arrived, not before it could have.
+
+**Recognition signs.** The test calls the local event emitter directly and then concludes something
+about fan-out. The broker is mocked, so self-echo never happens and the guard has never been tried.
+Only one app is booted, and the "second instance" is a variable.
 
 **Boundary.** Not `DELIVERY-5`: see above. The closed exception is that the two instances may boot a
 reduced module graph and substitute infrastructure that is not the subject — retry, logging, digest

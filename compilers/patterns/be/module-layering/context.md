@@ -94,6 +94,17 @@ run all the way to the file that declares that symbol, rather than stopping at t
 **What it emits in source.** A cross-capability specifier whose last segment is a file: the caller's
 import block lists the real dependencies of the file, and every one of them can be opened directly.
 
+**Recognition signs.**
+
+- The specifier ends right after the capability name, with nothing after it.
+- A file exists inside that capability whose only content is `export ... from` other files.
+- Reading the whole import block does not tell you which file is actually depended on.
+- The question to ask: if I open exactly the path I just wrote, do I open a file, or a folder?
+- Category-folder trap: some folders hold capabilities rather than being one (`platform/`, `lib/`,
+  `integrations/`, and in many trees `databases/`). Under those, the capability is the second
+  segment, so "reaches a file" is one segment deeper, and a specifier stopping at
+  `<category>/<capability>` is still a barrel even though it looks like two segments.
+
 **Boundary.** This is not `LAYERING-2`: `LAYERING-1` asks where the specifier stops, `LAYERING-2`
 asks whether it may be an alias at all — a single line can be wrong on both counts, a self-alias
 that also stops at a folder. It is not `LAYERING-5` either: `LAYERING-1` is the caller's obligation
@@ -109,6 +120,19 @@ path must be relative.
 alias appearing only on lines that genuinely leave the capability — so renaming the capability never
 touches its own internal imports.
 
+**Recognition signs.**
+
+- The public alias appears on a line whose target is in the same capability as the source.
+- The capability folder appears twice on one path: once because the file is there, once inside the
+  specifier.
+- Renaming the capability forces edits to its own internal imports.
+- The question to ask: is the target in the same capability folder as the file I am writing? If yes,
+  the path is `./`.
+- Why a self-pointing alias is dangerous: the alias exists to signal "this comes from elsewhere".
+  Using it for something that does not come from elsewhere is the fastest way to drain that signal;
+  after that nobody reads the alias as a boundary any more, and an unreadable boundary is no
+  boundary.
+
 **Boundary.** This is not `LAYERING-1` — see above. It is not `LAYERING-3` either: `LAYERING-2` is
 about a specifier in any file, `LAYERING-3` is about the edge between two `@Module`s. A
 `LAYERING-3` violation always comes with a sideways specifier; a `LAYERING-2` violation crosses to
@@ -121,6 +145,17 @@ somewhere is the application root, whose entire job IS knowing what the applicat
 
 **What it emits in source.** The registration of both capabilities in the root's module list, and
 two capability modules neither of which names the other.
+
+**Recognition signs.**
+
+- A capability `@Module`'s `imports:` contains another capability's `@Module`.
+- The decision "these two go together" is recorded in a file whose subject is not both of them.
+- Starting one capability to debug it drags the other one along.
+- The question to ask: is the file I am writing the place that OWNS the question "what does this
+  application consist of"? If not, this edge does not get wired here.
+- Why not wire it directly: two directly wired capabilities can no longer be started apart, and the
+  first thing anyone wants during an incident is to start one piece and see whether that piece is
+  alive.
 
 **Boundary.** This is not a downward edge: if the imported module is a child of this same
 capability, that is nesting, and nesting is allowed — this code is about sideways edges, not
@@ -139,6 +174,19 @@ in which application. All of those belong to the root.
 including the same capability registered by two roots with two different answers, and start-order
 knowledge held in the file whose subject IS the whole.
 
+**Recognition signs.**
+
+- A capability declares itself `isGlobal` on the application's behalf.
+- A comment of the form "must be imported before X" sits in a file belonging to a capability.
+- The same capability needs two different configurations in two applications, and that configuration
+  is buried inside the capability.
+- The question to ask: is this fact true for EVERY application that uses this capability? If not, it
+  is not the capability's knowledge.
+- Why this is its own code rather than folded into `LAYERING-3`: they break in two different ways. A
+  `LAYERING-3` violation glues two capabilities together. A `LAYERING-4` violation makes ONE
+  capability unable to start on its own, and no second capability has to take part for that to
+  happen.
+
 **Boundary.** This is not `LAYERING-3` — see above. It is not `LAYERING-5` either: `LAYERING-4` says
 who may know the whole picture, `LAYERING-5` says what each capability exposes. A capability can
 expose exactly the right surface and still hide start-order knowledge in its guts.
@@ -150,6 +198,18 @@ people to import. No index re-exports the folder; the caller names the file itse
 
 **What it emits in source.** No `index.ts` anywhere in the capability, and an alias mapping with no
 barrel specifier to resolve to — so the surface is readable only from callers' import lists.
+
+**Recognition signs.**
+
+- A file whose entire content is `export ... from`.
+- Adding a file to the folder widens the public surface without anyone deciding it.
+- Finding out what this capability exposes requires opening a list file instead of reading call
+  sites.
+- The question to ask: is this capability's surface being read in the import lists of the places
+  that call it, or declared in a file nobody opens?
+- Why the surface belongs at the call site: a wrong dependency then shows up as an import line that
+  looks odd — the kind a reviewer spots instantly. When the surface lives in a barrel, a wrong
+  dependency is just one more name on a long list, and long lists go unread.
 
 **Boundary.** This is not `LAYERING-1` — see above; these are two ends of the same wire. It is not
 `LAYERING-4` — see above.

@@ -18,26 +18,33 @@ title: Layouts
 You are given a screenshot of one page or a prose description of a page flow. Identify every page and its
 closed visible intent before composing. Then resolve two independent evidence tracks: customer journey plus
 routed business truth from the top down, and component, contract, current/legacy composition plus source
-capability from the bottom up. Their explicit merge bindings produce complete pages.
-Default `generate` returns one result; explicit `brainstorm` alone returns 3–4 targeted alternatives after the
-owner reviews that baseline.
+capability from the bottom up. Their explicit merge bindings produce complete pages. Synthesis prints the
+journey direction and UI direction separately before joining them into anatomy. Default `generate` returns one
+direction; an explicit owner `brainstorm` request before direction approval returns 3–4 complete alternatives
+without requiring a separately reviewed baseline.
 
 ## Law
 
-A schema 7 candidate names its `page` or `flow` scope, stage, MASTER system id, deviations-only page override,
+A schema 8 candidate names its `page` or `flow` scope, stage, MASTER system id, deviations-only page override,
 every composed page, ordered nested ownership nodes and owned regions. `synthesis.pageIntents` records what
 each page must visibly render before either track; customer journeys and component capabilities are authored
 independently; every page-level intersection contains binding rows joining each render intent to journey,
-business and contract-backed regions. Every
+business and contract-backed regions. Each page intent declares whether its route is `existing`, `new` or
+`changed`. Each component capability proves every bound render-intent obligation with an observable outcome,
+source evidence and a `supported` or `missing` verdict. `reuse` is legal only when every obligation is supported;
+each missing obligation names the exact required source paths. `synthesis.directionReceipt` prints one
+flow-level journey direction and one flow-level UI direction as separate fields. Each direction names the exact
+complete candidate page set, preventing a multi-page flow from multiplying alternatives per page. Every
 region still hashes its minimum child geometry and representative anatomy. Each node is `existing`, `proposed`
 or `new`; `existing` cites real source plus SHA-256 and cannot drift between choices. Older schemas remain
 compatibility input. Candidates never name classes; MASTER fixes macro taste once.
 
 The `pages` stage carries a `pageContract`, one representative populated state per page, the full future state
 inventory and full-viewport coverage at every reference viewport. It carries no `renderContract` or
-`executionPrompt`, therefore its approval is cache-only. `OK #1` binds the canonical page-contract hash.
+`executionPrompt`, therefore its approval is cache-only. `OK #1` binds the canonical selected direction receipt
+plus page-contract hash.
 
-The `states` stage carries that exact approved page contract, `mode: expand-states` and `approvedPageAt`.
+The `states` stage carries that exact approved direction receipt and page contract, `mode: expand-states` and `approvedPageAt`.
 It expands every state and transition, then adds the hashed `renderContract` that fixes exact source files and
 complete page, region, state and transition obligations. State is classified at its real owner: a page state
 exists only when region arrangement, hierarchy or active page-level composition changes; a loading, refusal,
@@ -91,7 +98,7 @@ Seven, and no more. Each is here because something specific breaks without it.
 | 3 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
 | 4 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
 | 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
-| 6 | In brainstorm mode only, the requested diversity axis | alternatives drift across unrelated parts of the reviewed baseline |
+| 6 | In brainstorm mode only, the requested diversity axis | alternatives drift across unrelated parts of the shared synthesis scope |
 | 7 | Current source and legacy baseline for this project | every request is answered as if it were the first |
 
 **Input 3 is queried, not read, and the class arrays are never extracted.** One need per region through
@@ -187,15 +194,20 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 2. Every region cites an entry key, or declares a new one with its `why`.
 3. Every region names its assembling branch.
 4. A candidate declares its axis values, and no two candidates in a batch share the whole set.
-5. `generate` returns exactly one complete implementable result. Explicit `brainstorm` returns 3–4 targeted alternatives that vary only the requested axis and preserve the reviewed baseline elsewhere.
+5. Direction is mandatory inside synthesis. `generate` returns exactly one complete implementable direction;
+   explicit owner `brainstorm` before `OK #1` returns 3–4 targeted alternatives without requiring an earlier baseline.
 6. A missing product decision is returned to the owner. It is never guessed to complete a batch.
 7. A candidate's JSON is canonical — fixed key order, no timestamps, no per-run ids — because its hash
    is what the owner's approval attaches to.
 8. Feedback replaces the cache round. No candidate survives as durable authority after the invocation.
 9. Every candidate page has exactly one pre-track page intent record, and every render intent is bound exactly once.
-10. Journey and contract-first tracks are completed independently; anatomy is generated only from their merge bindings.
-11. Every merged region has a contract-first capability, and every journey step, business obligation and page region appears in the binding matrix.
-12. Every states-stage render region passes the layout-grammar gate; a missing scope, stale decision or mismatched component owner is not an approvable candidate.
+10. Journey and contract-first tracks are completed independently; synthesis prints the journey direction and UI
+    direction separately, and anatomy is generated only from their merge bindings.
+11. Each schema 8 direction receipt covers the complete candidate page set; alternatives are flow-level and never multiplied per page.
+12. Every merged region has a contract-first capability, and every journey step, business obligation and page region appears in the binding matrix.
+13. Every states-stage render region passes the layout-grammar gate; a missing scope, stale decision or mismatched component owner is not an approvable candidate.
+14. Data ownership, state ownership or a similarly named component does not prove visual anatomy, responsive behavior, spacing, typography, surface or icon capability; each bound observable requires source evidence.
+15. Every `new`/`changed` route and every page using a `generalize`/`new-required` capability appears in the selected visual-proof renders. Every missing obligation's `requiredPaths` appears in `renderContract.sourceBoundary`.
 
 ## Preview
 
@@ -245,10 +257,11 @@ The output **is** JSON, and its authority is `@schema` beside this record — no
 excerpt. `envelope` holds what varies between runs; the hash covers a candidate only, so the same
 decision re-run in a later round produces the same hash.
 
-New work uses schema 7. `envelope.scope` declares screenshot `page` or described `flow`; `stage: pages` requires
-`synthesis` and `pageContract` and forbids source authority. After `OK #1`, `stage: states` preserves the approved
-page hash, expands the complete state inventory and adds `renderContract` plus canonical `executionPrompt`.
-Older examples are compatibility documentation only.
+New work uses schema 8. `envelope.scope` declares screenshot `page` or described `flow`; `stage: pages` requires
+`synthesis.directionReceipt` and `pageContract` and forbids source authority. After `OK #1`, `stage: states`
+preserves the approved direction-plus-page hash, expands the complete state inventory and adds `renderContract`
+plus canonical `executionPrompt`.
+Schema 7 remains accepted compatibility input; older examples are compatibility documentation only.
 
 ```json
 {

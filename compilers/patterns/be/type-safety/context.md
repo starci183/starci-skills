@@ -55,6 +55,8 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 
 **What it emits in source.** The value is declared `unknown` at the point it enters, and one visible narrowing — `typeof`, `instanceof` or a predicate — stands between it and the first concrete read. `any` appears nowhere: not as a parameter, a return, a field, a generic argument or a cast target. `any` does not mean "I do not know this type". It means **stop checking**, and the stopping spreads: every property read off it, every value derived from it and every place it is passed on is unchecked too. One `any` in a parser can blind a whole call chain without another `any` being written.
 
+**Recognition signs.** The value comes off the network, off a third-party SDK, out of `JSON.parse`, out of a jsonb column, out of a `catch`. The reason for reaching for `any` is "the real type is too long" or "the SDK declares it wrong". After that line the IDE stops suggesting anything — the most visible sign that a guarantee has just been spent. Ask: if this were declared `unknown`, which lines would go red? Each red line is an assumption that was about to be hidden.
+
 **Boundary.** Not `TYPE-2`: `any` confesses that it checks nothing, while a double cast lies that the value is `T`; `any` fails outward, the double cast fails inward. Not `TYPE-3`: an inline type on a parameter is still fully checked — it is unreferenceable, not unsafe — and merging the two loses that distinction.
 
 ## `TYPE-2` — no double cast through unknown
@@ -62,6 +64,8 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 **Situation.** `x as T` is written, the compiler refuses because the two types do not overlap, and the refusal is answered by inserting `unknown` in the middle: `x as unknown as T`.
 
 **What it emits in source.** The chain `as unknown as` does not exist in product code. The type is repaired instead — a minimal structural interface, a real mapping function — or the value is narrowed by a guard that actually checks. This is the compiler overruled twice. Once: these two types are unrelated. Twice: never mind. It is worse than `any` at exactly one point, and that point decides. `any` says "do not trust me", so everything after it is reconsidered; the double cast produces a value that claims to be `T`, so everything after it trusts it absolutely, and the failure lands on a line that did nothing wrong, dozens of files from the cause.
+
+**Recognition signs.** The string `as unknown as` in product code. An object missing fields being forced into a full entity. The result of a raw query forced into an entity type with nothing checked. The reason in your head is "I know at runtime it is right". Ask: if the thing you know for certain is wrong, who finds out? If the answer is "the customer", this is `TYPE-2`.
 
 **Boundary.** Not `TYPE-1`: see above. Not a single cast: a lone `as unknown` is honest widening — it throws information away and claims nothing extra — and a lone narrowing cast is a different and smaller question this code does not answer. Not `TYPE-6`: inside the spec family and the test tree a double cast is legitimate and necessary, and that is a property of the lane, not of the line.
 
@@ -71,6 +75,8 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 
 **What it emits in source.** A named type in the module's `types/` folder, one per operation, documented per field, and the signature references it. An inline type written at the call point cannot be referenced, imported, extended or indexed. So the second caller retypes it, and the two copies drift apart in silence because nothing links them; when the third field arrives, only one copy gets it. A named type carries the same information with a handle on it.
 
+**Recognition signs.** The signature is longer than the body. Two places in the repository declare nearly the same object. You want to write `Params["field"]` and there is nothing to index into. You want to write a wrapper function and cannot name the inner function's parameter type. Ask: if a second caller appears tomorrow, what do they import? If there is no answer, this is `TYPE-3`.
+
 **Boundary.** Not `TYPE-1`: an inline type is still fully checked; the problem is reuse, not safety. Not a positional parameter: `(params: { userId: string })` is outside this code. This code governs the destructured form, because that is the form the next caller retypes; an inline type on a positional parameter is a smaller problem with a different remedy.
 
 ## `TYPE-4` — plain enum, never const enum
@@ -78,6 +84,8 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 **Situation.** A named set of constants: order status, notification kind, model provider.
 
 **What it emits in source.** A plain `enum` declaration that survives to runtime as an object. `const enum` is inlined at compile time and leaves no runtime object. What it saves is a few bytes. What it takes away is a whole family of ordinary work: no `Object.values()`, so no iterating to build a choice list; no reverse map from value back to member, so no recovering a value stored in the database; no passing the enum itself as a value into a generic function; and no crossing the `isolatedModules` boundary this compilation runs under.
+
+**Recognition signs.** Somebody added `const` in front of `enum` "to shrink the bundle" — inside a Node process. A coercion helper takes `enumObject` as a parameter: that is proof the enum must exist at runtime. A `registerEnumType` call or an enum column in the database: both need a real object. Ask: does anything iterate this enum, reverse-map it, or pass it as a value? In a back end the answer is almost always yes, even when it is not yes today.
 
 **Boundary.** Not `TYPE-5`: an enum is one axis of values, while a discriminated union is several states each carrying different data — if every branch needs its own fields, an enum is not enough and the situation is `TYPE-5`. Not `declare enum`: an ambient declaration describes something that already exists elsewhere and emits nothing, so it is outside this code.
 
@@ -87,6 +95,8 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 
 **What it emits in source.** A union of the states that actually exist, separated by a discriminant, so an unreal state cannot be written down. Four booleans admit sixteen combinations. Perhaps three of them exist. The other thirteen compile cleanly, and one of them is what a caller passes at four in the morning. `isGraded && isFailed` compiles. `isGraded` without `score` compiles. Neither is a real business state, but the compiler has no way to know — it was never told. This is the one code in the module that forbids nothing: it switches the compiler further on instead of stopping somebody from switching it off.
 
+**Recognition signs.** Two or more booleans describing **one** thing. An optional field that "only exists when that other flag is set" — and that fact lives only in a comment. Code that reads `if (a && !b && c)` to reconstruct a state that should have had a name. A comment explaining which combinations are valid: that comment is the type, written in the wrong place. Ask: list the states that really exist, then count the states the current shape allows. The difference is error surface created on purpose.
+
 **Boundary.** Not `TYPE-4`: see above. Not several independent booleans: this code is about several booleans describing one situation; two booleans answering two independent questions are two booleans. Not a transport type: a schema-registered response class or a stored column cannot carry a union — the union lives on the internal result, the transport shape carries the flattened form, and the mapping happens once, in one place.
 
 ## `TYPE-6` — a sanctioned exit is declared at the lane
@@ -94,6 +104,8 @@ Six codes, and it ends at six. A situation that genuinely has no code is a recor
 **Situation.** Some places must be allowed to do what the law forbids. The clearest one: the spec family and the test tree may double cast, because building a deliberately wrong value is how a spec proves a closed API refuses it. Without this exit, the law itself cannot be tested.
 
 **What it emits in source.** One declaration at the lane — a predicate in the rule, or a config entry — consulted once, from which every place the exit is in force is derivable. The problem was never that an exit exists; it is where the exit is written. Declared once at the lane, the exits are countable: read one function and you know every place it applies. Scattered as per-line `eslint-disable` comments, the exit stops existing and starts being a habit: nobody knows how many there are, nobody knows which are still needed, and the fiftieth is added because forty-nine were already there.
+
+**Recognition signs.** An `eslint-disable-next-line` in product code for a rule belonging to this module. The same suppression line in three or more files — that is an undeclared lane. A product file that needs the test lane's exit: the file is in the wrong lane, the law is not wrong. Ask: if every suppression in the repository were deleted, could you still read off which places are allowed an exception? If not, the exit is in the wrong place.
 
 **Boundary.** Not `TYPE-2`: `TYPE-2` says what is forbidden, `TYPE-6` says where the exemption is written. A spec that double casts is not a `TYPE-2` violation that was forgiven — it was never inside `TYPE-2`'s scope. Not a business exception: a closed exception listed under `Exceptions` is part of the law; a suppression is part of fatigue.
 

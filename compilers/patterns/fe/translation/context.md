@@ -88,6 +88,10 @@ loading, empty, error, or holding figures — so only it knows **which sentence 
 **What it emits in source.** The translation hook sits in the connected entrypoint, beside the hook
 that fetches the data. The drawing twin receives finished `string` values only — no ids, no conditions.
 
+**Recognition signs.** The file calling a copy-resolving hook is the same file calling for data. The
+wording changes with state: pending says one thing, settled another. The other half takes in nothing
+but resolved strings.
+
 **Boundary.** Not `COPY-2`: `COPY-1` says **where a word is chosen**, `COPY-2` says **where a word may
 not be present at all** — a leaf calling a translation hook breaks `COPY-1`, a leaf writing
 `"Search courses"` inline breaks `COPY-2`; two different faults, two different fixes. Not `COPY-3`
@@ -108,6 +112,10 @@ around it.
 prose in text, `aria-label`, `placeholder`, `title` or `alt`. Every such string is lifted up to the
 connected half and arrives as a value.
 
+**Recognition signs.** The string has spaces and starts with a capital — it reads as something a person
+would say. The file sits under `leaves/`, `composites/` or `branches/`. Delete the string and the
+component still builds; it just has no words.
+
 **Boundary.** Not `COPY-1` — see above. Not `COPY-6`: a string the **program** matches on is not copy
 even when it lands in this tier; settle it by asking whether any code **compares** against this string.
 And a token is not copy: `"search"` in `name="search"` is an icon name — no spaces, nobody speaks it.
@@ -122,6 +130,10 @@ a fixture.
 **What it emits in source.** Word-bearing props in the drawing twin are typed as the resolved value
 (`label: string`). No prop carries a dictionary path across the boundary, and the child imports no
 dictionary lookup at all.
+
+**Recognition signs.** A prop name ends in `Key`, `I18nKey` or `MessageId` and its value is a
+dotted path. The child has to import a dictionary function to display the prop it received. The child's
+test only runs with a language provider mounted.
 
 **Boundary.** Not `COPY-4`: `COPY-4` says a word **already resolved** travels in `props`, `COPY-3`
 forbids the **unresolved** thing travelling the same road — one pipe, two different cargoes. And **not
@@ -142,6 +154,9 @@ the word arrived as a value.
 translation provider mounted. No word reaches the component by context, ambient runtime or module
 import.
 
+**Recognition signs.** The prop's type is `string`, not a union of keys. The test builds the component
+from made-up strings and mounts no provider. Changing the dictionary changes no test.
+
 **Boundary.** Not `COPY-3` — see above. Not `COPY-1`: `COPY-1` says who chooses, `COPY-4` says which
 road the word takes after it is chosen. A word resolved in the right place but slipped downward through
 a global context breaks `COPY-4`, not `COPY-1`.
@@ -155,6 +170,9 @@ locale folder against that rule misreads both rules.
 **What it emits in source.** The locale files are exempt by a PATH list — `messages/<locale>.json`
 and the `CONTENT_PATHS` list — so no file argues its own case. Fixtures and specs are exempt the same
 way, by path.
+
+**Recognition signs.** The file sits in a locale folder with a `.json` extension and each key is a
+sentence. There is no logic in the file — only words.
 
 **Boundary.** The exemption is a **path**, not a judgement: that is this code's most expensive
 decision, because a judgement-based exemption would be argued file by file forever. Not `COPY-6`: the
@@ -175,8 +193,14 @@ forgot to translate.
 line. Where a value is both compared and shown, source holds two things: the value to compare and the
 copy to display.
 
+**Recognition signs.** There is an `===`, a `switch`, or a map key matching this exact string. The
+string comes from outside the system: server, webhook, payment gateway, a third-party enum. Changing
+this string means changing the other side too.
+
 **Boundary.** Not `COPY-2`: both are literals in source, but `COPY-2` is about the string the **reader**
 reads and `COPY-6` about the string the **program** reads. Not `COPY-5` — see above. And the mark
+**does not** turn copy into a value: marking a sentence just to slip it past the language gate is
+misuse of this code, and nothing in the system detects it.
 
 ## Layer held
 

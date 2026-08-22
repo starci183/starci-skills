@@ -66,8 +66,8 @@ Read `package.json` before evaluating any `ASSURANCE-*` situation:
 |---|---|---|
 | `ASSURANCE-1` | A developer is about to push | Husky is installed; `pre-push` runs full check-only lint and the fast unit lane, and exits on either failure |
 | `ASSURANCE-2` | A pull request is opened or updated | An active PR workflow installs from the lockfile and runs zero-warning check-only lint, typecheck/build, mature unit coverage and every declared E2E suite; no CI command fixes source, skips a suite or accepts an empty lane |
-| `ASSURANCE-3` | Unit tests ran in CI | One run emits LCOV, independently clears statements, functions and lines at 80% plus branches at 75%, enforces 90% on new-code/patch for all four metrics, uploads through Codecov and exposes blocking statuses |
-| `ASSURANCE-4` | The same revision needs quality and security analysis | An authenticated scan of the exact checkout consumes the LCOV, proves the strict Sonar profile and waits for `OK`; CI repeats that gate and README exposes the complete metric set |
+| `ASSURANCE-3` | Unit tests ran in CI | One run emits LCOV, independently clears statements, functions and lines at 80% plus branches at 75%, enforces 90% on new-code/patch for all four metrics, uploads through Codecov, exposes blocking patch/project statuses, and README links a reachable safe Codecov badge |
+| `ASSURANCE-4` | The same revision needs quality and security analysis | A local authenticated scan of the exact checkout consumes the LCOV, proves the strict Sonar profile and waits for `OK` before CI; SonarQube CI repeats that blocking gate and README exposes the full safe metric set |
 | `ASSURANCE-5` | Codecov or SonarQube needs a credential | `codecov-token.key.enc` and `sonarqube-token.key.enc` exist under `.stacks/dev/runtime/files/`; workflows reference named GitHub secrets and never decrypt stacks |
 | `ASSURANCE-6` | A pull request is ready to merge | GitHub branch protection or a ruleset requires CI, Codecov and SonarQube checks from their expected apps |
 | `ASSURANCE-7` | A deploy workflow exists | Deployment depends on successful verification through `needs`, a reusable workflow, or a successful workflow-run trigger |
@@ -89,13 +89,29 @@ Read `package.json` before evaluating any `ASSURANCE-*` situation:
 
 ## Blocking quality profile
 
-Every routed source must have zero lint errors/warnings; statements/functions/lines >=80%, branches >=75%
-and new-code/patch >=90% for each metric from one unit LCOV; every declared E2E lane must contain real,
-non-skipped tests and pass; and Sonar on the exact revision must report gate `OK`, bugs/vulnerabilities/
-code smells 0, hotspots reviewed 100%, all three ratings A, duplicated-lines density ≤3% overall/new,
-native coverage >=80% overall and >=90% new. Jest owns the four distinct coverage metrics; Codecov and
-Sonar consume the same LCOV and prove only their native project/new metrics. Badges, upload success, `NONE`, stale revisions
-and unmeasured values are not proof.
+The complete profile is mandatory for every routed source; it has no informational mode:
+
+- lint finishes with zero errors and zero warnings;
+- one successful unit run produces `coverage/lcov.info` and independently proves statements, functions
+  and lines at least 80%, branches at least 75%, and new-code/patch coverage at least 90% for each metric;
+- every declared E2E entrypoint exists, discovers real tests and passes without `skip`, `todo`,
+  `passWithNoTests`, a zero-test success or a cheaper substitute;
+- Sonar analyses the exact checkout revision, reports Quality Gate `OK`, bugs, vulnerabilities and code
+  smells equal to zero, security hotspots reviewed 100%, maintainability/reliability/security rating A,
+  duplicated-lines density no more than 3% overall and on new code, native coverage at least 80% overall
+  and 90% on new code.
+
+Jest owns the four distinct coverage metrics. Codecov and Sonar consume the same LCOV and gate only the
+native project/new coverage metrics they actually expose; neither may be described as independently proving
+Jest statements, functions or branches. A badge, an uploaded analysis, `NONE`, a stale revision or an unmeasured provider
+value is not proof.
+
+## Lane separation
+
+Unit is the sole coverage-producing lane. E2E is a separate behavioral refusal and never contributes to,
+merges with or rewrites the LCOV consumed by Sonar. CI may order unit, E2E and Sonar, but it records their
+verdicts independently: E2E pass is not Sonar evidence, Sonar pass is not E2E evidence, and neither failure
+is renamed as the other.
 
 ## The seven refusals
 
@@ -157,7 +173,7 @@ revision while its checks are red; paths-ignore never substitutes for a dependen
 1. Backend assurance is required by default; only the tracked manifest declaration in Applicability can exempt it.
 2. Hooks and CI invoke check-only commands and never mutate source; readiness requires zero lint warnings.
 3. Local pre-push stays at lint plus unit; repair runs local coverage and waited Sonar analysis separately.
-4. Codecov and SonarQube consume the same LCOV report from the same successful unit run, and README exposes
+4. Codecov and SonarQube consume the same LCOV report from the same successful mature-threshold unit run, and README exposes
    reachable safe badges for both provider results.
 5. Provider tokens are encrypted in stacks and projected to GitHub Secrets without plaintext transit through source or chat.
 6. A green local Sonar scan never claims branch protection is configured without external evidence.

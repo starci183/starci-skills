@@ -21,6 +21,17 @@ title: Backend plan · Vietnamese
 
 Không có. Plan kết thúc bằng brief; nó không tự chạy setup hay approval.
 
+## PIPELINE
+
+Topology: `dual-track`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| nhu cầu | top-down | routed business head và capability được yêu cầu | suy ra operation, outcome, branch và test obligation mà không giả định source | backend demand contract | mọi behavior có evidence và owner outcome |
+| khả năng | bottom-up | route đã verify, live schema và sibling operation family | kiểm kê entity, module, handler, projection và convention | source capability matrix | mọi reuse claim trích exact owner và path |
+| tổng hợp | hợp nhất | demand và capability artifact đã qua gate | bind từng behavior và branch vào exact files cùng tests | complete backend brief | không còn behavior, file, branch hoặc test chưa bind |
+| chứng minh | proof | canonical brief | validate boundary completeness mà không ghi product source | planning receipt | brief gọi đủ mọi file cần thiết và vẫn source-write free |
+
 ## Cách chạy
 
 Đọc `@skill-shape` trước. Phase này chỉ tạo brief và ranh giới file đã sẵn sàng để phê duyệt; tuyệt đối

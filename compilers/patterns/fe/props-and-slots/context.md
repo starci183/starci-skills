@@ -93,7 +93,16 @@ document could hold, and only that.
 behaviour that wanted to ride along is moved into the `on` slot, and nothing that carries behaviour
 is reachable from `props`.
 
+**Recognition signs.** A `() =>` appears inside `props`; a capitalised name, or a variable holding a
+component, appears inside `props`; somebody argues that "it belongs to this data so keep it close";
+the shape being passed is defined by the **caller** rather than by the component. The test: serialize
+all of `props` to JSON and read it back — whatever is lost was never `props`.
+
 **Boundary.** This is not `SLOTS-4`: a handler that strays into `props` is `SLOTS-1`, but a
+**component** that strays into `props` is `SLOTS-4` disguised as `SLOTS-1` — the caller is deciding
+the interior without declaring `contract`. It is not `SLOTS-2` either: `SLOTS-1` is about the
+**value** passed, `SLOTS-2` about **how the type of that value is declared**, and a `SLOTS-2`
+violation is the most common way a `SLOTS-1` violation stays green.
 
 ## `SLOTS-2` — data is declared with `type`, never with `interface`
 
@@ -105,6 +114,11 @@ equivalent, and only one keeps `SLOTS-1`'s fence standing.
 preference: TypeScript grants an *implicit index signature* to a type alias and **not** to an
 interface, so an interface **silently** slips the data constraint — it compiles at the declaration
 and then stops satisfying the constraint that keeps functions out of `props`.
+
+**Recognition signs.** The compile error appears at the **use site** rather than at the declaration,
+and the reader wrongly concludes the tier alias is broken; somebody has just "fixed" it by loosening
+the tier alias constraint instead of changing `interface` to `type`. The test: will this data type
+ever be passed through an alias slot? If yes, it must be a `type`.
 
 **Boundary.** This is not `SLOTS-1`: the alias is the **precondition** for `SLOTS-1` to have any
 force, and an interface does not break `SLOTS-1` loudly — it makes `SLOTS-1` absent. It is not
@@ -121,6 +135,11 @@ referenceable from the twin test, not findable by the person asking "what does t
 **What it emits in source.** One exported named type per component, `XProps` for component `X`,
 declared in the component's own module and naming the **entire input** before the function begins.
 The parameter takes that name and nothing else.
+
+**Recognition signs.** A `{` opens immediately after the parameter's `:`; an intersection is
+assembled in place, such as `Frame & { signOutLabel: string }` — half-named is still anonymous,
+because nobody can name the other half; the twin test has to copy the shape instead of importing it.
+The test: can anything else in the repository refer to this shape?
 
 **Boundary.** This is not `SLOTS-2` — see above. It is also not the scalar-parameter case:
 `(value: string)` is not a shape, has no place it needs to be read from, and does not belong to this
@@ -141,7 +160,15 @@ parameter, one named component per slot the key declares; a closed shape emits a
 anywhere. `render` takes **one component per named slot**, which turns the boundary into a fact the
 compiler holds rather than a habit the reviewer holds.
 
+**Recognition signs.** A closed shape has just grown a slot for the caller to pour content into; a
+container the caller **cannot** pour content into belongs to a lower tier whatever it is named;
+somebody proposes "let it take markup just this once". The test: may the caller decide the interior?
+Yes ⇒ declare `contract` + `render`. No ⇒ this component is on the closed tier and the slot under
+discussion does not exist.
+
 **Boundary.** This is not `SLOTS-1` — see above. It is not `SLOTS-7` either: `SLOTS-4` asks
+**whether the caller may fill**, `SLOTS-7` asks **which lane the data takes** once `SLOTS-4`'s answer
+is already yes.
 
 ## `SLOTS-5` — `isLoading` is RECEIVED, never self-decided
 
@@ -154,8 +181,16 @@ situation** rather than a waiting flag.
 own props alias carries no such flag. No `useState`, `useEffect` or fetch hook computes a waiting
 state inside a leaf or a composite.
 
+**Recognition signs.** A `useState`, `useEffect` or fetch hook inside a leaf or composite decides the
+waiting state; two components in the same tree wait **out of step** because each answers for itself;
+`isLoading` appears in the props of the layer that owns the request. The test: who calls the request?
+If not this file, this file has **no standing** to answer "has it arrived yet?"
+
 **Boundary.** This is not `SLOTS-1`: a waiting flag is a `boolean`, so it passes `SLOTS-1`
 legitimately. `SLOTS-5`'s problem is not the flag's type but **who writes it**.
+
+**This is the module's weakest code.** No type and no rule catches a component computing its own
+waiting state; only a reader catches it.
 
 ## `SLOTS-6` — there is no appearance slot
 
@@ -166,6 +201,11 @@ hook per interior part. None of those slots exist.
 appearance anywhere in the alias. Whoever can adjust a node's appearance has become its **second
 owner**, and the component then has two authors who never speak to each other. What the caller is
 trying to say is a **named variant**.
+
+**Recognition signs.** A prop name ending in `ClassName`, `Style`, `Gap`, `Spacing`; a `classNames`
+object opening each interior part to the caller; the same component looking different on two screens
+with neither screen able to name the difference. The test: what is the caller trying to say about the
+**business**? That answer is the variant's name.
 
 **Boundary.** This is not `SLOTS-1`: a class string **is** valid data by type, so `SLOTS-1` does not
 block it; `SLOTS-6` blocks it on ownership grounds, not type grounds. It is not `SLOTS-4` either:
@@ -183,6 +223,11 @@ name** inside `props`.
 top-level `items` slot on the shared surface. A top-level `items` slot creates a **second data lane**
 running parallel to `props` and teaches the shared surface each caller's collection model; by the
 third caller the surface knows three models it should have known none of.
+
+**Recognition signs.** One call site sends data down two paths, part in `props` and part in `items`;
+somebody is debating whether a value "should go in `props` or `items`" — a question that only exists
+once the second lane exists. The test: if another domain uses this surface tomorrow, does the surface
+have to learn anything new?
 
 **Boundary.** This is not `SLOTS-4` — see above. It is not `SLOTS-1` either: both speak about
 `props`, but `SLOTS-1` says **what may enter** and `SLOTS-7` says **which path is used**.

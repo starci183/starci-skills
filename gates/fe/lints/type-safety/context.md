@@ -146,6 +146,17 @@ runs.
 | delegated | **`TYPE-SAFETY-2` and `TYPE-SAFETY-3`** — held by a package this module does not ship, so a loose configuration there breaks two published codes with a green gate here |
 | nobody | **`TYPE-SAFETY-5`.** The rule reports the shape and never reads what is written beside it, so a cast with a careful explanation and a cast with none are treated identically. Nothing anywhere checks that a surviving cast carries its reason |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| file path | `context.filename`, falling back to `context.getFilename()`, normalised to forward slashes |
+| scope test | the substring `/src/` present in that path |
+| exemption test | the path NOT ending `.test.ts`, `.test.tsx`, `.spec.ts` or `.spec.tsx` |
+| outer node | a `TSAsExpression` |
+| inner node | that node's `expression`, required to be a `TSAsExpression` |
+| inner annotation | that inner cast's `typeAnnotation`, required to be `TSUnknownKeyword` |
+
 ## Rules
 
 1. The rule's identity is its published name — the string that appears in a build log and in a disable

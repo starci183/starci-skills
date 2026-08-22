@@ -92,6 +92,18 @@ terminal link and outside the conditional spread that inserts the auth link. Add
 one link; the locale link is present in both shapes. The file that assembles the chain owns this; the
 hook owns nothing about it.
 
+**Recognition signs.**
+
+- The file is building the terminal link — the one link that talks to the network.
+- The chain is otherwise complete: retry, timeout, token — and mute about language.
+- The attachment sits behind a condition: only when signed in, only on one route, only behind a flag.
+
+Ask: if I attach the locale at the hook layer instead of at the chain, will the next author of a new
+hook **have to remember** to attach it? If yes, it is in the wrong place. And it is unconditional
+because a guest reads in a language too — unlike a bearer token, there is no anonymous branch that is
+**allowed** to declare nothing. Putting the locale behind a `withAuth` flag turns all public content —
+what most readers see first — into the default language.
+
 **Boundary.** This is not `LOCALE-5`: `LOCALE-1` says there must **be** a place that attaches;
 `LOCALE-5` says there must be **only one**. A missing chain is `LOCALE-1`; two writers is `LOCALE-5`.
 It is not `LOCALE-2` either: the chain **has** a locale link here, and where that link gets its value
@@ -106,6 +118,19 @@ assembled**. The law takes the second.
 **What it emits in source.** A resolver that takes no locale argument. It reads the first path
 segment and rejects a segment that is not a shipped locale rather than accepting whatever the default
 narrowing returns. Public callers pass nothing.
+
+**Recognition signs.**
+
+- A hook with a `locale` parameter in its signature.
+- A query function receiving `headers` from outside purely to slip the language in.
+- An SWR key with `locale` appended "so the cache is right" — the sign that the locale is travelling
+  by hand.
+
+Ask: does this value arrive by being **derived**, or by being **passed**? If passed, what reminds the
+next hook author? The address is the source because the URL already carries the reader's language and
+the middleware already redirected them there. It is the strongest statement of intent and — more
+importantly — the one nobody has to remember to forward. A forgotten parameter raises no error: the
+call still succeeds and returns the default language.
 
 **Boundary.** Against `LOCALE-1`: a link that exists but reads the wrong source is `LOCALE-2`; no link
 at all is `LOCALE-1`. Against `LOCALE-3`: a cookie **is** a valid source for the link to read, since it
@@ -124,7 +149,23 @@ of reading that cookie. Both are true, and **neither** makes the value cross to 
 nearly every read, sends no cookie. The header is therefore the only carrier that survives that path,
 and the source must send it.
 
+**Recognition signs.**
+
+- The API sits on a different domain from the app.
+- The chain sends anonymous requests, and the anonymous path deliberately does **not** enable
+  credentials.
+- Somebody is arguing "the server already reads the cookie" to conclude no header is needed.
+
+Ask: on the exact path this request travels — anonymous, cross-origin — **is the cookie actually
+sent**? This is the most expensive kind of correct: right in principle, wrong in fact. The server has
+cookie-reading code, that code runs, and it never receives anything. Nobody sees an error; they only
+see content in the wrong language. Do not fix it by enabling credentials — the anonymous path is
+credential-free for its own reasons: sending cookies to a cross-origin API that has not opted in
+produces CORS errors and drags in a different security scope. The fix is **to send the header**.
+
 **Boundary.** Against `LOCALE-2`: a cookie as a client-side **source** is fine; a cookie as the
+**carrier** to the server is not. Against `LOCALE-4`: `LOCALE-3` is the most common reason `LOCALE-4`
+happens — nothing gets through, so the default comes back.
 
 ## `LOCALE-4` — the server's default is a floor, not a fallback
 
@@ -134,6 +175,17 @@ being **careful**, not the server granting **permission**.
 **What it emits in source.** A resolver whose return type is the closed locale union, not an optional,
 with no path that returns nothing — so there is no path that hands the server an undeclared request to
 be careful about. Every request declares.
+
+**Recognition signs.**
+
+- The page runs, there is no error, the content is readable — just readable in another language.
+- Somebody concludes "the fallback works fine".
+- The tester and the real reader do not share a language.
+
+Ask: is this answer right because **the request made it explicit**, or right because **I happen to
+read the default language**? Treating the default as a fallback turns a missing header into an
+**implicit product decision**: "readers of other languages can make do with the default". Nobody ever
+decided that, and the only person who finds out is the one being served the wrong language.
 
 **Boundary.** Against `LOCALE-1` and `LOCALE-3`: those two are the **cause**; `LOCALE-4` is **how
 people wave the consequence through**. Against `LOCALE-2`: the no-address branch falling back to the
@@ -147,6 +199,17 @@ that sets it as well is a **second answer** to the same question.
 **What it emits in source.** The header literal appears in exactly one production file — the locale
 link — and its other occurrences are that file's own prose. A second production hit is the violation
 itself.
+
+**Recognition signs.**
+
+- A `headers` object at the hook or query layer with a language key.
+- A language constant hard-coded right at the call site.
+- Two places in the repository containing that header string.
+
+Ask: if the locale source changes tomorrow, **how many** places must I edit to be correct again? Two
+answers are not harmless redundancy: they **diverge the first time** one of them is updated. The
+typical result is one correct hook and the whole rest of the surface in the default language — exactly
+the hardest state to diagnose, because there is evidence that "this part works".
 
 **Boundary.** Against `LOCALE-1`: missing entirely is `LOCALE-1`; one place too many is `LOCALE-5`.
 Against `LOCALE-2`: a call site that both sets the header and receives `locale` as a parameter

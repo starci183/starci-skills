@@ -220,6 +220,16 @@ this rule. Whether that operation is useful belongs to its own law.
 | A path with two offending segments | `no-second-language-in-path` | `.find` stops at the first. Rename it and the same rule fires again on the next one — correct, but a reader reading one message will under-estimate the work |
 | A checkout placed under an accented folder outside the repository | `no-second-language-in-path` | The whole absolute path is scanned, including the part outside the repository, so every file reports at once on a segment nobody in the repository can fix |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| source | A parsed file; every rule here works on the syntax tree alone, with no type information |
+| parser | TypeScript with JSX enabled — two of `handler-on-prefix`'s three visitors are TypeScript or JSX nodes and are silently never reached otherwise |
+| `context.filename` | An absolute path as the linter reports it, which `no-second-language-in-path` reads before it returns any visitor |
+| glob | The consuming configuration decides which files are linted. A file no glob names is a file no rule here exists for |
+| severity | The rules' own opinion is `error` for all four; the consuming configuration remains the authority on what is switched on |
+
 ## Rules
 
 1. A rule's identity is its published name. No rule carries a numeric code, and no message is addressed

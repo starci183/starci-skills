@@ -98,6 +98,12 @@ suffix, while the throw-site rule recognises only `Error` and framework names. S
 `SomethingError` sits in the right folder, extends the right house base, is thrown at a real call
 site, and **no rule checks it**. The gate stays silent, and silence reads as approval.
 
+**Recognition signs.** The name ends in `Error`, or is a bare noun (`InvalidToken`, `QuotaExceeded`).
+The class extends `AbstractException` but lint never says anything about it — even when you
+deliberately break something else in the same file. Grepping the class name in the lint report
+returns no line. The self-test: if I deliberately break another exception rule inside this class, does
+the gate turn red? If not, the class is invisible.
+
 **Boundary.** Not `EXCEPTION-3`: that is the same trap seen from the other end. `EXCEPTION-3` catches
 a class extending a framework base — it looks like the house at the throw site. `IDENTITY-1` catches
 a class named outside the convention — it looks like the house inside the folder. Both are failures
@@ -120,6 +126,13 @@ declared just above is the most common way two unrelated failures share one iden
 actually happened: an OTP challenge and a course challenge reported one code, so a client matching on
 code could not tell "missing lesson" from "missing sign-in step" — exactly the defect `EXCEPTION-1`
 refuses framework exceptions to avoid, except this time it happened inside the house vocabulary.
+
+**Recognition signs.** The code is visibly shorter than the class name (`REVIEW_FORBIDDEN` for
+`DocumentNotOwnedException`). The code is a generic noun many failures could use (`NOT_FOUND`,
+`FORBIDDEN`, `INVALID_INPUT`). The code is assembled from a template string, a constant, or
+`${prefix}_NOT_FOUND`. Two files side by side in one folder carry the same code. The self-test: if I
+grep this exact code string in the repository, do I land on the class? If not, the code is a second
+name.
 
 **Boundary.** Not `IDENTITY-1`: see above. Not `IDENTITY-3`: `IDENTITY-2` applies when **writing
 new**, `IDENTITY-3` when **editing what exists**. Same law that the code follows the class name, but
@@ -144,6 +157,15 @@ migration**, not a tidy-up done in passing. If the old code must stay on the wir
 client, then **the class keeps its old name** until that client is retired. What is refused is the
 silent half-rename that leaves the two names disagreeing forever.
 
+**Recognition signs.** The diff renames the class without touching the `super(...)` line. The diff
+changes the code without renaming the class. The commit message says "rename", "cleanup" or "chore"
+for a file in the errors folder. An e2e spec asserts that exact code string and the spec is not in
+the diff. The self-test: who matches this code right now — which client, which alert, which spec? If
+I cannot answer, I am not yet entitled to rename. One thing here is expensive because it is believed
+and cheap because it is measured: the assumption that changing a code forces a synchronised release
+was believed for a long time; measured, across three front ends, five codes were matched in total, and
+none of them belonged to a declaration that had drifted. Measuring is cheap; believing is expensive.
+
 **Boundary.** Not `IDENTITY-2`: see above. Not `IDENTITY-1`: changing `SomethingError` to
 `SomethingException` is **also** a rename with a consequence on the wire; fixing `IDENTITY-1` does not
 excuse `IDENTITY-3`.
@@ -161,6 +183,13 @@ being true the moment somebody has an id to attach. And at exactly that moment t
 **every** other exception, so the new field cannot be added there, and the declaration has to be torn
 open and reshaped before it can be extended. Naming the type after the exception also means a reader
 holding the failure's name finds its payload **without opening the file**.
+
+**Recognition signs.** The parameter is typed straight to `AbstractExceptionMetadata`. The parameter
+carries no annotation at all (bare destructuring) — accepting any object, including one missing
+exactly the id this failure exists to carry. The type is named after the entity rather than the
+exception (`ReviewMetadata` for `DocumentNotOwnedException`). One metadata type is reused for two
+different exceptions. The self-test: tomorrow this failure needs to say **which** thing was refused —
+where do I add the field? If the answer is "to the base every failure shares", wrong code.
 
 **Boundary.** Not `EXCEPTION-2`: `EXCEPTION-2` requires the constructor to take **one object**;
 `IDENTITY-4` requires that object to have **a name of its own**. Satisfying the former while breaking
@@ -180,6 +209,13 @@ hundreds of failures belong to. That is why an exception that sets a status stil
 code above, and why the reviewer's question is always "what does the client match?" — that question is
 about the code. A declaration reaching for a status **in order to become distinguishable** is a
 declaration that has answered the wrong question.
+
+**Recognition signs.** Two neighbouring failures carry equally generic codes and are told apart by 403
+versus 404. The code is the name of a status (`FORBIDDEN_EXCEPTION`, `BAD_REQUEST_EXCEPTION`). The
+reason given for the status is "so the other side knows this is a different failure", not "this
+endpoint commits to that status". A status is set on a failure that only runs in a background job,
+where no transport reads it. The self-test: has any caller **already committed** to this status? If
+not, drop it and let the default do its work.
 
 **Boundary.** Not `IDENTITY-2`: see above. The status answers "how should the transport reply"; the
 code answers "which failure is this". Using the former to do the latter's job is a layer mistake. Not

@@ -48,6 +48,8 @@ The numbering is fixed and cited from outside this module. A code is never renum
 
 **What it emits in source.** The consuming config spreads the received attachment block. The attachment factory in `@canon-fe` emits the globs, the linter options, the plugin and the rules in ONE block, and throws on an empty recommendation instead of returning a block with no rules. No local plugin folder is kept beside the mirror, and no second copy of the same rule set lives anywhere in the repository.
 
+**Recognition signs.** `eslint.config.mjs` lists rule names inside `rules: {}` instead of spreading what it received. A repository-maintained plugin folder sits beside the mirror. A second copy of the same rule set lives somewhere else in the repository. Somebody answers "the plugin is imported" when asked how many rules govern the repository. The test: if canon adds a rule tomorrow, does this repository receive it with nobody editing by hand? If a hand edit is required, this is a copy, not a unit.
+
 **Boundary.** This is not `LINT-ADOPTION-3`: code 1 asks whether the rules arrived at all, code 3 asks what level they ended at once they did. A hand-written subset can be entirely `error` and still fail code 1, because what it lacks is the rules nobody copied in. It is also not `LINT-ADOPTION-2`: code 1 is how the set attaches, code 2 is how attachment is proven. Attaching correctly without measuring is still not evidence.
 
 ## `LINT-ADOPTION-2` — measure on a real production file
@@ -60,6 +62,8 @@ path names a production source file inside the governed globs — not a test, no
 Candidate source from a preview pass sits inside those globs deliberately. This tree currently ships no
 wrapper for that invocation, so the command and its printed result are evidence the run must retain.
 
+**Recognition signs.** The adoption conclusion is drawn by opening `eslint.config.mjs` and reading it. Nobody can run the audit command, or it runs with `--probe` pointing at a test file, a config file or a script. The repository is "green" but nobody can say how many rules it is green under. The globs do not cover the file chosen as probe, and nobody notices because the output still prints normally. The test: is the file used as probe genuinely part of the set that ships? If it is a test or configuration file, something nobody deploys was measured.
+
 **Boundary.** This is not `LINT-ADOPTION-1`: see above. It is not `LINT-ADOPTION-5` either: code 2 is the act of measuring, code 5 is the consequence when the result is red. Measuring and then ignoring the result fails code 5, not code 2.
 
 ## `LINT-ADOPTION-3` — every rule resolves to `error`
@@ -68,6 +72,8 @@ wrapper for that invocation, so the command and its printed result are evidence 
 
 **What it emits in source.** The printed config resolves every canonical rule to `error`. `severityOf` in `@canon-fe` collapses every spelling of a severity to a number, and the `nonError` list collects everything not equal to `2`; both `missing` and `nonError` come back empty. `recommended` in `@canon-fe` is gathered from every module, with every level `error` and no per-module discretion. No later config block overrides a level for a "temporary" glob.
 
+**Recognition signs.** In the audit output, `nonError` is non-empty: a rule is present but at `warn` or `off`. In the audit output, `missing` is non-empty: the rule does not exist in the resolved config. A later config block overrides the level of a few rules for a "temporary" glob. Somebody describes `warn` as a "rollout phase". The test: if a fresh violation of this rule were written today, would it block? If it only prints a yellow line and merges, the rule has not been adopted, only mentioned.
+
 **Boundary.** This is not `LINT-ADOPTION-1`: `missing` is usually a symptom of code 1, `nonError` almost always code 3. It is not `LINT-ADOPTION-4` either: code 3 is about the level of a rule, code 4 about whether a comment inside the violating file can switch that rule off. Full `error` that still permits inline disable means that level is only a default.
 
 ## `LINT-ADOPTION-4` — the resolved config refuses inline config
@@ -75,6 +81,8 @@ wrapper for that invocation, so the command and its printed result are evidence 
 **Situation.** `noInlineConfig` is not an extra strictness option. It is what makes a directive inside a file *have no effect*, rather than merely being considered wrong. Without it, the author of a violation is also the person deciding whether it is a violation.
 
 **What it emits in source.** `refusesInlineConfig`, read from the PRINTED `linterOptions.noInlineConfig` in `@canon-fe` and required by `ok` alongside the rule comparison, comes back `true`. The consuming config applies the frozen linter options published by `@canon-fe` beside the rule that reports the directive. Product source carries no `eslint-disable`, `eslint-disable-next-line` or `eslint-enable`.
+
+**Recognition signs.** `refusesInlineConfig: false` in the audit output even though the rule list is complete. The config attaches rules but forgets to spread the linter options. A later config block overrides `linterOptions` and nobody notices, because flat config takes the later block. Product source contains `eslint-disable`, `eslint-disable-next-line` or `eslint-enable`. The test: can a comment placed in the right spot switch off the rule reporting that very line? If it can, what is standing there is not a fence.
 
 **Boundary.** This is not `LINT-ADOPTION-3`: see above. It is also not the `lint-escape-hatch` law: the *rule that reports* a directive belongs to that module, while the *linter option that renders the directive inert* is the adoption condition here. Both are needed — one explains why it broke, the other guarantees the directive cannot silence its own guard.
 
@@ -86,6 +94,8 @@ wrapper for that invocation, so the command and its printed result are evidence 
 The runner must turn that result into a non-zero exit; this tree currently has no script that does so,
 therefore the halt is documented rather than mechanically held here. Wiring diffs and product diffs stay
 in separate commits, so it can be read which caused which.
+
+**Recognition signs.** An Apply or fidelity pass starts editing `.tsx` while the audit has never run, or ran and returned `ok: false`. Somebody says "fix lint later, the feature comes first". The product diff and the wiring diff sit in one commit, so nobody can read which caused which. A measuring pass — a duplicate survey, a parity comparison — runs on a repository with broken adoption and reports its results as real. The test: if the wiring were repaired right after this commit, would this diff still be green? If that is uncertain, this diff is being graded by a different rule set than the one that will grade it tomorrow.
 
 **Boundary.** This is not `LINT-ADOPTION-2`: code 2 is the measurement, code 5 is what the red result obliges. It is also not its own exception: repairing wiring is not editing product source. Code 5 stops product source; it does not stop the approved repair of the configuration that just went red, inside a boundary approved before it starts.
 

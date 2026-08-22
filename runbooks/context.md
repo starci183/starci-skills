@@ -31,12 +31,12 @@ bridge from `metadata.json` and the stack records first.
 
 | Need | Runbook |
 |---|---|
-| Install tools, create encrypted records, sync, rotate or recover a credential | `secrets/context.md` |
-| Start/stop the complete local platform or diagnose one backing service | `local-stack/context.md` |
-| Configure Keycloak, Google login or GitHub login | `oauth/context.md` |
-| Configure cAdvisor, Prometheus and Grafana Cloud remote write | `observability/context.md` |
-| Configure Husky, GitHub CI, Codecov Cloud and SonarQube Cloud | `delivery-assurance-cloud/context.md` |
-| Configure payments, email, AI pools, remote S3, GCP or GitHub/data tokens | `external-integrations/context.md` |
+| Install tools, create encrypted records, sync, rotate or recover a credential | [Secrets](./secrets/context.md) |
+| Start/stop the complete local platform or diagnose one backing service | [Local stack](./local-stack/context.md) |
+| Configure Keycloak, Google login or GitHub login | [OAuth](./oauth/context.md) |
+| Configure cAdvisor, Prometheus and Grafana Cloud remote write | [Observability](./observability/context.md) |
+| Configure Husky, GitHub CI, Codecov Cloud and SonarQube Cloud | [Delivery assurance cloud](./delivery-assurance-cloud/context.md) |
+| Configure payments, email, AI pools, remote S3, GCP or GitHub/data tokens | [External integrations](./external-integrations/context.md) |
 
 ## Complete component registry
 

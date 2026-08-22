@@ -8,6 +8,7 @@ import {test} from "node:test";
 const trustRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docsRoot = join(trustRoot, "docs");
 const contentRoot = join(docsRoot, "content");
+const skillSourceRoot = join(trustRoot, "skills");
 
 function filesBelow(directory) {
   return readdirSync(directory, {withFileTypes: true}).flatMap((entry) => {
@@ -32,4 +33,33 @@ test("Nextra publishes EN and VI without module context pages", () => {
   assert.ok(skillMeta.indexOf('"index": "EN"') < skillMeta.indexOf('"vi": "VI"'));
   assert.ok(skillMeta.indexOf('"vi": "VI"') < skillMeta.indexOf('"agent": "Agent (EN)"'));
   assert.equal(existsSync(join(skillRoot, "agent.mdx")), true);
+});
+
+test("every StarCi capability entry publishes its own executable pipeline contract", () => {
+  const capabilities = readdirSync(skillSourceRoot, {withFileTypes: true})
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("starci-"))
+    .map((entry) => entry.name)
+    .sort();
+  assert.equal(capabilities.length, 17);
+  assert.deepEqual(
+    capabilities.filter((name) => name.startsWith("starci-fe-")),
+    ["starci-fe-design-block", "starci-fe-design-layout", "starci-fe-layout-refactor"],
+  );
+  const refactorBinding = readFileSync(join(skillSourceRoot, "starci-fe-layout-refactor", "SKILL.md"), "utf8");
+  assert.match(refactorBinding, /Owner feedback is a failed-skill signal/);
+  assert.match(refactorBinding, /Grammar owns product-family facts[\s\S]*Principles own only/);
+  assert.match(refactorBinding, /authority-to-write map/);
+
+  for (const capability of capabilities) {
+    for (const file of ["SKILL.md", "en.md", "vi.md"]) {
+      const content = readFileSync(join(skillSourceRoot, capability, file), "utf8");
+      assert.match(content, /^## PIPELINE$/m, `${capability}/${file} has no pipeline section`);
+      assert.match(content, /^Topology:/m, `${capability}/${file} has no explicit topology`);
+      if (file === "vi.md") {
+        assert.match(content, /\| Bước \| Nhánh \| Đầu vào \| Cách thực hiện \| Đầu ra bắt buộc \| Điều kiện kiểm tra \|/);
+      } else {
+        assert.match(content, /\| Step \| Track \| Input \| Transform \| Required output \| Gate \|/);
+      }
+    }
+  }
 });

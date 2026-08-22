@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "grammar": "starci",
   "grammarId": "starci-ui",
-  "version": 22,
+  "version": 25,
   "factCatalog": "./facts.json",
   "evidenceCatalog": "./capsules.json",
   "rulingCatalog": "./rulings.json",
@@ -111,6 +111,21 @@
       "emit": {
         "outcome": "surface-accordion",
         "obligations": ["vendor-disclosure-mechanics", "controlled-expanded-keys", "summary-and-panel-contracts", "full-bleed-group-dividers"]
+      },
+      "capsuleRefs": ["hierarchical-disclosure"]
+    },
+    {
+      "id": "labelled-bounded-hierarchical-local-disclosure",
+      "slot": "collection-surface",
+      "priority": 300,
+      "when": {
+        "all": ["surface-section-labelled", "collection-hierarchical", "interaction-local-disclosure"],
+        "any": [],
+        "none": ["all-groups-must-remain-visible"]
+      },
+      "emit": {
+        "outcome": "surface-accordion",
+        "obligations": ["vendor-disclosure-mechanics", "controlled-expanded-keys", "summary-and-panel-contracts", "full-bleed-group-dividers", "surface-row-inline-inset-6", "surface-row-block-inset-3"]
       },
       "capsuleRefs": ["hierarchical-disclosure"]
     },
@@ -533,6 +548,21 @@
         "obligations": ["explicit-selection-boundary", "stable-passage-identities", "no-global-prose-opt-in", "selection-controls-owned-outside-document"]
       },
       "capsuleRefs": ["markdown-document"]
+    },
+    {
+      "id": "protected-brand-mark-uses-owned-lockup",
+      "slot": "brand-asset-source",
+      "priority": 400,
+      "when": {
+        "all": ["brand-mark"],
+        "any": [],
+        "none": ["product-reaction"]
+      },
+      "emit": {
+        "outcome": "protected-brand-lockup",
+        "obligations": ["dedicated-brand-asset-owner", "intrinsic-controlled-brand-palette", "wordmark-and-mark-variants", "browser-icon-derived-from-brand-mark", "not-icon-vocabulary", "accessible-product-name"]
+      },
+      "capsuleRefs": ["brand-lockup"]
     },
     {
       "id": "product-glyph-extension",

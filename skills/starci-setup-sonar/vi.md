@@ -16,6 +16,17 @@
 
 None.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| kiểm kê | dùng chung | mọi routed source role và declared shared Sonar service | resolve project keys, scanners, credentials và required quality metrics | Sonar desired-state matrix | mỗi backend, frontend và console role có một identity |
+| kiểm kê-lập kế hoạch | reconciliation | desired matrix và current Docker/Sonar/project state | tính service, project, gate và badge deltas | reconciliation plan | strict overall/new-code requirements vẫn explicit |
+| duyệt-thực thi | execution | approved plan và scoped authorities | reconcile shared service và project configuration | setup receipts | không lộ secret hay làm yếu quality gate |
+| chứng minh | proof | fresh service, API và scan results | verify từng role và strict gate condition | Sonar readiness proof | service healthy và mọi required project gate measurable |
+
 ## Run
 
 Xác minh mọi row route Source (`be`/backend, `fe`/frontend và console) rồi kiểm kê project. Dùng một Sonar service

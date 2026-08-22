@@ -23,6 +23,17 @@ title: Backend approve · Vietnamese
 
 Không có. Skill này không tự gọi skill khác.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | backend brief đã duyệt, route, business head | khóa revision và exact proposed boundary | approval context | brief, revision và authority khớp nhau |
+| phản biện | đối chiếu | approval context, live schema và sibling source | đối chiếu từng file, branch và test dự kiến với owner thật | discrepancy report và exact revision | không còn mismatch về schema, ownership hoặc boundary |
+| phê duyệt | hợp nhất | revision đã nhận và phản hồi owner | bind một `OK` rõ ràng vào revision đang hiển thị | approval receipt | chưa có receipt thì không ghi production source |
+| triển khai-chứng minh | thực thi | approval receipt | chỉ ghi trong boundary và chạy backend gates đã khai | source receipt và proof | implementation đúng revision đã duyệt và mọi gate xanh |
+
 ## Cách chạy
 
 Đọc `@skill-shape`, `@be-patterns` và `@rule-bindings` theo thứ tự đó. Skill này giữ cả vòng phê duyệt lẫn phần triển khai, ngăn cách bằng một hard

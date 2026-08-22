@@ -105,6 +105,11 @@ hover.
 symbol is FOR and when to reach for it rather than the thing sitting next to it. A name plus a
 signature says what it TAKES; it never says what it is for.
 
+**Recognition signs.** The keyword `export` in front of a declaration with a surface. At least one
+other file imports it — or will, the moment somebody needs it. Something next to it looks nearly
+identical and the reader has to choose between the two. Ask: does the reader at the import line know
+why they should call this? If not, the doc is missing.
+
 **Boundary.** This is NOT the data-constant case: `export const MAX_ATTEMPTS = 3` does not belong to
 this code, because the name already is the full description and demanding a sentence beside it only
 produces a sentence that restates the name — which `COMMENT-3` forbids. It is NOT the re-export case:
@@ -123,6 +128,10 @@ open that other file.
 do? `Pending` documented as "the pending state" teaches nothing. "No payment has settled, so no access
 is granted and the cart is still editable" is the fact the next author needs and cannot derive.
 
+**Recognition signs.** The enum carries `export`. There is at least one `switch` over it, or a map from
+member to behaviour. Reading the member name alone does not predict what the system will do. Ask: if I
+pick this member at a call site, what changes behind it? That answer IS the doc.
+
 **Boundary.** This is NOT `COMMENT-1`: `COMMENT-1` documents the WHOLE enum — what the enum is for;
 this code documents EACH member — what choosing it causes. An enum with a doc on top and empty members
 still violates. And it is NOT `COMMENT-3`: a doc restating the member's name (`/** The settled state.
@@ -138,6 +147,11 @@ bug this shape prevents, a race between two replicas.
 re-describes the statement below it. A comment that copies the line beneath it is WORSE than no
 comment: it doubles the maintenance cost and becomes the part that silently goes wrong, because
 nothing breaks when a sentence stops being true.
+
+**Recognition signs.** Delete the comment and the code still compiles and still runs, but is no longer
+explicable. The sentence talks about something absent from the line below: another system, another
+run, an edge case, a past failure. The violation sign is the reverse: read the comment, read the line,
+and see the same information twice. Ask: does this sentence say anything the line below does not?
 
 **Boundary.** This is NOT `COMMENT-1` in the sense of being satisfied by its gate: an export's doc
 block must satisfy this code too — "Inject the primary entity manager" above
@@ -167,6 +181,10 @@ real back end it reported 857 sites — and ALL of them were em dashes, box draw
 is not this law being recorded, it is a stricter law being invented, and inventing law is the one thing
 canon may not do.
 
+**Recognition signs.** A reason comment written in Vietnamese. An emoji in a log message or a banner. A
+tick, a cross or a star standing in for a word. Ask: someone who cannot read Vietnamese opens this
+file — which part of the argument do they lose?
+
 **Boundary.** This is NOT `COMMENT-5`, and that is the most important boundary in the module: this code
 governs PROSE, `COMMENT-5` governs DATA that happens to be shaped like prose. A Vietnamese sentence the
 program MATCHES on or EMITS is not a comment, and translating it breaks the program. It is NOT the
@@ -190,6 +208,11 @@ required to emit verbatim, a fixture reproducing exactly the sentence a user wil
 why it stays — so the next sweep does not "fix" it into a bug. Translating these breaks the program in
 the worst way: SILENTLY. A mistranslated regex throws nothing, it simply never matches again. A
 mistranslated comparison branch never turns red, it just never becomes true again.
+
+**Recognition signs.** The string sits on the right-hand side of a comparison, inside a regex, in a
+per-locale map, or in a prompt template the model must reproduce verbatim. An EXTERNAL system decides
+its content, not us. Changing the string changes BEHAVIOUR, not just displayed text. Ask: is this
+string mine to change? If not, it is data.
 
 **Boundary.** This is NOT `COMMENT-4`: prose gets translated, data is kept and marked. It is NOT the
 empty marker: a `vn-ok` with NO reason is not an exception — the marker exists so the next sweep can

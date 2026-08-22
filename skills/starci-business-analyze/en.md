@@ -17,6 +17,17 @@ title: starci-business-analyze · English
 
 None. A stop ends this run; this skill never invokes another skill as recovery.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| evidence | shared | owner statements, routed source evidence and current feature head | separate fact, intent, example, unknown and contradiction | normalized evidence pack | every claim has provenance and examples create no product truth |
+| model | reconciliation | evidence pack and predecessor head | reconcile actors, goals, rules, states, operations and failures | proposed business model and delta | every change traces to evidence and preserves lineage |
+| publish | execution | accepted model and requested lifecycle transition | write immutable model, compact context, modules and evidence links | new feature head and publication receipt | schema, predecessor and lifecycle transition validate |
+| reconcile | proof | published head and implemented source when applicable | compare declared truth with observed implementation | implemented or discrepancy receipt | no unsupported claim or unbound source baseline |
+
 ## Purpose
 
 Build, advance or reconcile one stable `featureId` from routed source and explicit owner intent. The

@@ -24,6 +24,17 @@ title: starci-be-approve · English
 None. This skill never invokes another skill.
 
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | approved backend brief, route, business head | freeze revision and exact proposed boundary | approval context | brief, revision and authority agree |
+| challenge | reconciliation | approval context, live schema and sibling source | compare every planned file, branch and test with observed owners | discrepancy report and exact revision | no unresolved schema, ownership or boundary mismatch |
+| approve | join | accepted revision and owner response | bind one explicit `OK` to the displayed revision | approval receipt | no production write before the receipt |
+| implement-proof | execution | approved receipt | write only the boundary and run declared backend gates | source receipt and proof | implementation matches the approved revision and all gates pass |
+
 ## Run
 
 Read `@skill-shape`, `@be-patterns` and `@rule-bindings` in that order. This skill contains both the approval loop and

@@ -17,6 +17,17 @@ title: starci-business-analyze · Tiếng Việt
 
 Không có. Một stop kết thúc run; skill này không gọi skill khác để recovery.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| bằng chứng | dùng chung | phát biểu owner, routed source evidence và feature head hiện tại | tách fact, intent, example, unknown và contradiction | normalized evidence pack | mọi claim có provenance và example không tạo product truth |
+| mô hình | đối chiếu | evidence pack và predecessor head | reconcile actor, goal, rule, state, operation và failure | proposed business model và delta | mọi thay đổi truy được về evidence và giữ lineage |
+| xuất bản | thực thi | model đã nhận và lifecycle transition được yêu cầu | ghi immutable model, compact context, module và evidence links | feature head mới và publication receipt | schema, predecessor và lifecycle transition hợp lệ |
+| hòa giải | proof | head đã publish và implemented source khi áp dụng | đối chiếu declared truth với implementation quan sát được | implemented hoặc discrepancy receipt | không còn claim thiếu evidence hay source baseline chưa bind |
+
 ## Mục đích
 
 Build, advance hoặc reconcile một `featureId` ổn định từ source đã route và owner intent rõ ràng. Kết quả là

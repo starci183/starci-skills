@@ -95,6 +95,11 @@ nothing can group, match or retry without parsing English. Not a framework excep
 status and no identity: two unrelated failures look identical to the client, and the only thing
 separating them is the message — exactly the part a later refactor rewords.
 
+**Recognition signs.** The `throw` contains an English string describing what just happened; the
+client has to read `message` to know which branch it hit; alerts group by status code, so one 400
+alert collects six different failures; somebody just asked whether this error is retryable and nobody
+could answer without opening the source.
+
 **Boundary.** This is not `EXCEPTION-3`: the same trap seen from the other end. `EXCEPTION-1` reads
 the **throw**; `EXCEPTION-3` reads the **declaration**, and a class extending a framework base passes
 `EXCEPTION-1` because at the throw site it carries the house name. It is not `EXCEPTION-6`: the same
@@ -111,6 +116,11 @@ this is where two different habits slip into one codebase.
 **What it emits in source.** Exactly one object literal at every throw site — `new XException({})`
 when the failure has nothing of its own to say, `new XException({ tier })` when it does. Not
 `new XException()`, not `new XException("id")`, not `new XException(a, b)`.
+
+**Recognition signs.** The same file contains both `new XException()` and `new YException({...})`;
+a constructor takes `(id: string, status: string)` instead of an object; a throw site passes two
+arguments "so it carries enough information"; somebody just had to grep the repository to fix
+argument order after adding a field.
 
 **Boundary.** This is not `EXCEPTION-5`: this code is about the **shape** of the argument — it must
 be an object; that one is about the **contents** of the object. `new XException({})` satisfies
@@ -130,6 +140,10 @@ every throw site the line reads exactly like a house exception and a rule watchi
 nothing wrong. That is not hypothetical: exactly one such class lived in the tree, thrown from four
 call sites, while the gate stayed green.
 
+**Recognition signs.** The throw site looks entirely normal but the client receives a "clean" status
+with no code; the class sits in the right errors folder with the right suffix and only the `extends`
+line differs; a filter catches `AbstractException` and this failure never lands in it.
+
 **Boundary.** This is not `EXCEPTION-1`, which reads the throw — the two are one law read from two
 ends, and dropping either end leaves exactly the hole the other closes. It is not `EXCEPTION-4`: this
 code asks what the class **extends**, that one asks where it **lives**, and a class can sit in the
@@ -147,6 +161,10 @@ per application, so that "what can this application throw?" has **one** place to
 **sees a new failure mode arrive** in the diff. An exception declared next to the code that throws it
 is invisible until something throws it in production.
 
+**Recognition signs.** A `class ...Exception` at the bottom of a service file, after all the logic;
+two near-identical errors in two modules, because whoever wrote the second did not know the first
+existed; nobody can produce "the application's list of errors" without grepping.
+
 **Boundary.** This is not `EXCEPTION-3`, which reads the `extends` line rather than the path. It is
 not a demand for one literal path: the law asks for **one place per application**, so a repository
 holding several applications satisfies it with one such folder each, because "what can this
@@ -162,6 +180,11 @@ of the record not found, the state that made the operation impossible, the thres
 The message is for **a human reading a log**; the metadata is for **everything else**: the client
 deciding what to display, the retry policy deciding whether to try again, the alert grouping by code
 that needs to know which tenant this is. Not a pre-rendered sentence.
+
+**Recognition signs.** The metadata has exactly one field and it is named `message`, `detail`,
+`reason` or `description`; the message already interpolated the id via a template string while the
+metadata is empty; somebody is writing a regex over `message` in a log dashboard; the client can
+display the error but cannot link to the record that caused it.
 
 **A note on the real reader.** As things stand, the HTTP filter sends `statusCode`, `code` and
 `message` — and **not** the metadata. So metadata's reader today is the log line and the in-process
@@ -184,6 +207,11 @@ A lane forbidden from failing its own setup would have to invent a domain except
 is missing" — putting a failure **of the test** into the same vocabulary the product uses for real
 ones, and adding a line to the application's error list that no user can ever reach. The exit is
 sanctioned where it applies and nowhere else.
+
+**Recognition signs.** The `throw new Error` line sits in a spec file or the test tree and describes
+a condition of the test environment rather than of the business; the reverse — a domain exception
+declared that only a spec throws; a test helper imported into product code, carrying this exit with
+it.
 
 **Boundary.** This is not `EXCEPTION-1`: the same line of code, differing by file, and the boundary
 is a **path** — written twice, once in the rule and once in the config of the repository consuming

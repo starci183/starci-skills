@@ -94,6 +94,10 @@ doing, never its size.
 role-to-class map inside the icon leaf. The leaf's prop shape carries no size, class or colour slot,
 so a fourth role does not compile and a pixel value has no channel.
 
+**Recognition signs.** Somebody wants to pass `size`, a `size-*` class, a `strokeWidth` or a pixel
+number. Somebody describes the need as "a bit bigger" or "smaller than that one". A step appears
+between the two steps that exist.
+
 **Boundary.** Not `ICON-2`/`ICON-3`/`ICON-4`: this code says there are exactly three roles; those
 three say which drawing each role uses. Not `ICON-11`: a large or small plate is not a role — it is
 the size of the disc, not of the glyph.
@@ -105,6 +109,10 @@ INTRODUCES; it does not LEAD.
 
 **What it emits in source.** The 24 outline import block in the icon leaf, and a `heading` entry
 reading `size-6 shrink-0`.
+
+**Recognition signs.** Beside it is a real heading, not a line of text inside a list. The region can be
+empty, and when it is empty the glyph is the first thing a reader sees. Remove the glyph and the region
+is still correct, only harder to locate.
 
 **Boundary.** Not `ICON-3`: a heading glyph is not a leading glyph enlarged — they are two different
 drawings, not one drawing at two sizes. Not `ICON-4`: taking the micro drawing and giving it a 24px box
@@ -118,6 +126,9 @@ control. It leads the way; it does not claim a heading's weight.
 **What it emits in source.** A `leading` entry reading `size-5 shrink-0`, selected from the same
 outline import block as `heading`.
 
+**Recognition signs.** It repeats many times in one tree, each time with a different meaning. It sits
+on the same line as the text, not above it. Remove it and the cluster still reads, only slower to scan.
+
 **Boundary.** Not `ICON-2`: see above. Not `ICON-12`: this code says what a leading glyph is drawn
 with; `ICON-12` says where a leading glyph is allowed to appear. A lone summary row is still `size-5`
 if it carries a glyph — but `ICON-12` says it should not carry one.
@@ -129,6 +140,10 @@ the glyph inside is to stay legible at a very small size.
 
 **What it emits in source.** A separate 16 solid import block, aliased per meaning, and a `chip` entry
 reading `size-4 shrink-0`.
+
+**Recognition signs.** The chip shell already states the boundary, so the glyph no longer needs a thin
+stroke to feel light. At `size-4` a 24 outline stroke blurs into a grey smear. The micro drawing has
+markedly less detail — that is the illustrator's intent, not an omission.
 
 **Boundary.** Not `ICON-2`: these are two ends of the same mistake — one enlarges the small drawing,
 the other crushes the large one. Not the 20px `mini` family: mini is not chip. An approximately right
@@ -143,6 +158,10 @@ colour belongs to that region, not to itself.
 one mark keeps four authored hex fills while the monochrome mark uses `currentColor` — the exception
 and the rule side by side.
 
+**Recognition signs.** The text beside it changes colour with state and the glyph does not. Somebody
+writes `text-*` or `fill="#..."` directly on the glyph "to make it match". In dark theme the glyph
+still carries the light-theme colour.
+
 **Boundary.** The brand mark is a closed exception: a multi-colour mark is recognised BY those colours,
 so recolouring it produces a different mark; monochrome marks still take `currentColor`. Not `ICON-13`:
 reaction artwork is multi-colour by nature and is not a semantic glyph — it sits outside this code.
@@ -155,6 +174,10 @@ straight from the glyph package right there.
 **What it emits in source.** `starci-fe/no-vendor-icon-outside-icon-leaf` — glyph packages matched as a
 prefix, so a subpath cannot walk around the check — plus the single allowed module path in
 `@canon-fe`.
+
+**Recognition signs.** A screen file contains `import { XxxIcon } from "..."`. A "helper" file next to
+the icon leaf imports the package too, "for convenience". The same concept is drawn with two different
+shapes on two screens.
 
 **Boundary.** Not `ICON-7`: this code is WHERE a package may be imported; `ICON-7` is WHAT may be
 imported. A file in the right place calling the wrong package is silent to `ICON-6` and caught only by
@@ -169,6 +192,10 @@ only `@heroicons/react/24/outline`, `@heroicons/react/16/solid`, `@starci/heroic
 `@starci/heroicons/16/solid`. The StarCi entry points contain custom cuts only and never re-export
 upstream. The rule applies inside the icon leaf too, which is the half `ICON-6` cannot see.
 
+**Recognition signs.** A second glyph library appears in `package.json`. A brand mark is picked from a
+general-purpose package instead of drawn exactly. Somebody argues "the other one doesn't have this" —
+correct, and that is exactly the moment to decide about MEANING, not about a package.
+
 **Boundary.** Not `ICON-6`: see above. `ICON-7` applies INSIDE the icon leaf, the place `ICON-6`
 deliberately does not look. Award artwork has no Iconify exemption: use upstream `TrophyIcon` where
 faithful, and add missing medal cuts to `@starci/heroicons` before product source imports them.
@@ -181,6 +208,9 @@ smaller.
 **What it emits in source.** `shrink-0` baked into every one of the three role class strings —
 including `chip`, the one most often assumed too small to matter.
 
+**Recognition signs.** A round icon becomes an oval. A square icon flattens on one side. The text is
+still intact while the glyph is already deformed — the order of yielding is reversed.
+
 **Boundary.** Not `ICON-1`: deformation does not create a new role, it destroys the existing one. Not
 the text-expansion law: long text wraps or truncates, and that is the text's job, not the glyph's.
 
@@ -192,6 +222,10 @@ one place that answers it.
 **What it emits in source.** The feature table beside the meaning union and the glyph map, in one
 folder, updated by hand. The parity test the flat law claims **could not be found in source** — it is
 named by the law and is not anchored.
+
+**Recognition signs.** The meaning union has a new name but the source table does not. Two different
+meanings point at the same drawing "because it looks about right". The table still names a component
+that was renamed long ago.
 
 **Boundary.** Not `ICON-6`: `ICON-6` blocks the shortcut; `ICON-9` describes the main road. Not
 `ICON-12`: the table says WHICH drawing, `ICON-12` says WHETHER to draw. A row in the table is not a
@@ -206,6 +240,10 @@ reference is TEXT-ONLY.
 path, so the rule holds that cell and no other. The composite it is bound to renders a label, a figure
 and a bar with no glyph.
 
+**Recognition signs.** The glyph repeats exactly what the adjacent text already said (a book beside the
+word "Content"). In a grid, each cell sprouts a different glyph and creates a SECOND visual axis. The
+person adding the glyph explains it as "it looked empty", not as "to distinguish".
+
 **Boundary.** Closed exception: generic state/action semantics the reference genuinely carries —
 complete, failed, pending, close, disclosure — stay. Navigation, named entry points and large
 empty-region headings keep their reference glyphs, because there the glyph is part of LOCATING the
@@ -217,6 +255,10 @@ region. Not `ICON-12`: this code is about REPEATED fact cells; `ICON-12` is abou
 
 **What it emits in source.** Two plate steps in the tile's size map, and one line below it passing
 `role: "leading"` unconditionally, so every plated tile draws the `leading` glyph at `size-5`.
+
+**Recognition signs.** Somebody wants the glyph to "grow along" when the plate grows. The same meaning
+appears on two screens with two different weights, only because the plates differ. A caller is deriving
+the role from the tile's `size`.
 
 **Boundary.** Not `ICON-1`: a plate is not a fourth role. Not `ICON-2`: a large tile still does not turn
 the glyph into a heading — heading is a POSITION IN THE CONTENT, not the diameter of a disc.
@@ -231,6 +273,10 @@ positive case. The label-led recipe already renders its trailing fact small and 
 a glyph** — the half of this code that source does not yet keep. When a shape falls into this code, the
 source renders the main label normally and the trailing fact as `text-xs muted`, with no glyph.
 
+**Recognition signs.** In the whole section only ONE row carries a glyph. The section already has a
+heading naming the very concept the glyph repeats. The set is homogeneous — ten rows of the same kind —
+so an identical glyph on every row distinguishes nothing.
+
 **Boundary.** Not `ICON-3`: `ICON-3` is what it is drawn WITH, `ICON-12` is whether it may be drawn at
 all. Not `ICON-10`: `ICON-10` protects REPEATED fact cells; `ICON-12` protects the LONE row. One is a
 grid, the other is a line.
@@ -242,6 +288,9 @@ symbol.
 
 **What it emits in source.** A closed identity list inside the reaction leaf, and the checked-in
 artwork files with the attribution travelling alongside them; call sites pass identity only.
+
+**Recognition signs.** Somebody is about to render a Unicode emoji "for speed". A call site passes an
+image path or an `<img>`. Somebody wants to import the whole artwork set as a second glyph catalogue.
 
 **Boundary.** Not `ICON-7`: this is a NARROW artwork boundary. It opens no second glyph vendor;
 navigation, state and action still belong to the single vocabulary. Not `ICON-5`: multi-colour artwork

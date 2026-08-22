@@ -107,6 +107,12 @@ out loud that it is not bound by it.
 of the longest one. This is the default of flex and grid, and the great majority of containers are
 correct here.
 
+**Recognition signs**
+
+- Each child is a REGION that must be equally tall: two card columns side by side, two cells in a grid.
+- Some child needs a background, a border or a hit area that runs the full height of the row.
+- No child owns a content height that stretching would lie about.
+
 **Ask yourself.** If the tallest child grew taller, SHOULD the rest grow with it?
 
 **Boundary**
@@ -124,6 +130,13 @@ SITUATION code, not a CSS class name.
 
 **Situation.** The children own their own cross measure and NONE of them should be stretched. Together
 they form ONE line the eye reads in a single pass.
+
+**Recognition signs**
+
+- At least one child is a DRAWING or a FIXED BOX: an icon, an avatar, a status pill, a checkbox, a
+  switch, a loading indicator.
+- The text in the row is certain to be one line.
+- Stretching any child is meaningless: an icon as tall as two lines of text is a distorted icon.
 
 **Ask yourself.** Is any child a drawing or a fixed box that stretching would make wrong?
 
@@ -143,6 +156,12 @@ they form ONE line the eye reads in a single pass.
 where the eye anchors. Hanging from the middle makes the fixed children DRIFT every time the long one
 changes length.
 
+**Recognition signs**
+
+- In a row: a passage of text that can reach a second or third line.
+- One child is a fixed drawing (avatar, icon) that must sit level with the FIRST LINE of the other.
+- In a column: the children must pack to the LEADING edge in reading order, not the trailing one.
+
 **Ask yourself.** If the longest child doubled in length, may the fixed child DRIFT DOWN with it? If
 not — `ALIGN-2`.
 
@@ -160,6 +179,12 @@ not — `ALIGN-2`.
 **Situation.** The TRAILING edge is the edge that carries meaning. In a COLUMN this is how a cluster
 packs toward the end of reading order. In a ROW this is children standing on one shared floor.
 
+**Recognition signs**
+
+- Column: a price cluster, a time cluster, an action cluster in the last cell of a record.
+- Row: the bars of a chart all growing up from one floor.
+- Numbers read from the trailing side (money, percentages) that must line up with each other.
+
 **Ask yourself.** Is what the reader compares between children where they END, or where they BEGIN?
 
 **Boundary**
@@ -176,6 +201,12 @@ packs toward the end of reading order. In a ROW this is children standing on one
 
 **Situation.** Two or more pieces of text of DIFFERENT SIZES must be read as ONE VALUE or ONE SENTENCE.
 This is the code that makes a number and its unit read as one thing rather than two.
+
+**Recognition signs**
+
+- Every child is text; none is a drawing.
+- The type sizes differ visibly: a large number beside a small label.
+- Read aloud, it is ONE phrase: "42 lessons", "799,000 per month", "4.9 out of 5".
 
 **Ask yourself.** Read the whole row aloud: is it ONE phrase, or two separate pieces of information?
 
@@ -197,6 +228,15 @@ things. `items-baseline` puts them on one foot, and the cluster becomes one valu
 **Situation.** The parent declared a rule that is right for MOST of its children, and EXACTLY ONE
 child has a business reason not to follow it.
 
+**Recognition signs**
+
+- The parent is `ALIGN-2` for a long text block, but one action button must sit in the middle of the
+  row.
+- The parent is `ALIGN-0` for equally tall columns, but one cell holds only an icon and must not be
+  stretched.
+- The number of departing children is ONE. Two or more means the parent's rule is wrong, not that a
+  child departs.
+
 **Ask yourself.** With this child removed, is the parent's rule still right for ALL the rest? If yes —
 `ALIGN-5`. If no — fix the parent's rule.
 
@@ -211,6 +251,11 @@ child has a business reason not to follow it.
 
 **Situation.** The content belongs to the LEADING edge of the reading flow, and the surplus falls
 behind it. This is the default and the right answer for the great majority of rows.
+
+**Recognition signs**
+
+- The children follow one another in reading order; none of them "belongs to" the trailing edge.
+- The container is no wider than its content, or the surplus carries no meaning.
 
 **Ask yourself.** Does the surplus space MEAN anything? If not — let it fall behind and declare
 nothing.
@@ -227,6 +272,13 @@ nothing.
 
 **Situation.** The container's ENTIRE content belongs at the trailing end of the flow direction. It is
 not one child being pushed — the whole cluster lives there.
+
+**Recognition signs**
+
+- The container holds ONE KIND of thing: a button group, a meta cluster.
+- Add one more child and it too belongs at the trailing end, standing beside the ones already there.
+- In a column (`flex-col`), this is pushing the whole run to the BOTTOM of an area taller than its
+  content.
 
 **Ask yourself.** If one more child were added to this container, would it stand BESIDE the current
 cluster at the trailing end, or split off to the opposite edge?
@@ -247,6 +299,12 @@ cluster at the trailing end, or split off to the opposite edge?
 **Situation.** The content is a message ABOUT the container itself: it does not continue the reading
 flow from any edge, so it sits in the middle of the surplus.
 
+**Recognition signs**
+
+- The container is distinctly wider than the content, and the space on both sides is DELIBERATE.
+- The content speaks about the WHOLE REGION: an empty state, a loading state, an error for the block.
+- Remove the content and the region is completely empty.
+
 **Ask yourself.** Does this content CONTINUE the reading flow from an edge, or does it speak about the
 WHOLE empty region?
 
@@ -263,6 +321,12 @@ WHOLE empty region?
 
 **Situation.** The two ends of the container have OPPOSED CLAIMS on those two edges, or every child has
 an EQUAL claim on the whole length. The surplus belongs to neither side, so it sits BETWEEN.
+
+**Recognition signs**
+
+- One end says "what this is", the other says "what to do with it".
+- The two roles CANNOT be swapped and still mean the same thing.
+- Or: the children are an equal-ranked set sharing one band (`justify-evenly`).
 
 **Ask yourself.** If a third child were added, would it have a LEGITIMATE PLACE IN THE MIDDLE? If not —
 these two are not opposed, and the right code is `ALIGN-6` with the last child pushing itself.
@@ -289,6 +353,11 @@ two remaining ones FLY APART to the two edges, and the layout changes shape with
 measure larger than the lines together. It must then state what the lines hang from inside that
 surplus.
 
+**Recognition signs**
+
+- The container has `flex-wrap` AND a height (or minimum height) it set for itself.
+- The number of lines changes with the data; the height does not.
+
 **Ask yourself.** Does this container REALLY own a cross measure larger than its content? If not —
 there is no surplus to divide, and this code emits nothing.
 
@@ -300,6 +369,18 @@ there is no surplus to divide, and this code emits nothing.
 - **The right answer is usually to remove the height.** Most cases that call for `content-*` are cases
   where the container was given a height it did not earn. Declare it only when that height has a real
   business reason.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| container | Whether the element declares `flex`, `inline-flex` or `grid` at all |
+| axis | Which direction the run flows, hence which axis is cross |
+| children | Direct children only, and the cross measure each of them owns |
+| nature | Whether each child is text, a box with a boundary, or a fixed-size control |
+| growth | Whether any child's cross measure can change with real data |
+| surplus | Whether the container can be longer on the main axis than its content |
+| roles | Whether the children at the two ends have opposed claims on those ends |
 
 ## Rules
 

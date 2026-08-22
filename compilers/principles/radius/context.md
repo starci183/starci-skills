@@ -110,6 +110,13 @@ to do it in their head:
 **Situation.** Either the element is **not** a boundary, or it is a real boundary that **refuses** a
 corner. Two different facts, so two different emissions.
 
+**Recognition signs**
+
+- No background, no border, no shadow, no clipping — it only arranges its children into a row, a
+  column or a grid.
+- Or: it is a row or a cell inside a parent that already has `overflow-hidden` and already rounds.
+- Or: it is a real plane that touches both screen edges, so there is no corner left to round.
+
 **Ask yourself.** Is there a real boundary here? No means **write no class at all**. Yes, and it
 deliberately does not round, means **write `rounded-none`**.
 
@@ -130,6 +137,12 @@ taken there.
 
 **Situation.** A boundary the size of **one operation**: the user clicks it, types into it, or selects
 it. It stands on its own, and its corner is not inside anybody's arc.
+
+**Recognition signs**
+
+- Its height is roughly one line of text plus padding, not a region of content.
+- It has interactive states: hover, focus, disabled, checked.
+- It contains no structure — inside is text, an icon, or both.
 
 **Ask yourself.** Is this a single operation, and is its corner clear of every other arc?
 
@@ -152,6 +165,12 @@ control step moves with it, automatically, in proportion.
 **Situation.** A boundary that **owns a whole region of content**: it has its own background or border,
 and what sits inside it is a structure rather than a line of text.
 
+**Recognition signs**
+
+- Inside there are several groups, its own heading, or both controls and content.
+- It has its own padding — and that very number feeds the subtraction of a `RADIUS-4` one level down.
+- Remove it and the content inside loses its support, not just its decoration.
+
 **Ask yourself.** Is this box **containing a region**, or is it **being an operation**?
 
 **Boundary**
@@ -169,6 +188,13 @@ Same role, same step.
 
 **Situation.** Not "a rectangle rounded a lot", but **a circle or a capsule**. The arc is not at the
 corner; the arc **is** both ends.
+
+**Recognition signs**
+
+- Height and width are equal (circle), or both ends are half-circles (capsule).
+- The content inside is short and always short: one letter, one number, one or two words.
+- Change the radius by one step and the shape **loses its identity**, rather than looking slightly
+  different.
 
 **Ask yourself.** Rounded one step less, is this still itself?
 
@@ -193,6 +219,13 @@ two edges is smaller than the outer radius**. The inner corner then falls inside
 
 The inset is the **measured distance between the two edges**: the parent's padding, plus its border
 width if the parent draws a border.
+
+**Recognition signs**
+
+- The inner box reaches nearly to three or four of the outer box's inner edges, separated only by a
+  thin band of padding.
+- The four corners of the inner box sit just inside the four corners of the outer box.
+- Looking at one corner you see **two curves**, and the question is whether they run parallel.
 
 **Ask yourself.** Is the distance between the two edges **smaller** than the outer radius? If it is,
 the radius is derived, and every step code loses.
@@ -226,6 +259,13 @@ while the first sits still and is wrong.
 **Situation.** The boundary is **cut** or **joined**. One or more of its edges do not terminate on
 screen, or they meet another element flush, so on that side there is no corner to round.
 
+**Recognition signs**
+
+- The plane is anchored to a screen edge and runs off past it.
+- Several elements are stacked flush, and only the first and the last touch the outside of the shared
+  block.
+- An element is glued to its neighbour, with no sibling seam between them.
+
 **Ask yourself.** Does a corner still exist on this side, or does the edge continue out of view / meet
 a neighbour?
 
@@ -241,6 +281,16 @@ a neighbour?
 because its two bottom corners disappeared. This code says only **which corners exist**; **how round
 they are** is still answered by a step code or by the subtraction. Merging those two questions is how a
 system ends up with two surface radii and nobody remembers why.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| boundary | Whether the element draws one — background, border, elevation, clip — or owns one semantically |
+| role | control, surface, shape, cell, or arranger |
+| outer corner | The radius of the nearest ancestor that draws a boundary, if any |
+| inset | The measured distance between the two edges: the outer's padding plus any border it draws |
+| edge continuity | Whether all four corners terminate on screen, or an edge is cut or joined |
 
 ## Rules
 

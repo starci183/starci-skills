@@ -91,6 +91,15 @@ with a directive. The pattern is `INLINE_DIRECTIVE`, anchored at the start of th
 legal, with the comment explaining why the pattern is anchored and what the unanchored version cost.
 Product source itself emits nothing: no directive comment of any form.
 
+**Recognition signs.** A comment opening with `eslint-disable`, `eslint-disable-next-line`,
+`eslint-disable-line` or `eslint-enable` in a shipping file. An `eslint-disable` at the top of a
+file — the whole file leaves the law, and the next reader does not know which set of rules they are
+reading under. A paired `eslint-disable` … `eslint-enable` wrapping a block, meaning somebody
+*designed* an exempt region rather than slipped. A very carefully written reason beside the
+directive: the more careful the reason, the more suspect it is, because it is evidence the author
+knew they were going around. Somebody saying "it is only one line", "leave it for now and fix later",
+"just to make the demo merge".
+
 **Boundary.** This is not `LINT-ESCAPE-2`: code 1 is about text inside source, code 2 is about the
 condition of the config that makes that text ineffective — delete every directive while the config
 still allows inline config and code 1 is green with the fence still unbuilt. This is not
@@ -117,6 +126,13 @@ disable naming the guard itself, and the assertion that the guard still reports 
 code is held at tier `documented`, not `enforced`: nothing checks that a consuming config actually
 spread the options. `refusesInlineConfig` can be read from the printed config, but this tree ships no
 script that measures it in a real repository. The consuming repository therefore owes that proof.
+
+**Recognition signs.** A config attaching `plugins` and `rules` with no `linterOptions` anywhere.
+`linterOptions` present in the first block and then overwritten by a later one — flat config takes
+the later block, and nobody notices because the rule is still in the list. Rule and linter options
+imported from two different places, so one can be attached while the other is forgotten. A PR adding
+`eslint-disable <name-of-the-directive-guard-rule>` with CI still green. Somebody answering "but the
+rule is on" when asked whether directives still work.
 
 **Boundary.** This is not `LINT-ESCAPE-1`, which is the text inside source rather than the condition
 of the config. And it is not the `lint-adoption` law: code 2 says the artifact must **publish** the
@@ -148,6 +164,13 @@ per-path or per-name carve-out would have to live. A legitimate case emits an ad
 matcher or a closed type, with its twin test, never a per-file exemption. This code is held at tier
 `documented`: `schema: []` closes the rule to options, and nothing at all holds an allowlist built
 *around* it out of a later config block.
+
+**Recognition signs.** A `files`/`ignores` in the config named after exactly one component or exactly
+one folder. A later config block lowering a rule's level for a "legacy" or "temporary" glob. An
+architectural rule described as "still rolling out, `warn` this week". Somebody proposing an option
+on the rule so the rule skips a list of paths. An architectural finding handled by changing the
+rule's scope instead of fixing the boundary it found. A glob narrowed to exactly the place that just
+went red.
 
 **Boundary.** This is not `LINT-ESCAPE-1`, which is a file exempting itself and leaves a trace in
 source. It is not the repository's own glob: which source trees the law applies to is still the

@@ -87,6 +87,12 @@ every file in it carries the operation name.
 `.module-definition.ts`. No file in the folder is named for anything other than the operation, and
 the operation is not split across folders.
 
+**Recognition signs.** Knowing the operation name lets you guess **every** filename in the folder.
+Grepping the operation name returns the whole operation, not a slice of it. A generically named file
+in the folder (`utils`, `helpers`, `mapper`) is the sign that something reusable was just born where
+nobody will look for it. Ask: does this file carry the operation name? If not, it is shared, and it
+belongs where other people can find it.
+
 **Boundary.** Not `CQRS-4`: `CQRS-1` says which file **may** live in the folder, `CQRS-4` says what
 that service file **may contain** — a service in the right place can still hold the wrong contents.
 Not `CQRS-7`: `CQRS-1` says what may live in the folder, `CQRS-7` says what **must**; a folder can be
@@ -99,6 +105,11 @@ request, the authenticated user and the locale. No methods, no defaults, no logi
 
 **What it emits in source.** A plain class in `<operation>.command.ts` (or `<operation>.query.ts`)
 whose constructor takes exactly one `readonly params` and declares nothing else.
+
+**Recognition signs.** The message constructor has exactly one parameter, named `params`. No getter
+computes a new value out of the request. No default value is filled in here. Ask: if two different
+call sites dispatch this message, could they read it two different ways? If the message computes
+anything, the answer is yes.
 
 **Boundary.** Not `CQRS-4`: both are places business logic may not sit, but for different reasons.
 Logic in the service is logic **no other door can reach**; logic in the message is logic **nobody
@@ -117,6 +128,11 @@ handler.
 declaring `protected override async process(...)`. `execute` stays concrete on the base and is not
 declared on the handler.
 
+**Recognition signs.** The handler declares `protected override async process(...)`. If the handler
+declares `execute`, it has **stepped out of the template**: it still compiles, still runs, and is
+exactly the file the next cross-cutting change silently misses. Ask: if someone adds a transaction to
+the base next week, does this file get it?
+
 **Boundary.** Not `CQRS-4`: a service **also** has a method named `execute`, and that is correct — a
 service inherits no template. The misplaced `execute` is `execute` on a **handler**. Not the
 intermediate abstract handler exception: a handler extending another abstract handler may **inherit**
@@ -131,6 +147,12 @@ It is one line long, and it is one line long on purpose.
 `commandBus.execute(new …Command(params))` and returns. It imports no repository, no entity manager,
 no business service.
 
+**Recognition signs.** The method body is a single `commandBus.execute(new …Command(params))` call.
+The service imports no repository, no entity manager, no business service. A business `if` here means
+that rule just landed somewhere **with no message**, so a CLI doing the same work cannot reach it and
+will grow its own copy. Ask: if a background job needs exactly this operation tomorrow, can it call
+it? If it has to stand up a whole door first, the rule is in the wrong place.
+
 **Boundary.** Not `CQRS-2`: see above — same prohibition, different file and different reason. Not
 `CQRS-5`: a service throwing a domain exception itself is still wrong — not because throwing is
 wrong, but because the **decision** to throw sits outside the handler. In the right place the same
@@ -143,6 +165,12 @@ return `null`, and it does not return a success shape carrying an error string.
 
 **What it emits in source.** Inside `<operation>.handler.ts`, each failure path throws a named domain
 exception carrying the identifier that caused it; no path returns `null` to mean "no".
+
+**Recognition signs.** Each refusal branch has its own name, and that name carries the data the
+caller will need. There is no `return null` meaning "not allowed". There is no `{ ok: false, error }`
+— every caller would decode it its own way. Ask: can the caller tell "does not exist", "was deleted"
+and "not permitted to read" apart? If all three arrive as the same `null`, the reason died on the way
+back.
 
 **Boundary.** Not `CQRS-4`: see above — same exception, different throw site, different conclusion.
 Not `CQRS-6`: a failed side effect does **not** turn the main operation into a failure. Mail that
@@ -158,6 +186,11 @@ stays in the command.
 **What it emits in source.** An event class carrying a payload, and a handler that enqueues —
 nothing on the request path awaits its result. The event returns no value.
 
+**Recognition signs.** Nobody `await`s the event's result to answer the request. The event returns no
+value, and nobody needs it to. If a resolver publishes an event and then **asks the database again**
+whether the row is there, that is a command written as an event. Ask: does the caller need to know
+this finished before it can answer? If yes, it is a command.
+
 **Boundary.** Not `CQRS-2`: both are messages; the difference is **who waits**. A command has someone
 waiting for the result, an event does not. Not `CQRS-5`: see above.
 
@@ -168,6 +201,11 @@ live, so that is where the unit test lives.
 
 **What it emits in source.** A file `<operation>.handler.spec.ts` sitting beside
 `<operation>.handler.ts`, not in a parallel test tree.
+
+**Recognition signs.** Opening the operation folder shows the spec immediately. Whoever edits the
+handler sees the spec **without going to look for it**; a spec in a separate test tree is seen only
+by someone who went looking for tests. Ask: will whoever edits this file tomorrow have the spec hit
+them in the eye, or do they have to remember it exists?
 
 **Boundary.** Not `CQRS-1`: see above. `CQRS-1` is "may live here", `CQRS-7` is "must live here".
 

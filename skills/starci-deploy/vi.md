@@ -17,6 +17,17 @@ title: StarCi deploy
 
 Không có.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | roles đã verify, environment và durable `.stacks` intent | khóa release, host, domain và rollback ownership | deployment contract | mọi target đều declared và routable |
+| kiểm kê-lập kế hoạch | đối chiếu | deployment contract và observed `.infra`/host/provider state | tính setup, release, migration và traffic deltas | execution plan và rollback point | destructive/external mutation vẫn cần approval |
+| thực thi | execution | plan đã duyệt | reconcile infrastructure và immutable release, retry bước recoverable | release và operation receipts | chỉ target đã khai mutation, từng bước idempotent hoặc recoverable |
+| trạng thái ổn định | proof | fresh public, host và service observations | monitor health, so desired với observed state | deployment proof hoặc rollback receipt | public steady state pass, nếu không thì recover hoặc rollback |
+
 ## Run
 
 Đọc `@skill-shape`, `@initialization` và `@deployment` theo thứ tự đó. Resolve ngôn ngữ Source, project,

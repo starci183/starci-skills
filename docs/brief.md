@@ -25,7 +25,7 @@ The result is not merely a suggested design or plan. Selected decisions remain t
 session to the source state they were made against; the same invocation implements them, and execution stops
 when that evidence is stale or incomplete.
 
-## The nineteen skills
+## The seventeen skills
 
 ### Environment and trust
 
@@ -44,11 +44,10 @@ when that evidence is stale or incomplete.
 
 | Skill | Use it for | Approval boundary |
 |---|---|---|
-| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Generate one complete long page/full flow with every block and state; brainstorm alternatives only on request | one `OK` binds the complete baseline to exact source paths |
-| [`starci-fe-design-block`](./skills/starci-fe-design-block) | Audit/correct a Layout-generated block in its full page; brainstorm anatomies only on request | audit findings and correction stay inside the owning block paths |
-| [`starci-fe-ui-align`](./skills/starci-fe-ui-align) | Audit equivalent UI responsibilities across existing surfaces and converge them on evidence-backed authority | the complete authority/source impact cone and same-state/same-viewport proof plan |
+| [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Generate one complete long page/full flow with every block and state; brainstorm alternatives only on request; orchestrate frozen HTML, approved code, seed and proof through bounded workers | `OK #1` freezes direction/page anatomy; `OK #2` authorizes exact source and seed paths |
+| [`starci-fe-design-block`](./skills/starci-fe-design-block) | Audit/correct a Layout-generated block in its full page; brainstorm anatomies only on request; orchestrate complete-parent HTML, approved code and proof | `OK #1` freezes block direction; `OK #2` authorizes exact FE/test paths |
+| [`starci-fe-layout-refactor`](./skills/starci-fe-layout-refactor) | Correct any Layout/Block-rendered output; owner feedback is evidence that skill authority, reasoning, enforcement or source application failed; orchestrate authority audit, frozen HTML, approved FE and proof | `OK #1` freezes correction direction; `OK #2` authorizes the authority-to-write and FE impact cone |
 | [`starci-grammar-refresh-references`](./skills/starci-grammar-refresh-references) | Refresh stale optional immutable grammar provenance without changing durable authority | routed grammar reference sidecar only |
-| [`starci-fe-minor-fix`](./skills/starci-fe-minor-fix) | Correct one existing block, composite, or leaf without changing its contract, ownership, or public shape | one clean component folder, at most two production files, two tests, and 40 production changed lines |
 
 Frontend design keeps review evidence temporary and makes source the durable result:
 

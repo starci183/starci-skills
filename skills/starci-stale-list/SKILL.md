@@ -20,6 +20,17 @@ description: Read the shared stale registry, inventory every routed workspace ro
 
 None. This skill names owners and never invokes them.
 
+## PIPELINE
+
+Topology: `reconciliation` and read-only.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| route | shared | stale registry and every routed workspace role | resolve applicable category modules and check-only commands | inventory context | all declared roles and categories are represented |
+| declare | declared | routes, contracts and readiness requirements | enumerate expected state and clearing owner per category | expected-state matrix | expectations come only from owning modules |
+| observe | observed | real files, routes, ports and check outputs | execute check-only measurements without repair | observed-state matrix | no product or external state changes |
+| report | join | expected and observed matrices | classify stale facts, evidence and clearing owners | complete stale report | every finding is reproducible and no failure is softened |
+
 ## Run
 
 Read `@skill-shape`, `@staleness`, then every module routed by the registry. Use only each module's

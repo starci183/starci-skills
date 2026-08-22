@@ -63,7 +63,12 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all nineteen capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all seventeen capabilities share.",
+  },
+  {
+    source: "orchestration",
+    title: "Agent orchestration",
+    description: "One coordinator/worker contract, explicit Claude and Codex runtime adapters, and the complete Layout, Block and Refactor phase map.",
   },
   {
     source: "contexts",

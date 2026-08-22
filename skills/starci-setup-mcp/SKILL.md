@@ -22,6 +22,17 @@ description: Set up the Source-wide read-only StarCi source-context MCP from ver
 
 None.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | verified workspace routes, selected roles and MCP hostname intent | freeze partitions, read-only scope and publication ownership | MCP desired-state contract | every indexed root is routed and read-only |
+| inspect-plan | reconciliation | desired state, current index/runtime and control-plane reads | compute index, service, credential and DNS deltas | setup plan | no connector, database or raw TCP scope is introduced |
+| reconcile | execution | approved setup plan | build/rebuild partitions, service state and declared publication | setup receipts | credentials remain encrypted and mutations are idempotent |
+| prove | proof | fresh MCP and public endpoint reads | query each partition and verify isolation/read-only behavior | MCP steady-state proof | selected sources resolve and no write capability exists |
+
 ## Run
 
 Read `@skill-shape`, `@workspaces`, `@mcp` and `@embedding` before resolving Source language, project and exact roles from

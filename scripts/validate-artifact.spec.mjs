@@ -133,7 +133,43 @@ const addPageSynthesis = (candidate) => {
     return candidate
 }
 
-const pageHash = (candidate) => createHash("sha256").update(canonical(candidate.pageContract)).digest("hex")
+const addSchema8CapabilityProof = (candidate, routeStatus = "existing") => {
+    for (const pageIntent of candidate.synthesis.pageIntents) pageIntent.routeStatus = routeStatus
+    const pageIds = candidate.pages.map((page) => page.id)
+    candidate.synthesis.directionReceipt = {
+        journey: {
+            summary: "Move the actor through one ordered experience to the declared terminal outcome",
+            pageIds,
+            waypoints: candidate.synthesis.customerJourneys.flatMap((journey) => journey.steps.map((step) => step.action)),
+            terminalOutcome: candidate.synthesis.customerJourneys[0].outcome,
+        },
+        ui: {
+            summary: `Compose ${candidate.id} as one complete responsive hierarchy for the full scope`,
+            pageIds,
+            hierarchy: candidate.pageContract.pages.flatMap((page) => page.hierarchy),
+            responsive: candidate.pageContract.pages.flatMap((page) => page.responsive),
+            emphasis: ["Keep the decisive action and terminal outcome visibly dominant"],
+        },
+    }
+    for (const capability of candidate.synthesis.capabilities) {
+        const renderIntentIds = candidate.synthesis.intersections.flatMap((intersection) =>
+            intersection.bindings
+                .filter((binding) => binding.regionIds.includes(capability.regionId))
+                .map((binding) => binding.renderIntentId))
+        capability.obligations = renderIntentIds.map((renderIntentId) => ({
+            renderIntentId,
+            observable: `${capability.component} visibly renders the bound intent with complete anatomy`,
+            verdict: "supported",
+            evidence: [`${capability.component} in ${capability.sourcePaths[0]} owns the observable anatomy`],
+            requiredPaths: [],
+        }))
+    }
+    return candidate
+}
+
+const pageHash = (candidate, schema = 7) => createHash("sha256")
+    .update(canonical(schema === 8 ? {directionReceipt: candidate.synthesis.directionReceipt, pageContract: candidate.pageContract} : candidate.pageContract))
+    .digest("hex")
 
 function runArtifact(artifact) {
     const root = mkdtempSync(join(tmpdir(), "validate-page-set-"))
@@ -157,6 +193,41 @@ const batch = (candidates, scope = { kind: "page", source: "screenshot" }) => ({
     envelope: { round: 1, project: "sample", surface: "course-learning", scope },
     candidates,
 })
+
+const statesArtifact = (schema = 8) => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addPageSynthesis(candidate)
+    if (schema === 8) addSchema8CapabilityProof(candidate)
+    const approvedPageAt = pageHash(candidate, schema)
+    addRenderContract(candidate)
+    const states = candidate.pageContract.stateInventory[0].states
+    candidate.renderContract.pages[0].states = states
+    const lessonRegion = candidate.renderContract.pages[0].regions[0]
+    lessonRegion.data.states = states
+    lessonRegion.sourceOwnership = {
+        stateOwner: "block",
+        drawing: {component: "LessonContentBase", path: "src/components/blocks/LessonContent/component.tsx"},
+        connected: {component: "LessonContent", path: "src/components/blocks/LessonContent/index.tsx"},
+        compositorKind: "page",
+        compositor: {component: "LessonPageBase", path: "src/components/pages/LessonPage/component.tsx"},
+        entry: {component: "LessonPage", path: "src/components/pages/LessonPage/index.tsx"},
+        parentUses: "connected-component",
+    }
+    const blockPaths = ["src/components/blocks/LessonContent/component.tsx", "src/components/blocks/LessonContent/index.tsx"]
+    candidate.renderContract.sourceBoundary.push(...blockPaths)
+    candidate.renderContract.renders = candidate.renderContract.viewports.map((viewport) => ({
+        pageId: "lesson", stateId: "lesson-error", viewportId: viewport.id, regions: ["lesson-content"],
+    }))
+    const artifact = {...batch([candidate]), schema}
+    artifact.envelope.mode = "expand-states"
+    artifact.envelope.stage = "states"
+    artifact.envelope.approvedPageAt = approvedPageAt
+    return {artifact, candidate}
+}
 
 test("schema 4 accepts three complete single-page choices with source-bound existing layouts", () => {
     const result = runArtifact(batch(axes.map((axis, index) => pageCandidate(["one", "two", "three"][index], axis))))
@@ -203,6 +274,85 @@ test("schema 7 pages stage accepts journey-business and component synthesis with
     artifact.envelope.stage = "pages"
     const result = runArtifact(artifact)
     assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 8 pages stage accepts obligation-level capability evidence while schema 7 stays compatible", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    const artifact = {...batch([candidate]), schema: 8}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 8 pages stage requires separately printed journey and UI directions for the complete scope", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    delete candidate.synthesis.directionReceipt
+    const artifact = {...batch([candidate]), schema: 8}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /directionReceipt/)
+})
+
+test("schema 8 direction receipt must cover the complete page or flow instead of one page fragment", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    candidate.synthesis.directionReceipt.ui.pageIds = ["other-page"]
+    const artifact = {...batch([candidate]), schema: 8}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must cover the complete candidate page\/flow exactly/)
+})
+
+test("schema 8 direct brainstorm accepts 3-4 flow-level direction receipts without an earlier baseline", () => {
+    const candidates = axes.map((axis, index) => {
+        const candidate = pageCandidate(["one", "two", "three"][index], axis)
+        delete candidate.direction
+        delete candidate.citesPrecedent
+        candidate.systemId = "starci-master"
+        candidate.pageOverride = {deviations: [{axis: "composition", from: "shared-scope", to: candidate.id, reason: "Owner explicitly requested alternatives before direction approval."}]}
+        return addSchema8CapabilityProof(addPageSynthesis(candidate))
+    })
+    const artifact = {...batch(candidates), schema: 8}
+    artifact.envelope.mode = "brainstorm"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 8 refuses reuse when an observable capability obligation is missing", () => {
+    const candidate = pageCandidate("one", axes[0])
+    delete candidate.direction
+    delete candidate.citesPrecedent
+    candidate.systemId = "starci-master"
+    candidate.pageOverride = {deviations: []}
+    addSchema8CapabilityProof(addPageSynthesis(candidate))
+    candidate.synthesis.capabilities[0].obligations[0].verdict = "missing"
+    candidate.synthesis.capabilities[0].obligations[0].requiredPaths = ["src/components/atoms/TileIcon/index.tsx"]
+    const artifact = {...batch([candidate]), schema: 8}
+    artifact.envelope.mode = "generate"
+    artifact.envelope.stage = "pages"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /reuse is forbidden while an obligation is missing/)
 })
 
 test("schema 7 pages stage refuses a source handoff before page approval", () => {
@@ -253,6 +403,40 @@ test("schema 7 states stage preserves the approved page contract, expands every 
     artifact.envelope.approvedPageAt = approvedPageAt
     const result = runArtifact(artifact)
     assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 8 states stage accepts a fully supported capability proof", () => {
+    const {artifact} = statesArtifact()
+    const result = runArtifact(artifact)
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test("schema 8 states stage refuses direction drift after OK #1", () => {
+    const {artifact, candidate} = statesArtifact()
+    candidate.synthesis.directionReceipt.ui.summary = "Replace the approved hierarchy with a different complete responsive composition"
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /direction or page anatomy drifted after page approval/)
+})
+
+test("schema 8 states stage requires every missing capability path in the exact source boundary", () => {
+    const {artifact, candidate} = statesArtifact()
+    const capability = candidate.synthesis.capabilities[0]
+    capability.verdict = "generalize"
+    capability.obligations[0].verdict = "missing"
+    capability.obligations[0].requiredPaths = ["src/components/atoms/TileIcon/index.tsx"]
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /missing capability path src\/components\/atoms\/TileIcon\/index\.tsx/)
+})
+
+test("schema 8 states stage requires every new or changed route in parity proof", () => {
+    const {artifact, candidate} = statesArtifact()
+    candidate.synthesis.pageIntents[0].routeStatus = "changed"
+    candidate.renderContract.renders = []
+    const result = runArtifact(artifact)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /new\/changed route or non-reuse capability page lesson must enter parity proof/)
 })
 
 test("schema 7 states stage refuses page drift and incomplete approved states", () => {
@@ -568,7 +752,7 @@ test("schema 5 refuses a candidate that silently omits MASTER", () => {
     assert.notEqual(result.status, 0)
 })
 
-test("schema 5 brainstorm requires a reviewed baseline and 3-4 targeted alternatives", () => {
+test("schema 5 explicit brainstorm accepts 3-4 targeted alternatives without requiring an earlier baseline", () => {
     const candidates = axes.map((axis, index) => {
         const candidate = pageCandidate(["one", "two", "three"][index], axis)
         delete candidate.direction
@@ -579,10 +763,9 @@ test("schema 5 brainstorm requires a reviewed baseline and 3-4 targeted alternat
     })
     const artifact = {...batch(candidates), schema: 5}
     artifact.envelope.mode = "brainstorm"
+    assert.equal(runArtifact(artifact).status, 0)
     artifact.envelope.baselineCandidateAt = "d".repeat(64)
     assert.equal(runArtifact(artifact).status, 0)
-    delete artifact.envelope.baselineCandidateAt
-    assert.notEqual(runArtifact(artifact).status, 0)
 })
 
 test("schema 5 generate accepts one complete long flow with every page and region", () => {

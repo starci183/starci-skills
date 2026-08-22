@@ -17,6 +17,17 @@ title: starci-repair · English
 
 None. A stale route is returned to the initialization owner; this skill never starts setup.
 
+## PIPELINE
+
+Topology: `reconciliation` with separated repair passes.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| inventory | shared | verified route, stale registry and current source | measure every applicable category without suppressing gates | repair findings matrix | each finding has evidence, owner and exact clearing gate |
+| plan | reconciliation | findings and category-owned law | group non-overlapping fixes into ordered passes and freeze boundaries | repair execution contract | approval covers every proposed product/external mutation |
+| repair | execution | approved pass | apply only that pass, then re-measure before advancing | per-pass receipt | no mixed concern, gate weakening or plaintext credential |
+| close | proof | all pass receipts and fresh full inventory | run complete delivery assurance and stale checks | green repair receipt | every in-scope finding clears through its real owner gate |
+
 ## Run
 
 Read `@skill-shape`, then `@staleness`. Do not restate a category's law here. The registry owns what

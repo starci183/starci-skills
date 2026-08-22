@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Design, stage-approve, implement, seed and prove one mature long page or end-to-end flow by synthesizing customer journey and business truth with component, contract and source capability. Approve page anatomy first, expand states second, then approve the exact source-and-seed boundary, code, seed the real local product and prove it.
+description: Design, stage-approve, implement, seed and prove one mature long page or end-to-end flow. Page synthesis prints journey and UI directions separately, joins them into complete desktop/narrow anatomy, then approves states and exact source-and-seed scope before coding. One direction is default; 3–4 require an explicit owner brainstorm request.
 ---
 
 # starci-fe-design-layout
@@ -10,6 +10,7 @@ description: Design, stage-approve, implement, seed and prove one mature long pa
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | staged approval and reporting boundary |
+| `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for decision, HTML, source and proof |
 | `@workspaces` | `contexts/workspaces/en.md` | en | verified frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | ignored session cache |
 | `@composition` | `brainstorms/composition/en.md` | en | Scope, Owner, Invariant and Proof |
@@ -18,7 +19,7 @@ description: Design, stage-approve, implement, seed and prove one mature long pa
 | `@principles` | `compilers/principles` | module | visual decision audit |
 | `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
 | `@lints-fe` | `gates/fe/lints` | module | source proof |
-| `@layouts` | `brainstorms/layouts/en.md` | en | schema 7 synthesis and staged contracts |
+| `@layouts` | `brainstorms/layouts/en.md` | en | schema 8 synthesis, capability proof and staged contracts |
 | `@design-review` | `publication/design-review-preview/en.md` | en | staged HTML review |
 | `@contract-search` | `scripts/contract-search.mjs` | script | component contract evidence |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | routed grammar decisions |
@@ -39,9 +40,30 @@ description: Design, stage-approve, implement, seed and prove one mature long pa
 
 None. Layout owns design through implementation and QA.
 
+## PIPELINE
+
+Topology: `dual-track` through page synthesis, then `linear` through implementation and proof. One isolated
+top-down owner receives normalized evidence plus business authority; one isolated bottom-up owner receives scope,
+source, contracts and current capability evidence. Neither sees the other's draft. One coordinator joins only
+gate-passed outputs, owns decisions and shared artifacts, and delegates only disjoint approved source writes.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| evidence | shared | request, authorities, baseline | normalize facts, constraints, examples and unknowns | evidence pack and context envelope | provenance and scope complete |
+| orchestration | coordination | immutable evidence envelope and measured runtime | apply the Layout dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; every task bounded |
+| page-synthesis | join | evidence, business head, source, contracts, data, grammar and MASTER | run isolated journey and capability subphases, print journey and UI directions, join them and author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt and schema 8 page contract | both origins pass, nothing is unbound, then `OK #1`; cache only |
+| states | execution | approved direction-plus-page hash and state truth | expand states, owners, transitions, seeds and boundary | schema 8 render contract and canonical prompt | `OK #2`; exact files complete |
+| implementation | execution | approved prompt | code, gate and seed without reinterpretation | implementation, gate and seed receipts | every obligation reaches product evidence |
+| parity | proof | previews and seeded product | compare same state and viewport | `visual-proof.json` | `mismatches: []` and delivery reached |
+
 ## Run
 
-Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session and validate the four-lock composition baseline.
+Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session, validate the four-lock composition baseline, then display the orchestration receipt. The coordinator owns journey/UI decisions and approvals. Workers inventory evidence, generate HTML only from frozen contracts, implement disjoint paths only after `OK #2`, seed, test and capture proof.
+
+The user-facing execution table exposes sections 1–3 below as one `page-synthesis` step. Page mapping, both
+isolated tracks, direction declaration, their join and desktop/narrow rendering are internal subphases; no
+intermediate `OK` may split them. Direction is never a separate mode. The next approval is `OK #1` on the
+completed page anatomy and printed directions.
 
 ### 1. Map pages before drawing
 
@@ -49,42 +71,62 @@ Enumerate every page in scope before either design track. Each page records id, 
 intent, decision, successful outcome, failure consequence and the closed render intents it must visibly
 satisfy. A flow includes its start, every decision page and terminal page before regions are drawn.
 
-### 2. Resolve from two independent directions
+### 2. Resolve and print the journey and UI directions
 
-Top-down, write the customer actors, entries, goals, successful outcomes and ordered steps. Each step names intent, decision, action, consequence and its page. Bind all business rules, operations, entitlements, data owners and failure consequences to routed truth.
+Run the two tracks with isolated context owners when delegation is available; otherwise execute them sequentially with the same context firewall and keep their artifacts separate until the join. Top-down, write the customer actors, entries, goals, successful outcomes and ordered steps. Each step names intent, decision, action, consequence and its page. Bind all business rules, operations, entitlements, data owners and failure consequences to routed truth, then print one flow-level journey direction spanning the whole scope rather than one direction per page.
 
-Bottom-up and contract-first, inspect the complete composition, components, contracts, data mappings,
-responsive behavior, exact source owners and legacy/current nested visual owners without adapting this track
-to proposed journey regions. Classify every region as `reuse`, `generalize` or `new-required`. Missing
-capability never justifies weakening the journey.
+Bottom-up and contract-first, without seeing proposed journey regions or a preferred candidate, inspect the complete composition, components, contracts, data mappings,
+responsive behavior, exact source owners and legacy/current nested visual owners. For every render intent a region
+serves, record an observable obligation with `supported` or `missing` verdict, exact source evidence and exact
+required paths when missing. Classify every region as `reuse`, `generalize` or `new-required`; `reuse` is valid only
+when every obligation is supported. Missing capability never justifies weakening the journey.
 
 Only after both tracks are complete, merge them in a page-level binding matrix. Every render intent binds to
 journey steps, business obligations and contract-backed regions; every region cites the render intent it
-serves. Any unbound intent, step, capability or region stops the run. Draw anatomy only from this matrix.
+serves. Any unbound intent, step, capability or region stops the run. From this matrix print one UI direction for
+hierarchy, composition, responsiveness and emphasis. Print journey and UI direction as separate fields before
+drawing their joined anatomy. Default is one flow-level receipt; an explicit owner brainstorm request before
+`OK #1` produces 3–4 complete receipts, never alternatives multiplied per page.
 
 ### 3. Pages stage — complete anatomy before states
 
-Emit schema 7 `stage: pages`. Default `generate` creates one complete mature long page or flow in one representative populated state per page, at desktop and narrow viewports. Include full chrome, meaningful content, intentional hierarchy and density, every major region and complete block anatomy. Create the complete future state inventory now, but do not render those states yet.
+Emit schema 8 `stage: pages`. Default `generate` creates the complete mature long page or flow for one direction
+receipt; explicit brainstorm creates 3–4 complete candidates. Use one representative populated state per page at
+desktop and narrow viewports. Include full chrome, meaningful content, intentional hierarchy and density, every
+major region and complete block anatomy. Create the complete future state inventory now, but do not render those states yet.
 
 The page contract binds the synthesis, routes, regions, representative states, hierarchy, density, responsive behavior, visual precedent, state inventory and representative full-viewport renders. `renderContract` and `executionPrompt` are forbidden.
 
 Validate the artifact and schema 2 maturity review with `reviewStage: pages`. Refuse wireframes, sparse scaffolds, generic admin templates, unjustified dead space, unanchored controls, weak type rank and unfinished anatomy.
 
-Publish a `pages` review and disclose `OK #1: PAGE ANATOMY`, candidate, canonical page-contract hash and routes. This approval is cache-only: it freezes page anatomy and opens state expansion; it never authorizes source writes. Three or four page alternatives require an explicit brainstorm request after the baseline is reviewed.
+Publish a `pages` review, print both directions for each candidate and disclose `OK #1: DIRECTION + PAGE ANATOMY`,
+candidate, canonical direction-plus-page hash and routes. This approval is cache-only: it selects the single direction,
+or names `A`–`D` in brainstorm mode, freezes page anatomy and opens state expansion; it never authorizes source writes.
 
 ### 4. States stage — expand within approved pages
 
-After `OK #1`, emit schema 7 `stage: states`, `mode: expand-states` and the approved page hash. Preserve the canonical page contract exactly. Expand every declared loading, empty, ready, error, permission, disabled, unavailable, success and overlay condition in the contract and executable in-memory behavior. Add transitions and source-owned data mappings. Classify each condition at its real owner: a page state exists only when region arrangement, hierarchy or active page-level composition changes; a condition confined to one subtree remains a block state even when evidence captures the complete page around it. Select no more than five complete-page render targets across the flow, each binding any page state plus the seeded block states visible in that capture, and render every target at each reference viewport. The exact render contract keeps the complete implementation inventory while its renders are this bounded evidence sample; then create the canonical execution prompt.
+After `OK #1`, emit schema 8 `stage: states`, `mode: expand-states` and the SHA-256 of canonical selected
+`directionReceipt` plus `pageContract`. Preserve both exactly. Expand every declared loading, empty, ready, error,
+permission, disabled, unavailable, success and overlay condition in the contract and executable in-memory behavior.
+Add transitions and source-owned data mappings. Classify each condition at its real owner: a page state exists only
+when region arrangement, hierarchy or active page-level composition changes; a condition confined to one subtree
+remains a block state even when evidence captures the complete page around it. Select no more than five
+complete-page render targets across the flow, each binding any page state plus the seeded block states visible in
+that capture, and render every target at each reference viewport. Every new route and distinct
+`generalize`/`new-required` capability family must be represented; if five targets cannot cover them, split scope
+before `OK #2`. The exact render contract keeps the complete implementation inventory while its renders are this
+bounded evidence sample; then create the canonical execution prompt.
 
 Before composing a complete render region, decompose it into closed child targets. Record one `grammarScopes` row per target with observable facts and exact slot/outcome/component decisions from the routed grammar. The region composes those owners and may not substitute a generic card for a resolved list, accordion, form or body surface. Run `@validate-layout-grammar` before source approval.
 
-Before `OK #2`, print a source-owner matrix for every stateful region: state owner, exact drawing `ComponentBase`, optional connected `Component`, compositor kind plus exact `PageBase`/`LayoutBase`/`OverlayBase`, connected outer entry, and which child the parent renders. A block state requires a distinct child drawing owner. Nesting its state or data under Page, Layout or Overlay props while the outer surface still owns rendering is not extraction. Add nested Block chains only for independently stateful subtrees, never as dummy layers. Include every exact child and outer-surface file in the source boundary.
+Before `OK #2`, print a source-owner matrix for every stateful region: state owner, exact drawing `ComponentBase`, optional connected `Component`, compositor kind plus exact `PageBase`/`LayoutBase`/`OverlayBase`, connected outer entry, and which child the parent renders. A block state requires a distinct child drawing owner. Nesting its state or data under Page, Layout or Overlay props while the outer surface still owns rendering is not extraction. Add nested Block chains only for independently stateful subtrees, never as dummy layers. Include every exact child and outer-surface file plus every missing obligation's `requiredPath` in the source boundary. A consumer-only boundary that omits the contract, branch, leaf or data owner needed by approved anatomy is invalid.
 
 For every selected render target, also print a seed-owner row before `OK #2`: exact development/test identity, required page and block states, product-native seed owner, exact seed files or existing command, idempotency key, local dependencies and cleanup/safe-repeat behavior. New seed files belong to the approved source boundary. Cache fixtures cannot satisfy this contract.
 
 Validate the artifact, layout grammar and schema 2 maturity review with `reviewStage: states`. A state that cannot fit approved page anatomy invalidates page approval. State-only feedback preserves page approval.
 
-Publish a `states` review and disclose `OK #2: STATES + SOURCE BOUNDARY`, unchanged page hash, render contract and exact files. Only this approval authorizes source writes.
+Publish a `states` review and disclose `OK #2: STATES + SOURCE BOUNDARY`, unchanged direction-plus-page hash,
+render contract and exact files. Only this approval authorizes source writes.
 
 ### 5. Code the approved source
 
@@ -104,14 +146,20 @@ Run browser proof for every selected render target, never more than five complet
 
 1. One invocation owns synthesis, two approvals, implementation, deterministic local seeding and QA.
 2. Journey/business defines what must exist; component/contract evidence constrains how it is built.
-3. One complete result is default; alternatives require explicit brainstorming.
-4. `OK #1` is cache-only; only `OK #2` authorizes exact source files.
-5. Page drift returns to page approval; state-only rejection preserves it.
-6. Review artifacts are disposable cache; source and executable proof are durable.
-7. MASTER is selected once and execution may not reinterpret the approved preview.
-8. Ordered multi-stage progress uses connected stepper anatomy.
-9. Cache fixtures never replace product-native seed data for final proof.
-10. Every state-stage render child resolves through one grammar scope; its exact component owner is execution authority.
+3. Direction is mandatory inside page synthesis. Layout prints journey and UI direction separately before their join.
+4. One flow-level direction is default; 3–4 require an explicit owner brainstorm request before `OK #1` and are never multiplied per page.
+5. `OK #1` is cache-only; only `OK #2` authorizes exact source files.
+6. Page drift returns to page approval; state-only rejection preserves it.
+7. Review artifacts are disposable cache; source and executable proof are durable.
+8. MASTER is selected once and execution may not reinterpret the approved preview.
+9. Ordered multi-stage progress uses connected stepper anatomy.
+10. Cache fixtures never replace product-native seed data for final proof.
+11. Every state-stage render child resolves through one grammar scope; its exact component owner is execution authority.
+12. `reuse` requires observable source evidence for every bound render-intent obligation; state/data ownership alone does not prove anatomy.
+13. Every new route and distinct non-reuse capability family enters final parity proof; missing `visual-proof.json` keeps the run incomplete.
+14. Journey obligations, FE capability, both directions, their join and page anatomy are one displayed `page-synthesis` step; internal gates remain mandatory but are not separate owner approvals.
+15. Layout owns first synthesis. Concrete owner feedback that rejects emitted or implemented output as wrong
+    Grammar/Principles leaves first-synthesis scope and enters the correction owner.
 
 ## Stops
 
@@ -121,7 +169,10 @@ Run browser proof for every selected render target, never more than five complet
 - `OK #1` treated as source authority, or `OK #2` without exact files.
 - Hidden page-contract drift or required work outside the approved boundary.
 - Missing seed ownership, unseedable selected state, non-idempotent seed or final proof that exists only in cache/component mocks.
+- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in emitted output — owner: `starci-fe-layout-refactor`.
 
 ## OUTPUT
 
-At page review, report journey/business/component synthesis, page URL, maturity verdict and cache-only `OK #1`. At state review, report state coverage, unchanged page hash, exact source files, seed-owner rows and `OK #2`. After code, report changed files, tests, seed command/identity/observed data and real-product parity.
+At page review, print journey and UI direction separately for every candidate, then report their joined page URL,
+maturity verdict and cache-only `OK #1`. At state review, report state coverage, unchanged direction-plus-page hash, exact source
+files, seed-owner rows and `OK #2`. After code, report changed files, tests, seed command/identity/observed data and real-product parity.

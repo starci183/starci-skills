@@ -36,6 +36,9 @@ the promoted package.
 9. `GRAMMAR-9` — MASTER fixes visual language once; a profile may override only declared roles and a page records deviations only.
 10. `GRAMMAR-10` — When an observable fact excludes a neighboring outcome, encode that negative boundary in the rule and a counterexample; absence of a positive fact is not durable refusal evidence.
 11. `GRAMMAR-11` — Decompose every labelled feature section into one grammar scope before composition. A single body, peer list, disclosure hierarchy and bounded form resolve to their semantic surface owners; the section label remains outside that surface.
+12. `GRAMMAR-12` — A protected product brand mark resolves to the profile-owned artwork lockup and matching browser icon. It never falls back to a generic product glyph or heading-only identity, and its controlled palette remains owned by the profile-global theme.
+13. `GRAMMAR-13` — A structured disclosure preserves the complete evidenced summary and panel anatomy. A curriculum module with metadata, derived facts and ordered preview rows never collapses into a generic title-description pair; a genuinely title-description disclosure and an independently authored typed React panel remain valid negative boundaries.
+14. `GRAMMAR-14` — A static supporting-text list uses dot markers in the same semantic foreground as its labels. Disclosure or navigation rows keep their actionable indicator, and ordered steps or ranks keep markers that communicate order rather than simple membership.
 
 ## Routing
 

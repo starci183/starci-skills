@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove một long page hoặc end-to-end flow mature bằng cách tổng hợp customer journey và business truth với năng lực component, contract và source. Duyệt page anatomy trước, bung states sau, rồi duyệt exact source-and-seed boundary, code, seed real local product và prove.
+description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove một long page hoặc end-to-end flow mature. Page synthesis in riêng journey direction và UI direction, join thành complete desktop/narrow anatomy rồi mới duyệt states cùng exact source-and-seed boundary. Mặc định một direction; 3–4 chỉ khi owner explicit brainstorm.
 ---
 
 # starci-fe-design-layout
@@ -10,6 +10,7 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | staged approval và reporting boundary |
+| `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho decision, HTML, source và proof |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | frontend route đã verify |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | ignored session cache |
 | `@composition` | `brainstorms/composition/vi.md` | vi | Scope, Owner, Invariant và Proof |
@@ -18,7 +19,7 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove 
 | `@principles` | `compilers/principles` | module | audit visual decision |
 | `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
 | `@lints-fe` | `gates/fe/lints` | module | source proof |
-| `@layouts` | `brainstorms/layouts/vi.md` | vi | schema 7 synthesis và staged contracts |
+| `@layouts` | `brainstorms/layouts/vi.md` | vi | schema 8 synthesis, capability proof và staged contracts |
 | `@design-review` | `publication/design-review-preview/vi.md` | vi | staged HTML review |
 | `@contract-search` | `scripts/contract-search.mjs` | script | component contract evidence |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | routed grammar decisions |
@@ -39,9 +40,30 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove 
 
 Không có. Layout sở hữu design đến implementation và QA.
 
+## PIPELINE
+
+Topology: `dual-track` tới khi tổng hợp page, sau đó `linear` qua implementation và proof. Một owner top-down
+biệt lập chỉ nhận normalized evidence cùng business authority; một owner bottom-up biệt lập chỉ nhận scope,
+source, contract và current capability evidence. Hai bên không thấy draft của nhau. Một coordinator chỉ join
+output đã pass gate, sở hữu decision/shared artifact và chỉ delegate source write đã duyệt, tách rời.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| evidence | shared | request, authority, baseline | chuẩn hóa fact, constraint, example và unknown | evidence pack cùng context envelope | đủ provenance và scope |
+| orchestration | coordination | immutable evidence envelope và measured runtime | áp dụng Layout dependency graph cùng one-writer registry | runtime adapter, task batch, coordinator reservation và sequential fallback | không approval; mọi task bounded |
+| page-synthesis | join | evidence, business head, source, contract, data, grammar và MASTER | chạy journey và capability subphase biệt lập, in journey và UI direction, join rồi author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt và schema 8 page contract | cả hai origin pass, không còn item chưa bind, rồi `OK #1`; chỉ cache |
+| states | execution | approved direction-plus-page hash và state truth | bung state, owner, transition, seed và boundary | schema 8 render contract cùng canonical prompt | `OK #2`; exact files đầy đủ |
+| implementation | execution | approved prompt | code, gate và seed không reinterpret | implementation, gate và seed receipts | mọi obligation tới product evidence |
+| parity | proof | preview và seeded product | so cùng state, cùng viewport | `visual-proof.json` | `mismatches: []` và đạt delivery |
+
 ## Run
 
-Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo một ignored design session và validate four-lock composition baseline.
+Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo ignored design session, validate four-lock composition baseline rồi hiển thị orchestration receipt. Coordinator sở hữu journey/UI decision và approval. Worker inventory evidence, chỉ sinh HTML từ contract đã freeze, chỉ implement path tách rời sau `OK #2`, rồi seed, test và capture proof.
+
+User-facing execution table hiển thị các section 1–3 dưới đây như một bước `page-synthesis`. Page mapping, hai
+track biệt lập, direction declaration, phần join và desktop/narrow rendering là internal subphase; không được chen
+một `OK` trung gian. Direction không phải mode riêng. Approval kế tiếp là `OK #1` cho complete page anatomy và
+hai direction đã in.
 
 ### 1. Map page trước khi vẽ
 
@@ -49,42 +71,61 @@ Liệt kê mọi page trong scope trước cả hai design track. Mỗi page ghi
 decision, successful outcome, failure consequence và closed render intents mà page bắt buộc phải thể hiện.
 Flow phải có start, mọi decision page và terminal page trước khi vẽ region.
 
-### 2. Resolve từ hai hướng độc lập
+### 2. Resolve và in journey direction cùng UI direction
 
-Từ trên xuống, viết customer actors, entry, goal, successful outcome và ordered steps. Mỗi step gọi tên intent, decision, action, consequence và page của nó. Bind toàn bộ business rule, operation, entitlement, data owner và failure consequence vào routed truth.
+Khi có delegation, chạy hai track bằng hai context owner biệt lập; nếu không có thì chạy tuần tự nhưng vẫn giữ context firewall và artifact tách riêng tới bước join. Từ trên xuống, viết customer actors, entry, goal, successful outcome và ordered steps. Mỗi step gọi tên intent, decision, action, consequence và page của nó. Bind toàn bộ business rule, operation, entitlement, data owner và failure consequence vào routed truth, rồi in một flow-level journey direction cho toàn scope thay vì một direction riêng cho mỗi page.
 
-Từ dưới lên theo contract-first, inspect complete composition, component, contract, data mapping, responsive
-behavior, exact source owner và nested visual owner từ legacy/current mà không uốn track theo journey region
-đã đề xuất. Phân loại mọi region là `reuse`, `generalize` hoặc `new-required`. Thiếu capability không bao giờ
-là lý do làm yếu customer journey.
+Từ dưới lên theo contract-first, không được thấy proposed journey region hay preferred candidate, inspect complete composition, component, contract, data mapping, responsive
+behavior, exact source owner và nested visual owner từ legacy/current. Với mỗi render intent mà region phục vụ,
+ghi observable obligation có verdict `supported` hoặc `missing`, exact source evidence và exact required paths
+khi còn thiếu. Phân loại region là `reuse`, `generalize` hoặc `new-required`; `reuse` chỉ hợp lệ khi mọi obligation
+đều supported. Thiếu capability không bao giờ là lý do làm yếu customer journey.
 
 Chỉ sau khi cả hai track hoàn tất mới merge bằng page-level binding matrix. Mỗi render intent bind journey
 steps, business obligations và contract-backed regions; mỗi region phải cite render intent nó phục vụ. Intent,
-step, capability hoặc region nào không bind đều stop run. Chỉ binding matrix được phép sinh page anatomy.
+step, capability hoặc region nào không bind đều stop run. Từ matrix này, in một UI direction cho hierarchy,
+composition, responsive và emphasis. In journey direction và UI direction thành hai field riêng trước khi join
+thành anatomy. Mặc định là một flow-level receipt; owner explicit brainstorm trước `OK #1` mới sinh 3–4 complete
+receipt, không nhân alternatives theo từng page.
 
 ### 3. Pages stage — complete anatomy trước states
 
-Emit schema 7 `stage: pages`. Default `generate` tạo một complete mature long page hoặc flow với một representative populated state cho mỗi page, ở desktop và narrow viewport. Phải có full chrome, meaningful content, intentional hierarchy và density, mọi major region và complete block anatomy. Tạo complete future state inventory ngay lúc này nhưng chưa render các state đó.
+Emit schema 8 `stage: pages`. Default `generate` tạo complete mature long page hoặc flow cho một direction receipt;
+explicit brainstorm tạo 3–4 complete candidate. Dùng một representative populated state cho mỗi page ở desktop
+và narrow viewport. Phải có full chrome, meaningful content, intentional hierarchy và density, mọi major region
+và complete block anatomy. Tạo complete future state inventory ngay lúc này nhưng chưa render các state đó.
 
 Page contract bind synthesis, route, region, representative state, hierarchy, density, responsive behavior, visual precedent, state inventory và representative full-viewport render. `renderContract` và `executionPrompt` bị cấm.
 
 Validate artifact và schema 2 maturity review với `reviewStage: pages`. Refuse wireframe, sparse scaffold, generic admin template, dead space không có lý do, control không có anchor, type rank yếu và anatomy chưa hoàn tất.
 
-Publish review nhãn `pages` và disclose `OK #1: PAGE ANATOMY`, candidate, canonical page-contract hash và routes. Approval này chỉ tác động cache: nó freeze page anatomy và mở state expansion; tuyệt đối không cấp quyền ghi source. Ba hoặc bốn page alternative chỉ được tạo sau explicit brainstorm request khi owner đã xem baseline.
+Publish review nhãn `pages`, in cả hai direction cho từng candidate và disclose `OK #1: DIRECTION + PAGE ANATOMY`,
+candidate, canonical direction-plus-page hash và routes. Approval này chỉ tác động cache: nó select direction duy nhất,
+hoặc gọi tên `A`–`D` trong brainstorm mode, freeze page anatomy và mở state expansion; tuyệt đối không cấp quyền ghi source.
 
 ### 4. States stage — bung trong page đã duyệt
 
-Sau `OK #1`, emit schema 7 `stage: states`, `mode: expand-states` và approved page hash. Giữ canonical page contract chính xác. Expand mọi loading, empty, ready, error, permission, disabled, unavailable, success và overlay condition trong contract cùng executable in-memory behavior. Thêm transition và source-owned data mapping. Phân loại mỗi condition tại đúng owner: page state chỉ tồn tại khi region arrangement, hierarchy hoặc active page-level composition thay đổi; condition chỉ đổi một subtree vẫn là block state dù evidence chụp cả page quanh nó. Chọn tối đa năm complete-page render target trên toàn flow; mỗi target bind page state nếu có cùng các seeded block state nhìn thấy trong capture, rồi render target ở mọi reference viewport. Exact render contract vẫn giữ complete implementation inventory còn `renders` chỉ là bounded evidence sample này; sau đó tạo canonical execution prompt.
+Sau `OK #1`, emit schema 8 `stage: states`, `mode: expand-states` và SHA-256 của canonical selected
+`directionReceipt` cùng `pageContract`. Giữ chính xác cả hai. Expand mọi loading, empty, ready, error, permission,
+disabled, unavailable, success và overlay condition trong contract cùng executable in-memory behavior. Thêm
+transition và source-owned data mapping. Phân loại mỗi condition tại đúng owner: page state chỉ tồn tại khi region
+arrangement, hierarchy hoặc active page-level composition thay đổi; condition chỉ đổi một subtree vẫn là block
+state dù evidence chụp cả page quanh nó. Chọn tối đa năm complete-page render target trên toàn flow; mỗi target
+bind page state nếu có cùng các seeded block state nhìn thấy trong capture, rồi render target ở mọi reference
+viewport. Mọi route mới và từng family capability `generalize`/`new-required` khác biệt phải được đại diện; nếu
+năm target không đủ thì split scope trước `OK #2`. Exact render contract vẫn giữ complete implementation inventory
+còn `renders` chỉ là bounded evidence sample này; sau đó tạo canonical execution prompt.
 
 Trước khi compose complete render region, phân rã nó thành closed child target. Ghi một dòng `grammarScopes` cho mỗi target với observable facts và đúng quyết định slot/outcome/component từ routed grammar. Region compose các owner đó và không được thay list, accordion, form hay body surface đã resolve bằng generic card. Chạy `@validate-layout-grammar` trước source approval.
 
-Trước `OK #2`, in source-owner matrix cho từng stateful region: state owner, exact drawing `ComponentBase`, optional connected `Component`, compositor kind cùng exact `PageBase`/`LayoutBase`/`OverlayBase`, connected outer entry, và parent render child nào. Block state bắt buộc có child drawing owner riêng. Nhét state hoặc data của nó dưới props của Page, Layout hay Overlay trong khi outer surface vẫn sở hữu render không phải extraction. Chỉ thêm nested Block chain cho subtree stateful độc lập, không tạo tầng giả. Source boundary phải chứa mọi exact child và outer-surface file trong chain.
+Trước `OK #2`, in source-owner matrix cho từng stateful region: state owner, exact drawing `ComponentBase`, optional connected `Component`, compositor kind cùng exact `PageBase`/`LayoutBase`/`OverlayBase`, connected outer entry, và parent render child nào. Block state bắt buộc có child drawing owner riêng. Nhét state hoặc data của nó dưới props của Page, Layout hay Overlay trong khi outer surface vẫn sở hữu render không phải extraction. Chỉ thêm nested Block chain cho subtree stateful độc lập, không tạo tầng giả. Source boundary phải chứa mọi exact child và outer-surface file trong chain cùng mọi `requiredPath` của missing obligation. Boundary chỉ chứa consumer nhưng bỏ contract, branch, leaf hay data owner mà approved anatomy cần là không hợp lệ.
 
 Với mỗi selected render target, trước `OK #2` phải in thêm seed-owner row: exact development/test identity, page state và block states cần có, product-native seed owner, exact seed files hoặc existing command, idempotency key, local dependencies và cleanup/safe-repeat behavior. Seed file mới thuộc approved source boundary. Cache fixture không thể hoàn thành contract này.
 
 Validate artifact, layout grammar và schema 2 maturity review với `reviewStage: states`. State không fit approved page anatomy sẽ làm page approval mất hiệu lực. Feedback chỉ đổi cách thể hiện state thì giữ page approval.
 
-Publish review nhãn `states` và disclose `OK #2: STATES + SOURCE BOUNDARY`, page hash không đổi, render contract và exact files. Chỉ approval này mới cấp quyền ghi source.
+Publish review nhãn `states` và disclose `OK #2: STATES + SOURCE BOUNDARY`, direction-plus-page hash không đổi,
+render contract và exact files. Chỉ approval này mới cấp quyền ghi source.
 
 ### 5. Code approved source
 
@@ -104,14 +145,20 @@ Chạy browser proof cho mọi selected render target, tối đa năm complete-p
 
 1. Một invocation sở hữu synthesis, hai approval, implementation, deterministic local seeding và QA.
 2. Journey/business định nghĩa cái phải tồn tại; component/contract evidence ràng buộc cách build.
-3. Một complete result là default; alternative cần explicit brainstorm.
-4. `OK #1` chỉ tác động cache; chỉ `OK #2` authorize exact source files.
-5. Page drift quay lại page approval; state-only rejection giữ approval đó.
-6. Review artifact là disposable cache; source và executable proof là durable.
-7. MASTER được chọn một lần và execution không được reinterpret approved preview.
-8. Ordered multi-stage progress dùng connected stepper anatomy.
-9. Cache fixture không bao giờ thay product-native seed data trong final proof.
-10. Mọi render child ở states stage resolve qua một grammar scope; exact component owner của nó là execution authority.
+3. Direction bắt buộc nằm trong page synthesis. Layout in journey direction và UI direction riêng trước khi join.
+4. Mặc định một flow-level direction; 3–4 chỉ khi owner explicit brainstorm trước `OK #1` và không nhân theo page.
+5. `OK #1` chỉ tác động cache; chỉ `OK #2` authorize exact source files.
+6. Page drift quay lại page approval; state-only rejection giữ approval đó.
+7. Review artifact là disposable cache; source và executable proof là durable.
+8. MASTER được chọn một lần và execution không được reinterpret approved preview.
+9. Ordered multi-stage progress dùng connected stepper anatomy.
+10. Cache fixture không bao giờ thay product-native seed data trong final proof.
+11. Mọi render child ở states stage resolve qua một grammar scope; exact component owner của nó là execution authority.
+12. `reuse` cần observable source evidence cho mọi bound render-intent obligation; ownership của state/data không tự chứng minh anatomy.
+13. Mọi route mới và distinct non-reuse capability family phải vào final parity proof; thiếu `visual-proof.json` thì run chưa hoàn tất.
+14. Journey obligations, FE capability, hai direction, phần join và page anatomy là một displayed `page-synthesis` step; internal gate vẫn bắt buộc nhưng không trở thành approval riêng của owner.
+15. Layout sở hữu first synthesis. Concrete owner feedback từ chối emitted/implemented output vì sai
+    Grammar/Principles thì rời first-synthesis scope và vào correction owner.
 
 ## Stops
 
@@ -121,7 +168,10 @@ Chạy browser proof cho mọi selected render target, tối đa năm complete-p
 - Dùng `OK #1` như source authority, hoặc `OK #2` không có exact files.
 - Giấu page-contract drift hoặc required work nằm ngoài approved boundary.
 - Thiếu seed ownership, selected state không seed được, seed không idempotent hoặc final proof chỉ tồn tại trong cache/component mock.
+- Concrete owner feedback chỉ ra semantic owner, visual law hoặc repeated skill decision sai trong emitted output — owner: `starci-fe-layout-refactor`.
 
 ## OUTPUT
 
-Ở page review, báo journey/business/component synthesis, page URL, maturity verdict và cache-only `OK #1`. Ở state review, báo state coverage, page hash không đổi, exact source files, seed-owner rows và `OK #2`. Sau code, báo changed files, tests, seed command/identity/observed data và real-product parity.
+Ở page review, in riêng journey direction và UI direction cho từng candidate rồi báo joined page URL, maturity
+verdict và cache-only `OK #1`. Ở state review, báo state coverage, direction-plus-page hash không đổi, exact source files,
+seed-owner rows và `OK #2`. Sau code, báo changed files, tests, seed command/identity/observed data và real-product parity.

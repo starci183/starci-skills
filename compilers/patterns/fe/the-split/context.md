@@ -93,6 +93,16 @@ paid every time afterwards, each time someone wants to check one state.
 **What it emits in source.** A `component.tsx` whose imports are components, types and pure helpers
 only, and whose props carry every value it draws.
 
+**Recognition signs.**
+
+- `component.tsx` calls a request hook, a store hook, a translation hook, a locale hook or a
+  formatter.
+- Writing a test for it requires mocking something that is not props.
+- The file has an `if` branching on data that has not been given a name — it is settling a situation
+  of its own.
+
+Ask: hand this file a plain props object; does it draw every state without anything else?
+
 **Boundary.** It is not `SPLIT-2`: `SPLIT-1` says the drawing half may not ask, `SPLIT-2` says the
 connected half may not draw — two directions of the same line, and one file can break exactly one of
 them. It is not only `SPLIT-4`: calling `useTranslations` in the drawing half breaks both, `SPLIT-1`
@@ -111,6 +121,15 @@ spacing or a variant blind. The drawing half sees the whole tree.
 
 **What it emits in source.** An `index.tsx` carrying the request and the situation, with no
 `className`, no spacing value and no element choice anywhere in it.
+
+**Recognition signs.**
+
+- `index.tsx` contains a `className`, a spacing value or an appearance variant name.
+- It passes down a `size`, `tone` or `compact` prop that is not a business fact.
+- It passes down a pre-formatted string chosen to fit a space, rather than because that is the real
+  number.
+
+Ask: could this decision be wrong while the network is fine? If yes, it belongs to the drawing half.
 
 **Boundary.** It is not `SPLIT-1`, which governs the opposite direction of the same line. It is not
 `SPLIT-5`: `SPLIT-2` is a presentation decision leaking through props, `SPLIT-5` is markup sitting
@@ -131,6 +150,15 @@ drawn, and every situation that is not real cannot be written.
 **What it emits in source.** An exported props type in `component.tsx` that is a union of members
 discriminated by a literal `state`.
 
+**Recognition signs.**
+
+- The drawing half's props carry two or more independent booleans describing the same lifecycle.
+- The drawing half contains `if (isLoading) … else if (hasError) …` — the order of the branches is
+  standing in for a closed set.
+- There is a combination of flags nobody can say what it draws.
+
+Ask: is there a writable combination of props that corresponds to no real situation?
+
 **Boundary.** It is not `SPLIT-2`: `SPLIT-2` asks *who* settles the situation, `SPLIT-3` asks what
 shape that situation takes as it crosses. A correctly settled situation can still be sent across as a
 handful of flags.
@@ -147,6 +175,15 @@ of copy you must stand up the whole translation layer, and at that point `SPLIT-
 
 **What it emits in source.** Copy-carrying boundary props declared in `component.tsx` typed `string`
 and holding sentences, filled by the JSX in `index.tsx`.
+
+**Recognition signs.**
+
+- A prop named `*Key`, or an `*Id` carrying the meaning of copy, or a string with dotted namespacing
+  like `quest.failed`.
+- The drawing half imports anything from the translation layer.
+- There is a string that does not read as human language.
+
+Ask: is this string readable the moment it reaches the reader, or does it still need one more lookup?
 
 **Boundary.** It is not `SPLIT-1`: calling a translation hook in the drawing half is `SPLIT-1`, and
 passing a key down for the drawing half to look up is also `SPLIT-1`; but passing a key down which is
@@ -166,6 +203,19 @@ not require opening the other file", because something might be sitting on the o
 **What it emits in source.** `import { XBase } from "./component"` in `index.tsx`, where `X` is the
 folder name, and `XBase` is the only JSX identifier the file renders.
 
+**No thin-block exception.** One leaf, one tree in every state, no local domain state, or a twin that
+only forwards props — those are precisely the cases most likely to grow a second situation. They
+cross the same exact twin.
+
+**Recognition signs.**
+
+- The connected file has a JSX identifier other than `XBase`.
+- The connected file imports `XBase` but has a `return` branch that does not go through it.
+- There is an early branch like `if (error) return null` — that branch has drawn something (drawing
+  nothing is also a presentation decision) without crossing the twin.
+
+Ask: does every render path of this file go through exactly one component?
+
 **Boundary.** It is not `SPLIT-2`, which is a presentation decision leaking through props rather than
 markup in the file. It is not `SPLIT-6`: `SPLIT-5` applies only to a surface that *has* a request, and
 demanding a twin from a file that reads nothing contradicts `SPLIT-6`.
@@ -180,6 +230,16 @@ The line is worth its cost because it separates two kinds of fault; where there 
 fault, drawing another line only creates another file to open.
 
 **What it emits in source.** A folder holding `index.tsx` and no `component.tsx`.
+
+**Recognition signs.**
+
+- `index.tsx` makes no request, reads no store, reads no locale — it only takes props from its
+  parent, or composes other connected surfaces.
+- `component.tsx` does nothing but receive props and pass them straight down.
+- Changing one line means opening two files, and those two files have never yet been wrong for two
+  different reasons.
+
+Ask: does this file ask the world anything? If not — one file.
 
 **Boundary.** It is not `SPLIT-5`: the moment this surface *adds* a request, `SPLIT-6` stops applying
 and `SPLIT-5` turns on, and that is a real file split rather than a rename. Local UI state is not a

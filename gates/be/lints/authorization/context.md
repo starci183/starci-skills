@@ -152,6 +152,17 @@ Two of these are the same defect wearing different clothes and are worth naming 
 strings that a rename changes**, and **it counts a decorator's presence rather than its effect.** Neither
 is sabotage. Both are what ordinary tidying up looks like.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| node type | `MethodDefinition`. A class field, an object method, a plain function or a programmatic registration is not one |
+| parameters | `node.value.params`, with `TSParameterProperty` unwrapped to its inner parameter as a fallback |
+| parameter decorators | The identifiers as spelled at the parameter, not as imported and not as they resolve |
+| method decorators | The identifiers as spelled at the method |
+| class decorators | Read through `node.parent.parent` — the immediate class only. No base class, no module, no application-level registration |
+| filename | Not consulted. The rule applies wherever the config points it |
+
 ## Rules
 
 1. A rule's identity is its published name. No numeric code is minted for a rule.

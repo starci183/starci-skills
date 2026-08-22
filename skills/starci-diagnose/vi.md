@@ -14,6 +14,17 @@ title: Diagnose skill · Vietnamese
 
 Không có. Skill này không tự gọi skill khác.
 
+## PIPELINE
+
+Topology: `reconciliation`, chỉ đọc.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | target skill, routed project và scenario được yêu cầu | khóa invocation mô phỏng và cấm target writes | diagnosis context | exact target skill và route resolve |
+| kỳ vọng | declared | target skill pipeline và loaded authorities | liệt kê mỗi step sẽ đọc, transform, emit và gate gì | expected trace | trace theo target skill nhưng không execute nó |
+| quan sát | observed | real machine, routes và files | inspect thứ thực sự tồn tại tại từng expected read | observed trace | observation chỉ đọc và có evidence |
+| phân loại | hợp nhất | expected và observed traces | tìm first stopping point cùng owner | diagnosis report | tách environment-not-ready khỏi defective skill |
+
 ## Cách chạy
 
 Đọc `@skill-shape` trước. Gọi bằng `/starci-diagnose <skill>` và có thể thêm scenario. Không có scenario

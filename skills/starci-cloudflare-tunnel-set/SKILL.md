@@ -16,6 +16,17 @@ description: Manage the multi-project Source Cloudflare control plane by encrypt
 
 None.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | verified workspace route, declared hostname/service and credential identity | freeze intended tunnel and DNS ownership | desired-state contract | project, role, zone and service are explicit |
+| inspect | reconciliation | desired state and Cloudflare read state | compare tunnel, ingress and DNS records without mutation | reconciliation plan | every remote delta is exact and credential-safe |
+| approve-apply | execution | displayed plan and required approval | execute idempotent mutations through the control plane | apply receipt | authority exists and only declared records change |
+| prove | proof | apply receipt and fresh remote reads | re-read tunnel and DNS behavior | steady-state receipt | desired and observed state match with no exposed secret |
+
 ## Run
 
 Read `@skill-shape`, then `@initialization`. Resolve the Source-wide language and the declared project and

@@ -19,6 +19,17 @@ description: Audit and immediately refresh stale optional immutable Git referenc
 
 None.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | exact grammar/profile and optional immutable references | freeze reference-only boundary and current authority hashes | refresh context | facts, rules, capsules and product source are excluded |
+| audit | reconciliation | declared references and current immutable Git objects | resolve availability, identity and staleness | stale-reference matrix | every finding names the exact optional reference |
+| refresh | execution | repairable matrix | update only reference hashes/metadata | refreshed reference receipt | no durable grammar meaning changes |
+| prove | proof | refreshed records | validate dependency, hash and grammar resolution | refresh proof | references resolve and authority bytes remain unchanged |
+
 ## Run
 
 Read `@skill-shape`, resolve the exact project role, and require its explicit grammar/profile pair. This is one

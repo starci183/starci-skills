@@ -22,6 +22,17 @@ description: Record or query provider-neutral OpenAI/ChatGPT/Codex and Anthropic
 
 None.
 
+## PIPELINE
+
+Topology: `linear`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | provider conversation reference and target artifact identity | resolve project, role, provider and allowed provenance scope | provenance context | no raw transcript is treated as authority |
+| sanitize | execution | provider metadata and content snapshot | redact secrets and separate rebuildable search data from durable provenance | sanitized immutable snapshot | forbidden keys and secret-shaped values are absent |
+| link | execution | sanitized snapshot and exact artifact hashes/paths | create provider-neutral provenance links and advance one stable head | snapshot head and artifact links | hashes, predecessor and ownership validate |
+| prove | proof | stored records | read back and validate redaction, encryption and linkage | provenance receipt | raw transcript is not committed and links resolve |
+
 ## Run
 
 This skill records provenance, not authority. Frontend design cache is transient; durable FE provenance binds

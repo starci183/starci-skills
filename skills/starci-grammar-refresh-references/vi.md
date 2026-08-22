@@ -18,6 +18,17 @@ title: starci-grammar-refresh-references · Vietnamese
 
 Không có.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | exact grammar/profile và optional immutable references | khóa reference-only boundary cùng current authority hashes | refresh context | fact, rule, capsule và product source bị loại khỏi boundary |
+| audit | đối chiếu | declared references và current immutable Git objects | resolve availability, identity và staleness | stale-reference matrix | mọi finding gọi đúng exact optional reference |
+| làm mới | execution | repairable matrix | chỉ update reference hashes/metadata | refreshed reference receipt | durable grammar meaning không đổi |
+| chứng minh | proof | refreshed records | validate dependency, hash và grammar resolution | refresh proof | references resolve và authority bytes không đổi |
+
 ## Run
 
 Resolve role project đã khai cùng cặp grammar/profile rõ ràng. Snapshot mọi durable grammar artifact, audit

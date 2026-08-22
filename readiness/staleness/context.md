@@ -32,25 +32,26 @@ and proof. Route staleness has no repair module here because its owner is `starc
 |---|---|---|
 | `route` | checkout, contract, branch or recorded head no longer describes this machine | `starci-init` |
 | `port-offset` | Source allocation is absent/invalid, product owns an offset, projection drifts, or local listeners collide | `starci-repair`, port-offset pass |
-| `source` | any routed role lacks or fails format→lint→typecheck→build→unit coverage→E2E→Sonar, including lint warnings, low coverage, fake E2E or missing Sonar | `starci-repair`, source-gates pass |
+| `source` | any routed role lacks or fails the ordered format→lint→typecheck→build→unit coverage→E2E→Sonar fence, including lint warnings, coverage below threshold, fake/empty E2E or missing Sonar | `starci-repair`, source-gates pass |
 | `index` | a contract `why` describes a shape instead of the need that finds it | `starci-repair`, why pass |
 | `machine` | published lint canon is absent or a vendored rule copy is imported | `starci-repair`, lint-machine pass |
 | `formatter` | strict-fix scope still has first-party Prettier integration | `starci-repair`, strict-fix pass |
 | `assurance` | assurance is required and any reached delivery-fence fact is absent or non-blocking | `starci-repair`, assurance pass |
-| `debt` | a valid `.worktrees/<project>/debts/<role>.md` records any owner-approved unresolved finding by namespaced scope; the owning machine decides delivery impact, and malformed/expired debt fails closed | finding owner, then removal after exit criteria pass |
+| `debt` | a valid `.worktrees/<project>/debts/<role>.md` records any owner-approved unresolved finding by namespaced scope; its owning machine decides delivery impact, and malformed/expired debt fails closed | finding owner, then removal after exit criteria pass |
 | `structure` | a retired tier still exists, including an empty directory | `starci-repair`, retired-structure pass |
 | `remnant` | a routed checkout contains an old nested `.claude/` | `starci-repair`, remnant pass or owner decision |
 
 ## Shared rules
 
 - `stale-list` reports; it never repairs. `repair` measures before it writes.
-- `ready` requires current-checkout evidence for every routed role and the ordered source fence:
-  format→lint→typecheck→build→unit coverage→E2E→Sonar. Lint is 0/0; unit is S/L/F ≥80%, branches ≥75%,
-  patch/new metrics ≥90%; E2E needs an existing declared entrypoint, real tests and all passing. Skip/todo/
-  passWithNoTests/zero-test/check substitutes reject. Undispatched gates are unmeasured and cannot support ready.
+- `ready` requires local execution evidence from the current checkout for every routed role. The source
+  fence is format→lint→typecheck→build→unit coverage→E2E→Sonar; lint is 0 errors/0 warnings, unit is
+  S/L/F ≥80%, branches ≥75%, patch/new metrics ≥90%, and E2E must use an existing declared entrypoint,
+  real tests and all passing. `skip`, `todo`, `passWithNoTests`, zero-test and check substitutes reject.
+  A declared gate only discovered, not run, is `unmeasured` and can never support ready.
 - Every finding carries category, evidence, applicability and owner.
-- Debt never changes a measurement to green. `pass` stays false while debt exists; delivery may continue
-  only when all remaining findings are covered by active debt and every non-debt gate is green.
+- Debt never changes a measurement to green. `pass` remains false while debt exists; delivery may continue
+  only when every remaining finding is covered by active debt and every non-debt gate is green.
 - `absent`, `invalid`, `stale`, `debt`, `not required`, `unmeasured external` and `clean` are distinct verdicts.
 - A route finding ends repair before target-source reads. Source repair through a stale route targets an
   unverified checkout.

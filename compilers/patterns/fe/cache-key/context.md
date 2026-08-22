@@ -94,6 +94,13 @@ passes THOSE to the request — never the identically named parameter sitting in
 Key and closure are two copies of one truth, and after a re-render the two copies can diverge; the
 entry is then filed under the name of this question while holding the answer to that one.
 
+**Recognition signs.** A variable appears in the request but not in the key. The fetcher takes no
+argument from the key and still works, which means it is reading from the outer scope. Changing a
+filter on screen leaves the data unchanged, or changes it and then snaps back. The reverse: the key
+holds a value the server never uses, and every change to it refetches. The failure is not
+occasional staleness — it is deterministically wrong data, and it looks right, because a plausible
+answer to the wrong question is indistinguishable from the right one.
+
 **Boundary.** Not `CACHE-2`: the viewer is also a fragment, but it has its own code because it fails
 in a different way — across a sign-out, not across a parameter change. Not `CACHE-3`: an item id is
 also a fragment, but on a mutation it decides the running state, not only the data. Not `CACHE-4`:
@@ -112,6 +119,14 @@ and to anywhere a key is logged when a request fails; a bearer token sitting the
 mistake of a bearer token sitting in web storage. The fingerprint is NOT a security boundary and
 does not claim to be — it only has to differ when the reader differs.
 
+**Recognition signs.** The query name says "mine", "following", "purchased", "remaining", "for
+you". The server reads identity from a header to compute the result, not merely to permit access.
+After signing out the screen still shows the previous figures until a refresh. Just after signing in
+the screen still shows "please sign in". Two failures chain, and the second is worse than the first:
+signing in changes nothing because the key did not change, and signing out changes nothing, so the
+next person on that tab reads the previous person's figures — and those figures look entirely
+plausible.
+
 **Boundary.** Not `CACHE-1`: being behind auth is not the same fact as being computed from the
 reader; adding a viewer to a shared key only clones one identical entry per person. Not `CACHE-4`:
 while the viewer is unknown, `CACHE-2` says the fragment must be there and `CACHE-4` says the key is
@@ -128,6 +143,10 @@ press the reader never made.
 once per row, so the running state belongs to one row. The item is what makes this press different
 from the press on the row beside it; without it in the key the whole list has, as far as the cache
 is concerned, exactly one button.
+
+**Recognition signs.** A mutation hook called inside a component rendered repeatedly by a `map`.
+"Add", "Delete", "Follow", "Like" buttons on each row. One press and the whole grid shows a running
+state.
 
 **Boundary.** Not `CACHE-1`: `CACHE-1` is about the DATA returned; `CACHE-3` is about the shared
 RUNNING STATE. A mutation can be wrong under `CACHE-3` while the data it returns is perfectly
@@ -151,6 +170,11 @@ flashing a skeleton at somebody who is waiting for nothing. A placeholder is tha
 a valid key: `""`, `0` or `"guest"` creates a REAL entry holding a REAL answer to a question the
 caller did not ask, with nothing afterwards to show it is broken.
 
+**Recognition signs.** The key contains `??`, `||`, or a literal `""` / `0` / `"guest"` /
+`"anonymous"`. A parameter typed `id?: string` while the key is built unconditionally. A signed-out
+screen with a skeleton running forever. Devtools showing the same request repeating on a widening
+interval, failing every time.
+
 **Boundary.** Not `CACHE-1`: `CACHE-1` is wrong by OMITTING a fragment that should have been there;
 `CACHE-4` is wrong by INVENTING one that has not arrived. Not `CACHE-5`: `CACHE-4` is about `null`
 in the KEY position (not asked yet); `CACHE-5` is about `null` in the RESULT position (asked, and
@@ -169,6 +193,10 @@ to carry exactly one meaning, and the hook is where that meaning is written down
 unwrapping that produces it: a price preview returns `null` when no personal price can be computed
 for this person, so the screen shows the list price — an honest answer, not a swallowed error. The
 caller cannot infer that from the type and must not be made to guess.
+
+**Recognition signs.** `try { … } catch { return null }` inside a fetcher. A return type `T | null`
+with not one line saying what the `null` means. The screen showing "no data yet" while the network
+is broken. Each component interpreting `null` its own way, and the interpretations disagreeing.
 
 **Boundary.** Not `CACHE-4`: as above, a `null` key and a `null` result are two different things.
 Not the contract-failure exception: a fetcher may still return `null` for a failure the caller MUST

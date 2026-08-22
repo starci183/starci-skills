@@ -75,6 +75,10 @@ parameter.
 branch at every line except the element it opens. The branch's own file is the one place that element
 is written by hand. Adding a landmark element stays a one-file change.
 
+**Recognition signs.** Someone has just said that another branch would be too much repeated code. The
+counter-proposal is always a flag, a map, or a prop that picks the tag. The new branch would match the
+ordinary branch on every line but one.
+
 **Boundary.** This is not `LANDMARK-3`: `LANDMARK-1` says how MANY branches there are, `LANDMARK-3`
 says who may CHOOSE the element. Collapsing two branches into one that takes a prop breaks both, for
 two different reasons. It is not `LANDMARK-2` either: the new branch must match the ordinary branch
@@ -88,6 +92,10 @@ including in owning no class — the moment it grows one, the situation is `LAND
 **What it emits in source.** A branch whose props carry the element and nothing else. Classes, the set
 of admitted children and the reason all stay on the key in the registry, which is where they were
 already declared.
+
+**Recognition signs.** The branch starts to carry props the key has no say in. Two places can answer
+"why is this button indented" — the key, and the branch. Nobody can state the difference between the
+landmark branch and the registry any more.
 
 **Boundary.** This is not `LANDMARK-1`: `LANDMARK-1` lets the branch EXIST, `LANDMARK-2` limits what it
 may CARRY. And it is not `LANDMARK-3`: a class on the branch loses the REASON, while a prop that picks
@@ -103,6 +111,10 @@ one branch, every element.
 content — so `as` / `element` / `tag` is an excess property and fails to typecheck. The element is read
 from the entry's closed `host` union, and the branch file records that `as` was considered and refused.
 
+**Recognition signs.** The document's meaning sits on the same line as interface decisions. Whether a
+page has a landmark at all depends on whether the call site remembered to pass the prop. Nowhere
+records the REASON this page opens that element.
+
 **Boundary.** Against `LANDMARK-1`, see above. Against `LANDMARK-5`: `LANDMARK-3` says the call site may
 not CHOOSE the element, `LANDMARK-5` says which call site may CARRY a landmark at all. A legal prop
 placed in exactly the right file is still wrong under `LANDMARK-3`.
@@ -115,6 +127,10 @@ that KNOWS where navigation ends and the page begins — so it is the file that 
 **What it emits in source.** A route `layout.tsx` that both composes chrome and renders `children` must
 reach a landmark: it hands the routed `children` to a frame keyed as the page landmark, with the
 navigation drawn as a sibling. Sibling route layouts repeat the shape.
+
+**Recognition signs.** The file both builds chrome and receives `children` from the router. Reading it
+shows the boundary between what repeats on every page and what the reader came to see. Remove the mark
+and keyboard and screen-reader users traverse the whole navbar again after every route change.
 
 **Boundary.** This is not `LANDMARK-5`: `LANDMARK-4` requires one file to mark, `LANDMARK-5` forbids
 other files from marking. Two halves of one idea, over different sets of files. Two kinds of layout are
@@ -131,6 +147,10 @@ inside a page whose landmark was already opened one tier above.
 **What it emits in source.** The landmark stays with whoever owns a whole screen — a route file, or the
 page surface — and the carrier decides which of the two. Keys named for reading columns declare no
 `host` at all; only the entry that declares `host: "main"` is a promise.
+
+**Recognition signs.** More than one place on the same screen claims to be "main". The key lives inside
+a block, a composite or a leaf — that is, a PART of the screen. Delete the node and the screen still
+has a page; it has only lost a column.
 
 **Boundary.** Against `LANDMARK-4`, see above. Two carriers, two different sets of files — and merging
 them was once a real defect. The landmark BRANCH is the thing somebody imports to wrap a screen: it

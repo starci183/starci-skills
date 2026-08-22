@@ -288,7 +288,8 @@ function layoutRegionLaws(data) {
 }
 
 function renderContractLaws(data) {
-  const requiresExecutionAuthority = data.schema === 6 || (data.schema === 7 && data.envelope?.stage === "states");
+  const stagedSchema = data.schema === 7 || data.schema === 8;
+  const requiresExecutionAuthority = data.schema === 6 || (stagedSchema && data.envelope?.stage === "states");
   if (!requiresExecutionAuthority || !Array.isArray(data.candidates)) return [];
   const found = [];
   const asSet = (values) => [...new Set(values)].sort();
@@ -304,8 +305,8 @@ function renderContractLaws(data) {
     const at = `candidates[${candidateIndex}]`;
     const contract = candidate.renderContract;
     const prompt = candidate.executionPrompt;
-    if (!contract) found.push(`${at}.renderContract: ${data.schema === 7 ? "states stage" : "schema 6"} requires complete implementation authority`);
-    if (!prompt) found.push(`${at}.executionPrompt: ${data.schema === 7 ? "states stage" : "schema 6"} requires the canonical execution prompt`);
+    if (!contract) found.push(`${at}.renderContract: ${stagedSchema ? "states stage" : "schema 6"} requires complete implementation authority`);
+    if (!prompt) found.push(`${at}.executionPrompt: ${stagedSchema ? "states stage" : "schema 6"} requires the canonical execution prompt`);
     if (!contract || !prompt) continue;
     if (contract.candidateId !== candidate.id) found.push(`${at}.renderContract.candidateId: must equal candidate id ${candidate.id}`);
     if (prompt.candidateId !== candidate.id) found.push(`${at}.executionPrompt.candidateId: must equal candidate id ${candidate.id}`);
@@ -399,19 +400,20 @@ function renderContractLaws(data) {
 }
 
 function stagedLayoutLaws(data) {
-  if (data.schema !== 7 || !Array.isArray(data.candidates)) return [];
+  if (![7, 8].includes(data.schema) || !Array.isArray(data.candidates)) return [];
   const found = [];
   const stage = data.envelope?.stage;
   const asSet = (values) => [...new Set(values)].sort();
+  const directionReceipts = new Map();
   if (stage === "pages") {
     if (!["generate", "brainstorm"].includes(data.envelope?.mode)) found.push("envelope.mode: pages stage requires generate or brainstorm");
     if (data.envelope?.approvedPageAt !== undefined) found.push("envelope.approvedPageAt: pages stage cannot claim approval before the owner approves its page contract");
   } else if (stage === "states") {
     if (data.envelope?.mode !== "expand-states") found.push("envelope.mode: states stage requires expand-states");
-    if (data.candidates.length !== 1) found.push("candidates: states stage expands exactly one approved page contract");
-    if (!/^[a-f0-9]{64}$/.test(data.envelope?.approvedPageAt ?? "")) found.push("envelope.approvedPageAt: states stage requires the approved canonical page-contract hash");
+    if (data.candidates.length !== 1) found.push("candidates: states stage expands exactly one approved direction-and-page selection");
+    if (!/^[a-f0-9]{64}$/.test(data.envelope?.approvedPageAt ?? "")) found.push("envelope.approvedPageAt: states stage requires the approved canonical direction-and-page hash");
   } else {
-    found.push("envelope.stage: schema 7 requires pages or states");
+    found.push(`envelope.stage: schema ${data.schema} requires pages or states`);
   }
 
   for (const [candidateIndex, candidate] of data.candidates.entries()) {
@@ -425,12 +427,31 @@ function stagedLayoutLaws(data) {
     if (!synthesis || !pageContract) continue;
     if (pageContract.candidateId !== candidate.id) found.push(`${at}.pageContract.candidateId: must equal candidate id ${candidate.id}`);
     if (stage === "states") {
-      const pageHash = createHash("sha256").update(canonical(pageContract)).digest("hex");
-      if (pageHash !== data.envelope?.approvedPageAt) found.push(`${at}.pageContract: drifted after page approval; return to the pages stage`);
+      const approvedSelection = data.schema === 8 ? {directionReceipt: synthesis.directionReceipt, pageContract} : pageContract;
+      const pageHash = createHash("sha256").update(canonical(approvedSelection)).digest("hex");
+      if (pageHash !== data.envelope?.approvedPageAt) found.push(`${at}.pageContract: direction or page anatomy drifted after page approval; return to the pages stage`);
     }
 
     const candidatePages = new Map((candidate.pages ?? []).map((page) => [page.id, page]));
     const candidateRegions = new Map((candidate.regions ?? []).map((region) => [region.name, region]));
+    if (data.schema === 8) {
+      const receipt = synthesis.directionReceipt;
+      if (!receipt) {
+        found.push(`${at}.synthesis.directionReceipt: schema 8 must print journey and UI directions separately`);
+      } else {
+      const pageIds = asSet(candidatePages.keys());
+      for (const [kind, direction] of Object.entries({journey: receipt.journey, ui: receipt.ui})) {
+        if (direction && canonical(asSet(direction.pageIds ?? [])) !== canonical(pageIds)) {
+          found.push(`${at}.synthesis.directionReceipt.${kind}.pageIds: must cover the complete candidate page/flow exactly`);
+        }
+      }
+      if (data.envelope?.mode === "brainstorm") {
+        const signature = canonical(receipt);
+        if (directionReceipts.has(signature)) found.push(`${at}.synthesis.directionReceipt: duplicates ${directionReceipts.get(signature)}; brainstorm directions must be materially distinct`);
+        else directionReceipts.set(signature, at);
+      }
+      }
+    }
     const pageIntents = new Map();
     const renderIntents = new Map();
     for (const pageIntent of synthesis.pageIntents ?? []) {
@@ -459,6 +480,28 @@ function stagedLayoutLaws(data) {
       if (capabilities.has(capability.regionId)) found.push(`${at}.synthesis.capabilities: duplicate region capability ${capability.regionId}`);
       capabilities.set(capability.regionId, capability);
       if (!candidateRegions.has(capability.regionId)) found.push(`${at}.synthesis.capabilities.${capability.regionId}: unknown candidate region`);
+      if (data.schema === 8) {
+        const obligations = capability.obligations ?? [];
+        const missing = obligations.filter((obligation) => obligation.verdict === "missing");
+        if (capability.verdict === "reuse" && missing.length > 0) {
+          found.push(`${at}.synthesis.capabilities.${capability.regionId}: reuse is forbidden while an obligation is missing`);
+        }
+        if (capability.verdict !== "reuse" && missing.length === 0) {
+          found.push(`${at}.synthesis.capabilities.${capability.regionId}: ${capability.verdict} must expose at least one missing obligation`);
+        }
+        const obligationIntentIds = new Set();
+        for (const [obligationIndex, obligation] of obligations.entries()) {
+          const obligationAt = `${at}.synthesis.capabilities.${capability.regionId}.obligations[${obligationIndex}]`;
+          if (obligationIntentIds.has(obligation.renderIntentId)) found.push(`${obligationAt}.renderIntentId: duplicate capability obligation`);
+          obligationIntentIds.add(obligation.renderIntentId);
+          if (!renderIntents.has(obligation.renderIntentId)) found.push(`${obligationAt}.renderIntentId: unknown render intent ${obligation.renderIntentId}`);
+          const sourceEvidence = (obligation.evidence ?? []).some((item) =>
+            (capability.sourcePaths ?? []).some((path) => item.includes(path))
+            || item.includes(capability.contract)
+            || item.includes(capability.component));
+          if (!sourceEvidence) found.push(`${obligationAt}.evidence: must cite a declared source path, contract or component`);
+        }
+      }
     }
     if (canonical(asSet(capabilities.keys())) !== canonical(asSet(candidateRegions.keys()))) found.push(`${at}.synthesis.capabilities: must classify every candidate region exactly`);
 
@@ -494,6 +537,9 @@ function stagedLayoutLaws(data) {
         for (const regionId of binding.regionIds ?? []) {
           if (!page?.regions?.includes(regionId)) found.push(`${bindingAt}.regionIds: ${regionId} is not owned by page ${intersection.pageId}`);
           if (!capabilities.has(regionId)) found.push(`${bindingAt}.regionIds: ${regionId} has no contract-first capability`);
+          if (data.schema === 8 && !(capabilities.get(regionId)?.obligations ?? []).some((obligation) => obligation.renderIntentId === binding.renderIntentId)) {
+            found.push(`${bindingAt}.regionIds: ${regionId} has no obligation proof for render intent ${binding.renderIntentId}`);
+          }
           boundRegionIds.add(regionId);
         }
         for (const obligation of binding.businessObligations ?? []) boundBusinessObligations.add(obligation);
@@ -505,6 +551,30 @@ function stagedLayoutLaws(data) {
       if (canonical(asSet(boundBusinessObligations)) !== canonical(asSet(intersection.businessObligations ?? []))) found.push(`${at}.synthesis.intersections.${intersection.pageId}.bindings: business rows must equal the page business intersection`);
     }
     if (canonical(asSet(intersections.keys())) !== canonical(asSet(candidatePages.keys()))) found.push(`${at}.synthesis.intersections: must synthesize every candidate page exactly`);
+
+    if (data.schema === 8 && stage === "states") {
+      const selectedPageIds = new Set((candidate.renderContract?.renders ?? []).map((render) => render.pageId));
+      const riskPageIds = new Set((synthesis.pageIntents ?? [])
+        .filter((pageIntent) => pageIntent.routeStatus !== "existing")
+        .map((pageIntent) => pageIntent.pageId));
+      for (const capability of capabilities.values()) {
+        if (capability.verdict !== "reuse") {
+          const pageId = candidateRegions.get(capability.regionId)?.pageId;
+          if (pageId) riskPageIds.add(pageId);
+        }
+      }
+      for (const pageId of riskPageIds) {
+        if (!selectedPageIds.has(pageId)) found.push(`${at}.renderContract.renders: new/changed route or non-reuse capability page ${pageId} must enter parity proof`);
+      }
+
+      const sourceBoundary = new Set(candidate.renderContract?.sourceBoundary ?? []);
+      for (const capability of capabilities.values()) for (const obligation of capability.obligations ?? []) {
+        if (obligation.verdict !== "missing") continue;
+        for (const requiredPath of obligation.requiredPaths ?? []) {
+          if (!sourceBoundary.has(requiredPath)) found.push(`${at}.renderContract.sourceBoundary: missing capability path ${requiredPath}`);
+        }
+      }
+    }
 
     const anatomyByPage = new Map((pageContract.pages ?? []).map((page) => [page.pageId, page]));
     const inventoryByPage = new Map((pageContract.stateInventory ?? []).map((page) => [page.pageId, page]));
@@ -558,12 +628,12 @@ function pageSetLaws(data) {
   const found = [];
   const candidates = data.candidates;
   const first = candidates[0];
-  if (data.schema === 7 && data.envelope?.stage === "states" && candidates.length !== 1) found.push("candidates: states stage requires exactly one approved complete long-page/full-flow result");
+  const stagedSchema = data.schema === 7 || data.schema === 8;
+  if (stagedSchema && data.envelope?.stage === "states" && candidates.length !== 1) found.push("candidates: states stage requires exactly one approved complete long-page/full-flow result");
   else if (data.schema >= 5 && data.envelope?.mode === "generate" && candidates.length !== 1) found.push("candidates: generate mode requires exactly one complete long-page/full-flow result");
   else if (data.schema >= 5 && data.envelope?.mode === "brainstorm" && (candidates.length < 3 || candidates.length > 4)) found.push("candidates: explicit brainstorm mode requires 3-4 targeted alternatives");
-  else if (data.schema >= 5 && !["generate", "brainstorm", ...(data.schema === 7 ? ["expand-states"] : [])].includes(data.envelope?.mode)) found.push(`envelope.mode: schema ${data.schema} requires generate, brainstorm${data.schema === 7 ? ", or expand-states" : ""}`);
+  else if (data.schema >= 5 && !["generate", "brainstorm", ...(stagedSchema ? ["expand-states"] : [])].includes(data.envelope?.mode)) found.push(`envelope.mode: schema ${data.schema} requires generate, brainstorm${stagedSchema ? ", or expand-states" : ""}`);
   else if (data.schema < 5 && (candidates.length < 3 || candidates.length > 4)) found.push("candidates: legacy page/flow review requires 3-4 complete page-set choices");
-  if (data.schema >= 5 && data.envelope?.mode === "brainstorm" && !/^[a-f0-9]{64}$/.test(data.envelope?.baselineCandidateAt ?? "")) found.push("envelope.baselineCandidateAt: brainstorm requires the reviewed generated baseline");
   if (data.schema >= 5 && data.envelope?.mode === "generate" && data.envelope?.baselineCandidateAt !== undefined) found.push("envelope.baselineCandidateAt: generate mode has no earlier candidate dependency");
 
   const scopeSignature = canonical((first?.pages ?? []).map((page) => ({id: page.id, route: page.route, state: page.state})));
@@ -625,8 +695,17 @@ function pageSetLaws(data) {
 function blockModeLaws(data) {
   if (data.schema !== 2 || !Array.isArray(data.anatomies)) return [];
   const found = [];
+  const uiDirections = new Map();
+  for (const [index, anatomy] of data.anatomies.entries()) {
+    if (!anatomy.uiDirection) found.push(`anatomies[${index}].uiDirection: schema 2 block work must print one UI direction`);
+    else if (data.envelope?.mode === "brainstorm") {
+      const signature = canonical(anatomy.uiDirection);
+      if (uiDirections.has(signature)) found.push(`anatomies[${index}].uiDirection: duplicates anatomies[${uiDirections.get(signature)}]; brainstorm UI directions must be materially distinct`);
+      else uiDirections.set(signature, index);
+    }
+  }
   if (data.envelope?.mode === "audit") {
-    if (data.anatomies.length !== 1) found.push("anatomies: audit mode requires exactly one Layout-generated current anatomy");
+    if (data.anatomies.length !== 1) found.push("anatomies: audit mode requires exactly one audited/corrected UI direction inside the Layout-generated parent");
     if (!data.audit || !["pass", "correct"].includes(data.audit.verdict)) found.push("audit: audit mode requires pass or correct verdict");
     if (data.audit?.verdict === "correct" && !data.audit.correction) found.push("audit.correction: correct verdict requires the exact correction");
   } else if (data.envelope?.mode === "brainstorm") {

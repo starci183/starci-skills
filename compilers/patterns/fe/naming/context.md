@@ -81,6 +81,11 @@ defined before it is used. A `const` cannot be used before it exists, so the fil
 in the order it actually runs. `export default function` costs one more thing: the export has no name
 to grep at its call sites.
 
+**Recognition signs.** The declaration sits flush at the left margin and its parent is the module
+itself or an `export` statement. Somewhere in the file a name defined BELOW is called and still runs.
+You have to scroll up and then down to find where a name comes from. Ask: reading this file top to
+bottom, is there a place that uses a name which has not appeared yet?
+
 **Boundary.** This is not a nested declaration: a `function` inside the BODY of another function is
 not module level, because hoisting within a single body does not destroy the order of the file — that
 body is read as one unit. It is not `NAMING-2` either: this code states HOW a thing is declared, not
@@ -97,6 +102,10 @@ codebase using both has two vocabularies for one idea, and every writer has to d
 this file is speaking. `on` is the spelling that survives the trip: the slot is already `on`, the DOM
 attribute is already `onClick`, the props type already declares `on…` — so a local named `handlePress`
 is renamed at the boundary, every time, and every rename is an occasion to be wrong.
+
+**Recognition signs.** It does not return a value to display; it CAUSES something. It appears on the
+right-hand side of a prop or a DOM attribute. Within one screen the same name exists in two different
+spellings. Ask: is what runs it the reader's action, or the render pass?
 
 **Boundary.** It is not a value: something that COMPUTES a result taking `on` is a false statement
 about the thing, and this rule does not ask for it — a label built from data is a value, not a
@@ -119,6 +128,11 @@ check is two-part, because a path cannot carry diacritics: `cấp phát` reaches
 is deliberate rather than lazy — guessing by the shape of the letters would refuse `capacity` and
 `dangerous`, and a rule that reports errors on English words is a rule that gets turned off, and a
 rule that is off holds nothing.
+
+**Recognition signs.** The segment carries tone marks, or is an accent-stripped word of another
+language. The letters in the URL match the letters displayed on screen — the sign that somebody used
+content as an address. The import specifier reads like a sentence rather than like an address. Ask: is
+this segment an ADDRESS or is it CONTENT? Content belongs in the locale catalogue.
 
 **Boundary.** It is not the locale catalogue: a translation dictionary IS the other language, that is
 content, and switching it is the point — though the name of the catalogue file itself is still an

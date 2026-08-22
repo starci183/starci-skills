@@ -40,7 +40,7 @@ strength.
 | `export-matches-folder` | `FILE-1` | `mismatch` — names the folder, lists every direct named export it collected, and asks for the folder's own name or a prefixed member |
 | `no-runtime-namespace` | `FILE-4` | `namespace` — names the binding and lists the members, then states the bundling cost |
 | `monorepo-tier-belongs-to-its-side` | `FILE-5` | `featureInPackage` when a feature tier sits in the shared package, `vocabularyInApp` when a shape tier sits inside one app; each names the tier and the destination |
-| `source-tier-marker-matches-folder` | `FILE-7` | `mismatch` — names the tier and the declared `meta.shape` value, then requires the path owner and marker to agree |
+| `source-tier-marker-matches-folder` | `FILE-7` | `mismatch` — names the tier and the declared `meta.shape` value, then asks for the path owner and source marker to agree |
 | `no-shell-tier` | `FILE-8` | `shell` — names the untyped `shells/` path and sends the owner to a named branch with typed contract content |
 | `unit-test-colocated` | `FILE-9` | `suffix` for `.test.` units and `bucket` for a frontend unit/E2E test tree; sends the spec beside its owner |
 
@@ -50,8 +50,8 @@ instead is the reach of those machines: six are path-only, two use a path gate b
 one reads source without a path gate, and the Escape hatches section below is the honest list of what
 that leaves through.
 
-The source's own file header describes "four rules". It publishes nine. The header is stale; the export
-table is the truth.
+The source's own file header describes "four rules". It publishes nine. The header is stale; the
+export table is the truth.
 
 ## Reading a diff
 
@@ -229,23 +229,24 @@ other file-layout rules.
 **What it reports.** `mismatch` — names the tier and the exported `meta.shape` value that disagrees
 with it. The report points at the literal shape value, once for each mismatched `meta` declaration.
 
-**How it detects.** The normalised filename is matched against
+**How it detects.** The filename is normalised and matched against
 `/(?:src\/components|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/)?)/(leaves|composites|branches|blocks|layouts|overlays|pages)\//`.
-The expected markers are `leaf`, `composite`, `branch`, `block`, `layout`, `overlay` and `page`.
-Inside an exported `VariableDeclaration`, only a declarator named `meta` is inspected; its
-`TSAsExpression` and `TSSatisfiesExpression` wrappers are removed, then a non-computed `shape` property
-is read when its value is a string literal.
+The expected markers are `leaf`, `composite`, `branch`, `block`, `layout`, `overlay` and `page`
+respectively. In an exported `VariableDeclaration`, only a declarator named `meta` is inspected;
+its `TSAsExpression` and `TSSatisfiesExpression` wrappers are removed, then a non-computed
+`shape` property is read when its value is a string literal.
 
 **What it cannot see.** A tier outside the closed path expression — including `contracts/`, `shells/`,
 a package tree with `src/components/`, or a root-level `components/` tree — is out of scope. A
 non-exported `meta`, a non-variable export, a computed `shape`, a spread or method, a non-literal
-shape, and a nested `meta` are not inspected. The `contracts` expected-marker entry is unreachable
-because `contracts` is absent from the path expression. The rule checks only the marker; it does not
-prove the file behaves like the tier.
+shape, and a `meta` object nested in another declaration are not inspected. The `contracts` entry in
+the implementation's expected-marker map is unreachable because `contracts` is absent from its path
+expression. The rule also checks only the declared marker; it does not prove that the surrounding
+file actually behaves like the tier.
 
 **Boundary.** This rule joins one path fact to one source fact. `no-shell-tier` owns the forbidden
-shell path; the other file-layout rules own cardinality, helpers, exports, namespaces and workspace
-side placement.
+shell path; the other file-layout rules own folder cardinality, helpers, exports, namespaces and
+workspace side placement.
 
 ## `no-shell-tier` — FILE-8
 
@@ -255,17 +256,17 @@ linted file, on `Program`.
 
 **How it detects.** The normalised filename is matched against
 `/(?:src\/components|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/)?)\/shells\//`:
-single-app `src/components/shells/`, package `packages/<name>/src/shells/`, and app
-`apps/<name>/src/shells/` or `apps/<name>/src/components/shells/` all fire. The rule reads no AST and
-has no import or metadata inspection.
+single-app `src/components/shells/`, package `packages/<name>/src/shells/`,
+and app `apps/<name>/src/shells/` or `apps/<name>/src/components/shells/` all fire. The rule reads no
+AST and has no import or metadata inspection.
 
 **What it cannot see.** `shells/` outside those three layout prefixes, a root-level `app/` or
 `components/` tree, and a shell-like folder with another name are out of scope. Imports containing
-`/shells/` in an otherwise legal file and `meta.shape = "shell"` are invisible: this published rule
-is path-only. An extension the consuming ESLint glob does not lint reaches no rule.
+`/shells/` in an otherwise legal file and `meta.shape = "shell"` are also invisible: this published
+rule is a path rule only. An extension the consuming ESLint glob does not lint reaches no rule.
 
-**Boundary.** This rule forbids the physical shell tier. It does not migrate files, validate the named
-branch, inspect contract slots, or enforce the separate marker law in `FILE-7`.
+**Boundary.** This rule forbids the physical shell tier. It does not migrate files, validate the
+named branch, inspect contract slots, or enforce the separate marker law in `FILE-7`.
 
 ## Detection
 
@@ -317,12 +318,23 @@ repository.
 | `export-matches-folder` | **`export * from "./component"`**, `export default`, `export class` and `export enum`, **one matching export carrying any number of unrelated passengers**, a non-PascalCase folder or a half that is not `index` or an extension that is not `.ts`/`.tsx`, and `export type` |
 | `no-runtime-namespace` | **`Object.assign(CardRoot, { Header, Footer })`**, `Card.Header = CardHeader` after the declaration, declare-then-`export { Card }`, `export default { Root, Header }`, **one lower-case member such as `displayName`**, `satisfies` instead of `as`, quoted keys, and a lower-case binding |
 | `monorepo-tier-belongs-to-its-side` | **`packages/ui/src/components/blocks/…`** — the same violation with one extra segment — a workspace named `libs/`, `services/` or `modules/`, **a domain-aware component in `packages/ui/src/leaves/<Name>/`**, and shared vocabulary parked in one app's feature tier |
-| `source-tier-marker-matches-folder` | **`contracts/` and `shells/` paths**, package `src/components/` paths, root-level trees, non-exported or non-variable `meta`, computed/spread/method `shape`, non-literal shape values, nested `meta`, the unreachable `contracts` expected-marker entry, and an extension the runner does not lint |
+| `source-tier-marker-matches-folder` | **`contracts/` and `shells/` paths**, package `src/components/` paths, root-level trees, non-exported or non-variable `meta`, computed/spread/method `shape`, non-literal shape values, nested `meta`, the unreachable `contracts` expected-marker entry, and a file whose extension is not linted |
 | `no-shell-tier` | **`shells/` outside the three supported prefixes**, shell-like names other than `shells`, imports containing `/shells/`, `meta.shape = "shell"`, root-level trees, and unlinted extensions; the rule is path-only |
 
 That is the honest summary: all nine codes are held. Six holders decide from a path string alone,
 two join a path gate to a narrow source read, and one reads source without a path gate. An ordinary
 rename or one extra folder segment can therefore remove a rule rather than failing it.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | The path the runner passes as `context.filename`, before normalisation |
+| tier segment | Which of `pages`, `layouts`, `overlays`, `blocks`, `leaves`, `composites`, `branches`, `shells`, `contracts` the path names; FILE-7 recognises only its closed seven-tier path set |
+| workspace shape | Whether the repository has a `packages/` and `apps/` split, and whether the tree nests under `components/` |
+| export list | For the three source-reading rules: every direct named export, its node type and its initialiser |
+| source marker | For `source-tier-marker-matches-folder`: an exported variable named `meta`, its unwrapped object literal and literal `shape` property |
+| runner globs | Which extensions the consuming config actually lints — an unlinted file reaches no rule at all |
 
 ## Rules
 

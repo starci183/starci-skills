@@ -362,6 +362,16 @@ The machinery every rule shares, and the two rules that reach outside the file.
 | literal-class and host rules | **The four named surface branches, including nested subfolders.** The exemption is total rather than scoped to the wrapper seam: a fifth surface branch gets none, and a helper filed under one of the four gets a full one |
 | table rules | **A table copy inside a plan record.** Only `no-dead-contract-key` skips `/.artifacts/`, so the source-AST table rules, including `contract-children-are-typed`, still lint a design candidate's copied vocabulary as if it shipped |
 
+## Inputs
+
+| Input | What reads it |
+|---|---|
+| `context.filename` | Every rule |
+| The file's AST | Source-node rules, including `contract-children-are-typed` and `no-structural-arrangement-in-leaf` |
+| The contract table on disk, read as TEXT | `no-unknown-contract-key` |
+| The repository tree on disk | `no-dead-contract-key` |
+| The table's mtime | The key cache, which invalidates on it |
+
 ## Rules
 
 1. A rule that cannot read what it needs stays SILENT. A missing table, an unparsable table and an

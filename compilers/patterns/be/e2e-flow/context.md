@@ -90,6 +90,10 @@ resolver am I testing" but **which business sentence is being promised**.
 and a verb — *a learner buys a course and can then start learning* — and a `describe` string stating
 the same sentence as the filename.
 
+**Recognition signs.** The filename reads as a sentence with a subject and a verb. The `describe`
+string says the same sentence as the filename. Someone who did not write the file can guess what it
+proves before opening it. Ask: if this file were deleted, which business promise loses its guard?
+
 **Boundary.** Not `E2E-2`: `E2E-1` says what the file **is**, `E2E-2` says how the inside is
 **divided** — a correct name with one `it` swallowing everything still fails `E2E-2`. Not `E2E-8`: a
 file named after an infrastructure module (`app.e2e-spec.ts`) is not a flow at all, it is the sign
@@ -101,6 +105,10 @@ that wiring has leaked into this lane.
 
 **What it emits in source.** One `it` per stage, in business order, inside one `describe`; shared
 state is declared at the `describe` scope and assigned in the step that produces it.
+
+**Recognition signs.** Each `it` reads as a business step, not a technical call. On failure the
+runner prints the step name, and later steps are skipped rather than failing in a chain. Ask: reading
+only the red line, without opening the file, do I know which stage broke?
 
 **Boundary.** Not `E2E-7`: `E2E-2` divides a flow into steps, `E2E-7` forbids a branch **inside** one
 step — correct splitting does not rescue a step containing an `if`. Not `E2E-6`: an absence step is
@@ -117,6 +125,10 @@ needs time to finish.
 
 **What it emits in source.** A bounded poll of the awaited state: a predicate plus a deadline, whose
 failure message names the state that was waited for, never the word "timeout".
+
+**Recognition signs.** An `await` on a function named `sleep`, `delay`, `wait`, `pause`, or a
+`Promise` wrapping `setTimeout`. A millisecond number nobody can explain. File history showing that
+number only ever going up. Ask: which state am I waiting for? If that has an answer, poll that state.
 
 **Why sleeping is wrong in both directions at once.** Too short and the suite goes red for a reason
 that is not a defect; too long and **every** run pays for the worst case. Both get "fixed" by raising
@@ -138,6 +150,11 @@ consequence lives.
 entity manager of the primary datasource, the message, or the subsequent query — with the assertion
 made against that read, not against the transport envelope.
 
+**Recognition signs.** The step asserts only `statusCode`, an empty `errors`, or `data.x` in the
+returned envelope. There is no read from database, message or subsequent query. If the handler wrote
+to the wrong table but still returned `200`, the step would stay green. Ask: if the server answered
+correctly but **wrote nothing**, would this step go red?
+
 **What an envelope proves.** Only that the server answered. That is a transport event, not a business
 consequence.
 
@@ -157,6 +174,10 @@ real client and await exactly that message.
 **What it emits in source.** A real socket client and an await on the NEXT message matching a
 predicate, with assertions on content and recipient — no length assertion and no hand-reset recorder.
 
+**Recognition signs.** An `expect(...).toBe(2)` on the length of a message array. A global recorder
+reset by hand between steps. Adding one more subscriber to the system turns this step red. Ask: if
+the payload were **wrong** but the number of recipients **right**, would this step go red?
+
 **Why counting is wrong.** The number encodes how many listeners happen to be connected today. Add a
 third listener and a correct system turns red; send the wrong payload to the right number of people
 and a broken system stays green. Counting is an implementation detail of fan-out; **content** is the
@@ -175,6 +196,11 @@ access must stay **closed**.
 **What it emits in source.** At least one named step proving the absence, with a second actor
 standing outside, observed across a short, explicitly stated silence window.
 
+**Recognition signs.** The file contains only "then it must arrive" steps and no "then it must not
+arrive" step. There is no second actor standing outside to prove nothing leaked. A system that
+broadcast everything to everybody would pass the whole file clean. Ask: if the system sent everything
+to everyone, would this file catch it?
+
 **Why this is the most important failure.** It is **invisible on the happy path**. A leak makes
 nobody complain: the person who should receive still receives. Only an absence step can see it.
 
@@ -190,6 +216,11 @@ silence window must be short and explicitly stated.
 **What it emits in source.** One unconditional assertion per step: the condition is forced to happen
 and then asserted flatly, or the case leaves this file. No `IfStatement`,
 `ConditionalExpression`, `SwitchStatement` or statement-level `LogicalExpression` inside a step.
+
+**Recognition signs.** An `if`, a ternary, a `switch`, or `a && expect(...)` standing as a statement
+inside an `it`. An `expect` sitting in a branch that does not always run. Two runs going green two
+different ways, proving two different things. Ask: on the run that **skipped** this branch, what did
+the file prove?
 
 **Why green becomes empty.** A branch inside a step means the test **accepts both paths**, so a green
 run is no longer evidence that the business is correct — it only proves the code reached the end. The
@@ -209,6 +240,11 @@ infrastructure, not to the flow file.
 the spec's first line; the spec file itself contains no wiring of its own, and a per-flow override
 re-declares exactly the one token it overrides.
 
+**Recognition signs.** A flow file opening with two hundred lines of `Test.createTestingModule`.
+Changing one infrastructure provider means editing twenty-five files. Two flow files standing the
+world up **slightly differently**, with nobody knowing where they differ. Ask: when the wiring
+changes, how many files change with it?
+
 **Boundary.** Not `E2E-12`: the shared infrastructure decides what is scripted **by default**, and a
 flow overrides it by re-declaring that same token — overriding is legitimate, **copying the whole
 world** to override one token is not. Not `E2E-9`: the world supplies the actor **factory** and the
@@ -224,6 +260,10 @@ It belongs to a gate that can see the whole tree, not to a rule that sees only o
 **What it emits in source.** Calls to the world's actor factory taking a NAME, persisting a fresh row
 per flow; no ordinal is accepted and no actor is shared between flows.
 
+**Recognition signs.** Magic ordinals: `accountNumber: 8`, `userId: 3`. An actor taken from a shared
+seed instead of minted fresh. Two files run at the same time and both go red inexplicably. Ask: if
+this file ran **at the same time** as another, would the two tread on each other?
+
 **Why an ordinal is debt.** It tells the reader nothing, and it **collides silently** when two flows
 pick the same number. A name both describes the role and forces each flow to mint its own actor — so
 flows share no state and run in any order.
@@ -238,6 +278,11 @@ above.
 
 **What it emits in source.** Nothing: the step name and the assertion are the spec's only output. No
 `console.log`, `console.debug` or framework logger anywhere in a spec file.
+
+**Recognition signs.** A `console.log`, `console.debug`, or a framework logger inside the spec file.
+The output of a green run being longer than the list of step names. On failure, the assertion line
+being pushed off the screen. Ask: when it goes red, what does the reader **need**? The step name and
+the assertion — the runner already prints both.
 
 **Boundary.** Not `E2E-2`: if you need a log to know which step is running, what is missing is a
 **step name**, not a log. Not `E2E-4`: if you need a log to know the state, what is missing is **a
@@ -255,6 +300,11 @@ or realtime delivery.
 **What it emits in source.** Entry through GraphQL, HTTP, a socket, a publish to the real broker, or
 letting the real scheduler fire; a worker may be imported so the framework registers it, and nothing
 in the file resolves an internal actor to drive the flow.
+
+**Recognition signs.** The file imports a bus and calls `execute` itself "to move the flow along
+faster". The file resolves a `*Worker` / `*Handler` from the container and calls `process` directly.
+Retry, ack, locking and competing-consumer behaviour appear **nowhere** in the file. Ask: if
+serialization or ack broke, would this file go red?
 
 **The narrow, decisive boundary.** **Importing** a worker so the framework can register it is
 **correct and required**. **Resolving it and calling** an internal method is refused: the direct call
@@ -278,6 +328,12 @@ SMTP, a code-grading sandbox, a transcoder.
 **What it emits in source.** A script over the concrete external client's own seam — its `invoke` /
 `stream` function, or the gateway's HTTP call — and nothing inside it; no provider SDK is imported in
 a spec.
+
+**Recognition signs.** A mock placed on one of **your own** services: the provider selector, the
+balancer, the action router, the billing path. The file importing a provider SDK directly. Fallback,
+attribution, rollback and idempotency having **no remaining way** to go red. Ask: if the **internal
+policy** picked the wrong provider, the wrong refund path, the wrong entitlement — would this file go
+red?
 
 **Where the seam is.** At the **concrete external client**: its `invoke` / `stream` function, or the
 gateway's HTTP call. Everything **inside** that seam — key rotation, health cache, entitlement,

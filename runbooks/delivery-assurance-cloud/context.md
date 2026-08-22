@@ -42,10 +42,12 @@ This order is mandatory for every assured frontend or backend:
 1. Local lint finishes with zero errors/warnings; typecheck and build pass.
 2. Generate **exactly one** LCOV report. Two runs for two dashboards is drift, not stronger assurance.
 3. Prove statements/functions/lines >=80%, branches >=75% and new-code/patch >=90% for each metric.
-4. Run every declared E2E entrypoint; real non-skipped tests all pass and an empty lane fails.
-5. Run authenticated local Sonar analysis from the exact checkout and wait for the quality gate.
-6. Query provider evidence and prove the strict profile below on the exact checkout SHA.
-7. Repair every failed condition and rescan until the whole profile passes; only then trust provider CI.
+4. Run every declared E2E entrypoint; real non-skipped tests all pass and an empty lane is a failure.
+5. Run authenticated local Sonar analysis from the exact checkout, against the local service.
+6. Wait for the quality gate — `sonar.qualitygate.wait=true` with a timeout of at least 600 seconds.
+7. Query provider evidence and prove the strict profile below on the exact checkout SHA.
+8. Treat any failed condition as a **source repair finding**, not a provider or CI problem.
+9. Repair the source and rescan until the whole profile passes; only then trust provider CI.
 
 "Unmeasured" and "scan uploaded" are not ready. A red gate deferred to CI is a red gate hidden, not
 handled.
@@ -61,11 +63,16 @@ Two further constraints hold whenever analysis runs:
 
 ## Strict Sonar profile
 
-Idempotent gate reconciliation plus authenticated proof requires gate `OK`, bugs/vulnerabilities/code
-smells 0, hotspots reviewed 100%, three A ratings, duplicated-lines density ≤3% overall/new, native
-coverage >=80% overall and >=90% new, and latest analysis SHA equal to checkout. Jest/Vitest owns the four
-distinct metrics; Codecov and Sonar use the same LCOV and gate native project/new metrics only. Scanner and
-admin/operator authority are distinct encrypted tokens and neither may enter logs or arguments.
+The assigned gate is reconciled idempotently, then authenticated API proof requires Quality Gate `OK`,
+bugs, vulnerabilities and code smells equal to zero, security hotspots reviewed 100%, maintainability,
+reliability and security rating A, duplicated-lines density no more than 3% overall and on new code,
+native coverage at least 80% overall and 90% on new code, and latest analysis SHA equal to the checkout.
+Jest/Vitest enforces the four distinct coverage metrics. Codecov and Sonar consume the same LCOV and gate
+their native project/new coverage metrics only. Badges are visibility, not policy evidence.
+
+The project analysis token scans. Quality-gate reconciliation and hotspot proof may require a distinct
+admin/operator token. Both stay encrypted and enter only through process environment or stdin; neither is
+printed, passed as an argument or stored in plaintext.
 
 ```powershell
 $env:SOPS_AGE_KEY_FILE = "$HOME\.starci\master.identity"
@@ -111,8 +118,9 @@ node .claude/scripts/publish-secret.mjs --name CODECOV_TOKEN --stack ".::dev/run
 ```
 
 4. Keep `coverage/lcov.info`, `codecov/codecov-action@v5`, `fail_ci_if_error: true`, and blocking project/
-patch statuses in `codecov.yml`: native project 80% and patch 90%; the runner separately enforces S/F/L
-80%, branches 75% and new-code 90% per metric. A target is raised by covering code, never by adding an
+patch statuses in `codecov.yml`: native project coverage 80% and patch coverage 90%. The local runner
+separately enforces statements/functions/lines 80%, branches 75% and new-code 90% for each metric.
+A coverage target is raised by covering code, never by adding an
 exclusion.
 
 ### SonarQube
@@ -161,6 +169,9 @@ expected GitHub Apps. Required checks must be observed first; do not invent a co
 
 A quality gate reported as `NONE` means the project has never been analysed. That is unmeasured, not
 clean, and it never supports a ready verdict.
+
+Verification also runs the Source quality and Sonar assurance machines; a green workflow or badge without
+exact-SHA metric proof remains incomplete.
 
 ## Stop or rollback
 

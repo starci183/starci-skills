@@ -9,13 +9,14 @@
 
 ## Record
 
-You are given one Layout-generated region inside its complete current page. Default `audit` returns one current
-anatomy plus pass/exact findings and correction. Explicit owner `brainstorm` alone returns 3–4 targeted anatomies
-inside the same parent geometry.
+You are given one Layout-generated region inside its complete current page. Direction is mandatory inside the
+block workflow. Default `audit` prints one audited/corrected UI direction plus pass/exact findings. Explicit owner
+`brainstorm` before direction approval returns 3–4 targeted UI directions inside the same parent geometry. The
+parent page and Layout journey direction stay fixed.
 
 ## Law
 
-An anatomy names the parts, how many times the block rests, every state it draws, and who owns its data.
+An anatomy prints its UI direction, names the parts, how many times the block rests, every state it draws, and who owns its data.
 It never names a class.
 
 **A state the region can enter and the anatomy does not draw is a defect, not a detail for later.** The
@@ -113,7 +114,8 @@ an anatomy.
 3. `repeats` carries a `restingCount`.
 4. Every part cites a name that exists, or declares a new one with its `why`.
 5. No two anatomies in a batch share the whole axis set.
-6. `audit` returns exactly one current anatomy and verdict. Explicit `brainstorm` returns 3–4 anatomies varying only the requested axis; decoration alone is a duplicate.
+6. Direction is mandatory. `audit` returns exactly one audited/corrected UI direction and verdict. Explicit owner
+   `brainstorm` before direction approval returns 3–4 UI directions varying only the requested axis; decoration alone is a duplicate.
 7. A missing product decision is returned to the owner.
 8. The JSON is canonical, and its hash is what approval attaches to.
 9. Feedback opens a new round; an accepted anatomy is never edited in place.
@@ -142,12 +144,13 @@ The anatomy hash is a cache key only and covers one anatomy.
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "envelope": {
     "round": 1,
     "project": "example-app",
     "region": "criteria",
-    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c"
+    "parentAt": "f5534ef5e7fbe30c385108fb95702a64ac66d905414e0f7105873d67822be54c",
+    "mode": "audit"
   },
   "anatomies": [
     {
@@ -155,6 +158,12 @@ The anatomy hash is a cache key only and covers one anatomy.
       "axes": {"dataOwner": "parent", "repetition": "repeats", "weight": "populated", "composition": "label-value"},
       "citesPrecedent": "none",
       "states": ["populated", "empty", "pending"],
+      "uiDirection": {
+        "summary": "Keep criteria comparable inside the unchanged complete parent",
+        "hierarchy": ["Criterion label precedes its stored value"],
+        "responsive": ["Rows retain reading order when the parent narrows"],
+        "emphasis": ["The compared value remains the dominant fact"]
+      },
       "restingCount": 4,
       "parts": [
         {
@@ -165,7 +174,8 @@ The anatomy hash is a cache key only and covers one anatomy.
       ],
       "reason": "why this anatomy is worth the owner's attention"
     }
-  ]
+  ],
+  "audit": {"verdict": "pass", "findings": []}
 }
 ```
 

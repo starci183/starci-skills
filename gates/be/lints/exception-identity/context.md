@@ -197,6 +197,19 @@ The pattern behind most of those rows is one sentence: **the rules recognise one
 silent on every neighbouring shape rather than reporting it.** An early `return` is indistinguishable,
 in a build log, from a clean file.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| Source AST | `ClassDeclaration`, its `superClass`, its `id`, its constructor `MethodDefinition`, that constructor's top-level statements and `params[0]` |
+| Scope decision | Which class gate matched, or that none did |
+| Code argument | `arguments[1]` of the `super()` call: its node type, and its value when it is a string `Literal` |
+| Metadata parameter | The node type of `params[0]` after unwrapping, and the node type of its annotation |
+| Filename | **Nothing.** No rule reads `context.filename`, so no folder, suffix or fixture path exempts a file |
+| Options | **Nothing.** All three declare `schema: []`; there is no configuration surface |
+| Imports | **Nothing.** No module is resolved; the superclass is matched by spelling |
+| Types | **Nothing.** No type is resolved; the metadata annotation is matched by spelling |
+
 ## Rules
 
 1. A rule fires only inside a `ClassDeclaration` whose superclass is the bare identifier

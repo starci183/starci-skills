@@ -97,6 +97,11 @@ component sits there knowing nothing about it.
 state of itself and rests as itself. No sibling file whose only job is to mirror it, and no prop
 named `skeleton`, `placeholder` or `fallback` that takes an element.
 
+**Recognition signs.** A file whose only job is to imitate the shape of another file. A prop named
+`skeleton`, `placeholder` or `fallback` receiving an element. Finishing an edit to the real component
+and having to remember a second place — with nothing to remind you. Ask: if this component gains a
+line tomorrow, does the waiting version gain that line by itself?
+
 **Boundary.** Not `LOADING-2`: `LOADING-1` is the EXISTENCE of a second tree — a file, a prop.
 `LOADING-2` is a second tree written AT THE CALL SITE with a ternary. Same mistake, different place.
 Not `LOADING-7`: `LOADING-1` says WHO DRAWS; `LOADING-7` says WHETHER THE SITUATION HAS A NAME. A
@@ -114,6 +119,11 @@ things.
 change; the tag and the arrangement do not. The measure lives in the component, not rewritten by hand
 at the call site.
 
+**Recognition signs.** The two arms of a ternary name different elements. The resting version's size,
+spacing or corner radius is written by hand at the call site. When the data lands, the text shifts a
+little, because the two elements do not share a measure. Ask: are both arms the same element? If not,
+which one is lying about its measure?
+
 **Boundary.** Not `LOADING-1`: see above — that is a second tree that exists as a file or a prop, this
 one is written inline. Not `LOADING-3`: `LOADING-2` is ONE ELEMENT preserving its shape; `LOADING-3`
 is A WHOLE REGION preserving its height. A line of copy can rest lawfully inside a section that
@@ -129,6 +139,11 @@ column below it jumps down. The reader was in the middle of something and loses 
 count that is a declared decision — a named constant of resting rows substituted for the real rows,
 not a number scattered through JSX and not an accident. In the child-spec union, `repeats: true`
 cannot be written without `restingCount: number`, and `repeats: false` cannot carry one.
+
+**Recognition signs.** `isLoading ? null : …` at REGION level rather than control level. A list that
+draws 0 rows while waiting and 6 rows once it lands. Nowhere declaring "this region rests as N rows" —
+the number is scattered through JSX or missing entirely. Ask: if the data landed now, would anything
+on screen move? And is the resting row count a NAMED DECISION or an accidental consequence?
 
 **Boundary.** Not `LOADING-2`: see above. Not `LOADING-5`: dropping a CONTROL because it has no
 destination yet is lawful; dropping a WHOLE REGION because the data has not arrived is not. The
@@ -146,6 +161,11 @@ be told something.
 rests, and absent the moment it carries content. No per-cell `aria-label` describing the shimmer
 itself.
 
+**Recognition signs.** A resting element with no `aria-hidden`. An `aria-label` describing the shimmer
+itself ("loading…") attached to every cell. Turning on a screen reader and hearing a run of
+whitespace, or the same sentence ten times over. Ask: is there any CONTENT to read at this second? If
+not, why is it still in the accessibility tree?
+
 **Boundary.** Not `LOADING-2`: `LOADING-2` governs what is SEEN keeping its shape; `LOADING-4` governs
 what is HEARD staying silent. An element can satisfy `LOADING-2` and still break `LOADING-4`. Not
 `LOADING-7`: announcing ONCE at region level that something is loading is the frame's business — that
@@ -161,6 +181,11 @@ it and nothing happens — or worse, something wrong happens.
 the item is unresolved — not rendered disabled, not rendered resting. A ternary with a `null` arm is
 the correct shape here.
 
+**Recognition signs.** A control whose `href`, target `id` or handler is currently `undefined`. A
+control drawn `disabled` "so it does not look empty". A control frame already on screen while its
+label is still untranslated. Ask: if the reader pressed this RIGHT NOW, what would they learn? If the
+answer is "that this surface cannot be trusted" — do not draw it.
+
 **Boundary.** Not `LOADING-3`: see above — dropping a control costs nobody their place, dropping a
 region does. Not `LOADING-2`: this is the CLOSED exception to `LOADING-2` — a ternary with a `null`
 arm is not a second tree. And absent, not `disabled`: a greyed-out button is still a promise, it says
@@ -174,6 +199,11 @@ for the slowest one, and four real situations are merged into one.
 **What it emits in source.** One waiting flag per request. Each region resolves on its own request and
 lands when it lands, and each block is asserted resting against its OWN unresolved request, one at a
 time.
+
+**Recognition signs.** `const isLoading = a.isLoading || b.isLoading || c.isLoading`. A `Promise.all`
+gathering unrelated requests purely to produce one state. The whole page blank for three seconds and
+then appearing all at once, instead of filling in over a second. Ask: do these two regions have THE
+SAME ANSWER? If not, why do they share a flag?
 
 **Boundary.** Not `LOADING-3`: see above. Not `LOADING-7`: `LOADING-7` says ONE region must have a
 named `pending` situation; `LOADING-6` says EACH region must have its OWN. A page can satisfy
@@ -190,6 +220,11 @@ those two need two different sentences.
 **What it emits in source.** `pending` standing in the state union beside `ready`, `empty` and
 `failed`, carrying the frame rather than nothing: the region's label, its heading — everything already
 known before the request went out. Only the content is unknown.
+
+**Recognition signs.** A union with only `ready`, `empty`, `failed` — `pending` missing. The waiting
+arm returning `null`, or returning the empty state. The waiting arm carrying no `props`, so the
+region's name disappears while its content is on the way. Ask: looking at this surface while it waits,
+does the reader still know WHICH REGION THEY ARE IN?
 
 **Boundary.** Not `LOADING-1`: see above — having `pending` in the union saves nothing if that arm
 draws a twin. Not `LOADING-3`: `LOADING-7` is HAVING A NAME for the situation; `LOADING-3` is HAVING A

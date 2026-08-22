@@ -103,6 +103,14 @@ and the size the reader's eye sees are two facts of the same thing.
 passed to the outline tag AND used to select the class set — one prop, two facts, in one expression.
 No `h*` tag is written at the call site, and no size-plus-weight pair is assembled to imitate one.
 
+**Recognition signs.**
+
+- Remove the line and the part below it loses its name, not its content.
+- It appears in the page's table of contents if the page has one.
+- People tend to write it as a hand-typed `h*` tag with a few size classes.
+- Ask: if a blind user hears this page's outline, is this line in it? If yes, it is a heading, and a
+  prop must decide its level.
+
 **Boundary.** Not `TYPESET-9`: a card title is not necessarily a heading — the deciding question is
 the outline, not the size. Not `TYPESET-8`: a time label is not a heading even though it stands above
 a whole group of results. Writing the tag in one place and the size in another lets them drift apart:
@@ -118,6 +126,13 @@ section, and inside that there is one more group.
 shape's nesting is flattened in the source until the title can be set with a level the scale has. No
 smaller step is invented, and no bold body line is written to stand in for a level five.
 
+**Recognition signs.**
+
+- The request arrives as "give me one more small step".
+- The DOM tree already has three heading tiers before the real content.
+- The writer plans to substitute a bold body line to look "like a level five heading".
+- Ask: is this a SIZE problem, or a STRUCTURE problem wearing a size problem's clothes?
+
 **Boundary.** Not `TYPESET-1`: `TYPESET-1` says a heading must come from a level; `TYPESET-2` says the
 set of levels is closed. Not `TYPESET-6`: do not solve it by giving a level 4 heading a different
 weight — that is a different violation. The answer is NOT a smaller step. The answer is that the
@@ -131,6 +146,13 @@ background behind it, or to put it in a chip.
 **What it emits in source.** Size, weight and tone classes only. The text leaf draws no border and no
 background, so the box is always somebody else's element; the class list of the line that carries copy
 has no `border-*` and no `bg-*` entry.
+
+**Recognition signs.**
+
+- The box does not correspond to any state — it is there only to stand out.
+- The same surface already carries several similar boxes.
+- Remove the box and no information is lost, only prominence.
+- Ask: what TRUTH is this box stating that size, weight and tone cannot state?
 
 **Boundary.** Not `TYPESET-4`: `TYPESET-3` forbids a medium; `TYPESET-4` names the right direction when
 both sides want prominence. Not a state: a chip saying "completed" or "3 days left" is not this code —
@@ -147,6 +169,13 @@ is to raise the most important one by a step.
 weight or a smaller step — while the contested line keeps the set it already had. The scale's ceiling
 stays where it is; level 1 is `text-xl font-semibold`, not `text-3xl font-bold`.
 
+**Recognition signs.**
+
+- The diff only increases a size or a weight and lowers nothing.
+- On that surface, more lines sit in default tone than in muted.
+- The previous change also raised something a step, for the same reason.
+- Ask: am I making this BIGGER, or making the things around it QUIETER?
+
 **Boundary.** Not `TYPESET-3`: if the raise is being done with a box, that is `TYPESET-3`. Not
 `TYPESET-5`: if the thing competing is the title's own secondary line, that is `TYPESET-5`, and lowering
 it is mandatory rather than a choice. Emphasis is RELATIVE. Raising the important thing raises the
@@ -162,6 +191,14 @@ MORE ABOUT the title; it is not a peer object.
 **What it emits in source.** Two lines whose sets differ by size or by weight, with the secondary line
 strictly below: the title stays at its rank while the facts around it stay at the lower step and muted
 tone. It is never emitted at the same size and the same weight as its title with only the tone changed.
+
+**Recognition signs.**
+
+- Read the secondary line alone and you cannot tell what it is about.
+- It is shorter than the title but currently the same size as the title.
+- It is being made prominent "for rhythm".
+- Ask: if the user could read only ONE line in this cluster, which one do they need? The other must
+  sit below.
 
 **Boundary.** Not `TYPESET-7`: if the secondary line drops to the 12px step, muted tone becomes
 mandatory — that is `TYPESET-7`. Not `TYPESET-9`: `TYPESET-9` picks the step for the TITLE;
@@ -182,6 +219,13 @@ heading component had a `weight` prop.
 **What it emits in source.** A heading call with exactly two fields, `content` and `level`. There is no
 weight field to pass and no `font-*` class beside the heading; the weight lives in the level class set.
 
+**Recognition signs.**
+
+- A `font-*` class sits next to a heading.
+- A request arrives for "level 3 headings bolder, just on this screen".
+- Two screens use the same heading level but look different.
+- Ask: if the level already decided the weight, what is the weight I am about to add DECIDING AGAIN?
+
 **Boundary.** Not `TYPESET-9`: body text DOES have a weight axis, and that is the only legal place to
 use it. Not `TYPESET-1` — or rather, a "heading" assembled from a large size and a heavy weight is not a
 heading at all: the outline does not contain it, so it belongs to `TYPESET-1`. A heading already carries
@@ -196,6 +240,14 @@ and keeps the foreground tone.
 **What it emits in source.** The union branch `{ size: "xs"; tone?: "muted" }` — a foreground 12px line
 is impossible to write, and the component re-derives the tone at runtime, ignoring a caller's tone when
 the size is `xs`. Copy the user MUST read to get their work done is emitted at 14px or larger instead.
+
+**Recognition signs.**
+
+- The 12px line carries information the user MUST read in order to act.
+- It was set to 12px because the space was narrow, not because it is supporting.
+- It stands alone, with no primary line for it to qualify.
+- Ask: if this line must keep the primary tone, is it still supporting copy? If not, it stays at 14px
+  or above.
 
 **Boundary.** Not `TYPESET-8`: a time label partitioning results STAYS at 14px even though it is also
 muted — it partitions a scan region rather than explaining any line. Not `TYPESET-5`: `TYPESET-5` says a
@@ -212,6 +264,13 @@ QUALIFIES the group of results directly beneath it.
 below told to hide its own label — so one group of results is never named twice at two different ranks.
 No heading level, and not the joined surface's own label treatment.
 
+**Recognition signs.**
+
+- The label is generated from data, not from the page's structure.
+- The number of labels varies with the data; three today, one tomorrow.
+- Below it sits a list surface that already has a label of its own.
+- Ask: if the data went empty, would this line disappear? If yes, it is not a section of the page.
+
 **Boundary.** Not `TYPESET-1`: giving it a heading level WRONGLY PROMOTES every time marker into a
 section of the page, and the page's outline grows with the data. Not `TYPESET-7`: it is muted but does
 NOT drop to 12px, because it explains no line — it partitions a scan region.
@@ -225,6 +284,13 @@ in the outline.
 a large card; 14px medium for compact, repeated or long titles; 14px normal for their descriptions,
 metadata and ordinary values. The evidence for the split is the ratio on the surface — one dominant
 prompt at 16px medium against roughly thirty compact titles at 14px medium.
+
+**Recognition signs.**
+
+- The reason about to be used is "this card has hover", "this is a number", or "there was room here".
+- The same kind of title repeats dozens of times inside one list.
+- The title is long enough to wrap to two lines at the larger step.
+- Ask: does this line STAND FOR AN IMPORTANT OBJECT on display, or is it a repeated row in a list?
 
 **Boundary.** Not `TYPESET-1`: if it is in the outline, do not pick a body step — it is a heading. Not
 `TYPESET-5`: descriptions, meta and ordinary values of that same object sit at 14px normal, not medium.

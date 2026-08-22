@@ -21,6 +21,17 @@ title: starci-setup-mcp
 
 Không có.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | verified workspace routes, selected roles và MCP hostname intent | khóa partitions, read-only scope và publication ownership | MCP desired-state contract | mọi indexed root routed và read-only |
+| kiểm kê-lập kế hoạch | reconciliation | desired state, current index/runtime và control-plane reads | tính index, service, credential và DNS deltas | setup plan | không đưa connector, database hay raw TCP vào scope |
+| reconcile | execution | approved setup plan | build/rebuild partitions, service state và declared publication | setup receipts | credential vẫn encrypted và mutation idempotent |
+| chứng minh | proof | fresh MCP và public endpoint reads | query từng partition, verify isolation/read-only behavior | MCP steady-state proof | selected sources resolve và không có write capability |
+
 ## Chạy
 
 Đọc `@skill-shape`, `@workspaces`, `@mcp` và `@embedding` trước khi resolve ngôn ngữ Source, project cùng đúng các role từ

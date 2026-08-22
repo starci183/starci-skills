@@ -157,6 +157,17 @@ written.
 That last row is the honest summary: of nine codes, two are held, and both are held by one purely
 syntactic rule that a single capitalised binding defeats.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| file path | `context.filename`, or `context.getFilename()`, normalised to forward slashes |
+| scope segment | the literal `/src/` appearing anywhere in that path |
+| exemption segment | the literal `/src/components/leaves/Heading/` appearing anywhere in that path |
+| test suffix | the path ending in `.test.ts`, `.test.tsx`, `.spec.ts` or `.spec.tsx` |
+| element name | the `name` of a `JSXIdentifier` on a `JSXOpeningElement`, equal to its own lower-cased form |
+| level | `Number` of the tag's second character, compared against the constant `4` |
+
 ## Rules
 
 1. The rule's identity is its published name; nothing here assigns it a number.

@@ -208,6 +208,15 @@ were judged.
 That last row is the honest summary: of seven codes, two are held, and the two that are held are
 defeated by one ordinary rename.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| `context.filename` | Absolute or repository-relative path of the file being linted |
+| scope decision | Whether the normalised path contained `/src/components/`, and whether the test/spec pattern matched |
+| source text | Parsed as TypeScript with JSX; the branch rule additionally reads its test back as text |
+| nothing else | No type information, no module resolution, no cross-file reading, no configuration options — every rule declares `schema: []` |
+
 ## Rules
 
 1. A rule's identity is the name it publishes. There is no second identifier for it anywhere; the

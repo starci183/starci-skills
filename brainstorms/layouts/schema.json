@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/brainstorms/layouts/schema.json",
   "title": "Layout candidate batch",
-  "description": "One round of layout brainstorming. `candidates[i]` is what a hash binds to; `envelope` is what changes between runs and is deliberately outside the hash.",
+  "description": "One Layout synthesis direction round. Generate carries one direction; explicit owner brainstorm carries 3-4 complete alternatives. `candidates[i]` is hashed while run-varying envelope data stays outside the hash.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "envelope", "candidates"],
   "properties": {
-    "schema": {"enum": [1, 2, 3, 4, 5, 6, 7], "description": "Schema 7 separates page-anatomy approval from state expansion and source approval. Schema 6 remains compatibility input."},
+    "schema": {"enum": [1, 2, 3, 4, 5, 6, 7, 8], "description": "Schema 8 adds separately printed journey/UI directions, obligation-level capability proof and required-path coverage to the staged page/state contract. Schema 7 remains compatibility input."},
     "envelope": {"$ref": "#/$defs/envelope"},
     "candidates": {
       "type": "array",
@@ -80,7 +80,7 @@
       }
     },
     {
-      "if": {"properties": {"schema": {"const": 7}}, "required": ["schema"]},
+      "if": {"properties": {"schema": {"enum": [7, 8]}}, "required": ["schema"]},
       "then": {
         "properties": {
           "envelope": {"allOf": [{"$ref": "#/$defs/envelope"}, {"required": ["scope", "mode", "stage"]}]},
@@ -112,6 +112,40 @@
           }
         }
       }
+    },
+    {
+      "if": {"properties": {"schema": {"const": 8}}, "required": ["schema"]},
+      "then": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "properties": {
+                "synthesis": {
+                  "required": ["directionReceipt"],
+                  "properties": {
+                    "pageIntents": {
+                      "items": {
+                        "allOf": [
+                          {"$ref": "#/$defs/pageIntent"},
+                          {"required": ["routeStatus"]}
+                        ]
+                      }
+                    },
+                    "capabilities": {
+                      "items": {
+                        "allOf": [
+                          {"$ref": "#/$defs/componentCapability"},
+                          {"required": ["obligations"]}
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -129,8 +163,8 @@
         "scope": {"$ref": "#/$defs/scope"},
         "mode": {"enum": ["generate", "brainstorm", "expand-states"]},
         "stage": {"enum": ["pages", "states"], "description": "Pages is the cache-only page-anatomy review. States is the post-page-approval expansion and exact source-boundary review."},
-        "baselineCandidateAt": {"$ref": "#/$defs/hash", "description": "Required only for explicit brainstorm mode after the owner has reviewed a complete generated baseline."},
-        "approvedPageAt": {"$ref": "#/$defs/hash", "description": "Required in the states stage. SHA-256 of the canonical selected pageContract approved at the pages stage."}
+        "baselineCandidateAt": {"$ref": "#/$defs/hash", "description": "Optional provenance when an explicit brainstorm was requested against an already rendered direction. Direct page-synthesis brainstorming does not require an earlier baseline."},
+        "approvedPageAt": {"$ref": "#/$defs/hash", "description": "Required in the states stage. For schema 8, SHA-256 of the canonical selected directionReceipt plus pageContract approved at the pages stage; schema 7 retains the pageContract-only compatibility hash."}
       }
     },
     "scope": {
@@ -177,11 +211,45 @@
       "additionalProperties": false,
       "required": ["pageIntents", "customerJourneys", "business", "capabilities", "intersections"],
       "properties": {
+        "directionReceipt": {"$ref": "#/$defs/directionReceipt"},
         "pageIntents": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pageIntent"}},
         "customerJourneys": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/customerJourney"}},
         "business": {"$ref": "#/$defs/businessTruth"},
         "capabilities": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/componentCapability"}},
         "intersections": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/designIntersection"}}
+      }
+    },
+    "directionReceipt": {
+      "description": "The two separately printed directions joined into one complete Layout page or flow. Both page sets cover the whole candidate, so multi-page alternatives are flow-level rather than multiplied per page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["journey", "ui"],
+      "properties": {
+        "journey": {"$ref": "#/$defs/journeyDirection"},
+        "ui": {"$ref": "#/$defs/uiDirection"}
+      }
+    },
+    "journeyDirection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "pageIds", "waypoints", "terminalOutcome"],
+      "properties": {
+        "summary": {"type": "string", "minLength": 12},
+        "pageIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "waypoints": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "terminalOutcome": {"type": "string", "minLength": 1}
+      }
+    },
+    "uiDirection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "pageIds", "hierarchy", "responsive", "emphasis"],
+      "properties": {
+        "summary": {"type": "string", "minLength": 12},
+        "pageIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}},
+        "hierarchy": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "responsive": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "emphasis": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
       }
     },
     "pageIntent": {
@@ -190,6 +258,7 @@
       "required": ["pageId", "route", "actor", "entry", "intent", "decision", "outcome", "failureConsequence", "renderIntents"],
       "properties": {
         "pageId": {"$ref": "#/$defs/slug"}, "route": {"type": "string", "minLength": 1},
+        "routeStatus": {"enum": ["existing", "new", "changed"]},
         "actor": {"type": "string", "minLength": 1}, "entry": {"type": "string", "minLength": 1},
         "intent": {"type": "string", "minLength": 1}, "decision": {"type": "string", "minLength": 1},
         "outcome": {"type": "string", "minLength": 1}, "failureConsequence": {"type": "string", "minLength": 1},
@@ -239,8 +308,32 @@
         "regionId": {"$ref": "#/$defs/slug"}, "verdict": {"enum": ["reuse", "generalize", "new-required"]},
         "owner": {"type": "string", "minLength": 1}, "component": {"type": "string", "minLength": 1}, "contract": {"type": "string", "minLength": 1},
         "sourcePaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "obligations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/capabilityObligation"}},
         "why": {"type": "string", "minLength": 12}
       }
+    },
+    "capabilityObligation": {
+      "description": "One visible render-intent obligation tested against real bottom-up source capability before a region may be classified as reuse.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["renderIntentId", "observable", "verdict", "evidence", "requiredPaths"],
+      "properties": {
+        "renderIntentId": {"$ref": "#/$defs/slug"},
+        "observable": {"type": "string", "minLength": 12},
+        "verdict": {"enum": ["supported", "missing"]},
+        "evidence": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "requiredPaths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"verdict": {"const": "supported"}}, "required": ["verdict"]},
+          "then": {"properties": {"requiredPaths": {"maxItems": 0}}}
+        },
+        {
+          "if": {"properties": {"verdict": {"const": "missing"}}, "required": ["verdict"]},
+          "then": {"properties": {"requiredPaths": {"minItems": 1}}}
+        }
+      ]
     },
     "designIntersection": {
       "type": "object", "additionalProperties": false,

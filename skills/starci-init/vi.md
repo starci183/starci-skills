@@ -15,6 +15,17 @@ title: Initialize Source · Vietnamese
 
 Không có. Skill này không tự gọi skill khác.
 
+## PIPELINE
+
+Topology: `reconciliation` qua bốn readiness boundary có thứ tự.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| định danh | execution | machine và encrypted Source identity declarations | reconcile SOPS/age identity mà không chạm target repositories | identity receipt | decrypt identity available và secret-safe |
+| bootstrap | execution | identity receipt và agent bootstrap declarations | reconcile required local bootstrap state | bootstrap receipt | bootstrap reads/checks pass |
+| route | reconciliation | workspace declarations và observed project/role locations | verify và reconcile route records | workspace receipt | mọi requested role resolve chính xác |
+| worktree-chứng minh | execution | verified routes và durable worktree declarations | reconcile project worktree state rồi đọc lại cả bốn boundary | readiness receipt | identity, bootstrap, route và worktree đều xanh |
+
 ## Cách chạy
 
 Đọc `@skill-shape`, rồi `@initialization`. Từ đó, load bốn runtime context module theo đúng thứ tự

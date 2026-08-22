@@ -137,6 +137,16 @@ Three details of that pattern decide most of the behaviour below:
 Every open hatch above is a documented gap, not a permission. Writing one of those forms to avoid a
 report is the violation the law names, whether or not a build agrees.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | The value the linter reports for the file, before normalisation |
+| comment set | Every comment node the parser attached to the program |
+| comment body | The text after the delimiter, untrimmed |
+| flat configuration | Whether `linterOptions.noInlineConfig` is applied beside the recommended rules |
+| severity | Whether the effective configuration keeps the rule at `error` |
+
 ## Rules
 
 1. The identity of the rule is its published name. It carries no numeric code of its own.

@@ -12,6 +12,7 @@ title: Skill shape · Vietnamese
 | `@credential-intake` | `runbooks/secrets/vi.md` | vi | nhận credential operator còn thiếu ngay qua intake ẩn và được mã hóa |
 | `@host-os` | `scripts/check-host-os.mjs` | script | chỉ chọn credential/setup entrypoint được host hiện tại hỗ trợ |
 | `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset và completion transition |
+| `@orchestration` | `orchestration/vi.md` | vi | chia provider-neutral coordinator/worker work mà không chuyển approval hay decision ownership |
 
 
 ## Bản ghi
@@ -71,9 +72,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười chín năng lực
+## Mười bảy năng lực
 
-Mười bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười lăm capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -90,12 +91,10 @@ thể ngay từ đầu nó đã đúng.
 | `starci-diagnose` | một lượt lần theo chỉ-đọc: skill sẽ dừng ở đâu, và cái dừng đó có đúng hay không |
 | `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
-| `starci-fe-design-layout` | chất vấn, preview, duyệt và implement một page/page flow đã bind source trong cùng invocation |
-| `starci-fe-design-block` | đánh giá, preview, duyệt và implement một region trong current complete page ở cùng invocation |
-| `starci-fe-ui-align` | chủ động audit và hội tụ UI responsibility tương đương trên các surface hiện hữu, chỉ evolve authority cho gap đã chứng minh |
-| `starci-fe-feedback-evolve` | biến feedback owner đã chứng minh thành cải tiến authority bền vững nhỏ nhất và source correction |
+| `starci-fe-design-layout` | in journey và UI direction, join thành một complete source-bound page/flow rồi duyệt, seed, implement và prove |
+| `starci-fe-layout-refactor` | sở hữu mọi correction của Layout/Block-rendered output, classify owner feedback là failed-skill signal, evolve durable authority/enforcement layer nhỏ nhất rồi refactor exact impact cone và prove parity |
+| `starci-fe-design-block` | in một UI direction mặc định hoặc 3–4 khi explicit brainstorm cho một region trong complete parent, rồi duyệt, implement và prove |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |
-| `starci-fe-minor-fix` | một correction nhỏ giữ nguyên contract trong một folder block, composite hoặc leaf hiện hữu và sạch; machine reject khi scope lớn lên |
 | `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |
 | `starci-be-plan` | brief backend: file nào, biên giới nào, ca kiểm thử nào |
 | `starci-be-approve` | sự chấp thuận, rồi source backend |
@@ -112,11 +111,45 @@ Không bao giờ in bảng context nội bộ. Nói một câu thân thiện cho
 và role nào đã resolve, hành động hiện tại được chạm boundary nào. Bảng bước bắt buộc bên dưới là execution control cho user, không phải context nội bộ. Chỉ bị chặn khi giá trị context bắt buộc
 không thể tìm từ yêu cầu, workspace route hoặc live evidence.
 
+## Hợp đồng pipeline
+
+Mọi capability được thực thi như một pipeline artifact rõ ràng. Trước khi làm phải resolve một context envelope
+bất biến gồm: identity của lượt chạy, project và role, endpoint của scope, authority đã route, source baseline,
+trạng thái được phép ghi, approval identity, proof obligation và delivery target. Bước sau chỉ nối thêm artifact
+reference; không được âm thầm thay identity trong envelope. Raw chat, screenshot chưa phân loại và prose của agent
+khác chỉ là evidence input, chưa phải handoff artifact.
+
+Mỗi bước khai năm thứ trước khi chạy: context slice được phép đọc, exact input artifacts, phép biến đổi nó sở hữu,
+output artifact hoặc receipt bắt buộc, và gate nhận hay từ chối output đó. Output phải ghi provenance về input.
+Bước sau chỉ dùng output đã pass gate, không dùng draft chưa validate hay bản tóm tắt dựng lại từ trí nhớ hội thoại.
+Nếu durable record hiện hữu đã mang các field này thì dùng record đó; không tạo pipeline file thứ hai chỉ để lặp
+lại cùng authority.
+
+Chọn topology nhỏ nhất nhưng đúng bản chất:
+
+| Topology | Dùng khi | Cách chạy |
+|---|---|---|
+| `dual-track` | hai authority độc lập phải giao nhau trước khi có thể sinh shape | một owner top-down biệt lập, một owner bottom-up biệt lập, rồi một coordinator chỉ join hai output đã pass |
+| `reconciliation` | declared/desired state phải được đối chiếu với observed state | đo hai phía độc lập rồi reconcile delta |
+| `linear` | một authority được biến đổi hoặc ghi lại mà không có nguồn độc lập thứ hai | các bước tuần tự vẫn có input/output/gate receipt; không bịa track thứ hai |
+
+Với `dual-track`, mỗi track chỉ nhận context slice của nó. Track top-down không được thấy proposed implementation;
+track bottom-up không được uốn theo journey region hay đáp án ưa thích. Coordinator chỉ thấy hai output sau khi cả
+hai gate pass và phải sinh binding matrix rõ ràng. Obligation, capability, state, owner hay proof target nào chưa
+bind đều stop join. Capability bottom-up còn thiếu trở thành exact required change; nó không bao giờ làm yếu outcome
+top-down.
+
+Pipeline artifact đi theo authority của nó: business truth là durable; design/review nằm trong session cache;
+product code chỉ vào routed repository sau approval; provider execution state ở đúng local owner đã khai; capability
+chỉ đọc không ghi artifact chỉ để chứng minh nó đã chạy.
+
 ## Các trạng thái tiến trình
 
 Mỗi StarCi skill khi được gọi phải suy ra các bước thực thi có thứ tự từ `Run` hoặc `Process` của chính nó
-và in một bảng gọn với đúng bốn cột: `Bước`, `Việc làm`, `Kết quả bắt buộc`, `Trạng thái`. Bảng chỉ chứa
-các bước công việc thật, không chứa context values, agent assignments hoặc implementation trivia. Vocabulary
+và in một bảng gọn với đúng bảy cột: `Bước`, `Nhánh`, `Đầu vào`, `Cách thực hiện`, `Đầu ra bắt buộc`,
+`Điều kiện kiểm tra`, `Trạng thái`. `Nhánh` chỉ nhận `shared`, `top-down`, `bottom-up`, `join`, `execution`
+hoặc `proof`; nó gọi tên semantic ownership, không phải roster agent. Bảng chỉ chứa các bước công việc thật,
+không chứa context values hay implementation trivia. Vocabulary
 trạng thái đóng là `đang làm`, `chờ OK`, `hoàn tất`, `blocked`; tối đa một row được `đang làm`.
 
 Lời gọi skill ban đầu authorize bước discovery read-only đầu tiên. Sau khi hoàn tất một bước, cập nhật cùng
@@ -217,9 +250,11 @@ thêm**.
 6. Task khác dựng lại design evidence từ current source, contract, grammar và business truth.
 7. Production baseline lấy sau source-authorizing `OK` và trước production write đầu tiên.
 8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
-9. Việc chia an toàn được thì nhắm mười assignment không chồng lấn; một coordinator giữ gate shared-state.
-   Runtime dưới mười slot thì lấp đầy và backfill mọi slot khả dụng.
-10. Mọi StarCi skill duy trì bảng bước user-facing gọn; bảng internal context và agent assignment vẫn bị cấm.
+9. Delegation đi theo `@orchestration` và validated phase map của skill đã chọn. Synthesis `dual-track` dùng
+   evidence owner biệt lập và một coordinator cho bước join; chỉ chia source khi một path có đúng một writer.
+   Skill không có orchestration binding rõ vẫn chạy tuần tự.
+10. Mọi StarCi skill duy trì bảng bước user-facing gọn. Layout, Block và Refactor có row `orchestration` bắt buộc
+    cùng compact receipt; raw worker prompt, hidden context và tool chatter vẫn internal.
 11. Resolve `defaultLang` từ workspace config chung của Source trước phản hồi đầu tiên cho người dùng.
 12. Credential còn thiếu kích hoạt intake owner ngay và không chứa value; value không bao giờ đi qua chat,
     argument, generated command hoặc log.
@@ -227,6 +262,10 @@ thêm**.
 14. Candidate label chỉ chọn; chỉ `OK` trên exact-source boundary đã hiển thị rõ mới authorize write; `continue` resume không mở checkpoint mới.
 15. Owner rejection reset baseline và assumptions trước edit tiếp theo.
 16. Completion cần zero known defect, đủ requested proof và đúng declared delivery state.
+17. Bước downstream chỉ dùng upstream artifact đã pass gate và có provenance; trí nhớ hội thoại không thay được
+    input receipt còn thiếu.
+18. Không ép `dual-track` vào capability tuyến tính. Khi thật sự có hai nguồn độc lập, không được trộn chúng
+    trong reasoning của một agent trước bước join.
 
 ## Ngoại lệ
 

@@ -18,24 +18,31 @@ title: Layouts · Vietnamese
 Mô-đun này nhận ảnh chụp một page hoặc mô tả page flow. Trước khi compose, nó xác định mọi page cùng closed
 visible intent của page đó. Sau đó nó resolve hai evidence track độc lập: customer journey cùng routed business
 truth từ trên xuống, và component, contract, current/legacy composition cùng source capability từ dưới lên.
-Các merge binding rõ ràng giữa hai track tạo thành complete pages. Default `generate` trả một result;
-chỉ explicit `brainstorm` mới trả 3–4 targeted alternative sau khi owner đã xem baseline.
+Các merge binding rõ ràng giữa hai track tạo thành complete pages. Synthesis in riêng journey direction và UI
+direction trước khi join thành anatomy. Default `generate` trả một direction; owner explicit `brainstorm` trước
+direction approval mới trả 3–4 complete alternative và không đòi một baseline đã review riêng.
 
 ## Luật
 
-Phương án schema 7 gọi tên scope `page`/`flow`, stage, MASTER system id, page override chỉ chứa deviation, mọi
+Phương án schema 8 gọi tên scope `page`/`flow`, stage, MASTER system id, page override chỉ chứa deviation, mọi
 page đã compose, ownership node lồng theo thứ tự và owned region. `synthesis.pageIntents` ghi page phải render
 gì trước cả hai track; customer journey và component capability được author độc lập; mỗi page-level intersection
-có binding rows nối từng render intent với journey, business và contract-backed regions. Mỗi region vẫn hash
+có binding rows nối từng render intent với journey, business và contract-backed regions. Mỗi page intent khai
+route là `existing`, `new` hay `changed`. Mỗi component capability chứng minh từng render-intent obligation đã
+bind bằng observable outcome, source evidence và verdict `supported` hoặc `missing`. Chỉ được ghi `reuse` khi
+mọi obligation đều supported; mỗi obligation còn thiếu phải gọi tên exact required source paths.
+`synthesis.directionReceipt` in một flow-level journey direction và một flow-level UI direction thành hai field
+riêng. Mỗi direction gọi đúng complete candidate page set, nên flow nhiều page không nhân alternative theo page.
+Mỗi region vẫn hash
 minimum child geometry và representative anatomy. Mỗi node là `existing`, `proposed` hoặc `new`; `existing`
 trích real source cùng SHA-256 và không được drift giữa các choice. Schema cũ là compatibility input. Candidate
 không bao giờ gọi tên class; MASTER khóa macro taste một lần.
 
 Stage `pages` mang `pageContract`, một representative populated state cho mỗi page, full future state inventory
 và full-viewport coverage ở mọi reference viewport. Nó không có `renderContract` hay `executionPrompt`, vì vậy
-approval chỉ tác động cache. `OK #1` bind canonical page-contract hash.
+approval chỉ tác động cache. `OK #1` bind hash của canonical selected direction receipt cùng page contract.
 
-Stage `states` mang đúng approved page contract đó, `mode: expand-states` và `approvedPageAt`. Nó bung mọi state
+Stage `states` mang đúng approved direction receipt cùng page contract đó, `mode: expand-states` và `approvedPageAt`. Nó bung mọi state
 và transition, rồi thêm `renderContract` đã hash để khóa exact source files cùng complete page, region, state và
 transition obligation. State phải được phân loại tại đúng owner: page state chỉ tồn tại khi region arrangement,
 hierarchy hoặc active page-level composition thay đổi; loading, refusal, answered hay interaction condition chỉ
@@ -85,7 +92,7 @@ Bảy, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuy�
 | 3 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
 | 4 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
 | 5 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
-| 6 | Chỉ trong brainstorm mode, requested diversity axis | alternative drift qua phần không liên quan của reviewed baseline |
+| 6 | Chỉ trong brainstorm mode, requested diversity axis | alternative drift qua phần không liên quan của shared synthesis scope |
 | 7 | Current source và legacy baseline của project | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
 
 **Đầu vào số 3 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
@@ -182,15 +189,19 @@ Mười bốn luật mà **mọi** phương án phải thoả. Phương án ph�
 2. Mọi region trích một entry key, hoặc khai một entry mới kèm `why` của nó.
 3. Mọi region gọi tên branch ghép nó.
 4. Phương án khai bộ giá trị trục, và không hai phương án nào trong một lô trùng cả bộ.
-5. `generate` trả đúng một complete implementable result. Explicit `brainstorm` trả 3–4 targeted alternative chỉ đổi requested axis và giữ reviewed baseline ở phần còn lại.
+5. Direction bắt buộc nằm trong synthesis. `generate` trả đúng một complete implementable direction; owner
+   explicit `brainstorm` trước `OK #1` mới trả 3–4 targeted alternative mà không đòi baseline trước đó.
 6. Quyết định sản phẩm còn thiếu thì trả về cho người chủ. Không bao giờ đoán để lô cho đủ.
 7. JSON của phương án là dạng chuẩn hoá — thứ tự khoá cố định, không timestamp, không id theo lượt — vì
    **hash của nó** là thứ lời chấp thuận gắn vào.
 8. Feedback thay cache round. Candidate không sống như durable authority sau invocation.
 9. Mỗi candidate page có đúng một pre-track page intent record, và mỗi render intent được bind đúng một lần.
-10. Journey và contract-first track hoàn tất độc lập; anatomy chỉ được sinh từ merge bindings của chúng.
-11. Mọi merged region có contract-first capability, và mọi journey step, business obligation cùng page region đều xuất hiện trong binding matrix.
-12. Mọi render region ở states stage phải qua layout-grammar gate; thiếu scope, decision stale hoặc component owner sai không phải candidate có thể duyệt.
+10. Journey và contract-first track hoàn tất độc lập; synthesis in journey direction và UI direction riêng, còn anatomy chỉ được sinh từ merge bindings của chúng.
+11. Mỗi schema 8 direction receipt cover complete candidate page set; alternative ở cấp flow và không nhân theo page.
+12. Mọi merged region có contract-first capability, và mọi journey step, business obligation cùng page region đều xuất hiện trong binding matrix.
+13. Mọi render region ở states stage phải qua layout-grammar gate; thiếu scope, decision stale hoặc component owner sai không phải candidate có thể duyệt.
+14. Data ownership, state ownership hoặc component trùng tên không chứng minh visual anatomy, responsive behavior, spacing, typography, surface hay icon capability; từng observable đã bind phải có source evidence.
+15. Mọi route `new`/`changed` và mọi page dùng capability `generalize`/`new-required` phải có trong visual-proof renders đã chọn. Mọi `requiredPaths` của obligation còn thiếu phải có trong `renderContract.sourceBoundary`.
 
 ## Preview
 
@@ -239,10 +250,10 @@ blocked: <những region không giải được nếu thiếu nó>
 không phải cái trích đoạn dưới đây. `envelope` giữ những thứ đổi theo lượt; hash chỉ phủ **một phương
 án**, nên cùng một quyết định chạy lại ở lượt sau vẫn ra đúng hash đó.
 
-Work mới dùng schema 7. `envelope.scope` khai screenshot `page` hoặc described `flow`; `stage: pages` bắt buộc
-`synthesis` cùng `pageContract` và cấm source authority. Sau `OK #1`, `stage: states` giữ approved page hash,
+Work mới dùng schema 8. `envelope.scope` khai screenshot `page` hoặc described `flow`; `stage: pages` bắt buộc
+`synthesis.directionReceipt` cùng `pageContract` và cấm source authority. Sau `OK #1`, `stage: states` giữ approved direction-plus-page hash,
 bung complete state inventory và thêm `renderContract` cùng canonical `executionPrompt`. Example cũ chỉ là
-compatibility documentation.
+compatibility documentation; schema 7 vẫn được nhận làm compatibility input.
 
 ```json
 {

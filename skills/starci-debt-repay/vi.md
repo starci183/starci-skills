@@ -18,6 +18,17 @@ title: Trả nợ Source
 
 Không có. Initialization, duyệt debt mới và provider setup là capability owner riêng.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | debt record đã được owner duyệt và project/role đã verify | khóa scope, exit criteria, expiry và owning gates | debt work contract | debt đang active, explicit và đúng scope |
+| đo | đối chiếu | debt contract và current source/gate state | đối chiếu từng recorded scope với measured evidence | progress và remaining-delta matrix | không scope nào được coi xanh từ prose |
+| trả nợ | thực thi | delta matrix đã nhận | chỉ sửa debt-owned source và chạy owning gates | implementation và measured progress receipt | không tạo debt mới, gia hạn hay ghi ngoài scope |
+| đóng | proof | fresh green evidence và debt record | chỉ bỏ scope có exit criteria pass | updated hoặc removed debt receipt | mọi scope bị bỏ có reproducible green proof |
+
 ## Boundary
 
 Chỉ trả debt hiện có đã được owner duyệt. Không tạo debt, gia hạn, thêm scope hay đi qua repository khác.

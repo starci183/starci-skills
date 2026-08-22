@@ -14,8 +14,8 @@ Backend and frontend assurance are required by default. Only tracked
 `starci.deliveryAssurance.required: false` with a non-empty `reason` yields `not required`. Missing policy,
 `required: true`, or false without a reason keeps assurance required. For any required routed role, any missing
 or non-blocking reached `ASSURANCE-*` fact is stale; partial adoption is not a smaller profile.
-A valid debt record keeps assurance required and strict checks installed, but classifies its exact coverage/
-Sonar findings as `debt` until expiry. It never makes them pass.
+A valid debt record does not make assurance optional: covered ASSURANCE-3/4 facts become `debt`, strict
+thresholds/checks stay installed, and delivery is allowed only until expiry.
 
 ## Required README badges
 
@@ -47,11 +47,11 @@ return an SVG, and every badge must link to the matching provider repository/pro
 Read the manifest policy first. For `not required`, report the exact reason and stop this module. Otherwise
 read `@assurance-be` for a backend or `@assurance-fe` for a frontend and inspect names/wiring only: Husky check-only pre-push, active PR CI, one unit LCOV
 producer, Codecov consumer, Sonar scan plus quality gate, fixed encrypted stack records, symbolic GitHub
-secret references, safe README badges for Codecov plus SonarQube quality gate, coverage, bugs,
+ secret references, safe README badges for Codecov plus SonarQube quality gate, coverage, bugs,
 vulnerabilities, code smells, maintainability, reliability and security, required checks and deploy
 dependency. Never decrypt credentials. Provider values and required-check app binding
 stay `unmeasured external` without authorized API evidence.
-Read the role debt record and report its baseline/expiry beside covered findings.
+Read the role debt record and display its baseline and expiry beside covered coverage or Sonar facts.
 
 ## Repair inventory
 
@@ -72,6 +72,14 @@ Secrets come from process env by name or hidden input through `scripts/publish-s
 stdout, command arguments or plaintext tracked files. Repository tokens target one repository unless the
 provider actually issued wider scope.
 
+## Lane separation
+
+Unit, E2E and Sonar retain separate ownership even when CI schedules them in one workflow. Unit alone
+produces `coverage/lcov.info`; Sonar consumes that unit artifact and excludes E2E files from scanner scope. E2E owns only
+real end-to-end behavior and its own pass/fail count. The workflow and proof machine must keep three
+independent verdicts: E2E cannot raise or satisfy Sonar coverage, and Sonar cannot satisfy or excuse E2E.
+Any E2E mutation of unit coverage artifacts is a stale boundary violation.
+
 ## Local analysis order
 
 Provider CI is trusted only after local analysis of this exact checkout has waited for and passed the
@@ -83,17 +91,23 @@ quality gate. Three facts decide whether that happened:
 - **A red gate is a source finding.** It is repaired in source and rescanned until green; deferring it to
   CI hides it rather than handling it.
 - **E2E is not a Sonar coverage lane.** Unit alone emits the LCOV consumed by Sonar. E2E owns only
-  end-to-end behavior, is excluded from Sonar analysis/coverage, must not mutate unit coverage artifacts
-  and keeps an independent verdict.
-- **Coverage is always blocking and four-dimensional.** One unit run must prove statements/functions/
-  lines >=80%, branches >=75%, and new-code/patch >=90% for each metric, then emit the single LCOV used
-  by Codecov and Sonar; providers gate native project/new coverage while the runner owns four metrics.
-  Informational status, a blended percentage or a badge is stale. Every declared E2E
-  lane must discover real non-skipped tests and pass.
+  end-to-end behavior, is excluded from Sonar analysis/coverage and must not mutate unit coverage artifacts;
+  E2E and Sonar keep independent verdicts.
+- **Coverage is always blocking and four-dimensional.** One successful unit run must prove statements,
+  functions and lines at least 80%, branches at least 75%, and new-code/patch at least 90% for each metric.
+  A blended percentage, informational status or provider badge cannot replace any one of those facts.
+  The same run emits the single LCOV consumed by Codecov and Sonar; providers gate native project/new
+  coverage while the runner owns all four distinct metrics. Every declared E2E lane must also
+  discover real, non-skipped tests and pass; an empty or cheaper substitute is stale.
 
-- **A green Sonar badge is not the strict profile.** The exact revision must return gate `OK`, bugs/
-  vulnerabilities/code smells 0, hotspots reviewed 100%, three A ratings, duplicated-lines density ≤3%
-  overall/new, native coverage >=80% overall and >=90% new. Missing API authority is `unmeasured external`.
+- **A green Sonar badge is not the strict profile.** The exact checkout analysis must return gate `OK`,
+  bugs/vulnerabilities/code smells 0, hotspots reviewed 100%, all three ratings A, duplicated-lines
+  density ≤3% overall/new, native coverage >=80% overall and >=90% new. Missing API authority leaves
+  these values `unmeasured external`; it never turns them clean.
+
+`@stale-debts` may temporarily accept project/patch coverage or Sonar without changing this blocking
+profile, provider checks or badges. The verdict is `debt`, never green; every non-debt fact remains blocking,
+and malformed or expired debt fails closed.
 
 **A framework's required emit may carry its own branch threshold.** Where a dependency-injection
 framework compels metadata the runtime needs, the compiler emits guards no test can reach — under
@@ -122,15 +136,12 @@ Parallel scanner lanes must not share one binary cache; give each source its own
 scan sequentially. A shared cache is never deleted to clear a symptom unless an exact corrupt path is
 proven first.
 
-Active debt may temporarily accept project/patch coverage or Sonar without changing the strict profile.
-The module remains incomplete/non-ready; delivery may continue only while every other fact is green.
-
 ## Proof
 
 Prove the hook refuses a controlled failure, exact CI graph, one LCOV consumed twice, a current-checkout
-local Sonar analysis whose waited quality gate is `OK` after repair, authenticated exact-SHA API evidence
-for every blocking-profile condition, encrypted filenames
+local Sonar analysis whose waited quality gate is `OK` after any source repair, and authenticated exact-SHA
+API evidence for every condition in the blocking quality profile, encrypted filenames
 without plaintext twins, every required badge image endpoint returns an image using no credential other than an allowed read-only badge capability,
 external secret names and required checks through APIs, and deploy dependency. Unmeasured external
 enforcement or an unmeasured badge endpoint leaves the module incomplete.
-Debt is reported explicitly and removed when its exit criteria pass.
+Active debt may allow delivery while this module remains incomplete and non-ready.

@@ -101,6 +101,10 @@ of the export: `*.service.ts` declares a `*Service`, `*.handler.ts` declares a `
 subject, a suffix matching the export's role, and one declared symbol that is folder plus file read
 together.
 
+**Recognition signs.** Reading `folder/file` as one phrase produces exactly the class name. Deleting
+a word from the file name loses no information — that word is being said twice. A suffix promises one
+role and the file exports another.
+
 **Boundary.** Not `NAME-3`: `NAME-1` says a path is **allowed** to contribute to a name, while
 `NAME-3` forbids taking a physical address — mount, bucket, infrastructure directory — as a name. A
 classifying path contributes; a storage path does not. Not `NAME-7`: a surface-shaped folder (one
@@ -120,6 +124,8 @@ number** as the name: `isV2`, `IsContentV2Params`, `parseV2Body`.
 **What it emits in source.** An identifier naming the property that generation introduced — the thing
 that is actually true of the value — so the identifier survives the generation that prompted it.
 
+**Recognition signs.** A `V` followed by a digit inside the name. Right next to that name, the
+expression is reading a real property (`Boolean(record.verified)`). Nobody can answer "is V2 the
 **current** generation or the **old** one?" without opening the file.
 
 **Boundary.** Not `NAME-6`: `isV2` is wrong twice — it is a boolean, so `NAME-6` matches, and it asks
@@ -138,6 +144,10 @@ the **name of the location** as the name: `VolumeService`, `readVolumeDoc`.
 
 **What it emits in source.** An identifier naming the document, record or subject being read, with
 the storage location appearing only in the path constant it resolves — never in the exported name.
+
+**Recognition signs.** The name contains a directory, a mount, a bucket or an infrastructure prefix.
+Renaming the storage location makes the name wrong immediately, and **no test goes red**. A newcomer
+reading the name still finds it reasonable — which is precisely the danger.
 
 **Boundary.** Not `NAME-1`: a **classifying** path (`parsers/`, `path/`) is a role and may contribute
 to the name; a **storage** path (`.volume`, `.mount`) is an address and may not. Not `NAME-4`: an
@@ -158,6 +168,10 @@ fallback chain, a routing algorithm — and the author took the **mechanism's na
 weight, the credit a typical call costs — so the mechanism can be replaced without invalidating the
 name.
 
+**Recognition signs.** The name describes how the choosing happens, not **what is chosen**. Reading
+the whole cluster of surrounding identifiers, none of them says what the final **thing** is. Remove
+the mechanism and **the entire cluster of names goes wrong at once**.
+
 **Boundary.** Not `NAME-3`: see above — address versus production. Not the exception: an integration
 module whose **whole job is** one external system may carry that system's name, because there the
 mechanism **is** the subject. What is refused is naming a **business capability** after the
@@ -175,6 +189,10 @@ name** — no body, no signature.
 **What it emits in source.** An exported identifier that is a verb with its object attached, so the
 import line alone says what the function does without consulting the path.
 
+**Recognition signs.** The name is a bare verb: `generate`, `parse`, `run`, `handle`, `build`. Reading
+the import line, you have to look at the **path** to guess what it does. Two modules exporting the
+same bare verb force an alias in the import list.
+
 **Boundary.** Not `NAME-6`: a function returning a boolean does not take verb-plus-object, it takes a
 **question** — that is `NAME-6`. Not the exception: this code governs **exports**. A private helper
 read three lines from its own body may be a bare verb; the moment it is exported it acquires an
@@ -190,6 +208,10 @@ Note: the code forbids a **bare verb**, not a verb. `resolveGradingChain` is leg
 
 **What it emits in source.** A predicate whose identifier reads as a yes/no question about a property
 that outlives the reason it was added.
+
+**Recognition signs.** The return type is `boolean` or `Promise<boolean>`. The name starts with
+`check` — reading as **performing** the check rather than **answering**. The name ends in `Flag`,
+which cannot say what it flags.
 
 **Boundary.** Not `NAME-2`: right sentence form with the wrong subject is still `NAME-2`. `isV2` is a
 boolean asking about a schema generation; `hasVerifiedMarker` is a boolean asking about a property.
@@ -210,6 +232,8 @@ still alive after the next change.
 `progress`, `user` — with the surface word appearing only in the per-surface operation path that
 calls it.
 
+**Recognition signs.** The name of a shared service contains the name of a screen, a page or a tab. It
+lives in the shared layer but has exactly one caller — for now. The day a second caller appears, it
 **still runs** and **still says the wrong thing**.
 
 **Boundary.** Not `NAME-1`: a surface-shaped operation folder is a legitimate scope for that operation

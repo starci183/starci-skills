@@ -19,11 +19,9 @@ pair into a concrete drawing. Types close the meaning and role unions, so the es
 the ones types cannot see: a call site that imports a glyph package directly, a leaf that quietly adds
 a second vendor, and a size written as neither of the steps the roles offer.
 
-Four rules exist in the rule module, and this file documents four. Their identity is the published
-name — the string that appears in a build log and in a disable comment — and each holds one published
-law code: `ICON-6`, `ICON-7`, `ICON-1` (its size half only) and `ICON-10`. Rank artwork receives no
-vendor exemption; missing medal cuts live in `@starci/heroicons` and pass through the ordinary icon
-leaf ownership boundary.
+Four rules exist in the rule module, and this file documents four. Each holds one published law code:
+`ICON-6`, `ICON-7`, `ICON-1` (its size half only) and `ICON-10`. Rank artwork receives no vendor
+exemption; missing medal cuts live in `@starci/heroicons` and pass through the ordinary icon owner.
 
 ## Published rules
 
@@ -48,8 +46,8 @@ them.
    passed — it means no visitor was installed and the rule did not exist for that file. Three of the
    four rules require `/src/` in the path; `no-decorative-icon-in-metric-cell` requires its own path
    and nothing else.
-2. **Check the owner boundary.** The icon leaf is exempt from the caller rule only; it is never exempt
-   from the closed vendor allow set. No rank or artwork file gets another package.
+2. **Check the owner boundary.** The icon leaf is exempt from the caller rule only; it remains bound
+   to the four approved Heroicons/StarCi subpaths. Rank has no second-vendor exemption.
 3. **Read the nodes the rules actually stand on** — `ImportDeclaration` source strings, static class
    text from a class attribute or a variable init, `JSXIdentifier` element names, and every string
    `Literal`. A value that never reaches one of those nodes was never judged.
@@ -70,7 +68,8 @@ which drawing, how big — and the next screen answers all three differently.
 equals or starts with one of ten package prefixes, or when it is an external specifier (not starting
 with `.` or `@/`) whose text matches `/(?:icon|glyph|lucide|feather|tabler|fortawesome)/i`. File gate:
 `context.filename`, back-slashes normalised to forward, must contain `/src/` and must not end with
-`/leaves/Icon/index.tsx`. There is no rank or artwork exemption.
+`/leaves/Icon/index.tsx`. One exemption: filename ends with `/leaves/RankMark/index.tsx` **and** the
+source is exactly the award package.
 
 **What it cannot see.** `require("lucide-react")`, `await import("lucide-react")` and a lazily-loaded
 component built from a dynamic import: only the `ImportDeclaration` node is visited.
@@ -93,8 +92,8 @@ to open a second drawing vocabulary inside it.
 
 **How it detects.** Same `ImportDeclaration` visitor and same glyph test as the rule above, minus the
 leaf gate: every file containing `/src/` is scanned. A hit is dropped only when the source is exactly
-`@heroicons/react/24/outline`, `@heroicons/react/16/solid`, `@starci/heroicons/24/outline` or
-`@starci/heroicons/16/solid`. StarCi entry points are custom-only; upstream icons use upstream imports.
+`@heroicons/react/24/outline` or `@heroicons/react/16/solid`, or when it is the same
+rank-leaf-plus-package pair.
 
 **What it cannot see.** A glyph catalogue whose package name carries none of the six name signals and
 is on no list — pictogram, emoji and mark packages routinely qualify. A local `.svg` or a hand-written
@@ -159,12 +158,10 @@ every `Icon` tag reports.
 | Part | Mechanism |
 |---|---|
 | separator normalisation | `context.filename` (or `getFilename()`) has back-slashes normalised to forward slashes before any suffix test, so a path gate behaves the same on both platforms |
-| `/src/` gate | Four of the five rules require the path to contain `/src/`; `no-decorative-icon-in-metric-cell` is gated on its own path and nothing else |
+| `/src/` gate | Three of the four rules require the path to contain `/src/`; `no-decorative-icon-in-metric-cell` is gated on its own path and nothing else |
 | glyph-source test | Shared by both import rules: a source matches when it equals or starts with one of ten package prefixes, or when it is an external specifier (not starting with `.` or `@/`) matching `/(?:icon\|glyph\|lucide\|feather\|tabler\|fortawesome)/i` |
 | static-text extractor | Reads a string `Literal`, a `TemplateLiteral` with zero expressions, or either of those through a `JSXExpressionContainer`; a call expression yields nothing |
 | size pattern | `/\bsize-(?:\d+\.\d+\|\[[^\]]+\])/`, first match only, not global |
-| artwork prefix | The one collection prefix `fluent-emoji-flat:`; a string not starting with it is ignored before any branch runs |
-| exemption shape | Every exemption is a pair — a file **and** a value — and each path gate is a suffix test, so it names a shape of path rather than a unique file |
 
 Detection is purely syntactic. No module is resolved, no type is consulted, no code runs, and nothing
 reaches outside the linted file.
@@ -181,7 +178,7 @@ reaches outside the linted file.
 | `className={"size-[18px]"}` or `` className={`size-[18px]`} `` | The static-text extractor unwraps an expression container and reads a template literal that carries no expressions |
 | `const ICON = "size-[18px]"`, used far away | Every `VariableDeclarator` with a static string init is scanned, so the plainest form of constant laundering is covered for this one rule |
 | A glyph catalogue nobody listed | An external specifier carrying `icon`, `glyph`, `lucide`, `feather`, `tabler` or `fortawesome` in its name is treated as a glyph package even though it appears in no list |
-| The rank leaf importing Iconify | Rank has no import exemption; only the icon leaf may name an approved glyph package |
+| The rank identifiers copied into another file | Outside the leaf, any identifier with that prefix reports on sight, so the map cannot be answered twice |
 | Adding a vendor from inside the icon leaf | The vendor rule deliberately keeps no leaf exemption, so the leaf is bound by it like every other file |
 
 **Open** — shipped blindness. A verdict must not claim these were judged.
@@ -205,6 +202,16 @@ reaches outside the linted file.
 | `no-decorative-icon-in-metric-cell` | Any tag that is not literally `Icon`: an alias at the import, a member expression, a tile or badge component that renders a glyph internally, or a glyph handed in as a prop |
 | `no-decorative-icon-in-metric-cell` | Every other compact fact cell in the product. The law is general; the rule is one file, and the tenth metric cell written next week is outside it by default |
 | none | Everything `ICON-2`, `ICON-3`, `ICON-4`, `ICON-11` and `ICON-13` state — which role takes which size, the tile's leading-role glyph at size five, and the closed reaction identity set. Documented, typed, exported, unenforced |
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| file path | `context.filename` (or `getFilename()`), normalised to forward slashes |
+| import source | the string value on an `ImportDeclaration` |
+| class text | static string from a class attribute or a variable init |
+| element name | `JSXIdentifier` on a `JSXOpeningElement` |
+| string value | any string `Literal` in the file |
 
 ## Rules
 

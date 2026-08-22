@@ -92,6 +92,15 @@ has nothing to inset and emits no padding class. In the second form there is a r
 deliberately hands its whole inset to its direct rows or cells, or to one content child, so that
 dividers reach the edge or media bleeds to the border; it emits `p-0`.
 
+**Recognition signs**
+
+- *No boundary:* removing the element makes no boundary disappear, only the layout collapse; its
+  classes are only `flex`, `grid`, `gap-*`, `items-*`, `justify-*`, `min-w-0`; the content inside
+  already carries its own surface, or already sits inside a parent surface.
+- *Delegating boundary:* there is a `border`, a `bg-*` or a `rounded-*` on the element; its direct
+  children add their own padding and are their own hit areas; if the parent kept the inset, the
+  dividers would fall short at both ends and the list would look truncated.
+
 **Ask yourself.** If every decorative class were stripped, would this element still draw a boundary?
 If it would not, it is the no-class form. If it would, is the boundary real and is it *deliberately*
 handing its inset to its children? Then it is the `p-0` form.
@@ -113,6 +122,12 @@ to tell "decided to hand it over" from "forgot to set it".
 **Situation.** A repeated cell inside a set of identical cells, holding one short datum or one
 action. The cell exists to be counted and scanned, not read.
 
+**Recognition signs**
+
+- The content is a number, a label, a date, a shortcut, a status.
+- Every cell in the set has the same structure; reading one cell explains the whole set.
+- The cell sits inside a parent that has already delegated its inset (`PADDING-0`, `p-0` form).
+
 **Ask yourself.** Does this cell hold ONE datum, or a GROUP of data?
 
 **Boundary**
@@ -130,6 +145,12 @@ datum, not a criterion for choosing.
 **Situation.** Still a repeated or ruled cell, but the inside is now a small content group: a label
 and a value, a title and a sub-line, a name and a status.
 
+**Recognition signs**
+
+- The inside of the cell already needs a `gap` to organise its parts.
+- The cell still belongs to a uniform set and still cannot stand on its own.
+- Rules or a grid still separate the cells; whitespace does not.
+
 **Ask yourself.** Does this cell already need internal structure, and does it still depend on its
 set?
 
@@ -145,6 +166,13 @@ set?
 **Situation.** A reusable surface: it draws its own boundary, holds a composed cluster of content,
 and carries its whole meaning if moved elsewhere. This is the default rung for every card, frame and
 nested callout.
+
+**Recognition signs**
+
+- There is a real boundary and several kinds of content inside it: heading, description, metric,
+  action.
+- Other peer surfaces sit beside it.
+- It is NOT the reason the route exists.
 
 **Ask yourself.** Is this a reusable surface among other surfaces, or the primary plane of the route?
 
@@ -163,6 +191,12 @@ stack is `PADDING-0` in the no-class form.
 **Situation.** The route exists to serve exactly one task, and this is the plane holding that task: a
 reading, a working flow, a document, a long form. No peer surface competes with it for attention.
 
+**Recognition signs**
+
+- There is only one such plane on the route.
+- The content inside is a long flow that needs a resting margin to be read continuously.
+- Remove this plane and the route loses its reason to exist.
+
 **Ask yourself.** If this plane were removed, would the route still mean anything?
 
 **Boundary**
@@ -170,6 +204,16 @@ reading, a working flow, a document, a long form. No peer surface competes with 
 - `PADDING-4`: see above. "Bigger", "airier" and a screenshot are NOT evidence. The only evidence is
   the role on the route. Two primary planes on one route is a contradiction: either one of them is
   `PADDING-4`, or the route is doing two jobs, which is the route's problem and not padding's.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| boundary owner | The element drawing or semantically owning the boundary |
+| direct content | One datum, one small group, a composed surface, or a route's primary task |
+| delegation | Whether direct rows, cells or one content child own the inset instead |
+| nesting | Whether an inner element is a transparent wrapper or a second real boundary |
+| role | Ordinary reusable surface, or the plane the route exists for |
 
 ## Rules
 

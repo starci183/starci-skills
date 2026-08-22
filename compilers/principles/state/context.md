@@ -114,6 +114,12 @@ style decision; it deletes the only signal a keyboard user has about where they 
 **Situation.** Nothing can act on this element. It does not take a pointer, does not take the
 keyboard, and holds no value that could be rejected. It has ONE appearance and that is complete.
 
+**Recognition signs**
+
+- Not clickable, not reachable by Tab, no `tabindex`, not inside an `<a>` or a `<button>`.
+- Delete every handler and the content still means the same thing.
+- Nothing in the data makes this element change appearance.
+
 **Ask yourself.** Is there anything — pointer, keyboard, data, validator — that makes this element
 change appearance? If there is nothing at all, it is `STATE-0`.
 
@@ -134,6 +140,14 @@ change appearance? If there is nothing at all, it is `STATE-0`.
 **Situation.** The element is operable and nothing is happening to it right now. This is the
 appearance it returns to after the pointer leaves, the keyboard moves on and the press ends.
 
+**Recognition signs**
+
+- At least one other layer exists; if none does, this is `STATE-0`.
+- Every geometric property of the element — height, border, padding — is decided in this layer, not
+  in the hover layer.
+- Read this layer alone and you can still tell what kind of element it is: button, link, input,
+  selectable row.
+
 **Ask yourself.** When everything lets go of this element, what appearance does it return to?
 
 **Boundary**
@@ -150,6 +164,12 @@ appearance it returns to after the pointer leaves, the keyboard moves on and the
 
 **Situation.** The pointer sits on an operable element, and the element must ACKNOWLEDGE that before
 the user clicks.
+
+**Recognition signs**
+
+- The element has a handler, or is an `<a>`, `<button>`, `<label>`, or a selectable row.
+- Something will happen if the user clicks right now.
+- `cursor-pointer` is present — setting the hand cursor is already a promise that it can be clicked.
 
 **Ask yourself.** If the user clicked while the pointer is here, would anything happen?
 
@@ -172,6 +192,12 @@ revealed only by hover DOES NOT EXIST on a phone — if it matters, it is not a 
 
 **Situation.** The user is driving the page from the keyboard and needs to know WHERE THEY ARE. This
 is the unconditionally mandatory layer of every focusable element.
+
+**Recognition signs**
+
+- Reachable by Tab: `<a href>`, `<button>`, `<input>`, `<select>`, `<textarea>`, or `tabindex="0"`.
+- Take the mouse off the desk and the user must still be able to finish the flow.
+- Someone in the codebase has written `outline-none` — that is the sign this layer was deleted.
 
 **Ask yourself.** With the mouse unplugged, can the user see where they are standing?
 
@@ -196,6 +222,13 @@ legal only in the SAME class list as its replacement.
 **Situation.** The mouse button is held down, or a finger is touching. The element must CONFIRM IT
 RECEIVED the press, immediately, before any result can come back.
 
+**Recognition signs**
+
+- Clicking commits an action rather than merely opening a transient menu.
+- On a slow network, the gap between "clicked" and "result" is long enough for the user to click a
+  second time.
+- On touch this is the ONLY feedback layer the user receives, because there is no hover.
+
 **Ask yourself.** Does the user know the press registered, before the result arrives?
 
 **Boundary**
@@ -217,6 +250,12 @@ shadow, or `scale` — `scale` runs at paint time and does not recompute layout.
 
 **Situation.** The element exists, the user can see it, but RIGHT NOW it cannot be used: insufficient
 permission, an unfinished prior step, an exhausted quota, the wrong context.
+
+**Recognition signs**
+
+- A business condition decides whether this element is on or off.
+- If it could be clicked, the server would refuse anyway.
+- It does not disappear — meaning the intent is to LET THE USER KNOW IT EXISTS.
 
 **Ask yourself.** Is there a business condition — permission, quota, prior step, context — that
 decides whether this element is on or off?
@@ -244,6 +283,13 @@ reason in text.
 **Situation.** Among a set of peers, this element carries a PERSISTENT condition: selected, current
 page, checked, expanded. That condition is decided by DATA, not by the pointer.
 
+**Recognition signs**
+
+- Move the pointer away, close the page and reopen it, and it is still there.
+- One element — usually exactly one — in the group carries this condition.
+- A matching ARIA attribute exists: `aria-current`, `aria-selected`, `aria-checked`,
+  `aria-expanded`, `aria-pressed`.
+
 **Ask yourself.** Let go of the pointer and reload the page: is this condition still there? If it is,
 `STATE-6`.
 
@@ -268,6 +314,13 @@ screen reader cannot report what the eye is seeing.
 **Situation.** The user has clicked, the press registered, and THE RESULT HAS NOT COME BACK. The
 element must say the work is running, and must block a second click.
 
+**Recognition signs**
+
+- The action crosses the network, or a computation that does not finish in the same frame.
+- Clicking twice would create two records, two charges, two emails.
+- There is a stretch of time where the interface has nothing new to say but is not yet allowed to be
+  silent.
+
 **Ask yourself.** Between the click and the result, where does the user look to know the system
 heard them?
 
@@ -289,6 +342,12 @@ drawn against.
 
 **Situation.** The element holds a value, and a validator — on the client or the server — has
 REJECTED it. The element must say the fault is IN ITSELF, and say what the fault is.
+
+**Recognition signs**
+
+- There is a rule this value can break: required, format, length, uniqueness, range.
+- There is a message that must attach to THIS element, not to the form as a whole.
+- The user must be able to FIX it — meaning the element stays operable.
 
 **Ask yourself.** Is there a rule this element's value can break?
 
@@ -312,6 +371,12 @@ who was aiming at the submit button hits something else.
 **Situation.** The value is REAL, must be readable, must be selectable, must be reachable by Tab —
 but must not be edited HERE. This is not disabled; this is a value on display.
 
+**Recognition signs**
+
+- The user has a legitimate reason to select and copy this value.
+- The value is editable SOMEWHERE ELSE, or is generated by the system.
+- It is still submitted with the form, or still needs to be read by a screen reader.
+
 **Ask yourself.** Does the user need to read and copy this value? If yes, `STATE-9`; if no, consider
 `STATE-5`.
 
@@ -324,6 +389,17 @@ but must not be edited HERE. This is not disabled; this is a value on display.
   is `STATE-0` and more honest.
 
 **`STATE-3` is still owed.** Read-only is still reachable by Tab, so focus must still be visible.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| element | The rendered node and whether anything can act on it |
+| capability | Whether it is pointer-operable, focusable, pressable, selectable, value-holding |
+| availability | Whether permission, quota, prerequisite or context can withhold it |
+| duration | Whether the work it starts finishes in the same frame |
+| validation | Whether a validator can reject the value it holds |
+| ownership | Whether this element or an ancestor owns the selection, busy or invalid condition |
 
 ## Rules
 

@@ -167,6 +167,18 @@ most are somebody tidying up.
 A green result on both rules is a statement about NAMES and PLACES, never about the value a request
 carries.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | `context.filename`, or `context.getFilename()` where the first is absent, as a normalised forward-slash path |
+| scope decision | Which exemption gate matched, or that none did |
+| syntax | The AST of ONE file: `CallExpression`, `NewExpression`, `Property` |
+| names | The callee's own spelling, and the property key's spelling |
+| types | None |
+| imports | Not resolved. An imported binding is a name and nothing more |
+| other files | Not read. Both rules are file-at-a-time by construction |
+
 ## Rules
 
 1. The identity of a rule is its **published name**. This module gives no rule a second numeric code.

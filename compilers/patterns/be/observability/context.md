@@ -53,6 +53,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 
 **What it emits in source.** The house logging service is injected into the class and the call is made on it. Nothing is constructed locally. The correlation id, the transport configuration and the redaction stay inside that one service and are not repeated at the call site.
 
+**Recognition signs.** A logger built in place inside the class — `new Logger(...)` — or a leftover `console.*`. The line comes out correctly formatted but has **no correlation id** when you look it up. Within one request, some lines are in the log store and some are not.
+
+The question to ask: can this line carry the request that produced it, or only its own contents?
+
 **Boundary.** Not `OBSERVABILITY-2`: `-1` asks **where it goes out**; `-2` asks **what it is called**. Calling the right service while passing a template literal is still broken, and broken under `-2`. Not `OBSERVABILITY-6`: if that code runs **outside** the request lifecycle there is no request left to attach, and that is the `-6` exit, not a violation of `-1`. This is not a formatting concern — the framework's logger writes the right shape to stdout and still loses the request it belongs to, because the correlation id lives in the service it went around.
 
 ## `OBSERVABILITY-2` — the event name is an enum member
@@ -60,6 +64,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 **Situation.** The first argument of a log call is being written. That argument **names what happened**, and it must come from a closed set.
 
 **What it emits in source.** A member of the closed log-name enum in the first position. If the event does not exist yet, a new member is added to that enum with its own JSDoc line — the name is created in the set, never at the call site.
+
+**Recognition signs.** A `${}` in the first argument. A `+` string concatenation in the first argument. A bare inline string in the first argument, even with no variable inside it.
+
+The question to ask: if somebody rewords this tomorrow to read better, does the dashboard built on it go silent?
 
 **Boundary.** Not `OBSERVABILITY-3`: `-2` forbids pushing data **into** the name; `-3` says data travels **beside** it. One template literal often breaks both at once, but they are two different defects — one makes the name ungroupable, the other makes the data unqueryable. Not `OBSERVABILITY-4`: `-2` does not ask whether the event deserves to be logged. An enum name given to "entered the function" still violates `-4` while satisfying `-2`. A bare hard-coded string is forbidden too, not only an interpolated one: a fixed string is exactly **one** rewording away from being a different event, and nobody treats rewording as a behaviour change.
 
@@ -69,6 +77,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 
 **What it emits in source.** A second argument: a typed object whose interface belongs to that event, so a new field is added in one place and every mis-typed call site goes red at build time instead of staying silent until somebody queries it.
 
+**Recognition signs.** The second argument is missing while the story obviously has a "which one" and a "how many". Data pushed into the name "so it reads better". Wanting to add a field and having to edit the name itself to do it.
+
+The question to ask: six months from now, filtering by tenant — do I add a field, or rewrite the event name?
+
 **Boundary.** Not `OBSERVABILITY-2`: see above. Not `OBSERVABILITY-5`: `-3` covers the data of an ordinary event; `-5` covers specifically the data of a **failure**, where the required field is the exception's identity.
 
 ## `OBSERVABILITY-4` — log the decision, not the passing through
@@ -76,6 +88,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 **Situation.** Choosing where in a function the log line goes. Two places are tempting: the top of the function, and the point where the code has just **chosen** a branch.
 
 **What it emits in source.** A line at the branch, naming what was chosen and carrying the evidence it was chosen on. Nothing at the entry or the exit of the function.
+
+**Recognition signs.** The event name reads like a method name: `MethodEntered`, `HandlerStarted`, `LeavingService`. Reading the line tells you nothing about **why** the code did what it did, only that it ran. Deleting the line costs nobody any information, because the source already said the same thing.
+
+The question to ask: what does a reader learn from this line that reading the source would not give them?
 
 **Boundary.** Not `OBSERVABILITY-3`: a line that records the right decision but omits its evidence is still broken, but broken under `-3` — missing data, not the wrong placement. Not `OBSERVABILITY-2`: `-2` only judges the shape of the name. A perfect enum member for a meaningless event still violates `-4`. Pipeline steps are the blurriest boundary: a "step finished" event earns its existence only when the step is an **outcome** that could have gone otherwise — succeeded, skipped, failed — not when it merely marks how far the cursor got.
 
@@ -85,6 +101,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 
 **What it emits in source.** The exception's `code` and its metadata in the data object, as the grouping key. The human-readable message may exist beside them as a secondary field.
 
+**Recognition signs.** `error.message`, `String(error)` or `${error}` going into a data field. One incident showing up as several different alert groups on the dashboard. An old alert going silent right after somebody reworded a message to be clearer.
+
+The question to ask: if somebody rewrites this exception's message tomorrow, does the alert split in two?
+
 **Boundary.** Not `OBSERVABILITY-3`: `-5` is the narrower and **stricter** case of `-3` — here the required data is the exception's `code` and metadata. Not `OBSERVABILITY-4`: `-5` does not say whether the line deserves to be logged, only that once it is logged the grouping key must be identity. The wording is still allowed to exist, as long as it is not the grouping key: it is a secondary field for a human reader, not the thing a dashboard counts.
 
 ## `OBSERVABILITY-6` — a standalone program is the only exit
@@ -92,6 +112,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 **Situation.** A CLI, an agent, a script running outside the request lifecycle. There is no request to correlate to and no transport configured for it.
 
 **What it emits in source.** A plain logger in the program's own entry point, and one line in the lint configuration scoping the exit to that program's path. Nothing else changes.
+
+**Recognition signs.** The entry point is the `main.ts` of a program that runs and exits. The logger is needed **before** the injector exists. There is no `traceId` to attach, because nobody called in.
+
+The question to ask: is there a request or a job for this line to attach to? If there is, this is **not** the exit.
 
 **Boundary.** Not `OBSERVABILITY-1`: the exit turns on **whether a request exists**, not on "this program is small". A queue worker has a job to attach to, so it stays under `-1`. Declared once, by path: the exit is a line in the lint config pointing at those programs' directories, not a rule-disabling comment on each line. Declaring one exception in two places is how one of the two quietly grows without anybody seeing it.
 
@@ -101,6 +125,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 
 **What it emits in source.** The smallest complete path: the named core signals collected, stored or forwarded through an approved backend, health visible, critical alerts firing. Anything past that is a Phase 2 item and is not written now.
 
+**Recognition signs.** The brief lists tools instead of listing signals. The reason to add is "it is already integrated", "the cloud has it", "turn it on for completeness". Nobody can say what **already** exists, what is being added, and what is deliberately deferred.
+
+The question to ask: what is the smallest **complete** path that collects the named core signals, keeps or forwards them through an approved backend, makes health visible and fires the critical alerts?
+
 **Boundary.** Not `OBSERVABILITY-8`: `-7` asks **whether the signal scope should widen**; `-8` asks **who pays the lifecycle** for the process that would carry it. A legitimate Phase 2 still has to pass `-8`. Phase 2 is not Phase 1's debt: Minimal done is done. Full reopens at a later Review, on a measured SLO or debugging gap, a scale or cardinality limit, a compliance or data-residency constraint, a reliability requirement, or a demonstrated cost.
 
 ## `OBSERVABILITY-8` — every telemetry process pays its own lifecycle
@@ -108,6 +136,10 @@ Every situation this module governs carries a code, `OBSERVABILITY-<n>`. The cod
 **Situation.** An agent, collector, exporter, store or dashboard service is about to become part of the runtime.
 
 **What it emits in source.** Either nothing new — the signal goes through the process or approved backend that already exists — or a declared process whose owner, resources, ports, credentials, persistence, health check, backup and removal condition are all written down before it runs.
+
+**Recognition signs.** The brief talks about the tool's features, not about a signal the current path **cannot** carry. Nobody can answer: who owns it, how much resource it takes, which port it opens, where the credentials live, how long it retains, how it is health-checked, who backs it up, when it gets removed. The sentence "let us just stand it up and figure it out later" appears.
+
+The question to ask: can this signal travel through an existing process or an approved backend? If it can, the new process is refused.
 
 **Boundary.** Not `OBSERVABILITY-7`: see above. Not `OBSERVABILITY-1`: `-1` is about where **one line** goes out; `-8` is about **a whole process** being added to the runtime. Managed does not delete the obligation: a managed backend reduces local operation, but PII, cardinality, egress, retention and spend must still be controlled **before** telemetry crosses the boundary. And "cloud-first" does not mean "cloud-only": security, data residency, reliability or cost can each make managed the wrong choice — and then the reason is recorded, not skipped.
 

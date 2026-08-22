@@ -21,6 +21,17 @@ title: StarCi conversation record
 
 Không có.
 
+## PIPELINE
+
+Topology: `linear`.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| ràng buộc | dùng chung | provider conversation reference và target artifact identity | resolve project, role, provider và allowed provenance scope | provenance context | raw transcript không được coi là authority |
+| làm sạch | thực thi | provider metadata và content snapshot | redact secret, tách rebuildable search data khỏi durable provenance | sanitized immutable snapshot | không còn forbidden key hay secret-shaped value |
+| liên kết | thực thi | sanitized snapshot và exact artifact hashes/paths | tạo provider-neutral provenance links và advance một stable head | snapshot head và artifact links | hash, predecessor và ownership hợp lệ |
+| chứng minh | proof | stored records | đọc lại và validate redaction, encryption cùng linkage | provenance receipt | raw transcript không commit và links resolve |
+
 ## Run
 
 Skill ghi provenance, không sở hữu authority. Frontend design cache là tạm thời; FE provenance bền bind

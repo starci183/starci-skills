@@ -19,6 +19,17 @@ title: starci-stale-list
 
 Không có. Skill này gọi tên owner và không invoke họ.
 
+## PIPELINE
+
+Topology: `reconciliation`, chỉ đọc.
+
+| Bước | Nhánh | Đầu vào | Cách thực hiện | Đầu ra bắt buộc | Điều kiện kiểm tra |
+|---|---|---|---|---|---|
+| định tuyến | dùng chung | stale registry và mọi routed workspace role | resolve applicable category modules cùng check-only commands | inventory context | đủ mọi declared role và category |
+| khai kỳ vọng | declared | routes, contracts và readiness requirements | liệt kê expected state cùng clearing owner mỗi category | expected-state matrix | expectation chỉ đến từ owning module |
+| quan sát | observed | real files, routes, ports và check outputs | chạy check-only measurements mà không repair | observed-state matrix | không đổi product hay external state |
+| báo cáo | hợp nhất | expected và observed matrices | classify stale facts, evidence và clearing owners | complete stale report | mọi finding reproducible và không failure nào bị làm nhẹ |
+
 ## Chạy
 
 Đọc `@skill-shape`, `@staleness`, rồi mọi module registry route tới. Chỉ dùng `Evidence cho stale list`

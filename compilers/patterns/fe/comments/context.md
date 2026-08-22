@@ -92,6 +92,10 @@ declaration lives, naming the role. Internal helpers in the same file carry no s
 re-export line emits nothing: `export { X }` states a binding, and the contract belongs in the file
 where `X` was declared.
 
+**Recognition signs.** The keyword `export` stands before the declaration. Its callers live in
+another file, usually in another layer. You have to open the body to learn what returning `null`
+means.
+
 **Boundary.** This is not `COMMENTS-5`. A block that copies the signature (`@param name - The name`)
 IS a restatement; it falls to `COMMENTS-5` and is deleted, not "written better". `COMMENTS-1` demands
 that a block exist; `COMMENTS-5` decides whether the existing block is kept. It is also not the
@@ -108,6 +112,10 @@ and the smaller one silently stops reading exactly the parts it cannot read. Nob
 **What it emits in source.** English in every authoring position of the file: comment, JSDoc,
 identifier, string literal, template chunk, JSX text, diagnostic message. Moving a sentence out of a
 comment and into a name does not translate it and does not exempt it, so the name is English too.
+
+**Recognition signs.** Accented characters anywhere in an authoring file. A sentence that has just
+been moved from a comment into a variable name, a function name or an object key. An error message
+addressed to the person on call rather than to the person who wrote it.
 
 **Boundary.** This is not `COMMENTS-3`: if the string is a value the running program matches on or
 emits, it is not prose — it is data, and it stays, marked. It is not `COMMENTS-5` either:
@@ -131,6 +139,10 @@ carrying a mark on its own line, and the reason after that mark. The mark is the
 third exception: an unmarked literal is indistinguishable from a comment somebody forgot to
 translate, so the reader has to guess, and the next reader guesses differently.
 
+**Recognition signs.** The file sits on a content path. The string is compared with `===`, used as a
+key, or sent straight out of the system. Ask: if this string were translated into English, would the
+program behave wrongly? If yes, it is a functional literal. If no, it is prose, and it is English.
+
 **Boundary.** This is not `COMMENTS-2` reopened by argument: the exception is a PATH plus a MARK, not
 a JUDGEMENT. A judgement-based exception is re-argued in every file forever, and the argument is won
 by whoever is in a hurry. It is also not `COMMENTS-4`: content files are exempt from the LANGUAGE
@@ -148,6 +160,9 @@ that was not expecting it, and does not carry the same meaning in two countries.
 reaction uses attributed checked-in SVG artwork, routed through the leaf that owns reactions. That
 second path is the narrower case and the only one — it is not an open door.
 
+**Recognition signs.** A pictorial character inside a log string, a message string, or JSX text. A
+regional-indicator pair (a flag) — precisely the case a single-pictograph test misses.
+
 **Boundary.** This is not `COMMENTS-3`. Content files are exempt from the LANGUAGE rule only. The law
 says a pictograph is NOT exempt, even in locale data; the rule exempts content files wholesale, and
 that mismatch between law and rule is a recorded gap.
@@ -161,6 +176,10 @@ that says why the counter resets on Sunday.
 **What it emits in source.** Nothing. The line is removed. Rewriting a restatement into a better
 restatement preserves the whole cost: the reader still has to read it to discover it says nothing.
 The cost is in the EXISTENCE, not in the quality of the sentence.
+
+**Recognition signs.** Delete the comment and no information is lost. The comment uses exactly the
+words already present in the function and variable names beneath it. The comment describes the
+MECHANISM (`calls the API`, `loops over the array`) rather than the CAUSE.
 
 **Boundary.** This is not `COMMENTS-1`: `COMMENTS-1` requires that a block EXIST, `COMMENTS-5`
 decides whether the block that exists is KEPT — a documentation block copying the signature is a
@@ -177,6 +196,10 @@ shape with no reason attached, and "tidy it up" is the correct reflex of a good 
 **What it emits in source.** A comment at the strange line itself, carrying four things: what the
 obvious shape is; why it is wrong HERE, stated as a concrete failure rather than as an adjective;
 what was paid to learn that, if anything; and what would make the decision expire.
+
+**Recognition signs.** There is a shorter or clearer way to write this that you deliberately did not
+use. There is a workaround, a required execution order, or a constant that looks arbitrary. Somebody
+already fixed it the obvious way once and had to come back.
 
 **Boundary.** This is not `COMMENTS-5`: `COMMENTS-5` deletes what says nothing, `COMMENTS-6` COMPELS
 writing what only you know. The two do not conflict — they state one sentence together: only prose

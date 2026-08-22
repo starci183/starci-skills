@@ -21,6 +21,17 @@ description: Set up the shared SonarQube service and reconcile strict quality ga
 
 None.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| inventory | shared | all routed source roles and declared shared Sonar service | resolve project keys, scanners, credentials and required quality metrics | Sonar desired-state matrix | every backend, frontend and console role has one identity |
+| inspect-plan | reconciliation | desired matrix and current Docker/Sonar/project state | compute service, project, gate and badge deltas | reconciliation plan | strict overall/new-code requirements remain explicit |
+| approve-apply | execution | approved plan and scoped authorities | reconcile shared service and project configuration | setup receipts | no secret exposure or quality-gate weakening |
+| prove | proof | fresh service, API and scan results | verify every role and strict gate condition | Sonar readiness proof | service healthy and all required project gates are measurable |
+
 ## Run
 
 Resolve and verify every Source row (`be`/backend, `fe`/frontend and console), then inventory projects. Use the

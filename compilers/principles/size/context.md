@@ -91,6 +91,12 @@ is one axis with one owner — the ceiling — and `w-full` is merely how the bo
 **Situation.** The box is exactly what it holds. Nobody imposes anything on it: remove the text and
 the box shrinks, add text and it grows, and that is what is wanted.
 
+**Recognition signs**
+
+- The content is short, known in advance, and no state makes it several times longer.
+- The box sits beside other boxes in a row and is NOT expected to line up with them.
+- Forcing it wider would turn the leftover space inside it into a lie about the content.
+
 **Ask yourself.** With all content removed, should this box collapse to zero on this axis?
 
 **Vendor-default reset.** If the answer is yes but computed style shows vendor-owned `width: 100%`,
@@ -112,6 +118,12 @@ the counterexample and remains `SIZE-1`. Callers never own this reset.
 **Situation.** The parent is holding a portion of space and this box takes ALL of it. The extent is a
 consequence of the layout, not of the text inside.
 
+**Recognition signs**
+
+- The box must line up with its siblings above and below it.
+- When the content is empty, the box must keep its extent.
+- The parent is flex or grid, or the box is a control whose browser default is to shrink to content.
+
 **Ask yourself.** If the content disappeared, must this extent stay the same?
 
 **Boundary**
@@ -131,6 +143,14 @@ where the default is otherwise: flex children, grid children, `inline-block`, `i
 
 **Situation.** The box is willing to grow, but somebody set a level it must not pass. A ceiling always
 has a REASON, and that reason must be sayable in words before the number is written.
+
+**Recognition signs**
+
+- Past some level the box starts to BREAK FUNCTIONALLY, not merely look worse: the eye loses the
+  return point at the end of a line, an overlay runs off the screen, the page stretches on an
+  ultra-wide monitor.
+- The number comes from a standard or a frame, not from a screenshot.
+- On a narrow screen the ceiling does NOTHING at all — that is the correct sign of a ceiling.
 
 **Ask yourself.** Is there a level past which this box stops working rather than merely looking bad?
 
@@ -152,6 +172,12 @@ narrow column looks nicer.
 **Situation.** The box is sometimes empty or nearly empty, and letting it shrink to its content would
 make the page JUMP or the region vanish. A floor is space RESERVED for a state that has not arrived.
 
+**Recognition signs**
+
+- The box has several content states: empty, loading, one line, ten lines.
+- The user will ACT on that region, so it must be large enough to click or type in from the start.
+- If the floor were removed, what breaks is THE POSITION OF OTHER ELEMENTS, not the look of this box.
+
 **Ask yourself.** In the smallest content state, does anything else on the page move?
 
 **Boundary**
@@ -169,6 +195,12 @@ number came from, not who owns the axis.
 **Situation.** The number does NOT come from the content and does NOT come from the parent. It is a
 system decision, identical everywhere this element appears.
 
+**Recognition signs**
+
+- The same element appears on several screens and must look exactly alike.
+- The content inside has no trustworthy intrinsic extent: a glyph shape, an avatar, a slider track.
+- Letting it shrink to content would make it jump every time the data changes.
+
 **Ask yourself.** Must this number be identical everywhere this element appears?
 
 **Boundary**
@@ -184,6 +216,12 @@ system decision, identical everywhere this element appears.
 
 **Situation.** The parent is divided by a STATED ratio and this box takes exactly its share. The ratio
 is a statement about content: which side matters more, which side is secondary.
+
+**Recognition signs**
+
+- It can be said in words: "half", "a third", "two thirds".
+- The ratio holds at every width for which this layout is in force.
+- The box's extent depends NEITHER on its own content NOR on the content of the box beside it.
 
 **Ask yourself.** Is this ratio a decision about importance, or just the number that makes the current
 screenshot look balanced?
@@ -205,6 +243,13 @@ child MAY NOT BE SMALLER THAN ITS MINIMUM CONTENT, so the parent's measurement i
 
 `SIZE-6` is where we rule in the parent's favour.
 
+**Recognition signs**
+
+- There is `truncate`, `line-clamp`, or a long text cell in a flex row.
+- There is a scroll region inside a flex column of determined height.
+- Symptoms: the box OVERFLOWS its parent, the whole page gains a horizontal scrollbar, or the scroll
+  region never scrolls and stretches the page instead.
+
 **Ask yourself.** Is something inside refusing to shrink, so that the parent's measurement has no
 effect?
 
@@ -225,6 +270,13 @@ still measured wrongly, we merely stop seeing it.
 **Situation.** Only ONE axis is measured; the other is a consequence of a fixed ratio. The box holds
 exactly the room for something that has not arrived, or whose real extent is unknown.
 
+**Recognition signs**
+
+- The content is an image, a video, a map or an embed — something arriving with a size NOBODY IN THIS
+  CODEBASE CHOSE.
+- Without reserving the room first, the content will PUSH whatever is already on screen once it loads.
+- The ratio is part of the design: a square for an avatar, a film frame for a thumbnail.
+
 **Ask yourself.** Is this axis derived from the other one rather than measured on its own?
 
 **Boundary**
@@ -234,6 +286,17 @@ exactly the room for something that has not arrived, or whose real extent is unk
 
 **Required, not optional.** Anywhere late-arriving content could move what is already displayed,
 reserving the room by ratio is the rule.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| box | The element being measured, not its wrapper |
+| axis | Inline or block, stated separately; never "size" as one word |
+| parent layout | Normal flow, flex, grid, or a positioning containing block |
+| content dependency | Whether the extent must survive when the content is removed |
+| bound | Any ceiling or floor the request states, and the standard it comes from |
+| state set | Every content state the axis must hold without moving |
 
 ## Render-contract opt-in control scale
 

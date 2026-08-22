@@ -144,6 +144,17 @@ world — the exact hole `presentational-purity` leaves open.
 That last row is the honest summary: of six codes, two are held, and the two that are held share a
 single detector that any ordinarily-named wrapper function defeats.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | The path as the rule sees it, separators normalised to `/` |
+| scope decision | Which filename test matched, or that none did |
+| call names | Every `Identifier` callee in the file |
+| import specifiers | Source string, `imported.name` and `local.name` per specifier |
+| folder name | For a block index, the capitalised segment above `index.tsx` — it decides the twin |
+| JSX tag names | Every `JSXIdentifier` opening tag; member-expression tags are not collected |
+
 ## Rules
 
 1. The identity of a rule is its published name. There is no numeric identifier for a rule anywhere in

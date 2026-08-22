@@ -203,6 +203,16 @@ That is a cost to know in advance, not an open hatch.
 | all three | **A disable comment, and the lint glob.** Any rule here is switched off for a file by one comment at the top, and does not exist at all for a file the configuration never lints. This is listed once so no rule above claims to be airtight |
 | none | **Everything `COMMENTS-5` and `COMMENTS-6` forbid** — a comment that restates the line below it, and a comment that argues without naming the decision it argues with |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | `context.filename`, normalized to forward slashes, tested against the seven content paths |
+| scope decision | Which path test matched, or that none did |
+| comments | `sourceCode.getAllComments()`, both `Line` and `Block`, plus their line numbers for the pragma set |
+| nodes | `Identifier`, string `Literal`, `TemplateElement`, `JSXText`, and the two export nodes |
+| leading comments | `sourceCode.getCommentsBefore(node)` for the export check |
+
 ## Rules
 
 1. A rule is cited by its published name. There is no second identifier for it, because the name is

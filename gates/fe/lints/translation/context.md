@@ -158,6 +158,19 @@ key crossing the line is `COPY-3`, which has no rule.
 | both | **Resolution moved one file out.** A hook in `hooks/` that calls the runtime, imported by a leaf: the dependency the rule exists to prevent is still there, and the call is not in a gated file |
 | neither | **Everything `COPY-3`, `COPY-4` and `COPY-6` forbid** — a key crossing the line, a resolved string breaking the data fence, a matched-on value treated as copy |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| file path | `context.filename`, or `context.getFilename()` where the former is absent, with `\` rewritten to `/`. Used only for the folder gate |
+| scope decision | Which of the four folder substrings matched, or that none did |
+| syntax tree | One file's AST: `CallExpression`, `JSXAttribute`, `JSXText` nodes |
+| callee names | Every bare `Identifier` callee in the file |
+| attribute values | Attribute name and the string `attributeText` extracted, or `null` |
+| element text | `node.value` of each `JSXText`, coerced and trimmed |
+| options | None. Both declare `schema: []`, so neither the folder list nor the resolver list can be configured at the call site |
+| types | None. No type information, no import resolution, no cross-file analysis |
+
 ## Rules
 
 1. The identity of a rule is its **published name**. The name in the build log, in a disable comment and

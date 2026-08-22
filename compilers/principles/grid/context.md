@@ -92,6 +92,14 @@ fractional or off-field. A count outside its row of this table — `grid-cols-5`
 **Situation.** Items repeat, but they are read along ONE direction only. Nobody needs the item in the
 lower row to align with the item above it, because "row" is not a concept this block has.
 
+**Recognition signs**
+
+- A stacked list, an activity feed, a timeline, a navigation menu.
+- A row of chips or tags that wraps when it runs out of room: there are lines, but no columns, because
+  each item is as wide as its own content.
+- Adding or removing one item does not disturb the layout of the others.
+- Item width is a consequence of content or of the parent, not a decision.
+
 **Ask yourself.** Must an item in a later row line up on a vertical edge with an item in the row
 above? If not — `GRID-0`.
 
@@ -113,6 +121,13 @@ above? If not — `GRID-0`.
 items is known in advance, or has been cut to fit that number, and the reader is allowed to rely on
 that rhythm.
 
+**Recognition signs**
+
+- The count is spoken aloud in the request: "three cards in a row".
+- The items are interchangeable — same kind, same role.
+- Item width is a CONSEQUENCE of the count, not its cause.
+- Adding a fourth item wraps to the next line, and that is acceptable.
+
 **Ask yourself.** Is the count a promise the design made, or a consequence of an item not being
 allowed below some width? A promise — `GRID-1`.
 
@@ -132,6 +147,13 @@ push every item off the field's edges and turn the field into decoration.
 **Situation.** The number of items comes from DATA, and the only thing the design can state is that an
 item below some width stops being readable. The count is what drops out afterwards, not what is chosen
 first.
+
+**Recognition signs**
+
+- The number of items changes by account, by filter, by page.
+- The request speaks in WIDTH, not in COUNT.
+- The same block is embedded in several places of differing width without being re-authored.
+- A last row with fewer items must still look right.
 
 **Ask yourself.** If tomorrow the data returns seventeen items instead of six, does anyone have to
 edit a class? If not — `GRID-2`.
@@ -153,6 +175,13 @@ to take the whole row.
 **Situation.** The tracks are NOT interchangeable. One side is a rail, the other is content; one side
 is a canvas, the other an inspector. A track's width is a layout decision, not a division.
 
+**Recognition signs**
+
+- At least one track has a fixed or bounded width (`16rem`, `minmax(0,1fr)`).
+- Adding a third child to this container is WRONG, not "wrapping".
+- Each side can be pinned, scrolled on its own, or disappear on a narrow screen.
+- Swapping the two children makes the page read wrongly, not merely look worse.
+
 **Ask yourself.** If the two children swapped places, would the page still mean what it means? If not
 — `GRID-3`.
 
@@ -171,6 +200,13 @@ fault, not an aesthetic one.
 
 **Situation.** One element decides WHERE CONTENT IS ALLOWED TO EXIST: it centres, caps the maximum
 width, and sets the outer margin. It says nothing about how many columns there are.
+
+**Recognition signs**
+
+- `mx-auto` plus a `max-w-*`.
+- Horizontal padding that changes by breakpoint — that padding IS the outer margin.
+- Every section of the page sits inside it and does not re-declare a `max-w` of its own.
+- Remove it and the text runs the full width of a 27-inch screen.
 
 **Ask yourself.** Is this element deciding WHERE CONTENT ENDS, or HOW MANY COLUMNS there are? Where it
 ends — `GRID-4`.
@@ -193,6 +229,12 @@ field, ONE gutter per breakpoint, and the gutter is the only horizontal space be
 **Situation.** A child ACCEPTS the track the container hands it. It negotiates nothing. This is the
 most common situation in the whole module, and the one most often over-declared.
 
+**Recognition signs**
+
+- No placement class on the child at all.
+- Its width is decided by the container, not by itself.
+- Move it into another container and it fits without edits.
+
 **Ask yourself.** Does this child CLAIM anything from the grid? If not — `GRID-5`, and write nothing.
 
 **Boundary**
@@ -212,6 +254,13 @@ strings — from swelling the track. A `GRID-5` with `min-w-0` is still `GRID-5`
 
 **Situation.** A child is MORE IMPORTANT or WIDER than the rest, and it says so with the number of
 columns it takes — not with a width of its own.
+
+**Recognition signs**
+
+- The first item of the grid is the featured item and the rest are ordinary.
+- A chart needs horizontal room to be readable while the tiles beside it do not.
+- A heading row or an empty state must occupy the full width of the grid.
+- The number of columns claimed changes by breakpoint, but the role does not.
 
 **Ask yourself.** Does this child claim MORE THAN ONE column of the grid that contains it?
 
@@ -234,6 +283,13 @@ so a responsive span needs every rung — `col-span-2 lg:col-span-3`.
 everything before and after it still respects the margin. This is a DECLARED exception, not a
 work-around.
 
+**Recognition signs**
+
+- The block has a coloured or image background, and the gap on either side of that background reads as
+  a bug.
+- A horizontally scrolled rail must "run off" the edge so the reader knows there is more to the right.
+- Before and after the block, content returns to exactly the old margin.
+
 **Ask yourself.** Must this block touch the edge to say what it means, or does it just want to be a bit
 wider? Just a bit wider is a mis-sized `GRID-4`, not a `GRID-7`.
 
@@ -252,6 +308,17 @@ on a browser where the scrollbar takes space it creates horizontal overflow. To 
 must accept `overflow-x-clip`, and that is a decision of the page, not of the block. Inside the
 break-out, the field is re-declared so the text stays on the measure: the break-out belongs to the
 background, not to the content.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| field | The element owning the measure and the outer margin, and its column count per breakpoint |
+| container | The element declaring tracks, and whether it is the field itself |
+| item source | Whether the number of items is authored or comes from data |
+| item role | Whether children are interchangeable or each track has a named role |
+| alignment | Whether items in successive rows must share a vertical edge |
+| geometry | Which element decides width, and which merely fills what it is given |
 
 ## Rules
 

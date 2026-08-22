@@ -11,6 +11,8 @@ import { loadAndValidateGrammar } from "../scripts/validate-fe-grammar.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const GRAMMAR_ROOT = join(ROOT, "grammars", "starci")
 const PROFILE = JSON.parse(readFileSync(join(GRAMMAR_ROOT, "profiles", "starci-academy.json"), "utf8"))
+const TAYSON_GRAMMAR_ROOT = join(ROOT, "grammars", "tayson")
+const TAYSON_PROFILE = JSON.parse(readFileSync(join(TAYSON_GRAMMAR_ROOT, "profiles", "tayson.json"), "utf8"))
 const sha256 = (value) => `sha256:${createHash("sha256").update(value).digest("hex")}`
 
 const withGrammarCopy = (run) => {
@@ -62,6 +64,36 @@ test("every golden and counterexample case resolves deterministically", () => {
   }
 })
 
+test("labelled bounded surface accordion adds its exact inset without changing embedded disclosure", () => {
+  const loaded = loadAndValidateGrammar(GRAMMAR_ROOT)
+  const input = {
+    grammar: loaded.grammar,
+    profile: PROFILE,
+    factCatalog: loaded.factCatalog,
+    evidenceCatalog: loaded.evidenceCatalog,
+    rulingCatalog: loaded.rulingCatalog,
+    designSystem: loaded.designSystem,
+    templateCatalog: loaded.templateCatalog,
+  }
+  const labelled = resolveGrammar({
+    ...input,
+    facts: ["surface-section-labelled", "collection-hierarchical", "interaction-local-disclosure"],
+  })
+  const embedded = resolveGrammar({
+    ...input,
+    facts: ["collection-hierarchical", "interaction-local-disclosure"],
+  })
+  const labelledDecision = labelled.decisions.find((decision) => decision.slot === "collection-surface")
+  const embeddedDecision = embedded.decisions.find((decision) => decision.slot === "collection-surface")
+
+  assert.equal(labelledDecision?.ruleId, "labelled-bounded-hierarchical-local-disclosure")
+  assert.ok(labelledDecision?.obligations.includes("surface-row-inline-inset-6"))
+  assert.ok(labelledDecision?.obligations.includes("surface-row-block-inset-3"))
+  assert.equal(embeddedDecision?.ruleId, "hierarchical-local-disclosure")
+  assert.equal(embeddedDecision?.obligations.includes("surface-row-inline-inset-6"), false)
+  assert.equal(embeddedDecision?.obligations.includes("surface-row-block-inset-3"), false)
+})
+
 test("stored source origin fields and active or legacy source evidence kinds are rejected", () => withGrammarCopy((grammarRoot) => {
   const evidenceFile = join(grammarRoot, "capsules.json")
   const evidence = JSON.parse(readFileSync(evidenceFile, "utf8"))
@@ -105,12 +137,12 @@ test("rulings require explicit negative scope", () => withGrammarCopy((grammarRo
   assert.throws(() => loadAndValidateGrammar(grammarRoot), /requires negative scope/)
 }))
 
-test("MASTER fixes one spacing rhythm and profile-declared accent override", () => withGrammarCopy((grammarRoot) => {
+test("MASTER spacing rhythm is positive, unique and strictly increasing", () => withGrammarCopy((grammarRoot) => {
   const systemFile = join(grammarRoot, "design-system.json")
   const system = JSON.parse(readFileSync(systemFile, "utf8"))
-  system.spacingRungs = [1, 2, 3, 4, 5, 6, 8]
+  system.spacingRungs = [1, 2, 2, 4, 6, 8]
   writeFileSync(systemFile, `${JSON.stringify(system, null, 2)}\n`)
-  assert.throws(() => loadAndValidateGrammar(grammarRoot), /spacing rungs differ/)
+  assert.throws(() => loadAndValidateGrammar(grammarRoot), /strictly increasing/)
 }))
 
 test("template bytes must match their durable hash", () => withGrammarCopy((grammarRoot) => {
@@ -169,6 +201,27 @@ test("principle context contains only delta concerns for selected owners", () =>
   })
   assert.deepEqual(resolved.contextPack.principleConcerns, ["size", "state"])
   assert.doesNotMatch(JSON.stringify(resolved.contextPack), /surface-in-surface|typography|responsive/)
+})
+
+test("the independent Tây Sơn package resolves public and CRM outcomes without StarCi product authority", () => {
+  const loaded = loadAndValidateGrammar(TAYSON_GRAMMAR_ROOT)
+  for (const item of loaded.cases) {
+    const input = {
+      grammar: loaded.grammar,
+      profile: TAYSON_PROFILE,
+      factCatalog: loaded.factCatalog,
+      evidenceCatalog: loaded.evidenceCatalog,
+      rulingCatalog: loaded.rulingCatalog,
+      designSystem: loaded.designSystem,
+      templateCatalog: loaded.templateCatalog,
+    }
+    const resolved = resolveGrammar({ ...input, facts: item.facts })
+    assert.deepEqual(resolved.decisions.map((decision) => decision.outcome).sort(), [...item.expectedOutcomes].sort(), item.caseId)
+    assert.equal(resolved.receipt.grammar, "tayson")
+    assert.equal(resolved.receipt.profileId, "tayson")
+    assert.equal(resolved.receipt.designSystemId, "tayson-master")
+    assert.doesNotMatch(JSON.stringify(resolved.contextPack), /starci-master|starci-dashboard-theme/)
+  }
 })
 
 test("collapsible rail preserves the exact StarCi optional title, circular ghost toggle, separator, inset and motion contract", () => {

@@ -82,6 +82,13 @@ it possible to say a use of it is wrong.
 **Situation.** This is the sentence the user must read to decide: the course title, the amount due,
 the body of the question, the sender's name. Remove it and the screen loses its reason to exist.
 
+**Recognition signs**
+
+- If the user were allowed to read only ONE line on this screen, that is the line.
+- It does not depend on another line to have meaning.
+- It carries no success, warning or danger state.
+- It is the safe default: when no other role has been established, this is the code.
+
 **Ask yourself.** Does this sentence stand on its own and carry the decision of the screen?
 
 **Boundary**
@@ -99,6 +106,12 @@ the body of the question, the sender's name. Remove it and the screen loses its 
 of primary content standing right beside it. Delete it and the screen still works, only less
 precisely.
 
+**Recognition signs**
+
+- It answers "when", "how many", "where from", "what kind" for a piece of primary content.
+- There is a clear `COLOUR-1` nearby for it to attach to.
+- It contains no instruction and no deciding condition.
+
 **Ask yourself.** If the user skipped this line, would they lose information required to act? If not
 — `COLOUR-2`.
 
@@ -115,6 +128,12 @@ precisely.
 
 **Situation.** The element can be clicked or navigated to, or it is the CURRENT item in a set of
 choices. The colour here says "something can be done here" or "you are here".
+
+**Recognition signs**
+
+- It has an `href`, an `onClick`, or an `aria-current` / `aria-selected`.
+- Remove the colour and the user no longer knows where anything can be clicked.
+- Selection PERSISTS; it does not vanish when the pointer leaves.
 
 **Ask yourself.** Does this element lead to an action, or does it declare where the user currently
 is?
@@ -134,6 +153,12 @@ is?
 **Situation.** Something has ACTUALLY completed, and the system knows it. Not "the wording sounds
 cheerful".
 
+**Recognition signs**
+
+- An event has happened: paid, published, submitted, synced.
+- There is a state field in the data to point at.
+- A word or an icon can be attached that states that very state.
+
 **Ask yourself.** Is there a state in the data named "success" or "complete" for this code to point
 at?
 
@@ -150,6 +175,12 @@ at?
 **Situation.** Nothing has broken yet, but it will break if the user does nothing. There is always a
 preventive action alongside.
 
+**Recognition signs**
+
+- There is a deadline or a threshold being approached.
+- The user still has a way to avoid the consequence.
+- The current content is still valid, only about to stop being valid.
+
 **Ask yourself.** Has this ALREADY broken, or is it only ABOUT to break if nobody intervenes?
 
 **Boundary**
@@ -163,6 +194,12 @@ preventive action alongside.
 
 **Situation.** One of three things: an operation HAS failed, a piece of data IS invalid, or an
 action WILL destroy something that cannot be recovered.
+
+**Recognition signs**
+
+- There is a real error to display, with a readable reason.
+- Or the input is in an `aria-invalid` state AFTER validation has run.
+- Or the button will delete, cancel, revoke or terminate.
 
 **Ask yourself.** Has a failure already happened, or is an unrecoverable loss about to happen?
 
@@ -182,6 +219,12 @@ Always keep a visible message.
 **Situation.** Where the keyboard is standing. This is information about the INPUT DEVICE, not about
 the data.
 
+**Recognition signs**
+
+- It appears only during keyboard navigation (`focus-visible`).
+- It moves continuously as Tab is pressed; nothing is recorded.
+- It must be visible on EVERY surface, including while the element is selected.
+
 **Ask yourself.** Does this thing disappear when the user tabs away? If so — it is focus, not
 selection.
 
@@ -199,6 +242,13 @@ user's only path.
 **Situation.** The control is PRESENT but NOT YET USABLE, because a business condition has not been
 met.
 
+**Recognition signs**
+
+- There is a real `disabled` or `aria-disabled` attribute, not merely a pale colour.
+- There is a business reason that can be said out loud: selection incomplete, insufficient rights,
+  processing.
+- Clicking it does nothing.
+
 **Ask yourself.** Is there a specific business condition making this control unusable, and has that
 condition been stated anywhere?
 
@@ -214,6 +264,11 @@ condition been stated anywhere?
 ## `COLOUR-9` — the base plane
 
 **Situation.** The background of the whole page. Everything else sits ON it.
+
+**Recognition signs**
+
+- There is no surface beneath it any more.
+- It is where the theme decides "light or dark".
 
 **Ask yourself.** Is there any surface underneath this element? If not — `COLOUR-9`.
 
@@ -232,6 +287,12 @@ outside it. An intentionally isolated embed with its own declared theme owner is
 **Situation.** A SELF-CONTAINED block sitting on the page background: it gathers a group of content
 into one unit with its own boundary.
 
+**Recognition signs**
+
+- It has its own boundary (border, shadow, rounded corner).
+- The content inside belongs together and is separated from the rest of the page.
+- Text inside DOES NOT change meaning on entering it — it is still `text-foreground`.
+
 **Ask yourself.** Is this block a self-contained unit of content standing on the page background?
 
 **Boundary**
@@ -244,6 +305,12 @@ into one unit with its own boundary.
 
 **Situation.** A region INSIDE a surface that needs to read as a sub-group but must NOT be promoted
 into a self-contained block.
+
+**Recognition signs**
+
+- It always sits inside a `COLOUR-10` or a `COLOUR-9`.
+- It has no page-level heading of its own and does not exist if pulled out.
+- It only says "these things go together".
 
 **Ask yourself.** Could this region stand on its own if taken out of its parent surface? If not —
 `COLOUR-11`.
@@ -260,6 +327,11 @@ into a self-contained block.
 
 **Situation.** You need to say "these two sides are different things", and NOTHING more.
 
+**Recognition signs**
+
+- The boundary carries no state.
+- It must not read as a warning, as selection, or as an error.
+
 **Ask yourself.** Is this line carrying any state? If not — `border-border`.
 
 **Boundary**
@@ -273,6 +345,12 @@ into a self-contained block.
 
 **Situation.** Several PEER data series, none of which is success, warning or danger. They only need
 to be TELLABLE APART.
+
+**Recognition signs**
+
+- The number of series is decided by the data, not by the design.
+- No series is better than another.
+- A legend, a label or a value accompanies them.
 
 **Ask yourself.** Are these several peer categories, or is this ONE state being drawn in several
 colours?
@@ -291,6 +369,11 @@ read in black and white.
 **Situation.** The brand IMAGE itself: logo, mascot, illustration. Its palette is decided by the
 brand, not by this module.
 
+**Recognition signs**
+
+- It is a graphic asset, not a control.
+- It carries no state and cannot be clicked (if it can be clicked, the clickable area is `COLOUR-3`).
+
 **Ask yourself.** Is this artwork, or is it the interface borrowing brand colour?
 
 **Boundary**
@@ -302,6 +385,11 @@ brand, not by this module.
 
 **Situation.** Text must be readable over an image whose lightness is NOT known in advance.
 
+**Recognition signs**
+
+- What sits behind is decided by the user or by the data.
+- No token can guarantee contrast, because the background is undetermined.
+
 **Ask yourself.** Is this overlay GUARANTEEING CONTRAST, or is it making the image look nicer?
 
 **Boundary**
@@ -310,6 +398,18 @@ brand, not by this module.
   overlay.
 - decoration: an overlay chosen for aesthetics is a violation. This exception is open for legibility
   only.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| element | The single node receiving the class |
+| role | content, interaction, state, surface or boundary |
+| rank | primary or supporting — for content only |
+| state | neutral, selected, success, warning, danger or disabled |
+| surface relationship | base, raised, nested or overlay |
+| non-colour cue | text, icon, shape, pattern or accessible label |
+| theme | light, dark and forced-colour must resolve the same role |
 
 ## Rules
 

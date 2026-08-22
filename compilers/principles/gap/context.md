@@ -68,6 +68,13 @@ arithmetic.
 **Situation.** A joined list: each row carries its own padding, and a divider already states the
 boundary between rows. The parent of the rows owns no sibling seam at all.
 
+**Recognition signs**
+
+- Each row is clickable, or carries its own internal padding.
+- A rule is already drawn between rows.
+- Adding whitespace would break the rules into detached segments and the list would stop reading as
+  one joined surface.
+
 **Ask yourself.** If whitespace were added here, would the dividers turn into disconnected strokes?
 
 **Boundary**
@@ -84,6 +91,12 @@ boundary between rows. The parent of the rows owns no sibling seam at all.
 **Situation.** The second line only qualifies or identifies the first. Read alone, it is no longer
 an independent object.
 
+**Recognition signs**
+
+- Both lines answer one question: "who is this?", "how many?", "what does it cost?".
+- Remove the second and the first is still true, only less precise.
+- Neither side is an action.
+
 **Ask yourself.** Read the lower part alone: is it still an independent object? If not — `GAP-1`.
 
 **Boundary**
@@ -97,6 +110,12 @@ an independent object.
 
 **Situation.** The parts together form one operation, one record, one sentence or one ordered run.
 Pull one out and the block breaks.
+
+**Recognition signs**
+
+- They share a boundary, a state or an action.
+- They read as one cluster, not as two errands.
+- The horizontal or vertical axis is NOT a criterion.
 
 **Ask yourself.** If the parts were separated from the shared boundary or state, would the operation
 or the record break?
@@ -112,6 +131,12 @@ or the record break?
 **Situation.** The first part names, controls or explains the second. The relationship is ownership,
 not peerage.
 
+**Recognition signs**
+
+- The first part is short; the second is the real content.
+- Remove the first and the second still works, only unnamed.
+- Remove the second and the first becomes meaningless.
+
 **Ask yourself.** Is the first part naming, controlling or explaining the second?
 
 **Boundary**
@@ -123,6 +148,12 @@ not peerage.
 ## `GAP-4` — both sides are already a group
 
 **Situation.** Each side already owns its internal seam. The two are peers; neither owns the other.
+
+**Recognition signs**
+
+- Each side can be named as a complete group on its own.
+- Inside each side, `GAP-1`, `GAP-2` or `GAP-3` is already in use.
+- Neither side is large enough to be a page section.
 
 **Ask yourself.** Can both sides be named as a complete group on their own?
 
@@ -136,6 +167,12 @@ not peerage.
 
 **Situation.** Each section has its own heading, content and purpose, yet both still belong to one
 page and run in one content flow.
+
+**Recognition signs**
+
+- Each section can stand alone as an independent section.
+- Each has its own loading state and can be empty on its own.
+- They still scroll together in one flow; they are not yet two layout regions.
 
 **Ask yourself.** Pulled out on its own, could this section stand as an independent section?
 
@@ -154,12 +191,26 @@ its purpose.
 **Situation.** The two sides govern how the whole page area is organised. Each owns its own
 geometry: width, position, behaviour when the screen changes size.
 
+**Recognition signs**
+
+- One side can be pinned, scrolled independently, or disappear on mobile.
+- The width of each side is a layout decision, not a consequence of content.
+
 **Ask yourself.** Do both sides govern how the whole page area is organised?
 
 **Boundary**
 
 - `GAP-6`: see above. The size of a component does NOT make it a layout region — a large card is
   still a card.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| parent | Immediate common parent |
+| siblings | Direct children only |
+| relationship | identity, compact cluster, owned block, peer groups, sections, regions or joined list |
+| behavior | Whether action, state and boundary are shared or independent |
 
 ## Rules
 

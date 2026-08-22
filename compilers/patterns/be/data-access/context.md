@@ -48,6 +48,8 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 
 **What it emits in source.** A constructor parameter typed `EntityManager` whose parameter carries an `@Inject*EntityManager()` decorator naming the datasource. The house wrapper is one line: it binds the framework's own injector to a named connection constant. The application holds more than one datasource family, which is the fact that makes an undecorated `EntityManager` ambiguous rather than merely untidy.
 
+**Recognition signs.** A constructor parameter typed `EntityManager` with no decorator in front of it. Reading the file top to bottom finds not one word saying which database this is. The module wiring is correct, so the code runs — until the day someone changes the default provider.
+
 **Boundary.** Not `DATA-2`: `DATA-1` says the handle **does not declare** where it points; `DATA-2` says the handle is the **wrong shape** even when it points in the right place. A carefully written `@InjectRepository` fails both; a bare `EntityManager` fails only the first. Not `DATA-4` either: `DATA-1` reads the **injection site**, `DATA-4` reads the **place of use** — a correct injection can still be used wrongly by reaching for one's own manager while the caller holds a transaction.
 
 ## `DATA-2` — the handle must be able to carry a second write
@@ -55,6 +57,8 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 **Situation.** The shape of the handle is being chosen. A repository looks more convenient: it already knows the entity, the calls are shorter, the IDE suggests better. But it is **bound to one entity**, so the day this operation must write one more table, it cannot travel with it.
 
 **What it emits in source.** Persistence reached through the `EntityManager`, never through a repository — neither the `@InjectRepository` decorator nor the types `Repository`, `TreeRepository` or `MongoRepository` on a constructor parameter. Catching the type as well as the decorator matters, because the type alone is enough to bind the handle. One `entityManager.transaction` writing several tables through the callback's `manager` is the shape this code produces; a repository-shaped handler could not have written it without one handle per table, and the tables would then commit separately.
+
+**Recognition signs.** A constructor carrying `@InjectRepository(...)`, or a parameter typed `Repository<T>` / `TreeRepository<T>` / `MongoRepository<T>`. A handler holding two or three repositories — one per table — with the writes sitting side by side and nothing wrapping them. The sentence "this does not need a transaction yet" appearing in code review.
 
 **Boundary.** Not `DATA-1`: see above. Not `DATA-4`: `DATA-2` says you **have** a unit of work that can be passed; `DATA-4` says whether you **actually passed it**. Fixing `DATA-2` does not make `DATA-4` correct.
 
@@ -64,6 +68,8 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 
 **What it emits in source.** `@Entity("table_name")` on the entity class, or `@Entity({ name: "table_name", schema: "..." })` when a schema qualifier is also needed. The class name and the table name deliberately differ, which is the point: the class can be renamed without the table following it.
 
+**Recognition signs.** `@Entity()` with no argument. A table name in a migration matching the class name exactly, suffixes like `_entity` included. A class-rename pull request whose diff contains no migration file.
+
 **Boundary.** Not `DATA-5`: both are decisions that sit on the entity, but `DATA-3` is about the table's **identity** while `DATA-5` is about the **cost** the entity imposes on every query. An entity that names its table perfectly can still make the whole system pay for an eager relation.
 
 ## `DATA-4` — the transaction is the unit of work, and it is passed, not assumed
@@ -72,6 +78,8 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 
 **What it emits in source.** Work that must succeed or fail together running in one transaction, with the transactional manager passed as an argument to everything inside it. The helper's signature takes the work as `(manager: EntityManager) => Promise<Result>` and invokes it with the manager of the session that holds it; private methods on a service take `manager` as a parameter the same way. Nothing inside reaches for an injected manager.
 
+**Recognition signs.** A call inside a `transaction()` callback that does **not** receive `manager` as an argument. A helper using `this.entityManager` while its caller is mid-transaction. A bug that appears only under load and always has the shape "half of it was written".
+
 **Boundary.** Not `DATA-2`: see above. Not `DATA-1`: a helper that violates `DATA-4` usually does not violate `DATA-1` at all — its manager is injected perfectly, it simply should not be used here. That is why this code cannot be caught by reading one file. **No lint holds this code.** Whether a helper was handed the caller's transactional manager is a fact about the call graph, not about any one file; a rule reading a single file would have to guess, and a guess here fires on correct code — which is how a correct rule gets disabled.
 
 ## `DATA-5` — the query states what it needs; the entity does not decide for it
@@ -79,6 +87,8 @@ Every situation this module governs carries a code, `DATA-<n>`. The numbers are 
 **Situation.** Data is being fetched for one specific answer. Relations, columns and ordering are properties of **that answer**, not properties of the entity. The one who knows what is needed is the call site.
 
 **What it emits in source.** Relations, selects and ordering stated at the call site that knows what the answer is for — a `relations` tree written in the handler, with the branch each screen needs named beside it. The entity's `@ManyToOne` relations carry no `eager` option, so a caller that wants one column pays for one column.
+
+**Recognition signs.** A relation declared `eager` on an entity. A screen that needs one column receiving the whole relation tree. Someone "optimising" by adding eager for convenience, and the query count rising somewhere else.
 
 **Boundary.** Not `DATA-3`: see above. Not `DATA-4`: both are "a decision made in the wrong place", but `DATA-4` is a decision about **atomicity** while `DATA-5` is a decision about **cost**. Getting `DATA-4` wrong loses data; getting `DATA-5` wrong degrades steadily. **No lint holds this code.** Whether a relation should have been asked for at the call site depends on what the answer is for, and nothing in the entity file says whether the caller needed one column or the whole tree.
 

@@ -39,6 +39,9 @@ khám phá rule, nhưng source origin bị cấm trong package đã promote.
 9. `GRAMMAR-9` — MASTER khóa visual language một lần; profile chỉ override role đã khai và page chỉ ghi deviation.
 10. `GRAMMAR-10` — Khi một fact quan sát được loại trừ outcome lân cận, phải encode negative boundary đó trong rule và counterexample; chỉ thiếu positive fact không phải refusal evidence bền vững.
 11. `GRAMMAR-11` — Phân rã mọi feature section có label thành một grammar scope trước khi compose. Một body, peer list, disclosure hierarchy và bounded form phải resolve về semantic surface owner tương ứng; label của section nằm ngoài surface đó.
+12. `GRAMMAR-12` — Brand mark được bảo hộ của product phải resolve về artwork lockup do profile sở hữu và browser icon tương ứng. Nó không được fallback thành product glyph chung hay identity chỉ bằng heading, còn controlled palette luôn thuộc profile-global theme.
+13. `GRAMMAR-13` — Disclosure có cấu trúc phải giữ nguyên anatomy đầy đủ đã được evidence cho summary và panel. Curriculum module có metadata, derived fact và ordered preview row không được hạ thành cặp title-description chung; disclosure thật sự chỉ có title-description và typed React panel được author độc lập vẫn là negative boundary hợp lệ.
+14. `GRAMMAR-14` — Danh sách supporting text tĩnh dùng marker dạng dấu chấm và marker phải có cùng semantic foreground với nhãn bên cạnh. Row có hành động disclosure/navigation vẫn giữ indicator hành động; bước hoặc thứ hạng có thứ tự vẫn giữ marker biểu đạt thứ tự thay vì membership đơn thuần.
 
 ## Routing
 

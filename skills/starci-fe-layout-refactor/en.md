@@ -1,0 +1,129 @@
+---
+name: starci-fe-layout-refactor
+description: Correct or restructure an exact Layout- or Block-rendered frontend scope. Concrete owner feedback proves that the producing skill's authority, reasoning, enforcement or source application failed; evolve the smallest durable layer, refactor every affected consumer and prove the real product. One direction is default; 3–4 require explicit owner brainstorming. Product truth and backend stay fixed.
+---
+
+# starci-fe-layout-refactor
+
+## LOADS
+
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-shape` | `skills/skill-shape/en.md` | en | staged approval and reporting |
+| `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for failure audit, HTML, authority, FE and proof |
+| `@workspaces` | `contexts/workspaces/en.md` | en | verified frontend route |
+| `@worktrees` | `contexts/worktrees/en.md` | en | correction cache |
+| `@composition` | `brainstorms/composition/en.md` | en | rendered scope and allowed delta |
+| `@business` | `contexts/business/en.md` | en | frozen product truth |
+| `@grammar` | `grammars` | module | routed semantics and owners |
+| `@principles` | `compilers/principles` | module | unresolved visual situations |
+| `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
+| `@lints-fe` | `gates/fe/lints` | module | frontend proof |
+| `@standards` | `standards` | module | law-to-proof accountability |
+| `@design-review` | `publication/design-review-preview/en.md` | en | cache reviews |
+| `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | semantic outcome and owner receipt |
+| `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
+| `@verify-design-grammar` | `scripts/verify-design-grammar.mjs` | script | routed receipt proof |
+| `@validate-artifact` | `scripts/validate-artifact.mjs` | script | page/state contract proof |
+| `@validate-layout-grammar` | `scripts/validate-layout-grammar.mjs` | script | rendered-owner proof |
+| `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | scope/owner/invariant/proof locks |
+| `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | principle catalogue proof |
+| `@validate-maturity` | `scripts/validate-design-maturity.mjs` | script | mature-direction gate |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | review rendering |
+| `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | parity proof |
+| `@business-boundary` | `scripts/business-write-boundary.mjs` | script | write authority |
+| `@compile-context` | `scripts/compile-context.mjs` | script | rebuild runtime context |
+| `@check-deps` | `scripts/check-deps.mjs` | script | dependency-graph proof |
+
+## NESTED SKILLS
+
+None. Refactor is the only correction and authority-evolution lane for Layout/Block-rendered frontend output.
+
+## PIPELINE
+
+Topology: `reconciliation` through authority classification, then `linear` correction and proof.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind-classify | shared | rendered scope, routed FE, source and feedback/objective | freeze product truth, reproduce mismatch and locate highest failed layer | correction envelope, owner chain and verdict | rendered scope and evidence resolve |
+| orchestration | coordination | correction envelope and measured runtime | apply the Refactor dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; `.claude` remains coordinator-only |
+| direction | reconciliation | envelope, grammar and correction objective | print one UI direction by default, or 3–4 after explicit brainstorm | complete-context desktop/narrow review | `OK #1` selects cache direction |
+| authority-state-boundary | execution | selected direction, state truth and verdict | ensure up to five complete-page views and bind authority, impact cone and FE owners | authority-to-write map and exact batch | `OK #2` authorizes the batch once |
+| evolve-refactor | execution | approved authority/source batch | evolve authority first when required, compile it, then correct every consumer | authority receipts and bounded green FE diff | no lower-layer patch hides an upper-layer failure |
+| parity | proof | approved views, existing seeds and product | compare identical states and viewports | final views and `visual-proof.json` | zero mismatch |
+
+## Run
+
+### 1. Bind the rendered scope and classify the failure
+
+Require one routed frontend, an exact validated Layout states artifact or Block-rendered child, and concrete owner
+feedback or a visual restructuring objective. A closed set of already-rendered equivalent surfaces is also valid.
+Freeze business, routes, page/block state truth, data capability, API and backend ownership. Only rendered regions
+and their real source-owner chains are eligible.
+
+Concrete owner feedback rejecting an emitted or implemented visual result proves that the producing skill failed
+to resolve, apply or enforce governing authority. Reproduce it and classify the highest failed layer as
+`law-misruling`, `evidence-inventory-miss`, `application-miss`, `grammar-gap`, `principle-gap`,
+`pattern-or-gate-gap` or `source-drift`. Preserve sound law, but strengthen the missing case, gate or source
+assertion that allowed the bad output. Product-truth feedback returns to business authority.
+
+Now display the mandatory orchestration receipt. The coordinator owns failed-layer classification, every
+`.claude` write, UI direction, approvals and integration. Workers audit evidence/impact cones, generate HTML only
+from a frozen direction, implement disjoint FE paths only after `OK #2`, test and capture proof. Dependent product
+work waits for authority compilation and dependency proof.
+
+### 2. Print and render the UI direction
+
+Print one complete-context UI direction. The journey and product truth remain frozen. One direction is default;
+three or four materially distinct alternatives require an explicit brainstorm request before `OK #1`. `OK #1`
+is cache-only.
+
+### 3. Ensure states and approve the authority/source boundary
+
+After direction selection, show no more than five complete-page state view families. Block-only crops do not
+count. Publish one authority-to-write map containing only required Grammar/Principles/Patterns/gate files, all
+affected drawing/connected owners and compositors, tests and every routed consumer in the impact cone. Existing
+seeds may run but are not writable. Exact `OK #2` authorizes that displayed batch once.
+
+### 4. Evolve authority and apply the selected frontend structure
+
+When a durable gap or misruling is proven, update the smallest paired English/Vietnamese authority and executable
+case first, compile runtime context and prove grammar, principles and dependency graphs. When law is sound, repair
+evidence reach, enforcement or source application without duplicating it. Then correct every affected FE consumer
+without changing copy, product truth, routes, state truth, data capability, API, backend, seeds or unrendered siblings.
+
+### 5. Prove the ensured states
+
+Prove the real connected product at the same states and viewports.
+
+## Rules
+
+1. Owner feedback is a failed-skill signal, never a separate feedback workflow or a taste patch.
+2. Grammar owns product-family facts, outcomes, semantic owners and durable behavior. Principles own only
+   product-neutral visual situations left unresolved after the direct owner and child set are known.
+3. Authority changes precede source, update paired publications, compile runtime context and carry executable proof.
+4. Sound law is preserved; an application miss strengthens its reach or enforcement rather than duplicating law.
+5. Refactor owns corrections of any size inside an exact Layout/Block-rendered block, page, flow or declared
+   surface set. There is no minor-fix, UI-align or separate feedback lane.
+6. Page and block state stay at their real owners; outer props cannot proxy child state or request data.
+7. One direction is default; 3–4 require explicit brainstorming. State proof is capped at five complete-page views.
+8. `OK #1` is cache-only. Only `OK #2` authorizes the exact authority/state/source/proof batch.
+9. Completion requires green authority and FE gates plus same-state, same-viewport real-product parity.
+
+## Stops
+
+- Missing, stale, invalid or page-drifted Layout artifact.
+- Required outcome, state, region or data capability was never rendered; return to Layout.
+- Product truth or backend must change; return to the routed business/backend workflow.
+- Feedback has no reproducible state or recoverable expected outcome.
+- A claimed misruling has no counterexample, or current law already expresses the case and the real
+  application/enforcement failure is not classified.
+- The approved impact cone cannot include every affected consumer, target dirt is unsafe, more than five views are
+  required, or a gate/parity defect cannot be repaired inside the approved boundary.
+
+## OUTPUT
+
+At direction review, print the feedback verdict, governing Grammar/Principles chain and UI direction, then show one
+complete-context desktop/narrow candidate by default or 3–4 after explicit brainstorming. Under `OK #2`, show up
+to five complete-page views and the exact authority-to-write batch. On completion, distinguish authority gaps from
+application/enforcement failures and report strengthened authority, affected owners, tests and real-product parity.

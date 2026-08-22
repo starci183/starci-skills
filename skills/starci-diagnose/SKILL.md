@@ -16,6 +16,17 @@ description: Trace another skill's flow against the real machine without running
 None. This skill never invokes another skill.
 
 
+## PIPELINE
+
+Topology: `reconciliation` and read-only.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | target skill, routed project and requested scenario | freeze the simulated invocation and deny target writes | diagnosis context | exact target skill and route resolve |
+| expected | declared | target skill pipeline and loaded authorities | enumerate what each step would read, transform, emit and gate | expected trace | trace follows the target skill without executing it |
+| observed | observed | real machine, routes and files | inspect what actually exists at every expected read | observed trace | observations are read-only and evidence-backed |
+| classify | join | expected and observed traces | identify first stopping point and owner | diagnosis report | separates environment-not-ready from defective skill |
+
 ## Run
 
 Read `@skill-shape` first.

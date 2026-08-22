@@ -17,6 +17,17 @@ title: starci-deploy · English
 
 None.
 
+## PIPELINE
+
+Topology: `reconciliation`.
+
+| Step | Track | Input | Transform | Required output | Gate |
+|---|---|---|---|---|---|
+| bind | shared | verified roles, environment and durable `.stacks` intent | freeze release, host, domain and rollback ownership | deployment contract | every target is declared and routable |
+| inspect-plan | reconciliation | deployment contract and observed `.infra`/host/provider state | compute setup, release, migration and traffic deltas | execution plan and rollback point | destructive or external mutations remain approval-bound |
+| execute | execution | approved plan | reconcile infrastructure and immutable release, retrying recoverable steps | release and operation receipts | only declared targets mutate and each step is idempotent or recoverable |
+| steady-state | proof | fresh public, host and service observations | monitor health and compare desired with observed state | deployment proof or rollback receipt | public steady state passes, otherwise recover or roll back |
+
 ## Run
 
 Read `@skill-shape`, `@initialization` and `@deployment` in that order. Resolve the Source language,

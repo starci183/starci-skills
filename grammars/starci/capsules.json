@@ -93,20 +93,25 @@
     },
     {
       "id": "hierarchical-disclosure",
-      "intent": "Keep parent groups, descendants, local disclosure, search and progress summaries under one hierarchy owner.",
+      "intent": "Keep parent groups, descendants, local disclosure, search and progress summaries under one joined hierarchy owner, with positional trigger inset, continuous expanded items, complete evidenced summary and panel anatomy, and semantically faithful supporting-list markers when that owner is the labelled bounded surface.",
       "triggerFacts": ["collection-hierarchical", "interaction-local-disclosure"],
       "decisionQuestions": ["Do members contain ordered descendants rather than compare as peers?", "May each parent reveal its descendants independently?"],
       "variableAxes": ["expanded-groups", "filter-query", "active-descendant"],
-      "invariants": ["active-parent-auto-open", "search-reveals-matches", "adaptive-group-summary", "vendor-disclosure-mechanics"],
+      "invariants": ["active-parent-auto-open", "search-reveals-matches", "adaptive-group-summary", "vendor-disclosure-mechanics", "bounded-surface-summary-delegates-trigger-inset", "bounded-surface-panel-inline-inset-6", "bounded-surface-panel-block-inset-3", "inset-separator-between-items-only", "expanded-item-has-no-internal-divider", "bounded-trigger-has-no-hover-fill", "panel-preserves-evidenced-structure-or-typed-render", "curriculum-summary-preserves-title-level-preview-count", "curriculum-panel-preserves-derived-facts-description-preview-rows", "static-supporting-list-uses-dot-marker", "supporting-marker-and-label-share-semantic-foreground"],
       "interactionProof": [
         { "id": "active-parent-opens", "kind": "state", "assertion": "The parent containing the active descendant remains expanded." },
-        { "id": "search-keeps-context", "kind": "interaction", "assertion": "A descendant match retains its parent and reveals the matching row." }
+        { "id": "search-keeps-context", "kind": "interaction", "assertion": "A descendant match retains its parent and reveals the matching row." },
+        { "id": "bounded-surface-single-inset", "kind": "computed-style", "assertion": "When the hierarchy itself owns the labelled bounded surface, the trigger owns the positional first, middle, last or single-row inset, the summary contract adds none, and expanded panel content uses inline inset six and block inset three." },
+        { "id": "bounded-surface-continuous-item", "kind": "computed-style", "assertion": "Only the inset item separator remains; an expanded trigger and panel have no internal divider and a bounded trigger has no hover fill." },
+        { "id": "panel-content-preserved", "kind": "content", "assertion": "Structured data keeps every evidenced summary and panel field in its semantic position, while a supplied typed React render reaches the panel unchanged." },
+        { "id": "curriculum-module-anatomy", "kind": "content", "assertion": "A curriculum summary renders title, level and preview count; its panel renders derived content count and duration, description and ordered preview rows without flattening the module to title-description." },
+        { "id": "static-supporting-dot-list", "kind": "content", "assertion": "Every non-interactive supporting preview row uses a dot marker, never a disclosure chevron, and the marker computed foreground equals its adjacent label in every supported theme." }
       ],
       "counterexampleCaseRefs": ["static-hierarchy"],
       "templateRef": "./templates/hierarchical-disclosure.template.tsx",
-      "templateHash": "sha256:d946cb527e92d828e40c93e4bad7fc169a3ddd49b174086a3f7f58f1fde844f9",
-      "rulings": ["founder-feedback:2026-08-21:long-hierarchy-renders-as-accordion"],
-      "goldenCaseRefs": ["course-content-map", "personal-project-milestone-rail"]
+      "templateHash": "sha256:114118823594d0422fdf20a62d399ae507c19a75a13ac00183928c84aceaef38",
+      "rulings": ["founder-feedback:2026-08-21:long-hierarchy-renders-as-accordion", "founder-feedback:2026-08-22:bounded-surface-accordion-keeps-items-continuous", "founder-feedback:2026-08-22:curriculum-disclosure-preserves-module-anatomy", "founder-feedback:2026-08-22:static-supporting-list-uses-dot-marker-and-shared-tone"],
+      "goldenCaseRefs": ["course-content-map", "personal-project-milestone-rail", "labelled-hierarchical-disclosure-surface"]
     },
     {
       "id": "selection-listbox",
@@ -336,6 +341,24 @@
       "templateHash": "sha256:1eef4f0f5b40553a8536c13f2bbbd74a94fad9022f773ae7bb8ef2feb008e52a",
       "rulings": ["founder-feedback:2026-08-21:continue-learning-uses-one-legacy-highlight-card"],
       "goldenCaseRefs": ["single-continuation-highlight"]
+    },
+    {
+      "id": "brand-lockup",
+      "intent": "Render routed product identity through one protected artwork owner and derive browser identity from the same mark.",
+      "triggerFacts": ["brand-mark"],
+      "decisionQuestions": ["Does this mark identify the routed product rather than a generic feature meaning?", "Which lockup or mark presentation fits the current brand context?"],
+      "variableAxes": ["asset-presentation", "brand-palette", "browser-context"],
+      "invariants": ["dedicated-brand-asset-owner", "intrinsic-controlled-brand-palette", "wordmark-and-mark-variants", "browser-icon-derived-from-brand-mark", "not-icon-vocabulary", "accessible-product-name"],
+      "interactionProof": [
+        { "id": "brand-name-accessible", "kind": "accessibility", "assertion": "The protected artwork exposes the routed product name to assistive technology." },
+        { "id": "brand-owner-present", "kind": "dom", "assertion": "The identity slot renders the dedicated brand owner rather than a heading or generic icon substitute." },
+        { "id": "brand-palette-controlled", "kind": "computed-style", "assertion": "The artwork resolves its paint from profile-owned global brand tokens." }
+      ],
+      "counterexampleCaseRefs": ["product-glyph-not-brand-mark"],
+      "templateRef": "./templates/brand-lockup.template.tsx",
+      "templateHash": "sha256:134ad013c57618162db93e4481d0ab809649fcd5bc9030bc8c1575125e6f1123",
+      "rulings": ["founder-feedback:2026-08-22:protected-brand-mark-owns-lockup-and-browser-icon"],
+      "goldenCaseRefs": ["protected-brand-mark"]
     },
     {
       "id": "heroicons-extension",

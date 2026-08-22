@@ -89,6 +89,13 @@ failed silently, which is worse.
 real datum exists that can break this box, so declaring overflow here is a lie about a risk that
 does not exist.
 
+**Recognition signs**
+
+- The longest possible string can be listed, now, by hand.
+- The content comes from no user, no third party and no open translation table.
+- The maximum width follows from the format: two digits of percentage, one currency symbol, one of
+  four status labels.
+
 **Ask yourself.** Can I list **every** value this cell can receive? If I can, and the list does not
 change with the data — `OVERFLOW-0`.
 
@@ -106,6 +113,13 @@ change with the data — `OVERFLOW-0`.
 **Situation.** The value is **an identity** the reader recognises at the front: a person's name, a
 file name, a title, an email address. Losing the tail loses detail; it does **not** lose
 recognition and does **not** change the meaning.
+
+**Recognition signs**
+
+- The heaviest information sits at the start of the string.
+- Two different values almost never agree on their first 20 characters.
+- There is a way back to the full value: a tooltip, a detail page, or the row itself being
+  clickable.
 
 **Ask yourself.** Looking only at the first half of the string, does the reader recognise **this**
 record and no other?
@@ -131,6 +145,12 @@ code.
 four lines are enough for the reader to decide whether to open it, and holding every card in a grid
 to one height has real business value: it makes them comparable.
 
+**Recognition signs**
+
+- The content is sentences, not an identity.
+- There is somewhere to read it in full: a detail page, a panel, or an expand control.
+- Left to grow freely, neighbouring items fall out of alignment and lose comparability.
+
 **Ask yourself.** On this screen, is the reader **scanning** or **reading**? Scanning is
 `OVERFLOW-2`; reading is `OVERFLOW-7`.
 
@@ -151,6 +171,13 @@ choose by" changes.
 
 **Situation.** The value **loses or changes its meaning** when cut. The reader has no way of knowing
 it was cut, so what they read is **wrong** information, not missing information.
+
+**Recognition signs**
+
+- It is a number, a code, an identifier, a path, or an error message.
+- The tail carries the distinguishing information: the end of an order code, the end of a URL, the
+  end of an error sentence.
+- The string may contain no spaces at all, so the browser has nowhere to break it.
 
 **Ask yourself.** If the tail of this string were cut, would the reader **believe** they were
 looking at the complete value? Yes — `OVERFLOW-3`.
@@ -174,6 +201,12 @@ anywhere and belongs to machine-readable strings only.
 **Situation.** The list may be **unbounded**, but the region it sits in must keep its shape so that
 the things around it stay usable: a dialog's confirm action must always be visible, a header must
 stay put, a panel must not stretch past the screen.
+
+**Recognition signs**
+
+- The excess is **worth keeping**: the reader will want to see more of it, not skip it.
+- There is a sibling that must always be present — an action footer, a header, a summary bar.
+- The number of items is decided by the data, not by the design.
 
 **Ask yourself.** Is there something beside this region that the reader **must always see**? Yes —
 the ceiling belongs here, and this is `OVERFLOW-4`.
@@ -207,6 +240,12 @@ their place.
 table, the lines of a code snippet, a strip of chips. Dropping a column drops data; forcing a wrap
 destroys the structure.
 
+**Recognition signs**
+
+- The minimum width of the content is a fact, not a choice.
+- Wrapping misaligns the rows and the table can no longer be read down its columns.
+- Space is short only on narrow screens; on wide screens nothing overflows at all.
+
 **Ask yourself.** Would taking width away here **lose data or break the structure**? Yes —
 `OVERFLOW-5`.
 
@@ -231,6 +270,13 @@ signal must say there is more to the right: a fade at the edge, an arrow control
 Leave it undeclared and the browser decides, and the way it decides is to push the last element out
 of the row or to squeeze an element that must not be squeezed.
 
+**Recognition signs**
+
+- The row has a **shrinkable** part — a name, a title, a description — and a part that **must not
+  shrink**: a button, a status label, a price, an avatar, an icon.
+- The unshrinkable part has fixed meaning: cutting it loses a function or a value.
+- On a narrow screen, exactly the element on the right is the first to disappear.
+
 **Ask yourself.** In this row, which element **may** lose detail, and which **may not**? Answer that
 and you already have `OVERFLOW-6`.
 
@@ -254,6 +300,12 @@ first — otherwise the browser decides by the length of the data rather than by
 viewport, and the viewport already has its own way of scrolling. Nothing is declared here — and that
 is a decision, not a blank.
 
+**Recognition signs**
+
+- No sibling needs to stay visible.
+- The reader came here to read it all, not to glance at it.
+- Putting a ceiling here would create a second scrollbar nested inside the page's own.
+
 **Ask yourself.** Does anyone **other than the viewport** need to cap the height of this region? No
 — `OVERFLOW-7`.
 
@@ -274,6 +326,16 @@ viewport or an ancestor with a definite height.
 **`OVERFLOW-7` is not "forgot to declare".** It is the conclusion that this region may grow, and
 that conclusion has to be sayable out loud when the review asks.
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| content bound | Is the length closed, or can real data be arbitrarily long? |
+| loss tolerance | Does losing the tail lose meaning, or only detail? |
+| recoverability | Can the reader recover the full value — tooltip, expand, detail view? |
+| axis | Does it overrun inline (width) or block (height)? |
+| ceiling owner | Which ancestor owns the height limit: this box, a rail, or the viewport? |
+
 ## `OVERFLOW-8` — parallel panes share one viewport
 
 **Situation.** A route places two or more panes beside each other and each pane can exceed the visible
@@ -282,6 +344,10 @@ height independently: a course map, a reading document and an on-page outline.
 **What it emits.** The common parent owns one exact viewport height and `overflow-hidden`. Each moving
 pane is projected through the house scroll branch and carries `h-full min-h-0 overflow-y-auto`; pinned
 controls stay outside their inner scroll child. Sibling panes begin and end on the same edges.
+
+**Recognition signs.** Scrollbars start at different vertical positions. A small empty strip appears
+between panes. A child combines `sticky top-*`, `max-h-*` and `overflow-y-auto` while its sibling uses
+another height rule. Scrolling reaches the end of one pane but clips the other.
 
 **Boundary.** Not `OVERFLOW-4`: that code classifies one scrolling box. This code owns the shared
 height and alignment between several independent boxes. `sticky top-*` or `max-h-*` on those children

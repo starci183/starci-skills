@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "product-glyph-not-brand-mark",
+  "kind": "counterexample",
+  "because": "A stable product meaning without an upstream glyph extends the icon vocabulary but does not become product identity.",
+  "facts": ["product-meaning-stable", "upstream-glyph-absent"],
+  "expectedOutcomes": ["heroicons-extension"],
+  "rejectedOutcomes": ["protected-brand-lockup"]
+}

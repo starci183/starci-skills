@@ -92,6 +92,12 @@ narrowing. That is erasure — and what it erases is the seam most worth keeping
 wrong cast is usually caught by other types a few lines later. At the boundary nothing catches it; the
 wrong data travels on until it breaks somewhere unrelated.
 
+**Recognition signs.** The literal `as unknown as` in a non-test file. A cast sitting immediately after
+`JSON.parse`, `response.json()`, `localStorage.getItem`, or a vendor import. A stated reason of the
+form *TypeScript complains*, *it will not accept it*, *I know what shape it is*. Ask: if the server
+renames a field tomorrow, does this line go red? If not, nobody is checking, and this cast is where
+the checking was switched off.
+
 **Boundary.** Not `TYPE-SAFETY-2`: this erases **at one line**, while `any` erases and then travels
 with the value into every file it touches. Not `TYPE-SAFETY-4`: same syntax, different **file** — in a
 `.test.`/`.spec.` file, building the wrong value is the file's job. Not `TYPE-SAFETY-5`: that code
@@ -112,6 +118,12 @@ no `any` anywhere in the file. A cast stops at its line. `any` **travels**: ever
 is `any`, every value derived from it is `any`, and the erasure reaches files that never mentioned it.
 The next reader opens a clean file, sees a variable with a type, and has no way to know that type
 stopped being checked three files ago. `unknown` does not lie: it says "not known yet", and it
+**forces** the narrowing to happen somewhere in the open.
+
+**Recognition signs.** `: any`, `<any>`, `as any`, `Array<any>`, `Record<string, any>`. A function that
+takes `any` and returns something typed, with **no** checking step in between. A stated reason of the
+form *temporary*, *will fix later*, *this place is too generic*. Ask: if this `any` became `unknown`,
+how many places go red? Each one is a place trusting something nobody checked.
 
 **Boundary.** Not `TYPE-SAFETY-1`: if both could apply, take the code with the right radius — one line
 is `TYPE-SAFETY-1`, a type that spreads is `TYPE-SAFETY-2`. Not `TYPE-SAFETY-5`: `any` is **not**
@@ -130,6 +142,9 @@ that say "this is an array" are pushed to the very end, after the eye has alread
 generic layers. A file written on Tuesday reads differently from the file beside it, and every later
 diff carries noise that says nothing about the business.
 
+**Recognition signs.** `T[]` or `readonly T[]` in a `.ts`/`.tsx` file. Both spellings living in **one**
+file. Ask: if the element type becomes generic tomorrow, is this line still readable?
+
 **Boundary.** Not any other code here: this is the only one that is **not** about switching checking
 off. Nothing is erased; the type system keeps working as usual. It sits in this module for the same
 root reason — what nobody fixes will drift.
@@ -137,6 +152,8 @@ root reason — what nobody fixes will drift.
 ## `TYPE-SAFETY-4` — a test may build the wrong value, because that is its job
 
 **Situation.** Something has to prove that a type-closed API **refuses** bad input. Proving that means
+**constructing** bad input — and there is no way to construct a value the types forbid without telling
+the compiler to forget them.
 
 **What it emits in source.** A file whose path ends in `.test.ts`, `.test.tsx`, `.spec.ts` or
 `.spec.tsx`, holding the deliberately wrong value, with the production file left clean. This is the
@@ -145,8 +162,18 @@ only code in the module that says **permitted**. It exists precisely so that the
 judgement-based exemption — "when it is truly necessary it is allowed" — gets re-argued at **every**
 call site, and the side arguing is always the side in a hurry. A path is argued **once**, here.
 
+**Recognition signs.** The file ends in `.test.ts`, `.test.tsx`, `.spec.ts`, `.spec.tsx`. The value
+built is a fake that is **deliberately incomplete**: enough for the function under test to touch, not
+enough to match the real type. A sentence nearby makes clear what this file is guarding. Ask: is this
+wrong value **the thing being proved**? If it is only a quick fixture, the exemption does not apply —
+it is borrowing another code's permission.
+
 **Boundary.** Not `TYPE-SAFETY-1`: same syntax, different file. That is the whole difference, and also
 why the exemption must be a path rather than a promise. Not `TYPE-SAFETY-5`: inside a test a reason is
+**not** the condition for the cast to exist; a sentence saying what the file guards is still what makes
+it readable later, but that is habit, not law. **A test file is not automatically clean.** The
+exemption says only that building a wrong value here is not a fault. It does **not** say every cast in
+a test is right. A lazy cast in a test is still a lazy cast — there is just nothing reporting it.
 
 ## `TYPE-SAFETY-5` — a surviving cast carries its reason
 
@@ -160,6 +187,11 @@ guarantees** or **what the vendor declared wrongly**, and a checking step still 
 the rest is not the writer's confidence but that **the reason can be written as a clause**. That test
 is stronger than it looks: forced to write the sentence, most casts collapse, because the only sentence
 available is "otherwise it errors" — and that error was the compiler saying something **true**.
+
+**Recognition signs.** A single-step cast, not routed through `unknown`. A sentence beside it stating a
+runtime guarantee or a vendor misdeclaration, not restating what the cast does. A narrowing step
+remaining after the cast. Ask: write the reason as one sentence. If the sentence is "because it errors",
+the cast belongs to `TYPE-SAFETY-1` or to a change of shape, not here.
 
 **Boundary.** Not `TYPE-SAFETY-1`: a reason does **not** rescue a cast through `unknown`; erasure with
 an explanation is still erasure. Not `TYPE-SAFETY-2`: a reason does not rescue `any` either, because

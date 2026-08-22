@@ -86,6 +86,15 @@ class.
 usable hit size, no text pushed outside its box. The base layout — already written for the narrowest
 state — is correct on its own. This region owns no transformation.
 
+**Recognition signs**
+
+- Narrow the viewport to the narrowest supported width and nothing breaks.
+- The content already wraps on its own, or is already a single column.
+- The only request heard is "make it responsive" or "make it look more mobile", and nobody can name
+  what fails.
+- The reported cramping is actually a long line of text inside a flex child, repaired by `min-w-0`
+  rather than by a breakpoint.
+
 **Ask yourself.** At the narrowest supported width, WHAT is failing? If it cannot be named — stop,
 this is `RESPONSIVE-1`.
 
@@ -108,6 +117,13 @@ grid already at three, `md:block` on a visible block — each claims a width mat
 count may be unknown in advance, and the last one falling to the next line costs no meaning. The run
 is still one run; it simply grows downward.
 
+**Recognition signs**
+
+- The count is decided by data: tags, filter chips, labels, authors, skills.
+- Label length changes with language or with user-entered data.
+- Moving one item off the first line makes nobody misread anything.
+- No participant is the "left side" or the "right side" of a two-sided relationship.
+
 **Ask yourself.** If the last item drops to the next line, does anyone misread anything? If not —
 `RESPONSIVE-2`.
 
@@ -128,6 +144,14 @@ is still one run; it simply grows downward.
 least one side drops below its usable width — text clipped, an input down to a few characters,
 buttons overlapping. The same sides, in the same order, still read correctly stacked.
 
+**Recognition signs**
+
+- Each side can be named: "the heading cluster" and "the action cluster"; "the input" and "the submit
+  button".
+- In the narrow state, reading top to bottom tells the same story as reading left to right when wide.
+- No side disappears, and no side changes priority.
+- Only the AXIS changes. Gap between the sides, padding and hierarchy all stay as they were.
+
 **Ask yourself.** Is it still the same sides in the same order once stacked? If the order has to be
 reversed to make sense — STOP: that is a task redesign, not a responsive change.
 
@@ -144,6 +168,14 @@ reversed to make sense — STOP: that is a task redesign, not a responsive chang
 **Situation.** A set of same-kind, peer, repeated items, each with a MEASURED minimum width below
 which it stops being readable or usable. As the container narrows, the track count falls. The order
 of the items does not change; only the number of tracks does.
+
+**Recognition signs**
+
+- The items are rendered from a loop over one kind of data.
+- Every item has the same internal structure and the same role.
+- Column and row alignment between items means something to the reader — it is what makes comparison
+  and scanning possible.
+- You have a real number for "narrower than this and the item is unreadable".
 
 **Ask yourself.** Are these repeated identical items, and do you have a measured minimum width for
 one item? Without that number, do not invent a threshold — stay at one column.
@@ -162,6 +194,14 @@ one item? Without that number, do not invent a threshold — stay at one column.
 a table, the milestones on a timeline, the nodes and connectors of a diagram. Wrapping or stacking is
 not a rearrangement, it is an erasure of information. So the region scrolls horizontally — but it
 scrolls INSIDE ITS OWNER, and the page never scrolls horizontally.
+
+**Recognition signs**
+
+- You can point to a sentence the user reads BECAUSE of the alignment: "this column against that
+  one".
+- Dropping a column, or pushing it to the next line, loses a comparison.
+- The content has an intrinsic width: a table, a diagram, a line of code, a musical stave, a Gantt
+  chart.
 
 **Ask yourself.** If this were reflowed onto another axis, would a comparison DISAPPEAR? The answer
 must be yes, with a concrete example, before this code may be used.
@@ -185,6 +225,13 @@ navigation, a side pane). At narrow widths that region has no room, and it is re
 control that reaches the same content. This is the most expensive code, because it is the only one
 that gives the DOM two representations of one job.
 
+**Recognition signs**
+
+- The region is a LAYOUT REGION with its own geometry, not a cluster of text.
+- The replacement control can be named — a button that opens a pane, a menu button — and it ALREADY
+  EXISTS; it is not something to be built later.
+- Both representations read the SAME state: the same active filters, the same selected item.
+
 **Ask yourself.** Is there EXACTLY ONE replacement control reaching the same task with the same
 state, and does focus return to the right place on close? Missing any of the three — refuse this code
 and keep the content visible.
@@ -198,6 +245,21 @@ and keep the content visible.
 
 **Two representations, one state.** If each side keeps its own state, the user's filters "vanish" when
 the device is rotated. The state lives in the owner and both sides only read it.
+
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| owner | The single component that owns the changing geometry |
+| participants | The direct children whose arrangement changes |
+| failure | `none`, `wrap-needed`, `row-unusable`, `tracks-too-narrow`, `horizontal-meaning`, `region-to-control` |
+| minimum usable width | A measured or tested threshold per participant, not a device width |
+| essential | Whether the content or task is required for the page's purpose |
+| alternate path | `none`, or one named control that reaches the same task with the same state |
+| states | That loading, empty, error and ready are the same owner |
+
+Anything absent from this list is not admissible as a reason. Aesthetic density, a screenshot of a
+phone, and the sentence "it feels cramped" select nothing.
 
 ## Rules
 

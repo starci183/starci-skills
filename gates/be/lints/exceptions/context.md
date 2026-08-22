@@ -210,6 +210,18 @@ next to the code that throws it does not escape it.
 | all four | `// eslint-disable-next-line` above any of the four. None of the rules is unsuppressible; every hatch above is reachable in one line by a person who is in a hurry |
 | no rule | Everything `EXCEPTION-5` and `EXCEPTION-6` state — metadata that does not carry what the reader of the failure will need, and a test-runner assertion dressed as a domain failure |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| `context.filename` | The path as the rule sees it, backslash-normalized, and which of the test-lane, probe, base-file or errors-folder patterns matched |
+| `ThrowStatement` | `node.argument`, its `type`, its `callee.type`, its `callee.name`, its `arguments` |
+| `ClassDeclaration` | `node.id.name` and `node.superClass` (`type` and `name`) |
+| Framework name list | A closed 17-entry `Set` of transport exception names, hard-coded in the source |
+
+Nothing else is read. No type information, no import graph, no second file, no configuration — every
+rule declares `schema: []` and therefore takes no options.
+
 ## Rules
 
 1. A rule's identity is its **published name**. There is no numeric identifier for a rule; the name is

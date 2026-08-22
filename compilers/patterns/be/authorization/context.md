@@ -96,6 +96,10 @@ redundancy is the code. The authorization rule lives in the handler, where a sec
 it — not in a service beside the handler, because a service has no message and the next door will
 grow its own copy.
 
+**Recognition signs.** The handler sits behind a bus (command bus, query bus, event bus) rather than
+behind a single door. The same command has been, or will be, called from a CLI, a job, a test
+harness or another transport. A reviewer proposes "drop the `if (!user)`, the resolver has a guard".
+
 **Boundary.** It is not `AUTHZ-2`: that code is about the **door**, where the identity is
 established; this one is about the **handler**, where the identity is used, and a correct system has
 both rather than choosing one. It is not `AUTHZ-3`: `AUTHZ-1` only asks "is there anyone". The moment
@@ -113,6 +117,11 @@ class: `@UseGuards(...)` standing above the parameter that reads the user. The l
 parameter decorators as identity readers — `IDENTITY_PARAM_DECORATORS` — and climbs from the method
 to its class via `hasGuard`.
 
+**Recognition signs.** An identity parameter decorator is present while no guard decorator is present
+on either the method or the class. The new door was copied from an old one and the guard line was
+lost in the copy. The failure is **invisible**: no exception, no log, no 401 — only an identity
+nobody proved.
+
 **Boundary.** It is not `AUTHZ-1`, which lives in the handler rather than at the door. It is not
 `AUTHZ-6`: `AUTHZ-2` asks **whether there is a guard**, `AUTHZ-6` asks **whose subject's guard it
 is** — an operator door wearing a user guard satisfies `AUTHZ-2` and violates `AUTHZ-6`. This is the
@@ -127,6 +136,10 @@ the caller **named**, not the record the caller **owns**.
 **What it emits in source.** A `findOne` by the requested id, a not-found on the miss, then a
 comparison such as `review.userId !== user.id` — the comparison reads the loaded row, and the request
 supplied only which row to load.
+
+**Recognition signs.** A `userId` (or `ownerId`, `tenantId`) travels inside the request payload. The
+check compares two values that are **both** supplied by the caller. Removing the check turns no test
+red, because every test sends its own id.
 
 **Boundary.** It is not `AUTHZ-1`, which only asks whether anyone is signed in. It is not `AUTHZ-4`:
 `AUTHZ-3` decides **whether to refuse**, `AUTHZ-4` decides **which refusal is said** — a correct
@@ -145,6 +158,10 @@ answering one not-found for both "missing" and "not yours", with an e2e flow pro
 that answer and that nothing was written. The log carries the real reason the refusal was softened;
 the caller does not — if the log loses the reason too, the next investigation has nothing to read.
 
+**Recognition signs.** The record's id is guessable or enumerable (incrementing, or taken from
+another source). The caller has no legitimate path to knowing this record is present in the system.
+Iterating ids in a loop and reading the error code alone already maps the data.
+
 **Boundary.** It is not `AUTHZ-3`, which decides whether to refuse at all. Its **mirror failure** is
 answering "not found" for a record the caller **legitimately knows** — they just saw it in a listing
 they were entitled to see — which sends a valid user chasing a bug that does not exist. Both
@@ -161,6 +178,12 @@ guards over one relationship: one resolves-or-creates a trial row and always ret
 reads the paid flag and refuses — the pair is the proof that the row and the state are different
 facts. Name the state in the query, not in a comment.
 
+**Recognition signs.** The check is written as `exists` or `count > 0` over the relationship table.
+The relationship table has a state column (`isEnrolled`, `status`, `plan`, `expiresAt`) that the
+query does not mention. Some path **creates** the relationship row on its own (trial placeholder,
+resolve-or-create), which makes the row's existence nearly free. This is a check that gets written
+correctly once and then copied elsewhere with the distinguishing column dropped.
+
 **Boundary.** It is not `AUTHZ-3`, which asks whose row this is. It is not `AUTHZ-6`: `AUTHZ-5` is a
 state of the **same subject**, `AUTHZ-6` is a **different subject**.
 
@@ -173,6 +196,10 @@ Folding all three into one guard can let a customer's administrator operate the 
 authenticates with a mounted key on a header, a viewer with a session token, and neither can be
 reached through the other. The subject also decides the transport: a door serving a non-user subject
 says so, and that is one of the few valid reasons for that door not to be GraphQL.
+
+**Recognition signs.** One guard accepts both a user session and a machine key. An `isAdmin` flag on
+the user table decides operational rights. An operational endpoint sits in the same class as a user
+endpoint and shares the class-level guard.
 
 **Boundary.** It is not `AUTHZ-2`, which asks only whether a guard exists at all; `AUTHZ-6` asks
 which subject the guard serves, so a door can pass one and fail the other.

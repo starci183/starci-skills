@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "grammar": "starci",
+  "caseId": "protected-brand-mark",
+  "kind": "golden",
+  "because": "A routed product identity uses its protected lockup and derives the browser icon from the same mark.",
+  "facts": ["brand-mark"],
+  "expectedOutcomes": ["protected-brand-lockup"],
+  "rejectedOutcomes": ["heroicons-extension"]
+}

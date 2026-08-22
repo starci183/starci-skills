@@ -167,6 +167,16 @@ document ends up with is a review question and is written down as one.
 | `main-landmark-belongs-to-a-route-file` | **An entry table indented with anything but four spaces.** The window runs to end of file and an entry with no host inherits the first host below it |
 | neither | **A layout and the page beneath it both opening a landmark**, and **everything `LANDMARK-1`, `LANDMARK-2` and `LANDMARK-3` forbid** — one branch per landmark element, a branch that owns no class, and the refusal of an element-choosing prop on the neutral frame |
 
+## Inputs
+
+| Input | Evidence required |
+|---|---|
+| filename | The linted file's path, normalised to forward slashes |
+| AST | One file's JSX, under one parser, with no cross-file resolution |
+| entry table | The nearest table found by walking up, read as text |
+| element name | A bare identifier; member expressions and aliases are different strings |
+| contract key | A string literal written at the attribute, and nothing else |
+
 ## Rules
 
 1. A rule's identity is its published name. There is no second identifier.
