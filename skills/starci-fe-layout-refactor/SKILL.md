@@ -1,6 +1,6 @@
 ---
 name: starci-fe-layout-refactor
-description: Correct or restructure an exact Layout- or Block-rendered frontend scope, treating concrete owner feedback as evidence that the producing skill's authority, reasoning, enforcement or source application failed. Evolve the smallest durable grammar/principle/pattern/gate layer when required, then refactor and prove the real product. One direction is default; 3–4 require an explicit owner brainstorm request. Product truth and backend scope stay fixed.
+description: Correct or restructure an exact Layout- or Block-rendered frontend scope. Treat owner feedback as a signal to investigate, evolve durable authority only with systemic evidence, choose the smallest proportional path, then refactor and prove the real product. Product truth and backend scope stay fixed.
 ---
 
 # starci-fe-layout-refactor
@@ -11,6 +11,7 @@ description: Correct or restructure an exact Layout- or Block-rendered frontend 
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared staged approval and reporting boundary |
 | `@orchestration` | `orchestration/context.md` | context | split failure audit, HTML, authority, FE source and proof without splitting decisions |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | choose micro, component, page or full correction from observed impact |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | keep restructuring directions in session cache |
 | `@composition` | `brainstorms/composition/context.md` | context | freeze the Layout-rendered scope and allowed visual delta |
@@ -40,6 +41,17 @@ description: Correct or restructure an exact Layout- or Block-rendered frontend 
 
 None.
 
+## IMPACT ROUTING
+
+Run `@classify-fe-change` before creating a refactor session. `micro` uses an exact edit, targeted test and browser
+evidence when visual with no direction or authority evolution. `component` uses one boundary and direction only if
+a UI decision remains open. `page` uses the full two-stage refactor. `capability` and `cross-domain` additionally
+require a blind read-only reviewer and evidence-closed challenges before source dispatch.
+
+Feedback is an investigation signal, not proof that grammar or principles are wrong. Evolve durable authority only
+when a binding invariant is violated, at least two independent cases support the same generalization, or the owner
+explicitly rules that the correction is systemic. A single local preference remains local.
+
 ## PIPELINE
 
 Topology: `reconciliation` through authority classification, then `linear` correction and proof.
@@ -49,9 +61,9 @@ Topology: `reconciliation` through authority classification, then `linear` corre
 | bind-classify | shared | exact Layout/Block-rendered scope, routed FE, source and concrete owner feedback or restructuring objective | freeze product truth, reproduce the mismatch and locate the highest failed authority/application layer | correction envelope, owner chain and feedback verdict | every observation is reproducible; rendered scope only |
 | orchestration | coordination | correction envelope, failed-layer evidence and measured runtime | apply the Refactor phase map, dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; `.claude` and decision ownership remain coordinator-only |
 | direction | reconciliation | envelope, grammar, MASTER and correction objective | print direction, run integrated quality review, then render one UI direction by default or 3–4 only after an explicit owner brainstorm request | complete-context desktop/narrow review plus standalone refactor quality receipt | functional direction and required lenses/detectors selected under `OK #1`; cache only |
-| authority-state-boundary | execution | selected direction, state truth and failure verdict | ensure at most five complete-page state views and bind the smallest authority, impact-cone, FE and proof boundary | authority-to-write map, state review and exact batch | every risky family and affected consumer is covered; exact `OK #2` authorizes the batch |
+| authority-state-boundary | execution | selected direction, state truth and failure verdict | choose risk-covering complete-page state views and bind the smallest authority, impact-cone, FE and proof boundary | authority-to-write map, state review and exact batch | every risky family and affected consumer is covered; exact `OK #2` authorizes the batch |
 | evolve-refactor | execution | approved authority-to-write map and exact files | evolve authority first when needed, compile it, then correct every affected FE consumer | authority receipts, bounded FE diff and green gates | no lower-layer patch hides an upper-layer failure; product truth stays fixed |
-| parity | proof | approved state views, existing seeds and product | compare the same complete page states and viewports | up to five final state views and `visual-proof.json` | `parity: passed`, `mismatches: []` |
+| parity | proof | approved state views, existing seeds and product | compute PNG, DOM, accessibility and interaction evidence at the same states/viewports | risk-covering final views and schema-3 `visual-proof.json` | configured thresholds pass and zero known defect remains |
 
 ## Approval modes
 
@@ -68,7 +80,7 @@ Layout `stage: states` artifact or exact Block-rendered child within it, plus co
 restructuring objective. A closed declared set of already-rendered equivalent surfaces is also admissible. Initial
 invocation authorizes read-only classification and direction review; neither authorizes authority or product source.
 
-After `bind-classify`, execute and display the mandatory `orchestration` step. The coordinator classifies the
+After `bind-classify`, build the internal orchestration plan; do not display its record unless `debug=true`. The coordinator classifies the
 highest failed layer, owns every `.claude` write, authors UI direction and integrated quality verdict, consumes
 approvals and integrates. Workers may audit counterexamples, impact cones and lens/detector evidence, generate HTML
 only from an eligible frozen direction, implement disjoint approved
@@ -87,9 +99,9 @@ Audit the concrete `ComponentBase → Component → PageBase/LayoutBase/OverlayB
 Record source hashes and pre-existing target dirt. Unattributable overlap stops the run. Continue directly into
 the direction step; `bind-classify` is not a separate owner approval.
 
-Concrete owner feedback rejecting an emitted or implemented visual result is evidence that the producing skill
-failed to resolve, apply or enforce the governing authority. Never dismiss it as a separate feedback workflow or
-patch it as taste. Reproduce the exact state and classify the highest failed layer as `law-misruling`,
+Concrete owner feedback rejecting an emitted or implemented visual result is a high-priority signal that the
+producing skill may have resolved, applied or enforced authority incorrectly. Reproduce the exact state, test the
+feedback against binding invariants and independent cases, then classify it as `local-correction`, `law-misruling`,
 `evidence-inventory-miss`, `application-miss`, `grammar-gap`, `principle-gap`, `pattern-or-gate-gap` or
 `source-drift`. A sound grammar/principle is preserved, but an application miss still strengthens the smallest
 missing case, gate or source assertion so the skill cannot emit the same wrong result again. Product-truth feedback
@@ -116,7 +128,7 @@ in brainstorm mode it also names `A`, `B`, `C` or `D`. Direction approval is cac
 ### 3. Ensure states and approve the authority/source boundary
 
 Expand the selected direction against the complete Layout state inventory without changing state ownership. Show
-at most five **complete-page state views** across the whole scope, prioritizing distinct high-risk page/block state
+five **complete-page state views** as the default review budget across the whole scope, prioritizing distinct high-risk page/block state
 and transition families. One view is a full-page review item; desktop and narrow captures are its responsive proof,
 and block-only crops never count. If five views cannot cover every new visual structure and risky family, split the
 scope rather than omit one.
@@ -145,7 +157,7 @@ and relevant tests. A required outside path returns to authority-state-boundary 
 
 Execute only existing approved local seed commands and identities. Capture the real connected product for the same
 selected state views and viewports, validate parity and clean browser behavior, and repair in-boundary defects.
-Hand off at most five labeled complete-page state views; each names its page state and visible seeded block states.
+Hand off five labeled complete-page state views by default; each names its page state and visible seeded block states, and distinct uncovered risk may justify more.
 
 ## Rules
 
@@ -154,12 +166,12 @@ Hand off at most five labeled complete-page state views; each names its page sta
    request before `OK #1` and are never multiplied per page.
 3. Directions may restructure only Layout-rendered regions; business, route, state and data scope are frozen.
 4. Manual `OK #1` or its bound auto receipt selects cache direction; FE writes require manual `OK #2` or its exact-boundary auto receipt.
-5. State ensure is capped at five complete-page view families, never block crops or five variants per block.
+5. Five complete-page view families is the default review budget, never a substitute for risk coverage or block crops.
 6. Page state and block state remain at their real owners; `PageProps.<block>.state/data` is not extraction.
 7. Existing seeds may be executed for proof but never created or edited here.
 8. Completion requires green FE gates and same-state, same-viewport real-product parity.
-9. Owner feedback is a failed-skill signal: classification must strengthen the highest failed authority,
-   evidence, application or enforcement layer before the source correction is complete.
+9. Owner feedback triggers investigation. Strengthen durable authority only with systemic evidence; otherwise
+   keep the correction local and prove it without manufacturing a universal rule.
 10. Grammar owns product-family facts, outcomes, semantic owners and durable behavior. Principles own only
     product-neutral visual situations left unresolved after the direct owner and child set are known.
 11. Authority changes precede source changes, update paired publications, compile runtime context and carry

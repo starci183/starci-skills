@@ -13,6 +13,7 @@ title: Skill shape
 | `@host-os` | `scripts/check-host-os.mjs` | script | select only credential and setup entrypoints supported by this host |
 | `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset and completion transitions |
 | `@orchestration` | `orchestration/en.md` | en | partition provider-neutral coordinator and worker work without moving approval or decision ownership |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | choose the smallest frontend workflow from observable impact facts |
 
 
 ## Record
@@ -91,7 +92,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
 | `starci-fe-design-layout` | print journey and UI direction, join them into one complete source-bound page/flow, then approve, seed, implement and prove it |
-| `starci-fe-layout-refactor` | own every correction of Layout/Block-rendered output, classify owner feedback as a failed-skill signal, evolve the smallest durable authority/enforcement layer, then refactor the exact impact cone and prove parity |
+| `starci-fe-layout-refactor` | own proportional correction of Layout/Block-rendered output, investigate owner feedback, evolve durable authority only with systemic evidence, then prove the exact impact cone |
 | `starci-fe-design-block` | print one UI direction by default or 3–4 on explicit brainstorm for one region inside its complete parent, then approve, implement and prove it |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |
 | `starci-conversation-record` | provider-neutral conversation provenance snapshots and exact FE/BE artifact links without raw transcript Git storage |
@@ -142,12 +143,27 @@ Pipeline artifacts follow their authority: business truth is durable, design and
 cache, product code lives only in the routed repository after approval, provider execution state stays in its
 declared local owner, and a read-only capability writes no artifact merely to prove it ran.
 
+## Public vocabulary and proportional process
+
+User-facing frontend communication uses only six terms: **Scope**, **Decision**, **Source boundary**, **Test evidence**, **Approval** and **Result**. Names such as receipt, authority, grammar, lock, eligibility, owner chain and parity remain internal implementation vocabulary and are printed only when `debug=true` is explicitly requested. An internal artifact exists only when a named downstream task, gate or delivery result consumes it.
+
+Before selecting a frontend skill path, run `@classify-fe-change` from observable facts. Never classify from effort estimates or preferred ceremony.
+
+| Impact | Path | Direction | Staged approvals | Proof |
+|---|---|---|---|---|
+| `micro` | plain edit | none | none when the request already names the exact change and source scope | targeted test; browser evidence when visual |
+| `component` | Block | only while a UI decision remains unresolved | one exact source-boundary approval | complete-parent behavior and responsive evidence |
+| `page` | Layout or Layout Refactor | required | two | complete-page states and computed visual/behavior proof |
+| `capability` | full workflow | required | two | page proof plus blind independent challenge |
+| `cross-domain` | full governance | required | explicit domain boundaries | independent challenge and each domain's production proof |
+
+An ambiguous request is not promoted to a larger path just to feel safer; gather the missing observable fact. Exact label, icon, token, spacing or disabled-state corrections stay `micro` when they do not change anatomy, ownership, journey, contracts or domains.
+
 ## Process states
 
 Every invoked StarCi skill first derives its ordered execution steps from its own `Run` or `Process` and
-prints one compact table with exactly these columns: `Step`, `Track`, `Input`, `Transform`, `Required output`,
-`Gate`, `Status`. `Track` is `shared`, `top-down`, `bottom-up`, `join`, `execution` or `proof`; it names semantic
-ownership, not an agent roster. The table contains real task steps, not context values or implementation trivia. Use
+prints one compact table with exactly these columns: `Step`, `Work`, `Evidence`, `Status`. The table contains real
+task steps, not context values, internal artifact names, agent assignments or implementation trivia. Use
 `in progress`, `waiting for OK`, `completed` and `blocked` as the closed status vocabulary; exactly one row
 may be `in progress`.
 
@@ -277,9 +293,8 @@ appended.
 9. Delegation follows `@orchestration` and the selected skill's validated phase map. A `dual-track` synthesis uses
    isolated evidence owners and one coordinator for the join; source partitioning is legal only with one writer per
    path. Skills without an explicit orchestration binding remain sequential.
-10. Every invoked StarCi skill maintains the compact user-facing step table. Layout, Block and Refactor include
-    their mandatory `orchestration` row and compact receipt; raw worker prompts, hidden context and tool chatter
-    remain internal.
+10. Every invoked StarCi skill maintains the compact user-facing step table. Orchestration is internal and is
+    shown only as material progress or a genuine boundary; raw records, worker prompts and tool chatter remain internal.
 11. Resolve `defaultLang` from the Source-wide workspace config before the first user-facing reply.
 12. Missing credentials trigger immediate value-free owner intake; values never enter chat, arguments,
     generated commands or logs.
@@ -291,6 +306,8 @@ appended.
     never a substitute for a missing input receipt.
 18. Do not force `dual-track` onto a linear capability. When two independent origins do exist, do not collapse
     them into one agent's blended reasoning before the join.
+19. Numeric limits are typed: three workers is current runtime capacity, not a quality optimum; five review views is a default human-review budget, not state coverage; visual thresholds are set per reference. Departures need measured risk or runtime evidence, not a new universal number.
+20. A complete internal run record measures elapsed time, available token usage, approval decisions changed, unique defects caught, false-positive gates, coordinator rework and artifact use. Compare only like impact levels; rules that do not improve outcomes become optional or are removed.
 
 ## Exceptions
 

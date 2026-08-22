@@ -453,7 +453,6 @@ function renderContractLaws(data) {
         }
       }
     }
-    if (selectedTargetKeys.size > 5) found.push(`${at}.renderContract.renders: must select no more than 5 complete-page render targets, received ${selectedTargetKeys.size}`);
     if (data.schema === 9) {
       const seedOwners = contract.seedOwners ?? [];
       if (seedOwners.length === 0) found.push(`${at}.renderContract.seedOwners: schema 9 states require one product-native seed owner per selected render target`);
@@ -866,7 +865,6 @@ function blockModeLaws(data) {
       if (!data.stateReview) found.push("stateReview: schema 3 states stage requires complete-page state assurance and exact FE boundary");
       else {
         if (data.stateReview.candidateId !== data.anatomies[0]?.id) found.push("stateReview.candidateId: must equal the selected anatomy id");
-        if ((data.stateReview.views ?? []).length > 5) found.push(`stateReview.views: must contain no more than 5 complete-page state families, received ${data.stateReview.views.length}`);
         const viewIds = new Set();
         const selectedAnatomy = data.anatomies[0];
         for (const [index, view] of (data.stateReview.views ?? []).entries()) {

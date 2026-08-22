@@ -12,7 +12,7 @@ title: Agent orchestration
 | `@claude-orchestration` | `orchestration/claude/en.md` | en | map the common contract to Opus coordinator and Sonnet workers |
 | `@frontend-map` | `orchestration/frontend/en.md` | en | bind Layout, Block and Refactor steps to exact coordinator and worker work |
 | `@profiles` | `orchestration/profiles.json` | file | keep runtime model roles and concurrency machine-readable |
-| `@receipt-schema` | `orchestration/receipt.schema.json` | file | define the compact orchestration receipt each bound skill emits |
+| `@receipt-schema` | `orchestration/receipt.schema.json` | file | define the internal machine-validated run record |
 | `@validate-orchestration` | `scripts/validate-orchestration.mjs` | script | reject unsafe ownership or incomplete skill bindings |
 
 ## Record
@@ -23,11 +23,11 @@ write boundaries. Runtime adapters translate the same roles into Claude Code or 
 
 ## Roles
 
-The **coordinator** is the sole decision and integration owner. It resolves scope, business and journey meaning,
+The **coordinator** is the integration owner, not an unquestionable source of truth. It resolves scope, business and journey meaning,
 chooses UI direction, classifies state ownership, presents approvals, freezes the exact boundary, reviews worker
 receipts, integrates shared files and declares the final verdict.
 
-A **worker** receives one bounded task with one output owner. Workers may inventory evidence, generate cache HTML,
+A **worker** receives one bounded task with one output owner. Workers may inventory and challenge evidence, generate cache HTML,
 implement approved source in disjoint files, seed approved local data, run tests or capture browser proof. A worker
 never selects a product or UI decision, consumes approval, expands scope, edits shared authority, integrates
 overlapping changes or declares completion.
@@ -58,8 +58,9 @@ before direction rendering. The coordinator publishes a compact orchestration re
 4. the coordinator-only decisions and shared paths;
 5. concurrency batches and the sequential fallback.
 
-The receipt is part of the user-facing step plan, but raw prompts, hidden context and tool chatter remain internal.
-It adds no owner approval and never splits an existing staged approval.
+This is an internal run record, not part of the user-facing step plan. Show only material progress, evidence,
+decision and exact boundary. Every produced output names a downstream task, gate or delivery consumer; an unused
+artifact invalidates a complete run. It adds no owner approval and never splits an existing staged approval.
 
 ## Dispatch contract
 
@@ -70,9 +71,9 @@ and a boundary-drift flag.
 
 The receipt is revalidated and append-only refreshed at each coordinator phase gate. Cache tasks bind both the
 exact frozen contract hash and the validated target-matched `qualityReviewAt` hash, and depend on passed
-`contract-freeze` plus `quality-review` events. Source tasks bind the complete approved path set and either manual
-`OK #2:<source-boundary-hash>` or, after exact invocation `mode=auto`,
-`AUTO:<autoApprovalAt>:OK #2:<source-boundary-hash>`. Auto also binds `autoApprovalAt` to the immutable envelope.
+`contract-freeze` plus `quality-review` events. Source tasks bind the complete approved path set and the proportional
+approval identity: component impact uses `OK #1:<source-boundary-hash>`; page/full impact uses `OK #2:<source-boundary-hash>`.
+Auto prefixes the same identity with `AUTO:<autoApprovalAt>:` and binds `autoApprovalAt` to the immutable envelope.
 Both forms depend on the same passed source-approval gate and exact writer registry; neither authorizes scope
 expansion or external action. When Refactor evolves authority, source tasks also bind the compiled authority-proof hash. Proof tasks bind the stable-build and selected
 proof-target hashes and depend on every source task. A future task is not dispatchable while its gate identity is
@@ -85,6 +86,10 @@ consumers, tests, required paths and inventory proof, and every required path re
 The coordinator rejects a receipt when its envelope is stale, evidence is unproved, a write is outside boundary,
 a decision was made by a worker or another task owns the same path. Rejected work is not silently integrated.
 
+For `capability` and `cross-domain` impact, a second reviewer receives evidence without the coordinator's recommendation,
+cannot write source, may raise concrete challenges, and must close them through evidence before source dispatch. A
+consistent coordinator answer is not treated as an independent proof.
+
 ## Dependency and writer law
 
 - Parallelize only tasks whose required inputs are already gate-passed and whose output and write ownership do not overlap.
@@ -92,7 +97,8 @@ a decision was made by a worker or another task owns the same path. Rejected wor
 - `.claude` authority, approval records, shared contracts, shared entrypoints, manifests and final integration remain coordinator-only.
 - A worker may implement product source only after the source-authorizing approval and only inside its assigned subset.
 - Workers do not spawn workers. The coordinator alone refills slots, follows up, interrupts and closes tasks.
-- More agents are not progress. Use the smallest worker set that shortens independent work; ordered work stays ordered.
+- More agents are not progress. Three is the current runtime capacity, not a claimed optimum. Dispatch only ready,
+  disjoint work whose expected saved time exceeds coordination overhead; otherwise execute sequentially.
 - Dirty or unattributable target overlap stops that assignment and returns it to the coordinator.
 
 ## Runtime and fallback
@@ -101,6 +107,10 @@ Measure the active host before dispatch and select exactly one adapter. Never mi
 single orchestration receipt. If delegation, the requested model or safe disjoint boundaries are unavailable,
 execute the same tasks sequentially under the coordinator with identical context firewalls and receipts. Fallback
 changes scheduling, not authority or proof.
+
+On completion record wall time, token usage when measurable, coordinator rework, approvals that changed a decision,
+unique defects caught, false-positive gates and artifact creation/use. `scripts/summarize-run-metrics.mjs` compares
+only like impact levels. A rule without positive outcome evidence is downgraded or removed instead of gaining ceremony.
 
 ## Scope
 

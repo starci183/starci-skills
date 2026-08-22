@@ -11,6 +11,7 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove 
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | staged approval và reporting boundary |
 | `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho decision, HTML, source và proof |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | từ chối ceremony lớn hơn frontend impact đã đo |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | frontend route đã verify |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | ignored session cache |
 | `@composition` | `brainstorms/composition/vi.md` | vi | Scope, Owner, Invariant và Proof |
@@ -41,6 +42,10 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove 
 
 Không có. Layout sở hữu design đến implementation và QA.
 
+## Routing theo impact
+
+Phân loại trước. Layout chỉ nhận page, capability và cross-domain; micro sửa trực tiếp, component dùng Block. Source capability/cross-domain cần blind read-only reviewer và challenge được close bằng evidence.
+
 ## PIPELINE
 
 Topology: `dual-track` tới khi tổng hợp page, sau đó `linear` qua implementation và proof. Một owner top-down
@@ -55,7 +60,7 @@ output đã pass gate, sở hữu decision/shared artifact và chỉ delegate so
 | page-synthesis | join | evidence, business head, source, contract, data, grammar và MASTER | chạy journey và capability subphase biệt lập, in direction, join, chạy integrated quality review rồi author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt, quality review và schema 9 page contract | cả hai origin cùng required lens/detector pass, không còn item chưa bind, rồi `OK #1`; chỉ cache |
 | states | execution | approved direction-quality-page hash và state truth | bung state, owner, transition, seed và boundary không review drift | schema 9 render contract cùng canonical prompt | `OK #2`; exact files đầy đủ |
 | implementation | execution | approved prompt | code, gate và seed không reinterpret | implementation, gate và seed receipts | mọi obligation tới product evidence |
-| parity | proof | preview và seeded product | so cùng state, cùng viewport | `visual-proof.json` | `mismatches: []` và đạt delivery |
+| parity | proof | preview và seeded product | tính PNG, DOM, axe và Playwright evidence | `visual-proof.json` | per-reference threshold pass và đạt delivery |
 
 ## Approval modes
 
@@ -66,7 +71,7 @@ destructive/external action hoặc boundary expansion vẫn dừng. Auto hết h
 
 ## Run
 
-Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo ignored design session, validate four-lock composition baseline rồi hiển thị orchestration receipt. Coordinator sở hữu journey/UI decision, integrated quality verdict và approval. Worker có thể inventory lens/detector evidence, chỉ sinh HTML từ eligible frozen contract, chỉ implement path tách rời sau source-authorizing manual hoặc auto receipt, rồi seed, test và capture proof.
+Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo ignored design session, validate composition baseline rồi lập orchestration plan nội bộ, không in record trừ khi `debug=true`. Coordinator sở hữu journey/UI decision, integrated quality verdict và approval. Worker có thể inventory lens/detector evidence, chỉ sinh HTML từ eligible frozen contract, chỉ implement path tách rời sau source approval, rồi seed, test và capture proof.
 
 User-facing execution table hiển thị các section 1–3 dưới đây như một bước `page-synthesis`. Page mapping, hai
 track biệt lập, direction declaration, phần join và desktop/narrow rendering là internal subphase; không được chen
@@ -158,7 +163,7 @@ Phase này được phép start declared local dependencies cùng real frontend/
 
 ### 7. Prove real-product parity
 
-Chạy browser proof cho mọi selected render target, tối đa năm complete-page target. Final proof cần capture từ real connected product với cùng page state, seeded block states và viewport, kèm seed evidence, `parity: passed`, `mismatches: []` và terminal delivery. Repair defect trong boundary mà không cần approval thứ ba.
+Chạy browser proof cho mọi selected render target. Năm complete-page target là default review budget, không phải coverage cap. Final proof dùng PNG/DOM/axe/trace từ real connected product ở cùng page state, seeded block states và viewport; validator tự tính verdict. Repair defect trong boundary mà không cần approval thứ ba.
 
 ## Rules
 

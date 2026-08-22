@@ -11,6 +11,7 @@ description: Design, stage-approve, implement, seed and prove one mature long pa
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | staged approval and reporting boundary |
 | `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for decision, HTML, source and proof |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse ceremony larger than measured frontend impact |
 | `@workspaces` | `contexts/workspaces/en.md` | en | verified frontend route |
 | `@worktrees` | `contexts/worktrees/en.md` | en | ignored session cache |
 | `@composition` | `brainstorms/composition/en.md` | en | Scope, Owner, Invariant and Proof |
@@ -41,6 +42,10 @@ description: Design, stage-approve, implement, seed and prove one mature long pa
 
 None. Layout owns design through implementation and QA.
 
+## Impact routing
+
+Classify first. Layout accepts page, capability and cross-domain impact; micro uses a plain edit and component uses Block. Capability and cross-domain source require a blind read-only reviewer with evidence-closed challenges.
+
 ## PIPELINE
 
 Topology: `dual-track` through page synthesis, then `linear` through implementation and proof. One isolated
@@ -55,7 +60,7 @@ gate-passed outputs, owns decisions and shared artifacts, and delegates only dis
 | page-synthesis | join | evidence, business head, source, contracts, data, grammar and MASTER | run isolated journey and capability subphases, print directions, join them, run integrated quality review, then author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt, quality review and schema 9 page contract | both origins and required lenses/detectors pass, nothing is unbound, then `OK #1`; cache only |
 | states | execution | approved direction-quality-page hash and state truth | expand states, owners, transitions, seeds and boundary without review drift | schema 9 render contract and canonical prompt | `OK #2`; exact files complete |
 | implementation | execution | approved prompt | code, gate and seed without reinterpretation | implementation, gate and seed receipts | every obligation reaches product evidence |
-| parity | proof | previews and seeded product | compare same state and viewport | `visual-proof.json` | `mismatches: []` and delivery reached |
+| parity | proof | previews and seeded product | compute PNG, normalized DOM, axe and Playwright evidence | `visual-proof.json` | per-reference thresholds pass and delivery is reached |
 
 ## Approval modes
 
@@ -67,7 +72,7 @@ expires with the invocation.
 
 ## Run
 
-Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session, validate the four-lock composition baseline, then display the orchestration receipt. The coordinator owns journey/UI decisions, integrated quality verdict and approvals. Workers may inventory lens/detector evidence, generate HTML only from eligible frozen contracts, implement disjoint paths only after the source-authorizing manual or auto receipt, seed, test and capture proof.
+Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session, validate the composition baseline, then build the internal orchestration plan without displaying its record unless `debug=true`. The coordinator owns journey/UI decisions, integrated quality verdict and approvals. Workers may inventory lens/detector evidence, generate HTML only from eligible frozen contracts, implement disjoint paths only after source approval, seed, test and capture proof.
 
 The user-facing execution table exposes sections 1–3 below as one `page-synthesis` step. Page mapping, both
 isolated tracks, direction declaration, their join and desktop/narrow rendering are internal subphases; no
@@ -161,7 +166,7 @@ This phase may start declared local dependencies and the real frontend/backend. 
 
 ### 7. Prove real-product parity
 
-Run browser proof for every selected render target, never more than five complete-page targets. Final proof requires real connected-product captures with the same page state, seeded block states and viewport, plus seed evidence, `parity: passed`, `mismatches: []` and terminal delivery. Repair in-boundary defects without a third approval.
+Run browser proof for every selected render target. Five complete-page targets is the default review budget, not a coverage cap. Final proof uses real connected-product PNG/DOM/axe/trace evidence at the same page state, seeded block states and viewport; the validator computes the verdict. Repair in-boundary defects without a third approval.
 
 ## Rules
 

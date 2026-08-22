@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-block
-description: Reconcile một block đã được Layout generate qua bước UI-direction bắt buộc trong complete parent page, duyệt tối đa năm complete-page state view cùng exact FE boundary rồi implement và prove. Mặc định một direction; 3–4 chỉ khi owner explicit brainstorm. Whole-page restructuring thuộc Layout refactor.
+description: Reconcile một block impact component trong complete parent, chỉ resolve direction khi UI decision còn mở, duyệt một exact FE boundary rồi implement và prove. Exact micro fix dùng plain path.
 ---
 
 # starci-fe-design-block
@@ -11,6 +11,7 @@ description: Reconcile một block đã được Layout generate qua bước UI-
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | approval và reporting boundary dùng chung |
 | `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho block HTML, source và proof |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fix khỏi component workflow |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify frontend route |
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ review evidence trong session cache |
 | `@composition` | `brainstorms/composition/vi.md` | vi | khóa highlighted parent và preserved page |
@@ -36,6 +37,10 @@ description: Reconcile một block đã được Layout generate qua bước UI-
 
 None. Skill này sở hữu block decision tới implementation và full-page QA.
 
+## Routing theo impact
+
+Block chỉ nhận component impact. Micro dùng exact edit, targeted test và complete-parent browser evidence nếu visual. Bỏ direction alternatives khi owner đã chỉ rõ decision; trình đúng một exact source-boundary approval.
+
 ## PIPELINE
 
 Topology: `reconciliation` trong một complete page đã nhận.
@@ -44,49 +49,49 @@ Topology: `reconciliation` trong một complete page đã nhận.
 |---|---|---|---|---|---|
 | ràng buộc | dùng chung | accepted page contract, exact block boundary và owner request | khóa parent geometry, state và proof viewport | block audit context | resolve đúng một block và complete parent page |
 | orchestration | coordination | block audit context và measured runtime | áp dụng Block dependency graph cùng one-writer registry | runtime adapter, task batch, coordinator reservation và sequential fallback | không approval, không recompose page |
-| direction | đối chiếu | block contract, grammar, source và rendered parent page | audit anatomy, in direction, chạy integrated quality review rồi render một direction mặc định hoặc 3–4 sau owner explicit brainstorm | schema 3 complete-parent direction review, quality receipt và correction contract | required lens/detector pass; `OK #1` select cache direction, không page drift |
-| state-boundary | execution | selected direction và block state truth | ensure tối đa năm complete-page state view và bind exact FE owners | state review và exact FE boundary | `OK #2` authorize exact files |
+| direction | đối chiếu | block contract, grammar, source và rendered parent page | verify owner-specified decision hoặc resolve direction khi còn mở | schema 3 complete-parent review và correction contract | không approval; evidence pass, không page drift |
+| state-boundary | execution | selected direction và block state truth | chọn complete-page view phủ risk và bind exact FE owner | state review và exact FE boundary | một exact approval authorize files |
 | implement | execution | approved direction và exact files | chỉ sửa proven owners và affected tests | implementation receipt | giữ parent contract và block ownership |
 | parity | proof | approved preview/source cùng state và viewport | so block trong context | bounded state views và visual proof | zero known mismatch |
 
 ## Approval modes
 
 `manual` là mặc định. Exact `mode=auto` bind invocation envelope. Khi từng normal gate pass, coordinator chọn
-evidence-backed recommendation, ghi exact-parent auto receipt bind boundary cho `OK #1` và `OK #2`, rồi đi tiếp.
+evidence-backed recommendation và ghi một exact-parent auto approval bind boundary cho `OK #1`, rồi đi tiếp.
 Complete-parent review vẫn bắt buộc; thiếu default, gate đỏ, credential, destructive/external action hoặc boundary
 drift vẫn dừng. Auto hết hiệu lực cùng invocation.
 
 ## Run
 
-Đọc `@skill-shape` và `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng. Bind exact `parentPageId` cùng current drawing/compositor/entry/test `sourceOwners`. Sau đó hiển thị orchestration receipt. Coordinator sở hữu state/anatomy classification, UI direction, integrated quality verdict, approval và integration. Worker có thể thu lens/detector evidence, chỉ sinh complete-parent HTML từ eligible frozen anatomy và chỉ ghi source tách rời sau source-authorizing manual hoặc auto receipt.
+Đọc `@skill-shape` và `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract và source. Viết composition baseline; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng. Bind exact `parentPageId` cùng current drawing/compositor/entry/test `sourceOwners`. Lập orchestration plan nội bộ, không in record trừ khi `debug=true`. Coordinator sở hữu state/anatomy classification, UI direction, integrated quality verdict, approval và integration. Worker có thể thu evidence, chỉ sinh complete-parent HTML từ eligible frozen anatomy và chỉ ghi source tách rời sau source approval.
 
-Audit một generated block, trả pass hoặc exact findings rồi synthesize UI direction trong khi giữ nguyên page.
-Direction bắt buộc nằm trong workflow. Emit schema 3 `stage: direction`; trước HTML phải chạy `@frontend-quality`
+Audit một generated block, trả pass hoặc exact findings rồi verify decision đã chỉ rõ hoặc synthesize direction
+chỉ khi còn mở, trong khi giữ nguyên page. Emit schema 3 `stage: direction`; trước HTML phải chạy `@frontend-quality`
 qua mười lens và sáu detector
 family; external UX/UI source chỉ là digest-pinned advisory. Mặc định một complete desktop/narrow direction trong
 exact parent. Chỉ owner explicit brainstorm trước `OK #1` mới emit 3–4 targeted anatomy đã review riêng trong
 geometry đó. Journey direction được
-inherit và freeze. Exact `OK #1` select direction duy nhất, hoặc gọi tên `A`–`D`, và chỉ tác động cache.
+inherit và freeze. Không manufacture alternative khi decision đã được chỉ rõ.
 
-Sau `OK #1`, emit schema 3 `stage: states` cùng machine-validated `stateReview`: tối đa năm complete-page view
+Emit schema 3 `stage: states` cùng machine-validated `stateReview`: mặc định năm complete-page view
 family bind exact parent cùng reachable states và source boundary chứa mọi proven owner/test path, ưu tiên block
 state cùng transition khác nhau. Desktop/narrow capture prove
-responsive còn isolated block crop không được tính. Publish nó dưới `OK #2`; chỉ exact `OK #2` authorize
-implementation. Sau đó implement và prove cùng các full-page
-view. Split scope nếu năm view không đủ ensure. Known defect hoặc delivery chưa đạt cấm nói hoàn tất.
+responsive còn isolated block crop không được tính. Trình selected decision, evidence và exact source boundary
+cùng nhau dưới một `OK #1`; chỉ approval đó authorize implementation. Thêm view cho distinct uncovered risk.
+Known defect hoặc delivery chưa đạt cấm nói hoàn tất.
 
 ## Rules
 
 1. Current routed source là parent authority.
-2. Audit, direction, hai staged approval, implementation và QA xảy ra trong cùng invocation.
+2. Audit, optional direction resolution, một exact source approval, implementation và QA xảy ra trong cùng invocation.
 3. Preview artifact chỉ sống trong ignored cache.
 4. Không có design registry hay durable design identity.
 5. Source cùng full-page proof là durable outcome.
 6. MASTER được inherit; chỉ page/block deviation được khác.
-7. UI direction bắt buộc; mặc định một và 3–4 chỉ khi owner explicit brainstorm trước `OK #1`.
+7. Verify UI direction; chỉ resolve khi còn mở, 3–4 alternative cần owner explicit brainstorm.
 8. Journey direction được inherit và freeze; Block chỉ in UI direction.
-9. Manual `OK #1` hoặc bound auto receipt chỉ tác động cache; displayed source boundary cần manual `OK #2` hoặc exact-boundary auto receipt.
-10. State assurance dùng tối đa năm complete-page view family và không thay bằng block-only crop.
+9. Một manual `OK #1` hoặc bound auto event approve decision, evidence và exact source boundary cùng nhau.
+10. Năm complete-page view family là default review budget, không phải coverage cap; không thay bằng block-only crop.
 11. Block sở hữu first synthesis. Concrete owner feedback từ chối emitted/implemented output vì sai
     Grammar/Principles thì rời first-synthesis scope và vào correction owner.
 12. New work emit Block schema 3 với một target-matched quality review cho mỗi anatomy.

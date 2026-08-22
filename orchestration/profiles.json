@@ -1,7 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "common": {
     "maxConcurrentWorkers": 3,
+    "workerLimitKind": "runtime-capacity",
+    "scheduler": "ready-disjoint-overhead-positive",
     "oneWriterPerPath": true,
     "workersMaySpawn": false,
     "coordinatorOwns": [
@@ -19,7 +21,8 @@
       "approved-disjoint-code",
       "seed-execution",
       "tests",
-      "browser-capture"
+      "browser-capture",
+      "evidence-challenge"
     ]
   },
   "runtimes": {

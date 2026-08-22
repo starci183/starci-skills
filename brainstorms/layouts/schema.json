@@ -410,7 +410,7 @@
       }
     },
     "renderContract": {
-      "description": "The complete implementation authority for the selected preview. Pages, regions, states and transitions stay exhaustive; renders select at most five complete-page targets, and schema-9 states bind one product-native seed owner per selected target.",
+      "description": "The complete implementation authority for the selected preview. Pages, regions, states and transitions stay exhaustive; five renders is the default human-review budget rather than a coverage cap, and schema-9 states bind one product-native seed owner per selected target.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "candidateId", "sourceBoundary", "viewports", "pages", "renders"],

@@ -120,7 +120,7 @@
       "required": ["candidateId", "views", "sourceBoundary"],
       "properties": {
         "candidateId": {"$ref": "#/$defs/slug"},
-        "views": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"$ref": "#/$defs/stateView"}},
+        "views": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateView"}},
         "sourceBoundary": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
       }
     },

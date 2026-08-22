@@ -51,8 +51,8 @@ Stage `states` mang đúng approved direction receipt, quality review cùng page
 và transition, rồi thêm `renderContract` đã hash để khóa exact source files cùng complete page, region, state và
 transition obligation. State phải được phân loại tại đúng owner: page state chỉ tồn tại khi region arrangement,
 hierarchy hoặc active page-level composition thay đổi; loading, refusal, answered hay interaction condition chỉ
-đổi một subtree vẫn là block state dù full-page capture có hiển thị nó. `renders` chọn tối đa năm complete-page
-render target trên toàn flow; mỗi target bind page state nếu có cùng các seeded block state nhìn thấy trong capture,
+đổi một subtree vẫn là block state dù full-page capture có hiển thị nó. `renders` dùng năm complete-page target làm
+default review budget và chỉ mở rộng cho distinct uncovered risk; mỗi target bind page state nếu có cùng các seeded block state nhìn thấy trong capture,
 và phủ mọi reference viewport cho target đó. Việc chọn ưu tiên các condition family và transition family rủi ro
 khác nhau; nó không loại bỏ implementation hay test obligation chưa được render. Mỗi region khóa owner,
 component, contract, anatomy, data, visual behavior cùng SPLIT-6 source ownership. Schema 9 còn bắt buộc một

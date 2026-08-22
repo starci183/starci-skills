@@ -15,22 +15,24 @@ const receipt = () => {
   const impactCone = {owners: [{id: "page", path: "src/Page.tsx"}], consumers: ["src/Page.tsx"], tests: [], requiredPaths: ["src/Page.tsx"], inventoryProof: ["source-owner matrix at boundary hash"]};
   const impactConeAt = canonicalHash(impactCone);
   return ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   status: "planned",
   runtime: "codex",
   skill: "starci-fe-design-layout",
   envelopeAt: hash,
-  coordinator: {model: "gpt-5.6-sol", owns: decisions},
+  impact: {level: "page", workflow: "layout", classificationAt: hash},
+  coordinator: {id: "coordinator", model: "gpt-5.6-sol", owns: decisions},
   phaseGates: {authorityMode: "preserve", approvalMode: "manual", cacheRoots: ["review"], frozenContractAt: hash, qualityReviewAt: boundaryHash, sourceBoundaryAt: boundaryHash, sourceApprovalAt: `OK #2:${boundaryHash}`, approvedSourcePaths: ["src/Page.tsx"], impactConeAt, impactCone, proofRoots: ["proof"]},
   gateEvents: [
-    {id: "pages-frozen", kind: "contract-freeze", at: hash, status: "passed", dependsOn: []},
-    {id: "quality-passed", kind: "quality-review", at: boundaryHash, status: "passed", dependsOn: ["pages-frozen"]},
-    {id: "impact-locked", kind: "impact-cone", at: impactConeAt, status: "passed", dependsOn: ["quality-passed"]},
-    {id: "source-approved", kind: "source-approval", at: `OK #2:${boundaryHash}`, status: "passed", dependsOn: ["impact-locked"]}
+    {id: "pages-frozen", kind: "contract-freeze", at: hash, status: "passed", dependsOn: [], requiredArtifacts: []},
+    {id: "quality-passed", kind: "quality-review", at: boundaryHash, status: "passed", dependsOn: ["pages-frozen"], requiredArtifacts: []},
+    {id: "impact-locked", kind: "impact-cone", at: impactConeAt, status: "passed", dependsOn: ["quality-passed"], requiredArtifacts: []},
+    {id: "source-approved", kind: "source-approval", at: `OK #2:${boundaryHash}`, status: "passed", dependsOn: ["impact-locked"], requiredArtifacts: ["complete HTML"]}
   ],
+  challenges: [],
   tasks: [
-    {id: "render-pages", skill: "starci-fe-design-layout", envelopeAt: hash, step: "page-synthesis", kind: "cache-write", model: "gpt-5.6-luna", objective: "Render the frozen page contract exactly.", requiredInputs: ["pages.json", "quality-review.json"], dependsOn: [], dependsOnGates: ["pages-frozen", "quality-passed"], reads: ["pages.json", "quality-review.json"], writes: ["review/index.html"], frozenContractAt: hash, qualityReviewAt: boundaryHash, forbiddenDecisions: decisions, output: "complete HTML", requiredProof: ["desktop and narrow captures"], stopConditions: ["contract drift"]},
-    {id: "code-page", skill: "starci-fe-design-layout", envelopeAt: hash, step: "implementation", kind: "source-write", model: "gpt-5.6-luna", objective: "Implement the approved render contract exactly.", requiredInputs: ["render-contract.json"], dependsOn: ["render-pages"], dependsOnGates: ["source-approved", "impact-locked"], reads: ["render-contract.json"], writes: ["src/Page.tsx"], sourceApprovalAt: `OK #2:${boundaryHash}`, forbiddenDecisions: decisions, output: "page diff", requiredProof: ["targeted tests"], stopConditions: ["outside boundary"]}
+    {id: "render-pages", skill: "starci-fe-design-layout", envelopeAt: hash, step: "page-synthesis", kind: "cache-write", model: "gpt-5.6-luna", objective: "Render the frozen page contract exactly.", requiredInputs: ["pages.json", "quality-review.json"], dependsOn: [], dependsOnGates: ["pages-frozen", "quality-passed"], reads: ["pages.json", "quality-review.json"], writes: ["review/index.html"], frozenContractAt: hash, qualityReviewAt: boundaryHash, forbiddenDecisions: decisions, output: "complete HTML", outputConsumers: ["gate:source-approved"], requiredProof: ["desktop and narrow captures"], stopConditions: ["contract drift"]},
+    {id: "code-page", skill: "starci-fe-design-layout", envelopeAt: hash, step: "implementation", kind: "source-write", model: "gpt-5.6-luna", objective: "Implement the approved render contract exactly.", requiredInputs: ["render-contract.json"], dependsOn: ["render-pages"], dependsOnGates: ["source-approved", "impact-locked"], reads: ["render-contract.json"], writes: ["src/Page.tsx"], sourceApprovalAt: `OK #2:${boundaryHash}`, forbiddenDecisions: decisions, output: "page diff", outputConsumers: ["delivery"], requiredProof: ["targeted tests"], stopConditions: ["outside boundary"]}
   ],
   batches: [["render-pages"], ["code-page"]],
   results: [],
@@ -42,6 +44,10 @@ const receipt = () => {
 test("published profiles and all three skill maps are valid", () => {
   assert.equal(validateProfiles(profiles()).ok, true);
   assert.deepEqual(validateWorkspace(root), {ok: true, failures: []});
+  const schema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
+  assert.equal(schema.properties.schemaVersion.const, 3);
+  assert.ok(schema.required.includes("impact"));
+  assert.ok(schema.required.includes("challenges"));
 });
 
 test("a frozen HTML task followed by approved disjoint source is valid", () => assert.equal(validateReceipt(receipt(), profiles()).ok, true));
@@ -50,6 +56,12 @@ test("two workers may not write one path", () => {
   const value = receipt();
   value.tasks[1].writes = ["review/index.html"];
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /overlaps writer path/);
+});
+
+test("an intermediate artifact without a downstream consumer is rejected", () => {
+  const value = receipt();
+  value.tasks[0].outputConsumers = [];
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /no declared consumer/);
 });
 
 test("directory and descendant file writers overlap", () => {
@@ -76,10 +88,21 @@ test("cache HTML requires a passed target-matched integrated quality-review gate
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without the passed integrated quality-review gate/);
 });
 
-test("source work without OK #2 is rejected", () => {
+test("source work without its proportional exact approval is rejected", () => {
   const value = receipt();
   delete value.tasks[1].sourceApprovalAt;
-  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without passed OK #2/);
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without the proportional approval/);
+});
+
+test("component impact uses one exact source approval", () => {
+  const value = receipt();
+  value.skill = "starci-fe-design-block";
+  value.impact = {level: "component", workflow: "block", classificationAt: hash};
+  value.phaseGates.sourceApprovalAt = `OK #1:${boundaryHash}`;
+  value.gateEvents[3].at = value.phaseGates.sourceApprovalAt;
+  value.tasks[0].skill = value.skill; value.tasks[0].step = "direction";
+  value.tasks[1].skill = value.skill; value.tasks[1].step = "implement"; value.tasks[1].sourceApprovalAt = value.phaseGates.sourceApprovalAt;
+  assert.equal(validateReceipt(value, profiles()).ok, true);
 });
 
 test("auto approval binds source work to both invocation authority and exact boundary", () => {
@@ -91,7 +114,7 @@ test("auto approval binds source work to both invocation authority and exact bou
   value.tasks[1].sourceApprovalAt = value.phaseGates.sourceApprovalAt;
   assert.equal(validateReceipt(value, profiles()).ok, true);
   value.tasks[1].sourceApprovalAt = `AUTO:${boundaryHash}:OK #2:${boundaryHash}`;
-  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without passed OK #2/);
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without the proportional approval/);
 });
 
 test("auto approval cannot be inferred without an immutable opt-in hash", () => {
@@ -100,6 +123,17 @@ test("auto approval cannot be inferred without an immutable opt-in hash", () => 
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /immutable invocation envelope hash/);
   value.phaseGates.autoApprovalAt = boundaryHash;
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /immutable invocation envelope hash/);
+});
+
+test("high-risk work requires a blind independent reviewer and a resolved challenge gate", () => {
+  const value = receipt();
+  value.impact = {level: "capability", workflow: "full", classificationAt: hash};
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /independent reviewer|challenge-review/);
+  value.challenges = [{id: "contract-risk", raisedBy: "reviewer", claim: "The new contract omits a permission refusal path.", evidence: ["review:permission-state"], status: "resolved", resolutionEvidence: ["contract:test-forbidden"]}];
+  value.independentReview = {reviewerId: "reviewer", model: "gpt-5.6-sol", blindToRecommendation: true, mayWrite: false, status: "passed", challengeIds: ["contract-risk"]};
+  value.gateEvents.push({id: "reviewer-passed", kind: "challenge-review", at: "reviewer", status: "passed", dependsOn: ["quality-passed"], requiredArtifacts: []});
+  value.tasks[1].dependsOnGates.push("reviewer-passed");
+  assert.equal(validateReceipt(value, profiles()).ok, true);
 });
 
 test("a worker missing a forbidden coordinator decision is rejected", () => {
@@ -154,8 +188,8 @@ test("proof must bind the stable build and depend on every source task", () => {
   const value = receipt();
   value.phaseGates.stableBuildAt = hash;
   value.phaseGates.proofTargetsAt = boundaryHash;
-  value.gateEvents.push({id: "build-stable", kind: "stable-build", at: hash, status: "passed", dependsOn: ["source-approved"]}, {id: "targets-frozen", kind: "proof-targets", at: boundaryHash, status: "passed", dependsOn: ["pages-frozen"]});
-  value.tasks.push({id: "prove-page", skill: value.skill, envelopeAt: hash, step: "parity", kind: "proof", model: "gpt-5.6-luna", objective: "Capture approved parity targets exactly.", requiredInputs: ["stable build"], dependsOn: [], dependsOnGates: ["build-stable", "targets-frozen"], reads: ["src/Page.tsx"], writes: ["proof/visual-proof.json"], stableBuildAt: hash, proofTargetsAt: boundaryHash, forbiddenDecisions: decisions, output: "parity proof", requiredProof: ["same-state same-viewport captures"], stopConditions: ["known mismatch"]});
+  value.gateEvents.push({id: "build-stable", kind: "stable-build", at: hash, status: "passed", dependsOn: ["source-approved"], requiredArtifacts: []}, {id: "targets-frozen", kind: "proof-targets", at: boundaryHash, status: "passed", dependsOn: ["pages-frozen"], requiredArtifacts: []});
+  value.tasks.push({id: "prove-page", skill: value.skill, envelopeAt: hash, step: "parity", kind: "proof", model: "gpt-5.6-luna", objective: "Capture approved parity targets exactly.", requiredInputs: ["stable build"], dependsOn: [], dependsOnGates: ["build-stable", "targets-frozen"], reads: ["src/Page.tsx"], writes: ["proof/visual-proof.json"], stableBuildAt: hash, proofTargetsAt: boundaryHash, forbiddenDecisions: decisions, output: "parity proof", outputConsumers: ["delivery"], requiredProof: ["same-state same-viewport captures"], stopConditions: ["known mismatch"]});
   value.batches.push(["prove-page"]);
   value.sequentialFallback.order.push("prove-page");
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /does not depend on source task/);

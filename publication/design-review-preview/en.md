@@ -27,9 +27,9 @@ source capability evidence, so a capability cannot be called reusable merely bec
 It covers complete page anatomy, representative
 states, state inventory and reference viewports but carries no write authority. After `OK #1`, state review
 preserves that page hash and adds the `renderContract`, which covers every page/region/state/transition and exact
-source files, owner/component/contract, anatomy, data mapping and visual obligations. Its `renders` select no more
-than five representative page/state pairs across the whole flow and cover every reference viewport for each
-selected state. Its canonical prompt
+source files, owner/component/contract, anatomy, data mapping and visual obligations. Five representative
+page/state pairs is the default human-review budget across a flow, not a coverage cap; selected pairs cover every
+distinct risk and reference viewport. Its canonical prompt
 repeats identities and boundary, requires exact implementation and forbids reinterpretation. Only `OK #2`
 turns that exact contract into implementation authority.
 Every new or changed route and every page backed by a generalized or new-required capability enters the selected
@@ -53,8 +53,8 @@ No accepted bundle, revision map, layout head, block head or design branch exist
 Layout publishes two labeled reviews. `pages` displays one complete long page or full flow at one representative
 populated state per page and every reference viewport. It proves customer journey, business obligations,
 component anatomy, hierarchy and density before states. `OK #1` is cache-only. `states` then keeps every declared
-condition executable without changing the approved page contract, displays no more than five representative
-states selected for risk and transition coverage, and discloses exact source files for `OK #2`.
+condition executable without changing the approved page contract, displays risk-covering representative states
+(five by default), and discloses exact source files for `OK #2`.
 Only explicit page-stage `brainstorm` displays three or four targeted alternatives.
 
 ### Block
@@ -74,10 +74,10 @@ Representative content must be business-faithful and production-like. Lorem, gen
 Before each layout approval, schema 2 maturity evidence binds either page contract (`reviewStage: pages`) or
 the render contract's bounded selected pairs (`reviewStage: states`) to real full-viewport captures and zero
 defects. After implementation, review every selected preview/source pair at the exact baseline viewport/state.
-`visual-proof.json` schema 2 binds
-the selected candidate and render-contract identities, records distinct real preview/source capture paths for
-each pair, and requires parity plus explicit `mismatches: []`, zero known defects and the requested delivery
-state. Computed CSS supports but never replaces those captures.
+`visual-proof.json` schema 3 binds actual preview/source PNGs, normalized DOM snapshots, axe-core reports and
+Playwright traces. The validator checks dimensions, computes pixel/DOM differences using thresholds configured
+per reference, rejects accessibility violations and requires every declared interaction in the trace. A producer's
+`passed` assertion is never proof. Zero known defects and requested delivery remain mandatory.
 
 Creativity precedes principles review. Only the selected candidate is audited into class-free `principleObligations`; source implementation resolves those obligations through current principles and patterns.
 

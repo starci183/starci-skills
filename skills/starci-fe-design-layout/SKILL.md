@@ -11,6 +11,7 @@ description: Design, stage-approve, implement, seed and visually prove one produ
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared staged approval and reporting boundary |
 | `@orchestration` | `orchestration/context.md` | context | assign decision, HTML, source and proof phases safely across the active runtime |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse ceremony larger than the measured frontend impact |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | keep review evidence in session cache |
 | `@composition` | `brainstorms/composition/context.md` | context | lock Scope, Owner, Invariant and Proof |
@@ -41,6 +42,12 @@ description: Design, stage-approve, implement, seed and visually prove one produ
 
 None. This skill owns design through implementation and QA in one invocation.
 
+## IMPACT ROUTING
+
+Run `@classify-fe-change` before creating a design session. Layout accepts `page`, `capability` and `cross-domain`.
+Route `micro` to a plain exact edit and `component` to Block. For `capability` or `cross-domain`, dispatch a blind,
+read-only reviewer distinct from the coordinator; source cannot start until concrete challenges are evidence-closed.
+
 ## PIPELINE
 
 Topology: `dual-track` until page synthesis, then `linear` execution and proof. Resolve the shared context envelope
@@ -55,7 +62,7 @@ only gate-passed outputs, owns every decision and shared artifact, and delegates
 | page-synthesis | join | evidence pack, business head, source baseline, components, contracts, grammar and MASTER | run isolated journey and capability subphases, print directions, join them, run integrated frontend-quality review, then author complete desktop/narrow anatomy | page map, capability obligations, binding matrix, direction receipt, quality review, schema 9 page contract and maturity evidence | both origins and all required quality lenses/detectors pass, nothing remains unbound, then `OK #1`; no source authority |
 | states | execution | approved direction-quality-page hash, complete state truth | expand states, owners, transitions, seeds and boundary without direction, quality or page drift | schema 9 render contract, canonical prompt, source/seed matrices | manual `OK #2` or its bound auto receipt; exact files cover every required change |
 | implementation | execution | approved canonical prompt | implement without reinterpretation, run source gates and seed real local data | implementation receipts, green gates and seed receipts | every approved obligation maps to source and product read-path evidence |
-| parity | proof | approved previews and seeded product | capture the same state at the same viewport and repair in-boundary defects | `visual-proof.json` | `parity: passed`, `mismatches: []`, requested delivery reached |
+| parity | proof | approved previews and seeded product | compute PNG, normalized DOM, axe and Playwright-trace comparisons, then repair in-boundary defects | `visual-proof.json` | per-reference thresholds pass, required interactions are covered and zero known defect remains |
 
 ## Approval modes
 
@@ -70,7 +77,7 @@ or any scope/project/role/repository/write-boundary expansion stop for owner app
 Read `@skill-shape` and `@orchestration` first. Confirm exactly one scope: `page` for one complete composed route,
 or `flow` for explicit start and terminal endpoints. A screenshot authorizes only what it shows. Create one ignored
 session root at `.worktrees/<project>/cache/design/<session-id>` and validate the four-lock composition baseline.
-Then execute and display the mandatory `orchestration` step from the frontend map. The coordinator authors
+Then build the internal orchestration plan from the frontend map; do not display its record unless `debug=true`. The coordinator authors
 journey/UI decisions, the integrated quality verdict and approvals; workers may inventory lens/detector evidence,
 project only an eligible frozen contract into cache HTML, implement disjoint approved paths, seed, test and capture
 proof. Cache HTML may start only after the direction, quality review and page contract are frozen; source work may
@@ -219,7 +226,7 @@ The seed phase may start declared local dependencies and the real frontend/backe
 
 ### 7. Prove real-product parity
 
-Run browser proof against the real connected product for every selected render target, never more than five complete-page targets. Capture preview and source with the identical page state, seeded block states and viewport. `visual-proof.json` must bind the candidate and render contract, seed proof, real capture paths, `parity: passed`, `mismatches: []` and terminal delivery state. Repair in-boundary defects until green; no third approval is required.
+Run browser proof against the real connected product for every selected render target. Five complete-page views is the default human-review budget, not a state-coverage invariant; add or split evidence only when a distinct uncovered risk requires it. Capture preview and source with identical page state, seeded block states and viewport. `visual-proof.json` schema 3 binds actual PNGs, normalized DOM snapshots, axe reports and Playwright traces; the validator computes the verdict using per-reference thresholds. Repair in-boundary defects until green; no third approval is required.
 
 ## Rules
 

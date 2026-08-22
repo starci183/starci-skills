@@ -13,6 +13,7 @@ title: Skill shape · Vietnamese
 | `@host-os` | `scripts/check-host-os.mjs` | script | chỉ chọn credential/setup entrypoint được host hiện tại hỗ trợ |
 | `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset và completion transition |
 | `@orchestration` | `orchestration/vi.md` | vi | chia provider-neutral coordinator/worker work mà không chuyển approval hay decision ownership |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | chọn frontend workflow nhỏ nhất từ impact fact quan sát được |
 
 
 ## Bản ghi
@@ -92,7 +93,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
 | `starci-fe-design-layout` | in journey và UI direction, join thành một complete source-bound page/flow rồi duyệt, seed, implement và prove |
-| `starci-fe-layout-refactor` | sở hữu mọi correction của Layout/Block-rendered output, classify owner feedback là failed-skill signal, evolve durable authority/enforcement layer nhỏ nhất rồi refactor exact impact cone và prove parity |
+| `starci-fe-layout-refactor` | sở hữu proportional correction của Layout/Block-rendered output, điều tra owner feedback, chỉ evolve durable authority bằng systemic evidence rồi prove exact impact cone |
 | `starci-fe-design-block` | in một UI direction mặc định hoặc 3–4 khi explicit brainstorm cho một region trong complete parent, rồi duyệt, implement và prove |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |
 | `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |
@@ -143,13 +144,27 @@ Pipeline artifact đi theo authority của nó: business truth là durable; desi
 product code chỉ vào routed repository sau approval; provider execution state ở đúng local owner đã khai; capability
 chỉ đọc không ghi artifact chỉ để chứng minh nó đã chạy.
 
+## Từ vựng công khai và quy trình theo mức ảnh hưởng
+
+Trao đổi frontend với người dùng chỉ dùng sáu từ: **Phạm vi**, **Quyết định**, **Boundary source**, **Bằng chứng test**, **Phê duyệt** và **Kết quả**. Các tên receipt, authority, grammar, lock, eligibility, owner chain và parity là chi tiết triển khai nội bộ; chỉ in khi owner yêu cầu rõ `debug=true`. Artifact nội bộ chỉ tồn tại khi một task, gate hoặc delivery result có tên thật sự tiêu thụ nó.
+
+Trước khi chọn frontend path, chạy `@classify-fe-change` từ fact quan sát được; không phân loại theo ước lượng công sức hay mức nghi lễ mong muốn.
+
+| Impact | Path | Direction | Approval theo chặng | Proof |
+|---|---|---|---|---|
+| `micro` | sửa trực tiếp | không | không, nếu request đã chỉ đúng thay đổi và source scope | targeted test; browser evidence nếu là visual |
+| `component` | Block | chỉ khi còn UI decision chưa chốt | một exact source-boundary approval | behavior trong complete parent và responsive evidence |
+| `page` | Layout hoặc Layout Refactor | bắt buộc | hai | complete-page states và visual/behavior proof được tính từ evidence |
+| `capability` | full workflow | bắt buộc | hai | page proof cộng blind independent challenge |
+| `cross-domain` | full governance | bắt buộc | boundary rõ cho từng domain | independent challenge và production proof của từng domain |
+
+Request mơ hồ không bị nâng lên path lớn chỉ để có cảm giác an toàn; hãy thu fact còn thiếu. Sửa chính xác label, icon, token, spacing hay disabled state vẫn là `micro` nếu không đổi anatomy, ownership, journey, contract hoặc domain.
+
 ## Các trạng thái tiến trình
 
 Mỗi StarCi skill khi được gọi phải suy ra các bước thực thi có thứ tự từ `Run` hoặc `Process` của chính nó
-và in một bảng gọn với đúng bảy cột: `Bước`, `Nhánh`, `Đầu vào`, `Cách thực hiện`, `Đầu ra bắt buộc`,
-`Điều kiện kiểm tra`, `Trạng thái`. `Nhánh` chỉ nhận `shared`, `top-down`, `bottom-up`, `join`, `execution`
-hoặc `proof`; nó gọi tên semantic ownership, không phải roster agent. Bảng chỉ chứa các bước công việc thật,
-không chứa context values hay implementation trivia. Vocabulary
+và in một bảng gọn với đúng bốn cột: `Bước`, `Công việc`, `Bằng chứng`, `Trạng thái`. Bảng chỉ chứa các bước
+công việc thật, không chứa context value, tên artifact nội bộ, agent assignment hay implementation trivia. Vocabulary
 trạng thái đóng là `đang làm`, `chờ OK`, `hoàn tất`, `blocked`; tối đa một row được `đang làm`.
 
 Approval mode mặc định là `manual`. Lời gọi skill ban đầu authorize bước discovery read-only đầu tiên. Sau khi hoàn tất một bước, cập nhật cùng
@@ -273,8 +288,8 @@ thêm**.
 9. Delegation đi theo `@orchestration` và validated phase map của skill đã chọn. Synthesis `dual-track` dùng
    evidence owner biệt lập và một coordinator cho bước join; chỉ chia source khi một path có đúng một writer.
    Skill không có orchestration binding rõ vẫn chạy tuần tự.
-10. Mọi StarCi skill duy trì bảng bước user-facing gọn. Layout, Block và Refactor có row `orchestration` bắt buộc
-    cùng compact receipt; raw worker prompt, hidden context và tool chatter vẫn internal.
+10. Mọi StarCi skill duy trì bảng bước user-facing gọn. Orchestration là nội bộ và chỉ hiện thành tiến độ có ý nghĩa
+    hoặc boundary thật; raw record, worker prompt, hidden context và tool chatter không được in.
 11. Resolve `defaultLang` từ workspace config chung của Source trước phản hồi đầu tiên cho người dùng.
 12. Credential còn thiếu kích hoạt intake owner ngay và không chứa value; value không bao giờ đi qua chat,
     argument, generated command hoặc log.
@@ -286,6 +301,8 @@ thêm**.
     input receipt còn thiếu.
 18. Không ép `dual-track` vào capability tuyến tính. Khi thật sự có hai nguồn độc lập, không được trộn chúng
     trong reasoning của một agent trước bước join.
+19. Mọi giới hạn số phải có loại: ba worker là capacity runtime hiện tại, không phải quality optimum; năm review view là default human-review budget, không phải state coverage; visual threshold thuộc từng reference. Chỉ đổi default bằng measured risk hoặc runtime evidence, không tạo universal number mới.
+20. Internal run record hoàn tất phải đo elapsed time, token usage nếu khả dụng, approval đã đổi decision, unique defect bắt được, false-positive gate, coordinator rework và artifact use. Chỉ so các impact level tương đương; luật không cải thiện outcome phải thành optional hoặc bị bỏ.
 
 ## Ngoại lệ
 

@@ -721,7 +721,7 @@ test("schema 6 refuses incomplete viewport coverage and execution reinterpretati
     assert.match(result.stderr, /selected state lesson\/lesson-ready must cover viewport mobile|expected "forbidden"/)
 })
 
-test("schema 6 refuses more than five distinct state-review selections", () => {
+test("schema 6 allows review evidence beyond the five-view default when distinct risks require it", () => {
     const candidate = pageCandidate("one", axes[0])
     delete candidate.direction
     delete candidate.citesPrecedent
@@ -729,16 +729,26 @@ test("schema 6 refuses more than five distinct state-review selections", () => {
     candidate.pageOverride = {deviations: []}
     addRenderContract(candidate)
     const states = ["s1", "s2", "s3", "s4", "s5", "s6"]
-    candidate.renderContract.pages[0].states = states
-    candidate.renderContract.pages[0].regions[0].data.states = states
-    candidate.renderContract.renders = candidate.renderContract.viewports.flatMap((viewport) => states.map((stateId) => ({
+    candidate.renderContract.pages[0].states = ["lesson-ready", ...states]
+    candidate.renderContract.pages[0].regions[0].data.states = ["lesson-ready", ...states]
+    candidate.renderContract.pages[0].regions[0].sourceOwnership = {
+        stateOwner: "block",
+        drawing: {component: "LessonContentBase", path: "src/components/blocks/LessonContent/component.tsx"},
+        connected: {component: "LessonContent", path: "src/components/blocks/LessonContent/index.tsx"},
+        compositorKind: "page",
+        compositor: {component: "LessonPageBase", path: "src/components/pages/LessonPage/component.tsx"},
+        entry: {component: "LessonPage", path: "src/components/pages/LessonPage/index.tsx"},
+        parentUses: "connected-component",
+    }
+    candidate.renderContract.sourceBoundary.push("src/components/blocks/LessonContent/component.tsx", "src/components/blocks/LessonContent/index.tsx")
+    candidate.executionPrompt.sourceBoundary = candidate.renderContract.sourceBoundary
+    candidate.renderContract.renders = candidate.renderContract.viewports.flatMap((viewport) => ["lesson-ready", ...states].map((stateId) => ({
         pageId: "lesson", stateId, viewportId: viewport.id, regions: ["lesson-content"],
     })))
     const artifact = {...batch([candidate]), schema: 6}
     artifact.envelope.mode = "generate"
     const result = runArtifact(artifact)
-    assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /must select no more than 5 complete-page render targets, received 6/)
+    assert.equal(result.status, 0, result.stderr)
 })
 
 test("schema 6 refuses a prompt whose identity or source boundary drifts", () => {
@@ -1074,7 +1084,7 @@ test("block schema 3 source boundary must contain the proven owner and test chai
     assert.match(result.stderr, /missing drawing owner path|missing test owner path/)
 })
 
-test("block schema 3 states stage enforces no more than five complete-page state families", () => {
+test("block schema 3 allows state evidence beyond the five-view default", () => {
     const artifact = blockArtifact()
     artifact.envelope.stage = "states"
     artifact.stateReview = {
@@ -1089,6 +1099,5 @@ test("block schema 3 states stage enforces no more than five complete-page state
         sourceBoundary: blockSourceBoundary,
     }
     const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
-    assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /no more than 5 complete-page state families|more than 5 items/)
+    assert.equal(result.status, 0, result.stderr)
 })

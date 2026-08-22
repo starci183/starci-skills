@@ -23,7 +23,8 @@ export const canonicalHash = (value) => crypto.createHash("sha256").update(JSON.
 
 export function validateProfiles(value) {
   const failures = [];
-  if (value?.schemaVersion !== 1) failures.push("profiles.schemaVersion must equal 1");
+  if (value?.schemaVersion !== 2) failures.push("profiles.schemaVersion must equal 2");
+  if (value?.common?.workerLimitKind !== "runtime-capacity" || value?.common?.scheduler !== "ready-disjoint-overhead-positive") failures.push("worker limit must be runtime capacity and scheduling must be overhead-positive");
   if (value?.common?.maxConcurrentWorkers !== 3) failures.push("maxConcurrentWorkers must equal 3");
   if (value?.common?.oneWriterPerPath !== true) failures.push("oneWriterPerPath must be true");
   if (value?.common?.workersMaySpawn !== false) failures.push("workersMaySpawn must be false");
@@ -47,7 +48,12 @@ export function validateProfiles(value) {
 
 export function validateReceipt(receipt, profiles) {
   const failures = [];
-  if (receipt?.schemaVersion !== 2) failures.push("receipt.schemaVersion must equal 2");
+  if (receipt?.schemaVersion !== 3) failures.push("receipt.schemaVersion must equal 3");
+  const impact = receipt?.impact;
+  const validImpact = {component: "block", page: "layout", capability: "full", "cross-domain": "full"};
+  if (!validImpact[impact?.level] || validImpact[impact?.level] !== impact?.workflow || !/^[0-9a-f]{64}$/.test(impact?.classificationAt ?? "")) failures.push("receipt impact classification is missing or inconsistent");
+  const highRisk = ["capability", "cross-domain"].includes(impact?.level);
+  if (!Array.isArray(receipt?.challenges)) failures.push("receipt challenges must be an explicit array");
   const approvalMode = receipt?.phaseGates?.approvalMode;
   const autoApprovalAt = receipt?.phaseGates?.autoApprovalAt;
   if (!['manual', 'auto'].includes(approvalMode)) failures.push("phaseGates.approvalMode must be manual or auto");
@@ -57,6 +63,7 @@ export function validateReceipt(receipt, profiles) {
   if (receipt?.runtime !== "sequential" && !runtimeProfile) failures.push(`unknown runtime ${receipt?.runtime}`);
   if (!profiles?.boundSkills?.includes(receipt?.skill)) failures.push(`unbound skill ${receipt?.skill}`);
   if (receipt?.runtime !== "sequential" && receipt?.coordinator?.model !== runtimeProfile?.coordinatorModel) failures.push("coordinator model does not match runtime profile");
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(receipt?.coordinator?.id ?? "")) failures.push("coordinator id is missing");
   for (const decision of requiredDecisions) {
     if (!receipt?.coordinator?.owns?.includes(decision)) failures.push(`coordinator receipt is missing ${decision}`);
   }
@@ -92,6 +99,17 @@ export function validateReceipt(receipt, profiles) {
     visitedGates.add(id);
   };
   for (const id of gateEvents.keys()) visitGate(id);
+  const challengeById = new Map();
+  for (const challenge of receipt?.challenges ?? []) {
+    if (challengeById.has(challenge.id)) failures.push(`duplicate challenge ${challenge.id}`);
+    challengeById.set(challenge.id, challenge);
+    if (challenge.status !== "resolved" || !(challenge.evidence?.length) || !(challenge.resolutionEvidence?.length)) failures.push(`challenge ${challenge.id} is not evidence-resolved`);
+  }
+  if (highRisk) {
+    const review = receipt?.independentReview;
+    if (!review || review.reviewerId === receipt?.coordinator?.id || review.blindToRecommendation !== true || review.mayWrite !== false || review.status !== "passed") failures.push("high-risk work requires a blind read-only independent reviewer distinct from the coordinator");
+    for (const id of review?.challengeIds ?? []) if (!challengeById.has(id)) failures.push(`independent review references unknown challenge ${id}`);
+  }
   const pathOverlaps = (left, right) => {
     const a = normalizePath(left);
     const b = normalizePath(right);
@@ -103,6 +121,7 @@ export function validateReceipt(receipt, profiles) {
     return normalizedTarget === normalizedRoot || normalizedTarget.startsWith(`${normalizedRoot}/`);
   });
   for (const task of receipt?.tasks ?? []) {
+    if (!Array.isArray(task.outputConsumers) || task.outputConsumers.length === 0) failures.push(`${task.id} produces an artifact with no declared consumer`);
     if (ids.has(task.id)) failures.push(`duplicate task id ${task.id}`);
     ids.add(task.id);
     if (task.skill !== receipt.skill) failures.push(`${task.id} skill does not match the receipt`);
@@ -125,13 +144,15 @@ export function validateReceipt(receipt, profiles) {
     if (task.kind === "source-write") {
       sourceTaskIds.push(task.id);
       const boundaryAt = receipt?.phaseGates?.sourceBoundaryAt;
+      const approvalNumber = impact?.level === "component" ? 1 : 2;
       const expectedApproval = boundaryAt
         ? approvalMode === "auto"
-          ? `AUTO:${autoApprovalAt}:OK #2:${boundaryAt}`
-          : `OK #2:${boundaryAt}`
+          ? `AUTO:${autoApprovalAt}:OK #${approvalNumber}:${boundaryAt}`
+          : `OK #${approvalNumber}:${boundaryAt}`
         : undefined;
-      if (!task.sourceApprovalAt || task.sourceApprovalAt !== receipt?.phaseGates?.sourceApprovalAt || task.sourceApprovalAt !== expectedApproval || !hasPassedGate("source-approval", task.sourceApprovalAt)) failures.push(`${task.id} writes source without passed OK #2 bound to the approved boundary`);
+      if (!task.sourceApprovalAt || task.sourceApprovalAt !== receipt?.phaseGates?.sourceApprovalAt || task.sourceApprovalAt !== expectedApproval || !hasPassedGate("source-approval", task.sourceApprovalAt)) failures.push(`${task.id} writes source without the proportional approval bound to the exact boundary`);
       if (!hasPassedGate("impact-cone", receipt?.phaseGates?.impactConeAt)) failures.push(`${task.id} writes source without the passed impact-cone gate`);
+      if (highRisk && !hasPassedGate("challenge-review", receipt?.independentReview?.reviewerId)) failures.push(`${task.id} writes high-risk source without the passed independent challenge-review gate`);
       if (receipt.skill === "starci-fe-layout-refactor" && receipt?.phaseGates?.authorityMode === "evolve" && (!task.authorityProofAt || task.authorityProofAt !== receipt?.phaseGates?.authorityProofAt || !hasPassedGate("authority-proof", task.authorityProofAt))) failures.push(`${task.id} writes FE before passed compiled authority proof`);
     }
     if (task.kind === "proof" && (!task.stableBuildAt || task.stableBuildAt !== receipt?.phaseGates?.stableBuildAt || !task.proofTargetsAt || task.proofTargetsAt !== receipt?.phaseGates?.proofTargetsAt || !hasPassedGate("stable-build", task.stableBuildAt) || !hasPassedGate("proof-targets", task.proofTargetsAt))) failures.push(`${task.id} proves without passed stable-build and proof-target gates`);
@@ -142,6 +163,23 @@ export function validateReceipt(receipt, profiles) {
       else writers.set(target, task.id);
       const shared = (receipt?.sharedPaths ?? []).find((reserved) => pathOverlaps(reserved, target));
       if (shared) failures.push(`${task.id} writes coordinator-only shared path ${shared}`);
+    }
+  }
+  const taskById = new Map((receipt?.tasks ?? []).map((task) => [task.id, task]));
+  const validRaisers = new Set([receipt?.coordinator?.id, receipt?.independentReview?.reviewerId, ...taskById.keys()].filter(Boolean));
+  for (const challenge of receipt?.challenges ?? []) if (!validRaisers.has(challenge.raisedBy)) failures.push(`challenge ${challenge.id} has unknown raiser ${challenge.raisedBy}`);
+  for (const task of receipt?.tasks ?? []) for (const consumer of task.outputConsumers ?? []) {
+    if (consumer === "delivery") {
+      if (!['source-write', 'proof'].includes(task.kind)) failures.push(`${task.id} exposes an intermediate artifact as delivery`);
+      continue;
+    }
+    const [kind, id] = consumer.split(":");
+    if (kind === "task") {
+      const target = taskById.get(id);
+      if (!target || !target.dependsOn?.includes(task.id) || !target.requiredInputs?.includes(task.output)) failures.push(`${task.id} output is not consumed by downstream task ${id}`);
+    } else if (kind === "gate") {
+      const gate = gateEvents.get(id);
+      if (!gate || !gate.requiredArtifacts?.includes(task.output)) failures.push(`${task.id} output is not consumed by gate ${id}`);
     }
   }
   if (sourceTaskIds.length) {
@@ -181,6 +219,16 @@ export function validateReceipt(receipt, profiles) {
   if (receipt?.status === "complete") {
     for (const id of ids) if (!resultIds.has(id)) failures.push(`complete receipt is missing result for ${id}`);
     for (const result of receipt.results ?? []) if (result.status !== "passed") failures.push(`complete receipt contains non-passing result ${result.taskId}`);
+    const metrics = receipt.metrics;
+    const started = Date.parse(metrics?.startedAt ?? "");
+    const finished = Date.parse(metrics?.finishedAt ?? "");
+    if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started || metrics?.wallTimeMs !== finished - started) failures.push("complete receipt has invalid measured wall time");
+    if (metrics?.tokenUsage?.status === "measured" && !Number.isInteger(metrics?.tokenUsage?.total)) failures.push("measured token usage requires a total");
+    if (!['measured', 'unavailable'].includes(metrics?.tokenUsage?.status)) failures.push("complete receipt must record token measurement availability");
+    const artifactsCreated = (receipt.tasks ?? []).length;
+    const artifactsUsed = (receipt.tasks ?? []).filter((task) => task.outputConsumers?.length).length;
+    if (metrics?.artifactsCreated !== artifactsCreated || metrics?.artifactsUsed !== artifactsUsed || metrics?.unusedArtifacts !== artifactsCreated - artifactsUsed || metrics?.unusedArtifacts !== 0) failures.push("complete receipt contains unused or miscounted artifacts");
+    for (const name of ["coordinatorReworkCount", "approvalsChangedDecision", "uniqueDefectsCaught", "falsePositiveGates"]) if (!Number.isInteger(metrics?.[name]) || metrics[name] < 0) failures.push(`complete receipt lacks measured ${name}`);
   }
   for (const task of receipt?.tasks ?? []) {
     for (const dependency of task.dependsOn ?? []) if (!ids.has(dependency)) failures.push(`${task.id} depends on unknown task ${dependency}`);
@@ -203,7 +251,7 @@ export function validateReceipt(receipt, profiles) {
   }
   const visiting = new Set();
   const visited = new Set();
-  const tasksById = new Map((receipt?.tasks ?? []).map((task) => [task.id, task]));
+  const tasksById = taskById;
   const visit = (id) => {
     if (visiting.has(id)) { failures.push(`dependency cycle includes ${id}`); return; }
     if (visited.has(id) || !tasksById.has(id)) return;

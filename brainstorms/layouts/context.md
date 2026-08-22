@@ -49,7 +49,8 @@ It expands every state and transition, then adds the hashed `renderContract` tha
 complete page, region, state and transition obligations. State is classified at its real owner: a page state
 exists only when region arrangement, hierarchy or active page-level composition changes; a loading, refusal,
 answered or interaction condition confined to one subtree remains a block state even when a full-page capture
-shows it. Its `renders` select no more than five complete-page render targets across the whole flow, each binding
+shows it. Its `renders` use five complete-page targets as the default review budget and expand only for a distinct
+uncovered risk, each binding
 the page state when one exists plus the seeded block states visible in that capture, and cover every reference
 viewport for each target. Selection prioritizes distinct high-risk condition and transition families; it does not
 remove unrendered implementation or test obligations. Each region fixes owner, component, contract, anatomy,

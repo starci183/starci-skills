@@ -27,8 +27,8 @@ capability evidence, nên không thể gọi capability là reusable chỉ vì n
 page anatomy, representative state,
 state inventory và reference viewport nhưng không có write authority. Sau `OK #1`, state review giữ page hash
 đó và thêm `renderContract`, phủ mọi page/region/state/transition cùng exact source files,
-owner/component/contract, anatomy, data mapping và visual obligation. `renders` chọn tối đa năm cặp page/state
-đại diện trên toàn flow và phủ mọi reference viewport cho mỗi state đã chọn. Canonical prompt lặp identities cùng
+owner/component/contract, anatomy, data mapping và visual obligation. Năm cặp page/state là default human-review
+budget, không phải coverage cap; selected pair phải phủ distinct risk và mọi reference viewport. Canonical prompt lặp identities cùng
 boundary, bắt exact implementation và cấm reinterpretation. Chỉ `OK #2` biến exact contract đó thành
 implementation authority.
 Mọi route mới/đã đổi và mọi page dựa vào capability `generalize`/`new-required` phải vào selected parity set;
@@ -51,8 +51,8 @@ Không có accepted bundle, revision map, layout head, block head hoặc design 
 Layout publish hai review có nhãn. `pages` hiển thị một complete long page hoặc full flow ở một representative
 populated state mỗi page và mọi reference viewport. Nó prove customer journey, business obligation, component
 anatomy, hierarchy và density trước states. `OK #1` chỉ tác động cache. `states` sau đó giữ mọi declared
-condition executable mà không đổi approved page contract, chỉ hiển thị tối đa năm state đại diện được chọn theo
-risk và transition coverage, rồi disclose exact source files cho `OK #2`. Chỉ explicit
+condition executable mà không đổi approved page contract, hiển thị representative state phủ risk (mặc định năm),
+rồi disclose exact source files cho `OK #2`. Chỉ explicit
 page-stage `brainstorm` mới hiển thị ba hoặc bốn targeted alternative.
 
 ### Block
@@ -72,10 +72,10 @@ Representative content phải trung thực với business và có production-lik
 Trước mỗi layout approval, schema 2 maturity evidence bind page contract (`reviewStage: pages`) hoặc bounded
 selected pairs của render contract (`reviewStage: states`) vào real full-viewport capture và zero defect. Sau
 implementation, review mọi selected preview/source pair ở exact baseline viewport/state. `visual-proof.json`
-schema 2 bind selected candidate
-và render-contract identities, ghi distinct real preview/source capture paths cho từng cặp, bắt parity cùng
-`mismatches: []` tường minh, zero known defect và requested delivery state. Computed CSS chỉ support, không thay
-những capture này.
+schema 3 bind PNG preview/source thật, normalized DOM snapshot, axe-core report và Playwright trace. Validator
+kiểm tra dimension, tự tính pixel/DOM diff bằng threshold riêng từng reference, từ chối accessibility violation
+và bắt trace cover mọi interaction đã khai. Producer tự ghi `passed` không phải proof. Zero known defect và
+requested delivery vẫn bắt buộc.
 
 Creativity đi trước principles review. Chỉ selected candidate được audit thành class-free `principleObligations`; source implementation resolve obligation qua current principles và patterns.
 

@@ -46,7 +46,8 @@ test("every StarCi capability entry publishes its own executable pipeline contra
     ["starci-fe-design-block", "starci-fe-design-layout", "starci-fe-layout-refactor"],
   );
   const refactorBinding = readFileSync(join(skillSourceRoot, "starci-fe-layout-refactor", "SKILL.md"), "utf8");
-  assert.match(refactorBinding, /Owner feedback is a failed-skill signal/);
+  assert.match(refactorBinding, /Feedback is an investigation signal, not proof/);
+  assert.match(refactorBinding, /at least two independent cases|explicitly rules that the correction is systemic/);
   assert.match(refactorBinding, /Grammar owns product-family facts[\s\S]*Principles own only/);
   assert.match(refactorBinding, /authority-to-write map/);
 
@@ -62,4 +63,11 @@ test("every StarCi capability entry publishes its own executable pipeline contra
       }
     }
   }
+});
+
+test("frontend progress uses the compact public vocabulary instead of internal methodology columns", () => {
+  const shape = readFileSync(join(skillSourceRoot, "skill-shape", "en.md"), "utf8");
+  assert.match(shape, /`Step`, `Work`, `Evidence`, `Status`/);
+  assert.match(shape, /Scope.*Decision.*Source boundary.*Test evidence.*Approval.*Result/);
+  assert.doesNotMatch(shape, /exactly these columns: `Step`, `Track`/);
 });

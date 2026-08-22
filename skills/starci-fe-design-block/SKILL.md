@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-block
-description: Reconcile one Layout-generated frontend block through a mandatory UI-direction step inside its exact complete parent page, approve up to five complete-page state views and an exact source boundary, then implement and prove it. One direction is default; 3–4 require an explicit owner brainstorm request. Whole-page restructuring belongs to Layout refactor.
+description: Reconcile one component-impact Layout-generated frontend block inside its exact complete parent page, resolve UI direction only when a decision remains open, approve one exact source boundary, then implement and prove it. Whole-page restructuring belongs to Layout refactor; exact micro corrections use the plain path.
 ---
 
 # starci-fe-design-block
@@ -11,6 +11,7 @@ description: Reconcile one Layout-generated frontend block through a mandatory U
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and reporting boundary |
 | `@orchestration` | `orchestration/context.md` | context | assign block audit, HTML, source and proof without transferring UI decisions |
+| `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fixes away from the component workflow |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
 | `@worktrees` | `contexts/worktrees/context.md` | context | keep review evidence in session cache |
 | `@composition` | `brainstorms/composition/context.md` | context | lock highlighted parent, preserved page and proof scope |
@@ -36,6 +37,13 @@ description: Reconcile one Layout-generated frontend block through a mandatory U
 
 None. This skill owns the block decision through implementation and full-page QA.
 
+## IMPACT ROUTING
+
+Run `@classify-fe-change` first. Block accepts only `component`. A measured `micro` correction uses a plain source
+edit, targeted test and complete-parent browser evidence when visual—no direction HTML or staged design approval.
+For `component`, skip direction alternatives when the owner already specified the exact UI decision; verify it in
+the complete parent and present one exact source-boundary approval. Use direction review only for a genuinely open choice.
+
 ## PIPELINE
 
 Topology: `reconciliation` inside one accepted complete page.
@@ -44,8 +52,8 @@ Topology: `reconciliation` inside one accepted complete page.
 |---|---|---|---|---|---|
 | bind | shared | accepted page contract, exact block boundary and owner request | freeze parent geometry, state and proof viewport | block audit context | one block and complete parent page resolve |
 | orchestration | coordination | block audit context and measured runtime | apply the Block phase map, dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; no task may recompose the page |
-| direction | reconciliation | block contract, grammar, source and rendered parent page | audit current anatomy, print direction, run integrated quality review, then render one direction by default or 3–4 only after an explicit owner brainstorm request | schema 3 complete-parent direction review, quality receipt and correction contract | no page/layout/route drift; required lenses/detectors pass; `OK #1` selects cache direction |
-| state-boundary | execution | selected direction and complete block state truth | ensure up to five complete-page state views and bind exact FE owners | state review and exact source boundary | every risky family is covered; manual `OK #2` or its bound auto receipt authorizes exact files |
+| direction | reconciliation | block contract, grammar, source and rendered parent page | verify an owner-specified decision or resolve and render a direction when still open | schema 3 complete-parent direction review, quality review and correction contract | no approval; no page/layout/route drift; required evidence passes |
+| state-boundary | execution | selected or owner-specified decision and complete block state truth | choose risk-covering complete-page views and bind exact FE owners | state review and exact source boundary | every risky family is covered; one exact approval authorizes files |
 | implement | execution | approved direction and exact files | change only proven owners and affected tests | implementation receipt | source preserves parent contract and block ownership |
 | parity | proof | approved previews and source at identical state and viewport | compare the block in context across selected complete-page views | bounded state views and visual proof | zero known mismatch in every selected complete page |
 
@@ -53,7 +61,7 @@ Topology: `reconciliation` inside one accepted complete page.
 
 `manual` is the default. Exact `mode=auto` in the invocation binds auto approval to the immutable block envelope.
 After each normal gate passes, the coordinator selects the evidence-backed recommendation and records exact-parent,
-boundary-bound auto receipts for `OK #1` and `OK #2`, then continues without pausing. Complete-parent reviews remain
+one boundary-bound auto approval for `OK #1`, then continues without pausing. Complete-parent reviews remain
 mandatory. Missing defaults, red gates, credentials, destructive/external actions or parent/source-boundary drift
 still stop for owner approval. Auto expires with this run.
 
@@ -65,10 +73,10 @@ Read the complete parent composition and exact owning subtree. Write `baseline.j
 every direct child, preserved page nodes, allowed delta and reference viewport/state. Bind the exact `parentPageId`
 and current drawing/compositor/entry/test chain as anatomy `sourceOwners`. A coloured annotation is parent
 evidence: a wrapper containing only some enclosed children is refused before any gap or padding decision. Then
-execute and display the mandatory `orchestration` step. The coordinator owns state/anatomy classification, UI
+build the internal orchestration plan without displaying its record unless `debug=true`. The coordinator owns state/anatomy classification, UI
 direction, integrated quality verdict, approvals and integration. Workers may inventory source/state and
 lens/detector facts, generate complete-parent HTML only from an eligible frozen anatomy, implement disjoint
-approved paths, test and capture proof. Product source starts only after `OK #2`.
+approved paths, test and capture proof. Product source starts only after the one exact source approval.
 
 Create `.worktrees/<project>/cache/design/<session-id>`. Inspect the one block Layout generated inside the complete
 parent page, return pass or exact findings, and synthesize the UI direction that resolves those findings while
@@ -85,39 +93,39 @@ By default print and render exactly one complete UI direction inside the exact p
 Only an explicit owner request for `brainstorm` made before direction approval produces 3–4 materially distinct
 block anatomies. They remain inside the exact parent geometry, start from the audited baseline and vary only the
 requested anatomy/interaction axis. Each alternative is reviewed independently against identical facts. Block
-inherits and freezes the journey direction; it publishes UI direction only. Exact `OK #1` selects the single
-direction plus quality receipt, or names `A`, `B`, `C` or `D` in brainstorm mode. It is cache-only.
+inherits and freezes the journey direction; it publishes UI direction only. When the owner already specified the
+decision, do not manufacture alternatives. Otherwise recommend the single direction or one brainstorm candidate.
 
-After `OK #1`, emit the selected schema-3 anatomy with `envelope.stage: states` and machine-validated
+Emit the selected schema-3 anatomy with `envelope.stage: states` and machine-validated
 `stateReview`. Every view must use the bound parent, name only anatomy-reachable states, and the source boundary
-must include every proven owner/test path. Ensure the complete block state and transition truth inside the unchanged parent. Select no more
-than five complete-page view families, prioritizing distinct high-risk block states and transitions; desktop and
+must include every proven owner/test path. Ensure the complete block state and transition truth inside the unchanged parent. Use five
+complete-page view families by default, prioritizing distinct high-risk block states and transitions; desktop and
 narrow captures are responsive proof and isolated block crops never count. `stateReview.views` holds those
-families and `stateReview.sourceBoundary` holds the smallest exact frontend source/test boundary. Disclose `OK #2`.
-Only manual `OK #2` or the bound auto receipt for that exact boundary authorizes implementation. If five views cannot
-ensure the block, split the scope before approval.
+families and `stateReview.sourceBoundary` holds the smallest exact frontend source/test boundary. Present one
+`OK #1` containing the decision, complete-parent evidence and exact source boundary. Only that approval or its bound
+auto event authorizes implementation. Five views is a default review budget; add evidence for distinct uncovered risk.
 
-After `OK #2`, take the target baseline and implement immediately in the same invocation. Reuse current contract
+After approval, take the target baseline and implement immediately in the same invocation. Reuse current contract
 owners and source patterns; implement all states and transitions.
 
 Run canonical lint/tests and browser proof on the complete real page at every baseline viewport/state. Prove full-page parity, target parent fit, preserved regions, transitions and clean console through `visual-proof.json`. Known defects or an unmet delivery target forbid completion wording.
 
-State evidence remains capped at the exact view families approved under `OK #2`.
+State evidence remains bound to the exact risk-covering view families in the approval.
 
 ## Rules
 
 1. The current routed source page is the parent authority.
-2. Audit, direction, two staged approvals, implementation and QA occur in one invocation.
+2. Audit, optional direction resolution, one exact source approval, implementation and QA occur in one invocation.
 3. Candidate and selected previews live only in project cache.
 4. No block head, layout head, revision bundle or design branch is created.
 5. Untargeted parent and sibling regions remain unchanged.
 6. Source plus full-page browser proof is the durable outcome.
 7. MASTER is never re-decided by a block; only evidenced page/block deviations may differ.
-8. A UI-direction step is mandatory. One complete direction is default; three or four alternatives require an
-   explicit owner brainstorm request before `OK #1`.
+8. Verify UI direction in context. Resolve one only when the owner has not already specified it; three or four
+   alternatives require an explicit owner brainstorm request.
 9. Journey direction is inherited and frozen; Block prints UI direction only.
-10. Manual `OK #1` or its bound auto receipt selects cache direction; the displayed source boundary requires manual `OK #2` or its exact-boundary auto receipt.
-11. State assurance uses at most five complete-page view families and never substitutes isolated block screenshots for parent-context proof.
+10. One manual `OK #1` or its exact-boundary auto event approves the selected decision, evidence and source boundary together.
+11. Five complete-page view families is the default review budget, not a coverage cap; isolated block screenshots never substitute for parent-context proof.
 12. Block owns first block synthesis. Concrete owner feedback that rejects an emitted or implemented result as
     wrong Grammar/Principles leaves first-synthesis scope and enters the correction owner.
 13. New work emits Block schema 3 with one target-matched quality review per anatomy before HTML.
@@ -132,12 +140,12 @@ State evidence remains capped at the exact view families approved under `OK #2`.
 - Missing quality lens/detector closure, target mismatch or advisory evidence presented as authority.
 - Required source change outside the approved boundary.
 - More than one block or whole-page visual restructuring — owner: `starci-fe-layout-refactor`.
-- More than five complete-page state views are required to ensure this block scope.
+- Required evidence no longer fits one component-impact boundary.
 - Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in an already emitted result; preserve complete-parent evidence — owner: `starci-fe-layout-refactor`.
 
 ## OUTPUT
 
-At direction review, report audit findings, integrated quality verdict and one UI direction in the complete parent
-by default, or 3–4 independently reviewed targeted alternatives only after an explicit brainstorm request. At state review, report up to five complete-page
-views and the exact source/test boundary under `OK #2`. After implementation, report changed paths and the same
+Report audit findings and the verified or resolved UI direction in the complete parent, or 3–4 independently
+reviewed alternatives only after an explicit brainstorm request. Then report risk-covering complete-page views and
+the exact source/test boundary under one `OK #1`. After implementation, report changed paths and the same
 labeled complete-page views with code/browser proof.

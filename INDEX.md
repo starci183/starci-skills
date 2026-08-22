@@ -58,6 +58,12 @@ order follows from it rather than defining it.
 | `@compilers` | exactly one answer, no candidates | an accepted shape needs execution detail — `@principles` decide classes and `@patterns` decide files/imports |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
+Frontend work first classifies observable impact: `micro` uses a plain exact edit, `component` uses Block,
+`page` uses Layout/Refactor, and `capability` or `cross-domain` adds independent challenge. Do not force the
+full design workflow onto label, icon, token, spacing or other exact corrections that preserve anatomy and ownership.
+User-facing progress uses Scope, Decision, Source boundary, Test evidence, Approval and Result; internal methodology
+names remain debug detail.
+
 Frontend layout generation starts top-down from customer journey plus routed business truth and bottom-up from
 component, contract plus source capability. Their explicit intersection produces one functional,
 business-faithful complete long page or flow by default. Page anatomy is rendered first at representative
@@ -80,6 +86,11 @@ design-system fit, accessibility, interaction, responsive content, performance/m
 state resilience and copy/localization resolve to StarCi owners and detector proof. Profiles override declared roles
 only, pages record deviations only, grammar selects semantic owners, and principles resolve visual deltas left
 unanswered by those authorities.
+
+Three workers is a runtime-capacity ceiling, not a claimed optimum. Five visual views is a default human-review
+budget, not state coverage. Visual verdicts are computed from actual PNG, normalized DOM, axe and Playwright-trace
+evidence with per-reference thresholds. Complete internal run records reject unused artifacts and measure time,
+available tokens, decision-changing approvals, defects caught, false-positive gates and coordinator rework.
 
 ## V4 authority route
 
@@ -151,8 +162,8 @@ record. `@orchestration` partitions only explicitly bound skills; it is policy, 
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
 | `starci-fe-design-layout` | mandatory journey-plus-UI direction synthesis into complete pages; one direction by default or 3–4 on explicit brainstorm, then staged source/seed implementation and proof |
-| `starci-fe-layout-refactor` | the only correction lane for exact Layout/Block-rendered output: treat owner feedback as a failed-skill signal, evolve the smallest Grammar/Principles/Patterns/gate layer, then correct every affected FE consumer and prove parity |
-| `starci-fe-design-block` | mandatory UI direction for one Layout-generated block in its complete parent; one by default or 3–4 on explicit brainstorm, then bounded implementation and proof |
+| `starci-fe-layout-refactor` | proportional correction for exact Layout/Block-rendered output; feedback triggers investigation and durable authority evolves only with systemic evidence |
+| `starci-fe-design-block` | component-impact correction in its complete parent; direction only for an unresolved UI decision, then one bounded source approval and proof |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
 | `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |
 | `starci-be-plan` | the backend brief |
