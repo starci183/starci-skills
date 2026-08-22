@@ -53,6 +53,14 @@ Topology: `reconciliation` through authority classification, then `linear` corre
 | evolve-refactor | execution | approved authority/source batch | evolve authority first when required, compile it, then correct every consumer | authority receipts and bounded green FE diff | no lower-layer patch hides an upper-layer failure |
 | parity | proof | approved views, existing seeds and product | compare identical states and viewports | final views and `visual-proof.json` | zero mismatch |
 
+## Approval modes
+
+`manual` is the default. Exact `mode=auto` binds the immutable correction envelope. After normal gates pass, the
+coordinator selects the evidence-backed recommendation, records boundary-bound auto receipts for `OK #1` and
+`OK #2`, and continues through authority evolution, FE correction and proof. It cannot widen rendered scope,
+authority roots, impact cone or FE boundary; missing defaults, red gates, credentials and destructive/external
+actions still stop. Auto expires with the invocation.
+
 ## Run
 
 ### 1. Bind the rendered scope and classify the failure
@@ -111,7 +119,7 @@ Prove the real connected product at the same states and viewports.
    surface set. There is no minor-fix, UI-align or separate feedback lane.
 6. Page and block state stay at their real owners; outer props cannot proxy child state or request data.
 7. One direction is default; 3–4 require explicit brainstorming. State proof is capped at five complete-page views.
-8. `OK #1` is cache-only. Only `OK #2` authorizes the exact authority/state/source/proof batch.
+8. Manual `OK #1` or its bound auto receipt is cache-only. The exact authority/state/source/proof batch requires manual `OK #2` or its exact-boundary auto receipt.
 9. Completion requires green authority and FE gates plus same-state, same-viewport real-product parity.
 10. Every direction passes the shared quality review before HTML; external UX/UI evidence is advisory only.
 11. Quality review may expose the failed layer but cannot override classification or expand product truth.

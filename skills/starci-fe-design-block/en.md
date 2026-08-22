@@ -49,9 +49,16 @@ Topology: `reconciliation` inside one accepted complete page.
 | implement | execution | approved direction and exact files | change only proven owners and affected tests | implementation receipt | parent contract and block ownership preserved |
 | parity | proof | approved preview/source at identical state and viewport | compare the block in context | bounded state views and visual proof | zero known mismatch |
 
+## Approval modes
+
+`manual` is the default. Exact `mode=auto` binds the invocation envelope. Once each normal gate passes, the
+coordinator selects the evidence-backed recommendation, records exact-parent boundary-bound auto receipts for
+`OK #1` and `OK #2`, and continues. Complete-parent reviews remain mandatory; missing defaults, red gates,
+credentials, destructive/external actions or boundary drift still stop. Auto expires with the invocation.
+
 ## Run
 
-Read `@skill-shape` and `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract and source. Write a four-lock baseline; a highlighted region must name one parent containing every enclosed direct child. Bind exact `parentPageId` and current drawing/compositor/entry/test `sourceOwners`. Then display the orchestration receipt. The coordinator owns state/anatomy classification, UI direction, integrated quality verdict, approvals and integration. Workers may collect lens/detector evidence, generate complete-parent HTML only from eligible frozen anatomy and write disjoint source only after `OK #2`.
+Read `@skill-shape` and `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract and source. Write a four-lock baseline; a highlighted region must name one parent containing every enclosed direct child. Bind exact `parentPageId` and current drawing/compositor/entry/test `sourceOwners`. Then display the orchestration receipt. The coordinator owns state/anatomy classification, UI direction, integrated quality verdict, approvals and integration. Workers may collect lens/detector evidence, generate complete-parent HTML only from eligible frozen anatomy and write disjoint source only after the source-authorizing manual or auto receipt.
 
 Audit the single generated block, return pass or exact findings and synthesize its UI direction while preserving
 the page. Direction is mandatory inside the workflow. Emit schema 3 `stage: direction`; before HTML, run
@@ -79,7 +86,7 @@ views. Split scope if five views cannot ensure it. Known defects or unmet delive
 6. MASTER is inherited; only page/block deviations may differ.
 7. UI direction is mandatory; one is default and 3–4 require explicit owner brainstorm before `OK #1`.
 8. Journey direction is inherited and frozen; Block prints UI direction only.
-9. `OK #1` is cache-only; exact `OK #2` authorizes the displayed source boundary.
+9. Manual `OK #1` or its bound auto receipt is cache-only; the displayed source boundary requires manual `OK #2` or its exact-boundary auto receipt.
 10. State assurance uses at most five complete-page view families and never substitutes block-only crops.
 11. Block owns first synthesis. Concrete owner feedback that rejects emitted or implemented output as wrong
     Grammar/Principles leaves first-synthesis scope and enters the correction owner.

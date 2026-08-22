@@ -152,7 +152,7 @@ hoặc `proof`; nó gọi tên semantic ownership, không phải roster agent. B
 không chứa context values hay implementation trivia. Vocabulary
 trạng thái đóng là `đang làm`, `chờ OK`, `hoàn tất`, `blocked`; tối đa một row được `đang làm`.
 
-Lời gọi skill ban đầu authorize bước discovery read-only đầu tiên. Sau khi hoàn tất một bước, cập nhật cùng
+Approval mode mặc định là `manual`. Lời gọi skill ban đầu authorize bước discovery read-only đầu tiên. Sau khi hoàn tất một bước, cập nhật cùng
 bảng đó, đánh dấu row kế tiếp `chờ OK`, hiển thị exact action và write boundary của bước kế tiếp, rồi dừng.
 Chỉ đi tiếp khi toàn bộ message sau trim khớp `OK` không phân biệt hoa thường (`OK`, `ok`, `Ok`, `oK`). Token
 đó chỉ authorize đúng bước kế tiếp đang hiển thị một lần. Feedback hoặc message khác giữ run ở bước hiện tại
@@ -174,6 +174,24 @@ Khi user trả lời token `ok` exact và không phân biệt hoa thường, ch�
 hiển thị cùng mọi product/source approval được đặt rõ trên chính row đó. Ghi identity hoặc hash, lấy baseline
 nếu cần rồi chạy bước ấy ngay. Approval không phủ scope chưa trình hoặc các row sau. Im lặng và message khác
 không phải tín hiệu approval.
+
+### Approval modes
+
+Một skill chỉ được dùng `mode=auto` khi binding entry của chính nó khai mode này rõ ràng. Owner phải đặt exact
+token `mode=auto` trong invocation request; các từ hội thoại kiểu “automatic” không bật mode. Bind opt-in đó với
+immutable invocation-envelope hash trước checkpoint đầu tiên. Nó hết hiệu lực cùng invocation và không bao giờ
+trở thành default của workspace, project hay skill.
+
+Auto mode chỉ bỏ các lần dừng chờ owner ở staged checkpoint đã khai. Coordinator vẫn phải tạo, hiển thị và
+validate mọi artifact cùng exact boundary; chỉ tự chọn evidence-backed recommended candidate; rồi ghi
+`AUTO:<invocation-envelope-hash>:OK #n:<boundary-hash>` trước khi vào row kế. Gate fail, thiếu recommendation,
+credential, destructive loss, external publication/commitment, hoặc mở rộng project/role/repository/write boundary
+vẫn phải dừng dưới `NEED APPROVALS`. Auto mode không duyệt path chưa disclose, hạ proof, reinterpret feedback hay
+tự bịa product decision không có supported default.
+
+Trong auto mode, bảng bước vẫn bắt buộc nhưng row đã pass đi thẳng vào row kế thay vì kết thúc lượt ở `chờ OK`.
+Manual mode giữ exact-`OK` protocol. Rejection invalidate approval liên quan ở cả hai mode; auto chỉ được rebuild
+và đi tiếp trong chính envelope không đổi.
 
 ## Quyết định và thi hành
 
@@ -205,7 +223,8 @@ state switcher không thể được chọn hoặc publish.
 Trước khi ghi, đọc business authority, canon, hợp đồng và source sống rồi nêu `businessImpact`, stable
 feature/head, mục tiêu, bằng chứng, boundary chính xác, quyết định và bằng chứng nghiệm thu. Work ảnh hưởng
 business cần `in-progress`; work thuần kỹ thuật bind `implemented` với `businessImpact: none` và không tạo
-feature. Khi cần quyền owner, chờ `OK` trước lần ghi sản phẩm đầu tiên và giữ lại phương án bị từ chối cùng lý do của owner.
+feature. Khi cần quyền owner, chờ manual `OK` hoặc declared bound auto receipt trước lần ghi sản phẩm đầu tiên và
+giữ lại phương án bị từ chối cùng lý do của owner.
 
 Sau khi được cấp quyền, xác nhận boundary ghi, lấy baseline commit **trước** khi sửa, thi hành revision
 đã duyệt và chứng minh tại biên sản phẩm. Work ảnh hưởng business sau đó reconcile final committed source
@@ -215,8 +234,9 @@ không được lặng lẽ xuất hiện trong diff.
 ## Đầu ra cho người dùng
 
 In bảng bước bắt buộc khi gọi skill, sau mỗi bước hoàn tất và khi feedback đổi phần kế hoạch còn lại. Không
-in section rỗng, dòng `None`, context nội bộ hay ma trận chia agent. Một lượt kết thúc khi `own = 0` của bước
-hiện tại và row kế tiếp đang `chờ OK`, khi chờ một mục `### NEED APPROVALS` thật khác, hoặc khi mọi row hoàn tất.
+in section rỗng, dòng `None`, context nội bộ hay ma trận chia agent. Lượt manual kết thúc khi `own = 0` của bước
+hiện tại và row kế tiếp đang `chờ OK`; lượt auto tiếp tục qua staged checkpoint hợp lệ. Mọi lượt vẫn kết thúc khi
+chờ một mục `### NEED APPROVALS` thật khác hoặc khi mọi row hoàn tất.
 
 Khi hoàn tất, nói gọn kết quả, path chính và proof bằng văn xuôi hoặc danh sách ngắn. Không dùng từ hoàn tất khi còn known defect, viewport/state bắt buộc thiếu full-page proof, gate đỏ, source ở sai repository hoặc requested delivery state chưa đạt. Phải nói chính xác `verified locally`, `committed`, `pushed` hoặc `merged`. Khi bị chặn bởi thẩm
 quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agent không thể tự sở hữu, default được
@@ -243,12 +263,12 @@ thêm**.
 ## Quy tắc
 
 1. Resolve context lock và `Touching` trước khi ghi; trình chúng bằng câu thân thiện.
-2. Tiếp tục mọi action trong bước hiện tại đã duyệt; không được vào row kế tiếp nếu chưa có approval token của row đó.
+2. Tiếp tục mọi action trong bước hiện tại đã duyệt; chỉ vào row kế với manual `OK` hoặc bound auto-approval event từ skill có khai `mode=auto`.
 3. Chỉ hỏi `need approval` thật, với một default đang hiển thị.
-4. Chỉ toàn bộ message sau trim bằng `ok` không phân biệt hoa thường mới consume approval bước kế tiếp đang hiển thị và resume bước ấy ngay.
+4. Trong manual mode, chỉ toàn bộ message sau trim bằng `ok` không phân biệt hoa thường mới consume approval bước kế. Trong declared auto mode, chỉ current invocation hash cùng exact passed boundary mới được sinh equivalent auto-approval event.
 5. Design approval và source implementation xảy ra trong cùng invocation; cached candidate key không bao giờ là durable authority.
 6. Task khác dựng lại design evidence từ current source, contract, grammar và business truth.
-7. Production baseline lấy sau source-authorizing `OK` và trước production write đầu tiên.
+7. Production baseline lấy sau source-authorizing manual hoặc auto receipt và trước production write đầu tiên.
 8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
 9. Delegation đi theo `@orchestration` và validated phase map của skill đã chọn. Synthesis `dual-track` dùng
    evidence owner biệt lập và một coordinator cho bước join; chỉ chia source khi một path có đúng một writer.
@@ -259,7 +279,7 @@ thêm**.
 12. Credential còn thiếu kích hoạt intake owner ngay và không chứa value; value không bao giờ đi qua chat,
     argument, generated command hoặc log.
 13. Đo host OS trước khi chọn setup script; không bao giờ thử extension không tương thích.
-14. Candidate label chỉ chọn; chỉ `OK` trên exact-source boundary đã hiển thị rõ mới authorize write; `continue` resume không mở checkpoint mới.
+14. Candidate label chỉ chọn. Source write cần `OK` trên exact-source boundary đã hiển thị hoặc declared auto receipt bind cùng boundary đó; `continue` resume không mở checkpoint mới.
 15. Owner rejection reset baseline và assumptions trước edit tiếp theo.
 16. Completion cần zero known defect, đủ requested proof và đúng declared delivery state.
 17. Bước downstream chỉ dùng upstream artifact đã pass gate và có provenance; trí nhớ hội thoại không thay được

@@ -774,13 +774,13 @@
     "orchestration/context.md": {
       "kind": "module",
       "source": "orchestration/en.md",
-      "sourceHash": "e453618396e31d2cb54543347ae11b725c092fdf7ee5438b87969886cb2916ef",
+      "sourceHash": "60edace0ad1efce449000d928f828a382fa2cfef1faff86544cfd06c4fe62354",
       "contextVersion": 1
     },
     "orchestration/frontend/context.md": {
       "kind": "module",
       "source": "orchestration/frontend/en.md",
-      "sourceHash": "638f9b857920b0fd2a7fb6380da44d1c8b5e356a2b8bf2a424b2673ab6c5b7ec",
+      "sourceHash": "3377a60ab6898d1b42faadf104d7f2e35d87f475722bbba81d18c449f53b0640",
       "contextVersion": 1
     },
     "publication/context.md": {
@@ -932,7 +932,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "fb475463b8c774e21b1b622d9790281807d5a52fc3acb83a899fcd39919d5db5",
+      "sourceHash": "46a19b5506a5939b009811528d1ccf00eee846306bb83526843ac65a47c92bda",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

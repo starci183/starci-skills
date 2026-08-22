@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {isApprovalToken, transitionSession} from "./session-control.mjs";
+import {isApprovalToken, isAutoModeRequest, transitionSession} from "./session-control.mjs";
 
 const start = () => ({phase: "review", selectedCandidate: null, boundaryDisplayed: true, boundaryApproved: false, assumptionsValid: true, baselineVersion: 1});
-const pageStart = () => ({phase: "page-review", selectedCandidate: null, boundaryDisplayed: true, boundaryApproved: false, sourceAuthorized: false, assumptionsValid: true, baselineVersion: 1});
+const pageStart = () => ({phase: "page-review", envelopeAt: autoAt, selectedCandidate: null, boundaryDisplayed: true, boundaryApproved: false, sourceAuthorized: false, assumptionsValid: true, baselineVersion: 1});
 const pageAt = "a".repeat(64);
+const autoAt = "c".repeat(64);
+const boundaryAt = "b".repeat(64);
 
 test("A selects but does not authorize source writes", () => {
   const state = transitionSession(start(), {type: "select", candidateId: "a"});
@@ -72,6 +74,43 @@ test("approval accepts only a whole-message case-insensitive OK token", () => {
   for (const token of ["continue", "okay", "OK now", "", undefined]) assert.equal(isApprovalToken(token), false);
   const selected = transitionSession(start(), {type: "select", candidateId: "a"});
   assert.throws(() => transitionSession(selected, {type: "approve", token: "continue"}), /whole-message OK token/);
+});
+
+test("auto mode requires explicit mode=auto and binds the immutable invocation envelope", () => {
+  assert.equal(isAutoModeRequest("mode=auto"), true);
+  assert.equal(isAutoModeRequest("design page mode=AUTO"), true);
+  assert.equal(isAutoModeRequest("automatic"), false);
+  assert.throws(() => transitionSession(pageStart(), {type: "configure-approval-mode", mode: "auto", request: "please continue", envelopeAt: autoAt}), /explicit mode=auto/);
+  assert.throws(() => transitionSession(pageStart(), {type: "configure-approval-mode", mode: "auto", request: "mode=auto", envelopeAt: boundaryAt}), /must equal the session invocation envelope/);
+  const configured = transitionSession(pageStart(), {type: "configure-approval-mode", mode: "auto", request: "mode=auto", envelopeAt: autoAt});
+  assert.equal(configured.approvalMode, "auto");
+  assert.equal(configured.autoApprovalAt, autoAt);
+});
+
+test("bound auto mode consumes page and source checkpoints without bypassing displayed contracts", () => {
+  const configured = transitionSession(pageStart(), {type: "configure-approval-mode", mode: "auto", request: "layout mode=auto", envelopeAt: autoAt});
+  assert.throws(() => transitionSession(configured, {type: "select", review: "pages", candidateId: "alternative"}), /evidence-backed recommendation/);
+  const pageSelected = transitionSession(configured, {type: "select", review: "pages", candidateId: "recommended", recommended: true});
+  const pageApproved = transitionSession(pageSelected, {type: "approve", auto: true, autoApprovalAt: autoAt, approvalKind: "pages", pageContractAt: pageAt});
+  assert.equal(pageApproved.approvalEvidence, `AUTO:${autoAt}:OK #1:${pageAt}`);
+  const stateReview = transitionSession(pageApproved, {type: "open-state-review", pageContractAt: pageAt, boundaryDisplayed: true});
+  const stateSelected = transitionSession(stateReview, {type: "select", review: "states", candidateId: "recommended", recommended: true});
+  assert.throws(() => transitionSession(stateSelected, {type: "approve", auto: true, autoApprovalAt: autoAt, pageContractAt: pageAt}), /source-boundary hash/);
+  const sourceApproved = transitionSession(stateSelected, {type: "approve", auto: true, autoApprovalAt: autoAt, pageContractAt: pageAt, sourceBoundaryAt: boundaryAt});
+  assert.equal(sourceApproved.sourceAuthorized, true);
+  assert.equal(sourceApproved.approvalEvidence, `AUTO:${autoAt}:OK #2:${boundaryAt}`);
+});
+
+test("auto mode advances only the next completed step and refuses stale authority", () => {
+  const state = transitionSession({
+    phase: "review", envelopeAt: autoAt, stepTableDisplayed: true, activeStepIndex: 0,
+    steps: [{id: "discover", status: "completed"}, {id: "plan", status: "waiting-for-ok"}, {id: "write", status: "waiting-for-ok"}],
+  }, {type: "configure-approval-mode", mode: "auto", request: "mode=auto", envelopeAt: autoAt});
+  assert.throws(() => transitionSession(state, {type: "advance-step", auto: true, autoApprovalAt: boundaryAt}), /whole-message OK token or bound auto authority/);
+  const advanced = transitionSession(state, {type: "advance-step", auto: true, autoApprovalAt: autoAt});
+  assert.equal(advanced.activeStepIndex, 1);
+  assert.equal(advanced.steps[1].status, "in-progress");
+  assert.equal(advanced.steps[2].status, "waiting-for-ok");
 });
 
 test("a displayed skill-step table advances exactly one completed row per OK", () => {

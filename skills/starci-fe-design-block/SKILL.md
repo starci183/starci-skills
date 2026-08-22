@@ -45,9 +45,17 @@ Topology: `reconciliation` inside one accepted complete page.
 | bind | shared | accepted page contract, exact block boundary and owner request | freeze parent geometry, state and proof viewport | block audit context | one block and complete parent page resolve |
 | orchestration | coordination | block audit context and measured runtime | apply the Block phase map, dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; no task may recompose the page |
 | direction | reconciliation | block contract, grammar, source and rendered parent page | audit current anatomy, print direction, run integrated quality review, then render one direction by default or 3–4 only after an explicit owner brainstorm request | schema 3 complete-parent direction review, quality receipt and correction contract | no page/layout/route drift; required lenses/detectors pass; `OK #1` selects cache direction |
-| state-boundary | execution | selected direction and complete block state truth | ensure up to five complete-page state views and bind exact FE owners | state review and exact source boundary | every risky family is covered; `OK #2` authorizes exact files |
+| state-boundary | execution | selected direction and complete block state truth | ensure up to five complete-page state views and bind exact FE owners | state review and exact source boundary | every risky family is covered; manual `OK #2` or its bound auto receipt authorizes exact files |
 | implement | execution | approved direction and exact files | change only proven owners and affected tests | implementation receipt | source preserves parent contract and block ownership |
 | parity | proof | approved previews and source at identical state and viewport | compare the block in context across selected complete-page views | bounded state views and visual proof | zero known mismatch in every selected complete page |
+
+## Approval modes
+
+`manual` is the default. Exact `mode=auto` in the invocation binds auto approval to the immutable block envelope.
+After each normal gate passes, the coordinator selects the evidence-backed recommendation and records exact-parent,
+boundary-bound auto receipts for `OK #1` and `OK #2`, then continues without pausing. Complete-parent reviews remain
+mandatory. Missing defaults, red gates, credentials, destructive/external actions or parent/source-boundary drift
+still stop for owner approval. Auto expires with this run.
 
 ## Run
 
@@ -86,7 +94,7 @@ must include every proven owner/test path. Ensure the complete block state and t
 than five complete-page view families, prioritizing distinct high-risk block states and transitions; desktop and
 narrow captures are responsive proof and isolated block crops never count. `stateReview.views` holds those
 families and `stateReview.sourceBoundary` holds the smallest exact frontend source/test boundary. Disclose `OK #2`.
-Only exact `OK #2` authorizes implementation. If five views cannot
+Only manual `OK #2` or the bound auto receipt for that exact boundary authorizes implementation. If five views cannot
 ensure the block, split the scope before approval.
 
 After `OK #2`, take the target baseline and implement immediately in the same invocation. Reuse current contract
@@ -108,7 +116,7 @@ State evidence remains capped at the exact view families approved under `OK #2`.
 8. A UI-direction step is mandatory. One complete direction is default; three or four alternatives require an
    explicit owner brainstorm request before `OK #1`.
 9. Journey direction is inherited and frozen; Block prints UI direction only.
-10. `OK #1` selects cache direction; only exact `OK #2` authorizes the displayed source boundary.
+10. Manual `OK #1` or its bound auto receipt selects cache direction; the displayed source boundary requires manual `OK #2` or its exact-boundary auto receipt.
 11. State assurance uses at most five complete-page view families and never substitutes isolated block screenshots for parent-context proof.
 12. Block owns first block synthesis. Concrete owner feedback that rejects an emitted or implemented result as
     wrong Grammar/Principles leaves first-synthesis scope and enters the correction owner.

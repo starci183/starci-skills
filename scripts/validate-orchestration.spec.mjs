@@ -15,13 +15,13 @@ const receipt = () => {
   const impactCone = {owners: [{id: "page", path: "src/Page.tsx"}], consumers: ["src/Page.tsx"], tests: [], requiredPaths: ["src/Page.tsx"], inventoryProof: ["source-owner matrix at boundary hash"]};
   const impactConeAt = canonicalHash(impactCone);
   return ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   status: "planned",
   runtime: "codex",
   skill: "starci-fe-design-layout",
   envelopeAt: hash,
   coordinator: {model: "gpt-5.6-sol", owns: decisions},
-  phaseGates: {authorityMode: "preserve", cacheRoots: ["review"], frozenContractAt: hash, qualityReviewAt: boundaryHash, sourceBoundaryAt: boundaryHash, sourceApprovalAt: `OK #2:${boundaryHash}`, approvedSourcePaths: ["src/Page.tsx"], impactConeAt, impactCone, proofRoots: ["proof"]},
+  phaseGates: {authorityMode: "preserve", approvalMode: "manual", cacheRoots: ["review"], frozenContractAt: hash, qualityReviewAt: boundaryHash, sourceBoundaryAt: boundaryHash, sourceApprovalAt: `OK #2:${boundaryHash}`, approvedSourcePaths: ["src/Page.tsx"], impactConeAt, impactCone, proofRoots: ["proof"]},
   gateEvents: [
     {id: "pages-frozen", kind: "contract-freeze", at: hash, status: "passed", dependsOn: []},
     {id: "quality-passed", kind: "quality-review", at: boundaryHash, status: "passed", dependsOn: ["pages-frozen"]},
@@ -80,6 +80,26 @@ test("source work without OK #2 is rejected", () => {
   const value = receipt();
   delete value.tasks[1].sourceApprovalAt;
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without passed OK #2/);
+});
+
+test("auto approval binds source work to both invocation authority and exact boundary", () => {
+  const value = receipt();
+  value.phaseGates.approvalMode = "auto";
+  value.phaseGates.autoApprovalAt = hash;
+  value.phaseGates.sourceApprovalAt = `AUTO:${hash}:OK #2:${boundaryHash}`;
+  value.gateEvents[3].at = value.phaseGates.sourceApprovalAt;
+  value.tasks[1].sourceApprovalAt = value.phaseGates.sourceApprovalAt;
+  assert.equal(validateReceipt(value, profiles()).ok, true);
+  value.tasks[1].sourceApprovalAt = `AUTO:${boundaryHash}:OK #2:${boundaryHash}`;
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without passed OK #2/);
+});
+
+test("auto approval cannot be inferred without an immutable opt-in hash", () => {
+  const value = receipt();
+  value.phaseGates.approvalMode = "auto";
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /immutable invocation envelope hash/);
+  value.phaseGates.autoApprovalAt = boundaryHash;
+  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /immutable invocation envelope hash/);
 });
 
 test("a worker missing a forbidden coordinator decision is rejected", () => {

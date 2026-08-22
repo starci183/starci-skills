@@ -57,9 +57,17 @@ gate-passed outputs, owns decisions and shared artifacts, and delegates only dis
 | implementation | execution | approved prompt | code, gate and seed without reinterpretation | implementation, gate and seed receipts | every obligation reaches product evidence |
 | parity | proof | previews and seeded product | compare same state and viewport | `visual-proof.json` | `mismatches: []` and delivery reached |
 
+## Approval modes
+
+`manual` is the default. Exact `mode=auto` in the invocation binds auto approval to the immutable envelope. Once
+each normal gate passes, the coordinator selects the evidence-backed recommendation, records boundary-bound auto
+receipts for `OK #1` and `OK #2`, and continues without pausing. Both reviews and exact boundaries still render.
+Missing defaults, red gates, credentials, destructive/external actions or boundary expansion still stop. Auto
+expires with the invocation.
+
 ## Run
 
-Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session, validate the four-lock composition baseline, then display the orchestration receipt. The coordinator owns journey/UI decisions, integrated quality verdict and approvals. Workers may inventory lens/detector evidence, generate HTML only from eligible frozen contracts, implement disjoint paths only after `OK #2`, seed, test and capture proof.
+Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session, validate the four-lock composition baseline, then display the orchestration receipt. The coordinator owns journey/UI decisions, integrated quality verdict and approvals. Workers may inventory lens/detector evidence, generate HTML only from eligible frozen contracts, implement disjoint paths only after the source-authorizing manual or auto receipt, seed, test and capture proof.
 
 The user-facing execution table exposes sections 1–3 below as one `page-synthesis` step. Page mapping, both
 isolated tracks, direction declaration, their join and desktop/narrow rendering are internal subphases; no
@@ -161,7 +169,7 @@ Run browser proof for every selected render target, never more than five complet
 2. Journey/business defines what must exist; component/contract evidence constrains how it is built.
 3. Direction is mandatory inside page synthesis. Layout prints journey and UI direction separately before their join.
 4. One flow-level direction is default; 3–4 require an explicit owner brainstorm request before `OK #1` and are never multiplied per page.
-5. `OK #1` is cache-only; only `OK #2` authorizes exact source files.
+5. Manual `OK #1` or its bound auto receipt is cache-only; exact source files require manual `OK #2` or its exact-boundary auto receipt.
 6. Page drift returns to page approval; state-only rejection preserves it.
 7. Review artifacts are disposable cache; source and executable proof are durable.
 8. MASTER is selected once and execution may not reinterpret the approved preview.

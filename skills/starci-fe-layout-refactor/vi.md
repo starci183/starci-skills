@@ -53,6 +53,13 @@ Topology: `reconciliation` qua authority classification, rồi `linear` correcti
 | evolve-refactor | execution | approved authority/source batch | evolve authority trước khi cần, compile rồi sửa mọi consumer | authority receipt và bounded green FE diff | không dùng lower-layer patch để che upper-layer failure |
 | parity | proof | approved views, existing seed và product | so đúng state và viewport | final views cùng `visual-proof.json` | zero mismatch |
 
+## Approval modes
+
+`manual` là mặc định. Exact `mode=auto` bind immutable correction envelope. Sau khi normal gate pass, coordinator
+chọn evidence-backed recommendation, ghi auto receipt bind boundary cho `OK #1` và `OK #2`, rồi tiếp tục qua
+authority evolution, FE correction cùng proof. Nó không được nới rendered scope, authority root, impact cone hay FE
+boundary; thiếu default, gate đỏ, credential và destructive/external action vẫn dừng. Auto hết hiệu lực cùng invocation.
+
 ## Run
 
 ### 1. Bind rendered scope và classify failure
@@ -111,7 +118,7 @@ Prove real connected product ở cùng state và viewport.
    surface set. Không còn minor-fix, UI-align hay feedback lane riêng.
 6. Page/block state ở real owner; outer props không được proxy child state hoặc request data.
 7. Mặc định một direction; 3–4 cần explicit brainstorm. State proof tối đa năm complete-page view.
-8. `OK #1` chỉ ở cache. Chỉ `OK #2` authorize exact authority/state/source/proof batch.
+8. Manual `OK #1` hoặc bound auto receipt chỉ ở cache. Exact authority/state/source/proof batch cần manual `OK #2` hoặc exact-boundary auto receipt.
 9. Completion cần green authority/FE gates và same-state, same-viewport real-product parity.
 10. Mọi direction pass shared quality review trước HTML; external UX/UI evidence chỉ là advisory.
 11. Quality review có thể expose failed layer nhưng không override classification hoặc mở product truth.

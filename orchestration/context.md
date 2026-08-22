@@ -66,8 +66,11 @@ and a boundary-drift flag.
 
 The receipt is revalidated and append-only refreshed at each coordinator phase gate. Cache tasks bind both the
 exact frozen contract hash and the validated target-matched `qualityReviewAt` hash, and depend on passed
-`contract-freeze` plus `quality-review` events. Source tasks bind `OK #2:<source-boundary-hash>`, the complete approved path set and, when
-Refactor evolves authority, the compiled authority-proof hash. Proof tasks bind the stable-build and selected
+`contract-freeze` plus `quality-review` events. Source tasks bind the complete approved path set and either manual
+`OK #2:<source-boundary-hash>` or, after exact invocation `mode=auto`,
+`AUTO:<autoApprovalAt>:OK #2:<source-boundary-hash>`. Auto also binds `autoApprovalAt` to the immutable envelope.
+Both forms depend on the same passed source-approval gate and exact writer registry; neither authorizes scope
+expansion or external action. When Refactor evolves authority, source tasks also bind the compiled authority-proof hash. Proof tasks bind the stable-build and selected
 proof-target hashes and depend on every source task. A future task is not dispatchable while its gate identity is
 absent.
 

@@ -47,6 +47,12 @@ export function validateProfiles(value) {
 
 export function validateReceipt(receipt, profiles) {
   const failures = [];
+  if (receipt?.schemaVersion !== 2) failures.push("receipt.schemaVersion must equal 2");
+  const approvalMode = receipt?.phaseGates?.approvalMode;
+  const autoApprovalAt = receipt?.phaseGates?.autoApprovalAt;
+  if (!['manual', 'auto'].includes(approvalMode)) failures.push("phaseGates.approvalMode must be manual or auto");
+  if (approvalMode === "auto" && (!/^[0-9a-f]{64}$/.test(autoApprovalAt ?? "") || autoApprovalAt !== receipt?.envelopeAt)) failures.push("auto approval mode requires the immutable invocation envelope hash");
+  if (approvalMode === "manual" && autoApprovalAt !== undefined) failures.push("manual approval mode cannot carry autoApprovalAt");
   const runtimeProfile = profiles?.runtimes?.[receipt?.runtime];
   if (receipt?.runtime !== "sequential" && !runtimeProfile) failures.push(`unknown runtime ${receipt?.runtime}`);
   if (!profiles?.boundSkills?.includes(receipt?.skill)) failures.push(`unbound skill ${receipt?.skill}`);
@@ -119,7 +125,11 @@ export function validateReceipt(receipt, profiles) {
     if (task.kind === "source-write") {
       sourceTaskIds.push(task.id);
       const boundaryAt = receipt?.phaseGates?.sourceBoundaryAt;
-      const expectedApproval = boundaryAt ? `OK #2:${boundaryAt}` : undefined;
+      const expectedApproval = boundaryAt
+        ? approvalMode === "auto"
+          ? `AUTO:${autoApprovalAt}:OK #2:${boundaryAt}`
+          : `OK #2:${boundaryAt}`
+        : undefined;
       if (!task.sourceApprovalAt || task.sourceApprovalAt !== receipt?.phaseGates?.sourceApprovalAt || task.sourceApprovalAt !== expectedApproval || !hasPassedGate("source-approval", task.sourceApprovalAt)) failures.push(`${task.id} writes source without passed OK #2 bound to the approved boundary`);
       if (!hasPassedGate("impact-cone", receipt?.phaseGates?.impactConeAt)) failures.push(`${task.id} writes source without the passed impact-cone gate`);
       if (receipt.skill === "starci-fe-layout-refactor" && receipt?.phaseGates?.authorityMode === "evolve" && (!task.authorityProofAt || task.authorityProofAt !== receipt?.phaseGates?.authorityProofAt || !hasPassedGate("authority-proof", task.authorityProofAt))) failures.push(`${task.id} writes FE before passed compiled authority proof`);

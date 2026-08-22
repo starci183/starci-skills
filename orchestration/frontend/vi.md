@@ -38,6 +38,15 @@ request + routed truth
 HTML trước eligible decision contract cùng quality receipt đã freeze là design chưa được phép. Product code trước source-authorizing approval
 là implementation chưa được phép. Agent label không làm yếu hai boundary này.
 
+## Approval execution mode
+
+Ba frontend skill đã bind mặc định dùng `manual`. Exact `mode=auto` trong invocation bind
+`phaseGates.approvalMode: auto` cùng `autoApprovalAt` với immutable envelope. Trong các bảng dưới, `OK #1` và
+`OK #2` là checkpoint identity ở cả hai mode: manual trình rồi chờ; auto chỉ chọn evidence-backed recommendation
+của coordinator và emit `AUTO:<autoApprovalAt>:OK #n:<boundaryAt>` sau khi cùng gate pass. Worker vẫn phụ thuộc
+passed gate event. Auto không đổi decision, artifact, writer registry hay proof gate và dừng trước boundary chưa
+disclose, credential, destructive action hoặc external commitment.
+
 ## Map Layout
 
 | Step | Việc coordinator | Việc worker | Artifact | Dependency và gate |

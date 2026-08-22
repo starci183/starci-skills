@@ -53,6 +53,14 @@ Topology: `reconciliation` through authority classification, then `linear` corre
 | evolve-refactor | execution | approved authority-to-write map and exact files | evolve authority first when needed, compile it, then correct every affected FE consumer | authority receipts, bounded FE diff and green gates | no lower-layer patch hides an upper-layer failure; product truth stays fixed |
 | parity | proof | approved state views, existing seeds and product | compare the same complete page states and viewports | up to five final state views and `visual-proof.json` | `parity: passed`, `mismatches: []` |
 
+## Approval modes
+
+`manual` is the default. Exact `mode=auto` in the invocation binds auto approval to the immutable correction
+envelope. After each normal gate passes, the coordinator selects the evidence-backed recommendation and records
+boundary-bound auto receipts for `OK #1` and `OK #2`, then continues through authority evolution, FE correction and
+proof without pausing. It cannot widen the rendered scope, authority roots, impact cone or FE boundary; missing
+defaults, red gates, credentials and destructive/external actions still stop. Auto expires with this run.
+
 ## Run
 
 Read `@skill-shape` and `@orchestration` first and resolve `defaultLang`. The caller supplies the project, FE role, exact validated
@@ -117,7 +125,7 @@ Publish one authority-to-write map and exact batch: the governing grammar/profil
 pattern or gate files only when the verdict requires them; every affected drawing/connected component, outer
 compositor, shared contract/leaf owner and test; and every routed consumer in the impact cone. Already-sound owners
 are explicitly preserved. Existing product-native seeds may run but seed files and backend data are not writable.
-Only exact `OK #2` on the displayed authority/state/source/proof boundary authorizes that batch once.
+Only manual `OK #2` or the bound auto receipt on the displayed authority/state/source/proof boundary authorizes that batch once.
 
 ### 4. Evolve authority and apply the selected frontend structure
 
@@ -145,7 +153,7 @@ Hand off at most five labeled complete-page state views; each names its page sta
 2. One complete direction is default. Three or four complete UI alternatives require an explicit owner brainstorm
    request before `OK #1` and are never multiplied per page.
 3. Directions may restructure only Layout-rendered regions; business, route, state and data scope are frozen.
-4. `OK #1` direction selection is cache-only; only exact `OK #2` state/source approval authorizes FE writes.
+4. Manual `OK #1` or its bound auto receipt selects cache direction; FE writes require manual `OK #2` or its exact-boundary auto receipt.
 5. State ensure is capped at five complete-page view families, never block crops or five variants per block.
 6. Page state and block state remain at their real owners; `PageProps.<block>.state/data` is not extraction.
 7. Existing seeds may be executed for proof but never created or edited here.

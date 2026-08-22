@@ -146,7 +146,7 @@ ownership, not an agent roster. The table contains real task steps, not context 
 `in progress`, `waiting for OK`, `completed` and `blocked` as the closed status vocabulary; exactly one row
 may be `in progress`.
 
-The initial skill invocation authorizes the first read-only discovery step. After completing a step, update
+The default approval mode is `manual`. The initial skill invocation authorizes the first read-only discovery step. After completing a step, update
 the same table, mark the next row `waiting for OK`, display that next step's exact action and write boundary,
 and stop. Advance only when the user's whole trimmed message matches `OK` case-insensitively (`OK`, `ok`,
 `Ok` or `oK`). That token authorizes exactly the displayed next step once. Feedback or any other message
@@ -170,6 +170,24 @@ When the user replies with the case-insensitive exact `ok` token, approve only t
 boundary and any explicitly co-located product/source approval. Record the identity or hash, take the
 baseline if required, and execute that step immediately. Approval never covers undisclosed scope or later
 rows. Silence and every other message are not approval signals.
+
+### Approval modes
+
+A skill may use `mode=auto` only when its own binding entry explicitly declares that mode. The owner must include
+the exact token `mode=auto` in the invocation request; conversational words such as “automatic” do not enable it.
+Bind that opt-in to the immutable invocation-envelope hash before the first checkpoint. It expires with the
+invocation and never becomes a workspace, project or skill default.
+
+Auto mode removes only the owner pauses at already-declared staged checkpoints. The coordinator still produces,
+displays and validates every artifact and exact boundary, automatically selects only the evidence-backed
+recommended candidate, and records `AUTO:<invocation-envelope-hash>:OK #n:<boundary-hash>` before entering the
+next row. A failed gate, missing recommendation, credential, destructive loss, external publication or commitment,
+or any project/role/repository/write-boundary expansion still stops under `NEED APPROVALS`. Auto mode cannot approve
+an undisclosed path, weaken proof, reinterpret feedback or manufacture a product decision with no supported default.
+
+In auto mode the step table remains mandatory, but a passed row advances directly into the next row instead of
+ending the turn as `waiting for OK`. Manual mode retains the exact-`OK` protocol. Rejection invalidates the affected
+approval in both modes; auto may rebuild and advance again only inside the same unchanged envelope.
 
 ## Decisions and execution
 
@@ -201,8 +219,8 @@ toy content or QA-only state switcher cannot be selected or published.
 Before writing, read business authority, canon, contracts and live source, then name `businessImpact`,
 the stable feature/head, objective, evidence, exact boundary, decision and acceptance evidence.
 Business-affecting work requires `in-progress`; technical-only work binds `implemented` with
-`businessImpact: none` and creates no feature. When owner authority is required, wait for `OK` before the
-first production write and preserve rejected alternatives with the owner's reason.
+`businessImpact: none` and creates no feature. When owner authority is required, wait for manual `OK` or the
+declared bound auto receipt before the first production write and preserve rejected alternatives with the owner's reason.
 
 After authorization, confirm the write boundary, record a baseline commit taken **before** the change,
 implement the approved revision and prove it at the production boundary. Business-affecting work then
@@ -213,8 +231,9 @@ returns to its owner instead of arriving quietly in a diff.
 
 Print the required skill-step table at invocation, after each completed step and whenever feedback changes
 the remaining plan. Do not print empty sections, `None` rows, internal context or agent assignment matrices.
-A turn ends when the current step's `own = 0` and the next row is waiting for `OK`, while waiting on another
-genuine `### NEED APPROVALS` item, or after all rows are completed.
+A manual-mode turn ends when the current step's `own = 0` and the next row is waiting for `OK`; an auto-mode turn
+continues across valid staged checkpoints. Any turn ends while waiting on a genuine `### NEED APPROVALS` item or
+after all rows are completed.
 
 On completion, state the outcome, material paths changed and proof run in compact prose or a short list.
 Never use completion wording while known defects remain, a required viewport/state lacks full-page proof, a gate is red, source is in the wrong repository, or the requested delivery state has not been reached. Say `verified locally`, `committed`, `pushed` or `merged` exactly.
@@ -243,12 +262,12 @@ appended.
 ## Rules
 
 1. Resolve the context lock and `Touching` before writing; present them as friendly prose.
-2. Continue every action inside the approved current step; never enter the next displayed row without its approval token.
+2. Continue every action inside the approved current step; enter the next displayed row only with its manual `OK` or a bound auto-approval event from a skill that declares `mode=auto`.
 3. Ask only for genuine `need approval`, with one displayed default.
-4. Only a whole trimmed message equal to `ok` case-insensitively consumes the displayed next-step approval and resumes that step immediately.
+4. In manual mode, only a whole trimmed message equal to `ok` case-insensitively consumes the displayed next-step approval. In declared auto mode, only the current invocation hash plus the exact passed boundary may generate the equivalent auto-approval event.
 5. Design approval and source implementation happen in the same invocation; cached candidate keys are never durable authority.
 6. Another task regenerates design evidence from current source, contract, grammar and business truth.
-7. A production baseline is taken after the source-authorizing `OK` and before the first production write.
+7. A production baseline is taken after the source-authorizing manual or auto receipt and before the first production write.
 8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
 9. Delegation follows `@orchestration` and the selected skill's validated phase map. A `dual-track` synthesis uses
    isolated evidence owners and one coordinator for the join; source partitioning is legal only with one writer per
@@ -260,7 +279,7 @@ appended.
 12. Missing credentials trigger immediate value-free owner intake; values never enter chat, arguments,
     generated commands or logs.
 13. Host OS is measured before selecting a setup script; an incompatible extension is never attempted.
-14. Candidate labels select; only an `OK` on an explicitly displayed exact-source boundary authorizes writes; `continue` resumes without a new checkpoint.
+14. Candidate labels only select. Source writing requires either `OK` on the displayed exact-source boundary or the declared auto receipt bound to that same boundary; `continue` resumes without a checkpoint.
 15. Owner rejection resets the baseline and assumptions before another edit.
 16. Completion requires zero known defects, every requested proof and the declared delivery state.
 17. A downstream step consumes only gate-passed upstream artifacts with provenance; raw conversation memory is

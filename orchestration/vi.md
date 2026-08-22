@@ -72,8 +72,11 @@ decision hoặc task khác sở hữu cùng path. Work bị từ chối không �
 
 Receipt được revalidate và append-only refresh tại mỗi coordinator phase gate. Cache task bind cả exact frozen
 contract hash lẫn validated target-matched `qualityReviewAt` hash, và phụ thuộc event `contract-freeze` cùng
-`quality-review` đã pass. Source task bind `OK #2:<source-boundary-hash>`, complete approved path set và, khi Refactor evolve
-authority, compiled authority-proof hash. Proof task bind stable-build/proof-target hash và phụ thuộc mọi source
+`quality-review` đã pass. Source task bind complete approved path set cùng manual `OK #2:<source-boundary-hash>`
+hoặc, sau exact invocation `mode=auto`, `AUTO:<autoApprovalAt>:OK #2:<source-boundary-hash>`. Auto còn bind
+`autoApprovalAt` với immutable envelope. Cả hai dạng phụ thuộc cùng passed source-approval gate và exact writer
+registry; không dạng nào authorize scope expansion hay external action. Khi Refactor evolve authority, source task
+còn bind compiled authority-proof hash. Proof task bind stable-build/proof-target hash và phụ thuộc mọi source
 task. Future task không được dispatch khi gate identity của nó còn thiếu.
 
 Mỗi phase gate đồng thời là coordinator event đã pass. Worker task gọi event id trong `dependsOnGates`; chỉ copy

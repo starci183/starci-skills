@@ -34,6 +34,15 @@ request + routed truth
 HTML before a frozen eligible decision contract and quality receipt is unauthorized design. Product code before the source-authorizing approval
 is unauthorized implementation. An agent label never weakens either boundary.
 
+## Approval execution mode
+
+The three bound frontend skills default to `manual`. Exact `mode=auto` on the invocation binds
+`phaseGates.approvalMode: auto` and `autoApprovalAt` to the immutable envelope. In the tables below, `OK #1` and
+`OK #2` name checkpoint identities in both modes: manual presents and waits; auto selects only the coordinator's
+evidence-backed recommendation and emits `AUTO:<autoApprovalAt>:OK #n:<boundaryAt>` after the same gate passes.
+Workers still depend on the passed gate event. Auto never changes a decision, artifact, writer registry or proof
+gate and stops on any undisclosed boundary, credential, destructive action or external commitment.
+
 ## Layout map
 
 | Step | Coordinator work | Worker work | Artifact | Dependency and gate |

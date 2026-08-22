@@ -49,9 +49,16 @@ Topology: `reconciliation` trong một complete page đã nhận.
 | implement | execution | approved direction và exact files | chỉ sửa proven owners và affected tests | implementation receipt | giữ parent contract và block ownership |
 | parity | proof | approved preview/source cùng state và viewport | so block trong context | bounded state views và visual proof | zero known mismatch |
 
+## Approval modes
+
+`manual` là mặc định. Exact `mode=auto` bind invocation envelope. Khi từng normal gate pass, coordinator chọn
+evidence-backed recommendation, ghi exact-parent auto receipt bind boundary cho `OK #1` và `OK #2`, rồi đi tiếp.
+Complete-parent review vẫn bắt buộc; thiếu default, gate đỏ, credential, destructive/external action hoặc boundary
+drift vẫn dừng. Auto hết hiệu lực cùng invocation.
+
 ## Run
 
-Đọc `@skill-shape` và `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng. Bind exact `parentPageId` cùng current drawing/compositor/entry/test `sourceOwners`. Sau đó hiển thị orchestration receipt. Coordinator sở hữu state/anatomy classification, UI direction, integrated quality verdict, approval và integration. Worker có thể thu lens/detector evidence, chỉ sinh complete-parent HTML từ eligible frozen anatomy và chỉ ghi source tách rời sau `OK #2`.
+Đọc `@skill-shape` và `@orchestration`. Resolve FE, grammar/profile, MASTER, business, contract và source. Viết baseline bốn lock; highlighted region phải gọi tên một parent chứa mọi direct child trong vùng. Bind exact `parentPageId` cùng current drawing/compositor/entry/test `sourceOwners`. Sau đó hiển thị orchestration receipt. Coordinator sở hữu state/anatomy classification, UI direction, integrated quality verdict, approval và integration. Worker có thể thu lens/detector evidence, chỉ sinh complete-parent HTML từ eligible frozen anatomy và chỉ ghi source tách rời sau source-authorizing manual hoặc auto receipt.
 
 Audit một generated block, trả pass hoặc exact findings rồi synthesize UI direction trong khi giữ nguyên page.
 Direction bắt buộc nằm trong workflow. Emit schema 3 `stage: direction`; trước HTML phải chạy `@frontend-quality`
@@ -78,7 +85,7 @@ view. Split scope nếu năm view không đủ ensure. Known defect hoặc deliv
 6. MASTER được inherit; chỉ page/block deviation được khác.
 7. UI direction bắt buộc; mặc định một và 3–4 chỉ khi owner explicit brainstorm trước `OK #1`.
 8. Journey direction được inherit và freeze; Block chỉ in UI direction.
-9. `OK #1` chỉ tác động cache; exact `OK #2` authorize displayed source boundary.
+9. Manual `OK #1` hoặc bound auto receipt chỉ tác động cache; displayed source boundary cần manual `OK #2` hoặc exact-boundary auto receipt.
 10. State assurance dùng tối đa năm complete-page view family và không thay bằng block-only crop.
 11. Block sở hữu first synthesis. Concrete owner feedback từ chối emitted/implemented output vì sai
     Grammar/Principles thì rời first-synthesis scope và vào correction owner.

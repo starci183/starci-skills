@@ -57,9 +57,16 @@ output đã pass gate, sở hữu decision/shared artifact và chỉ delegate so
 | implementation | execution | approved prompt | code, gate và seed không reinterpret | implementation, gate và seed receipts | mọi obligation tới product evidence |
 | parity | proof | preview và seeded product | so cùng state, cùng viewport | `visual-proof.json` | `mismatches: []` và đạt delivery |
 
+## Approval modes
+
+`manual` là mặc định. Exact `mode=auto` trong invocation bind auto approval với immutable envelope. Khi từng normal
+gate pass, coordinator chọn evidence-backed recommendation, ghi auto receipt bind boundary cho `OK #1` và `OK #2`,
+rồi đi tiếp không dừng chờ. Cả hai review cùng exact boundary vẫn phải render. Thiếu default, gate đỏ, credential,
+destructive/external action hoặc boundary expansion vẫn dừng. Auto hết hiệu lực cùng invocation.
+
 ## Run
 
-Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo ignored design session, validate four-lock composition baseline rồi hiển thị orchestration receipt. Coordinator sở hữu journey/UI decision, integrated quality verdict và approval. Worker có thể inventory lens/detector evidence, chỉ sinh HTML từ eligible frozen contract, chỉ implement path tách rời sau `OK #2`, rồi seed, test và capture proof.
+Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo ignored design session, validate four-lock composition baseline rồi hiển thị orchestration receipt. Coordinator sở hữu journey/UI decision, integrated quality verdict và approval. Worker có thể inventory lens/detector evidence, chỉ sinh HTML từ eligible frozen contract, chỉ implement path tách rời sau source-authorizing manual hoặc auto receipt, rồi seed, test và capture proof.
 
 User-facing execution table hiển thị các section 1–3 dưới đây như một bước `page-synthesis`. Page mapping, hai
 track biệt lập, direction declaration, phần join và desktop/narrow rendering là internal subphase; không được chen
@@ -159,7 +166,7 @@ Chạy browser proof cho mọi selected render target, tối đa năm complete-p
 2. Journey/business định nghĩa cái phải tồn tại; component/contract evidence ràng buộc cách build.
 3. Direction bắt buộc nằm trong page synthesis. Layout in journey direction và UI direction riêng trước khi join.
 4. Mặc định một flow-level direction; 3–4 chỉ khi owner explicit brainstorm trước `OK #1` và không nhân theo page.
-5. `OK #1` chỉ tác động cache; chỉ `OK #2` authorize exact source files.
+5. Manual `OK #1` hoặc bound auto receipt chỉ tác động cache; exact source file cần manual `OK #2` hoặc exact-boundary auto receipt.
 6. Page drift quay lại page approval; state-only rejection giữ approval đó.
 7. Review artifact là disposable cache; source và executable proof là durable.
 8. MASTER được chọn một lần và execution không được reinterpret approved preview.

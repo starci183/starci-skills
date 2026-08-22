@@ -68,6 +68,11 @@ before direction approval. Layout prints journey and UI direction separately; Re
 direction only. The QA viewer may
 inspect states but may not substitute for product interaction.
 
+Layout, Block and Refactor use `manual` approval by default. An invocation containing exact `mode=auto` binds
+auto-approval to that invocation envelope, selects only the evidence-backed recommendation and crosses staged
+`OK #1`/`OK #2` checkpoints only after their normal contracts and gates pass. It never approves scope expansion,
+credentials, destructive work or external publication.
+
 Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
 then applies one routed StarCi MASTER visual system. Every candidate passes the shared `@frontend-quality` review:
 external taste/catalogue/guideline sources stay digest-bound advisory evidence while product fit, visual character,

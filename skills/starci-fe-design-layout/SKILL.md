@@ -53,9 +53,17 @@ only gate-passed outputs, owns every decision and shared artifact, and delegates
 | evidence | shared | request, routed authorities, current baseline | normalize facts, owner constraints, examples and unknowns | evidence pack plus immutable context envelope | every claim has provenance and scope |
 | orchestration | coordination | immutable evidence envelope and measured runtime | apply the Layout phase map, dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; every task is bounded and every dependency is explicit |
 | page-synthesis | join | evidence pack, business head, source baseline, components, contracts, grammar and MASTER | run isolated journey and capability subphases, print directions, join them, run integrated frontend-quality review, then author complete desktop/narrow anatomy | page map, capability obligations, binding matrix, direction receipt, quality review, schema 9 page contract and maturity evidence | both origins and all required quality lenses/detectors pass, nothing remains unbound, then `OK #1`; no source authority |
-| states | execution | approved direction-quality-page hash, complete state truth | expand states, owners, transitions, seeds and boundary without direction, quality or page drift | schema 9 render contract, canonical prompt, source/seed matrices | `OK #2`; exact files cover every required change |
+| states | execution | approved direction-quality-page hash, complete state truth | expand states, owners, transitions, seeds and boundary without direction, quality or page drift | schema 9 render contract, canonical prompt, source/seed matrices | manual `OK #2` or its bound auto receipt; exact files cover every required change |
 | implementation | execution | approved canonical prompt | implement without reinterpretation, run source gates and seed real local data | implementation receipts, green gates and seed receipts | every approved obligation maps to source and product read-path evidence |
 | parity | proof | approved previews and seeded product | capture the same state at the same viewport and repair in-boundary defects | `visual-proof.json` | `parity: passed`, `mismatches: []`, requested delivery reached |
+
+## Approval modes
+
+`manual` is the default. If the invocation contains exact `mode=auto`, bind it to the immutable context-envelope
+hash before page synthesis. After every normal gate passes, the coordinator selects the evidence-backed
+recommendation and records bound auto receipts for `OK #1` and `OK #2`, then continues without pausing. It still
+renders both reviews and exact boundaries. Missing defaults, red gates, credentials, destructive/external actions
+or any scope/project/role/repository/write-boundary expansion stop for owner approval. Auto expires with this run.
 
 ## Run
 
@@ -66,7 +74,7 @@ Then execute and display the mandatory `orchestration` step from the frontend ma
 journey/UI decisions, the integrated quality verdict and approvals; workers may inventory lens/detector evidence,
 project only an eligible frozen contract into cache HTML, implement disjoint approved paths, seed, test and capture
 proof. Cache HTML may start only after the direction, quality review and page contract are frozen; source work may
-start only after `OK #2`.
+start only after the source-authorizing manual or auto receipt.
 
 The user-facing execution table exposes sections 1–3 below as one `page-synthesis` step. Page mapping, the two
 isolated tracks, direction declaration, their join and desktop/narrow page rendering are internal subphases of
@@ -221,7 +229,7 @@ Run browser proof against the real connected product for every selected render t
 3. The default is one flow-level direction receipt; three or four complete alternatives require an explicit owner
    brainstorm request before `OK #1` and are never multiplied per page.
 4. Journey plus business defines the required experience; components plus contracts constrain its implementable anatomy.
-5. Pages are approved before states. `OK #1` is cache-only; only `OK #2` authorizes source writes.
+5. Pages are approved before states. Manual `OK #1` or its bound auto receipt is cache-only; source writes require manual `OK #2` or its exact-boundary auto receipt.
 6. Page-contract drift during state expansion returns to page approval.
 7. State-only rejection preserves page approval when page anatomy is unchanged.
 8. A page state changes page architecture; a local condition remains a block state even when its evidence is a full-page capture.
