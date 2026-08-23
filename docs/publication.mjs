@@ -61,9 +61,14 @@ export const groups = [
     description: "Ground rules: each module decides one className from a business relationship, never from how it looks.",
   },
   {
+    source: "requests",
+    title: "Design requests",
+    description: "Source-first frontend feedback, rejected attempts, and the durable queue for grammar/principle learning.",
+  },
+  {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all eighteen capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all nineteen capabilities share.",
   },
   {
     source: "orchestration",

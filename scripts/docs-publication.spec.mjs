@@ -40,16 +40,18 @@ test("every StarCi capability entry publishes its own executable pipeline contra
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("starci-"))
     .map((entry) => entry.name)
     .sort();
-  assert.equal(capabilities.length, 18);
+  assert.equal(capabilities.length, 19);
   assert.deepEqual(
     capabilities.filter((name) => name.startsWith("starci-fe-")),
-    ["starci-fe-design-block", "starci-fe-design-layout", "starci-fe-layout-refactor", "starci-fe-ui-reconcile"],
+    ["starci-fe-design-block", "starci-fe-design-layout", "starci-fe-design-refactor", "starci-fe-design-resolve", "starci-fe-ui-reconcile"],
   );
-  const refactorBinding = readFileSync(join(skillSourceRoot, "starci-fe-layout-refactor", "SKILL.md"), "utf8");
-  assert.match(refactorBinding, /Feedback is an investigation signal, not proof/);
-  assert.match(refactorBinding, /at least two independent cases|explicitly rules that the correction is systemic/);
-  assert.match(refactorBinding, /Grammar owns product-family facts[\s\S]*Principles own only/);
-  assert.match(refactorBinding, /authority-to-write map/);
+  const refactorBinding = readFileSync(join(skillSourceRoot, "starci-fe-design-refactor", "SKILL.md"), "utf8");
+  assert.match(refactorBinding, /fix product source before writing the request/i);
+  assert.match(refactorBinding, /implementation `applied`[\s\S]*proof `passed`[\s\S]*authority `pending`/);
+  const resolveBinding = readFileSync(join(skillSourceRoot, "starci-fe-design-resolve", "SKILL.md"), "utf8");
+  assert.match(resolveBinding, /requests\/rejects\.json/);
+  assert.match(resolveBinding, /Grammar owns product-specific meaning[\s\S]*principles own reusable product-neutral/);
+  assert.match(resolveBinding, /append[\s\S]*reject[\s\S]*before overwriting source/i);
   const uiReconcileBinding = readFileSync(join(skillSourceRoot, "starci-fe-ui-reconcile", "SKILL.md"), "utf8");
   assert.match(uiReconcileBinding, /Declared authority and observed product evidence remain independent/);
   assert.match(uiReconcileBinding, /at least two independent cases[\s\S]*explicitly rules it\s+systemic/);

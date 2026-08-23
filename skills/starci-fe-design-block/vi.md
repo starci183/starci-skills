@@ -102,9 +102,9 @@ Known defect hoặc delivery chưa đạt cấm nói hoàn tất.
 - Product behavior chưa rõ, state thiếu, preview không functional hoặc explicit brainstorm batch có ít hơn ba alternative thật.
 - Thiếu quality lens/detector closure hoặc advisory evidence bị trình bày như authority.
 - Work bắt buộc nằm ngoài approved source boundary.
-- Nhiều hơn một block hoặc whole-page restructuring — owner: `starci-fe-layout-refactor`.
+- Nhiều hơn một block hoặc whole-page restructuring — owner: `starci-fe-design-refactor`.
 - Cần hơn năm complete-page state view.
-- Concrete owner feedback chỉ ra semantic owner, visual law hoặc repeated skill decision sai trong emitted output — owner: `starci-fe-layout-refactor`.
+- Concrete owner feedback chỉ ra semantic owner, visual law hoặc repeated skill decision sai trong emitted output — owner: `starci-fe-design-refactor`.
 
 ## OUTPUT
 

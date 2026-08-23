@@ -139,9 +139,9 @@ State evidence remains bound to the exact risk-covering view families in the app
 - Fabricated product content, or an explicit brainstorm batch with fewer than three materially distinct candidates.
 - Missing quality lens/detector closure, target mismatch or advisory evidence presented as authority.
 - Required source change outside the approved boundary.
-- More than one block or whole-page visual restructuring — owner: `starci-fe-layout-refactor`.
+- More than one block or whole-page visual restructuring — owner: `starci-fe-design-refactor`.
 - Required evidence no longer fits one component-impact boundary.
-- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in an already emitted result; preserve complete-parent evidence — owner: `starci-fe-layout-refactor`.
+- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in an already emitted result; preserve complete-parent evidence — owner: `starci-fe-design-refactor`.
 
 ## OUTPUT
 

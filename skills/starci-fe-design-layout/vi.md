@@ -209,7 +209,7 @@ Chạy browser proof cho mọi selected render target. Năm complete-page target
 - Thiếu seed ownership, selected state không seed được, seed không idempotent hoặc final proof chỉ tồn tại trong cache/component mock.
 - Protected route thiếu product login entry đã render, test credential owner hoặc schema-4 authentication trace
   điền cả hai control và tới route mà không dùng session shortcut.
-- Concrete owner feedback chỉ ra semantic owner, visual law hoặc repeated skill decision sai trong emitted output — owner: `starci-fe-layout-refactor`.
+- Concrete owner feedback chỉ ra semantic owner, visual law hoặc repeated skill decision sai trong emitted output — owner: `starci-fe-design-refactor`.
 
 ## OUTPUT
 

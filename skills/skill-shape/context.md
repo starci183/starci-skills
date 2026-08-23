@@ -68,9 +68,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The eighteen capabilities
+## The nineteen capabilities
 
-Sixteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Seventeen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -87,7 +87,8 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-repair` | a red or incompletely assured source returned green: repair passes kept apart and the complete frontend or backend delivery fence installed after gates pass |
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
 | `starci-fe-design-layout` | print journey and UI direction, join them into one complete source-bound page/flow, then approve, seed, implement and prove it |
-| `starci-fe-layout-refactor` | own proportional correction of Layout/Block-rendered output, investigate owner feedback, evolve durable authority only with systemic evidence, then prove the exact impact cone |
+| `starci-fe-design-refactor` | apply any concrete UI/user-flow feedback to source first, prove it, then create or update the durable request |
+| `starci-fe-design-resolve` | audit queued source attempts, preserve rejects, encode the accepted result in grammar/principles and close requests with proof |
 | `starci-fe-ui-reconcile` | challenge consistency across existing UI surfaces, separate local drift from systemic authority gaps, evolve grammar/principles only with evidence, then align and prove the approved impact cone |
 | `starci-fe-design-block` | print one UI direction by default or 3–4 on explicit brainstorm for one region inside its complete parent, then approve, implement and prove it |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |

@@ -73,9 +73,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười tám năng lực
+## Mười chín năng lực
 
-Mười sáu capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -93,7 +93,8 @@ thể ngay từ đầu nó đã đúng.
 | `starci-repair` | source đỏ hoặc assurance chưa đủ trở lại xanh: các repair pass giữ tách nhau và frontend hoặc backend delivery fence được cài trọn sau khi gate pass |
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
 | `starci-fe-design-layout` | in journey và UI direction, join thành một complete source-bound page/flow rồi duyệt, seed, implement và prove |
-| `starci-fe-layout-refactor` | sở hữu proportional correction của Layout/Block-rendered output, điều tra owner feedback, chỉ evolve durable authority bằng systemic evidence rồi prove exact impact cone |
+| `starci-fe-design-refactor` | áp dụng mọi concrete UI/user-flow feedback vào source trước, prove, rồi tạo/cập nhật durable request |
+| `starci-fe-design-resolve` | audit queued source attempt, giữ rejects, encode accepted result vào grammar/principles rồi đóng request bằng proof |
 | `starci-fe-ui-reconcile` | phản biện consistency giữa các UI surface hiện hữu, tách local drift khỏi systemic authority gap, chỉ evolve grammar/principles bằng evidence rồi align và prove approved impact cone |
 | `starci-fe-design-block` | in một UI direction mặc định hoặc 3–4 khi explicit brainstorm cho một region trong complete parent, rồi duyệt, implement và prove |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |

@@ -296,7 +296,7 @@ per-reference thresholds. Repair in-boundary defects until green; no third appro
 - A source, gate or visual defect that cannot be repaired inside the approved boundary.
 - A protected route has no rendered product login entry, test credential owner or schema-4 browser authentication
   trace that fills both credential controls and reaches the protected route without a session shortcut.
-- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in an already emitted result; preserve the exact rendered evidence — owner: `starci-fe-layout-refactor`.
+- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in an already emitted result; preserve the exact rendered evidence — owner: `starci-fe-design-refactor`.
 
 ## OUTPUT
 

@@ -29,6 +29,7 @@ The installation is intentionally kept together:
   .claude/
     INDEX.md
     contexts/
+    requests/
     grammars/
     brainstorms/
     compilers/
@@ -54,6 +55,7 @@ The original stage trees remain the detailed authorities. The v4 roots are stabl
 - `standards` connects role patterns, gates, rule bindings and assurance;
 - `machines` exposes deterministic parity and evidence checks;
 - `operations` routes deployment, MCP, readiness and runbooks without merging their laws;
+- `requests` keeps source-first frontend feedback, rejected attempts and pending grammar/principle learning;
 - `publication` keeps generated human documentation separate from runtime context.
 
 The binding chain is `pattern situation → gate situation → published machine rule → executable proof`.

@@ -49,7 +49,7 @@ test("published profiles cover every physical StarCi skill", () => {
   assert.deepEqual(validateWorkspace(root), {ok: true, failures: []});
   const schema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
   assert.equal(schema.properties.schemaVersion.const, 4);
-  assert.equal(schema.$defs.skill.enum.length, 18);
+  assert.equal(schema.$defs.skill.enum.length, 19);
   assert.ok(schema.required.includes("impact"));
   assert.ok(schema.required.includes("challenges"));
 });
@@ -223,17 +223,6 @@ test("impact-cone hash must cover the disclosed inventory", () => {
   const value = receipt();
   value.phaseGates.impactCone.consumers.push("src/HiddenConsumer.tsx");
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /stale impact-cone manifest/);
-});
-
-test("refactor evolving authority requires compiled authority proof", () => {
-  const value = receipt();
-  value.skill = "starci-fe-layout-refactor";
-  value.tasks[0].skill = value.skill;
-  value.tasks[0].step = "direction";
-  value.tasks[1].skill = value.skill;
-  value.tasks[1].step = "evolve-refactor";
-  value.phaseGates.authorityMode = "evolve";
-  assert.match(validateReceipt(value, profiles()).failures.join("\n"), /before passed compiled authority proof/);
 });
 
 test("proof must bind stable state and depend on every write task", () => {

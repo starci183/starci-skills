@@ -102,9 +102,9 @@ distinct uncovered risk. Known defects or unmet delivery forbid completion.
 - Unknown product behavior, incomplete states, non-functional preview or an explicit brainstorm batch with fewer than three real alternatives.
 - Missing quality lens/detector closure or advisory evidence presented as authority.
 - Required work outside the approved source boundary.
-- More than one block or whole-page restructuring — owner: `starci-fe-layout-refactor`.
+- More than one block or whole-page restructuring — owner: `starci-fe-design-refactor`.
 - More than five complete-page state views are needed.
-- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in emitted output — owner: `starci-fe-layout-refactor`.
+- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in emitted output — owner: `starci-fe-design-refactor`.
 
 ## OUTPUT
 

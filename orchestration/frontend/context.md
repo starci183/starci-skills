@@ -40,7 +40,8 @@ is unauthorized implementation. An agent label never weakens either boundary.
 |---|---|
 | `starci-fe-design-layout` | Layout map |
 | `starci-fe-design-block` | Block map |
-| `starci-fe-layout-refactor` | Refactor map |
+| `starci-fe-design-refactor` | Source-first feedback map |
+| `starci-fe-design-resolve` | Request learning and resolution map |
 
 ## Approval execution mode
 

@@ -212,7 +212,7 @@ Run browser proof for every selected render target. Five complete-page targets i
 - Missing seed ownership, unseedable selected state, non-idempotent seed or final proof that exists only in cache/component mocks.
 - A protected route lacks a rendered product login entry, test credential owner or schema-4 authentication trace
   that fills both controls and reaches the route without a session shortcut.
-- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in emitted output — owner: `starci-fe-layout-refactor`.
+- Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in emitted output — owner: `starci-fe-design-refactor`.
 
 ## OUTPUT
 

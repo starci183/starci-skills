@@ -792,7 +792,7 @@
     "orchestration/frontend/context.md": {
       "kind": "module",
       "source": "orchestration/frontend/en.md",
-      "sourceHash": "5da1f69cc7eb3dff981c69496c069c8b9d44d040eab332580e4a1c894f66c8d1",
+      "sourceHash": "87405bc10952744cb9c62eef481e5caadd5a7e67ecec8c6b1abe0e2a08434e53",
       "contextVersion": 1
     },
     "orchestration/maps/context.md": {
@@ -901,6 +901,12 @@
       "sourceHash": "9a0bae7387e85c759380830ef2a130593ba915ee94a7574b7d51af5703973714",
       "contextVersion": 1
     },
+    "requests/context.md": {
+      "kind": "module",
+      "source": "requests/en.md",
+      "sourceHash": "5d689528bf3f22b6c799ac1acd5db5979a08ae9c7e3b46adb2dbead5dc8fee48",
+      "contextVersion": 1
+    },
     "runbooks/context.md": {
       "kind": "module",
       "source": "runbooks/en.md",
@@ -950,7 +956,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "58bc636aaa4490628b95e5df45d5548609c7e58225e7c6240129b5de6f8d0575",
+      "sourceHash": "ffb1f26bf6b3f672c720ffc1bf93caa57784c96b6ed5f4138defbae07e50ca79",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

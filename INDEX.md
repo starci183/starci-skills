@@ -33,6 +33,7 @@ title: Docs
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | prove Source family offsets, application slots, projections and local listener uniqueness |
 | `@principles` | `compilers/principles/context.md` | context | resolve classes from accepted situations |
 | `@publication` | `publication/context.md` | context | separate runtime authority from generated human documentation |
+| `@requests` | `requests/context.md` | context | persist source-first frontend feedback, rejected attempts and authority-resolution state |
 | `@skill-shape` | `skills/skill-shape/context.md` | context | load the shared reporting contract when a skill runs |
 | `@skills` | `skills/context.md` | context | locate the capability registry |
 | `@standards` | `standards/context.md` | context | route role patterns, gates, rule bindings and assurance from one stable entry |
@@ -53,13 +54,14 @@ order follows from it rather than defining it.
 | Tree | Returns | Read it when |
 |---|---|---|
 | `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
+| `@requests` | source-first frontend correction evidence, rejects and unresolved authority learning | design feedback must survive beyond the immediate source fix |
 | `@grammars` | deterministic product-family facts, outcomes, owners and durable behavior | a verified workspace route explicitly selects a grammar/profile |
 | `@brainstorms` | one complete generated baseline, or 3–4 targeted alternatives only after an explicit owner brainstorm request | a complete baseline or requested variation is not yet decided |
 | `@compilers` | exactly one answer, no candidates | an accepted shape needs execution detail — `@principles` decide classes and `@patterns` decide files/imports |
 | `@gates` | pass, or reject with evidence | code exists and must be judged — `@gates` point at the character they refuse on |
 
 Frontend work first classifies observable impact: `micro` uses a plain exact edit, `component` uses Block,
-`page` uses Layout/Refactor, and `capability` or `cross-domain` adds independent challenge. Do not force the
+`page` uses Layout/Design Refactor, and `capability` or `cross-domain` adds independent challenge. Do not force the
 full design workflow onto label, icon, token, spacing or other exact corrections that preserve anatomy and ownership.
 User-facing progress uses Scope, Decision, Source boundary, Test evidence, Approval and Result; internal methodology
 names remain debug detail.
@@ -70,7 +72,7 @@ business-faithful complete long page or flow by default. Page anatomy is rendere
 desktop/narrow states and receives cache-only `OK #1`; only then are all evidenced conditions expanded under the
 unchanged direction-plus-page hash. `OK #2` binds complete states and exact source files before implementation. One
 direction is rendered by default and 3–4 alternatives appear only after an explicit owner brainstorm request
-before direction approval. Layout prints journey and UI direction separately; Refactor and Block print UI
+before direction approval. Layout prints journey and UI direction separately; Design Refactor and Block print UI
 direction only. The QA viewer may
 inspect states but may not substitute for product interaction.
 
@@ -103,6 +105,7 @@ not copy those laws:
   → @orchestration through the selected skill's machine-validated phase map
   → @standards
   → approved source write
+  → @requests when frontend feedback must survive from source-first correction to authority learning
   → @gates
   → @machines
   → @operations when the request reaches runtime/provider state
@@ -146,7 +149,7 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Eighteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Nineteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. `@orchestration` covers all physical skills through one machine registry; it is policy, not another capability,
 and coverage does not force delegation when sequential execution is safer or cheaper.
 
@@ -163,7 +166,8 @@ and coverage does not force delegation when sequential execution is safer or che
 | `starci-repair` | a red or incompletely assured source returned green — Source-owned port allocation, separated passes, complete frontend or backend delivery fence, never suppression or plaintext secrets |
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
 | `starci-fe-design-layout` | mandatory journey-plus-UI direction synthesis into complete pages; one direction by default or 3–4 on explicit brainstorm, then staged source/seed implementation and proof |
-| `starci-fe-layout-refactor` | proportional correction for exact Layout/Block-rendered output; feedback triggers investigation and durable authority evolves only with systemic evidence |
+| `starci-fe-design-refactor` | any concrete UI/user-flow feedback applied and proved in source first, then persisted as one design-learning request |
+| `starci-fe-design-resolve` | request batches audited against source; bad attempts enter rejects before replacement, then grammar/principles learn the accepted result |
 | `starci-fe-ui-reconcile` | cross-surface UI consistency reconciliation; separates local drift from systemic grammar/principle gaps, then aligns and proves the approved impact cone |
 | `starci-fe-design-block` | component-impact correction in its complete parent; direction only for an unresolved UI decision, then one bounded source approval and proof |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v1/requests/request.schema.json",
+  "title": "StarCi frontend design request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "status", "createdOn", "updatedOn", "project", "role", "scope", "feedback", "authority", "implementation", "proof"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "status": {"enum": ["open", "in-progress", "blocked", "resolved", "superseded"]},
+    "createdOn": {"type": "string", "format": "date"},
+    "updatedOn": {"type": "string", "format": "date"},
+    "project": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "role": {"const": "fe"},
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kinds", "feature", "surfaces"],
+      "properties": {
+        "kinds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["ui", "user-flow"]}},
+        "feature": {"type": "string", "minLength": 3},
+        "surfaces": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "sourceBoundary": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "expectedOutcome", "evidence"],
+      "properties": {
+        "summary": {"type": "string", "minLength": 8},
+        "expectedOutcome": {"type": "string", "minLength": 8},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ref"],
+            "properties": {
+              "kind": {"enum": ["screenshot", "conversation", "route", "runtime", "code", "other"]},
+              "ref": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "grammarTargets", "principleTargets", "evidence"],
+      "properties": {
+        "disposition": {"enum": ["pending", "grammar", "principle", "both"]},
+        "grammarTargets": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "principleTargets": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "paths", "rejectRefs"],
+      "properties": {
+        "status": {"enum": ["pending", "planned", "applied"]},
+        "paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "rejectRefs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}}
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": {"enum": ["pending", "passed", "failed", "blocked"]},
+        "evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "summary", "authorityChanged", "sourceChanged", "proofRefs"],
+      "properties": {
+        "verdict": {"enum": ["applied", "blocked", "superseded"]},
+        "summary": {"type": "string", "minLength": 8},
+        "authorityChanged": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "sourceChanged": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "proofRefs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "open"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "implementation": {
+            "properties": {"status": {"const": "applied"}, "paths": {"minItems": 1}}
+          },
+          "proof": {
+            "properties": {"status": {"const": "passed"}, "evidence": {"minItems": 1}}
+          },
+          "authority": {
+            "properties": {"disposition": {"const": "pending"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "resolved"}}, "required": ["status"]},
+      "then": {"required": ["resolution"]}
+    }
+  ]
+}

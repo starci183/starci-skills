@@ -44,7 +44,8 @@ là implementation chưa được phép. Agent label không làm yếu hai bound
 |---|---|
 | `starci-fe-design-layout` | Map Layout |
 | `starci-fe-design-block` | Map Block |
-| `starci-fe-layout-refactor` | Map Refactor |
+| `starci-fe-design-refactor` | Map feedback source-first |
+| `starci-fe-design-resolve` | Map request learning và resolution |
 
 ## Approval execution mode
 
