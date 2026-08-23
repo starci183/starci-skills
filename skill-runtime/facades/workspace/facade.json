@@ -1,0 +1,38 @@
+{
+  "$schema": "../facade.schema.json",
+  "schemaVersion": 1,
+  "facadeId": "workspace",
+  "kind": "semantic-skill-facade",
+  "executable": false,
+  "description": "Route Source, machine, project, role, workspace-route, decrypt-identity, and worktree readiness to the existing initialization owner.",
+  "modes": [
+    {
+      "id": "init",
+      "intent": "Make a Source, machine, project, or role ready and portable.",
+      "targetSkill": "starci-init",
+      "selectionFacts": ["new Source or machine", "decrypt identity or agent bootstrap", "compile or hydrate workspace declarations", "worktree or session readiness"],
+      "excludes": ["target repository product edit", "runtime deployment", "repair of a routed product"]
+    }
+  ],
+  "permissions": {
+    "selectionOnly": true,
+    "writes": [],
+    "externalMutations": false,
+    "approvalTransfer": false
+  },
+  "dispatch": {
+    "loadsTargetSkill": false,
+    "startsTargetSeparately": true,
+    "targetOwnsApprovalAndProof": true,
+    "requiresOwnOrchestrationProfile": false
+  },
+  "output": {
+    "fields": ["facadeId", "mode", "targetSkill", "selectionReason", "unresolvedFacts", "invocationEnvelope"]
+  },
+  "stops": [
+    "Source identity is unresolved",
+    "requested target repository edit is outside initialization ownership",
+    "request is deployment or product repair",
+    "request requires another capability owner"
+  ]
+}

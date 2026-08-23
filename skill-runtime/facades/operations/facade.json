@@ -1,0 +1,60 @@
+{
+  "$schema": "../facade.schema.json",
+  "schemaVersion": 1,
+  "facadeId": "operations",
+  "kind": "semantic-skill-facade",
+  "executable": false,
+  "description": "Route public HTTP tunnels, declared deployment, source-context MCP, and shared SonarQube operations to separate provider owners.",
+  "modes": [
+    {
+      "id": "tunnel",
+      "intent": "Reconcile one approved HTTP or HTTPS Cloudflare tunnel and DNS route.",
+      "targetSkill": "starci-cloudflare-tunnel-set",
+      "selectionFacts": ["public hostname", "Cloudflare tunnel", "HTTP or HTTPS route"],
+      "excludes": ["raw TCP exposure", "database exposure", "connector runtime"]
+    },
+    {
+      "id": "deploy",
+      "intent": "Adopt, deploy, monitor, recover, or roll back a declared routed product stack.",
+      "targetSkill": "starci-deploy",
+      "selectionFacts": ["declared .stacks intent", "host release or steady state", "recover or roll back"],
+      "excludes": ["local development startup", "undeclared external host"]
+    },
+    {
+      "id": "mcp",
+      "intent": "Set up or refresh the Source-wide read-only source-context MCP.",
+      "targetSkill": "starci-setup-mcp",
+      "selectionFacts": ["source-context MCP", "routed source partitions", "approved MCP publication"],
+      "excludes": ["generic connector runtime", "write-enabled source service"]
+    },
+    {
+      "id": "sonar",
+      "intent": "Set up shared SonarQube and reconcile strict quality gates for routed roles.",
+      "targetSkill": "starci-setup-sonar",
+      "selectionFacts": ["SonarQube service setup", "strict quality gate reconciliation", "routed role onboarding"],
+      "excludes": ["ordinary local lint execution", "silencing Sonar findings", "generic product deployment"]
+    }
+  ],
+  "permissions": {
+    "selectionOnly": true,
+    "writes": [],
+    "externalMutations": false,
+    "approvalTransfer": false
+  },
+  "dispatch": {
+    "loadsTargetSkill": false,
+    "startsTargetSeparately": true,
+    "targetOwnsApprovalAndProof": true,
+    "requiresOwnOrchestrationProfile": false
+  },
+  "output": {
+    "fields": ["facadeId", "mode", "targetSkill", "selectionReason", "riskClass", "unresolvedFacts", "invocationEnvelope"]
+  },
+  "stops": [
+    "Source or project routing is unresolved",
+    "operation spans more than one provider owner",
+    "credential authority is missing",
+    "destructive or publication boundary is undisclosed",
+    "request is local development startup or another excluded operation"
+  ]
+}

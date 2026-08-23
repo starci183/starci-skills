@@ -1,0 +1,45 @@
+{
+  "$schema": "../facade.schema.json",
+  "schemaVersion": 1,
+  "facadeId": "analysis",
+  "kind": "semantic-skill-facade",
+  "executable": false,
+  "description": "Distinguish difficult cross-system technical decisions from evidence-backed business feature authority before planning or source writes.",
+  "modes": [
+    {
+      "id": "architecture",
+      "intent": "Analyze a difficult cross-system technical decision without product writes.",
+      "targetSkill": "starci-architecture-analyze",
+      "selectionFacts": ["multiple viable technical solutions", "cross-system trade-offs", "failure, security, cost, or scale challenge"],
+      "excludes": ["ordinary CRUD", "exact file planning", "business feature authority"]
+    },
+    {
+      "id": "business",
+      "intent": "Create, advance, or reconcile evidence-backed business feature authority.",
+      "targetSkill": "starci-business-analyze",
+      "selectionFacts": ["actors, flows, rules, states, or product truth", "business feature head", "owner intent before design or code"],
+      "excludes": ["technical-only architecture trade-off", "product source implementation"]
+    }
+  ],
+  "permissions": {
+    "selectionOnly": true,
+    "writes": [],
+    "externalMutations": false,
+    "approvalTransfer": false
+  },
+  "dispatch": {
+    "loadsTargetSkill": false,
+    "startsTargetSeparately": true,
+    "targetOwnsApprovalAndProof": true,
+    "requiresOwnOrchestrationProfile": false
+  },
+  "output": {
+    "fields": ["facadeId", "mode", "targetSkill", "selectionReason", "unresolvedFacts", "invocationEnvelope"]
+  },
+  "stops": [
+    "technical decision and business authority remain conflated",
+    "project routing is unresolved",
+    "request includes undisclosed source writes",
+    "request requires another capability owner"
+  ]
+}

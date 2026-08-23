@@ -342,7 +342,9 @@ for (const [file, en] of parsed) {
   if (JSON.stringify(outline(en.lines)) !== JSON.stringify(outline(vi.lines))) {
     report(viPath, 1, "section count or order differs from en.md");
   }
-  const codes = (lines) => [...new Set(lines.join("\n").match(/\b[A-Z][A-Z0-9-]*-[0-9]+\b/g) ?? [])].sort();
+  const codes = (lines) => [...new Set(
+    [...lines.join("\n").matchAll(/^\| `([A-Z][A-Z0-9-]*-[0-9]+)` \|/gm)].map((match) => match[1]),
+  )].sort();
   if (JSON.stringify(codes(en.lines)) !== JSON.stringify(codes(vi.lines))) {
     report(viPath, 1, "situation codes differ from en.md");
   }
@@ -378,7 +380,9 @@ for (const [file, skill] of parsed) {
   if (JSON.stringify(outline(skill.lines)) !== JSON.stringify(outline(vi.lines))) {
     report(viPath, 1, "section count or order differs from SKILL.md");
   }
-  const codes = (lines) => [...new Set(lines.join("\n").match(/\b[A-Z][A-Z0-9-]*-[0-9]+\b/g) ?? [])].sort();
+  const codes = (lines) => [...new Set(
+    [...lines.join("\n").matchAll(/^\| `([A-Z][A-Z0-9-]*-[0-9]+)` \|/gm)].map((match) => match[1]),
+  )].sort();
   if (JSON.stringify(codes(skill.lines)) !== JSON.stringify(codes(vi.lines))) {
     report(viPath, 1, "situation codes differ from SKILL.md");
   }

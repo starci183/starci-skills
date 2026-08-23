@@ -5,10 +5,238 @@
       "kind": "router",
       "contextVersion": 1
     },
+    "archetypes/detail/authored-analytical-briefing/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/authored-analytical-briefing/en.md",
+      "sourceHash": "bcc231dd7bc0726efcc3d1133206f0fa8545602af98c3d5fab2bb4cf3212ea6d",
+      "contextVersion": 1
+    },
+    "archetypes/detail/binary-structure-hex-inspector/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/binary-structure-hex-inspector/en.md",
+      "sourceHash": "83583ebc1a7580dcae39f6dc2748cdc268700939ded9dac8ee4aeb26cc5b2d98",
+      "contextVersion": 1
+    },
+    "archetypes/detail/bitemporal-record-validity-detail/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/bitemporal-record-validity-detail/en.md",
+      "sourceHash": "db8e6ff4340065b1f7d15a04e9e4761e34dc1488d52aff337b5ed4e38298871c",
+      "contextVersion": 1
+    },
+    "archetypes/detail/causal-root-analysis-dossier/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/causal-root-analysis-dossier/en.md",
+      "sourceHash": "0b3687e22d061a5d6d092d4ff8d50deeb19f407a495b764bf41270d69d4fda48",
+      "contextVersion": 1
+    },
+    "archetypes/detail/editable-record-with-summary-rail/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/editable-record-with-summary-rail/en.md",
+      "sourceHash": "ed3af66cc41e0ed418ba23cc4bda997eae8a71ee820e17b6b7ce2d72fa50b036",
+      "contextVersion": 1
+    },
+    "archetypes/detail/enterprise-record-home/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/enterprise-record-home/en.md",
+      "sourceHash": "85d40d2de17b512f9909d655231828a75a5b8a8b02e9e3f59cdb1bd858a9b71f",
+      "contextVersion": 1
+    },
+    "archetypes/detail/evidence-led-case-resolution-dossier/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/evidence-led-case-resolution-dossier/en.md",
+      "sourceHash": "bd289471044ebb68185d0f725855bd154ca60c1cb11d5aa1eef14b69a90e4f8d",
+      "contextVersion": 1
+    },
+    "archetypes/detail/genomic-locus-read-evidence-inspector/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/genomic-locus-read-evidence-inspector/en.md",
+      "sourceHash": "3c6d6464840966b4abdfeddc2d6c47137efdc36afdc8ab93f30a319a69adfd6f",
+      "contextVersion": 1
+    },
+    "archetypes/detail/heap-dominator-path-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/heap-dominator-path-explorer/en.md",
+      "sourceHash": "89627d8514ee0dd186aa5efa5ca3762bf9377d0f9f904419bea9e70a35f41ab0",
+      "contextVersion": 1
+    },
+    "archetypes/detail/job-run-detail-timeline/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/job-run-detail-timeline/en.md",
+      "sourceHash": "0515f3003bc714b2dabb8460601bdc6f42890f4c586cf758684505c5c77cd30f",
+      "contextVersion": 1
+    },
     "archetypes/detail/narrative-detail-with-decision-rail/context.md": {
       "kind": "module",
       "source": "archetypes/detail/narrative-detail-with-decision-rail/en.md",
       "sourceHash": "f6b3d874872a7d0712c9c39fc51925353fbc46b45acffe5efdc4f59c2d9813f5",
+      "contextVersion": 1
+    },
+    "archetypes/detail/order-fulfillment-tracker/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/order-fulfillment-tracker/en.md",
+      "sourceHash": "e0f4099725e009b53889d36ab667e22348b269046ef2f9721df9f24431923ebc",
+      "contextVersion": 1
+    },
+    "archetypes/detail/orthogonal-volume-slice-inspector/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/orthogonal-volume-slice-inspector/en.md",
+      "sourceHash": "2d3f7968c3bffb76884da1c181695ab7eec93d77cc80f1887342afa3a1cc0c6f",
+      "contextVersion": 1
+    },
+    "archetypes/detail/print-proof-preflight-review/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/print-proof-preflight-review/en.md",
+      "sourceHash": "84881add754ecbfefe6511a9bb2faef7eadbd96c77b9c0d41d3dd816e7794105",
+      "contextVersion": 1
+    },
+    "archetypes/detail/query-plan-hotspot-analyzer/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/query-plan-hotspot-analyzer/en.md",
+      "sourceHash": "f6670f72a6ca25ea387e30aa55bbd2245acbeb6048544a9821b8e70f6a716837",
+      "contextVersion": 1
+    },
+    "archetypes/detail/sampled-call-stack-profile-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/sampled-call-stack-profile-explorer/en.md",
+      "sourceHash": "9e67916ddc459983bb8a497d2a82979742490db7ed7c630435b0d831348d7713",
+      "contextVersion": 1
+    },
+    "archetypes/detail/scientific-notebook-reproducibility-audit/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/scientific-notebook-reproducibility-audit/en.md",
+      "sourceHash": "e538597d44d701cae0f0e5b8c1bca10ecce9b730a2e8be8672bbec48afe17840",
+      "contextVersion": 1
+    },
+    "archetypes/detail/stream-window-join-debugger/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/stream-window-join-debugger/en.md",
+      "sourceHash": "368025b09a800826fb956497e8fb70e748f0bd3e7a18ddfb98980dda77d5e6b1",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/calendar-agenda-browser/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/calendar-agenda-browser/en.md",
+      "sourceHash": "e8fdf6d40d1b98f63c5930daafad2a07cde7069b672b8783047cd2012cef780e",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/comparison-matrix/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/comparison-matrix/en.md",
+      "sourceHash": "4d816dcf4c14e461ffff6dce4060b7c9a06073256ee1c3d517937d18c51872b9",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/editorial-feed-reader/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/editorial-feed-reader/en.md",
+      "sourceHash": "8c958da9c872656174a629933b6c3284aafb3665eba369c6b34fcaa352dd0e27",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/faceted-ranked-results/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/faceted-ranked-results/en.md",
+      "sourceHash": "416e2468364927b614ac92b9e449714ccf2f702592a812284ad3976692c9e3d4",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/hierarchical-content-browser/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/hierarchical-content-browser/en.md",
+      "sourceHash": "271483901a5eddf1e96faa2ce0d36988803f7944b8c0a92b80a3d9dfa726e26f",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/hierarchical-three-pane-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/hierarchical-three-pane-explorer/en.md",
+      "sourceHash": "7c4deb5804b1ec5577970afc58eab641363aa5eedd08ca4bb31830691e693fec",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/immersive-gallery-lightbox/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/immersive-gallery-lightbox/en.md",
+      "sourceHash": "7e70030f2c8a60c917345f976f6508ae1cd5f207f0a97a6029b34535b8c99d24",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/jurisdiction-authority-resolution/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/jurisdiction-authority-resolution/en.md",
+      "sourceHash": "59c611cb4befef9c6d5eafaa82b2cbea0038e74cc5df25d9a6f5a7ebe5eb8613",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/knowledge-graph-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/knowledge-graph-explorer/en.md",
+      "sourceHash": "1319d4371b367ca03872df8c3511ed5f057b174dbc00af08cf186d0089ec1224",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/manuscript-reader-notes/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/manuscript-reader-notes/en.md",
+      "sourceHash": "0e62a4b4be2417683ab8d962b42b85f5eba6b893f4da07acacbb92caa3eafdf1",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/map-results-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/map-results-explorer/en.md",
+      "sourceHash": "b3d57763861cd8731fbb21211b2ed4344f979c6bb596be4b0941701c6a88bf35",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/media-rails-browser/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/media-rails-browser/en.md",
+      "sourceHash": "60fdbd69c03d6723e05ed1e52a589f9e78bb4d169ea75d18988954c078a81a66",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/media-theater-queue/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/media-theater-queue/en.md",
+      "sourceHash": "9a696a7acfd034c36a68a068250992228c63e546e006cf8ffa3004fdfaefd66f",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/multi-program-eligibility-screening/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/multi-program-eligibility-screening/en.md",
+      "sourceHash": "47958b27354e6d6fabc4fd3f5b2660200a56b4ebf7d2bc36e6b5c6097fb5c832",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/paged-presentation-stage/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/paged-presentation-stage/en.md",
+      "sourceHash": "d9e41247f9f8c469e822cdcc71c824bbd9dd657b118549d26060817a715ba83c",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/parallel-document-reader/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/parallel-document-reader/en.md",
+      "sourceHash": "1a997943cf31fab8c15c46105ff6419f67cceeddeed46ee243be788bd7de4971",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/phylogeny-alignment-comparison-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/phylogeny-alignment-comparison-explorer/en.md",
+      "sourceHash": "18023dafb150a9bc09408c9a12ddf8c8ef7ed900150ec9acd9ccc4df32a6f8b7",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/prerequisite-pathway-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/prerequisite-pathway-planner/en.md",
+      "sourceHash": "c0ce50a68af28899cdeeb411c2c65cee913115696063dbf23af5ba89a6f5923b",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/sample-lineage-custody-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/sample-lineage-custody-explorer/en.md",
+      "sourceHash": "1e848a251835d8c14b3bf8cdc4618e0bf694ce27d63bce266769811e5c06a297",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/scoped-federated-search/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/scoped-federated-search/en.md",
+      "sourceHash": "12a2b2af5341d23313731b0489f6a60ec5122d50374b8f5a896d977d43386a0e",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/scrollytelling-chapter-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/scrollytelling-chapter-explorer/en.md",
+      "sourceHash": "10ff63733a51491735e9ade4cc632f47ea043d8b9506476e34b59c94a48b5f94",
       "contextVersion": 1
     },
     "archetypes/discovery/searchable-card-catalog/context.md": {
@@ -17,10 +245,538 @@
       "sourceHash": "8236c09a35d932e2000986aafd336bf314a4ba03a984846fcbd00c0ca1bf7a6a",
       "contextVersion": 1
     },
+    "archetypes/discovery/service-navigation-hub/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/service-navigation-hub/en.md",
+      "sourceHash": "c70aec9184b95b61fbcf2de13f425c62c111bbf9662e46e6f9e2d432f2d49592",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/spatial-route-itinerary-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/spatial-route-itinerary-explorer/en.md",
+      "sourceHash": "4b5f64fddb5095a98247864d0bc27dff50afff8ab00cc763a97eb4af17bee1a8",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/timeline-audit-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/timeline-audit-explorer/en.md",
+      "sourceHash": "9f5a8067426983c4e53e867c70339d644cd6774066c3e0dd29ea7eafd5966c53",
+      "contextVersion": 1
+    },
+    "archetypes/flow/asynchronous-outcome-tracker/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/asynchronous-outcome-tracker/en.md",
+      "sourceHash": "d9d3ba4f8745993ada6d6cc4d538b8a28df7f852881dd46e135718180800c34e",
+      "contextVersion": 1
+    },
+    "archetypes/flow/automated-decision-explanation-challenge/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/automated-decision-explanation-challenge/en.md",
+      "sourceHash": "0b2e764001ad62147334bcae9f8c68e53f84af28d85c3b097067a2dc69f73754",
+      "contextVersion": 1
+    },
+    "archetypes/flow/booking-slot-selection/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/booking-slot-selection/en.md",
+      "sourceHash": "cea3c813cb92cbe59c47d67b7e169cbee69ffb0f5d73d81191bbf74413b05f07",
+      "contextVersion": 1
+    },
+    "archetypes/flow/calculation-estimate-flow/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/calculation-estimate-flow/en.md",
+      "sourceHash": "342c5360a732c5f52fc4e60aebaff942b36a8ed1a718bf8e12fb851106dfa6a3",
+      "contextVersion": 1
+    },
+    "archetypes/flow/care-transition-readiness-orchestrator/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/care-transition-readiness-orchestrator/en.md",
+      "sourceHash": "5e215b5334fc6b7209badcc55669b19860f7080bd1f03d13164aefaeec3dbed6",
+      "contextVersion": 1
+    },
+    "archetypes/flow/cart-checkout-flow/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/cart-checkout-flow/en.md",
+      "sourceHash": "b4c676aac61e9bd07d17a85b22bac826d426c18ea4dd95b32ae37243cd947b0d",
+      "contextVersion": 1
+    },
+    "archetypes/flow/chain-of-custody-transfer-ledger/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/chain-of-custody-transfer-ledger/en.md",
+      "sourceHash": "956bf375e7b52701948eb461dfec2bcfb43ed147a2a8112d498d0b53cca6902c",
+      "contextVersion": 1
+    },
+    "archetypes/flow/consent-signature-ceremony/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/consent-signature-ceremony/en.md",
+      "sourceHash": "93d0798b1d3e1a54fc0f1c0b09ae0d6636fe72c2e18969a7b935f6fab969205d",
+      "contextVersion": 1
+    },
+    "archetypes/flow/consent-withdrawal-impact-review/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/consent-withdrawal-impact-review/en.md",
+      "sourceHash": "34d31d327737e07d27fd29a1270b3eaee387ea60d144ddb4427353c4c91bb386",
+      "contextVersion": 1
+    },
+    "archetypes/flow/cross-party-handoff-flow/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/cross-party-handoff-flow/en.md",
+      "sourceHash": "df1eee5a9a82d585033599c40007ae95c3441b07c1f4307bbf3c70ec108d83fc",
+      "contextVersion": 1
+    },
+    "archetypes/flow/data-export-delivery-flow/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/data-export-delivery-flow/en.md",
+      "sourceHash": "ea2047f807fd3909c0e72e0e7326240a609a06164f3f0c7e5103d31492cd32d8",
+      "contextVersion": 1
+    },
+    "archetypes/flow/data-import-mapping-pipeline/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/data-import-mapping-pipeline/en.md",
+      "sourceHash": "e41f7fd8b9bdb5b16a25bde6668df70c21ab51d8ad2e139ec0a47a29f4033e03",
+      "contextVersion": 1
+    },
+    "archetypes/flow/exposure-contact-followup-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/exposure-contact-followup-workbench/en.md",
+      "sourceHash": "2c6114a9a0b2af75ea1b26579753e294182ba8ef880e1250199607100d943563",
+      "contextVersion": 1
+    },
+    "archetypes/flow/flight-dispatch-release-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/flight-dispatch-release-workbench/en.md",
+      "sourceHash": "dfee0d32237c5f71f05ad2ed7f099655b359d04f59690a3d619cff158d1fc3f0",
+      "contextVersion": 1
+    },
+    "archetypes/flow/grid-outage-restoration-switching-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/grid-outage-restoration-switching-board/en.md",
+      "sourceHash": "4ee36b0d62ead5b6bc09a57d2616e743b202033627a5ed328f16388cfc6eaf23",
+      "contextVersion": 1
+    },
+    "archetypes/flow/guided-setup-checklist/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/guided-setup-checklist/en.md",
+      "sourceHash": "375fdd2dc381b9763c90bdccdb96410a415c868ae930d03c90449748c37c45dc",
+      "contextVersion": 1
+    },
+    "archetypes/flow/guided-troubleshooting-tree/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/guided-troubleshooting-tree/en.md",
+      "sourceHash": "0c470dd0d18e6443cc8ff1deeeb9b0a60a257d27ea9c3c004e2a2ccbccee1723",
+      "contextVersion": 1
+    },
+    "archetypes/flow/insolvency-priority-distribution-waterfall/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/insolvency-priority-distribution-waterfall/en.md",
+      "sourceHash": "25c2236d796b9dde2f789b14c6780f2ac1f7ac596fbe2f5da0a2979f4431a051",
+      "contextVersion": 1
+    },
+    "archetypes/flow/linear-multi-step-application/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/linear-multi-step-application/en.md",
+      "sourceHash": "f8e7e86e06ea12d310768a5510c5315fe8e03deb3c9ced2eaa4741e4b9fc36bd",
+      "contextVersion": 1
+    },
+    "archetypes/flow/moderated-briefing-qa-stage/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/moderated-briefing-qa-stage/en.md",
+      "sourceHash": "1cddd9ae24ba70bc04f87f3f9399b6901c9f791c306d4f2afea337ff8d6d81d1",
+      "contextVersion": 1
+    },
+    "archetypes/flow/multi-creditor-hardship-plan-negotiator/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/multi-creditor-hardship-plan-negotiator/en.md",
+      "sourceHash": "bc30093a55ec4c07bcb77a722787dcda9d128a900e46c8c44c1a0656cfd87d74",
+      "contextVersion": 1
+    },
+    "archetypes/flow/multi-item-return-resolution/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/multi-item-return-resolution/en.md",
+      "sourceHash": "4a52d5e6ad16572846a4fdd2fc79b3e197b5b6b0ab15172c419b23d7c64de63b",
+      "contextVersion": 1
+    },
+    "archetypes/flow/multi-payer-responsibility-coordinator/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/multi-payer-responsibility-coordinator/en.md",
+      "sourceHash": "04c6a8403fdbf256f54eb5cb6e4fe83bafe9de90fa4854d18f542bdb4a441870",
+      "contextVersion": 1
+    },
+    "archetypes/flow/multi-service-life-event-orchestrator/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/multi-service-life-event-orchestrator/en.md",
+      "sourceHash": "f499b908f598458f32cd2ba1a40ce4a610fe10a88b9334b57af2ec55be1d7d4b",
+      "contextVersion": 1
+    },
+    "archetypes/flow/nonlinear-task-list-application/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/nonlinear-task-list-application/en.md",
+      "sourceHash": "100b7649bd79474e3cf685016f8cfeb688c3292934c87f02f4aea4d602b31d2b",
+      "contextVersion": 1
+    },
+    "archetypes/flow/peer-review-exchange-cycle/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/peer-review-exchange-cycle/en.md",
+      "sourceHash": "62996c030bebe4975f8221ba198ca26ba26aa2c1c32a41ebd035e4766bb0b9d0",
+      "contextVersion": 1
+    },
+    "archetypes/flow/plan-selection-purchase/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/plan-selection-purchase/en.md",
+      "sourceHash": "4390ea90b228258d869cfe6b260b05e35020bc14b00936c0b860fa95f7205e10",
+      "contextVersion": 1
+    },
+    "archetypes/flow/prescribed-fire-ignition-window-control-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/prescribed-fire-ignition-window-control-planner/en.md",
+      "sourceHash": "2642793b00b473f3a3a0c34b0f1b1bb7b4cdcc51b84b27adfd5d2a005fb48ee0",
+      "contextVersion": 1
+    },
+    "archetypes/flow/progressive-rollout-gate-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/progressive-rollout-gate-console/en.md",
+      "sourceHash": "6ac0e06fc5c23d36a6f8792f86d6d5d150575a01813ea878b0d828e5527d7a24",
+      "contextVersion": 1
+    },
+    "archetypes/flow/referral-negotiation-exchange/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/referral-negotiation-exchange/en.md",
+      "sourceHash": "f4e8f6bd9f0340a5c8e01a1fa792f09fa9932e1cf282499c7c0476e99e03c289",
+      "contextVersion": 1
+    },
+    "archetypes/flow/regulatory-filing-package-validator/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/regulatory-filing-package-validator/en.md",
+      "sourceHash": "d4ae00a5e458a3450251ee322db3fa05e5b9f93e7140e507d89726eef519d650",
+      "contextVersion": 1
+    },
+    "archetypes/flow/repeated-item-manager/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/repeated-item-manager/en.md",
+      "sourceHash": "cdb5906f4bd21ec2c37f7c9756b7994daea1895c5a89befe65cf491c8d02010c",
+      "contextVersion": 1
+    },
+    "archetypes/flow/review-submit-ledger/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/review-submit-ledger/en.md",
+      "sourceHash": "2bec3633f732b5609d0155c69f402afcc1886f5779331c0191ea78bdd615efa3",
+      "contextVersion": 1
+    },
+    "archetypes/flow/service-accommodation-commitment-plan/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/service-accommodation-commitment-plan/en.md",
+      "sourceHash": "d484a6aee63904ed8aeb0b6182c64290b9fc149d4ab767445e48cf697a773d08",
+      "contextVersion": 1
+    },
+    "archetypes/flow/shift-handoff-acknowledgement-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/shift-handoff-acknowledgement-board/en.md",
+      "sourceHash": "36142d523e7a3fab7b1fa5efd011316354e28fc2952bf0dce007fce2d9ee9295",
+      "contextVersion": 1
+    },
+    "archetypes/flow/single-question-step/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/single-question-step/en.md",
+      "sourceHash": "d6d1568a464dee9a6a61f6e7f7c3bd6c8dba72f703da1221d49aa9f2a53300a9",
+      "contextVersion": 1
+    },
+    "archetypes/flow/spatial-seat-reservation/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/spatial-seat-reservation/en.md",
+      "sourceHash": "b771e23989c93de95c39f9cd49bd1cda6b4a46edb33b505d36404b265edcffeb",
+      "contextVersion": 1
+    },
+    "archetypes/flow/split-reference-form/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/split-reference-form/en.md",
+      "sourceHash": "1a887da4d7b69fe98d493d217f814f925069934b309ab19bae6cf646bcff61c4",
+      "contextVersion": 1
+    },
+    "archetypes/flow/stage-gated-process-record/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/stage-gated-process-record/en.md",
+      "sourceHash": "e088bf0495a7f155ffa6ec7d8fd0f7c22fa9438c7a6503bb0dc69cfd1d5c8291",
+      "contextVersion": 1
+    },
+    "archetypes/flow/third-party-data-access-grant/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/third-party-data-access-grant/en.md",
+      "sourceHash": "f4a0b40ceb800bd9429ac5d56ab088bc7421d2b7d9d009684bee4fa99631d922",
+      "contextVersion": 1
+    },
+    "archetypes/flow/transfusion-compatibility-release-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/transfusion-compatibility-release-workbench/en.md",
+      "sourceHash": "0666a58f384f717f5b5faec10884aea9d1cdc7ad53a9b5ecc481b5438603b675",
+      "contextVersion": 1
+    },
+    "archetypes/flow/waitlist-offer-allocation-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/waitlist-offer-allocation-board/en.md",
+      "sourceHash": "bd0e9f61a3ed6910d84b5013b0399c6c9f70213a8de4e60c071bd3ee107bb9ca",
+      "contextVersion": 1
+    },
+    "archetypes/flow/water-network-leak-isolation-recovery-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/flow/water-network-leak-isolation-recovery-workbench/en.md",
+      "sourceHash": "979877d37bcb7286e0a0439aee6b36997b7d53caa7d986ff18bdcaa2f9e0bdf4",
+      "contextVersion": 1
+    },
+    "archetypes/overview/aircraft-deicing-holdover-control-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/aircraft-deicing-holdover-control-board/en.md",
+      "sourceHash": "545117737cb0e1211ab63798d7c62b8cc809302ab79b2c09b894ae3b512b784d",
+      "contextVersion": 1
+    },
+    "archetypes/overview/autonomous-vehicle-remote-assistance-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/autonomous-vehicle-remote-assistance-console/en.md",
+      "sourceHash": "3ff8b9bf9972519b1fae07439c224b2e421978d3821183e6d8f30b2b9126f163",
+      "contextVersion": 1
+    },
+    "archetypes/overview/benchmark-comparison-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/benchmark-comparison-overview/en.md",
+      "sourceHash": "8e00201400f862f9c85f14e14d0eff15fe710e21220af26a415779c5d8e7bc5a",
+      "contextVersion": 1
+    },
+    "archetypes/overview/bridge-contribution-waterfall-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/bridge-contribution-waterfall-overview/en.md",
+      "sourceHash": "828223b1fe05468581d1826e7f4f4162614102183842068a724e0fe96b200b61",
+      "contextVersion": 1
+    },
+    "archetypes/overview/capacity-allocation-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/capacity-allocation-overview/en.md",
+      "sourceHash": "c2d75730abba1a67ea5c79acba5419b9510e476ffd3a909b9a410045a1695732",
+      "contextVersion": 1
+    },
+    "archetypes/overview/cohort-retention-grid/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/cohort-retention-grid/en.md",
+      "sourceHash": "193fc4128dd822e25e27c8604ef96915096c4e8b47d333aa0844ab1cc0c495bc",
+      "contextVersion": 1
+    },
+    "archetypes/overview/consensus-replication-state-monitor/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/consensus-replication-state-monitor/en.md",
+      "sourceHash": "5c0f47fefe778bc0126f01c3fbe76465738bdc17c3074f53ae71f40b88e77b2d",
+      "contextVersion": 1
+    },
+    "archetypes/overview/dependency-topology-monitor/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/dependency-topology-monitor/en.md",
+      "sourceHash": "5281914354db2077a767fc9a86cc37ce707fab32c36b1333a3fc10668e326952",
+      "contextVersion": 1
+    },
+    "archetypes/overview/distributed-trace-waterfall-monitor/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/distributed-trace-waterfall-monitor/en.md",
+      "sourceHash": "82abc4dca3cad52aa2e2f447b51d21a62016457755960f445fedbc882aa352a9",
+      "contextVersion": 1
+    },
+    "archetypes/overview/editorial-rundown-control-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/editorial-rundown-control-board/en.md",
+      "sourceHash": "2ecb60a850b2dcc78b6112dbfb8240305218664823f1bcb661db8e266f14c94c",
+      "contextVersion": 1
+    },
+    "archetypes/overview/event-stream-partition-lag-inspector/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/event-stream-partition-lag-inspector/en.md",
+      "sourceHash": "dd4411d08e5ef5802efdadcc673940358ee3f83cc821ec05ff56afaed542ac07",
+      "contextVersion": 1
+    },
+    "archetypes/overview/funnel-path-analysis/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/funnel-path-analysis/en.md",
+      "sourceHash": "770cf31cb8523c065f9722113bc98250a2c5d1d548d5861ce366d82afb1c3a2a",
+      "contextVersion": 1
+    },
+    "archetypes/overview/goal-cascade-progress/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/goal-cascade-progress/en.md",
+      "sourceHash": "69de586f451cb19ffa1ab0892e63e9ae2e9c19a8782ca29e9ffeacb297f6193c",
+      "contextVersion": 1
+    },
+    "archetypes/overview/live-operations-command-center/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/live-operations-command-center/en.md",
+      "sourceHash": "65216a21cb060a342e78a282144cc809b069511ca2eda659f186baad34a41a13",
+      "contextVersion": 1
+    },
+    "archetypes/overview/map-led-situation-monitor/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/map-led-situation-monitor/en.md",
+      "sourceHash": "e50e14f698ea4345e8b7970c724a9ecf84de0dfb1f1fe64b0b7b500fde12f39c",
+      "contextVersion": 1
+    },
+    "archetypes/overview/market-depth-order-entry-monitor/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/market-depth-order-entry-monitor/en.md",
+      "sourceHash": "8aebbf328ef7741b2116bc47ce2a42681b1193037a083610dec5a568a37428cf",
+      "contextVersion": 1
+    },
     "archetypes/overview/overview-dashboard/context.md": {
       "kind": "module",
       "source": "archetypes/overview/overview-dashboard/en.md",
       "sourceHash": "558dcdfd8e6b70fcd82e356ba5487a5d16e5af5b14529b99a7f1837548617df2",
+      "contextVersion": 1
+    },
+    "archetypes/overview/passenger-connection-protection-decision-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/passenger-connection-protection-decision-board/en.md",
+      "sourceHash": "08f01468032da81f6e54fe1a3d8703107a36bf3db9d10fe742a7a29a8b62519f",
+      "contextVersion": 1
+    },
+    "archetypes/overview/portfolio-health-matrix/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/portfolio-health-matrix/en.md",
+      "sourceHash": "4323620c5c9372cf86632ca729596961646f80137a147fa9f1023433a16558d7",
+      "contextVersion": 1
+    },
+    "archetypes/overview/process-variant-mining-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/process-variant-mining-overview/en.md",
+      "sourceHash": "3537cc192a12f89cfaf83f34c19d2a6a4bc655784358bb7250738818d5fc1ce6",
+      "contextVersion": 1
+    },
+    "archetypes/overview/risk-bow-tie-control-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/risk-bow-tie-control-overview/en.md",
+      "sourceHash": "48acc066b12703f450b8f3da822f9d2c36ccfba96ab095ce6e6cbcc3991ca5a9",
+      "contextVersion": 1
+    },
+    "archetypes/overview/risk-impact-likelihood-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/risk-impact-likelihood-overview/en.md",
+      "sourceHash": "364a95a80ec36dd9a775d8b97b99bf35d5bd456adc1edf03c79ed84ec56bf3fc",
+      "contextVersion": 1
+    },
+    "archetypes/overview/slo-error-budget-burn-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/slo-error-budget-burn-console/en.md",
+      "sourceHash": "9c3a760539974ca7369e801acf1a6f9b3f98c0777ce1fc528da120a4c9a147cc",
+      "contextVersion": 1
+    },
+    "archetypes/overview/statistical-process-control-overview/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/statistical-process-control-overview/en.md",
+      "sourceHash": "257986abec719aa43f15da7639f95dd1bceb909e059edae0ab7a0b371ab387c7",
+      "contextVersion": 1
+    },
+    "archetypes/overview/timeline-status-monitor/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/timeline-status-monitor/en.md",
+      "sourceHash": "309da76d29bca7f38a26d16308a28af69cf92484602ad53287a5aed3be4a27cb",
+      "contextVersion": 1
+    },
+    "archetypes/settings/configuration-dependency-resolver/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/configuration-dependency-resolver/en.md",
+      "sourceHash": "9e0c5c1761167fadf89a7b2ff2d44b68b51d227edc44559b7a9e82e816b8497e",
+      "contextVersion": 1
+    },
+    "archetypes/settings/constrained-quota-allocation-editor/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/constrained-quota-allocation-editor/en.md",
+      "sourceHash": "e06731b3b75390bc2b407a402d51518c08fc22b9e23119ad2286ef33d9729a48",
+      "contextVersion": 1
+    },
+    "archetypes/settings/credential-rotation-cutover-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/credential-rotation-cutover-console/en.md",
+      "sourceHash": "1ec986c6fb9b484a70037d496e9d26fd24cbdaad8d2badc98090324ccfe04dfd",
+      "contextVersion": 1
+    },
+    "archetypes/settings/cross-scope-access-conflict-resolver/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/cross-scope-access-conflict-resolver/en.md",
+      "sourceHash": "1b72fd979567bcbec87d4fb0d48a120f9800d626242d6073d5db88d700141a9f",
+      "contextVersion": 1
+    },
+    "archetypes/settings/delegated-access-lifecycle-manager/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/delegated-access-lifecycle-manager/en.md",
+      "sourceHash": "48f8891d6d13c03cf59ef378893ab1f3b6752348b62be038a128ffd85c126ef4",
+      "contextVersion": 1
+    },
+    "archetypes/settings/effective-setting-provenance-inspector/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/effective-setting-provenance-inspector/en.md",
+      "sourceHash": "a6ebd25526add077be9b1ec37e35643463d774108db7ed7b99f64983ae4937aa",
+      "contextVersion": 1
+    },
+    "archetypes/settings/independent-preference-autosave-center/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/independent-preference-autosave-center/en.md",
+      "sourceHash": "95ad8bb0c99b091d67b8d7b062d0708f6a747aaffa5bc58bf36f33cc2faa6f0a",
+      "contextVersion": 1
+    },
+    "archetypes/settings/retention-disposition-policy-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/settings/retention-disposition-policy-planner/en.md",
+      "sourceHash": "3ab6310c138ac7266a05939f076dde33c303b556b52dbb20ce42116f41a26410",
+      "contextVersion": 1
+    },
+    "archetypes/support/active-session-threat-containment/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/active-session-threat-containment/en.md",
+      "sourceHash": "97223157e90efb7bfeda7d71cb33509b07451f262458aed817d57076f9e9bdc6",
+      "contextVersion": 1
+    },
+    "archetypes/support/certificate-trust-path-validator/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/certificate-trust-path-validator/en.md",
+      "sourceHash": "c6e57635327f4ce2072ea7263a28c830582990b3d9eb56990d8dfb6c9557c22f",
+      "contextVersion": 1
+    },
+    "archetypes/support/communication-delivery-recovery-center/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/communication-delivery-recovery-center/en.md",
+      "sourceHash": "1b61273d0b15fea8cec57ca5ac594a735c641666fafa1e56ea850f65927e2e7e",
+      "contextVersion": 1
+    },
+    "archetypes/support/diagnostic-evidence-bundle-review/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/diagnostic-evidence-bundle-review/en.md",
+      "sourceHash": "1dff4558e14ff25dd2ea16a7d6e9996bb98367fd4142b9bc606b025fc6491309",
+      "contextVersion": 1
+    },
+    "archetypes/support/dns-resolution-path-inspector/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/dns-resolution-path-inspector/en.md",
+      "sourceHash": "234c8f63a522d72d275cc9a126d7462a6e2f0bf828e5b3d5506677dcbf739bbb",
+      "contextVersion": 1
+    },
+    "archetypes/support/interactive-code-example-lab/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/interactive-code-example-lab/en.md",
+      "sourceHash": "bd3df0ab19e522bdca8b675e81e8dae4e2f02d1b060c67356d171e6a93ea4b62",
+      "contextVersion": 1
+    },
+    "archetypes/support/interrupted-service-continuity-router/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/interrupted-service-continuity-router/en.md",
+      "sourceHash": "162a365848e5238efa9fcbf3f130486d5d838d9581254e6ffcbae8ff27351431",
+      "contextVersion": 1
+    },
+    "archetypes/support/live-support-session-room/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/live-support-session-room/en.md",
+      "sourceHash": "56fc93f16a4a9c067a29e4f975017e498c6f45e5d44453d59f3636beb85d9c22",
+      "contextVersion": 1
+    },
+    "archetypes/support/support-handoff-redaction-review/context.md": {
+      "kind": "module",
+      "source": "archetypes/support/support-handoff-redaction-review/en.md",
+      "sourceHash": "1ecddc41170218d6828ff29a8739c3bd83fd028257449aedcd6395dea17fb742",
+      "contextVersion": 1
+    },
+    "archetypes/system/offline-draft-preservation-recovery/context.md": {
+      "kind": "module",
+      "source": "archetypes/system/offline-draft-preservation-recovery/en.md",
+      "sourceHash": "f436ef2ffe69d57df22bfe922f20a1c44995b7c800036ca04b8ed8b43f14d7dc",
       "contextVersion": 1
     },
     "archetypes/task/centered-single-task/context.md": {
@@ -29,16 +785,1030 @@
       "sourceHash": "f76a22ecb92099194efdd3cef2281a5c0474ab37e3b50e5d98d88db76d8423ce",
       "contextVersion": 1
     },
+    "archetypes/work/air-traffic-separation-resolution-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/air-traffic-separation-resolution-console/en.md",
+      "sourceHash": "c0a5e23648e946cb231fa9aef40a75643bf666aefc883c276df37bb084587e71",
+      "contextVersion": 1
+    },
+    "archetypes/work/aircraft-defect-deferral-disposition-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/aircraft-defect-deferral-disposition-workbench/en.md",
+      "sourceHash": "f849b215203bfd8a941822dc06d41ab478e68dfc45194214a37d8c8edf5c4260",
+      "contextVersion": 1
+    },
+    "archetypes/work/airspace-volume-deconfliction-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/airspace-volume-deconfliction-planner/en.md",
+      "sourceHash": "379221edf3c43bf8649fc277b8f13a41b60d15d84fb19baeb87759707f3b7d76",
+      "contextVersion": 1
+    },
+    "archetypes/work/antimicrobial-susceptibility-interpretation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/antimicrobial-susceptibility-interpretation-workbench/en.md",
+      "sourceHash": "3e9f783be0f00847e8078c39ebfeb41476332b03594127026f6c473b05bb2236",
+      "contextVersion": 1
+    },
+    "archetypes/work/archaeological-fragment-refit-assembly-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/archaeological-fragment-refit-assembly-workbench/en.md",
+      "sourceHash": "792bf2d7194f364c65246cb7420f5930ed99da9b15d726c62676e618784d78c3",
+      "contextVersion": 1
+    },
+    "archetypes/work/archaeological-stratigraphic-phasing-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/archaeological-stratigraphic-phasing-workbench/en.md",
+      "sourceHash": "d1d3aa1101b6fea8667aab4b63e516cb538bf9bca5664caefcd99b00c930525d",
+      "contextVersion": 1
+    },
+    "archetypes/work/assessment-item-calibration-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/assessment-item-calibration-workbench/en.md",
+      "sourceHash": "ae10fb1828b9ac85aa284fee45743339b0c516d1827ced0cc177d785a8e21f12",
+      "contextVersion": 1
+    },
     "archetypes/work/assessment-workbench/context.md": {
       "kind": "module",
       "source": "archetypes/work/assessment-workbench/en.md",
       "sourceHash": "5f9c700098f7cbb415e82a459f382a016341ef157eee360769d69d2574e84cf2",
       "contextVersion": 1
     },
+    "archetypes/work/astronomical-observation-sequence-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/astronomical-observation-sequence-planner/en.md",
+      "sourceHash": "746cf4d3bd8211ccffd4b40327b2b2c62bb84fc258d27960c57d893740bc48f8",
+      "contextVersion": 1
+    },
+    "archetypes/work/audio-mix-routing-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/audio-mix-routing-console/en.md",
+      "sourceHash": "0bbf57eed88fb41e79b6a35d9d74e86a1b3334fed5a1363189e09c474acdfc77",
+      "contextVersion": 1
+    },
+    "archetypes/work/aviation-crew-pairing-legality-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/aviation-crew-pairing-legality-workbench/en.md",
+      "sourceHash": "fb5c8fab7e9ec09538adbd7655d0f50a1990d251b600024b213b7cf46a7db098",
+      "contextVersion": 1
+    },
+    "archetypes/work/bank-regulatory-capital-rwa-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/bank-regulatory-capital-rwa-workbench/en.md",
+      "sourceHash": "3644b33e3fb5b9a79f35267a3ff4608a6bbfe98d8055e536a29e422c0c4cd189",
+      "contextVersion": 1
+    },
+    "archetypes/work/batch-table-operations/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/batch-table-operations/en.md",
+      "sourceHash": "877bda773f2245a6f0628a1e66e1b9cfab6ed1c6b93c9fa90109c9b6761e90fa",
+      "contextVersion": 1
+    },
+    "archetypes/work/bookbinding-collation-structure-reconstruction-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/bookbinding-collation-structure-reconstruction-workbench/en.md",
+      "sourceHash": "33232024d87a96d3e401a3fa4d39c922ee0d30a001cac3c5778ca95125abe462",
+      "contextVersion": 1
+    },
+    "archetypes/work/braille-translation-contraction-proof-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/braille-translation-contraction-proof-workbench/en.md",
+      "sourceHash": "763fb3953776eb90da59cd54380c4b17a7fc742f1e43b5f0fb3b7c68547b4612",
+      "contextVersion": 1
+    },
+    "archetypes/work/bridge-defect-load-rating-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/bridge-defect-load-rating-workbench/en.md",
+      "sourceHash": "2fd9596acedf14f4be46d53109e7ce303e219617926c43d9c63e9f5795cd42aa",
+      "contextVersion": 1
+    },
+    "archetypes/work/building-retrofit-measure-bundle-modeler/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/building-retrofit-measure-bundle-modeler/en.md",
+      "sourceHash": "9b129c6ed7f29f08f76d66879cc3681ac02f7896441ec3fcc332235832aac47b",
+      "contextVersion": 1
+    },
+    "archetypes/work/calendar-resource-scheduler/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/calendar-resource-scheduler/en.md",
+      "sourceHash": "390e0cd97296d726f47afd8803c5d0b571771f4657734b38c8f5b711173a227f",
+      "contextVersion": 1
+    },
+    "archetypes/work/canvas-inspector-studio/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/canvas-inspector-studio/en.md",
+      "sourceHash": "e081ce2beddaf68e91b37fc834065c5695cee5f8751dba73ea976e6985a7b1d7",
+      "contextVersion": 1
+    },
+    "archetypes/work/capitalization-dilution-event-modeler/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/capitalization-dilution-event-modeler/en.md",
+      "sourceHash": "7a4c256490335dfdb8ee3a1281cb1eb39eef7d868c950e18df67c988d0adfcc5",
+      "contextVersion": 1
+    },
+    "archetypes/work/cardiac-electrophysiology-ablation-map-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/cardiac-electrophysiology-ablation-map-workbench/en.md",
+      "sourceHash": "3a647ee604f2e86e693b99afc20913d9b9c43e25db8e72b57f387ae4ec21c11e",
+      "contextVersion": 1
+    },
+    "archetypes/work/chart-specification-authoring-studio/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/chart-specification-authoring-studio/en.md",
+      "sourceHash": "bd150f485024d7605c5036673e0bf15ad776c27280a8458c7f81a4f888c5fa7b",
+      "contextVersion": 1
+    },
+    "archetypes/work/cinema-focus-pull-depth-of-field-rehearsal-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/cinema-focus-pull-depth-of-field-rehearsal-workbench/en.md",
+      "sourceHash": "92e4ee464d2ec71b88f94a774bceeff801ee6ce79d2e09545682256db9bedda8",
+      "contextVersion": 1
+    },
+    "archetypes/work/circular-sequence-construct-designer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/circular-sequence-construct-designer/en.md",
+      "sourceHash": "835ccc4107226558625b3facfa9220dbe0921e065d7d0fb675da3d9324f93c2f",
+      "contextVersion": 1
+    },
+    "archetypes/work/claims-development-triangle-reserving-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/claims-development-triangle-reserving-workbench/en.md",
+      "sourceHash": "80e5e22dec3bd27202ba3d434aca9e842cca1345bd8dcf87a0cde05c4da8c4b4",
+      "contextVersion": 1
+    },
+    "archetypes/work/clinical-differential-test-strategy-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/clinical-differential-test-strategy-workbench/en.md",
+      "sourceHash": "086cfd417ebc3351ece19a066428297e3ac9afb86cbdebec4080eedfb9fbdf9c",
+      "contextVersion": 1
+    },
+    "archetypes/work/clinical-trial-safety-signal-triage/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/clinical-trial-safety-signal-triage/en.md",
+      "sourceHash": "ab9532497c2155ba325aa39328a54e80e5abf225f0b01647657b6848a35b6bc6",
+      "contextVersion": 1
+    },
+    "archetypes/work/collaborative-ideation-convergence-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/collaborative-ideation-convergence-board/en.md",
+      "sourceHash": "65694f4d79ce01cdfdb9ce789e1286619be41a25e26c12d59339a6a66971c0f5",
+      "contextVersion": 1
+    },
+    "archetypes/work/collateral-margin-call-substitution-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/collateral-margin-call-substitution-workbench/en.md",
+      "sourceHash": "8fd56ce53accade986685e60b7b85d959e77f7bcfb021947a8195b238dadf0ef",
+      "contextVersion": 1
+    },
+    "archetypes/work/collective-bargaining-package-negotiation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/collective-bargaining-package-negotiation-workbench/en.md",
+      "sourceHash": "ffbd78460042773cd5b9e28805840eafec0488974abab5cffb662e64dcdb72be",
+      "contextVersion": 1
+    },
+    "archetypes/work/conflict-of-interest-recusal-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/conflict-of-interest-recusal-workbench/en.md",
+      "sourceHash": "ae5ec4f3cf71d78825a132d7a3413e19f71a3698f0106c570359ccf0d98ce14f",
+      "contextVersion": 1
+    },
+    "archetypes/work/constraint-solver-unsat-core-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/constraint-solver-unsat-core-explorer/en.md",
+      "sourceHash": "ba8ab31a26ba201e12a0719e51abfc9b8691d53a12d648dfdf2c689f6104f282",
+      "contextVersion": 1
+    },
+    "archetypes/work/contaminated-site-linkage-remediation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/contaminated-site-linkage-remediation-workbench/en.md",
+      "sourceHash": "fd25737a37410fff76920fa9bf20b50a0f3aeb48640b7f7c095d1922a31e8eed",
+      "contextVersion": 1
+    },
+    "archetypes/work/control-assurance-testing-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/control-assurance-testing-workbench/en.md",
+      "sourceHash": "a57b5c9cda7cb97684624834d682c2d3bfd0ce9b96091fde0fcf83055c1bd83f",
+      "contextVersion": 1
+    },
+    "archetypes/work/conversation-room/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/conversation-room/en.md",
+      "sourceHash": "04a38dc495e7700bacdad82e59f29bb1d12182d3d3b1559dbaf2d014ce8af6d7",
+      "contextVersion": 1
+    },
+    "archetypes/work/corporate-action-election-entitlement-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/corporate-action-election-entitlement-workbench/en.md",
+      "sourceHash": "abddaf4b4c267a151e895c644483ec7c471b0db8232626b59d1b0015cc62d5eb",
+      "contextVersion": 1
+    },
+    "archetypes/work/critical-path-project-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/critical-path-project-planner/en.md",
+      "sourceHash": "658325f938297d1ccc8c78e37394f4e2e602a56d41c81be75bc45a3933524143",
+      "contextVersion": 1
+    },
+    "archetypes/work/cross-framework-traceability-mapper/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/cross-framework-traceability-mapper/en.md",
+      "sourceHash": "e6e4ff46bbc282ce54b737f4ed1b6a3eb6a4edbe77545ba54bcdca19ec9350a1",
+      "contextVersion": 1
+    },
+    "archetypes/work/customs-origin-valuation-duty-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/customs-origin-valuation-duty-workbench/en.md",
+      "sourceHash": "7f6cea05a80b8ea7c119bc5e0a0b55b975a5d39618c81b53fa0f4c56ee231ea1",
+      "contextVersion": 1
+    },
+    "archetypes/work/cycle-count-variance-reconciliation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/cycle-count-variance-reconciliation-workbench/en.md",
+      "sourceHash": "ba0b96e572791560cf4c20ef97f8e7a0431e054c0bf4b75c373184b600c7f96c",
+      "contextVersion": 1
+    },
+    "archetypes/work/cytogenetic-karyotype-assembly-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/cytogenetic-karyotype-assembly-workbench/en.md",
+      "sourceHash": "0bb05c7d36d34f02e33691c7ee1cb2081c16904b1a3df48fccafdc8fa8eb1b8e",
+      "contextVersion": 1
+    },
+    "archetypes/work/derivative-rate-reset-cashflow-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/derivative-rate-reset-cashflow-workbench/en.md",
+      "sourceHash": "f61d955908b2d63f2102bc55196952a4e6c73acbb606aa2d887201ffacb0baff",
+      "contextVersion": 1
+    },
+    "archetypes/work/derivatives-portfolio-compression-cycle-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/derivatives-portfolio-compression-cycle-workbench/en.md",
+      "sourceHash": "9e697115ce8e788a19b22f99e752963c36b0ff01c406572662423df71388f793",
+      "contextVersion": 1
+    },
+    "archetypes/work/dialysis-prescription-delivery-reconciliation/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/dialysis-prescription-delivery-reconciliation/en.md",
+      "sourceHash": "4bd0301829b111e6872d51a0d1d1f6c025a10bec8c598b0d68b6ff01b825fec0",
+      "contextVersion": 1
+    },
+    "archetypes/work/distributed-energy-interconnection-study-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/distributed-energy-interconnection-study-workbench/en.md",
+      "sourceHash": "51a9be78fa1ad5f0f4f3e417bc053332f7d3b76c69261cb360b29cdfd1055a17",
+      "contextVersion": 1
+    },
+    "archetypes/work/dock-yard-door-dispatch-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/dock-yard-door-dispatch-board/en.md",
+      "sourceHash": "d72b27a4b56ba290cb12c0b6c953005e821c441b708cf5619e2896aa0805dec8",
+      "contextVersion": 1
+    },
+    "archetypes/work/document-outline-editor/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/document-outline-editor/en.md",
+      "sourceHash": "0c655a421c7892af84b42a29efb51168f57759c44bfd781289415ab054c30017",
+      "contextVersion": 1
+    },
+    "archetypes/work/double-entry-journal-posting-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/double-entry-journal-posting-workbench/en.md",
+      "sourceHash": "e0a77857e34bf92f3bac10b878a11f3ff9ac63b9187230f1866f1251ab2e4200",
+      "contextVersion": 1
+    },
+    "archetypes/work/driver-duty-rest-compliance-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/driver-duty-rest-compliance-planner/en.md",
+      "sourceHash": "53cdca095a81412adb8b43a731bd763e6de6434790b33cefabf006ca2cd0ab9d",
+      "contextVersion": 1
+    },
+    "archetypes/work/dual-list-transfer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/dual-list-transfer/en.md",
+      "sourceHash": "71b9e9db84943f8ff8d47fbf1b2bd481ce6322d6ec934568379a5c468ae2c0e3",
+      "contextVersion": 1
+    },
+    "archetypes/work/earthwork-cut-fill-mass-haul-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/earthwork-cut-fill-mass-haul-planner/en.md",
+      "sourceHash": "5f3c5c3ff08d02f684383c00fd943a9bb9f0447990f3e0da83677f1c44b9a901",
+      "contextVersion": 1
+    },
+    "archetypes/work/entity-resolution-cluster-adjudicator/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/entity-resolution-cluster-adjudicator/en.md",
+      "sourceHash": "303371ee270bba68cf3ac77050e61d3c344522a6e9e83d8e8b7f12622bc224c2",
+      "contextVersion": 1
+    },
+    "archetypes/work/event-stream-replay-projection-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/event-stream-replay-projection-workbench/en.md",
+      "sourceHash": "f05bf39d6edc5850614b3d05e2b8e24623d9a5e595b0f8c088e21e97c3df580d",
+      "contextVersion": 1
+    },
+    "archetypes/work/evidence-extraction-synthesis-matrix/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/evidence-extraction-synthesis-matrix/en.md",
+      "sourceHash": "6af49ffd7193bd3245d21049aad6d9e1e41a2ae782630dc826502bf70032d8ca",
+      "contextVersion": 1
+    },
+    "archetypes/work/exchange-volatility-auction-reopening-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/exchange-volatility-auction-reopening-console/en.md",
+      "sourceHash": "99bc8b155eedee04815bce4953c41ac4506096d4474beabd701fc1115872a851",
+      "contextVersion": 1
+    },
+    "archetypes/work/experiment-randomization-design-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/experiment-randomization-design-planner/en.md",
+      "sourceHash": "4f11291bf0fad5aeb5d184b02f75f83f1f8ae51635e51e203d79943ac1a520cc",
+      "contextVersion": 1
+    },
+    "archetypes/work/finite-element-mesh-convergence-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/finite-element-mesh-convergence-workbench/en.md",
+      "sourceHash": "572c1af2d61ce46934d15fe590325549a8c27d55cd541a6eb2c60961ba3d965e",
+      "contextVersion": 1
+    },
+    "archetypes/work/fleet-route-dispatch-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/fleet-route-dispatch-planner/en.md",
+      "sourceHash": "eb82768b16fedc93746c8dbf4e32277d274d047eba99fe9959544244f0b8beab",
+      "contextVersion": 1
+    },
+    "archetypes/work/flight-procedure-obstacle-clearance-designer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/flight-procedure-obstacle-clearance-designer/en.md",
+      "sourceHash": "5867b846bb1f8527bbc9a03237fc307cd4b4e8784b105bf5f774daffeb02b534",
+      "contextVersion": 1
+    },
+    "archetypes/work/flow-cytometry-gating-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/flow-cytometry-gating-workbench/en.md",
+      "sourceHash": "ef5e01b9b88474e86f0616d292b189e66fe2350eee9d7a45ecb9eeb878f28e6f",
+      "contextVersion": 1
+    },
+    "archetypes/work/formal-proof-obligation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/formal-proof-obligation-workbench/en.md",
+      "sourceHash": "89e54955d9eceaf60246603c58777150b8942c208f17366e101408c6ab7bb468",
+      "contextVersion": 1
+    },
+    "archetypes/work/fund-nav-strike-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/fund-nav-strike-workbench/en.md",
+      "sourceHash": "73892bc2487a491b9dd2004a2872f38fcac773c20fa57dc2c1fcaede0132c416",
+      "contextVersion": 1
+    },
+    "archetypes/work/geospatial-raster-layer-analysis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/geospatial-raster-layer-analysis-workbench/en.md",
+      "sourceHash": "7949266bd870bf0b2bf40387deecc26ba5ce815b7ec3bf093d2dabe89b10e0ca",
+      "contextVersion": 1
+    },
+    "archetypes/work/greenhouse-gas-inventory-consolidation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/greenhouse-gas-inventory-consolidation-workbench/en.md",
+      "sourceHash": "5d43927c40e248b1a06de58d81530e24869578375d00e2b7e3183499ce931847",
+      "contextVersion": 1
+    },
+    "archetypes/work/groundwater-wellfield-pumping-allocation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/groundwater-wellfield-pumping-allocation-workbench/en.md",
+      "sourceHash": "6c2039aa37d83a78ccc4aac34e35dcd74454d6874688671b05c7477f824fdf68",
+      "contextVersion": 1
+    },
+    "archetypes/work/haplotype-phase-block-curation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/haplotype-phase-block-curation-workbench/en.md",
+      "sourceHash": "ffcd673bc169aaf5031e86e2f3c56c4d365288866c1fd8b8fac40dce02f36621",
+      "contextVersion": 1
+    },
+    "archetypes/work/hedge-accounting-designation-rebalancing-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/hedge-accounting-designation-rebalancing-workbench/en.md",
+      "sourceHash": "5ef7ae48faaa5886a5296f58a6572f9fba3afbdc10b5de574f2ce17877690775",
+      "contextVersion": 1
+    },
+    "archetypes/work/heraldic-blazon-emblazonment-roundtrip-validator/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/heraldic-blazon-emblazonment-roundtrip-validator/en.md",
+      "sourceHash": "78dfcd0df875ffceb6a306217381d4cbe697ff9e0e4580eab2a80e62544f9182",
+      "contextVersion": 1
+    },
+    "archetypes/work/hereditary-variant-classification-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/hereditary-variant-classification-workbench/en.md",
+      "sourceHash": "d8642943d0a05afc3032ec184e32e0bec610611be5bb88a5a3f8f4e803f61136",
+      "contextVersion": 1
+    },
+    "archetypes/work/histopathology-slide-signout-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/histopathology-slide-signout-workbench/en.md",
+      "sourceHash": "1f4ba102d6699da6e3943b30566d7786d4c1db94d7a47d489a8a756f4e2b2eda",
+      "contextVersion": 1
+    },
+    "archetypes/work/immunization-catch-up-series-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/immunization-catch-up-series-planner/en.md",
+      "sourceHash": "7974ca2c6ce52b953de7d7ade7671975b0ad9958f12b15f95d141aa5320728a1",
+      "contextVersion": 1
+    },
+    "archetypes/work/implantable-cardiac-device-interrogation-programmer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/implantable-cardiac-device-interrogation-programmer/en.md",
+      "sourceHash": "2cb936b7c7a7939ac60b7dfe0321c458e61e8350bb6a341e40b0bfa2013c00f9",
+      "contextVersion": 1
+    },
+    "archetypes/work/industrial-symbiosis-exchange-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/industrial-symbiosis-exchange-planner/en.md",
+      "sourceHash": "30b6930aa2dedcf8ea774105cff9117ba2abd24de376e0530856c31555dfd03a",
+      "contextVersion": 1
+    },
+    "archetypes/work/infusion-titration-safety-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/infusion-titration-safety-console/en.md",
+      "sourceHash": "88947fa07cae52eef1693556981e23e76f99f178f3aef957efe950195ae514f5",
+      "contextVersion": 1
+    },
+    "archetypes/work/interlinear-gloss-morpheme-alignment-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/interlinear-gloss-morpheme-alignment-workbench/en.md",
+      "sourceHash": "5d98e5dbdf1adb1728e401b873e43ba18ecb35cb81857efe5af777890de72f3b",
+      "contextVersion": 1
+    },
+    "archetypes/work/inventory-replenishment-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/inventory-replenishment-planner/en.md",
+      "sourceHash": "6dc2085d302faa3405cb838918295f10e5c194c34d3910a8bc622c8673edbdcf",
+      "contextVersion": 1
+    },
+    "archetypes/work/kanban-swimlane-board/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/kanban-swimlane-board/en.md",
+      "sourceHash": "5a93adf2f79fb19fa36f65c63837648bc24f215d1c718f2ae026fafd2efb534f",
+      "contextVersion": 1
+    },
+    "archetypes/work/learning-evidence-portfolio-composer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/learning-evidence-portfolio-composer/en.md",
+      "sourceHash": "73e84ac241a9c902e6590a57e36797ac0447e65a6ccee11a8c9ac4f56a82699e",
+      "contextVersion": 1
+    },
+    "archetypes/work/literature-screening-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/literature-screening-workbench/en.md",
+      "sourceHash": "bdaddd15bc98046de65773c9196a28f3c79d0497d2f997aed6bc68f82c80cfb4",
+      "contextVersion": 1
+    },
+    "archetypes/work/load-and-balance-packing-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/load-and-balance-packing-workbench/en.md",
+      "sourceHash": "34fc7a5e7d191e1760d1a4fe389e6bfc7549fb9ca492194aa27c1e2211674849",
+      "contextVersion": 1
+    },
+    "archetypes/work/localization-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/localization-workbench/en.md",
+      "sourceHash": "1d4040ba2a6ba37165da64e814575eb5aa40fa2359250dace0558af0ab2f2dd0",
+      "contextVersion": 1
+    },
+    "archetypes/work/longitudinal-radiology-comparison-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/longitudinal-radiology-comparison-workbench/en.md",
+      "sourceHash": "2c264c0001a9df1c0159ed27df822d2918721c98ca63a3301c9b4cf3dcd3437c",
+      "contextVersion": 1
+    },
+    "archetypes/work/materials-disassembly-recovery-sequence-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/materials-disassembly-recovery-sequence-planner/en.md",
+      "sourceHash": "11d54484614506648b40e0dc76b0bfcaa675b77e13c1b95a8dbf8f533213fb11",
+      "contextVersion": 1
+    },
+    "archetypes/work/media-annotation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/media-annotation-workbench/en.md",
+      "sourceHash": "1488ab3b975462080d4c7cee7ceaa4fc68babb548affe80676a945cde739ea75",
+      "contextVersion": 1
+    },
+    "archetypes/work/memory-consistency-litmus-explorer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/memory-consistency-litmus-explorer/en.md",
+      "sourceHash": "9fb65f7731789d4b2443f1c38cd23ae9af77ef363f0e06144dfdbb87eeaac310",
+      "contextVersion": 1
+    },
+    "archetypes/work/mensural-notation-proportion-tactus-realization-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/mensural-notation-proportion-tactus-realization-workbench/en.md",
+      "sourceHash": "93a4535cc45186a8e21244aaa8fa23acd155feedea564173323f1a74b4a1697f",
+      "contextVersion": 1
+    },
+    "archetypes/work/microplate-dose-response-analysis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/microplate-dose-response-analysis-workbench/en.md",
+      "sourceHash": "c93fd82ed75bad7d88af879f7d308412dbc8717471fda9fbb565f374ee179062",
+      "contextVersion": 1
+    },
+    "archetypes/work/motion-capture-skeleton-retargeting-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/motion-capture-skeleton-retargeting-workbench/en.md",
+      "sourceHash": "3b9bac832973433cc7c66a7d13fa64d1241a63ca9b25d3f0c2df14c9fa14a1c4",
+      "contextVersion": 1
+    },
+    "archetypes/work/motion-picture-keycode-cut-list-conform-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/motion-picture-keycode-cut-list-conform-workbench/en.md",
+      "sourceHash": "b6fceddc1b186a742ba649e2f190f0538e06d37009c458258b37c56196ad11b9",
+      "contextVersion": 1
+    },
+    "archetypes/work/multi-party-consensus-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/multi-party-consensus-workbench/en.md",
+      "sourceHash": "d855ea545fc9e06fde458383b5ebc340ed410584ec8ee3e1cc59a672f2963a62",
+      "contextVersion": 1
+    },
+    "archetypes/work/multi-rendition-creative-adaptation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/multi-rendition-creative-adaptation-workbench/en.md",
+      "sourceHash": "723187f0efb3614e4d7d9e9d804c6cdcf570c8bbff963b8713706a85c71479e5",
+      "contextVersion": 1
+    },
+    "archetypes/work/multi-track-timeline-editor/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/multi-track-timeline-editor/en.md",
+      "sourceHash": "b1eb12db83fc0c971176656dd4befee5f36a61615f285c2cda6ab8a584c971f6",
+      "contextVersion": 1
+    },
+    "archetypes/work/multichannel-microscopy-analysis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/multichannel-microscopy-analysis-workbench/en.md",
+      "sourceHash": "7d35ce92f18ebf23df07e4b5bb28b170df5ebd3a7ff2588d2ef9586a6bfa2ec6",
+      "contextVersion": 1
+    },
+    "archetypes/work/multichannel-waveform-analysis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/multichannel-waveform-analysis-workbench/en.md",
+      "sourceHash": "b27ec88d396ba00af3b54a24e83b68d4c5f3dda90bc5afe31ef6f34b6514522d",
+      "contextVersion": 1
+    },
+    "archetypes/work/multicurrency-netting-settlement-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/multicurrency-netting-settlement-workbench/en.md",
+      "sourceHash": "afc26fb5519915fd5c0b8cb85c54173a7ec34f82034866acb27db083dc91127b",
+      "contextVersion": 1
+    },
+    "archetypes/work/musical-instrument-fingering-mechanism-mapper/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/musical-instrument-fingering-mechanism-mapper/en.md",
+      "sourceHash": "f201059e2ec54008182e9e51785b5cb7e384e32206cfc6bd90079a8d2dac0f77",
+      "contextVersion": 1
+    },
+    "archetypes/work/musical-temperament-beat-rate-tuning-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/musical-temperament-beat-rate-tuning-workbench/en.md",
+      "sourceHash": "9a5d15a3241d572c4217b55be273f7ac03d66c0c697b2a5ca0f17afcf643a6bf",
+      "contextVersion": 1
+    },
+    "archetypes/work/navigation-lock-chamber-interlock-control-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/navigation-lock-chamber-interlock-control-console/en.md",
+      "sourceHash": "f9f7c0fafecc41e6970a658ab4b29909de09e0e1aa54c3ce73830c6b3d385963",
+      "contextVersion": 1
+    },
+    "archetypes/work/numismatic-specimen-die-linkage-analyzer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/numismatic-specimen-die-linkage-analyzer/en.md",
+      "sourceHash": "bd7b27fa92191152459a28ca455ded4445b1a57c6c0d29a313f7dd3f1ec67646",
+      "contextVersion": 1
+    },
+    "archetypes/work/odontogram-treatment-charting-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/odontogram-treatment-charting-workbench/en.md",
+      "sourceHash": "330c36afe0ed90fc06e13ba9a4d9e7cb48c974e945cb35bf44fae380c61454bf",
+      "contextVersion": 1
+    },
     "archetypes/work/operational-collection-workbench/context.md": {
       "kind": "module",
       "source": "archetypes/work/operational-collection-workbench/en.md",
       "sourceHash": "7c958e1ca263895b45a50bc3b45ac8b2dfd939fab15fb89a35c638be0068168f",
+      "contextVersion": 1
+    },
+    "archetypes/work/orbital-conjunction-assessment-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/orbital-conjunction-assessment-workbench/en.md",
+      "sourceHash": "387e52bdb6242fa3ba778314e46700e6303496af79b21ab81adc09ff4d5f1f59",
+      "contextVersion": 1
+    },
+    "archetypes/work/organ-registration-coupler-piston-programmer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/organ-registration-coupler-piston-programmer/en.md",
+      "sourceHash": "73add281f8496d0baa2e83ccb252f7a70d70b5b5e96bd49dc075dcdecf315837",
+      "contextVersion": 1
+    },
+    "archetypes/work/palette-canvas-properties-builder/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/palette-canvas-properties-builder/en.md",
+      "sourceHash": "bde55ea70fc96c22180398a88b3050225998cf69bb2e6ca09843e5b82ca451b7",
+      "contextVersion": 1
+    },
+    "archetypes/work/passenger-disruption-reaccommodation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/passenger-disruption-reaccommodation-workbench/en.md",
+      "sourceHash": "4f07e83b7056ce8fa96ba5244eeac5c4884eb367a7aac484a7cb6613cfa51293",
+      "contextVersion": 1
+    },
+    "archetypes/work/pedigree-inheritance-risk-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/pedigree-inheritance-risk-workbench/en.md",
+      "sourceHash": "a7378917e57be6379e71d78fcf6f2dd64737fbb217f64874b9dc288de3a68783",
+      "contextVersion": 1
+    },
+    "archetypes/work/peer-instruction-revote-session/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/peer-instruction-revote-session/en.md",
+      "sourceHash": "9ac48517c1953b652254cef3631e8988b03939329d65193fee5563c8adac41c3",
+      "contextVersion": 1
+    },
+    "archetypes/work/performance-obligation-revenue-schedule-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/performance-obligation-revenue-schedule-workbench/en.md",
+      "sourceHash": "bd9188e10ae70b5c56b6707044ab632184ad20d3e657b0e1aedb8c113e530f19",
+      "contextVersion": 1
+    },
+    "archetypes/work/permissions-matrix/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/permissions-matrix/en.md",
+      "sourceHash": "09f1e5901aaa3959da29a80db60bff6621e57aa84dab56d47a2cd5dbc119ec1d",
+      "contextVersion": 1
+    },
+    "archetypes/work/permit-to-work-isolation-control-room/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/permit-to-work-isolation-control-room/en.md",
+      "sourceHash": "ec126cadccdb67b64cf5f86ed59c46c45eb0d635b489418fec82a92f70f636ca",
+      "contextVersion": 1
+    },
+    "archetypes/work/pivot-drilldown-analytics/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/pivot-drilldown-analytics/en.md",
+      "sourceHash": "49f8ab28c308a543c58962e7d81437e83176638cb7d28669eaad7ebaff9e9884",
+      "contextVersion": 1
+    },
+    "archetypes/work/poetry-meter-scansion-prosody-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/poetry-meter-scansion-prosody-workbench/en.md",
+      "sourceHash": "7d03eccb5bbe5b03f442666b910d797794db66c52f5468762f53098569bef648",
+      "contextVersion": 1
+    },
+    "archetypes/work/policy-obligation-authoring-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/policy-obligation-authoring-workbench/en.md",
+      "sourceHash": "d280deb559516250ef57cb0df3557ffa3b48fc1894f1e2d75512ac713d9a2128",
+      "contextVersion": 1
+    },
+    "archetypes/work/power-grid-state-estimation-residual-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/power-grid-state-estimation-residual-workbench/en.md",
+      "sourceHash": "a0ac4f5ee2e48bdc38da5fbd51aea1d3c05391efe7a83f7cef464938610b69fd",
+      "contextVersion": 1
+    },
+    "archetypes/work/power-system-protection-coordination-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/power-system-protection-coordination-workbench/en.md",
+      "sourceHash": "254b078e76f1c8a57f07a0d687a992bd29e11e0f99d5b71f3883dda2a5568fd8",
+      "contextVersion": 1
+    },
+    "archetypes/work/print-signature-imposition-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/print-signature-imposition-planner/en.md",
+      "sourceHash": "9f010b392b9b65d46df41ab08261a55fa1388af5f17f0973ae89237fab6d8e33",
+      "contextVersion": 1
+    },
+    "archetypes/work/process-mass-balance-analyzer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/process-mass-balance-analyzer/en.md",
+      "sourceHash": "aaad70fb10eca27213ace03a474ce3d95410e438a0241cc24da8fb16c09c2ec0",
+      "contextVersion": 1
+    },
+    "archetypes/work/product-life-cycle-impact-assessment-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/product-life-cycle-impact-assessment-workbench/en.md",
+      "sourceHash": "88b521ce45639a16d8d02c7cfd1f27802131e0f3da4e036fdf2a1d3f2f446800",
+      "contextVersion": 1
+    },
+    "archetypes/work/public-consultation-response-workspace/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/public-consultation-response-workspace/en.md",
+      "sourceHash": "1f7bcb4cdbaaefe54dd37dcfb2166e6140f07cba091c050c25ccdc6bfb4de438",
+      "contextVersion": 1
+    },
+    "archetypes/work/public-health-outbreak-hypothesis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/public-health-outbreak-hypothesis-workbench/en.md",
+      "sourceHash": "9a8e77f988938dabc0b02b2ce9a48c98157a3550dc5737efb2a8c0146283749e",
+      "contextVersion": 1
+    },
+    "archetypes/work/query-builder-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/query-builder-workbench/en.md",
+      "sourceHash": "2443c1ef58917e20c58ceaea0262e04087bd2da5efd136454d4b59efe75eb6ac",
+      "contextVersion": 1
+    },
+    "archetypes/work/radio-frequency-interference-coordination-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/radio-frequency-interference-coordination-workbench/en.md",
+      "sourceHash": "193e816b227726338af7d523ed8a026ebe8b2f3f66a724242b91f338088d185c",
+      "contextVersion": 1
+    },
+    "archetypes/work/radiotherapy-contour-dose-plan-review/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/radiotherapy-contour-dose-plan-review/en.md",
+      "sourceHash": "965d47e4073a146e1a585b922eba243c4d877d70edf4c03cb263397228b67b7f",
+      "contextVersion": 1
+    },
+    "archetypes/work/rail-consist-inspection-release-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/rail-consist-inspection-release-workbench/en.md",
+      "sourceHash": "e283d1da676fc6263eb425efcd4c67323c8f0078f61955b8cf0adf9862c427b8",
+      "contextVersion": 1
+    },
+    "archetypes/work/rail-disruption-timetable-recovery-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/rail-disruption-timetable-recovery-workbench/en.md",
+      "sourceHash": "da266d3f590c0ab78a789aaf702da68627d6db339b401758855d9b98d43ee2db",
+      "contextVersion": 1
+    },
+    "archetypes/work/rail-possession-access-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/rail-possession-access-planner/en.md",
+      "sourceHash": "39af4174cebdbe9cd1923b62edc55a964a4ce9b1933d52703551f0f1f954fb44",
+      "contextVersion": 1
+    },
+    "archetypes/work/railway-movement-authority-control-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/railway-movement-authority-control-console/en.md",
+      "sourceHash": "b7cd5edf6cae3565eba88349f87de18188ce28ff5f858208da6788175309f89f",
+      "contextVersion": 1
+    },
+    "archetypes/work/ranked-choice-round-tabulation-audit/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/ranked-choice-round-tabulation-audit/en.md",
+      "sourceHash": "f102ff2c9752cb847d346ca3e93c4e697cf05b27aaaec2b9effbf38aef672830",
+      "contextVersion": 1
+    },
+    "archetypes/work/reconciliation-diff-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/reconciliation-diff-workbench/en.md",
+      "sourceHash": "f2aec026484fe102808d61fa1d4e12b58a4f86c9dcc7584b0100139b775eea84",
+      "contextVersion": 1
+    },
+    "archetypes/work/regulated-sample-selection-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/regulated-sample-selection-workbench/en.md",
+      "sourceHash": "7e4c81217c15cd706bea3be45eb684e6339624f6dabdaa54b66293efeca0d36a",
+      "contextVersion": 1
+    },
+    "archetypes/work/regulatory-comment-synthesis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/regulatory-comment-synthesis-workbench/en.md",
+      "sourceHash": "5fd9700ca029e2f23fee9a9633f23fd1f6a71ae96fbb03f737f6fcd36862d6ca",
+      "contextVersion": 1
+    },
+    "archetypes/work/reservoir-release-rule-curve-coordinator/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/reservoir-release-rule-curve-coordinator/en.md",
+      "sourceHash": "304f429d7553de0b169f7eef8215f00ae6fb1062202dda2a8bd0466047b93cf6",
+      "contextVersion": 1
+    },
+    "archetypes/work/retention-obligation-disposition-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/retention-obligation-disposition-workbench/en.md",
+      "sourceHash": "800de904b4dcf249ab57895c185ae8da9d18234ef3a5bdcc0d7c882826b459fc",
+      "contextVersion": 1
+    },
+    "archetypes/work/roll-call-quorum-threshold-determination-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/roll-call-quorum-threshold-determination-workbench/en.md",
+      "sourceHash": "d9b457353b8f22b4c35b0e3c94b23ff656825b6c794dc054cb98bc29809eb2b7",
+      "contextVersion": 1
+    },
+    "archetypes/work/rolling-stock-circulation-maintenance-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/rolling-stock-circulation-maintenance-planner/en.md",
+      "sourceHash": "91006770788ea73849d138c483be97b2f895a489fd8df6d2cee44b992d9c848d",
+      "contextVersion": 1
+    },
+    "archetypes/work/rule-builder-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/rule-builder-workbench/en.md",
+      "sourceHash": "e549a6caa8c23b0fa1f051c47ba8d572381bb70b9abbad33dd3a8074076d77d3",
+      "contextVersion": 1
+    },
+    "archetypes/work/scenario-sensitivity-modeler/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/scenario-sensitivity-modeler/en.md",
+      "sourceHash": "4e5c8fea11338287e4b9eac01347cfca2a36e0a6409a689034fb74c6f26679fa",
+      "contextVersion": 1
+    },
+    "archetypes/work/sealed-bid-multi-lot-award-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/sealed-bid-multi-lot-award-workbench/en.md",
+      "sourceHash": "c15cca71f2fe5d2678f8dfa39af598bddc600026970a73c353e607a79316969b",
+      "contextVersion": 1
+    },
+    "archetypes/work/search-and-rescue-coverage-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/search-and-rescue-coverage-planner/en.md",
+      "sourceHash": "70c0b561cdb1e91cb5afbafaec52f2c97afbb89062c9e64024157577a59e567b",
+      "contextVersion": 1
+    },
+    "archetypes/work/security-constrained-grid-dispatch-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/security-constrained-grid-dispatch-workbench/en.md",
+      "sourceHash": "4863a63c9f9c6aba48092c5e8c58771a6c382fafa530c080428445ca4f7f12ec",
+      "contextVersion": 1
+    },
+    "archetypes/work/serials-holdings-enumeration-gap-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/serials-holdings-enumeration-gap-workbench/en.md",
+      "sourceHash": "cafb256216fc30630ed7c81f8212e072c346b0c26c4ef12e4120ca12b5d3c7f4",
+      "contextVersion": 1
+    },
+    "archetypes/work/ship-mooring-line-load-sharing-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/ship-mooring-line-load-sharing-console/en.md",
+      "sourceHash": "b5a79a6f0845e4f07d08cc77c921f5f6e60de939c8c47c0b10d5f7a22621bd6e",
+      "contextVersion": 1
+    },
+    "archetypes/work/simultaneous-interpretation-channel-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/simultaneous-interpretation-channel-console/en.md",
+      "sourceHash": "aa654be7a406740c7c800a3ac696701f51d44b51201ec155ce6d752a5976793b",
+      "contextVersion": 1
+    },
+    "archetypes/work/software-regression-bisect-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/software-regression-bisect-workbench/en.md",
+      "sourceHash": "09103236bc4eee0ed8d41639867fc55edabe19488e9defa79ae3c2c91ddabde0",
+      "contextVersion": 1
+    },
+    "archetypes/work/spatial-change-detection-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/spatial-change-detection-workbench/en.md",
+      "sourceHash": "68103662aa3eb5228dc6746c1c8a3cdaf8ba661c6bc3799861b6ceebd8d45dfe",
+      "contextVersion": 1
+    },
+    "archetypes/work/spirometry-maneuver-quality-repeatability-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/spirometry-maneuver-quality-repeatability-workbench/en.md",
+      "sourceHash": "5733e3b1b3d57df5346a8b1381628ff897333d9cd6b2055e9cf940ac17fe2367",
+      "contextVersion": 1
+    },
+    "archetypes/work/spreadsheet-grid-editor/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/spreadsheet-grid-editor/en.md",
+      "sourceHash": "cb2819625b5b35d61af56dd8b99129c0b6bc885a65cc71b36e53df0169b669e5",
+      "contextVersion": 1
+    },
+    "archetypes/work/stormwater-catchment-control-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/stormwater-catchment-control-planner/en.md",
+      "sourceHash": "0ac805fdabbde77acbc38cc98f20483deffb1eb10d60f2e4dd48ff25cb80b30f",
+      "contextVersion": 1
+    },
+    "archetypes/work/storyboard-sequence-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/storyboard-sequence-planner/en.md",
+      "sourceHash": "84667607f2f0b2afacf0ea1bfdd4ded330777197769bd837f293710c723b51fe",
+      "contextVersion": 1
+    },
+    "archetypes/work/streaming-log-console/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/streaming-log-console/en.md",
+      "sourceHash": "1b84f141a26686c03eac89f08c98979548764f2cc41a666e45f2e27960e47884",
+      "contextVersion": 1
+    },
+    "archetypes/work/structure-spectrum-assignment-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/structure-spectrum-assignment-workbench/en.md",
+      "sourceHash": "ae73c9927da82d9c7775908d6e30529b79dd3f80bc6769c0b0f657efd666782e",
+      "contextVersion": 1
+    },
+    "archetypes/work/systematic-evidence-synthesis-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/systematic-evidence-synthesis-workbench/en.md",
+      "sourceHash": "e3a807db6c4f1271fca23975f3c1ba72d9a3903316261700edbabd21ce8bff6b",
+      "contextVersion": 1
+    },
+    "archetypes/work/taxonomy-facet-modeling-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/taxonomy-facet-modeling-workbench/en.md",
+      "sourceHash": "64fb1ca65a26a376075e39bb92bcdb79cda2292054faa291b34adbcb4cffd29f",
+      "contextVersion": 1
+    },
+    "archetypes/work/theatrical-counterweight-rigging-load-path-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/theatrical-counterweight-rigging-load-path-workbench/en.md",
+      "sourceHash": "97844023128f29ad77ebbe49f408dceb8e53df43867e2d505f82a764af16d3f7",
+      "contextVersion": 1
+    },
+    "archetypes/work/therapeutic-drug-monitoring-regimen-modeler/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/therapeutic-drug-monitoring-regimen-modeler/en.md",
+      "sourceHash": "fe0465959b6a519e6de7d638c6ac72a787e3af59ad71c76273f9a2aeada0b352",
+      "contextVersion": 1
+    },
+    "archetypes/work/traffic-signal-phase-timing-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/traffic-signal-phase-timing-workbench/en.md",
+      "sourceHash": "3165ca238e0086ed1f5490e5724594faa1f91af7ec30cd823244507dca307ab9",
+      "contextVersion": 1
+    },
+    "archetypes/work/transit-network-service-pattern-authoring-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/transit-network-service-pattern-authoring-workbench/en.md",
+      "sourceHash": "3a308f915e5e728fad937fb558767408273479f5e50d0ec3f58e29b3713dc0cc",
+      "contextVersion": 1
+    },
+    "archetypes/work/transport-demand-assignment-modeling-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/transport-demand-assignment-modeling-workbench/en.md",
+      "sourceHash": "7995dd2ddfea7ca274e942f6b771984d2791eb2e73b3f10b7e2ec49e72d77426",
+      "contextVersion": 1
+    },
+    "archetypes/work/treasury-cash-pool-sweep-orchestrator/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/treasury-cash-pool-sweep-orchestrator/en.md",
+      "sourceHash": "879b915e1af111f8f0dd279525e4b63ffa0869aa7c77ecfe6ebe26977bb38c0f",
+      "contextVersion": 1
+    },
+    "archetypes/work/treaty-reservation-depositary-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/treaty-reservation-depositary-workbench/en.md",
+      "sourceHash": "9549a1a819959edf2f8d36b07d454620f43382cb250ceba4975ebbd83df0972c",
+      "contextVersion": 1
+    },
+    "archetypes/work/typeface-glyph-metrics-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/typeface-glyph-metrics-workbench/en.md",
+      "sourceHash": "83d197371ee290e06fdfd104d3650c985bcd06be71f13db6db26815b5ed71ee8",
+      "contextVersion": 1
+    },
+    "archetypes/work/urban-heat-equity-intervention-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/urban-heat-equity-intervention-planner/en.md",
+      "sourceHash": "0a6c01723ecf7c005690351cb9bfeabe183db2360bddea0d9f4888733a22b5c6",
+      "contextVersion": 1
+    },
+    "archetypes/work/version-control-history-rewrite-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/version-control-history-rewrite-workbench/en.md",
+      "sourceHash": "67dacf693675bc0df068ffd468729f5f61f689c42ff2c07be64df45b25024171",
+      "contextVersion": 1
+    },
+    "archetypes/work/vessel-damage-stability-response-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/vessel-damage-stability-response-workbench/en.md",
+      "sourceHash": "c36da1278da60c6e45205716b2f33e962f89087a5510d1e2eaa32eff9b946b8d",
+      "contextVersion": 1
+    },
+    "archetypes/work/vinyl-side-sequencing-groove-budget-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/vinyl-side-sequencing-groove-budget-planner/en.md",
+      "sourceHash": "7a2d324ef55d9556205f864a654eab04ddb7e5abc32f791f95b4df5757f0df62",
+      "contextVersion": 1
+    },
+    "archetypes/work/warehouse-pick-wave-planner/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/warehouse-pick-wave-planner/en.md",
+      "sourceHash": "5a3bbaacde135cc484a4e64a598bfcdccee96472454fd1509f57bc1b99aedc71",
+      "contextVersion": 1
+    },
+    "archetypes/work/weaving-draft-liftplan-drawdown-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/weaving-draft-liftplan-drawdown-workbench/en.md",
+      "sourceHash": "e87199787c3815997bc62a488880bd232ccee416727641e67b1c8b3a908591fa",
+      "contextVersion": 1
+    },
+    "archetypes/work/well-to-well-liquid-transfer-programmer/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/well-to-well-liquid-transfer-programmer/en.md",
+      "sourceHash": "1f69985df44cc1efa8dcf726c27c9ca064dc782c2beb880ecbf29da6828bccd2",
+      "contextVersion": 1
+    },
+    "archetypes/work/workflow-automation-builder/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/workflow-automation-builder/en.md",
+      "sourceHash": "fcc131788836e43218a620972a272c055940e205892f08673f55b1ad8ed402bc",
+      "contextVersion": 1
+    },
+    "archetypes/work/xbrl-fact-context-dimensional-validation-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/xbrl-fact-context-dimensional-validation-workbench/en.md",
+      "sourceHash": "42058a4107dbfc912ba65864bfe09ccba97ff7db330d386cfa703d24172d013e",
+      "contextVersion": 1
+    },
+    "archetypes/work/zero-coupon-yield-curve-bootstrap-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/zero-coupon-yield-curve-bootstrap-workbench/en.md",
+      "sourceHash": "349bd7ed17ce790d8d6b325c0e2a2c2a9b0df77c1098743b299879c4fe8ad883",
       "contextVersion": 1
     },
     "brainstorms/blocks/context.md": {
@@ -987,6 +2757,48 @@
       "kind": "module",
       "source": "runbooks/secrets/en.md",
       "sourceHash": "ecbb19ffb10e84411e3f78a3c64396cec0852d92f3fae309f555b63a03fbd7fc",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/analysis/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/analysis/en.md",
+      "sourceHash": "5223021cb98351d269ed44dffe7d41ba60c14f0316ec11291699a4235e29860f",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/backend/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/backend/en.md",
+      "sourceHash": "28313da840def8a2037aca649a1eba73b37e97f21128b88a3910de5633c79941",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/design/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/design/en.md",
+      "sourceHash": "3fcb956120fbd576f093fd404b3324a2466949dfe12c981063ab7248506a4b16",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/operations/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/operations/en.md",
+      "sourceHash": "06689ac28ee1b1200c13c2d0c5a103759d54dca5ed8352f42bd4466099c1198c",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/provenance/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/provenance/en.md",
+      "sourceHash": "086879de2f7685bc75a1daddd62301b8177b63e0707945c1dcfad3d601def89d",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/quality/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/quality/en.md",
+      "sourceHash": "7c3ea6494fe1afda2cb8dd8a314ba6c96adea3e9ae8f2e76d2d2cf054b4327f1",
+      "contextVersion": 1
+    },
+    "skill-runtime/facades/workspace/context.md": {
+      "kind": "module",
+      "source": "skill-runtime/facades/workspace/en.md",
+      "sourceHash": "936ec4fbd16002dbd6ecb12af559e58b5684e9743a1836408e6e77b14dd62825",
       "contextVersion": 1
     },
     "skills/context.md": {

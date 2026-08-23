@@ -60,7 +60,7 @@ test("archetype HTML templates publish byte-identically through safe indexed pre
   const templateSources = filesBelow(archetypeSourceRoot)
     .filter((path) => basename(path) === "template.html")
     .sort();
-  assert.equal(templateSources.length, 5);
+  assert.equal(templateSources.length, 301);
 
   const component = readFileSync(
     join(docsRoot, "src", "components", "ArchetypeTemplatePreview", "index.js"),

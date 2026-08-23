@@ -1,0 +1,38 @@
+{
+  "$schema": "../facade.schema.json",
+  "schemaVersion": 1,
+  "facadeId": "provenance",
+  "kind": "semantic-skill-facade",
+  "executable": false,
+  "description": "Route provider-neutral conversation snapshot and FE or BE artifact provenance requests without treating raw transcripts as source authority.",
+  "modes": [
+    {
+      "id": "conversation",
+      "intent": "Record or query provider-neutral conversation and exact artifact provenance.",
+      "targetSkill": "starci-conversation-record",
+      "selectionFacts": ["OpenAI, ChatGPT, Codex, Anthropic, or Claude conversation provenance", "exact FE or BE artifact link", "snapshot or provenance query"],
+      "excludes": ["raw transcript committed to Git", "business truth extraction", "generic source search"]
+    }
+  ],
+  "permissions": {
+    "selectionOnly": true,
+    "writes": [],
+    "externalMutations": false,
+    "approvalTransfer": false
+  },
+  "dispatch": {
+    "loadsTargetSkill": false,
+    "startsTargetSeparately": true,
+    "targetOwnsApprovalAndProof": true,
+    "requiresOwnOrchestrationProfile": false
+  },
+  "output": {
+    "fields": ["facadeId", "mode", "targetSkill", "selectionReason", "unresolvedFacts", "invocationEnvelope"]
+  },
+  "stops": [
+    "project or artifact identity is unresolved",
+    "request would commit a raw transcript or secret",
+    "request treats conversation as business or source authority",
+    "request requires another capability owner"
+  ]
+}

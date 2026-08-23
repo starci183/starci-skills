@@ -2,12 +2,20 @@
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@skill-catalog` | `skill-runtime/catalog/catalog.json` | file | shortlist one semantic facade and route its exact mode to one physical skill before loading any skill body |
 
 ## Routes
 
-The twenty capability entries each live in their own capability folder as `SKILL.md`. Select them from their frontmatter
-descriptions and load exactly one binding entry unless the owner explicitly requests separate runs.
+The twenty capability entries each live in their own capability folder as `SKILL.md`. Use `@skill-catalog` first:
+select one of its seven semantic facades, then one exact mode, apply the declared exclusions and risk/read/write filters,
+and load only the routed physical skill. Full skill bodies do not participate in shortlisting. A facade is non-executable
+selection metadata; it transfers no approval, permission, proof or orchestration identity to its target.
+
+Exact skill names remain valid explicit routes. If catalog evidence cannot separate two modes, recover the missing
+observable fact instead of loading both skills. Rebuild the generated catalog from its overrides and physical
+frontmatter; never edit `catalog.json` by hand.
 
 `skill-shape/context.md` is shared runtime policy, not a capability entry. Every selected capability compiles its
 own `Run` or `Process` through that module's context-envelope and `Input → Transform → Output → Gate` contract.

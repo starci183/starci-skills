@@ -1,0 +1,83 @@
+{
+  "$schema": "../facade.schema.json",
+  "schemaVersion": 1,
+  "facadeId": "design",
+  "kind": "semantic-skill-facade",
+  "executable": false,
+  "description": "Classify frontend design intent and route it to one existing physical design skill without loading that skill or inheriting its permissions.",
+  "modes": [
+    {
+      "id": "layout",
+      "intent": "Create a complete new page or end-to-end frontend flow.",
+      "targetSkill": "starci-fe-design-layout",
+      "selectionFacts": ["new complete page", "new end-to-end flow", "page-impact anatomy"],
+      "excludes": ["exact micro correction", "component-only change in an unchanged parent"]
+    },
+    {
+      "id": "block",
+      "intent": "Add a component-impact block inside an unchanged complete parent.",
+      "targetSkill": "starci-fe-design-block",
+      "selectionFacts": ["component impact", "complete parent stays structurally unchanged"],
+      "excludes": ["page anatomy or journey change", "exact micro correction"]
+    },
+    {
+      "id": "refactor",
+      "intent": "Apply concrete frontend UI or flow feedback source-first.",
+      "targetSkill": "starci-fe-design-refactor",
+      "selectionFacts": ["concrete feedback", "bounded current product surface", "source-first correction"],
+      "excludes": ["new page", "cross-surface authority reconciliation"]
+    },
+    {
+      "id": "reconcile",
+      "intent": "Reconcile consistency across an explicitly closed set of existing surfaces.",
+      "targetSkill": "starci-fe-ui-reconcile",
+      "selectionFacts": ["multiple existing surfaces", "closed consumer set", "systemic consistency question"],
+      "excludes": ["single local correction", "new page"]
+    },
+    {
+      "id": "resolve",
+      "intent": "Audit accepted source-first design requests and learn the result into the smallest durable authority.",
+      "targetSkill": "starci-fe-design-resolve",
+      "selectionFacts": ["queued design request", "accepted source correction exists", "authority learning requested"],
+      "excludes": ["unimplemented feedback", "optional immutable Git reference refresh only"]
+    },
+    {
+      "id": "refresh-references",
+      "intent": "Refresh stale optional immutable Git references without changing durable grammar authority.",
+      "targetSkill": "starci-grammar-refresh-references",
+      "selectionFacts": ["optional immutable grammar references", "staleness audit and refresh only", "durable authority must remain byte-identical"],
+      "excludes": ["grammar fact or rule change", "product source change", "design request learning"]
+    }
+  ],
+  "preDispatch": {
+    "kind": "read-only-evidence",
+    "command": "python .claude/scripts/design-knowledge-query.py query",
+    "requiredArgs": ["--text"],
+    "optionalArgs": ["--route", "--project", "--grammar", "--profile", "--kind", "--top-k", "--index", "--rebuild-if-stale"],
+    "successExitCode": 0,
+    "stopExitCodes": [2, 3, 4],
+    "resultFields": ["schemaVersion", "query", "filters", "selected", "dependencyClosure", "provenance", "index"]
+  },
+  "permissions": {
+    "selectionOnly": true,
+    "writes": [],
+    "externalMutations": false,
+    "approvalTransfer": false
+  },
+  "dispatch": {
+    "loadsTargetSkill": false,
+    "startsTargetSeparately": true,
+    "targetOwnsApprovalAndProof": true,
+    "requiresOwnOrchestrationProfile": false
+  },
+  "output": {
+    "fields": ["facadeId", "mode", "targetSkill", "selectionReason", "queryEvidence", "unresolvedFacts", "invocationEnvelope"]
+  },
+  "stops": [
+    "observable impact does not select exactly one mode",
+    "project routing is unresolved",
+    "explicit grammar or profile filter is invalid",
+    "design knowledge query exits with code 2, 3, or 4",
+    "request spans more than one physical capability owner"
+  ]
+}

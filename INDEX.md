@@ -36,6 +36,7 @@ title: Docs
 | `@publication` | `publication/context.md` | context | separate runtime authority from generated human documentation |
 | `@requests` | `requests/context.md` | context | persist source-first frontend feedback, rejected attempts and authority-resolution state |
 | `@skill-shape` | `skills/skill-shape/context.md` | context | load the shared reporting contract when a skill runs |
+| `@skill-catalog` | `skill-runtime/catalog/catalog.json` | file | shortlist one semantic facade and exact mode before loading one physical skill |
 | `@skills` | `skills/context.md` | context | locate the capability registry |
 | `@standards` | `standards/context.md` | context | route role patterns, gates, rule bindings and assurance from one stable entry |
 | `@staleness` | `readiness/staleness/context.md` | context | share one stale taxonomy and category modules between inventory and repair |
@@ -155,7 +156,8 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Twenty. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Twenty physical capabilities sit behind seven non-executable semantic facades in `@skill-catalog`. `@skills`
+routes one exact leaf; `@skill-shape` holds what every selected capability must print, ask and
 record. `@orchestration` covers all physical skills through one machine registry; it is policy, not another capability,
 and coverage does not force delegation when sequential execution is safer or cheaper.
 
