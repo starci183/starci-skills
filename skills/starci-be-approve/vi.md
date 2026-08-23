@@ -9,14 +9,14 @@ title: Backend approve · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | reverify checkout, branch và source revision trước approval |
-| `@business` | `contexts/business/vi.md` | vi | bind approval và implementation vào product authority |
-| `@be-patterns` | `standards/backend/patterns/vi.md` | vi | challenge situation-to-file binding với source hiện tại |
-| `@rule-bindings` | `standards/backend/rule-bindings/vi.md` | vi | từ chối drift giữa situation enforced, gate và machine |
-| `@rule-binding-check` | `machines/rule-bindings/check.mjs` | script | chạy parity backend gate-to-canon |
-| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate compiler boundary đầy đủ đang được duyệt |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | reverify checkout, branch và source revision trước approval |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | bind approval và implementation vào product authority |
+| `@be-patterns` | `runtime/standards/backend/patterns/vi.md` | vi | challenge situation-to-file binding với source hiện tại |
+| `@rule-bindings` | `runtime/standards/backend/rule-bindings/vi.md` | vi | từ chối drift giữa situation enforced, gate và machine |
+| `@rule-binding-check` | `runtime/machines/rule-bindings/check.mjs` | script | chạy parity backend gate-to-canon |
+| `@plan-schema` | `runtime/kernel/approvals/backend-plan.schema.json` | file | validate compiler boundary đầy đủ đang được duyệt |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | từ chối brief malformed trước approval loop |
-| `@plan-check` | `machines/backend-plan/check.mjs` | script | từ chối stale identity, situation giả và file chưa bind |
+| `@plan-check` | `runtime/machines/backend-plan/check.mjs` | script | từ chối stale identity, situation giả và file chưa bind |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | chặn write thiếu business-impact binding chính xác |
 
 ## NESTED SKILLS

@@ -8,42 +8,42 @@ title: Docs
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@archetypes` | `archetypes/context.md` | context | resolve reusable macro page topology and responsive transformation before product Grammar and Principles |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
-| `@brainstorms` | `brainstorms/context.md` | context | challenge a design and expose only materially useful alternatives before a shape is accepted |
-| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge one frontend direction through integrated craft, UX, accessibility, engineering and detector lenses |
-| `@business` | `contexts/business/context.md` | context | resolve evidence-backed actors, flows, rules, states, operations and prototype surfaces |
+| `@archetypes` | `knowledge/archetypes/context.md` | context | resolve reusable macro page topology and responsive transformation before product Grammar and Principles |
+| `@assurance-be` | `knowledge/compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
+| `@brainstorms` | `knowledge/brainstorms/context.md` | context | challenge a design and expose only materially useful alternatives before a shape is accepted |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/context.md` | context | challenge one frontend direction through integrated craft, UX, accessibility, engineering and detector lenses |
+| `@business` | `knowledge/contexts/business/context.md` | context | resolve evidence-backed actors, flows, rules, states, operations and prototype surfaces |
 | `@canon-be` | `@starci/eslint-canon-be` | npm package | the published backend machine this record cites |
 | `@canon-fe` | `@starci/eslint-canon-fe` | npm package | the published frontend machine this record cites |
-| `@compilers` | `compilers/context.md` | context | compile an accepted shape into one answer |
-| `@conversations` | `contexts/conversations/context.md` | context | bind provider-neutral chat provenance to exact FE/BE artifact hashes without storing raw transcripts in Git |
-| `@contexts` | `contexts/context.md` | context | resolve where reads and writes occur |
-| `@deployment` | `deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
+| `@compilers` | `knowledge/compilers/context.md` | context | compile an accepted shape into one answer |
+| `@conversations` | `knowledge/contexts/conversations/context.md` | context | bind provider-neutral chat provenance to exact FE/BE artifact hashes without storing raw transcripts in Git |
+| `@contexts` | `knowledge/contexts/context.md` | context | resolve where reads and writes occur |
+| `@deployment` | `platform/deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
-| `@design-review` | `publication/design-review-preview/context.md` | context | write static HTML layout/block review files directly under session root |
+| `@design-review` | `runtime/publication/design-review-preview/context.md` | context | write static HTML layout/block review files directly under session root |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
-| `@gates` | `gates/context.md` | context | judge existing code with evidence |
-| `@grammars` | `grammars/context.md` | context | load explicitly selected product-family UI facts, outcomes, owners and durable behavior authority |
-| `@initialization` | `readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
-| `@kernel` | `kernel/context.md` | context | resolve route, state, approval identity and evidence before role law |
-| `@machines` | `machines/context.md` | context | locate deterministic dependency, parity, quality, artifact and secret machines |
-| `@mcp` | `mcp/context.md` | context | build and expose routed source context through isolated read-only MCP services |
-| `@operations` | `operations/context.md` | context | route deployment, MCP, readiness and operator procedures without merging their outputs |
-| `@orchestration` | `orchestration/context.md` | context | map coordinator decisions and bounded worker execution across Claude and Codex |
-| `@patterns` | `compilers/patterns/context.md` | context | resolve files and import boundaries |
+| `@gates` | `runtime/gates/context.md` | context | judge existing code with evidence |
+| `@grammars` | `knowledge/grammars/context.md` | context | load explicitly selected product-family UI facts, outcomes, owners and durable behavior authority |
+| `@initialization` | `platform/readiness/initialization/context.md` | context | establish identity, bootstrap, workspace routes and worktree state from one readiness contract |
+| `@kernel` | `runtime/kernel/context.md` | context | resolve route, state, approval identity and evidence before role law |
+| `@machines` | `runtime/machines/context.md` | context | locate deterministic dependency, parity, quality, artifact and secret machines |
+| `@mcp` | `platform/mcp/context.md` | context | build and expose routed source context through isolated read-only MCP services |
+| `@operations` | `platform/operations/context.md` | context | route deployment, MCP, readiness and operator procedures without merging their outputs |
+| `@orchestration` | `runtime/orchestration/context.md` | context | map coordinator decisions and bounded worker execution across Claude and Codex |
+| `@patterns` | `knowledge/compilers/patterns/context.md` | context | resolve files and import boundaries |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | prove Source family offsets, application slots, projections and local listener uniqueness |
-| `@principles` | `compilers/principles/context.md` | context | resolve classes from accepted situations |
-| `@publication` | `publication/context.md` | context | separate runtime authority from generated human documentation |
-| `@requests` | `requests/context.md` | context | persist source-first frontend feedback, rejected attempts and authority-resolution state |
+| `@principles` | `knowledge/compilers/principles/context.md` | context | resolve classes from accepted situations |
+| `@publication` | `runtime/publication/context.md` | context | separate runtime authority from generated human documentation |
+| `@requests` | `knowledge/requests/context.md` | context | persist source-first frontend feedback, rejected attempts and authority-resolution state |
 | `@skill-shape` | `skills/skill-shape/context.md` | context | load the shared reporting contract when a skill runs |
-| `@skill-catalog` | `skill-runtime/catalog/catalog.json` | file | shortlist one semantic facade and exact mode before loading one physical skill |
+| `@skill-catalog` | `runtime/skill-runtime/catalog/catalog.json` | file | shortlist one semantic facade and exact mode before loading one physical skill |
 | `@skills` | `skills/context.md` | context | locate the capability registry |
-| `@standards` | `standards/context.md` | context | route role patterns, gates, rule bindings and assurance from one stable entry |
-| `@staleness` | `readiness/staleness/context.md` | context | share one stale taxonomy and category modules between inventory and repair |
+| `@standards` | `runtime/standards/context.md` | context | route role patterns, gates, rule bindings and assurance from one stable entry |
+| `@staleness` | `platform/readiness/staleness/context.md` | context | share one stale taxonomy and category modules between inventory and repair |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
-| `@workflows` | `workflows/context.md` | context | group discoverable skills by source, backend, frontend, quality and operations lifecycle |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve Source-wide defaults and verify role routes |
-| `@worktrees` | `contexts/worktrees/context.md` | context | resolve durable write roots |
+| `@workflows` | `runtime/workflows/context.md` | context | group discoverable skills by source, backend, frontend, quality and operations lifecycle |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve Source-wide defaults and verify role routes |
+| `@worktrees` | `knowledge/contexts/worktrees/context.md` | context | resolve durable write roots |
 
 
 ## Record
@@ -104,6 +104,10 @@ available tokens, decision-changing approvals, defects caught, false-positive ga
 
 The stage trees above remain the one homes of detailed law. V5 adds compact semantic facades and stable cross-stage routers; it does
 not copy those laws:
+
+Physical placement is bounded to three responsibility namespaces: `knowledge/` for durable facts and design authority,
+`runtime/` for selection, execution and proof, and `platform/` for Source infrastructure. `skills/`, `scripts/` and
+`docs/` stay at the root because discovery, command and publication contracts depend on those stable locations.
 
 ```text
 @kernel

@@ -9,10 +9,10 @@ title: Skill shape · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve ngôn ngữ chung của Source cho mọi phản hồi tới người dùng |
-| `@credential-intake` | `runbooks/secrets/vi.md` | vi | nhận credential operator còn thiếu ngay qua intake ẩn và được mã hóa |
+| `@credential-intake` | `platform/runbooks/secrets/vi.md` | vi | nhận credential operator còn thiếu ngay qua intake ẩn và được mã hóa |
 | `@host-os` | `scripts/check-host-os.mjs` | script | chỉ chọn credential/setup entrypoint được host hiện tại hỗ trợ |
 | `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset và completion transition |
-| `@orchestration` | `orchestration/vi.md` | vi | chia provider-neutral coordinator/worker work mà không chuyển approval hay decision ownership |
+| `@orchestration` | `runtime/orchestration/vi.md` | vi | chia provider-neutral coordinator/worker work mà không chuyển approval hay decision ownership |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | chọn frontend workflow nhỏ nhất từ impact fact quan sát được |
 
 
@@ -204,7 +204,7 @@ Auto mode chỉ bỏ các lần dừng chờ owner ở staged checkpoint đã kh
 validate mọi artifact cùng exact boundary; chỉ tự chọn evidence-backed recommended candidate; rồi ghi
 `AUTO:<invocation-envelope-hash>:<approval-label>:<boundary-hash>` trước write hoặc staged boundary. Skill
 read-only hay không-write đi qua row đã pass mà không tạo write approval giả. Gate fail, thiếu recommendation,
-credential, destructive loss, external publication/commitment, hoặc mở rộng project/role/repository/write boundary
+credential, destructive loss, external runtime/publication/commitment, hoặc mở rộng project/role/repository/write boundary
 vẫn phải dừng dưới `NEED APPROVALS`. Auto mode không duyệt path chưa disclose, hạ proof, reinterpret feedback hay
 tự bịa product decision không có supported default.
 

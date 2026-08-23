@@ -9,9 +9,9 @@ title: Trả nợ Source
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract execution, approval và reporting |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | verify route project/role trước target read |
-| `@staleness` | `readiness/staleness/vi.md` | vi | route scope namespace về owner finding |
-| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | authority, expiry và close semantics của debt |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | verify route project/role trước target read |
+| `@staleness` | `platform/readiness/staleness/vi.md` | vi | route scope namespace về owner finding |
+| `@stale-debts` | `platform/readiness/staleness/debts/vi.md` | vi | authority, expiry và close semantics của debt |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | validate debt và remeasure quality scope đã biết |
 
 ## NESTED SKILLS

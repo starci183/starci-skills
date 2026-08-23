@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v5/knowledge/brainstorms/frontend-quality/schema.json",
+  "title": "Integrated frontend brainstorm quality receipt",
+  "description": "One candidate reviewed through the closed StarCi product, craft, UX, accessibility, engineering and detector lenses. External sources remain advisory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "scope", "targetId", "evidenceAt", "sources", "lenses", "signature", "rejections", "detectors", "verdict"],
+  "properties": {
+    "schema": {"const": 1},
+    "scope": {"enum": ["layout", "block", "refactor"]},
+    "targetId": {"$ref": "#/$defs/slug"},
+    "evidenceAt": {"$ref": "#/$defs/hash"},
+    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
+    "lenses": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"$ref": "#/$defs/lens"}},
+    "signature": {"$ref": "#/$defs/signature"},
+    "rejections": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 8}},
+    "detectors": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"$ref": "#/$defs/detector"}},
+    "verdict": {"const": "eligible"}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "locator", "digest", "use", "lenses"],
+      "properties": {
+        "id": {"$ref": "#/$defs/slug"},
+        "kind": {"enum": ["routed-authority", "current-source", "rendered-evidence", "external-advisory"]},
+        "locator": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/hash"},
+        "use": {"enum": ["binding", "advisory"]},
+        "lenses": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/lensId"}}
+      }
+    },
+    "lens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "verdict", "evidence", "decision", "owner", "proof"],
+      "properties": {
+        "id": {"$ref": "#/$defs/lensId"},
+        "verdict": {"enum": ["pass", "not-applicable"]},
+        "evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 8}},
+        "decision": {"type": "string", "minLength": 12},
+        "owner": {"enum": ["business", "grammar", "principle", "pattern", "gate", "source", "none"]},
+        "proof": {"type": "string", "minLength": 12}
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["move", "productReason", "authority", "decorativeOnly"],
+      "properties": {
+        "move": {"type": "string", "minLength": 12},
+        "productReason": {"type": "string", "minLength": 12},
+        "authority": {"enum": ["grammar", "master", "page-deviation", "inherited-parent"]},
+        "decorativeOnly": {"const": false}
+      }
+    },
+    "detector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "verdict", "evidence"],
+      "properties": {
+        "id": {"$ref": "#/$defs/detectorId"},
+        "verdict": {"enum": ["pass", "not-applicable"]},
+        "evidence": {"type": "string", "minLength": 12}
+      }
+    },
+    "lensId": {
+      "enum": [
+        "product-fit",
+        "visual-character",
+        "design-system",
+        "accessibility",
+        "interaction",
+        "responsive-content",
+        "performance-motion",
+        "component-composition",
+        "state-resilience",
+        "copy-localization"
+      ]
+    },
+    "detectorId": {
+      "enum": [
+        "semantics-a11y",
+        "interaction-feedback",
+        "responsive-overflow",
+        "motion-performance",
+        "react-composition",
+        "state-content"
+      ]
+    },
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

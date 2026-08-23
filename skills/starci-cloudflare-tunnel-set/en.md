@@ -9,7 +9,7 @@ title: starci-cloudflare-tunnel-set · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and output contract |
-| `@initialization` | `readiness/initialization/en.md` | en | owns Source identity and routed workspace readiness |
+| `@initialization` | `platform/readiness/initialization/en.md` | en | owns Source identity and routed workspace readiness |
 
 ## NESTED SKILLS
 

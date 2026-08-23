@@ -9,11 +9,11 @@ title: StarCi conversation record
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | reporting contract và approval boundary dùng chung |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve project trước provider/artifact read |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | verify ownership business registry bền và placement của session/generated state |
-| `@conversations` | `contexts/conversations/vi.md` | vi | luật identity, custody, redaction và artifact link provider-neutral |
-| `@snapshot-schema` | `contexts/conversations/conversation-snapshot.schema.json` | file | validate một provenance snapshot immutable |
-| `@registry-schema` | `contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | resolve project trước provider/artifact read |
+| `@worktrees` | `knowledge/contexts/worktrees/vi.md` | vi | verify ownership business registry bền và placement của session/generated state |
+| `@conversations` | `knowledge/contexts/conversations/vi.md` | vi | luật identity, custody, redaction và artifact link provider-neutral |
+| `@snapshot-schema` | `knowledge/contexts/conversations/conversation-snapshot.schema.json` | file | validate một provenance snapshot immutable |
+| `@registry-schema` | `knowledge/contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
 | `@record` | `scripts/record-conversation-snapshot.mjs` | script | hash và append một snapshot đã duyệt |
 | `@check` | `scripts/check-conversation-registry.mjs` | script | chứng minh hash, ancestry và plaintext refusal |
 

@@ -10,7 +10,7 @@ description: "Make a Source ready and portable through machine decrypt identity,
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
-| `@initialization` | `readiness/initialization/context.md` | context | the identity-first boundaries and the owner of each init verdict |
+| `@initialization` | `platform/readiness/initialization/context.md` | context | the identity-first boundaries and the owner of each init verdict |
 
 ## NESTED SKILLS
 

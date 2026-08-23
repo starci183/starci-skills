@@ -9,7 +9,7 @@ const trustRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docsRoot = join(trustRoot, "docs");
 const contentRoot = join(docsRoot, "content");
 const skillSourceRoot = join(trustRoot, "skills");
-const archetypeSourceRoot = join(trustRoot, "archetypes");
+const archetypeSourceRoot = join(trustRoot, "knowledge", "archetypes");
 const archetypeTemplateAssetRoot = join(docsRoot, "public", "template-assets", "archetypes");
 
 function filesBelow(directory) {

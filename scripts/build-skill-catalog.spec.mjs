@@ -31,7 +31,7 @@ function syntheticSource(mutator = (value) => value) {
     }
   };
   const changed = mutator(structuredClone(metadata));
-  const catalogDirectory = join(root, ".claude", "skill-runtime", "catalog");
+  const catalogDirectory = join(root, ".claude", "runtime", "skill-runtime", "catalog");
   mkdirSync(catalogDirectory, {recursive: true});
   writeFileSync(join(catalogDirectory, "overrides.json"), `${JSON.stringify(changed, null, 2)}\n`, "utf8");
   return root;
@@ -65,8 +65,8 @@ test("every skill id, alias, intent and macro route is unambiguous", () => {
 
 test("generated catalog and schema are byte-identical to a fresh build", () => {
   const built = checkSkillCatalog(sourceRoot);
-  assert.equal(readFileSync(join(sourceRoot, ".claude/skill-runtime/catalog/catalog.json"), "utf8"), built.catalogText);
-  assert.equal(readFileSync(join(sourceRoot, ".claude/skill-runtime/catalog/schema.json"), "utf8"), built.schemaText);
+  assert.equal(readFileSync(join(sourceRoot, ".claude/runtime/skill-runtime/catalog/catalog.json"), "utf8"), built.catalogText);
+  assert.equal(readFileSync(join(sourceRoot, ".claude/runtime/skill-runtime/catalog/schema.json"), "utf8"), built.schemaText);
 });
 
 test("writer output passes its own stale check", () => {

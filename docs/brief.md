@@ -89,7 +89,7 @@ proves product facts and capability, not that its macro layout is correct; arche
 
 ### Agent orchestration
 
-All twenty physical skills resolve one machine-validated entry in `orchestration/profiles.json`. The selected
+All twenty physical skills resolve one machine-validated entry in `runtime/orchestration/profiles.json`. The selected
 skill keeps its own `PIPELINE`, approvals and proof law; orchestration only partitions accepted work into bounded
 Claude or Codex tasks. Read-only and authority/provider work may remain coordinator-sequential, while independent
 evidence, approved disjoint repository changes, tests and proof can run through workers. The machine rejects a

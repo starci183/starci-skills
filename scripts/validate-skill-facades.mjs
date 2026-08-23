@@ -55,9 +55,9 @@ function validateSchema(value, schema, location, failures) {
 
 export function validateFacades(trustRoot = defaultTrustRoot) {
   const failures = [];
-  const facadeRoot = path.join(trustRoot, "skill-runtime", "facades");
+  const facadeRoot = path.join(trustRoot, "runtime", "skill-runtime", "facades");
   const facadeSchema = JSON.parse(fs.readFileSync(path.join(facadeRoot, "facade.schema.json"), "utf8"));
-  const catalogPath = path.join(trustRoot, "skill-runtime", "catalog", "catalog.json");
+  const catalogPath = path.join(trustRoot, "runtime", "skill-runtime", "catalog", "catalog.json");
   const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
   const macros = new Map(catalog.macros.map((macro) => [macro.id, macro]));
   const physicalSkills = new Set(catalog.skills.map((skill) => skill.id));

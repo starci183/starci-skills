@@ -33,9 +33,9 @@ function fixture(t) {
   t.after(() => rmSync(repositories, {recursive: true, force: true}));
   repository(source, "https://github.com/starci-lab/source.git");
   repository(frontend, "https://github.com/starci-lab/frontend.git");
-  mkdirSync(join(source, ".claude", "grammars", "starci", "profiles"), {recursive: true});
-  writeFileSync(join(source, ".claude", "grammars", "starci", "grammar.json"), "{}\n");
-  writeFileSync(join(source, ".claude", "grammars", "starci", "profiles", "demo.json"), "{}\n");
+  mkdirSync(join(source, ".claude", "knowledge", "grammars", "starci", "profiles"), {recursive: true});
+  writeFileSync(join(source, ".claude", "knowledge", "grammars", "starci", "grammar.json"), "{}\n");
+  writeFileSync(join(source, ".claude", "knowledge", "grammars", "starci", "profiles", "demo.json"), "{}\n");
   mkdirSync(join(frontend, "src", "components", "contracts"), {recursive: true});
   writeFileSync(join(frontend, "src", "components", "contracts", "index.ts"), "export {};\n");
   const legacy = join(source, ".workspace");

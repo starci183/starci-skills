@@ -10,8 +10,8 @@ const trustRoot = path.resolve(import.meta.dirname, "..");
 function withFacadeFixture(mutate, run) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "starci-facades-"));
   try {
-    fs.cpSync(path.join(trustRoot, "skill-runtime"), path.join(temporary, "skill-runtime"), {recursive: true});
-    const target = path.join(temporary, "skill-runtime", "facades", "analysis", "facade.json");
+    fs.cpSync(path.join(trustRoot, "runtime", "skill-runtime"), path.join(temporary, "runtime", "skill-runtime"), {recursive: true});
+    const target = path.join(temporary, "runtime", "skill-runtime", "facades", "analysis", "facade.json");
     const facade = JSON.parse(fs.readFileSync(target, "utf8"));
     mutate(facade);
     fs.writeFileSync(target, `${JSON.stringify(facade)}\n`);

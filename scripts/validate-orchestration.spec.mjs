@@ -6,7 +6,7 @@ import {fileURLToPath} from "node:url";
 import {canonicalHash, validateProfiles, validateReceipt, validateWorkspace} from "./validate-orchestration.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const profiles = () => JSON.parse(fs.readFileSync(path.join(root, "orchestration", "profiles.json"), "utf8"));
+const profiles = () => JSON.parse(fs.readFileSync(path.join(root, "runtime", "orchestration", "profiles.json"), "utf8"));
 const hash = "a".repeat(64);
 const boundaryHash = "b".repeat(64);
 const decisions = ["scope-decision", "authority-decision", "approval", "shared-integration", "final-verdict"];
@@ -47,7 +47,7 @@ test("published profiles cover every physical StarCi skill", () => {
   assert.equal(validateProfiles(published).ok, true);
   for (const map of Object.values(published.skillMaps)) assert.deepEqual(map.approvalModes, ["manual", "auto"]);
   assert.deepEqual(validateWorkspace(root), {ok: true, failures: []});
-  const schema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
+  const schema = JSON.parse(fs.readFileSync(path.join(root, "runtime", "orchestration", "receipt.schema.json"), "utf8"));
   assert.equal(schema.properties.schemaVersion.const, 4);
   assert.equal(schema.$defs.skill.enum.length, 20);
   assert.ok(schema.required.includes("impact"));
@@ -73,7 +73,7 @@ test("a read-only non-frontend skill uses the common receipt without mutation ap
     gateEvents: [{id: "report-ready", kind: "proof-targets", at: hash, status: "passed", dependsOn: [], requiredArtifacts: ["observed report evidence"]}],
     challenges: [],
     tasks: [
-      {id: "route-scan", skill: "starci-stale-list", envelopeAt: hash, step: "route", kind: "read", model: "gpt-5.6-luna", objective: "Resolve every routed stale category.", requiredInputs: ["stale registry"], dependsOn: [], dependsOnGates: [], reads: ["readiness/staleness"], writes: [], forbiddenDecisions: decisions, output: "expected matrix", outputConsumers: ["task:observe-state"], requiredProof: ["route inventory"], stopConditions: ["stale route"]},
+      {id: "route-scan", skill: "starci-stale-list", envelopeAt: hash, step: "route", kind: "read", model: "gpt-5.6-luna", objective: "Resolve every routed stale category.", requiredInputs: ["stale registry"], dependsOn: [], dependsOnGates: [], reads: ["platform/readiness/staleness"], writes: [], forbiddenDecisions: decisions, output: "expected matrix", outputConsumers: ["task:observe-state"], requiredProof: ["route inventory"], stopConditions: ["stale route"]},
       {id: "observe-state", skill: "starci-stale-list", envelopeAt: hash, step: "observe", kind: "read", model: "gpt-5.6-luna", objective: "Measure the expected state without repair.", requiredInputs: ["expected matrix"], dependsOn: ["route-scan"], dependsOnGates: [], reads: ["routed workspaces"], writes: [], forbiddenDecisions: decisions, output: "observed report evidence", outputConsumers: ["gate:report-ready"], requiredProof: ["check-only commands"], stopConditions: ["mutation required"]}
     ],
     batches: [["route-scan"], ["observe-state"]],

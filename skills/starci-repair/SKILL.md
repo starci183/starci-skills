@@ -10,9 +10,9 @@ description: Take a routed source that is red, structurally stale, port-conflict
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared phase, approval and output contract |
-| `@staleness` | `readiness/staleness/context.md` | context | the one taxonomy and router for every repair module |
+| `@staleness` | `platform/readiness/staleness/context.md` | context | the one taxonomy and router for every repair module |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic whole-Source proof for the ordered delivery fence |
-| `@stale-debts` | `readiness/staleness/debts/context.md` | context | identify existing owner-approved debt and preserve truthful verdicts |
+| `@stale-debts` | `platform/readiness/staleness/debts/context.md` | context | identify existing owner-approved debt and preserve truthful verdicts |
 
 ## NESTED SKILLS
 

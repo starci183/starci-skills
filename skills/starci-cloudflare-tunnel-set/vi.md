@@ -9,7 +9,7 @@ title: StarCi Cloudflare tunnel set
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract approval và output dùng chung |
-| `@initialization` | `readiness/initialization/vi.md` | vi | sở hữu identity của Source và trạng thái route workspace |
+| `@initialization` | `platform/readiness/initialization/vi.md` | vi | sở hữu identity của Source và trạng thái route workspace |
 
 ## NESTED SKILLS
 

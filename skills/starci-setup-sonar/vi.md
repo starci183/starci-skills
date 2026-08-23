@@ -5,10 +5,10 @@
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng phê duyệt và đầu ra dùng chung |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | xác định mọi vai trò Source đã route |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/vi.md` | vi | bằng chứng scanner, coverage và quality |
-| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/vi.md` | vi | bằng chứng frontend scanner, coverage và quality |
-| `@sonar-assurance` | `machines/sonar-assurance/vi.md` | vi | máy gate nghiêm ngặt và ranh giới secret |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | xác định mọi vai trò Source đã route |
+| `@assurance-be` | `knowledge/compilers/patterns/be/delivery-assurance/vi.md` | vi | bằng chứng scanner, coverage và quality |
+| `@assurance-fe` | `knowledge/compilers/patterns/fe/delivery-assurance/vi.md` | vi | bằng chứng frontend scanner, coverage và quality |
+| `@sonar-assurance` | `runtime/machines/sonar-assurance/vi.md` | vi | máy gate nghiêm ngặt và ranh giới secret |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | reconcile hostname tường minh, an toàn giá trị |
 | `@credential-bootstrap` | `scripts/sonar-source-credentials.mjs` | script | reconcile project, identity theo scope, record mã hóa và GitHub an toàn value phía sau Windows wrapper |
 

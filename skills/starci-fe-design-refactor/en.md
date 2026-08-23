@@ -9,10 +9,10 @@ title: StarCi frontend design refactor intake
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared reporting and invocation boundary |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve the project and FE role |
-| `@requests` | `requests/en.md` | en | own request shape, lifecycle and placement |
-| `@business` | `contexts/business/en.md` | en | separate design feedback from product-truth change |
-| `@grammar` | `grammars` | module | record routed product authority as a hypothesis, not a verdict |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve the project and FE role |
+| `@requests` | `knowledge/requests/en.md` | en | own request shape, lifecycle and placement |
+| `@business` | `knowledge/contexts/business/en.md` | en | separate design feedback from product-truth change |
+| `@grammar` | `knowledge/grammars` | module | record routed product authority as a hypothesis, not a verdict |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | classify the observed frontend impact |
 | `@validate-request` | `scripts/validate-design-request.mjs` | script | validate the created or updated request |
 
@@ -30,7 +30,7 @@ Topology: `reconciliation` between owner feedback and reproducible product evide
 | reproduce | evidence | screenshot, route, prose, runtime or source reference | recover the affected surface, current behavior and owner-expected outcome | concise observed-versus-expected evidence | uncertainty is explicit; secrets are redacted |
 | classify-boundary | reconciliation | evidence and routed business/grammar context | classify impact, freeze exact product source/proof boundary and record authority hypotheses without declaring a failed law | bounded correction plus normalized request body | feedback is preserved; product truth is not invented |
 | correct-prove | execution | bounded correction and owner-expected outcome | correct product source first and prove the real affected state proportionally | applied source paths and passing proof | expected outcome is observable; unrelated dirt is preserved |
-| enqueue | record | normalized request body and source proof | create or update one stable `.claude/requests/<id>.request.json` record with applied paths/proof | valid `open` request | request validation passes; grammar/principles remain unchanged |
+| enqueue | record | normalized request body and source proof | create or update one stable `.claude/knowledge/requests/<id>.request.json` record with applied paths/proof | valid `open` request | request validation passes; grammar/principles remain unchanged |
 
 ## Run
 
@@ -48,7 +48,7 @@ directly; an unresolved component/page/flow direction follows the proportional f
 the connected affected state and retain the exact source paths and evidence.
 
 Create a stable lowercase id, reuse an existing request when it owns the same outcome, and write the record directly
-under `.claude/requests` with implementation `applied`, proof `passed` and authority `pending`. When required
+under `.claude/knowledge/requests` with implementation `applied`, proof `passed` and authority `pending`. When required
 business truth or source access blocks the correction, preserve the feedback as `blocked` instead of inventing a
 fix. Push, publication, provider changes and grammar/principle edits remain outside this skill.
 
@@ -60,7 +60,7 @@ fix. Push, publication, provider changes and grammar/principle edits remain outs
 4. Preserve project, feature, surfaces, expected outcome, applied source paths and stable proof references.
 5. A business-capability change is queued as blocked and identified as requiring business authority.
 6. Never copy raw secrets, signed URLs, private tool output or unredacted transcripts into a request.
-7. Do not modify backend, grammar, principles or provider state; package publication/push still needs explicit authority.
+7. Do not modify backend, grammar, principles or provider state; package runtime/publication/push still needs explicit authority.
 8. Validate the exact request and report its durable path and status.
 
 ## Stops

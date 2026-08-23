@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
-RUNTIME_ROOT = SOURCE_ROOT / ".claude" / "design-runtime"
+RUNTIME_ROOT = SOURCE_ROOT / ".claude" / "runtime" / "design-runtime"
 sys.path.insert(0, str(RUNTIME_ROOT))
 
 from design_knowledge import (  # noqa: E402

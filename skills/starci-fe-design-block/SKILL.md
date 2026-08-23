@@ -10,19 +10,19 @@ description: Reconcile one component-impact Layout-generated frontend block insi
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and reporting boundary |
-| `@orchestration` | `orchestration/context.md` | context | assign block audit, HTML, source and proof without transferring UI decisions |
+| `@orchestration` | `runtime/orchestration/context.md` | context | assign block audit, HTML, source and proof without transferring UI decisions |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fixes away from the component workflow |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/context.md` | context | keep disposable review evidence in the current session |
-| `@composition` | `brainstorms/composition/context.md` | context | lock highlighted parent, preserved page and proof scope |
-| `@business` | `contexts/business/context.md` | context | resolve real data, actions and states |
-| `@grammar` | `grammars/context.md` | context | load routed block facts, outcomes and owners |
-| `@principles` | `compilers/principles/context.md` | context | audit the selected anatomy |
-| `@patterns-fe` | `compilers/patterns/fe/context.md` | context | choose owning source files and imports |
-| `@lints-fe` | `gates/fe/lints/context.md` | context | prove implemented source |
-| `@blocks` | `brainstorms/blocks/context.md` | context | block ownership, anatomy, state and contract law |
-| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | review each block direction through shared craft, UX, accessibility, engineering and detectors |
-| `@design-review` | `publication/design-review-preview/context.md` | context | exact-parent authored HTML review in cache |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve and verify the frontend route |
+| `@worktrees` | `knowledge/contexts/worktrees/context.md` | context | keep disposable review evidence in the current session |
+| `@composition` | `knowledge/brainstorms/composition/context.md` | context | lock highlighted parent, preserved page and proof scope |
+| `@business` | `knowledge/contexts/business/context.md` | context | resolve real data, actions and states |
+| `@grammar` | `knowledge/grammars/context.md` | context | load routed block facts, outcomes and owners |
+| `@principles` | `knowledge/compilers/principles/context.md` | context | audit the selected anatomy |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe/context.md` | context | choose owning source files and imports |
+| `@lints-fe` | `runtime/gates/fe/lints/context.md` | context | prove implemented source |
+| `@blocks` | `knowledge/brainstorms/blocks/context.md` | context | block ownership, anatomy, state and contract law |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/context.md` | context | review each block direction through shared craft, UX, accessibility, engineering and detectors |
+| `@design-review` | `runtime/publication/design-review-preview/context.md` | context | exact-parent authored HTML review in cache |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify current vocabulary |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package |

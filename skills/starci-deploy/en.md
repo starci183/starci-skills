@@ -9,8 +9,8 @@ title: starci-deploy · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval, persistence and output contract |
-| `@initialization` | `readiness/initialization/en.md` | en | identity, bootstrap, routed workspace and worktree readiness |
-| `@deployment` | `deployment/en.md` | en | manifest, `.infra`, setup, domain, deploy and monitor law |
+| `@initialization` | `platform/readiness/initialization/en.md` | en | identity, bootstrap, routed workspace and worktree readiness |
+| `@deployment` | `platform/deployment/en.md` | en | manifest, `.infra`, setup, domain, deploy and monitor law |
 | `@deployment-plan` | `scripts/deployment-plan.mjs` | script | validate, plan and initialize the declared deployment without duplicating manifest logic in the skill |
 
 ## NESTED SKILLS
@@ -38,11 +38,61 @@ Run `@deployment-plan` in plan mode. If `.stacks/deployment.json` is absent, sca
 workflows, credentials-by-name, runtime definitions, probes and relevant sibling precedent, then produce
 one exact manifest and touch boundary. Do not substitute a generic example or infer a host/domain.
 
+Bind target topology separately from environment, following the MiAmia family shape without copying
+product ownership. Local Compose lives below `.stacks/dev`, VPS Swarm or Compose below `.stacks/vps`,
+and Kubernetes below `.stacks/k8s`. `production` and `staging` belong only to
+`manifest.environment` and `.infra/<environment>`. Refuse `.stacks/production`, `.stacks/staging` or
+any stack root derived from an environment name, and migrate that stale layout before deployment.
+
+## Invocation semantics
+
+Classify the owner's verb before choosing a path. `deploy`, `deploy VPS`, `deploy production`, `redeploy`,
+`release`, `triển khai VPS` and equivalent imperatives are execution intent, not a request to explain or
+compare infrastructure. Resolve project, role and environment from the explicit request, then the active
+invocation envelope, then one unambiguous verified workspace route plus manifest. Stop only if those facts
+still leave more than one target.
+
+When the resolved manifest already declares the host, runtime manager, artifacts, domains and probes, the
+imperative invocation is the release decision for exactly that declared boundary. Print the resolved target
+and value-free execution plan as notice, then execute; do not ask the owner to choose Caddy, Docker, Swarm,
+Tunnel or another platform when the manifest already chose, do not stop after planning, and do not require a
+second generic `OK`. A sibling such as MiAmia may prove a stack pattern or shared ingress identity, but never
+becomes the deployment target, credential owner or application being released.
+
+## Frontend Next.js
+
+For each Next.js artifact, read the manifest's explicit `frontend.layout`, `frontend.surface`,
+`frontend.buildContext`, `frontend.dockerfile` and `frontend.stackDefinition`; never infer repository layout from
+a sibling or folder name alone. `single-app` means one routed repository role owns one deployed surface.
+`monorepo` may build several surface artifacts from one repository, but each surface keeps its own source root,
+Dockerfile, immutable image, runtime target, domain mapping and health probe. Use the declared build context so
+workspace packages remain available during `next build`; prefer Next.js standalone production output when source
+supports it.
+
+Surface names are product-owned slugs such as `landing`, `app`, `crm`, `admin` or another declared name. Hostname
+is an independent product decision for each artifact; never derive it from the surface name, repository layout or
+a sibling project. During adoption, ask the owner for each missing surface hostname in one batched approval. Once
+a valid manifest declares the artifact-to-domain mapping, reuse it without asking. A monorepo with several surfaces
+still builds and deploys independent artifacts and proves trusted HTTPS for every declared primary hostname.
+
+The runtime declaration for every surface belongs to the manifest owner's tracked
+`<stack.root>/frontend/<surface>/...` boundary: `.stacks/vps/frontend/...` for a VPS and
+`.stacks/k8s/frontend/...` for Kubernetes. During adoption, create or reconcile that definition together with the
+manifest, service target, immutable image and probe. After the approved stack write passes validation, continue
+directly through build, publication, rollout, domain/TLS reconciliation and steady-state proof in the same
+invocation. Creating `.stacks` files is not a deployment result.
+
 ## Approval boundary
 
-Display one value-free plan under `### NEED APPROVALS`: tracked manifest/source writes, exact routed
-repositories, SSH host reference, artifact targets, domain names with owner/driver, workflow/ref, provider
-mutations and monitor success window. `OK` authorizes that complete declared boundary once.
+For adoption, a missing manifest, an ambiguous target or any new host/domain/tenant/project, display one
+value-free plan under `### NEED APPROVALS`: tracked manifest/source writes, exact routed repositories, SSH
+host reference, artifact targets, domain names with owner/driver, workflow/ref, provider mutations and monitor
+success window. `OK` authorizes that complete new boundary once.
+
+For an imperative execution request whose observed plan exactly matches an existing valid manifest, display
+the same facts as an execution notice and continue immediately. That invocation authorizes release operations
+and the smallest deployment-owned repair inside the declared repositories; it does not authorize destructive
+data loss, credential rotation, product/business expansion or a different external boundary.
 
 After `OK`, take baselines and continue setup, source wiring, `.infra` initialization, provider changes,
 workflow dispatch, SSH repair, retry and monitoring without asking about ordinary in-scope decisions.
@@ -62,6 +112,12 @@ shared value-safe helper is callable directly. Always plan provider changes firs
 Run verification before release. Dispatch the declared immutable release workflow, wait for completion,
 inspect bounded remote evidence and public probes, repair the smallest owned failure and retry only after
 the cause changes. Continue until every required probe stays green for the manifest's steady window.
+
+The concrete release path follows declared source rather than a fresh technology proposal: verify; build and
+publish immutable container artifacts when declared; install or prove the declared runtime; deploy through the
+declared Compose, Swarm, Kubernetes or other manager; run migrations/init jobs; reconcile the declared domain
+driver; prove trusted TLS and application health for the full steady window. Re-enter the smallest failed stage
+after repair instead of restarting the conversation at architecture selection.
 
 A green apply, workflow or container is intermediate evidence, never the terminal condition. Pause only
 when a vendor credential must be entered through hidden input, access is absent, or the next action crosses

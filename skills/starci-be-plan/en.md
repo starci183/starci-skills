@@ -9,13 +9,13 @@ title: starci-be-plan · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
-| `@workspaces` | `contexts/workspaces/en.md` | en | canonical route and freshness verification before target reads |
-| `@business` | `contexts/business/en.md` | en | bind the plan to current actors, flows, rules, states and operations |
-| `@be-patterns` | `standards/backend/patterns/en.md` | en | bind accepted backend facts to fixed pattern situations and exact files |
-| `@rule-bindings` | `standards/backend/rule-bindings/en.md` | en | prove enforced situations remain accountable to gates and machines |
-| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | refuse a brief missing the complete compiler boundary |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | canonical route and freshness verification before target reads |
+| `@business` | `knowledge/contexts/business/en.md` | en | bind the plan to current actors, flows, rules, states and operations |
+| `@be-patterns` | `runtime/standards/backend/patterns/en.md` | en | bind accepted backend facts to fixed pattern situations and exact files |
+| `@rule-bindings` | `runtime/standards/backend/rule-bindings/en.md` | en | prove enforced situations remain accountable to gates and machines |
+| `@plan-schema` | `runtime/kernel/approvals/backend-plan.schema.json` | file | refuse a brief missing the complete compiler boundary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate the approval-ready brief before presentation |
-| `@plan-check` | `machines/backend-plan/check.mjs` | script | prove content hash, real situations and complete file coverage |
+| `@plan-check` | `runtime/machines/backend-plan/check.mjs` | script | prove content hash, real situations and complete file coverage |
 
 ## NESTED SKILLS
 

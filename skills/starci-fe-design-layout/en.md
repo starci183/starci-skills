@@ -10,20 +10,20 @@ description: Design, stage-approve, implement, seed and browser-prove one mature
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | staged approval and reporting boundary |
-| `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for decision, HTML, source and proof |
+| `@orchestration` | `runtime/orchestration/en.md` | en | coordinator/worker phase map for decision, HTML, source and proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse ceremony larger than measured frontend impact |
-| `@workspaces` | `contexts/workspaces/en.md` | en | verified frontend route |
-| `@worktrees` | `contexts/worktrees/en.md` | en | ignored disposable session evidence |
-| `@composition` | `brainstorms/composition/en.md` | en | Scope, Owner, Invariant and Proof |
-| `@business` | `contexts/business/en.md` | en | routed business truth |
-| `@archetypes` | `archetypes` | module | reusable macro page topology and complete responsive transformation before Grammar and Principles |
-| `@grammar` | `grammars` | module | product-family facts and owners |
-| `@principles` | `compilers/principles` | module | visual decision audit |
-| `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
-| `@lints-fe` | `gates/fe/lints` | module | source proof |
-| `@layouts` | `brainstorms/layouts/en.md` | en | schema 9 synthesis, capability proof and staged contracts |
-| `@frontend-quality` | `brainstorms/frontend-quality/en.md` | en | integrated craft, UX, accessibility, engineering and detector review before HTML |
-| `@design-review` | `publication/design-review-preview/en.md` | en | staged HTML review |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | verified frontend route |
+| `@worktrees` | `knowledge/contexts/worktrees/en.md` | en | ignored disposable session evidence |
+| `@composition` | `knowledge/brainstorms/composition/en.md` | en | Scope, Owner, Invariant and Proof |
+| `@business` | `knowledge/contexts/business/en.md` | en | routed business truth |
+| `@archetypes` | `knowledge/archetypes` | module | reusable macro page topology and complete responsive transformation before Grammar and Principles |
+| `@grammar` | `knowledge/grammars` | module | product-family facts and owners |
+| `@principles` | `knowledge/compilers/principles` | module | visual decision audit |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | source ownership |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | source proof |
+| `@layouts` | `knowledge/brainstorms/layouts/en.md` | en | schema 9 synthesis, capability proof and staged contracts |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/en.md` | en | integrated craft, UX, accessibility, engineering and detector review before HTML |
+| `@design-review` | `runtime/publication/design-review-preview/en.md` | en | staged HTML review |
 | `@contract-search` | `scripts/contract-search.mjs` | script | component contract evidence |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | routed grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
@@ -33,7 +33,7 @@ description: Design, stage-approve, implement, seed and browser-prove one mature
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | schema 9 page/state and quality-review validation |
 | `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | composition proof |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | principle proof |
-| `@maturity-schema` | `publication/design-review-preview/maturity.schema.json` | file | staged maturity evidence |
+| `@maturity-schema` | `runtime/publication/design-review-preview/maturity.schema.json` | file | staged maturity evidence |
 | `@validate-maturity` | `scripts/validate-design-maturity.mjs` | script | mature-page refusal gate |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | cache review publisher |
 | `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | final parity proof |

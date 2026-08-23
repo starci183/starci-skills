@@ -9,11 +9,11 @@ title: StarCi conversation record
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared reporting and approval boundary |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve the named project before provider or artifact reads |
-| `@worktrees` | `contexts/worktrees/en.md` | en | verify durable business-registry ownership and session/generated-state placement |
-| `@conversations` | `contexts/conversations/en.md` | en | provider-neutral identity, custody, redaction and artifact-link law |
-| `@snapshot-schema` | `contexts/conversations/conversation-snapshot.schema.json` | file | validate one immutable provenance snapshot |
-| `@registry-schema` | `contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve the named project before provider or artifact reads |
+| `@worktrees` | `knowledge/contexts/worktrees/en.md` | en | verify durable business-registry ownership and session/generated-state placement |
+| `@conversations` | `knowledge/contexts/conversations/en.md` | en | provider-neutral identity, custody, redaction and artifact-link law |
+| `@snapshot-schema` | `knowledge/contexts/conversations/conversation-snapshot.schema.json` | file | validate one immutable provenance snapshot |
+| `@registry-schema` | `knowledge/contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
 | `@record` | `scripts/record-conversation-snapshot.mjs` | script | hash and append one approved snapshot |
 | `@check` | `scripts/check-conversation-registry.mjs` | script | prove hashes, ancestry and plaintext refusal |
 

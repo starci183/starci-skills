@@ -28,8 +28,8 @@ if (!project || (!inputPath && !check)) {
 
 const businessRoot = join(source, ".worktrees", project, "businesses");
 const registryPath = join(businessRoot, "business-registry-v1.json");
-const featureSchema = join(claudeRoot, "contexts", "business", "schema.json");
-const registrySchema = join(claudeRoot, "contexts", "business", "registry.schema.json");
+const featureSchema = join(claudeRoot, "knowledge", "contexts", "business", "schema.json");
+const registrySchema = join(claudeRoot, "knowledge", "contexts", "business", "registry.schema.json");
 const validator = join(scriptDir, "validate-artifact.mjs");
 
 const canonical = (value) => {

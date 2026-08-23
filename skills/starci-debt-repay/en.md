@@ -9,9 +9,9 @@ title: Repay Source debt
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | execution, approval and reporting contract |
-| `@workspaces` | `contexts/workspaces/en.md` | en | verify the project/role route before target reads |
-| `@staleness` | `readiness/staleness/en.md` | en | route each namespaced scope to its finding owner |
-| `@stale-debts` | `readiness/staleness/debts/en.md` | en | debt authority, expiry and close semantics |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | verify the project/role route before target reads |
+| `@staleness` | `platform/readiness/staleness/en.md` | en | route each namespaced scope to its finding owner |
+| `@stale-debts` | `platform/readiness/staleness/debts/en.md` | en | debt authority, expiry and close semantics |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | validate debt and remeasure recognized quality scopes |
 
 ## NESTED SKILLS

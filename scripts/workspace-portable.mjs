@@ -169,7 +169,7 @@ function compilePortableRoute(route, source, repositoriesRoot) {
   const directory = kind === "source" ? null : portablePath(repositoriesRoot, repo, `${route.project}/${route.role} repository`);
   const relativeList = (paths, name) => (paths ?? []).map((path, index) => portablePath(repo, path, `${route.project}/${route.role} ${name}[${index}]`));
   const compiled = {
-    $schema: "../../../.claude/readiness/initialization/workspaces/portable-route.schema.json",
+    $schema: "../../../.claude/platform/readiness/initialization/workspaces/portable-route.schema.json",
     version: 1,
     project: route.project,
     role: route.role,
@@ -202,7 +202,7 @@ function expectedExport({source, repositoriesRoot, inputRoot}) {
   const configPath = legacy ? join(inputRoot, "config.json") : roots.config;
   if (!existsSync(configPath)) fail(`workspace config is absent: ${configPath}`);
   const config = readJson(configPath);
-  writes.set(roots.config, {$schema: "../.claude/contexts/workspaces/config.schema.json", version: 1, defaultLang: config.defaultLang});
+  writes.set(roots.config, {$schema: "../.claude/knowledge/contexts/workspaces/config.schema.json", version: 1, defaultLang: config.defaultLang});
   for (const path of routeFiles) {
     const route = compilePortableRoute(readJson(path), source, repositoriesRoot);
     writes.set(join(roots.projects, route.project, `${route.role}.json`), route);
@@ -263,14 +263,14 @@ function expectedHydrate({source, repositoriesRoot}) {
     verifyRelativeFiles(repo, context.manifests, `${declaration.project}/${declaration.role} manifest`);
     if (context.contract !== null) verifyRelativeFiles(repo, [context.contract], `${declaration.project}/${declaration.role} contract`);
     if (context.grammar !== null) {
-      const grammarRoot = join(source, ".claude", "grammars", context.grammar);
+      const grammarRoot = join(source, ".claude", "knowledge", "grammars", context.grammar);
       if (!existsSync(join(grammarRoot, "grammar.json")) || !existsSync(join(grammarRoot, "profiles", `${context.grammarProfile}.json`))) {
         fail(`${declaration.project}/${declaration.role} grammar/profile is absent`);
       }
     }
     const absoluteList = (paths) => paths.map((path) => resolve(repo, path));
     const route = {
-      $schema: "../../../../../.claude/contexts/workspaces/schema.json",
+      $schema: "../../../../../.claude/knowledge/contexts/workspaces/schema.json",
       version: 1,
       project: declaration.project,
       role: declaration.role,

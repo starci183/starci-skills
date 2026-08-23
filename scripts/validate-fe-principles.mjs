@@ -8,8 +8,8 @@ const json = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 export function validatePrinciples(sourceRoot) {
   const root = resolve(sourceRoot);
-  const principleRoot = resolve(root, "compilers/principles");
-  const profileRoot = resolve(root, "grammars/starci/profiles");
+  const principleRoot = resolve(root, "knowledge/compilers/principles");
+  const profileRoot = resolve(root, "knowledge/grammars/starci/profiles");
   const modules = readdirSync(principleRoot, {withFileTypes: true})
     .filter((entry) => entry.isDirectory() && existsSync(resolve(principleRoot, entry.name, "context.md")))
     .map((entry) => entry.name).sort();

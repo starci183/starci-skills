@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { evaluateQualityGate, rejectSecretArguments } from "../machines/sonar-assurance/check.mjs"
+import { evaluateQualityGate, rejectSecretArguments } from "../runtime/machines/sonar-assurance/check.mjs"
 
 function formBody(body = {}) { return new URLSearchParams(Object.entries(body).filter(([, value]) => value !== undefined)).toString() }
 

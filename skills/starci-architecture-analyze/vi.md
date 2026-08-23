@@ -10,8 +10,8 @@ description: Phân tích evidence-first, ưu tiên người đọc cho quyết �
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract reporting và orchestration dùng chung |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify mọi routed source được dùng làm evidence |
-| `@business` | `contexts/business/vi.md` | vi | giữ phương án kỹ thuật bên trong product truth đã chấp nhận |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | resolve và verify mọi routed source được dùng làm evidence |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | giữ phương án kỹ thuật bên trong product truth đã chấp nhận |
 
 ## NESTED SKILLS
 

@@ -10,20 +10,20 @@ description: Design, stage-approve, implement, seed and browser-prove one produc
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared staged approval and reporting boundary |
-| `@orchestration` | `orchestration/context.md` | context | assign decision, HTML, source and proof phases safely across the active runtime |
+| `@orchestration` | `runtime/orchestration/context.md` | context | assign decision, HTML, source and proof phases safely across the active runtime |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse ceremony larger than the measured frontend impact |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/context.md` | context | keep disposable review evidence in the current session |
-| `@composition` | `brainstorms/composition/context.md` | context | lock Scope, Owner, Invariant and Proof |
-| `@business` | `contexts/business/context.md` | context | bind journey and page decisions to current product truth |
-| `@archetypes` | `archetypes/context.md` | context | resolve one reusable macro page topology and complete responsive transformation before Grammar and Principles |
-| `@grammar` | `grammars/context.md` | context | load routed facts, outcomes and owners |
-| `@principles` | `compilers/principles/context.md` | context | audit selected visual decisions |
-| `@patterns-fe` | `compilers/patterns/fe/context.md` | context | choose source ownership before writing |
-| `@lints-fe` | `gates/fe/lints/context.md` | context | prove implemented source |
-| `@layouts` | `brainstorms/layouts/context.md` | context | validate journey/business/component synthesis and staged contracts |
-| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | run the integrated craft, UX, accessibility, engineering and detector review before HTML |
-| `@design-review` | `publication/design-review-preview/context.md` | context | publish page and state reviews in cache |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve and verify the frontend route |
+| `@worktrees` | `knowledge/contexts/worktrees/context.md` | context | keep disposable review evidence in the current session |
+| `@composition` | `knowledge/brainstorms/composition/context.md` | context | lock Scope, Owner, Invariant and Proof |
+| `@business` | `knowledge/contexts/business/context.md` | context | bind journey and page decisions to current product truth |
+| `@archetypes` | `knowledge/archetypes/context.md` | context | resolve one reusable macro page topology and complete responsive transformation before Grammar and Principles |
+| `@grammar` | `knowledge/grammars/context.md` | context | load routed facts, outcomes and owners |
+| `@principles` | `knowledge/compilers/principles/context.md` | context | audit selected visual decisions |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe/context.md` | context | choose source ownership before writing |
+| `@lints-fe` | `runtime/gates/fe/lints/context.md` | context | prove implemented source |
+| `@layouts` | `knowledge/brainstorms/layouts/context.md` | context | validate journey/business/component synthesis and staged contracts |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/context.md` | context | run the integrated craft, UX, accessibility, engineering and detector review before HTML |
+| `@design-review` | `runtime/publication/design-review-preview/context.md` | context | publish page and state reviews in cache |
 | `@contract-search` | `scripts/contract-search.mjs` | script | query contract reasons without exposing classes |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | emit selected grammar decisions and compact context |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package |
@@ -33,7 +33,7 @@ description: Design, stage-approve, implement, seed and browser-prove one produc
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | enforce schema 9 page/state, quality-review and capability-proof boundaries |
 | `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | refuse wrong parent or missing full-page proof |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | refuse phantom principle concerns |
-| `@maturity-schema` | `publication/design-review-preview/maturity.schema.json` | file | bind page-stage and state-stage maturity to captures |
+| `@maturity-schema` | `runtime/publication/design-review-preview/maturity.schema.json` | file | bind page-stage and state-stage maturity to captures |
 | `@validate-maturity` | `scripts/validate-design-maturity.mjs` | script | refuse juvenile, generic or unfinished previews |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | publish the staged cache review |
 | `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | enforce final same-viewport parity |

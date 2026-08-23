@@ -4,7 +4,7 @@ import {execFileSync, spawnSync} from "node:child_process";
 import {existsSync, readFileSync, readdirSync} from "node:fs";
 import {dirname, join, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
-import {evaluateQualityGate} from "../machines/sonar-assurance/check.mjs";
+import {evaluateQualityGate} from "../runtime/machines/sonar-assurance/check.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = resolve(here, "../..");
