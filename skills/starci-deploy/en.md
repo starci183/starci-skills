@@ -38,11 +38,32 @@ Run `@deployment-plan` in plan mode. If `.stacks/deployment.json` is absent, sca
 workflows, credentials-by-name, runtime definitions, probes and relevant sibling precedent, then produce
 one exact manifest and touch boundary. Do not substitute a generic example or infer a host/domain.
 
+## Invocation semantics
+
+Classify the owner's verb before choosing a path. `deploy`, `deploy VPS`, `deploy production`, `redeploy`,
+`release`, `triển khai VPS` and equivalent imperatives are execution intent, not a request to explain or
+compare infrastructure. Resolve project, role and environment from the explicit request, then the active
+invocation envelope, then one unambiguous verified workspace route plus manifest. Stop only if those facts
+still leave more than one target.
+
+When the resolved manifest already declares the host, runtime manager, artifacts, domains and probes, the
+imperative invocation is the release decision for exactly that declared boundary. Print the resolved target
+and value-free execution plan as notice, then execute; do not ask the owner to choose Caddy, Docker, Swarm,
+Tunnel or another platform when the manifest already chose, do not stop after planning, and do not require a
+second generic `OK`. A sibling such as Nivo may prove a stack pattern or shared ingress identity, but never
+becomes the deployment target, credential owner or application being released.
+
 ## Approval boundary
 
-Display one value-free plan under `### NEED APPROVALS`: tracked manifest/source writes, exact routed
-repositories, SSH host reference, artifact targets, domain names with owner/driver, workflow/ref, provider
-mutations and monitor success window. `OK` authorizes that complete declared boundary once.
+For adoption, a missing manifest, an ambiguous target or any new host/domain/tenant/project, display one
+value-free plan under `### NEED APPROVALS`: tracked manifest/source writes, exact routed repositories, SSH
+host reference, artifact targets, domain names with owner/driver, workflow/ref, provider mutations and monitor
+success window. `OK` authorizes that complete new boundary once.
+
+For an imperative execution request whose observed plan exactly matches an existing valid manifest, display
+the same facts as an execution notice and continue immediately. That invocation authorizes release operations
+and the smallest deployment-owned repair inside the declared repositories; it does not authorize destructive
+data loss, credential rotation, product/business expansion or a different external boundary.
 
 After `OK`, take baselines and continue setup, source wiring, `.infra` initialization, provider changes,
 workflow dispatch, SSH repair, retry and monitoring without asking about ordinary in-scope decisions.
@@ -62,6 +83,12 @@ shared value-safe helper is callable directly. Always plan provider changes firs
 Run verification before release. Dispatch the declared immutable release workflow, wait for completion,
 inspect bounded remote evidence and public probes, repair the smallest owned failure and retry only after
 the cause changes. Continue until every required probe stays green for the manifest's steady window.
+
+The concrete release path follows declared source rather than a fresh technology proposal: verify; build and
+publish immutable container artifacts when declared; install or prove the declared VPS runtime; deploy through
+the declared Compose, Swarm or other manager; run migrations/init jobs; reconcile the declared domain driver;
+prove trusted TLS and application health for the full steady window. Re-enter the smallest failed stage after
+repair instead of restarting the conversation at architecture selection.
 
 A green apply, workflow or container is intermediate evidence, never the terminal condition. Pause only
 when a vendor credential must be entered through hidden input, access is absent, or the next action crosses

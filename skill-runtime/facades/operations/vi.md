@@ -13,7 +13,7 @@ Route provider và runtime operation tới đúng một existing owner mà khôn
 | Mode | Physical skill | Discriminating intent |
 |---|---|---|
 | `tunnel` | `starci-cloudflare-tunnel-set` | public HTTP(S) tunnel và DNS route đã approve |
-| `deploy` | `starci-deploy` | declared stack adoption, release, monitoring, recovery hoặc rollback |
+| `deploy` | `starci-deploy` | imperative deploy/deploy-VPS stack đã khai tới release, trusted HTTPS và steady state; hoặc adoption, monitoring, recovery và rollback |
 | `mcp` | `starci-setup-mcp` | setup hoặc refresh Source-wide read-only source-context MCP |
 | `sonar` | `starci-setup-sonar` | shared SonarQube service và strict quality-gate reconciliation |
 

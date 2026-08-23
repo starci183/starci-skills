@@ -67,9 +67,9 @@
       "knowledge": ["quality debt", "source gates"], "tools": ["source gates", "test runner"]
     },
     "starci-deploy": {
-      "macro": "operations", "macroMode": "deploy", "aliases": ["release-project"],
-      "intent": ["deploy declared project stack", "recover immutable project release", "triển khai release và rollback dự án"],
-      "excludes": ["local development startup", "undeclared external host", "ad hoc file upload"],
+      "macro": "operations", "macroMode": "deploy", "aliases": ["release-project", "deploy-vps"],
+      "intent": ["deploy declared project stack", "deploy production and prove https", "deploy vps for routed project", "recover immutable project release", "deploy VPS dự án đã route", "triển khai VPS đến khi HTTPS ổn định", "triển khai release và rollback dự án"],
+      "excludes": ["architecture recommendation without deployment", "local development startup", "undeclared external host", "ad hoc file upload"],
       "modes": ["adopt", "deploy", "monitor", "recover", "rollback", "setup"], "risk": "external-write",
       "read": ["declared stack intent", "deployment execution state"], "write": ["deployment execution state", "remote host and release state"],
       "knowledge": ["deployment contracts", "workspace routes"], "tools": ["ssh host control", "release workflows"]

@@ -15,9 +15,9 @@
     },
     {
       "id": "deploy",
-      "intent": "Adopt, deploy, monitor, recover, or roll back a declared routed product stack.",
+      "intent": "Execute an imperative deploy or deploy-VPS request for a declared routed product through trusted HTTPS and steady state, or adopt, monitor, recover, or roll it back.",
       "targetSkill": "starci-deploy",
-      "selectionFacts": ["declared .stacks intent", "host release or steady state", "recover or roll back"],
+      "selectionFacts": ["imperative deploy or deploy VPS", "declared .stacks intent", "host release, trusted HTTPS, or steady state", "recover or roll back"],
       "excludes": ["local development startup", "undeclared external host"]
     },
     {

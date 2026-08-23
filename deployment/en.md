@@ -82,6 +82,25 @@ The value-free plan plus exact source, provider, host and public boundaries is t
 After approval, initialize execution state with the same command using `--init` and continue without
 asking about ordinary setup, repair or retry.
 
+## Execution intent
+
+An imperative deploy, deploy-VPS, production-release, redeploy or rollback request is an operation, not
+an architecture consultation. Resolve its target in this order: explicit project/role/environment in the
+request, the active invocation envelope, then one unambiguous verified workspace route with a valid manifest.
+An unresolved or multiple target stops before external mutation; a clearly resolved target never detours into
+another project's stack merely because that stack supplied precedent.
+
+When the observed plan is byte-for-boundary equivalent to an existing valid manifest, the imperative request
+itself is the release authorization for that declared host, artifacts, domains, driver, workflow and steady
+window. Report those facts as an execution notice and proceed through verification, immutable build/publication,
+runtime deployment, migrations or initialization, domain reconciliation, trusted TLS and steady-state proof.
+A second generic approval is required only when adopting missing intent or introducing a new host, hostname,
+tenant, project, destructive action or credential rotation.
+
+The declared runtime owns the mechanism. Docker Swarm stays Docker Swarm, Compose stays Compose and an existing
+shared ingress stays shared unless approved source changes that intent. Sibling deployments may provide immutable
+implementation precedent; they do not transfer application, host, domain, credential or state ownership.
+
 ## Setup
 
 Setup proves all prerequisites instead of trusting presence:
@@ -114,8 +133,9 @@ a platform record never captures tenant space by convenience.
 
 ## Deploy loop
 
-Verification gates run first. A deploy uses the workflow/ref declared by the manifest and immutable
-artifact tags or digests. It does not push or merge source just to trigger a workflow.
+Verification gates run first. A deploy uses the workflow/ref declared by the manifest and immutable artifact
+tags or digests. The declared workflow may verify, build and publish those artifacts before deploying them. It
+does not push or merge source merely to trigger a workflow when the release mechanism supports explicit dispatch.
 
 Observe the workflow and remote runtime. On failure, classify it as source, credential/config presence,
 provider access, domain, SSH/host, runtime manager, rollout or application health. Gather bounded evidence,
@@ -159,6 +179,9 @@ mutation. A real run additionally proves:
 6. Verification precedes deployment and immutable identity survives rollout and rollback.
 7. SSH/runtime evidence and public probes both participate in completion.
 8. Repair and retry continue until steady success or a genuine approval/input boundary.
+9. An imperative deploy request against one valid resolved manifest executes that release; planning is an
+   intermediate control and never the terminal result.
+10. Sibling precedent can supply a pattern but never changes the resolved deployment target or ownership.
 
 ## Scope
 

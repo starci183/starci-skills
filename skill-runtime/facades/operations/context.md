@@ -13,7 +13,7 @@ Route provider and runtime operations to one exact existing owner without mergin
 | Mode | Physical skill | Discriminating intent |
 |---|---|---|
 | `tunnel` | `starci-cloudflare-tunnel-set` | approved public HTTP(S) tunnel and DNS route |
-| `deploy` | `starci-deploy` | declared stack adoption, release, monitoring, recovery, or rollback |
+| `deploy` | `starci-deploy` | imperative deploy/deploy-VPS of a declared stack through release, trusted HTTPS and steady state; or adoption, monitoring, recovery and rollback |
 | `mcp` | `starci-setup-mcp` | Source-wide read-only source-context MCP setup or refresh |
 | `sonar` | `starci-setup-sonar` | shared SonarQube service and strict quality-gate reconciliation |
 

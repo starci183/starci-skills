@@ -80,6 +80,23 @@ Plan không có value cùng exact source, provider, host và public boundary là
 init execution state bằng cùng command với `--init` và tiếp tục mà không hỏi về setup, repair hay retry thông
 thường.
 
+## Execution intent
+
+Imperative request deploy, deploy VPS, production release, redeploy hoặc rollback là operation, không phải
+architecture consultation. Resolve target theo thứ tự: project/role/environment explicit trong request, active
+invocation envelope, rồi một verified workspace route không mơ hồ có manifest hợp lệ. Target chưa resolve hoặc
+có nhiều target dừng trước external mutation; target đã rõ không vòng sang stack dự án khác chỉ vì stack đó cấp precedent.
+
+Khi observed plan tương đương byte-for-boundary với manifest hợp lệ hiện có, imperative request tự nó là release
+authorization cho host, artifact, domain, driver, workflow và steady window đã khai. Report các fact đó như
+execution notice rồi chạy verification, immutable build/publication, runtime deployment, migration/init, domain
+reconciliation, trusted TLS và steady-state proof. Chỉ cần generic approval thứ hai khi adopt intent còn thiếu
+hoặc thêm host, hostname, tenant, project, destructive action hay credential rotation mới.
+
+Declared runtime sở hữu mechanism. Docker Swarm vẫn là Docker Swarm, Compose vẫn là Compose và shared ingress
+hiện có vẫn dùng chung trừ khi source intent được duyệt thay đổi. Sibling deployment có thể cấp immutable
+implementation precedent; nó không chuyển ownership của application, host, domain, credential hay state.
+
 ## Setup
 
 Setup chứng minh mọi prerequisite thay vì tin vào sự tồn tại:
@@ -111,7 +128,8 @@ chiếm tenant space.
 ## Deploy loop
 
 Verification gate chạy trước. Deploy dùng workflow/ref manifest khai và artifact tag hoặc digest bất biến.
-Nó không push hay merge source chỉ để trigger workflow.
+Declared workflow có thể verify, build và publish các artifact đó trước khi deploy. Nó không push hay merge
+source chỉ để trigger workflow khi release mechanism hỗ trợ explicit dispatch.
 
 Quan sát workflow và remote runtime. Khi fail, phân loại source, credential/config presence, provider access,
 domain, SSH/host, runtime manager, rollout hoặc application health. Thu bounded evidence, repair owned boundary
@@ -155,6 +173,9 @@ Một run thật còn phải chứng minh:
 6. Verification đi trước deployment và immutable identity sống qua rollout lẫn rollback.
 7. SSH/runtime evidence và public probe cùng tham gia completion.
 8. Repair và retry tiếp tục tới steady success hoặc approval/input boundary thật.
+9. Imperative deploy request trên một manifest hợp lệ đã resolve phải thực thi release đó; planning là control
+   trung gian và không bao giờ là terminal result.
+10. Sibling precedent có thể cấp pattern nhưng không bao giờ đổi deployment target hoặc ownership đã resolve.
 
 ## Scope
 

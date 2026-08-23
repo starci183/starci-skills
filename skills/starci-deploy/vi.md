@@ -38,11 +38,30 @@ Chạy `@deployment-plan` ở plan mode. Nếu `.stacks/deployment.json` chưa c
 credential-by-name, runtime definition, probe và sibling precedent liên quan thật, rồi tạo đúng một manifest
 và touch boundary chính xác. Không thay bằng generic example hoặc infer host/domain.
 
+## Ngữ nghĩa invocation
+
+Phân loại động từ của owner trước khi chọn path. `deploy`, `deploy VPS`, `deploy production`, `redeploy`,
+`release`, `triển khai VPS` và imperative tương đương là execution intent, không phải yêu cầu giải thích hay
+so sánh hạ tầng. Resolve project, role và environment từ request explicit, rồi active invocation envelope,
+sau đó một verified workspace route cùng manifest không mơ hồ. Chỉ dừng nếu các evidence đó vẫn còn hơn một target.
+
+Khi manifest đã resolve khai đủ host, runtime manager, artifact, domain và probe, invocation imperative chính
+là release decision cho đúng declared boundary đó. In target đã resolve và value-free execution plan như notice,
+rồi thực thi; không hỏi owner chọn Caddy, Docker, Swarm, Tunnel hay platform khác khi manifest đã chọn, không dừng
+sau planning và không đòi thêm một `OK` chung chung. Sibling như Nivo có thể chứng minh stack pattern hoặc shared
+ingress identity, nhưng không bao giờ trở thành deployment target, credential owner hay application được release.
+
 ## Approval boundary
 
-Hiển thị một plan không có value dưới `### NEED APPROVALS`: tracked manifest/source write, routed repository
-chính xác, SSH host reference, artifact target, domain name cùng owner/driver, workflow/ref, provider mutation
-và monitor success window. `OK` authorize toàn bộ declared boundary đó đúng một lần.
+Với adoption, manifest thiếu, target mơ hồ hoặc host/domain/tenant/project mới, hiển thị một plan không có value
+dưới `### NEED APPROVALS`: tracked manifest/source write, routed repository chính xác, SSH host reference,
+artifact target, domain name cùng owner/driver, workflow/ref, provider mutation và monitor success window.
+`OK` authorize toàn bộ boundary mới đó đúng một lần.
+
+Với imperative execution request có observed plan khớp chính xác manifest hợp lệ hiện có, hiển thị cùng các fact
+như execution notice và tiếp tục ngay. Invocation đó authorize release operation và deployment-owned repair nhỏ
+nhất trong declared repository; nó không authorize destructive data loss, credential rotation, product/business
+expansion hay external boundary khác.
 
 Sau `OK`, lấy baseline rồi tiếp tục setup, source wiring, `.infra` initialization, provider change, workflow
 dispatch, SSH repair, retry và monitoring mà không hỏi về quyết định in-scope thông thường. Chỉ quay lại
@@ -62,6 +81,11 @@ helper value-safe được gọi trực tiếp. Luôn plan provider change trư�
 Chạy verification trước release. Dispatch immutable release workflow đã khai, đợi completion, inspect bounded
 remote evidence và public probe, repair owned failure nhỏ nhất và chỉ retry sau khi nguyên nhân đổi. Tiếp tục
 tới khi mọi required probe giữ green suốt steady window của manifest.
+
+Concrete release path theo declared source thay vì mở lại technology proposal: verify; build và publish immutable
+container artifact khi đã khai; cài hoặc prove declared VPS runtime; deploy qua Compose, Swarm hay manager đã khai;
+chạy migration/init job; reconcile domain driver đã khai; prove trusted TLS và application health đủ steady window.
+Sau repair, quay lại stage nhỏ nhất đã fail thay vì khởi động lại hội thoại ở bước chọn architecture.
 
 Apply, workflow hay container green chỉ là evidence trung gian, không phải terminal condition. Chỉ pause khi
 vendor credential phải nhập qua hidden input, thiếu access, hoặc action tiếp theo vượt approved boundary. Không
