@@ -15,9 +15,9 @@ workers concurrently; refill a slot only after one worker finishes or is interru
 small bounded turn window so each worker receives only its explicit task envelope and the exact authority paths it
 must read. Workers default to medium reasoning unless the coordinator records a measured need for another level.
 
-The Sol root alone selects journey and UI direction, consumes approvals, owns `.claude`, integrates shared source
-and declares parity. Luna workers default to evidence inventory, cache HTML generation, approved disjoint product
-code, seed execution, tests and browser captures. Every Luna must read the Source `AGENTS.md` bootstrap and complete
+The Sol root alone selects scope, authority and domain decisions, consumes approvals, owns `.claude` and provider
+mutation, integrates shared targets and declares the final verdict. Luna workers default to evidence inventory,
+bounded materialization, approved disjoint repository work, tests and proof capture. Every Luna must read the Source `AGENTS.md` bootstrap and complete
 `.claude/INDEX.md` before its task authority, must not spawn another worker and must return a structured receipt.
 
 If the Codex collaboration runtime exposes fewer than three worker slots, use the measured capacity. If the named

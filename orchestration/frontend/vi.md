@@ -38,6 +38,14 @@ request + routed truth
 HTML trước eligible decision contract cùng quality receipt đã freeze là design chưa được phép. Product code trước source-authorizing approval
 là implementation chưa được phép. Agent label không làm yếu hai boundary này.
 
+## Skill bindings
+
+| Skill | Exact phase map |
+|---|---|
+| `starci-fe-design-layout` | Map Layout |
+| `starci-fe-design-block` | Map Block |
+| `starci-fe-layout-refactor` | Map Refactor |
+
 ## Approval execution mode
 
 Ba frontend skill đã bind mặc định dùng `manual`. Exact `mode=auto` trong invocation bind

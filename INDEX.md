@@ -100,7 +100,7 @@ not copy those laws:
 ```text
 @kernel
   → @workflows
-  → @orchestration when a selected skill declares a validated phase map
+  → @orchestration through the selected skill's machine-validated phase map
   → @standards
   → approved source write
   → @gates
@@ -147,7 +147,8 @@ target-specific work. Say so; do not proceed on a guess.
 ## Capabilities
 
 Seventeen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
-record. `@orchestration` partitions only explicitly bound skills; it is policy, not another capability.
+record. `@orchestration` covers all physical skills through one machine registry; it is policy, not another capability,
+and coverage does not force delegation when sequential execution is safer or cheaper.
 
 | Skill | Owns |
 |---|---|

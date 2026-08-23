@@ -38,6 +38,14 @@ request + routed truth
 HTML before a frozen eligible decision contract and quality receipt is unauthorized design. Product code before the source-authorizing approval
 is unauthorized implementation. An agent label never weakens either boundary.
 
+## Skill bindings
+
+| Skill | Exact phase map |
+|---|---|
+| `starci-fe-design-layout` | Layout map |
+| `starci-fe-design-block` | Block map |
+| `starci-fe-layout-refactor` | Refactor map |
+
 ## Approval execution mode
 
 The three bound frontend skills default to `manual`. Exact `mode=auto` on the invocation binds

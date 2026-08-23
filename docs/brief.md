@@ -25,7 +25,7 @@ The result is not merely a suggested design or plan. Selected decisions remain t
 session to the source state they were made against; the same invocation implements them, and execution stops
 when that evidence is stale or incomplete.
 
-## The seventeen skills
+## The eighteen skills
 
 ### Environment and trust
 
@@ -47,6 +47,7 @@ when that evidence is stale or incomplete.
 | [`starci-fe-design-layout`](./skills/starci-fe-design-layout) | Generate one complete long page/full flow with every block and state; brainstorm alternatives only on request; orchestrate frozen HTML, approved code, seed and proof through bounded workers | `OK #1` freezes direction/page anatomy; `OK #2` authorizes exact source and seed paths |
 | [`starci-fe-design-block`](./skills/starci-fe-design-block) | Audit/correct a Layout-generated block in its full page; brainstorm anatomies only on request; orchestrate complete-parent HTML, approved code and proof | `OK #1` freezes block direction; `OK #2` authorizes exact FE/test paths |
 | [`starci-fe-layout-refactor`](./skills/starci-fe-layout-refactor) | Correct any Layout/Block-rendered output; owner feedback is evidence that skill authority, reasoning, enforcement or source application failed; orchestrate authority audit, frozen HTML, approved FE and proof | `OK #1` freezes correction direction; `OK #2` authorizes the authority-to-write and FE impact cone |
+| [`starci-fe-ui-reconcile`](./skills/starci-fe-ui-reconcile) | Challenge consistency across a closed set of existing UI surfaces, distinguish local drift from systemic grammar/principle gaps, then align the approved impact cone | exact `OK` authorizes the displayed authority, FE consumer and proof boundary |
 | [`starci-grammar-refresh-references`](./skills/starci-grammar-refresh-references) | Refresh stale optional immutable grammar provenance without changing durable authority | routed grammar reference sidecar only |
 
 Frontend design keeps review evidence temporary and makes source the durable result:
@@ -75,6 +76,15 @@ resolve only visual deltas left unanswered by baseline, MASTER, grammar and sour
 |---|---|---|
 | [`starci-be-plan`](./skills/starci-be-plan) | Name the exact files, schema evidence, sibling shape, boundaries, and tests before code exists | no product code |
 | [`starci-be-approve`](./skills/starci-be-approve) | Challenge one exact backend revision until the owner approves it, then implement and prove only that revision | approved backend paths |
+
+### Agent orchestration
+
+All eighteen physical skills resolve one machine-validated entry in `orchestration/profiles.json`. The selected
+skill keeps its own `PIPELINE`, approvals and proof law; orchestration only partitions accepted work into bounded
+Claude or Codex tasks. Read-only and authority/provider work may remain coordinator-sequential, while independent
+evidence, approved disjoint repository changes, tests and proof can run through workers. The machine rejects a
+missing skill map, stale step order, overlapping writer target or mutation without the selected skill's exact
+approval.
 
 ## What the machine refuses
 

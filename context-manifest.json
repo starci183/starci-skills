@@ -759,28 +759,40 @@
       "kind": "router",
       "contextVersion": 1
     },
+    "orchestration/capabilities/context.md": {
+      "kind": "module",
+      "source": "orchestration/capabilities/en.md",
+      "sourceHash": "70bb09ae1b4cb4809b37f421ed8b293516e4547de0ad8ec0e53af06723ece7f1",
+      "contextVersion": 1
+    },
     "orchestration/claude/context.md": {
       "kind": "module",
       "source": "orchestration/claude/en.md",
-      "sourceHash": "29ab2a5006651628928e51f273ef39afebb581dcd338bc7e956c2d31749dce3a",
+      "sourceHash": "ea96b2d587f9d437d41e35cebb7fa097bddea9362a49df2441196fdc9962cd56",
       "contextVersion": 1
     },
     "orchestration/codex/context.md": {
       "kind": "module",
       "source": "orchestration/codex/en.md",
-      "sourceHash": "51b910c8b64c7e38ab4c3f44c70b5bf0003b10ced29f26af11e9b0f15b1ae656",
+      "sourceHash": "6e719516790e24f9593ec388494c69b2a3731ef2c913cfdbc31de4fc736a18f8",
       "contextVersion": 1
     },
     "orchestration/context.md": {
       "kind": "module",
       "source": "orchestration/en.md",
-      "sourceHash": "f44100e99f0590d41071f555eafbaff1a9700eb8a83ca6445a02e216748dfcd2",
+      "sourceHash": "eb28a6c5cd61cda140b4775cea4ae8a4a50676872f836f8d490c5f7187d4eec9",
       "contextVersion": 1
     },
     "orchestration/frontend/context.md": {
       "kind": "module",
       "source": "orchestration/frontend/en.md",
-      "sourceHash": "6b3bb109b58c5bb0590547614e4606d6c67f7112b1544e593022188a8ab5a899",
+      "sourceHash": "5da1f69cc7eb3dff981c69496c069c8b9d44d040eab332580e4a1c894f66c8d1",
+      "contextVersion": 1
+    },
+    "orchestration/maps/context.md": {
+      "kind": "module",
+      "source": "orchestration/maps/en.md",
+      "sourceHash": "76a0fe11f8648e79e643de61531ba5918693122e6253f7b8b69edefc6d0d8e09",
       "contextVersion": 1
     },
     "publication/context.md": {
@@ -932,7 +944,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "de2fde2237aec687cd62623976f3a97c5b9b6c78a5cc5549b56dc67a205aac0b",
+      "sourceHash": "09707ac1aa759ad933ce114dc71c56074b2cc000523ada6d4b196d22582f2b4a",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {
@@ -980,7 +992,7 @@
     "workflows/business/context.md": {
       "kind": "module",
       "source": "workflows/business/en.md",
-      "sourceHash": "71e370982d9a73390037068c2170df125d74a2f61e2d4f13b290310959925c9a",
+      "sourceHash": "ba22332a54defb3e6475c6e757801fe755b8f2b6cd89fc7f566d7f3afd5d9e38",
       "contextVersion": 1
     },
     "workflows/context.md": {

@@ -63,12 +63,12 @@ export const groups = [
   {
     source: "skills",
     title: "Skills",
-    description: "What every skill must print, ask and record — the reporting shape all seventeen capabilities share.",
+    description: "What every skill must print, ask and record — the reporting shape all eighteen capabilities share.",
   },
   {
     source: "orchestration",
     title: "Agent orchestration",
-    description: "One coordinator/worker contract, explicit Claude and Codex runtime adapters, and the complete Layout, Block and Refactor phase map.",
+    description: "One coordinator/worker contract, explicit Claude and Codex adapters, and machine-validated phase maps for every physical StarCi skill.",
   },
   {
     source: "contexts",

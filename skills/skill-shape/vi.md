@@ -73,9 +73,9 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười bảy năng lực
+## Mười tám năng lực
 
-Mười lăm capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
+Mười sáu capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
 máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
@@ -94,6 +94,7 @@ thể ngay từ đầu nó đã đúng.
 | `starci-debt-repay` | trả debt đã được owner duyệt theo từng scope, ghi tiến độ và chỉ bỏ scope có proof pass |
 | `starci-fe-design-layout` | in journey và UI direction, join thành một complete source-bound page/flow rồi duyệt, seed, implement và prove |
 | `starci-fe-layout-refactor` | sở hữu proportional correction của Layout/Block-rendered output, điều tra owner feedback, chỉ evolve durable authority bằng systemic evidence rồi prove exact impact cone |
+| `starci-fe-ui-reconcile` | phản biện consistency giữa các UI surface hiện hữu, tách local drift khỏi systemic authority gap, chỉ evolve grammar/principles bằng evidence rồi align và prove approved impact cone |
 | `starci-fe-design-block` | in một UI direction mặc định hoặc 3–4 khi explicit brainstorm cho một region trong complete parent, rồi duyệt, implement và prove |
 | `starci-grammar-refresh-references` | một lượt sửa liên tục cho optional immutable grammar provenance stale; durable authority giữ nguyên byte |
 | `starci-conversation-record` | conversation provenance snapshot provider-neutral và exact FE/BE artifact link, không lưu raw transcript trong Git |
@@ -285,9 +286,10 @@ thêm**.
 6. Task khác dựng lại design evidence từ current source, contract, grammar và business truth.
 7. Production baseline lấy sau source-authorizing manual hoặc auto receipt và trước production write đầu tiên.
 8. Path ngoài boundary đã trình trở lại thành mục `NEED APPROVALS` mới.
-9. Delegation đi theo `@orchestration` và validated phase map của skill đã chọn. Synthesis `dual-track` dùng
-   evidence owner biệt lập và một coordinator cho bước join; chỉ chia source khi một path có đúng một writer.
-   Skill không có orchestration binding rõ vẫn chạy tuần tự.
+9. Delegation đi theo `@orchestration` và machine-validated phase map của skill đã chọn. Synthesis `dual-track`
+   dùng evidence owner biệt lập và một coordinator cho bước join; chỉ chia repository khi một target có đúng một
+   writer. Mọi physical skill đều có map; execution vẫn tuần tự khi không có task rời nhau an toàn với coordination
+   benefit dương.
 10. Mọi StarCi skill duy trì bảng bước user-facing gọn. Orchestration là nội bộ và chỉ hiện thành tiến độ có ý nghĩa
     hoặc boundary thật; raw record, worker prompt, hidden context và tool chatter không được in.
 11. Resolve `defaultLang` từ workspace config chung của Source trước phản hồi đầu tiên cho người dùng.

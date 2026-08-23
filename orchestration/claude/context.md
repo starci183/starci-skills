@@ -11,9 +11,9 @@ at most three Sonnet workers concurrently and refill completed slots. Every back
 agent definition or prompt envelope, allowed tools, exact working directory, model, effort and permission mode.
 Use medium effort for workers by default.
 
-The Opus coordinator alone selects journey and UI direction, consumes approvals, owns `.claude`, integrates shared
-source and declares parity. Sonnet workers default to evidence inventory, cache HTML generation, approved disjoint
-product code, seed execution, tests and browser captures. Workers must read the Source bootstrap and complete
+The Opus coordinator alone selects scope, authority and domain decisions, consumes approvals, owns `.claude` and
+provider mutation, integrates shared targets and declares the final verdict. Sonnet workers default to evidence
+inventory, bounded materialization, approved disjoint repository work, tests and proof capture. Workers must read the Source bootstrap and complete
 `.claude/INDEX.md`, cannot create child agents and return the common structured receipt.
 
 Use Claude Code background agents only when the installed runtime exposes the required `--agents` or `agents`

@@ -73,9 +73,9 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The seventeen capabilities
+## The eighteen capabilities
 
-Fifteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Sixteen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
@@ -93,6 +93,7 @@ measurement: a route it quietly refreshed reads as a route that was fine.
 | `starci-debt-repay` | existing owner-approved debt repaid scope by scope, with progress recorded and only proven scopes removed |
 | `starci-fe-design-layout` | print journey and UI direction, join them into one complete source-bound page/flow, then approve, seed, implement and prove it |
 | `starci-fe-layout-refactor` | own proportional correction of Layout/Block-rendered output, investigate owner feedback, evolve durable authority only with systemic evidence, then prove the exact impact cone |
+| `starci-fe-ui-reconcile` | challenge consistency across existing UI surfaces, separate local drift from systemic authority gaps, evolve grammar/principles only with evidence, then align and prove the approved impact cone |
 | `starci-fe-design-block` | print one UI direction by default or 3–4 on explicit brainstorm for one region inside its complete parent, then approve, implement and prove it |
 | `starci-grammar-refresh-references` | one continuous repair of stale optional immutable grammar provenance; durable authority stays byte-identical |
 | `starci-conversation-record` | provider-neutral conversation provenance snapshots and exact FE/BE artifact links without raw transcript Git storage |
@@ -290,9 +291,10 @@ appended.
 6. Another task regenerates design evidence from current source, contract, grammar and business truth.
 7. A production baseline is taken after the source-authorizing manual or auto receipt and before the first production write.
 8. A path outside the displayed boundary returns as a new `NEED APPROVALS` item.
-9. Delegation follows `@orchestration` and the selected skill's validated phase map. A `dual-track` synthesis uses
-   isolated evidence owners and one coordinator for the join; source partitioning is legal only with one writer per
-   path. Skills without an explicit orchestration binding remain sequential.
+9. Delegation follows `@orchestration` and the selected skill's machine-validated phase map. A `dual-track`
+   synthesis uses isolated evidence owners and one coordinator for the join; repository partitioning is legal only
+   with one writer per target. Every physical skill is mapped; execution remains sequential when no safe disjoint
+   task has positive coordination benefit.
 10. Every invoked StarCi skill maintains the compact user-facing step table. Orchestration is internal and is
     shown only as material progress or a genuine boundary; raw records, worker prompts and tool chatter remain internal.
 11. Resolve `defaultLang` from the Source-wide workspace config before the first user-facing reply.

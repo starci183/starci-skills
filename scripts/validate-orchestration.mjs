@@ -4,8 +4,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 
 const requiredDecisions = [
-  "journey-decision", "ui-direction", "state-ownership", "approval",
-  "claude-authority", "shared-integration", "final-verdict"
+  "scope-decision", "authority-decision", "approval", "shared-integration", "final-verdict"
 ];
 
 const exactRuntimes = {
@@ -23,15 +22,15 @@ export const canonicalHash = (value) => crypto.createHash("sha256").update(JSON.
 
 export function validateProfiles(value) {
   const failures = [];
-  if (value?.schemaVersion !== 2) failures.push("profiles.schemaVersion must equal 2");
+  if (value?.schemaVersion !== 3) failures.push("profiles.schemaVersion must equal 3");
   if (value?.common?.workerLimitKind !== "runtime-capacity" || value?.common?.scheduler !== "ready-disjoint-overhead-positive") failures.push("worker limit must be runtime capacity and scheduling must be overhead-positive");
   if (value?.common?.maxConcurrentWorkers !== 3) failures.push("maxConcurrentWorkers must equal 3");
-  if (value?.common?.oneWriterPerPath !== true) failures.push("oneWriterPerPath must be true");
+  if (value?.common?.oneWriterPerTarget !== true) failures.push("oneWriterPerTarget must be true");
   if (value?.common?.workersMaySpawn !== false) failures.push("workersMaySpawn must be false");
   for (const decision of requiredDecisions) {
     if (!value?.common?.coordinatorOwns?.includes(decision)) failures.push(`coordinatorOwns is missing ${decision}`);
   }
-  for (const capability of ["cache-html", "approved-disjoint-code", "tests", "browser-capture"]) {
+  for (const capability of ["evidence-inventory", "bounded-materialization", "approved-disjoint-repository-write", "tests", "proof-capture"]) {
     if (!value?.common?.workerDefaults?.includes(capability)) failures.push(`workerDefaults is missing ${capability}`);
   }
   for (const [runtime, expected] of Object.entries(exactRuntimes)) {
@@ -39,29 +38,40 @@ export function validateProfiles(value) {
       if (value?.runtimes?.[runtime]?.[key] !== expectedValue) failures.push(`${runtime}.${key} must equal ${expectedValue}`);
     }
   }
-  for (const skill of value?.boundSkills ?? []) {
-    const steps = value?.stepMaps?.[skill];
-    if (!Array.isArray(steps) || steps.length < 2 || steps[1] !== "orchestration") failures.push(`${skill} must declare orchestration as its second step`);
+  const allowedTopologies = new Set(["dual-track", "reconciliation", "linear"]);
+  const allowedMaps = new Set(["frontend", "capabilities"]);
+  const allowedWorkflows = new Set(["audit", "record", "repository", "provider", "block", "layout", "full"]);
+  const allowedImpacts = new Set(["read-only", "record", "repository", "provider", "component", "page", "capability", "cross-domain"]);
+  for (const [skill, map] of Object.entries(value?.skillMaps ?? {})) {
+    if (!/^starci-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill)) failures.push(`invalid skill map key ${skill}`);
+    if (!allowedTopologies.has(map?.topology)) failures.push(`${skill} has invalid topology`);
+    if (!allowedMaps.has(map?.map)) failures.push(`${skill} has invalid phase map`);
+    if (!allowedWorkflows.has(map?.workflow)) failures.push(`${skill} has invalid workflow`);
+    if (!Array.isArray(map?.impactLevels) || !map.impactLevels.length || map.impactLevels.some((impact) => !allowedImpacts.has(impact))) failures.push(`${skill} has invalid impact levels`);
+    if (!Array.isArray(map?.approvalModes) || !map.approvalModes.includes("manual") || map.approvalModes.some((mode) => !["manual", "auto"].includes(mode))) failures.push(`${skill} has invalid approval modes`);
+    if (map?.approvalLabel !== null && !/^OK(?: #[12])?$/.test(map?.approvalLabel ?? "")) failures.push(`${skill} has invalid approval label`);
+    if (map?.approvalModes?.includes("auto") && !/^OK #[12]$/.test(map?.approvalLabel ?? "")) failures.push(`${skill} enables auto without a staged approval label`);
+    if (!Array.isArray(map?.steps) || map.steps.length < 2 || new Set(map.steps).size !== map.steps.length) failures.push(`${skill} has an invalid step map`);
   }
   return {ok: failures.length === 0, failures};
 }
 
 export function validateReceipt(receipt, profiles) {
   const failures = [];
-  if (receipt?.schemaVersion !== 3) failures.push("receipt.schemaVersion must equal 3");
+  if (receipt?.schemaVersion !== 4) failures.push("receipt.schemaVersion must equal 4");
   const impact = receipt?.impact;
-  const validImpact = {component: "block", page: "layout", capability: "full", "cross-domain": "full"};
-  if (!validImpact[impact?.level] || validImpact[impact?.level] !== impact?.workflow || !/^[0-9a-f]{64}$/.test(impact?.classificationAt ?? "")) failures.push("receipt impact classification is missing or inconsistent");
+  const skillMap = profiles?.skillMaps?.[receipt?.skill];
+  if (!skillMap || impact?.workflow !== skillMap.workflow || !skillMap.impactLevels.includes(impact?.level) || !/^[0-9a-f]{64}$/.test(impact?.classificationAt ?? "")) failures.push("receipt impact classification is missing or inconsistent with the selected skill map");
   const highRisk = ["capability", "cross-domain"].includes(impact?.level);
   if (!Array.isArray(receipt?.challenges)) failures.push("receipt challenges must be an explicit array");
   const approvalMode = receipt?.phaseGates?.approvalMode;
   const autoApprovalAt = receipt?.phaseGates?.autoApprovalAt;
-  if (!['manual', 'auto'].includes(approvalMode)) failures.push("phaseGates.approvalMode must be manual or auto");
+  if (!skillMap?.approvalModes?.includes(approvalMode)) failures.push("phaseGates.approvalMode is not allowed by the selected skill map");
   if (approvalMode === "auto" && (!/^[0-9a-f]{64}$/.test(autoApprovalAt ?? "") || autoApprovalAt !== receipt?.envelopeAt)) failures.push("auto approval mode requires the immutable invocation envelope hash");
   if (approvalMode === "manual" && autoApprovalAt !== undefined) failures.push("manual approval mode cannot carry autoApprovalAt");
   const runtimeProfile = profiles?.runtimes?.[receipt?.runtime];
   if (receipt?.runtime !== "sequential" && !runtimeProfile) failures.push(`unknown runtime ${receipt?.runtime}`);
-  if (!profiles?.boundSkills?.includes(receipt?.skill)) failures.push(`unbound skill ${receipt?.skill}`);
+  if (!skillMap) failures.push(`unbound skill ${receipt?.skill}`);
   if (receipt?.runtime !== "sequential" && receipt?.coordinator?.model !== runtimeProfile?.coordinatorModel) failures.push("coordinator model does not match runtime profile");
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(receipt?.coordinator?.id ?? "")) failures.push("coordinator id is missing");
   for (const decision of requiredDecisions) {
@@ -69,7 +79,7 @@ export function validateReceipt(receipt, profiles) {
   }
   const ids = new Set();
   const writers = new Map();
-  const sourceTaskIds = [];
+  const writeTaskIds = [];
   const normalizePath = (value) => {
     const raw = String(value);
     const windowsPath = /^[A-Za-z]:[\\/]/.test(raw);
@@ -126,7 +136,7 @@ export function validateReceipt(receipt, profiles) {
     ids.add(task.id);
     if (task.skill !== receipt.skill) failures.push(`${task.id} skill does not match the receipt`);
     if (task.envelopeAt !== receipt.envelopeAt) failures.push(`${task.id} envelope is stale or mismatched`);
-    if (!profiles?.stepMaps?.[receipt.skill]?.includes(task.step)) failures.push(`${task.id} uses invalid step ${task.step} for ${receipt.skill}`);
+    if (!skillMap?.steps?.includes(task.step)) failures.push(`${task.id} uses invalid step ${task.step} for ${receipt.skill}`);
     if (!task.objective || !task.requiredInputs?.length || !task.requiredProof?.length) failures.push(`${task.id} has an incomplete dispatch contract`);
     for (const gateId of task.dependsOnGates ?? []) if (!gateEvents.has(gateId)) failures.push(`${task.id} depends on unknown gate ${gateId}`);
     if (receipt.runtime !== "sequential" && task.model !== runtimeProfile?.workerModel) failures.push(`${task.id} uses a non-worker model`);
@@ -141,28 +151,29 @@ export function validateReceipt(receipt, profiles) {
     if (task.kind === "cache-write" && (!task.qualityReviewAt || task.qualityReviewAt !== receipt?.phaseGates?.qualityReviewAt || !hasPassedGate("quality-review", task.qualityReviewAt))) failures.push(`${task.id} writes cache HTML without the passed integrated quality-review gate`);
     if (task.kind === "read" && task.writes?.length) failures.push(`${task.id} is read-only but declares writes`);
     if (task.kind === "cache-write" && (!(task.writes?.length) || task.writes.some((target) => !insideAnyRoot(target, receipt?.phaseGates?.cacheRoots)))) failures.push(`${task.id} writes outside declared cacheRoots`);
-    if (task.kind === "source-write") {
-      sourceTaskIds.push(task.id);
-      const boundaryAt = receipt?.phaseGates?.sourceBoundaryAt;
-      const approvalNumber = impact?.level === "component" ? 1 : 2;
-      const expectedApproval = boundaryAt
+    if (["repository-write", "authority-write", "external-write"].includes(task.kind)) {
+      writeTaskIds.push(task.id);
+      const boundaryAt = receipt?.phaseGates?.writeBoundaryAt;
+      const approvalLabel = skillMap?.approvalLabel;
+      const expectedApproval = boundaryAt && approvalLabel
         ? approvalMode === "auto"
-          ? `AUTO:${autoApprovalAt}:OK #${approvalNumber}:${boundaryAt}`
-          : `OK #${approvalNumber}:${boundaryAt}`
+          ? `AUTO:${autoApprovalAt}:${approvalLabel}:${boundaryAt}`
+          : `${approvalLabel}:${boundaryAt}`
         : undefined;
-      if (!task.sourceApprovalAt || task.sourceApprovalAt !== receipt?.phaseGates?.sourceApprovalAt || task.sourceApprovalAt !== expectedApproval || !hasPassedGate("source-approval", task.sourceApprovalAt)) failures.push(`${task.id} writes source without the proportional approval bound to the exact boundary`);
+      if (!task.writeApprovalAt || task.writeApprovalAt !== receipt?.phaseGates?.writeApprovalAt || task.writeApprovalAt !== expectedApproval || !hasPassedGate("write-approval", task.writeApprovalAt)) failures.push(`${task.id} mutates state without the selected skill's approval bound to the exact boundary`);
       if (!hasPassedGate("impact-cone", receipt?.phaseGates?.impactConeAt)) failures.push(`${task.id} writes source without the passed impact-cone gate`);
       if (highRisk && !hasPassedGate("challenge-review", receipt?.independentReview?.reviewerId)) failures.push(`${task.id} writes high-risk source without the passed independent challenge-review gate`);
       if (receipt.skill === "starci-fe-layout-refactor" && receipt?.phaseGates?.authorityMode === "evolve" && (!task.authorityProofAt || task.authorityProofAt !== receipt?.phaseGates?.authorityProofAt || !hasPassedGate("authority-proof", task.authorityProofAt))) failures.push(`${task.id} writes FE before passed compiled authority proof`);
+      if (["authority-write", "external-write"].includes(task.kind) && receipt.runtime !== "sequential") failures.push(`${task.id} assigns coordinator-only ${task.kind} to a worker runtime`);
     }
-    if (task.kind === "proof" && (!task.stableBuildAt || task.stableBuildAt !== receipt?.phaseGates?.stableBuildAt || !task.proofTargetsAt || task.proofTargetsAt !== receipt?.phaseGates?.proofTargetsAt || !hasPassedGate("stable-build", task.stableBuildAt) || !hasPassedGate("proof-targets", task.proofTargetsAt))) failures.push(`${task.id} proves without passed stable-build and proof-target gates`);
+    if (task.kind === "proof" && (!task.stableStateAt || task.stableStateAt !== receipt?.phaseGates?.stableStateAt || !task.proofTargetsAt || task.proofTargetsAt !== receipt?.phaseGates?.proofTargetsAt || !hasPassedGate("stable-state", task.stableStateAt) || !hasPassedGate("proof-targets", task.proofTargetsAt))) failures.push(`${task.id} proves without passed stable-state and proof-target gates`);
     if (task.kind === "proof" && (!(task.writes?.length) || task.writes.some((target) => !insideAnyRoot(target, receipt?.phaseGates?.proofRoots)))) failures.push(`${task.id} writes outside declared proofRoots`);
     for (const target of task.writes ?? []) {
       const overlap = [...writers.entries()].find(([written]) => pathOverlaps(written, target));
       if (overlap) failures.push(`${target} overlaps writer path ${overlap[0]} owned by ${overlap[1]} and ${task.id}`);
       else writers.set(target, task.id);
       const shared = (receipt?.sharedPaths ?? []).find((reserved) => pathOverlaps(reserved, target));
-      if (shared) failures.push(`${task.id} writes coordinator-only shared path ${shared}`);
+      if (shared && receipt.runtime !== "sequential") failures.push(`${task.id} writes coordinator-only shared path ${shared}`);
     }
   }
   const taskById = new Map((receipt?.tasks ?? []).map((task) => [task.id, task]));
@@ -170,7 +181,7 @@ export function validateReceipt(receipt, profiles) {
   for (const challenge of receipt?.challenges ?? []) if (!validRaisers.has(challenge.raisedBy)) failures.push(`challenge ${challenge.id} has unknown raiser ${challenge.raisedBy}`);
   for (const task of receipt?.tasks ?? []) for (const consumer of task.outputConsumers ?? []) {
     if (consumer === "delivery") {
-      if (!['source-write', 'proof'].includes(task.kind)) failures.push(`${task.id} exposes an intermediate artifact as delivery`);
+      if (!["repository-write", "authority-write", "external-write", "proof"].includes(task.kind)) failures.push(`${task.id} exposes an intermediate artifact as delivery`);
       continue;
     }
     const [kind, id] = consumer.split(":");
@@ -182,19 +193,19 @@ export function validateReceipt(receipt, profiles) {
       if (!gate || !gate.requiredArtifacts?.includes(task.output)) failures.push(`${task.id} output is not consumed by gate ${id}`);
     }
   }
-  if (sourceTaskIds.length) {
-    const approved = new Set((receipt?.phaseGates?.approvedSourcePaths ?? []).map(normalizePath));
-    const assigned = new Set((receipt.tasks ?? []).filter((task) => task.kind === "source-write").flatMap((task) => task.writes ?? []).map(normalizePath));
-    for (const target of assigned) if (!approved.has(target)) failures.push(`${target} is outside approvedSourcePaths`);
-    for (const target of approved) if (!assigned.has(target)) failures.push(`${target} has no source writer`);
+  if (writeTaskIds.length) {
+    const approved = new Set((receipt?.phaseGates?.approvedWriteTargets ?? []).map(normalizePath));
+    const assigned = new Set((receipt.tasks ?? []).filter((task) => ["repository-write", "authority-write", "external-write"].includes(task.kind)).flatMap((task) => task.writes ?? []).map(normalizePath));
+    for (const target of assigned) if (!approved.has(target)) failures.push(`${target} is outside approvedWriteTargets`);
+    for (const target of approved) if (!assigned.has(target)) failures.push(`${target} has no writer`);
     const impactCone = receipt?.phaseGates?.impactCone;
     if (!impactCone || receipt?.phaseGates?.impactConeAt !== canonicalHash(impactCone)) failures.push("source dispatch has a missing or stale impact-cone manifest");
     if (impactCone) {
-      const required = new Set((impactCone.requiredPaths ?? []).map(normalizePath));
-      const inventoryPaths = [...(impactCone.owners ?? []).map((owner) => owner.path), ...(impactCone.consumers ?? []), ...(impactCone.tests ?? [])].map(normalizePath);
-      if (required.size !== (impactCone.requiredPaths ?? []).length) failures.push("impactCone.requiredPaths contains canonical duplicates");
-      for (const target of inventoryPaths) if (!required.has(target)) failures.push(`${target} is inventoried but absent from impactCone.requiredPaths`);
-      if ([...required].some((target) => !approved.has(target)) || [...approved].some((target) => !required.has(target))) failures.push("approvedSourcePaths do not equal impactCone.requiredPaths");
+      const required = new Set((impactCone.requiredTargets ?? []).map(normalizePath));
+      const inventoryTargets = [...(impactCone.owners ?? []).map((owner) => owner.target), ...(impactCone.consumers ?? []), ...(impactCone.proofs ?? [])].map(normalizePath);
+      if (required.size !== (impactCone.requiredTargets ?? []).length) failures.push("impactCone.requiredTargets contains canonical duplicates");
+      for (const target of inventoryTargets) if (!required.has(target)) failures.push(`${target} is inventoried but absent from impactCone.requiredTargets`);
+      if ([...required].some((target) => !approved.has(target)) || [...approved].some((target) => !required.has(target))) failures.push("approvedWriteTargets do not equal impactCone.requiredTargets");
       if (!(impactCone.inventoryProof?.length)) failures.push("impact cone has no inventory proof");
     }
   }
@@ -247,7 +258,7 @@ export function validateReceipt(receipt, profiles) {
     if (batchOf.has(task.id) && batchOf.has(dependency) && batchOf.get(dependency) >= batchOf.get(task.id)) failures.push(`${task.id} is batched before dependency ${dependency}`);
   }
   for (const task of receipt?.tasks ?? []) if (task.kind === "proof") {
-    for (const sourceId of sourceTaskIds) if (!task.dependsOn?.includes(sourceId)) failures.push(`${task.id} does not depend on source task ${sourceId}`);
+    for (const writeId of writeTaskIds) if (!task.dependsOn?.includes(writeId)) failures.push(`${task.id} does not depend on write task ${writeId}`);
   }
   const visiting = new Set();
   const visited = new Set();
@@ -277,22 +288,42 @@ export function validateWorkspace(root) {
   const profilesPath = path.join(root, "orchestration", "profiles.json");
   const profiles = JSON.parse(fs.readFileSync(profilesPath, "utf8"));
   failures.push(...validateProfiles(profiles).failures);
+  const skillRoot = path.join(root, "skills");
+  const physicalSkills = fs.readdirSync(skillRoot, {withFileTypes: true})
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(skillRoot, entry.name, "SKILL.md")))
+    .map((entry) => entry.name)
+    .sort();
+  const mappedSkills = Object.keys(profiles.skillMaps ?? {}).sort();
+  for (const skill of physicalSkills) if (!mappedSkills.includes(skill)) failures.push(`${skill} has no orchestration phase map`);
+  for (const skill of mappedSkills) if (!physicalSkills.includes(skill)) failures.push(`${skill} phase map has no physical skill`);
+  const receiptSchema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
+  const schemaSkills = [...(receiptSchema?.$defs?.skill?.enum ?? [])].sort();
+  for (const skill of mappedSkills) if (!schemaSkills.includes(skill)) failures.push(`${skill} is absent from the orchestration receipt schema`);
+  for (const skill of schemaSkills) if (!mappedSkills.includes(skill)) failures.push(`${skill} receipt schema entry has no phase map`);
   const rootAuthority = fs.readFileSync(path.join(root, "orchestration", "en.md"), "utf8");
-  for (const load of ["orchestration/codex/en.md", "orchestration/claude/en.md", "orchestration/frontend/en.md", "orchestration/receipt.schema.json"]) {
+  for (const load of ["orchestration/codex/en.md", "orchestration/claude/en.md", "orchestration/maps/en.md", "orchestration/receipt.schema.json"]) {
     if (!rootAuthority.includes(load)) failures.push(`orchestration/en.md does not load ${load}`);
   }
-  const frontendMap = fs.readFileSync(path.join(root, "orchestration", "frontend", "en.md"), "utf8");
-  for (const skill of profiles.boundSkills) {
+  const mapRouter = fs.readFileSync(path.join(root, "orchestration", "maps", "en.md"), "utf8");
+  for (const target of ["orchestration/frontend/en.md", "orchestration/capabilities/en.md"]) if (!mapRouter.includes(target)) failures.push(`orchestration map router does not route ${target}`);
+  const mapRecords = new Map(["frontend", "capabilities"].map((map) => [map, fs.readFileSync(path.join(root, "orchestration", map, "en.md"), "utf8")]));
+  const pipeline = (source) => {
+    const section = source.match(/## PIPELINE\s+([\s\S]*?)(?=\n## |$)/)?.[1] ?? "";
+    const topology = section.match(/Topology:\s+`(dual-track|reconciliation|linear)`/)?.[1];
+    const steps = [...section.matchAll(/^\|\s*([a-z0-9]+(?:-[a-z0-9]+)*)\s*\|/gm)]
+      .map((match) => match[1])
+      .filter((step) => step !== "step");
+    return {topology, steps};
+  };
+  for (const skill of mappedSkills) {
+    const map = profiles.skillMaps[skill];
     const skillPath = path.join(root, "skills", skill, "SKILL.md");
     const source = fs.readFileSync(skillPath, "utf8");
-    if (!source.includes("`@orchestration` | `orchestration/context.md`")) failures.push(`${skill} does not load @orchestration`);
-    let cursor = -1;
-    for (const step of profiles.stepMaps[skill]) {
-      const next = source.indexOf(`| ${step} |`, cursor + 1);
-      if (next < 0) failures.push(`${skill} is missing ordered pipeline step ${step}`);
-      else cursor = next;
-    }
-    if (!frontendMap.includes(`## ${skill === "starci-fe-design-layout" ? "Layout" : skill === "starci-fe-design-block" ? "Block" : "Refactor"} map`)) failures.push(`frontend map is missing ${skill}`);
+    if (!source.includes("`@skill-shape` | `skills/skill-shape/context.md`")) failures.push(`${skill} does not load @skill-shape and therefore cannot reach orchestration`);
+    const actual = pipeline(source);
+    if (actual.topology !== map.topology) failures.push(`${skill} topology does not match its PIPELINE`);
+    if (JSON.stringify(actual.steps) !== JSON.stringify(map.steps)) failures.push(`${skill} step map does not match its ordered PIPELINE`);
+    if (!mapRecords.get(map.map)?.includes(`\`${skill}\``)) failures.push(`${map.map} orchestration map does not publish ${skill}`);
   }
   return {ok: failures.length === 0, failures};
 }

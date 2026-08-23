@@ -40,16 +40,21 @@ test("every StarCi capability entry publishes its own executable pipeline contra
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("starci-"))
     .map((entry) => entry.name)
     .sort();
-  assert.equal(capabilities.length, 17);
+  assert.equal(capabilities.length, 18);
   assert.deepEqual(
     capabilities.filter((name) => name.startsWith("starci-fe-")),
-    ["starci-fe-design-block", "starci-fe-design-layout", "starci-fe-layout-refactor"],
+    ["starci-fe-design-block", "starci-fe-design-layout", "starci-fe-layout-refactor", "starci-fe-ui-reconcile"],
   );
   const refactorBinding = readFileSync(join(skillSourceRoot, "starci-fe-layout-refactor", "SKILL.md"), "utf8");
   assert.match(refactorBinding, /Feedback is an investigation signal, not proof/);
   assert.match(refactorBinding, /at least two independent cases|explicitly rules that the correction is systemic/);
   assert.match(refactorBinding, /Grammar owns product-family facts[\s\S]*Principles own only/);
   assert.match(refactorBinding, /authority-to-write map/);
+  const uiReconcileBinding = readFileSync(join(skillSourceRoot, "starci-fe-ui-reconcile", "SKILL.md"), "utf8");
+  assert.match(uiReconcileBinding, /Declared authority and observed product evidence remain independent/);
+  assert.match(uiReconcileBinding, /at least two independent cases[\s\S]*explicitly rules it\s+systemic/);
+  assert.match(uiReconcileBinding, /Grammar owns product-family meaning[\s\S]*Principles own only/);
+  assert.match(uiReconcileBinding, /one writer per target/);
 
   for (const capability of capabilities) {
     for (const file of ["SKILL.md", "en.md", "vi.md"]) {

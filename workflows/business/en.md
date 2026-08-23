@@ -8,6 +8,8 @@ title: Business workflows
 
 None.
 
+## Lifecycle
+
 | Phase | Binding skill |
 |---|---|
 | Analyze or refresh evidence-backed product truth from routed FE and BE | `skills/starci-business-analyze/SKILL.md` |
