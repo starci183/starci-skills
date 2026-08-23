@@ -3,17 +3,24 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
+import shutil
 import subprocess
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import Any, Sequence
 
 
-SCHEMA_VERSION = 1
-INDEX_RELATIVE_PATH = Path(".workspaces/local/design-knowledge/index-v1.json")
+SCHEMA_VERSION = 2
+INDEX_RELATIVE_PATH = Path(".workspaces/local/design-knowledge/qdrant-edge-v2")
+INDEX_MANIFEST_NAME = "manifest.json"
+SHARD_DIRECTORY_NAME = "shard"
+FALLBACK_VECTOR_NAME = "fallback"
+LOCAL_VECTOR_NAME = "local"
 TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
 HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 IDENTITY_ROW_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$", re.MULTILINE)
@@ -175,10 +182,48 @@ def stable_sparse_vector(value: str, dimensions: int = VECTOR_DIMENSIONS) -> lis
     return [round(features.get(index, 0) / magnitude, 7) for index in range(dimensions)]
 
 
-def cosine(left: Sequence[float], right: Sequence[float]) -> float:
-    if len(left) != len(right):
-        return 0.0
-    return max(0.0, sum(a * b for a, b in zip(left, right)))
+def qdrant_edge_module() -> Any:
+    try:
+        import qdrant_edge  # type: ignore[import-not-found]
+    except ImportError as error:
+        raise DesignKnowledgeError(
+            "qdrant-edge-py is required; install runtime/design-runtime/requirements.txt",
+            code="qdrant-edge-unavailable",
+            exit_code=3,
+        ) from error
+    return qdrant_edge
+
+
+def qdrant_edge_version() -> str:
+    try:
+        return package_version("qdrant-edge-py")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def record_point_id(record_id: str) -> int:
+    return int.from_bytes(hashlib.sha256(record_id.encode("utf-8")).digest()[:8], "big") & ((1 << 63) - 1)
+
+
+def remove_cache_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+def replace_cache_directory(temporary: Path, target: Path) -> None:
+    backup = target.with_name(f"{target.name}.previous-{os.getpid()}-{time.time_ns()}")
+    if target.exists():
+        target.replace(backup)
+    try:
+        temporary.replace(target)
+    except Exception:
+        if backup.exists() and not target.exists():
+            backup.replace(target)
+        raise
+    if backup.exists():
+        remove_cache_path(backup)
 
 
 def local_model_signature(model_path: Path) -> str:
@@ -581,6 +626,18 @@ def build_index(source_root: Path, index_path: Path, embedding_model: Path | Non
         for item in files
     ]
     counts = Counter(record["kind"] for record in records)
+    local = provider.get("local")
+    vector_dimensions = {
+        FALLBACK_VECTOR_NAME: VECTOR_DIMENSIONS,
+        **({LOCAL_VECTOR_NAME: int(local["dimensions"])} if local else {}),
+    }
+    point_ids = [record_point_id(record["id"]) for record in records]
+    if len(point_ids) != len(set(point_ids)):
+        raise DesignKnowledgeError(
+            "Deterministic Qdrant point id collision",
+            code="qdrant-point-id-collision",
+            exit_code=3,
+        )
     index = {
         "schemaVersion": SCHEMA_VERSION,
         "generation": source_generation(files),
@@ -594,37 +651,191 @@ def build_index(source_root: Path, index_path: Path, embedding_model: Path | Non
         "embedding": provider,
         "counts": dict(sorted(counts.items())),
         "sources": source_manifest,
-        "records": records,
+        "recordCount": len(records),
+        "storage": {
+            "engine": "qdrant-edge",
+            "binding": "qdrant-edge-py",
+            "bindingVersion": qdrant_edge_version(),
+            "shard": SHARD_DIRECTORY_NAME,
+            "distance": "cosine",
+            "vectors": vector_dimensions,
+        },
     }
     index_path = index_path.resolve()
     index_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = index_path.with_suffix(index_path.suffix + ".tmp")
-    temporary.write_text(json.dumps(index, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-    temporary.replace(index_path)
+    temporary = index_path.with_name(f"{index_path.name}.building-{os.getpid()}-{time.time_ns()}")
+    temporary.mkdir(parents=True)
+    shard = None
+    try:
+        qdrant = qdrant_edge_module()
+        vectors = {
+            name: qdrant.EdgeVectorParams(size=dimensions, distance=qdrant.Distance.Cosine)
+            for name, dimensions in vector_dimensions.items()
+        }
+        (temporary / SHARD_DIRECTORY_NAME).mkdir()
+        shard = qdrant.EdgeShard.create(
+            str(temporary / SHARD_DIRECTORY_NAME),
+            qdrant.EdgeConfig(vectors=vectors, on_disk_payload=True),
+        )
+        points = []
+        for record, point_id in zip(records, point_ids):
+            point_vectors = {FALLBACK_VECTOR_NAME: record["fallbackVector"]}
+            if local:
+                point_vectors[LOCAL_VECTOR_NAME] = record["localVector"]
+            payload_record = {
+                key: value
+                for key, value in record.items()
+                if key not in {"fallbackVector", "localVector"}
+            }
+            points.append(qdrant.Point(point_id, point_vectors, {"record": payload_record}))
+        for offset in range(0, len(points), 128):
+            shard.update(qdrant.UpdateOperation.upsert_points(points[offset : offset + 128]))
+        shard.flush()
+        observed = int(shard.info().points_count)
+        if observed != len(records):
+            raise DesignKnowledgeError(
+                f"Qdrant Edge persisted {observed} of {len(records)} design records",
+                code="qdrant-record-count-mismatch",
+                exit_code=3,
+            )
+        shard.close()
+        shard = None
+        (temporary / INDEX_MANIFEST_NAME).write_text(
+            json.dumps(index, ensure_ascii=False, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        replace_cache_directory(temporary, index_path)
+    except DesignKnowledgeError:
+        raise
+    except Exception as error:
+        raise DesignKnowledgeError(
+            f"Qdrant Edge index build failed: {error}",
+            code="qdrant-index-build-failed",
+            exit_code=3,
+        ) from error
+    finally:
+        if shard is not None:
+            shard.close()
+        if temporary.exists():
+            remove_cache_path(temporary)
     return index_summary(index, index_path=index_path, stale=False)
 
 
+def load_qdrant_records(index_path: Path, expected_count: int) -> list[dict[str, Any]]:
+    qdrant = qdrant_edge_module()
+    shard = None
+    try:
+        shard = qdrant.EdgeShard.load(str(index_path / SHARD_DIRECTORY_NAME))
+        records: list[dict[str, Any]] = []
+        offset = None
+        while True:
+            page, offset = shard.scroll(
+                qdrant.ScrollRequest(
+                    offset=offset,
+                    limit=256,
+                    with_payload=True,
+                    with_vector=False,
+                )
+            )
+            for item in page:
+                payload = item.payload if isinstance(item.payload, dict) else {}
+                record = payload.get("record")
+                if not isinstance(record, dict):
+                    raise DesignKnowledgeError(
+                        f"Qdrant point {item.id} has no design record payload",
+                        code="qdrant-payload-invalid",
+                        exit_code=3,
+                    )
+                records.append(record)
+            if offset is None:
+                break
+        if len(records) != expected_count:
+            raise DesignKnowledgeError(
+                f"Qdrant Edge contains {len(records)} records; manifest expects {expected_count}",
+                code="qdrant-record-count-mismatch",
+                exit_code=3,
+            )
+        return sorted(records, key=lambda item: item["id"])
+    except DesignKnowledgeError:
+        raise
+    except Exception as error:
+        raise DesignKnowledgeError(
+            f"Qdrant Edge shard is unreadable: {index_path}",
+            code="index-invalid",
+            exit_code=3,
+        ) from error
+    finally:
+        if shard is not None:
+            shard.close()
+
+
+def qdrant_vector_scores(
+    index_path: Path,
+    query_vector: Sequence[float],
+    vector_name: str,
+    record_count: int,
+) -> dict[int, float]:
+    qdrant = qdrant_edge_module()
+    shard = None
+    try:
+        shard = qdrant.EdgeShard.load(str(index_path / SHARD_DIRECTORY_NAME))
+        points = shard.query(
+            qdrant.QueryRequest(
+                limit=record_count,
+                query=qdrant.Query.Nearest(list(query_vector), using=vector_name),
+                with_payload=False,
+                with_vector=False,
+            )
+        )
+        scores = {int(point.id): max(0.0, float(point.score)) for point in points}
+        if len(scores) != record_count:
+            raise DesignKnowledgeError(
+                f"Qdrant Edge returned {len(scores)} of {record_count} vector scores",
+                code="qdrant-query-count-mismatch",
+                exit_code=3,
+            )
+        return scores
+    except DesignKnowledgeError:
+        raise
+    except Exception as error:
+        raise DesignKnowledgeError(
+            f"Qdrant Edge vector query failed: {error}",
+            code="qdrant-query-failed",
+            exit_code=3,
+        ) from error
+    finally:
+        if shard is not None:
+            shard.close()
+
+
 def load_index(index_path: Path) -> dict[str, Any]:
-    if not index_path.is_file():
+    manifest_path = index_path / INDEX_MANIFEST_NAME
+    if not index_path.is_dir() or not manifest_path.is_file():
         raise DesignKnowledgeError(
             f"Design knowledge index is missing: {index_path}",
             code="index-missing",
             exit_code=3,
         )
     try:
-        index = json.loads(index_path.read_text(encoding="utf-8"))
+        index = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise DesignKnowledgeError(
             f"Design knowledge index is unreadable: {index_path}",
             code="index-invalid",
             exit_code=3,
         ) from error
-    if index.get("schemaVersion") != SCHEMA_VERSION or not isinstance(index.get("records"), list):
+    if (
+        index.get("schemaVersion") != SCHEMA_VERSION
+        or index.get("storage", {}).get("engine") != "qdrant-edge"
+        or not isinstance(index.get("recordCount"), int)
+    ):
         raise DesignKnowledgeError(
             f"Unsupported design knowledge index schema: {index.get('schemaVersion')}",
             code="index-schema-unsupported",
             exit_code=3,
         )
+    index["records"] = load_qdrant_records(index_path, int(index["recordCount"]))
+    index["_indexPath"] = str(index_path.resolve())
     return index
 
 
@@ -656,12 +867,13 @@ def index_summary(index: dict[str, Any], *, index_path: Path, stale: bool, chang
         "changedSourceCount": len(changed),
         "counts": index.get("counts", {}),
         "sourceCount": len(index.get("sources", [])),
-        "recordCount": len(index.get("records", [])),
+        "recordCount": int(index.get("recordCount", len(index.get("records", [])))),
         "embedding": {
             "active": "local" if local else "deterministic-fallback",
             "fallback": index.get("embedding", {}).get("fallback"),
             "local": local,
         },
+        "storage": index.get("storage", {}),
     }
 
 
@@ -799,7 +1011,8 @@ def resolve_route(route_path: Path, source_root: Path) -> dict[str, str | None]:
 def score_records(
     records: Sequence[dict[str, Any]],
     query_text: str,
-    query_local_vector: Sequence[float] | None,
+    vector_scores: dict[int, float],
+    vector_provider: str,
 ) -> list[dict[str, Any]]:
     expanded_query = expand_query_text(query_text)
     query_tokens = tokenize(expanded_query)
@@ -807,18 +1020,11 @@ def score_records(
         raise DesignKnowledgeError("Query text has no searchable terms", code="query-empty", exit_code=2)
     lexical = bm25_scores(records, query_tokens)
     maximum = max(lexical, default=0.0) or 1.0
-    fallback_query_vector = stable_sparse_vector(expanded_query)
     normalized_query = normalize_text(query_text)
     query_set = set(query_tokens)
     scored: list[dict[str, Any]] = []
     for record, lexical_score in zip(records, lexical):
-        local_vector = record.get("localVector")
-        if query_local_vector is not None and isinstance(local_vector, list):
-            vector_score = cosine(query_local_vector, local_vector)
-            vector_provider = "local"
-        else:
-            vector_score = cosine(fallback_query_vector, record.get("fallbackVector", []))
-            vector_provider = "deterministic-fallback"
+        vector_score = vector_scores.get(record_point_id(record["id"]), 0.0)
         identity = normalize_text(
             " ".join(
                 [
@@ -919,6 +1125,8 @@ def query_index(
 ) -> dict[str, Any]:
     if top_k < 1 or top_k > 20:
         raise DesignKnowledgeError("--top-k must be between 1 and 20", code="top-k-invalid", exit_code=2)
+    if not tokenize(expand_query_text(query_text)):
+        raise DesignKnowledgeError("Query text has no searchable terms", code="query-empty", exit_code=2)
     selected_kinds = validate_kinds(kinds)
     records = index["records"]
     ensure_grammar_profile(records, grammar, profile)
@@ -940,6 +1148,15 @@ def query_index(
                 exit_code=2,
             )
         query_local_vector = encode_with_local_model(embedding_model, [query_text])[0]
+    vector_provider = "local" if query_local_vector is not None else "deterministic-fallback"
+    vector_name = LOCAL_VECTOR_NAME if query_local_vector is not None else FALLBACK_VECTOR_NAME
+    query_vector = query_local_vector or stable_sparse_vector(expand_query_text(query_text))
+    vector_scores = qdrant_vector_scores(
+        Path(index["_indexPath"]),
+        query_vector,
+        vector_name,
+        len(records),
+    )
 
     archetypes: list[dict[str, Any]] = []
     grammar_hits: list[dict[str, Any]] = []
@@ -949,7 +1166,7 @@ def query_index(
     if KIND_ARCHETYPE in selected_kinds:
         candidates = [record for record in records if record["kind"] == KIND_ARCHETYPE]
         archetypes = eligible_scores(
-            score_records(candidates, query_text, query_local_vector),
+            score_records(candidates, query_text, vector_scores, vector_provider),
             local_embeddings=query_local_vector is not None,
         )[:top_k]
 
@@ -967,11 +1184,11 @@ def query_index(
             and record.get("metadata", {}).get("profileId") == profile
         ]
         grammar_hits = eligible_scores(
-            score_records(grammar_candidates, query_text, query_local_vector),
+            score_records(grammar_candidates, query_text, vector_scores, vector_provider),
             local_embeddings=query_local_vector is not None,
         )[:top_k]
         owner_hits = eligible_scores(
-            score_records(owner_candidates, query_text, query_local_vector),
+            score_records(owner_candidates, query_text, vector_scores, vector_provider),
             local_embeddings=query_local_vector is not None,
         )[:top_k]
 
@@ -983,7 +1200,7 @@ def query_index(
     if KIND_PRINCIPLE in selected_kinds:
         principle_candidates = [record for record in records if record["kind"] == KIND_PRINCIPLE]
         principle_hits = eligible_scores(
-            score_records(principle_candidates, query_text, query_local_vector),
+            score_records(principle_candidates, query_text, vector_scores, vector_provider),
             local_embeddings=query_local_vector is not None,
         )[:top_k]
         selected_ids = {hit["record"]["metadata"]["principleId"] for hit in principle_hits}
@@ -1000,7 +1217,7 @@ def query_index(
                     code="principle-dependency-missing",
                     exit_code=4,
                 )
-            principle_hits.append(score_records([exact], query_text, query_local_vector)[0])
+            principle_hits.append(score_records([exact], query_text, vector_scores, vector_provider)[0])
 
     selected_count = len(archetypes) + len(grammar_hits) + len(owner_hits) + len(principle_hits)
     if selected_count == 0:
@@ -1057,7 +1274,8 @@ def query_index(
         "index": {
             "recordCount": len(records),
             "counts": index.get("counts", {}),
-            "embedding": "local" if query_local_vector is not None else "deterministic-fallback",
+            "embedding": vector_provider,
+            "vectorStore": "qdrant-edge",
         },
     }
 
@@ -1096,7 +1314,7 @@ def run_query(
         grammar = str(routed["grammar"]) if routed["grammar"] else None
         profile = str(routed["profile"]) if routed["profile"] else None
 
-    if not index_path.is_file():
+    if not index_path.is_dir() or not (index_path / INDEX_MANIFEST_NAME).is_file():
         if not rebuild_if_stale:
             raise DesignKnowledgeError(
                 f"Design knowledge index is missing: {index_path}",

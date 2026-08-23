@@ -1,0 +1,1 @@
+qdrant-edge-py==0.8.0

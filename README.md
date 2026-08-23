@@ -20,6 +20,7 @@ Clone the complete trust tree into the Source's `.claude` directory:
 ```bash
 cd <Source>
 git clone https://github.com/starci183/starci-skills.git .claude
+python -m pip install -r .claude/runtime/design-runtime/requirements.txt
 ```
 
 The installation is intentionally kept together:
@@ -185,6 +186,12 @@ current or legacy implementation supplies product facts, source ownership and ca
 prove its macro layout correct: conflicts with the selected archetype are recorded as `layout-drift` and corrected
 unless binding business truth or an owner-approved exception requires them. MASTER keeps every untouched region
 visually consistent; Grammar selects semantic owners and Principles resolve only remaining deltas.
+
+Design retrieval is embedded and offline. `python .claude/scripts/design-knowledge-query.py build` compiles the
+tracked archetype, grammar and principle authority into a machine-local Qdrant Edge shard at
+`.workspaces/local/design-knowledge/qdrant-edge-v2`. The default named vector is the deterministic 256-dimensional
+`hash-ngram-v1` engine; an explicitly supplied local sentence-transformers model adds a separate `local` vector.
+The shard is rebuildable cache, never committed authority, and query mode does not start a server or make a network call.
 
 Conversation provenance is project-scoped and provider-neutral:
 

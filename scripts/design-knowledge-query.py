@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["qdrant-edge-py==0.8.0"]
 # ///
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from design_knowledge import (  # noqa: E402
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
-        description="Build and query the local StarCi design-knowledge index without a network dependency."
+        description="Build and query the embedded Qdrant Edge design-knowledge index without a network service."
     )
     root.add_argument("--source-root", type=Path, default=SOURCE_ROOT)
     root.add_argument("--index", type=Path)

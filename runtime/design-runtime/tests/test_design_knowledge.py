@@ -27,7 +27,7 @@ class RealCorpusTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.temporary = tempfile.TemporaryDirectory()
-        cls.index_path = Path(cls.temporary.name) / "index.json"
+        cls.index_path = Path(cls.temporary.name) / "index.qdrant"
         cls.summary = build_index(SOURCE_ROOT, cls.index_path)
         cls.index = load_index(cls.index_path)
 
@@ -42,6 +42,10 @@ class RealCorpusTests(unittest.TestCase):
         source_paths = [item.relative_path for item in discover_source_files(SOURCE_ROOT)]
         self.assertFalse(any(path.endswith("/en.md") or path.endswith("/vi.md") for path in source_paths))
         self.assertFalse(any("/templates/" in path for path in source_paths))
+        self.assertEqual(self.summary["storage"]["engine"], "qdrant-edge")
+        self.assertTrue((self.index_path / "shard").is_dir())
+        manifest = json.loads((self.index_path / "manifest.json").read_text(encoding="utf-8"))
+        self.assertNotIn("records", manifest)
 
     def test_clinical_query_selects_specific_archetype(self) -> None:
         packet = query_index(
@@ -90,7 +94,7 @@ class RealCorpusTests(unittest.TestCase):
 
     def test_read_only_query_does_not_create_missing_index(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            index_path = Path(temporary) / "missing" / "index.json"
+            index_path = Path(temporary) / "missing" / "index.qdrant"
             with self.assertRaises(DesignKnowledgeError) as raised:
                 run_query(
                     source_root=SOURCE_ROOT,
@@ -111,7 +115,7 @@ class RealCorpusTests(unittest.TestCase):
     def test_cli_accepts_index_after_query_subcommand(self) -> None:
         script = SOURCE_ROOT / ".claude" / "scripts" / "design-knowledge-query.py"
         with tempfile.TemporaryDirectory() as temporary:
-            index_path = Path(temporary) / "index.json"
+            index_path = Path(temporary) / "index.qdrant"
             built = subprocess.run(
                 [sys.executable, str(script), "--index", str(index_path), "build"],
                 capture_output=True,
@@ -204,7 +208,7 @@ class RealCorpusTests(unittest.TestCase):
 
     def test_run_query_rebuilds_missing_index(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            index_path = Path(temporary) / "nested" / "index.json"
+            index_path = Path(temporary) / "nested" / "index.qdrant"
             packet = run_query(
                 source_root=SOURCE_ROOT,
                 index_path=index_path,
@@ -218,7 +222,7 @@ class RealCorpusTests(unittest.TestCase):
                 rebuild_if_stale=True,
                 embedding_model=None,
             )
-            self.assertTrue(index_path.is_file())
+            self.assertTrue(index_path.is_dir())
             self.assertEqual(
                 packet["selected"]["archetypes"][0]["data"]["archetypeId"],
                 "batch-table-operations",
