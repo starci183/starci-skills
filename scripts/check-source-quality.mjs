@@ -2,7 +2,7 @@
 // commands come from package.json and credentials are read only from the process environment.
 import {execFileSync, spawnSync} from "node:child_process";
 import {existsSync, readFileSync, readdirSync} from "node:fs";
-import {dirname, join, resolve} from "node:path";
+import {dirname, join, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {evaluateQualityGate} from "../machines/sonar-assurance/check.mjs";
 
@@ -173,6 +173,26 @@ function e2eSurface(dir, scripts) {
   return {scripts: names, files, exists: files > 0, blocked: /\.(?:skip|todo|only)\s*\(|passWithNoTests|--passWithNoTests|--pass-with-no-tests|--testNamePattern\b|(?:^|\s)-t(?:\s|=)/i.test(`${declaration}\n${source}`)};
 }
 
+function unitFixtureIsolation(dir) {
+  const roots = ["src", "apps", "libs", "test", "tests"].map((name) => join(dir, name)).filter(existsSync);
+  const ignored = new Set(["node_modules", "dist", "build", "coverage", ".git", ".gitmounts", ".workspaces", ".worktrees", ".sessions"]);
+  const unitFile = (name) => /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/.test(name)
+    && !/(?:^|[.-])(?:e2e|integration|int)(?:[.-])/.test(name);
+  const violations = [];
+  const walk = (current) => {
+    for (const entry of readdirSync(current, {withFileTypes: true})) {
+      if (entry.isDirectory() && ignored.has(entry.name)) continue;
+      const file = join(current, entry.name);
+      if (entry.isDirectory()) walk(file);
+      else if (unitFile(entry.name) && /\.gitmounts(?:[\\/]|$)/.test(readFileSync(file, "utf8"))) {
+        violations.push(relative(dir, file).replaceAll("\\", "/"));
+      }
+    }
+  };
+  roots.forEach(walk);
+  return {violations: violations.sort(), pass: violations.length === 0};
+}
+
 export async function sonar(dir, {fetchImpl = fetch} = {}) {
   const config = readFileSync(join(dir, "sonar-project.properties"), "utf8");
   const key = config.match(/^sonar\.projectKey\s*=\s*(\S+)/m)?.[1];
@@ -227,6 +247,7 @@ export async function checkRepository(row, {execute = true, sonarEvidence = null
   const lintName = firstScript(scripts, ["lint:check", "lint"]);
   const unitName = firstScript(scripts, ["test:ci", "test:unit", "test:coverage", "test:cov", "test"]);
   const e2e = e2eSurface(row.diskPath, scripts);
+  const unitFixtures = unitFixtureIsolation(row.diskPath);
   const sourceRuns = execute ? [lintName, unitName].filter(Boolean).map((name) => runScript(row.diskPath, name)) : [];
   const lint = sourceRuns.find((r) => r.name === lintName) ?? {passed: false, unmeasured: true};
   const unit = sourceRuns.find((r) => r.name === unitName) ?? {passed: false, unmeasured: true};
@@ -241,6 +262,7 @@ export async function checkRepository(row, {execute = true, sonarEvidence = null
   if (debt.errors.length) findings.push(...debt.errors);
   if (!lintName || !lint.passed || /\b\d+\s+warning[s]?\b/i.test(lint.output ?? "") || /\b\d+\s+error[s]?\b/i.test(lint.output ?? "")) findings.push("lint is missing or not 0 errors/0 warnings");
   if (!unitName || !unit.passed) findings.push("unit test command is missing or failed");
+  if (!unitFixtures.pass) findings.push("unit specs depend on external .gitmounts data instead of repository-owned fixtures");
   if (!cov.project.pass) {
     const message = "project coverage is missing or below statements/lines/functions 80% and branches 75%";
     if (debt.active && debt.scopes.includes("source:project-coverage")) debtFindings.push(message); else findings.push(message);
@@ -257,7 +279,7 @@ export async function checkRepository(row, {execute = true, sonarEvidence = null
   }
   const publicCommand = (command) => command && {name: command.name, command: command.command, status: command.status, passed: command.passed, ...(command.unmeasured ? {unmeasured: true} : {})};
   const verdict = findings.length ? "fail" : debtFindings.length ? "debt" : "pass";
-  return {...row, verdict, deliveryAllowed: verdict !== "fail", commands: {lint: publicCommand(lint), unit: publicCommand(unit), e2e: e2eRuns.map(publicCommand)}, coverage: cov, e2e, sonar: sonarResult, debt, debtFindings: debtFindings.map(redact), findings: findings.map(redact)};
+  return {...row, verdict, deliveryAllowed: verdict !== "fail", commands: {lint: publicCommand(lint), unit: publicCommand(unit), e2e: e2eRuns.map(publicCommand)}, coverage: cov, unitFixtures, e2e, sonar: sonarResult, debt, debtFindings: debtFindings.map(redact), findings: findings.map(redact)};
 }
 
 export async function runQuality({root = source, execute = true} = {}) {

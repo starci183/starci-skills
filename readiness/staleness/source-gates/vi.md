@@ -25,6 +25,8 @@ hay đóng góp vào coverage đó, và file E2E bị loại khỏi Sonar scanne
 bao giờ suy ra hoặc đổi nhãn cho nhau.
 Trên cả frontend và backend, unit file nằm cạnh production owner và dùng `.spec.`. Chỉ backend E2E được
 ở cây test riêng; frontend có bucket `src/tests`/`e2e` hoặc unit file `.test.` là stale.
+Unit spec phải hermetic: fixture là test data được track trong repo hoặc mock in-memory. Unit spec đọc
+`.gitmounts` hay checkout external khác là stale; dependency đó thuộc lane integration/E2E được phân loại rõ.
 Patch/new-code chỉ `not applicable` khi diff từ base SHA chứng minh không có authored production code
 thay đổi; working-tree diff rỗng, thiếu base SHA hoặc thiếu coverage entry không phải N/A.
 

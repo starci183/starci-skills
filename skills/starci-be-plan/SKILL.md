@@ -102,6 +102,8 @@ Write the cases while the branches that would suggest them do not exist yet — 
 it here. Name the failing paths: rejected input, absent row, forbidden viewer, concurrent write,
 duplicate delivery, empty projection. Every exception the capability can raise derives from the abstract
 exception; a bare throw is not a case, it is a defect.
+Unit cases use repository-owned fixtures or in-memory mocks and never read `.gitmounts`; an external
+checkout dependency must be classified and planned in the integration/E2E lane.
 
 ### 8 — State boundaries, alternatives and acceptance evidence
 

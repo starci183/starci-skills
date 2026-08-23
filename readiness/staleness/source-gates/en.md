@@ -26,6 +26,8 @@ neither mutate nor contribute to that coverage, and E2E files are excluded from 
 E2E and Sonar verdicts never imply or relabel each other.
 Across frontend and backend, unit files are colocated beside their production owner and use `.spec.`.
 Only backend E2E may occupy a separate test tree; a frontend `src/tests`/`e2e` bucket or any unit `.test.` file is stale.
+Unit specs are hermetic: fixtures are tracked test data or in-memory mocks. A unit spec that reads
+`.gitmounts` or another external checkout is stale; that dependency belongs to an explicitly classified integration/E2E lane.
 Patch/new-code is explicitly `not applicable` only when a base-SHA diff proves there is no changed
 authored production code; an empty working-tree diff, missing base SHA or missing coverage entry is not N/A.
 

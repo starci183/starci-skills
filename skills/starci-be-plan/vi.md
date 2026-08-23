@@ -83,6 +83,8 @@ chỉ là luật trang trí; situation enforced thiếu rule accountability thì
 Viết test case khi các branch gợi ý chúng còn chưa tồn tại. Gọi tên từng đường lỗi: input bị từ chối,
 không có row, viewer không đủ quyền, concurrent write, delivery trùng, projection rỗng. Mọi exception mà
 capability có thể raise phải kế thừa abstract exception; một bare throw là defect, không phải test case.
+Unit case dùng fixture thuộc repo hoặc mock in-memory và không bao giờ đọc `.gitmounts`; dependency vào
+checkout external phải được phân loại và plan ở lane integration/E2E.
 
 ### 8 — Xác định ranh giới, phương án khác và bằng chứng chấp nhận
 

@@ -164,6 +164,16 @@ test("temporary debt never forgives lint, unit, patch or E2E failures", async ()
   assert.match(result.findings.join("; "), /change\/patch/);
 });
 
+test("unit specs cannot depend on an external gitmount", async () => {
+  const row = fixture();
+  mkdirSync(join(row.diskPath, "src"), {recursive: true});
+  writeFileSync(join(row.diskPath, "src", "parser.spec.ts"), 'const fixture = ".gitmounts/data/courses";\n');
+  const result = await checkRepository(row, {execute: true, sonarEvidence: {status: "pass"}});
+  assert.equal(result.verdict, "fail");
+  assert.deepEqual(result.unitFixtures.violations, ["src/parser.spec.ts"]);
+  assert.match(result.findings.join("\n"), /unit specs depend on external \.gitmounts data/);
+});
+
 test("lists Markdown debts by project and role without treating them as pass", () => {
   const root = mkdtempSync(join(tmpdir(), "starci-debt-list-"));
   const roleRoot = join(root, ".workspaces", "local", "routes", "fixture", "be");

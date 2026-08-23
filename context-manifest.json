@@ -886,7 +886,7 @@
     "readiness/staleness/source-gates/context.md": {
       "kind": "module",
       "source": "readiness/staleness/source-gates/en.md",
-      "sourceHash": "b07cf71a3c95a4f384b42c5847fd7a248b65e0d52aae92547f38d96e0354c618",
+      "sourceHash": "ba623a4784334a1ce1f06abac73f6fee8dc7b121c48a9aeddbde3e37a9f198b9",
       "contextVersion": 1
     },
     "readiness/staleness/strict-fix/context.md": {
