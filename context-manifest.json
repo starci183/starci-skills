@@ -808,7 +808,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "868698e5dbc9c96f6c67ba07047d0e177264b681338b0327ba39a5c838dd501d",
+      "sourceHash": "cfdd15c7b0199729d6a1d7adf31a9c2e877513ca68865803d33fb5c10e24ad9d",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {

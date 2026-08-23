@@ -72,10 +72,14 @@ Representative content phải trung thực với business và có production-lik
 Trước mỗi layout approval, schema 2 maturity evidence bind page contract (`reviewStage: pages`) hoặc bounded
 selected pairs của render contract (`reviewStage: states`) vào real full-viewport capture và zero defect. Sau
 implementation, review mọi selected preview/source pair ở exact baseline viewport/state. `visual-proof.json`
-schema 3 bind PNG preview/source thật, normalized DOM snapshot, axe-core report và Playwright trace. Validator
-kiểm tra dimension, tự tính pixel/DOM diff bằng threshold riêng từng reference, từ chối accessibility violation
-và bắt trace cover mọi interaction đã khai. Producer tự ghi `passed` không phải proof. Zero known defect và
-requested delivery vẫn bắt buộc.
+schema 4 bind authentication applicability, PNG preview/source thật, normalized DOM snapshot, axe-core report và
+Playwright trace. Validator kiểm tra dimension, tự tính pixel/DOM diff bằng threshold riêng từng reference, từ
+chối accessibility violation và bắt trace cover mọi interaction đã khai. Proof có auth còn phải bắt đầu signed
+out và bind một trace Playwright riêng: đi tới product login entry, điền username/password bằng locator, submit
+form nhìn thấy được rồi tới protected route. Direct API session, cookie/header injection, preloaded storage state
+và proof-only login switch đều bị từ chối. Credential value nằm ngoài evidence; chỉ ghi source class là process
+environment hoặc encrypted workspace. Producer tự ghi `passed` không phải proof. Zero known defect và requested
+delivery vẫn bắt buộc.
 
 Creativity đi trước principles review. Chỉ selected candidate được audit thành class-free `principleObligations`; source implementation resolve obligation qua current principles và patterns.
 
@@ -92,12 +96,16 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 9. MASTER dùng chung cho mọi candidate; page file chỉ ghi deviation và principles chỉ inspect delta.
 10. Generate/audit mode có đúng một result; 3–4 alternative cần explicit page-stage brainstorm mode và reviewed baseline.
 11. Page-stage review không bao giờ chứa render contract hay execution prompt; schema 8 state-stage review giữ exact approved direction-plus-page hash.
+12. Authenticated delivery chưa hoàn tất cho tới khi schema-4 browser proof nhập cả hai test credentials qua
+    product UI và tới protected route mà không inject session state.
 
 ## Stops
 
 - Từ chối output ngoài exact project cache.
 - Từ chối page review thiếu journey/business/component synthesis, representative full-page HTML, maturity evidence hoặc viewport coverage.
 - Từ chối state review thiếu condition coverage, executable interaction, exact source files hoặc approved page contract không còn nguyên.
+- Từ chối authenticated proof thiếu login entry, hai credential-fill action, form submit, protected-route arrival
+  hoặc secret-safe credential source classification.
 - Từ chối block không có current parent page hoặc same-session parent preview.
 - Task không thể tiếp tục tới source implementation có thể hiển thị design-only evidence, nhưng phải báo kết quả hết hiệu lực và không phải accepted authority.
 - Post-choice state cần product truth mới phải quay lại owner approval.

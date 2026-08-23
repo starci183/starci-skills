@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Design, stage-approve, implement, seed and prove one mature long page or end-to-end flow. Page synthesis prints journey and UI directions separately, joins them into complete desktop/narrow anatomy, then approves states and exact source-and-seed scope before coding. One direction is default; 3–4 require an explicit owner brainstorm request.
+description: Design, stage-approve, implement, seed and browser-prove one mature long page or end-to-end flow. Authenticated flows must enter test credentials through the product login UI in Playwright before protected-page parity can pass. One direction is default; 3–4 require an explicit owner brainstorm request.
 ---
 
 # starci-fe-design-layout
@@ -60,7 +60,7 @@ gate-passed outputs, owns decisions and shared artifacts, and delegates only dis
 | page-synthesis | join | evidence, business head, source, contracts, data, grammar and MASTER | run isolated journey and capability subphases, print directions, join them, run integrated quality review, then author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt, quality review and schema 9 page contract | both origins and required lenses/detectors pass, nothing is unbound, then `OK #1`; cache only |
 | states | execution | approved direction-quality-page hash and state truth | expand states, owners, transitions, seeds and boundary without review drift | schema 9 render contract and canonical prompt | `OK #2`; exact files complete |
 | implementation | execution | approved prompt | code, gate and seed without reinterpretation | implementation, gate and seed receipts | every obligation reaches product evidence |
-| parity | proof | previews and seeded product | compute PNG, normalized DOM, axe and Playwright evidence | `visual-proof.json` | per-reference thresholds pass and delivery is reached |
+| parity | proof | previews and seeded product | classify authentication, execute required login through product UI, then compute PNG, normalized DOM, axe and Playwright evidence | `visual-proof.json` schema 4 | authenticated proof enters credentials in-browser with no session shortcut; parity and delivery pass |
 
 ## Approval modes
 
@@ -149,6 +149,12 @@ exact development/test identity, required page and block states, product-native 
 existing command, idempotency key, local dependencies, safe-repeat behavior and product read path. New seed files
 belong to the approved source boundary. Cache fixtures cannot satisfy this contract.
 
+Before `OK #2`, classify authentication as `required` or `not-applicable`. A protected actor route makes it
+required. The page map and selected proof scope must then include the product login entry, username/password form,
+invalid-credential state, successful session transition and protected landing. If any is missing, reopen pages;
+never plan direct session mutation, cookie injection or a proof-only login helper. Put the required login page,
+form owner, session client, route transition and tests in the exact source boundary.
+
 Validate the artifact, layout grammar and schema 2 maturity review with `reviewStage: states`. A state that cannot fit approved page anatomy invalidates page approval. State-only feedback preserves page approval.
 
 Publish a `states` review and disclose `OK #2: STATES + SOURCE BOUNDARY`, unchanged direction-quality-page hash,
@@ -164,9 +170,13 @@ Before browser proof, materialize every selected render target through the appro
 
 This phase may start declared local dependencies and the real frontend/backend. It may not require a VPS, mutate production data, call an undeclared external provider or replace backend-owned truth with client mocks, component props, static HTML or cache fixtures. Prove the result through the product's own read path and record command, identity, stable identifiers and observed rows/states. A missing or failed seed stops visual proof; repair inside the approved boundary or return to `OK #2` for new files.
 
+When authentication is required, resolve a dedicated development/test operator and expose its username/password
+to browser automation only through process environment or an encrypted workspace reference. Never persist values
+in source, cache JSON, trace actions, screenshots, command-line arguments or logs.
+
 ### 7. Prove real-product parity
 
-Run browser proof for every selected render target. Five complete-page targets is the default review budget, not a coverage cap. Final proof uses real connected-product PNG/DOM/axe/trace evidence at the same page state, seeded block states and viewport; the validator computes the verdict. Repair in-boundary defects without a third approval.
+Run browser proof for every selected render target. Five complete-page targets is the default review budget, not a coverage cap. For authenticated flows, start Playwright signed out, navigate to the product login entry, fill the username and password controls from the declared test identity, submit the visible form, wait for the protected route and only then capture protected states. The trace records `auth-open-login`, `auth-fill-username`, `auth-fill-password`, `auth-submit` and `auth-reach-protected-route` with real UI methods but no entered values. Direct API session creation, cookie/header injection, preloaded `storageState`, `document.cookie` and proof-only switches are invalid. `visual-proof.json` schema 4 binds that authentication trace to the real connected-product PNG/DOM/axe/state traces at identical states and viewports; the validator computes the verdict. Repair in-boundary defects without a third approval.
 
 ## Rules
 
@@ -188,6 +198,8 @@ Run browser proof for every selected render target. Five complete-page targets i
     Grammar/Principles leaves first-synthesis scope and enters the correction owner.
 16. Every candidate passes the shared quality review before HTML; external UX/UI evidence is advisory only.
 17. State expansion preserves the approved quality review byte-for-byte; review change reopens pages.
+18. An authenticated Layout run cannot finish until signed-out Playwright fills both credential controls through
+    the product form and reaches the protected route. API-created sessions and injected state never pass.
 
 ## Stops
 
@@ -198,10 +210,13 @@ Run browser proof for every selected render target. Five complete-page targets i
 - `OK #1` treated as source authority, or `OK #2` without exact files.
 - Hidden page-contract drift or required work outside the approved boundary.
 - Missing seed ownership, unseedable selected state, non-idempotent seed or final proof that exists only in cache/component mocks.
+- A protected route lacks a rendered product login entry, test credential owner or schema-4 authentication trace
+  that fills both controls and reaches the route without a session shortcut.
 - Concrete owner feedback identifies a wrong semantic owner, visual law or repeated skill decision in emitted output — owner: `starci-fe-layout-refactor`.
 
 ## OUTPUT
 
 At page review, print journey and UI direction plus quality verdict for every candidate, then report their joined
 page URL, maturity verdict and cache-only `OK #1`. At state review, report state coverage, unchanged direction-quality-page hash, exact source
-files, seed-owner rows and `OK #2`. After code, report changed files, tests, seed command/identity/observed data and real-product parity.
+files, seed-owner rows and `OK #2`. After code, report changed files, tests, seed command/identity/observed data,
+authentication applicability and—when required—the login route plus credential source class without values, then real-product parity.

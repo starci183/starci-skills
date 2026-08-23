@@ -74,10 +74,15 @@ Representative content must be business-faithful and production-like. Lorem, gen
 Before each layout approval, schema 2 maturity evidence binds either page contract (`reviewStage: pages`) or
 the render contract's bounded selected pairs (`reviewStage: states`) to real full-viewport captures and zero
 defects. After implementation, review every selected preview/source pair at the exact baseline viewport/state.
-`visual-proof.json` schema 3 binds actual preview/source PNGs, normalized DOM snapshots, axe-core reports and
-Playwright traces. The validator checks dimensions, computes pixel/DOM differences using thresholds configured
-per reference, rejects accessibility violations and requires every declared interaction in the trace. A producer's
-`passed` assertion is never proof. Zero known defects and requested delivery remain mandatory.
+`visual-proof.json` schema 4 binds authentication applicability, actual preview/source PNGs, normalized DOM
+snapshots, axe-core reports and Playwright traces. The validator checks dimensions, computes pixel/DOM differences
+using thresholds configured per reference, rejects accessibility violations and requires every declared
+interaction in the trace. Authenticated proof additionally starts signed out and binds a dedicated Playwright
+trace that navigates to the product login entry, fills username and password through locators, submits the visible
+form and reaches the protected route. Direct API session creation, cookie/header injection, preloaded storage
+state and proof-only login switches are refused. Credential values stay outside evidence; only process-environment
+or encrypted-workspace source class is recorded. A producer's `passed` assertion is never proof. Zero known
+defects and requested delivery remain mandatory.
 
 Creativity precedes principles review. Only the selected candidate is audited into class-free `principleObligations`; source implementation resolves those obligations through current principles and patterns.
 
@@ -94,12 +99,16 @@ Creativity precedes principles review. Only the selected candidate is audited in
 9. MASTER is shared by every candidate; page files record deviations only and principles inspect deltas only.
 10. Generate/audit modes contain exactly one result; 3–4 alternatives require explicit page-stage brainstorm mode and an existing reviewed baseline.
 11. Page-stage review never contains a render contract or execution prompt; schema 8 state-stage review preserves the exact approved direction-plus-page hash.
+12. Authenticated delivery is incomplete until schema-4 browser proof enters both test credentials through the
+    product UI and reaches the protected route without injecting session state.
 
 ## Stops
 
 - Output outside the exact project cache is refused.
 - Page review missing journey/business/component synthesis, representative full-page HTML, maturity evidence or viewport coverage is refused.
 - State review missing condition coverage, executable interaction, exact source files or an unchanged approved page contract is refused.
+- Authenticated proof missing its login entry, both credential-fill actions, form submit, protected-route arrival
+  or secret-safe credential source classification is refused.
 - A block without a current parent page or same-session parent preview is refused.
 - A task that cannot continue through source implementation may show design-only evidence, but it must report that the result expired and is not accepted authority.
 - A post-choice state requiring new product truth returns to owner approval.

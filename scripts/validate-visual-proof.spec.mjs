@@ -31,8 +31,8 @@ const setup = () => {
   writeFileSync(join(root, "source-dom.json"), JSON.stringify({children: [{name: "Open", role: "button"}], role: "main"}));
   writeFileSync(join(root, "axe.json"), JSON.stringify({tool: "axe-core", violations: []}));
   writeFileSync(join(root, "trace.json"), JSON.stringify({tool: "playwright", actions: [{id: "open", status: "passed"}], consoleErrors: [], failedRequests: []}));
-  const baseline = {references: [{id: "desktop-ready", state: "ready", viewport: {width: 2, height: 1}, deviceScaleFactor: 1, visualThresholds: {maxChangedRatio: 0, maxMeanDelta: 0, perPixelDelta: 0, masks: []}, previewDomSnapshot: "preview-dom.json", requiredInteractions: ["open"]}]};
-  const proof = {schemaVersion: 3, candidateAt: "a".repeat(64), renderContractId: "lesson-render", requestedTerminalState: "committed", actualTerminalState: "committed", knownDefects: [], checks: {build: "passed", lint: "passed", tests: "passed", browser: "passed"}, comparisons: [{referenceId: "desktop-ready", state: "ready", viewport: {width: 2, height: 1}, previewCapture: "preview.png", sourceCapture: "source.png", sourceDomSnapshot: "source-dom.json", accessibilityReport: "axe.json", interactionTrace: "trace.json"}]};
+  const baseline = {authentication: {applicability: "not-applicable"}, references: [{id: "desktop-ready", state: "ready", viewport: {width: 2, height: 1}, deviceScaleFactor: 1, visualThresholds: {maxChangedRatio: 0, maxMeanDelta: 0, perPixelDelta: 0, masks: []}, previewDomSnapshot: "preview-dom.json", requiredInteractions: ["open"]}]};
+  const proof = {schemaVersion: 4, candidateAt: "a".repeat(64), renderContractId: "lesson-render", requestedTerminalState: "committed", actualTerminalState: "committed", authentication: {applicability: "not-applicable", reason: "The route is public."}, knownDefects: [], checks: {build: "passed", lint: "passed", tests: "passed", browser: "passed"}, comparisons: [{referenceId: "desktop-ready", state: "ready", viewport: {width: 2, height: 1}, previewCapture: "preview.png", sourceCapture: "source.png", sourceDomSnapshot: "source-dom.json", accessibilityReport: "axe.json", interactionTrace: "trace.json"}]};
   return {root, baseline, proof};
 };
 
@@ -68,4 +68,39 @@ test("known defects and an uncommitted delivery cannot pass", (t) => {
 test("evidence paths cannot escape their declared roots", (t) => {
   const value = setup(); t.after(() => rmSync(value.root, {recursive: true, force: true})); value.proof.comparisons[0].sourceDomSnapshot = "../outside.json";
   assert.match(validateVisualProof(value.baseline, value.proof, {baselineRoot: value.root, proofRoot: value.root}).failures.join("\n"), /escapes its evidence root/);
+});
+test("authenticated delivery must fill credentials through the product UI", (t) => {
+  const value = setup(); t.after(() => rmSync(value.root, {recursive: true, force: true}));
+  value.baseline.authentication = {applicability: "required", entryRoute: "/dang-nhap", protectedRoute: "/hoi-vien"};
+  value.proof.authentication = {applicability: "required", entryRoute: "/dang-nhap", protectedRoute: "/hoi-vien", credentialSource: "process-environment", interactionTrace: "auth-trace.json"};
+  writeFileSync(join(value.root, "auth-trace.json"), JSON.stringify({
+    tool: "playwright", sessionSetup: "product-ui", credentialSource: "process-environment", consoleErrors: [], failedRequests: [],
+    actions: [
+      {id: "auth-open-login", status: "passed", method: "page.goto"},
+      {id: "auth-fill-username", status: "passed", method: "locator.fill", selector: "username"},
+      {id: "auth-fill-password", status: "passed", method: "locator.fill", selector: "password"},
+      {id: "auth-submit", status: "passed", method: "locator.click", selector: "submit"},
+      {id: "auth-reach-protected-route", status: "passed", method: "page.waitForURL"},
+    ],
+  }));
+  assert.equal(validateVisualProof(value.baseline, value.proof, {baselineRoot: value.root, proofRoot: value.root}).ok, true);
+});
+test("direct API session setup cannot satisfy authenticated browser proof", (t) => {
+  const value = setup(); t.after(() => rmSync(value.root, {recursive: true, force: true}));
+  value.baseline.authentication = {applicability: "required", entryRoute: "/dang-nhap", protectedRoute: "/hoi-vien"};
+  value.proof.authentication = {applicability: "required", entryRoute: "/dang-nhap", protectedRoute: "/hoi-vien", credentialSource: "process-environment", interactionTrace: "auth-trace.json"};
+  writeFileSync(join(value.root, "auth-trace.json"), JSON.stringify({tool: "playwright", sessionSetup: "direct-api", credentialSource: "process-environment", actions: [], consoleErrors: [], failedRequests: []}));
+  assert.match(validateVisualProof(value.baseline, value.proof, {baselineRoot: value.root, proofRoot: value.root}).failures.join("\n"), /product UI/);
+});
+test("authenticated browser proof cannot omit password entry", (t) => {
+  const value = setup(); t.after(() => rmSync(value.root, {recursive: true, force: true}));
+  value.baseline.authentication = {applicability: "required", entryRoute: "/dang-nhap", protectedRoute: "/hoi-vien"};
+  value.proof.authentication = {applicability: "required", entryRoute: "/dang-nhap", protectedRoute: "/hoi-vien", credentialSource: "process-environment", interactionTrace: "auth-trace.json"};
+  writeFileSync(join(value.root, "auth-trace.json"), JSON.stringify({tool: "playwright", sessionSetup: "product-ui", credentialSource: "process-environment", actions: [
+    {id: "auth-open-login", status: "passed", method: "page.goto"},
+    {id: "auth-fill-username", status: "passed", method: "locator.fill"},
+    {id: "auth-submit", status: "passed", method: "locator.click"},
+    {id: "auth-reach-protected-route", status: "passed", method: "page.waitForURL"},
+  ], consoleErrors: [], failedRequests: []}));
+  assert.match(validateVisualProof(value.baseline, value.proof, {baselineRoot: value.root, proofRoot: value.root}).failures.join("\n"), /auth-fill-password/);
 });

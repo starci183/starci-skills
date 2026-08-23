@@ -1,6 +1,6 @@
 ---
 name: starci-fe-design-layout
-description: Thiết kế, duyệt theo giai đoạn, implement, seed và prove một long page hoặc end-to-end flow mature. Page synthesis in riêng journey direction và UI direction, join thành complete desktop/narrow anatomy rồi mới duyệt states cùng exact source-and-seed boundary. Mặc định một direction; 3–4 chỉ khi owner explicit brainstorm.
+description: Thiết kế, duyệt theo giai đoạn, implement, seed và browser-prove một long page hoặc end-to-end flow mature. Flow có xác thực phải để Playwright tự nhập test credentials qua UI đăng nhập thật trước khi protected-page parity được pass. Mặc định một direction; 3–4 chỉ khi owner explicit brainstorm.
 ---
 
 # starci-fe-design-layout
@@ -60,7 +60,7 @@ output đã pass gate, sở hữu decision/shared artifact và chỉ delegate so
 | page-synthesis | join | evidence, business head, source, contract, data, grammar và MASTER | chạy journey và capability subphase biệt lập, in direction, join, chạy integrated quality review rồi author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt, quality review và schema 9 page contract | cả hai origin cùng required lens/detector pass, không còn item chưa bind, rồi `OK #1`; chỉ cache |
 | states | execution | approved direction-quality-page hash và state truth | bung state, owner, transition, seed và boundary không review drift | schema 9 render contract cùng canonical prompt | `OK #2`; exact files đầy đủ |
 | implementation | execution | approved prompt | code, gate và seed không reinterpret | implementation, gate và seed receipts | mọi obligation tới product evidence |
-| parity | proof | preview và seeded product | tính PNG, DOM, axe và Playwright evidence | `visual-proof.json` | per-reference threshold pass và đạt delivery |
+| parity | proof | preview và seeded product | phân loại authentication, chạy login bắt buộc qua product UI rồi tính PNG, DOM, axe và Playwright evidence | `visual-proof.json` schema 4 | proof có auth tự nhập credentials trên browser, không session shortcut; parity và delivery pass |
 
 ## Approval modes
 
@@ -146,6 +146,12 @@ development/test identity, page state và block states cần có, product-native
 existing command, idempotency key, local dependencies, safe-repeat behavior cùng product read path. Seed file mới
 thuộc approved source boundary. Cache fixture không thể hoàn thành contract này.
 
+Trước `OK #2`, phân loại authentication của flow là `required` hoặc `not-applicable`. Protected actor route làm
+authentication thành required. Page map và selected proof scope khi đó phải có product login entry, form
+username/password, invalid-credential state, successful session transition và protected landing. Thiếu bất kỳ
+phần nào thì mở lại pages; không được lập kế hoạch direct session mutation, cookie injection hay proof-only login
+helper. Exact source boundary phải chứa login page, form owner, session client, route transition và tests cần thiết.
+
 Validate artifact, layout grammar và schema 2 maturity review với `reviewStage: states`. State không fit approved page anatomy sẽ làm page approval mất hiệu lực. Feedback chỉ đổi cách thể hiện state thì giữ page approval.
 
 Publish review nhãn `states` và disclose `OK #2: STATES + SOURCE BOUNDARY`, direction-quality-page hash không đổi,
@@ -161,9 +167,13 @@ Trước browser proof, materialize mọi selected render target qua approved pr
 
 Phase này được phép start declared local dependencies cùng real frontend/backend. Nó không được đòi VPS, mutate production data, gọi undeclared external provider hoặc thay backend-owned truth bằng client mock, component props, static HTML hay cache fixture. Prove kết quả qua chính read path của product và ghi command, identity, stable identifiers cùng observed rows/states. Seed thiếu hoặc fail sẽ stop visual proof; repair trong approved boundary hoặc quay lại `OK #2` nếu cần file mới.
 
+Khi authentication là required, resolve một development/test operator riêng và chỉ đưa username/password cho
+browser automation qua process environment hoặc encrypted workspace reference. Không persist value vào source,
+cache JSON, trace action, screenshot, command-line argument hay log.
+
 ### 7. Prove real-product parity
 
-Chạy browser proof cho mọi selected render target. Năm complete-page target là default review budget, không phải coverage cap. Final proof dùng PNG/DOM/axe/trace từ real connected product ở cùng page state, seeded block states và viewport; validator tự tính verdict. Repair defect trong boundary mà không cần approval thứ ba.
+Chạy browser proof cho mọi selected render target. Năm complete-page target là default review budget, không phải coverage cap. Với flow có auth, bắt đầu bằng Playwright chưa đăng nhập, đi tới product login entry, tự điền username và password từ test identity đã khai, submit form nhìn thấy được, chờ protected route rồi mới capture protected states. Trace phải ghi `auth-open-login`, `auth-fill-username`, `auth-fill-password`, `auth-submit` và `auth-reach-protected-route` bằng UI method thật nhưng không ghi entered values. Direct API session, cookie/header injection, preloaded `storageState`, `document.cookie` và proof-only switch đều không hợp lệ. `visual-proof.json` schema 4 bind authentication trace đó với PNG/DOM/axe/state traces của real connected product ở cùng state và viewport; validator tự tính verdict. Repair defect trong boundary mà không cần approval thứ ba.
 
 ## Rules
 
@@ -185,6 +195,8 @@ Chạy browser proof cho mọi selected render target. Năm complete-page target
     Grammar/Principles thì rời first-synthesis scope và vào correction owner.
 16. Mọi candidate pass shared quality review trước HTML; external UX/UI evidence chỉ là advisory.
 17. State expansion giữ approved quality review byte-identical; đổi review phải mở lại pages.
+18. Layout có authentication không được kết thúc trước khi signed-out Playwright điền cả hai credential control
+    qua product form và tới protected route. API-created session hay injected state không bao giờ pass.
 
 ## Stops
 
@@ -195,10 +207,13 @@ Chạy browser proof cho mọi selected render target. Năm complete-page target
 - Dùng `OK #1` như source authority, hoặc `OK #2` không có exact files.
 - Giấu page-contract drift hoặc required work nằm ngoài approved boundary.
 - Thiếu seed ownership, selected state không seed được, seed không idempotent hoặc final proof chỉ tồn tại trong cache/component mock.
+- Protected route thiếu product login entry đã render, test credential owner hoặc schema-4 authentication trace
+  điền cả hai control và tới route mà không dùng session shortcut.
 - Concrete owner feedback chỉ ra semantic owner, visual law hoặc repeated skill decision sai trong emitted output — owner: `starci-fe-layout-refactor`.
 
 ## OUTPUT
 
 Ở page review, in journey direction, UI direction cùng quality verdict cho từng candidate rồi báo joined page URL,
 maturity verdict và cache-only `OK #1`. Ở state review, báo state coverage, direction-quality-page hash không đổi, exact source files,
-seed-owner rows và `OK #2`. Sau code, báo changed files, tests, seed command/identity/observed data và real-product parity.
+seed-owner rows và `OK #2`. Sau code, báo changed files, tests, seed command/identity/observed data,
+authentication applicability và—khi required—login route cùng credential source class không có value, rồi real-product parity.
