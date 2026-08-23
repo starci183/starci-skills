@@ -50,7 +50,7 @@ const validate = (schema, data) => execFileSync(process.execPath, [validator, "-
 const normalized = (path) => path.replaceAll("\\", "/");
 
 function workspaceRoute(role) {
-  const path = join(source, ".workspace", project, role, "config.json");
+  const path = join(source, ".workspaces", "local", "routes", project, role, "config.json");
   if (!existsSync(path)) throw new Error(`workspace route is absent: ${relative(source, path)}`);
   const route = readJson(path);
   const diskPath = route?.repository?.diskPath;

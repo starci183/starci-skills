@@ -13,7 +13,7 @@ description: Reconcile one component-impact Layout-generated block inside its co
 | `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for block HTML, source and proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fixes away from the component workflow |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/en.md` | en | keep review evidence in session cache |
+| `@worktrees` | `contexts/worktrees/en.md` | en | keep disposable review evidence in the current session |
 | `@composition` | `brainstorms/composition/en.md` | en | lock highlighted parent and preserved page |
 | `@business` | `contexts/business/en.md` | en | resolve real data, actions and states |
 | `@grammar` | `grammars` | module | load routed block facts, outcomes and owners |

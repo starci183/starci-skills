@@ -9,7 +9,7 @@ title: Initialization · identity
 None.
 
 The machine identity is `~/.starci/master.identity`. It is private machine state: never commit it, copy
-it into `.workspace`, place it in a command argument, or print its contents or derived secret material.
+it into `.workspaces`, place it in a command argument, or print its contents or derived secret material.
 
 Run `node .claude/scripts/init-identity.mjs --source <Source> --plan` first. The preflight proves `sops`,
 `age`, and `age-keygen` are callable, validates the identity with `age-keygen -y`, and verifies a real

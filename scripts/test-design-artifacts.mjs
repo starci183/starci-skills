@@ -211,7 +211,13 @@ const worktreeRoots = write("worktree-roots.json", {
       ignored: false,
       ownership: {locked: true, clean: true, branch: "codex/businesses/example-app", owningGit: root},
     },
-    cache: {path: ".worktrees/example-app/cache", durability: "rebuildable", ignored: true},
+    debts: {
+      path: ".worktrees/example-app/debts",
+      durability: "durable",
+      ignored: false,
+      ownership: {locked: true, clean: true, branch: "quality-debts/example-app", owningGit: root},
+    },
+    sessions: {path: ".sessions/example-app/session-test", durability: "session", ignored: true},
   },
 });
 

@@ -13,7 +13,7 @@ description: Correct or restructure an exact Layout- or Block-rendered frontend 
 | `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for failure audit, HTML, authority, FE and proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | choose the proportional correction path from observed impact |
 | `@workspaces` | `contexts/workspaces/en.md` | en | verified frontend route |
-| `@worktrees` | `contexts/worktrees/en.md` | en | correction cache |
+| `@worktrees` | `contexts/worktrees/en.md` | en | disposable correction-session evidence |
 | `@composition` | `brainstorms/composition/en.md` | en | rendered scope and allowed delta |
 | `@business` | `contexts/business/en.md` | en | frozen product truth |
 | `@grammar` | `grammars` | module | routed semantics and owners |

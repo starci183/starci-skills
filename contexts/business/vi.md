@@ -50,7 +50,7 @@ thành `implemented` với final committed source heads. Thay đổi thuần k�
 ## Rules
 
 1. `featureId` ổn định; SHA-256 head là version.
-2. Business state là durable và versioned; preview pack sinh lại được vẫn ở project cache.
+2. Business state là durable và versioned; preview pack sinh lại được vẫn ở session root.
 3. FE/BE evidence đọc từ workspace route đã verify tại committed head.
 4. Mọi claim không phải unknown cite evidence có trong cùng object.
 5. Example import chỉ cho cấu trúc, không cho business fact.

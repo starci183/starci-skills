@@ -42,7 +42,7 @@ tracked source hoặc external state thì không còn ai tin measurement của n
 
 ### 1 — Lập boundary read-only
 
-`Touching` không có gì. Đọc `.workspace/config.json` và mọi declared role. Nếu workspace root absent,
+`Touching` không có gì. Đọc `.workspaces/config.json` và mọi declared role. Nếu workspace root absent,
 report fact đó và dừng.
 
 ### 2 — Chạy shared scanner
@@ -90,7 +90,7 @@ authority riêng.
 
 ## Stops
 
-- `.workspace` absent → report không có route và kết thúc.
+- `.workspaces` absent → report không có route và kết thúc.
 - Route JSON invalid → report `invalid`, không phải `absent` hay `stale`.
 - Category không đọc an toàn được → report `unmeasured` kèm reason; không guess.
 - Reader hỏi repair → finish inventory; capability khác sở hữu write.

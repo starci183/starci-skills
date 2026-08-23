@@ -38,7 +38,7 @@ names a batch. Route debt is record-only here: a stale route returns to the init
 
 ## Process
 
-1. Resolve and verify `.workspace/<project>/<role>/config.json`, then validate
+1. Resolve and verify `.workspaces/local/routes/<project>/<role>/config.json`, then validate
    `.worktrees/<project>/debts/<role>.md` with `node @source-quality --debts --project <project> --role <role>`.
    Missing, invalid or expired debt stops the run; never reconstruct it from chat.
 2. Read every scope and its Markdown baseline/exit criteria. Route `<category>:<finding>` through

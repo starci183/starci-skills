@@ -80,7 +80,7 @@ const readJson = (path, label) => {
 }
 
 const resolveContext = ({ project, role }) => {
-    const routePath = join(sourceRoot, ".workspace", project, role, "config.json")
+    const routePath = join(sourceRoot, ".workspaces", "local", "routes", project, role, "config.json")
     const route = readJson(routePath, `${project}/${role} route`)
     if (route.project !== project || route.role !== role) fail(`${routePath} identifies ${route.project}/${route.role}`)
     const requestedRepo = resolve(route.repository?.diskPath ?? "")
@@ -101,7 +101,7 @@ const resolveContext = ({ project, role }) => {
         routePath,
         requestedRepo,
         identity,
-        credentialsRoot: join(sourceRoot, ".workspace", "credentials"),
+        credentialsRoot: join(sourceRoot, ".workspaces", "local", "credentials"),
     }
 }
 
@@ -290,7 +290,7 @@ const main = async () => {
     console.log(`identity: ${context.identity} (present; value never read)`)
     console.log(`origin: ${input.service}`)
     console.log(`public route: https://${input.hostname} through ${input.tunnel}`)
-    console.log(`encrypted records: .workspace/credentials/${API_RECORD}, .workspace/credentials/${tunnelRecord}`)
+    console.log(`encrypted records: .workspaces/local/credentials/${API_RECORD}, .workspaces/local/credentials/${tunnelRecord}`)
     console.log("external state: remotely managed tunnel ingress and proxied CNAME")
     console.log("credential output: never")
     if (input.plan) return

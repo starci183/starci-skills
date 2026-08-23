@@ -13,7 +13,7 @@ description: Reconcile một block impact component trong complete parent, chỉ
 | `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho block HTML, source và proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fix khỏi component workflow |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify frontend route |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ review evidence trong session cache |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ disposable review evidence trong session hiện tại |
 | `@composition` | `brainstorms/composition/vi.md` | vi | khóa highlighted parent và preserved page |
 | `@business` | `contexts/business/vi.md` | vi | resolve data, action và state thật |
 | `@grammar` | `grammars` | module | load routed block facts, outcomes và owners |

@@ -60,7 +60,7 @@ const readJson = (path, label) => {
   catch (error) { fail(`${label} is invalid JSON: ${error.message}`); }
 };
 const routes = roles.map((role) => {
-  const routePath = join(sourceRoot, ".workspace", project, role, "config.json");
+  const routePath = join(sourceRoot, ".workspaces", "local", "routes", project, role, "config.json");
   const route = readJson(routePath, `${project}/${role} route`);
   if (route.project !== project || route.role !== role) fail(`${routePath} identifies ${route.project}/${route.role}`);
   const diskPath = resolve(route.repository?.diskPath ?? "");
@@ -74,7 +74,7 @@ const restPort = appQdrantPort + 2;
 const grpcPort = restPort + 1;
 const mcpPort = 8011;
 const showcasePort = 8012;
-const cacheDir = join(sourceRoot, ".worktrees", "source-context", "cache", "mcp");
+const cacheDir = join(sourceRoot, ".workspaces", "local", "state", "source-context", "mcp");
 const composeFile = join(cacheDir, "compose.yaml");
 const envFile = join(cacheDir, ".env");
 const clientFile = join(cacheDir, "mcp.json");

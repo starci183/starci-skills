@@ -49,14 +49,14 @@ Creating or changing a tunnel, ingress, DNS record, or encrypted credential is a
 Display the helper's value-free plan under `### NEED APPROVALS`; only `OK` authorizes those exact targets.
 Run the same command without `--plan` to reconcile the declared route.
 
-The helper reuses `.workspace/credentials/cloudflare-api-token.key.enc` through the initialized SOPS identity
+The helper reuses `.workspaces/local/credentials/cloudflare-api-token.key.enc` through the initialized SOPS identity
 when the record exists. Otherwise it reads `CLOUDFLARE_API_TOKEN` from its process environment or asks through
 a hidden interactive prompt. The value is never accepted in chat, a command argument or a plaintext config
 file, and is never printed. It
 encrypts credentials directly under the machine-local Source workspace:
 
-- `.workspace/credentials/cloudflare-api-token.key.enc`
-- `.workspace/credentials/cloudflare-<tunnel>-tunnel-token.key.enc`
+- `.workspaces/local/credentials/cloudflare-api-token.key.enc`
+- `.workspaces/local/credentials/cloudflare-<tunnel>-tunnel-token.key.enc`
 
 The first record authorizes reconciliation. The second is namespaced by the normalized tunnel name and
 holds the run token returned for that tunnel, so two tunnels never overwrite one credential owner.

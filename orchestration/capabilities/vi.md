@@ -33,7 +33,7 @@ cùng map chạy sequential dưới coordinator.
 | Skill | Topology | Coordinator owns | Delegable work | Final gate |
 |---|---|---|---|---|
 | `starci-business-analyze` | reconciliation | evidence classification, lifecycle transition và publication | routed source evidence và contradiction inventory | feature head cùng implementation reconciliation validate |
-| `starci-init` | reconciliation | bốn readiness approval và shared record | identity-safe check và route observation | identity, bootstrap, route và worktree đều xanh |
+| `starci-init` | reconciliation | bốn readiness boundary, quyết định portable declaration và publication ra ngoài | identity-safe check, route observation và portable schema proof | identity, bootstrap, portable/local route cùng durable worktree đều xanh; remote đã duyệt bằng đúng portable commit |
 | `starci-cloudflare-tunnel-set` | reconciliation | credential authority và external apply | tunnel/DNS read inventory cùng proof read | tunnel và DNS state đã khai khớp |
 | `starci-deploy` | reconciliation | release decision, external mutation và rollback | host/service observation cùng bounded proof | public steady state hoặc rollback đã chứng minh |
 | `starci-setup-mcp` | reconciliation | read-only scope, credential authority và publication | route/index inventory cùng partition proof | mọi partition isolated và read-only |

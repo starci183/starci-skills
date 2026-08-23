@@ -20,10 +20,10 @@ the source-location authority; Git remains the source-content authority; Qdrant 
 
 ## Rules
 
-- Resolve `.workspace/<project>/<role>/config.json` before reading a checkout.
+- Resolve `.workspaces/local/routes/<project>/<role>/config.json` before reading a checkout.
 - Use one Source-wide Qdrant instance and collection. Partition documents by virtual root
   `/<role>/<project>/`; adding a project must not add another Qdrant or MCP container.
-- Store generated configuration and manifests under `.worktrees/source-context/cache/mcp/`, never in this tree.
+- Store generated configuration and manifests under `.workspaces/local/state/source-context/mcp/`, never in this tree.
 - Launch source-context MCP read-only. Refresh happens only through the deterministic indexer.
 - Read credentials from the routed backend stack's ignored plaintext file after `npm run sync`; never copy a
   value into MCP JSON, arguments, output or a tracked file.
@@ -31,7 +31,7 @@ the source-location authority; Git remains the source-content authority; Qdrant 
   `http://localhost:8011/mcp/` only for machine-local health checks and recovery.
 - Publish only the MCP HTTP port through the Source-wide, remotely managed
   `starci-local-services` Cloudflare tunnel. Qdrant ports and the Ollama API remain private.
-- Own Cloudflare API and tunnel run tokens only as SOPS ciphertext under `.workspace/credentials/`.
+- Own Cloudflare API and tunnel run tokens only as SOPS ciphertext under `.workspaces/local/credentials/`.
   The connector may consume a decrypted runtime file, but no token enters this trust tree, client JSON,
   Compose arguments or logs.
 - Rebuild context from source whenever the route or desired revision changes. Search results are additional

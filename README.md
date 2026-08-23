@@ -101,11 +101,12 @@ With Claude Code:
 /starci-init setup this Source for project academy with roles fe and be
 ```
 
-The skill presents three independent write boundaries for approval:
+The skill presents four independent write boundaries for approval:
 
 1. `AGENTS.md` and `CLAUDE.md` — entry into the trust tree.
-2. `.workspace/` — machine-local routes to each target checkout.
-3. `.worktrees/<project>/` — durable business/conversation authority and rebuildable design cache.
+2. `.workspaces/` — tracked portable declarations plus generated machine-local routes.
+3. `.worktrees/<project>/` — local mounts of durable `businesses` and `debts` Git branches.
+4. `.sessions/<project>/<session-id>/` — ignored disposable invocation evidence; never durable authority.
 
 Review the exact paths shown by the skill and approve only the boundaries you want initialized.
 
@@ -116,26 +117,37 @@ One Source can manage many projects, and each project can expose several roles. 
 
 ```text
 <Source>/
-  .workspace/
+  .workspaces/
     config.json
-    academy/
-      fe/config.json
-      be/config.json
-    payments/
-      fe/config.json
-      be/config.json
+    projects/
+      academy/
+        fe.json
+        be.json
+      payments/
+        fe.json
+        be.json
+    ports/
+      config.json
+      academy.json
+      payments.json
+    local/
+      routes/
+        academy/
+          fe/config.json
+          be/config.json
   .worktrees/
     academy/
       businesses/
-      conversations/
-      cache/
+      debts/
     payments/
       businesses/
-      conversations/
-      cache/
+      debts/
+  .sessions/
+    academy/<session-id>/
+    payments/<session-id>/
 ```
 
-`.workspace/config.json` holds only Source-wide defaults:
+`.workspaces/config.json` holds only Source-wide defaults:
 
 ```json
 {
@@ -145,13 +157,16 @@ One Source can manage many projects, and each project can expose several roles. 
 }
 ```
 
-Each `.workspace/<project>/<role>/config.json` describes an existing checkout: its declared identity,
+Each tracked `.workspaces/projects/<project>/<role>.json` contains only credential-free GitHub identity,
+expected branch and repository-relative context paths. `starci-init` hydrates it into
+`.workspaces/local/routes/<project>/<role>/config.json`, which describes an existing checkout: its declared identity,
 absolute paths, Git root, remote, branch, observed head, required instructions, manifests, and any
 role-specific contract. Routes describe checkouts; they do not clone or copy them.
 
-Because these records contain machine-local paths and Git state, keep `.workspace/` out of shared
-repository history. Run `starci-init` again when adding a role or project, or when a checkout, branch,
-or recorded head changes. Do not duplicate the nearest config by hand.
+Commit only `.workspaces/config.json`, `.workspaces/projects/**/*.json` and `.workspaces/ports/*.json`.
+`.workspaces/local` is ignored because it contains machine-local paths and observed Git state. Run
+`starci-init` again when adding a role or project, or when a checkout or branch changes. Do not duplicate
+the nearest config by hand.
 
 StarCi frontend work resolves one compact visual system from `grammars/starci/design-system.json`. The
 routed profile may override declared roles such as accent; a page/session file records deviations only.
@@ -161,14 +176,16 @@ visually consistent. Grammar selects semantic owners and principles resolve only
 Conversation provenance is project-scoped and provider-neutral:
 
 ```text
-.worktrees/<project>/
+.worktrees/<project>/businesses/
   conversations/
     conversation-registry-v1.json
     objects/sha256/
   businesses/
     business-registry-v1.json
-  cache/conversations/
-    transcripts/
+.sessions/<project>/<session-id>/conversations/
+  transcripts/
+.workspaces/local/state/conversations/
+  search-indexes/
     search.sqlite
     vectors/
 ```
@@ -187,13 +204,13 @@ Sources/
     AGENTS.md
     CLAUDE.md
     .claude/
-    .workspace/
+    .workspaces/
     .worktrees/
   platform-source/
     AGENTS.md
     CLAUDE.md
     .claude/
-    .workspace/
+    .workspaces/
     .worktrees/
 ```
 

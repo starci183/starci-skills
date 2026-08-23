@@ -302,7 +302,7 @@ function readRemnant(diskPath) {
 }
 
 function readWorkspaces() {
-  const root = join(source, ".workspace");
+  const root = join(source, ".workspaces", "local", "routes");
   const rows = [];
   for (const project of dirs(root)) {
     const projectRoot = join(root, project);
@@ -390,7 +390,7 @@ for (const project of new Set(workspaces.map((w) => w.project))) {
   if (!projects.some((p) => p.project === project)) warnings.push(`${project}: no .worktrees/${project}/ in this Source — needed only once a skill records a decision for it → starci-init, the worktree-state root`);
 }
 for (const {project} of projects) {
-  if (!workspaces.some((w) => w.project === project)) warnings.push(`${project}: .worktrees/${project}/ exists in this Source but .workspace/${project}/ does not — no source to read → starci-init, the workspace-route root`);
+  if (!workspaces.some((w) => w.project === project)) warnings.push(`${project}: .worktrees/${project}/ exists in this Source but .workspaces/local/routes/${project}/ does not — no source to read → starci-init, the generated workspace-route root`);
 }
 
 const state = {

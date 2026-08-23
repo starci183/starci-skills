@@ -90,8 +90,8 @@ export function buildManifest(options) {
 }
 
 function assertOutputPath(outDir, project) {
-  const marker = `${sep}.worktrees${sep}${project}${sep}cache${sep}design${sep}`;
-  if (!`${resolve(outDir)}${sep}`.includes(marker)) throw new Error(`review output must stay under .worktrees/${project}/cache/design`);
+  const marker = `${sep}.sessions${sep}${project}${sep}`;
+  if (!`${resolve(outDir)}${sep}`.includes(marker)) throw new Error(`review output must stay under .sessions/${project}/<session-id>/design`);
 }
 
 function reviewIndex(manifest, entries) {

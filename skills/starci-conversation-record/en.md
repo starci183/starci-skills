@@ -10,7 +10,7 @@ title: StarCi conversation record
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared reporting and approval boundary |
 | `@workspaces` | `contexts/workspaces/en.md` | en | resolve the named project before provider or artifact reads |
-| `@worktrees` | `contexts/worktrees/en.md` | en | verify durable registry ownership and cache placement |
+| `@worktrees` | `contexts/worktrees/en.md` | en | verify durable business-registry ownership and session/generated-state placement |
 | `@conversations` | `contexts/conversations/en.md` | en | provider-neutral identity, custody, redaction and artifact-link law |
 | `@snapshot-schema` | `contexts/conversations/conversation-snapshot.schema.json` | file | validate one immutable provenance snapshot |
 | `@registry-schema` | `contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
@@ -34,13 +34,13 @@ Topology: `linear`.
 
 ## Run
 
-This skill records provenance, not authority. Frontend design cache is transient; durable FE provenance binds
+This skill records provenance, not authority. Frontend design session evidence is transient; durable FE provenance binds
 implemented source commits and paths. BE capability/operation authority remains separately owned.
 
 ### 1 — Resolve scope
 
-Require project, stable `conversationId`, provider and surface. `Touching` is the project conversation
-registry and ignored conversation cache; an encrypted external write is a separate displayed boundary.
+Require project, stable `conversationId`, provider and surface. `Touching` is the conversation registry below
+the durable `businesses` worktree plus ignored session/generated state; an encrypted external write is a separate displayed boundary.
 
 ### 2 — Acquire evidence explicitly
 
@@ -67,7 +67,7 @@ before a durable registry write or external encrypted upload. `OK` approves only
 ### 6 — Record and prove
 
 After approval apply the recorder, validate the registry, run the checker and commit only the immutable
-object and updated head. Search SQLite/vector state stays cache.
+object and updated head. Search SQLite/vector state stays under `.workspaces/local/state/conversations`.
 
 ## Stops
 

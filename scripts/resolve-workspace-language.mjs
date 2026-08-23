@@ -11,7 +11,7 @@ if (!args.includes("--source") || !sourceArg) {
   process.exit(2);
 }
 
-const route = join(resolve(sourceArg), ".workspace", "config.json");
+const route = join(resolve(sourceArg), ".workspaces", "config.json");
 if (!existsSync(route)) {
   console.error(`workspace config is absent: ${route}`);
   process.exit(1);

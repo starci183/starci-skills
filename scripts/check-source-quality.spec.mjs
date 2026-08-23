@@ -166,7 +166,7 @@ test("temporary debt never forgives lint, unit, patch or E2E failures", async ()
 
 test("lists Markdown debts by project and role without treating them as pass", () => {
   const root = mkdtempSync(join(tmpdir(), "starci-debt-list-"));
-  const roleRoot = join(root, ".workspace", "fixture", "be");
+  const roleRoot = join(root, ".workspaces", "local", "routes", "fixture", "be");
   const debtRoot = join(root, ".worktrees", "fixture", "debts");
   mkdirSync(roleRoot, {recursive: true});
   mkdirSync(debtRoot, {recursive: true});

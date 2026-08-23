@@ -13,7 +13,7 @@ description: Design, stage-approve, implement, seed and browser-prove one produc
 | `@orchestration` | `orchestration/context.md` | context | assign decision, HTML, source and proof phases safely across the active runtime |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse ceremony larger than the measured frontend impact |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/context.md` | context | keep review evidence in session cache |
+| `@worktrees` | `contexts/worktrees/context.md` | context | keep disposable review evidence in the current session |
 | `@composition` | `brainstorms/composition/context.md` | context | lock Scope, Owner, Invariant and Proof |
 | `@business` | `contexts/business/context.md` | context | bind journey and page decisions to current product truth |
 | `@grammar` | `grammars/context.md` | context | load routed facts, outcomes and owners |
@@ -76,7 +76,7 @@ or any scope/project/role/repository/write-boundary expansion stop for owner app
 
 Read `@skill-shape` and `@orchestration` first. Confirm exactly one scope: `page` for one complete composed route,
 or `flow` for explicit start and terminal endpoints. A screenshot authorizes only what it shows. Create one ignored
-session root at `.worktrees/<project>/cache/design/<session-id>` and validate the four-lock composition baseline.
+session root at `.sessions/<project>/<session-id>/design` and validate the four-lock composition baseline.
 Then build the internal orchestration plan from the frontend map; do not display its record unless `debug=true`. The coordinator authors
 journey/UI decisions, the integrated quality verdict and approvals; workers may inventory lens/detector evidence,
 project only an eligible frozen contract into cache HTML, implement disjoint approved paths, seed, test and capture
@@ -264,7 +264,7 @@ per-reference thresholds. Repair in-boundary defects until green; no third appro
 6. Page-contract drift during state expansion returns to page approval.
 7. State-only rejection preserves page approval when page anatomy is unchanged.
 8. A page state changes page architecture; a local condition remains a block state even when its evidence is a full-page capture.
-9. Candidates and previews live only in ignored project cache; source and executable proof are durable.
+9. Candidates and previews live only in ignored session root; source and executable proof are durable.
 10. MASTER is selected once; page files contain deviations only.
 11. Multi-stage progress uses one connected semantic stepper with markers, connectors and completed/current/upcoming states.
 12. Execution consumes the approved canonical prompt and may not reinterpret the preview.

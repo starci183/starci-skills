@@ -35,7 +35,7 @@ Topology: `reconciliation`.
 ## Run
 
 Read `@skill-shape`, `@workspaces`, `@mcp` and `@embedding` before resolving Source language, project and exact roles from
-`.workspace/<project>/<role>/config.json`. Never infer
+`.workspaces/local/routes/<project>/<role>/config.json`. Never infer
 a checkout and never clone a repository: “get StarCi source” means read the already declared routed checkout.
 Stop on an absent or stale route.
 
@@ -50,7 +50,7 @@ publishes only source catalogs. Direct source reads remain authoritative.
 
 ## DNS and credentials
 
-The credential directory is singular: `.workspace/credentials/`, not `.workspaces/credentials/`. Reuse these
+The credential directory is singular: `.workspaces/local/credentials/`, not `.workspaces/credentials/`. Reuse these
 SOPS ciphertext records through the initialized machine identity; never print or copy their plaintext:
 
 - `cloudflare-api-token.key.enc` — Source-wide Cloudflare reconciliation authority;

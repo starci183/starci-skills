@@ -5,7 +5,7 @@
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@manifest-schema` | `publication/design-review-preview/schema.json` | file | validate the session-local review graph |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | write static HTML previews below project cache with no app build |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | write static HTML previews below session root with no app build |
 | `@baseline-schema` | `brainstorms/composition/schema.json` | file | bind the four-lock reference and owner tree |
 | `@visual-proof-schema` | `publication/design-review-preview/visual-proof.schema.json` | file | prove same-viewport parity and delivery completion |
 
@@ -41,7 +41,7 @@ content is explicitly fixture-only; runtime values remain source-owned.
 All material lives below:
 
 ```text
-.worktrees/<project>/cache/design/<session-id>/
+.sessions/<project>/<session-id>/design/
 ```
 
 No accepted bundle, revision map, layout head, block head or design branch exists. Candidate digests are cache keys only.
@@ -88,7 +88,7 @@ Creativity precedes principles review. Only the selected candidate is audited in
 
 ## Rules
 
-1. Every review artifact is ignored project cache.
+1. Every review artifact is ignored session root.
 2. Candidate digests identify cache entries only and never become durable design identity.
 3. Layout uses cache-only page approval followed by state/source approval; block uses its displayed source approval. Implementation remains in the same invocation.
 4. Another task must regenerate design evidence from current authority; it cannot resume from cache.
@@ -104,7 +104,7 @@ Creativity precedes principles review. Only the selected candidate is audited in
 
 ## Stops
 
-- Output outside the exact project cache is refused.
+- Output outside the exact session root is refused.
 - Page review missing journey/business/component synthesis, representative full-page HTML, maturity evidence or viewport coverage is refused.
 - State review missing condition coverage, executable interaction, exact source files or an unchanged approved page contract is refused.
 - Authenticated proof missing its login entry, both credential-fill actions, form submit, protected-route arrival

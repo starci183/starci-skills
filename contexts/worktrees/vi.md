@@ -1,112 +1,110 @@
-# Worktree
+# Worktree và session
 
 ## LOADS
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@schema` | `contexts/worktrees/schema.json` | file | kiểm tra cache theo project và business root bền vững |
+| `@schema` | `contexts/worktrees/schema.json` | file | kiểm tra Git worktree bền vững và session root dùng xong bỏ |
 
 ## Record
 
-Module này quyết định state của một lượt chạy nằm ở đâu. Product truth phải tồn tại lâu được version trong business worktree của project. Candidate thiết kế, authored preview, review manifest và composition được chọn chỉ là cache trong phiên. Kết quả sản phẩm chỉ trở thành bền vững khi chính skill invocation đó ghi và chứng minh frontend source.
+Module này tách authority bền vững có branch khỏi state dùng trong một invocation. Business truth và quality debt đã chấp nhận sống trên remote branch. Design candidate, preview, browser profile, generated index và run manifest hết hiệu lực cùng session.
 
 ## Law
 
-State được đặt theo thứ cần sống lâu. Business truth có evidence nằm trên branch riêng. Design và review có thể dựng lại nằm dưới project cache và không trở thành product authority thứ hai. Skill thiết kế đã xin owner chọn candidate phải triển khai lựa chọn đó trong cùng invocation; task khác không được tiếp tục từ design cache.
-
-Project segment là bắt buộc. `.claude` là trust tree, không phải runtime storage. Target repository chỉ nhận product source sau khi exact write boundary được duyệt; bookkeeping của lượt chạy không đi vào đó.
+`.worktrees` chỉ chứa local mount của durable Git branch. Mount có thể dựng lại nhưng nội dung branch là authority tái sử dụng được. `.sessions/<project>/<session-id>` chứa invocation artifact đã ignore mà session khác không dùng làm authority. Generated machine state không thuộc một session nằm dưới `.workspaces/local`, không nằm trong `.worktrees`.
 
 ## Situation codes
 
 | Code | Situation | Nơi lưu |
 |---|---|---|
-| `WORKTREE-1` | Product truth có evidence phải sống lâu và review được | `<Source>/.worktrees/<project>/businesses`, linked worktree khóa trên `codex/businesses/<project>` |
-| `WORKTREE-2` | Draft, candidate, preview, review manifest hoặc selected design đang chờ execute cùng phiên | `<Source>/.worktrees/<project>/cache`, ignored |
-| `WORKTREE-3` | Path thiếu project segment hoặc nằm dưới `.claude` | từ chối |
-| `WORKTREE-4` | Business worktree bền vững là foreign, unlocked, dirty hoặc sai branch | từ chối |
-| `WORKTREE-5` | Các agent song song sẽ sửa cùng file hoặc cùng source boundary | isolate hoặc chạy tuần tự |
-| `WORKTREE-6` | Linked worktree stale hoặc prunable | prune có chủ đích qua Git |
-| `WORKTREE-7` | Frontend design được review trước implementation | giữ session pack đầy đủ trong cache và execute candidate đã chọn trước khi invocation kết thúc |
-| `WORKTREE-8` | Product truth phải phục vụ FE, BE và design | stable `featureId` heads trong `businesses` |
+| `WORKTREE-1` | Product truth có evidence phải sống lâu | `.worktrees/<project>/businesses` trên `codex/businesses/<project>` |
+| `WORKTREE-2` | Draft, preview, browser profile hoặc review pack phục vụ một invocation | `.sessions/<project>/<session-id>`, ignored |
+| `WORKTREE-3` | State thiếu project/session segment hoặc đi vào `.claude` | từ chối |
+| `WORKTREE-4` | Durable linked worktree là foreign, dirty, thiếu lock bắt buộc hoặc sai branch | từ chối |
+| `WORKTREE-5` | Parallel writer overlap một target | isolate hoặc chạy tuần tự |
+| `WORKTREE-6` | Linked worktree mount stale hoặc prunable | prune có chủ đích qua Git |
+| `WORKTREE-7` | Frontend design được review trước implementation | giữ pack trong session hiện tại và execute trước khi invocation kết thúc |
+| `WORKTREE-8` | Product truth phục vụ FE, BE và design | stable feature head trong `businesses` |
+| `WORKTREE-9` | Quality debt đã chấp nhận phải sống lâu và được repay | `.worktrees/<project>/debts` trên `quality-debts/<project>` |
 
 ## Reading a run
 
-1. Gọi tên từng output và việc task khác có phải đọc nó không. Business truth là durable; design-review material là rebuildable và session-local.
-2. Bắt buộc `.worktrees/<project>/` trước mọi state path.
-3. Chỉ kiểm tra Git ownership cho business worktree bền vững.
-4. Isolate collision file thật, không isolate chỉ vì có nhiều agent.
-5. Giữ candidate dưới `cache/design/<session-id>/`. Pack chứa `baseline.json`, page override deviations-only nếu có, artifact, preview, screenshot, `review-manifest.json` và `visual-proof.json`.
-6. Sau owner approval, chỉ giữ selected pack đủ lâu để implement và prove source trong cùng invocation. Source history, test và browser proof là record bền vững.
-7. Không tạo layout head, block head, immutable design revision hoặc design-registry branch.
+1. Phân loại từng output thành durable authority, generated machine state hoặc disposable session state.
+2. Bắt buộc `.worktrees/<project>/{businesses,debts}` cho durable linked worktree.
+3. Bắt buộc `.sessions/<project>/<session-id>` cho invocation artifact.
+4. Chỉ verify Git ownership, branch, cleanliness và lock cho durable linked worktree.
+5. Giữ design material dưới `.sessions/<project>/<session-id>/design`.
+6. Không resume product hay design authority từ file của session khác.
+7. Prune stale linked mount qua Git; không xóa tay linked worktree directory.
 
 ## `WORKTREE-1` — business truth bền vững
 
-Business feature decision không thể tái tạo chỉ từ code nên vẫn được version dưới `businesses`. Situation này không cho phép design registry hay accepted-preview store.
+Business decision không thể tái tạo chỉ từ code nên remote branch vẫn durable và review được. Local linked mount có thể dựng lại.
 
-## `WORKTREE-2` — session state có thể dựng lại
+## `WORKTREE-2` — session state dùng xong bỏ
 
-Candidate, render output, screenshot, index và selected design metadata có thể dựng lại từ business authority, grammar, contract và source. Chúng luôn là ignored cache dù tạo ra tốn công.
+Candidate, screenshot, browser profile, render output và selected-design metadata có thể dựng lại từ durable authority cùng source. Chúng vẫn là ignored session artifact dù tạo ra tốn công.
 
 ## `WORKTREE-3` — state path không hợp lệ
 
-State thiếu project segment có thể trộn project. State dưới `.claude` làm bẩn trust tree. Cả hai bị từ chối.
+Session state thiếu project và session identity có thể trộn lượt chạy. State dưới `.claude` làm bẩn trust tree. Cả hai bị từ chối.
 
 ## `WORKTREE-4` — durable worktree foreign hoặc invalid
 
-Chỉ business authority cần linked durable worktree. Nó phải thuộc Source này, locked, clean và ở đúng project branch.
+Business và debt branch phải thuộc Source này và mount trên đúng branch đã khai. Lock bắt buộc cùng clean state phải giữ trước authority write.
 
 ## `WORKTREE-5` — parallel writes
 
-Parallel reader và writer có path rời nhau không cần isolation thêm. Agent sửa cùng source file hoặc authority file chạy tuần tự hoặc ở target worktree riêng.
+Parallel reader và writer rời nhau không cần isolation thêm. Writer overlap chạy tuần tự hoặc trong target worktree riêng.
 
 ## `WORKTREE-6` — linked worktree stale
 
-Prune qua Git sau khi chứng minh exact target. Không xóa tay thư mục linked worktree.
+Prune qua Git sau khi chứng minh exact target. Bỏ local mount không xóa durable remote branch.
 
-## `WORKTREE-7` — design và execute cùng phiên
+## `WORKTREE-7` — design và execute cùng session
 
-Design candidate không có durable head. Review pack bind baseline bốn lock, StarCi MASTER, page override deviations-only, business head, grammar/profile receipt, contract evidence, candidate key và same-viewport proof. Approval cho phép selected candidate cùng exact source boundary một lần. Cùng invocation đó implement, test và visual proof.
+Design candidate không có durable head. Approval cho phép selected candidate cùng exact source boundary một lần; chính invocation đó implement và prove.
 
 ## `WORKTREE-8` — product truth
 
-Business feature head vẫn durable vì FE, BE và design phải dùng chung actor, flow, rule, state và outcome. Design choice không đi vào registry đó.
+Business feature head vẫn durable vì mọi role phải dùng chung actor, flow, rule, state và outcome.
+
+## `WORKTREE-9` — debt đã chấp nhận
+
+Debt record vẫn durable vì delivery và repayment dùng chung baseline, expiry cùng exit criteria đã duyệt. Local mount có thể dựng lại; remote branch mới là record.
 
 ## Inputs
 
 | Input | Evidence required |
 |---|---|
-| project | project do owner khai báo |
-| source | Source repository sở hữu trust và local state |
-| business root | project business worktree thuộc Git, locked và clean |
-| cache root | project cache path được ignore |
-| design session | một invocation identity và routed source baseline |
-| target source | exact frontend write boundary đã duyệt |
+| project | project được khai rõ |
+| source | Source sở hữu trust và local state |
+| businesses | linked worktree đúng owner |
+| debts | linked worktree đúng owner |
+| session | một invocation identity cùng ignored root |
+| target source | source boundary đã duyệt khi có implementation |
 
 ## Rules
 
-1. Business truth là durable; design-review material là cache.
-2. Design approval và source execution xảy ra trong cùng skill invocation.
-3. Không task nào dùng design cache của task khác làm authority.
-4. Project segment là bắt buộc.
+1. Business truth và accepted debt là durable branch-backed authority.
+2. Session artifact dùng xong bỏ và không bao giờ là authority giữa các session.
+3. `.worktrees` không chứa cache hay session directory.
+4. `.sessions` không chứa durable authority.
 5. `.claude` không lưu runtime state.
-6. Business worktree bền vững phải thuộc Source, locked và clean.
-7. Isolation theo collision ghi thật.
-8. Linked worktree stale được prune qua Git.
-9. Frontend source cùng executable proof là accepted design outcome bền vững.
-10. Không tạo design registry, layout head, block head hoặc immutable preview revision.
+6. Isolation theo collision ghi thật.
+7. Frontend source cùng executable proof là accepted design outcome bền vững.
 
 ## Exceptions
 
-- Cache pack có thể còn sau completion để debug local, nhưng vẫn ignored và không có authority.
-- Conversation provenance và business authority có thể dùng durable store riêng được route rõ; chúng không phải design registry.
-- Request design-only cấm implementation có thể render candidate, nhưng kết quả hết hiệu lực cùng invocation và không được gọi là accepted authority.
+- Session đã hoàn tất có thể còn để debug local nhưng vẫn ignored và không có authority.
+- Conversation provenance có thể dùng durable branch đã khai; derivative đã decrypt/search vẫn là session hoặc generated local state.
 
 ## Output
 
 ```text
-output: <business authority | design session | source implementation>
-durability: <durable | rebuildable | product source>
-path: <business worktree | project cache | routed frontend>
-session: <same invocation identity khi có design>
+output: <business authority | debt authority | session artifact | source implementation>
+durability: <durable branch | generated local | session | product source>
+path: <business worktree | debt worktree | session root | routed frontend>
 reason: <fact quyết định placement>
 ```

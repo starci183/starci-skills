@@ -20,7 +20,7 @@ function redact(value) {
 
 const readJson = (file) => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; } };
 const routeRows = (root = source) => {
-  const workspace = join(root, ".workspace");
+  const workspace = join(root, ".workspaces", "local", "routes");
   if (!existsSync(workspace)) return [];
   const rows = [];
   for (const project of readdirSync(workspace, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name)) {

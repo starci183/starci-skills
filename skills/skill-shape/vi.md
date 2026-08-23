@@ -225,7 +225,7 @@ Trước implementation, khóa `Scope`, `Owner`, `Invariant`, `Proof`. Request n
 
 **Các lượt design** là session evidence tùy chọn. Lựa chọn direction hỗ trợ một lượt layout và không có
 durable hash hay checkpoint owner riêng. Candidate chính xác cùng recommendation dựa trên evidence nằm
-trong project cache của invocation hiện tại. Block dùng một displayed source boundary. Layout dùng hai
+trong session root của invocation hiện tại. Block dùng một displayed source boundary. Layout dùng hai
 boundary rõ ràng: `OK #1` freeze page contract trong cache và mở state expansion nhưng không có source
 authority; `OK #2` duyệt complete states cùng exact source files và mở implementation. Feedback về page
 anatomy quay lại page review; state-only feedback giữ approved page contract.
@@ -262,7 +262,7 @@ quyền owner, `### NEED APPROVALS` giải thích còn thiếu gì, vì sao agen
 ## Bản ghi
 
 Không có report file riêng hay design registry bền vững. Design candidate, selected preview và review manifest
-nằm dưới `<Source>/.worktrees/<project>/cache/design/<session-id>` và hết hiệu lực cùng invocation. Frontend
+nằm dưới `<Source>/.sessions/<project>/<session-id>/design` và hết hiệu lực cùng invocation. Frontend
 source, test và browser proof là accepted design outcome bền vững. Business và conversation authority giữ store
 được route riêng. Repair ghi bằng commit/diff; lượt chỉ đọc không ghi file trừ khi được yêu cầu rõ.
 

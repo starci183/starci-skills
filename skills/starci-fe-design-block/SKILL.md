@@ -13,7 +13,7 @@ description: Reconcile one component-impact Layout-generated frontend block insi
 | `@orchestration` | `orchestration/context.md` | context | assign block audit, HTML, source and proof without transferring UI decisions |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fixes away from the component workflow |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/context.md` | context | keep review evidence in session cache |
+| `@worktrees` | `contexts/worktrees/context.md` | context | keep disposable review evidence in the current session |
 | `@composition` | `brainstorms/composition/context.md` | context | lock highlighted parent, preserved page and proof scope |
 | `@business` | `contexts/business/context.md` | context | resolve real data, actions and states |
 | `@grammar` | `grammars/context.md` | context | load routed block facts, outcomes and owners |
@@ -78,7 +78,7 @@ direction, integrated quality verdict, approvals and integration. Workers may in
 lens/detector facts, generate complete-parent HTML only from an eligible frozen anatomy, implement disjoint
 approved paths, test and capture proof. Product source starts only after the one exact source approval.
 
-Create `.worktrees/<project>/cache/design/<session-id>`. Inspect the one block Layout generated inside the complete
+Create `.sessions/<project>/<session-id>/design`. Inspect the one block Layout generated inside the complete
 parent page, return pass or exact findings, and synthesize the UI direction that resolves those findings while
 preserving all untargeted rendering. Direction is a mandatory internal step, not a separate mode. Block never
 re-composes the page.
@@ -116,7 +116,7 @@ State evidence remains bound to the exact risk-covering view families in the app
 
 1. The current routed source page is the parent authority.
 2. Audit, optional direction resolution, one exact source approval, implementation and QA occur in one invocation.
-3. Candidate and selected previews live only in project cache.
+3. Candidate and selected previews live only in session root.
 4. No block head, layout head, revision bundle or design branch is created.
 5. Untargeted parent and sibling regions remain unchanged.
 6. Source plus full-page browser proof is the durable outcome.

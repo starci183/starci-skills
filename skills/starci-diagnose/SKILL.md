@@ -131,8 +131,8 @@ before closing; do not turn incomplete diagnosis work into an owed list.
 | Target step | What it reads | What is there | Verdict |
 |---|---|---|---|
 | 1 establish context lock | — | — | `pass` |
-| 2 resolve + verify the `fe` route | `.workspace/second-app/fe/config.json` | `.workspace/` holds `example-app` only; no `second-app` | **`would-stop`** — `WORKSPACE-2` |
-| 3 worktree roots | `.worktrees/second-app/{businesses,cache}` | absent, as expected without a route | `blocked` behind step 2 |
+| 2 resolve + verify the `fe` route | `.workspaces/local/routes/second-app/fe/config.json` | `.workspaces/` holds `example-app` only; no `second-app` | **`would-stop`** — `WORKSPACE-2` |
+| 3 worktree roots | `.worktrees/second-app/{businesses,debts} plus .sessions/second-app/<session-id>` | absent, as expected without a route | `blocked` behind step 2 |
 | 4 open or resume review work | the registry | unreachable | `blocked` behind step 3 |
 | 5 read the six inputs | the contract at `context.contract` | **that checkout has no `components/contracts` directory** | `defect` in the *environment*, not the skill |
 | 6 per-region verdicts | contract keys by `why` | no contract to search, so every region would resolve `new` | `blocked` by step 5 |
@@ -143,7 +143,7 @@ before closing; do not turn incomplete diagnosis work into an owed list.
 ```text
 finding: no workspace route for this project
 label: blocked
-evidence: .workspace/ contains example-app; second-app absent
+evidence: .workspaces/ contains example-app; second-app absent
 first-stop: yes, at target step 2
 cleared-by: the route owner, with the project declared by the owner
 ```
@@ -167,7 +167,7 @@ settled-by: the owner naming which app or package holds it, or confirming it doe
 ```text
 finding: a design task attempts to resume another task's expired cache pack
 label: blocked
-evidence: no session pack under <Source>/.worktrees/<project>/cache/design/
+evidence: no session pack under <Source>/.sessions/<project>/<session-id>/design/
 cleared-by: regenerate candidates from current business authority, grammar, contract and source in the new invocation
 ```
 

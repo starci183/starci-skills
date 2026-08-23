@@ -13,7 +13,8 @@ const plan = args.includes("--plan")
 if (apply === plan) throw new Error("Use exactly one of --plan or --apply")
 
 const trustRoot = resolve(sourceRoot, ".claude")
-const workspaceRoot = resolve(sourceRoot, ".workspace")
+const workspaceRoot = resolve(sourceRoot, ".workspaces", "local")
+const routeRoot = resolve(workspaceRoot, "routes")
 const catalog = JSON.parse(readFileSync(
   resolve(trustRoot, "compilers", "patterns", "source-references", "references.json"),
   "utf8",
@@ -40,10 +41,10 @@ const verify = (path, entry) => {
 }
 
 const routeCandidates = []
-if (existsSync(workspaceRoot)) {
-  for (const project of readdirSync(workspaceRoot, { withFileTypes: true })) {
-    if (!project.isDirectory() || ["cache", "credentials", "ports"].includes(project.name)) continue
-    const projectRoot = resolve(workspaceRoot, project.name)
+if (existsSync(routeRoot)) {
+  for (const project of readdirSync(routeRoot, { withFileTypes: true })) {
+    if (!project.isDirectory()) continue
+    const projectRoot = resolve(routeRoot, project.name)
     for (const role of readdirSync(projectRoot, { withFileTypes: true })) {
       const routePath = resolve(projectRoot, role.name, "config.json")
       if (!role.isDirectory() || !existsSync(routePath)) continue

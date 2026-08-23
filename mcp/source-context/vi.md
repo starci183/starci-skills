@@ -6,7 +6,7 @@ title: Ngữ cảnh source theo route
 
 ## Projection
 
-Mỗi role được resolve từ `.workspace/<project>/<role>/config.json` và publish virtual path dưới
+Mỗi role được resolve từ `.workspaces/local/routes/<project>/<role>/config.json` và publish virtual path dưới
 `/<role>/<project>/` trong collection dùng chung `starci-context-v1`. Refresh upsert một generation rồi chỉ
 xóa point cũ của đúng partition role/project đó; source khác không bị chạm.
 
@@ -33,15 +33,15 @@ Pattern endpoint remote chuẩn là `https://mcp.<zone>/mcp/`; endpoint chẩn �
 gRPC và Ollama không bao giờ là tunnel origin.
 
 Hai record control-plane toàn Source là
-`.workspace/credentials/cloudflare-api-token.key.enc` và
-`.workspace/credentials/cloudflare-starci-local-services-tunnel-token.key.enc`. Chúng luôn là SOPS
+`.workspaces/local/credentials/cloudflare-api-token.key.enc` và
+`.workspaces/local/credentials/cloudflare-starci-local-services-tunnel-token.key.enc`. Chúng luôn là SOPS
 ciphertext cục bộ theo máy. Reconcile phải merge hostname này vào ingress sẵn có và giữ catch-all 404;
 không được thay thế service khác trên tunnel dùng chung.
 
 ## Lệnh
 
 - `plan` resolve route, chủ stack, collection và prerequisite mà không ghi.
-- `config` ghi Compose, environment và client JSON cục bộ vào `.worktrees/source-context/cache/mcp/`; truyền
+- `config` ghi Compose, environment và client JSON cục bộ vào `.workspaces/local/state/source-context/mcp/`; truyền
   `--public-url https://mcp.<zone>/mcp/` khi Source không dùng StarCi zone mặc định. URL showcase mặc định là
   `https://qdrant.<zone>/dashboard`; chỉ truyền `--showcase-url` khi hostname đó chủ ý khác đi.
 - `index` chạy indexer bằng container, tải embedding model nếu máy chưa có, dựng các projection và ghi manifest không chứa giá trị bên

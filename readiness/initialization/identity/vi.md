@@ -9,7 +9,7 @@ title: Khởi tạo · identity
 None.
 
 Identity của máy nằm tại `~/.starci/master.identity`. Đây là private machine state: không commit, không
-chép vào `.workspace`, không đặt trong command argument, và không in nội dung hay secret material suy ra.
+chép vào `.workspaces`, không đặt trong command argument, và không in nội dung hay secret material suy ra.
 
 Chạy `node .claude/scripts/init-identity.mjs --source <Source> --plan` trước. Preflight chứng minh `sops`,
 `age`, `age-keygen` gọi được, validate identity bằng `age-keygen -y`, rồi verify một lượt decrypt thật.

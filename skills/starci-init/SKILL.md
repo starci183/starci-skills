@@ -1,6 +1,6 @@
 ---
 name: starci-init
-description: "Make a Source ready through four identity-first boundaries: machine decrypt identity, agent bootstrap, workspace read routes, and project worktree state. Use for a new Source, machine, project or role, or when one of those records moved or went stale. Never edits a target repository."
+description: "Make a Source ready and portable through machine decrypt identity, agent bootstrap, compile or hydration of tracked .workspaces declarations, and durable worktree/session state. Use for a new Source, machine, project or role, when generated routes moved or went stale, or when portable workspace topology must be published. Never edits a target repository."
 ---
 
 # starci-init
@@ -24,7 +24,7 @@ Topology: `reconciliation` across four ordered readiness boundaries.
 |---|---|---|---|---|---|
 | identity | execution | machine and encrypted Source identity declarations | reconcile SOPS/age identity without touching target repositories | identity receipt | decrypt identity is available and secret-safe |
 | bootstrap | execution | identity receipt and agent bootstrap declarations | reconcile required local bootstrap state | bootstrap receipt | bootstrap reads and checks pass |
-| routes | reconciliation | workspace declarations, immutable source-reference catalog and observed project/role locations | install/verify shared offline references and reconcile route records | workspace receipt | every source reference and requested role resolves exactly |
+| routes | reconciliation | workspace declarations, immutable source-reference catalog and observed project/role locations | compile or hydrate portable declarations, install/verify shared offline references and reconcile route records | workspace receipt | every source reference and requested role resolves exactly; publish candidates contain no machine or secret state |
 | worktrees-proof | execution | verified routes and durable worktree declarations | reconcile project worktree state and re-read all four boundaries | readiness receipt | identity, bootstrap, routes and worktrees are all green |
 
 ## Run
@@ -43,16 +43,23 @@ adds no write. Execute requested local actions in registry order:
    blocked. Never display private material. Installing `~/.starci/master.identity` is a separate write.
 2. **Bootstrap** — prove the trust entry exists; classify and display complete before/after content for
    `AGENTS.md` and `CLAUDE.md`.
-3. **Workspaces** — plan and install every immutable FE/BE pattern reference at
-   `.workspace/references/<id>`, writing portable routes to `.workspace/pattern-references.json`; then
-   verify the Source-wide language, persistent family offsets/application slots, and every declared
-   project/role read route against the real checkout. Reuse local Git objects when present and fetch the
+3. **Workspaces** — hydrate tracked `.workspaces/config.json`, `projects/**/*.json` and `ports/*.json` into
+   `.workspaces/local/routes` with `workspace-portable.mjs`; then plan and install every immutable FE/BE pattern
+   reference at `.workspaces/local/references/<id>`, writing generated routes to
+   `.workspaces/local/pattern-references.json`. Verify every declared project/role read route against the real
+   checkout. Reuse local Git objects when present and fetch the
    exact catalog commit only when missing. Allocation stays in
-   `.workspace/ports/config.json` plus one `.workspace/ports/<project>.json`; init never copies allocation
+   `.workspaces/ports/config.json` plus one `.workspaces/ports/<project>.json`; init never copies allocation
    ownership into a product. For every role, write `grammar` and `grammarProfile` as both null or an
    explicitly declared pair whose grammar authority package and profile exist; never infer them from identity.
-4. **Worktrees** — verify the project business authority and ignored cache root against Git's worktree
-   account and path policy. Create/reuse businesses on `codex/businesses/<project>`; create no design registry.
+   When the requested operation is sharing or refreshing topology, run `workspace-portable.mjs export --plan`,
+   display the exact candidate, then apply only `.workspaces/config.json`, `.workspaces/projects/**/*.json` and
+   `.workspaces/ports/*.json`. Exclude `.workspaces/local`, `.sessions`, `.worktrees`, absolute paths, observed
+   heads, timestamps and credential-like fields or values. A request that explicitly includes commit/push
+   authorises that exact portable boundary; otherwise external publication remains a separate approval.
+4. **Worktrees** — verify `businesses` and `debts` against Git's worktree account and path policy, and verify
+   `.sessions/<project>` is ignored. Create/reuse durable branches only; create no design registry or cache under
+   `.worktrees`.
 
 State the evidence and exact action per boundary before changing it. A direct init instruction naming
 the needed Source and Project authorises these bounded local writes; do not add a generic approval stop.
@@ -69,6 +76,7 @@ action or its proof remains.
 - Existing ciphertext with no original identity available, or an identity that cannot decrypt its sample.
 - A project/role required by the requested boundary was not declared by the owner.
 - A stale route is never silently repointed; show the replacement.
+- A portable candidate containing machine-local, generated, observed-head, timestamp or credential material.
 - A missing pattern reference returns to this skill; downstream pattern compilers may not install it.
 - Foreign Git ownership or a business-authority branch collision.
 - Any requested product-repository edit; init describes targets and owns Source-local state only.

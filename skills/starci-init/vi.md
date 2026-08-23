@@ -40,16 +40,23 @@ local action đã yêu cầu theo thứ tự registry:
    import identity gốc, có thể generate identity đầu tiên, hay `blocked`. Không hiển thị private material.
 2. **Bootstrap** — chứng minh trust entry tồn tại; phân loại và trình toàn bộ before/after của `AGENTS.md`
    cùng `CLAUDE.md`.
-3. **Workspaces** — plan và cài mọi immutable FE/BE pattern reference tại
-   `.workspace/references/<id>`, ghi route portable vào `.workspace/pattern-references.json`; sau đó
-   verify ngôn ngữ chung, family offset/application slot bền và mọi read route project/role đã khai với
-   checkout thật. Reuse Git object cục bộ khi có, chỉ fetch đúng catalog commit khi thiếu. Allocation chỉ ở
-   `.workspace/ports/config.json` cùng một
-   `.workspace/ports/<project>.json`; init không copy ownership đó vào product. Với mỗi role, ghi
+3. **Workspaces** — hydrate `.workspaces/config.json`, `projects/**/*.json` và `ports/*.json` đã track vào
+   `.workspaces/local/routes` bằng `workspace-portable.mjs`; sau đó plan và cài mọi immutable FE/BE pattern
+   reference tại `.workspaces/local/references/<id>`, ghi generated route vào
+   `.workspaces/local/pattern-references.json`. Verify mọi read route project/role đã khai với checkout thật.
+   Reuse Git object cục bộ khi có, chỉ fetch đúng catalog commit khi thiếu. Allocation chỉ ở
+   `.workspaces/ports/config.json` cùng một
+   `.workspaces/ports/<project>.json`; init không copy ownership đó vào product. Với mỗi role, ghi
    `grammar` và `grammarProfile` cùng null hoặc thành cặp đã khai rõ, có grammar authority package/profile thật;
    không suy ra chúng từ identity.
-4. **Worktrees** — verify business authority và ignored cache root của project bằng account worktree của Git
-   cùng path policy. Tạo hoặc reuse `businesses` trên `codex/businesses/<project>`; không tạo design registry.
+   Khi operation được yêu cầu là chia sẻ hoặc refresh topology, chạy `workspace-portable.mjs export --plan`,
+   trình exact candidate, rồi chỉ apply `.workspaces/config.json`, `.workspaces/projects/**/*.json` và
+   `.workspaces/ports/*.json`. Loại `.workspaces/local`, `.sessions`, `.worktrees`, absolute path, observed head,
+   timestamp và field/value giống credential. Request đã nói rõ commit/push cấp quyền đúng portable boundary đó;
+   nếu không, publication ra ngoài vẫn là approval riêng.
+4. **Worktrees** — verify `businesses` và `debts` bằng account worktree/path policy của Git, đồng thời verify
+   `.sessions/<project>` đã ignore. Chỉ tạo/reuse durable branch; không tạo design registry hay cache dưới
+   `.worktrees`.
 
 Nêu evidence và action chính xác của từng boundary trước khi đổi. Chỉ thị init trực tiếp đã nêu Source và
 Project cần thiết cho phép các local write có giới hạn này; không thêm approval stop chung. Chỉ hỏi nếu
@@ -66,6 +73,7 @@ yêu cầu hoặc proof của nó.
 - Đã có ciphertext nhưng không có identity gốc, hoặc identity không decrypt được sample.
 - Project/role cần cho boundary chưa được owner khai.
 - Route stale không được repoint âm thầm; phải trình replacement.
+- Portable candidate chứa machine-local, generated, observed-head, timestamp hoặc credential material.
 - Pattern reference thiếu quay về skill này; downstream pattern compiler không được tự cài.
 - Git owner lạ hoặc business-authority branch collision.
 - Yêu cầu sửa product repository; init chỉ mô tả target và sở hữu Source-local state.

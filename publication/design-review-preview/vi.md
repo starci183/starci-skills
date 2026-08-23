@@ -5,7 +5,7 @@
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@manifest-schema` | `publication/design-review-preview/schema.json` | file | kiểm tra review graph chỉ sống trong phiên |
-| `@render-design-review` | `scripts/render-design-review.mjs` | script | ghi static HTML preview dưới project cache, không build app |
+| `@render-design-review` | `scripts/render-design-review.mjs` | script | ghi static HTML preview dưới session root, không build app |
 | `@baseline-schema` | `brainstorms/composition/schema.json` | file | bind reference bốn lock và owner tree |
 | `@visual-proof-schema` | `publication/design-review-preview/visual-proof.schema.json` | file | prove same-viewport parity và delivery completion |
 
@@ -39,7 +39,7 @@ content được đánh dấu fixture-only; runtime value vẫn do source sở h
 Mọi material nằm dưới:
 
 ```text
-.worktrees/<project>/cache/design/<session-id>/
+.sessions/<project>/<session-id>/design/
 ```
 
 Không có accepted bundle, revision map, layout head, block head hoặc design branch. Candidate digest chỉ là cache key.
@@ -85,7 +85,7 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 
 ## Rules
 
-1. Mọi review artifact là ignored project cache.
+1. Mọi review artifact là ignored session root.
 2. Candidate digest chỉ định danh cache entry, không trở thành durable design identity.
 3. Layout dùng cache-only page approval rồi state/source approval; block dùng displayed source approval. Implementation vẫn ở cùng invocation.
 4. Task khác phải dựng lại design evidence từ current authority; không được resume từ cache.
@@ -101,7 +101,7 @@ Creativity đi trước principles review. Chỉ selected candidate được aud
 
 ## Stops
 
-- Từ chối output ngoài exact project cache.
+- Từ chối output ngoài exact session root.
 - Từ chối page review thiếu journey/business/component synthesis, representative full-page HTML, maturity evidence hoặc viewport coverage.
 - Từ chối state review thiếu condition coverage, executable interaction, exact source files hoặc approved page contract không còn nguyên.
 - Từ chối authenticated proof thiếu login entry, hai credential-fill action, form submit, protected-route arrival

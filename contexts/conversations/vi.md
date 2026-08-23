@@ -26,11 +26,11 @@ không cite mutable provider thread head.
 
 Provider chỉ là metadata. Mọi provider dùng cùng snapshot shape; `provider` và `surface` nói exchange diễn
 ra ở đâu. Raw message, prompt, completion và tool output không vào durable registry. Chúng ở provider,
-ignored local cache, hoặc encrypted external object.
+một ignored session, hoặc encrypted external object.
 
 Registry chỉ giữ redacted summary, message identities, provider reference, transcript custody và artifact
-decision links. Search database và embedding là projection dưới `cache/conversations`; xóa chúng chỉ mất
-thời gian dựng lại, không mất authority.
+decision links. Search database và embedding là generated projection dưới
+`.workspaces/local/state/conversations`; xóa chúng chỉ mất thời gian dựng lại, không mất authority.
 
 ## Situations
 
@@ -40,15 +40,15 @@ thời gian dựng lại, không mất authority.
 | `CONVERSATION-2` | Exchange có thêm message/decision | immutable snapshot với `previousHash`; không sửa object cũ |
 | `CONVERSATION-3` | Cần giữ raw transcript | provider reference, cache-only digest, hoặc encrypted external reference; không plaintext Git |
 | `CONVERSATION-4` | Chat ảnh hưởng product authority | exact artifact identity, artifact hash và message ids |
-| `CONVERSATION-5` | Cần full-text/semantic search | SQLite/vector projection dựng lại được trong cache |
+| `CONVERSATION-5` | Cần full-text/semantic search | SQLite/vector projection dựng lại được trong generated local state |
 | `CONVERSATION-6` | Content có thể chứa credential/private data | redact trước summary; từ chối secret-shaped key và signed URL |
 | `CONVERSATION-7` | Cần đọc provider history | chỉ đọc qua access owner đã cho phép hoặc export được cung cấp; không tự scrape |
 
 ## Placement
 
-Metadata bền nằm dưới worktree được route riêng `<Source>/.worktrees/<project>/conversations`. Immutable snapshot
+Metadata bền nằm dưới `<Source>/.worktrees/<project>/businesses/conversations` trên business-authority branch hiện có. Immutable snapshot
 object nằm dưới `objects/sha256`; `conversation-registry-v1.json` giữ current heads. Transcript đã
-decrypt, SQLite index và vectors nằm dưới `<Source>/.worktrees/<project>/cache/conversations`.
+decrypt, SQLite index và vectors nằm dưới `<Source>/.sessions/<project>/<session-id>/conversations`.
 
 External ciphertext reference phải ổn định, không chứa query string, temporary signature, credential hay
 bearer value. Encryption credential ở Source credential authority, không ở conversation metadata.

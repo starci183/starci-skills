@@ -94,8 +94,8 @@ Invocation: `/starci-diagnose <skill>  render the settings page at second-app`.
 | Bước target | Nó đọc gì | Thực tế có gì | Verdict |
 |---|---|---|---|
 | 1 lập context lock | — | — | `pass` |
-| 2 resolve + xác minh route `fe` | `.workspace/second-app/fe/config.json` | `.workspace/` chỉ có `example-app`; không có `second-app` | **`would-stop`** — `WORKSPACE-2` |
-| 3 các root worktree | `.worktrees/second-app/{businesses,cache}` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
+| 2 resolve + xác minh route `fe` | `.workspaces/local/routes/second-app/fe/config.json` | `.workspaces/` chỉ có `example-app`; không có `second-app` | **`would-stop`** — `WORKSPACE-2` |
+| 3 các root worktree | `.worktrees/second-app/{businesses,debts} plus .sessions/second-app/<session-id>` | không có, đúng như dự kiến khi chưa có route | `blocked` sau bước 2 |
 | 4 mở hoặc tiếp review work | registry | không thể đi tới | `blocked` sau bước 3 |
 | 5 đọc sáu input | contract tại `context.contract` | **checkout đó không có thư mục `components/contracts`** | `defect` trong *environment*, không phải skill |
 | 6 verdict theo từng region | contract key theo `why` | không có contract để search, nên mọi region sẽ resolve thành `new` | `blocked` bởi bước 5 |
@@ -106,7 +106,7 @@ Invocation: `/starci-diagnose <skill>  render the settings page at second-app`.
 ```text
 finding: project không có workspace route
 label: blocked
-evidence: .workspace/ có example-app; không có second-app
+evidence: .workspaces/ có example-app; không có second-app
 first-stop: yes, tại target step 2
 cleared-by: owner của route, với project do owner khai
 ```
@@ -130,7 +130,7 @@ settled-by: owner gọi tên app hay package chứa nó, hoặc xác nhận nó 
 ```text
 finding: design task cố resume cache pack đã hết hiệu lực của task khác
 label: blocked
-evidence: không có session pack dưới <Source>/.worktrees/<project>/cache/design/
+evidence: không có session pack dưới <Source>/.sessions/<project>/<session-id>/design/
 cleared-by: dựng lại candidate từ current business authority, grammar, contract và source trong invocation mới
 ```
 

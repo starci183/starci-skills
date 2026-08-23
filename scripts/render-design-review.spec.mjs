@@ -65,7 +65,7 @@ test("block audit binds one Layout-generated block inside current parent", () =>
 test("renderer writes static HTML directly below project cache and refuses other output", () => {
   const f = fixture();
   try {
-    const out = join(f.root, ".worktrees", "sample", "cache", "design", "abc", "review");
+    const out = join(f.root, ".sessions", "sample", "abc", "design", "review");
     const rendered = renderReview({...options(f), out});
     assert.equal(JSON.parse(readFileSync(join(out, "review-manifest.json"), "utf8")).schemaVersion, 4);
     assert.match(readFileSync(join(out, "index.html"), "utf8"), /<iframe class="frame"/);

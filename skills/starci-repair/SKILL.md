@@ -70,7 +70,7 @@ baselines and diffs under one approval batch. Whole-repository gates run once pe
 
 ### 1 — Resolve the route
 
-Read `.workspace/<project>/<role>/config.json`. Verify checkout, git root, branch/head, manifests and the
+Read `.workspaces/local/routes/<project>/<role>/config.json`. Verify checkout, git root, branch/head, manifests and the
 frontend contract when declared. Stop before target-source reads if the route is absent, invalid or stale;
 `@staleness` assigns that finding to the initialization owner.
 

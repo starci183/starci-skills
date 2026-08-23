@@ -17,9 +17,14 @@ one the request meant.
 
 ## Law
 
-A Source-wide default is resolved first from `.workspace/config.json`, valid against `@config-schema`.
+A Source-wide default is resolved first from tracked `.workspaces/config.json`, valid against `@config-schema`.
 `defaultLang` sets the language of user-facing replies for every project and role unless the current
 request explicitly selects another language. It is read once, not copied into every role route.
+
+Tracked `.workspaces/projects/<project>/<role>.json` and `.workspaces/ports/*.json` are credential-free,
+portable declarations. Setup hydrates them into ignored `.workspaces/local/routes`; only that generated route
+contains absolute paths, observed heads and other machine facts. Portable declarations identify an expected
+GitHub repository, branch and repository-relative context paths; they never claim that a checkout exists.
 
 A route is resolved from a declared file, never inferred. `project` and `role` are the whole lookup
 identity; a sibling checkout name, a directory that happens to be open, and what a previous session
@@ -38,19 +43,19 @@ missing forces a question, stale invites a confident wrong answer.
 | `WORKSPACE-3` | Route resolves; the checkout is where reads and writes go | read `repository.diskPath` directly |
 | `WORKSPACE-4` | A role needs its domain contract | read `context.contract`, with `contractSource` as its provenance |
 | `WORKSPACE-5` | The route records a path or head that no longer holds | stop; the route is stale, not approximate |
-| `WORKSPACE-6` | The route carries local paths, secrets or credentials | route stays machine-local; never copied into the trust tree |
+| `WORKSPACE-6` | A generated route carries local paths or observed machine facts | `.workspaces/local` stays machine-local; only its credential-free portable declaration may be committed |
 | `WORKSPACE-7` | The Source-wide workspace config resolves | apply `defaultLang` to every user-facing reply |
 | `WORKSPACE-8` | A frontend role declares product-family grammar | verify the exact grammar and profile; never infer either from identity |
 
 ## Reading a start request
 
-1. **Resolve shared defaults.** Read `.workspace/config.json`, validate it against `@config-schema`,
+1. **Resolve shared defaults.** Read `.workspaces/config.json`, validate it against `@config-schema`,
    and retain `defaultLang` for every user-facing reply — `WORKSPACE-7`.
 2. **Take the request literally.** `start <project> <roles...>` names exactly the roles to load. Do
    not add a role because the repository looks like it has one, and do not drop a role because the
    last session did not use it.
-3. **Resolve one file per role**: `.workspace/<project>/<role>/config.json`. Every named file must
-   exist — `WORKSPACE-1`.
+3. **Resolve one file per role**: `.workspaces/local/routes/<project>/<role>/config.json`, generated from the
+   matching tracked declaration. Every named file must exist — `WORKSPACE-1`.
 4. **Verify before reading.** For each route, the checkout directory must exist and must still hold
    the evidence the route claims: the contract path for a frontend role, the manifests it names.
    A failure here is `WORKSPACE-5` and it stops the run.
@@ -173,8 +178,9 @@ produces work that looks finished and applies to nothing.
 
 ## `WORKSPACE-6` — the route carries machine-local facts
 
-**Situation.** The route holds disk paths and public git metadata. It is local configuration, not
-shared knowledge.
+**Situation.** The generated route holds disk paths, observed heads and public git metadata. It is local
+configuration. Its credential-free repository identity, expected branch and relative paths have a separate
+portable declaration that may be shared.
 
 **Recognition signs**
 
@@ -185,19 +191,19 @@ shared knowledge.
 
 **Boundary**
 
-- `WORKSPACE-3`: reading the checkout is allowed; publishing where the checkout lives is not.
+- `WORKSPACE-3`: reading the checkout is allowed; publishing where the checkout lives or its observed head is not.
 
 **How it fails.** A path or a token is copied into a rule, and the rule silently becomes true on one
 machine only. Runtime secrets, environment values and tokens are never workspace context at all.
 
 ## `WORKSPACE-7` — shared defaults apply to every reply
 
-**Situation.** `.workspace/config.json` is valid and its `defaultLang` applies to every project and role
+**Situation.** `.workspaces/config.json` is valid and its `defaultLang` applies to every project and role
 in this Source.
 
 **Recognition signs**
 
-- The config sits directly under `.workspace`, outside every project directory.
+- The config sits directly under `.workspaces`, outside every project directory.
 - The value is a BCP 47-style language tag such as `vi` or `en-US`.
 
 **Ask yourself.** Did the run resolve the shared default before producing user-facing prose?
@@ -233,8 +239,9 @@ route never selected, or loads every grammar and lets the model choose.
 | Input | Evidence required |
 |---|---|
 | request | The literal project and role list |
-| workspace config | `.workspace/config.json`, valid against `@config-schema` beside this record |
-| route | `.workspace/<project>/<role>/config.json`, valid against `@schema` beside this record |
+| workspace config | tracked `.workspaces/config.json`, valid against `@config-schema` beside this record |
+| portable declaration | tracked `.workspaces/projects/<project>/<role>.json`, credential-free and repository-relative |
+| route | `.workspaces/local/routes/<project>/<role>/config.json`, valid against `@schema` beside this record |
 | checkout | The directory at `repository.diskPath`, present on disk |
 | contract | The file at `context.contract`, and `context.contractSource` for its provenance |
 | grammar | Exact `context.grammar` package and `context.grammarProfile`, or both explicitly `null` |
@@ -247,10 +254,10 @@ route never selected, or loads every grammar and lets the model choose.
 3. Verify before reading. Parsing a route is not verifying it.
 4. The route describes; it never mirrors. Configuration holds no copy of a target repository.
 5. Setup refreshes routes only. It never clones, links, copies or edits a target repository.
-6. Route values stay machine-local. They are never committed into the trust tree, and secrets are
-   never route values in the first place.
+6. Generated route values stay under `.workspaces/local` and are never committed. Only schema-valid portable
+   declarations are tracked; they contain no absolute path, observed head, timestamp or credential material.
 7. Every start request resolves to exactly one verdict per role: read, or stop.
-8. `defaultLang` is resolved once from `.workspace/config.json` and applies across every project and role.
+8. `defaultLang` is resolved once from `.workspaces/config.json` and applies across every project and role.
 9. Grammar and profile are an explicit pair; identity names never select them.
 
 ## Exceptions
@@ -270,7 +277,7 @@ One block per role, in the order the request names them:
 ```text
 project: <project>
 role: <role>
-route: .workspace/<project>/<role>/config.json
+route: .workspaces/local/routes/<project>/<role>/config.json
 repository: <diskPath>
 verified: <what was checked against disk or git>
 sense: <grammar/profile, or none>

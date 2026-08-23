@@ -6,4 +6,4 @@ None.
 
 | Intent | Binding skill |
 |---|---|
-| Initialize identity, bootstrap, routes or worktree state | `skills/starci-init/SKILL.md` |
+| Initialize identity/bootstrap/worktrees, or compile, hydrate and publish portable workspace declarations | `skills/starci-init/SKILL.md` |

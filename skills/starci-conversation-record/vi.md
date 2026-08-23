@@ -10,7 +10,7 @@ title: StarCi conversation record
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | reporting contract và approval boundary dùng chung |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve project trước provider/artifact read |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | verify durable registry ownership và cache placement |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | verify ownership business registry bền và placement của session/generated state |
 | `@conversations` | `contexts/conversations/vi.md` | vi | luật identity, custody, redaction và artifact link provider-neutral |
 | `@snapshot-schema` | `contexts/conversations/conversation-snapshot.schema.json` | file | validate một provenance snapshot immutable |
 | `@registry-schema` | `contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
@@ -34,13 +34,13 @@ Topology: `linear`.
 
 ## Run
 
-Skill ghi provenance, không sở hữu authority. Frontend design cache là tạm thời; FE provenance bền bind
+Skill ghi provenance, không sở hữu authority. Frontend design session evidence là tạm thời; FE provenance bền bind
 implemented source commit và path. BE capability/operation authority vẫn có owner riêng.
 
 ### 1 — Resolve scope
 
-Bắt buộc project, `conversationId` ổn định, provider và surface. `Touching` là conversation registry và
-conversation cache bị ignore; encrypted external write là boundary riêng phải hiển thị.
+Bắt buộc project, `conversationId` ổn định, provider và surface. `Touching` là conversation registry dưới
+durable `businesses` worktree cùng session/generated state bị ignore; encrypted external write là boundary riêng phải hiển thị.
 
 ### 2 — Acquire evidence explicitly
 
@@ -67,7 +67,7 @@ durable registry write hay encrypted external upload. `OK` chỉ duyệt các bo
 ### 6 — Record and prove
 
 Sau approval, apply recorder, validate registry, chạy checker và chỉ commit immutable object cùng updated
-head. SQLite/vector search state vẫn là cache.
+head. SQLite/vector search state ở `.workspaces/local/state/conversations`.
 
 ## Stops
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const sourceRoot = resolve(here, "../../../..")
-const workspaceRoot = resolve(sourceRoot, ".workspace")
+const workspaceRoot = resolve(sourceRoot, ".workspaces", "local")
 const catalog = JSON.parse(readFileSync(resolve(here, "references.json"), "utf8"))
 const args = process.argv.slice(2)
 const roleIndex = args.indexOf("--role")

@@ -35,7 +35,7 @@ Topology: `reconciliation`.
 ## Chạy
 
 Đọc `@skill-shape`, `@workspaces`, `@mcp` và `@embedding` trước khi resolve ngôn ngữ Source, project cùng đúng các role từ
-`.workspace/<project>/<role>/config.json`. Không suy đoán
+`.workspaces/local/routes/<project>/<role>/config.json`. Không suy đoán
 checkout và không clone repository: “lấy source StarCi” nghĩa là đọc checkout đã được route khai báo. Route
 thiếu hoặc stale thì dừng.
 
@@ -50,7 +50,7 @@ source catalog. Việc đọc source trực tiếp vẫn là thẩm quyền.
 
 ## DNS và credential
 
-Tên thư mục đúng là số ít: `.workspace/credentials/`, không phải `.workspaces/credentials/`. Tái sử dụng các
+Tên thư mục đúng là số ít: `.workspaces/local/credentials/`, không phải `.workspaces/credentials/`. Tái sử dụng các
 SOPS ciphertext sau qua machine identity đã khởi tạo; không in hoặc sao chép plaintext:
 
 - `cloudflare-api-token.key.enc` — quyền reconcile Cloudflare dùng chung toàn Source;

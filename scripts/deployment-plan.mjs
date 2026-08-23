@@ -154,7 +154,7 @@ const validateManifest = (manifest) => {
 
 const git = (repo, args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8", windowsHide: true })
 const resolveRoute = (source, project, role) => {
-    const routePath = join(source, ".workspace", project, role, "config.json")
+    const routePath = join(source, ".workspaces", "local", "routes", project, role, "config.json")
     const route = readJson(routePath, `${project}/${role} route`)
     if (route.project !== project || route.role !== role) fail(`${project}/${role} route has the wrong identity`)
     const repository = resolve(route.repository?.diskPath ?? "")

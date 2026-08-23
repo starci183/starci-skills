@@ -13,7 +13,7 @@ description: Design, stage-approve, implement, seed and browser-prove one mature
 | `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for decision, HTML, source and proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse ceremony larger than measured frontend impact |
 | `@workspaces` | `contexts/workspaces/en.md` | en | verified frontend route |
-| `@worktrees` | `contexts/worktrees/en.md` | en | ignored session cache |
+| `@worktrees` | `contexts/worktrees/en.md` | en | ignored disposable session evidence |
 | `@composition` | `brainstorms/composition/en.md` | en | Scope, Owner, Invariant and Proof |
 | `@business` | `contexts/business/en.md` | en | routed business truth |
 | `@grammar` | `grammars` | module | product-family facts and owners |

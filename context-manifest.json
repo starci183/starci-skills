@@ -190,7 +190,7 @@
     "compilers/patterns/be/port-offset/context.md": {
       "kind": "module",
       "source": "compilers/patterns/be/port-offset/en.md",
-      "sourceHash": "6663037be55a24d65cd35fe71d865f167318a07fc8219afa50a4aa5638f429f9",
+      "sourceHash": "3127b8ce721cc40444a8188bae797b5b71274cda19a7fcff30252af518facb14",
       "contextVersion": 1
     },
     "compilers/patterns/be/resilience/context.md": {
@@ -348,7 +348,7 @@
     "compilers/patterns/source-references/context.md": {
       "kind": "module",
       "source": "compilers/patterns/source-references/en.md",
-      "sourceHash": "5d9fb0267baa06f3ec9c80674752b1afb9c3d1a8b87aba200297eaf4501adab9",
+      "sourceHash": "754989b165f16c9aeeda3e860d2a155b3451d7f38dd5c36bbdef47fd00682a87",
       "contextVersion": 1
     },
     "compilers/principles/alignment/context.md": {
@@ -448,7 +448,7 @@
     "contexts/business/context.md": {
       "kind": "module",
       "source": "contexts/business/en.md",
-      "sourceHash": "489383287bc70dd8ea4fe39c0fd4deb8a89a12845009e39efb855eacc887bffd",
+      "sourceHash": "da6152f157208cdf9e57364b5557a3377cadb82af84e54d5539a95cbf5847704",
       "contextVersion": 1
     },
     "contexts/context.md": {
@@ -458,19 +458,19 @@
     "contexts/conversations/context.md": {
       "kind": "module",
       "source": "contexts/conversations/en.md",
-      "sourceHash": "0c3cb993ab08fdaca01035e8c92bf564efe6268c650240e2e543d8dd27afac0e",
+      "sourceHash": "a14bdc75c6f5b58ff310f66f3b3d4783c3664b852f6ebe02997991146caa6740",
       "contextVersion": 1
     },
     "contexts/workspaces/context.md": {
       "kind": "module",
       "source": "contexts/workspaces/en.md",
-      "sourceHash": "7fb2f984e8d25fad9feb5f359ac2fd637963f3f998737c89dfd68630c39e8472",
+      "sourceHash": "98be7f6d714e9ec38d8460489090ea2be7585bc391926e164db863d5cd09b428",
       "contextVersion": 1
     },
     "contexts/worktrees/context.md": {
       "kind": "module",
       "source": "contexts/worktrees/en.md",
-      "sourceHash": "90e11bcdb7de69ca0a6c1b5efcb98f82e0a258c6c12f710ca75f8515db4124f1",
+      "sourceHash": "2c14baae26f1d3b48e46fd109740b16ef685bccc8c7ed9d1e6082a3097083d16",
       "contextVersion": 1
     },
     "deployment/context.md": {
@@ -740,7 +740,7 @@
     "mcp/context.md": {
       "kind": "module",
       "source": "mcp/en.md",
-      "sourceHash": "d23fc3ecaf43e71a2e8bb51c55c2d346fd15fa3c9882bdb14550e4cb000512e1",
+      "sourceHash": "8b2bb90820ee05b100f940e95682a080376da861f2fcc1413670f9f3a9d76424",
       "contextVersion": 1
     },
     "mcp/embedding/context.md": {
@@ -758,7 +758,7 @@
     "mcp/source-context/context.md": {
       "kind": "module",
       "source": "mcp/source-context/en.md",
-      "sourceHash": "0eb3695559b971524e140771e136df311346630795ada982e9dd9a6f163d5129",
+      "sourceHash": "15ddcebd094decf1ef4dc4a8067e96cda8b6c943b88b781d1692fd023a9964d2",
       "contextVersion": 1
     },
     "operations/context.md": {
@@ -768,7 +768,7 @@
     "orchestration/capabilities/context.md": {
       "kind": "module",
       "source": "orchestration/capabilities/en.md",
-      "sourceHash": "e10123560d346ab6c627861776b62488538b19e535c4ebed862b5b37a4c542ca",
+      "sourceHash": "0c3e78fd5b99742e601c508b6099068fae54a29b4fdba34215560f6ae6522fde",
       "contextVersion": 1
     },
     "orchestration/claude/context.md": {
@@ -808,7 +808,7 @@
     "publication/design-review-preview/context.md": {
       "kind": "module",
       "source": "publication/design-review-preview/en.md",
-      "sourceHash": "cfdd15c7b0199729d6a1d7adf31a9c2e877513ca68865803d33fb5c10e24ad9d",
+      "sourceHash": "f0439fd5747f2ec3242521c19542ec4ac9756a44358005dad9244c6380602f0e",
       "contextVersion": 1
     },
     "readiness/initialization/bootstrap/context.md": {
@@ -826,19 +826,19 @@
     "readiness/initialization/identity/context.md": {
       "kind": "module",
       "source": "readiness/initialization/identity/en.md",
-      "sourceHash": "ff5086c36e08e2e92338489775d3aef747bf0ddb483ae367833564c968e0585c",
+      "sourceHash": "75b487697434d030b6d8be2dc14ae5068dcb4eb87c152a4508b2662cf262cbe4",
       "contextVersion": 1
     },
     "readiness/initialization/workspaces/context.md": {
       "kind": "module",
       "source": "readiness/initialization/workspaces/en.md",
-      "sourceHash": "5c71d8d62eb588b6d38e502d4a2369a0849d02c20464dbdcf3a43cc6677688cb",
+      "sourceHash": "1d8a23402834a47f2b256c6633d7009a283ece57879d54e0d578d165ff1816fc",
       "contextVersion": 1
     },
     "readiness/initialization/worktrees/context.md": {
       "kind": "module",
       "source": "readiness/initialization/worktrees/en.md",
-      "sourceHash": "82b5d43bf0d3003a68272d0dce41eaa72b860eda8d7406865827599ae8b93b6e",
+      "sourceHash": "f138dfec494d506c916c706430ddea69ed7832a2414c702466e9dd0acadfca5e",
       "contextVersion": 1
     },
     "readiness/staleness/assurance/context.md": {
@@ -868,7 +868,7 @@
     "readiness/staleness/port-offset/context.md": {
       "kind": "module",
       "source": "readiness/staleness/port-offset/en.md",
-      "sourceHash": "514ba04a08fbd867ab887b32b107c8f39e78a376df793d9733c55b1bce6edf22",
+      "sourceHash": "870a0eeeef3db697eb7948cf36f216c255332a6a881fe40fdbdfa2e2bba10c09",
       "contextVersion": 1
     },
     "readiness/staleness/remnant/context.md": {
@@ -950,7 +950,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "126fc000073ce88026dbce7501ec48f9a46061b2cf0da8b51f01b2112cdafa25",
+      "sourceHash": "58bc636aaa4490628b95e5df45d5548609c7e58225e7c6240129b5de6f8d0575",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

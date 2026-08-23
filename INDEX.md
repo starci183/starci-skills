@@ -19,7 +19,7 @@ title: Docs
 | `@contexts` | `contexts/context.md` | context | resolve where reads and writes occur |
 | `@deployment` | `deployment/context.md` | context | govern portable stack intent, ignored execution state, host setup, domains, release and monitoring |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
-| `@design-review` | `publication/design-review-preview/context.md` | context | write static HTML layout/block review files directly under project cache |
+| `@design-review` | `publication/design-review-preview/context.md` | context | write static HTML layout/block review files directly under session root |
 | `@eslint-repo` | `https://github.com/starci183/starci-eslint` | URL | identify the repository that publishes the lint machines |
 | `@gates` | `gates/context.md` | context | judge existing code with evidence |
 | `@grammars` | `grammars/context.md` | context | load explicitly selected product-family UI facts, outcomes, owners and durable behavior authority |
@@ -153,8 +153,8 @@ and coverage does not force delegation when sequential execution is safer or che
 | Skill | Owns |
 |---|---|
 | `starci-business-analyze` | evidence-backed FE+BE business feature heads, modular LLM context and prototype-ready surfaces |
-| `starci-init` | making a Source ready: SOPS+age identity, bootstrap, `.workspace/<project>/`, and `.worktrees/<project>/` |
-| `starci-cloudflare-tunnel-set` | the Source-wide multi-project Cloudflare control plane: API custody in `.workspace/credentials` and declared HTTP(S) tunnel/DNS routes |
+| `starci-init` | making a Source ready and portable: SOPS+age identity, bootstrap, tracked `.workspaces` compile/hydration, durable worktrees and disposable sessions |
+| `starci-cloudflare-tunnel-set` | the Source-wide multi-project Cloudflare control plane: API custody in `.workspaces/local/credentials` and declared HTTP(S) tunnel/DNS routes |
 | `starci-deploy` | adopting, setting up, deploying, monitoring, recovering and rolling back a routed product from durable `.stacks` intent through ignored `.infra` execution state |
 | `starci-setup-mcp` | one Source-wide read-only source-context MCP, routed project partitions, and approved `mcp.<zone>` publication |
 | `starci-setup-sonar` | one shared Docker SonarQube service, project onboarding, and approved `sonar.<zone>` publication |

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v4/readiness/initialization/workspaces/portable-route.schema.json",
+  "title": "Portable workspace route declaration",
+  "description": "Pushable project/role intent. Absolute paths, observed heads, timestamps, credentials and generated state are forbidden.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "project", "role", "repository", "context"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "version": {"const": 1},
+    "project": {"$ref": "#/$defs/slug"},
+    "role": {"$ref": "#/$defs/slug"},
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "directory", "gitRepository", "branch"],
+      "properties": {
+        "kind": {"enum": ["source", "sibling"]},
+        "directory": {"oneOf": [{"$ref": "#/$defs/relativePath"}, {"type": "null"}]},
+        "gitRepository": {
+          "type": "string",
+          "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\\.git)?$"
+        },
+        "branch": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "source"}}, "required": ["kind"]},
+          "then": {"properties": {"directory": {"type": "null"}}},
+          "else": {"properties": {"directory": {"$ref": "#/$defs/relativePath"}}}
+        }
+      ]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructions", "contract", "contractSource", "manifests", "grammar", "grammarProfile"],
+      "properties": {
+        "instructions": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}},
+        "contract": {"oneOf": [{"$ref": "#/$defs/relativePath"}, {"type": "null"}]},
+        "contractSource": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "manifests": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}},
+        "grammar": {"oneOf": [{"$ref": "#/$defs/slug"}, {"type": "null"}]},
+        "grammarProfile": {"oneOf": [{"$ref": "#/$defs/slug"}, {"type": "null"}]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"grammar": {"type": "null"}}, "required": ["grammar"]},
+          "then": {"properties": {"grammarProfile": {"type": "null"}}},
+          "else": {"properties": {"grammarProfile": {"$ref": "#/$defs/slug"}}}
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._ -]+(?:/[A-Za-z0-9._ -]+)*$"
+    }
+  }
+}

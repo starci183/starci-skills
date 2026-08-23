@@ -222,7 +222,7 @@ Before implementation, lock `Scope`, `Owner`, `Invariant` and `Proof`. A shared 
 
 **Design rounds** are optional session evidence. Direction choices support a layout review and have no durable
 hash or owner checkpoint of their own. The exact candidates and evidence-backed recommendation live in the
-project cache for the current invocation. Block uses one displayed source boundary. Layout uses two explicit
+session root for the current invocation. Block uses one displayed source boundary. Layout uses two explicit
 boundaries: `OK #1` freezes the page contract in cache and opens state expansion without source authority;
 `OK #2` approves complete states plus exact source files and opens implementation. Feedback on page anatomy
 returns to page review; state-only feedback preserves the approved page contract.
@@ -261,7 +261,7 @@ it, the recommended/default answer and the exact scope `OK` authorises.
 ## The record
 
 There is no separate report file or durable design registry. Design candidates, selected previews and review
-manifests live below `<Source>/.worktrees/<project>/cache/design/<session-id>` and expire with the invocation.
+manifests live below `<Source>/.sessions/<project>/<session-id>/design` and expire with the invocation.
 Frontend source, tests and browser proof are the durable accepted design outcome. Business and conversation
 authorities keep their own explicitly routed stores. A repair records through commits/diffs; a read-only run
 writes no file unless explicitly requested.

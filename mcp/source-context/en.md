@@ -6,7 +6,7 @@ title: Routed source context
 
 ## Projection
 
-Each requested role resolves from `.workspace/<project>/<role>/config.json` and publishes virtual paths
+Each requested role resolves from `.workspaces/local/routes/<project>/<role>/config.json` and publishes virtual paths
 below `/<role>/<project>/` in the shared `starci-context-v1` collection. Refresh upserts one generation and
 deletes older points only for that exact role/project partition; every other source remains untouched.
 
@@ -33,15 +33,15 @@ The canonical remote pattern is `https://mcp.<zone>/mcp/`; the local diagnostic 
 Qdrant gRPC and Ollama are never tunnel origins.
 
 The Source-wide control-plane records are
-`.workspace/credentials/cloudflare-api-token.key.enc` and
-`.workspace/credentials/cloudflare-starci-local-services-tunnel-token.key.enc`. They remain machine-local
+`.workspaces/local/credentials/cloudflare-api-token.key.enc` and
+`.workspaces/local/credentials/cloudflare-starci-local-services-tunnel-token.key.enc`. They remain machine-local
 SOPS ciphertext. Reconciliation merges this hostname with existing ingress and preserves the terminal 404;
 it must not replace other services on the shared tunnel.
 
 ## Commands
 
 - `plan` resolves routes, stack ownership, collections and prerequisites without writing.
-- `config` writes machine-local Compose, environment and client JSON under `.worktrees/source-context/cache/mcp/`;
+- `config` writes machine-local Compose, environment and client JSON under `.workspaces/local/state/source-context/mcp/`;
   pass `--public-url https://mcp.<zone>/mcp/` when the Source does not use the default StarCi zone. The
   showcase URL defaults to `https://qdrant.<zone>/dashboard`; pass `--showcase-url` only when that hostname
   intentionally differs.

@@ -13,7 +13,7 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và browse
 | `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho decision, HTML, source và proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | từ chối ceremony lớn hơn frontend impact đã đo |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | frontend route đã verify |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | ignored session cache |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | disposable session evidence bị ignore |
 | `@composition` | `brainstorms/composition/vi.md` | vi | Scope, Owner, Invariant và Proof |
 | `@business` | `contexts/business/vi.md` | vi | routed business truth |
 | `@grammar` | `grammars` | module | product-family facts và owners |

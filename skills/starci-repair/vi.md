@@ -68,7 +68,7 @@ diff riêng trong một approval batch. Whole-repository gate chạy một lần
 
 ### 1 — Resolve route
 
-Đọc `.workspace/<project>/<role>/config.json`. Verify checkout, git root, branch/head, manifest và frontend
+Đọc `.workspaces/local/routes/<project>/<role>/config.json`. Verify checkout, git root, branch/head, manifest và frontend
 contract khi declared. Dừng trước target-source read nếu route absent, invalid hoặc stale;
 `@staleness` giao finding đó cho initialization owner.
 

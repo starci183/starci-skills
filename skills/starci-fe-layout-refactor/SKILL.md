@@ -13,7 +13,7 @@ description: Correct or restructure an exact Layout- or Block-rendered frontend 
 | `@orchestration` | `orchestration/context.md` | context | split failure audit, HTML, authority, FE source and proof without splitting decisions |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | choose micro, component, page or full correction from observed impact |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/context.md` | context | keep restructuring directions in session cache |
+| `@worktrees` | `contexts/worktrees/context.md` | context | keep restructuring directions as disposable session evidence |
 | `@composition` | `brainstorms/composition/context.md` | context | freeze the Layout-rendered scope and allowed visual delta |
 | `@business` | `contexts/business/context.md` | context | preserve outcomes, actions, states and data owners |
 | `@grammar` | `grammars/context.md` | context | preserve the grammar and MASTER selected by Layout |

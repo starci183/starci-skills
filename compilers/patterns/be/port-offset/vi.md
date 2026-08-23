@@ -16,8 +16,8 @@ runtime projection đã resolve, không đổi một effective port đang sạch
 
 ## Law
 
-`.workspace/ports/config.json` sở hữu slot step chung của Source, và mỗi
-`.workspace/ports/<project>.json` là nơi duy nhất sở hữu lâu dài offset cùng application slot của family đó. Backend
+`.workspaces/ports/config.json` sở hữu slot step chung của Source, và mỗi
+`.workspaces/ports/<project>.json` là nơi duy nhất sở hữu lâu dài offset cùng application slot của family đó. Backend
 `metadata.json` khai service identity cùng base port trong `portServices`, và có thể giữ `ports` đã
 resolve cho consumer. Product không giữ `portOffset`, slot number hoặc allocation table thứ hai.
 
@@ -31,7 +31,7 @@ port là ngoại lệ explicit có reason.
 
 | Code | Situation | Source phải có hình dạng gì |
 |---|---|---|
-| `PORT-OFFSET-1` | Source family cần allocation bền vững | Family offset và các application slot nguyên không âm, không trùng nhau chỉ sống trong `.workspace/ports/<project>.json`; slot step chung sống trong `.workspace/ports/config.json` |
+| `PORT-OFFSET-1` | Source family cần allocation bền vững | Family offset và các application slot nguyên không âm, không trùng nhau chỉ sống trong `.workspaces/ports/<project>.json`; slot step chung sống trong `.workspaces/ports/config.json` |
 | `PORT-OFFSET-2` | Backend service bind trên Source host | `metadata.json.portServices` khai scope và base port; `metadata.json.ports` giữ projection đã resolve |
 | `PORT-OFFSET-3` | Frontend và backend thuộc cùng application | Cả hai declaration dùng cùng application slot và mọi consumer đạt tới dùng projection tương ứng |
 | `PORT-OFFSET-4` | Tool hoặc external service không dùng được family arithmetic | Declaration dùng explicit port và reason không rỗng; chỉ `external` bị loại khỏi host-collision proof |
@@ -50,8 +50,8 @@ port là ngoại lệ explicit có reason.
 
 **Situation.** Nhiều repository dùng chung một host và cần dải port ổn định, không collision.
 
-**What it emits in source.** Một family record `.workspace/ports/<project>.json` với `project`, `offset`,
-`applications`, cộng với Source-wide `slotStep` trong `.workspace/ports/config.json`. Product repository
+**What it emits in source.** Một family record `.workspaces/ports/<project>.json` với `project`, `offset`,
+`applications`, cộng với Source-wide `slotStep` trong `.workspaces/ports/config.json`. Product repository
 không chứa offset hoặc slot authority.
 
 **Boundary.** Nó không khai service; đó là `PORT-OFFSET-2`. Nó không sửa consumer; đó là
@@ -109,7 +109,7 @@ sau đó chạy checker và concurrent runtime evidence.
 
 | Input | Evidence cần có |
 |---|---|
-| Source registry | `.workspace/ports/config.json` cùng các family record `.workspace/ports/<project>.json` |
+| Source registry | `.workspaces/ports/config.json` cùng các family record `.workspaces/ports/<project>.json` |
 | backend declaration | routed `metadata.json` có `portServices` và `ports` |
 | consumers | compose/env script, application default, example và paired frontend reference |
 | listeners | mọi local host binding và mọi external service được loại explicit |
@@ -135,7 +135,7 @@ sau đó chạy checker và concurrent runtime evidence.
 
 ```text
 family: <Source family>
-allocation: <offset và application slots từ .workspace/ports/<project>.json>
+allocation: <offset và application slots từ .workspaces/ports/<project>.json>
 services: <metadata portServices declarations>
 projection: <metadata ports đã resolve>
 consumers: <backend/frontend runtime paths đã cập nhật>

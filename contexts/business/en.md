@@ -50,7 +50,7 @@ declares `businessImpact: none`, binds the current implemented head, and does no
 ## Rules
 
 1. `featureId` is stable; its SHA-256 head is a version.
-2. Business state is durable and versioned; generated preview packs remain under project cache.
+2. Business state is durable and versioned; generated preview packs remain under session root.
 3. FE and BE evidence is read from verified workspace routes at committed heads.
 4. Every non-unknown claim cites evidence present in the same object.
 5. Imported examples contribute shape only, never business facts.

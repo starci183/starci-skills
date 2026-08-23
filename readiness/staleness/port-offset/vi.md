@@ -10,8 +10,8 @@ Không có.
 
 ## Luật
 
-`.workspace/ports/config.json` là authority duy nhất cho slot step chung của Source, và mỗi
-`.workspace/ports/<project>.json` là authority duy nhất cho family offset cùng application slot map bền.
+`.workspaces/ports/config.json` là authority duy nhất cho slot step chung của Source, và mỗi
+`.workspaces/ports/<project>.json` là authority duy nhất cho family offset cùng application slot map bền.
 Product repository được khai service identity/base port và giữ `ports` đã resolve cho runtime consumer;
 không được sở hữu offset hay slot.
 
@@ -49,8 +49,8 @@ allocation defect khỏi consumer drift. Project bị exclude vẫn phải đư�
 
 ## Apply
 
-Ghi slot step chung đúng một lần trong `.workspace/ports/config.json` và từng family allocation đúng một lần
-trong `.workspace/ports/<project>.json`. Thay product allocation ownership bằng
+Ghi slot step chung đúng một lần trong `.workspaces/ports/config.json` và từng family allocation đúng một lần
+trong `.workspaces/ports/<project>.json`. Thay product allocation ownership bằng
 `portServices` và projection `ports` đã derive, rồi cập nhật mọi consumer đã chạm. Migration một family
 coordinate frontend/backend route thành một structural pass vì di chuyển một nửa tạo runtime pair sai.
 Không renumber effective port đang sạch trừ khi xử collision đã đo.

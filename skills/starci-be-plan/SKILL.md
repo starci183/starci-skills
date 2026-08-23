@@ -52,7 +52,7 @@ skipped its own approval.
 
 ### 2 — Resolve and verify the backend route
 
-Read `.workspace/<project>/<role>/config.json` for the `be` role and verify the checkout before reading
+Read `.workspaces/local/routes/<project>/<role>/config.json` for the `be` role and verify the checkout before reading
 anything from it (`WORKSPACE-5`). A stale route means the schema and the sibling folder you are about to
 mirror belong to a different state of the product.
 

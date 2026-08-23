@@ -56,7 +56,7 @@ const assertSafeReadmeWrites = (rows) => {
 }
 
 export const inventorySonarRoutes = (sourceRoot) => {
-    const workspace = join(sourceRoot, ".workspace")
+    const workspace = join(sourceRoot, ".workspaces", "local", "routes")
     if (!existsSync(workspace)) fail(`workspace is missing: ${workspace}`)
     const rows = []
     for (const projectEntry of readdirSync(workspace, { withFileTypes: true })) {

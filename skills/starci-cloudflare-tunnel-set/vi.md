@@ -48,14 +48,14 @@ Tạo hoặc đổi tunnel, ingress, DNS record hay encrypted credential đều 
 plan không có value dưới `### NEED APPROVALS`; chỉ `OK` mới cho phép đúng các target đã nêu. Sau approval,
 chạy lại đúng command đó nhưng bỏ `--plan`.
 
-Khi record đã tồn tại, helper tái sử dụng `.workspace/credentials/cloudflare-api-token.key.enc` qua SOPS
+Khi record đã tồn tại, helper tái sử dụng `.workspaces/local/credentials/cloudflare-api-token.key.enc` qua SOPS
 identity đã khởi tạo. Nếu chưa có, helper đọc `CLOUDFLARE_API_TOKEN` từ process environment hoặc hỏi bằng
 interactive prompt ẩn. Không nhận value qua chat, command argument hay plaintext config file và không bao
 giờ in value. Credential được mã hóa trực
 tiếp dưới workspace machine-local của Source:
 
-- `.workspace/credentials/cloudflare-api-token.key.enc`
-- `.workspace/credentials/cloudflare-<tunnel>-tunnel-token.key.enc`
+- `.workspaces/local/credentials/cloudflare-api-token.key.enc`
+- `.workspaces/local/credentials/cloudflare-<tunnel>-tunnel-token.key.enc`
 
 Record đầu cấp quyền reconcile. Record sau là run token Cloudflare trả về cho named tunnel. Cả hai đều được
 mã hóa bằng identity do initialization thiết lập. Đây là một control plane cấp Source dùng chung cho mọi

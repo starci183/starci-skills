@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "starci-v3/contexts/workspaces/config.schema.json",
   "title": "Workspace defaults",
-  "description": "Source-wide defaults shared by every project and role on this machine.",
+  "description": "Portable Source-wide defaults tracked and shared by every project and role.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "defaultLang"],

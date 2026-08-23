@@ -13,7 +13,7 @@ description: Sửa hoặc tái cấu trúc exact frontend scope đã được La
 | `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho failure audit, HTML, authority, FE và proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | chọn correction path theo observed impact |
 | `@workspaces` | `contexts/workspaces/vi.md` | vi | verified frontend route |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | correction cache |
+| `@worktrees` | `contexts/worktrees/vi.md` | vi | correction-session evidence dùng một lần |
 | `@composition` | `brainstorms/composition/vi.md` | vi | rendered scope và allowed delta |
 | `@business` | `contexts/business/vi.md` | vi | product truth bị freeze |
 | `@grammar` | `grammars` | module | routed semantics và owner |

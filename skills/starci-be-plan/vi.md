@@ -46,7 +46,7 @@ phê duyệt của chính nó.
 
 ### 2 — Resolve và kiểm tra route backend
 
-Đọc `.workspace/<project>/<role>/config.json` của role `be`, rồi kiểm tra checkout trước khi đọc source
+Đọc `.workspaces/local/routes/<project>/<role>/config.json` của role `be`, rồi kiểm tra checkout trước khi đọc source
 (`WORKSPACE-5`). Route stale đồng nghĩa schema và thư mục sibling sắp dùng làm mẫu thuộc về một trạng thái
 sản phẩm khác; phải dừng tại đây.
 

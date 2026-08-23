@@ -43,7 +43,7 @@ repairs tracked source or external state nobody can trust it as a measurement.
 
 ### 1 — Establish the read-only boundary
 
-`Touching` is nothing. Read `.workspace/config.json` and every declared role. If the workspace root is
+`Touching` is nothing. Read `.workspaces/config.json` and every declared role. If the workspace root is
 absent, report that fact and stop.
 
 ### 2 — Run the shared scanner
@@ -92,7 +92,7 @@ or initialization request with its own authority.
 
 ## Stops
 
-- `.workspace` absent → report no routes and end.
+- `.workspaces` absent → report no routes and end.
 - Route JSON invalid → report `invalid`, not `absent` or `stale`.
 - A category cannot be read safely → report it `unmeasured` with reason; do not guess.
 - Reader asks for repair → finish the inventory; another capability owns the write.

@@ -24,15 +24,15 @@ concern đã chốt khác. Reference là bằng chứng cho shape, không phải
 |---|---|---|
 | `SOURCE-REF-1` | Pattern FE compile một capability hoặc family dùng chung | Resolve reference `fe` đúng commit, chỉ đọc path liên quan và trích dẫn exact reference path cho mọi precedent được nhận |
 | `SOURCE-REF-2` | Pattern BE compile một capability hoặc operation family dùng chung | Resolve reference `be` đúng commit, chỉ đọc path liên quan và trích dẫn exact reference path cho mọi precedent được nhận |
-| `SOURCE-REF-3` | Không workspace reference đã init nào chứa immutable commit | Dừng trước target-specific pattern reads và route Source qua `starci-init`; initialization sở hữu `.workspace/references/<id>`, pattern compiler không tự clone hoặc fetch |
+| `SOURCE-REF-3` | Không workspace reference đã init nào chứa immutable commit | Dừng trước target-specific pattern reads và route Source qua `starci-init`; initialization sở hữu `.workspaces/local/references/<id>`, pattern compiler không tự clone hoặc fetch |
 | `SOURCE-REF-4` | Target repository đã có sibling cùng loại | Target sibling vẫn là chuẩn chính; shared reference chỉ phản biện hoặc bù convention còn thiếu và không được ghi đè ownership đang sống |
 | `SOURCE-REF-5` | Hành vi reference xung đột business truth, live schema, grammar hoặc target contract đã route | Authority target thắng; ghi nhận xung đột và không nhập hành vi reference |
 
 ## Cách resolve
 
 1. Đọc `@catalog`; chỉ chọn reference khớp role đang compile.
-2. Chạy `@resolve --role <role>`. Script validate `.workspace/pattern-references.json`, `workspacePath`
-   portable, checkout dưới `.workspace/references/<id>`, remote identity và immutable commit.
+2. Chạy `@resolve --role <role>`. Script validate `.workspaces/local/pattern-references.json`, `workspacePath`
+   portable, checkout dưới `.workspaces/local/references/<id>`, remote identity và immutable commit.
 3. Kết quả `needs-init` dừng pattern compilation và quay về `starci-init`. Chỉ initialization mới
    được reuse checkout hiện hữu hoặc cài immutable object vào workspace cache của Source.
 4. Chỉ đọc source paths nhỏ nhất cần để trả lời pattern situation đã nhận. Không inventory toàn bộ

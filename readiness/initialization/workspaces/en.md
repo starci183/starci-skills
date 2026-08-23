@@ -9,33 +9,27 @@ title: Initialization · workspaces
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@pattern-reference-catalog` | `compilers/patterns/source-references/references.json` | file | bind shared FE/BE precedent to immutable Git truth |
-| `@pattern-reference-schema` | `readiness/initialization/workspaces/pattern-references.schema.json` | file | validate portable Source-local offline reference routes |
-| `@install-pattern-references` | `readiness/initialization/workspaces/install-pattern-references.mjs` | script | reuse local Git objects or install missing immutable refs under `.workspace/references` |
+| `@pattern-reference-schema` | `readiness/initialization/workspaces/pattern-references.schema.json` | file | validate generated offline reference routes |
+| `@install-pattern-references` | `readiness/initialization/workspaces/install-pattern-references.mjs` | script | install immutable refs under `.workspaces/local/references` |
+| `@portable-route-schema` | `readiness/initialization/workspaces/portable-route.schema.json` | file | refuse absolute paths, observed heads and secret-bearing portable declarations |
+| `@workspace-portable` | `scripts/workspace-portable.mjs` | script | export pushable declarations and hydrate verified local routes deterministically |
 
-`.workspace/config.json` owns one Source-wide `defaultLang`. Each declared project role owns one
-`.workspace/<project>/<role>/config.json` read route. Project and roles are owner-declared, never inferred
-from directory names or a previous run.
+`.workspaces/config.json`, `.workspaces/projects/<project>/<role>.json` and `.workspaces/ports/*.json` are
+pushable declarations. A role declaration owns its credential-free GitHub URL, expected branch, repository-relative
+directory and context paths, plus explicit grammar/profile. It never contains an absolute path, observed head,
+timestamp, credential or generated state.
 
-`.workspace/pattern-references.json` owns portable `workspacePath` routes to the immutable FE/BE
-precedent declared by `@pattern-reference-catalog`. Initialization always materializes independent
-detached checkouts at `.workspace/references/<id>`. It reuses Git objects from an existing routed
-checkout when available and otherwise fetches the declared immutable commit. Pattern compilers only
-validate and read these offline checkouts; a missing or stale route returns `needs-init`.
+`@workspace-portable hydrate` verifies each declared checkout and generates the machine-local read route at
+`.workspaces/local/routes/<project>/<role>/config.json`. That route owns absolute paths, the observed Git head and
+verification time. Missing checkouts stop hydration; cloning is a separate explicitly authorized materialization.
 
-`.workspace/ports/config.json` owns the same Source's slot step, while one
-`.workspace/ports/<project>.json` owns each persistent family offset and application slot map. When a
-declared project binds local services, initialization creates or validates its project-named allocation
-record before the route is reusable. It never copies the offset into a target repository and never edits a target.
+`.workspaces/local/pattern-references.json` and `.workspaces/local/references/<id>` are generated offline access to
+immutable FE/BE precedent. Initialization reuses local Git objects when possible and otherwise fetches only the
+catalog-pinned commit. Pattern compilers validate and read these detached checkouts.
 
-Verify checkout, repository, branch/head, manifests, and the real contract location before classifying a
-route as `create`, `reuse`, or `refresh`. A missing contract is `null` only when the repository truly has
-none. Record `grammar` and `grammarProfile` as an explicit pair: both `null`, or both resolving to the
-exact grammar authority package and profile. Project and repository names never infer them. Route records are
-machine-local descriptions: they never clone, mirror, mount, or edit a target,
-and never contain credentials or environment values.
+Portable port declarations retain the Source slot step, project offsets and application slots. Initialization
+never copies allocation ownership into a product repository.
 
-Evidence is the shared config, immutable reference catalog, portable pattern-reference routes, port
-allocation, every role record, and each resolved checkout fact. Action writes or refreshes only those
-local route records and may install a missing immutable reference under `.workspace/references`. Proof
-parses every record and verifies every remote, commit and path again; print `installed`, `written`,
-`refreshed`, or `reused` per route.
+Evidence is the tracked declarations, immutable reference catalog and each resolved checkout fact. Action hydrates
+only `.workspaces/local` and may install a missing immutable reference there. Proof rejects any portable absolute
+path or secret-bearing value, then verifies every generated remote, branch, head and path.

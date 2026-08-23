@@ -33,9 +33,9 @@ if (!project || !role || !need) {
 }
 
 const source = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const route = join(source, ".workspace", project, role, "config.json");
+const route = join(source, ".workspaces", "local", "routes", project, role, "config.json");
 if (!existsSync(route)) {
-  console.error(`no route at .workspace/${project}/${role}/config.json — WORKSPACE-2; stop this run`);
+  console.error(`no route at .workspaces/local/routes/${project}/${role}/config.json — WORKSPACE-2; stop this run`);
   process.exit(2);
 }
 

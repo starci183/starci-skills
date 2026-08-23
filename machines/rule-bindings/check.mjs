@@ -45,7 +45,7 @@ export function parseGateRouter(text) {
 }
 
 function workspaceRouteRoots(role) {
-    const workspaceRoot = join(sourceRoot, ".workspace")
+    const workspaceRoot = join(sourceRoot, ".workspaces", "local", "routes")
     if (!existsSync(workspaceRoot)) return []
     const roots = []
     for (const project of readdirSync(workspaceRoot, { withFileTypes: true })) {

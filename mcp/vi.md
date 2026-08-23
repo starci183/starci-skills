@@ -20,10 +20,10 @@ route vẫn quyết định vị trí source; Git vẫn quyết định nội du
 
 ## Quy tắc
 
-- Resolve `.workspace/<project>/<role>/config.json` trước khi đọc checkout.
+- Resolve `.workspaces/local/routes/<project>/<role>/config.json` trước khi đọc checkout.
 - Dùng một Qdrant instance và collection cho toàn Source. Chia partition bằng virtual root
   `/<role>/<project>/`; thêm project không tạo thêm Qdrant hay MCP container.
-- Cấu hình và manifest sinh ra nằm trong `.worktrees/source-context/cache/mcp/`, không nằm trong cây này.
+- Cấu hình và manifest sinh ra nằm trong `.workspaces/local/state/source-context/mcp/`, không nằm trong cây này.
 - MCP source-context chạy read-only. Chỉ indexer deterministic được refresh dữ liệu.
 - Credential được đọc từ file plaintext đã gitignore của backend route sau `npm run sync`; không sao chép giá
   trị vào MCP JSON, argument, output hay file tracked.
@@ -32,7 +32,7 @@ route vẫn quyết định vị trí source; Git vẫn quyết định nội du
 - Chỉ publish cổng HTTP của MCP qua tunnel Cloudflare remotely managed dùng chung
   `starci-local-services`. Cổng Qdrant và Ollama API luôn private.
 - Cloudflare API token và tunnel run token chỉ thuộc các SOPS ciphertext trong
-  `.workspace/credentials/`. Connector có thể đọc runtime file đã giải mã, nhưng token không được đi vào
+  `.workspaces/local/credentials/`. Connector có thể đọc runtime file đã giải mã, nhưng token không được đi vào
   cây trust này, client JSON, Compose argument hay log.
 - Dựng lại context khi route hoặc revision mong muốn thay đổi. Kết quả tìm kiếm chỉ là evidence bổ sung,
   không cho phép bỏ qua việc đọc source trực tiếp trước khi ghi.

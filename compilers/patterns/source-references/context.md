@@ -21,15 +21,15 @@ paste.
 |---|---|---|
 | `SOURCE-REF-1` | A frontend pattern is compiling a shared capability or family | Resolve the `fe` reference at its exact commit, inspect only paths relevant to the accepted shape, and cite the exact reference path behind every adopted precedent |
 | `SOURCE-REF-2` | A backend pattern is compiling a shared capability or operation family | Resolve the `be` reference at its exact commit, inspect only paths relevant to the accepted shape, and cite the exact reference path behind every adopted precedent |
-| `SOURCE-REF-3` | No initialized workspace reference contains the immutable commit | Stop before target-specific pattern reads and route the Source through `starci-init`; initialization owns `.workspace/references/<id>` and pattern compilation never clones or fetches |
+| `SOURCE-REF-3` | No initialized workspace reference contains the immutable commit | Stop before target-specific pattern reads and route the Source through `starci-init`; initialization owns `.workspaces/local/references/<id>` and pattern compilation never clones or fetches |
 | `SOURCE-REF-4` | The target repository already has a sibling of the same kind | The target sibling remains primary; the shared reference challenges or fills missing convention only and may not overwrite live target ownership |
 | `SOURCE-REF-5` | Reference behavior conflicts with routed business truth, live schema, grammar or target contracts | Routed target authority wins; record the conflict and do not import the reference behavior |
 
 ## Resolution
 
 1. Read `@catalog`; select exactly the reference matching the compiling role.
-2. Run `@resolve --role <role>`. It validates `.workspace/pattern-references.json`, its portable
-   `workspacePath`, the checkout under `.workspace/references/<id>`, remote identity and immutable commit.
+2. Run `@resolve --role <role>`. It validates `.workspaces/local/pattern-references.json`, its portable
+   `workspacePath`, the checkout under `.workspaces/local/references/<id>`, remote identity and immutable commit.
 3. A `needs-init` result stops pattern compilation and returns to `starci-init`. Only initialization
    may reuse an existing checkout or install the immutable object into Source-local workspace cache.
 4. Inspect the smallest source paths needed to answer the accepted pattern situation. Do not inventory

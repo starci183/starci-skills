@@ -22,9 +22,14 @@ chỉ không phải repository mà yêu cầu muốn nói.
 
 ## Luật
 
-Default chung của Source được resolve trước từ `.workspace/config.json`, hợp lệ theo `@config-schema`.
+Default chung của Source được resolve trước từ `.workspaces/config.json` đã track, hợp lệ theo `@config-schema`.
 `defaultLang` đặt ngôn ngữ phản hồi cho mọi project và role, trừ khi request hiện tại chỉ định rõ ngôn
 ngữ khác. Giá trị này được đọc một lần, không copy vào từng route của role.
+
+`.workspaces/projects/<project>/<role>.json` và `.workspaces/ports/*.json` đã track là declaration portable,
+không credential. Setup hydrate chúng thành `.workspaces/local/routes` bị ignore; chỉ generated route đó chứa
+absolute path, observed head và machine fact khác. Portable declaration định danh GitHub repository, expected
+branch cùng context path tương đối trong repository; nó không tuyên bố checkout đang tồn tại.
 
 Route được giải ra từ **một tệp đã khai báo**, không bao giờ bằng suy diễn. `project` và `role` là toàn
 bộ danh tính tra cứu; tên một checkout nằm cạnh, một thư mục đang mở, hay thứ mà session trước dùng
@@ -43,19 +48,19 @@ thì buộc phải hỏi, cũ thì mời người ta trả lời sai một cách
 | `WORKSPACE-3` | Route giải được; checkout là nơi đọc và ghi | đọc thẳng `repository.diskPath` |
 | `WORKSPACE-4` | Một vai trò cần hợp đồng miền của nó | đọc `context.contract`, kèm `contractSource` là xuất xứ |
 | `WORKSPACE-5` | Route ghi một đường dẫn hoặc head không còn đúng | dừng; route đã cũ, không phải xấp xỉ |
-| `WORKSPACE-6` | Route mang đường dẫn máy, khoá hoặc thông tin đăng nhập | route ở lại trong máy; không bao giờ chép vào cây quy tắc |
+| `WORKSPACE-6` | Generated route mang local path hoặc observed machine fact | `.workspaces/local` ở lại trong máy; chỉ portable declaration không credential mới được commit |
 | `WORKSPACE-7` | Config workspace chung của Source resolve được | áp dụng `defaultLang` cho mọi phản hồi tới người dùng |
 | `WORKSPACE-8` | Role frontend khai báo product-family grammar | verify đúng grammar và profile; không suy ra từ identity |
 
 ## Đọc một lệnh khởi động
 
-1. **Resolve default chung.** Đọc `.workspace/config.json`, validate theo `@config-schema`, rồi giữ
+1. **Resolve default chung.** Đọc `.workspaces/config.json`, validate theo `@config-schema`, rồi giữ
    `defaultLang` cho mọi phản hồi tới người dùng — `WORKSPACE-7`.
 2. **Hiểu yêu cầu đúng nghĩa chữ.** `start <project> <roles...>` gọi tên chính xác những vai trò cần
    tải. Không thêm một vai trò vì repository trông như có nó, và không bỏ một vai trò vì session trước
    không dùng.
-3. **Giải một tệp cho mỗi vai trò**: `.workspace/<project>/<role>/config.json`. Mọi tệp được gọi tên
-   đều phải tồn tại — `WORKSPACE-1`.
+3. **Giải một tệp cho mỗi vai trò**: `.workspaces/local/routes/<project>/<role>/config.json`, được generate từ
+   tracked declaration tương ứng. Mọi tệp được gọi tên đều phải tồn tại — `WORKSPACE-1`.
 4. **Xác minh trước khi đọc.** Với từng route, thư mục checkout phải tồn tại và phải còn chứa đúng
    bằng chứng mà route khai: đường dẫn hợp đồng với vai trò frontend, các manifest nó gọi tên. Hỏng ở
    bước này là `WORKSPACE-5` và nó **dừng** cả lượt chạy.
@@ -178,8 +183,9 @@ nhánh khác.
 
 ## `WORKSPACE-6` — route mang những sự thật riêng của một máy
 
-**Khi nào gặp.** Route giữ đường dẫn đĩa và siêu dữ liệu git công khai. Nó là cấu hình cục bộ, không
-phải kiến thức dùng chung.
+**Khi nào gặp.** Generated route giữ đường dẫn đĩa, observed head và siêu dữ liệu git công khai. Nó là cấu hình
+cục bộ. Repository identity không credential, expected branch và relative path nằm trong portable declaration
+riêng có thể chia sẻ.
 
 **Cách nhận ra**
 
@@ -190,7 +196,7 @@ phải kiến thức dùng chung.
 
 **Ranh giới**
 
-- `WORKSPACE-3`: đọc checkout thì được; công bố checkout nằm ở đâu thì không.
+- `WORKSPACE-3`: đọc checkout thì được; không công bố checkout nằm ở đâu hay observed head của nó.
 
 **Nó hỏng bằng đường nào.** Một đường dẫn hoặc một token bị chép vào trong một luật, và luật đó âm
 thầm chỉ còn đúng trên một máy. Khoá bí mật, biến môi trường và token thì không bao giờ là context của
@@ -198,12 +204,12 @@ workspace ngay từ đầu.
 
 ## `WORKSPACE-7` — default chung áp dụng cho mọi phản hồi
 
-**Khi nào gặp.** `.workspace/config.json` hợp lệ và `defaultLang` của nó áp dụng cho mọi project và role
+**Khi nào gặp.** `.workspaces/config.json` hợp lệ và `defaultLang` của nó áp dụng cho mọi project và role
 trong Source này.
 
 **Cách nhận ra**
 
-- Config nằm trực tiếp dưới `.workspace`, ngoài mọi thư mục project.
+- Config nằm trực tiếp dưới `.workspaces`, ngoài mọi thư mục project.
 - Giá trị là language tag kiểu BCP 47 như `vi` hoặc `en-US`.
 
 **Tự hỏi.** Lượt chạy đã resolve default chung trước khi sinh văn xuôi cho người dùng chưa?
@@ -239,8 +245,9 @@ behavior route chưa chọn, hoặc load mọi grammar rồi để model đoán.
 | Đầu vào | Bằng chứng bắt buộc |
 |---|---|
 | yêu cầu | Danh sách project và vai trò đúng nghĩa chữ |
-| config workspace | `.workspace/config.json`, hợp `@config-schema` nằm cạnh bản ghi này |
-| route | `.workspace/<project>/<role>/config.json`, hợp `@schema` nằm cạnh bản ghi này |
+| config workspace | `.workspaces/config.json` đã track, hợp `@config-schema` nằm cạnh bản ghi này |
+| portable declaration | `.workspaces/projects/<project>/<role>.json` đã track, không credential và chỉ dùng repository-relative path |
+| route | `.workspaces/local/routes/<project>/<role>/config.json`, hợp `@schema` nằm cạnh bản ghi này |
 | checkout | Thư mục tại `repository.diskPath`, có thật trên đĩa |
 | hợp đồng | Tệp tại `context.contract`, và `context.contractSource` cho xuất xứ của nó |
 | grammar | Đúng package `context.grammar` và `context.grammarProfile`, hoặc cả hai ghi rõ `null` |
@@ -253,10 +260,10 @@ behavior route chưa chọn, hoặc load mọi grammar rồi để model đoán.
 3. Xác minh trước khi đọc. Đọc được cú pháp của route không phải là đã xác minh nó.
 4. Route **mô tả**, không bao giờ **nhân bản**. Cấu hình không giữ bản sao nào của repository đích.
 5. Setup chỉ làm mới route. Nó không clone, không link, không copy, không sửa repository đích.
-6. Giá trị trong route ở lại trong máy. Chúng không bao giờ được commit vào cây quy tắc, và khoá bí mật
-   thì ngay từ đầu đã không phải giá trị của route.
+6. Generated route ở dưới `.workspaces/local` và không bao giờ được commit. Chỉ portable declaration hợp schema
+   mới được track; nó không chứa absolute path, observed head, timestamp hay credential material.
 7. Mỗi lệnh khởi động ra đúng một phán quyết cho mỗi vai trò: đọc, hoặc dừng.
-8. `defaultLang` được resolve một lần từ `.workspace/config.json` và áp dụng xuyên mọi project, role.
+8. `defaultLang` được resolve một lần từ `.workspaces/config.json` và áp dụng xuyên mọi project, role.
 9. Grammar và profile là một cặp khai báo rõ; tên identity không được chọn thay.
 
 ## Ngoại lệ
@@ -276,7 +283,7 @@ Mỗi vai trò một khối, theo đúng thứ tự yêu cầu gọi tên:
 ```text
 project: <project>
 role: <role>
-route: .workspace/<project>/<role>/config.json
+route: .workspaces/local/routes/<project>/<role>/config.json
 repository: <diskPath>
 verified: <đã kiểm gì với đĩa hoặc với git>
 sense: <grammar/profile, hoặc none>
@@ -295,7 +302,7 @@ gọi tên đường dẫn nào, nhánh nào, hợp đồng nào, nên không th
 ```text
 project: example-app
 role: fe
-route: .workspace/example-app/fe/config.json
+route: .workspaces/local/routes/example-app/fe/config.json
 repository: <disk>\example-app-fe
 verified: checkout tồn tại; context.contract có thật tại src/components/contracts/index.ts
 situation: WORKSPACE-3
@@ -306,7 +313,7 @@ reason: route giải được và lời khai về hợp đồng của nó sống
 ```text
 project: example-app
 role: be
-route: .workspace/example-app/be/config.json
+route: .workspaces/local/routes/example-app/be/config.json
 repository: <chưa giải>
 verified: tệp route không tồn tại
 situation: WORKSPACE-2

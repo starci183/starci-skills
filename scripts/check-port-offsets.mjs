@@ -10,7 +10,8 @@ const value = (name) => {
 const trustRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = resolve(value("--source") ?? join(trustRoot, ".."));
 const excluded = new Set(args.flatMap((arg, index) => arg === "--exclude" ? [args[index + 1]] : []).filter(Boolean));
-const workspaceRoot = join(source, ".workspace");
+const workspaceRoot = join(source, ".workspaces");
+const routeRoot = join(workspaceRoot, "local", "routes");
 const registryRoot = join(workspaceRoot, "ports");
 const configPath = join(registryRoot, "config.json");
 const findings = [];
@@ -59,11 +60,11 @@ for (const entry of allocationFiles) {
   allocations.set(family, allocation);
 }
 
-const routedFamilies = existsSync(workspaceRoot)
-  ? readdirSync(workspaceRoot, {withFileTypes: true})
+const routedFamilies = existsSync(routeRoot)
+  ? readdirSync(routeRoot, {withFileTypes: true})
     .filter((entry) => entry.isDirectory() && (
-      existsSync(join(workspaceRoot, entry.name, "be", "config.json"))
-      || existsSync(join(workspaceRoot, entry.name, "fe", "config.json"))
+      existsSync(join(routeRoot, entry.name, "be", "config.json"))
+      || existsSync(join(routeRoot, entry.name, "fe", "config.json"))
     ))
     .map((entry) => entry.name)
     .sort()
@@ -75,7 +76,7 @@ for (const family of routedFamilies) {
     findings.push(`${family}: allocation record is absent at ${join(registryRoot, `${family}.json`)}`);
     continue;
   }
-  const routePath = join(workspaceRoot, family, "be", "config.json");
+  const routePath = join(routeRoot, family, "be", "config.json");
   if (!existsSync(routePath)) continue;
   const route = readJson(routePath, `${family}/be route`);
   const checkout = route?.repository?.diskPath;

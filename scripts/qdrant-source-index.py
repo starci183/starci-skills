@@ -19,7 +19,7 @@ import uuid
 from pathlib import Path
 
 EXCLUDED_DIRS = {
-    ".git", ".github-cache", ".next", ".stacks", ".turbo", ".workspace", ".worktrees",
+    ".git", ".github-cache", ".next", ".stacks", ".turbo", ".workspace", ".workspaces", ".worktrees", ".sessions",
     "build", "coverage", "dist", "node_modules", "out", "target", "vendor", "__pycache__",
 }
 EXCLUDED_NAMES = {"package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"}

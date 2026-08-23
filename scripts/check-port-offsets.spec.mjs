@@ -14,7 +14,7 @@ const writeJson = (path, value) => {
 const fixture = (t) => {
   const root = mkdtempSync(join(tmpdir(), "starci-port-offset-"));
   t.after(() => rmSync(root, {recursive: true, force: true}));
-  writeJson(join(root, ".workspace", "ports", "config.json"), {version: 1, slotStep: 1000});
+  writeJson(join(root, ".workspaces", "ports", "config.json"), {version: 1, slotStep: 1000});
   return root;
 };
 
@@ -31,12 +31,12 @@ test("shared services ignore application slots", () => {
 test("per-project allocation resolves application and shared projections", (t) => {
   const root = fixture(t);
   const repository = join(root, "tedo-backend");
-  mkdirSync(join(root, ".workspace", "cache"), {recursive: true});
-  mkdirSync(join(root, ".workspace", "credentials"), {recursive: true});
-  writeJson(join(root, ".workspace", "ports", "tedo.json"), {
+  mkdirSync(join(root, ".workspaces", "local", "state"), {recursive: true});
+  mkdirSync(join(root, ".workspaces", "local", "credentials"), {recursive: true});
+  writeJson(join(root, ".workspaces", "ports", "tedo.json"), {
     version: 1, project: "tedo", offset: 2, applications: {main: 0},
   });
-  writeJson(join(root, ".workspace", "tedo", "be", "config.json"), {repository: {diskPath: repository}});
+  writeJson(join(root, ".workspaces", "local", "routes", "tedo", "be", "config.json"), {repository: {diskPath: repository}});
   writeJson(join(repository, "metadata.json"), {
     ports: {web: 3002, postgres: 5434},
     portServices: {
@@ -54,7 +54,7 @@ test("per-project allocation resolves application and shared projections", (t) =
 
 test("a routed project without its own allocation record is stale", (t) => {
   const root = fixture(t);
-  writeJson(join(root, ".workspace", "tedo", "be", "config.json"), {repository: {diskPath: join(root, "tedo-backend")}});
+  writeJson(join(root, ".workspaces", "local", "routes", "tedo", "be", "config.json"), {repository: {diskPath: join(root, "tedo-backend")}});
 
   const result = spawnSync(process.execPath, [checker, "--source", root], {encoding: "utf8"});
   assert.equal(result.status, 1);

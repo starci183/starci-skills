@@ -15,7 +15,7 @@ test("inventories one distinct project-analysis identity for every routed source
         ]
         for (const route of routes) {
             const repo = join(sourceRoot, "repositories", route.repository)
-            const routeRoot = join(sourceRoot, ".workspace", route.project, route.role)
+            const routeRoot = join(sourceRoot, ".workspaces", "local", "routes", route.project, route.role)
             mkdirSync(repo, { recursive: true })
             mkdirSync(routeRoot, { recursive: true })
             execFileSync("git", ["init", repo], { windowsHide: true })

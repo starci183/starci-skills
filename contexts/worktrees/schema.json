@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v3/contexts/worktrees/schema.json",
-  "title": "Project worktree roots",
+  "$id": "starci-v4/contexts/worktrees/schema.json",
+  "title": "Durable worktree and disposable session roots",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "project", "source", "roots"],
@@ -12,10 +12,11 @@
     "roots": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["businesses", "cache"],
+      "required": ["businesses", "debts", "sessions"],
       "properties": {
         "businesses": {"$ref": "#/$defs/durableRoot"},
-        "cache": {"$ref": "#/$defs/rebuildableRoot"}
+        "debts": {"$ref": "#/$defs/durableRoot"},
+        "sessions": {"$ref": "#/$defs/sessionRoot"}
       }
     }
   },
@@ -26,7 +27,7 @@
       "required": ["path", "durability"],
       "properties": {
         "path": {"type": "string", "minLength": 1},
-        "durability": {"enum": ["durable", "rebuildable"]},
+        "durability": {"enum": ["durable", "session"]},
         "ignored": {"type": "boolean"},
         "ownership": {
           "type": "object",
@@ -52,13 +53,13 @@
         "ownership": {"$ref": "#/$defs/root/properties/ownership"}
       }
     },
-    "rebuildableRoot": {
+    "sessionRoot": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "durability", "ignored"],
       "properties": {
         "path": {"type": "string", "minLength": 1},
-        "durability": {"const": "rebuildable"},
+        "durability": {"const": "session"},
         "ignored": {"const": true}
       }
     }

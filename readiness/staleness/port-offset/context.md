@@ -6,8 +6,8 @@ None.
 
 ## Law
 
-`.workspace/ports/config.json` is the only authority for the Source-wide slot step, and one
-`.workspace/ports/<project>.json` is the only authority for each persistent family offset and application
+`.workspaces/ports/config.json` is the only authority for the Source-wide slot step, and one
+`.workspaces/ports/<project>.json` is the only authority for each persistent family offset and application
 slot map. A product repository may declare service identity and base ports and may carry resolved `ports`
 for runtime consumers; it never owns an offset or slot.
 
@@ -47,8 +47,8 @@ silence never implies measurement.
 
 ## Apply
 
-Write the shared slot step once in `.workspace/ports/config.json` and each family allocation once in
-`.workspace/ports/<project>.json`. Replace product allocation ownership with
+Write the shared slot step once in `.workspaces/ports/config.json` and each family allocation once in
+`.workspaces/ports/<project>.json`. Replace product allocation ownership with
 `portServices` declarations and a derived `ports` projection, then update all reached consumers. A family
 migration coordinates its routed frontend and backend as one structural pass because a partial move creates
 a false runtime pair. Do not renumber a clean effective port unless resolving a measured collision.

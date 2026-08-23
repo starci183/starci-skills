@@ -11,7 +11,7 @@ description: Record or query provider-neutral OpenAI/ChatGPT/Codex and Anthropic
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared reporting and approval boundary |
 | `@workspaces` | `contexts/workspaces/context.md` | context | resolve the named project before provider or artifact reads |
-| `@worktrees` | `contexts/worktrees/context.md` | context | verify durable registry ownership and cache placement |
+| `@worktrees` | `contexts/worktrees/context.md` | context | verify durable business-registry ownership and session/generated-state placement |
 | `@conversations` | `contexts/conversations/context.md` | context | provider-neutral identity, custody, redaction and artifact-link law |
 | `@snapshot-schema` | `contexts/conversations/conversation-snapshot.schema.json` | file | validate one immutable provenance snapshot |
 | `@registry-schema` | `contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
@@ -35,14 +35,14 @@ Topology: `linear`.
 
 ## Run
 
-This skill records provenance, not authority. Frontend design cache is transient; durable FE provenance binds
+This skill records provenance, not authority. Frontend design session evidence is transient; durable FE provenance binds
 implemented source commits and paths. BE capability/operation authority remains separately owned.
 
 ### 1 — Resolve scope
 
 Require a project and a stable `conversationId`. Resolve provider and surface separately (`openai/codex`,
-`openai/chatgpt`, `anthropic/claude-code`, etc.). `Touching` is the project's conversation registry and
-ignored conversation cache; an encrypted external write is a separate displayed boundary.
+`openai/chatgpt`, `anthropic/claude-code`, etc.). `Touching` is the project's conversation registry below its
+durable `businesses` worktree plus ignored session/generated state; an encrypted external write is a separate displayed boundary.
 
 ### 2 — Acquire evidence explicitly
 
@@ -55,7 +55,7 @@ provider thread reference and redacted decision metadata that the current reques
 Raw transcript choices are closed:
 
 - provider-held reference;
-- ignored `cache/conversations` with a digest;
+- ignored `.sessions/<project>/<session-id>/conversations` with a digest;
 - encrypted external object with a stable ciphertext reference and digest.
 
 Plaintext transcript, prompts, completions, tool output, credentials and signed URLs never enter Git.
@@ -76,8 +76,8 @@ upload. `OK` approves only the displayed snapshot and boundaries.
 ### 6 — Record and prove
 
 After approval run `@record --apply`, validate `conversation-registry-v1.json`, run `@check`, then commit
-only the new immutable object, updated head and projections. Search SQLite/vector state remains cache and is
-never committed.
+only the new immutable object and updated head. Search SQLite/vector state remains generated under
+`.workspaces/local/state/conversations` and is never committed.
 
 ## Stops
 

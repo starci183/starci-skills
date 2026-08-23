@@ -26,11 +26,11 @@ them, never a mutable provider thread head.
 
 Provider vocabulary is metadata, not structure. Every provider uses the same snapshot shape; `provider` and
 `surface` state where the exchange occurred. Raw messages, prompts, completions and tool output never enter
-the durable registry. They remain at the provider, in ignored local cache, or in an encrypted external object.
+the durable registry. They remain at the provider, in one ignored session, or in an encrypted external object.
 
 The registry stores only a redacted summary, message identities, provider reference, transcript custody and
-artifact decision links. Search databases and embeddings are derived under `cache/conversations`; deleting
-them loses time, not authority.
+artifact decision links. Cross-session search databases and embeddings are generated under
+`.workspaces/local/state/conversations`; deleting them loses time, not authority.
 
 ## Situations
 
@@ -40,15 +40,15 @@ them loses time, not authority.
 | `CONVERSATION-2` | The exchange gains messages or decisions | immutable snapshot with `previousHash`; old object untouched |
 | `CONVERSATION-3` | Raw transcript must be retained | provider reference, cache-only digest, or encrypted external reference; never plaintext Git |
 | `CONVERSATION-4` | A chat informed product authority | exact artifact identity, artifact hash and message ids |
-| `CONVERSATION-5` | People need full-text or semantic lookup | rebuildable SQLite/vector projection in cache |
+| `CONVERSATION-5` | People need full-text or semantic lookup | rebuildable SQLite/vector projection in generated local state |
 | `CONVERSATION-6` | Content may carry credentials or private data | redact before summary; reject secret-shaped keys and signed URLs |
 | `CONVERSATION-7` | Provider history is requested | read only through explicit owner-authorized access or supplied export; never infer or scrape silently |
 
 ## Placement
 
-Durable metadata lives below the independently routed `<Source>/.worktrees/<project>/conversations` worktree.
+Durable metadata lives below `<Source>/.worktrees/<project>/businesses/conversations` on the existing business-authority branch.
 Immutable snapshot objects live below `objects/sha256`; `conversation-registry-v1.json` owns current heads.
-Decrypted transcripts, SQLite indexes and vectors live below `<Source>/.worktrees/<project>/cache/conversations`.
+Decrypted transcripts, SQLite indexes and vectors live below `<Source>/.sessions/<project>/<session-id>/conversations`.
 
 An external ciphertext reference must be stable and must not contain a query string, temporary signature,
 credential or bearer value. Encryption credentials remain under the Source credential authority, never in
@@ -61,7 +61,7 @@ conversation metadata.
 3. Artifact provenance binds a specific snapshot hash and specific message ids.
 4. No raw `messages`, `content`, `prompt`, `completion`, token, authorization or secret keys enter Git.
 5. Redacted summaries contain no credential or private tool output.
-6. Search projections are cache and can be rebuilt.
+6. Search projections are generated local state and can be rebuilt.
 7. Recording provider history requires explicit access; absence is reported, never fabricated.
 8. Conversation provenance never turns cached frontend previews into authority or advances BE capability/operation heads.
 
