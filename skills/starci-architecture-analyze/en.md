@@ -10,8 +10,8 @@ description: Human-first, evidence-backed analysis for difficult cross-system te
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared reporting and orchestration contract |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify every routed source used as evidence |
-| `@business` | `contexts/business/en.md` | en | keep technical options inside accepted product truth |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve and verify every routed source used as evidence |
+| `@business` | `knowledge/contexts/business/en.md` | en | keep technical options inside accepted product truth |
 
 ## NESTED SKILLS
 

@@ -9,10 +9,10 @@ title: starci-setup-mcp · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and output contract |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify every requested project/role route |
-| `@mcp` | `mcp/en.md` | en | Source-wide Qdrant, indexing and publication contract |
-| `@embedding` | `mcp/embedding/en.md` | en | hardware-based Ollama installation and model selection |
-| `@clients` | `mcp/clients/en.md` | en | Codex/OpenAI and Claude Code client installation |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve and verify every requested project/role route |
+| `@mcp` | `platform/mcp/en.md` | en | Source-wide Qdrant, indexing and publication contract |
+| `@embedding` | `platform/mcp/embedding/en.md` | en | hardware-based Ollama installation and model selection |
+| `@clients` | `platform/mcp/clients/en.md` | en | Codex/OpenAI and Claude Code client installation |
 | `@source-context` | `scripts/qdrant-source-context.mjs` | script | deterministic Docker setup and partition refresh |
 | `@client-setup` | `scripts/mcp-client-setup.mjs` | script | idempotent public smoke plus both client installations |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | value-safe tunnel and DNS reconciliation |

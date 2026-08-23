@@ -9,10 +9,10 @@ title: Skill shape
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@workspace-language` | `scripts/resolve-workspace-language.mjs` | script | resolve the Source-wide language for every user-facing reply |
-| `@credential-intake` | `runbooks/secrets/en.md` | en | acquire missing operator credentials immediately through hidden, encrypted intake |
+| `@credential-intake` | `platform/runbooks/secrets/en.md` | en | acquire missing operator credentials immediately through hidden, encrypted intake |
 | `@host-os` | `scripts/check-host-os.mjs` | script | select only credential and setup entrypoints supported by this host |
 | `@session-control` | `scripts/session-control.mjs` | script | enforce selection, approval, continuation, rejection reset and completion transitions |
-| `@orchestration` | `orchestration/en.md` | en | partition provider-neutral coordinator and worker work without moving approval or decision ownership |
+| `@orchestration` | `runtime/orchestration/en.md` | en | partition provider-neutral coordinator and worker work without moving approval or decision ownership |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | choose the smallest frontend workflow from observable impact facts |
 
 

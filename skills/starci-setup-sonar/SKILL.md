@@ -10,10 +10,10 @@ description: Set up the shared SonarQube service and reconcile strict quality ga
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared approval and output contract |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve every routed Source role |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | scanner, coverage and quality evidence |
-| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/context.md` | context | frontend scanner, coverage and quality evidence |
-| `@sonar-assurance` | `machines/sonar-assurance/context.md` | context | strict gate and secret-boundary machine |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve every routed Source role |
+| `@assurance-be` | `knowledge/compilers/patterns/be/delivery-assurance/context.md` | context | scanner, coverage and quality evidence |
+| `@assurance-fe` | `knowledge/compilers/patterns/fe/delivery-assurance/context.md` | context | frontend scanner, coverage and quality evidence |
+| `@sonar-assurance` | `runtime/machines/sonar-assurance/context.md` | context | strict gate and secret-boundary machine |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | explicit value-safe hostname reconciliation |
 | `@credential-bootstrap` | `scripts/sonar-source-credentials.mjs` | script | value-safe project, scoped identity, encrypted record and GitHub reconciliation behind the Windows wrapper |
 

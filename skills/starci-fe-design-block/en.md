@@ -10,19 +10,19 @@ description: Reconcile one component-impact Layout-generated block inside its co
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and reporting boundary |
-| `@orchestration` | `orchestration/en.md` | en | coordinator/worker phase map for block HTML, source and proof |
+| `@orchestration` | `runtime/orchestration/en.md` | en | coordinator/worker phase map for block HTML, source and proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fixes away from the component workflow |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify the frontend route |
-| `@worktrees` | `contexts/worktrees/en.md` | en | keep disposable review evidence in the current session |
-| `@composition` | `brainstorms/composition/en.md` | en | lock highlighted parent and preserved page |
-| `@business` | `contexts/business/en.md` | en | resolve real data, actions and states |
-| `@grammar` | `grammars` | module | load routed block facts, outcomes and owners |
-| `@principles` | `compilers/principles` | module | audit the selected anatomy |
-| `@patterns-fe` | `compilers/patterns/fe` | module | choose owning source files and imports |
-| `@lints-fe` | `gates/fe/lints` | module | prove implemented source |
-| `@blocks` | `brainstorms/blocks/en.md` | en | block ownership, anatomy, state and contract law |
-| `@frontend-quality` | `brainstorms/frontend-quality/en.md` | en | integrated craft, UX, accessibility, engineering and detector review |
-| `@design-review` | `publication/design-review-preview/en.md` | en | exact-parent authored HTML review in cache |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve and verify the frontend route |
+| `@worktrees` | `knowledge/contexts/worktrees/en.md` | en | keep disposable review evidence in the current session |
+| `@composition` | `knowledge/brainstorms/composition/en.md` | en | lock highlighted parent and preserved page |
+| `@business` | `knowledge/contexts/business/en.md` | en | resolve real data, actions and states |
+| `@grammar` | `knowledge/grammars` | module | load routed block facts, outcomes and owners |
+| `@principles` | `knowledge/compilers/principles` | module | audit the selected anatomy |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | choose owning source files and imports |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | prove implemented source |
+| `@blocks` | `knowledge/brainstorms/blocks/en.md` | en | block ownership, anatomy, state and contract law |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/en.md` | en | integrated craft, UX, accessibility, engineering and detector review |
+| `@design-review` | `runtime/publication/design-review-preview/en.md` | en | exact-parent authored HTML review in cache |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify current vocabulary |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove the routed grammar package |

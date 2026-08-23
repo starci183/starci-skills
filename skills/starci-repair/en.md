@@ -9,9 +9,9 @@ title: starci-repair · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared phase, approval and output contract |
-| `@staleness` | `readiness/staleness/en.md` | en | the one taxonomy and router for every repair module |
+| `@staleness` | `platform/readiness/staleness/en.md` | en | the one taxonomy and router for every repair module |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic whole-Source proof for the ordered delivery fence |
-| `@stale-debts` | `readiness/staleness/debts/en.md` | en | identify existing owner-approved debt and preserve truthful verdicts |
+| `@stale-debts` | `platform/readiness/staleness/debts/en.md` | en | identify existing owner-approved debt and preserve truthful verdicts |
 
 ## NESTED SKILLS
 

@@ -10,20 +10,20 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và browse
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | staged approval và reporting boundary |
-| `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho decision, HTML, source và proof |
+| `@orchestration` | `runtime/orchestration/vi.md` | vi | phase map coordinator/worker cho decision, HTML, source và proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | từ chối ceremony lớn hơn frontend impact đã đo |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | frontend route đã verify |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | disposable session evidence bị ignore |
-| `@composition` | `brainstorms/composition/vi.md` | vi | Scope, Owner, Invariant và Proof |
-| `@business` | `contexts/business/vi.md` | vi | routed business truth |
-| `@archetypes` | `archetypes` | module | macro page topology dùng chung và complete responsive transformation trước Grammar và Principles |
-| `@grammar` | `grammars` | module | product-family facts và owners |
-| `@principles` | `compilers/principles` | module | audit visual decision |
-| `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
-| `@lints-fe` | `gates/fe/lints` | module | source proof |
-| `@layouts` | `brainstorms/layouts/vi.md` | vi | schema 9 synthesis, capability proof và staged contracts |
-| `@frontend-quality` | `brainstorms/frontend-quality/vi.md` | vi | integrated review craft, UX, accessibility, engineering và detector trước HTML |
-| `@design-review` | `publication/design-review-preview/vi.md` | vi | staged HTML review |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | frontend route đã verify |
+| `@worktrees` | `knowledge/contexts/worktrees/vi.md` | vi | disposable session evidence bị ignore |
+| `@composition` | `knowledge/brainstorms/composition/vi.md` | vi | Scope, Owner, Invariant và Proof |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | routed business truth |
+| `@archetypes` | `knowledge/archetypes` | module | macro page topology dùng chung và complete responsive transformation trước Grammar và Principles |
+| `@grammar` | `knowledge/grammars` | module | product-family facts và owners |
+| `@principles` | `knowledge/compilers/principles` | module | audit visual decision |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | source ownership |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | source proof |
+| `@layouts` | `knowledge/brainstorms/layouts/vi.md` | vi | schema 9 synthesis, capability proof và staged contracts |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/vi.md` | vi | integrated review craft, UX, accessibility, engineering và detector trước HTML |
+| `@design-review` | `runtime/publication/design-review-preview/vi.md` | vi | staged HTML review |
 | `@contract-search` | `scripts/contract-search.mjs` | script | component contract evidence |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | routed grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
@@ -33,7 +33,7 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và browse
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate schema 9 page/state và quality-review |
 | `@validate-baseline` | `scripts/validate-design-baseline.mjs` | script | composition proof |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | principle proof |
-| `@maturity-schema` | `publication/design-review-preview/maturity.schema.json` | file | staged maturity evidence |
+| `@maturity-schema` | `runtime/publication/design-review-preview/maturity.schema.json` | file | staged maturity evidence |
 | `@validate-maturity` | `scripts/validate-design-maturity.mjs` | script | mature-page refusal gate |
 | `@render-design-review` | `scripts/render-design-review.mjs` | script | cache review publisher |
 | `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | final parity proof |

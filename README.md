@@ -20,6 +20,7 @@ Clone the complete trust tree into the Source's `.claude` directory:
 ```bash
 cd <Source>
 git clone https://github.com/starci183/starci-skills.git .claude
+python -m pip install -r .claude/runtime/design-runtime/requirements.txt
 ```
 
 The installation is intentionally kept together:
@@ -28,38 +29,42 @@ The installation is intentionally kept together:
 <Source>/
   .claude/
     INDEX.md
-    contexts/
-    requests/
-    archetypes/
-    grammars/
-    brainstorms/
-    compilers/
-    gates/
-    kernel/
-    standards/
-    workflows/
-    machines/
-    operations/
-    publication/
-    scripts/
-    skills/
+    knowledge/       # reusable facts, design authority, prompts and durable records
+      archetypes/
+      grammars/
+      compilers/
+      contexts/
+    runtime/         # routing, orchestration, gates, machines and generated runtime state
+      kernel/
+      workflows/
+      orchestration/
+      standards/
+      gates/
+      machines/
+    platform/        # deployment, MCP, readiness and operator runbooks
+      deployment/
+      mcp/
+      readiness/
+      runbooks/
+    skills/          # stays at root for Codex and Claude discovery
+    scripts/         # stable executable entrypoints
+    docs/            # generated Nextra publication
 ```
 
 Do not copy individual skills into a second directory. A skill can depend on schemas, scripts,
 grammars, compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
 that can drift from its dependencies. Reusable frontend structure resolves in the order
-`archetypes → grammars → compilers/principles`: macro page topology first, product semantic owners second, and
+`knowledge/archetypes → knowledge/grammars → knowledge/compilers/principles`: macro page topology first, product semantic owners second, and
 exact remaining geometry last.
 
-The original stage trees remain the detailed authorities. The V5 roots are compact semantic facades and stable process routers:
+V5.1 groups the detailed authorities by responsibility without changing their ownership. The three namespaces are intentionally asymmetric:
 
-- `kernel` resolves routes, state and approval identity;
-- `workflows` groups discoverable skills by lifecycle without moving their `SKILL.md` entries;
-- `standards` connects role patterns, gates, rule bindings and assurance;
-- `machines` exposes deterministic parity and evidence checks;
-- `operations` routes deployment, MCP, readiness and runbooks without merging their laws;
-- `requests` keeps source-first frontend feedback, rejected attempts and pending grammar/principle learning;
-- `publication` keeps generated human documentation separate from runtime context.
+- `knowledge` answers what the system knows and which design/product authority owns a decision;
+- `runtime` answers how an invocation routes, executes, validates and publishes evidence;
+- `platform` answers how Source infrastructure is initialized, exposed, deployed and operated.
+
+`skills`, `scripts` and `docs` remain top-level integration surfaces because their locations are part of tool discovery,
+command stability and hosting contracts. They are not a fourth authority namespace.
 
 The binding chain is `pattern situation → gate situation → published machine rule → executable proof`.
 A rule in the machine with no gate route, or an enforced gate with no machine rule, is a broken trust
@@ -156,7 +161,7 @@ One Source can manage many projects, and each project can expose several roles. 
 
 ```json
 {
-  "$schema": "../.claude/contexts/workspaces/config.schema.json",
+  "$schema": "../.claude/knowledge/contexts/workspaces/config.schema.json",
   "version": 1,
   "defaultLang": "vi"
 }
@@ -175,12 +180,18 @@ the nearest config by hand.
 
 StarCi frontend work first resolves one product-neutral page archetype, including required regions and
 wide/intermediate/compact transformation, then resolves one compact visual system from
-`grammars/starci/design-system.json`. The routed profile may override declared roles such as accent; a page/session file records deviations only.
+`knowledge/grammars/starci/design-system.json`. The routed profile may override declared roles such as accent; a page/session file records deviations only.
 An explicit owner-approved screenshot or reference remains specification inside its exact target scope. A merely
 current or legacy implementation supplies product facts, source ownership and capability evidence, but does not
 prove its macro layout correct: conflicts with the selected archetype are recorded as `layout-drift` and corrected
 unless binding business truth or an owner-approved exception requires them. MASTER keeps every untouched region
 visually consistent; Grammar selects semantic owners and Principles resolve only remaining deltas.
+
+Design retrieval is embedded and offline. `python .claude/scripts/design-knowledge-query.py build` compiles the
+tracked archetype, grammar and principle authority into a machine-local Qdrant Edge shard at
+`.workspaces/local/design-knowledge/qdrant-edge-v2`. The default named vector is the deterministic 256-dimensional
+`hash-ngram-v1` engine; an explicitly supplied local sentence-transformers model adds a separate `local` vector.
+The shard is rebuildable cache, never committed authority, and query mode does not start a server or make a network call.
 
 Conversation provenance is project-scoped and provider-neutral:
 
@@ -298,7 +309,7 @@ Documentation shelves are declared in `docs/publication.mjs`. The hosting contra
 
 ```bash
 node scripts/validate-artifact.mjs \
-  --schema brainstorms/layouts/schema.json \
+  --schema knowledge/brainstorms/layouts/schema.json \
   --data <batch.json> --hash
 ```
 

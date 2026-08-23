@@ -5,7 +5,7 @@ The site is generated from the tree; nothing under `content/` is hand-authored.
 A paired module keeps three separate source records:
 
 ```text
-compilers/principles/gap/
+knowledge/compilers/principles/gap/
 ├─ en.md       # EN — published in Nextra
 ├─ vi.md       # VI — published in Nextra
 └─ context.md  # agent runtime only — not published in Nextra

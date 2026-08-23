@@ -9,16 +9,16 @@ title: starci-fe-ui-reconcile · Tiếng Việt
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | boundary chung cho approval, execution và reporting |
-| `@orchestration` | `orchestration/vi.md` | vi | cô lập evidence declared/observed, giữ authority write và join proof |
+| `@orchestration` | `runtime/orchestration/vi.md` | vi | cô lập evidence declared/observed, giữ authority write và join proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | từ chối local fix hoặc new-layout work |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | frontend route và source boundary chính xác |
-| `@business` | `contexts/business/vi.md` | vi | product truth cố định |
-| `@grammar` | `grammars` | module | meaning, semantic owner và behavior theo product family |
-| `@principles` | `compilers/principles` | module | visual situation không phụ thuộc product |
-| `@patterns-fe` | `compilers/patterns/fe` | module | binding từ authority đến source |
-| `@lints-fe` | `gates/fe/lints` | module | frontend proof |
-| `@standards` | `standards` | module | trách nhiệm từ law đến proof |
-| `@frontend-quality` | `brainstorms/frontend-quality/vi.md` | vi | phản biện consistency tích hợp |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | frontend route và source boundary chính xác |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | product truth cố định |
+| `@grammar` | `knowledge/grammars` | module | meaning, semantic owner và behavior theo product family |
+| `@principles` | `knowledge/compilers/principles` | module | visual situation không phụ thuộc product |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | binding từ authority đến source |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | frontend proof |
+| `@standards` | `runtime/standards` | module | trách nhiệm từ law đến proof |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/vi.md` | vi | phản biện consistency tích hợp |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | outcome và owner hiện hành |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | principle proof |

@@ -9,9 +9,9 @@ title: starci-business-analyze · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | own execution and user-facing proof |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve and verify FE/BE routes |
-| `@worktrees` | `contexts/worktrees/en.md` | en | verify the durable business root |
-| `@business` | `contexts/business/en.md` | en | business schema, evidence and publication law |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve and verify FE/BE routes |
+| `@worktrees` | `knowledge/contexts/worktrees/en.md` | en | verify the durable business root |
+| `@business` | `knowledge/contexts/business/en.md` | en | business schema, evidence and publication law |
 
 ## NESTED SKILLS
 
@@ -45,8 +45,8 @@ Unproved claims become explicit unknowns.
 1. Resolve the Source, project, stable `featureId`, requested surfaces and runtime language.
 2. Verify every routed role's path, branch, committed head, origin and local instructions.
 3. Verify the locked, clean, Source-owned business worktree on `codex/businesses/<project>`.
-4. Read route mounts and connected UI states, then frontend operations/types/tests, then backend
-   operations/schema/services/tests. Read siblings only to settle an exact contract.
+4. Read route mounts and connected UI states, then frontend platform/operations/types/tests, then backend
+   platform/operations/schema/services/tests. Read siblings only to settle an exact contract.
 5. Select one authority operation: observe new implemented truth, publish `pending`, advance it to
    `in-progress`, publish `rejected`, or reconcile source as `implemented`. Never skip the write boundary.
 6. Create a model valid against `@business/@feature-schema`. Every non-unknown actor, flow, rule, state,

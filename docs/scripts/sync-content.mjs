@@ -172,11 +172,10 @@ async function discoverGroup(group) {
   // A shelf may state its own law — a compiler shelf does — in which case that record IS the shelf
   // page. Without this the shelf gets a generated list of links and its law has nowhere to live.
   const names = new Set(await readdir(shelf));
-  // The route mirrors the source path, so a reader who sees `compilers/principles/gap` in the site
-  // can open exactly that directory in the tree. A published page is never at an invented address.
+  // Physical V5 namespaces may change without breaking stable public documentation URLs.
   return {
     ...group,
-    route: group.source,
+    route: group.route ?? group.source,
     modules: found,
     own: {en: names.has("en.md"), vi: names.has("vi.md")},
   };

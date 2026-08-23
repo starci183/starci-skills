@@ -9,9 +9,9 @@ title: starci-repair
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | contract chung về phase, approval và output |
-| `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy và router duy nhất cho mọi repair module |
+| `@staleness` | `platform/readiness/staleness/vi.md` | vi | taxonomy và router duy nhất cho mọi repair module |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | whole-Source proof deterministic cho ordered delivery fence |
-| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | nhận diện debt đã được owner duyệt và giữ verdict trung thực |
+| `@stale-debts` | `platform/readiness/staleness/debts/vi.md` | vi | nhận diện debt đã được owner duyệt và giữ verdict trung thực |
 
 ## NESTED SKILLS
 

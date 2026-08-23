@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "starci-v5/runtime/publication/design-review-preview/maturity.schema.json",
+  "title": "Pre-approval product maturity review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "candidateId", "verdict", "axes", "inspected", "defects"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]},
+    "candidateId": {"$ref": "#/$defs/slug"},
+    "renderContractId": {"$ref": "#/$defs/slug"},
+    "reviewStage": {"enum": ["pages", "states"]},
+    "authorityId": {"$ref": "#/$defs/slug", "description": "pageContract id during pages review; renderContract id during states review."},
+    "verdict": {"const": "passed"},
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hierarchy", "density", "chrome", "componentAnatomy", "stateClarity", "responsive", "productSpecificity"],
+      "properties": {
+        "hierarchy": {"$ref": "#/$defs/axis"},
+        "density": {"$ref": "#/$defs/axis"},
+        "chrome": {"$ref": "#/$defs/axis"},
+        "componentAnatomy": {"$ref": "#/$defs/axis"},
+        "stateClarity": {"$ref": "#/$defs/axis"},
+        "responsive": {"$ref": "#/$defs/axis"},
+        "productSpecificity": {"$ref": "#/$defs/axis"}
+      }
+    },
+    "inspected": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pageId", "stateId", "viewportId", "capture", "fullViewport"],
+        "properties": {
+          "pageId": {"$ref": "#/$defs/slug"},
+          "stateId": {"$ref": "#/$defs/slug"},
+          "viewportId": {"$ref": "#/$defs/slug"},
+          "capture": {"type": "string", "pattern": "\\.(?:png|jpe?g|webp)$"},
+          "fullViewport": {"const": "passed"}
+        }
+      }
+    },
+    "defects": {"type": "array", "maxItems": 0}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}, "required": ["schemaVersion"]}, "then": {"required": ["renderContractId"]}},
+    {"if": {"properties": {"schemaVersion": {"const": 2}}, "required": ["schemaVersion"]}, "then": {"required": ["reviewStage", "authorityId"]}}
+  ],
+  "$defs": {
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "evidence"],
+      "properties": {
+        "verdict": {"const": "passed"},
+        "evidence": {"type": "string", "minLength": 24}
+      }
+    }
+  }
+}

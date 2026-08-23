@@ -10,11 +10,11 @@ description: Record or query provider-neutral OpenAI/ChatGPT/Codex and Anthropic
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared reporting and approval boundary |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve the named project before provider or artifact reads |
-| `@worktrees` | `contexts/worktrees/context.md` | context | verify durable business-registry ownership and session/generated-state placement |
-| `@conversations` | `contexts/conversations/context.md` | context | provider-neutral identity, custody, redaction and artifact-link law |
-| `@snapshot-schema` | `contexts/conversations/conversation-snapshot.schema.json` | file | validate one immutable provenance snapshot |
-| `@registry-schema` | `contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve the named project before provider or artifact reads |
+| `@worktrees` | `knowledge/contexts/worktrees/context.md` | context | verify durable business-registry ownership and session/generated-state placement |
+| `@conversations` | `knowledge/contexts/conversations/context.md` | context | provider-neutral identity, custody, redaction and artifact-link law |
+| `@snapshot-schema` | `knowledge/contexts/conversations/conversation-snapshot.schema.json` | file | validate one immutable provenance snapshot |
+| `@registry-schema` | `knowledge/contexts/conversations/conversation-registry.schema.json` | file | validate current conversation heads |
 | `@record` | `scripts/record-conversation-snapshot.mjs` | script | hash and append one approved snapshot |
 | `@check` | `scripts/check-conversation-registry.mjs` | script | prove hashes, ancestry and plaintext refusal |
 

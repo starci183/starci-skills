@@ -5,7 +5,7 @@ import {basename, dirname, join, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
 const trustRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const requestsRoot = join(trustRoot, "requests");
+const requestsRoot = join(trustRoot, "knowledge", "requests");
 const statusValues = new Set(["open", "in-progress", "blocked", "resolved", "superseded"]);
 const kindValues = new Set(["ui", "user-flow"]);
 const evidenceKinds = new Set(["screenshot", "conversation", "route", "runtime", "code", "other"]);

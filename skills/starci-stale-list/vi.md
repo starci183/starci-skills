@@ -9,11 +9,11 @@ title: starci-stale-list
 | Alias | Target | Kind | Vì sao |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | output và authority contract chung |
-| `@staleness` | `readiness/staleness/vi.md` | vi | taxonomy/router duy nhất dùng chung với repair |
+| `@staleness` | `platform/readiness/staleness/vi.md` | vi | taxonomy/router duy nhất dùng chung với repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | workspace measurement read-only deterministic |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | Source allocation và collision measurement deterministic |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | phép đo deterministic cho routed lint, coverage, E2E và strict Sonar |
-| `@stale-debts` | `readiness/staleness/debts/vi.md` | vi | validate và report debt project/role hiện tại mà không repair |
+| `@stale-debts` | `platform/readiness/staleness/debts/vi.md` | vi | validate và report debt project/role hiện tại mà không repair |
 
 ## NESTED SKILLS
 

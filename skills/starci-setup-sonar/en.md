@@ -5,10 +5,10 @@
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approval and output contract |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve every routed Source role |
-| `@assurance-be` | `compilers/patterns/be/delivery-assurance/en.md` | en | scanner, coverage and quality evidence |
-| `@assurance-fe` | `compilers/patterns/fe/delivery-assurance/en.md` | en | frontend scanner, coverage and quality evidence |
-| `@sonar-assurance` | `machines/sonar-assurance/en.md` | en | strict gate and secret-boundary machine |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve every routed Source role |
+| `@assurance-be` | `knowledge/compilers/patterns/be/delivery-assurance/en.md` | en | scanner, coverage and quality evidence |
+| `@assurance-fe` | `knowledge/compilers/patterns/fe/delivery-assurance/en.md` | en | frontend scanner, coverage and quality evidence |
+| `@sonar-assurance` | `runtime/machines/sonar-assurance/en.md` | en | strict gate and secret-boundary machine |
 | `@tunnel-set` | `scripts/cloudflare-tunnel-set.mjs` | script | explicit value-safe hostname reconciliation |
 | `@credential-bootstrap` | `scripts/sonar-source-credentials.mjs` | script | value-safe project, scoped identity, encrypted record and GitHub reconciliation behind the Windows wrapper |
 

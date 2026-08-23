@@ -10,8 +10,8 @@ description: "Analyze a difficult cross-system technical decision before impleme
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared reporting and orchestration contract |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify every routed source used as evidence |
-| `@business` | `contexts/business/context.md` | context | keep technical options inside accepted product truth |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve and verify every routed source used as evidence |
+| `@business` | `knowledge/contexts/business/context.md` | context | keep technical options inside accepted product truth |
 
 ## NESTED SKILLS
 

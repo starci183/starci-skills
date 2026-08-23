@@ -9,13 +9,13 @@ title: Backend plan · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | verify route và freshness theo canonical law trước target read |
-| `@business` | `contexts/business/vi.md` | vi | bind plan vào actor, flow, rule, state và operation hiện hành |
-| `@be-patterns` | `standards/backend/patterns/vi.md` | vi | bind backend fact vào fixed pattern situations và exact files |
-| `@rule-bindings` | `standards/backend/rule-bindings/vi.md` | vi | chứng minh situation enforced còn accountable với gate và machine |
-| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | từ chối brief thiếu compiler boundary đầy đủ |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | verify route và freshness theo canonical law trước target read |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | bind plan vào actor, flow, rule, state và operation hiện hành |
+| `@be-patterns` | `runtime/standards/backend/patterns/vi.md` | vi | bind backend fact vào fixed pattern situations và exact files |
+| `@rule-bindings` | `runtime/standards/backend/rule-bindings/vi.md` | vi | chứng minh situation enforced còn accountable với gate và machine |
+| `@plan-schema` | `runtime/kernel/approvals/backend-plan.schema.json` | file | từ chối brief thiếu compiler boundary đầy đủ |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate brief sẵn sàng approval trước khi trình |
-| `@plan-check` | `machines/backend-plan/check.mjs` | script | chứng minh content hash, situation thật và file coverage đầy đủ |
+| `@plan-check` | `runtime/machines/backend-plan/check.mjs` | script | chứng minh content hash, situation thật và file coverage đầy đủ |
 
 ## NESTED SKILLS
 

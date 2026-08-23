@@ -270,7 +270,7 @@ try {
   if (!mustFail("--schema", join(root, "brainstorms", "blocks", "schema.json"), "--data", write("invalid-block-brainstorm.json", {...JSON.parse(readFileSync(brainstormedBlock, "utf8")), anatomies: [blockAnatomy]})).includes("requires 3-4 alternatives")) {
     throw new Error("block brainstorm count failed for the wrong reason");
   }
-  run("--schema", join(root, "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
+  run("--schema", join(root, "knowledge", "contexts", "worktrees", "schema.json"), "--data", worktreeRoots);
   console.log("ok  single complete generation, audited blocks, explicit brainstorm alternatives, MASTER binding and static cache review hold");
 } finally {
   rmSync(temp, {recursive: true, force: true});

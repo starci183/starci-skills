@@ -31,7 +31,7 @@ riêng và bằng chứng API.
   35.80% / 36.06%; StarCi FE 76.14% / 76.87%. StarCi BE đang kéo test/E2E vào production denominator.
 - Sáu route MiAmia/Nivo/StarCi hiện verify được; mọi execution vẫn phải reverify recorded head/branch
   ngay trước write vì route là machine evidence, không phải trạng thái vĩnh viễn.
-- Trust tree hiện có thay đổi dở trong `readiness/staleness/assurance/{en.md,vi.md,context.md}` và
+- Trust tree hiện có thay đổi dở trong `platform/readiness/staleness/assurance/{en.md,vi.md,context.md}` và
   `context-manifest.json`; mọi migration phải giữ nguyên và không ghi chồng các hunk đó.
 - Một trust tree legacy riêng còn tồn tại tại `<Source>/.claude_legacy`, đang dirty và dùng remote khác;
   nó phải được archive có kiểm chứng, không merge vào canonical `.claude`.
@@ -46,14 +46,14 @@ human docs, không đổi hàng trăm path chỉ để giảm số thư mục �
 ```text
 .claude/
   INDEX.md                 # router duy nhất, không chứa luật chi tiết
-  contexts/                # locate: đọc/ghi ở đâu
-  brainstorms/             # choose: 3–4 candidates
-  compilers/               # compile: một đáp án từ shape đã nhận
-  gates/                   # judge: pass hoặc refusal có evidence
-  readiness/               # measure/setup readiness
-  deployment/              # portable stack/deploy law
-  mcp/                     # routed source-context law
-  runbooks/                # human operator procedures
+  knowledge/contexts/                # locate: đọc/ghi ở đâu
+  knowledge/brainstorms/             # choose: 3–4 candidates
+  knowledge/compilers/               # compile: một đáp án từ shape đã nhận
+  runtime/gates/                   # judge: pass hoặc refusal có evidence
+  platform/readiness/               # measure/setup readiness
+  platform/deployment/              # portable stack/deploy law
+  platform/mcp/                     # routed source-context law
+  platform/runbooks/                # human operator procedures
   skills/                  # binding capability; chỉ load runtime context
   scripts/                 # deterministic machines và regression tests
   docs/                    # publication tooling và human-only migration material
@@ -65,9 +65,9 @@ phải là migration riêng, không shim hoặc duplicate copy.
 
 ## Ownership map bắt buộc
 
-- `compilers/**/delivery-assurance`: shape repository phải được sinh ra như thế nào.
-- `operations/readiness/staleness/assurance`: khi nào shape hiện có là stale, inventory/apply/proof.
-- `operations/runbooks/delivery-assurance-cloud`: thao tác provider và recovery như thế nào.
+- `knowledge/compilers/**/delivery-assurance`: shape repository phải được sinh ra như thế nào.
+- `platform/operations/readiness/staleness/assurance`: khi nào shape hiện có là stale, inventory/apply/proof.
+- `platform/operations/runbooks/delivery-assurance-cloud`: thao tác provider và recovery như thế nào.
 - `gates`: source hiện có bị từ chối ở ký tự/evidence nào; không chứa repair procedure.
 - `skills`: orchestration và approval boundary; không chép category law.
 - `scripts`: enforcement executable; mỗi behavior mới có regression test.
@@ -211,7 +211,7 @@ external enforcement. Coordinator là writer duy nhất của `INDEX.md`, root `
 
 ## One-shot orchestration prompt cho 10 Luna agents
 
-> Hãy điều phối đúng 10 subagent `gpt-5.6-luna` với `fork_turns=none`, reasoning `medium`, chạy theo batch phù hợp concurrency và refill slot cho đến khi đủ 10 agent hoàn tất; mọi agent phải đọc toàn bộ `<Source>/.claude/INDEX.md`, verify route, bảo toàn dirty changes, không đọc/in/rotate secret, không disable gate, không tự spawn agent và ghi result/proof vào `.sessions/starci-skills/<run-id>/results/<agent-id>/`; Agent 1 chỉ audit toàn cây và trả ownership/legacy/runtime-debris map; Agent 2 chỉ đề xuất contexts/readiness parity; Agent 3 chỉ đề xuất brainstorms/compilers parity; Agent 4 chỉ lập gates law-to-published-rule parity; Agent 5 chỉ lập skills LOADS/stop/output parity; Agent 6 chỉ lập logical Operate map cho `deployment`, `mcp`, `runbooks` và retirement plan, không move canonical paths; Agent 7 chỉ đề xuất và test scanner assurance/coverage/OIDC/badge/CI-graph dưới `scripts/**`; Agent 8 chỉ lập/apply approved Nivo FE/BE ESLint và coverage boundary; Agent 9 chỉ lập/apply approved MiAmia FE/BE boundary; Agent 10 chỉ lập/apply approved StarCi FE/BE denominator/quality boundary; coordinator duy nhất ghi shared `INDEX.md`, `README.md`, `context-manifest.json`, schemas, gates, publication, manifests/lockfiles/config/workflows, refresh route, tích hợp conflict, chạy global proofs và thực hiện mọi provider/GitHub/Cloudflare mutation sau approval; agent nào cần nở boundary phải STOP và handoff, không tự sửa.
+> Hãy điều phối đúng 10 subagent `gpt-5.6-luna` với `fork_turns=none`, reasoning `medium`, chạy theo batch phù hợp concurrency và refill slot cho đến khi đủ 10 agent hoàn tất; mọi agent phải đọc toàn bộ `<Source>/.claude/INDEX.md`, verify route, bảo toàn dirty changes, không đọc/in/rotate secret, không disable gate, không tự spawn agent và ghi result/proof vào `.sessions/starci-skills/<run-id>/results/<agent-id>/`; Agent 1 chỉ audit toàn cây và trả ownership/legacy/runtime-debris map; Agent 2 chỉ đề xuất knowledge/contexts/readiness parity; Agent 3 chỉ đề xuất knowledge/brainstorms/compilers parity; Agent 4 chỉ lập gates law-to-published-rule parity; Agent 5 chỉ lập skills LOADS/stop/output parity; Agent 6 chỉ lập logical Operate map cho `deployment`, `mcp`, `runbooks` và retirement plan, không move canonical paths; Agent 7 chỉ đề xuất và test scanner assurance/coverage/OIDC/badge/CI-graph dưới `scripts/**`; Agent 8 chỉ lập/apply approved Nivo FE/BE ESLint và coverage boundary; Agent 9 chỉ lập/apply approved MiAmia FE/BE boundary; Agent 10 chỉ lập/apply approved StarCi FE/BE denominator/quality boundary; coordinator duy nhất ghi shared `INDEX.md`, `README.md`, `context-manifest.json`, schemas, gates, publication, manifests/lockfiles/config/workflows, refresh route, tích hợp conflict, chạy global proofs và thực hiện mọi provider/GitHub/Cloudflare mutation sau approval; agent nào cần nở boundary phải STOP và handoff, không tự sửa.
 
 ## Final acceptance
 

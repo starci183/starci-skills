@@ -4,7 +4,7 @@
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
-| `@skill-catalog` | `skill-runtime/catalog/catalog.json` | file | shortlist one semantic facade and route its exact mode to one physical skill before loading any skill body |
+| `@skill-catalog` | `runtime/skill-runtime/catalog/catalog.json` | file | shortlist one semantic facade and route its exact mode to one physical skill before loading any skill body |
 
 ## Routes
 
@@ -21,7 +21,7 @@ frontmatter; never edit `catalog.json` by hand.
 own `Run` or `Process` through that module's context-envelope and `Input → Transform → Output → Gate` contract.
 Use `dual-track` only for genuinely independent origins, `reconciliation` for declared-versus-observed work and
 `linear` for a single authority; never duplicate this shared pipeline law inside individual skills. Every physical
-capability reaches `orchestration/context.md` through `skill-shape`, resolves its exact `profiles.skillMaps` entry
+capability reaches `runtime/orchestration/context.md` through `skill-shape`, resolves its exact `profiles.skillMaps` entry
 and follows one phase map. Layout, Block and Refactor keep their explicit orchestration step; other capabilities
 reuse their existing `PIPELINE` steps. Any map may execute sequentially when no safe disjoint task has positive
 coordination benefit.

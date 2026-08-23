@@ -9,7 +9,7 @@ title: Initialize Source · Vietnamese
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | hợp đồng báo cáo chung mà mọi skill đều đọc |
-| `@initialization` | `readiness/initialization/vi.md` | vi | các boundary identity-first và owner của từng init verdict |
+| `@initialization` | `platform/readiness/initialization/vi.md` | vi | các boundary identity-first và owner của từng init verdict |
 
 ## NESTED SKILLS
 

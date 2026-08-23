@@ -10,9 +10,9 @@ description: Repay owner-approved Source debt recorded in project and role Markd
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | execution, approval and reporting contract |
-| `@workspaces` | `contexts/workspaces/context.md` | context | verify the project/role route before target reads |
-| `@staleness` | `readiness/staleness/context.md` | context | route each namespaced scope to its finding owner |
-| `@stale-debts` | `readiness/staleness/debts/context.md` | context | debt authority, expiry and close semantics |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | verify the project/role route before target reads |
+| `@staleness` | `platform/readiness/staleness/context.md` | context | route each namespaced scope to its finding owner |
+| `@stale-debts` | `platform/readiness/staleness/debts/context.md` | context | debt authority, expiry and close semantics |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | validate debt and remeasure recognized source-quality scopes |
 
 ## NESTED SKILLS

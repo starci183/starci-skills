@@ -9,16 +9,16 @@ title: starci-fe-ui-reconcile · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approvals, execution and reporting boundary |
-| `@orchestration` | `orchestration/en.md` | en | declared/observed isolation, authority reservations and proof join |
+| `@orchestration` | `runtime/orchestration/en.md` | en | declared/observed isolation, authority reservations and proof join |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse local or new-layout work |
-| `@workspaces` | `contexts/workspaces/en.md` | en | exact frontend route and source boundary |
-| `@business` | `contexts/business/en.md` | en | frozen product truth |
-| `@grammar` | `grammars` | module | product-family meaning, semantic owners and behavior |
-| `@principles` | `compilers/principles` | module | product-neutral visual situations |
-| `@patterns-fe` | `compilers/patterns/fe` | module | authority-to-source binding |
-| `@lints-fe` | `gates/fe/lints` | module | frontend proof |
-| `@standards` | `standards` | module | law-to-proof accountability |
-| `@frontend-quality` | `brainstorms/frontend-quality/en.md` | en | integrated consistency challenge |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | exact frontend route and source boundary |
+| `@business` | `knowledge/contexts/business/en.md` | en | frozen product truth |
+| `@grammar` | `knowledge/grammars` | module | product-family meaning, semantic owners and behavior |
+| `@principles` | `knowledge/compilers/principles` | module | product-neutral visual situations |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | authority-to-source binding |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | frontend proof |
+| `@standards` | `runtime/standards` | module | law-to-proof accountability |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/en.md` | en | integrated consistency challenge |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | active outcomes and owners |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | grammar proof |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | principle proof |

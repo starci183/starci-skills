@@ -9,7 +9,7 @@ title: starci-init · English
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | the shared reporting contract every skill reads |
-| `@initialization` | `readiness/initialization/en.md` | en | the identity-first boundaries and the owner of each init verdict |
+| `@initialization` | `platform/readiness/initialization/en.md` | en | the identity-first boundaries and the owner of each init verdict |
 
 ## NESTED SKILLS
 

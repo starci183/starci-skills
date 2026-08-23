@@ -10,11 +10,11 @@ description: Read the shared stale registry, inventory every routed workspace ro
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared output and authority contract |
-| `@staleness` | `readiness/staleness/context.md` | context | the one taxonomy and router shared with repair |
+| `@staleness` | `platform/readiness/staleness/context.md` | context | the one taxonomy and router shared with repair |
 | `@export-state` | `scripts/export-console-state.mjs` | script | deterministic read-only workspace measurement |
 | `@port-offset-check` | `scripts/check-port-offsets.mjs` | script | deterministic Source allocation and collision measurement |
 | `@source-quality` | `scripts/check-source-quality.mjs` | script | deterministic routed lint, coverage, E2E and strict Sonar measurement |
-| `@stale-debts` | `readiness/staleness/debts/context.md` | context | validate and report current project/role debt without repairing it |
+| `@stale-debts` | `platform/readiness/staleness/debts/context.md` | context | validate and report current project/role debt without repairing it |
 
 ## NESTED SKILLS
 

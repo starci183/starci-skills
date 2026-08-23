@@ -10,14 +10,14 @@ description: Challenge a backend plan against real schema and sibling code, loop
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | the shared reporting contract every skill reads |
-| `@workspaces` | `contexts/workspaces/context.md` | context | re-verify checkout, branch and source revision before approval |
-| `@business` | `contexts/business/context.md` | context | bind approval and implementation to product authority |
-| `@be-patterns` | `standards/backend/patterns/context.md` | context | challenge the plan's situation-to-file bindings against current source |
-| `@rule-bindings` | `standards/backend/rule-bindings/context.md` | context | refuse an enforced situation whose gate or machine identity drifted |
-| `@rule-binding-check` | `machines/rule-bindings/check.mjs` | script | execute backend gate-to-canon parity before approval and after implementation |
-| `@plan-schema` | `kernel/approvals/backend-plan.schema.json` | file | validate that the revision being approved carries the complete compiler boundary |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | re-verify checkout, branch and source revision before approval |
+| `@business` | `knowledge/contexts/business/context.md` | context | bind approval and implementation to product authority |
+| `@be-patterns` | `runtime/standards/backend/patterns/context.md` | context | challenge the plan's situation-to-file bindings against current source |
+| `@rule-bindings` | `runtime/standards/backend/rule-bindings/context.md` | context | refuse an enforced situation whose gate or machine identity drifted |
+| `@rule-binding-check` | `runtime/machines/rule-bindings/check.mjs` | script | execute backend gate-to-canon parity before approval and after implementation |
+| `@plan-schema` | `runtime/kernel/approvals/backend-plan.schema.json` | file | validate that the revision being approved carries the complete compiler boundary |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | refuse a malformed or incomplete brief before the approval loop |
-| `@plan-check` | `machines/backend-plan/check.mjs` | script | refuse stale content identity, invented situations or uncovered files |
+| `@plan-check` | `runtime/machines/backend-plan/check.mjs` | script | refuse stale content identity, invented situations or uncovered files |
 | `@business-boundary` | `scripts/business-write-boundary.mjs` | script | refuse source writes without the exact business-impact binding |
 
 ## NESTED SKILLS

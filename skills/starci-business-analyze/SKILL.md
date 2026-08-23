@@ -10,9 +10,9 @@ description: "Create, advance or reconcile one routed project's evidence-backed 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | own execution and user-facing proof |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve and verify FE/BE routes |
-| `@worktrees` | `contexts/worktrees/context.md` | context | verify the durable business root |
-| `@business` | `contexts/business/context.md` | context | business schema, evidence and publication law |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve and verify FE/BE routes |
+| `@worktrees` | `knowledge/contexts/worktrees/context.md` | context | verify the durable business root |
+| `@business` | `knowledge/contexts/business/context.md` | context | business schema, evidence and publication law |
 
 ## NESTED SKILLS
 

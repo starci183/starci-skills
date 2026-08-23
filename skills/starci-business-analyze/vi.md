@@ -9,9 +9,9 @@ title: starci-business-analyze · Tiếng Việt
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | sở hữu execution và proof cho user |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify route FE/BE |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | verify business root bền vững |
-| `@business` | `contexts/business/vi.md` | vi | luật schema, evidence và publication của business |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | resolve và verify route FE/BE |
+| `@worktrees` | `knowledge/contexts/worktrees/vi.md` | vi | verify business root bền vững |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | luật schema, evidence và publication của business |
 
 ## NESTED SKILLS
 

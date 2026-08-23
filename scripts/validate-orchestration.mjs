@@ -283,7 +283,7 @@ export function validateReceipt(receipt, profiles) {
 
 export function validateWorkspace(root) {
   const failures = [];
-  const profilesPath = path.join(root, "orchestration", "profiles.json");
+  const profilesPath = path.join(root, "runtime", "orchestration", "profiles.json");
   const profiles = JSON.parse(fs.readFileSync(profilesPath, "utf8"));
   failures.push(...validateProfiles(profiles).failures);
   const skillRoot = path.join(root, "skills");
@@ -294,17 +294,17 @@ export function validateWorkspace(root) {
   const mappedSkills = Object.keys(profiles.skillMaps ?? {}).sort();
   for (const skill of physicalSkills) if (!mappedSkills.includes(skill)) failures.push(`${skill} has no orchestration phase map`);
   for (const skill of mappedSkills) if (!physicalSkills.includes(skill)) failures.push(`${skill} phase map has no physical skill`);
-  const receiptSchema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
+  const receiptSchema = JSON.parse(fs.readFileSync(path.join(root, "runtime", "orchestration", "receipt.schema.json"), "utf8"));
   const schemaSkills = [...(receiptSchema?.$defs?.skill?.enum ?? [])].sort();
   for (const skill of mappedSkills) if (!schemaSkills.includes(skill)) failures.push(`${skill} is absent from the orchestration receipt schema`);
   for (const skill of schemaSkills) if (!mappedSkills.includes(skill)) failures.push(`${skill} receipt schema entry has no phase map`);
-  const rootAuthority = fs.readFileSync(path.join(root, "orchestration", "en.md"), "utf8");
-  for (const load of ["orchestration/codex/en.md", "orchestration/claude/en.md", "orchestration/maps/en.md", "orchestration/receipt.schema.json"]) {
-    if (!rootAuthority.includes(load)) failures.push(`orchestration/en.md does not load ${load}`);
+  const rootAuthority = fs.readFileSync(path.join(root, "runtime", "orchestration", "en.md"), "utf8");
+  for (const load of ["runtime/orchestration/codex/en.md", "runtime/orchestration/claude/en.md", "runtime/orchestration/maps/en.md", "runtime/orchestration/receipt.schema.json"]) {
+    if (!rootAuthority.includes(load)) failures.push(`runtime/orchestration/en.md does not load ${load}`);
   }
-  const mapRouter = fs.readFileSync(path.join(root, "orchestration", "maps", "en.md"), "utf8");
-  for (const target of ["orchestration/frontend/en.md", "orchestration/capabilities/en.md"]) if (!mapRouter.includes(target)) failures.push(`orchestration map router does not route ${target}`);
-  const mapRecords = new Map(["frontend", "capabilities"].map((map) => [map, fs.readFileSync(path.join(root, "orchestration", map, "en.md"), "utf8")]));
+  const mapRouter = fs.readFileSync(path.join(root, "runtime", "orchestration", "maps", "en.md"), "utf8");
+  for (const target of ["runtime/orchestration/frontend/en.md", "runtime/orchestration/capabilities/en.md"]) if (!mapRouter.includes(target)) failures.push(`orchestration map router does not route ${target}`);
+  const mapRecords = new Map(["frontend", "capabilities"].map((map) => [map, fs.readFileSync(path.join(root, "runtime", "orchestration", map, "en.md"), "utf8")]));
   const pipeline = (source) => {
     const section = source.match(/## PIPELINE\s+([\s\S]*?)(?=\n## |$)/)?.[1] ?? "";
     const topology = section.match(/Topology:\s+`(dual-track|reconciliation|linear)`/)?.[1];

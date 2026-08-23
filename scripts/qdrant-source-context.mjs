@@ -84,8 +84,8 @@ const keyFile = join(sourceRoot, ".stacks", secretRecord);
 const docker = process.platform === "win32" ? "docker.exe" : "docker";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const yamlPath = (path) => path.replaceAll("\\", "/").replaceAll("'", "''");
-const mcpGatewayTemplate = join(trustRoot, "mcp", "docker", "mcp-gateway.conf.template");
-const showcaseTemplate = join(trustRoot, "mcp", "docker", "qdrant-showcase.conf.template");
+const mcpGatewayTemplate = join(trustRoot, "platform", "mcp", "docker", "mcp-gateway.conf.template");
+const showcaseTemplate = join(trustRoot, "platform", "mcp", "docker", "qdrant-showcase.conf.template");
 
 const run = (command, commandArgs, options = {}) => {
   const result = spawnSync(command, commandArgs, {
@@ -135,7 +135,7 @@ const writeConfig = () => {
     image: starci/mcp-server-qdrant-ollama:${MCP_REVISION.slice(0, 12)}
     build:
       context: '${yamlPath(trustRoot)}'
-      dockerfile: mcp/docker/mcp-ollama.Dockerfile
+      dockerfile: platform/mcp/docker/mcp-ollama.Dockerfile
       args:
         MCP_SERVER_QDRANT_REVISION: ${MCP_REVISION}
     container_name: starci-source-context-mcp
@@ -192,7 +192,7 @@ const writeConfig = () => {
     image: starci/qdrant-source-indexer:v1
     build:
       context: '${yamlPath(trustRoot)}'
-      dockerfile: mcp/docker/indexer.Dockerfile
+      dockerfile: platform/mcp/docker/indexer.Dockerfile
     profiles: ["tools"]
     environment:
       QDRANT_MCP_API_KEY: \${QDRANT_MCP_API_KEY}

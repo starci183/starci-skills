@@ -9,20 +9,20 @@ title: StarCi frontend design request resolver
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/en.md` | en | shared approvals, progress and reporting boundary |
-| `@orchestration` | `orchestration/en.md` | en | coordinate authority, source and proof without split decisions |
-| `@requests` | `requests/en.md` | en | select and close durable feedback records |
-| `@workspaces` | `contexts/workspaces/en.md` | en | resolve the project and FE role |
-| `@worktrees` | `contexts/worktrees/en.md` | en | resolve durable authority and product write roots |
-| `@business` | `contexts/business/en.md` | en | preserve or explicitly block on product truth |
-| `@grammar` | `grammars` | module | own product-family outcomes, meaning, owners and behavior |
-| `@principles` | `compilers/principles` | module | own reusable product-neutral visual situations |
-| `@patterns-fe` | `compilers/patterns/fe` | module | bind corrections to exact FE owners |
-| `@frontend-quality` | `brainstorms/frontend-quality/en.md` | en | challenge unresolved UI direction when one is required |
+| `@orchestration` | `runtime/orchestration/en.md` | en | coordinate authority, source and proof without split decisions |
+| `@requests` | `knowledge/requests/en.md` | en | select and close durable feedback records |
+| `@workspaces` | `knowledge/contexts/workspaces/en.md` | en | resolve the project and FE role |
+| `@worktrees` | `knowledge/contexts/worktrees/en.md` | en | resolve durable authority and product write roots |
+| `@business` | `knowledge/contexts/business/en.md` | en | preserve or explicitly block on product truth |
+| `@grammar` | `knowledge/grammars` | module | own product-family outcomes, meaning, owners and behavior |
+| `@principles` | `knowledge/compilers/principles` | module | own reusable product-neutral visual situations |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | bind corrections to exact FE owners |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/en.md` | en | challenge unresolved UI direction when one is required |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | choose proportional execution depth |
 | `@validate-request` | `scripts/validate-design-request.mjs` | script | validate request transitions and closure |
 | `@compile-context` | `scripts/compile-context.mjs` | script | rebuild runtime context after authority changes |
 | `@check-deps` | `scripts/check-deps.mjs` | script | prove authority dependency graphs |
-| `@lints-fe` | `gates/fe/lints` | module | prove implemented frontend source |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | prove implemented frontend source |
 | `@validate-visual-proof` | `scripts/validate-visual-proof.mjs` | script | enforce same-state, same-viewport proof when visual |
 
 ## NESTED SKILLS
@@ -67,7 +67,7 @@ split incompatible batches rather than merging their decisions.
 
 Reproduce exact states and audit the source-first attempt already recorded in the request. When it is wrong, prepare
 one reject row and replacement inside the displayed write boundary. After approval, append that immutable row to
-`requests/rejects.json` before overwriting source, add its id to the same request, and prove the replacement. Never
+`knowledge/requests/rejects.json` before overwriting source, add its id to the same request, and prove the replacement. Never
 create a second request for the same expected outcome. Classify the durable lesson as business-authority gap,
 grammar ruling/gap, principle gap, pattern-or-gate gap, source application miss or drift.
 
@@ -84,12 +84,12 @@ risk-covering states/viewports so authority did not invalidate the source result
 
 ## Rules
 
-1. Process only valid records under `.claude/requests`; never resolve feedback from memory alone.
+1. Process only valid records under `.claude/knowledge/requests`; never resolve feedback from memory alone.
 2. Source is corrected before authority learning; every resolved request cites at least one final product source path and changes at least one routed grammar or principle path.
 3. Grammar owns product-specific meaning and behavior; principles own reusable product-neutral visual situations.
 4. Owner feedback is decisive about expected product outcome but remains evidence, not an automatic diagnosis.
 5. Do not manufacture business truth, backend capability, routes, states or data operations.
-6. A wrong source attempt is recorded in `requests/rejects.json` before it is overwritten; the same request gains the reject ref.
+6. A wrong source attempt is recorded in `knowledge/requests/rejects.json` before it is overwritten; the same request gains the reject ref.
 7. Micro corrections stay micro when anatomy and ownership are fixed; authority regression does not force a full layout ceremony.
 8. Conflicting request outcomes require owner reconciliation before implementation.
 9. Preserve unrelated dirty files and use exact write boundaries.

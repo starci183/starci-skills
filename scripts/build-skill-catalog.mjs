@@ -5,9 +5,9 @@ import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from "n
 import {resolve, relative} from "node:path";
 import {fileURLToPath, pathToFileURL} from "node:url";
 
-const CATALOG_RELATIVE = ".claude/skill-runtime/catalog/catalog.json";
-const SCHEMA_RELATIVE = ".claude/skill-runtime/catalog/schema.json";
-const OVERRIDES_RELATIVE = ".claude/skill-runtime/catalog/overrides.json";
+const CATALOG_RELATIVE = ".claude/runtime/skill-runtime/catalog/catalog.json";
+const SCHEMA_RELATIVE = ".claude/runtime/skill-runtime/catalog/schema.json";
+const OVERRIDES_RELATIVE = ".claude/runtime/skill-runtime/catalog/overrides.json";
 const SKILLS_RELATIVE = ".claude/skills";
 const ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const RISKS = new Set(["read-only", "local-write", "source-write", "external-write"]);
@@ -235,7 +235,7 @@ export function buildSkillCatalog(sourceRoot = DEFAULT_SOURCE_ROOT) {
 export function writeSkillCatalog(sourceRoot = DEFAULT_SOURCE_ROOT) {
   const root = resolve(sourceRoot);
   const built = buildSkillCatalog(root);
-  mkdirSync(resolve(root, ".claude/skill-runtime/catalog"), {recursive: true});
+  mkdirSync(resolve(root, ".claude/runtime/skill-runtime/catalog"), {recursive: true});
   writeFileSync(resolve(root, CATALOG_RELATIVE), built.catalogText, "utf8");
   writeFileSync(resolve(root, SCHEMA_RELATIVE), built.schemaText, "utf8");
   return built;

@@ -26,7 +26,7 @@ const root = resolve(registryRoot);
 const snapshotFile = resolve(snapshotPath);
 execFileSync(process.execPath, [
   join(trustRoot, "scripts", "validate-artifact.mjs"),
-  "--schema", join(trustRoot, "contexts", "conversations", "conversation-snapshot.schema.json"),
+  "--schema", join(trustRoot, "knowledge", "contexts", "conversations", "conversation-snapshot.schema.json"),
   "--data", snapshotFile,
 ], {stdio: "inherit"});
 const snapshot = JSON.parse(readFileSync(snapshotFile, "utf8"));
@@ -79,7 +79,7 @@ renameSync(temporary, registryPath);
 
 execFileSync(process.execPath, [
   join(trustRoot, "scripts", "validate-artifact.mjs"),
-  "--schema", join(trustRoot, "contexts", "conversations", "conversation-registry.schema.json"),
+  "--schema", join(trustRoot, "knowledge", "contexts", "conversations", "conversation-registry.schema.json"),
   "--data", registryPath,
 ], {stdio: "inherit"});
 const result = checkConversationRegistry(root);

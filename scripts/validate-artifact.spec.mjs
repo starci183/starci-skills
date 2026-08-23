@@ -213,7 +213,7 @@ const pageHash = (candidate, schema = 7) => createHash("sha256")
             : candidate.pageContract))
     .digest("hex")
 
-function runArtifact(artifact, schemaFile = "brainstorms/layouts/schema.json") {
+function runArtifact(artifact, schemaFile = "knowledge/brainstorms/layouts/schema.json") {
     const root = mkdtempSync(join(tmpdir(), "validate-page-set-"))
     const artifactPath = join(root, "artifact.json")
     const vocabularyPath = join(root, "vocabulary.json")
@@ -975,14 +975,14 @@ test("schema 4 requires 3-4 complete candidates when a flow renders three pages"
 })
 
 test("frontend quality receipt accepts closed lenses and detector families with binding StarCi evidence", () => {
-    const result = runArtifact(qualityReview("refactor", "lesson-page"), "brainstorms/frontend-quality/schema.json")
+    const result = runArtifact(qualityReview("refactor", "lesson-page"), "knowledge/brainstorms/frontend-quality/schema.json")
     assert.equal(result.status, 0, result.stderr)
 })
 
 test("frontend quality receipt refuses external advisory evidence presented as binding", () => {
     const receipt = qualityReview("refactor", "lesson-page")
     receipt.sources[0].kind = "external-advisory"
-    const result = runArtifact(receipt, "brainstorms/frontend-quality/schema.json")
+    const result = runArtifact(receipt, "knowledge/brainstorms/frontend-quality/schema.json")
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /external design intelligence is advisory|at least one routed authority/)
 })
@@ -990,7 +990,7 @@ test("frontend quality receipt refuses external advisory evidence presented as b
 test("frontend quality receipt refuses duplicate lens coverage even when array length stays ten", () => {
     const receipt = qualityReview("refactor", "lesson-page")
     receipt.lenses[9] = {...receipt.lenses[0]}
-    const result = runArtifact(receipt, "brainstorms/frontend-quality/schema.json")
+    const result = runArtifact(receipt, "knowledge/brainstorms/frontend-quality/schema.json")
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /closed frontend-quality lens exactly once/)
 })
@@ -1036,7 +1036,7 @@ const blockArtifact = () => ({
 
 test("block schema 3 binds one target-matched quality review before HTML", () => {
     const artifact = blockArtifact()
-    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    const result = runArtifact(artifact, "knowledge/brainstorms/blocks/schema.json")
     assert.equal(result.status, 0, result.stderr)
 })
 
@@ -1054,7 +1054,7 @@ test("block schema 3 states stage accepts a selected direction with bounded comp
         }],
         sourceBoundary: blockSourceBoundary,
     }
-    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    const result = runArtifact(artifact, "knowledge/brainstorms/blocks/schema.json")
     assert.equal(result.status, 0, result.stderr)
 })
 
@@ -1066,7 +1066,7 @@ test("block schema 3 state views must bind the parent page and reachable block s
         views: [{id: "invented-state", pageId: "another-page", visibleStates: ["invented"], viewports: ["desktop", "narrow"], completePage: true}],
         sourceBoundary: blockSourceBoundary,
     }
-    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    const result = runArtifact(artifact, "knowledge/brainstorms/blocks/schema.json")
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /must equal bound parent page|unknown block states/)
 })
@@ -1079,7 +1079,7 @@ test("block schema 3 source boundary must contain the proven owner and test chai
         views: [{id: "criteria-empty", pageId: "lesson", visibleStates: ["empty"], viewports: ["desktop", "narrow"], completePage: true}],
         sourceBoundary: ["src/unrelated.tsx"],
     }
-    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    const result = runArtifact(artifact, "knowledge/brainstorms/blocks/schema.json")
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /missing drawing owner path|missing test owner path/)
 })
@@ -1098,6 +1098,6 @@ test("block schema 3 allows state evidence beyond the five-view default", () => 
         })),
         sourceBoundary: blockSourceBoundary,
     }
-    const result = runArtifact(artifact, "brainstorms/blocks/schema.json")
+    const result = runArtifact(artifact, "knowledge/brainstorms/blocks/schema.json")
     assert.equal(result.status, 0, result.stderr)
 })

@@ -1,0 +1,14 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "role": "be",
+  "patternRouter": "knowledge/compilers/patterns/be/context.md",
+  "gateRouter": "runtime/gates/be/lints/context.md",
+  "publishedPackage": "@starci/eslint-canon-be",
+  "policy": {
+    "unknownMachineRule": "fail",
+    "missingGateBinding": "fail",
+    "missingMachineTest": "external",
+    "documentedSituationRequiresReason": true
+  }
+}

@@ -10,19 +10,19 @@ description: Reconcile một block impact component trong complete parent, chỉ
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/vi.md` | vi | approval và reporting boundary dùng chung |
-| `@orchestration` | `orchestration/vi.md` | vi | phase map coordinator/worker cho block HTML, source và proof |
+| `@orchestration` | `runtime/orchestration/vi.md` | vi | phase map coordinator/worker cho block HTML, source và proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | route exact micro fix khỏi component workflow |
-| `@workspaces` | `contexts/workspaces/vi.md` | vi | resolve và verify frontend route |
-| `@worktrees` | `contexts/worktrees/vi.md` | vi | giữ disposable review evidence trong session hiện tại |
-| `@composition` | `brainstorms/composition/vi.md` | vi | khóa highlighted parent và preserved page |
-| `@business` | `contexts/business/vi.md` | vi | resolve data, action và state thật |
-| `@grammar` | `grammars` | module | load routed block facts, outcomes và owners |
-| `@principles` | `compilers/principles` | module | audit selected anatomy |
-| `@patterns-fe` | `compilers/patterns/fe` | module | chọn owning source file và import |
-| `@lints-fe` | `gates/fe/lints` | module | prove implemented source |
-| `@blocks` | `brainstorms/blocks/vi.md` | vi | block ownership, anatomy, state và contract law |
-| `@frontend-quality` | `brainstorms/frontend-quality/vi.md` | vi | integrated review craft, UX, accessibility, engineering và detector |
-| `@design-review` | `publication/design-review-preview/vi.md` | vi | exact-parent authored HTML review trong cache |
+| `@workspaces` | `knowledge/contexts/workspaces/vi.md` | vi | resolve và verify frontend route |
+| `@worktrees` | `knowledge/contexts/worktrees/vi.md` | vi | giữ disposable review evidence trong session hiện tại |
+| `@composition` | `knowledge/brainstorms/composition/vi.md` | vi | khóa highlighted parent và preserved page |
+| `@business` | `knowledge/contexts/business/vi.md` | vi | resolve data, action và state thật |
+| `@grammar` | `knowledge/grammars` | module | load routed block facts, outcomes và owners |
+| `@principles` | `knowledge/compilers/principles` | module | audit selected anatomy |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe` | module | chọn owning source file và import |
+| `@lints-fe` | `runtime/gates/fe/lints` | module | prove implemented source |
+| `@blocks` | `knowledge/brainstorms/blocks/vi.md` | vi | block ownership, anatomy, state và contract law |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/vi.md` | vi | integrated review craft, UX, accessibility, engineering và detector |
+| `@design-review` | `runtime/publication/design-review-preview/vi.md` | vi | exact-parent authored HTML review trong cache |
 | `@inventory-visual-language` | `scripts/inventory-visual-language.mjs` | script | verify current vocabulary |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve deterministic block grammar decisions |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove routed grammar package |

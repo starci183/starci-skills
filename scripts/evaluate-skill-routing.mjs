@@ -5,8 +5,8 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 
 const trustRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultCatalog = path.join(trustRoot, "skill-runtime", "catalog", "catalog.json");
-const defaultCases = path.join(trustRoot, "skill-runtime", "evals", "cases.json");
+const defaultCatalog = path.join(trustRoot, "runtime", "skill-runtime", "catalog", "catalog.json");
+const defaultCases = path.join(trustRoot, "runtime", "skill-runtime", "evals", "cases.json");
 
 const stopwords = new Set([
   "a", "an", "and", "the", "this", "that", "to", "for", "of", "on", "in", "with", "or", "its", "it",

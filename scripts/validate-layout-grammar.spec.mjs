@@ -5,7 +5,7 @@ import test from "node:test"
 import { validateLayoutGrammar } from "./validate-layout-grammar.mjs"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
-const grammarRoot = join(root, "grammars", "starci")
+const grammarRoot = join(root, "knowledge", "grammars", "starci")
 const profilePath = join(grammarRoot, "profiles", "starci-academy.json")
 
 const fixture = () => ({

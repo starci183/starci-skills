@@ -88,9 +88,14 @@ const validateManifest = (manifest) => {
     unique(manifest.roles, "manifest.roles")
     if (!manifest.roles.includes(manifest.ownerRole)) fail("manifest.ownerRole must be included in manifest.roles")
     assertKeys(manifest.stack, "manifest.stack", ["root", "runtime", "credentialRefs"], ["root", "runtime", "credentialRefs"])
-    const stackRoot = safeRelative(manifest.stack.root, "manifest.stack.root")
-    if (!/^\.stacks\/[^/]+$/.test(stackRoot)) fail("manifest.stack.root must identify one .stacks environment")
     if (!new Set(["docker-swarm", "docker-compose", "kubernetes"]).has(manifest.stack?.runtime)) fail("manifest.stack.runtime is unsupported")
+    const stackRoot = safeRelative(manifest.stack.root, "manifest.stack.root")
+    const allowedRoots = manifest.stack.runtime === "kubernetes"
+        ? new Set([".stacks/k8s"])
+        : manifest.stack.runtime === "docker-swarm"
+            ? new Set([".stacks/vps"])
+            : new Set([".stacks/dev", ".stacks/vps"])
+    if (!allowedRoots.has(stackRoot)) fail(`manifest.stack.root does not match runtime ${manifest.stack.runtime}; use .stacks/dev, .stacks/vps or .stacks/k8s for target topology, never an environment name`)
     nonEmptyStrings(manifest.stack.credentialRefs, "manifest.stack.credentialRefs")
     unique(manifest.stack.credentialRefs, "manifest.stack.credentialRefs")
     assertKeys(manifest.infra, "manifest.infra", ["root", "workingDirectories"], ["root", "workingDirectories"])
@@ -307,6 +312,10 @@ const selfTest = () => {
     assert.throws(() => validateManifest({ ...frontendSample, artifacts: frontendSample.artifacts.map((artifact) => artifact.name === "crm" ? { ...artifact, frontend: { ...artifact.frontend, stackDefinition: ".stacks/vps/crm/stack.yml" } } : artifact) }), /must live under .stacks\/vps\/frontend\/crm/)
     assert.throws(() => validateManifest({ ...frontendSample, domains: frontendSample.domains.filter((route) => route.artifact !== "crm") }), /frontend artifact crm needs a declared domain/)
     assert.throws(() => validateManifest({ ...frontendSample, domains: frontendSample.domains.map((route) => ({ ...route, artifact: "missing" })) }), /undeclared artifact/)
+    assert.throws(() => validateManifest({ ...sample, stack: { ...sample.stack, root: ".stacks/production" } }), /never an environment name/)
+    assert.throws(() => validateManifest({ ...sample, stack: { ...sample.stack, root: ".stacks/k8s" } }), /does not match runtime/)
+    assert.deepEqual(validateManifest({ ...sample, stack: { ...sample.stack, root: ".stacks/k8s", runtime: "kubernetes" } }), { stackRoot: ".stacks/k8s", infraRoot: ".infra/production" })
+    assert.deepEqual(validateManifest({ ...sample, stack: { ...sample.stack, root: ".stacks/dev", runtime: "docker-compose" } }), { stackRoot: ".stacks/dev", infraRoot: ".infra/production" })
     assert.throws(() => safeRelative("../escape", "probe"), /repository-relative/)
     console.log("deployment-plan self-test: pass (no filesystem or external mutations)")
 }

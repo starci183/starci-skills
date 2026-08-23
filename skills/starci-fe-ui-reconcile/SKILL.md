@@ -10,16 +10,16 @@ description: Challenge and reconcile UI consistency across an explicitly routed 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
 | `@skill-shape` | `skills/skill-shape/context.md` | context | shared approvals, execution and reporting boundary |
-| `@orchestration` | `orchestration/context.md` | context | isolate declared and observed evidence, reserve authority writes and join proof |
+| `@orchestration` | `runtime/orchestration/context.md` | context | isolate declared and observed evidence, reserve authority writes and join proof |
 | `@classify-fe-change` | `scripts/classify-frontend-change.mjs` | script | refuse local or new-layout work before opening systemic reconciliation |
-| `@workspaces` | `contexts/workspaces/context.md` | context | resolve the exact frontend route and source boundary |
-| `@business` | `contexts/business/context.md` | context | freeze product truth while visual authority is challenged |
-| `@grammar` | `grammars/context.md` | context | product-family facts, outcomes, semantic owners and durable behavior |
-| `@principles` | `compilers/principles/context.md` | context | product-neutral visual situations after direct ownership resolves |
-| `@patterns-fe` | `compilers/patterns/fe/context.md` | context | bind authority outcomes to frontend source owners |
-| `@lints-fe` | `gates/fe/lints/context.md` | context | prove affected frontend consumers |
-| `@standards` | `standards/context.md` | context | require durable law to carry executable proof |
-| `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge consistency through craft, UX, accessibility, engineering and detectors |
+| `@workspaces` | `knowledge/contexts/workspaces/context.md` | context | resolve the exact frontend route and source boundary |
+| `@business` | `knowledge/contexts/business/context.md` | context | freeze product truth while visual authority is challenged |
+| `@grammar` | `knowledge/grammars/context.md` | context | product-family facts, outcomes, semantic owners and durable behavior |
+| `@principles` | `knowledge/compilers/principles/context.md` | context | product-neutral visual situations after direct ownership resolves |
+| `@patterns-fe` | `knowledge/compilers/patterns/fe/context.md` | context | bind authority outcomes to frontend source owners |
+| `@lints-fe` | `runtime/gates/fe/lints/context.md` | context | prove affected frontend consumers |
+| `@standards` | `runtime/standards/context.md` | context | require durable law to carry executable proof |
+| `@frontend-quality` | `knowledge/brainstorms/frontend-quality/context.md` | context | challenge consistency through craft, UX, accessibility, engineering and detectors |
 | `@resolve-grammar` | `scripts/resolve-fe-grammar.mjs` | script | resolve the active grammar outcomes and owners |
 | `@validate-grammar` | `scripts/validate-fe-grammar.mjs` | script | prove grammar authority before and after an approved evolution |
 | `@validate-principles` | `scripts/validate-fe-principles.mjs` | script | refuse invented or duplicate product-neutral visual law |
