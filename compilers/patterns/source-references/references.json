@@ -4,10 +4,10 @@
     {
       "id": "starci-academy-fe",
       "role": "fe",
-      "repository": "https://github.com/starci-lab/starci-academy.git",
-      "commit": "9a193423128efa1dc83f23ab0f79fb4ae66db847",
+      "repository": "https://github.com/starci-lab/starci-academy-fe",
+      "commit": "acc7e2656228f53cc63c9bca3b079ee869e5d940",
       "path": "src",
-      "ref": "git+https://github.com/starci-lab/starci-academy.git@9a193423128efa1dc83f23ab0f79fb4ae66db847:src"
+      "ref": "git+https://github.com/starci-lab/starci-academy-fe@acc7e2656228f53cc63c9bca3b079ee869e5d940:src"
     },
     {
       "id": "starci-academy-be",
