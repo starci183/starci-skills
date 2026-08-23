@@ -6,7 +6,7 @@ None.
 
 ## Record
 
-Đây là entry v4 ổn định cho kiến trúc source backend. Luật pattern chi tiết tiếp tục sống đúng một nơi
+Đây là entry V5 ổn định cho kiến trúc source backend. Luật pattern chi tiết tiếp tục sống đúng một nơi
 dưới `compilers/patterns/be/`; shelf này chọn và bind chúng mà không chép lại phán quyết.
 
 ## Routes

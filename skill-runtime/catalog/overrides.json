@@ -36,7 +36,7 @@
     },
     "starci-business-analyze": {
       "macro": "analysis", "macroMode": "business", "aliases": ["business-authority"],
-      "intent": ["create business feature authority", "reconcile product truth evidence", "tạo authority tính năng nghiệp vụ từ evidence"],
+      "intent": ["create business feature authority", "create owner approved feature head before code", "reconcile product truth evidence", "tạo authority tính năng nghiệp vụ từ evidence"],
       "excludes": ["product source implementation", "example-derived business facts", "technical architecture selection"],
       "modes": ["advance", "create", "reconcile"], "risk": "local-write",
       "read": ["routed product evidence", "business feature heads"], "write": ["business authority worktree"],

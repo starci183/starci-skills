@@ -51,7 +51,7 @@ that can drift from its dependencies. Reusable frontend structure resolves in th
 `archetypes → grammars → compilers/principles`: macro page topology first, product semantic owners second, and
 exact remaining geometry last.
 
-The original stage trees remain the detailed authorities. The v4 roots are stable process routers:
+The original stage trees remain the detailed authorities. The V5 roots are compact semantic facades and stable process routers:
 
 - `kernel` resolves routes, state and approval identity;
 - `workflows` groups discoverable skills by lifecycle without moving their `SKILL.md` entries;

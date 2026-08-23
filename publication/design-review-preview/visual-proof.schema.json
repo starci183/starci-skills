@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/publication/design-review-preview/visual-proof.schema.json",
+  "$id": "starci-v5/publication/design-review-preview/visual-proof.schema.json",
   "title": "Computed same-viewport delivery proof",
   "type": "object",
   "additionalProperties": false,

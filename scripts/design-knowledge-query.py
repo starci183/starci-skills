@@ -38,6 +38,8 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("status", help="Report index inventory and source staleness")
 
     query = commands.add_parser("query", help="Return one compact typed design context packet")
+    query.add_argument("--source-root", type=Path, default=argparse.SUPPRESS)
+    query.add_argument("--index", type=Path, default=argparse.SUPPRESS)
     query.add_argument("--text", required=True)
     query.add_argument("--project")
     query.add_argument("--grammar")

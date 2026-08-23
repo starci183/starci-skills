@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/brainstorms/blocks/schema.json",
+  "$id": "starci-v5/brainstorms/blocks/schema.json",
   "title": "Block UI direction audit or explicit anatomy brainstorm",
   "description": "Schema 3 binds the integrated frontend-quality review to each audited/corrected block UI direction. Three or four UI-direction anatomies are legal only in explicit owner brainstorm mode.",
   "type": "object",

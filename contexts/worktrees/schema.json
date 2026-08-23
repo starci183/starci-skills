@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/contexts/worktrees/schema.json",
+  "$id": "starci-v5/contexts/worktrees/schema.json",
   "title": "Durable worktree and disposable session roots",
   "type": "object",
   "additionalProperties": false,

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/orchestration/receipt.schema.json",
+  "$id": "starci-v5/orchestration/receipt.schema.json",
   "title": "Internal StarCi orchestration run record",
   "type": "object",
   "additionalProperties": false,

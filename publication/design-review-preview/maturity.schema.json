@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/publication/design-review-preview/maturity.schema.json",
+  "$id": "starci-v5/publication/design-review-preview/maturity.schema.json",
   "title": "Pre-approval product maturity review",
   "type": "object",
   "additionalProperties": false,

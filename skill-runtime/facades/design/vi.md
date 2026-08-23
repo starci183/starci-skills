@@ -31,7 +31,7 @@ Trả selected mode và physical skill, discriminating fact, query provenance ho
 
 ## Permissions
 
-Selection và query đều chỉ đọc. Facade không ghi product, authority, provider, credential hay external state và không chuyển giao approval.
+Selection và pre-dispatch query đều chỉ đọc. Chúng không bao giờ dùng `--rebuild-if-stale`; index thiếu hoặc stale sẽ dừng selection để một cache-maintenance action tường minh rebuild bên ngoài facade. Facade không ghi product, authority, provider, credential, cache hay external state và không chuyển giao approval.
 
 ## Stops
 

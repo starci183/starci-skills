@@ -100,9 +100,9 @@ budget, not state coverage. Visual verdicts are computed from actual PNG, normal
 evidence with per-reference thresholds. Complete internal run records reject unused artifacts and measure time,
 available tokens, decision-changing approvals, defects caught, false-positive gates and coordinator rework.
 
-## V4 authority route
+## V5 authority route
 
-The stage trees above remain the one homes of detailed law. V4 adds stable cross-stage routers; it does
+The stage trees above remain the one homes of detailed law. V5 adds compact semantic facades and stable cross-stage routers; it does
 not copy those laws:
 
 ```text

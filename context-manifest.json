@@ -2774,7 +2774,7 @@
     "skill-runtime/facades/design/context.md": {
       "kind": "module",
       "source": "skill-runtime/facades/design/en.md",
-      "sourceHash": "3fcb956120fbd576f093fd404b3324a2466949dfe12c981063ab7248506a4b16",
+      "sourceHash": "a399b7e4aeb3ea09d6fd8c54423e12b1ab4c40413adb1c6e5f6f24fd7a10e4f7",
       "contextVersion": 1
     },
     "skill-runtime/facades/operations/context.md": {
@@ -2826,7 +2826,7 @@
     "standards/backend/patterns/context.md": {
       "kind": "module",
       "source": "standards/backend/patterns/en.md",
-      "sourceHash": "058cc765914578d232d50ae75577752f7fc6b3890ccc20579345ea7854cab1c6",
+      "sourceHash": "2fa42416dd72fd3952d86c40492494292fa17478f1ae3e9d40556f71db9c1c90",
       "contextVersion": 1
     },
     "standards/backend/rule-bindings/context.md": {

@@ -31,7 +31,7 @@ Return the selected mode and physical skill, the discriminating fact, query prov
 
 ## Permissions
 
-Selection and the query are read-only. The facade performs no product, authority, provider, credential, or external-state write and transfers no approval.
+Selection and pre-dispatch query are read-only. They never use `--rebuild-if-stale`; a missing or stale index stops selection so an explicit cache-maintenance action can rebuild it outside the facade. The facade performs no product, authority, provider, credential, cache, or external-state write and transfers no approval.
 
 ## Stops
 

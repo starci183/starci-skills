@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/brainstorms/frontend-quality/schema.json",
+  "$id": "starci-v5/brainstorms/frontend-quality/schema.json",
   "title": "Integrated frontend brainstorm quality receipt",
   "description": "One candidate reviewed through the closed StarCi product, craft, UX, accessibility, engineering and detector lenses. External sources remain advisory.",
   "type": "object",

@@ -19,6 +19,27 @@ HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 IDENTITY_ROW_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$", re.MULTILINE)
 JSON_FENCE_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 VECTOR_DIMENSIONS = 256
+LOCAL_VECTOR_RELEVANCE_FLOOR = 0.35
+QUERY_EXPANSIONS = {
+    "hàng đợi": "queue backlog",
+    "bệnh nhân": "patient clinical",
+    "xử lý": "processing operations",
+    "danh sách": "list collection",
+    "ưu tiên": "priority",
+    "phân công": "assignment",
+    "trạng thái": "state status",
+    "chi tiết": "detail",
+    "khóa học": "course",
+    "đăng ký": "enrollment",
+    "thanh toán": "payment",
+    "hành trình": "itinerary journey",
+    "bản đồ": "map spatial",
+    "bảo mật": "security",
+    "sự cố": "incident",
+    "điều tra": "investigation",
+    "tài liệu": "document",
+    "chỉnh sửa": "editing",
+}
 
 KIND_ARCHETYPE = "archetype"
 KIND_GRAMMAR = "grammar"
@@ -50,6 +71,12 @@ def normalize_text(value: str) -> str:
 
 def tokenize(value: str) -> list[str]:
     return normalize_text(value).split()
+
+
+def expand_query_text(value: str) -> str:
+    normalized = normalize_text(value)
+    expansions = [english for vietnamese, english in QUERY_EXPANSIONS.items() if vietnamese in normalized]
+    return " ".join([normalized, *expansions])
 
 
 def compact_whitespace(value: str) -> str:
@@ -774,12 +801,13 @@ def score_records(
     query_text: str,
     query_local_vector: Sequence[float] | None,
 ) -> list[dict[str, Any]]:
-    query_tokens = tokenize(query_text)
+    expanded_query = expand_query_text(query_text)
+    query_tokens = tokenize(expanded_query)
     if not query_tokens:
         raise DesignKnowledgeError("Query text has no searchable terms", code="query-empty", exit_code=2)
     lexical = bm25_scores(records, query_tokens)
     maximum = max(lexical, default=0.0) or 1.0
-    fallback_query_vector = stable_sparse_vector(query_text)
+    fallback_query_vector = stable_sparse_vector(expanded_query)
     normalized_query = normalize_text(query_text)
     query_set = set(query_tokens)
     scored: list[dict[str, Any]] = []
@@ -815,6 +843,15 @@ def score_records(
             }
         )
     return sorted(scored, key=lambda item: (-item["score"], item["record"]["id"]))
+
+
+def eligible_scores(scored: Sequence[dict[str, Any]], *, local_embeddings: bool) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in scored
+        if (item["lexicalScore"] > 0 and item["matchedTerms"])
+        or (local_embeddings and item["vectorScore"] >= LOCAL_VECTOR_RELEVANCE_FLOOR)
+    ]
 
 
 def public_hit(scored: dict[str, Any], *, required_by: Sequence[str] = ()) -> dict[str, Any]:
@@ -911,7 +948,10 @@ def query_index(
 
     if KIND_ARCHETYPE in selected_kinds:
         candidates = [record for record in records if record["kind"] == KIND_ARCHETYPE]
-        archetypes = score_records(candidates, query_text, query_local_vector)[:top_k]
+        archetypes = eligible_scores(
+            score_records(candidates, query_text, query_local_vector),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
 
     if KIND_GRAMMAR in selected_kinds and grammar is not None and profile is not None:
         grammar_candidates = [
@@ -926,8 +966,14 @@ def query_index(
             and record.get("metadata", {}).get("grammar") == grammar
             and record.get("metadata", {}).get("profileId") == profile
         ]
-        grammar_hits = score_records(grammar_candidates, query_text, query_local_vector)[:top_k]
-        owner_hits = score_records(owner_candidates, query_text, query_local_vector)[:top_k]
+        grammar_hits = eligible_scores(
+            score_records(grammar_candidates, query_text, query_local_vector),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
+        owner_hits = eligible_scores(
+            score_records(owner_candidates, query_text, query_local_vector),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
 
     dependency_owners: dict[str, list[str]] = defaultdict(list)
     for hit in owner_hits:
@@ -936,7 +982,10 @@ def query_index(
 
     if KIND_PRINCIPLE in selected_kinds:
         principle_candidates = [record for record in records if record["kind"] == KIND_PRINCIPLE]
-        principle_hits = score_records(principle_candidates, query_text, query_local_vector)[:top_k]
+        principle_hits = eligible_scores(
+            score_records(principle_candidates, query_text, query_local_vector),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
         selected_ids = {hit["record"]["metadata"]["principleId"] for hit in principle_hits}
         for principle_id in sorted(dependency_owners):
             if principle_id in selected_ids:

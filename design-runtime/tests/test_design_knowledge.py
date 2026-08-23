@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -56,6 +57,92 @@ class RealCorpusTests(unittest.TestCase):
         )
         selected = [item["data"]["archetypeId"] for item in packet["selected"]["archetypes"]]
         self.assertEqual(selected[0], "antimicrobial-susceptibility-interpretation-workbench")
+
+    def test_irrelevant_vector_collision_is_refused(self) -> None:
+        with self.assertRaises(DesignKnowledgeError) as raised:
+            query_index(
+                self.index,
+                query_text="zxqv plmnb qqqxyz uuuvoid",
+                kinds=["archetype"],
+                top_k=3,
+                project=None,
+                grammar=None,
+                profile=None,
+                route=None,
+                embedding_model=None,
+            )
+        self.assertEqual(raised.exception.code, "no-eligible-result")
+
+    def test_vietnamese_queue_query_selects_operational_workbench(self) -> None:
+        packet = query_index(
+            self.index,
+            query_text="hàng đợi bệnh nhân cần xử lý, ưu tiên, phân công và theo dõi trạng thái",
+            kinds=["archetype"],
+            top_k=3,
+            project=None,
+            grammar=None,
+            profile=None,
+            route=None,
+            embedding_model=None,
+        )
+        selected = [item["data"]["archetypeId"] for item in packet["selected"]["archetypes"]]
+        self.assertEqual(selected[0], "operational-collection-workbench")
+
+    def test_read_only_query_does_not_create_missing_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            index_path = Path(temporary) / "missing" / "index.json"
+            with self.assertRaises(DesignKnowledgeError) as raised:
+                run_query(
+                    source_root=SOURCE_ROOT,
+                    index_path=index_path,
+                    query_text="queue operations",
+                    kinds=["archetype"],
+                    top_k=1,
+                    project=None,
+                    grammar=None,
+                    profile=None,
+                    route_path=None,
+                    rebuild_if_stale=False,
+                    embedding_model=None,
+                )
+            self.assertEqual(raised.exception.code, "index-missing")
+            self.assertFalse(index_path.exists())
+
+    def test_cli_accepts_index_after_query_subcommand(self) -> None:
+        script = SOURCE_ROOT / ".claude" / "scripts" / "design-knowledge-query.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            index_path = Path(temporary) / "index.json"
+            built = subprocess.run(
+                [sys.executable, str(script), "--index", str(index_path), "build"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr)
+            queried = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "query",
+                    "--text",
+                    "hàng đợi bệnh nhân cần xử lý",
+                    "--index",
+                    str(index_path),
+                    "--kind",
+                    "archetype",
+                    "--top-k",
+                    "1",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(queried.returncode, 0, queried.stderr)
+            packet = json.loads(queried.stdout)
+            self.assertEqual(
+                packet["selected"]["archetypes"][0]["data"]["archetypeId"],
+                "operational-collection-workbench",
+            )
 
     def test_routed_grammar_closes_owner_dependencies_to_principles(self) -> None:
         packet = query_index(

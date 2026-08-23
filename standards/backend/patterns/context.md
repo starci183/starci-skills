@@ -6,7 +6,7 @@ None.
 
 ## Record
 
-This is the stable v4 entry to backend source architecture. Detailed pattern laws remain in their one
+This is the stable V5 entry to backend source architecture. Detailed pattern laws remain in their one
 homes under `compilers/patterns/be/`; this shelf selects and binds them without copying a ruling.
 
 ## Routes

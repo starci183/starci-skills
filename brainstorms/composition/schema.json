@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "starci-v4/brainstorms/composition/schema.json",
+  "$id": "starci-v5/brainstorms/composition/schema.json",
   "title": "Design baseline four-lock record",
   "type": "object",
   "additionalProperties": false,

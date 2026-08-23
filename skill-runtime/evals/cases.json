@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "cases": [
     {"id":"architecture-decision","prompt":"Compare event streaming and transactional outbox for a difficult cross-system decision; analyze trade-offs only and do not implement.","expectedSkill":"starci-architecture-analyze"},
     {"id":"business-authority","prompt":"Create the evidence-backed business feature authority for actors, rules, states, flows, and acceptance outcomes before design.","expectedSkill":"starci-business-analyze"},
@@ -24,6 +24,18 @@
     {"id":"vi-design-page","prompt":"Thiết kế và triển khai trọn vẹn một trang dài responsive desktop tablet mobile rồi chứng minh bằng trình duyệt.","expectedSkill":"starci-fe-design-layout"},
     {"id":"vi-repair","prompt":"Sửa Source đang đỏ về xanh, xử lý port, lint, coverage, assurance và cấu trúc stale.","expectedSkill":"starci-repair"},
     {"id":"vi-backend-plan","prompt":"Lập kế hoạch chính xác toàn bộ file, schema, sibling và test cho mutation backend mới, chưa viết source.","expectedSkill":"starci-be-plan"},
-    {"id":"vi-deploy","prompt":"Triển khai release đã khai báo, theo dõi steady state và rollback nếu thất bại.","expectedSkill":"starci-deploy"}
+    {"id":"vi-deploy","prompt":"Triển khai release đã khai báo, theo dõi steady state và rollback nếu thất bại.","expectedSkill":"starci-deploy"},
+    {"id":"natural-business-head","prompt":"Create the owner-approved feature head for actors, rules, states and acceptance outcomes before code.","expectedSkill":"starci-business-analyze"},
+    {"id":"negated-backend-plan","prompt":"Do not create another plan; implement the approved backend brief.","expectedSkill":"starci-be-approve"},
+    {"id":"readiness-read-only","prompt":"Measure routed workspace readiness only; make no changes.","expectedSkill":"starci-stale-list"},
+    {"id":"whole-page-not-block","prompt":"Redesign the entire page anatomy and end-to-end responsive flow, not an isolated component.","expectedSkill":"starci-fe-design-layout"},
+    {"id":"stop-out-of-domain","prompt":"What is two plus two?","expectedStop":"insufficient-relevance"},
+    {"id":"stop-vague-design","prompt":"Thiết kế frontend cho đẹp hơn.","expectedStop":"ambiguous-route"},
+    {"id":"stop-missing-brief","prompt":"Implement a new backend mutation; there is no brief.","expectedStop":"required-authority-missing"},
+    {"id":"stop-multiple-operations","prompt":"Set up the Cloudflare tunnel and deploy the release.","expectedStop":"multiple-capability-owners"},
+    {"id":"stop-forbidden-provenance","prompt":"Commit raw transcript and secrets into Git provenance.","expectedStop":"request-matches-exclusion"},
+    {"id":"stop-local-development","prompt":"Start the app locally for development.","expectedStop":true},
+    {"id":"stop-permission-conflict","prompt":"Repair the source but keep the whole run read only and make no changes.","expectedStop":"permission-intent-conflict"},
+    {"id":"stop-plain-micro-edit","prompt":"Change only the sidebar label without changing anatomy or ownership.","expectedStop":"plain-edit-no-skill"}
   ]
 }

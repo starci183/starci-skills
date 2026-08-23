@@ -53,7 +53,7 @@
     "kind": "read-only-evidence",
     "command": "python .claude/scripts/design-knowledge-query.py query",
     "requiredArgs": ["--text"],
-    "optionalArgs": ["--route", "--project", "--grammar", "--profile", "--kind", "--top-k", "--index", "--rebuild-if-stale"],
+    "optionalArgs": ["--route", "--project", "--grammar", "--profile", "--kind", "--top-k", "--index"],
     "successExitCode": 0,
     "stopExitCodes": [2, 3, 4],
     "resultFields": ["schemaVersion", "query", "filters", "selected", "dependencyClosure", "provenance", "index"]
