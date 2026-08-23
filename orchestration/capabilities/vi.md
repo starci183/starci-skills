@@ -48,6 +48,14 @@ cùng map chạy sequential dưới coordinator.
 | `starci-be-plan` | dual-track | demand/capability join và complete brief | business-demand và schema/source inventory tách biệt | mọi behavior bind file và test; không source write |
 | `starci-be-approve` | reconciliation | revision decision, approval và integration | schema/sibling challenge, approved code rời nhau và gate | implementation bằng revision đã duyệt |
 
+## Approval execution mode
+
+Mọi capability đã bind mặc định dùng `manual` và hỗ trợ exact `mode=auto`. Auto bind
+`phaseGates.approvalMode: auto` cùng `autoApprovalAt` với immutable invocation envelope, chỉ đi tiếp sau khi cùng
+step/proof gate pass và dùng label `OK` của selected map cho exact write boundary. Map không có write label đi qua
+read-only hoặc no-write step mà không invent mutation approval. Credential, destructive loss, external
+publication/commitment và mọi scope expansion chưa disclose vẫn dừng dưới `NEED APPROVALS`.
+
 ## Write kinds
 
 - `repository-write` chỉ được delegate sau exact approval của skill đã chọn và chỉ trên các target rời nhau.

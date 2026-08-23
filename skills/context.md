@@ -18,6 +18,10 @@ and follows one phase map. Layout, Block and Refactor keep their explicit orches
 reuse their existing `PIPELINE` steps. Any map may execute sequentially when no safe disjoint task has positive
 coordination benefit.
 
+Every map declares both `manual` and `auto`. Manual remains the default; exact `mode=auto` binds the selected
+skill to the immutable invocation envelope and advances only gate-passed checkpoints inside the disclosed scope.
+Read-only and no-write capabilities never invent a write approval.
+
 ## Default topology registry
 
 The selected capability may narrow its topology when its own `Run` proves a different authority shape. These are

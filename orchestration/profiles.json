@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "common": {
     "maxConcurrentWorkers": 3,
     "workerLimitKind": "runtime-capacity",
@@ -37,23 +37,23 @@
     }
   },
   "skillMaps": {
-    "starci-be-approve": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["capability"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "challenge", "approve", "implement-proof"]},
-    "starci-be-plan": {"map": "capabilities", "topology": "dual-track", "workflow": "full", "impactLevels": ["capability"], "approvalModes": ["manual"], "approvalLabel": null, "steps": ["demand", "capability", "synthesis", "proof"]},
-    "starci-business-analyze": {"map": "capabilities", "topology": "reconciliation", "workflow": "record", "impactLevels": ["record", "capability"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["evidence", "model", "publish", "reconcile"]},
-    "starci-cloudflare-tunnel-set": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "inspect", "approve-apply", "prove"]},
-    "starci-conversation-record": {"map": "capabilities", "topology": "linear", "workflow": "record", "impactLevels": ["record"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "sanitize", "link", "prove"]},
-    "starci-debt-repay": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["repository", "capability"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "measure", "repay", "close"]},
-    "starci-deploy": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider", "cross-domain"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "inspect-plan", "execute", "steady-state"]},
-    "starci-diagnose": {"map": "capabilities", "topology": "reconciliation", "workflow": "audit", "impactLevels": ["read-only"], "approvalModes": ["manual"], "approvalLabel": null, "steps": ["bind", "expected", "observed", "classify"]},
+    "starci-be-approve": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "challenge", "approve", "implement-proof"]},
+    "starci-be-plan": {"map": "capabilities", "topology": "dual-track", "workflow": "full", "impactLevels": ["capability"], "approvalModes": ["manual", "auto"], "approvalLabel": null, "steps": ["demand", "capability", "synthesis", "proof"]},
+    "starci-business-analyze": {"map": "capabilities", "topology": "reconciliation", "workflow": "record", "impactLevels": ["record", "capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["evidence", "model", "publish", "reconcile"]},
+    "starci-cloudflare-tunnel-set": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "inspect", "approve-apply", "prove"]},
+    "starci-conversation-record": {"map": "capabilities", "topology": "linear", "workflow": "record", "impactLevels": ["record"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "sanitize", "link", "prove"]},
+    "starci-debt-repay": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["repository", "capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "measure", "repay", "close"]},
+    "starci-deploy": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "inspect-plan", "execute", "steady-state"]},
+    "starci-diagnose": {"map": "capabilities", "topology": "reconciliation", "workflow": "audit", "impactLevels": ["read-only"], "approvalModes": ["manual", "auto"], "approvalLabel": null, "steps": ["bind", "expected", "observed", "classify"]},
     "starci-fe-design-block": {"map": "frontend", "topology": "reconciliation", "workflow": "block", "impactLevels": ["component"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK #1", "steps": ["bind", "orchestration", "direction", "state-boundary", "implement", "parity"]},
     "starci-fe-design-layout": {"map": "frontend", "topology": "dual-track", "workflow": "layout", "impactLevels": ["page", "capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK #2", "steps": ["evidence", "orchestration", "page-synthesis", "states", "implementation", "parity"]},
     "starci-fe-layout-refactor": {"map": "frontend", "topology": "reconciliation", "workflow": "layout", "impactLevels": ["page", "capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK #2", "steps": ["bind-classify", "orchestration", "direction", "authority-state-boundary", "evolve-refactor", "parity"]},
-    "starci-fe-ui-reconcile": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["capability", "cross-domain"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "declared", "observed", "reconcile", "approve-apply", "proof"]},
-    "starci-grammar-refresh-references": {"map": "capabilities", "topology": "reconciliation", "workflow": "record", "impactLevels": ["record"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "audit", "refresh", "prove"]},
-    "starci-init": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["repository", "cross-domain"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["identity", "bootstrap", "routes", "worktrees-proof"]},
-    "starci-repair": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["repository", "capability", "cross-domain"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["inventory", "plan", "repair", "close"]},
-    "starci-setup-mcp": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider", "cross-domain"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["bind", "inspect-plan", "reconcile", "prove"]},
-    "starci-setup-sonar": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider", "cross-domain"], "approvalModes": ["manual"], "approvalLabel": "OK", "steps": ["inventory", "inspect-plan", "approve-apply", "prove"]},
-    "starci-stale-list": {"map": "capabilities", "topology": "reconciliation", "workflow": "audit", "impactLevels": ["read-only"], "approvalModes": ["manual"], "approvalLabel": null, "steps": ["route", "declare", "observe", "report"]}
+    "starci-fe-ui-reconcile": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["capability", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "declared", "observed", "reconcile", "approve-apply", "proof"]},
+    "starci-grammar-refresh-references": {"map": "capabilities", "topology": "reconciliation", "workflow": "record", "impactLevels": ["record"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "audit", "refresh", "prove"]},
+    "starci-init": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["repository", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["identity", "bootstrap", "routes", "worktrees-proof"]},
+    "starci-repair": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["repository", "capability", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["inventory", "plan", "repair", "close"]},
+    "starci-setup-mcp": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "inspect-plan", "reconcile", "prove"]},
+    "starci-setup-sonar": {"map": "capabilities", "topology": "reconciliation", "workflow": "provider", "impactLevels": ["provider", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["inventory", "inspect-plan", "approve-apply", "prove"]},
+    "starci-stale-list": {"map": "capabilities", "topology": "reconciliation", "workflow": "audit", "impactLevels": ["read-only"], "approvalModes": ["manual", "auto"], "approvalLabel": null, "steps": ["route", "declare", "observe", "report"]}
   }
 }

@@ -193,14 +193,15 @@ không phải tín hiệu approval.
 
 ### Approval modes
 
-Một skill chỉ được dùng `mode=auto` khi binding entry của chính nó khai mode này rõ ràng. Owner phải đặt exact
-token `mode=auto` trong invocation request; các từ hội thoại kiểu “automatic” không bật mode. Bind opt-in đó với
-immutable invocation-envelope hash trước checkpoint đầu tiên. Nó hết hiệu lực cùng invocation và không bao giờ
-trở thành default của workspace, project hay skill.
+Mọi physical StarCi skill đều hỗ trợ `mode=auto`; mỗi entry trong `profiles.skillMaps` phải khai cả `manual` và
+`auto`. Owner phải đặt exact token `mode=auto` trong invocation request; các từ hội thoại kiểu “automatic” không
+bật mode. Bind opt-in đó với immutable invocation-envelope hash trước checkpoint đầu tiên. Nó hết hiệu lực cùng
+invocation và không bao giờ trở thành default của workspace, project hay skill.
 
 Auto mode chỉ bỏ các lần dừng chờ owner ở staged checkpoint đã khai. Coordinator vẫn phải tạo, hiển thị và
 validate mọi artifact cùng exact boundary; chỉ tự chọn evidence-backed recommended candidate; rồi ghi
-`AUTO:<invocation-envelope-hash>:OK #n:<boundary-hash>` trước khi vào row kế. Gate fail, thiếu recommendation,
+`AUTO:<invocation-envelope-hash>:<approval-label>:<boundary-hash>` trước write hoặc staged boundary. Skill
+read-only hay không-write đi qua row đã pass mà không tạo write approval giả. Gate fail, thiếu recommendation,
 credential, destructive loss, external publication/commitment, hoặc mở rộng project/role/repository/write boundary
 vẫn phải dừng dưới `NEED APPROVALS`. Auto mode không duyệt path chưa disclose, hạ proof, reinterpret feedback hay
 tự bịa product decision không có supported default.
@@ -279,7 +280,7 @@ thêm**.
 ## Quy tắc
 
 1. Resolve context lock và `Touching` trước khi ghi; trình chúng bằng câu thân thiện.
-2. Tiếp tục mọi action trong bước hiện tại đã duyệt; chỉ vào row kế với manual `OK` hoặc bound auto-approval event từ skill có khai `mode=auto`.
+2. Tiếp tục mọi action trong bước hiện tại đã duyệt; chỉ vào row kế với manual `OK` hoặc bound auto-approval event từ selected skill map.
 3. Chỉ hỏi `need approval` thật, với một default đang hiển thị.
 4. Trong manual mode, chỉ toàn bộ message sau trim bằng `ok` không phân biệt hoa thường mới consume approval bước kế. Trong declared auto mode, chỉ current invocation hash cùng exact passed boundary mới được sinh equivalent auto-approval event.
 5. Design approval và source implementation xảy ra trong cùng invocation; cached candidate key không bao giờ là durable authority.

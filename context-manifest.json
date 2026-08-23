@@ -762,7 +762,7 @@
     "orchestration/capabilities/context.md": {
       "kind": "module",
       "source": "orchestration/capabilities/en.md",
-      "sourceHash": "70bb09ae1b4cb4809b37f421ed8b293516e4547de0ad8ec0e53af06723ece7f1",
+      "sourceHash": "e10123560d346ab6c627861776b62488538b19e535c4ebed862b5b37a4c542ca",
       "contextVersion": 1
     },
     "orchestration/claude/context.md": {
@@ -780,7 +780,7 @@
     "orchestration/context.md": {
       "kind": "module",
       "source": "orchestration/en.md",
-      "sourceHash": "eb28a6c5cd61cda140b4775cea4ae8a4a50676872f836f8d490c5f7187d4eec9",
+      "sourceHash": "02c9b9de20d492bfb9a59d2f89cb297930688d8e0328ae83cf9e545cca1963c2",
       "contextVersion": 1
     },
     "orchestration/frontend/context.md": {
@@ -944,7 +944,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "09707ac1aa759ad933ce114dc71c56074b2cc000523ada6d4b196d22582f2b4a",
+      "sourceHash": "126fc000073ce88026dbce7501ec48f9a46061b2cf0da8b51f01b2112cdafa25",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

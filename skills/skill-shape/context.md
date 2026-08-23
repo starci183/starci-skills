@@ -190,15 +190,16 @@ rows. Silence and every other message are not approval signals.
 
 ### Approval modes
 
-A skill may use `mode=auto` only when its own binding entry explicitly declares that mode. The owner must include
-the exact token `mode=auto` in the invocation request; conversational words such as “automatic” do not enable it.
-Bind that opt-in to the immutable invocation-envelope hash before the first checkpoint. It expires with the
-invocation and never becomes a workspace, project or skill default.
+Every physical StarCi skill supports `mode=auto`; `profiles.skillMaps` must declare both `manual` and `auto` for
+each entry. The owner must include the exact token `mode=auto` in the invocation request; conversational words
+such as “automatic” do not enable it. Bind that opt-in to the immutable invocation-envelope hash before the first
+checkpoint. It expires with the invocation and never becomes a workspace, project or skill default.
 
 Auto mode removes only the owner pauses at already-declared staged checkpoints. The coordinator still produces,
 displays and validates every artifact and exact boundary, automatically selects only the evidence-backed
-recommended candidate, and records `AUTO:<invocation-envelope-hash>:OK #n:<boundary-hash>` before entering the
-next row. A failed gate, missing recommendation, credential, destructive loss, external publication or commitment,
+recommended candidate, and records `AUTO:<invocation-envelope-hash>:<approval-label>:<boundary-hash>` before a
+write or staged boundary. Read-only and no-write skills advance passed rows without manufacturing a write approval.
+A failed gate, missing recommendation, credential, destructive loss, external publication or commitment,
 or any project/role/repository/write-boundary expansion still stops under `NEED APPROVALS`. Auto mode cannot approve
 an undisclosed path, weaken proof, reinterpret feedback or manufacture a product decision with no supported default.
 
@@ -279,7 +280,7 @@ appended.
 ## Rules
 
 1. Resolve the context lock and `Touching` before writing; present them as friendly prose.
-2. Continue every action inside the approved current step; enter the next displayed row only with its manual `OK` or a bound auto-approval event from a skill that declares `mode=auto`.
+2. Continue every action inside the approved current step; enter the next displayed row only with its manual `OK` or a bound auto-approval event from the selected skill map.
 3. Ask only for genuine `need approval`, with one displayed default.
 4. In manual mode, only a whole trimmed message equal to `ok` case-insensitively consumes the displayed next-step approval. In declared auto mode, only the current invocation hash plus the exact passed boundary may generate the equivalent auto-approval event.
 5. Design approval and source implementation happen in the same invocation; cached candidate keys are never durable authority.

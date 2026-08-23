@@ -72,8 +72,9 @@ The receipt is revalidated and append-only refreshed at each coordinator phase g
 exact frozen contract hash and the validated target-matched `qualityReviewAt` hash, and depend on passed
 `contract-freeze` plus `quality-review` events. Every mutation binds the complete approved target set and the
 selected skill's exact approval label from `profiles.skillMaps`; staged frontend writes retain `OK #1`/`OK #2`,
-while ordinary capability boundaries use `OK`. Auto remains available only to maps that declare it and binds the
-same identity to the immutable envelope. Authority and external writes are coordinator-only sequential tasks.
+while ordinary capability boundaries use `OK`. Every map declares `manual` and `auto`; exact `mode=auto` binds the
+same identity to the immutable envelope, while a no-write map advances without inventing an approval. Authority
+and external writes are coordinator-only sequential tasks.
 When Refactor evolves authority, dependent repository tasks also bind the compiled authority-proof hash. Proof
 tasks bind stable-state and selected proof-target hashes and depend on every mutation task. A future task is not
 dispatchable while its gate identity is absent.

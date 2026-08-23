@@ -42,13 +42,22 @@ const receipt = () => {
 };
 
 test("published profiles cover every physical StarCi skill", () => {
-  assert.equal(validateProfiles(profiles()).ok, true);
+  const published = profiles();
+  assert.equal(published.schemaVersion, 4);
+  assert.equal(validateProfiles(published).ok, true);
+  for (const map of Object.values(published.skillMaps)) assert.deepEqual(map.approvalModes, ["manual", "auto"]);
   assert.deepEqual(validateWorkspace(root), {ok: true, failures: []});
   const schema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
   assert.equal(schema.properties.schemaVersion.const, 4);
   assert.equal(schema.$defs.skill.enum.length, 18);
   assert.ok(schema.required.includes("impact"));
   assert.ok(schema.required.includes("challenges"));
+});
+
+test("a profile cannot drop auto support from one physical skill", () => {
+  const value = profiles();
+  value.skillMaps["starci-stale-list"].approvalModes = ["manual"];
+  assert.match(validateProfiles(value).failures.join("\n"), /must support manual and auto approval modes/);
 });
 
 test("a read-only non-frontend skill uses the common receipt without mutation approval", () => {
@@ -72,6 +81,8 @@ test("a read-only non-frontend skill uses the common receipt without mutation ap
     sharedPaths: [],
     sequentialFallback: {owner: "coordinator", order: ["route-scan", "observe-state"], preservesDependencies: true, preservesWriterRegistry: true}
   };
+  assert.deepEqual(validateReceipt(value, profiles()), {ok: true, failures: []});
+  value.phaseGates = {authorityMode: "preserve", approvalMode: "auto", autoApprovalAt: hash};
   assert.deepEqual(validateReceipt(value, profiles()), {ok: true, failures: []});
 });
 
@@ -140,6 +151,22 @@ test("auto approval binds source work to both invocation authority and exact bou
   assert.equal(validateReceipt(value, profiles()).ok, true);
   value.tasks[1].writeApprovalAt = `AUTO:${boundaryHash}:OK #2:${boundaryHash}`;
   assert.match(validateReceipt(value, profiles()).failures.join("\n"), /without the selected skill's approval/);
+});
+
+test("auto approval binds an ordinary non-frontend write boundary", () => {
+  const value = receipt();
+  value.skill = "starci-debt-repay";
+  value.impact = {level: "repository", workflow: "repository", classificationAt: hash};
+  value.phaseGates.approvalMode = "auto";
+  value.phaseGates.autoApprovalAt = hash;
+  value.phaseGates.writeApprovalAt = `AUTO:${hash}:OK:${boundaryHash}`;
+  value.gateEvents[3].at = value.phaseGates.writeApprovalAt;
+  value.tasks[0].skill = value.skill;
+  value.tasks[0].step = "measure";
+  value.tasks[1].skill = value.skill;
+  value.tasks[1].step = "repay";
+  value.tasks[1].writeApprovalAt = value.phaseGates.writeApprovalAt;
+  assert.equal(validateReceipt(value, profiles()).ok, true);
 });
 
 test("auto approval cannot be inferred without an immutable opt-in hash", () => {

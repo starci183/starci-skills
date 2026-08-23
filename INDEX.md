@@ -74,10 +74,10 @@ before direction approval. Layout prints journey and UI direction separately; Re
 direction only. The QA viewer may
 inspect states but may not substitute for product interaction.
 
-Layout, Block and Refactor use `manual` approval by default. An invocation containing exact `mode=auto` binds
-auto-approval to that invocation envelope, selects only the evidence-backed recommendation and crosses staged
-`OK #1`/`OK #2` checkpoints only after their normal contracts and gates pass. It never approves scope expansion,
-credentials, destructive work or external publication.
+Every physical skill uses `manual` approval by default and supports exact `mode=auto`. Auto binds to the immutable
+invocation envelope and advances only through declared checkpoints whose normal contracts and gates pass. It never
+approves scope expansion, credentials, destructive work or external publication; read-only and no-write skills do
+not manufacture a source approval merely to advance.
 
 Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
 then applies one routed StarCi MASTER visual system. Every candidate passes the shared `@frontend-quality` review:
@@ -146,7 +146,7 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Seventeen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Eighteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. `@orchestration` covers all physical skills through one machine registry; it is policy, not another capability,
 and coverage does not force delegation when sequential execution is safer or cheaper.
 
@@ -164,6 +164,7 @@ and coverage does not force delegation when sequential execution is safer or che
 | `starci-debt-repay` | repaying accepted Source debt, recording measured progress and removing only scopes whose exit criteria pass |
 | `starci-fe-design-layout` | mandatory journey-plus-UI direction synthesis into complete pages; one direction by default or 3–4 on explicit brainstorm, then staged source/seed implementation and proof |
 | `starci-fe-layout-refactor` | proportional correction for exact Layout/Block-rendered output; feedback triggers investigation and durable authority evolves only with systemic evidence |
+| `starci-fe-ui-reconcile` | cross-surface UI consistency reconciliation; separates local drift from systemic grammar/principle gaps, then aligns and proves the approved impact cone |
 | `starci-fe-design-block` | component-impact correction in its complete parent; direction only for an unresolved UI decision, then one bounded source approval and proof |
 | `starci-grammar-refresh-references` | audit and repair stale optional immutable grammar provenance without changing durable authority |
 | `starci-conversation-record` | provider-neutral conversation snapshots, artifact provenance links and redacted/encrypted transcript custody |

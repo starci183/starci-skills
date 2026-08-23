@@ -22,7 +22,7 @@ export const canonicalHash = (value) => crypto.createHash("sha256").update(JSON.
 
 export function validateProfiles(value) {
   const failures = [];
-  if (value?.schemaVersion !== 3) failures.push("profiles.schemaVersion must equal 3");
+  if (value?.schemaVersion !== 4) failures.push("profiles.schemaVersion must equal 4");
   if (value?.common?.workerLimitKind !== "runtime-capacity" || value?.common?.scheduler !== "ready-disjoint-overhead-positive") failures.push("worker limit must be runtime capacity and scheduling must be overhead-positive");
   if (value?.common?.maxConcurrentWorkers !== 3) failures.push("maxConcurrentWorkers must equal 3");
   if (value?.common?.oneWriterPerTarget !== true) failures.push("oneWriterPerTarget must be true");
@@ -48,9 +48,8 @@ export function validateProfiles(value) {
     if (!allowedMaps.has(map?.map)) failures.push(`${skill} has invalid phase map`);
     if (!allowedWorkflows.has(map?.workflow)) failures.push(`${skill} has invalid workflow`);
     if (!Array.isArray(map?.impactLevels) || !map.impactLevels.length || map.impactLevels.some((impact) => !allowedImpacts.has(impact))) failures.push(`${skill} has invalid impact levels`);
-    if (!Array.isArray(map?.approvalModes) || !map.approvalModes.includes("manual") || map.approvalModes.some((mode) => !["manual", "auto"].includes(mode))) failures.push(`${skill} has invalid approval modes`);
+    if (!Array.isArray(map?.approvalModes) || !map.approvalModes.includes("manual") || !map.approvalModes.includes("auto") || map.approvalModes.some((mode) => !["manual", "auto"].includes(mode))) failures.push(`${skill} must support manual and auto approval modes`);
     if (map?.approvalLabel !== null && !/^OK(?: #[12])?$/.test(map?.approvalLabel ?? "")) failures.push(`${skill} has invalid approval label`);
-    if (map?.approvalModes?.includes("auto") && !/^OK #[12]$/.test(map?.approvalLabel ?? "")) failures.push(`${skill} enables auto without a staged approval label`);
     if (!Array.isArray(map?.steps) || map.steps.length < 2 || new Set(map.steps).size !== map.steps.length) failures.push(`${skill} has an invalid step map`);
   }
   return {ok: failures.length === 0, failures};

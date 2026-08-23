@@ -79,8 +79,8 @@ Receipt được revalidate và append-only refresh tại mỗi coordinator phas
 contract hash lẫn validated target-matched `qualityReviewAt` hash, và phụ thuộc event `contract-freeze` cùng
 `quality-review` đã pass. Mọi mutation bind complete approved target set và exact approval label của selected skill
 từ `profiles.skillMaps`; frontend staged write giữ `OK #1`/`OK #2`, còn capability boundary thường dùng `OK`.
-Auto chỉ có ở map khai rõ và bind cùng identity vào immutable envelope. Authority/external write là sequential
-task chỉ coordinator làm. Khi Refactor evolve authority, repository task phụ thuộc còn bind compiled
+Mọi map khai cả `manual` và `auto`; exact `mode=auto` bind cùng identity vào immutable envelope, còn map không-write
+đi tiếp mà không invent approval. Authority/external write là sequential task chỉ coordinator làm. Khi Refactor evolve authority, repository task phụ thuộc còn bind compiled
 authority-proof hash. Proof task bind stable-state/proof-target hash và phụ thuộc mọi mutation task. Future task
 không được dispatch khi gate identity còn thiếu.
 

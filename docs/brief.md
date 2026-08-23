@@ -84,7 +84,8 @@ skill keeps its own `PIPELINE`, approvals and proof law; orchestration only part
 Claude or Codex tasks. Read-only and authority/provider work may remain coordinator-sequential, while independent
 evidence, approved disjoint repository changes, tests and proof can run through workers. The machine rejects a
 missing skill map, stale step order, overlapping writer target or mutation without the selected skill's exact
-approval.
+approval. Every skill defaults to `manual` and supports exact `mode=auto`, bound to one immutable invocation and
+unable to widen scope or manufacture permission for credentials, destructive loss or external publication.
 
 ## What the machine refuses
 

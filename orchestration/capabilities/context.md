@@ -45,6 +45,14 @@ coordination overhead is not positive, the same map runs sequentially under the 
 | `starci-be-plan` | dual-track | demand/capability join and complete brief | isolated business-demand and schema/source inventories | every behavior binds to files and tests; no source write |
 | `starci-be-approve` | reconciliation | revision decision, approval and integration | schema/sibling challenge, approved disjoint code and gates | implementation equals the approved revision |
 
+## Approval execution mode
+
+Every bound capability defaults to `manual` and supports exact `mode=auto`. Auto binds
+`phaseGates.approvalMode: auto` and `autoApprovalAt` to the immutable invocation envelope, advances only after the
+same step and proof gates pass, and uses the selected map's `OK` label for an exact write boundary. A map with no
+write label advances read-only or no-write steps without inventing a mutation approval. Credentials, destructive
+loss, external publication/commitment and any undisclosed scope expansion still stop under `NEED APPROVALS`.
+
 ## Write kinds
 
 - `repository-write` may be delegated only after the selected skill's exact approval and only across disjoint targets.
