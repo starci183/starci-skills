@@ -81,7 +81,8 @@
           "role": {"$ref": "#/$defs/slug"},
           "source": {"$ref": "#/$defs/relativePath"},
           "image": {"type": "string", "minLength": 1},
-          "target": {"type": "string", "minLength": 1}
+          "target": {"type": "string", "minLength": 1},
+          "frontend": {"$ref": "#/$defs/frontendArtifact"}
         }
       }
     },
@@ -96,6 +97,8 @@
           "owner": {"enum": ["platform", "tenant", "shared"]},
           "driver": {"enum": ["terraform", "cloudflare-tunnel"]},
           "definition": {"$ref": "#/$defs/relativePath"},
+          "artifact": {"$ref": "#/$defs/slug"},
+          "primary": {"type": "boolean"},
           "origin": {"type": "string", "pattern": "^https?://"},
           "tunnel": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$"}
         },
@@ -155,6 +158,18 @@
   "$defs": {
     "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "hostname": {"type": "string", "pattern": "^(?:\\*\\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"},
-    "relativePath": {"type": "string", "pattern": "^(?![A-Za-z]:|/|.*(?:^|/)\\.\\.(?:/|$)).+"}
+    "relativePath": {"type": "string", "pattern": "^(?![A-Za-z]:|/|.*(?:^|/)\\.\\.(?:/|$)).+"},
+    "frontendArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework", "layout", "surface", "buildContext", "dockerfile"],
+      "properties": {
+        "framework": {"const": "nextjs"},
+        "layout": {"enum": ["single-app", "monorepo"]},
+        "surface": {"$ref": "#/$defs/slug"},
+        "buildContext": {"$ref": "#/$defs/relativePath"},
+        "dockerfile": {"$ref": "#/$defs/relativePath"}
+      }
+    }
   }
 }

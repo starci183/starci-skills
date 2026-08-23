@@ -43,7 +43,8 @@ Một environment được khai tại `.stacks/deployment.json`, hợp lệ vớ
 - một root `.stacks/<environment>` và một root `.infra/<environment>` tương ứng;
 - SSH host reference và source setup host đã khai;
 - artifact bất biến và runtime target của chúng;
-- từng public hostname, ownership và đúng một domain driver;
+- metadata Next.js frontend tùy chọn trên từng artifact: repository layout, surface slug, build context và Dockerfile;
+- từng public hostname, artifact mapping, primary status, ownership và đúng một domain driver;
 - deploy workflow/ref cùng proof command hoặc endpoint;
 - monitor interval, steady window, timeout và probe;
 - chỉ credential reference, tuyệt đối không có value.
@@ -63,6 +64,7 @@ portable.
 | `DEPLOYMENT-6` | Có yêu cầu release | verification pass trước khi apply artifact bất biến và infrastructure |
 | `DEPLOYMENT-7` | Xuất hiện remote failure | monitor evidence chọn repair nhỏ nhất và chạy lại đúng proof đã fail |
 | `DEPLOYMENT-8` | Apply trả success | public probe và runtime identity quan sát được giữ green hết steady window đã khai |
+| `DEPLOYMENT-9` | Next.js frontend được release | mỗi surface single-app hoặc monorepo resolve tới immutable artifact, runtime target, explicit domain và public proof riêng |
 
 ## Planning và approval
 
@@ -96,6 +98,21 @@ hoặc thêm host, hostname, tenant, project, destructive action hay credential 
 Declared runtime sở hữu mechanism. Docker Swarm vẫn là Docker Swarm, Compose vẫn là Compose và shared ingress
 hiện có vẫn dùng chung trừ khi source intent được duyệt thay đổi. Sibling deployment có thể cấp immutable
 implementation precedent; nó không chuyển ownership của application, host, domain, credential hay state.
+
+## Frontend topology
+
+Frontend artifact có thể khai `framework: nextjs`, layout `single-app` hoặc `monorepo`, product-owned surface slug,
+build context và Dockerfile chính xác. `single-app` cho phép một deployed surface trên mỗi routed repository role.
+`monorepo` cho phép nhiều surface artifact từ một role, nhưng mỗi surface sở hữu source root, immutable image,
+runtime target và public probe riêng. Build dùng declared context—thường là repository root với workspace—để shared
+package vẫn available. Runtime packaging nên dùng Next.js standalone output khi product hỗ trợ; manifest ghi source
+và target ownership, không đoán framework.
+
+Surface và hostname độc lập. Các tên `landing`, `app`, `crm`, `admin` chỉ là ví dụ, không phải business vocabulary
+hay DNS convention đóng. Mỗi frontend artifact map tới ít nhất một domain đã khai explicit; khi có alias phải chỉ
+đúng một primary domain. Khi adopt hoặc surface còn thiếu domain, hỏi owner tất cả hostname còn thiếu trong cùng
+một batch. Không infer root hostname, subdomain prefix hay shared routing từ repository layout. Manifest hợp lệ
+hiện có sở hữu các decision đó và redeploy dùng lại mà không hỏi.
 
 ## Setup
 
@@ -176,6 +193,8 @@ Một run thật còn phải chứng minh:
 9. Imperative deploy request trên một manifest hợp lệ đã resolve phải thực thi release đó; planning là control
    trung gian và không bao giờ là terminal result.
 10. Sibling precedent có thể cấp pattern nhưng không bao giờ đổi deployment target hoặc ownership đã resolve.
+11. Frontend repository layout chỉ điều khiển build resolution; hostname của từng surface là owner input explicit,
+    không bao giờ derive từ `single-app`, `monorepo` hay surface slug.
 
 ## Scope
 

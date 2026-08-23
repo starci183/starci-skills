@@ -51,6 +51,21 @@ rồi thực thi; không hỏi owner chọn Caddy, Docker, Swarm, Tunnel hay pla
 sau planning và không đòi thêm một `OK` chung chung. Sibling như Nivo có thể chứng minh stack pattern hoặc shared
 ingress identity, nhưng không bao giờ trở thành deployment target, credential owner hay application được release.
 
+## Frontend Next.js
+
+Với từng Next.js artifact, đọc tường minh `frontend.layout`, `frontend.surface`, `frontend.buildContext` và
+`frontend.dockerfile` trong manifest; không infer repository layout từ sibling hay chỉ từ tên folder. `single-app`
+nghĩa là một routed repository role sở hữu một deployed surface. `monorepo` có thể build nhiều surface artifact
+từ một repository, nhưng mỗi surface giữ source root, Dockerfile, immutable image, runtime target, domain mapping
+và health probe riêng. Dùng declared build context để workspace package còn available khi `next build`; ưu tiên
+Next.js standalone production output trong runtime image khi product source hỗ trợ.
+
+Tên surface là product-owned slug như `landing`, `app`, `crm`, `admin` hoặc tên đã khai khác. Hostname là product
+decision độc lập cho từng artifact; không derive từ surface name, repository layout hay sibling project. Khi
+adopt, hỏi owner hostname của từng surface trong một approval batch. Khi manifest hợp lệ đã khai mapping
+artifact-to-domain, dùng lại mà không hỏi lần nữa. Monorepo có nhiều surface vẫn build/deploy artifact độc lập
+và prove trusted HTTPS cho từng primary hostname đã khai.
+
 ## Approval boundary
 
 Với adoption, manifest thiếu, target mơ hồ hoặc host/domain/tenant/project mới, hiển thị một plan không có value

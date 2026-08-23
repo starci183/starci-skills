@@ -44,7 +44,8 @@ One environment is declared at `.stacks/deployment.json`, valid against `@schema
 - one `.stacks/<environment>` root and one matching `.infra/<environment>` root;
 - SSH host references and the declared host setup source;
 - immutable artifacts and their runtime targets;
-- each public hostname, its ownership and exactly one domain driver;
+- optional Next.js frontend metadata per artifact: repository layout, surface slug, build context and Dockerfile;
+- each public hostname, its artifact mapping, primary status, ownership and exactly one domain driver;
 - the deploy workflow/ref and proof commands or endpoints;
 - the monitor interval, steady window, timeout and probes;
 - credential references only, never values.
@@ -64,6 +65,7 @@ manifest remains portable.
 | `DEPLOYMENT-6` | A release is requested | verification passes before immutable artifacts and infrastructure are applied |
 | `DEPLOYMENT-7` | A remote failure appears | monitor evidence selects the smallest repair and the same failed proof is rerun |
 | `DEPLOYMENT-8` | Apply returned success | public probes and observed runtime identities remain green for the declared steady window |
+| `DEPLOYMENT-9` | A Next.js frontend is released | every single-app or monorepo surface resolves to its own immutable artifact, runtime target, explicit domain and public proof |
 
 ## Planning and approval
 
@@ -100,6 +102,21 @@ tenant, project, destructive action or credential rotation.
 The declared runtime owns the mechanism. Docker Swarm stays Docker Swarm, Compose stays Compose and an existing
 shared ingress stays shared unless approved source changes that intent. Sibling deployments may provide immutable
 implementation precedent; they do not transfer application, host, domain, credential or state ownership.
+
+## Frontend topology
+
+A frontend artifact may declare `framework: nextjs`, a `single-app` or `monorepo` layout, a product-owned surface
+slug, and exact build context and Dockerfile. `single-app` permits one deployed surface per routed repository role.
+`monorepo` permits multiple surface artifacts from one role, but each surface owns a separate source root,
+immutable image, runtime target and public probe. The build uses the declared context—commonly the repository root
+for a workspace—so shared packages remain available. Runtime packaging should use Next.js standalone output when
+the product supports it; the manifest records source and target ownership, not framework guesswork.
+
+Surface and hostname are independent. Names such as `landing`, `app`, `crm` and `admin` are examples, not a closed
+business vocabulary or DNS convention. Every frontend artifact maps to at least one explicitly declared domain;
+aliases name exactly one primary domain. During adoption or when a surface lacks a domain, ask the owner for all
+missing surface hostnames together. Never infer a root hostname, a subdomain prefix or shared routing from the
+repository layout. An already valid manifest owns those decisions and a redeploy reuses them without asking.
 
 ## Setup
 
@@ -182,6 +199,8 @@ mutation. A real run additionally proves:
 9. An imperative deploy request against one valid resolved manifest executes that release; planning is an
    intermediate control and never the terminal result.
 10. Sibling precedent can supply a pattern but never changes the resolved deployment target or ownership.
+11. Frontend repository layout controls build resolution only; each surface hostname is explicit owner input and
+    never derived from `single-app`, `monorepo` or the surface slug.
 
 ## Scope
 

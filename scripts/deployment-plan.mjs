@@ -111,21 +111,46 @@ const validateManifest = (manifest) => {
     if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length === 0) fail("manifest.artifacts must not be empty")
     unique(manifest.artifacts.map((item) => item.name), "artifact names")
     for (const item of manifest.artifacts) {
-        assertKeys(item, `artifact ${item?.name ?? "<missing>"}`, ["name", "role", "source", "image", "target"], ["name", "role", "source", "image", "target"])
+        assertKeys(item, `artifact ${item?.name ?? "<missing>"}`, ["name", "role", "source", "image", "target", "frontend"], ["name", "role", "source", "image", "target"])
         if (!slug.test(item.name ?? "") || !manifest.roles.includes(item.role)) fail("each artifact needs a unique slug name and routed role")
         safeRelative(item.source, `artifact ${item.name} source`)
         if (typeof item.image !== "string" || !item.image.trim() || typeof item.target !== "string" || !item.target.trim()) fail(`artifact ${item.name} needs image and target`)
+        if ("frontend" in item) {
+            assertKeys(item.frontend, `artifact ${item.name} frontend`, ["framework", "layout", "surface", "buildContext", "dockerfile"], ["framework", "layout", "surface", "buildContext", "dockerfile"])
+            if (item.frontend.framework !== "nextjs") fail(`artifact ${item.name} frontend framework must be nextjs`)
+            if (!new Set(["single-app", "monorepo"]).has(item.frontend.layout)) fail(`artifact ${item.name} frontend layout is unsupported`)
+            if (!slug.test(item.frontend.surface ?? "")) fail(`artifact ${item.name} frontend surface must be a slug`)
+            safeRelative(item.frontend.buildContext, `artifact ${item.name} frontend buildContext`)
+            safeRelative(item.frontend.dockerfile, `artifact ${item.name} frontend dockerfile`)
+        }
     }
     if (!Array.isArray(manifest.domains)) fail("manifest.domains must be an array")
     unique(manifest.domains.map((route) => route.hostname), "deployment hostnames")
     for (const route of manifest.domains) {
-        assertKeys(route, `domain ${route?.hostname ?? "<missing>"}`, ["hostname", "owner", "driver", "definition", "origin", "tunnel"], ["hostname", "owner", "driver", "definition"])
+        assertKeys(route, `domain ${route?.hostname ?? "<missing>"}`, ["hostname", "owner", "driver", "definition", "artifact", "primary", "origin", "tunnel"], ["hostname", "owner", "driver", "definition"])
         if (!hostname.test(route.hostname ?? "")) fail(`invalid deployment hostname: ${route.hostname ?? "<missing>"}`)
         if (!new Set(["platform", "tenant", "shared"]).has(route.owner)) fail(`domain ${route.hostname} has no valid owner`)
         if (!new Set(["terraform", "cloudflare-tunnel"]).has(route.driver)) fail(`domain ${route.hostname} has no valid driver`)
         safeRelative(route.definition, `domain ${route.hostname} definition`)
+        if ("artifact" in route && !manifest.artifacts.some((artifact) => artifact.name === route.artifact)) fail(`domain ${route.hostname} references an undeclared artifact`)
+        if ("primary" in route && typeof route.primary !== "boolean") fail(`domain ${route.hostname} primary must be boolean`)
+        if (route.primary && !route.artifact) fail(`domain ${route.hostname} cannot be primary without an artifact`)
         if (route.driver === "cloudflare-tunnel" && (!route.origin || !route.tunnel)) fail(`tunnel domain ${route.hostname} needs origin and tunnel`)
         if (route.driver === "terraform" && (route.origin || route.tunnel)) fail(`terraform domain ${route.hostname} must leave origin/tunnel to its definition`)
+    }
+    const frontendArtifacts = manifest.artifacts.filter((artifact) => artifact.frontend)
+    unique(frontendArtifacts.map((artifact) => artifact.frontend.surface), "frontend surfaces")
+    for (const role of new Set(frontendArtifacts.map((artifact) => artifact.role))) {
+        const roleArtifacts = frontendArtifacts.filter((artifact) => artifact.role === role)
+        if (new Set(roleArtifacts.map((artifact) => artifact.frontend.layout)).size !== 1) fail(`frontend role ${role} cannot mix repository layouts`)
+        if (roleArtifacts[0]?.frontend.layout === "single-app" && roleArtifacts.length !== 1) fail(`single-app frontend role ${role} must own exactly one surface`)
+    }
+    for (const artifact of frontendArtifacts) {
+        const mapped = manifest.domains.filter((route) => route.artifact === artifact.name)
+        if (mapped.length === 0) fail(`frontend artifact ${artifact.name} needs a declared domain`)
+        const explicitPrimary = mapped.filter((route) => route.primary)
+        if (mapped.length > 1 && explicitPrimary.length !== 1) fail(`frontend artifact ${artifact.name} needs exactly one primary domain when aliases exist`)
+        if (explicitPrimary.length > 1) fail(`frontend artifact ${artifact.name} has multiple primary domains`)
     }
     assertKeys(manifest.deploy, "manifest.deploy", ["driver", "role", "workflow", "ref", "rollbackInput", "verification"], ["driver", "role", "workflow", "ref", "verification"])
     if (!new Set(["github-actions", "local"]).has(manifest.deploy.driver) || !manifest.roles.includes(manifest.deploy.role)) fail("manifest.deploy has no valid driver/role")
@@ -183,7 +208,13 @@ const createPlan = (input) => {
     const { stackRoot, infraRoot } = validateManifest(manifest)
     if (manifest.project !== input.project || manifest.ownerRole !== input.ownerRole || manifest.environment !== input.environment) fail("requested project/role/environment do not match deployment manifest")
     const routes = Object.fromEntries(manifest.roles.map((role) => [role, resolveRoute(input.source, input.project, role)]))
-    for (const artifact of manifest.artifacts) if (!existsSync(inside(routes[artifact.role].repository, artifact.source))) fail(`artifact source is absent: ${artifact.role}/${artifact.source}`)
+    for (const artifact of manifest.artifacts) {
+        if (!existsSync(inside(routes[artifact.role].repository, artifact.source))) fail(`artifact source is absent: ${artifact.role}/${artifact.source}`)
+        if (artifact.frontend) {
+            if (!existsSync(inside(routes[artifact.role].repository, artifact.frontend.buildContext))) fail(`frontend build context is absent: ${artifact.role}/${artifact.frontend.buildContext}`)
+            if (!existsSync(inside(routes[artifact.role].repository, artifact.frontend.dockerfile))) fail(`frontend Dockerfile is absent: ${artifact.role}/${artifact.frontend.dockerfile}`)
+        }
+    }
     if (!existsSync(inside(owner.repository, stackRoot))) fail(`stack root is absent: ${stackRoot}`)
     if (!existsSync(inside(routes[manifest.deploy.role].repository, manifest.deploy.workflow))) fail(`deploy workflow is absent: ${manifest.deploy.workflow}`)
     if (!existsSync(inside(owner.repository, manifest.host.runtimeSetup.path))) fail(`runtime setup source is absent: ${manifest.host.runtimeSetup.path}`)
@@ -216,6 +247,8 @@ const printPlan = (plan) => {
     console.log(`infra: ${plan.infraRoot}`)
     console.log(`roles: ${Object.keys(plan.routes).join(", ")}`)
     console.log(`artifacts: ${plan.artifacts.map((item) => item.name).join(", ")}`)
+    const frontends = plan.artifacts.filter((item) => item.frontend)
+    if (frontends.length) console.log(`frontends: ${frontends.map((item) => `${item.name} (${item.frontend.framework}/${item.frontend.layout}/${item.frontend.surface})`).join(", ")}`)
     console.log(`domains: ${plan.domains.map((item) => `${item.hostname} (${item.owner}/${item.driver})`).join(", ") || "none"}`)
     console.log(`deploy: ${plan.deploy.driver} ${plan.deploy.workflow}@${plan.deploy.ref}`)
     console.log(`monitor: ${plan.monitor.probes.length} probes; ${plan.monitor.steadySeconds}s steady window; ${plan.monitor.timeoutSeconds}s timeout`)
@@ -251,6 +284,25 @@ const selfTest = () => {
     assert.throws(() => validateManifest({ ...sample, apiToken: "not-a-real-value" }), /inline credential/)
     assert.throws(() => validateManifest({ ...sample, surprise: true }), /not allowed/)
     assert.throws(() => validateManifest({ ...sample, monitor: { ...sample.monitor, probes: [{ ...sample.monitor.probes[0], role: "missing" }] } }), /undeclared role/)
+    const frontendSample = {
+        ...sample,
+        ownerRole: "fe",
+        roles: ["fe"],
+        artifacts: [
+            { name: "landing", role: "fe", source: "apps/landing", image: "ghcr.io/example/landing:${FE_SHA}", target: "swarm:example_landing", frontend: { framework: "nextjs", layout: "monorepo", surface: "landing", buildContext: ".", dockerfile: "apps/landing/Dockerfile" } },
+            { name: "crm", role: "fe", source: "apps/crm", image: "ghcr.io/example/crm:${FE_SHA}", target: "swarm:example_crm", frontend: { framework: "nextjs", layout: "monorepo", surface: "crm", buildContext: ".", dockerfile: "apps/crm/Dockerfile" } },
+        ],
+        domains: [
+            { hostname: "example.com", owner: "platform", driver: "terraform", definition: ".stacks/vps/infra/terraform/dns.tf", artifact: "landing", primary: true },
+            { hostname: "crm.example.com", owner: "platform", driver: "terraform", definition: ".stacks/vps/infra/terraform/dns.tf", artifact: "crm", primary: true },
+        ],
+        deploy: { ...sample.deploy, role: "fe" },
+    }
+    assert.deepEqual(validateManifest(frontendSample), { stackRoot: ".stacks/vps", infraRoot: ".infra/production" })
+    assert.deepEqual(validateManifest({ ...frontendSample, domains: frontendSample.domains.map((route) => route.artifact === "crm" ? { ...route, hostname: "members.example.net" } : route) }), { stackRoot: ".stacks/vps", infraRoot: ".infra/production" })
+    assert.throws(() => validateManifest({ ...frontendSample, artifacts: frontendSample.artifacts.map((artifact) => artifact.name === "crm" ? { ...artifact, frontend: { ...artifact.frontend, surface: "CRM App" } } : artifact) }), /surface must be a slug/)
+    assert.throws(() => validateManifest({ ...frontendSample, domains: frontendSample.domains.filter((route) => route.artifact !== "crm") }), /frontend artifact crm needs a declared domain/)
+    assert.throws(() => validateManifest({ ...frontendSample, domains: frontendSample.domains.map((route) => ({ ...route, artifact: "missing" })) }), /undeclared artifact/)
     assert.throws(() => safeRelative("../escape", "probe"), /repository-relative/)
     console.log("deployment-plan self-test: pass (no filesystem or external mutations)")
 }
