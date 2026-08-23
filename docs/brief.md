@@ -17,6 +17,7 @@ StarCi separates work by what each stage may return:
 | Stage | Returns | Does not return |
 |---|---|---|
 | Context | verified read and write locations | product decisions |
+| Archetype | one reusable dominant-task, region-graph and responsive page topology | product components, visual classes or business facts |
 | Generate/brainstorm | one complete baseline by default; 3–4 targeted alternatives only on explicit request | implementation |
 | Compiler | one deterministic answer from an accepted shape | alternatives |
 | Gate | pass or a refusal with exact evidence | advice |
@@ -25,7 +26,7 @@ The result is not merely a suggested design or plan. Selected decisions remain t
 session to the source state they were made against; the same invocation implements them, and execution stops
 when that evidence is stale or incomplete.
 
-## The nineteen skills
+## The twenty skills
 
 ### Environment and trust
 
@@ -54,7 +55,7 @@ when that evidence is stale or incomplete.
 Frontend design keeps review evidence temporary and makes source the durable result:
 
 ```text
-legacy/current baseline + StarCi MASTER + business + grammar + contract + current source
+legacy/current baseline + business + archetype + grammar + StarCi MASTER + contract + current source
                     ↓
        one complete static HTML page/full flow
                     ↓ one OK selects baseline + exact source boundary
@@ -69,7 +70,15 @@ there is no separate React/Vite viewer build.
 
 MASTER fixes pattern, density, token roles, spacing rhythm, shape, depth, motion and anti-patterns once. Profiles
 override declared roles only; pages record deviations only. Candidate digests are cache keys, and principles
-resolve only visual deltas left unanswered by baseline, MASTER, grammar and source.
+resolve only visual deltas left unanswered by archetype, baseline, MASTER, grammar and source. Current source
+proves product facts and capability, not that its macro layout is correct; archetype conflicts are reported as
+`layout-drift` and corrected unless binding business truth or an owner-approved exception requires them.
+
+### Cross-system analysis
+
+| Skill | Use it for | Writes |
+|---|---|---|
+| [`starci-architecture-analyze`](./skills/starci-architecture-analyze) | Analyze a difficult cross-system decision for human readers, compare viable solutions and hand frozen context to planning | no product code or authority |
 
 ### Backend change
 
@@ -80,7 +89,7 @@ resolve only visual deltas left unanswered by baseline, MASTER, grammar and sour
 
 ### Agent orchestration
 
-All nineteen physical skills resolve one machine-validated entry in `orchestration/profiles.json`. The selected
+All twenty physical skills resolve one machine-validated entry in `orchestration/profiles.json`. The selected
 skill keeps its own `PIPELINE`, approvals and proof law; orchestration only partitions accepted work into bounded
 Claude or Codex tasks. Read-only and authority/provider work may remain coordinator-sequential, while independent
 evidence, approved disjoint repository changes, tests and proof can run through workers. The machine rejects a

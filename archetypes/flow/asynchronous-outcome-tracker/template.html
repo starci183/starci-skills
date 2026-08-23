@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en" data-archetype-template="asynchronous-outcome-tracker">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light">
+  <title>Asynchronous outcome tracker — archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-content: 76rem; --local-control: 2.75rem;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    html{background:var(--canvas);scroll-padding-block:var(--space-5)}
+    body{margin:0;color:var(--text);background:var(--canvas);font:400 1rem/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;overflow-wrap:anywhere}
+    button,input,select,textarea{font:inherit}
+    button,input{min-block-size:var(--local-control)}
+    button{border:1px solid var(--border);border-radius:calc(var(--radius) * .7);padding:.6rem .9rem;background:var(--surface);color:var(--text);cursor:pointer;touch-action:manipulation}
+    button:hover{border-color:var(--accent)} button:active{background:var(--surface-subtle)} button[disabled]{cursor:not-allowed;opacity:.6}
+    .primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}.primary:hover{background:var(--accent-strong)}
+    :focus-visible{outline:3px solid var(--focus);outline-offset:3px;scroll-margin-block:var(--space-5)}
+    .skip-link{position:fixed;inset:.75rem auto auto .75rem;z-index:10;transform:translateY(-180%);background:var(--text);color:#fff;padding:.7rem 1rem;border-radius:var(--radius)}
+    .skip-link:focus{transform:none}
+    .template-header,.template-main{inline-size:min(calc(100% - 2rem),var(--local-content));margin-inline:auto}
+    .template-header{padding-block:var(--space-6) var(--space-5)}
+    .eyebrow,.region-id{margin:0 0 var(--space-2);color:var(--accent-strong);font-size:.875rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+    h1,h2,h3,p{max-inline-size:70ch}h1{font-size:clamp(2rem,5vw,3.25rem);line-height:1.1;margin:.25rem 0 1rem}h2{font-size:1.25rem;line-height:1.25}h3{font-size:1rem}
+    .compact-nav{display:none;flex-wrap:wrap;margin-block-end:var(--space-4);gap:var(--space-2);overflow-x:visible;padding:var(--space-1)}
+    .compact-nav button[aria-current="step"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .flow-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);align-items:start;padding-block-end:var(--space-7)}
+    .region{min-inline-size:0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:var(--space-5);box-shadow:var(--shadow)}
+    .region:first-child{grid-column:1/-1;background:var(--surface-subtle)}
+    body[data-layout="linear"] .flow-grid{grid-template-columns:minmax(0,48rem)} body[data-layout="linear"] .region:first-child{grid-column:auto}
+    [data-region-role="support"]{position:sticky;inset-block-start:var(--space-4)}
+    label,legend{display:block;font-weight:700;margin-block:var(--space-3) var(--space-2)}
+    input{inline-size:100%;max-inline-size:32rem;border:1px solid var(--border);border-radius:calc(var(--radius)*.6);padding:.6rem .75rem;background:#fff;color:var(--text)}
+    fieldset{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:var(--space-2)}fieldset legend{inline-size:100%}
+    .choice[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent);font-weight:700}
+    .actions,.dialog-actions{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center}
+    .summary,.state-log{border-inline-start:.3rem solid var(--accent);padding:var(--space-3) var(--space-4);background:var(--surface-subtle)}
+    .status-line{display:flex;gap:var(--space-2);align-items:center}.marker{inline-size:.75rem;block-size:.75rem;border-radius:50%;background:var(--success);border:2px solid currentColor}
+    .error-summary{border:.2rem solid var(--danger);background:#fff;padding:var(--space-4);margin-block-end:var(--space-4)}
+    .error-summary[hidden]{display:none}.error-summary h2{color:var(--danger)}
+    dialog{max-inline-size:min(34rem,calc(100% - 2rem));border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-5);box-shadow:var(--shadow)}dialog::backdrop{background:rgba(23,32,42,.55)}
+    .sr-only{position:absolute!important;inline-size:1px!important;block-size:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+    @media (max-width:62rem){.flow-grid{grid-template-columns:1fr}[data-region-role="support"]{position:static}.region:first-child{grid-column:auto}.region{box-shadow:none}}
+    @media (max-width:42rem){body{font-size:1rem}.template-header,.template-main{inline-size:min(calc(100% - 1.25rem),var(--local-content))}.template-header{padding-block:var(--space-5) var(--space-4)}.compact-nav{display:flex}.flow-grid{display:block}.region{display:none;padding:var(--space-4)}.region:first-child,.region[data-compact-current="true"]{display:block}.region:first-child{margin-block-end:var(--space-4)}fieldset{display:grid}.actions{align-items:stretch}.actions button{inline-size:100%}}
+    @media (max-height:40rem){[data-region-role="support"]{position:static}.compact-nav{position:static}.region{scroll-margin-block:var(--space-3)}}
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}.skip-link{transform:none;position:absolute}}
+  </style>
+</head>
+<body data-layout="split" data-demo-type="tracker">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Asynchronous outcome tracker</h1>
+    <p>Track one submitted case across long-running milestones, expected updates, information requests, and stalled-progress recovery.</p>
+  </header>
+  <main id="main" class="template-main">
+    <div id="error-summary" class="error-summary" role="alert" tabindex="-1" hidden><h2>There is a problem</h2><p id="error-message">Review the highlighted fictional state and use Retry.</p><a href="#current-milestone-and-expectation">Go to the affected region</a><p><button type="button" data-demo="retry">Retry or recover</button></p></div>
+    <nav class="compact-nav" aria-label="Compact flow regions"><button type="button" data-pane-target="1" aria-current="step">1. submission identity and owner</button>
+<button type="button" data-pane-target="2" >2. current milestone and expectation</button>
+<button type="button" data-pane-target="3" >3. ordered milestone history</button>
+<button type="button" data-pane-target="4" >4. outstanding information requests</button>
+<button type="button" data-pane-target="5" >5. submitted record and messages</button>
+<button type="button" data-pane-target="6" >6. escalation or recovery</button></nav>
+    <div class="flow-grid"><section id="outcome-tracker" class="region" data-pane="0"  aria-labelledby="outcome-tracker-title"><p class="region-id">outcome-tracker</p><h2 id="outcome-tracker-title">outcome tracker</h2><p>Defines the fictional outcome tracker boundary and preserves one shared revision across every responsive topology.</p></section>
+<section id="submission-identity-and-owner" class="region" data-pane="1" data-compact-current="true" aria-labelledby="submission-identity-and-owner-title"><p class="region-id">submission-identity-and-owner</p><h2 id="submission-identity-and-owner-title">submission identity and owner</h2><p>Owns the submission identity and owner orientation and immutable basis that qualifies every downstream decision. This fictional realization demonstrates the relationship declared by the asynchronous-outcome-tracker authority.</p></section>
+<section id="current-milestone-and-expectation" class="region" data-pane="2"  aria-labelledby="current-milestone-and-expectation-title"><p class="region-id">current-milestone-and-expectation</p><h2 id="current-milestone-and-expectation-title">current milestone and expectation</h2><p>Owns the derived current milestone and expectation state This fictional realization demonstrates the relationship declared by the asynchronous-outcome-tracker authority.</p><label for="response-note">Response to information request</label><input id="response-note" name="response-note" type="text" value="Fictional supporting note" ></section>
+<section id="ordered-milestone-history" class="region" data-pane="3"  aria-labelledby="ordered-milestone-history-title"><p class="region-id">ordered-milestone-history</p><h2 id="ordered-milestone-history-title">ordered milestone history</h2><p>Owns the durable ordered milestone history evidence and its provenance This fictional realization demonstrates the relationship declared by the asynchronous-outcome-tracker authority.</p><fieldset><legend>Fictional choices</legend><button type="button" class="choice" data-choice="Current status: reviewing" aria-pressed="true">Current status: reviewing</button>
+<button type="button" class="choice" data-choice="Information requested" aria-pressed="false">Information requested</button>
+<button type="button" class="choice" data-choice="Expected update: not guaranteed" aria-pressed="false">Expected update: not guaranteed</button></fieldset></section>
+<section id="outstanding-information-requests" class="region" data-region-role="support" data-pane="4"  aria-labelledby="outstanding-information-requests-title"><p class="region-id">outstanding-information-requests</p><h2 id="outstanding-information-requests-title">outstanding information requests</h2><p>Owns the outstanding information requests input or decision and updates the shared transaction revision while preserving its label, status, and contextual actions. This fictional realization demonstrates the relationship declared by the asynchronous-outcome-tracker authority.</p><div class="summary" aria-labelledby="summary-title"><h3 id="summary-title">Current derived state</h3><p id="derived-value">No committed outcome. Fictional preview is ready.</p><p class="status-line"><span class="marker" aria-hidden="true"></span><span id="state-label">Ready for review</span></p></div></section>
+<section id="submitted-record-and-messages" class="region" data-region-role="support" data-pane="5"  aria-labelledby="submitted-record-and-messages-title"><p class="region-id">submitted-record-and-messages</p><h2 id="submitted-record-and-messages-title">submitted record and messages</h2><p>Owns the durable submitted record and messages evidence and its provenance This fictional realization demonstrates the relationship declared by the asynchronous-outcome-tracker authority.</p><div class="actions"><button type="button" class="primary" data-demo="primary">Send requested information</button><button type="button" data-demo="secondary">Simulate external milestone</button><button type="button" data-demo="back">Back or edit</button></div></section>
+<section id="escalation-or-recovery" class="region" data-pane="6"  aria-labelledby="escalation-or-recovery-title"><p class="region-id">escalation-or-recovery</p><h2 id="escalation-or-recovery-title">escalation or recovery</h2><p>Owns the escalation or recovery recovery route and preserves the exact state, trigger, and return position. This fictional realization demonstrates the relationship declared by the asynchronous-outcome-tracker authority.</p><div class="state-log"><h3>State and recovery preview</h3><p id="state-detail">Use the controls to simulate pending, error, conflict, success, and recovery without network access.</p><button type="button" data-demo="retry">Retry or recover</button></div></section></div>
+
+  </main>
+  <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  <script>
+    (() => {
+      'use strict';
+      const status = document.getElementById('live-status');
+      const stateLabel = document.getElementById('state-label');
+      const stateDetail = document.getElementById('state-detail');
+      const derived = document.getElementById('derived-value');
+      const errorSummary = document.getElementById('error-summary');
+      const paneButtons = Array.from(document.querySelectorAll('[data-pane-target]'));
+      const panes = Array.from(document.querySelectorAll('[data-pane]'));
+      const choices = Array.from(document.querySelectorAll('[data-choice]'));
+      let currentPane = 1;
+      let pending = false;
+      let selected = choices.length ? choices[0].dataset.choice : '';
+      const demoType = document.body.dataset.demoType;
+      const primaryButton = document.querySelector('[data-demo="primary"]');
+      const secondaryButton = document.querySelector('[data-demo="secondary"]');
+      let addManagerItem = null;
+      let refreshSignature = () => {};
+      const announce = (message) => { status.textContent = ''; window.setTimeout(() => { status.textContent = message; }, 10); };
+      const setState = (label, detail) => { if (stateLabel) stateLabel.textContent = label; if (stateDetail) stateDetail.textContent = detail; announce(label + '. ' + detail); };
+      const showPane = (index, moveFocus = true) => {
+        currentPane = Math.max(1, Math.min(index, panes.length - 1));
+        panes.forEach((pane) => {
+          if (pane.dataset.pane === '0') return;
+          if (Number(pane.dataset.pane) === currentPane) pane.setAttribute('data-compact-current','true');
+          else pane.removeAttribute('data-compact-current');
+        });
+        paneButtons.forEach((button) => { if (Number(button.dataset.paneTarget) === currentPane) button.setAttribute('aria-current','step'); else button.removeAttribute('aria-current'); });
+        const target = panes.find((pane) => Number(pane.dataset.pane) === currentPane);
+        if (moveFocus && target && window.matchMedia('(max-width: 42rem)').matches) target.querySelector('h2').setAttribute('tabindex','-1'), target.querySelector('h2').focus();
+      };
+      paneButtons.forEach((button) => button.addEventListener('click', () => showPane(Number(button.dataset.paneTarget))));
+      choices.forEach((button) => button.addEventListener('click', () => {
+        const value = button.dataset.choice;
+        if (demoType === 'signature') {
+          button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
+          selected = choices.filter((item) => item.getAttribute('aria-pressed') === 'true').map((item) => item.dataset.choice).join('; ');
+          refreshSignature();
+          return;
+        }
+        if (demoType === 'plans') {
+          const billing = value.includes('billing');
+          choices.filter((item) => item.dataset.choice.includes('billing') === billing).forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          selected = choices.filter((item) => item.getAttribute('aria-pressed') === 'true').map((item) => item.dataset.choice).join(' + ');
+          const expanded = selected.includes('Expanded');
+          const annual = selected.includes('Annual');
+          if (derived) derived.textContent = 'Selected: ' + selected + '. Fictional price: ' + (expanded ? (annual ? '216' : '22') : (annual ? '108' : '12')) + ' units.';
+          setState('Plan price updated', 'Plan and billing terms remain attached to the selected price.');
+          return;
+        }
+        selected = value;
+        choices.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        if (derived) derived.textContent = (demoType === 'branch' ? 'Evidence path: ' : 'Selected: ') + value + '. No committed outcome.';
+        setState('Selection updated', 'The same selected state remains available at every topology.');
+      }));
+      const updateDerived = () => {
+        const numbers = Array.from(document.querySelectorAll('input[type="number"]')).map((input) => Number(input.value || 0));
+        if (document.body.dataset.demoType === 'calculate' && numbers.length >= 2) derived.textContent = 'Fictional estimate: ' + (numbers[0] * numbers[1]).toFixed(2) + ' units, derived from every visible input.';
+        else if (document.body.dataset.demoType === 'checkout' && numbers.length) derived.textContent = 'Fictional total: ' + (numbers[0] * 18 + (selected.includes('Priority') ? 12 : 5)).toFixed(2) + ' units including selected fulfillment.';
+        else if (numbers.length) derived.textContent = 'Fictional derived preview: ' + numbers.reduce((a,b)=>a+b,0).toFixed(2) + ' units.';
+      };
+      document.querySelectorAll('input').forEach((input) => input.addEventListener('input', () => { updateDerived(); setState('Draft updated','Derived review is stale until recalculation completes.'); }));
+      updateDerived();
+      document.querySelectorAll('[data-demo]').forEach((button) => button.addEventListener('click', () => {
+        const action = button.dataset.demo;
+        if (action === 'back') { showPane(currentPane - 1); setState('Earlier context restored','The exact local inputs and selection remain unchanged.'); return; }
+        if (action === 'retry') { errorSummary.hidden = true; setState('Recovery ready','The draft and selection were preserved for another attempt.'); return; }
+        if (action === 'secondary') {
+          if (demoType === 'tasks') {
+            primaryButton.disabled = false;
+            setState('Required tasks complete', 'Final submission is now available and dependency state remains visible.');
+            return;
+          }
+          if (demoType === 'manager' && addManagerItem) {
+            addManagerItem();
+            return;
+          }
+          if (demoType === 'tracker') {
+            setState('External milestone received', 'The expected update changed; this remains an expectation rather than a guarantee.');
+            return;
+          }
+          if (demoType === 'seats') {
+            document.querySelectorAll('[data-seat-identity]').forEach((item) => item.setAttribute('aria-pressed','false'));
+            if (derived) derived.textContent = 'The fictional seat hold expired. Choose the same seat or another available seat.';
+          }
+          errorSummary.hidden = false;
+          const labels = {calculate:'Source rate is stale; review assumptions before acceptance.',question:'Choose one answer before continuing.',steps:'Draft save failed; retry without losing answers.',tasks:'A dependency remains locked.',manager:'A new fictional item was added; remove remains reversible.',export:'The generated archive expired; configuration is preserved.',pipeline:'Two fictional rows require correction before commit.',ledger:'A changed answer invalidated the derived total.',branch:'Escalation is pending with the accumulated evidence.',verify:'Verification failed; prerequisite context remains visible.',gate:'The record changed during transition; refresh evidence.',booking:'Open the date dialog and return focus to this trigger.',seats:'The seat hold expired; selection remains identified for recovery.',checkout:'Payment was declined; order submission was not duplicated.',plans:'Terms changed; re-encounter the current price before purchase.',reference:'The reference version changed; draft values remain preserved.',signature:'Signer capacity does not match the invitation.',handoff:'The recipient declined; access evidence remains in the tracker.',tracker:'An external milestone arrived; expectation is not a guarantee.'};
+          document.getElementById('error-message').textContent = labels[document.body.dataset.demoType] || 'A recoverable fictional conflict occurred.';
+          setState('Action needs attention', document.getElementById('error-message').textContent);
+          errorSummary.focus();
+          const dialog = document.getElementById('calendar-dialog'); if (dialog && !dialog.open) dialog.showModal();
+          return;
+        }
+        if (action === 'primary' && !pending) {
+          pending = true; button.disabled = true; setState('Pending','Duplicate commitment is prevented while the local simulation runs.');
+          window.setTimeout(() => { pending=false; button.disabled=false; errorSummary.hidden=true; setState('Success','The fictional outcome is confirmed with a recovery or handoff path.'); showPane(panes.length-1,false); }, 350);
+        }
+      }));
+      const dialog = document.getElementById('calendar-dialog');
+      if (dialog) {
+        const trigger = document.querySelector('[data-demo="secondary"]');
+        dialog.querySelectorAll('[data-calendar-choice]').forEach((button) => button.addEventListener('click', () => { selected=button.dataset.calendarChoice; if (derived) derived.textContent='Selected date: '+selected+'. Choose a held time slot next.'; dialog.close(); trigger.focus(); announce(selected+' selected. Focus returned to Choose another date.'); }));
+        dialog.querySelector('[data-dialog-close]').addEventListener('click', () => { dialog.close(); trigger.focus(); });
+        dialog.addEventListener('cancel', (event) => { event.preventDefault(); dialog.close(); trigger.focus(); });
+      }
+      if (demoType === 'steps' && derived) derived.textContent = 'Step 2 of 4 — Fictional evidence section. Draft saved locally for this preview.';
+      if (demoType === 'pipeline' && derived) derived.textContent = 'Parsed 6 fictional rows: 4 valid, 2 require mapping review.';
+      if (demoType === 'tasks') {
+        primaryButton.disabled = true;
+        primaryButton.setAttribute('aria-describedby','state-detail');
+        if (derived) derived.textContent = '2 of 3 required fictional tasks complete. One dependency is locked.';
+      }
+      if (demoType === 'reference') {
+        const field = document.getElementById('reference-value');
+        field.addEventListener('focus', () => { if (derived) derived.textContent = 'Reference anchor: Clause B. Draft value remains unchanged.'; announce('Clause B reference anchor selected for the focused field.'); });
+      }
+      if (demoType === 'signature') {
+        choices.forEach((item) => item.setAttribute('aria-pressed','false'));
+        const signatureField = document.getElementById('signature-name');
+        refreshSignature = () => {
+          const allAcknowledged = choices.every((item) => item.getAttribute('aria-pressed') === 'true');
+          const signerPresent = signatureField.value.trim().length > 0;
+          primaryButton.disabled = !(allAcknowledged && signerPresent);
+          if (derived) derived.textContent = allAcknowledged && signerPresent ? 'Current instrument version, required clauses, and signer capacity are ready for final review.' : 'Commit remains locked until every required clause and signer capacity are acknowledged.';
+          setState(primaryButton.disabled ? 'Signature not ready' : 'Signature ready for review', primaryButton.disabled ? 'Complete all independent evidence owners.' : 'Final commit can now create fictional audit evidence.');
+        };
+        signatureField.addEventListener('input', refreshSignature);
+        refreshSignature();
+      }
+      if (demoType === 'manager') {
+        const host = document.getElementById('item-summary-list');
+        const list = document.createElement('ul');
+        list.id = 'fictional-record-list';
+        host.append(list);
+        let count = 0;
+        const createRecord = () => {
+          count += 1;
+          const item = document.createElement('li');
+          const name = document.createElement('span');
+          name.textContent = 'Fictional record ' + count + '. ';
+          const edit = document.createElement('button');
+          edit.type = 'button'; edit.textContent = 'Edit fictional record ' + count;
+          const remove = document.createElement('button');
+          remove.type = 'button'; remove.textContent = 'Remove fictional record ' + count;
+          edit.addEventListener('click', () => { const field=document.getElementById('item-name'); field.value='Fictional record '+count; field.focus(); announce('Editing fictional record '+count+'.'); });
+          remove.addEventListener('click', () => { item.remove(); secondaryButton.focus(); setState('Record removed', 'Undo is represented by adding the preserved fictional value again.'); });
+          item.append(name, edit, document.createTextNode(' '), remove);
+          list.append(item);
+          remove.focus();
+          setState('Record added', 'The new record has contextual Edit and Remove names.');
+        };
+        addManagerItem = createRecord;
+        createRecord();
+      }
+      if (demoType === 'seats') {
+        const mapHost = document.getElementById('seat-map-and-legend');
+        const listHost = document.getElementById('accessible-seat-list');
+        const map = document.createElement('div'); map.setAttribute('role','group'); map.setAttribute('aria-label','Fictional seat map'); map.className='actions';
+        const list = document.createElement('ul'); list.setAttribute('aria-label','Accessible seat list');
+        const chooseSeat = (identity) => {
+          document.querySelectorAll('[data-seat-identity]').forEach((item) => item.setAttribute('aria-pressed',String(item.dataset.seatIdentity===identity)));
+          selected=identity;
+          if (derived) derived.textContent='Selected '+identity+' in both map and accessible list. Fictional hold: 04:59; price: 24 units.';
+          setState('Seat held','Map and list expose the same selected seat identity.');
+        };
+        ['A1','A2','B1'].forEach((identity,index) => {
+          const mapButton=document.createElement('button'); mapButton.type='button'; mapButton.textContent=identity+(index===2?' unavailable':' available'); mapButton.dataset.seatIdentity=identity; mapButton.setAttribute('aria-pressed','false'); mapButton.disabled=index===2; mapButton.addEventListener('click',()=>chooseSeat(identity)); map.append(mapButton);
+          const row=document.createElement('li'); const listButton=document.createElement('button'); listButton.type='button'; listButton.textContent='Choose '+identity+(index===0?' accessible':''); listButton.dataset.seatIdentity=identity; listButton.setAttribute('aria-pressed','false'); listButton.disabled=index===2; listButton.addEventListener('click',()=>chooseSeat(identity)); row.append(listButton); list.append(row);
+        });
+        mapHost.append(map); listHost.append(list); chooseSeat('A1');
+      }
+    })();
+  </script>
+</body>
+</html>

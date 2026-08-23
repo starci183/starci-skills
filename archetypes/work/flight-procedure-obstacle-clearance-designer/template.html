@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en" data-archetype-template="flight-procedure-obstacle-clearance-designer">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Flight procedure obstacle clearance designer · Archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-max: 94rem; --local-control: 2.75rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-block: var(--space-5); }
+    body { margin: 0; min-width: 20rem; color: var(--text); background: var(--canvas); font: 1rem/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-wrap: anywhere; }
+    button, input { min-height: var(--local-control); font: inherit; }
+    button { padding: var(--space-2) var(--space-3); color: #fff; background: var(--accent); border: 2px solid var(--accent); border-radius: calc(var(--radius) - var(--space-1)); font-weight: 750; cursor: pointer; }
+    button.secondary { color: var(--accent-strong); background: var(--surface); border-color: var(--border); }
+    button.danger { background: var(--danger); border-color: var(--danger); }
+    button:disabled { cursor: wait; opacity: .65; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip-link { position: fixed; inset: var(--space-2) auto auto var(--space-2); z-index: 50; padding: var(--space-2) var(--space-3); color: #fff; background: var(--focus); transform: translateY(-150%); }
+    .skip-link:focus { transform: translateY(0); }
+    .template-header { padding: var(--space-6) max(var(--space-4), calc((100% - var(--local-max)) / 2)); color: #fff; background: var(--accent-strong); }
+    .template-header p { max-width: 76ch; margin-bottom: 0; }
+    .template-header h1 { margin: var(--space-1) 0 0; line-height: 1.15; }
+    .eyebrow { margin: 0; color: inherit; font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .template-main { width: min(calc(100% - 2rem), var(--local-max)); margin-inline: auto; padding-block: var(--space-5) var(--space-7); }
+    .summary, .card, .pane-switcher, .intermediate-switch { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .summary { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; padding: var(--space-4); margin-bottom: var(--space-4); }
+    .summary h2, .summary p { margin: 0; }
+    .summary-copy { max-width: 76ch; }
+    .verdict { padding: var(--space-2) var(--space-3); color: var(--danger); background: var(--surface-subtle); border: 1px solid currentColor; border-radius: 999px; font-weight: 800; }
+    .layout { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(17rem,.9fr) minmax(18rem,.9fr); gap: var(--space-4); align-items: start; }
+    .pane { min-width: 0; display: grid; gap: var(--space-4); align-content: start; }
+    .card { min-width: 0; padding: var(--space-4); }
+    .section-heading { display: flex; gap: var(--space-3); align-items: start; justify-content: space-between; margin-bottom: var(--space-3); }
+    .section-heading h2 { margin: var(--space-1) 0 0; font-size: 1.08rem; }
+    .state-chip { padding: var(--space-1) var(--space-2); color: var(--text); background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 999px; font-size: .82rem; white-space: nowrap; }
+    .state-chip.error { color: var(--danger); border-color: var(--danger); }
+    .case-list, .scenario-list { display: grid; gap: var(--space-2); padding-left: 1.4rem; }
+    .scenario-list li { padding: var(--space-2); border-left: .3rem solid var(--border); }
+    .scenario-list li.current { border-left-color: var(--accent); background: var(--surface-subtle); }
+    .scenario-list li.complete { border-left-color: var(--success); }
+    .step-state { display: inline-block; min-width: 5.25rem; }
+    .case-button { width: 100%; display: grid; gap: var(--space-1); text-align: left; color: var(--text); background: var(--surface); border-color: var(--border); }
+    .case-button span { color: var(--muted); font-weight: 500; }
+    .case-button.selected { color: var(--accent-strong); background: var(--surface-subtle); border-color: var(--accent); }
+    .button-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .bounded { overflow: auto; overscroll-behavior: contain; max-block-size: 26rem; }
+    .action-rail { position: sticky; top: var(--space-4); }
+    .action-status { padding: var(--space-3); background: var(--surface-subtle); border-left: .35rem solid var(--accent); }
+    .action-status.error { border-left-color: var(--danger); }
+    .pane-switcher, .intermediate-switch { display: none; gap: var(--space-2); padding: var(--space-2); margin-bottom: var(--space-4); }
+    .pane-switcher button { flex: 1; }
+    .pane-switcher button[aria-pressed="true"] { background: var(--accent-strong); border-color: var(--accent-strong); }
+    dialog { width: min(calc(100% - 2rem), 34rem); padding: 0; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); }
+    dialog::backdrop { background: rgba(23,32,42,.66); }
+    .dialog-body { padding: var(--space-5); }
+    .dialog-body h2 { margin-top: 0; }
+    .dialog-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: var(--space-2); margin-top: var(--space-4); }
+    label { display: block; margin-top: var(--space-3); font-weight: 800; }
+    input { width: 100%; padding: var(--space-2) var(--space-3); color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+    .error-summary, .field-error { color: var(--danger); font-weight: 750; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 68rem) and (min-width: 44.01rem) {
+      .intermediate-switch { display: flex; align-items: center; justify-content: space-between; }
+      .layout { grid-template-columns: minmax(0,1.15fr) minmax(18rem,.85fr); }
+      .pane-support { display: none; }
+      .pane-support.is-revealed { display: grid; grid-column: 1 / -1; }
+      .pane-detail { grid-column: 2; grid-row: 1; }
+      .action-rail { position: static; }
+    }
+    @media (max-width: 44rem) {
+      body { font-size: 1rem; }
+      .template-main { width: min(calc(100% - 1rem), var(--local-max)); padding-top: var(--space-3); }
+      .template-header { padding: var(--space-5) var(--space-4); }
+      .summary { align-items: stretch; flex-direction: column; }
+      .verdict { align-self: start; }
+      .intermediate-switch { display: none; }
+      .pane-switcher { display: flex; position: sticky; top: var(--space-2); z-index: 5; }
+      .layout { display: block; }
+      .pane { display: none; }
+      .pane.is-active { display: grid; }
+      .section-heading { align-items: stretch; flex-direction: column; }
+      .state-chip { align-self: start; white-space: normal; }
+      .action-rail { position: static; }
+      .dialog-actions { flex-direction: column-reverse; }
+      .dialog-actions button { width: 100%; }
+    }
+    @media (max-height: 38rem) {
+      .pane-switcher, .action-rail { position: static; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to archetype content</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Flight procedure obstacle clearance designer</h1>
+    <p>Construct and independently validate an instrument flight procedure by defining ordered segments and protection areas, evaluating terrain and obstacles, deriving minima and encoding the publishable procedure.</p>
+  </header>
+  <main id="main" class="template-main" data-region="procedure-designer" tabindex="-1">
+    <section class="summary" aria-labelledby="task-summary-title">
+      <div class="summary-copy"><p class="eyebrow">Fictional product-neutral demonstration</p><h2 id="task-summary-title">Current task context</h2><p>segment geometry, protection surfaces, obstacle evaluation and encoded output retain one traceable coordinate authority.</p></div>
+      <span class="verdict" id="verdict">Attention required · textual verdict</span>
+    </section>
+    <div class="intermediate-switch"><span>Lower-priority evidence yields without losing the current case.</span><button type="button" class="secondary" id="toggle-support" aria-expanded="false" aria-controls="support-pane">Show alternate evidence</button></div>
+    <nav class="pane-switcher" aria-label="Compact dominant-task sequence">
+      <button type="button" data-pane-target="primary" aria-pressed="true">Context</button>
+      <button type="button" data-pane-target="support" aria-pressed="false">Proof</button>
+      <button type="button" data-pane-target="detail" aria-pressed="false">Decision</button>
+    </nav>
+    <div class="layout">
+      <div class="pane pane-primary is-active" data-pane="primary">
+        <section class="card" aria-labelledby="case-title">
+          <div class="section-heading"><div><p class="eyebrow">Selected fictional case</p><h2 id="case-title">Evidence identity</h2></div><span class="state-chip" id="selected-state">Selected</span></div>
+          <div class="case-list" id="case-list">
+            <button type="button" class="case-button selected" data-item="Case 1: Criteria loading/current/superseded" aria-pressed="true"><strong>Case 1</strong><span>Criteria loading/current/superseded</span></button>
+            <button type="button" class="case-button" data-item="Case 2: segment incomplete/valid" aria-pressed="false"><strong>Case 2</strong><span>segment incomplete/valid</span></button>
+            <button type="button" class="case-button" data-item="Case 3: navigation data current/stale" aria-pressed="false"><strong>Case 3</strong><span>navigation data current/stale</span></button>
+          </div>
+          <p id="selected-copy">Case 1 remains selected across wide, intermediate, and compact topology changes.</p>
+          <div class="button-row"><button type="button" class="secondary" id="move-up">Move up</button><button type="button" class="secondary" id="move-down">Move down</button></div>
+        </section>
+<section class="card" id="region-aerodrome-runway-navigation-and-criteria-version" data-region="aerodrome-runway-navigation-and-criteria-version" aria-labelledby="heading-aerodrome-runway-navigation-and-criteria-version">
+        <div class="section-heading"><div><p class="eyebrow">Required region 1</p><h2 id="heading-aerodrome-runway-navigation-and-criteria-version">Aerodrome Runway Navigation And Criteria Version</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+<section class="card" id="region-ordered-procedure-segment-model" data-region="ordered-procedure-segment-model" aria-labelledby="heading-ordered-procedure-segment-model">
+        <div class="section-heading"><div><p class="eyebrow">Required region 2</p><h2 id="heading-ordered-procedure-segment-model">Ordered Procedure Segment Model</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+<section class="card bounded" id="region-geographic-centerline-and-protection-surfaces" data-region="geographic-centerline-and-protection-surfaces" aria-labelledby="heading-geographic-centerline-and-protection-surfaces">
+        <div class="section-heading"><div><p class="eyebrow">Required region 3</p><h2 id="heading-geographic-centerline-and-protection-surfaces">Geographic Centerline And Protection Surfaces</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+<section class="card" id="region-obstacle-and-terrain-inventory" data-region="obstacle-and-terrain-inventory" aria-labelledby="heading-obstacle-and-terrain-inventory">
+        <div class="section-heading"><div><p class="eyebrow">Required region 4</p><h2 id="heading-obstacle-and-terrain-inventory">Obstacle And Terrain Inventory</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+      </div>
+      <div class="pane pane-support" id="support-pane" data-pane="support">
+        <section class="card" aria-labelledby="scenario-title">
+          <div class="section-heading"><div><p class="eyebrow">Acceptance scenario</p><h2 id="scenario-title">Ordered proof, not a miniature desktop</h2></div><span class="state-chip">Fictional</span></div>
+          <ol class="scenario-list">
+            <li data-step="1">add one obstacle that penetrates a selected segment surface</li>
+            <li data-step="2">recalculate the controlling minimum</li>
+            <li data-step="3">revise geometry without drag-only input</li>
+            <li data-step="4">expose the coded-data delta</li>
+            <li data-step="5">close an independent validation finding</li>
+            <li data-step="6">preserve coordinate/obstacle identity in compact</li>
+          </ol>
+          <div class="button-row"><button type="button" id="advance-scenario">Advance scenario proof</button><button type="button" class="secondary" id="reset-scenario">Reset scenario</button></div>
+        </section>
+<section class="card" id="region-penetration-and-required-clearance-calculation" data-region="penetration-and-required-clearance-calculation" aria-labelledby="heading-penetration-and-required-clearance-calculation">
+        <div class="section-heading"><div><p class="eyebrow">Required region 5</p><h2 id="heading-penetration-and-required-clearance-calculation">Penetration And Required Clearance Calculation</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+<section class="card" id="region-minima-and-gradient-ledger" data-region="minima-and-gradient-ledger" aria-labelledby="heading-minima-and-gradient-ledger">
+        <div class="section-heading"><div><p class="eyebrow">Required region 6</p><h2 id="heading-minima-and-gradient-ledger">Minima And Gradient Ledger</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+<section class="card" id="region-coded-path-and-chart-data" data-region="coded-path-and-chart-data" aria-labelledby="heading-coded-path-and-chart-data">
+        <div class="section-heading"><div><p class="eyebrow">Required region 7</p><h2 id="heading-coded-path-and-chart-data">Coded Path And Chart Data</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+      </div>
+      <div class="pane pane-detail action-rail" data-pane="detail">
+<section class="card" id="region-independent-validation-findings" data-region="independent-validation-findings" aria-labelledby="heading-independent-validation-findings">
+        <div class="section-heading"><div><p class="eyebrow">Required region 8</p><h2 id="heading-independent-validation-findings">Independent Validation Findings</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+<section class="card" id="region-approved-publication-package" data-region="approved-publication-package" aria-labelledby="heading-approved-publication-package">
+        <div class="section-heading"><div><p class="eyebrow">Required region 9</p><h2 id="heading-approved-publication-package">Approved Publication Package</h2></div><span class="state-chip" data-state-chip>Ready · fictional</span></div>
+        <p>This region preserves its named evidence, selection, and recovery relationship across every topology.</p>
+      </section>
+        <section class="card" aria-labelledby="action-title">
+          <div class="section-heading"><div><p class="eyebrow">State and recovery</p><h2 id="action-title">Complete the dominant task</h2></div><span class="state-chip" id="action-chip">Ready</span></div>
+          <p class="action-status" id="action-status">The selected fictional case is ready for its next evidenced action.</p>
+          <div class="button-row"><button type="button" class="danger" id="simulate-failure">Introduce blocking condition</button><button type="button" class="secondary" id="retry-action" hidden>Apply recovery step</button><button type="button" id="commit-action">Record terminal receipt</button><button type="button" class="secondary" id="back-evidence">Back to selected evidence</button></div>
+        </section>
+      </div>
+    </div>
+    <details>
+      <summary>State families and responsive recovery coverage</summary>
+      <p>Criteria loading/current/superseded, segment incomplete/valid, navigation data current/stale, obstacle unassessed/clear/penetrating/controlling, clearance pass/fail, minima provisional/final, coded path invalid/valid, validation open/resolved/waived with authority, package draft/approved/published and amendment superseding. Loading, ready, empty, error and retry, unavailable, pending, success, stale or conflict, focus transition, and responsive presentation preserve the exact selected fictional case.</p>
+    </details>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+  <dialog id="confirm-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description">
+    <form class="dialog-body" id="confirm-form" method="dialog" novalidate>
+      <h2 id="dialog-title">Record terminal receipt</h2>
+      <p id="dialog-description">Confirm the fictional action reference. This local-only transaction preserves selection, order, state, and recovery lineage.</p>
+      <div class="error-summary" id="error-summary" role="alert" tabindex="-1" hidden><p>Correct the action reference.</p><a href="#action-reference">Go to action reference</a></div>
+      <label for="action-reference">Action reference</label>
+      <input id="action-reference" name="actionReference" autocomplete="off" required minlength="3" value="REF-12">
+      <p class="field-error" id="reference-error" hidden>Enter at least three characters.</p>
+      <div class="dialog-actions"><button type="button" class="secondary" id="cancel-dialog">Cancel</button><button type="submit" id="confirm-action">Confirm receipt</button></div>
+    </form>
+  </dialog>
+  <script>
+    (() => {
+      const liveStatus = document.querySelector('#live-status');
+      const caseButtons = Array.from(document.querySelectorAll('.case-button'));
+      const caseList = document.querySelector('#case-list');
+      const selectedCopy = document.querySelector('#selected-copy');
+      const selectedState = document.querySelector('#selected-state');
+      const verdict = document.querySelector('#verdict');
+      const actionChip = document.querySelector('#action-chip');
+      const actionStatus = document.querySelector('#action-status');
+      const commitAction = document.querySelector('#commit-action');
+      const failureAction = document.querySelector('#simulate-failure');
+      const retryAction = document.querySelector('#retry-action');
+      const stateChips = Array.from(document.querySelectorAll('[data-state-chip]'));
+      const scenarioItems = Array.from(document.querySelectorAll('.scenario-list li'));
+      const advanceScenario = document.querySelector('#advance-scenario');
+      const resetScenario = document.querySelector('#reset-scenario');
+      const paneButtons = Array.from(document.querySelectorAll('[data-pane-target]'));
+      const panes = Array.from(document.querySelectorAll('[data-pane]'));
+      const supportPane = document.querySelector('#support-pane');
+      const toggleSupport = document.querySelector('#toggle-support');
+      const dialog = document.querySelector('#confirm-dialog');
+      const form = document.querySelector('#confirm-form');
+      const reference = document.querySelector('#action-reference');
+      const errorSummary = document.querySelector('#error-summary');
+      const referenceError = document.querySelector('#reference-error');
+      const confirmAction = document.querySelector('#confirm-action');
+      let dialogTrigger = null;
+      let scenarioIndex = 0;
+
+      function announce(message) { liveStatus.textContent = message; }
+      function renderScenario() {
+        scenarioItems.forEach((item, index) => {
+          const marker = item.querySelector('.step-state');
+          const state = index < scenarioIndex ? 'Complete' : index === scenarioIndex ? 'Current' : 'Pending';
+          marker.textContent = state;
+          item.classList.toggle('complete', state === 'Complete');
+          item.classList.toggle('current', state === 'Current');
+          if (state === 'Current') item.setAttribute('aria-current', 'step');
+          else item.removeAttribute('aria-current');
+        });
+        advanceScenario.disabled = scenarioIndex >= scenarioItems.length;
+      }
+      function selectedButton() { return caseButtons.find((button) => button.getAttribute('aria-pressed') === 'true'); }
+      function setSelected(button) {
+        caseButtons.forEach((row) => { row.classList.remove('selected'); row.setAttribute('aria-pressed', 'false'); });
+        button.classList.add('selected');
+        button.setAttribute('aria-pressed', 'true');
+        selectedCopy.textContent = button.dataset.item + ' remains selected across every topology.';
+        selectedState.textContent = 'Selected';
+        announce(button.dataset.item + ' selected. Related proof and actions updated without moving focus.');
+      }
+      function activatePane(name, moveFocus) {
+        panes.forEach((pane) => pane.classList.toggle('is-active', pane.dataset.pane === name));
+        paneButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.paneTarget === name)));
+        if (moveFocus) {
+          const pane = panes.find((candidate) => candidate.dataset.pane === name);
+          const heading = pane ? pane.querySelector('h2') : null;
+          if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({preventScroll:true}); }
+        }
+      }
+      function setFailure() {
+        verdict.textContent = 'Blocked · textual verdict';
+        actionChip.textContent = 'Error · recovery available';
+        actionChip.classList.add('error');
+        actionStatus.textContent = 'A fictional blocking condition invalidated the terminal proof. The selected case and safe evidence remain available.';
+        actionStatus.classList.add('error');
+        commitAction.disabled = true;
+        retryAction.hidden = false;
+        stateChips.forEach((chip,index) => { if (index < 2) { chip.textContent = 'Stale or conflict'; chip.classList.add('error'); } });
+        announce('Blocking condition introduced. Terminal action is disabled and a recovery step is available.');
+      }
+      function restoreReady() {
+        verdict.textContent = 'Ready · blocking condition resolved';
+        actionChip.textContent = 'Ready';
+        actionChip.classList.remove('error');
+        actionStatus.textContent = 'Recovery recomputed the complete ordered proof for the preserved fictional case.';
+        actionStatus.classList.remove('error');
+        commitAction.disabled = false;
+        retryAction.hidden = true;
+        stateChips.forEach((chip) => { chip.textContent = 'Ready · recomputed'; chip.classList.remove('error'); });
+        announce('Recovery completed. Selection, order, and responsive context are unchanged.');
+      }
+      scenarioItems.forEach((item) => {
+        const marker = document.createElement('strong');
+        marker.className = 'step-state';
+        item.tabIndex = -1;
+        item.prepend(marker, document.createTextNode(' · '));
+      });
+      renderScenario();
+      advanceScenario.addEventListener('click', () => {
+        if (scenarioIndex < scenarioItems.length) scenarioIndex += 1;
+        renderScenario();
+        const completed = scenarioItems[Math.max(0, scenarioIndex - 1)];
+        announce(scenarioIndex >= scenarioItems.length ? 'Acceptance scenario complete. Terminal receipt is available.' : 'Scenario step completed: ' + completed.textContent);
+      });
+      resetScenario.addEventListener('click', () => {
+        scenarioIndex = 0;
+        renderScenario();
+        scenarioItems[0].focus({preventScroll:true});
+        announce('Acceptance scenario reset to its first task-specific proof step.');
+      });
+      caseButtons.forEach((button) => button.addEventListener('click', () => setSelected(button)));
+      document.querySelector('#move-up').addEventListener('click', () => {
+        const button = selectedButton();
+        if (!button || !button.previousElementSibling) { announce('The selected case is already first.'); return; }
+        caseList.insertBefore(button, button.previousElementSibling);
+        button.focus();
+        announce(button.dataset.item + ' moved up with a non-drag control.');
+      });
+      document.querySelector('#move-down').addEventListener('click', () => {
+        const button = selectedButton();
+        if (!button || !button.nextElementSibling) { announce('The selected case is already last.'); return; }
+        caseList.insertBefore(button.nextElementSibling, button);
+        button.focus();
+        announce(button.dataset.item + ' moved down with a non-drag control.');
+      });
+      paneButtons.forEach((button) => button.addEventListener('click', () => {
+        activatePane(button.dataset.paneTarget, true);
+        announce(button.textContent + ' compact pane opened. Selection and state are preserved.');
+      }));
+      toggleSupport.addEventListener('click', () => {
+        const revealed = !supportPane.classList.contains('is-revealed');
+        supportPane.classList.toggle('is-revealed', revealed);
+        toggleSupport.setAttribute('aria-expanded', String(revealed));
+        toggleSupport.textContent = revealed ? 'Hide alternate evidence' : 'Show alternate evidence';
+        announce(revealed ? 'Alternate evidence revealed.' : 'Alternate evidence hidden; selection is preserved.');
+      });
+      failureAction.addEventListener('click', setFailure);
+      retryAction.addEventListener('click', restoreReady);
+      document.querySelector('#back-evidence').addEventListener('click', () => {
+        activatePane('primary', false);
+        const button = selectedButton();
+        if (button) button.focus({preventScroll:true});
+        announce('Returned to the exact selected evidence and preserved order.');
+      });
+      commitAction.addEventListener('click', () => {
+        dialogTrigger = commitAction;
+        errorSummary.hidden = true;
+        referenceError.hidden = true;
+        dialog.showModal();
+        reference.focus();
+      });
+      document.querySelector('#cancel-dialog').addEventListener('click', () => dialog.close('cancel'));
+      form.addEventListener('submit', (event) => {
+        if (reference.value.trim().length < 3) {
+          event.preventDefault();
+          errorSummary.hidden = false;
+          referenceError.hidden = false;
+          reference.setAttribute('aria-invalid', 'true');
+          errorSummary.focus();
+          announce('Receipt not recorded. Correct the highlighted reference.');
+          return;
+        }
+        event.preventDefault();
+        confirmAction.disabled = true;
+        confirmAction.textContent = 'Pending';
+        announce('Receipt pending. Duplicate submission is disabled.');
+        window.setTimeout(() => {
+          confirmAction.disabled = false;
+          confirmAction.textContent = 'Confirm receipt';
+          verdict.textContent = 'Success · terminal receipt recorded';
+          actionChip.textContent = 'Success';
+          actionStatus.textContent = 'The fictional terminal receipt preserves the complete proof and recovery lineage.';
+          dialog.close('success');
+        }, 280);
+      });
+      dialog.addEventListener('close', () => {
+        if (dialogTrigger) dialogTrigger.focus();
+        announce(dialog.returnValue === 'success' ? 'Receipt recorded. Focus returned to the exact trigger.' : 'Action cancelled. State and selection are unchanged.');
+      });
+      dialog.addEventListener('cancel', () => announce('Dialog closed with Escape. Focus will return to the exact trigger.'));
+    })();
+  </script>
+</body>
+</html>

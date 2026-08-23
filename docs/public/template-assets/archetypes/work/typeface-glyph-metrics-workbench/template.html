@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en" data-archetype-template="typeface-glyph-metrics-workbench">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Typeface Glyph Metrics Workbench · Archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-max: 96rem; --local-control: 2.75rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-block: var(--space-6); }
+    body { margin: 0; min-width: 20rem; color: var(--text); background: var(--canvas); font: 1rem/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-wrap: anywhere; }
+    button, input, select, summary, a { font: inherit; }
+    button, input, select { min-height: var(--local-control); }
+    button, summary { cursor: pointer; }
+    button { padding: var(--space-2) var(--space-4); color: #fff; background: var(--accent); border: 2px solid transparent; border-radius: calc(var(--radius) - var(--space-1)); font-weight: 700; }
+    button:hover { background: var(--accent-strong); }
+    button.secondary { color: var(--accent-strong); background: var(--surface); border-color: var(--accent); }
+    button.danger { background: var(--danger); }
+    button:disabled { cursor: wait; opacity: .65; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip-link { position: fixed; inset: var(--space-2) auto auto var(--space-2); z-index: 20; padding: var(--space-3); color: #fff; background: var(--focus); transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+    .template-header { padding: var(--space-6) max(var(--space-4), calc((100% - var(--local-max)) / 2)); color: #fff; background: var(--accent-strong); }
+    .template-header h1 { max-width: 28ch; margin: 0; font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1.1; }
+    .template-header p:last-child { max-width: 72ch; margin-bottom: 0; }
+    .eyebrow { margin: 0 0 var(--space-2); color: inherit; font-size: .875rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .template-main { width: min(100% - 2rem, var(--local-max)); margin: var(--space-5) auto var(--space-7); }
+    .mode-note { padding: var(--space-3) var(--space-4); border-left: .35rem solid var(--accent); background: var(--surface); }
+    .task-shell { display: grid; grid-template-columns: minmax(15rem, .75fr) minmax(22rem, 1.4fr) minmax(18rem, 1fr); gap: var(--space-4); align-items: start; }
+    .panel, .region-card, details, dialog { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .panel, .region-card { padding: var(--space-4); min-width: 0; }
+    .step-list { display: grid; gap: var(--space-2); }
+    .step-button { display: grid; grid-template-columns: var(--local-control) 1fr; gap: var(--space-2); align-items: center; width: 100%; min-height: var(--local-control); text-align: left; color: var(--text); background: var(--surface); border-color: var(--border); }
+    .step-button span { display: grid; place-items: center; min-width: var(--local-control); min-height: var(--local-control); color: #fff; background: var(--accent-strong); border-radius: 50%; }
+    .step-button.selected { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
+    .workspace { display: grid; gap: var(--space-4); min-width: 0; }
+    .supporting-disclosure { margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none; }
+    .supporting-disclosure > summary { display: none; }
+    .supporting-disclosure:not([open]) > .supporting-content { display: contents; }
+    .supporting-content { gap: var(--space-4); }
+    .section-heading { display: flex; gap: var(--space-3); align-items: start; justify-content: space-between; }
+    .section-heading h2 { margin: 0; font-size: 1.15rem; text-transform: capitalize; }
+    .status { display: inline-flex; align-items: center; min-height: 1.8rem; padding: 0 var(--space-2); color: var(--success); background: #e9f7ef; border: 1px solid currentColor; border-radius: 999px; font-weight: 800; }
+    .status.warning { color: var(--warning); background: #fff4e5; }
+    .status.error { color: var(--danger); background: #fff0ee; }
+    .action-rail { display: grid; gap: var(--space-3); }
+    .action-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    label { display: block; margin-top: var(--space-3); font-weight: 800; }
+    input { width: 100%; margin-top: var(--space-1); padding: var(--space-2); color: var(--text); background: var(--surface); border: 2px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+    .error { color: var(--danger); font-weight: 700; }
+    .error-summary { padding: var(--space-3); color: var(--danger); border: 2px solid currentColor; border-radius: var(--radius); background: #fff0ee; }
+    .bounded { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+    table { width: 100%; min-width: 36rem; border-collapse: collapse; }
+    th, td { padding: var(--space-2); text-align: left; border-bottom: 1px solid var(--border); }
+    details { margin-top: var(--space-4); padding: var(--space-3); }
+    summary { min-height: var(--local-control); display: flex; align-items: center; font-weight: 800; }
+    dialog { width: min(34rem, calc(100% - 2rem)); padding: 0; color: var(--text); }
+    dialog::backdrop { background: rgba(23,32,42,.62); }
+    .dialog-body { padding: var(--space-5); }
+    .compact-nav { display: none; gap: var(--space-2); margin-bottom: var(--space-3); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 68rem) {
+      .task-shell { grid-template-columns: minmax(15rem,.7fr) minmax(22rem,1.3fr); }
+      .action-rail { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+      .action-rail > * { min-width: 0; }
+      .supporting-disclosure { padding: var(--space-3); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+      .supporting-disclosure > summary { display: flex; }
+      .supporting-disclosure:not([open]) > .supporting-content { display: none; }
+      .supporting-disclosure[open] > .supporting-content { display: grid; }
+    }
+    @media (max-width: 46rem) {
+      body { font-size: 1rem; }
+      .template-main { width: min(100% - 1rem, var(--local-max)); }
+      .task-shell { display: block; }
+      .step-panel { display: none; }
+      .compact-nav { display: flex; }
+      .workspace .region-card { display: none; }
+      .workspace .region-card.compact-active { display: block; }
+      .supporting-disclosure { padding: 0; background: transparent; border: 0; box-shadow: none; }
+      .supporting-disclosure > summary { display: none; }
+      .supporting-disclosure:not([open]) > .supporting-content { display: contents; }
+      .action-rail { display: grid; grid-template-columns: 1fr; margin-top: var(--space-4); }
+      .action-row { display: grid; }
+      .action-row button { width: 100%; }
+      .section-heading { display: grid; }
+      table { min-width: 32rem; }
+    }
+    @media (max-height: 38rem) {
+      .template-header { padding-block: var(--space-4); }
+      .task-shell, .action-rail { position: static; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Typeface Glyph Metrics Workbench</h1>
+    <p>Author a coherent font repertoire by reconciling glyph outlines, anchors and metrics with pair or class spacing, shaping tests and whole-font specimen proof. Fictional data demonstrates one conforming realization, not product truth or visual authority.</p>
+  </header>
+  <main id="main" class="template-main">
+    <p class="mode-note"><strong>Transformation:</strong> wide keeps required owners simultaneous; intermediate moves lower-priority evidence into synchronized disclosure; compact becomes one stateful primary-pane sequence rather than stacking every desktop box.</p>
+    <nav class="compact-nav" aria-label="Compact task sequence"><button type="button" class="secondary" id="previous-step">Previous</button><button type="button" id="next-step">Next</button></nav>
+    <div class="task-shell">
+      <aside class="panel step-panel" aria-labelledby="step-heading"><h2 id="step-heading">Task sequence</h2><div class="step-list"><button type="button" class="step-button selected" data-select-step="0" aria-pressed="true"><span>1</span>Glyph Aacute · outline draft</button><button type="button" class="step-button" data-select-step="1" aria-pressed="false"><span>2</span>Advance width 620 · anchor top 310,700</button><button type="button" class="step-button" data-select-step="2" aria-pressed="false"><span>3</span>Kerning pair AV · -80 units</button><button type="button" class="step-button" data-select-step="3" aria-pressed="false"><span>4</span>Shaping run Latin · specimen stale</button></div></aside>
+      <div class="workspace" id="workspace">      <section class="region-card root-region" data-region="typeface-workbench" data-step="0" aria-labelledby="h-typeface-workbench">
+        <div class="section-heading"><div><p class="eyebrow">Required region 1</p><h2 id="h-typeface-workbench">typeface workbench</h2></div><span class="status" data-region-status>Ready</span></div>
+        <p>Author a coherent font repertoire by reconciling glyph outlines, anchors and metrics with pair or class spacing, shaping tests and whole-font specimen proof.</p>
+        
+      </section>
+      <section class="region-card" data-region="glyph-repertoire-grid" data-step="1" aria-labelledby="h-glyph-repertoire-grid">
+        <div class="section-heading"><div><p class="eyebrow">Required region 2</p><h2 id="h-glyph-repertoire-grid">glyph repertoire grid</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns glyph repertoire grid evidence, action, state, and recovery for the selected fictional context.</p>
+        
+      </section>
+      <section class="region-card" data-region="selected-glyph-outline-editor" data-step="2" aria-labelledby="h-selected-glyph-outline-editor">
+        <div class="section-heading"><div><p class="eyebrow">Required region 3</p><h2 id="h-selected-glyph-outline-editor">selected glyph outline editor</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns selected glyph outline editor evidence, action, state, and recovery for the selected fictional context.</p>
+        
+      </section>
+      <section class="region-card" data-region="metrics-and-anchor-inspector" data-step="3" aria-labelledby="h-metrics-and-anchor-inspector">
+        <div class="section-heading"><div><p class="eyebrow">Required region 4</p><h2 id="h-metrics-and-anchor-inspector">metrics and anchor inspector</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns metrics and anchor inspector evidence, action, state, and recovery for the selected fictional context.</p>
+        <div class="bounded" tabindex="0" role="region" aria-label="glyph-repertoire-grid bounded evidence"><table><thead><tr><th>Relation</th><th>Selected evidence</th><th>State</th></tr></thead><tbody><tr><td>1</td><td>Glyph Aacute · outline draft</td><td>Current</td></tr><tr><td>2</td><td>Advance width 620 · anchor top 310,700</td><td>Linked</td></tr><tr><td>3</td><td>Kerning pair AV · -80 units</td><td>Linked</td></tr><tr><td>4</td><td>Shaping run Latin · specimen stale</td><td>Linked</td></tr></tbody></table></div>
+      </section>
+      <section class="region-card" data-region="kerning-pair-or-class-editor" data-step="3" aria-labelledby="h-kerning-pair-or-class-editor">
+        <div class="section-heading"><div><p class="eyebrow">Required region 5</p><h2 id="h-kerning-pair-or-class-editor">kerning pair or class editor</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns kerning pair or class editor evidence, action, state, and recovery for the selected fictional context.</p>
+        
+      </section>
+      <section class="region-card" data-region="script-shaping-test-runs" data-step="3" aria-labelledby="h-script-shaping-test-runs">
+        <div class="section-heading"><div><p class="eyebrow">Required region 6</p><h2 id="h-script-shaping-test-runs">script shaping test runs</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns script shaping test runs evidence, action, state, and recovery for the selected fictional context.</p>
+        
+      </section>
+      <details class="supporting-disclosure">
+        <summary>Supporting evidence · synchronized with the current selection</summary>
+        <div class="supporting-content">
+      <section class="region-card" data-region="specimen-proof" data-step="3" aria-labelledby="h-specimen-proof">
+        <div class="section-heading"><div><p class="eyebrow">Required region 7</p><h2 id="h-specimen-proof">specimen proof</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns specimen proof evidence, action, state, and recovery for the selected fictional context.</p>
+        
+      </section>
+      <section class="region-card" data-region="font-validation-and-export" data-step="3" aria-labelledby="h-font-validation-and-export">
+        <div class="section-heading"><div><p class="eyebrow">Required region 8</p><h2 id="h-font-validation-and-export">font validation and export</h2></div><span class="status" data-region-status>Synchronized</span></div>
+        <p>Owns font validation and export evidence, action, state, and recovery for the selected fictional context.</p>
+        
+      </section>
+        </div>
+      </details></div>
+      <aside class="panel action-rail" aria-labelledby="action-heading">
+        <div><p class="eyebrow">Selected fictional context</p><h2 id="action-heading">Glyph Aacute · outline draft</h2><p id="selected-detail">Advance width 620 · anchor top 310,700</p><span class="status" id="validation-status">Ready to validate</span></div>
+        <form id="task-form" novalidate>
+          <div class="error-summary" id="error-summary" role="alert" tabindex="-1" hidden><strong>Correct the highlighted value.</strong><a href="#task-input"> Go to field</a></div>
+          <label for="task-input">Advance width (units)</label>
+          <input id="task-input" name="task-input" value="620" type="number" min="100" max="1200" inputmode="decimal" aria-describedby="field-help field-error">
+          <small id="field-help">Local fictional input; submitting never sends data.</small>
+          <p class="error" id="field-error" hidden>Enter a valid value within the stated range.</p>
+          <div class="action-row"><button type="submit" id="primary-action">Apply metrics and shape</button><button type="button" class="secondary" id="inspect-evidence">Inspect exact evidence</button></div>
+        </form>
+        <div class="action-row"><button type="button" class="danger" id="introduce-fault">Open contour and invalidate</button><button type="button" class="secondary" id="recover" disabled>Close contour and refresh specimen</button></div>
+        <details><summary>State and recovery obligations</summary><p>Initial/loading, ready, empty/not-applicable, error/retry, permission/unavailable, pending, success, stale/conflict, focus transition, and responsive presentation preserve the same selected context.</p></details>
+      </aside>
+    </div>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+  </main>
+  <dialog id="evidence-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description">
+    <div class="dialog-body"><h2 id="dialog-title">Exact synchronized evidence</h2><p id="dialog-description">typeface-workbench → glyph-repertoire-grid → selected-glyph-outline-editor ↔ metrics-and-anchor-inspector → kerning-pair-or-class-editor → script-shaping-test-runs → specimen-proof → font-validation-and-export</p><p id="dialog-state">Current selection, validation state, and recovery point remain unchanged.</p><div class="action-row"><button type="button" id="close-dialog">Return to task</button></div></div>
+  </dialog>
+  <script>
+    (() => {
+      const live = document.querySelector('#live-status');
+      const cards = Array.from(document.querySelectorAll('.region-card'));
+      const stepButtons = Array.from(document.querySelectorAll('[data-select-step]'));
+      const title = document.querySelector('#action-heading');
+      const detail = document.querySelector('#selected-detail');
+      const form = document.querySelector('#task-form');
+      const input = document.querySelector('#task-input');
+      const fieldError = document.querySelector('#field-error');
+      const errorSummary = document.querySelector('#error-summary');
+      const primary = document.querySelector('#primary-action');
+      const status = document.querySelector('#validation-status');
+      const fault = document.querySelector('#introduce-fault');
+      const recover = document.querySelector('#recover');
+      const dialog = document.querySelector('#evidence-dialog');
+      const inspect = document.querySelector('#inspect-evidence');
+      const closeDialog = document.querySelector('#close-dialog');
+      const items = cards.map((card) => card.querySelector('h2').textContent.trim());
+      let active = 0;
+      let dialogTrigger = null;
+      const announce = (message) => { live.textContent = message; };
+      function selectStep(index, moveFocus) {
+        active = Math.max(0, Math.min(items.length - 1, index));
+        stepButtons.forEach((button, i) => {
+          button.classList.toggle('selected', i === active);
+          button.setAttribute('aria-pressed', String(i === active));
+        });
+        cards.forEach((card, i) => card.classList.toggle('compact-active', i === active));
+        title.textContent = items[active];
+        detail.textContent = 'Selected step ' + (active + 1) + ' of ' + items.length + '. Evidence and recovery state are preserved.';
+        if (moveFocus) {
+          const card = cards.find((candidate, i) => i === active);
+          const heading = card ? card.querySelector('h2') : null;
+          if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({preventScroll:true}); }
+        }
+        announce('Step ' + (active + 1) + ' selected. ' + items[active]);
+      }
+      stepButtons.forEach((button) => button.addEventListener('click', () => selectStep(Number(button.dataset.selectStep), false)));
+      document.querySelector('#previous-step').addEventListener('click', () => selectStep(active - 1, true));
+      document.querySelector('#next-step').addEventListener('click', () => selectStep(active + 1, true));
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const invalid = !input.value.trim() || (input.type === 'number' && !input.checkValidity());
+        fieldError.hidden = !invalid;
+        errorSummary.hidden = !invalid;
+        input.setAttribute('aria-invalid', String(invalid));
+        if (invalid) {
+          errorSummary.focus();
+          status.textContent = 'Validation failed';
+          status.className = 'status error';
+          announce('Action has one validation error. The error summary has focus.');
+          return;
+        }
+        primary.disabled = true;
+        primary.textContent = 'Pending';
+        status.textContent = 'Pending · duplicate blocked';
+        status.className = 'status warning';
+        announce('Action is pending locally. Duplicate submission is disabled.');
+        window.setTimeout(() => {
+          primary.disabled = false;
+          primary.textContent = "Apply metrics and shape";
+          status.textContent = 'Success';
+          status.className = 'status';
+          announce("Compiled font validation and specimen are current.");
+        }, 260);
+      });
+      fault.addEventListener('click', () => {
+        fault.disabled = true;
+        recover.disabled = false;
+        status.textContent = 'Blocked · recovery required';
+        status.className = 'status error';
+        cards.forEach((card) => card.querySelector('[data-region-status]').textContent = 'Stale');
+        announce("Open contour and invalidate" + '. Last safe evidence remains visible. Recovery is available.');
+      });
+      recover.addEventListener('click', () => {
+        recover.disabled = true;
+        recover.textContent = 'Recovering';
+        status.textContent = 'Recovery pending';
+        status.className = 'status warning';
+        announce('Recovery is pending locally. Selection and input remain unchanged.');
+        window.setTimeout(() => {
+          fault.disabled = false;
+          recover.disabled = false;
+          recover.textContent = "Close contour and refresh specimen";
+          status.textContent = 'Recovered · ready';
+          status.className = 'status';
+          cards.forEach((card) => card.querySelector('[data-region-status]').textContent = 'Synchronized');
+          announce("Compiled font validation and specimen are current.");
+        }, 260);
+      });
+      inspect.addEventListener('click', () => {
+        dialogTrigger = inspect;
+        dialog.showModal();
+        closeDialog.focus();
+      });
+      closeDialog.addEventListener('click', () => dialog.close('cancel'));
+      dialog.addEventListener('close', () => {
+        if (dialogTrigger) dialogTrigger.focus();
+        announce('Evidence dialog closed. Focus returned to the exact trigger.');
+      });
+      dialog.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]'));
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      });
+      document.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !dialog.open) { event.preventDefault(); form.requestSubmit(); }
+      });
+      selectStep(0, false);
+    })();
+  </script>
+</body>
+</html>

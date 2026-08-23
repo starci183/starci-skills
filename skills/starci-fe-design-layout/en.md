@@ -16,6 +16,7 @@ description: Design, stage-approve, implement, seed and browser-prove one mature
 | `@worktrees` | `contexts/worktrees/en.md` | en | ignored disposable session evidence |
 | `@composition` | `brainstorms/composition/en.md` | en | Scope, Owner, Invariant and Proof |
 | `@business` | `contexts/business/en.md` | en | routed business truth |
+| `@archetypes` | `archetypes` | module | reusable macro page topology and complete responsive transformation before Grammar and Principles |
 | `@grammar` | `grammars` | module | product-family facts and owners |
 | `@principles` | `compilers/principles` | module | visual decision audit |
 | `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
@@ -57,7 +58,7 @@ gate-passed outputs, owns decisions and shared artifacts, and delegates only dis
 |---|---|---|---|---|---|
 | evidence | shared | request, authorities, baseline | normalize facts, constraints, examples and unknowns | evidence pack and context envelope | provenance and scope complete |
 | orchestration | coordination | immutable evidence envelope and measured runtime | apply the Layout dependency graph and one-writer registry | runtime adapter, task batches, coordinator reservations and sequential fallback | no approval; every task bounded |
-| page-synthesis | join | evidence, business head, source, contracts, data, grammar and MASTER | run isolated journey and capability subphases, print directions, join them, run integrated quality review, then author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt, quality review and schema 9 page contract | both origins and required lenses/detectors pass, nothing is unbound, then `OK #1`; cache only |
+| page-synthesis | join | evidence, business head, source, contracts, data, archetypes, grammar and MASTER | run isolated journey and capability subphases, resolve one archetype per page, audit current-layout conformance, bind Grammar owners after its macro topology, print directions, join them, run integrated quality review, then author complete wide/intermediate/compact anatomy | page map, archetype receipts, current-layout conformance verdicts, capability evidence, binding matrix, direction receipt, quality review and schema 9 page contract | both origins, archetype boundaries and required lenses/detectors pass, nothing is unbound, then `OK #1`; cache only |
 | states | execution | approved direction-quality-page hash and state truth | expand states, owners, transitions, seeds and boundary without review drift | schema 9 render contract and canonical prompt | `OK #2`; exact files complete |
 | implementation | execution | approved prompt | code, gate and seed without reinterpretation | implementation, gate and seed receipts | every obligation reaches product evidence |
 | parity | proof | previews and seeded product | classify authentication, execute required login through product UI, then compute PNG, normalized DOM, axe and Playwright evidence | `visual-proof.json` schema 4 | authenticated proof enters credentials in-browser with no session shortcut; parity and delivery pass |
@@ -72,7 +73,7 @@ expires with the invocation.
 
 ## Run
 
-Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, grammar, MASTER, contracts and current source. Create one ignored design session, validate the composition baseline, then build the internal orchestration plan without displaying its record unless `debug=true`. The coordinator owns journey/UI decisions, integrated quality verdict and approvals. Workers may inventory lens/detector evidence, generate HTML only from eligible frozen contracts, implement disjoint paths only after source approval, seed, test and capture proof.
+Read `@skill-shape` and `@orchestration`. Confirm one `page` or explicit start-to-terminal `flow` scope. Resolve the routed frontend, business head, archetypes, grammar, MASTER, contracts and current source. Create one ignored design session, validate the composition baseline, then build the internal orchestration plan without displaying its record unless `debug=true`. The coordinator owns journey/UI decisions, archetype selection, integrated quality verdict and approvals. Workers may inventory lens/detector evidence, generate HTML only from eligible frozen contracts, implement disjoint paths only after source approval, seed, test and capture proof.
 
 The user-facing execution table exposes sections 1–3 below as one `page-synthesis` step. Page mapping, both
 isolated tracks, direction declaration, their join and desktop/narrow rendering are internal subphases; no
@@ -95,7 +96,20 @@ serves, record an observable obligation with `supported` or `missing` verdict, e
 required paths when missing. Classify every region as `reuse`, `generalize` or `new-required`; `reuse` is valid only
 when every obligation is supported. Missing capability never justifies weakening the journey.
 
-Only after both tracks are complete, merge them in a page-level binding matrix. Every render intent binds to
+Only after both tracks are complete and before Grammar or Principles resolve the candidate, select exactly one
+`@archetypes` record for each page. Match dominant task, required region relationships and the full responsive
+contract; never select by route, screen name or existing component. Record id, runtime target, matched situation
+codes, required regions, wide/intermediate/compact transformations and evidenced deviations in the session
+archetype receipt. A missing or ambiguous match is `new-required` or a stop, not permission to stretch the nearest record.
+Candidate alternatives stay inside the selected archetype unless the owner changes the dominant task or required
+region graph.
+
+Audit the existing or legacy macro layout against the selected record and store `conform`, `layout-drift` or
+`needs-evidence` in the session archetype receipt. Source proves product facts, behavior, constraints, ownership and
+capability, not layout correctness. Correct `layout-drift`; preserve a conflicting topology only when binding
+business truth or an explicit owner-approved reference or exception requires it.
+
+Then merge the tracks in a page-level binding matrix whose macro regions come from that archetype. Every render intent binds to
 journey steps, business obligations and contract-backed regions; every region cites the render intent it
 serves. Any unbound intent, step, capability or region stops the run. From this matrix print one UI direction for
 hierarchy, composition, responsiveness and emphasis. Print journey and UI direction as separate fields before
@@ -112,7 +126,7 @@ receipt; explicit brainstorm creates 3–4 complete candidates. Use one represen
 desktop and narrow viewports. Include full chrome, meaningful content, intentional hierarchy and density, every
 major region and complete block anatomy. Create the complete future state inventory now, but do not render those states yet.
 
-The page contract binds the synthesis, routes, regions, representative states, hierarchy, density, responsive behavior, visual precedent, state inventory and representative full-viewport renders. `renderContract` and `executionPrompt` are forbidden.
+The page contract materially preserves the selected archetype through its hierarchy and responsive fields, and binds the synthesis, routes, regions, representative states, density, visual precedent, state inventory and representative full-viewport renders. `renderContract` and `executionPrompt` are forbidden.
 
 Validate the artifact and schema 2 maturity review with `reviewStage: pages`. Refuse wireframes, sparse scaffolds, generic admin templates, unjustified dead space, unanchored controls, weak type rank and unfinished anatomy.
 
@@ -200,10 +214,21 @@ Run browser proof for every selected render target. Five complete-page targets i
 17. State expansion preserves the approved quality review byte-for-byte; review change reopens pages.
 18. An authenticated Layout run cannot finish until signed-out Playwright fills both credential controls through
     the product form and reaches the protected route. API-created sessions and injected state never pass.
+19. Every page resolves exactly one archetype before Grammar and Principles. Grammar binds semantic owners inside
+    its regions; Principles resolve only exact geometry left open by its topology.
+20. Wide, intermediate and compact renders preserve reading order, navigation replacement, sticky safety,
+    overflow ownership and interaction parity. Compact may not delete a reachable action or state merely because
+    desktop seated it in a supporting region.
+21. Current or legacy macro layout receives `conform`, `layout-drift` or `needs-evidence`. Mere implementation
+    never vetoes the selected archetype; `layout-drift` is corrected unless binding business truth or an explicit
+    owner-approved reference or exception requires the departure.
 
 ## Stops
 
 - Missing route, scope, business authority, grammar/profile, contract, source baseline or flow endpoint.
+- Missing or ambiguous archetype, or a match based only on a screen/product name that violates dominant task,
+  negative boundary or responsive parity.
+- `needs-evidence` on a current-layout conflict that materially changes macro topology.
 - A journey step without page ownership or component capability.
 - Fabricated content, incomplete state inventory, immature page evidence or non-functional HTML.
 - Missing quality lens/detector closure or advisory evidence presented as authority.
@@ -216,7 +241,8 @@ Run browser proof for every selected render target. Five complete-page targets i
 
 ## OUTPUT
 
-At page review, print journey and UI direction plus quality verdict for every candidate, then report their joined
+At page review, print each page's archetype id, matched situation codes, current-layout conformance verdict and
+wide/intermediate/compact responsive verdict, then print journey and UI direction plus quality verdict for every candidate and report their joined
 page URL, maturity verdict and cache-only `OK #1`. At state review, report state coverage, unchanged direction-quality-page hash, exact source
 files, seed-owner rows and `OK #2`. After code, report changed files, tests, seed command/identity/observed data,
 authentication applicability and—when required—the login route plus credential source class without values, then real-product parity.

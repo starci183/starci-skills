@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en" data-archetype-template="progressive-rollout-gate-console">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Progressive rollout gate console · Archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-max: 92rem; --local-control: 2.75rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-block: var(--space-5); }
+    body { margin: 0; min-width: 20rem; color: var(--text); background: var(--canvas); font: 1rem/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input { min-height: var(--local-control); font: inherit; }
+    button { padding: var(--space-2) var(--space-3); color: #fff; background: var(--accent); border: 2px solid var(--accent); border-radius: calc(var(--radius) - var(--space-1)); font-weight: 750; cursor: pointer; }
+    button.secondary { color: var(--accent-strong); background: var(--surface); border-color: var(--border); }
+    button.danger { background: var(--danger); border-color: var(--danger); }
+    button:disabled { cursor: wait; opacity: .65; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip-link { position: fixed; inset: var(--space-2) auto auto var(--space-2); z-index: 50; padding: var(--space-2) var(--space-3); color: #fff; background: var(--focus); transform: translateY(-150%); }
+    .skip-link:focus { transform: translateY(0); }
+    .template-header { padding: var(--space-6) max(var(--space-4), calc((100% - var(--local-max)) / 2)); color: #fff; background: var(--accent-strong); }
+    .template-header p { max-width: 74ch; margin-bottom: 0; }
+    .template-header h1 { margin: var(--space-1) 0 0; line-height: 1.15; }
+    .eyebrow { margin: 0; color: inherit; font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .template-main { width: min(calc(100% - 2rem), var(--local-max)); margin-inline: auto; padding-block: var(--space-5) var(--space-7); }
+    .summary, .card, .pane-switcher, .intermediate-switch { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .summary { display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; padding: var(--space-4); margin-bottom: var(--space-4); }
+    .summary h2, .summary p { margin: 0; }
+    .summary-copy { max-width: 72ch; }
+    .verdict { padding: var(--space-2) var(--space-3); color: var(--danger); background: var(--surface-subtle); border: 1px solid var(--danger); border-radius: 999px; font-weight: 800; white-space: nowrap; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(17rem, .9fr) minmax(17rem, .85fr); gap: var(--space-4); align-items: start; }
+    .pane { min-width: 0; display: grid; gap: var(--space-4); align-content: start; }
+    .card { min-width: 0; padding: var(--space-4); }
+    .section-heading { display: flex; gap: var(--space-3); align-items: start; justify-content: space-between; margin-bottom: var(--space-3); }
+    .section-heading h2 { margin: var(--space-1) 0 0; font-size: 1.08rem; }
+    .state-chip { padding: var(--space-1) var(--space-2); color: var(--text); background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 999px; font-size: .82rem; white-space: nowrap; }
+    .state-chip.danger { color: var(--danger); border-color: var(--danger); }
+    .row-list { display: grid; gap: var(--space-2); min-width: 0; }
+    .row-button { width: 100%; display: grid; gap: var(--space-1); text-align: left; color: var(--text); background: var(--surface); border-color: var(--border); }
+    .row-button span { color: var(--muted); font-weight: 500; }
+    .row-button.selected { color: var(--accent-strong); background: var(--surface-subtle); border-color: var(--accent); }
+    .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem,1fr)); gap: var(--space-2); }
+    .facts div { padding: var(--space-3); background: var(--surface-subtle); border-radius: calc(var(--radius) - var(--space-1)); }
+    dt { color: var(--muted); } dd { margin: var(--space-1) 0 0; font-weight: 800; overflow-wrap: anywhere; }
+    .button-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .bounded { overflow-x: auto; overscroll-behavior-inline: contain; }
+    .action-rail { position: sticky; top: var(--space-4); }
+    .action-status { padding: var(--space-3); background: var(--surface-subtle); border-left: .35rem solid var(--accent); }
+    .action-status.error { border-left-color: var(--danger); }
+    .pane-switcher, .intermediate-switch { display: none; gap: var(--space-2); padding: var(--space-2); margin-bottom: var(--space-4); }
+    .pane-switcher button { flex: 1; }
+    .pane-switcher button[aria-pressed="true"] { background: var(--accent-strong); border-color: var(--accent-strong); }
+    dialog { width: min(calc(100% - 2rem), 34rem); padding: 0; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); }
+    dialog::backdrop { background: rgba(23,32,42,.66); }
+    .dialog-body { padding: var(--space-5); }
+    .dialog-body h2 { margin-top: 0; }
+    .dialog-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: var(--space-2); margin-top: var(--space-4); }
+    label { display: block; margin-top: var(--space-3); font-weight: 800; }
+    input { width: 100%; padding: var(--space-2) var(--space-3); color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+    .error-summary, .field-error { color: var(--danger); font-weight: 750; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 68rem) and (min-width: 44.01rem) {
+      .intermediate-switch { display: flex; align-items: center; justify-content: space-between; }
+      .layout { grid-template-columns: minmax(0,1.2fr) minmax(18rem,.8fr); }
+      .pane-support { display: none; }
+      .pane-support.is-revealed { display: grid; grid-column: 1 / -1; }
+      .pane-detail { grid-column: 2; grid-row: 1; }
+      .action-rail { position: static; }
+    }
+    @media (max-width: 44rem) {
+      body { font-size: 1rem; }
+      .template-main { width: min(calc(100% - 1rem), var(--local-max)); padding-top: var(--space-3); }
+      .template-header { padding: var(--space-5) var(--space-4); }
+      .summary { align-items: stretch; flex-direction: column; }
+      .verdict { align-self: start; white-space: normal; }
+      .intermediate-switch { display: none; }
+      .pane-switcher { display: flex; position: sticky; top: var(--space-2); z-index: 5; }
+      .layout { display: block; }
+      .pane.pane-primary, .pane.pane-support, .pane.pane-detail { display: none; }
+      .pane.is-active { display: grid; }
+      .section-heading { align-items: stretch; flex-direction: column; }
+      .state-chip { align-self: start; white-space: normal; }
+      .row-list { min-width: 0; }
+      .action-rail { position: static; }
+      .dialog-actions { flex-direction: column-reverse; }
+      .dialog-actions button { width: 100%; }
+    }
+    @media (max-height: 38rem) {
+      .pane-switcher, .action-rail { position: static; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to archetype content</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Progressive rollout gate console</h1>
+    <p>Shift exposure from an old version to a new version across cohorts only when live guardrails pass, with deterministic promotion and rollback.</p>
+  </header>
+  <main id="main" class="template-main" data-region="rollout-console" tabindex="-1">
+    <section class="summary" aria-labelledby="task-summary-title">
+      <div class="summary-copy"><p class="eyebrow">Fictional local demonstration</p><h2 id="task-summary-title">Current task context</h2><p id="task-summary">Exposure, treatment and control cohorts, and live guardrails jointly own promotion and rollback.</p></div>
+      <span class="verdict" id="verdict">Attention required · textual verdict</span>
+    </section>
+    <div class="intermediate-switch"><span>Supporting evidence is available without losing selection.</span><button type="button" class="secondary" id="toggle-support" aria-expanded="false" aria-controls="support-pane">Show evidence pane</button></div>
+    <nav class="pane-switcher" aria-label="Compact task sequence">
+      <button type="button" data-pane-target="primary" aria-pressed="true">Evidence</button>
+      <button type="button" data-pane-target="support" aria-pressed="false">Checks</button>
+      <button type="button" data-pane-target="detail" aria-pressed="false">Action</button>
+    </nav>
+    <div class="layout">
+      <div class="pane pane-primary is-active" data-pane="primary"><section class="card" id="region-release-and-version-context" data-region="release-and-version-context" aria-labelledby="heading-release-and-version-context">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-release-and-version-context">Release And Version Context</h2></div><span class="state-chip">Ready · fictional</span></div>
+      <div class="row-list" id="item-list" aria-label="Fictional selectable evidence">
+        <button type="button" class="row-button selected" data-item="Ring 0 · 5% exposure" aria-pressed="true"><strong>Ring 0 · 5% exposure</strong><span>Selected evidence</span></button>
+        <button type="button" class="row-button" data-item="Ring 1 · 20% exposure" aria-pressed="false"><strong>Ring 1 · 20% exposure</strong><span>Available evidence</span></button>
+        <button type="button" class="row-button" data-item="Control · old version" aria-pressed="false"><strong>Control · old version</strong><span>Available evidence</span></button>
+      </div>
+    </section>
+<section class="card" id="region-desired-and-current-traffic-split" data-region="desired-and-current-traffic-split" aria-labelledby="heading-desired-and-current-traffic-split">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-desired-and-current-traffic-split">Desired And Current Traffic Split</h2></div><span class="state-chip" id="selected-state">Selected</span></div>
+      <p id="selected-copy">Ring 0 · 5% exposure remains the active fictional context across every topology.</p>
+      <div class="button-row"><button type="button" class="secondary" id="move-up">Move up</button><button type="button" class="secondary" id="move-down">Move down</button></div>
+    </section></div>
+      <div class="pane pane-support" id="support-pane" data-pane="support"><section class="card bounded" id="region-rollout-cohorts-or-rings" data-region="rollout-cohorts-or-rings" aria-labelledby="heading-rollout-cohorts-or-rings">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-rollout-cohorts-or-rings">Rollout Cohorts Or Rings</h2></div><span class="state-chip">Current</span></div>
+      <p>Rollout Cohorts Or Rings owns its named evidence and action without borrowing product semantics.</p>
+      <dl class="facts"><div><dt>Selection</dt><dd id="fact-3">Ring 0 · 5% exposure</dd></div><div><dt>State</dt><dd>Ready</dd></div></dl>
+    </section>
+<section class="card" id="region-live-guardrail-comparison" data-region="live-guardrail-comparison" aria-labelledby="heading-live-guardrail-comparison">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-live-guardrail-comparison">Live Guardrail Comparison</h2></div><span class="state-chip">Current</span></div>
+      <p>Live Guardrail Comparison owns its named evidence and action without borrowing product semantics.</p>
+      <dl class="facts"><div><dt>Selection</dt><dd id="fact-4">Ring 0 · 5% exposure</dd></div><div><dt>State</dt><dd>Ready</dd></div></dl>
+    </section></div>
+      <div class="pane pane-detail action-rail" data-pane="detail"><section class="card" id="region-per-cohort-health" data-region="per-cohort-health" aria-labelledby="heading-per-cohort-health">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-per-cohort-health">Per Cohort Health</h2></div><span class="state-chip">Current</span></div>
+      <p>Per Cohort Health owns its named evidence and action without borrowing product semantics.</p>
+      <dl class="facts"><div><dt>Selection</dt><dd id="fact-5">Ring 0 · 5% exposure</dd></div><div><dt>State</dt><dd>Ready</dd></div></dl>
+    </section>
+<section class="card" id="region-promotion-or-rollback-gate" data-region="promotion-or-rollback-gate" aria-labelledby="heading-promotion-or-rollback-gate">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-promotion-or-rollback-gate">Promotion Or Rollback Gate</h2></div><span class="state-chip">Current</span></div>
+      <p>Promotion Or Rollback Gate owns its named evidence and action without borrowing product semantics.</p>
+      <dl class="facts"><div><dt>Selection</dt><dd id="fact-6">Ring 0 · 5% exposure</dd></div><div><dt>State</dt><dd>Ready</dd></div></dl>
+    </section>
+<section class="card" id="region-verification-and-receipt" data-region="verification-and-receipt" aria-labelledby="heading-verification-and-receipt">
+      <div class="section-heading"><div><p class="eyebrow">Required region</p><h2 id="heading-verification-and-receipt">Verification And Receipt</h2></div><span class="state-chip">Current</span></div>
+      <p>Verification And Receipt owns its named evidence and action without borrowing product semantics.</p>
+      <dl class="facts"><div><dt>Selection</dt><dd id="fact-7">Ring 0 · 5% exposure</dd></div><div><dt>State</dt><dd>Ready</dd></div></dl>
+    </section>
+        <section class="card" aria-labelledby="action-title">
+          <div class="section-heading"><div><p class="eyebrow">State and recovery</p><h2 id="action-title">Complete the dominant task</h2></div><span class="state-chip" id="action-chip">Ready</span></div>
+          <p class="action-status" id="action-status">Promote cohort is available for the selected fictional context.</p>
+          <div class="button-row"><button type="button" id="commit-action">Promote cohort</button><button type="button" class="danger" id="simulate-failure">Simulate guardrail failure</button><button type="button" class="secondary" id="retry-action" hidden>Roll back exposure</button><button type="button" class="secondary" id="back-evidence">Back to evidence</button></div>
+        </section>
+      </div>
+    </div>
+    <details>
+      <summary>State families and recovery coverage</summary>
+      <p>old only, canary active, cohort healthy, cohort degraded, cohort unknown, guardrail pending, guardrail pass, guardrail fail, promotion locked, promotion pending, promotion success, rollback available, rollback running, rollback failure, verification, receipt. Loading, ready, empty, error and retry, unavailable, pending, success, stale or conflict, focus transition, and responsive presentation preserve the same selected fictional context.</p>
+    </details>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+  <dialog id="confirm-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description">
+    <form class="dialog-body" id="confirm-form" method="dialog" novalidate>
+      <h2 id="dialog-title">Promote cohort</h2>
+      <p id="dialog-description">Confirm the exact fictional target. This local-only action preserves query, selection, order, and responsive context.</p>
+      <div class="error-summary" id="error-summary" role="alert" tabindex="-1" hidden><p>Correct the action reference.</p><a href="#action-reference">Go to action reference</a></div>
+      <label for="action-reference">Action reference</label>
+      <input id="action-reference" name="actionReference" autocomplete="off" required minlength="3" value="REF-07">
+      <p class="field-error" id="reference-error" hidden>Enter at least three characters.</p>
+      <div class="dialog-actions"><button type="button" class="secondary" id="cancel-dialog">Cancel</button><button type="submit" id="confirm-action">Confirm</button></div>
+    </form>
+  </dialog>
+  <script>
+    (() => {
+      const liveStatus = document.querySelector('#live-status');
+      const rowButtons = Array.from(document.querySelectorAll('.row-button'));
+      const itemList = document.querySelector('#item-list');
+      const selectedCopy = document.querySelector('#selected-copy');
+      const facts = Array.from(document.querySelectorAll('[id^="fact-"]'));
+      const selectedState = document.querySelector('#selected-state');
+      const verdict = document.querySelector('#verdict');
+      const actionChip = document.querySelector('#action-chip');
+      const actionStatus = document.querySelector('#action-status');
+      const commitAction = document.querySelector('#commit-action');
+      const failureAction = document.querySelector('#simulate-failure');
+      const retryAction = document.querySelector('#retry-action');
+      const paneButtons = Array.from(document.querySelectorAll('[data-pane-target]'));
+      const panes = Array.from(document.querySelectorAll('[data-pane]'));
+      const supportPane = document.querySelector('#support-pane');
+      const toggleSupport = document.querySelector('#toggle-support');
+      const dialog = document.querySelector('#confirm-dialog');
+      const form = document.querySelector('#confirm-form');
+      const reference = document.querySelector('#action-reference');
+      const errorSummary = document.querySelector('#error-summary');
+      const referenceError = document.querySelector('#reference-error');
+      const confirmAction = document.querySelector('#confirm-action');
+      let dialogTrigger = null;
+
+      function announce(message) { liveStatus.textContent = message; }
+      function selectedButton() { return rowButtons.find((button) => button.getAttribute('aria-pressed') === 'true'); }
+      function setSelected(button) {
+        rowButtons.forEach((row) => { row.classList.remove('selected'); row.setAttribute('aria-pressed', 'false'); });
+        button.classList.add('selected');
+        button.setAttribute('aria-pressed', 'true');
+        const value = button.dataset.item;
+        selectedCopy.textContent = value + ' remains the active fictional context across every topology.';
+        facts.forEach((fact) => { fact.textContent = value; });
+        selectedState.textContent = 'Selected';
+        announce(value + ' selected. Related evidence and actions updated without moving focus.');
+      }
+      function activatePane(name, moveFocus) {
+        panes.forEach((pane) => pane.classList.toggle('is-active', pane.dataset.pane === name));
+        paneButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.paneTarget === name)));
+        if (moveFocus) {
+          const pane = panes.find((candidate) => candidate.dataset.pane === name);
+          const heading = pane ? pane.querySelector('h2') : null;
+          if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({preventScroll:true}); }
+        }
+      }
+      function setFailure(message) {
+        verdict.textContent = 'Blocked · textual verdict';
+        actionChip.textContent = 'Error';
+        actionChip.classList.add('danger');
+        actionStatus.textContent = message;
+        actionStatus.classList.add('error');
+        commitAction.disabled = true;
+        retryAction.hidden = false;
+        announce(message + ' The selected context is preserved and recovery is available.');
+      }
+      function restoreReady() {
+        verdict.textContent = 'Ready to continue · textual verdict';
+        actionChip.textContent = 'Ready';
+        actionChip.classList.remove('danger');
+        actionStatus.textContent = 'Promote cohort is available again for the preserved fictional context.';
+        actionStatus.classList.remove('error');
+        commitAction.disabled = false;
+        retryAction.hidden = true;
+        announce('Recovery completed. Selection, order, and responsive context are unchanged.');
+      }
+
+      rowButtons.forEach((button) => button.addEventListener('click', () => setSelected(button)));
+      document.querySelector('#move-up').addEventListener('click', () => {
+        const button = selectedButton();
+        if (!button || !button.previousElementSibling) { announce('The selected item is already first.'); return; }
+        itemList.insertBefore(button, button.previousElementSibling);
+        button.focus();
+        announce(button.dataset.item + ' moved up with a non-drag control.');
+      });
+      document.querySelector('#move-down').addEventListener('click', () => {
+        const button = selectedButton();
+        if (!button || !button.nextElementSibling) { announce('The selected item is already last.'); return; }
+        itemList.insertBefore(button.nextElementSibling, button);
+        button.focus();
+        announce(button.dataset.item + ' moved down with a non-drag control.');
+      });
+      paneButtons.forEach((button) => button.addEventListener('click', () => {
+        activatePane(button.dataset.paneTarget, true);
+        announce(button.textContent + ' compact pane opened. Selection and state are preserved.');
+      }));
+      toggleSupport.addEventListener('click', () => {
+        const revealed = !supportPane.classList.contains('is-revealed');
+        supportPane.classList.toggle('is-revealed', revealed);
+        toggleSupport.setAttribute('aria-expanded', String(revealed));
+        toggleSupport.textContent = revealed ? 'Hide evidence pane' : 'Show evidence pane';
+        announce(revealed ? 'Supporting evidence pane revealed.' : 'Supporting evidence pane hidden; selection is preserved.');
+      });
+      failureAction.addEventListener('click', () => setFailure('Simulate guardrail failure produced a recoverable fictional failure.'));
+      retryAction.addEventListener('click', restoreReady);
+      document.querySelector('#back-evidence').addEventListener('click', () => {
+        activatePane('primary', false);
+        const button = selectedButton();
+        if (button) button.focus({preventScroll:true});
+        announce('Returned to the exact selected evidence and preserved order.');
+      });
+      commitAction.addEventListener('click', () => {
+        dialogTrigger = commitAction;
+        errorSummary.hidden = true;
+        referenceError.hidden = true;
+        dialog.showModal();
+        reference.focus();
+      });
+      document.querySelector('#cancel-dialog').addEventListener('click', () => dialog.close('cancel'));
+      form.addEventListener('submit', (event) => {
+        if (reference.value.trim().length < 3) {
+          event.preventDefault();
+          errorSummary.hidden = false;
+          referenceError.hidden = false;
+          reference.setAttribute('aria-invalid', 'true');
+          errorSummary.focus();
+          announce('Action not submitted. Correct the highlighted reference.');
+          return;
+        }
+        event.preventDefault();
+        confirmAction.disabled = true;
+        confirmAction.textContent = 'Pending';
+        announce('Action pending. Duplicate submission is disabled.');
+        window.setTimeout(() => {
+          confirmAction.disabled = false;
+          confirmAction.textContent = 'Confirm';
+          verdict.textContent = 'Success · receipt recorded';
+          actionChip.textContent = 'Success';
+          actionStatus.textContent = 'Promote cohort completed locally. Recovery and the selected context remain available.';
+          dialog.close('success');
+        }, 280);
+      });
+      dialog.addEventListener('close', () => {
+        if (dialogTrigger) dialogTrigger.focus();
+        announce(dialog.returnValue === 'success' ? 'Action succeeded. Focus returned to the exact trigger.' : 'Action cancelled. State and selection are unchanged.');
+      });
+      dialog.addEventListener('cancel', () => announce('Dialog closed with Escape. Focus will return to the exact trigger.'));
+    })();
+  </script>
+</body>
+</html>

@@ -8,6 +8,7 @@ title: Layouts
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@archetypes` | `archetypes` | module | shared macro page topology and full responsive contract before product Grammar and Principles |
 | `@contract-search` | `scripts/contract-search.mjs` | script | resolve contract entries by their stated need |
 | `@schema` | `brainstorms/layouts/schema.json` | file | validate the record's JSON shape |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | validate and hash candidate artifacts |
@@ -25,7 +26,24 @@ direction; an explicit owner `brainstorm` request before direction approval retu
 without requiring a separately reviewed baseline. Every joined direction then carries one integrated
 `qualityReview`; invalid drafts are revised or removed before HTML generation rather than presented as alternatives.
 
+After both tracks and before product Grammar, resolve exactly one reusable `@archetypes` topology per page. Its
+required regions and wide/intermediate/compact transformation constrain the explicit merge bindings that produce
+the page.
+
 ## Law
+
+Archetypes are cross-product macro authority, not candidate directions. Match each page by dominant task,
+required region relationships and complete responsive contract; never by route, product, component or visual
+style. Alternatives stay inside the selected archetype. Grammar binds semantic owners inside its regions and
+Principles resolve exact remaining geometry. A missing or ambiguous match is `new-required` or a stop, never a
+license to stretch the nearest record. Compact anatomy preserves reading order, reachable actions, state meaning,
+navigation replacement, sticky safety and overflow ownership rather than merely stacking desktop boxes.
+
+Current and legacy layout are observations, not a correctness authority. Use them to recover product content,
+behavior, constraints, source ownership and implemented capability, then compare their macro topology with the
+selected archetype. Record `conform`, `layout-drift` or `needs-evidence` in the session archetype receipt. Correct
+`layout-drift`; preserve a conflict only when binding business truth or an explicit owner-approved reference or
+exception requires it. A route already shipping does not turn its geometry into an industry-standard pattern.
 
 A schema 9 candidate names its `page` or `flow` scope, stage, MASTER system id, deviations-only page override,
 every composed page, ordered nested ownership nodes and owned regions. `synthesis.pageIntents` records what
@@ -100,20 +118,21 @@ structure.
 
 ## Inputs
 
-Eight, and no more. Each is here because something specific breaks without it.
+Nine, and no more. Each is here because something specific breaks without it.
 
 | # | Input | Without it |
 |---|---|---|
 | 1 | The business request, verbatim | there is no intent, only a shape |
-| 2 | StarCi MASTER plus an optional deviations-only page override | each candidate silently chooses its own taste |
-| 3 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
-| 4 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
-| 5 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
-| 6 | In brainstorm mode only, the requested diversity axis | alternatives drift across unrelated parts of the shared synthesis scope |
-| 7 | Current source and legacy baseline for this project | every request is answered as if it were the first |
-| 8 | Detected frontend stack plus any advisory source actually consulted, with locator and digest | generic advice is applied to the wrong runtime or an unpinned external rule silently becomes authority |
+| 2 | One resolved archetype id, runtime target, situation codes and responsive contract per page | candidates invent macro topology or treat compact as a smaller desktop |
+| 3 | StarCi MASTER plus an optional deviations-only page override | each candidate silently chooses its own taste |
+| 4 | Contract: entry **key**, `why`, `host`, and children **names** | nothing can be looked up, so entries get invented |
+| 5 | The branch inventory: every branch and what each may contain | a region has a shape and no assembler |
+| 6 | The route table: every route page and every persistent layout | nothing separates what mounts once from what changes per route |
+| 7 | In brainstorm mode only, the requested diversity axis | alternatives drift across unrelated parts of the shared synthesis scope |
+| 8 | Current source and legacy baseline, with explicit reference status | product facts and capability are lost, or an accidental layout is mistaken for a standard |
+| 9 | Detected frontend stack plus any advisory source actually consulted, with locator and digest | generic advice is applied to the wrong runtime or an unpinned external rule silently becomes authority |
 
-**Input 3 is queried, not read, and the class arrays are never extracted.** One need per region through
+**Input 4 is queried, not read, and the class arrays are never extracted.** One need per region through
 `@contract-search`, which returns `key`, `why` and `host`. The cut is not economy. A stage that
 cannot see a class cannot write one into its output, so "no class in a candidate" holds because the value
 never arrives — not because a reader was asked to skip a field. Measured on one 299-entry registry: 192KB
@@ -128,19 +147,26 @@ queries, locale copy, lints. Those belong to the stages that come after.
    modes owned by one surface, and illustrative examples. Only the first may become `layoutId`s. A request
    naming one page states one surface; a real product flow states several; “for example A → B” demonstrates
    framework capability until the owner explicitly promotes it into product scope.
-2. **Look up before designing.** For every region, search the contract by `why`, and read `why` for what
+2. **Resolve the archetype before Grammar.** Search `@archetypes` by dominant task, required region graph and
+   responsive failure, then load exactly one matched runtime record. Preserve its wide/intermediate/compact
+   behavior and negative boundary; return `new-required` or ambiguity rather than choosing by screen name.
+3. **Audit the existing layout instead of copying it.** Compare its macro regions and responsive behavior with
+   the selected archetype and record `conform`, `layout-drift` or `needs-evidence`. Current source proves facts and
+   capability only; an explicit owner-approved reference or binding business exception is required to preserve a
+   conflicting topology.
+4. **Look up before designing.** For every region, search the contract by `why`, and read `why` for what
    it is: **not a description of the business, but a statement of when you would reach for this entry.**
    Two entries with the same classes and different needs are different entries; two with different
    classes answering the same need are one entry that got written twice.
-3. **Choose the axes each candidate will differ on**, from input 5. Two candidates sharing every axis
+5. **Choose the axes each candidate will differ on**, from input 7. Two candidates sharing every axis
    value are one candidate.
-4. **Assign an assembler per region** from the branch inventory. A region with an entry and no branch
+6. **Assign an assembler per region** from the branch inventory. A region with an entry and no branch
    is unresolved, not finished.
-5. **Place each region against the route table**: does it mount once and persist, change per route, or
+7. **Place each region against the route table**: does it mount once and persist, change per route, or
    open as an overlay?
-6. **Refuse rather than invent.** A decision the request does not state and the tree cannot derive is
+8. **Refuse rather than invent.** A decision the request does not state and the tree cannot derive is
    returned to the owner.
-7. **Challenge the joined direction before rendering.** Run `@frontend-quality` against identical content,
+9. **Challenge the joined direction before rendering.** Run `@frontend-quality` against identical content,
    facts and viewports. Revise or drop drafts with unresolved lens or detector findings; never pad a batch with a
    candidate that already fails the quality floor.
 
@@ -226,6 +252,11 @@ a candidate, and shipping it as one of the 3–4 spends the owner's attention on
 15. Every `new`/`changed` route and every page using a `generalize`/`new-required` capability appears in the selected visual-proof renders. Every missing obligation's `requiredPaths` appears in `renderContract.sourceBoundary`.
 16. Schema 9 binds one `qualityReview` per candidate. External design intelligence is digest-pinned advisory
     evidence only; every adopted decision maps to a StarCi owner, and state expansion preserves the review unchanged.
+17. Every page resolves exactly one archetype before Grammar and Principles. Its required regions and
+    wide/intermediate/compact interaction parity survive every candidate and the approved page contract.
+18. The session archetype receipt records `conform`, `layout-drift` or `needs-evidence` for current macro layout. Mere
+    implementation never vetoes the selected archetype; only binding business truth or an explicit owner-approved
+    reference or exception can preserve a conflict.
 
 ## Preview
 

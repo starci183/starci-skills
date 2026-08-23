@@ -73,15 +73,16 @@ Nếu config chung bị thiếu hoặc không hợp lệ, không được âm th
 request hiện tại để chỉ đúng lỗi config; default còn thiếu vẫn là việc setup workspace. Tiếng Anh sở hữu
 instruction runtime, còn workspace config sở hữu ngôn ngữ mặc định của đầu ra cho người đọc.
 
-## Mười chín năng lực
+## Hai mươi năng lực
 
-Mười bảy capability trực tiếp làm việc. Hai capability chỉ **quan sát**: `starci-stale-list` đo trạng thái
-máy, còn `starci-diagnose` lần theo một skill khác. Một
+Mười bảy capability trực tiếp làm việc. Ba capability chỉ **quan sát**: `starci-architecture-analyze` phân tích
+quyết định kỹ thuật khó, `starci-stale-list` đo trạng thái máy, còn `starci-diagnose` lần theo một skill khác. Một
 bản báo cáo đã tự sửa thứ nó đang đo thì không còn đáng tin: route vừa bị âm thầm làm mới sẽ trông như
 thể ngay từ đầu nó đã đúng.
 
 | Skill | Sở hữu |
 |---|---|
+| `starci-architecture-analyze` | evidence ưu tiên người đọc, các phương án khả thi, trade-off, một sơ đồ luồng đơn giản và planning context đã khóa cho quyết định cross-system khó |
 | `starci-business-analyze` | business feature head có evidence từ FE+BE, LLM context theo module và surface sẵn sàng cho prototype |
 | `starci-init` | làm Source sẵn sàng: identity SOPS+age, bootstrap, route workspace và state worktree — bốn root được duyệt độc lập |
 | `starci-cloudflare-tunnel-set` | custody Cloudflare credential đã mã hóa và áp dụng một HTTP(S) tunnel/DNS route đã duyệt |

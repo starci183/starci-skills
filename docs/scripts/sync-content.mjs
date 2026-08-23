@@ -1,14 +1,19 @@
-import {mkdir, readdir, readFile, rm, stat, writeFile} from "node:fs/promises";
-import {dirname, relative, resolve} from "node:path";
+import {copyFile, mkdir, readdir, readFile, rm, stat, writeFile} from "node:fs/promises";
+import {dirname, isAbsolute, join, relative, resolve, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {groups, indexSource} from "../publication.mjs";
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const trustRoot = resolve(siteRoot, "..");
 const contentRoot = resolve(siteRoot, "content");
+const templateAssetRoot = resolve(siteRoot, "public", "template-assets", "archetypes");
 
 if (relative(siteRoot, contentRoot) !== "content") {
   throw new Error(`Refusing to replace unexpected path: ${contentRoot}`);
+}
+
+if (relative(siteRoot, templateAssetRoot) !== join("public", "template-assets", "archetypes")) {
+  throw new Error(`Refusing to replace unexpected path: ${templateAssetRoot}`);
 }
 
 // The public site exposes human publications only for paired modules. Compact context.md records stay
@@ -92,10 +97,42 @@ async function writeGenerated(path, source) {
   await writeFile(destination, source, "utf8");
 }
 
+function staysInside(root, candidate) {
+  const path = relative(root, candidate);
+  return path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+}
+
+function templateAssetUrl(module) {
+  return `/template-assets/archetypes/${module.id}/template.html`;
+}
+
+async function publishTemplateAsset(group, module) {
+  const source = resolve(trustRoot, group.source, module.id, "template.html");
+  const destination = resolve(templateAssetRoot, module.id, "template.html");
+
+  if (!staysInside(resolve(trustRoot, group.source), source)) {
+    throw new Error(`Refusing to read unexpected template asset: ${source}`);
+  }
+  if (!staysInside(templateAssetRoot, destination)) {
+    throw new Error(`Refusing to publish unexpected template asset: ${destination}`);
+  }
+
+  await mkdir(dirname(destination), {recursive: true});
+  await copyFile(source, destination);
+}
+
+function templatePage(module) {
+  const name = label(module.id.split("/").pop());
+  const source = templateAssetUrl(module);
+  const title = `${name} responsive template`;
+
+  return `---\ntitle: ${JSON.stringify(`${name} template`)}\n---\n\n# ${name} template\n\nResize the browser or open the template at full size to inspect its responsive transformations.\n\n<ArchetypeTemplatePreview src=${JSON.stringify(source)} title=${JSON.stringify(title)} />\n`;
+}
+
 // A module id is its path under the shelf, so a nested one reads `laws/b1-one-surface-owner`.
 // One level of family nesting is walked: a family folder holds no en.md, so a flat scan would
 // skip it and every module inside it silently. Deeper nesting is not a shape this tree has.
-async function discoverModules(root, prefix = "") {
+async function discoverModules(root, prefix = "", htmlTemplate = false) {
   const found = [];
   for (const entry of await readdir(root, {withFileTypes: true})) {
     if (!entry.isDirectory()) continue;
@@ -116,10 +153,11 @@ async function discoverModules(root, prefix = "") {
         binding,
         indexLabel: binding === "en.md" ? "EN" : "Agent (EN)",
         records,
+        htmlTemplate: htmlTemplate && names.has("template.html"),
       });
       continue;
     }
-    if (!prefix) found.push(...(await discoverModules(here, entry.name)));
+    if (!prefix) found.push(...(await discoverModules(here, entry.name, htmlTemplate)));
   }
   return found;
 }
@@ -129,7 +167,7 @@ async function discoverGroup(group) {
   if (!(await exists(shelf))) {
     throw new Error(`Published shelf "${group.source}" has no source. Expected: ${shelf}`);
   }
-  const found = await discoverModules(shelf);
+  const found = await discoverModules(shelf, "", group.htmlTemplate === true);
   found.sort((a, b) => a.id.localeCompare(b.id));
   // A shelf may state its own law — a compiler shelf does — in which case that record IS the shelf
   // page. Without this the shelf gets a generated list of links and its law has nowhere to live.
@@ -177,10 +215,21 @@ function branchRoutes(published) {
   return branches;
 }
 
-await rm(contentRoot, {recursive: true, force: true});
+await Promise.all([
+  rm(contentRoot, {recursive: true, force: true}),
+  rm(templateAssetRoot, {recursive: true, force: true}),
+]);
 
 const publishedGroups = await Promise.all(groups.map(discoverGroup));
 const branches = branchRoutes(publishedGroups);
+
+await Promise.all(
+  publishedGroups.flatMap((group) =>
+    group.modules
+      .filter((module) => module.htmlTemplate)
+      .map((module) => publishTemplateAsset(group, module))
+  )
+);
 
 // The index is the one page the tree cannot be missing: without it an empty tree has no route and
 // the site fails to build. Publish the real record when it exists, otherwise generate a stub that
@@ -216,6 +265,9 @@ await Promise.all(
       ...module.records.map((record) =>
         publish(`${group.source}/${module.id}/${record.source}`, `${group.route}/${module.id}/${record.route}.mdx`)
       ),
+      ...(module.htmlTemplate
+        ? [writeGenerated(`${group.route}/${module.id}/template.mdx`, templatePage(module))]
+        : []),
     ]),
   ])
 );
@@ -257,6 +309,7 @@ await Promise.all([
       writeMeta(`${group.route}/${module.id}/_meta.js`, {
         index: module.indexLabel,
         ...Object.fromEntries(module.records.map((record) => [record.route, record.label])),
+        ...(module.htmlTemplate ? {template: "Template"} : {}),
       })
     ),
   ]),

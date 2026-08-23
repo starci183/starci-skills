@@ -85,7 +85,7 @@
       "coordinatorReworkCount": {"type": "integer", "minimum": 0}, "approvalsChangedDecision": {"type": "integer", "minimum": 0}, "uniqueDefectsCaught": {"type": "integer", "minimum": 0},
       "falsePositiveGates": {"type": "integer", "minimum": 0}, "artifactsCreated": {"type": "integer", "minimum": 0}, "artifactsUsed": {"type": "integer", "minimum": 0}, "unusedArtifacts": {"const": 0}
     }},
-    "skill": {"enum": ["starci-be-approve", "starci-be-plan", "starci-business-analyze", "starci-cloudflare-tunnel-set", "starci-conversation-record", "starci-debt-repay", "starci-deploy", "starci-diagnose", "starci-fe-design-block", "starci-fe-design-layout", "starci-fe-design-refactor", "starci-fe-design-resolve", "starci-fe-ui-reconcile", "starci-grammar-refresh-references", "starci-init", "starci-repair", "starci-setup-mcp", "starci-setup-sonar", "starci-stale-list"]},
+    "skill": {"enum": ["starci-architecture-analyze", "starci-be-approve", "starci-be-plan", "starci-business-analyze", "starci-cloudflare-tunnel-set", "starci-conversation-record", "starci-debt-repay", "starci-deploy", "starci-diagnose", "starci-fe-design-block", "starci-fe-design-layout", "starci-fe-design-refactor", "starci-fe-design-resolve", "starci-fe-ui-reconcile", "starci-grammar-refresh-references", "starci-init", "starci-repair", "starci-setup-mcp", "starci-setup-sonar", "starci-stale-list"]},
     "decision": {"enum": ["scope-decision", "authority-decision", "approval", "shared-integration", "final-verdict"]},
     "approval": {"type": "string", "pattern": "^(?:OK(?: #[12])?|AUTO:[0-9a-f]{64}:OK(?: #[12])?):[0-9a-f]{64}$"},
     "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}

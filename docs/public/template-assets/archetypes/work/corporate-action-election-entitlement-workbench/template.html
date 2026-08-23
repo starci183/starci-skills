@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en" data-archetype-template="corporate-action-election-entitlement-workbench">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Corporate action election entitlement workbench · Archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-max: 94rem; --local-control: 2.75rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; min-width: 20rem; color: var(--text); background: var(--canvas); font: 1rem/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-wrap: anywhere; }
+    button, input { font: inherit; }
+    button, input { min-height: var(--local-control); }
+    button { cursor: pointer; padding: var(--space-2) var(--space-4); color: #fff; background: var(--accent); border: 2px solid transparent; border-radius: calc(var(--radius) - var(--space-1)); font-weight: 750; }
+    button:hover { background: var(--accent-strong); }
+    button:disabled { cursor: not-allowed; opacity: .62; }
+    button.secondary { color: var(--accent-strong); background: var(--surface); border-color: var(--accent); }
+    button.warning-action { color: #fff; background: var(--danger); }
+    input { width: min(100%, 24rem); padding: var(--space-2) var(--space-3); color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip-link { position: fixed; inset: var(--space-2) auto auto var(--space-2); z-index: 30; padding: var(--space-3); color: #fff; background: var(--focus); transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+    .template-header { padding: var(--space-6) max(var(--space-4), calc((100% - var(--local-max)) / 2)); color: #fff; background: var(--accent-strong); }
+    .header-mark { width: 2rem; height: 2rem; margin-bottom: var(--space-2); }
+    .template-header h1 { max-width: 32ch; margin: 0; font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1.1; }
+    .template-header p { max-width: 74ch; margin: var(--space-2) 0 0; }
+    .eyebrow { margin: 0 0 var(--space-1); font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .template-main { width: min(calc(100% - 2rem), var(--local-max)); margin: 0 auto; padding: var(--space-5) 0 var(--space-7); }
+    .card, .context-bar, .action-dock, .compact-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .context-bar { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-4); align-items: end; padding: var(--space-4); margin-bottom: var(--space-4); }
+    .context-bar h2, .section-heading h2 { margin: 0; }
+    .context-bar p { margin: var(--space-1) 0 0; color: var(--muted); }
+    .fictional { display: inline-block; padding: var(--space-1) var(--space-2); color: var(--accent-strong); background: #e8f0fe; border: 1px solid #9bb9e8; border-radius: 999px; font-weight: 750; }
+    .reference-form { display: grid; grid-template-columns: minmax(12rem,1fr) auto; gap: var(--space-2); align-items: end; }
+    .reference-form label { display: grid; gap: var(--space-1); font-weight: 700; }
+    .error-summary { grid-column: 1 / -1; padding: var(--space-3); border: 2px solid var(--danger); border-radius: var(--radius); }
+    .field-error { color: var(--danger); font-weight: 700; }
+    [hidden] { display: none !important; }
+    .support-toggle { display: none; margin: 0 0 var(--space-4) auto; }
+    .workspace { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-4); align-items: start; }
+    .step { min-width: 0; padding: var(--space-4); }
+    .step p { margin: var(--space-2) 0 0; }
+    .section-heading { display: flex; gap: var(--space-3); justify-content: space-between; align-items: start; }
+    .region-id { margin: 0 0 var(--space-1) !important; color: var(--muted); font-size: .76rem; font-weight: 800; letter-spacing: .04em; }
+    .state-chip { flex: none; padding: var(--space-1) var(--space-2); color: var(--text); background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 999px; font-size: .82rem; font-weight: 750; }
+    .state-chip.complete { color: var(--success); background: #eaf7f0; border-color: #8cc9aa; }
+    .state-chip.blocked { color: var(--danger); background: #fff0ee; border-color: #e5a49d; }
+    .data-rail { max-width: 100%; margin-top: var(--space-3); overflow-x: auto; overscroll-behavior-inline: contain; border: 1px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+    table { width: 100%; min-width: 34rem; border-collapse: collapse; }
+    th, td { padding: var(--space-2) var(--space-3); text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { background: var(--surface-subtle); }
+    .action-dock { position: sticky; bottom: var(--space-2); z-index: 10; display: grid; grid-template-columns: minmax(14rem,.7fr) minmax(0,2fr); gap: var(--space-4); align-items: center; padding: var(--space-4); margin-top: var(--space-5); }
+    .action-dock h2 { margin: 0; }
+    .action-dock p { margin: var(--space-1) 0 0; }
+    .scenario-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .receipt { margin-top: var(--space-3) !important; padding: var(--space-2); background: var(--surface-subtle); border-left: .3rem solid var(--accent); }
+    .receipt.success { border-color: var(--success); }
+    .receipt.danger { border-color: var(--danger); }
+    .compact-nav { display: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 64rem) and (min-width: 42.01rem) {
+      .workspace { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .support-toggle { display: block; }
+      .workspace:not(.support-open) .supporting { display: none; }
+      .action-dock { position: static; grid-template-columns: 1fr; }
+    }
+    @media (max-width: 42rem) {
+      body { font-size: 1rem; }
+      .template-header { padding: var(--space-5) var(--space-4); }
+      .template-main { width: min(calc(100% - 1rem), var(--local-max)); padding-bottom: 7rem; }
+      .context-bar { grid-template-columns: 1fr; }
+      .reference-form { grid-template-columns: 1fr; }
+      .workspace { display: block; }
+      .step { display: none; min-height: 18rem; }
+      .step.is-active { display: block; }
+      .support-toggle { display: none; }
+      .data-rail { overflow: visible; border: 0; }
+      table, tbody, tr, th, td { display: block; min-width: 0; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+      tr { margin-bottom: var(--space-3); padding: var(--space-3); background: var(--surface-subtle); border: 1px solid var(--border); border-radius: calc(var(--radius) - var(--space-1)); }
+      th, td { padding: var(--space-1) 0; border: 0; white-space: normal; }
+      .action-dock { position: static; grid-template-columns: 1fr; }
+      .scenario-actions { display: grid; grid-template-columns: 1fr; }
+      .compact-nav { position: sticky; bottom: var(--space-2); z-index: 12; display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; padding: var(--space-2); margin-top: var(--space-4); }
+      .compact-nav span { text-align: center; font-weight: 750; }
+    }
+    @media (max-height: 36rem) {
+      .action-dock, .compact-nav { position: static; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="template-header">
+    <svg class="header-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 3h16a1 1 0 0 1 1 1v16H3V4a1 1 0 0 1 1-1Zm2 4v2h12V7H6Zm0 4v2h5v-2H6Zm7 0v2h5v-2h-5Zm-7 4v2h5v-2H6Zm7 0v2h5v-2h-5Z"/></svg>
+    <p class="eyebrow">Archetype template</p>
+    <h1>Corporate action election entitlement workbench</h1>
+    <p>Derive fictional holder entitlements, manage election deadlines, and reconcile final movements.</p>
+  </header>
+  <main id="main" class="template-main" data-region="corporate-action-election">
+    <section class="context-bar" aria-labelledby="context-heading">
+      <div><span class="fictional">Fictional demonstration data</span><h2 id="context-heading">Working context</h2><p>Local-only scenario. No value is submitted or stored.</p></div>
+      <form id="reference-form" class="reference-form" novalidate>
+        <div id="error-summary" class="error-summary" role="alert" tabindex="-1" hidden><strong>Correct one error</strong><p>Operator reference must contain at least three characters.</p></div>
+        <label for="operator-reference">Operator reference<input id="operator-reference" name="operator-reference" value="OP-14" autocomplete="off" aria-describedby="reference-help reference-error"></label>
+        <button type="submit">Validate working reference</button>
+        <span id="reference-help">Required to run the deterministic scenario.</span><span id="reference-error" class="field-error" hidden>Enter at least three characters.</span>
+      </form>
+    </section>
+    <button type="button" id="support-toggle" class="support-toggle secondary" aria-expanded="false">Show supporting regions</button>
+    <div id="workspace" class="workspace" data-overflow-owner="holder-instruction-draft-send-acknowledge-amend-cancel-late-lifecycle">
+      <section class="step card" data-step="0" data-region="corporate-action-election">
+        <div class="section-heading"><div><p class="region-id">corporate-action-election</p><h2 id="step-0-heading" tabindex="-1">1. Corporate Action Election</h2></div><span class="state-chip" data-owner-state="0">Ready</span></div>
+        <p>Event CA-44 · fictional voluntary distribution</p>
+        
+      </section>
+      <section class="step card" data-step="1" data-region="event-announcement-and-version">
+        <div class="section-heading"><div><p class="region-id">event-announcement-and-version</p><h2 id="step-1-heading" tabindex="-1">2. Event Announcement And Version</h2></div><span class="state-chip" data-owner-state="1">Pending</span></div>
+        <p>Confirmed announcement v2 · cash or security option</p>
+        
+      </section>
+      <section class="step card" data-step="2" data-region="terms-options-and-key-dates">
+        <div class="section-heading"><div><p class="region-id">terms-options-and-key-dates</p><h2 id="step-2-heading" tabindex="-1">3. Terms Options And Key Dates</h2></div><span class="state-chip" data-owner-state="2">Pending</span></div>
+        <p>Record 2026-08-20 · election cutoff 15:00 UTC</p>
+        
+      </section>
+      <section class="step card" data-step="3" data-region="frozen-record-date-position-snapshot">
+        <div class="section-heading"><div><p class="region-id">frozen-record-date-position-snapshot</p><h2 id="step-3-heading" tabindex="-1">4. Frozen Record Date Position Snapshot</h2></div><span class="state-chip" data-owner-state="3">Pending</span></div>
+        <p>Holder H-01: 1,000 units; H-02: 600 units · frozen</p>
+        
+      </section>
+      <section class="step card" data-step="4" data-region="holder-account-entitlement-derivation">
+        <div class="section-heading"><div><p class="region-id">holder-account-entitlement-derivation</p><h2 id="step-4-heading" tabindex="-1">5. Holder Account Entitlement Derivation</h2></div><span class="state-chip" data-owner-state="4">Pending</span></div>
+        <p>Projected ceilings: H-01 100; H-02 60</p>
+        <div class="data-rail" role="region" aria-label="holder-instruction-draft-send-acknowledge-amend-cancel-late-lifecycle table" tabindex="0"><table><thead><tr><th scope="col">Holder</th><th scope="col">Frozen position</th><th scope="col">Entitlement</th><th scope="col">Instruction</th></tr></thead><tbody><tr><th scope="row">H-01</th><td>1,000</td><td>100</td><td>Draft 120 · invalid</td></tr><tr><th scope="row">H-02</th><td>600</td><td>60</td><td>No instruction</td></tr></tbody></table></div>
+      </section>
+      <section class="step card" data-step="5" data-region="holder-instruction-draft-send-acknowledge-amend-cancel-late-lifecycle">
+        <div class="section-heading"><div><p class="region-id">holder-instruction-draft-send-acknowledge-amend-cancel-late-lifecycle</p><h2 id="step-5-heading" tabindex="-1">6. Holder Instruction Draft Send Acknowledge Amend Cancel Late Lifecycle</h2></div><span class="state-chip" data-owner-state="5">Pending</span></div>
+        <p>H-01 draft security election 120 · over ceiling</p>
+        
+      </section>
+      <section class="step card" data-step="6" data-region="deadline-channel-and-agent-status">
+        <div class="section-heading"><div><p class="region-id">deadline-channel-and-agent-status</p><h2 id="step-6-heading" tabindex="-1">7. Deadline Channel And Agent Status</h2></div><span class="state-chip" data-owner-state="6">Pending</span></div>
+        <p>Agent channel open · acknowledgement pending</p>
+        
+      </section>
+      <section class="step card supporting" data-step="7" data-region="default-option">
+        <div class="section-heading"><div><p class="region-id">default-option</p><h2 id="step-7-heading" tabindex="-1">8. Default Option</h2></div><span class="state-chip" data-owner-state="7">Pending</span></div>
+        <p>H-02 default cash option after cutoff</p>
+        
+      </section>
+      <section class="step card supporting" data-step="8" data-region="confirmed-allocation-cash-or-security-movement">
+        <div class="section-heading"><div><p class="region-id">confirmed-allocation-cash-or-security-movement</p><h2 id="step-8-heading" tabindex="-1">9. Confirmed Allocation Cash Or Security Movement</h2></div><span class="state-chip" data-owner-state="8">Pending</span></div>
+        <p>Projected movement pending final proration</p>
+        
+      </section>
+      <section class="step card supporting" data-step="9" data-region="exception-tax-and-final-entitlement-receipt">
+        <div class="section-heading"><div><p class="region-id">exception-tax-and-final-entitlement-receipt</p><h2 id="step-9-heading" tabindex="-1">10. Exception Tax And Final Entitlement Receipt</h2></div><span class="state-chip" data-owner-state="9">Pending</span></div>
+        <p>Tax exception clear · final receipt pending</p>
+        
+      </section>
+    </div>
+    <section class="action-dock" aria-labelledby="scenario-heading">
+      <div><h2 id="scenario-heading">Deterministic task scenario</h2><p>Run actions in dependency order. Blocked attempts preserve the prior state.</p><p id="receipt" class="receipt">Validate the working reference to begin.</p></div>
+      <div class="scenario-actions">
+          <button type="button" id="action-0" class="scenario-action" data-requires="reference-valid" data-sets="entitlements" data-tone="success" data-message="H-01 ceiling 100 and H-02 ceiling 60 derived from frozen positions.">Derive holder entitlements</button>
+          <button type="button" id="action-1" class="warning-action" data-requires="entitlements" data-sets="" data-tone="danger" data-message="H-01 election 120 exceeds entitlement 100 and is blocked.">Try election above ceiling</button>
+          <button type="button" id="action-2" class="scenario-action" data-requires="entitlements" data-sets="sent" data-tone="success" data-message="H-01 election 100 sent with immutable instruction identity.">Send valid H-01 election</button>
+          <button type="button" id="action-3" class="scenario-action" data-requires="sent" data-sets="acknowledged" data-tone="success" data-message="Agent acknowledged H-01; the selected holder context is retained.">Acknowledge agent receipt</button>
+          <button type="button" id="action-4" class="scenario-action" data-requires="acknowledged" data-sets="defaulted" data-tone="success" data-message="H-02 received the declared cash default after cutoff.">Close deadline and apply default</button>
+          <button type="button" id="action-5" class="scenario-action" data-requires="defaulted" data-sets="allocated" data-tone="success" data-message="Final security allocation is prorated to 92 for H-01; cash difference recorded.">Confirm prorated allocation</button>
+          <button type="button" id="action-6" class="scenario-action" data-requires="allocated" data-sets="reconciled" data-tone="success" data-message="Cash and security movements reconcile to both confirmed instructions and positions.">Reconcile final movements</button>
+      </div>
+    </section>
+    <nav class="compact-nav" aria-label="Compact task sequence">
+      <button type="button" id="previous-step" class="secondary">Back</button>
+      <span id="step-position">Step 1 of 10</span>
+      <button type="button" id="next-step">Next</button>
+    </nav>
+  </main>
+  <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  <script>
+    (() => {
+      const workspace = document.getElementById('workspace');
+      const steps = Array.from(document.querySelectorAll('.step'));
+      const liveStatus = document.getElementById('live-status');
+      const receipt = document.getElementById('receipt');
+      const form = document.getElementById('reference-form');
+      const reference = document.getElementById('operator-reference');
+      const errorSummary = document.getElementById('error-summary');
+      const referenceError = document.getElementById('reference-error');
+      const supportToggle = document.getElementById('support-toggle');
+      const previousStep = document.getElementById('previous-step');
+      const nextStep = document.getElementById('next-step');
+      const stepPosition = document.getElementById('step-position');
+      const completed = new Set();
+      let activeStep = 0;
+
+      function announce(message) {
+        liveStatus.textContent = '';
+        window.setTimeout(() => { liveStatus.textContent = message; }, 20);
+      }
+
+      function renderStep(moveFocus) {
+        steps.forEach((step, index) => step.classList.toggle('is-active', index === activeStep));
+        previousStep.disabled = activeStep === 0;
+        nextStep.disabled = activeStep === steps.length - 1;
+        stepPosition.textContent = 'Step ' + (activeStep + 1) + ' of ' + steps.length;
+        if (moveFocus && window.matchMedia('(max-width: 42rem)').matches) {
+          const heading = steps[activeStep].querySelector('h2');
+          heading.focus();
+        }
+      }
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const valid = reference.value.trim().length >= 3;
+        reference.setAttribute('aria-invalid', String(!valid));
+        errorSummary.hidden = valid;
+        referenceError.hidden = valid;
+        if (!valid) {
+          errorSummary.focus();
+          receipt.className = 'receipt danger';
+          receipt.textContent = 'Reference validation failed. Scenario state is unchanged.';
+          announce('Reference validation failed. Correct one error.');
+          return;
+        }
+        completed.add('reference-valid');
+        receipt.className = 'receipt success';
+        receipt.textContent = 'Working reference ' + reference.value.trim() + ' is valid. The scenario is ready.';
+        announce('Working reference validated. Scenario actions are ready.');
+      });
+
+      document.querySelectorAll('[data-requires]').forEach((button, actionIndex) => {
+        button.addEventListener('click', () => {
+          const required = button.dataset.requires.split(',').map((item) => item.trim()).filter(Boolean);
+          const missing = required.filter((item) => !completed.has(item));
+          if (missing.length) {
+            receipt.className = 'receipt danger';
+            receipt.textContent = 'Blocked. Complete prerequisite: ' + missing.join(', ') + '.';
+            announce(receipt.textContent);
+            return;
+          }
+          const nextState = button.dataset.sets.trim();
+          if (nextState) {
+            completed.add(nextState);
+            button.disabled = true;
+            button.setAttribute('aria-pressed', 'true');
+          }
+          const tone = button.dataset.tone;
+          receipt.className = 'receipt ' + tone;
+          receipt.textContent = button.dataset.message;
+          const ownerIndex = Math.min(actionIndex + 1, steps.length - 1);
+          const chip = steps[ownerIndex].querySelector('.state-chip');
+          chip.classList.remove('complete', 'blocked');
+          chip.classList.add(tone === 'danger' ? 'blocked' : 'complete');
+          chip.textContent = tone === 'danger' ? 'Blocked evidence' : 'Complete';
+          announce(button.dataset.message);
+        });
+      });
+
+      supportToggle.addEventListener('click', () => {
+        const open = !workspace.classList.contains('support-open');
+        workspace.classList.toggle('support-open', open);
+        supportToggle.setAttribute('aria-expanded', String(open));
+        supportToggle.textContent = open ? 'Hide supporting regions' : 'Show supporting regions';
+        announce(open ? 'Supporting regions shown. Selection is unchanged.' : 'Supporting regions hidden. Selection is unchanged.');
+      });
+
+      previousStep.addEventListener('click', () => {
+        if (activeStep > 0) { activeStep -= 1; renderStep(true); }
+      });
+      nextStep.addEventListener('click', () => {
+        if (activeStep < steps.length - 1) { activeStep += 1; renderStep(true); }
+      });
+      renderStep(false);
+    })();
+  </script>
+</body>
+</html>
+

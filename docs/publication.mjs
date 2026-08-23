@@ -51,6 +51,12 @@ export const groups = [
     description: "Stable v4 accountability between frontend design/source patterns, gates and the published lint canon.",
   },
   {
+    source: "archetypes",
+    title: "Page archetypes",
+    description: "Reusable dominant-task, region-graph and responsive page topologies resolved before product Grammar and Principles.",
+    htmlTemplate: true,
+  },
+  {
     source: "grammars",
     title: "Grammars",
     description: "Explicit product-family authority: closed facts, deterministic outcomes, owner profiles, durable capsules, cases and templates.",

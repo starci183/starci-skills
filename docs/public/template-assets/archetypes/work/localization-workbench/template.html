@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en" data-archetype-template="localization-workbench">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Localization workbench template</title>
+  <style>
+:root {
+  color-scheme: light;
+  --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+  --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+  --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+  --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+  --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+  --local-max: 92rem; --local-side: minmax(15rem, 20rem); --local-work: minmax(0, 1fr);
+}
+* { box-sizing: border-box; }
+html { min-inline-size: 0; scroll-padding-block: 6rem; }
+body { margin: 0; min-block-size: 100dvh; overflow-x: clip; background: var(--canvas); color: var(--text); font: 16px/1.55 system-ui, sans-serif; }
+button, input, select, textarea, output { font: inherit; }
+button, input:not([type="checkbox"]):not([type="radio"]), select { min-block-size: 44px; }
+button { min-inline-size: 44px; cursor: pointer; border: 1px solid var(--border); border-radius: .55rem; padding: .55rem .8rem; color: var(--text); background: var(--surface); }
+button:hover { border-color: var(--accent); }
+button[aria-pressed="true"], button[aria-selected="true"], .primary { color: #fff; border-color: var(--accent); background: var(--accent); }
+button:disabled { cursor: not-allowed; opacity: .58; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+h1,h2,h3,p { margin-block-start: 0; overflow-wrap: anywhere; }
+h1 { margin-block-end: var(--space-2); }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1rem; }
+a { color: var(--accent-strong); }
+label { display: grid; gap: var(--space-1); font-weight: 700; }
+input,select,textarea { max-inline-size: 100%; border: 1px solid var(--border); border-radius: .5rem; padding: .6rem; color: var(--text); background: var(--surface); }
+textarea { inline-size: 100%; min-block-size: 7rem; resize: vertical; }
+fieldset { min-inline-size: 0; border: 1px solid var(--border); border-radius: .5rem; }
+.skip-link { position: fixed; inset: .5rem auto auto .5rem; z-index: 100; transform: translateY(-180%); padding: .7rem 1rem; background: var(--surface); }
+.skip-link:focus { transform: none; }
+.template-header { padding: var(--space-5) max(var(--space-4), calc((100% - var(--local-max))/2)); border-block-end: 1px solid var(--border); background: var(--surface); }
+.eyebrow { margin-block-end: var(--space-2); color: var(--accent-strong); font-weight: 800; }
+.template-header p:last-child { max-inline-size: 76ch; margin: 0; color: var(--muted); }
+.template-main { inline-size: min(calc(100% - 2rem), var(--local-max)); margin-inline: auto; padding-block: var(--space-5) var(--space-7); }
+.bar,.panel,.card,.status-box { min-inline-size: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.bar,.panel { padding: var(--space-4); }
+.bar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--space-3); margin-block-end: var(--space-4); }
+.workspace { display: grid; grid-template-columns: var(--local-side) var(--local-work) var(--local-side); gap: var(--space-4); align-items: start; }
+.workspace.two { grid-template-columns: var(--local-work) var(--local-side); }
+.primary-pane { min-inline-size: 0; }
+.rail { min-inline-size: 0; }
+.stack { display: grid; gap: var(--space-3); }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
+.spread { justify-content: space-between; }
+.stage-nav { display: none; flex-wrap: wrap; gap: var(--space-2); margin-block-end: var(--space-4); }
+.badge { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: .12rem .5rem; font-weight: 750; }
+.ok { color: var(--success); } .warn { color: var(--warning); } .bad { color: var(--danger); }
+.hint,.muted { color: var(--muted); }
+.notice { padding: var(--space-3); border-inline-start: 4px solid var(--accent); background: var(--surface-subtle); }
+.error-summary { padding: var(--space-3); border: 2px solid var(--danger); background: #fff0ee; }
+.error-summary:focus { outline: 3px solid var(--focus); }
+.bounded-x { inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+.bounded-y { max-block-size: 26rem; overflow-y: auto; overscroll-behavior-block: contain; }
+.bounded-both { inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; max-block-size: 28rem; overflow: auto; overscroll-behavior: contain; }
+.overflow-cue { margin-block-end: var(--space-2); color: var(--muted); }
+table { inline-size: 100%; border-collapse: collapse; }
+caption { padding: var(--space-3); text-align: start; font-weight: 800; }
+th,td { padding: .65rem; border: 1px solid var(--border); text-align: start; vertical-align: top; }
+thead th { background: var(--surface-subtle); }
+ul.clean,ol.clean { margin: 0; padding: 0; list-style: none; }
+.clean > li { margin-block-end: var(--space-2); }
+.item { padding: var(--space-3); border: 1px solid var(--border); border-radius: .55rem; background: var(--surface); }
+.selected { box-shadow: inset 0 0 0 3px var(--accent); }
+.sticky-actions { position: sticky; inset-block-end: 0; z-index: 4; padding: var(--space-3); border-block-start: 1px solid var(--border); background: var(--surface); }
+.grid-cells { display: grid; grid-template-columns: 4rem repeat(4,minmax(7rem,1fr)); min-inline-size: 36rem; }
+.grid-cells > * { min-block-size: 3.25rem; border: 1px solid var(--border); border-radius: 0; }
+.grid-cells [role="gridcell"] { text-align: start; }
+.grid-cells [aria-selected="true"] { box-shadow: inset 0 0 0 3px var(--accent); }
+.board { display: grid; grid-template-columns: repeat(3,minmax(15rem,1fr)); gap: var(--space-3); min-inline-size: 48rem; }
+.lane { padding: var(--space-3); background: var(--surface-subtle); border-radius: .5rem; }
+.timeline { display: grid; grid-template-columns: 7rem repeat(4,minmax(8rem,1fr)); min-inline-size: 42rem; }
+.bounded-both.timeline { min-inline-size: 0; }
+.timeline > * { min-block-size: 4.5rem; padding: var(--space-2); border: 1px solid var(--border); }
+pre { max-inline-size: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.log { margin: 0; padding: var(--space-3); color: #fff; background: #17202a; font: 1rem/1.6 ui-monospace,monospace; }
+.log button { inline-size: 100%; color: #fff; text-align: start; border-color: #8090a0; background: transparent; overflow-wrap: anywhere; }
+.chart { display: flex; align-items: end; gap: var(--space-3); min-block-size: 16rem; padding: var(--space-4); background: var(--surface-subtle); }
+.chart button { flex: 1; min-block-size: var(--local-height); border-radius: .35rem .35rem 0 0; background: #d8e6ff; }
+.canvas { inline-size: 100%; min-inline-size: 34rem; min-block-size: 22rem; background: var(--surface-subtle); }
+.canvas [data-shape] { fill: #d8e6ff; stroke: var(--accent-strong); stroke-width: 3; }
+.canvas [data-shape][aria-selected="true"] { stroke: var(--focus); stroke-width: 6; }
+.graph { inline-size: 100%; min-inline-size: 36rem; min-block-size: 18rem; background: var(--surface-subtle); }
+.graph path { fill: none; stroke: var(--muted); stroke-width: 4; }
+.graph rect { fill: #d8e6ff; stroke: var(--accent-strong); stroke-width: 3; }
+.graph [aria-selected="true"] rect { stroke: var(--focus); stroke-width: 6; }
+.graph text { text-anchor: middle; dominant-baseline: middle; font: 16px system-ui; }
+.thread { max-block-size: 28rem; overflow-y: auto; scroll-padding-block: var(--space-4); }
+.thread li { padding: var(--space-3); border-block-end: 1px solid var(--border); }
+.unread { border-block-start: 3px solid var(--accent); text-align: center; color: var(--accent-strong); font-weight: 750; }
+.sr-only { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+dialog { inline-size: min(40rem,calc(100% - 2rem)); max-block-size: calc(100dvh - 2rem); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: var(--surface); }
+dialog::backdrop { background: rgba(23,32,42,.58); }
+@media (max-width: 68rem) {
+  .workspace { grid-template-columns: minmax(0,1fr) var(--local-side); }
+  .workspace > .rail:first-child { display: none; }
+  .workspace.two { grid-template-columns: minmax(0,1fr); }
+  [data-intermediate-hide] { display: none; }
+}
+@media (max-width: 48rem) {
+  body { font-size: 16px; }
+  .template-header,.template-main { inline-size: 100%; padding-inline: var(--space-4); }
+  .workspace,.workspace.two { display: block; }
+  .workspace > .rail:first-child { display: block; }
+  .stage-nav { display: flex; }
+  [data-stage][hidden] { display: none !important; }
+  .bar { align-items: stretch; }
+  .bar > * { max-inline-size: 100%; }
+  .panel { box-shadow: none; }
+  .canvas,.graph { min-inline-size: 30rem; }
+  .sticky-actions { padding-block-end: max(var(--space-3),env(safe-area-inset-bottom)); }
+}
+@media (max-height: 34rem) { .sticky-actions { position: static; } }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+</style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workbench</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Localization workbench</h1>
+    <p>Translate source segments in context, preserve placeholders, resolve QA, and keep drafts across compact segment navigation. Fictional local data illustrates topology and states; it is not product truth or visual authority.</p>
+  </header>
+  <main id="main" class="template-main">
+    
+<section class="bar" id="project-locale-and-progress"><div><h2>Fictional project · English → Vietnamese</h2><p id="locale-progress">Segment 1 of 2 · Draft · 0 approved</p></div><button type="button" data-open="segment-sheet">Open segment queue</button></section>
+<nav class="stage-nav" aria-label="Compact localization stages"><button type="button" data-stage-target="work" aria-pressed="true">Source and target</button><button type="button" data-stage-target="review" aria-pressed="false">Terminology and QA</button></nav>
+<div class="workspace two"><section class="panel primary-pane" data-stage="work"><h2>Active segment</h2><article class="item" id="source-context"><h3>Source context</h3><p id="source-text">Hello {name}, you have {count} tasks.</p></article><label for="target-text">Vietnamese target<textarea id="target-text">Xin chào {name}, bạn có nhiệm vụ.</textarea></label><div class="row"><button id="previous-segment" type="button">Previous segment</button><button id="next-segment" type="button">Next segment</button><button id="save-target" class="primary" type="button">Save draft</button></div></section><aside class="panel rail" id="quality-issues" data-stage="review"><h2>Terminology and placeholder support</h2><p>Required placeholders: <code id="required-placeholders">{name}, {count}</code></p><div id="qa" class="error-summary">Missing placeholder: {count}</div><button id="insert-placeholder" type="button">Insert missing {count}</button><button id="approve-segment" type="button" disabled>Mark reviewed</button></aside></div><dialog id="segment-sheet" aria-labelledby="segment-title"><h2 id="segment-title">Segment queue</h2><button type="button" data-segment="0">1 · Draft · greeting</button><button type="button" data-segment="1">2 · Untranslated · summary</button><button type="button" data-close="true">Close segment queue</button></dialog>
+    <details class="panel"><summary><strong>Required region graph mapping</strong></summary><p class="muted">These stable region IDs name topology owners in this conforming realization.</p><ul><li><code>localization-workbench</code></li><li><code>project-locale-and-progress</code></li><li><code>segment-queue</code></li><li><code>source-context</code></li><li><code>target-editor</code></li><li><code>terminology-and-placeholder-support</code></li><li><code>quality-issues</code></li><li><code>save-and-submit</code></li></ul></details>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+  <script>(()=>{'use strict';
+const status=document.getElementById('live-status');
+const announce=(message)=>{status.textContent='';requestAnimationFrame(()=>{status.textContent=message;});};
+let dialogTrigger=null;
+document.addEventListener('click',(event)=>{
+  const button=event.target.closest('button'); if(!button)return;
+  if(button.dataset.open){const dialog=document.getElementById(button.dataset.open);if(dialog){dialogTrigger=button;dialog.showModal();const heading=dialog.querySelector('h2');if(heading){heading.tabIndex=-1;heading.focus();}}return;}
+  if(button.dataset.close){const dialog=button.closest('dialog');if(dialog)dialog.close();return;}
+  if(button.dataset.message)announce(button.dataset.message);
+});
+document.querySelectorAll('dialog').forEach((dialog)=>dialog.addEventListener('close',()=>{if(dialogTrigger){dialogTrigger.focus();dialogTrigger=null;}}));
+let activeStage='work';
+const applyStages=()=>{const compact=matchMedia('(max-width: 48rem)').matches;document.querySelectorAll('[data-stage]').forEach((panel)=>{panel.hidden=compact&&panel.dataset.stage!==activeStage;});document.querySelectorAll('[data-stage-target]').forEach((button)=>button.setAttribute('aria-pressed',String(button.dataset.stageTarget===activeStage)));};
+document.querySelectorAll('[data-stage-target]').forEach((button)=>button.addEventListener('click',()=>{activeStage=button.dataset.stageTarget;applyStages();const heading=document.querySelector('[data-stage="'+activeStage+'"] h2');if(heading){heading.tabIndex=-1;heading.focus();}}));
+applyStages();addEventListener('resize',applyStages);
+
+const segments=[{source:'Hello {name}, you have {count} tasks.',target:'Xin chào {name}, bạn có nhiệm vụ.',required:['{name}','{count}'],state:'Draft'},{source:'Open {item} to continue.',target:'',required:['{item}'],state:'Untranslated'}];let idx=0;const target=document.getElementById('target-text'),source=document.getElementById('source-text'),qa=document.getElementById('qa'),approve=document.getElementById('approve-segment'),progress=document.getElementById('locale-progress');const check=()=>{segments[idx].target=target.value;const missing=segments[idx].required.filter(p=>!target.value.includes(p));qa.className=missing.length?'error-summary':'notice';qa.textContent=missing.length?'Missing placeholder: '+missing.join(', '):'QA passed: every required placeholder is preserved.';approve.disabled=missing.length>0;document.getElementById('required-placeholders').textContent=segments[idx].required.join(', ');return missing;};const load=(next)=>{segments[idx].target=target.value;idx=Math.max(0,Math.min(segments.length-1,next));source.textContent=segments[idx].source;target.value=segments[idx].target;progress.textContent='Segment '+(idx+1)+' of 2 · '+segments[idx].state+' · '+segments.filter(s=>s.state==='Reviewed').length+' approved';check();target.focus();announce('Segment '+(idx+1)+' loaded; previous draft preserved');};target.addEventListener('input',()=>{segments[idx].state='Draft';check();});document.getElementById('insert-placeholder').addEventListener('click',()=>{const missing=check();if(missing.length){target.value+=(target.value?' ':'')+missing[0];check();target.focus();announce(missing[0]+' inserted; QA recomputed');}});document.getElementById('save-target').addEventListener('click',()=>{segments[idx].target=target.value;announce('Segment draft saved locally; focus and cursor retained');});document.getElementById('next-segment').addEventListener('click',()=>load(idx+1));document.getElementById('previous-segment').addEventListener('click',()=>load(idx-1));document.querySelectorAll('[data-segment]').forEach(b=>b.addEventListener('click',()=>{document.getElementById('segment-sheet').close();load(Number(b.dataset.segment));}));approve.addEventListener('click',()=>{segments[idx].state='Reviewed';progress.textContent='Segment '+(idx+1)+' of 2 · Reviewed · '+segments.filter(s=>s.state==='Reviewed').length+' approved';announce('Segment marked reviewed after QA passed');});check();})();</script>
+</body>
+</html>

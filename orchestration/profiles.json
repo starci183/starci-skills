@@ -37,6 +37,7 @@
     }
   },
   "skillMaps": {
+    "starci-architecture-analyze": {"map": "capabilities", "topology": "dual-track", "workflow": "audit", "impactLevels": ["read-only", "cross-domain"], "approvalModes": ["manual", "auto"], "approvalLabel": null, "steps": ["constraints", "capability", "alternatives", "decision-handoff"]},
     "starci-be-approve": {"map": "capabilities", "topology": "reconciliation", "workflow": "repository", "impactLevels": ["capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["bind", "challenge", "approve", "implement-proof"]},
     "starci-be-plan": {"map": "capabilities", "topology": "dual-track", "workflow": "full", "impactLevels": ["capability"], "approvalModes": ["manual", "auto"], "approvalLabel": null, "steps": ["demand", "capability", "synthesis", "proof"]},
     "starci-business-analyze": {"map": "capabilities", "topology": "reconciliation", "workflow": "record", "impactLevels": ["record", "capability"], "approvalModes": ["manual", "auto"], "approvalLabel": "OK", "steps": ["evidence", "model", "publish", "reconcile"]},

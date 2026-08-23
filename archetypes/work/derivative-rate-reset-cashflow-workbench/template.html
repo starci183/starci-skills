@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en" data-archetype-template="derivative-rate-reset-cashflow-workbench">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Derivative rate reset cashflow workbench · Archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-max: 96rem; --local-control: 2.75rem; --local-line: #9fb0c2;
+      --local-header-end: #102a43; --local-selection: #e8f0fe;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-block: var(--space-5); }
+    body { min-width: 20rem; margin: 0; color: var(--text); background: var(--canvas); font: 1rem/1.52 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button { min-height: var(--local-control); padding: var(--space-2) var(--space-3); color: var(--surface); background: var(--accent); border: 2px solid var(--accent); border-radius: calc(var(--radius) - var(--space-1)); font: inherit; font-weight: 750; cursor: pointer; touch-action: manipulation; }
+    button:active:not(:disabled) { filter: brightness(.88); }
+    button.secondary { color: var(--accent-strong); background: var(--surface); border-color: var(--border); }
+    button:disabled { cursor: not-allowed; opacity: .7; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip-link { position: fixed; inset: var(--space-2) auto auto var(--space-2); z-index: 20; padding: var(--space-2) var(--space-3); color: var(--surface); background: var(--focus); transform: translateY(-150%); }
+    .skip-link:focus { transform: translateY(0); }
+    .template-header { padding: var(--space-6) max(var(--space-4), calc((100% - var(--local-max)) / 2)); color: var(--surface); background: linear-gradient(105deg, var(--accent-strong), var(--local-header-end)); }
+    .template-header h1 { max-width: 34ch; margin: var(--space-1) 0 var(--space-2); font-size: clamp(1.65rem, 3vw, 2.65rem); line-height: 1.08; }
+    .template-header p:last-child { max-width: 80ch; margin: 0; }
+    .eyebrow { margin: 0; font-size: .78rem; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+    .template-main { width: min(calc(100% - 2rem), var(--local-max)); margin-inline: auto; padding-block: var(--space-4) var(--space-7); }
+    .summary, .card, .compact-nav, .intermediate-disclosure { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .summary { display: grid; grid-template-columns: minmax(18rem,1.4fr) minmax(26rem,2fr); gap: var(--space-4); align-items: center; padding: var(--space-4); margin-bottom: var(--space-4); }
+    .summary h2, .summary p { margin-block: var(--space-1); }
+    .metrics, .facts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: var(--space-2); margin: 0; }
+    .metrics div, .facts div { min-width: 0; padding: var(--space-2) var(--space-3); background: var(--surface-subtle); border-radius: calc(var(--radius) - var(--space-1)); }
+    dt { color: var(--muted); font-size: .82rem; } dd { margin: var(--space-1) 0 0; font-weight: 800; overflow-wrap: anywhere; }
+    .verdict { display: inline-flex; width: fit-content; margin-top: var(--space-2); padding: var(--space-1) var(--space-2); color: var(--danger); border: 1px solid currentColor; border-radius: 999px; font-weight: 800; }
+    .verdict.pass { color: var(--success); }
+    .layout { display: grid; grid-template-columns: minmax(19rem,.9fr) minmax(26rem,1.35fr) minmax(20rem,.95fr); gap: var(--space-4); align-items: start; }
+    .pane { min-width: 0; display: grid; gap: var(--space-4); align-content: start; }
+    .card { min-width: 0; padding: var(--space-4); }
+    .card h2 { margin: var(--space-1) 0 var(--space-3); font-size: 1.1rem; }
+    .card h3 { margin: var(--space-3) 0 var(--space-2); font-size: 1rem; }
+    .bounded { overflow-x: auto; overscroll-behavior-inline: contain; }
+    table { width: 100%; min-width: 35rem; border-collapse: collapse; }
+    th, td { padding: var(--space-2); text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    thead th { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+    .record-button { width: 100%; min-width: 8.5rem; color: var(--accent-strong); background: transparent; border-color: transparent; text-align: left; }
+    .record-button.selected { background: var(--surface-subtle); border-color: var(--accent); }
+    .selection { padding: var(--space-3); background: var(--local-selection); border-left: .35rem solid var(--accent); }
+    .route { display: grid; gap: 0; padding: 0; margin: 0; list-style: none; }
+    .route-node { position: relative; display: grid; grid-template-columns: 2.35rem 1fr; gap: var(--space-3); min-width: 0; padding: var(--space-2) 0 var(--space-4); }
+    .route-node:not(:last-child)::after { content: ""; position: absolute; left: 1.05rem; top: 2.5rem; bottom: 0; width: 2px; background: var(--local-line); }
+    .route-index { z-index: 1; display: grid; width: 2.2rem; height: 2.2rem; place-items: center; color: var(--surface); background: var(--accent-strong); border-radius: 50%; font-size: .78rem; font-weight: 850; }
+    .route-node p { margin: var(--space-1) 0 0; color: var(--muted); }
+    .action-pane { position: sticky; top: var(--space-4); }
+    .steps { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+    .step-button { width: 100%; display: grid; grid-template-columns: 2rem 1fr; gap: var(--space-2); align-items: center; text-align: left; }
+    .step-button span { display: grid; width: 1.8rem; height: 1.8rem; place-items: center; color: var(--accent-strong); background: var(--surface); border-radius: 50%; font-size: .75rem; }
+    .step-button[data-done="true"] { color: var(--text); background: var(--surface-subtle); border-color: var(--success); }
+    .step-button[data-done="true"] span { color: var(--surface); background: var(--success); }
+    .step-button.failure, .step-button.blocked { background: var(--warning); border-color: var(--warning); }
+    .button-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+    .receipt { padding-left: 1.2rem; }
+    .receipt li { margin-block: var(--space-2); }
+    .audit-log { padding-left: 1.3rem; }
+    .audit-log li { margin-block: var(--space-1); }
+    .intermediate-disclosure, .compact-nav { display: none; padding: var(--space-2); margin-bottom: var(--space-4); }
+    .compact-nav button[aria-pressed="true"] { background: var(--accent-strong); border-color: var(--accent-strong); }
+    details { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    summary { min-height: var(--local-control); padding-block: var(--space-2); font-weight: 800; cursor: pointer; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 72rem) and (min-width: 46.01rem) {
+      .summary { grid-template-columns: 1fr; }
+      .layout { grid-template-columns: minmax(0,1.35fr) minmax(20rem,.9fr); }
+      .scope-pane { display: none; }
+      .scope-pane.is-revealed { display: grid; grid-column: 1 / -1; }
+      .intermediate-disclosure { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+      .action-pane { position: static; }
+    }
+    @media (max-width: 46rem) {
+      body { font-size: 1rem; }
+      .template-header { padding: var(--space-5) var(--space-4); }
+      .template-main { width: min(calc(100% - 1rem), var(--local-max)); padding-top: var(--space-3); }
+      .summary { grid-template-columns: 1fr; }
+      .metrics, .facts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .intermediate-disclosure { display: none; }
+      .compact-nav { display: grid; grid-template-columns: repeat(3,1fr); position: sticky; top: var(--space-2); z-index: 5; }
+      .compact-nav button { min-width: 0; padding-inline: var(--space-1); }
+      .layout { display: block; }
+      .pane { display: none; }
+      .pane.is-active { display: grid; }
+      .action-pane { position: static; }
+      table { min-width: 31rem; }
+    }
+    @media (max-height: 38rem) {
+      .compact-nav, .action-pane { position: static; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to archetype content</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Derivative rate reset cashflow workbench</h1>
+    <p>Determine one contractual reset from schedule and observations, exercise the declared fallback when required, calculate both legs, agree the net amount, and settle it once.</p>
+  </header>
+  <main id="main" class="template-main" data-region="derivative-reset" tabindex="-1">
+    <section class="summary" aria-labelledby="summary-title">
+      <div>
+        <p class="eyebrow">Fictional local demonstration</p>
+        <h2 id="summary-title">Active computation receipt</h2>
+        <p>Selection, version, pending state, and recovery persist when the topology changes.</p>
+        <span class="verdict" id="verdict">Attention required · step 1</span>
+      </div>
+      <dl class="metrics"><div><dt>Notional</dt><dd id="metric-0">USD 25.0m</dd></div><div><dt>Day count</dt><dd id="metric-1">92 / 360</dd></div><div><dt>Net payment</dt><dd id="metric-2">Pending</dd></div><div><dt>Counterparty</dt><dd id="metric-3">Unconfirmed</dd></div></dl>
+    </section>
+    <div class="intermediate-disclosure">
+      <span>Scope evidence is synchronized with the active computation.</span>
+      <button type="button" class="secondary" id="toggle-scope" aria-expanded="false" aria-controls="scope-pane">Show scope evidence</button>
+    </div>
+    <nav class="compact-nav" aria-label="Compact task sequence">
+      <button type="button" data-pane-target="scope" aria-pressed="true">Scope</button>
+      <button type="button" data-pane-target="work" aria-pressed="false">Work</button>
+      <button type="button" data-pane-target="proof" aria-pressed="false">Proof</button>
+    </nav>
+    <div class="layout">
+      <div class="pane scope-pane is-active" id="scope-pane" data-pane="scope">
+        <section class="card" data-region="contract-confirmation-and-definition-version" aria-labelledby="context-title">
+          <p class="eyebrow">Scope and version</p>
+          <h2 id="context-title">Contract Confirmation And Definition Version</h2>
+          <dl class="facts"><div><dt>Scope</dt><dd>Fictional swap DR-804</dd></div><div><dt>Version</dt><dd>Definitions version 2021-v6</dd></div><div><dt>Rule / product</dt><dd>USD floating leg</dd></div><div><dt>Input</dt><dd>Payment date 30 Sep 2026</dd></div></dl>
+        </section>
+        <section class="card bounded" data-region="leg-schedule-and-business-day-conventions" aria-labelledby="records-title">
+          <p class="eyebrow">Bounded data owner</p>
+          <h2 id="records-title">Leg Schedule And Business Day Conventions</h2>
+          <table>
+            <thead><tr><th scope="col">Record</th><th scope="col">Detail</th><th scope="col">Amount / value</th></tr></thead>
+            <tbody>
+              <tr><th scope="row"><button type="button" class="record-button selected" data-record="0" aria-pressed="true">30 Jun–30 Sep</button></th><td>30 Jun 2026</td><td>Observation missing</td></tr>
+              <tr><th scope="row"><button type="button" class="record-button" data-record="1" aria-pressed="false">30 Sep–31 Dec</button></th><td>30 Sep 2026</td><td>Upcoming</td></tr>
+              <tr><th scope="row"><button type="button" class="record-button" data-record="2" aria-pressed="false">31 Dec–31 Mar</button></th><td>31 Dec 2026</td><td>Upcoming</td></tr>
+              <tr><th scope="row"><button type="button" class="record-button" data-record="3" aria-pressed="false">Fixed leg Q3</button></th><td>—</td><td>Rate 3.75%</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <section class="card" aria-labelledby="selection-title">
+          <p class="eyebrow">Selection continuity</p>
+          <h2 id="selection-title">Active fictional record</h2>
+          <p class="selection" id="selected-record">30 Jun–30 Sep · 30 Jun 2026 · Observation missing</p>
+        </section>
+      </div>
+      <section class="pane work-pane" data-pane="work" aria-labelledby="route-title">
+        <div class="card">
+          <p class="eyebrow">Required semantic route</p>
+          <h2 id="route-title">Computation graph neighborhood</h2>
+          <ol class="route">
+          <li class="route-node" data-region="accrual-period-and-reset-event"><span class="route-index">01</span><div><strong>Accrual Period And Reset Event</strong><p>Bind the reset to one confirmation and definitions version.</p></div></li>
+          <li class="route-node" data-region="observation-set-index-source-and-fallback-waterfall"><span class="route-index">02</span><div><strong>Observation Set Index Source And Fallback Waterfall</strong><p>Select one calculation period under the declared business-day convention.</p></div></li>
+          <li class="route-node" data-region="fixed-or-floating-rate-determination"><span class="route-index">03</span><div><strong>Fixed Or Floating Rate Determination</strong><p>Preserve reset date, fixing date, and payment date as separate owners.</p></div></li>
+          <li class="route-node" data-region="day-count-notional-and-compounding-calculation"><span class="route-index">04</span><div><strong>Day Count Notional And Compounding Calculation</strong><p>Trace the observation source and every ordered fallback gate.</p></div></li>
+          <li class="route-node" data-region="gross-leg-cashflows-and-net-payment"><span class="route-index">05</span><div><strong>Gross Leg Cashflows And Net Payment</strong><p>Retain provisional and final rate determinations side by side.</p></div></li>
+          </ol>
+        </div>
+      </section>
+      <div class="pane proof-pane action-pane" data-pane="proof">
+        <section class="card" data-region="counterparty-confirmation-dispute-and-adjustment" aria-labelledby="actions-title">
+          <p class="eyebrow">Deterministic local scenario</p>
+          <h2 id="actions-title">Counterparty Confirmation Dispute And Adjustment</h2>
+          <p id="step-guidance">Run the numbered steps. Expected failures expose a governing rule and do not mutate prior receipts.</p>
+          <ol class="steps">
+            <li><button type="button" class="step-button ready" data-step="0" data-kind="ready" data-message="30 June–30 September remains selected across schedule and compact flow."><span>01</span>Select active accrual period</button></li>
+            <li><button type="button" class="step-button failure" data-step="1" data-kind="failure" data-message="The fictional index observation is missing; the contract fallback waterfall is now active."><span>02</span>Attempt primary observation</button></li>
+            <li><button type="button" class="step-button success" data-step="2" data-kind="success" data-message="Fallback rate 4.180% plus 0.120% spread creates provisional 4.300%."><span>03</span>Apply temporary non-publication fallback</button></li>
+            <li><button type="button" class="step-button success" data-step="3" data-kind="success" data-message="Floating USD 274,722.22 less fixed USD 239,583.33 equals USD 35,138.89 payable."><span>04</span>Calculate gross and net cash flow</button></li>
+            <li><button type="button" class="step-button pending" data-step="4" data-kind="pending" data-message="Counterparty proposes corrected source rate 4.170%; both determinations remain in lineage."><span>05</span>Record counterparty adjustment</button></li>
+            <li><button type="button" class="step-button success" data-step="5" data-kind="success" data-message="Final rate 4.290% produces agreed net payment USD 34,500.00."><span>06</span>Agree final determination</button></li>
+            <li><button type="button" class="step-button success" data-step="6" data-kind="success" data-message="Payment DR-804-P3 settles once; the provisional determination is superseded, not overwritten."><span>07</span>Settle agreed payment</button></li>
+          </ol>
+          <div class="button-row"><button type="button" class="secondary" id="reset-demo">Reset demo</button><button type="button" class="secondary" id="back-to-work">Back to work</button></div>
+        </section>
+        <section class="card" data-region="settled-cancelled-or-superseded-cashflow-lineage" aria-labelledby="receipt-title">
+          <p class="eyebrow">Versioned proof</p>
+          <h2 id="receipt-title">Settled Cancelled Or Superseded Cashflow Lineage</h2>
+          <ul class="receipt"><li id="receipt-0">Reset DR-804-P3</li><li id="receipt-1">Original 4.300% · final 4.290%</li><li id="receipt-2">Agreed net USD 34,500.00</li><li id="receipt-3">Settlement pending</li></ul>
+          <h3>Audit lineage</h3>
+          <ol class="audit-log" id="audit-log"><li>No action has run.</li></ol>
+        </section>
+      </div>
+    </div>
+    <details>
+      <summary>State families and responsive recovery</summary>
+      <p>contract active/terminated/amended; schedule valid/broken; reset upcoming/due/determined; observation available/missing/corrected; fallback inactive/triggered/disputed; rate provisional/final; cash flow calculated/adjusted; counterparty unconfirmed/agreed/disputed; payment pending/settled/failed; prior determination superseded. Initial/loading, ready, empty/not-applicable, error/retry, permission/unavailable, pending, success, stale/conflict, focus transition, and responsive presentation preserve the active fictional object.</p>
+    </details>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    (() => {
+      const records = [["30 Jun–30 Sep","30 Jun 2026","Observation missing"],["30 Sep–31 Dec","30 Sep 2026","Upcoming"],["31 Dec–31 Mar","31 Dec 2026","Upcoming"],["Fixed leg Q3","—","Rate 3.75%"]];
+      const live = document.querySelector('#live-status');
+      const verdict = document.querySelector('#verdict');
+      const selectedRecord = document.querySelector('#selected-record');
+      const recordButtons = Array.from(document.querySelectorAll('.record-button'));
+      const stepButtons = Array.from(document.querySelectorAll('.step-button'));
+      const log = document.querySelector('#audit-log');
+      const receiptLast = document.querySelector('#receipt-3');
+      const metricTwo = document.querySelector('#metric-2');
+      const metricThree = document.querySelector('#metric-3');
+      const paneButtons = Array.from(document.querySelectorAll('[data-pane-target]'));
+      const panes = Array.from(document.querySelectorAll('[data-pane]'));
+      const scopePane = document.querySelector('#scope-pane');
+      const scopeToggle = document.querySelector('#toggle-scope');
+      let nextStep = 0;
+
+      function announce(message) { live.textContent = message; }
+
+      function selectPane(name) {
+        panes.forEach((pane) => pane.classList.toggle('is-active', pane.dataset.pane === name));
+        paneButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.paneTarget === name)));
+        const target = panes.find((pane) => pane.dataset.pane === name);
+        if (target && window.matchMedia('(max-width: 46rem)').matches) {
+          const heading = target.querySelector('h2');
+          if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus(); }
+        }
+      }
+
+      recordButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const index = Number(button.dataset.record);
+          recordButtons.forEach((candidate) => {
+            const selected = candidate === button;
+            candidate.classList.toggle('selected', selected);
+            candidate.setAttribute('aria-pressed', String(selected));
+          });
+          selectedRecord.textContent = records[index].join(' · ');
+          announce(records[index][0] + ' selected. Computation state is unchanged.');
+        });
+      });
+
+      paneButtons.forEach((button) => button.addEventListener('click', () => selectPane(button.dataset.paneTarget)));
+
+      scopeToggle.addEventListener('click', () => {
+        const open = !scopePane.classList.contains('is-revealed');
+        scopePane.classList.toggle('is-revealed', open);
+        scopeToggle.setAttribute('aria-expanded', String(open));
+        scopeToggle.textContent = open ? 'Hide scope evidence' : 'Show scope evidence';
+        announce(open ? 'Scope evidence shown.' : 'Scope evidence hidden; selection preserved.');
+      });
+
+      stepButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const index = Number(button.dataset.step);
+          if (index !== nextStep) {
+            verdict.textContent = 'Blocked · complete step ' + String(nextStep + 1);
+            announce('Complete the previous numbered step first. No state changed.');
+            return;
+          }
+          button.dataset.done = 'true';
+          button.disabled = true;
+          const kind = button.dataset.kind;
+          const message = button.dataset.message;
+          if (nextStep === 0) { log.textContent = ''; }
+          const entry = document.createElement('li');
+          entry.textContent = String(nextStep + 1).padStart(2, '0') + ' · ' + message;
+          log.append(entry);
+          nextStep += 1;
+          const remaining = stepButtons.length - nextStep;
+          metricTwo.textContent = remaining === 0 ? 'Complete' : String(remaining) + ' steps remain';
+          if (kind === 'failure' || kind === 'blocked') {
+            verdict.textContent = 'Expected block proved · continue';
+            metricThree.textContent = 'Blocked safely';
+          } else if (remaining === 0) {
+            verdict.textContent = 'Pass · versioned receipt ready';
+            verdict.classList.add('pass');
+            metricThree.textContent = 'Proof ready';
+            receiptLast.textContent = 'Receipt complete · deterministic local run';
+          } else {
+            verdict.textContent = 'Step ' + String(nextStep) + ' complete · continue';
+            metricThree.textContent = kind === 'pending' ? 'Pending review' : 'In progress';
+          }
+          announce(message);
+        });
+      });
+
+      document.querySelector('#reset-demo').addEventListener('click', () => {
+        nextStep = 0;
+        stepButtons.forEach((button) => { button.disabled = false; delete button.dataset.done; });
+        log.textContent = '';
+        const entry = document.createElement('li');
+        entry.textContent = 'Demo reset to the immutable fictional input.';
+        log.append(entry);
+        verdict.textContent = 'Attention required · step 1';
+        verdict.classList.remove('pass');
+        metricTwo.textContent = "Pending";
+        metricThree.textContent = "Unconfirmed";
+        receiptLast.textContent = "Settlement pending";
+        announce('Demo reset. Selection and immutable source evidence remain available.');
+        stepButtons[0].focus();
+      });
+
+      document.querySelector('#back-to-work').addEventListener('click', () => selectPane('work'));
+    })();
+  </script>
+</body>
+</html>

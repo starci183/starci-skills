@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en" data-archetype-template="narrative-detail-with-decision-rail">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light">
+  <title>Narrative detail with decision rail — archetype template</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --surface-subtle: #f1f5f9;
+      --foreground: #1e293b;
+      --muted: #475569;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --accent: #2563eb;
+      --accent-strong: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --warning: #92400e;
+      --warning-surface: #fffbeb;
+      --success: #166534;
+      --success-surface: #f0fdf4;
+      --focus: #0f172a;
+      --radius-small: 0.65rem;
+      --radius-medium: 1rem;
+      --radius-large: 1.35rem;
+      --shadow: 0 18px 50px rgb(15 23 42 / 0.08);
+      --content: 74rem;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--background);
+      scroll-behavior: smooth;
+      scroll-padding-block-start: 1.5rem;
+    }
+
+    body {
+      margin: 0;
+      min-inline-size: 0;
+      background:
+        radial-gradient(circle at 92% 0%, rgb(37 99 235 / 0.08), transparent 24rem),
+        var(--background);
+      color: var(--foreground);
+      font: 400 1rem/1.6 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-rendering: optimizeLegibility;
+    }
+
+    a {
+      color: var(--accent-strong);
+      text-underline-offset: 0.18em;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      min-block-size: 2.75rem;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+      scroll-margin-block: 1.5rem;
+    }
+
+    .skip-link {
+      position: fixed;
+      inset-block-start: 0.75rem;
+      inset-inline-start: 0.75rem;
+      z-index: 20;
+      translate: 0 -180%;
+      border-radius: var(--radius-small);
+      background: var(--foreground);
+      color: #ffffff;
+      padding: 0.7rem 1rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .skip-link:focus {
+      translate: 0;
+    }
+
+    .page-shell {
+      inline-size: min(calc(100% - 2rem), var(--content));
+      margin-inline: auto;
+      padding-block: 1.25rem 4rem;
+    }
+
+    .breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      min-block-size: 2.75rem;
+      margin-block-end: 1rem;
+      color: var(--muted);
+      font-size: 0.925rem;
+    }
+
+    .breadcrumb a {
+      color: inherit;
+    }
+
+    .breadcrumb svg {
+      inline-size: 1rem;
+      block-size: 1rem;
+      flex: none;
+    }
+
+    .detail-header {
+      display: grid;
+      gap: 1.25rem;
+      padding: clamp(1.4rem, 4vw, 2.75rem);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-large);
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      inline-size: fit-content;
+      min-block-size: 2rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      padding-inline: 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 750;
+      letter-spacing: 0.025em;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-block-start: 0;
+    }
+
+    h1 {
+      max-inline-size: 18ch;
+      margin-block-end: 0.75rem;
+      font-size: clamp(2.2rem, 6vw, 4.6rem);
+      line-height: 1.02;
+      letter-spacing: -0.045em;
+      text-wrap: balance;
+    }
+
+    h2 {
+      margin-block-end: 0.85rem;
+      font-size: clamp(1.45rem, 3vw, 2rem);
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+    }
+
+    h3 {
+      margin-block-end: 0.4rem;
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+
+    .summary {
+      max-inline-size: 68ch;
+      margin-block-end: 0;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+    }
+
+    .section-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      padding-block-start: 0.25rem;
+    }
+
+    .section-nav a {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 2.75rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--foreground);
+      padding-inline: 0.9rem;
+      font-size: 0.92rem;
+      font-weight: 650;
+      text-decoration: none;
+      transition: border-color 160ms ease, background 160ms ease;
+    }
+
+    .section-nav a:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .detail-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+      align-items: start;
+      gap: clamp(1.5rem, 4vw, 3rem);
+      padding-block-start: clamp(1.5rem, 4vw, 3rem);
+    }
+
+    .narrative-main,
+    .decision-region {
+      min-inline-size: 0;
+    }
+
+    .narrative-main {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .narrative-section {
+      padding: clamp(1.25rem, 3vw, 2rem);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-medium);
+      background: var(--surface);
+    }
+
+    .narrative-section > :last-child {
+      margin-block-end: 0;
+    }
+
+    .narrative-section p,
+    .narrative-section li {
+      max-inline-size: 68ch;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .outcome-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin-block-start: 1.25rem;
+    }
+
+    .outcome {
+      min-inline-size: 0;
+      border-inline-start: 3px solid var(--accent);
+      background: var(--surface-subtle);
+      padding: 1rem;
+    }
+
+    .outcome p {
+      margin-block-end: 0;
+      font-size: 0.95rem;
+    }
+
+    .requirements {
+      display: grid;
+      gap: 0.75rem;
+      padding: 0;
+      list-style: none;
+    }
+
+    .requirements li {
+      display: grid;
+      grid-template-columns: 1.5rem minmax(0, 1fr);
+      gap: 0.65rem;
+    }
+
+    .requirements svg {
+      inline-size: 1.25rem;
+      block-size: 1.25rem;
+      margin-block-start: 0.2rem;
+      color: var(--success);
+    }
+
+    .decision-region {
+      position: sticky;
+      inset-block-start: 1rem;
+      display: grid;
+      gap: 1.1rem;
+      padding: 1.35rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-large);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .decision-region h2 {
+      margin-block-end: 0;
+      font-size: 1.35rem;
+    }
+
+    .decision-intro {
+      margin-block-end: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .facts {
+      display: grid;
+      gap: 0;
+      margin: 0;
+    }
+
+    .fact {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1rem;
+      padding-block: 0.75rem;
+      border-block-start: 1px solid var(--border);
+    }
+
+    .fact:first-child {
+      border-block-start: 0;
+      padding-block-start: 0;
+    }
+
+    .fact dt {
+      color: var(--muted);
+    }
+
+    .fact dd {
+      margin: 0;
+      font-weight: 750;
+      text-align: end;
+    }
+
+    .qualification {
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-small);
+      background: var(--warning-surface);
+      color: var(--warning);
+      padding: 0.9rem;
+    }
+
+    .qualification strong {
+      display: block;
+      margin-block-end: 0.25rem;
+    }
+
+    .qualification p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .primary-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      inline-size: 100%;
+      min-block-size: 3rem;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-small);
+      background: var(--accent);
+      color: #ffffff;
+      padding: 0.75rem 1rem;
+      font-weight: 760;
+      transition: background 160ms ease, transform 160ms ease;
+    }
+
+    .primary-action:hover {
+      background: var(--accent-strong);
+    }
+
+    .primary-action:active {
+      transform: translateY(1px);
+    }
+
+    .primary-action:disabled {
+      cursor: not-allowed;
+      opacity: 0.72;
+    }
+
+    .policy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.875rem;
+      text-align: center;
+    }
+
+    .decision-status {
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius-small);
+      background: var(--success-surface);
+      color: var(--success);
+      padding: 0.9rem;
+      font-weight: 650;
+    }
+
+    .decision-status[hidden] {
+      display: none;
+    }
+
+    .compact-action {
+      display: none;
+    }
+
+    @media (max-width: 64rem) {
+      .detail-body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .decision-region {
+        position: static;
+      }
+    }
+
+    @media (max-width: 44rem) {
+      html {
+        scroll-padding-block-end: 6.5rem;
+      }
+
+      body {
+        padding-block-end: calc(5.75rem + env(safe-area-inset-bottom));
+      }
+
+      :focus-visible {
+        scroll-margin-block-end: 7rem;
+      }
+
+      .page-shell {
+        inline-size: 100%;
+        padding-block-start: 0;
+      }
+
+      .breadcrumb {
+        padding-inline: 1rem;
+        margin-block: 0.55rem;
+      }
+
+      .detail-header,
+      .narrative-section,
+      .decision-region {
+        border-inline: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .detail-header {
+        padding: 1.25rem 1rem 1.5rem;
+      }
+
+      .detail-body {
+        gap: 0.75rem;
+        padding-block-start: 0.75rem;
+      }
+
+      .narrative-main {
+        gap: 0.75rem;
+      }
+
+      .narrative-section,
+      .decision-region {
+        padding: 1.25rem 1rem;
+      }
+
+      .section-nav {
+        flex-wrap: wrap;
+      }
+
+      .outcome-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .rail-action {
+        display: none;
+      }
+
+      .compact-action {
+        position: fixed;
+        inset-inline: 0;
+        inset-block-end: 0;
+        z-index: 10;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(9rem, auto);
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem max(1rem, env(safe-area-inset-left)) calc(0.75rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-right));
+        border-block-start: 1px solid var(--border-strong);
+        background: rgb(255 255 255 / 0.96);
+        box-shadow: 0 -12px 30px rgb(15 23 42 / 0.12);
+        backdrop-filter: blur(12px);
+      }
+
+      .compact-action p {
+        min-inline-size: 0;
+        margin: 0;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+      }
+
+      .compact-action small {
+        display: block;
+        color: var(--muted);
+      }
+
+      .compact-action .primary-action {
+        min-block-size: 2.75rem;
+      }
+    }
+
+    @media (max-width: 24rem) {
+      .compact-action {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .compact-action p {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to course details</a>
+
+  <div class="page-shell">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="#">Learning library</a>
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="m7.5 4.5 5 5-5 5" />
+      </svg>
+      <span aria-current="page">Data ethics foundations</span>
+    </nav>
+
+    <header class="detail-header">
+      <span class="eyebrow">Professional certificate</span>
+      <div>
+        <h1>Data ethics foundations</h1>
+        <p class="summary">Build a practical framework for recognizing risk, explaining trade-offs, and making responsible data decisions with your team.</p>
+      </div>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#overview">Overview</a>
+        <a href="#outcomes">What you will learn</a>
+        <a href="#requirements">Requirements</a>
+        <a href="#format">Learning format</a>
+        <a href="#decision">Enrollment</a>
+      </nav>
+    </header>
+
+    <main class="detail-body" id="main-content">
+      <article class="narrative-main" aria-label="Course narrative">
+        <section class="narrative-section" id="overview">
+          <h2>Make difficult data choices explainable</h2>
+          <p>Responsible decisions rarely come from a checklist alone. This course gives cross-functional teams a shared way to identify affected people, test assumptions, document uncertainty, and choose proportionate safeguards.</p>
+          <p>You will work through realistic scenarios in product analytics, automated decisions, experimentation, and data sharing. Each scenario ends with a decision record you can adapt to your own work.</p>
+        </section>
+
+        <section class="narrative-section" id="outcomes">
+          <h2>What you will be able to do</h2>
+          <div class="outcome-grid">
+            <div class="outcome">
+              <h3>Frame the decision</h3>
+              <p>Name the purpose, affected groups, alternatives, and evidence gaps before choosing a path.</p>
+            </div>
+            <div class="outcome">
+              <h3>Test proportionality</h3>
+              <p>Compare expected benefit with privacy, fairness, autonomy, and operational risk.</p>
+            </div>
+            <div class="outcome">
+              <h3>Design safeguards</h3>
+              <p>Choose controls that are measurable, owned, and appropriate to the actual level of risk.</p>
+            </div>
+            <div class="outcome">
+              <h3>Explain the outcome</h3>
+              <p>Write a concise decision record that a reviewer and affected person can understand.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="narrative-section" id="requirements">
+          <h2>Who this course is for</h2>
+          <ul class="requirements">
+            <li>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6" /></svg>
+              <span>Product, data, policy, research, or operations practitioners who influence how data is used.</span>
+            </li>
+            <li>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6" /></svg>
+              <span>No legal or technical specialization is required; examples explain necessary terms in context.</span>
+            </li>
+            <li>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6" /></svg>
+              <span>Bring one current or recent data decision so the final exercise connects to real work.</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="narrative-section" id="format">
+          <h2>A paced, practice-led format</h2>
+          <p>Each week combines a concise lesson, one facilitated case discussion, and a workplace exercise. Facilitators respond to submitted decision records within two working days. All live discussions are recorded, with an equivalent written path for people who cannot attend.</p>
+          <p>Completion requires four scenario decisions and one final decision record. You may pause between cohorts and resume from your last completed exercise.</p>
+        </section>
+      </article>
+
+      <aside class="decision-region" id="decision" aria-labelledby="decision-title">
+        <div>
+          <h2 id="decision-title">Join the October cohort</h2>
+          <p class="decision-intro">Enrollment is open until 27 September or until the cohort is full.</p>
+        </div>
+
+        <dl class="facts">
+          <div class="fact"><dt>Starts</dt><dd>7 October</dd></div>
+          <div class="fact"><dt>Duration</dt><dd>6 weeks</dd></div>
+          <div class="fact"><dt>Commitment</dt><dd>4 hours/week</dd></div>
+          <div class="fact"><dt>Tuition</dt><dd>$320</dd></div>
+          <div class="fact"><dt>Places left</dt><dd>8</dd></div>
+        </dl>
+
+        <div class="qualification" role="note" aria-label="Important enrollment condition">
+          <strong>Check the weekly commitment</strong>
+          <p>Live discussions are optional, but the four practice submissions are required for certification.</p>
+        </div>
+
+        <div class="decision-status" data-status tabindex="-1" role="status" hidden>
+          Your place is held for 15 minutes. Continue to the secure enrollment form when you are ready.
+        </div>
+
+        <div class="rail-action">
+          <button class="primary-action" type="button" data-reserve>Reserve a place</button>
+        </div>
+        <p class="policy">Cancel before the cohort begins for a full refund. <a href="#format">Review the learning format</a>.</p>
+      </aside>
+    </main>
+  </div>
+
+  <div class="compact-action" aria-label="Enrollment action">
+    <p><strong>$320 · 8 places left</strong><small>October cohort</small></p>
+    <button class="primary-action" type="button" data-reserve>Reserve a place</button>
+  </div>
+
+  <script>
+    const reserveButtons = [...document.querySelectorAll("[data-reserve]")];
+    const decisionStatus = document.querySelector("[data-status]");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    reserveButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        decisionStatus.hidden = false;
+        reserveButtons.forEach((item) => {
+          item.disabled = true;
+          item.textContent = "Place reserved";
+        });
+        decisionStatus.focus({preventScroll: true});
+        decisionStatus.scrollIntoView({
+          block: "nearest",
+          behavior: reduceMotion.matches ? "auto" : "smooth"
+        });
+      });
+    });
+  </script>
+</body>
+</html>

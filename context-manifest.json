@@ -1,6 +1,46 @@
 {
   "version": 1,
   "records": {
+    "archetypes/context.md": {
+      "kind": "router",
+      "contextVersion": 1
+    },
+    "archetypes/detail/narrative-detail-with-decision-rail/context.md": {
+      "kind": "module",
+      "source": "archetypes/detail/narrative-detail-with-decision-rail/en.md",
+      "sourceHash": "f6b3d874872a7d0712c9c39fc51925353fbc46b45acffe5efdc4f59c2d9813f5",
+      "contextVersion": 1
+    },
+    "archetypes/discovery/searchable-card-catalog/context.md": {
+      "kind": "module",
+      "source": "archetypes/discovery/searchable-card-catalog/en.md",
+      "sourceHash": "8236c09a35d932e2000986aafd336bf314a4ba03a984846fcbd00c0ca1bf7a6a",
+      "contextVersion": 1
+    },
+    "archetypes/overview/overview-dashboard/context.md": {
+      "kind": "module",
+      "source": "archetypes/overview/overview-dashboard/en.md",
+      "sourceHash": "558dcdfd8e6b70fcd82e356ba5487a5d16e5af5b14529b99a7f1837548617df2",
+      "contextVersion": 1
+    },
+    "archetypes/task/centered-single-task/context.md": {
+      "kind": "module",
+      "source": "archetypes/task/centered-single-task/en.md",
+      "sourceHash": "f76a22ecb92099194efdd3cef2281a5c0474ab37e3b50e5d98d88db76d8423ce",
+      "contextVersion": 1
+    },
+    "archetypes/work/assessment-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/assessment-workbench/en.md",
+      "sourceHash": "5f9c700098f7cbb415e82a459f382a016341ef157eee360769d69d2574e84cf2",
+      "contextVersion": 1
+    },
+    "archetypes/work/operational-collection-workbench/context.md": {
+      "kind": "module",
+      "source": "archetypes/work/operational-collection-workbench/en.md",
+      "sourceHash": "7c958e1ca263895b45a50bc3b45ac8b2dfd939fab15fb89a35c638be0068168f",
+      "contextVersion": 1
+    },
     "brainstorms/blocks/context.md": {
       "kind": "module",
       "source": "brainstorms/blocks/en.md",
@@ -32,7 +72,7 @@
     "brainstorms/layouts/context.md": {
       "kind": "module",
       "source": "brainstorms/layouts/en.md",
-      "sourceHash": "f449fa541d80d06b90bc37c068985dc123b564555df60b70abb661336bb6bea0",
+      "sourceHash": "fde64962a632ecab686a811e606bcb038c6edb39f2b171325a5a9345798b13e4",
       "contextVersion": 1
     },
     "compilers/context.md": {
@@ -768,7 +808,7 @@
     "orchestration/capabilities/context.md": {
       "kind": "module",
       "source": "orchestration/capabilities/en.md",
-      "sourceHash": "0c3e78fd5b99742e601c508b6099068fae54a29b4fdba34215560f6ae6522fde",
+      "sourceHash": "1a60bda9fe8abbeb117419923c386f14cd85bcf4c89d986a138c93dc6eed0833",
       "contextVersion": 1
     },
     "orchestration/claude/context.md": {
@@ -792,7 +832,7 @@
     "orchestration/frontend/context.md": {
       "kind": "module",
       "source": "orchestration/frontend/en.md",
-      "sourceHash": "87405bc10952744cb9c62eef481e5caadd5a7e67ecec8c6b1abe0e2a08434e53",
+      "sourceHash": "ddf7863d14b793aa8598c0ffcf5ca0eddc75604372440a938b5b8d44f2b45935",
       "contextVersion": 1
     },
     "orchestration/maps/context.md": {
@@ -956,7 +996,7 @@
     "skills/skill-shape/context.md": {
       "kind": "module",
       "source": "skills/skill-shape/en.md",
-      "sourceHash": "ffb1f26bf6b3f672c720ffc1bf93caa57784c96b6ed5f4138defbae07e50ca79",
+      "sourceHash": "235520f7cbc21649eeb18229594b99f1d6c9727271979e18e5979dab060ffe87",
       "contextVersion": 1
     },
     "standards/backend/assurance/context.md": {

@@ -16,6 +16,7 @@ description: Thiết kế, duyệt theo giai đoạn, implement, seed và browse
 | `@worktrees` | `contexts/worktrees/vi.md` | vi | disposable session evidence bị ignore |
 | `@composition` | `brainstorms/composition/vi.md` | vi | Scope, Owner, Invariant và Proof |
 | `@business` | `contexts/business/vi.md` | vi | routed business truth |
+| `@archetypes` | `archetypes` | module | macro page topology dùng chung và complete responsive transformation trước Grammar và Principles |
 | `@grammar` | `grammars` | module | product-family facts và owners |
 | `@principles` | `compilers/principles` | module | audit visual decision |
 | `@patterns-fe` | `compilers/patterns/fe` | module | source ownership |
@@ -57,7 +58,7 @@ output đã pass gate, sở hữu decision/shared artifact và chỉ delegate so
 |---|---|---|---|---|---|
 | evidence | shared | request, authority, baseline | chuẩn hóa fact, constraint, example và unknown | evidence pack cùng context envelope | đủ provenance và scope |
 | orchestration | coordination | immutable evidence envelope và measured runtime | áp dụng Layout dependency graph cùng one-writer registry | runtime adapter, task batch, coordinator reservation và sequential fallback | không approval; mọi task bounded |
-| page-synthesis | join | evidence, business head, source, contract, data, grammar và MASTER | chạy journey và capability subphase biệt lập, in direction, join, chạy integrated quality review rồi author complete desktop/narrow anatomy | page map, capability evidence, binding matrix, direction receipt, quality review và schema 9 page contract | cả hai origin cùng required lens/detector pass, không còn item chưa bind, rồi `OK #1`; chỉ cache |
+| page-synthesis | join | evidence, business head, source, contract, data, archetypes, grammar và MASTER | chạy journey và capability subphase biệt lập, resolve một archetype cho mỗi page, audit current-layout conformance, bind Grammar owner sau macro topology của nó, in direction, join, chạy integrated quality review rồi author complete wide/intermediate/compact anatomy | page map, archetype receipt, current-layout conformance verdict, capability evidence, binding matrix, direction receipt, quality review và schema 9 page contract | cả hai origin, archetype boundary cùng required lens/detector pass, không còn item chưa bind, rồi `OK #1`; chỉ cache |
 | states | execution | approved direction-quality-page hash và state truth | bung state, owner, transition, seed và boundary không review drift | schema 9 render contract cùng canonical prompt | `OK #2`; exact files đầy đủ |
 | implementation | execution | approved prompt | code, gate và seed không reinterpret | implementation, gate và seed receipts | mọi obligation tới product evidence |
 | parity | proof | preview và seeded product | phân loại authentication, chạy login bắt buộc qua product UI rồi tính PNG, DOM, axe và Playwright evidence | `visual-proof.json` schema 4 | proof có auth tự nhập credentials trên browser, không session shortcut; parity và delivery pass |
@@ -71,7 +72,7 @@ destructive/external action hoặc boundary expansion vẫn dừng. Auto hết h
 
 ## Run
 
-Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, grammar, MASTER, contracts và current source. Tạo ignored design session, validate composition baseline rồi lập orchestration plan nội bộ, không in record trừ khi `debug=true`. Coordinator sở hữu journey/UI decision, integrated quality verdict và approval. Worker có thể inventory lens/detector evidence, chỉ sinh HTML từ eligible frozen contract, chỉ implement path tách rời sau source approval, rồi seed, test và capture proof.
+Đọc `@skill-shape` và `@orchestration`. Xác nhận một scope `page` hoặc `flow` có start và terminal rõ ràng. Resolve routed frontend, business head, archetypes, grammar, MASTER, contracts và current source. Tạo ignored design session, validate composition baseline rồi lập orchestration plan nội bộ, không in record trừ khi `debug=true`. Coordinator sở hữu journey/UI decision, archetype selection, integrated quality verdict và approval. Worker có thể inventory lens/detector evidence, chỉ sinh HTML từ eligible frozen contract, chỉ implement path tách rời sau source approval, rồi seed, test và capture proof.
 
 User-facing execution table hiển thị các section 1–3 dưới đây như một bước `page-synthesis`. Page mapping, hai
 track biệt lập, direction declaration, phần join và desktop/narrow rendering là internal subphase; không được chen
@@ -94,7 +95,19 @@ ghi observable obligation có verdict `supported` hoặc `missing`, exact source
 khi còn thiếu. Phân loại region là `reuse`, `generalize` hoặc `new-required`; `reuse` chỉ hợp lệ khi mọi obligation
 đều supported. Thiếu capability không bao giờ là lý do làm yếu customer journey.
 
-Chỉ sau khi cả hai track hoàn tất mới merge bằng page-level binding matrix. Mỗi render intent bind journey
+Chỉ sau khi cả hai track hoàn tất và trước khi Grammar hay Principles resolve candidate, select đúng một record
+`@archetypes` cho mỗi page. Match dominant task, required region relationships cùng full responsive contract;
+không bao giờ select bằng route, tên màn hay existing component. Ghi id, runtime target, matched situation codes,
+required regions, wide/intermediate/compact transformations và evidenced deviations vào session archetype receipt. Match
+thiếu hoặc ambiguous là `new-required` hay một stop, không phải quyền kéo giãn record gần nhất. Candidate
+alternative phải ở trong archetype đã chọn trừ khi owner đổi dominant task hoặc required region graph.
+
+Audit macro layout hiện tại hoặc legacy với record đã chọn rồi ghi `conform`, `layout-drift` hoặc
+`needs-evidence` vào session archetype receipt. Source chứng minh product fact, behavior, constraint, ownership cùng
+capability, không chứng minh layout đúng. Phải sửa `layout-drift`; chỉ giữ topology xung đột khi binding business
+truth hoặc reference/exception được owner duyệt rõ yêu cầu nó.
+
+Sau đó merge hai track bằng page-level binding matrix có macro regions đến từ archetype đó. Mỗi render intent bind journey
 steps, business obligations và contract-backed regions; mỗi region phải cite render intent nó phục vụ. Intent,
 step, capability hoặc region nào không bind đều stop run. Từ matrix này, in một UI direction cho hierarchy,
 composition, responsive và emphasis. In journey direction và UI direction thành hai field riêng trước khi join
@@ -110,7 +123,7 @@ explicit brainstorm tạo 3–4 complete candidate. Dùng một representative p
 và narrow viewport. Phải có full chrome, meaningful content, intentional hierarchy và density, mọi major region
 và complete block anatomy. Tạo complete future state inventory ngay lúc này nhưng chưa render các state đó.
 
-Page contract bind synthesis, route, region, representative state, hierarchy, density, responsive behavior, visual precedent, state inventory và representative full-viewport render. `renderContract` và `executionPrompt` bị cấm.
+Page contract materially preserve archetype đã chọn qua các field hierarchy và responsive, đồng thời bind synthesis, route, region, representative state, density, visual precedent, state inventory cùng representative full-viewport render. `renderContract` và `executionPrompt` bị cấm.
 
 Validate artifact và schema 2 maturity review với `reviewStage: pages`. Refuse wireframe, sparse scaffold, generic admin template, dead space không có lý do, control không có anchor, type rank yếu và anatomy chưa hoàn tất.
 
@@ -197,10 +210,21 @@ Chạy browser proof cho mọi selected render target. Năm complete-page target
 17. State expansion giữ approved quality review byte-identical; đổi review phải mở lại pages.
 18. Layout có authentication không được kết thúc trước khi signed-out Playwright điền cả hai credential control
     qua product form và tới protected route. API-created session hay injected state không bao giờ pass.
+19. Mỗi page resolve đúng một archetype trước Grammar và Principles. Grammar bind semantic owner trong các region;
+    Principles chỉ resolve exact geometry còn mở trong topology đó.
+20. Render wide, intermediate và compact phải giữ reading order, navigation replacement, sticky safety, overflow
+    ownership cùng interaction parity. Compact không được xóa reachable action hay state chỉ vì desktop đặt nó
+    trong supporting region.
+21. Macro layout hiện tại hoặc legacy nhận `conform`, `layout-drift` hoặc `needs-evidence`. Mere implementation
+    không được veto archetype đã chọn; phải sửa `layout-drift` trừ khi binding business truth hoặc
+    reference/exception được owner duyệt rõ yêu cầu departure.
 
 ## Stops
 
 - Thiếu route, scope, business authority, grammar/profile, contract, source baseline hoặc flow endpoint.
+- Archetype thiếu hoặc ambiguous, hay match chỉ dựa trên tên màn/product nhưng vi phạm dominant task, negative
+  boundary hoặc responsive parity.
+- `needs-evidence` ở xung đột current-layout làm thay đổi materially macro topology.
 - Journey step không có page ownership hoặc component capability.
 - Fabricated content, incomplete state inventory, immature page evidence hoặc non-functional HTML.
 - Thiếu quality lens/detector closure hoặc advisory evidence bị trình bày như authority.
@@ -213,7 +237,8 @@ Chạy browser proof cho mọi selected render target. Năm complete-page target
 
 ## OUTPUT
 
-Ở page review, in journey direction, UI direction cùng quality verdict cho từng candidate rồi báo joined page URL,
+Ở page review, in archetype id, matched situation codes, current-layout conformance verdict cùng
+wide/intermediate/compact responsive verdict của từng page, rồi in journey direction, UI direction cùng quality verdict cho từng candidate và báo joined page URL,
 maturity verdict và cache-only `OK #1`. Ở state review, báo state coverage, direction-quality-page hash không đổi, exact source files,
 seed-owner rows và `OK #2`. Sau code, báo changed files, tests, seed command/identity/observed data,
 authentication applicability và—khi required—login route cùng credential source class không có value, rồi real-product parity.

@@ -33,6 +33,7 @@ coordination overhead is not positive, the same map runs sequentially under the 
 
 | Skill | Topology | Coordinator owns | Delegable work | Final gate |
 |---|---|---|---|---|
+| `starci-architecture-analyze` | dual-track, read-only | decision frame, alternative synthesis, recommendation and planning handoff | isolated constraint and current-capability evidence | viable options share criteria; recommendation survives challenge and no source write occurs |
 | `starci-business-analyze` | reconciliation | evidence classification, lifecycle transition and publication | routed source evidence and contradiction inventory | feature head and implementation reconciliation validate |
 | `starci-init` | reconciliation | four readiness boundaries, portable declaration decisions and external publication | identity-safe checks, route observations and portable schema proof | identity, bootstrap, portable/local routes and durable worktrees are green; any approved remote equals the exact portable commit |
 | `starci-cloudflare-tunnel-set` | reconciliation | credential authority and external apply | tunnel/DNS read inventory and proof reads | declared tunnel and DNS state match |

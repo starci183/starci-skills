@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en" data-archetype-template="water-network-leak-isolation-recovery-workbench">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Water Network Leak Isolation Recovery Workbench</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5f7fa; --surface: #ffffff; --surface-subtle: #edf2f7;
+      --text: #17202a; --muted: #52606d; --border: #c7d0d9;
+      --accent: #0b57d0; --accent-strong: #073b8c; --focus: #6d28d9;
+      --success: #18794e; --warning: #8a4b08; --danger: #b42318;
+      --radius: 0.75rem; --shadow: 0 0.5rem 1.5rem rgba(23, 32, 42, 0.12);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+      --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+      --local-header-space: 10rem;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--canvas); scroll-padding-block: var(--local-header-space); }
+    body { margin: 0; color: var(--text); background: var(--canvas); font: 1rem/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-wrap: anywhere; }
+    button, input, select { font: inherit; }
+    button, input, select, summary { min-block-size: 46px; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip-link { position: absolute; inset-block-start: var(--space-2); inset-inline-start: var(--space-2); z-index: 20; padding: var(--space-3) var(--space-4); color: #fff; background: var(--accent-strong); transform: translateY(-150%); }
+    .skip-link:focus { transform: translateY(0); }
+    .template-header { padding: var(--space-5) clamp(var(--space-4), 3vw, var(--space-7)); color: #fff; background: #102a43; border-block-end: 4px solid var(--accent); }
+    .template-header h1 { max-inline-size: 34ch; margin: var(--space-1) 0; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1.12; }
+    .template-header p { max-inline-size: 86ch; margin: var(--space-2) 0 0; }
+    .eyebrow, .kicker { margin: 0; color: #b9d6ff; font-size: .78rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .kicker { color: var(--accent-strong); }
+    .template-main { max-inline-size: 100rem; margin-inline: auto; padding: var(--space-5); }
+    .context-strip { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end; margin-block-end: var(--space-4); }
+    .field { display: grid; gap: var(--space-1); min-inline-size: min(100%, 15rem); flex: 1; }
+    .field label { font-weight: 750; }
+    .field input, .field select { inline-size: 100%; padding: var(--space-2) var(--space-3); border: 1px solid #8190a0; border-radius: .45rem; color: var(--text); background: var(--surface); }
+    .field-error { min-block-size: 1.5rem; color: var(--danger); visibility: hidden; }
+    .field-error[data-visible="true"] { visibility: visible; }
+    .button-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .button { min-inline-size: 44px; padding: var(--space-2) var(--space-4); border: 2px solid var(--accent); border-radius: .45rem; color: #fff; background: var(--accent); font-weight: 750; }
+    .button:hover { background: var(--accent-strong); }
+    .button-secondary { color: var(--accent-strong); background: var(--surface); }
+    .button-danger { border-color: var(--danger); color: var(--danger); background: var(--surface); }
+    .button:disabled { cursor: not-allowed; opacity: .55; }
+    .workbench { display: grid; grid-template-columns: minmax(13rem, .7fr) minmax(24rem, 1.5fr) minmax(17rem, .8fr); gap: var(--space-4); align-items: start; }
+    .card { min-inline-size: 0; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: 0 .15rem .5rem rgba(23, 32, 42, .06); }
+    .card h2, .card h3 { margin-block: var(--space-1) var(--space-3); line-height: 1.25; }
+    .step-nav { display: grid; gap: var(--space-2); }
+    .step-button { display: grid; grid-template-columns: 2.5rem 1fr; gap: var(--space-2); align-items: center; inline-size: 100%; padding: var(--space-2); border: 1px solid var(--border); border-radius: .45rem; text-align: start; color: var(--text); background: var(--surface); }
+    .step-button span { display: grid; place-items: center; min-block-size: 2rem; border-radius: 999px; color: var(--accent-strong); background: var(--surface-subtle); font-weight: 800; }
+    .step-button[aria-pressed="true"] { border: 2px solid var(--accent); background: #e8f0fe; }
+    .panel-stack { display: grid; gap: var(--space-3); }
+    .task-panel dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-block-end: 0; }
+    .task-panel dl div { padding: var(--space-2); background: var(--surface-subtle); }
+    dt { color: var(--muted); font-size: .85rem; font-weight: 700; }
+    dd { margin: 0; font-weight: 650; }
+    .route-panel summary { display: flex; align-items: center; padding: var(--space-2); font-weight: 800; cursor: pointer; }
+    .evidence-table-wrap { max-inline-size: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: .5rem; }
+    table { inline-size: 100%; min-inline-size: 38rem; border-collapse: collapse; }
+    th, td { padding: var(--space-3); border-block-end: 1px solid var(--border); text-align: start; vertical-align: top; }
+    thead th { color: var(--muted); background: var(--surface-subtle); }
+    .status { display: inline-flex; align-items: center; min-block-size: 1.75rem; padding-inline: .55rem; border: 1px solid currentColor; border-radius: 999px; font-size: .82rem; font-weight: 800; }
+    .status-neutral { color: var(--accent-strong); }
+    .status-danger { color: var(--danger); }
+    .status-success { color: var(--success); }
+    .decision-rail { position: sticky; inset-block-start: var(--space-4); display: grid; gap: var(--space-3); }
+    .decision-rail p { margin: 0; }
+    .gate-message { padding: var(--space-3); border-inline-start: 5px solid var(--warning); background: #fff5e6; }
+    .gate-message[data-tone="danger"] { border-color: var(--danger); background: #fff0ee; }
+    .gate-message[data-tone="success"] { border-color: var(--success); background: #edf8f2; }
+    .error-summary { margin-block-end: var(--space-4); padding: var(--space-4); border: 3px solid var(--danger); background: #fff0ee; }
+    .error-summary h2 { margin-block-start: 0; }
+    .compact-controls { display: none; }
+    .sr-only { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 68rem) {
+      .workbench { grid-template-columns: minmax(13rem, .65fr) minmax(0, 1.35fr); }
+      .decision-rail { position: static; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+      .route-panel:not([open]) > :not(summary) { display: none; }
+    }
+    @media (max-width: 43rem) {
+      body { font-size: 1rem; }
+      .template-main { padding: var(--space-3); }
+      .context-strip { align-items: stretch; }
+      .context-strip .button-row { inline-size: 100%; }
+      .context-strip .button { flex: 1; }
+      .workbench { display: block; }
+      .step-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block-end: var(--space-3); }
+      .step-button { grid-template-columns: 2.25rem 1fr; }
+      .panel-stack .task-panel { display: none; }
+      .panel-stack .task-panel[data-active="true"] { display: block; }
+      .decision-rail { display: grid; grid-template-columns: 1fr; margin-block-start: var(--space-3); }
+      .compact-controls { display: flex; justify-content: space-between; gap: var(--space-2); margin-block: var(--space-3); }
+      .compact-controls .button { flex: 1; }
+      table { min-inline-size: 34rem; }
+    }
+    @media (max-height: 34rem) { .decision-rail { position: static; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workbench</a>
+  <header class="template-header">
+    <p class="eyebrow">Archetype template</p>
+    <h1>Water Network Leak Isolation Recovery Workbench</h1>
+    <p>Confirm a leak in a pressurized water network, derive a hydraulic valve cut set that actually disconnects the failed segment, accept its named customer and critical-service impacts, then repair, flush, prove quality and repressurize in controlled stages.</p>
+  </header>
+  <main id="main" class="template-main" tabindex="-1">
+    <div id="error-summary" class="error-summary" role="alert" tabindex="-1" hidden>
+      <h2>Resolve the validation gate</h2>
+      <p id="error-summary-text">The fictional adjustment needs a value.</p>
+      <a href="#adjustment">Review proposed adjustment</a>
+    </div>
+    <section class="context-strip" aria-label="Fictional study controls">
+      <div class="field"><label for="case-select">Fictional case</label><select id="case-select"><option>Case B13-07-A</option><option>Case B13-07-B</option></select></div>
+      <div class="field"><label for="adjustment">Proposed adjustment</label><input id="adjustment" value="Close V12 then V18 and verify zero flow" aria-describedby="adjustment-help adjustment-error"><small id="adjustment-help">Local demo data only; no network or storage is used.</small><span id="adjustment-error" class="field-error" data-visible="false" aria-hidden="true">Enter a proposed adjustment.</span></div>
+      <div class="button-row"><button id="stage-change" class="button" type="button">Stage change</button><button id="restore-baseline" class="button button-secondary" type="button">Restore baseline</button></div>
+    </section>
+    <div class="workbench">
+      <nav class="card" aria-label="Task sequence"><p class="kicker">Semantic route</p><div class="step-nav"><button type="button" class="step-button" data-step="0" aria-pressed="true"><span>01</span>leak recovery</button>
+          <button type="button" class="step-button" data-step="1" aria-pressed="false"><span>02</span>distribution network district and supply source topology</button>
+          <button type="button" class="step-button" data-step="2" aria-pressed="false"><span>03</span>pressure flow anomaly evidence</button>
+          <button type="button" class="step-button" data-step="3" aria-pressed="false"><span>04</span>failed pipe hypothesis</button>
+          <button type="button" class="step-button" data-step="4" aria-pressed="false"><span>05</span>candidate valve cut set generator</button>
+          <button type="button" class="step-button" data-step="5" aria-pressed="false"><span>06</span>hydraulic connectivity pressure and customer impact simulation</button>
+          <button type="button" class="step-button" data-step="6" aria-pressed="false"><span>07</span>named customer critical service and advisory ledger</button>
+          <button type="button" class="step-button" data-step="7" aria-pressed="false"><span>08</span>safe valve isolation order</button>
+          <button type="button" class="step-button" data-step="8" aria-pressed="false"><span>09</span>repair and contamination control</button>
+          <button type="button" class="step-button" data-step="9" aria-pressed="false"><span>10</span>flush path volume and quality sample gate</button>
+          <button type="button" class="step-button" data-step="10" aria-pressed="false"><span>11</span>staged repressurization and pressure verification</button>
+          <button type="button" class="step-button" data-step="11" aria-pressed="false"><span>12</span>restored service receipt</button></div></nav>
+      <div>
+        <div class="panel-stack"><section class="task-panel card" data-step-panel="0" aria-labelledby="panel-0-title">
+            <p class="kicker">Region 01</p>
+            <h2 id="panel-0-title">leak recovery</h2>
+            <p>Leak confirmed on pipe P-77</p>
+            <dl><div><dt>Owner</dt><dd>leak-recovery</dd></div><div><dt>State</dt><dd>Ready</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="1" aria-labelledby="panel-1-title">
+            <p class="kicker">Region 02</p>
+            <h2 id="panel-1-title">distribution network district and supply source topology</h2>
+            <p>Cut A leaves P-77 connected; Cut B isolates V12–V18</p>
+            <dl><div><dt>Owner</dt><dd>distribution-network-district-and-supply-source-topology</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="2" aria-labelledby="panel-2-title">
+            <p class="kicker">Region 03</p>
+            <h2 id="panel-2-title">pressure flow anomaly evidence</h2>
+            <p>Cut B interrupts 42 services but protects Clinic C</p>
+            <dl><div><dt>Owner</dt><dd>pressure-flow-anomaly-evidence</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="3" aria-labelledby="panel-3-title">
+            <p class="kicker">Region 04</p>
+            <h2 id="panel-3-title">failed pipe hypothesis</h2>
+            <p>Close V12 then V18 and verify zero flow</p>
+            <dl><div><dt>Owner</dt><dd>failed-pipe-hypothesis</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="4" aria-labelledby="panel-4-title">
+            <p class="kicker">Region 05</p>
+            <h2 id="panel-4-title">candidate valve cut set generator</h2>
+            <p>First quality sample fails turbidity after flush</p>
+            <dl><div><dt>Owner</dt><dd>candidate-valve-cut-set-generator</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="5" aria-labelledby="panel-5-title">
+            <p class="kicker">Region 06</p>
+            <h2 id="panel-5-title">hydraulic connectivity pressure and customer impact simulation</h2>
+            <p>Retest passes; repressurize at 25%, 60%, 100% and issue receipts</p>
+            <dl><div><dt>Owner</dt><dd>hydraulic-connectivity-pressure-and-customer-impact-simulation</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="6" aria-labelledby="panel-6-title">
+            <p class="kicker">Region 07</p>
+            <h2 id="panel-6-title">named customer critical service and advisory ledger</h2>
+            <p>a cut set is valid only when it hydraulically severs the failed segment and exposes every downstream service consequence before field execution.</p>
+            <dl><div><dt>Owner</dt><dd>named-customer-critical-service-and-advisory-ledger</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="7" aria-labelledby="panel-7-title">
+            <p class="kicker">Region 08</p>
+            <h2 id="panel-7-title">safe valve isolation order</h2>
+            <p>a cut set is valid only when it hydraulically severs the failed segment and exposes every downstream service consequence before field execution.</p>
+            <dl><div><dt>Owner</dt><dd>safe-valve-isolation-order</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="8" aria-labelledby="panel-8-title">
+            <p class="kicker">Region 09</p>
+            <h2 id="panel-8-title">repair and contamination control</h2>
+            <p>a cut set is valid only when it hydraulically severs the failed segment and exposes every downstream service consequence before field execution.</p>
+            <dl><div><dt>Owner</dt><dd>repair-and-contamination-control</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="9" aria-labelledby="panel-9-title">
+            <p class="kicker">Region 10</p>
+            <h2 id="panel-9-title">flush path volume and quality sample gate</h2>
+            <p>a cut set is valid only when it hydraulically severs the failed segment and exposes every downstream service consequence before field execution.</p>
+            <dl><div><dt>Owner</dt><dd>flush-path-volume-and-quality-sample-gate</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="10" aria-labelledby="panel-10-title">
+            <p class="kicker">Region 11</p>
+            <h2 id="panel-10-title">staged repressurization and pressure verification</h2>
+            <p>a cut set is valid only when it hydraulically severs the failed segment and exposes every downstream service consequence before field execution.</p>
+            <dl><div><dt>Owner</dt><dd>staged-repressurization-and-pressure-verification</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section>
+          <section class="task-panel card" data-step-panel="11" aria-labelledby="panel-11-title">
+            <p class="kicker">Region 12</p>
+            <h2 id="panel-11-title">restored service receipt</h2>
+            <p>a cut set is valid only when it hydraulically severs the failed segment and exposes every downstream service consequence before field execution.</p>
+            <dl><div><dt>Owner</dt><dd>restored-service-receipt</dd></div><div><dt>State</dt><dd>Synchronized</dd></div></dl>
+          </section></div>
+        <div class="compact-controls"><button id="previous-step" class="button button-secondary" type="button">Previous</button><button id="next-step" class="button" type="button">Next</button></div>
+        <details class="card route-panel" open>
+          <summary>Verified evidence ledger</summary>
+          <p>Fictional records demonstrate the required causal path and remain available as a semantic alternative to diagrams.</p>
+          <div class="evidence-table-wrap" tabindex="0" aria-label="Scrollable fictional evidence table">
+            <table><thead><tr><th scope="col">Seq.</th><th scope="col">Evidence</th><th scope="col">Class</th></tr></thead><tbody><tr><th scope="row">01</th><td>Leak confirmed on pipe P-77</td><td><span class="status status-neutral">Evidence</span></td></tr>
+                <tr><th scope="row">02</th><td>Cut A leaves P-77 connected; Cut B isolates V12–V18</td><td><span class="status status-neutral">Evidence</span></td></tr>
+                <tr><th scope="row">03</th><td>Cut B interrupts 42 services but protects Clinic C</td><td><span class="status status-neutral">Evidence</span></td></tr>
+                <tr><th scope="row">04</th><td>Close V12 then V18 and verify zero flow</td><td><span class="status status-neutral">Evidence</span></td></tr>
+                <tr><th scope="row">05</th><td>First quality sample fails turbidity after flush</td><td><span class="status status-danger">Gate</span></td></tr>
+                <tr><th scope="row">06</th><td>Retest passes; repressurize at 25%, 60%, 100% and issue receipts</td><td><span class="status status-success">Receipt</span></td></tr></tbody></table>
+          </div>
+        </details>
+      </div>
+      <aside class="card decision-rail" aria-labelledby="decision-title">
+        <div><p class="kicker">Decision gate</p><h2 id="decision-title">Validate complete path</h2><p id="gate-message" class="gate-message">Baseline is approved. Stage a change without overwriting it.</p></div>
+        <div class="button-row"><button id="run-check" class="button" type="button" disabled>Run complete check</button><button id="repair-rerun" class="button button-secondary" type="button" disabled>Resolve and rerun</button><button id="approve-result" class="button" type="button" disabled>Approve result</button></div>
+        <p><strong>Acceptance proof:</strong> Template must compare two hydraulic cut sets, reject one that leaves the failed pipe connected or harms a named critical service, acknowledge the feasible set's customer impact, execute its valve order, hold repressurization on a failed quality sample, pass the retest and restore supply in verified pressure stages.</p>
+      </aside>
+    </div>
+  </main>
+  <p id="live-status" class="sr-only" role="status" aria-live="polite"></p>
+  <script>
+    const panels = Array.from(document.querySelectorAll("[data-step-panel]"));
+    const stepButtons = Array.from(document.querySelectorAll("[data-step]"));
+    const previousStep = document.getElementById("previous-step");
+    const nextStep = document.getElementById("next-step");
+    const liveStatus = document.getElementById("live-status");
+    const adjustment = document.getElementById("adjustment");
+    const adjustmentError = document.getElementById("adjustment-error");
+    const errorSummary = document.getElementById("error-summary");
+    const errorSummaryText = document.getElementById("error-summary-text");
+    const stageChange = document.getElementById("stage-change");
+    const runCheck = document.getElementById("run-check");
+    const repairRerun = document.getElementById("repair-rerun");
+    const approveResult = document.getElementById("approve-result");
+    const restoreBaseline = document.getElementById("restore-baseline");
+    const gateMessage = document.getElementById("gate-message");
+    let activeStep = 0;
+    let checkCount = 0;
+    function announce(message) { liveStatus.textContent = message; }
+    function setStep(index, moveFocus) {
+      activeStep = Math.max(0, Math.min(index, panels.length - 1));
+      panels.forEach((panel, panelIndex) => panel.dataset.active = String(panelIndex === activeStep));
+      stepButtons.forEach((button, buttonIndex) => button.setAttribute("aria-pressed", String(buttonIndex === activeStep)));
+      previousStep.disabled = activeStep === 0;
+      nextStep.disabled = activeStep === panels.length - 1;
+      if (moveFocus) panels[activeStep].focus({ preventScroll: true });
+      announce("Task step " + (activeStep + 1) + " of " + panels.length + ": " + panels[activeStep].querySelector("h2").textContent);
+    }
+    panels.forEach((panel) => panel.tabIndex = -1);
+    stepButtons.forEach((button) => button.addEventListener("click", () => setStep(Number(button.dataset.step), true)));
+    previousStep.addEventListener("click", () => setStep(activeStep - 1, true));
+    nextStep.addEventListener("click", () => setStep(activeStep + 1, true));
+    adjustment.addEventListener("blur", () => {
+      const invalid = adjustment.value.trim() === "";
+      adjustment.setAttribute("aria-invalid", String(invalid));
+      adjustmentError.dataset.visible = String(invalid);
+      adjustmentError.setAttribute("aria-hidden", String(!invalid));
+    });
+    stageChange.addEventListener("click", () => {
+      if (adjustment.value.trim() === "") {
+        adjustment.setAttribute("aria-invalid", "true");
+        adjustmentError.dataset.visible = "true";
+        adjustmentError.setAttribute("aria-hidden", "false");
+        errorSummaryText.textContent = "Enter a proposed adjustment before staging the change.";
+        errorSummary.hidden = false;
+        errorSummary.focus();
+        return;
+      }
+      errorSummary.hidden = true;
+      adjustment.setAttribute("aria-invalid", "false");
+      adjustmentError.dataset.visible = "false";
+      adjustmentError.setAttribute("aria-hidden", "true");
+      stageChange.disabled = true;
+      gateMessage.dataset.tone = "";
+      gateMessage.textContent = "Change pending. The approved baseline remains available.";
+      announce("Change pending validation.");
+      window.setTimeout(() => {
+        stageChange.disabled = false;
+        runCheck.disabled = false;
+        gateMessage.textContent = "Change staged. Run the complete path check.";
+        announce("Change staged. Complete check is available.");
+      }, 250);
+    });
+    runCheck.addEventListener("click", () => {
+      checkCount += 1;
+      runCheck.disabled = true;
+      gateMessage.dataset.tone = "danger";
+      gateMessage.textContent = "Check blocked: First quality sample fails turbidity after flush.";
+      repairRerun.disabled = false;
+      approveResult.disabled = true;
+      announce("Complete check found a blocking regression. Resolve and rerun.");
+    });
+    repairRerun.addEventListener("click", () => {
+      repairRerun.disabled = true;
+      gateMessage.dataset.tone = "success";
+      gateMessage.textContent = "Rerun passed: Retest passes; repressurize at 25%, 60%, 100% and issue receipts.";
+      approveResult.disabled = false;
+      announce("Corrective rerun passed. Approval is available.");
+    });
+    approveResult.addEventListener("click", () => {
+      approveResult.disabled = true;
+      gateMessage.dataset.tone = "success";
+      gateMessage.textContent = "Result approved with the baseline and evidence lineage preserved.";
+      announce("Result approved. Evidence lineage is preserved.");
+    });
+    restoreBaseline.addEventListener("click", () => {
+      checkCount = 0;
+      runCheck.disabled = true;
+      repairRerun.disabled = true;
+      approveResult.disabled = true;
+      gateMessage.dataset.tone = "";
+      gateMessage.textContent = "Approved baseline restored; staged changes were discarded.";
+      announce("Approved baseline restored.");
+    });
+    setStep(0, false);
+  </script>
+</body>
+</html>

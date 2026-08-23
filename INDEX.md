@@ -8,6 +8,7 @@ title: Docs
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@archetypes` | `archetypes/context.md` | context | resolve reusable macro page topology and responsive transformation before product Grammar and Principles |
 | `@assurance-be` | `compilers/patterns/be/delivery-assurance/context.md` | context | compile the complete backend hook, CI, coverage, analysis, secret and deploy fence |
 | `@brainstorms` | `brainstorms/context.md` | context | challenge a design and expose only materially useful alternatives before a shape is accepted |
 | `@frontend-quality` | `brainstorms/frontend-quality/context.md` | context | challenge one frontend direction through integrated craft, UX, accessibility, engineering and detector lenses |
@@ -55,6 +56,7 @@ order follows from it rather than defining it.
 |---|---|---|
 | `@contexts` | where source is read from, where state is written | always first — nothing below is correct if the route is wrong |
 | `@requests` | source-first frontend correction evidence, rejects and unresolved authority learning | design feedback must survive beyond the immediate source fix |
+| `@archetypes` | one reusable dominant-task, region-graph and responsive page topology | page intent is known and its macro structure must resolve before product-specific semantic owners |
 | `@grammars` | deterministic product-family facts, outcomes, owners and durable behavior | a verified workspace route explicitly selects a grammar/profile |
 | `@brainstorms` | one complete generated baseline, or 3–4 targeted alternatives only after an explicit owner brainstorm request | a complete baseline or requested variation is not yet decided |
 | `@compilers` | exactly one answer, no candidates | an accepted shape needs execution detail — `@principles` decide classes and `@patterns` decide files/imports |
@@ -82,7 +84,10 @@ approves scope expansion, credentials, destructive work or external publication;
 not manufacture a source approval merely to advance.
 
 Before alternatives, frontend work locks `Scope`, `Owner`, `Invariant` and `Proof` from legacy/current evidence,
-then applies one routed StarCi MASTER visual system. Every candidate passes the shared `@frontend-quality` review:
+resolves one reusable page archetype, then applies the routed Grammar and one StarCi MASTER visual system. The
+archetype fixes macro regions and wide/intermediate/compact transformation; Grammar selects semantic owners and
+Principles resolve only remaining geometry. Current or legacy source proves facts and capability, not layout
+correctness; a macro mismatch is `layout-drift`, not precedent. Every candidate passes the shared `@frontend-quality` review:
 external taste/catalogue/guideline sources stay digest-bound advisory evidence while product fit, visual character,
 design-system fit, accessibility, interaction, responsive content, performance/motion, component composition,
 state resilience and copy/localization resolve to StarCi owners and detector proof. Profiles override declared roles
@@ -131,8 +136,9 @@ loading a stage the skill did not ask for is paying for a tree you are not using
    `in-progress`; technical-only work declares `none` and binds current `implemented` truth. `pending` and
    `rejected` are read-only for product source.
 3. `@worktrees` — only if the work writes state that must survive.
-4. `@grammars`, then `@compilers` — resolve the explicitly routed product grammar first. Before the first
-   source line, use `@principles` for every class and `@patterns` for which file holds the code and what it may import.
+4. `@archetypes`, `@grammars`, then `@compilers` — resolve reusable macro topology first, then the explicitly
+   routed product grammar. Before the first source line, use `@principles` for every remaining class decision and
+   `@patterns` for which file holds the code and what it may import.
    Both answer a shape already accepted, so reading them afterwards leaves only one move — moving code
    that is already written.
 5. `@gates` — last, on code that exists. Business-affecting work closes only after final committed source
@@ -149,12 +155,13 @@ target-specific work. Say so; do not proceed on a guess.
 
 ## Capabilities
 
-Nineteen. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
+Twenty. `@skills` holds them; `@skill-shape` holds what they must all print, ask and
 record. `@orchestration` covers all physical skills through one machine registry; it is policy, not another capability,
 and coverage does not force delegation when sequential execution is safer or cheaper.
 
 | Skill | Owns |
 |---|---|
+| `starci-architecture-analyze` | read-only analysis of hard cross-system decisions: evidence, viable alternatives, trade-offs, one simple flow and planning context |
 | `starci-business-analyze` | evidence-backed FE+BE business feature heads, modular LLM context and prototype-ready surfaces |
 | `starci-init` | making a Source ready and portable: SOPS+age identity, bootstrap, tracked `.workspaces` compile/hydration, durable worktrees and disposable sessions |
 | `starci-cloudflare-tunnel-set` | the Source-wide multi-project Cloudflare control plane: API custody in `.workspaces/local/credentials` and declared HTTP(S) tunnel/DNS routes |

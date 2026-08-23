@@ -8,6 +8,7 @@ title: Layouts · Vietnamese
 
 | Alias | Target | Kind | Why |
 |---|---|---|---|
+| `@archetypes` | `archetypes` | module | macro page topology dùng chung cùng full responsive contract trước product Grammar và Principles |
 | `@contract-search` | `scripts/contract-search.mjs` | script | tìm contract entry theo nhu cầu đã nêu |
 | `@schema` | `brainstorms/layouts/schema.json` | file | kiểm tra hình dạng JSON của bản ghi |
 | `@validate-artifact` | `scripts/validate-artifact.mjs` | script | kiểm tra và băm artifact ứng viên |
@@ -25,7 +26,24 @@ direction approval mới trả 3–4 complete alternative và không đòi một
 direction mang đúng một `qualityReview` tích hợp; draft invalid được sửa hoặc loại trước khi sinh HTML thay vì đem
 ra làm alternative.
 
+Sau cả hai track và trước product Grammar, resolve đúng một topology `@archetypes` dùng chung cho mỗi page.
+Required regions cùng wide/intermediate/compact transformation của nó ràng buộc các explicit merge binding tạo
+ra page.
+
 ## Luật
+
+Archetype là macro authority dùng chung giữa product, không phải candidate direction. Match mỗi page bằng dominant
+task, required region relationships cùng complete responsive contract; không bằng route, product, component hay
+visual style. Alternative phải ở trong archetype đã chọn. Grammar bind semantic owner trong các region, còn
+Principles resolve exact geometry còn lại. Match thiếu hoặc ambiguous là `new-required` hay một stop, không phải
+quyền kéo giãn record gần nhất. Compact anatomy giữ reading order, reachable action, state meaning, navigation
+replacement, sticky safety và overflow ownership thay vì chỉ stack desktop boxes.
+
+Layout hiện tại và legacy chỉ là observation, không phải correctness authority. Dùng chúng để khôi phục product
+content, behavior, constraint, source ownership cùng capability đã implement, rồi so macro topology với archetype
+đã chọn. Ghi `conform`, `layout-drift` hoặc `needs-evidence` vào session archetype receipt. Phải sửa `layout-drift`; chỉ giữ
+xung đột khi binding business truth hoặc reference/exception được owner duyệt rõ ràng yêu cầu nó. Một route đang
+ship không biến geometry của nó thành chuẩn ngành.
 
 Phương án schema 9 gọi tên scope `page`/`flow`, stage, MASTER system id, page override chỉ chứa deviation, mọi
 page đã compose, ownership node lồng theo thứ tự và owned region. `synthesis.pageIntents` ghi page phải render
@@ -93,20 +111,21 @@ một entry mới và vì sao. Region không trích gì cả là một thành ph
 
 ## Đầu vào
 
-Tám, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuyện cụ thể.
+Chín, không hơn. Mỗi cái có mặt vì thiếu nó là hỏng một chuyện cụ thể.
 
 | # | Đầu vào | Thiếu nó thì |
 |---|---|---|
 | 1 | Yêu cầu nghiệp vụ, đúng nguyên văn | không có ý định nào, chỉ có một cái hình |
-| 2 | StarCi MASTER cùng page override deviations-only nếu có | mỗi candidate âm thầm chọn taste riêng |
-| 3 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
-| 4 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
-| 5 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
-| 6 | Chỉ trong brainstorm mode, requested diversity axis | alternative drift qua phần không liên quan của shared synthesis scope |
-| 7 | Current source và legacy baseline của project | mọi yêu cầu bị trả lời như thể nó là yêu cầu đầu tiên |
-| 8 | Frontend stack đã phát hiện cùng mọi advisory source thực sự dùng, có locator và digest | advice chung bị áp vào runtime sai hoặc external rule chưa pin âm thầm thành authority |
+| 2 | Một resolved archetype id, runtime target, situation codes và responsive contract cho mỗi page | candidate bịa macro topology hoặc coi compact là desktop nhỏ hơn |
+| 3 | StarCi MASTER cùng page override deviations-only nếu có | mỗi candidate âm thầm chọn taste riêng |
+| 4 | Contract: **key** của entry, `why`, `host`, và **tên** children | không tra được cái đã có → bịa entry |
+| 5 | Danh sách branch: mỗi branch được chứa gì | region có hình mà không có người ghép |
+| 6 | Bảng route: mọi trang route và mọi layout giữ dai | không tách được cái mount một lần với cái đổi theo route |
+| 7 | Chỉ trong brainstorm mode, requested diversity axis | alternative drift qua phần không liên quan của shared synthesis scope |
+| 8 | Current source và legacy baseline, kèm explicit reference status | product fact/capability bị mất hoặc layout tình cờ bị hiểu nhầm là chuẩn |
+| 9 | Frontend stack đã phát hiện cùng mọi advisory source thực sự dùng, có locator và digest | advice chung bị áp vào runtime sai hoặc external rule chưa pin âm thầm thành authority |
 
-**Đầu vào số 3 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
+**Đầu vào số 4 được tra chứ không đọc, và mảng class thì không bao giờ được trích ra.** Mỗi region một
 truy vấn qua `@contract-search`, và thứ nó trả về là `key`, `why`, `host`. Cắt vậy không phải
 để tiết kiệm. Một tầng **không thấy** class thì không thể ghi class vào đầu ra của nó, nên "JSON không có
 class" đứng vững vì **giá trị đó không bao giờ tới nơi**, chứ không vì một lời nhắc phải tuân theo. Đo
@@ -122,18 +141,24 @@ locale, lint. Tất cả thuộc những tầng đến sau.
    surface sở hữu, và ví dụ minh họa. Chỉ nhóm đầu được thành `layoutId`. Yêu cầu gọi tên một trang thì có
    một surface; product flow thật có nhiều; “ví dụ A → B” chỉ minh họa năng lực framework cho tới khi owner
    đưa nó vào product scope rõ ràng.
-2. **Tra trước khi thiết kế.** Với mỗi region, tra contract theo `why`, và đọc `why` đúng bản chất của
+2. **Resolve archetype trước Grammar.** Search `@archetypes` bằng dominant task, required region graph cùng
+   responsive failure, rồi chỉ load một matched runtime record. Giữ wide/intermediate/compact behavior cùng
+   negative boundary; trả `new-required` hay ambiguity thay vì chọn theo tên màn.
+3. **Audit layout hiện có thay vì copy.** So macro regions cùng responsive behavior của nó với archetype đã chọn
+   rồi ghi `conform`, `layout-drift` hoặc `needs-evidence`. Current source chỉ chứng minh fact và capability; muốn
+   giữ topology xung đột phải có reference được owner duyệt rõ hoặc binding business exception.
+4. **Tra trước khi thiết kế.** Với mỗi region, tra contract theo `why`, và đọc `why` đúng bản chất của
    nó: **không phải một lời mô tả nghiệp vụ, mà là lời khai khi nào bạn cần tới entry này.** Hai entry
    cùng class mà khác nhu cầu là hai entry khác nhau; hai entry khác class mà trả lời cùng một nhu cầu
    là **một** entry đã bị viết hai lần.
-3. **Chọn những trục mà các phương án sẽ khác nhau ở đó**, lấy từ đầu vào số 5. Hai phương án trùng mọi
+5. **Chọn những trục mà các phương án sẽ khác nhau ở đó**, lấy từ đầu vào số 7. Hai phương án trùng mọi
    giá trị trục là **một** phương án.
-4. **Gán người ghép cho từng region** từ danh sách branch. Region có entry mà không có branch là **chưa
+6. **Gán người ghép cho từng region** từ danh sách branch. Region có entry mà không có branch là **chưa
    giải xong**, không phải đã xong.
-5. **Đặt từng region vào bảng route**: nó mount một lần rồi giữ, đổi theo route, hay mở ra như overlay?
-6. **Từ chối thay vì bịa.** Quyết định mà yêu cầu không nói ra và cây không suy ra được thì trả về cho
+7. **Đặt từng region vào bảng route**: nó mount một lần rồi giữ, đổi theo route, hay mở ra như overlay?
+8. **Từ chối thay vì bịa.** Quyết định mà yêu cầu không nói ra và cây không suy ra được thì trả về cho
    người chủ.
-7. **Phản biện joined direction trước khi render.** Chạy `@frontend-quality` trên cùng content, facts và
+9. **Phản biện joined direction trước khi render.** Chạy `@frontend-quality` trên cùng content, facts và
    viewports. Sửa hoặc loại draft còn lens/detector finding; không pad batch bằng candidate đã rớt quality floor.
 
 ## Trục khác biệt
@@ -218,6 +243,11 @@ Mười lăm luật mà **mọi** phương án phải thoả. Phương án phạ
 15. Mọi route `new`/`changed` và mọi page dùng capability `generalize`/`new-required` phải có trong visual-proof renders đã chọn. Mọi `requiredPaths` của obligation còn thiếu phải có trong `renderContract.sourceBoundary`.
 16. Schema 9 bind một `qualityReview` cho mỗi candidate. External design intelligence chỉ là advisory evidence đã
     pin digest; mọi decision được nhận map vào StarCi owner, và state expansion giữ review nguyên vẹn.
+17. Mỗi page resolve đúng một archetype trước Grammar và Principles. Required regions cùng
+    wide/intermediate/compact interaction parity của nó phải sống qua mọi candidate và approved page contract.
+18. Session archetype receipt ghi `conform`, `layout-drift` hoặc `needs-evidence` cho macro layout hiện tại. Mere
+    implementation không được veto archetype đã chọn; chỉ binding business truth hoặc reference/exception được
+    owner duyệt rõ mới được giữ xung đột.
 
 ## Preview
 

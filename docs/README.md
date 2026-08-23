@@ -35,4 +35,12 @@ Live examples in a record use `<CodeUiTabs example="…" />`, resolved from
 empty until v3 has examples to show; an unknown id renders a visible notice rather than failing the
 build.
 
-Do not edit generated files under `content/`, `.academy-src/` or `public/vendor/`.
+Each published archetype leaf carries a self-contained `template.html` beside its `en.md`, `vi.md`
+and `context.md`. `sync` copies that file byte-for-byte to
+`public/template-assets/archetypes/<family>/<archetype>/template.html` and generates a searchable
+Nextra `Template` page that displays it through a sandboxed iframe. Templates may use inline scripts,
+but they must include their responsive CSS locally and must not depend on network resources or inline
+HTML event-handler attributes.
+
+Do not edit generated files under `content/`, `.academy-src/`, `public/vendor/` or
+`public/template-assets/archetypes/`.

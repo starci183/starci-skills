@@ -73,14 +73,15 @@ If the shared config is absent or invalid, do not silently fall back to English.
 current request to identify the exact config failure; the missing default remains workspace setup work.
 English owns runtime instructions, while workspace config owns the default human-facing language.
 
-## The nineteen capabilities
+## The twenty capabilities
 
-Seventeen do work. Two only look — `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
+Seventeen do work. Three only look — `starci-architecture-analyze` at hard technical decisions, `starci-stale-list` at the machine, `starci-diagnose` at the other skills.
 The moment a report repairs something, nobody can trust it as a
 measurement: a route it quietly refreshed reads as a route that was fine.
 
 | Skill | Owns |
 |---|---|
+| `starci-architecture-analyze` | human-first evidence, viable alternatives, trade-offs, one simple flow and a frozen planning context for difficult cross-system decisions |
 | `starci-business-analyze` | evidence-backed FE+BE business feature heads, modular LLM context and prototype-ready surfaces |
 | `starci-init` | making a Source ready: SOPS+age identity, bootstrap, workspace routes and worktree state — four independently approved roots |
 | `starci-cloudflare-tunnel-set` | encrypted Cloudflare credential custody and one approved HTTP(S) tunnel/DNS route |

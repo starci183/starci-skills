@@ -30,6 +30,7 @@ The installation is intentionally kept together:
     INDEX.md
     contexts/
     requests/
+    archetypes/
     grammars/
     brainstorms/
     compilers/
@@ -46,7 +47,9 @@ The installation is intentionally kept together:
 
 Do not copy individual skills into a second directory. A skill can depend on schemas, scripts,
 grammars, compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
-that can drift from its dependencies.
+that can drift from its dependencies. Reusable frontend structure resolves in the order
+`archetypes → grammars → compilers/principles`: macro page topology first, product semantic owners second, and
+exact remaining geometry last.
 
 The original stage trees remain the detailed authorities. The v4 roots are stable process routers:
 
@@ -170,10 +173,14 @@ Commit only `.workspaces/config.json`, `.workspaces/projects/**/*.json` and `.wo
 `starci-init` again when adding a role or project, or when a checkout or branch changes. Do not duplicate
 the nearest config by hand.
 
-StarCi frontend work resolves one compact visual system from `grammars/starci/design-system.json`. The
-routed profile may override declared roles such as accent; a page/session file records deviations only.
-Legacy or screenshot baseline wins inside its exact target scope, while MASTER keeps every untouched region
-visually consistent. Grammar selects semantic owners and principles resolve only remaining deltas.
+StarCi frontend work first resolves one product-neutral page archetype, including required regions and
+wide/intermediate/compact transformation, then resolves one compact visual system from
+`grammars/starci/design-system.json`. The routed profile may override declared roles such as accent; a page/session file records deviations only.
+An explicit owner-approved screenshot or reference remains specification inside its exact target scope. A merely
+current or legacy implementation supplies product facts, source ownership and capability evidence, but does not
+prove its macro layout correct: conflicts with the selected archetype are recorded as `layout-drift` and corrected
+unless binding business truth or an owner-approved exception requires them. MASTER keeps every untouched region
+visually consistent; Grammar selects semantic owners and Principles resolve only remaining deltas.
 
 Conversation provenance is project-scoped and provider-neutral:
 
@@ -241,6 +248,7 @@ StarCi separates capabilities by what each stage may return:
 | Tree | Species | Returns |
 | --- | --- | --- |
 | `contexts` | location | verified read and write locations |
+| `archetypes` | reusable page topology | one dominant task, required region graph and responsive transformation shared across product families |
 | `grammars` | product-family authority | closed facts, outcomes, owners, capsules, cases and templates selected explicitly by workspace route |
 | `brainstorms` | creation | 3–4 candidates for the owner to choose from |
 | `compilers` | execution | one deterministic answer from an accepted shape |

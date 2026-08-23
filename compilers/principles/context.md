@@ -6,8 +6,11 @@ None.
 
 ## Record
 
-Route each unresolved visual delta to the smallest applicable principle module. MASTER, legacy baseline,
-current source and grammar owner are read first. Read only the
+Route each unresolved visual delta to the smallest applicable principle module. The selected page archetype,
+Grammar owner, MASTER, legacy baseline and current source are read first. An archetype fixes macro region
+relationships and responsive transformation; a Principle may resolve their exact geometry but may not select or
+replace the topology. Current and legacy source prove existing facts, owners and capability, not geometry
+correctness; a session verdict of `layout-drift` remains a required correction rather than a source veto. Read only the
 selected child `context.md`; do not load the whole shelf. A rendered element may require several
 modules because each module owns a different axis, but one decision within an axis resolves to one
 situation code and its emitted class mapping.
@@ -34,7 +37,8 @@ situation code and its emitted class mapping.
 
 ## Routing rules
 
-1. Route only a delta left unresolved by MASTER, legacy, current source and grammar; never re-decide their visual language.
+1. Route only a delta left unresolved by the selected archetype, Grammar, MASTER, legacy and current source; never
+   re-decide macro topology, semantic ownership or established visual language.
 2. Require the composition baseline's direct owner and child set before selecting any module.
 3. Use the selected module's situation table as the closed vocabulary; preserve its no-class cases.
 4. When two modules appear to answer the same symptom, separate the axes. For example, `flow`

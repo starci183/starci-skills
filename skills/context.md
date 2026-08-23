@@ -6,7 +6,7 @@ None.
 
 ## Routes
 
-The nineteen capability entries each live in their own capability folder as `SKILL.md`. Select them from their frontmatter
+The twenty capability entries each live in their own capability folder as `SKILL.md`. Select them from their frontmatter
 descriptions and load exactly one binding entry unless the owner explicitly requests separate runs.
 
 `skill-shape/context.md` is shared runtime policy, not a capability entry. Every selected capability compiles its
@@ -29,7 +29,7 @@ the defaults used before execution:
 
 | Topology | Capability entries | Join law |
 |---|---|---|
-| `dual-track` | `starci-be-plan`, `starci-fe-design-layout` | isolate demand/journey evidence from schema/source capability, then join only gate-passed artifacts |
+| `dual-track` | `starci-architecture-analyze`, `starci-be-plan`, `starci-fe-design-layout` | isolate independent constraint/journey evidence from observed source capability, then join only gate-passed artifacts |
 | `reconciliation` | `starci-be-approve`, `starci-business-analyze`, `starci-cloudflare-tunnel-set`, `starci-debt-repay`, `starci-deploy`, `starci-diagnose`, `starci-fe-design-block`, `starci-fe-design-refactor`, `starci-fe-design-resolve`, `starci-fe-ui-reconcile`, `starci-grammar-refresh-references`, `starci-init`, `starci-repair`, `starci-setup-mcp`, `starci-setup-sonar`, `starci-stale-list` | compare declared authority with observed state and emit one discrepancy/repair receipt |
 | `linear` | `starci-conversation-record` | advance one fenced authority through ordered gate-passed artifacts; do not invent a second branch |
 

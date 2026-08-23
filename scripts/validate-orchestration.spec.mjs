@@ -49,7 +49,7 @@ test("published profiles cover every physical StarCi skill", () => {
   assert.deepEqual(validateWorkspace(root), {ok: true, failures: []});
   const schema = JSON.parse(fs.readFileSync(path.join(root, "orchestration", "receipt.schema.json"), "utf8"));
   assert.equal(schema.properties.schemaVersion.const, 4);
-  assert.equal(schema.$defs.skill.enum.length, 19);
+  assert.equal(schema.$defs.skill.enum.length, 20);
   assert.ok(schema.required.includes("impact"));
   assert.ok(schema.required.includes("challenges"));
 });
