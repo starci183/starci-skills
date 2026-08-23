@@ -43,7 +43,8 @@ Một environment được khai tại `.stacks/deployment.json`, hợp lệ vớ
 - một root `.stacks/<environment>` và một root `.infra/<environment>` tương ứng;
 - SSH host reference và source setup host đã khai;
 - artifact bất biến và runtime target của chúng;
-- metadata Next.js frontend tùy chọn trên từng artifact: repository layout, surface slug, build context và Dockerfile;
+- metadata Next.js frontend tùy chọn trên từng artifact: repository layout, surface slug, build context, Dockerfile
+  và tracked VPS stack definition;
 - từng public hostname, artifact mapping, primary status, ownership và đúng một domain driver;
 - deploy workflow/ref cùng proof command hoặc endpoint;
 - monitor interval, steady window, timeout và probe;
@@ -65,6 +66,7 @@ portable.
 | `DEPLOYMENT-7` | Xuất hiện remote failure | monitor evidence chọn repair nhỏ nhất và chạy lại đúng proof đã fail |
 | `DEPLOYMENT-8` | Apply trả success | public probe và runtime identity quan sát được giữ green hết steady window đã khai |
 | `DEPLOYMENT-9` | Next.js frontend được release | mỗi surface single-app hoặc monorepo resolve tới immutable artifact, runtime target, explicit domain và public proof riêng |
+| `DEPLOYMENT-10` | Frontend surface được adopt vào VPS stack | runtime definition được track dưới `<stack.root>/frontend/<surface>` và cùng invocation tiếp tục tới public steady state |
 
 ## Planning và approval
 
@@ -113,6 +115,13 @@ hay DNS convention đóng. Mỗi frontend artifact map tới ít nhất một do
 đúng một primary domain. Khi adopt hoặc surface còn thiếu domain, hỏi owner tất cả hostname còn thiếu trong cùng
 một batch. Không infer root hostname, subdomain prefix hay shared routing từ repository layout. Manifest hợp lệ
 hiện có sở hữu các decision đó và redeploy dùng lại mà không hỏi.
+
+Mỗi frontend artifact gọi tên một `stackDefinition` dưới `<stack.root>/frontend/<surface>/...`; với
+`stack.root: .stacks/vps`, FE runtime ownership nằm dưới `.stacks/vps/frontend`. Definition nằm trong routed
+repository sở hữu manifest dù build source có thể ở FE role khác. Adoption write hoặc reconcile manifest và
+runtime definition trong cùng một approved boundary, validate rồi tiếp tục invocation đó qua immutable build,
+VPS rollout, domain/TLS reconciliation và public steady state. Chỉ có tracked stack scaffold chưa bao giờ là
+completion.
 
 ## Setup
 
@@ -195,6 +204,8 @@ Một run thật còn phải chứng minh:
 10. Sibling precedent có thể cấp pattern nhưng không bao giờ đổi deployment target hoặc ownership đã resolve.
 11. Frontend repository layout chỉ điều khiển build resolution; hostname của từng surface là owner input explicit,
     không bao giờ derive từ `single-app`, `monorepo` hay surface slug.
+12. Frontend adoption ghi VPS runtime dưới `<stack.root>/frontend/<surface>` rồi tiếp tục deployment; tạo source
+    `.stacks` mà chưa prove release vẫn là incomplete.
 
 ## Scope
 

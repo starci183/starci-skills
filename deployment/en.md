@@ -44,7 +44,8 @@ One environment is declared at `.stacks/deployment.json`, valid against `@schema
 - one `.stacks/<environment>` root and one matching `.infra/<environment>` root;
 - SSH host references and the declared host setup source;
 - immutable artifacts and their runtime targets;
-- optional Next.js frontend metadata per artifact: repository layout, surface slug, build context and Dockerfile;
+- optional Next.js frontend metadata per artifact: repository layout, surface slug, build context, Dockerfile and
+  tracked VPS stack definition;
 - each public hostname, its artifact mapping, primary status, ownership and exactly one domain driver;
 - the deploy workflow/ref and proof commands or endpoints;
 - the monitor interval, steady window, timeout and probes;
@@ -66,6 +67,7 @@ manifest remains portable.
 | `DEPLOYMENT-7` | A remote failure appears | monitor evidence selects the smallest repair and the same failed proof is rerun |
 | `DEPLOYMENT-8` | Apply returned success | public probes and observed runtime identities remain green for the declared steady window |
 | `DEPLOYMENT-9` | A Next.js frontend is released | every single-app or monorepo surface resolves to its own immutable artifact, runtime target, explicit domain and public proof |
+| `DEPLOYMENT-10` | A frontend surface is adopted onto a VPS stack | its runtime definition is tracked below `<stack.root>/frontend/<surface>` and the same invocation continues through public steady state |
 
 ## Planning and approval
 
@@ -117,6 +119,13 @@ business vocabulary or DNS convention. Every frontend artifact maps to at least 
 aliases name exactly one primary domain. During adoption or when a surface lacks a domain, ask the owner for all
 missing surface hostnames together. Never infer a root hostname, a subdomain prefix or shared routing from the
 repository layout. An already valid manifest owns those decisions and a redeploy reuses them without asking.
+
+Every frontend artifact names one `stackDefinition` below `<stack.root>/frontend/<surface>/...`; with
+`stack.root: .stacks/vps`, that places FE runtime ownership under `.stacks/vps/frontend`. The definition lives in
+the manifest owner's routed repository even when build source lives in another FE role. Adoption writes or
+reconciles the manifest and runtime definition as one approved boundary, validates it, then continues the same
+invocation through immutable build, VPS rollout, domain/TLS reconciliation and public steady state. A tracked
+stack scaffold alone is never completion.
 
 ## Setup
 
@@ -201,6 +210,8 @@ mutation. A real run additionally proves:
 10. Sibling precedent can supply a pattern but never changes the resolved deployment target or ownership.
 11. Frontend repository layout controls build resolution only; each surface hostname is explicit owner input and
     never derived from `single-app`, `monorepo` or the surface slug.
+12. Frontend adoption records its VPS runtime below `<stack.root>/frontend/<surface>` and continues to deployment;
+    creating `.stacks` source without a proved release is incomplete.
 
 ## Scope
 

@@ -57,7 +57,7 @@ becomes the deployment target, credential owner or application being released.
 ## Frontend Next.js
 
 For each Next.js artifact, read the manifest's explicit `frontend.layout`, `frontend.surface`,
-`frontend.buildContext` and `frontend.dockerfile`; never infer repository layout from a sibling or from a folder
+`frontend.buildContext`, `frontend.dockerfile` and `frontend.stackDefinition`; never infer repository layout from a sibling or from a folder
 name alone. `single-app` means one routed repository role owns one deployed surface. `monorepo` may build several
 surface artifacts from one repository, but each surface keeps its own source root, Dockerfile, immutable image,
 runtime target, domain mapping and health probe. Use the declared build context so workspace packages remain
@@ -69,6 +69,12 @@ is an independent product decision for each artifact; never derive it from the s
 a sibling project. During adoption, ask the owner for each surface hostname in one batched approval. Once a valid
 manifest declares the artifact-to-domain mapping, use it without asking again. A monorepo with several surfaces
 still builds and deploys independent artifacts and proves trusted HTTPS for every declared primary hostname.
+
+The VPS runtime declaration for every surface belongs to the manifest owner's tracked
+`<stack.root>/frontend/<surface>/...` boundary, for example `.stacks/vps/frontend/crm/stack.yml`. During adoption,
+create or reconcile that definition together with the manifest, service target, immutable image and probe. After
+the approved stack write passes validation, continue directly through build, publication, VPS rollout, domain/TLS
+reconciliation and steady-state proof in the same invocation. Creating `.stacks` files is not a deployment result.
 
 ## Approval boundary
 

@@ -116,12 +116,14 @@ const validateManifest = (manifest) => {
         safeRelative(item.source, `artifact ${item.name} source`)
         if (typeof item.image !== "string" || !item.image.trim() || typeof item.target !== "string" || !item.target.trim()) fail(`artifact ${item.name} needs image and target`)
         if ("frontend" in item) {
-            assertKeys(item.frontend, `artifact ${item.name} frontend`, ["framework", "layout", "surface", "buildContext", "dockerfile"], ["framework", "layout", "surface", "buildContext", "dockerfile"])
+            assertKeys(item.frontend, `artifact ${item.name} frontend`, ["framework", "layout", "surface", "buildContext", "dockerfile", "stackDefinition"], ["framework", "layout", "surface", "buildContext", "dockerfile", "stackDefinition"])
             if (item.frontend.framework !== "nextjs") fail(`artifact ${item.name} frontend framework must be nextjs`)
             if (!new Set(["single-app", "monorepo"]).has(item.frontend.layout)) fail(`artifact ${item.name} frontend layout is unsupported`)
             if (!slug.test(item.frontend.surface ?? "")) fail(`artifact ${item.name} frontend surface must be a slug`)
             safeRelative(item.frontend.buildContext, `artifact ${item.name} frontend buildContext`)
             safeRelative(item.frontend.dockerfile, `artifact ${item.name} frontend dockerfile`)
+            const stackDefinition = safeRelative(item.frontend.stackDefinition, `artifact ${item.name} frontend stackDefinition`)
+            if (!stackDefinition.startsWith(`${stackRoot}/frontend/${item.frontend.surface}/`)) fail(`artifact ${item.name} frontend stackDefinition must live under ${stackRoot}/frontend/${item.frontend.surface}`)
         }
     }
     if (!Array.isArray(manifest.domains)) fail("manifest.domains must be an array")
@@ -213,6 +215,7 @@ const createPlan = (input) => {
         if (artifact.frontend) {
             if (!existsSync(inside(routes[artifact.role].repository, artifact.frontend.buildContext))) fail(`frontend build context is absent: ${artifact.role}/${artifact.frontend.buildContext}`)
             if (!existsSync(inside(routes[artifact.role].repository, artifact.frontend.dockerfile))) fail(`frontend Dockerfile is absent: ${artifact.role}/${artifact.frontend.dockerfile}`)
+            if (!existsSync(inside(owner.repository, artifact.frontend.stackDefinition))) fail(`frontend stack definition is absent: ${artifact.frontend.stackDefinition}`)
         }
     }
     if (!existsSync(inside(owner.repository, stackRoot))) fail(`stack root is absent: ${stackRoot}`)
@@ -289,8 +292,8 @@ const selfTest = () => {
         ownerRole: "fe",
         roles: ["fe"],
         artifacts: [
-            { name: "landing", role: "fe", source: "apps/landing", image: "ghcr.io/example/landing:${FE_SHA}", target: "swarm:example_landing", frontend: { framework: "nextjs", layout: "monorepo", surface: "landing", buildContext: ".", dockerfile: "apps/landing/Dockerfile" } },
-            { name: "crm", role: "fe", source: "apps/crm", image: "ghcr.io/example/crm:${FE_SHA}", target: "swarm:example_crm", frontend: { framework: "nextjs", layout: "monorepo", surface: "crm", buildContext: ".", dockerfile: "apps/crm/Dockerfile" } },
+            { name: "landing", role: "fe", source: "apps/landing", image: "ghcr.io/example/landing:${FE_SHA}", target: "swarm:example_landing", frontend: { framework: "nextjs", layout: "monorepo", surface: "landing", buildContext: ".", dockerfile: "apps/landing/Dockerfile", stackDefinition: ".stacks/vps/frontend/landing/stack.yml" } },
+            { name: "crm", role: "fe", source: "apps/crm", image: "ghcr.io/example/crm:${FE_SHA}", target: "swarm:example_crm", frontend: { framework: "nextjs", layout: "monorepo", surface: "crm", buildContext: ".", dockerfile: "apps/crm/Dockerfile", stackDefinition: ".stacks/vps/frontend/crm/stack.yml" } },
         ],
         domains: [
             { hostname: "example.com", owner: "platform", driver: "terraform", definition: ".stacks/vps/infra/terraform/dns.tf", artifact: "landing", primary: true },
@@ -301,6 +304,7 @@ const selfTest = () => {
     assert.deepEqual(validateManifest(frontendSample), { stackRoot: ".stacks/vps", infraRoot: ".infra/production" })
     assert.deepEqual(validateManifest({ ...frontendSample, domains: frontendSample.domains.map((route) => route.artifact === "crm" ? { ...route, hostname: "members.example.net" } : route) }), { stackRoot: ".stacks/vps", infraRoot: ".infra/production" })
     assert.throws(() => validateManifest({ ...frontendSample, artifacts: frontendSample.artifacts.map((artifact) => artifact.name === "crm" ? { ...artifact, frontend: { ...artifact.frontend, surface: "CRM App" } } : artifact) }), /surface must be a slug/)
+    assert.throws(() => validateManifest({ ...frontendSample, artifacts: frontendSample.artifacts.map((artifact) => artifact.name === "crm" ? { ...artifact, frontend: { ...artifact.frontend, stackDefinition: ".stacks/vps/crm/stack.yml" } } : artifact) }), /must live under .stacks\/vps\/frontend\/crm/)
     assert.throws(() => validateManifest({ ...frontendSample, domains: frontendSample.domains.filter((route) => route.artifact !== "crm") }), /frontend artifact crm needs a declared domain/)
     assert.throws(() => validateManifest({ ...frontendSample, domains: frontendSample.domains.map((route) => ({ ...route, artifact: "missing" })) }), /undeclared artifact/)
     assert.throws(() => safeRelative("../escape", "probe"), /repository-relative/)

@@ -53,8 +53,8 @@ ingress identity, nhưng không bao giờ trở thành deployment target, creden
 
 ## Frontend Next.js
 
-Với từng Next.js artifact, đọc tường minh `frontend.layout`, `frontend.surface`, `frontend.buildContext` và
-`frontend.dockerfile` trong manifest; không infer repository layout từ sibling hay chỉ từ tên folder. `single-app`
+Với từng Next.js artifact, đọc tường minh `frontend.layout`, `frontend.surface`, `frontend.buildContext`,
+`frontend.dockerfile` và `frontend.stackDefinition` trong manifest; không infer repository layout từ sibling hay chỉ từ tên folder. `single-app`
 nghĩa là một routed repository role sở hữu một deployed surface. `monorepo` có thể build nhiều surface artifact
 từ một repository, nhưng mỗi surface giữ source root, Dockerfile, immutable image, runtime target, domain mapping
 và health probe riêng. Dùng declared build context để workspace package còn available khi `next build`; ưu tiên
@@ -65,6 +65,13 @@ decision độc lập cho từng artifact; không derive từ surface name, repo
 adopt, hỏi owner hostname của từng surface trong một approval batch. Khi manifest hợp lệ đã khai mapping
 artifact-to-domain, dùng lại mà không hỏi lần nữa. Monorepo có nhiều surface vẫn build/deploy artifact độc lập
 và prove trusted HTTPS cho từng primary hostname đã khai.
+
+Runtime declaration trên VPS của từng surface thuộc tracked boundary
+`<stack.root>/frontend/<surface>/...` trong repository sở hữu manifest, ví dụ
+`.stacks/vps/frontend/crm/stack.yml`. Khi adopt, tạo hoặc reconcile definition đó cùng manifest, service target,
+immutable image và probe. Sau khi stack write đã duyệt pass validation, tiếp tục thẳng qua build, publication,
+VPS rollout, domain/TLS reconciliation và steady-state proof trong cùng invocation. Chỉ tạo file `.stacks` chưa
+phải là kết quả deployment.
 
 ## Approval boundary
 

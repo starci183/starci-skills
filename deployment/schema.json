@@ -162,13 +162,14 @@
     "frontendArtifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["framework", "layout", "surface", "buildContext", "dockerfile"],
+      "required": ["framework", "layout", "surface", "buildContext", "dockerfile", "stackDefinition"],
       "properties": {
         "framework": {"const": "nextjs"},
         "layout": {"enum": ["single-app", "monorepo"]},
         "surface": {"$ref": "#/$defs/slug"},
         "buildContext": {"$ref": "#/$defs/relativePath"},
-        "dockerfile": {"$ref": "#/$defs/relativePath"}
+        "dockerfile": {"$ref": "#/$defs/relativePath"},
+        "stackDefinition": {"$ref": "#/$defs/relativePath"}
       }
     }
   }
