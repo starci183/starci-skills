@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "references"],
+  "properties": {
+    "version": { "const": 1 },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "immutableRef", "workspacePath"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "immutableRef": { "type": "string", "pattern": "^git\\+https://[^@\\s]+@[a-f0-9]{40}:.+$" },
+          "workspacePath": { "type": "string", "pattern": "^references/[a-z0-9-]+$" }
+        }
+      }
+    }
+  }
+}

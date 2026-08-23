@@ -23,7 +23,7 @@ Topology: `reconciliation` qua bốn readiness boundary có thứ tự.
 |---|---|---|---|---|---|
 | định danh | execution | machine và encrypted Source identity declarations | reconcile SOPS/age identity mà không chạm target repositories | identity receipt | decrypt identity available và secret-safe |
 | bootstrap | execution | identity receipt và agent bootstrap declarations | reconcile required local bootstrap state | bootstrap receipt | bootstrap reads/checks pass |
-| route | reconciliation | workspace declarations và observed project/role locations | verify và reconcile route records | workspace receipt | mọi requested role resolve chính xác |
+| route | reconciliation | workspace declarations, immutable source-reference catalog và observed project/role locations | cài/verify shared offline references rồi reconcile route records | workspace receipt | mọi source reference và requested role resolve chính xác |
 | worktree-chứng minh | execution | verified routes và durable worktree declarations | reconcile project worktree state rồi đọc lại cả bốn boundary | readiness receipt | identity, bootstrap, route và worktree đều xanh |
 
 ## Cách chạy
@@ -40,8 +40,11 @@ local action đã yêu cầu theo thứ tự registry:
    import identity gốc, có thể generate identity đầu tiên, hay `blocked`. Không hiển thị private material.
 2. **Bootstrap** — chứng minh trust entry tồn tại; phân loại và trình toàn bộ before/after của `AGENTS.md`
    cùng `CLAUDE.md`.
-3. **Workspaces** — verify ngôn ngữ chung, family offset/application slot bền và mọi read route
-   project/role đã khai với checkout thật. Allocation chỉ ở `.workspace/ports/config.json` cùng một
+3. **Workspaces** — plan và cài mọi immutable FE/BE pattern reference tại
+   `.workspace/references/<id>`, ghi route portable vào `.workspace/pattern-references.json`; sau đó
+   verify ngôn ngữ chung, family offset/application slot bền và mọi read route project/role đã khai với
+   checkout thật. Reuse Git object cục bộ khi có, chỉ fetch đúng catalog commit khi thiếu. Allocation chỉ ở
+   `.workspace/ports/config.json` cùng một
    `.workspace/ports/<project>.json`; init không copy ownership đó vào product. Với mỗi role, ghi
    `grammar` và `grammarProfile` cùng null hoặc thành cặp đã khai rõ, có grammar authority package/profile thật;
    không suy ra chúng từ identity.
@@ -63,5 +66,6 @@ yêu cầu hoặc proof của nó.
 - Đã có ciphertext nhưng không có identity gốc, hoặc identity không decrypt được sample.
 - Project/role cần cho boundary chưa được owner khai.
 - Route stale không được repoint âm thầm; phải trình replacement.
+- Pattern reference thiếu quay về skill này; downstream pattern compiler không được tự cài.
 - Git owner lạ hoặc business-authority branch collision.
 - Yêu cầu sửa product repository; init chỉ mô tả target và sở hữu Source-local state.

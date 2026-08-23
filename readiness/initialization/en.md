@@ -22,7 +22,7 @@ Initialization is four bounded modules, resolved in this order:
 
 1. [identity](identity/en.md) — prove this machine can decrypt the Source before any secret-backed setup;
 2. [bootstrap](bootstrap/en.md) — route both agent runtimes into the trust tree;
-3. [workspaces](workspaces/en.md) — record the shared language and every declared read route;
+3. [workspaces](workspaces/en.md) — install shared immutable pattern references, then record the shared language and every declared read route;
 4. [worktrees](worktrees/en.md) — install the durable and disposable write roots.
 
 Each module owns one verdict and one write surface, expressed as evidence, action, and proof. A direct

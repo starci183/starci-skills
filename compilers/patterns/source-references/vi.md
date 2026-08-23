@@ -24,16 +24,17 @@ concern đã chốt khác. Reference là bằng chứng cho shape, không phải
 |---|---|---|
 | `SOURCE-REF-1` | Pattern FE compile một capability hoặc family dùng chung | Resolve reference `fe` đúng commit, chỉ đọc path liên quan và trích dẫn exact reference path cho mọi precedent được nhận |
 | `SOURCE-REF-2` | Pattern BE compile một capability hoặc operation family dùng chung | Resolve reference `be` đúng commit, chỉ đọc path liên quan và trích dẫn exact reference path cho mọi precedent được nhận |
-| `SOURCE-REF-3` | Không checkout đã khai báo nào chứa immutable commit | Chạy `@resolve --role <fe|be> --materialize`; script clone hoặc fetch đúng object vào `.workspace/cache/pattern-references/<id>` rồi trả checkout đã verify |
+| `SOURCE-REF-3` | Không workspace reference đã init nào chứa immutable commit | Dừng trước target-specific pattern reads và route Source qua `starci-init`; initialization sở hữu `.workspace/references/<id>`, pattern compiler không tự clone hoặc fetch |
 | `SOURCE-REF-4` | Target repository đã có sibling cùng loại | Target sibling vẫn là chuẩn chính; shared reference chỉ phản biện hoặc bù convention còn thiếu và không được ghi đè ownership đang sống |
 | `SOURCE-REF-5` | Hành vi reference xung đột business truth, live schema, grammar hoặc target contract đã route | Authority target thắng; ghi nhận xung đột và không nhập hành vi reference |
 
 ## Cách resolve
 
 1. Đọc `@catalog`; chỉ chọn reference khớp role đang compile.
-2. Chạy `@resolve --role <role>`. Script kiểm tra khai báo máy cục bộ trong
-   `.workspace/pattern-references.json` trước, rồi mới kiểm tra managed workspace cache.
-3. Nếu cả hai không chứa commit đã khai báo, chạy lại với `--materialize`.
+2. Chạy `@resolve --role <role>`. Script validate `.workspace/pattern-references.json`, `workspacePath`
+   portable, checkout dưới `.workspace/references/<id>`, remote identity và immutable commit.
+3. Kết quả `needs-init` dừng pattern compilation và quay về `starci-init`. Chỉ initialization mới
+   được reuse checkout hiện hữu hoặc cài immutable object vào workspace cache của Source.
 4. Chỉ đọc source paths nhỏ nhất cần để trả lời pattern situation đã nhận. Không inventory toàn bộ
    reference repository hoặc nhập kiến trúc không liên quan.
 5. Đối chiếu target sibling, reference precedent và authority target. Giữ target sibling khi nó đã trả
@@ -44,8 +45,8 @@ concern đã chốt khác. Reference là bằng chứng cho shape, không phải
 
 1. Reference là bằng chứng Git bất biến, không phải branch URL mutable hay path máy cục bộ.
 2. Module này trung lập công nghệ; không client, framework hay transport nào có registry riêng trùng lặp.
-3. Checkout còn thiếu chỉ được materialize dưới workspace cache đã ignore và đúng commit khai báo.
-4. Không pull, checkout hoặc sửa repository hiện hữu của người dùng để thỏa reference.
+3. Pattern compilation chỉ đọc reference; nó không clone, fetch, pull hoặc viết lại workspace route.
+4. Local registry chỉ lưu `workspacePath` tương đối với Source, không lưu absolute disk path; durable authority không phụ thuộc layout máy.
 5. Business truth, schema, grammar, contract và same-repository sibling của target có ưu tiên cao hơn precedent.
 6. Cấm chép product logic, credential, generated output hoặc feature vocabulary từ reference.
 7. Mọi precedent được nhận phải trích reference id, immutable ref và exact source paths đã chứng minh nó.

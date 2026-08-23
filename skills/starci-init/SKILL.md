@@ -24,7 +24,7 @@ Topology: `reconciliation` across four ordered readiness boundaries.
 |---|---|---|---|---|---|
 | identity | execution | machine and encrypted Source identity declarations | reconcile SOPS/age identity without touching target repositories | identity receipt | decrypt identity is available and secret-safe |
 | bootstrap | execution | identity receipt and agent bootstrap declarations | reconcile required local bootstrap state | bootstrap receipt | bootstrap reads and checks pass |
-| routes | reconciliation | workspace declarations and observed project/role locations | verify and reconcile route records | workspace receipt | every requested role resolves exactly |
+| routes | reconciliation | workspace declarations, immutable source-reference catalog and observed project/role locations | install/verify shared offline references and reconcile route records | workspace receipt | every source reference and requested role resolves exactly |
 | worktrees-proof | execution | verified routes and durable worktree declarations | reconcile project worktree state and re-read all four boundaries | readiness receipt | identity, bootstrap, routes and worktrees are all green |
 
 ## Run
@@ -43,8 +43,11 @@ adds no write. Execute requested local actions in registry order:
    blocked. Never display private material. Installing `~/.starci/master.identity` is a separate write.
 2. **Bootstrap** — prove the trust entry exists; classify and display complete before/after content for
    `AGENTS.md` and `CLAUDE.md`.
-3. **Workspaces** — verify the Source-wide language, persistent family offsets/application slots, and
-   every declared project/role read route against the real checkout. Allocation stays in
+3. **Workspaces** — plan and install every immutable FE/BE pattern reference at
+   `.workspace/references/<id>`, writing portable routes to `.workspace/pattern-references.json`; then
+   verify the Source-wide language, persistent family offsets/application slots, and every declared
+   project/role read route against the real checkout. Reuse local Git objects when present and fetch the
+   exact catalog commit only when missing. Allocation stays in
    `.workspace/ports/config.json` plus one `.workspace/ports/<project>.json`; init never copies allocation
    ownership into a product. For every role, write `grammar` and `grammarProfile` as both null or an
    explicitly declared pair whose grammar authority package and profile exist; never infer them from identity.
@@ -66,5 +69,6 @@ action or its proof remains.
 - Existing ciphertext with no original identity available, or an identity that cannot decrypt its sample.
 - A project/role required by the requested boundary was not declared by the owner.
 - A stale route is never silently repointed; show the replacement.
+- A missing pattern reference returns to this skill; downstream pattern compilers may not install it.
 - Foreign Git ownership or a business-authority branch collision.
 - Any requested product-repository edit; init describes targets and owns Source-local state only.

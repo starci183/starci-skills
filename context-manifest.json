@@ -348,7 +348,7 @@
     "compilers/patterns/source-references/context.md": {
       "kind": "module",
       "source": "compilers/patterns/source-references/en.md",
-      "sourceHash": "c551e77b05d10486e1ffffc59dbfdb1d4b534985995c2b5be11a34f6415ddecc",
+      "sourceHash": "5d9fb0267baa06f3ec9c80674752b1afb9c3d1a8b87aba200297eaf4501adab9",
       "contextVersion": 1
     },
     "compilers/principles/alignment/context.md": {
@@ -820,7 +820,7 @@
     "readiness/initialization/context.md": {
       "kind": "module",
       "source": "readiness/initialization/en.md",
-      "sourceHash": "d34c458d39181b942d30265cecf4d168ad3022ad9643291536eeec05ff408d17",
+      "sourceHash": "c718d7182497c329bd0b3091e74c64a11447019442518dfcc545f0db1d775a70",
       "contextVersion": 1
     },
     "readiness/initialization/identity/context.md": {
@@ -832,7 +832,7 @@
     "readiness/initialization/workspaces/context.md": {
       "kind": "module",
       "source": "readiness/initialization/workspaces/en.md",
-      "sourceHash": "1595b1aec08be23c58f2192607a066f55f02829d5957bdf056533b1d1327b449",
+      "sourceHash": "5c71d8d62eb588b6d38e502d4a2369a0849d02c20464dbdcf3a43cc6677688cb",
       "contextVersion": 1
     },
     "readiness/initialization/worktrees/context.md": {

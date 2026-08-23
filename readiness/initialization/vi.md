@@ -22,7 +22,7 @@ Khởi tạo gồm bốn module có boundary rõ ràng và chạy đúng thứ t
 
 1. [identity](identity/vi.md) — chứng minh máy này giải mã được Source trước mọi setup dùng secret;
 2. [bootstrap](bootstrap/vi.md) — route cả hai agent runtime vào trust tree;
-3. [workspaces](workspaces/vi.md) — ghi ngôn ngữ chung và mọi read route đã khai;
+3. [workspaces](workspaces/vi.md) — cài shared immutable pattern references, rồi ghi ngôn ngữ chung và mọi read route đã khai;
 4. [worktrees](worktrees/vi.md) — cài write root durable và disposable.
 
 Mỗi module sở hữu một verdict và một write surface, trình theo evidence, action và proof. Request init
