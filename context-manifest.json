@@ -345,6 +345,12 @@
       "sourceHash": "0221202a80846b029e6acbd88ef8f594b3c6564b7b9b529c03c2affeec4069f6",
       "contextVersion": 1
     },
+    "compilers/patterns/source-references/context.md": {
+      "kind": "module",
+      "source": "compilers/patterns/source-references/en.md",
+      "sourceHash": "c551e77b05d10486e1ffffc59dbfdb1d4b534985995c2b5be11a34f6415ddecc",
+      "contextVersion": 1
+    },
     "compilers/principles/alignment/context.md": {
       "kind": "module",
       "source": "compilers/principles/alignment/en.md",

@@ -2,7 +2,9 @@
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@source-references` | `compilers/patterns/source-references/context.md` | context | resolve immutable StarCi backend precedent before a backend pattern invents a shared module or operation family |
 
 ## Record
 

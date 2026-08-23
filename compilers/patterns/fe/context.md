@@ -2,7 +2,9 @@
 
 ## LOADS
 
-None.
+| Alias | Target | Kind | Why |
+|---|---|---|---|
+| `@source-references` | `compilers/patterns/source-references/context.md` | context | resolve immutable StarCi frontend precedent before a frontend pattern invents a shared module or family |
 
 ## Record
 
