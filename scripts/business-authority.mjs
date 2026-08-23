@@ -24,10 +24,12 @@ export function proveBusinessTransition(previousHead, previousModel, nextModel) 
   }
   if (nextModel.schemaVersion !== 2) throw new Error("a feature with history can only advance through schemaVersion 2 authority transitions");
   const previous = authorityStatus(previousModel);
-  if (previous === "implemented" && next === "implemented") {
-    if (nextModel.authority?.basis !== "reconciled") throw new Error("technical reconciliation requires reconciled basis");
-    if (nextModel.authority.previousHead !== previousHead) throw new Error(`implemented technical reconciliation must name previousHead ${previousHead}`);
-    if (nextModel.authority.baseHead !== previousHead) throw new Error(`implemented technical reconciliation must preserve baseHead ${previousHead}`);
+  if (previous === next && ["implemented", "in-progress"].includes(next)) {
+    const expectedBasis = next === "implemented" ? "reconciled" : "owner-intent";
+    const expectedBase = next === "implemented" ? previousHead : previousModel.authority?.baseHead;
+    if (nextModel.authority?.basis !== expectedBasis) throw new Error(`${next} technical reconciliation requires ${expectedBasis} basis`);
+    if (nextModel.authority.previousHead !== previousHead) throw new Error(`${next} technical reconciliation must name previousHead ${previousHead}`);
+    if (nextModel.authority.baseHead !== expectedBase) throw new Error(`${next} technical reconciliation must preserve baseHead ${expectedBase}`);
     if (canonical(technicalReconciliationBody(previousModel)) !== canonical(technicalReconciliationBody(nextModel))) {
       throw new Error("technical reconciliation cannot change business claims, source identities or evidence claims");
     }

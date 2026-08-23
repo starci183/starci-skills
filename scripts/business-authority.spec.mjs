@@ -16,6 +16,10 @@ const implemented = (head, claim = "Same business claim", startLine = 1) => ({
   evidence: [{id: "EV-001", role: "fe", path: "src/page.tsx", startLine, endLine: startLine + 1, claim, kind: "ui"}],
   rules: [{id: "BR-01", statement: "Stable rule", evidenceIds: ["EV-001"]}],
 });
+const inProgress = (head, claim = "Same business claim", startLine = 1) => ({
+  ...implemented(head, claim, startLine),
+  authority: {status: "in-progress", basis: "owner-intent", requiredRoles: ["fe"], previousHead: pendingHead},
+});
 
 test("accepts implemented to pending to in-progress to implemented", () => {
   const pending = model("pending", implementedHead);
@@ -63,4 +67,27 @@ test("rejects technical reconciliation with an unbound predecessor", () => {
   const next = implemented("2".repeat(40));
   next.authority.previousHead = "f".repeat(64);
   assert.throws(() => proveBusinessTransition(implementedHead, previous, next), /previousHead/);
+});
+
+test("accepts in-progress technical reconciliation when only source heads and evidence locations move", () => {
+  const previous = inProgress("1".repeat(40), "Same business claim", 1);
+  const next = inProgress("2".repeat(40), "Same business claim", 8);
+  next.authority.previousHead = progressHead;
+  next.evidence[0].path = "src/blocks/page.tsx";
+  assert.doesNotThrow(() => proveBusinessTransition(progressHead, previous, next));
+});
+
+test("rejects in-progress technical reconciliation that changes authority or claims", () => {
+  const previous = inProgress("1".repeat(40));
+  const changedClaim = inProgress("2".repeat(40), "Changed claim");
+  changedClaim.authority.previousHead = progressHead;
+  assert.throws(() => proveBusinessTransition(progressHead, previous, changedClaim), /cannot change business claims/);
+
+  const wrongPredecessor = inProgress("2".repeat(40));
+  assert.throws(() => proveBusinessTransition(progressHead, previous, wrongPredecessor), /previousHead/);
+
+  const wrongBasis = inProgress("2".repeat(40));
+  wrongBasis.authority.previousHead = progressHead;
+  wrongBasis.authority.basis = "reconciled";
+  assert.throws(() => proveBusinessTransition(progressHead, previous, wrongBasis), /owner-intent basis/);
 });
