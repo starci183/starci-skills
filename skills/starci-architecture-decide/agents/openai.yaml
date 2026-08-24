@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Architecture Decide"
+  short_description: "Resolve difficult cross-system architecture choices"
+  default_prompt: "Use $starci-architecture-decide to analyze this request and execute only the required state-machine branch."

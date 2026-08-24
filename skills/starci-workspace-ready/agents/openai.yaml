@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Workspace Ready"
+  short_description: "Prepare and verify a routed StarCi workspace"
+  default_prompt: "Use $starci-workspace-ready to analyze this request and execute only the required state-machine branch."

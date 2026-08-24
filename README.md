@@ -1,320 +1,132 @@
-<p align="center">
-  <img src="./docs/public/brand/starci-skills-wallpaper.png" alt="StarCi Skills wallpaper" width="100%" />
-</p>
+# StarCi Skills
 
-<p align="center">
-  <img src="./docs/public/brand/starci-logo.png" alt="StarCi logo" width="112" />
-</p>
+Release-grade agent skills composed as validated state machines.
 
-<h1 align="center">StarCi Skills</h1>
+StarCi Skills turns one user request into a small, explicit execution graph. A skill analyzes the closed input, loads only the operators needed by the selected branch, retrieves operator knowledge lazily from local Qdrant Edge, validates every boundary, and follows declared choices, approvals, loops, or terminal states.
 
-<p align="center">
-  One source of truth that turns a loose product request into reviewed decisions,
-  bounded source changes, and machine-checkable proof.
-</p>
+```text
+request -> skill analysis -> operator -> validated result
+                      ^          |
+                      |-- loop --|
+                           |
+                  choice / wait / terminal
+```
+
+## Why this shape
+
+- **Small context:** skills compose; operators do one thing; knowledge loads only when referenced.
+- **Deterministic routing:** `machine.json` declares every branch and loop.
+- **Typed boundaries:** every skill and operator has closed input/output schemas and fail-closed validators.
+- **Traceable decisions:** transitions use contract-owned decisions or stage/status emissions.
+- **Safe extension:** add an operator or machine branch without copying a second policy tree.
+
+## Included skills
+
+| Skill | Capability |
+| --- | --- |
+| `starci-workspace-ready` | Initialize, hydrate, or verify workspace identity and routes |
+| `starci-business-authority` | Refresh, publish, or reconcile business truth |
+| `starci-architecture-decide` | Analyze difficult cross-system choices without source writes |
+| `starci-backend-delivery` | Plan, approve, implement, test, repair, and reconcile backend work |
+| `starci-frontend-design-delivery` | Deliver journeys, pages, layouts, blocks, maintenance, and design learning |
+| `starci-quality-readiness` | Diagnose, inventory, repair, and measure delivery quality |
+| `starci-deployment` | Adopt, deploy, monitor, recover, or roll back a release |
+| `starci-platform-services` | Reconcile tunnel, MCP/Qdrant, Sonar, and observability services |
+| `starci-conversation-provenance` | Record or query redacted conversation provenance |
+
+The release currently contains 80 atomic operators across 10 domains and 33 operator-knowledge records.
 
 ## Install
 
-Clone the complete trust tree into the Source's `.claude` directory:
+Requirements:
+
+- Node.js 20 or newer
+- Python 3.11 or newer
+
+Clone this repository as the target project's `.claude` directory:
 
 ```bash
-cd <Source>
 git clone https://github.com/starci183/starci-skills.git .claude
-python -m pip install -r .claude/runtime/design-runtime/requirements.txt
+cd .claude
+npm ci
+python -m pip install -r runtime/knowledge-runtime/requirements.txt
 ```
 
-The installation is intentionally kept together:
+Point the host repository's `AGENTS.md` or equivalent bootstrap at `.claude/INDEX.md`. Codex discovers repo-local skills from `.claude/skills`; each `SKILL.md` contains concise selection instructions while its supporting files remain local to that skill.
+
+## Use
+
+Invoke the narrowest matching skill, for example:
 
 ```text
-<Source>/
-  .claude/
-    INDEX.md
-    knowledge/       # reusable facts, design authority, prompts and durable records
-      archetypes/
-      grammars/
-      compilers/
-      contexts/
-    runtime/         # routing, orchestration, gates, machines and generated runtime state
-      kernel/
-      workflows/
-      orchestration/
-      standards/
-      gates/
-      machines/
-    platform/        # deployment, MCP, readiness and operator runbooks
-      deployment/
-      mcp/
-      readiness/
-      runbooks/
-    skills/          # stays at root for Codex and Claude discovery
-    scripts/         # stable executable entrypoints
-    docs/            # generated Nextra publication
+Use $starci-frontend-design-delivery to design and implement this customer journey.
 ```
 
-Do not copy individual skills into a second directory. A skill can depend on schemas, scripts,
-grammars, compilers, gates, and records elsewhere in this tree; copying one folder creates a partial install
-that can drift from its dependencies. Reusable frontend structure resolves in the order
-`knowledge/archetypes → knowledge/grammars → knowledge/compilers/principles`: macro page topology first, product semantic owners second, and
-exact remaining geometry last.
+At runtime:
 
-V5.1 groups the detailed authorities by responsibility without changing their ownership. The three namespaces are intentionally asymmetric:
+1. The host reads only the selected `SKILL.md`.
+2. `validate-input.mjs` rejects malformed or extra input.
+3. `analyze-input.md` selects one declared mode.
+4. `machine.json` routes to an atomic operator.
+5. The operator retrieves only its `knowledgeRefs`, executes, and validates its output.
+6. The machine advances, waits for approval, loops, or terminates.
 
-- `knowledge` answers what the system knows and which design/product authority owns a decision;
-- `runtime` answers how an invocation routes, executes, validates and publishes evidence;
-- `platform` answers how Source infrastructure is initialized, exposed, deployed and operated.
+See [INDEX.md](INDEX.md) for the binding load order.
 
-`skills`, `scripts` and `docs` remain top-level integration surfaces because their locations are part of tool discovery,
-command stability and hosting contracts. They are not a fourth authority namespace.
-
-The binding chain is `pattern situation → gate situation → published machine rule → executable proof`.
-A rule in the machine with no gate route, or an enforced gate with no machine rule, is a broken trust
-tree even when a consumer repository happens to lint green.
-
-## Use with Codex and Claude
-
-Keep `AGENTS.md` and `CLAUDE.md` at the Source root as thin bootstraps. Both files should contain only:
-
-```markdown
-# StarCi agent bootstrap
-
-Before planning, reading target source, or running a skill, read
-[`<Source>/.claude/INDEX.md`](.claude/INDEX.md) completely and follow its load order.
-
-This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
-the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
-```
-
-- **Codex** reads `AGENTS.md`. Ask it to read the exact
-  `.claude/skills/<skill>/SKILL.md` entry when invoking a StarCi skill.
-- **Claude Code** reads `CLAUDE.md` and discovers project skills under `.claude/skills`; invoke them by
-  name, for example `/starci-init` or `/starci-stale-list`.
-
-StarCi deliberately keeps the authoritative implementation in `.claude`. There is no duplicate
-`.agents/skills` tree: `AGENTS.md` routes Codex into the same entry that Claude uses.
-
-## Initialize a Source
-
-After installing the tree, run `starci-init` and explicitly name the project and roles. Project
-identity is never inferred from a folder name.
-
-With Codex:
+## Repository layout
 
 ```text
-Read .claude/skills/starci-init/SKILL.md and run it for this Source.
-Project: academy. Roles: fe and be.
-Prepare the bootstrap, workspace routes, and worktree state.
+skills/                       user-facing state-machine skills
+operators/<domain>/<name>/    atomic execution contracts
+knowledge/                    Qdrant-indexed operator knowledge
+runtime/knowledge-runtime/    embedded index and retrieval runtime
+scripts/                      query and release validation commands
 ```
 
-With Claude Code:
+Every operator contains exactly:
 
 ```text
-/starci-init setup this Source for project academy with roles fe and be
+execute.md
+input.md
+input.schema.json
+operator.json
+output.md
+output.schema.json
+validate-input.mjs
+validate-output.mjs
 ```
 
-The skill presents four independent write boundaries for approval:
+Every skill adds `SKILL.md`, `analyze-input.md`, `machine.json`, and `agents/openai.yaml` around the same validated input/output boundary.
 
-1. `AGENTS.md` and `CLAUDE.md` — entry into the trust tree.
-2. `.workspaces/` — tracked portable declarations plus generated machine-local routes.
-3. `.worktrees/<project>/` — local mounts of durable `businesses` and `debts` Git branches.
-4. `.sessions/<project>/<session-id>/` — ignored disposable invocation evidence; never durable authority.
+## Knowledge retrieval
 
-Review the exact paths shown by the skill and approve only the boundaries you want initialized.
-
-## Multiple projects and roles
-
-One Source can manage many projects, and each project can expose several roles. Every
-`(project, role)` pair has one verified route:
-
-```text
-<Source>/
-  .workspaces/
-    config.json
-    projects/
-      academy/
-        fe.json
-        be.json
-      payments/
-        fe.json
-        be.json
-    ports/
-      config.json
-      academy.json
-      payments.json
-    local/
-      routes/
-        academy/
-          fe/config.json
-          be/config.json
-  .worktrees/
-    academy/
-      businesses/
-      debts/
-    payments/
-      businesses/
-      debts/
-  .sessions/
-    academy/<session-id>/
-    payments/<session-id>/
-```
-
-`.workspaces/config.json` holds only Source-wide defaults:
-
-```json
-{
-  "$schema": "../.claude/knowledge/contexts/workspaces/config.schema.json",
-  "version": 1,
-  "defaultLang": "vi"
-}
-```
-
-Each tracked `.workspaces/projects/<project>/<role>.json` contains only credential-free GitHub identity,
-expected branch and repository-relative context paths. `starci-init` hydrates it into
-`.workspaces/local/routes/<project>/<role>/config.json`, which describes an existing checkout: its declared identity,
-absolute paths, Git root, remote, branch, observed head, required instructions, manifests, and any
-role-specific contract. Routes describe checkouts; they do not clone or copy them.
-
-Commit only `.workspaces/config.json`, `.workspaces/projects/**/*.json` and `.workspaces/ports/*.json`.
-`.workspaces/local` is ignored because it contains machine-local paths and observed Git state. Run
-`starci-init` again when adding a role or project, or when a checkout or branch changes. Do not duplicate
-the nearest config by hand.
-
-StarCi frontend work first resolves one product-neutral page archetype, including required regions and
-wide/intermediate/compact transformation, then resolves one compact visual system from
-`knowledge/grammars/starci/design-system.json`. The routed profile may override declared roles such as accent; a page/session file records deviations only.
-An explicit owner-approved screenshot or reference remains specification inside its exact target scope. A merely
-current or legacy implementation supplies product facts, source ownership and capability evidence, but does not
-prove its macro layout correct: conflicts with the selected archetype are recorded as `layout-drift` and corrected
-unless binding business truth or an owner-approved exception requires them. MASTER keeps every untouched region
-visually consistent; Grammar selects semantic owners and Principles resolve only remaining deltas.
-
-Design retrieval is embedded and offline. `python .claude/scripts/design-knowledge-query.py build` compiles the
-tracked archetype, grammar and principle authority into a machine-local Qdrant Edge shard at
-`.workspaces/local/design-knowledge/qdrant-edge-v2`. The default named vector is the deterministic 256-dimensional
-`hash-ngram-v1` engine; an explicitly supplied local sentence-transformers model adds a separate `local` vector.
-The shard is rebuildable cache, never committed authority, and query mode does not start a server or make a network call.
-
-Conversation provenance is project-scoped and provider-neutral:
-
-```text
-.worktrees/<project>/businesses/
-  conversations/
-    conversation-registry-v1.json
-    objects/sha256/
-  businesses/
-    business-registry-v1.json
-.sessions/<project>/<session-id>/conversations/
-  transcripts/
-.workspaces/local/state/conversations/
-  search-indexes/
-    search.sqlite
-    vectors/
-```
-
-Use `starci-conversation-record` to bind an OpenAI/ChatGPT/Codex or Anthropic/Claude exchange to exact
-frontend/backend artifact hashes. Registries contain only redacted metadata and immutable references;
-raw transcript content stays provider-held, cache-only, or encrypted in approved external storage.
-
-## Multiple Sources
-
-Give every Source its own authority and runtime state:
-
-```text
-Sources/
-  product-source/
-    AGENTS.md
-    CLAUDE.md
-    .claude/
-    .workspaces/
-    .worktrees/
-  platform-source/
-    AGENTS.md
-    CLAUDE.md
-    .claude/
-    .workspaces/
-    .worktrees/
-```
-
-A Source may route to target repositories anywhere on the machine. Start Codex or Claude from the
-intended Source root so its bootstrap, routes, and decision state remain unambiguous.
-
-## Verify the setup
-
-Before trusting a Source that is new or has not been used recently:
-
-```text
-# Codex
-Read .claude/skills/starci-stale-list/SKILL.md and list stale projects in this Source.
-
-# Claude Code
-/starci-stale-list
-```
-
-Use `starci-init` to repair a missing or stale route. Use `starci-diagnose` when a skill stops and it
-is unclear whether the environment is incomplete or the skill itself is defective.
-
-## How the tree works
-
-StarCi separates capabilities by what each stage may return:
-
-| Tree | Species | Returns |
-| --- | --- | --- |
-| `contexts` | location | verified read and write locations |
-| `archetypes` | reusable page topology | one dominant task, required region graph and responsive transformation shared across product families |
-| `grammars` | product-family authority | closed facts, outcomes, owners, capsules, cases and templates selected explicitly by workspace route |
-| `brainstorms` | creation | 3–4 candidates for the owner to choose from |
-| `compilers` | execution | one deterministic answer from an accepted shape |
-| `gates` | refusal | pass, or reject with exact evidence |
-
-`skills` contains the capability bindings and their common reporting shape. `scripts` contains the
-deterministic utilities that make schemas and approval hashes enforceable rather than decorative.
-
-Each paired module has three records with separate audiences:
-
-- `context.md` is the compact English runtime binding loaded by an agent;
-- `en.md` is the complete English record for a human reader;
-- `vi.md` is the complete Vietnamese record for a human reader.
-
-A skill starts at its binding `SKILL.md`, then loads only the reached modules' `context.md` records.
-It never combines `en.md` or `vi.md` with runtime instructions. Runtime records contain no publication
-metadata; `context-manifest.json` tracks their source hashes and schema versions out of band. Run
-`node scripts/compile-context.mjs --check .` after changing a paired module.
-
-Dependency checks are lane-specific: `node scripts/check-deps.mjs --context` validates runtime,
-`--en` validates English publication, and `--vi` validates Vietnamese publication. Use `--all` to run
-all three without allowing one lane to cross-load another.
-
-## Documentation site
-
-The site is generated from the records; files under `docs/content/` are generated, not hand-authored.
-Module navigation publishes only `EN` and `VI`; compact `context.md` files remain runtime-only and do
-not become Nextra pages. Skill navigation additionally publishes `SKILL.md` as `Agent (EN)`.
+Build and query the embedded index without a network service:
 
 ```bash
-cd docs
-npm install
-npm run sync
-npm run dev
+python scripts/knowledge-query.py build
+python scripts/knowledge-query.py status
+python scripts/knowledge-query.py query --text "nested surface complex case" --top-k 3
 ```
 
-Open [http://localhost:3000](http://localhost:3000). For a production check:
+The persisted index is local runtime state under `.workspaces/local/knowledge/` and is not committed.
+
+## Validate
 
 ```bash
-npm run build
+npm test
 ```
 
-Documentation shelves are declared in `docs/publication.mjs`. The hosting contract lives in
-`netlify.toml`, including the docs base, build command, publish directory, and pinned Node version.
-
-## Validate an artifact
+The release gate validates all operator contracts, all skill machines and routes, repository shape, generated metadata, and the Python Qdrant runtime. To regenerate deterministic contracts before testing:
 
 ```bash
-node scripts/validate-artifact.mjs \
-  --schema knowledge/brainstorms/layouts/schema.json \
-  --data <batch.json> --hash
+npm run materialize
+npm test
 ```
 
-## Brand assets
+## Versioning and support
 
-The text-free logo, favicon, and README wallpaper live in
-[`docs/public/brand`](./docs/public/brand). Their checked-in relative paths let GitHub and the generated
-documentation render the same StarCi identity without depending on a temporary local file.
+This project uses Semantic Versioning. Machine/schema compatibility is tied to the major release. See [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT © 2026 StarCi. See [LICENSE](LICENSE).

@@ -1,17 +1,30 @@
 {
   "name": "starci-skills",
-  "version": "0.0.0",
+  "version": "6.0.0",
   "private": true,
-  "description": "Executable checks for the StarCi skills trust tree.",
+  "description": "Composable StarCi agent skills built from validated state machines, atomic operators, and lazy knowledge retrieval.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/starci183/starci-skills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/starci183/starci-skills/issues"
+  },
+  "homepage": "https://github.com/starci183/starci-skills#readme",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "node --test scripts/fe-grammar.spec.mjs scripts/verify-design-grammar.spec.mjs scripts/functional-design-preview.spec.mjs scripts/validate-design-request.spec.mjs",
-    "test:all": "node --test \"scripts/*.spec.mjs\"",
-    "test:skill-runtime": "node --test scripts/build-skill-catalog.spec.mjs scripts/evaluate-skill-routing.spec.mjs scripts/validate-skill-facades.spec.mjs && python -m unittest discover -s runtime/design-runtime/tests -v",
-    "check:contexts": "node scripts/compile-context.mjs --check .",
-    "check:deps": "node scripts/check-deps.mjs --all",
-    "build:skill-catalog": "node scripts/build-skill-catalog.mjs",
-    "check:skill-runtime": "node scripts/build-skill-catalog.mjs --check && node scripts/evaluate-skill-routing.mjs --check && node scripts/validate-skill-facades.mjs && python scripts/design-knowledge-query.py build && python scripts/design-knowledge-query.py status",
-    "validate:grammars": "node scripts/validate-fe-grammar.mjs --grammar knowledge/grammars/starci"
+    "materialize": "node operators/materialize.mjs && node skills/materialize.mjs",
+    "check:operators": "node operators/validate-operators.mjs",
+    "check:skills": "node skills/validate-skills.mjs",
+    "check:release": "node scripts/validate-release.mjs",
+    "test:routes": "node --test skills/route-machine.spec.mjs",
+    "test:node": "npm run check:operators && npm run check:skills && npm run test:routes && npm run check:release",
+    "test:python": "python -m unittest discover -s runtime/knowledge-runtime/tests -v",
+    "test": "npm run test:node && npm run test:python",
+    "test:all": "npm test"
   },
   "devDependencies": {
     "typescript": "5.9.2"

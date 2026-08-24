@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Backend Delivery"
+  short_description: "Plan, implement, and prove backend delivery"
+  default_prompt: "Use $starci-backend-delivery to analyze this request and execute only the required state-machine branch."

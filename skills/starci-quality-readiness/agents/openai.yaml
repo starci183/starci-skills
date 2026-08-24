@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Quality Readiness"
+  short_description: "Diagnose, repair, and prove delivery readiness"
+  default_prompt: "Use $starci-quality-readiness to analyze this request and execute only the required state-machine branch."

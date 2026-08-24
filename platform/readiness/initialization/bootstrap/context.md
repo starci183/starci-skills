@@ -1,5 +1,0 @@
-# Bootstrap
-
-## LOADS
-
-None.

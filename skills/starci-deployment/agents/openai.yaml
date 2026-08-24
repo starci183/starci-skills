@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Deployment"
+  short_description: "Deploy, monitor, recover, or roll back releases"
+  default_prompt: "Use $starci-deployment to analyze this request and execute only the required state-machine branch."

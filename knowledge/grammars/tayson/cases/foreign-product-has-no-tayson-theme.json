@@ -1,1 +1,0 @@
-{"$schema":"../case.schema.json","grammar":"tayson","caseId":"foreign-product-has-no-tayson-theme","kind":"counterexample","because":"A surface with no Tây Sơn identity fact cannot inherit the Tây Sơn theme.","facts":[],"expectedOutcomes":[],"rejectedOutcomes":["tayson-brand-theme"]}

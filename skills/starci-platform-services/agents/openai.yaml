@@ -1,0 +1,4 @@
+interface:
+  display_name: "StarCi Platform Services"
+  short_description: "Reconcile shared StarCi platform services"
+  default_prompt: "Use $starci-platform-services to analyze this request and execute only the required state-machine branch."
