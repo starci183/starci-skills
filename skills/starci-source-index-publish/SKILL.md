@@ -19,7 +19,9 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `inspect + plan` | exact service identities, current revisions and declared target metadata | product source, broad provider discovery and raw credentials |
+| `approval + apply` | frozen delta, approval receipt and opaque handles | undeclared resources and new context |
+| `proof or partial recovery` | declared probes, before/after receipts and bounded retry state | adjacent services and unrelated tenant data |
 
 ## LOADS
 

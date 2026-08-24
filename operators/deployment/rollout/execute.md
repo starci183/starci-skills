@@ -62,14 +62,14 @@ Roll out the approved immutable release. All intermediate data and evidence are 
 **Action:** The coordinator verifies the published digest, domain, migration state, target baseline, strategy, health checkpoints, and rollback identity; then applies only the declared rollout actions and pauses at every checkpoint for proof. Workers never run commands or deployments and never mutate filesystem, runtime, provider, or data state; the coordinator owns effects and joins.
 **Session write:** observations and receipts below `scratchPrefix/execution`.
 **Durable write:** only mutations declared by the execution plan and bound by non-null approval.
-**Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, partial mutation, or failed rollback precondition.
+**Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, or failed rollback precondition. Emit `external-error` when no target changed and the provider failed; emit `partial` with exact before/after revisions when any target changed but the declared rollout did not complete. Never hide either condition behind `ready`.
 
 ## Step 6 — Select typed state
 
 **Read:** execution receipts and declared proof criteria.
 **Context:** pinned constraints and joined evidence only.
 **Analysis record:** criteria-to-evidence matches and one typed decision.
-**Action:** select one manifest decision. Success requires the intended immutable digest is active on every declared target and all bounded rollout checkpoints pass with rollback still reachable.
+**Action:** select one manifest decision. `ready` requires the intended immutable digest to be active on every declared target and all bounded rollout checkpoints to pass with rollback still reachable; already-converged targets are an idempotent ready no-op. `partial`, `external-error`, and `blocked` are fail-closed and never continue to monitor as if rollout succeeded.
 **Session write:** `scratchPrefix/decision`.
 **Durable write:** none beyond approved Step 5 mutations.
 **Stop:** never convert missing evidence into success; use only declared routes.

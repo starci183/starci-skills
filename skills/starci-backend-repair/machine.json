@@ -9,8 +9,171 @@
       "on": [
         {
           "when": {},
+          "target": "route",
+          "label": "enter route"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-staleness",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "business-staleness": {
+      "kind": "operator",
+      "ref": "business/staleness-check",
+      "on": [
+        {
+          "when": {
+            "decision": "fresh"
+          },
+          "target": "repair-prerequisites",
+          "label": "fresh"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "business-evidence",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "repair-prerequisites": {
+      "kind": "operator",
+      "ref": "be/repair-prerequisite-check",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "coding-scope",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "route-required"
+          },
+          "target": "route",
+          "label": "route-required"
+        },
+        {
+          "when": {
+            "decision": "business-refresh-required"
+          },
+          "target": "business-staleness",
+          "label": "business-refresh-required"
+        },
+        {
+          "when": {
+            "decision": "replan-required"
+          },
+          "target": "replan-handoff",
+          "label": "replan-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "business-evidence": {
+      "kind": "operator",
+      "ref": "business/evidence-normalize",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-model",
+          "label": "ready"
+        }
+      ]
+    },
+    "coding-scope": {
+      "kind": "operator",
+      "ref": "be/coding-scope-freeze",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
           "target": "implement",
-          "label": "enter implement"
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "replan-handoff",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "replan-handoff",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "replan-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "business-model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-approval",
+          "label": "ready"
         }
       ]
     },
@@ -29,14 +192,14 @@
           "when": {
             "decision": "source-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "source-drift"
         },
         {
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -45,6 +208,30 @@
           },
           "target": "blocked",
           "label": "blocked"
+        }
+      ]
+    },
+    "business-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve regenerated business authority before resuming the backend repair.",
+        "approve": "OK BUSINESS <hash>",
+        "reject": "REJECT BUSINESS <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "approved"
+          },
+          "target": "business-publish"
+        },
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "rejected"
+          },
+          "target": "business-evidence"
         }
       ]
     },
@@ -70,7 +257,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -82,22 +269,32 @@
         }
       ]
     },
-    "boundary-plan": {
+    "business-publish": {
       "kind": "operator",
-      "ref": "architecture/boundary-plan",
+      "ref": "business/publish",
       "on": [
         {
           "when": {
-            "decision": "ready"
+            "decision": "direct-plan"
           },
-          "target": "boundary-challenge",
-          "label": "ready"
+          "target": "business-staleness",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "decision": "architecture-required"
+          },
+          "target": "business-staleness",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "lint": {
       "kind": "operator",
@@ -121,7 +318,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -130,33 +327,6 @@
           },
           "target": "blocked",
           "label": "external-blocker"
-        }
-      ]
-    },
-    "boundary-challenge": {
-      "kind": "operator",
-      "ref": "architecture/boundary-challenge",
-      "on": [
-        {
-          "when": {
-            "decision": "clean"
-          },
-          "target": "boundary-approval",
-          "label": "clean"
-        },
-        {
-          "when": {
-            "decision": "revise"
-          },
-          "target": "boundary-plan",
-          "label": "revise"
-        },
-        {
-          "when": {
-            "decision": "blocked"
-          },
-          "target": "blocked",
-          "label": "blocked"
         }
       ]
     },
@@ -182,7 +352,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -191,30 +361,6 @@
           },
           "target": "blocked",
           "label": "external-blocker"
-        }
-      ]
-    },
-    "boundary-approval": {
-      "kind": "wait",
-      "approval": {
-        "prompt": "Approve the exact backend plan hash and file boundary.",
-        "approve": "OK BACKEND <hash>",
-        "reject": "REJECT BACKEND <hash>"
-      },
-      "on": [
-        {
-          "when": {
-            "stage": "architecture.boundary.review",
-            "status": "approved"
-          },
-          "target": "implement"
-        },
-        {
-          "when": {
-            "stage": "architecture.boundary.review",
-            "status": "rejected"
-          },
-          "target": "boundary-plan"
         }
       ]
     },
@@ -240,7 +386,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -274,7 +420,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -308,7 +454,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -342,7 +488,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {
@@ -376,7 +522,7 @@
           "when": {
             "decision": "boundary-drift"
           },
-          "target": "boundary-plan",
+          "target": "replan-handoff",
           "label": "boundary-drift"
         },
         {

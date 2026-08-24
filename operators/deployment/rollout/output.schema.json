@@ -28,6 +28,20 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.blocked"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
         }
       ]
     }
@@ -42,12 +56,14 @@
     },
     "stage": {
       "enum": [
-        "deployment.monitor"
+        "deployment.monitor",
+        "deployment.blocked"
       ]
     },
     "status": {
       "enum": [
-        "ready"
+        "ready",
+        "blocked"
       ]
     },
     "facts": {
@@ -68,7 +84,10 @@
       "properties": {
         "decision": {
           "enum": [
-            "ready"
+            "ready",
+            "partial",
+            "external-error",
+            "blocked"
           ]
         },
         "state": {
@@ -87,12 +106,16 @@
             },
             "status": {
               "enum": [
-                "completed"
+                "completed",
+                "blocked"
               ]
             },
             "code": {
               "enum": [
-                "deployment-rollout-ready"
+                "deployment-rollout-ready",
+                "deployment-rollout-partial",
+                "deployment-rollout-external-error",
+                "deployment-rollout-blocked"
               ]
             },
             "retryable": {
@@ -110,12 +133,14 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "deployment.monitor"
+                    "deployment.monitor",
+                    "deployment.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
-                    "ready"
+                    "ready",
+                    "blocked"
                   ]
                 },
                 "factsAdd": {

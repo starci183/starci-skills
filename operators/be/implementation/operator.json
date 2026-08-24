@@ -10,13 +10,13 @@
     {
       "stage": "architecture.boundary.review",
       "status": "approved",
-      "allFacts": ["backend-boundary-approved"],
+      "allFacts": ["backend-boundary-approved", "backend-coding-scope-frozen"],
       "noneFacts": []
     },
     {
       "stage": "be.repair",
       "status": "ready",
-      "allFacts": ["backend-boundary-approved", "in-boundary-repair"],
+      "allFacts": ["backend-boundary-approved", "backend-coding-scope-frozen", "in-boundary-repair"],
       "noneFacts": []
     }
   ],

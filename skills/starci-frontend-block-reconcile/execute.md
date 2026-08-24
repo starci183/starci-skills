@@ -11,7 +11,10 @@
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `route + target verification` | project route, approved target refs, source/contract hashes and receipt headers | business bodies, broad Qdrant and repository scans |
+| `audit or reconcile` | exact component/surface contracts, selected Grammar pair and closed consumer refs | other Grammar packages, unrelated consumers and raw business context |
+| `approval + mutation` | frozen decision hash, exact files and approval receipt | new discovery, undeclared files and scope expansion |
+| `proof + learning` | changed-file receipts, focused checks and one durable learning request | session scratch and unrelated design history |
 
 ## LOADS
 

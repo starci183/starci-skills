@@ -54,6 +54,20 @@
       "on": [
         {
           "when": {
+            "decision": "progressing"
+          },
+          "target": "monitor",
+          "label": "progressing"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "monitor",
+          "label": "external-error"
+        },
+        {
+          "when": {
             "decision": "steady"
           },
           "target": "proof",
@@ -92,6 +106,20 @@
           },
           "target": "proof",
           "label": "rolled-back"
+        },
+        {
+          "when": {
+            "decision": "partial"
+          },
+          "target": "blocked",
+          "label": "partial"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
         },
         {
           "when": {
@@ -143,6 +171,20 @@
         },
         {
           "when": {
+            "decision": "rolled-back"
+          },
+          "target": "rolled-back",
+          "label": "rolled-back"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
             "decision": "blocked"
           },
           "target": "blocked",
@@ -174,6 +216,10 @@
           "target": "complete"
         }
       ]
+    },
+    "rolled-back": {
+      "kind": "terminal",
+      "result": "rolled-back"
     },
     "business-reconcile": {
       "kind": "operator",

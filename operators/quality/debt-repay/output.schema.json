@@ -32,6 +32,20 @@
         {
           "properties": {
             "stage": {
+              "const": "quality.debt.proof"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
               "const": "quality.debt.result"
             },
             "status": {
@@ -71,7 +85,8 @@
     "stage": {
       "enum": [
         "quality.debt.result",
-        "quality.blocked"
+        "quality.blocked",
+        "quality.debt.proof"
       ]
     },
     "status": {
@@ -106,6 +121,7 @@
           "enum": [
             "closed",
             "progress",
+            "closure-candidate",
             "blocked"
           ]
         },
@@ -134,6 +150,7 @@
               "enum": [
                 "quality-debt-repay-closed",
                 "quality-debt-repay-progress",
+                "quality-debt-repay-closure-candidate",
                 "quality-debt-repay-blocked"
               ]
             },
@@ -152,7 +169,8 @@
                 "stage": {
                   "enum": [
                     "quality.debt.result",
-                    "quality.blocked"
+                    "quality.blocked",
+                    "quality.debt.proof"
                   ]
                 },
                 "status": {
@@ -180,6 +198,11 @@
           "additionalProperties": false,
           "required": [
             "debtReceiptRef",
+            "approvalFingerprint",
+            "loopProof",
+            "closureCandidateProofRef",
+            "closureProof",
+            "closedInventory",
             "durableWrites"
           ],
           "properties": {
@@ -191,6 +214,107 @@
                 {
                   "type": "null"
                 }
+              ]
+            },
+            "approvalFingerprint": {
+              "$ref": "#/$defs/sha256"
+            },
+            "loopProof": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "iteration",
+                "maxIterations",
+                "previousFingerprint",
+                "currentFingerprint",
+                "strictlyImproved",
+                "remainingReduced"
+              ],
+              "properties": {
+                "iteration": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "maxIterations": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20
+                },
+                "previousFingerprint": {
+                  "anyOf": [
+                    { "$ref": "#/$defs/sha256" },
+                    { "type": "null" }
+                  ]
+                },
+                "currentFingerprint": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "strictlyImproved": {
+                  "type": "boolean"
+                },
+                "remainingReduced": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "closureCandidateProofRef": {
+              "anyOf": [
+                { "$ref": "#/$defs/sessionRef" },
+                { "type": "null" }
+              ]
+            },
+            "closureProof": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ref",
+                    "verifier",
+                    "independent",
+                    "result",
+                    "evidenceSha256"
+                  ],
+                  "properties": {
+                    "ref": { "$ref": "#/$defs/sessionRef" },
+                    "verifier": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "independent": { "const": true },
+                    "result": { "const": "green" },
+                    "evidenceSha256": { "$ref": "#/$defs/sha256" }
+                  }
+                },
+                { "type": "null" }
+              ]
+            },
+            "closedInventory": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "receiptRef",
+                    "inventoryRef",
+                    "status",
+                    "beforeSha256",
+                    "afterSha256",
+                    "closureProofSha256"
+                  ],
+                  "properties": {
+                    "receiptRef": { "$ref": "#/$defs/sessionRef" },
+                    "inventoryRef": {
+                      "type": "string",
+                      "pattern": "^\\.worktrees/[A-Za-z0-9._-]+/quality/debts/inventory\\.json$"
+                    },
+                    "status": { "const": "closed" },
+                    "beforeSha256": { "$ref": "#/$defs/sha256" },
+                    "afterSha256": { "$ref": "#/$defs/sha256" },
+                    "closureProofSha256": { "$ref": "#/$defs/sha256" }
+                  }
+                },
+                { "type": "null" }
               ]
             },
             "durableWrites": {
@@ -289,6 +413,10 @@
     }
   },
   "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "sessionRef": {
       "type": "string",
       "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"

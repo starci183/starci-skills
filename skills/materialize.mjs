@@ -10,6 +10,8 @@ const wait = (prompt, approve, reject, on) => ({ kind: 'wait', approval: { promp
 const terminal = (result) => ({ kind: 'terminal', result });
 const decided = (routes) => Object.entries(routes).map(([decision, target]) => e({ decision }, target, decision));
 const qualityEdges = (pass) => decided({ pass, 'in-boundary': 'implement', 'boundary-drift': 'boundary-plan', 'external-blocker': 'blocked' });
+const repairQualityEdges = (pass) => decided({ pass, 'in-boundary': 'implement', 'boundary-drift': 'replan-handoff', 'external-blocker': 'blocked' });
+const routeEdges = (readyTarget, initializeTarget = 'blocked') => decided({ ready: readyTarget, 'initialize-required': initializeTarget, blocked: 'blocked' });
 
 function reachableSubgraph(states, entry) {
   const selected = { 'analyze-input': { kind: 'analysis', on: [e({}, entry, `enter ${entry}`)] } };
@@ -26,28 +28,28 @@ function reachableSubgraph(states, entry) {
 }
 
 const workspaceStates = {
-  identity: op('workspace/identity-verify', decided({ ready: 'bootstrap' })),
-  bootstrap: op('workspace/bootstrap-verify', decided({ ready: 'declarations' })),
+  identity: op('workspace/identity-verify', routeEdges('bootstrap')),
+  bootstrap: op('workspace/bootstrap-verify', routeEdges('declarations')),
   declarations: op('workspace/declarations-compile', decided({ ready: 'routes' })),
   routes: op('workspace/routes-hydrate', decided({ ready: 'worktree' })),
-  worktree: op('workspace/worktree-verify', decided({ ready: 'route' })),
-  route: op('workspace/route-verify', decided({ ready: 'complete' })),
-  complete: terminal('complete')
+  worktree: op('workspace/worktree-verify', routeEdges('route')),
+  route: op('workspace/route-verify', routeEdges('complete')),
+  complete: terminal('complete'), blocked: terminal('blocked')
 };
 
 const businessStates = {
-  route: op('workspace/route-verify', decided({ ready: 'evidence' })),
+  route: op('workspace/route-verify', routeEdges('evidence')),
   evidence: op('business/evidence-normalize', decided({ ready: 'model' })),
   model: op('business/model', decided({ ready: 'model-approval' })),
   'model-approval': wait('Approve the displayed business model revision and lifecycle transition.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [e({ stage: 'business.model.review', status: 'approved' }, 'publish'), e({ stage: 'business.model.review', status: 'rejected' }, 'evidence')]),
   publish: op('business/publish', decided({ 'direct-plan': 'complete', 'architecture-required': 'complete', blocked: 'blocked' })),
-  'reconcile-route': op('workspace/route-verify', decided({ ready: 'reconcile' })),
+  'reconcile-route': op('workspace/route-verify', routeEdges('reconcile')),
   reconcile: op('business/reconcile', decided({ implemented: 'complete', discrepancy: 'blocked' })),
   complete: terminal('complete'), blocked: terminal('blocked')
 };
 
 const architectureStates = {
-  route: op('workspace/route-verify', decided({ ready: 'business-staleness' })),
+  route: op('workspace/route-verify', routeEdges('business-staleness')),
   'business-staleness': op('business/staleness-check', decided({ fresh: 'frame', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
   'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
   'business-model': op('business/model', decided({ ready: 'business-approval' })),
@@ -63,7 +65,7 @@ const architectureStates = {
 };
 
 const backendStates = {
-  route: op('workspace/route-verify', decided({ ready: 'business-staleness' })),
+  route: op('workspace/route-verify', routeEdges('business-staleness')),
   'business-staleness': op('business/staleness-check', decided({ fresh: 'architecture-frame', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
   'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
   'business-model': op('business/model', decided({ ready: 'business-approval' })),
@@ -79,7 +81,8 @@ const backendStates = {
   'pattern-bind': op('architecture/pattern-bind', decided({ ready: 'boundary-plan' })),
   'boundary-plan': op('architecture/boundary-plan', decided({ ready: 'boundary-challenge' })),
   'boundary-challenge': op('architecture/boundary-challenge', decided({ clean: 'boundary-approval', revise: 'boundary-plan', blocked: 'blocked' })),
-  'boundary-approval': wait('Approve the exact backend plan hash and file boundary.', 'OK BACKEND <hash>', 'REJECT BACKEND <hash>', [e({ stage: 'architecture.boundary.review', status: 'approved' }, 'implement'), e({ stage: 'architecture.boundary.review', status: 'rejected' }, 'boundary-plan')]),
+  'boundary-approval': wait('Approve the exact backend plan hash and file boundary.', 'OK BACKEND <hash>', 'REJECT BACKEND <hash>', [e({ stage: 'architecture.boundary.review', status: 'approved' }, 'coding-scope'), e({ stage: 'architecture.boundary.review', status: 'rejected' }, 'boundary-plan')]),
+  'coding-scope': op('be/coding-scope-freeze', decided({ ready: 'implement', 'source-drift': 'boundary-plan', 'boundary-drift': 'boundary-plan', blocked: 'blocked' })),
   implement: op('be/implementation', decided({ ready: 'format', 'source-drift': 'boundary-plan', 'boundary-drift': 'boundary-plan', blocked: 'blocked' })),
   format: op('quality/format', qualityEdges('lint')), lint: op('quality/lint', qualityEdges('typecheck')),
   typecheck: op('quality/typecheck', qualityEdges('build')), build: op('quality/build', qualityEdges('unit')),
@@ -91,8 +94,28 @@ const backendStates = {
   complete: terminal('complete'), 'deployment-handoff': terminal('handoff'), blocked: terminal('blocked')
 };
 
+const backendRepairStates = {
+  route: op('workspace/route-verify', routeEdges('business-staleness')),
+  'business-staleness': op('business/staleness-check', decided({ fresh: 'repair-prerequisites', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
+  'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
+  'business-model': op('business/model', decided({ ready: 'business-approval' })),
+  'business-approval': wait('Approve regenerated business authority before resuming the backend repair.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [e({ stage: 'business.model.review', status: 'approved' }, 'business-publish'), e({ stage: 'business.model.review', status: 'rejected' }, 'business-evidence')]),
+  'business-publish': op('business/publish', decided({ 'direct-plan': 'business-staleness', 'architecture-required': 'business-staleness', blocked: 'blocked' })),
+  'repair-prerequisites': op('be/repair-prerequisite-check', decided({ ready: 'coding-scope', 'route-required': 'route', 'business-refresh-required': 'business-staleness', 'replan-required': 'replan-handoff', blocked: 'blocked' })),
+  'coding-scope': op('be/coding-scope-freeze', decided({ ready: 'implement', 'source-drift': 'replan-handoff', 'boundary-drift': 'replan-handoff', blocked: 'blocked' })),
+  implement: op('be/implementation', decided({ ready: 'format', 'source-drift': 'replan-handoff', 'boundary-drift': 'replan-handoff', blocked: 'blocked' })),
+  format: op('quality/format', repairQualityEdges('lint')), lint: op('quality/lint', repairQualityEdges('typecheck')),
+  typecheck: op('quality/typecheck', repairQualityEdges('build')), build: op('quality/build', repairQualityEdges('unit')),
+  unit: op('quality/unit-coverage', repairQualityEdges('integration')), integration: op('quality/integration', repairQualityEdges('e2e')),
+  e2e: op('quality/e2e', repairQualityEdges('sonar')), sonar: op('quality/sonar', repairQualityEdges('post-quality')),
+  'post-quality': choice([e({ inputEquals: { 'options.deploymentMode': 'none' } }, 'source-proof'), e({ inputEquals: { 'options.deploymentMode': 'handoff' } }, 'deployment-handoff')]),
+  'source-proof': op('quality/delivery-proof', decided({ pass: 'business-reconcile', blocked: 'blocked' })),
+  'business-reconcile': op('business/reconcile', decided({ implemented: 'complete', discrepancy: 'blocked' })),
+  complete: terminal('complete'), 'deployment-handoff': terminal('handoff'), 'replan-handoff': terminal('handoff'), blocked: terminal('blocked')
+};
+
 const frontendStates = {
-  route: op('workspace/route-verify', decided({ ready: 'business-staleness' })),
+  route: op('workspace/route-verify', routeEdges('business-staleness')),
   'business-staleness': op('business/staleness-check', decided({ fresh: 'preflight', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
   'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
   'business-model': op('business/model', decided({ ready: 'business-approval' })),
@@ -134,14 +157,24 @@ const qualityStates = {
   inventory: op('quality/readiness-inventory', decided({ green: 'complete', findings: 'repair-approval', blocked: 'blocked' })),
   'repair-approval': wait('Approve one exact measured finding and repair boundary.', 'OK REPAIR <finding>', 'REJECT REPAIR <finding>', [e({ stage: 'quality.repair.review', status: 'approved' }, 'repair'), e({ stage: 'quality.repair.review', status: 'rejected' }, 'rejected')]),
   repair: op('quality/finding-repair', decided({ repaired: 'inventory', 'stale-finding': 'inventory', 'boundary-drift': 'blocked', 'external-blocker': 'blocked' })),
-  debt: op('quality/debt-repay', decided({ closed: 'complete', progress: 'debt', blocked: 'blocked' })),
+  'debt-approval': wait('Approve the exact debt identity, baseline, closure criterion and bounded iteration budget.', 'OK DEBT <hash>', 'REJECT DEBT <hash>', [e({ stage: 'quality.debt.review', status: 'approved' }, 'debt'), e({ stage: 'quality.debt.review', status: 'rejected' }, 'rejected')]),
+  debt: op('quality/debt-repay', decided({ closed: 'complete', progress: 'debt', 'closure-candidate': 'debt-proof', blocked: 'blocked' })),
+  'debt-proof': op('quality/readiness-inventory', decided({ green: 'debt-close', findings: 'debt-approval', blocked: 'blocked' })),
+  'debt-close': op('quality/debt-repay', decided({ closed: 'complete', progress: 'blocked', 'closure-candidate': 'blocked', blocked: 'blocked' })),
   bindings: op('quality/rule-binding-check', decided({ pass: 'complete', fail: 'findings', blocked: 'blocked' })),
   findings: terminal('complete'),
   complete: terminal('complete'), rejected: terminal('rejected'), blocked: terminal('blocked')
 };
 
+const qualityFindingStates = {
+  ...qualityStates,
+  repair: op('quality/finding-repair', decided({ repaired: 'finding-proof', 'stale-finding': 'finding-proof', 'boundary-drift': 'blocked', 'external-blocker': 'blocked' })),
+  'finding-proof': op('quality/readiness-inventory', decided({ green: 'complete', findings: 'residual-findings', blocked: 'blocked' })),
+  'residual-findings': terminal('handoff')
+};
+
 const deploymentStates = {
-  route: op('workspace/route-verify', decided({ ready: 'intent' })),
+  route: op('workspace/route-verify', routeEdges('intent')),
   intent: op('deployment/intent-bind', decided({ ready: 'manifest' })),
   manifest: op('deployment/manifest-validate', decided({ ready: 'plan' })),
   plan: op('deployment/execution-plan', decided({ execute: 'execution-root', 'approval-required': 'approval', blocked: 'blocked' })),
@@ -153,25 +186,25 @@ const deploymentStates = {
   'artifact-publish': op('deployment/artifact-publish', decided({ ready: 'migration' })),
   migration: op('deployment/migration', decided({ applied: 'domain', 'not-applicable': 'domain', rollback: 'rollback', blocked: 'blocked' })),
   domain: op('deployment/domain-reconcile', decided({ ready: 'rollout' })),
-  rollout: op('deployment/rollout', decided({ ready: 'monitor' })),
-  monitor: op('deployment/monitor', decided({ steady: 'proof', recover: 'recover', rollback: 'rollback', blocked: 'blocked' })),
+  rollout: op('deployment/rollout', decided({ ready: 'monitor', partial: 'blocked', 'external-error': 'blocked', blocked: 'blocked' })),
+  monitor: op('deployment/monitor', decided({ progressing: 'monitor', 'external-error': 'monitor', steady: 'proof', recover: 'recover', rollback: 'rollback', blocked: 'blocked' })),
   recover: op('deployment/recover', decided({ retry: 'monitor', rollback: 'rollback', 'approval-required': 'approval', blocked: 'blocked' })),
-  rollback: op('deployment/rollback', decided({ 'rolled-back': 'proof', blocked: 'blocked' })),
-  proof: op('deployment/proof', decided({ complete: 'reconcile-choice', blocked: 'blocked' })),
+  rollback: op('deployment/rollback', decided({ 'rolled-back': 'proof', partial: 'blocked', 'external-error': 'blocked', blocked: 'blocked' })),
+  proof: op('deployment/proof', decided({ complete: 'reconcile-choice', 'rolled-back': 'rolled-back', 'external-error': 'blocked', blocked: 'blocked' })),
   'reconcile-choice': choice([e({ inputEquals: { 'options.reconcileBusiness': true } }, 'business-reconcile'), e({ inputEquals: { 'options.reconcileBusiness': false } }, 'complete')]),
   'business-reconcile': op('business/reconcile', decided({ implemented: 'complete', discrepancy: 'blocked' })),
-  complete: terminal('complete'), rejected: terminal('rejected'), blocked: terminal('blocked')
+  complete: terminal('complete'), 'rolled-back': terminal('rolled-back'), rejected: terminal('rejected'), blocked: terminal('blocked')
 };
 
 const deploymentFollowupStates = {
-  monitor: op('deployment/monitor', decided({ steady: 'proof', recover: 'recover', rollback: 'rollback', blocked: 'blocked' })),
+  monitor: op('deployment/monitor', decided({ progressing: 'monitor', 'external-error': 'monitor', steady: 'proof', recover: 'recover', rollback: 'rollback', blocked: 'blocked' })),
   recover: op('deployment/recover', decided({ retry: 'monitor', rollback: 'rollback', 'approval-required': 'recovery-approval', blocked: 'blocked' })),
   'recovery-approval': wait('Approve the exact recovery boundary.', 'OK DEPLOY <hash>', 'REJECT DEPLOY <hash>', [e({ stage: 'deployment.review', status: 'approved' }, 'recover'), e({ stage: 'deployment.review', status: 'rejected' }, 'rejected')]),
-  rollback: op('deployment/rollback', decided({ 'rolled-back': 'proof', blocked: 'blocked' })),
-  proof: op('deployment/proof', decided({ complete: 'reconcile-choice', blocked: 'blocked' })),
+  rollback: op('deployment/rollback', decided({ 'rolled-back': 'proof', partial: 'blocked', 'external-error': 'blocked', blocked: 'blocked' })),
+  proof: op('deployment/proof', decided({ complete: 'reconcile-choice', 'rolled-back': 'rolled-back', 'external-error': 'blocked', blocked: 'blocked' })),
   'reconcile-choice': choice([e({ inputEquals: { 'options.reconcileBusiness': true } }, 'business-reconcile'), e({ inputEquals: { 'options.reconcileBusiness': false } }, 'complete')]),
   'business-reconcile': op('business/reconcile', decided({ implemented: 'complete', discrepancy: 'blocked' })),
-  complete: terminal('complete'), rejected: terminal('rejected'), blocked: terminal('blocked')
+  complete: terminal('complete'), 'rolled-back': terminal('rolled-back'), rejected: terminal('rejected'), blocked: terminal('blocked')
 };
 
 const platformStates = {
@@ -197,6 +230,61 @@ const conversationStates = {
 const deployOptions = { reconcileBusiness: { type: 'boolean', description: 'Reconcile final proof into the business head.' } };
 const backendOptions = { deploymentMode: { enum: ['none', 'handoff'], description: 'Stop after source proof or hand off to deployment.' } };
 const repairOptions = { deploymentMode: backendOptions.deploymentMode };
+
+const domainContextMatrices = {
+  workspace: [
+    ['identity + freshness checks', 'project id, repository root, commit, config hashes and receipt headers', 'business bodies, Qdrant bodies, product source bodies'],
+    ['initialize one stale layer', 'only that layer manifest and exact initializer contract', 'later workspace layers and product context'],
+    ['route verification', 'compiled route refs and hash metadata', 'business, design, source and deployment context']
+  ],
+  business: [
+    ['route + freshness', 'project route, source commit, business baseline and generator/schema hashes', 'business body, Qdrant bodies and product source'],
+    ['evidence normalization', 'exact declared evidence only', 'frontend/backend implementation and unrelated feature evidence'],
+    ['model + review', 'normalized evidence, lifecycle law and current feature head', 'repository source and unrelated business heads'],
+    ['publish or reconcile', 'approved revision or frozen pre-delivery receipt plus delivery proof', 'mutable session plans and broad source scans']
+  ],
+  architecture: [
+    ['route + business freshness', 'route, commits, hashes and receipt headers', 'raw source and unrelated business bodies'],
+    ['frame + current state', 'exact business projection, canonical coding-context candidates and architecture law', 'raw source files and whole indexes'],
+    ['alternatives + challenge', 'frozen constraints and two-to-four candidate summaries', 'reloading business, source or unrelated knowledge'],
+    ['selection + handoff', 'option-set hash, selected decision and approval receipt', 'unselected bodies and new discovery']
+  ],
+  backend: [
+    ['route + freshness', 'route, source commit, authority and coding-context hash metadata', 'business bodies, raw source and Qdrant bodies'],
+    ['architecture + boundary planning', 'exact business projection, canonical coding-context records and narrow operator knowledge', 'raw source files, whole indexes and unrelated modules'],
+    ['approval + coding-scope freeze', 'plan hash, source HEAD and exact target path/hash headers', 'file bodies and repository scans'],
+    ['implementation', 'approved boundary, exact frozen files and be.implementation knowledge', 'undeclared files, broad Qdrant and adjacent business'],
+    ['quality + proof + reconcile', 'changed-file receipts, declared commands, frozen pre-delivery receipt and immutable proof', 'new design context and unfrozen source discovery']
+  ],
+  frontendMaintenance: [
+    ['route + target verification', 'project route, approved target refs, source/contract hashes and receipt headers', 'business bodies, broad Qdrant and repository scans'],
+    ['audit or reconcile', 'exact component/surface contracts, selected Grammar pair and closed consumer refs', 'other Grammar packages, unrelated consumers and raw business context'],
+    ['approval + mutation', 'frozen decision hash, exact files and approval receipt', 'new discovery, undeclared files and scope expansion'],
+    ['proof + learning', 'changed-file receipts, focused checks and one durable learning request', 'session scratch and unrelated design history']
+  ],
+  quality: [
+    ['diagnosis or inventory', 'declared command fingerprints, cached green receipts and exact failing evidence', 'unrelated source, broad Qdrant and speculative fixes'],
+    ['approval', 'one finding/debt identity, baseline, boundary and approval hash', 'source bodies and other findings'],
+    ['repair', 'only approved exact files and narrow repair law', 'scope expansion, unrelated findings and whole-repository scans'],
+    ['verification + loop', 'independent proof, prior fingerprint, loop counter and residual identity', 'stale observations and reloaded unrelated context']
+  ],
+  deployment: [
+    ['intent + plan', 'release, manifest, provider and environment metadata', 'credentials, product source and unrelated provider inventory'],
+    ['approval + apply', 'frozen plan, exact approval and opaque credential handles', 'raw secrets, new discovery and undeclared resources'],
+    ['monitor', 'same release identity, declared probes, attempt counter and backoff metadata', 'new deployment context and unrelated telemetry'],
+    ['recover or rollback', 'observed failure, bounded action plan and mutation receipts', 'different release targets and business reconciliation'],
+    ['proof + reconcile', 'public steady/rolled-back proof and frozen business receipt when eligible', 'raw credentials and mutable intermediate plans']
+  ],
+  platform: [
+    ['inspect + plan', 'exact service identities, current revisions and declared target metadata', 'product source, broad provider discovery and raw credentials'],
+    ['approval + apply', 'frozen delta, approval receipt and opaque handles', 'undeclared resources and new context'],
+    ['proof or partial recovery', 'declared probes, before/after receipts and bounded retry state', 'adjacent services and unrelated tenant data']
+  ],
+  conversation: [
+    ['record', 'redacted snapshot refs, provider-neutral identity and append head metadata', 'raw transcript, prompts, secrets and product reasoning'],
+    ['query', 'bounded conversation identity, authorized index metadata and returned refs', 'raw transcript bodies and unrelated conversations']
+  ]
+};
 
 const flows = [
   {
@@ -225,7 +313,7 @@ const flows = [
     checks: ['Resolve business authority, target module, permitted write roots and evidence freshness.', 'Confirm this is new delivery rather than a pre-approved repair.', 'Choose architecture depth and deployment handoff explicitly.']
   },
   {
-    id: 'backend-repair', display: 'StarCi Backend Repair', short: 'Repair one approved backend source boundary', entry: 'implement', states: backendStates, options: repairOptions,
+    id: 'backend-repair', display: 'StarCi Backend Repair', short: 'Repair one approved backend source boundary', entry: 'route', states: backendRepairStates, options: repairOptions,
     description: 'Use to resume one already approved in-boundary backend repair and rerun independent quality proof. Do not use for new feature planning, unapproved boundary changes, frontend work, or deployment.',
     checks: ['Resolve the approved plan hash, finding and current source baseline.', 'Confirm every write remains inside the approved backend boundary.', 'Route source or boundary drift back to planning.']
   },
@@ -280,12 +368,12 @@ const flows = [
     checks: ['Resolve one delivery boundary and required checks.', 'Separate measured findings from speculative improvements.', 'Require approval before every source repair.']
   },
   {
-    id: 'quality-finding-repair', display: 'StarCi Quality Finding Repair', short: 'Repair one approved measured quality finding', entry: 'repair-approval', states: qualityStates, options: {},
+    id: 'quality-finding-repair', display: 'StarCi Quality Finding Repair', short: 'Repair one approved measured quality finding', entry: 'repair-approval', states: qualityFindingStates, options: {},
     description: 'Use to repair one already measured quality finding after confirming its exact approval boundary, then re-inventory the target. Do not use for broad readiness assessment, diagnosis, or debt repayment.',
     checks: ['Resolve one finding, baseline and repair target.', 'Require the exact approval before mutation.', 'Re-inventory after repair and stop on boundary drift.']
   },
   {
-    id: 'quality-debt-repay', display: 'StarCi Quality Debt Repay', short: 'Repay one approved quality debt boundary', entry: 'debt', states: qualityStates, options: {},
+    id: 'quality-debt-repay', display: 'StarCi Quality Debt Repay', short: 'Repay one approved quality debt boundary', entry: 'debt-approval', states: qualityStates, options: {},
     description: 'Use to repay one declared and approved quality-debt item through a measured progress loop. Do not use for ordinary findings, diagnosis, readiness inventory, or feature delivery.',
     checks: ['Resolve one approved debt identity and closure criterion.', 'Confirm the permitted mutation boundary.', 'Reject undocumented cleanup or unrelated refactoring.']
   },
@@ -347,7 +435,19 @@ const flows = [
   }
 ];
 
-for (const flow of flows) flow.id = `starci-${flow.id}`;
+for (const flow of flows) {
+  flow.id = `starci-${flow.id}`;
+  if (flow.contextMatrix) continue;
+  if (flow.id === 'starci-workspace-ready') flow.contextMatrix = domainContextMatrices.workspace;
+  else if (['starci-business-authority', 'starci-business-reconcile'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.business;
+  else if (flow.id === 'starci-architecture-decide') flow.contextMatrix = domainContextMatrices.architecture;
+  else if (['starci-backend-delivery', 'starci-backend-repair'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.backend;
+  else if (flow.id.startsWith('starci-frontend-')) flow.contextMatrix = domainContextMatrices.frontendMaintenance;
+  else if (flow.id.startsWith('starci-quality-') || ['starci-workflow-diagnose', 'starci-rule-binding-audit'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.quality;
+  else if (flow.id.startsWith('starci-deployment')) flow.contextMatrix = domainContextMatrices.deployment;
+  else if (['starci-tunnel-reconcile', 'starci-source-index-publish', 'starci-sonar-service-reconcile', 'starci-observability-reconcile'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.platform;
+  else if (flow.id.startsWith('starci-conversation-')) flow.contextMatrix = domainContextMatrices.conversation;
+}
 
 for (const retired of ['starci-frontend-design-delivery', 'starci-platform-services', 'starci-conversation-provenance']) {
   rmSync(path.join(root, retired), { recursive: true, force: true });
@@ -385,7 +485,7 @@ for (const flow of flows) {
   const optionProperties = Object.fromEntries(Object.entries(flow.options).map(([name, spec]) => [name, spec.enum ? { type: typeof spec.enum[0], enum: spec.enum } : { type: spec.type ?? 'string' }]));
   const selectionSchema = { type: 'object', additionalProperties: false, required: ['analyzerVersion', 'skillId', 'confidence', 'activeInputRefs', 'passiveContextRefs'], properties: { analyzerVersion: { const: 1 }, skillId: { const: flow.id }, confidence: { enum: ['exact', 'clarified'] }, activeInputRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, passiveContextRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } } } };
   const inputSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://starci.dev/v6/skills/${flow.id}/input.schema.json`, type: 'object', additionalProperties: false, required: ['schemaVersion', 'runId', 'project', 'selection', 'requestRef', 'artifactRefs', 'evidenceRefs', 'scope', 'options'], properties: { schemaVersion: { const: 6 }, runId: { type: 'string', minLength: 1 }, project: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' }, selection: selectionSchema, requestRef: { type: 'string', minLength: 1 }, artifactRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, evidenceRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, scope: { type: 'object', additionalProperties: false, required: ['targetRefs', 'writeRoots', 'externalMutation', 'approvalRef'], properties: { targetRefs: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', minLength: 1 } }, writeRoots: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, externalMutation: { type: 'boolean' }, approvalRef: { type: ['string', 'null'], minLength: 1 } } }, options: { type: 'object', additionalProperties: false, required: Object.keys(optionProperties), properties: optionProperties } } };
-  const outputSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://starci.dev/v6/skills/${flow.id}/output.schema.json`, type: 'object', additionalProperties: false, required: ['schemaVersion', 'runId', 'skillId', 'result', 'finalState', 'receiptRefs', 'findings'], properties: { schemaVersion: { const: 6 }, runId: { type: 'string', minLength: 1 }, skillId: { const: flow.id }, result: { enum: ['complete', 'blocked', 'handoff', 'not-needed', 'rejected'] }, finalState: { type: 'string', minLength: 1 }, receiptRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, findings: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } } } };
+  const outputSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://starci.dev/v6/skills/${flow.id}/output.schema.json`, type: 'object', additionalProperties: false, required: ['schemaVersion', 'runId', 'skillId', 'result', 'finalState', 'receiptRefs', 'findings'], properties: { schemaVersion: { const: 6 }, runId: { type: 'string', minLength: 1 }, skillId: { const: flow.id }, result: { enum: ['complete', 'rolled-back', 'blocked', 'handoff', 'not-needed', 'rejected'] }, finalState: { type: 'string', minLength: 1 }, receiptRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, findings: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } } } };
   writeJson(path.join(directory, 'input.schema.json'), inputSchema);
   writeJson(path.join(directory, 'output.schema.json'), outputSchema);
   const checks = flow.checks.map((item, index) => `${index + 1}. ${item}`).join('\n');

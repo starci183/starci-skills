@@ -11,7 +11,9 @@
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `identity + freshness checks` | project id, repository root, commit, config hashes and receipt headers | business bodies, Qdrant bodies, product source bodies |
+| `initialize one stale layer` | only that layer manifest and exact initializer contract | later workspace layers and product context |
+| `route verification` | compiled route refs and hash metadata | business, design, source and deployment context |
 
 ## LOADS
 

@@ -28,6 +28,22 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": { "const": "workspace.initialization" },
+            "status": { "const": "ready" },
+            "payload": { "properties": { "decision": { "const": "initialize-required" } } }
+          },
+          "required": ["stage", "status", "payload"]
+        },
+        {
+          "properties": {
+            "stage": { "const": "workspace.blocked" },
+            "status": { "const": "blocked" },
+            "payload": { "properties": { "decision": { "const": "blocked" } } }
+          },
+          "required": ["stage", "status", "payload"]
         }
       ]
     }
@@ -42,12 +58,15 @@
     },
     "stage": {
       "enum": [
-        "workspace.ready"
+        "workspace.ready",
+        "workspace.initialization",
+        "workspace.blocked"
       ]
     },
     "status": {
       "enum": [
-        "ready"
+        "ready",
+        "blocked"
       ]
     },
     "facts": {
@@ -73,7 +92,9 @@
       "properties": {
         "decision": {
           "enum": [
-            "ready"
+            "ready",
+            "initialize-required",
+            "blocked"
           ]
         },
         "state": {
@@ -99,7 +120,9 @@
             },
             "code": {
               "enum": [
-                "workspace-worktree-verify-ready"
+                "workspace-worktree-verify-ready",
+                "workspace-worktree-verify-initialize-required",
+                "workspace-worktree-verify-blocked"
               ]
             },
             "retryable": {
@@ -116,12 +139,15 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "workspace.ready"
+                    "workspace.ready",
+                    "workspace.initialization",
+                    "workspace.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
-                    "ready"
+                    "ready",
+                    "blocked"
                   ]
                 },
                 "factsAdd": {

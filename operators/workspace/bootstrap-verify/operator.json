@@ -26,6 +26,18 @@
         "workspace-bootstrap-ready"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "workspace.initialization",
+      "status": "ready",
+      "factsAdd": ["workspace-bootstrap-initialize-required"],
+      "factsRemove": ["workspace-bootstrap-ready"]
+    },
+    {
+      "stage": "workspace.blocked",
+      "status": "blocked",
+      "factsAdd": ["workspace-bootstrap-blocked"],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

@@ -46,14 +46,14 @@
           "when": {
             "decision": "repaired"
           },
-          "target": "inventory",
+          "target": "finding-proof",
           "label": "repaired"
         },
         {
           "when": {
             "decision": "stale-finding"
           },
-          "target": "inventory",
+          "target": "finding-proof",
           "label": "stale-finding"
         },
         {
@@ -76,7 +76,7 @@
       "kind": "terminal",
       "result": "rejected"
     },
-    "inventory": {
+    "finding-proof": {
       "kind": "operator",
       "ref": "quality/readiness-inventory",
       "on": [
@@ -91,7 +91,7 @@
           "when": {
             "decision": "findings"
           },
-          "target": "repair-approval",
+          "target": "residual-findings",
           "label": "findings"
         },
         {
@@ -110,6 +110,10 @@
     "complete": {
       "kind": "terminal",
       "result": "complete"
+    },
+    "residual-findings": {
+      "kind": "terminal",
+      "result": "handoff"
     }
   }
 }

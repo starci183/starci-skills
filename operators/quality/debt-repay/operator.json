@@ -34,6 +34,14 @@
       "factsRemove": []
     },
     {
+      "stage": "quality.debt.proof",
+      "status": "ready",
+      "factsAdd": [
+        "debt-closure-candidate"
+      ],
+      "factsRemove": []
+    },
+    {
       "stage": "quality.blocked",
       "status": "blocked",
       "factsAdd": [
@@ -43,7 +51,8 @@
     }
   ],
   "sideEffects": [
-    "mutate approved debt scope and durable debt record",
+    "mutate only the exactly approved debt scope",
+    "finalize closed debt inventory only from an independent green closure proof",
     "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
     "purge every intermediate session object at each parent-skill terminal state"
   ],

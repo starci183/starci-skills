@@ -24,6 +24,20 @@
           },
           "target": "business-staleness",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -54,6 +68,10 @@
         }
       ]
     },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
     "frame": {
       "kind": "operator",
       "ref": "architecture/decision-frame",
@@ -79,10 +97,6 @@
           "label": "ready"
         }
       ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "current": {
       "kind": "operator",

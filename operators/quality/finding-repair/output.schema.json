@@ -184,6 +184,7 @@
           "additionalProperties": false,
           "required": [
             "repairReceiptRef",
+            "decisionProof",
             "durableWrites"
           ],
           "properties": {
@@ -196,6 +197,48 @@
                   "type": "null"
                 }
               ]
+            },
+            "decisionProof": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "kind",
+                "findingFingerprint",
+                "approvalFingerprint",
+                "observedBaseline",
+                "changedTargets",
+                "reinventoryRequired"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "kind": {
+                  "enum": [
+                    "mutation-applied",
+                    "finding-revision-mismatch",
+                    "boundary-expansion-required",
+                    "external-verdict-unavailable"
+                  ]
+                },
+                "findingFingerprint": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "approvalFingerprint": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "observedBaseline": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "changedTargets": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "reinventoryRequired": {
+                  "type": "boolean"
+                }
+              }
             },
             "durableWrites": {
               "type": "array",
@@ -293,6 +336,10 @@
     }
   },
   "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "sessionRef": {
       "type": "string",
       "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"

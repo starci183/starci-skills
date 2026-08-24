@@ -18,6 +18,10 @@ This closed output is ephemeral task-session state. Input, output, loaded contex
 | Decision | Operator state | Emitted state | Evidence |
 | --- | --- | --- | --- |
 | `complete` | `completed` | `delivery.proved / ready` | Adds `delivery-proof-ready`. |
+| `rolled-back` | `completed` | `deployment.rolled-back / complete` | Adds `deployment-rollback-proved`; removes `deployment-rollback-required`. |
+| `external-error` | `blocked` | `deployment.blocked / blocked` | Adds `deployment-proof-external-error`; retryable after re-observation. |
 | `blocked` | `blocked` | `deployment.blocked / blocked` | Adds `deployment-proof-blocked`. |
 
 `payload.state.emits` must match the root route and manifest facts. Receipts and evidence use `session://`; only approved deployment mutations may survive.
+
+`rolled-back` is a terminal rollback truth. It must never route through delivery success or business reconciliation for the rejected release.

@@ -14,8 +14,16 @@ function semantic(value) {
   if (JSON.stringify(actualKnowledge) !== JSON.stringify([...knowledgeIds].sort())) errors.push('/payload/loads/knowledge: exact knowledge set required');
   const taskPrefix = `session://tasks/${value.payload.session.taskId}/`;
   for (const key of ['inputRef', 'outputRef', 'scratchPrefix']) if (!value.payload.session[key].startsWith(taskPrefix)) errors.push(`/payload/session/${key}: must belong to taskId`);
+  for (const [key, ref] of Object.entries(value.payload.provided)) if (!ref.startsWith(taskPrefix)) errors.push(`/payload/provided/${key}: must belong to taskId`);
+  for (const [index, artifact] of value.payload.loads.artifacts.entries()) if (!artifact.ref.startsWith(taskPrefix)) errors.push(`/payload/loads/artifacts/${index}/ref: must belong to taskId`);
 
   if (value.payload.loads.source.repositoryContext !== false || value.payload.loads.source.loadMode !== 'exact-files') errors.push('/payload/loads/source: only exact files are allowed');
+  for (const [index, target] of value.payload.loads.source.targetFiles.entries()) {
+    const normalized = target.path.replaceAll('\\', '/');
+    if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith('/') || normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) errors.push(`/payload/loads/source/targetFiles/${index}/path: must be a safe repository-relative path`);
+  }
+  if (value.payload.scope.targetCount !== value.payload.loads.source.targetFiles.length) errors.push('/payload/scope/targetCount: must equal the exact approved source target count');
+  if (!value.payload.provided.approvalReceiptRef || !value.payload.provided.proofPlanRef) errors.push('/payload/provided: exact approval and proof plan are required');
 
   return errors;
 }

@@ -27,6 +27,20 @@
         },
         {
           "when": {
+            "decision": "partial"
+          },
+          "target": "blocked",
+          "label": "partial"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
             "decision": "blocked"
           },
           "target": "blocked",
@@ -44,6 +58,20 @@
           },
           "target": "reconcile-choice",
           "label": "complete"
+        },
+        {
+          "when": {
+            "decision": "rolled-back"
+          },
+          "target": "rolled-back",
+          "label": "rolled-back"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
         },
         {
           "when": {
@@ -78,6 +106,10 @@
           "target": "complete"
         }
       ]
+    },
+    "rolled-back": {
+      "kind": "terminal",
+      "result": "rolled-back"
     },
     "business-reconcile": {
       "kind": "operator",

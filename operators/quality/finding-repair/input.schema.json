@@ -63,6 +63,7 @@
       "additionalProperties": false,
       "required": [
         "provided",
+        "scope",
         "loads",
         "session"
       ],
@@ -74,7 +75,8 @@
             "approvedFindingRef",
             "approvalReceiptRef",
             "baselineRef",
-            "ownerBoundaryRef"
+            "ownerBoundaryRef",
+            "proofPlanRef"
           ],
           "properties": {
             "approvedFindingRef": {
@@ -88,6 +90,35 @@
             },
             "ownerBoundaryRef": {
               "$ref": "#/$defs/sessionRef"
+            },
+            "proofPlanRef": {
+              "$ref": "#/$defs/sessionRef"
+            }
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "findingId",
+            "findingFingerprint",
+            "approvalFingerprint",
+            "targetCount"
+          ],
+          "properties": {
+            "findingId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "findingFingerprint": {
+              "$ref": "#/$defs/sha256"
+            },
+            "approvalFingerprint": {
+              "$ref": "#/$defs/sha256"
+            },
+            "targetCount": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         },

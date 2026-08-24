@@ -62,14 +62,14 @@ Return provider and runtime state to the declared safe release. All intermediate
 **Action:** The coordinator verifies the safe release identity and rollback preconditions, executes only the approved rollback commands and provider actions, and proves the restored release health without deleting evidence or widening scope. Workers never run commands or deployments and never mutate filesystem, runtime, provider, or data state; the coordinator owns effects and joins.
 **Session write:** observations and receipts below `scratchPrefix/execution`.
 **Durable write:** only mutations declared by the execution plan and bound by non-null approval.
-**Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, partial mutation, or failed rollback precondition.
+**Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, or failed rollback precondition. If an external call fails before mutation, emit `external-error`; if any declared target changed before the rollback could be completed and proved, emit `partial` with every before/after revision. Never collapse either case into generic success or blocker.
 
 ## Step 6 — Select typed state
 
 **Read:** execution receipts and declared proof criteria.
 **Context:** pinned constraints and joined evidence only.
 **Analysis record:** criteria-to-evidence matches and one typed decision.
-**Action:** select one manifest decision. Success requires the declared safe release identity is active, its health checks pass, and every changed provider or runtime target has before and after revisions.
+**Action:** select one manifest decision. `rolled-back` requires the declared safe release identity to be active, its health checks to pass, and every changed provider or runtime target to have before/after revisions; an already-safe target is an idempotent rolled-back no-op. `partial`, `external-error`, and `blocked` preserve distinct fail-closed truths.
 **Session write:** `scratchPrefix/decision`.
 **Durable write:** none beyond approved Step 5 mutations.
 **Stop:** never convert missing evidence into success; use only declared routes.

@@ -19,7 +19,10 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `route + freshness` | project route, source commit, business baseline and generator/schema hashes | business body, Qdrant bodies and product source |
+| `evidence normalization` | exact declared evidence only | frontend/backend implementation and unrelated feature evidence |
+| `model + review` | normalized evidence, lifecycle law and current feature head | repository source and unrelated business heads |
+| `publish or reconcile` | approved revision or frozen pre-delivery receipt plus delivery proof | mutable session plans and broad source scans |
 
 ## LOADS
 

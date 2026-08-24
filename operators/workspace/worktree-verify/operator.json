@@ -26,6 +26,18 @@
         "workspace-worktree-ready"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "workspace.initialization",
+      "status": "ready",
+      "factsAdd": ["workspace-worktree-initialize-required"],
+      "factsRemove": ["workspace-worktree-ready"]
+    },
+    {
+      "stage": "workspace.blocked",
+      "status": "blocked",
+      "factsAdd": ["workspace-worktree-blocked"],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

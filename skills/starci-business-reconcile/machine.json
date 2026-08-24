@@ -24,6 +24,20 @@
           },
           "target": "reconcile",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -47,13 +61,13 @@
         }
       ]
     },
-    "complete": {
-      "kind": "terminal",
-      "result": "complete"
-    },
     "blocked": {
       "kind": "terminal",
       "result": "blocked"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
     }
   }
 }

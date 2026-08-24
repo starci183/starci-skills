@@ -27,6 +27,30 @@
         "deployment-rollout-ready"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-rollout-partial"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-rollout-external-error"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-rollout-blocked"
+      ],
+      "factsRemove": []
     }
   ],
   "sideEffects": [
@@ -36,6 +60,7 @@
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "an external error or partial rollout cannot be represented with exact revisions"
   ]
 }

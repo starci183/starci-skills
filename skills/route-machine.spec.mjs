@@ -13,6 +13,13 @@ assert.equal(nextState(backend, 'route', { payload: { decision: 'ready' } }, {})
 assert.equal(nextState(backend, 'business-staleness', { payload: { decision: 'initialize-required' } }, {}), 'business-evidence');
 assert.equal(nextState(backend, 'business-staleness', { payload: { decision: 'fresh' } }, {}), 'architecture-frame');
 assert.equal(nextState(backend, 'architecture-challenge', { payload: { decision: 'revise' } }, {}), 'architecture-alternatives');
+assert.equal(nextState(backend, 'boundary-approval', { stage: 'architecture.boundary.review', status: 'approved' }, {}), 'coding-scope');
+
+const backendRepair = machine('starci-backend-repair');
+assert.equal(nextState(backendRepair, 'analyze-input', {}, { selection: { skillId: 'starci-backend-repair' }, options: {} }), 'route');
+assert.equal(nextState(backendRepair, 'repair-prerequisites', { payload: { decision: 'ready' } }, {}), 'coding-scope');
+assert.equal(nextState(backendRepair, 'repair-prerequisites', { payload: { decision: 'replan-required' } }, {}), 'replan-handoff');
+assert.equal(nextState(backendRepair, 'coding-scope', { payload: { decision: 'source-drift' } }, {}), 'replan-handoff');
 
 const frontend = machine('starci-frontend-layout-delivery');
 assert.equal(nextState(frontend, 'analyze-input', {}, { selection: { skillId: 'starci-frontend-layout-delivery' }, options: {} }), 'route');
@@ -27,7 +34,13 @@ assert.equal(nextState(maintenance, 'analyze-input', {}, { selection: { skillId:
 
 const deployment = machine('starci-deployment');
 assert.equal(nextState(deployment, 'monitor', { payload: { decision: 'recover' } }, {}), 'recover');
+assert.equal(nextState(deployment, 'monitor', { payload: { decision: 'progressing' } }, {}), 'monitor');
 assert.equal(nextState(deployment, 'recover', { payload: { decision: 'retry' } }, {}), 'monitor');
+assert.equal(nextState(deployment, 'proof', { payload: { decision: 'rolled-back' } }, {}), 'rolled-back');
+
+const debt = machine('starci-quality-debt-repay');
+assert.equal(nextState(debt, 'debt', { payload: { decision: 'closure-candidate' } }, {}), 'debt-proof');
+assert.equal(nextState(debt, 'debt-proof', { payload: { decision: 'green' } }, {}), 'debt-close');
 
 assert.throws(
   () => nextState({ id: 'ambiguous', states: { start: { kind: 'choice', on: [

@@ -51,7 +51,7 @@
     }
   ],
   "sideEffects": [
-    "mutate only the approved finding boundary",
+    "mutate only one exact approved finding boundary and emit a typed decision proof",
     "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
     "purge every intermediate session object at each parent-skill terminal state"
   ],

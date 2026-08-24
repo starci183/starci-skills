@@ -62,14 +62,14 @@ Join exact deployment evidence into one release proof. All intermediate data and
 **Action:** Validate the pinned intent, artifact digest, migration or not-applicable receipt, domain state, rollout identity, stabilization observations, and recovery or rollback evidence when present; do not rerun deployment actions. Workers never run commands or deployments and never mutate filesystem, runtime, provider, or data state; the coordinator owns effects and joins.
 **Session write:** observations and receipts below `scratchPrefix/execution`.
 **Durable write:** none; this operator is read-only outside task-session state.
-**Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, partial mutation, or failed rollback precondition.
+**Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, partial mutation, or failed rollback precondition. A provider/probe transport failure emits `external-error`; it never becomes success or a fabricated product failure.
 
 ## Step 6 — Select typed state
 
 **Read:** execution receipts and declared proof criteria.
 **Context:** pinned constraints and joined evidence only.
 **Analysis record:** criteria-to-evidence matches and one typed decision.
-**Action:** select one manifest decision. Success requires every mandatory lifecycle invariant has current task-session evidence for the same release, target, environment, and provider revisions.
+**Action:** select one manifest decision. `complete` is legal only for the originally intended release after `deployment-steady`. `rolled-back` is legal only when the declared safe release is active after `deployment-rolled-back`; it emits a distinct terminal truth and never delivery success. Both require every mandatory lifecycle invariant to have current task-session evidence for the same target, environment, and provider revisions.
 **Session write:** `scratchPrefix/decision`.
 **Durable write:** none beyond approved Step 5 mutations.
 **Stop:** never convert missing evidence into success; use only declared routes.

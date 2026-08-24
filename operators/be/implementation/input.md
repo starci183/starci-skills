@@ -19,6 +19,7 @@ The input is an ephemeral object owned by the current task session. It is never 
 - `approvalReceiptRef`: the approval that binds the exact boundary revision.
 - `businessHeadRef`: the business head snapshot already selected by the machine.
 - `baselineCommitRef`: the Git revision against which source hashes were approved.
+- `codingScopeRef`: the deterministic session receipt that froze the exact target set before any source body was opened.
 
 ### Data that will be loaded
 
@@ -26,6 +27,7 @@ The input is an ephemeral object owned by the current task session. It is never 
 
 - `business`: load the exact revision from `.worktrees/<project>/businesses/...` into session memory.
 - `boundary`: load the approved boundary object from session memory.
+- `scope`: load the frozen coding scope and bind its source commit and target-set hash.
 - `knowledge`: retrieve only `be.implementation` from the pinned Qdrant generation; the approved boundary itself is loaded from session state.
 - `source`: open only `targetFiles`; repository-wide source context is forbidden.
 - `orchestration`: resolve one execution mode and one provider mapping.

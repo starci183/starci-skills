@@ -24,6 +24,18 @@
         "workspace-route-ready"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "workspace.initialization",
+      "status": "ready",
+      "factsAdd": ["workspace-route-initialize-required"],
+      "factsRemove": ["workspace-route-ready"]
+    },
+    {
+      "stage": "workspace.blocked",
+      "status": "blocked",
+      "factsAdd": ["workspace-route-blocked"],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

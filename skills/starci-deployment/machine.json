@@ -24,6 +24,20 @@
           },
           "target": "intent",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -39,6 +53,10 @@
           "label": "ready"
         }
       ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
     },
     "manifest": {
       "kind": "operator",
@@ -116,10 +134,6 @@
           "target": "rejected"
         }
       ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "credentials": {
       "kind": "operator",
@@ -237,6 +251,20 @@
         },
         {
           "when": {
+            "decision": "partial"
+          },
+          "target": "blocked",
+          "label": "partial"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
             "decision": "blocked"
           },
           "target": "blocked",
@@ -254,6 +282,27 @@
           },
           "target": "monitor",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "partial"
+          },
+          "target": "blocked",
+          "label": "partial"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -270,6 +319,20 @@
         },
         {
           "when": {
+            "decision": "rolled-back"
+          },
+          "target": "rolled-back",
+          "label": "rolled-back"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
             "decision": "blocked"
           },
           "target": "blocked",
@@ -281,6 +344,20 @@
       "kind": "operator",
       "ref": "deployment/monitor",
       "on": [
+        {
+          "when": {
+            "decision": "progressing"
+          },
+          "target": "monitor",
+          "label": "progressing"
+        },
+        {
+          "when": {
+            "decision": "external-error"
+          },
+          "target": "monitor",
+          "label": "external-error"
+        },
         {
           "when": {
             "decision": "steady"
@@ -331,6 +408,10 @@
           "target": "complete"
         }
       ]
+    },
+    "rolled-back": {
+      "kind": "terminal",
+      "result": "rolled-back"
     },
     "recover": {
       "kind": "operator",

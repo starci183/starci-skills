@@ -44,7 +44,7 @@ function walk(directory) {
 }
 
 const operatorManifests = walk(path.join(root, 'operators')).filter((file) => path.basename(file) === 'operator.json');
-if (operatorManifests.length !== 83) fail(`expected 83 operators, found ${operatorManifests.length}`);
+if (operatorManifests.length !== 85) fail(`expected 85 operators, found ${operatorManifests.length}`);
 
 const knowledgeFiles = walk(path.join(root, 'knowledge'))
   .filter((file) => file.endsWith('.md'));

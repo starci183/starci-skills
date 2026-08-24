@@ -18,6 +18,20 @@
         {
           "properties": {
             "stage": {
+              "const": "deployment.rolled-back"
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
               "const": "delivery.proved"
             },
             "status": {
@@ -57,12 +71,14 @@
     "stage": {
       "enum": [
         "delivery.proved",
+        "deployment.rolled-back",
         "deployment.blocked"
       ]
     },
     "status": {
       "enum": [
         "blocked",
+        "complete",
         "ready"
       ]
     },
@@ -85,6 +101,8 @@
         "decision": {
           "enum": [
             "complete",
+            "rolled-back",
+            "external-error",
             "blocked"
           ]
         },
@@ -111,6 +129,8 @@
             "code": {
               "enum": [
                 "deployment-proof-complete",
+                "deployment-proof-rolled-back",
+                "deployment-proof-external-error",
                 "deployment-proof-blocked"
               ]
             },
@@ -130,12 +150,14 @@
                 "stage": {
                   "enum": [
                     "delivery.proved",
+                    "deployment.rolled-back",
                     "deployment.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
                     "blocked",
+                    "complete",
                     "ready"
                   ]
                 },

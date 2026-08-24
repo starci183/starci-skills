@@ -17,6 +17,11 @@ This operator repairs one approved readiness finding. Its input is an ephemeral 
 - `approvalReceiptRef`: exact `session://` approval over the finding fingerprint, target hashes, permitted writes, and approval revision.
 - `baselineRef`: exact `session://` reference; the operator cannot replace or broaden it.
 - `ownerBoundaryRef`: exact `session://` reference; the operator cannot replace or broaden it.
+- `proofPlanRef`: exact `session://` plan naming the expected mutation proof and the independent reinventory gate.
+
+## One-finding scope
+
+`payload.scope` binds one `findingId`, its measured `findingFingerprint`, the exact `approvalFingerprint`, and the number of approved target files. Arrays of findings, wildcard targets, and approval over a category are invalid. `targetCount` must equal `payload.loads.source.targetFiles.length`.
 
 ## Loaded by the runtime
 
@@ -25,4 +30,4 @@ This operator repairs one approved readiness finding. Its input is an ephemeral 
 - `source`: open only declared target files and verify their hashes; broad repository context is forbidden.
 - `orchestration`: resolve execution strategy separately from provider/model mapping.
 
-Acceptance requires that every changed file belongs to the owner boundary and directly clears the finding. Validate the complete envelope before any load, command, or mutation.
+Acceptance requires that every changed file belongs to this one finding's exact approval boundary and directly addresses it. `repaired` means the approved mutation was applied and proven by hashes; the parent state machine must reinventory independently before claiming the finding is cleared.

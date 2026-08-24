@@ -59,7 +59,7 @@ Observe the rollout for the complete declared stabilization window. All intermed
 **Read:** joined preflight, exact constraints, and resolved handles.
 **Context:** no new context may be loaded.
 **Analysis record:** command outcomes, provider/data observations, and before/after identities only.
-**Action:** The coordinator runs only declared health, error, saturation, latency, dependency, and business-signal checks; records value-safe observations; and classifies steady, recoverable, rollback-required, or blocked state without mutating the deployment. Workers never run commands or deployments and never mutate filesystem, runtime, provider, or data state; the coordinator owns effects and joins.
+**Action:** The coordinator runs only declared health, error, saturation, latency, dependency, and business-signal checks; records value-safe observations; and classifies progressing, transient external observation error, steady, recoverable, rollback-required, or blocked state without mutating the deployment. Workers never run commands or deployments and never mutate filesystem, runtime, provider, or data state; the coordinator owns effects and joins.
 **Session write:** observations and receipts below `scratchPrefix/execution`.
 **Durable write:** none; this operator is read-only outside task-session state.
 **Stop:** stop on suppression, stale revision, unsafe effect, scope expansion, partial mutation, or failed rollback precondition.
@@ -69,7 +69,7 @@ Observe the rollout for the complete declared stabilization window. All intermed
 **Read:** execution receipts and declared proof criteria.
 **Context:** pinned constraints and joined evidence only.
 **Analysis record:** criteria-to-evidence matches and one typed decision.
-**Action:** select one manifest decision. Success requires all declared thresholds remain within bounds for the complete window and every expected release identity stays active.
+**Action:** select one manifest decision. `progressing` and `external-error` are legal only while the frozen attempt/deadline budget has capacity for exactly one declared delay. When either budget is exhausted, emit `blocked`; never spin or silently reset the cursor. `steady` requires all declared thresholds remain within bounds for the complete window and every expected release identity stays active.
 **Session write:** `scratchPrefix/decision`.
 **Durable write:** none beyond approved Step 5 mutations.
 **Stop:** never convert missing evidence into success; use only declared routes.

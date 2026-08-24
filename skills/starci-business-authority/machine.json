@@ -24,6 +24,20 @@
           },
           "target": "evidence",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -39,6 +53,10 @@
           "label": "ready"
         }
       ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
     },
     "model": {
       "kind": "operator",
@@ -107,10 +125,6 @@
     "complete": {
       "kind": "terminal",
       "result": "complete"
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     }
   }
 }

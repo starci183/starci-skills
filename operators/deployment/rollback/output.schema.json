@@ -85,6 +85,8 @@
         "decision": {
           "enum": [
             "rolled-back",
+            "partial",
+            "external-error",
             "blocked"
           ]
         },
@@ -111,6 +113,8 @@
             "code": {
               "enum": [
                 "deployment-rollback-rolled-back",
+                "deployment-rollback-partial",
+                "deployment-rollback-external-error",
                 "deployment-rollback-blocked"
               ]
             },

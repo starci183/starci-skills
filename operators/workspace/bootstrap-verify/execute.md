@@ -24,9 +24,10 @@ This operator verifies bootstrap entry files and agent discovery before declarat
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** identity, bootstrap entry, and source index identify one workspace.
 **Analysis:** inspect every declared bootstrap entry and reject stale or cross-workspace bindings. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Route:** emit `ready` when all bootstrap entries and their hashes match; emit `initialize-required` for missing or stale rebuildable bootstrap/index declarations; emit `blocked` for cross-workspace identity, ambiguous ownership, unsafe paths, or corrupt authority.
 **Session write:** candidate `bootstrapReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
-**Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.
+**Stop:** never repair declarations or indexes inside this read-only verifier.
 
 ## Step 4 — Validate the candidate
 

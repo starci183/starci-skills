@@ -18,6 +18,20 @@
         {
           "properties": {
             "stage": {
+              "const": "deployment.monitor"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
               "const": "deployment.proof"
             },
             "status": {
@@ -85,6 +99,7 @@
     "stage": {
       "enum": [
         "deployment.blocked",
+        "deployment.monitor",
         "deployment.proof",
         "deployment.recover",
         "deployment.rollback"
@@ -114,6 +129,8 @@
       "properties": {
         "decision": {
           "enum": [
+            "progressing",
+            "external-error",
             "steady",
             "recover",
             "rollback",
@@ -137,11 +154,14 @@
             "status": {
               "enum": [
                 "blocked",
-                "completed"
+                "completed",
+                "waiting"
               ]
             },
             "code": {
               "enum": [
+                "deployment-monitor-progressing",
+                "deployment-monitor-external-error",
                 "deployment-monitor-steady",
                 "deployment-monitor-recover",
                 "deployment-monitor-rollback",
@@ -164,6 +184,7 @@
                 "stage": {
                   "enum": [
                     "deployment.blocked",
+                    "deployment.monitor",
                     "deployment.proof",
                     "deployment.recover",
                     "deployment.rollback"
@@ -191,7 +212,8 @@
           "required": [
             "receiptRef",
             "artifacts",
-            "mutations"
+            "mutations",
+            "monitorBudget"
           ],
           "properties": {
             "receiptRef": {
@@ -283,6 +305,50 @@
                       }
                     ]
                   }
+                }
+              }
+            },
+            "monitorBudget": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "attempt",
+                "maxAttempts",
+                "elapsedSeconds",
+                "deadlineSeconds",
+                "nextDelaySeconds",
+                "backoffPolicyRef"
+              ],
+              "properties": {
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "maxAttempts": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "elapsedSeconds": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "deadlineSeconds": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "nextDelaySeconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "backoffPolicyRef": {
+                  "$ref": "#/$defs/sessionRef"
                 }
               }
             }

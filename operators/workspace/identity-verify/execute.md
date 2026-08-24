@@ -24,9 +24,10 @@ This operator verifies machine identity and its encrypted credential roster. Inp
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** the active identity matches the roster without exposing plaintext secrets.
 **Analysis:** inspect identity metadata and encrypted roster headers. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Route:** emit `ready` when identity is current; emit `initialize-required` when machine-local identity metadata can be safely rebuilt without choosing credentials; emit `blocked` for missing authority, decrypt failure, ambiguity, or any need to invent/rotate credentials.
 **Session write:** candidate `identityReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
-**Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.
+**Stop:** never treat missing or stale identity as success and never initialize secrets inside this read-only verifier.
 
 ## Step 4 — Validate the candidate
 

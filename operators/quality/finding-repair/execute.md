@@ -14,7 +14,7 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
 **Context:** resolve only the approved finding, baseline, owner boundary, approval revision, and `quality.readiness-repair`.
-**Analysis:** verify the finding fingerprint still exists at the same baseline, approval names this exact finding and permitted writes, and owner/gate identities are unchanged.
+**Analysis:** verify `payload.scope` names one finding, its fingerprint still exists at the same baseline, the approval fingerprint names this exact finding and permitted writes, `targetCount` matches, and owner/proof-plan identities are unchanged.
 **Session write:** `payload.session.scratchPrefix/bindings`.
 **Stop:** a missing or changed finding is stale and must return to inventory without mutation. Missing approval, expired approval, ambiguous owner, or foreign revision blocks.
 
@@ -33,7 +33,7 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 **Context:** load no undeclared knowledge, source, or business feature.
 **Decision criteria:** every planned change belongs to the owner boundary and directly addresses the measured finding without weakening its proving gate.
 **Analysis:** create one exact patch plan with before hashes, expected after invariants, and the narrow gate that must remove the finding during the following inventory. Do not mutate in this step.
-**Session write:** candidate patch plan at `scratchPrefix/candidate`.
+**Session write:** candidate patch plan and typed `decisionProof` at `scratchPrefix/candidate`; every branch records the finding, approval, and observed-baseline fingerprints.
 **Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
 **Stop:** emit only one declared decision and never widen a repair boundary.
 
@@ -41,8 +41,8 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 
 **Read:** exact targets, validated candidate, and approved mutation scope.
 **Context:** coordinator only. Workers do not write source or durable authority.
-**Action:** recheck before hashes immediately before write, then mutate only declared exact files and permitted responsibilities, preserving unrelated changes. Produce `repairReceiptRef`; do not claim the finding is cleared until the parent reinventory confirms it.
-**Durable write:** approved product-source files and the declared durable debt record only.
+**Action:** recheck before hashes immediately before write, then mutate only declared exact files and permitted responsibilities, preserving unrelated changes. Produce `repairReceiptRef` plus `decisionProof(kind=mutation-applied, changedTargets>0, reinventoryRequired=true)`. Do not claim the finding is cleared until the parent reinventory confirms it.
+**Durable write:** approved product-source files only. This one-finding operator never creates or edits a debt record.
 **Session write:** before/after hashes at `scratchPrefix/mutations`.
 **Stop:** emit boundary drift or blocked if correct repair needs another file, responsibility, or authority.
 
@@ -50,7 +50,7 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 
 **Read:** candidate, decision evidence, lineage, and mutation hashes.
 **Context:** return refs and revisions only, not loaded content, full command logs, prompts, or observations.
-**Action:** construct `output.schema.json`; align decision, state, root route, and emitted facts; run `validate-output.mjs`.
+**Action:** construct `output.schema.json`; align decision, typed proof, state, root route, and emitted facts; run `validate-output.mjs`. Non-repair outcomes must have zero changed targets and zero durable writes.
 **Session write:** `payload.session.outputRef`; list all scratch refs in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** coordinator validates output and purges all intermediate session objects at the parent terminal.

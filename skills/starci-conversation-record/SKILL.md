@@ -19,7 +19,8 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `record` | redacted snapshot refs, provider-neutral identity and append head metadata | raw transcript, prompts, secrets and product reasoning |
+| `query` | bounded conversation identity, authorized index metadata and returned refs | raw transcript bodies and unrelated conversations |
 
 ## LOADS
 

@@ -1,0 +1,11 @@
+# `be/coding-scope-freeze` input
+
+Receive one validated repair-prerequisite receipt, approved boundary, approval, business freshness receipt and baseline commit. The runtime may read repository metadata and calculate hashes only for declared targets. `repositoryContext` and `contentVisible` are always `false`; no file body enters model context.
+
+## JSON architecture
+
+| Section | Owner | Purpose |
+| --- | --- | --- |
+| `payload.provided` | prerequisite machine state | Immutable receipt and authority refs. |
+| `payload.loads` | runtime | Exact session authority and hash-only source metadata. |
+| `payload.session` | session runtime | Ephemeral input, output and scratch slots. |

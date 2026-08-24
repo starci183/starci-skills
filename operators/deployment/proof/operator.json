@@ -12,8 +12,22 @@
     {
       "stage": "deployment.proof",
       "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
+      "allFacts": [
+        "deployment-steady"
+      ],
+      "noneFacts": [
+        "deployment-rolled-back"
+      ]
+    },
+    {
+      "stage": "deployment.proof",
+      "status": "ready",
+      "allFacts": [
+        "deployment-rolled-back"
+      ],
+      "noneFacts": [
+        "deployment-steady"
+      ]
     }
   ],
   "emits": [
@@ -22,6 +36,24 @@
       "status": "ready",
       "factsAdd": [
         "delivery-proof-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.rolled-back",
+      "status": "complete",
+      "factsAdd": [
+        "deployment-rollback-proved"
+      ],
+      "factsRemove": [
+        "deployment-rollback-required"
+      ]
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-proof-external-error"
       ],
       "factsRemove": []
     },

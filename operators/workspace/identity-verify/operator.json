@@ -24,6 +24,18 @@
         "workspace-identity-ready"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "workspace.initialization",
+      "status": "ready",
+      "factsAdd": ["workspace-identity-initialize-required"],
+      "factsRemove": ["workspace-identity-ready"]
+    },
+    {
+      "stage": "workspace.blocked",
+      "status": "blocked",
+      "factsAdd": ["workspace-identity-blocked"],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

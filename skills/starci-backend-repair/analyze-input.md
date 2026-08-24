@@ -8,7 +8,7 @@ Global `@selection` has already selected this one-flow skill from prompt intent.
 
 Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 
-The fixed first state is `implement`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.
+The fixed first state is `route`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.
 
 ## Options
 

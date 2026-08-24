@@ -51,7 +51,7 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-conversation-record` | Append one redacted provenance snapshot |
 | `starci-conversation-query` | Query one bounded provenance identity |
 
-The release currently contains 83 atomic operators across 10 domains and 70 operator-knowledge records.
+The release currently contains 85 atomic operators across 10 domains and 70 operator-knowledge records.
 
 ## Install
 

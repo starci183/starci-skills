@@ -8,6 +8,14 @@ const routes = {
     "fact": "workspace-bootstrap-ready",
     "state": "completed",
     "code": "workspace-bootstrap-verify-ready"
+  },
+  "initialize-required": {
+    "stage": "workspace.initialization", "status": "ready", "fact": "workspace-bootstrap-initialize-required",
+    "state": "replan", "code": "workspace-bootstrap-verify-initialize-required"
+  },
+  "blocked": {
+    "stage": "workspace.blocked", "status": "blocked", "fact": "workspace-bootstrap-blocked",
+    "state": "blocked", "code": "workspace-bootstrap-verify-blocked"
   }
 };
 
@@ -19,8 +27,8 @@ function semantic(value) {
   if (value.payload.state.status !== route.state || value.payload.state.code !== route.code) errors.push('/payload/state: status or code does not match decision');
   if (value.payload.state.emits.stage !== value.stage || value.payload.state.emits.status !== value.status) errors.push('/payload/state/emits: must match root route');
   if (!value.facts.includes(route.fact) || !value.payload.state.emits.factsAdd.includes(route.fact)) errors.push(`/facts: missing emitted fact ${route.fact}`);
-  const blocked = value.payload.state.status === 'blocked';
-  if (!blocked && value.payload.produced.bootstrapReceiptRef === null) errors.push('/payload/produced/bootstrapReceiptRef: successful output requires a session artifact');
+  if (value.payload.decision === 'ready' && value.payload.produced.bootstrapReceiptRef === null) errors.push('/payload/produced/bootstrapReceiptRef: ready output requires a session artifact');
+  if (value.payload.decision !== 'ready' && value.payload.produced.bootstrapReceiptRef !== null) errors.push('/payload/produced/bootstrapReceiptRef: non-ready output cannot claim a readiness receipt');
   if (value.payload.produced.durableWrites.length !== 0) errors.push('/payload/produced/durableWrites: read-only operator cannot report durable writes');
   if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
   return errors;

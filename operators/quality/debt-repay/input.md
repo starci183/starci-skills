@@ -14,9 +14,18 @@ This operator repays one approved debt scope. Its input is an ephemeral task-ses
 ## Provided by the previous state
 
 - `approvedDebtRef`: exact `session://` reference; the operator cannot replace or broaden it.
+- `approvalReceiptRef`: exact unexpired owner approval over the debt identity, permitted writes, closure criterion, and approval revision.
+- `debtInventoryRef`: exact current open/closed debt inventory projection; closure finalization must update this authority atomically.
 - `baselineRef`: exact `session://` reference; the operator cannot replace or broaden it.
 - `scopeRef`: exact `session://` reference; the operator cannot replace or broaden it.
 - `loopControlRef`: exact `session://` iteration budget, prior fingerprint, prior metric, and stop-policy reference owned by the parent machine.
+- `closureProofRef`: `null` while repaying; an exact independent green proof when `intent` is `close`.
+
+## Intent and loop control
+
+- `intent: repay` requires `closureProofRef: null`, at least one exact source target, and `iteration < maxIterations`.
+- `intent: close` requires a non-null independent closure proof and zero source targets. It may only finalize the debt record and closed inventory; it cannot repair source.
+- `previousIterationFingerprint` is `null` only on the first repayment iteration. A repeated fingerprint, unchanged metric, unchanged remainder, or exhausted budget is blocked rather than emitted as progress.
 
 ## Loaded by the runtime
 
@@ -25,4 +34,4 @@ This operator repays one approved debt scope. Its input is an ephemeral task-ses
 - `source`: open only declared target files and verify their hashes; broad repository context is forbidden.
 - `orchestration`: resolve execution strategy separately from provider/model mapping.
 
-Acceptance requires that each mutation is inside the debt scope and measured exit criteria prove closure or progress. Validate the complete envelope before any load, command, or mutation.
+Acceptance requires exact current approval, a closed debt inventory authority, strict measured progress, and independent proof before closure. Validate the complete envelope before any load, command, or mutation.

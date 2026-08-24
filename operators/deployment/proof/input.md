@@ -21,3 +21,5 @@ This closed JSON object is ephemeral task-session state. It is never persisted t
 - `orchestration`: resolve one mode and provider profile.
 
 Validate before loading. Loaded values remain below `payload.session.scratchPrefix` and are never copied into output.
+
+The accepted facts must contain exactly one outcome lineage: `deployment-steady` for delivery proof or `deployment-rolled-back` for rollback proof. Ambiguous or missing lineage is invalid before any load.

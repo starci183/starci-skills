@@ -6,7 +6,7 @@ This operator converts one approved backend boundary into source changes. Its in
 
 **Read:** the complete input object only.
 **Context:** none. Do not resolve a binding before validation succeeds.
-**Action:** run `validate-input.mjs`; freeze `runId`, the four `provided` references, target paths, target hashes, and orchestration profile.
+**Action:** run `validate-input.mjs`; freeze `runId`, all five `provided` references, target paths, target hashes, and orchestration profile.
 **Session write:** store the validated envelope at `payload.session.inputRef`.
 **Stop:** emit `blocked` when validation or reference ownership fails.
 
@@ -20,9 +20,9 @@ This operator converts one approved backend boundary into source changes. Its in
 
 ## Step 3 — Load boundary and operator knowledge
 
-**Read:** `payload.loads.boundary` and the single `payload.loads.knowledge` entry.
-**Context:** resolve the approved boundary from session memory; retrieve only `be.implementation` from the pinned Qdrant generation and content hash.
-**Analysis:** verify approval identity, baseline commit, target set, allowed changes, exclusions, and knowledge generation. Record applied rules and evidence, never a reasoning transcript.
+**Read:** `payload.loads.boundary`, `payload.loads.scope`, and the single `payload.loads.knowledge` entry.
+**Context:** resolve the approved boundary and frozen coding scope from session memory; retrieve only `be.implementation` from the pinned Qdrant generation and content hash.
+**Analysis:** verify approval identity, coding-scope identity, baseline commit, target-set hash, allowed changes, exclusions, and knowledge generation. Record applied rules and evidence, never a reasoning transcript.
 **Session write:** normalized constraints at `scratchPrefix/constraints`.
 **Stop:** emit `blocked` if a required binding is missing; emit `boundary-drift` if the approved boundary and resolved target set disagree.
 

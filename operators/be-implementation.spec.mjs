@@ -14,21 +14,25 @@ function validInput() {
     runId: 'run-1',
     stage: 'architecture.boundary.review',
     status: 'approved',
-    facts: ['backend-boundary-approved'],
+    facts: ['backend-boundary-approved', 'backend-coding-scope-frozen'],
     payload: {
       provided: {
         approvedBoundaryRef: `${session}boundary`,
         approvalReceiptRef: `${session}approval`,
         businessHeadRef: `${session}business`,
-        baselineCommitRef: 'git:abcdef1'
+        baselineCommitRef: 'git:abcdef1',
+        codingScopeRef: `${session}coding-scope`
       },
       loads: {
         business: { ref: `${session}business`, authorityPath: '.worktrees/starci-academy/businesses/create-vps/model.json', revision: hash('a') },
         boundary: { ref: `${session}boundary`, revision: hash('b') },
+        scope: { ref: `${session}coding-scope`, revision: hash('f'), sourceCommitRef: 'git:abcdef1', targetSetSha256: hash('9') },
         knowledge: [{ id: 'be.implementation', generation: 'generation-1', contentSha256: hash('c'), loadMode: 'qdrant-exact' }],
         source: {
           loadMode: 'exact-files',
           repositoryContext: false,
+          sourceCommitRef: 'git:abcdef1',
+          targetSetSha256: hash('9'),
           targetFiles: [{ path: 'src/vps/vps.service.ts', beforeSha256: hash('d'), allowedChanges: ['implement create VPS'] }]
         },
         orchestration: {
@@ -95,6 +99,15 @@ test('requires project-scoped business authority', () => {
   const legacyAuthority = validInput();
   legacyAuthority.payload.loads.business.authorityPath = '.worktrees/business/create-vps/model.json';
   assert.equal(validateInput(legacyAuthority).valid, false);
+});
+
+test('requires a frozen coding scope before opening exact source', () => {
+  const input = validInput();
+  input.facts = ['backend-boundary-approved'];
+  assert.equal(validateInput(input).valid, false);
+  const drifted = validInput();
+  drifted.payload.loads.source.targetSetSha256 = hash('8');
+  assert.equal(validateInput(drifted).valid, false);
 });
 
 test('refuses non-ready state that claims source mutations', () => {

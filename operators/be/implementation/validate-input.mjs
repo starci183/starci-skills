@@ -2,8 +2,8 @@ import path from 'node:path';
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
 const requiredFacts = {
-  'architecture.boundary.review\u0000approved': ['backend-boundary-approved'],
-  'be.repair\u0000ready': ['backend-boundary-approved', 'in-boundary-repair']
+  'architecture.boundary.review\u0000approved': ['backend-boundary-approved', 'backend-coding-scope-frozen'],
+  'be.repair\u0000ready': ['backend-boundary-approved', 'backend-coding-scope-frozen', 'in-boundary-repair']
 };
 
 const profileByMode = {
@@ -20,6 +20,9 @@ function semanticErrors(value) {
   const { provided, loads, session } = value.payload;
   if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
   if (provided.approvedBoundaryRef !== loads.boundary.ref) errors.push('$.payload.loads.boundary.ref: must equal provided.approvedBoundaryRef');
+  if (provided.codingScopeRef !== loads.scope.ref) errors.push('$.payload.loads.scope.ref: must equal provided.codingScopeRef');
+  if (provided.baselineCommitRef !== loads.scope.sourceCommitRef || loads.scope.sourceCommitRef !== loads.source.sourceCommitRef) errors.push('$.payload.loads.source.sourceCommitRef: frozen baseline mismatch');
+  if (loads.scope.targetSetSha256 !== loads.source.targetSetSha256) errors.push('$.payload.loads.source.targetSetSha256: frozen target set mismatch');
   if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) {
     errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
   }
@@ -29,8 +32,10 @@ function semanticErrors(value) {
     provided.approvedBoundaryRef,
     provided.approvalReceiptRef,
     provided.businessHeadRef,
+    provided.codingScopeRef,
     loads.business.ref,
     loads.boundary.ref,
+    loads.scope.ref,
     session.inputRef,
     session.outputRef,
     session.scratchPrefix

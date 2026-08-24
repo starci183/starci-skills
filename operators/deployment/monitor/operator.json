@@ -20,6 +20,22 @@
   ],
   "emits": [
     {
+      "stage": "deployment.monitor",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-progressing"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.monitor",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-monitor-external-error"
+      ],
+      "factsRemove": []
+    },
+    {
       "stage": "deployment.proof",
       "status": "ready",
       "factsAdd": [
@@ -59,6 +75,7 @@
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "the bounded monitor attempt or deadline budget is exhausted"
   ]
 }

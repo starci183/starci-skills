@@ -19,7 +19,11 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `intent + plan` | release, manifest, provider and environment metadata | credentials, product source and unrelated provider inventory |
+| `approval + apply` | frozen plan, exact approval and opaque credential handles | raw secrets, new discovery and undeclared resources |
+| `monitor` | same release identity, declared probes, attempt counter and backoff metadata | new deployment context and unrelated telemetry |
+| `recover or rollback` | observed failure, bounded action plan and mutation receipts | different release targets and business reconciliation |
+| `proof + reconcile` | public steady/rolled-back proof and frozen business receipt when eligible | raw credentials and mutable intermediate plans |
 
 ## LOADS
 

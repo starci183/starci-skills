@@ -24,9 +24,10 @@ This operator resolves one request to one project-role route. Input, output, con
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** project, role, request, and checkout identity produce exactly one route.
 **Analysis:** match request evidence to declared route evidence. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Route:** emit `ready` for exactly one current route; emit `initialize-required` when the declared machine-local route is missing or stale but safely hydratable; emit `blocked` for ambiguous, foreign, root-escaping, cross-role, or unauthorized routes.
 **Session write:** candidate `routeReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
-**Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.
+**Stop:** this verifier never hydrates or rewrites routes.
 
 ## Step 4 — Validate the candidate
 

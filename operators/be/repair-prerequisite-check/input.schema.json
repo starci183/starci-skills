@@ -1,0 +1,47 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://starci.dev/v6/operators/be/repair-prerequisite-check/input.schema.json",
+  "title":"be/repair-prerequisite-check operator input",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","runId","stage","status","facts","payload"],
+  "properties":{
+    "schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},
+    "stage":{"const":"be.repair.prerequisite"},"status":{"const":"ready"},
+    "facts":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "payload":{"type":"object","additionalProperties":false,"required":["provided","loads","session"],"properties":{
+      "provided":{"type":"object","additionalProperties":false,"required":["project","routeReceiptRef","businessFreshnessReceiptRef","businessHeadRef","approvedBoundaryRef","approvalReceiptRef","repairFindingRef","baselineCommitRef"],"properties":{
+        "project":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]*$"},
+        "routeReceiptRef":{"$ref":"#/$defs/sessionRef"},"businessFreshnessReceiptRef":{"$ref":"#/$defs/sessionRef"},
+        "businessHeadRef":{"$ref":"#/$defs/sessionRef"},"approvedBoundaryRef":{"$ref":"#/$defs/sessionRef"},
+        "approvalReceiptRef":{"$ref":"#/$defs/sessionRef"},"repairFindingRef":{"$ref":"#/$defs/sessionRef"},
+        "baselineCommitRef":{"$ref":"#/$defs/gitRef"}
+      }},
+      "loads":{"type":"object","additionalProperties":false,"required":["route","business","boundary","repair"],"properties":{
+        "route":{"type":"object","additionalProperties":false,"required":["ref","project","role","revision","status","loadMode"],"properties":{
+          "ref":{"$ref":"#/$defs/sessionRef"},"project":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]*$"},"role":{"const":"backend"},
+          "revision":{"$ref":"#/$defs/sha256"},"status":{"enum":["ready","missing","stale","ambiguous","foreign"]},"loadMode":{"const":"session-metadata"}
+        }},
+        "business":{"type":"object","additionalProperties":false,"required":["freshnessReceiptRef","headRef","authorityPath","revision","status","boundRouteRevision","loadMode"],"properties":{
+          "freshnessReceiptRef":{"$ref":"#/$defs/sessionRef"},"headRef":{"$ref":"#/$defs/sessionRef"},
+          "authorityPath":{"type":"string","pattern":"^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses(?:/|$)"},
+          "revision":{"$ref":"#/$defs/sha256"},"status":{"enum":["fresh","missing","stale","unapproved","invalid"]},
+          "boundRouteRevision":{"$ref":"#/$defs/sha256"},"loadMode":{"const":"session-metadata"}
+        }},
+        "boundary":{"type":"object","additionalProperties":false,"required":["ref","revision","planHash","baselineCommitRef","approvalReceiptRef","approvalPlanHash","status","loadMode"],"properties":{
+          "ref":{"$ref":"#/$defs/sessionRef"},"revision":{"$ref":"#/$defs/sha256"},"planHash":{"$ref":"#/$defs/sha256"},
+          "baselineCommitRef":{"$ref":"#/$defs/gitRef"},"approvalReceiptRef":{"$ref":"#/$defs/sessionRef"},"approvalPlanHash":{"$ref":"#/$defs/sha256"},
+          "status":{"enum":["approved","missing","stale","rejected","invalid"]},"loadMode":{"const":"session-metadata"}
+        }},
+        "repair":{"type":"object","additionalProperties":false,"required":["findingRef","revision","boundaryRevision","status","loadMode"],"properties":{
+          "findingRef":{"$ref":"#/$defs/sessionRef"},"revision":{"$ref":"#/$defs/sha256"},"boundaryRevision":{"$ref":"#/$defs/sha256"},
+          "status":{"enum":["ready","resolved","stale","out-of-boundary"]},"loadMode":{"const":"session-metadata"}
+        }}
+      }},
+      "session":{"type":"object","additionalProperties":false,"required":["taskId","inputRef","outputRef","scratchPrefix","retention"],"properties":{
+        "taskId":{"type":"string","minLength":1},"inputRef":{"$ref":"#/$defs/sessionRef"},"outputRef":{"$ref":"#/$defs/sessionRef"},
+        "scratchPrefix":{"$ref":"#/$defs/sessionRef"},"retention":{"const":"until-skill-terminal"}
+      }}
+    }}
+  },
+  "$defs":{"sha256":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"gitRef":{"type":"string","pattern":"^git:[0-9a-f]{7,64}$"},"sessionRef":{"type":"string","pattern":"^session://tasks/[A-Za-z0-9._-]+/.+$"}}
+}

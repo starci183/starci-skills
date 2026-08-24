@@ -17,9 +17,13 @@ This closed output is ephemeral task-session state. Input, output, loaded contex
 
 | Decision | Operator state | Emitted state | Evidence |
 | --- | --- | --- | --- |
+| `progressing` | `waiting` | `deployment.monitor / ready` | Adds `deployment-progressing`; schedules one bounded poll. |
+| `external-error` | `waiting` | `deployment.monitor / ready` | Adds `deployment-monitor-external-error`; schedules one bounded observation retry without claiming rollout failure. |
 | `steady` | `completed` | `deployment.proof / ready` | Adds `deployment-steady`. |
 | `recover` | `completed` | `deployment.recover / ready` | Adds `deployment-recovery-required`. |
 | `rollback` | `completed` | `deployment.rollback / ready` | Adds `deployment-rollback-required`. |
 | `blocked` | `blocked` | `deployment.blocked / blocked` | Adds `deployment-monitor-blocked`. |
 
 `payload.state.emits` must match the root route and manifest facts. Receipts and evidence use `session://`; only approved deployment mutations may survive.
+
+`payload.produced.monitorBudget` is mandatory. Waiting decisions require `nextDelaySeconds`, `attempt < maxAttempts`, and `elapsedSeconds + nextDelaySeconds <= deadlineSeconds`. Every other decision must set `nextDelaySeconds` to `null`.

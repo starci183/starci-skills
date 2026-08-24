@@ -24,9 +24,10 @@ This operator verifies the durable worktree for the routed role. Input, output, 
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** worktree identity, declaration, route, and readiness agree.
 **Analysis:** compare hydration evidence with current worktree identity. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Route:** emit `ready` when identity, lock, branch, owner and declared route agree; emit `initialize-required` when the worktree is absent or safely rebuildable; emit `blocked` for a foreign Git owner, unsafe dirty boundary, root escape, ambiguous lock, or destructive replacement requirement.
 **Session write:** candidate `worktreeReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
-**Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.
+**Stop:** this verifier never creates, moves, deletes, resets, or repairs a worktree.
 
 ## Step 4 — Validate the candidate
 

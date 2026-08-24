@@ -19,7 +19,10 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `route + business freshness` | route, commits, hashes and receipt headers | raw source and unrelated business bodies |
+| `frame + current state` | exact business projection, canonical coding-context candidates and architecture law | raw source files and whole indexes |
+| `alternatives + challenge` | frozen constraints and two-to-four candidate summaries | reloading business, source or unrelated knowledge |
+| `selection + handoff` | option-set hash, selected decision and approval receipt | unselected bodies and new discovery |
 
 ## LOADS
 

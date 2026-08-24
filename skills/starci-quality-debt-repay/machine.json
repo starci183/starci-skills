@@ -9,8 +9,32 @@
       "on": [
         {
           "when": {},
-          "target": "debt",
-          "label": "enter debt"
+          "target": "debt-approval",
+          "label": "enter debt-approval"
+        }
+      ]
+    },
+    "debt-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact debt identity, baseline, closure criterion and bounded iteration budget.",
+        "approve": "OK DEBT <hash>",
+        "reject": "REJECT DEBT <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "quality.debt.review",
+            "status": "approved"
+          },
+          "target": "debt"
+        },
+        {
+          "when": {
+            "stage": "quality.debt.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
         }
       ]
     },
@@ -34,6 +58,13 @@
         },
         {
           "when": {
+            "decision": "closure-candidate"
+          },
+          "target": "debt-proof",
+          "label": "closure-candidate"
+        },
+        {
+          "when": {
             "decision": "blocked"
           },
           "target": "blocked",
@@ -41,13 +72,78 @@
         }
       ]
     },
+    "rejected": {
+      "kind": "terminal",
+      "result": "rejected"
+    },
     "complete": {
       "kind": "terminal",
       "result": "complete"
     },
+    "debt-proof": {
+      "kind": "operator",
+      "ref": "quality/readiness-inventory",
+      "on": [
+        {
+          "when": {
+            "decision": "green"
+          },
+          "target": "debt-close",
+          "label": "green"
+        },
+        {
+          "when": {
+            "decision": "findings"
+          },
+          "target": "debt-approval",
+          "label": "findings"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
     "blocked": {
       "kind": "terminal",
       "result": "blocked"
+    },
+    "debt-close": {
+      "kind": "operator",
+      "ref": "quality/debt-repay",
+      "on": [
+        {
+          "when": {
+            "decision": "closed"
+          },
+          "target": "complete",
+          "label": "closed"
+        },
+        {
+          "when": {
+            "decision": "progress"
+          },
+          "target": "blocked",
+          "label": "progress"
+        },
+        {
+          "when": {
+            "decision": "closure-candidate"
+          },
+          "target": "blocked",
+          "label": "closure-candidate"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
     }
   }
 }

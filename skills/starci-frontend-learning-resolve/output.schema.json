@@ -26,6 +26,7 @@
     "result": {
       "enum": [
         "complete",
+        "rolled-back",
         "blocked",
         "handoff",
         "not-needed",

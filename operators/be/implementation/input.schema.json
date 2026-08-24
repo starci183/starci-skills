@@ -44,19 +44,20 @@
           "type": "object",
           "description": "References supplied by the previous machine state. The operator must not replace or broaden them.",
           "additionalProperties": false,
-          "required": ["approvedBoundaryRef", "approvalReceiptRef", "businessHeadRef", "baselineCommitRef"],
+          "required": ["approvedBoundaryRef", "approvalReceiptRef", "businessHeadRef", "baselineCommitRef", "codingScopeRef"],
           "properties": {
             "approvedBoundaryRef": { "$ref": "#/$defs/sessionRef" },
             "approvalReceiptRef": { "$ref": "#/$defs/sessionRef" },
             "businessHeadRef": { "$ref": "#/$defs/sessionRef" },
-            "baselineCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" }
+            "baselineCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
+            "codingScopeRef": { "$ref": "#/$defs/sessionRef" }
           }
         },
         "loads": {
           "type": "object",
           "description": "Bindings resolved by the runtime. These fields declare what will be loaded; they are not caller-controlled content.",
           "additionalProperties": false,
-          "required": ["business", "boundary", "knowledge", "source", "orchestration"],
+          "required": ["business", "boundary", "scope", "knowledge", "source", "orchestration"],
           "properties": {
             "business": {
               "type": "object",
@@ -75,6 +76,17 @@
               "properties": {
                 "ref": { "$ref": "#/$defs/sessionRef" },
                 "revision": { "$ref": "#/$defs/sha256" }
+              }
+            },
+            "scope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "revision", "sourceCommitRef", "targetSetSha256"],
+              "properties": {
+                "ref": { "$ref": "#/$defs/sessionRef" },
+                "revision": { "$ref": "#/$defs/sha256" },
+                "sourceCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
+                "targetSetSha256": { "$ref": "#/$defs/sha256" }
               }
             },
             "knowledge": {
@@ -96,10 +108,12 @@
             "source": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["loadMode", "repositoryContext", "targetFiles"],
+              "required": ["loadMode", "repositoryContext", "sourceCommitRef", "targetSetSha256", "targetFiles"],
               "properties": {
                 "loadMode": { "const": "exact-files" },
                 "repositoryContext": { "const": false },
+                "sourceCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
+                "targetSetSha256": { "$ref": "#/$defs/sha256" },
                 "targetFiles": {
                   "type": "array",
                   "minItems": 1,

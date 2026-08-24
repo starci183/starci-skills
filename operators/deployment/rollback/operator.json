@@ -31,6 +31,22 @@
       "stage": "deployment.blocked",
       "status": "blocked",
       "factsAdd": [
+        "deployment-rollback-partial"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-rollback-external-error"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
         "deployment-rollback-blocked"
       ],
       "factsRemove": []

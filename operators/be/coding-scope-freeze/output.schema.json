@@ -1,0 +1,30 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v6/operators/be/coding-scope-freeze/output.schema.json",
+  "title":"be/coding-scope-freeze operator output","type":"object","additionalProperties":false,
+  "required":["schemaVersion","runId","stage","status","facts","payload"],
+  "allOf":[{"oneOf":[
+    {"properties":{"stage":{"const":"be.repair"},"status":{"const":"ready"},"payload":{"properties":{"decision":{"const":"ready"}}}}},
+    {"properties":{"stage":{"const":"architecture.boundary"},"status":{"const":"ready"},"payload":{"properties":{"decision":{"enum":["source-drift","boundary-drift"]}}}}},
+    {"properties":{"stage":{"const":"be.blocked"},"status":{"const":"blocked"},"payload":{"properties":{"decision":{"const":"blocked"}}}}}
+  ]}],
+  "properties":{
+    "schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},"stage":{"enum":["be.repair","architecture.boundary","be.blocked"]},"status":{"enum":["ready","blocked"]},
+    "facts":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "payload":{"type":"object","additionalProperties":false,"required":["decision","state","produced","context","cleanup","evidenceRefs","findings"],"properties":{
+      "decision":{"enum":["ready","source-drift","boundary-drift","blocked"]},
+      "state":{"type":"object","additionalProperties":false,"required":["operator","status","code","retryable","emits"],"properties":{
+        "operator":{"const":"be/coding-scope-freeze"},"status":{"enum":["completed","replan","blocked"]},
+        "code":{"enum":["coding-scope-frozen","coding-scope-source-drift","coding-scope-boundary-drift","coding-scope-blocked"]},"retryable":{"type":"boolean"},
+        "emits":{"type":"object","additionalProperties":false,"required":["stage","status","factsAdd"],"properties":{"stage":{"enum":["be.repair","architecture.boundary","be.blocked"]},"status":{"enum":["ready","blocked"]},"factsAdd":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}
+      }},
+      "produced":{"type":"object","additionalProperties":false,"required":["codingScopeRef","sourceCommitRef","targetSetSha256","targets"],"properties":{
+        "codingScopeRef":{"anyOf":[{"$ref":"#/$defs/sessionRef"},{"type":"null"}]},"sourceCommitRef":{"$ref":"#/$defs/gitRef"},"targetSetSha256":{"$ref":"#/$defs/sha256"},
+        "targets":{"type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["path","operation","beforeSha256","allowedChanges"],"properties":{"path":{"type":"string","minLength":1},"operation":{"enum":["create","modify","delete"]},"beforeSha256":{"anyOf":[{"$ref":"#/$defs/sha256"},{"type":"null"}]},"allowedChanges":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}}
+      }},
+      "context":{"type":"object","additionalProperties":false,"required":["used"],"properties":{"used":{"type":"array","minItems":3,"maxItems":3,"uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["kind","ref","revision"],"properties":{"kind":{"enum":["repair-prerequisite","approved-boundary","source-metadata-hash"]},"ref":{"type":"string","minLength":1},"revision":{"type":"string","minLength":1}}}}}},
+      "cleanup":{"type":"object","additionalProperties":false,"required":["scratchRefs","retention","purgeAt"],"properties":{"scratchRefs":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/sessionRef"}},"retention":{"const":"until-skill-terminal"},"purgeAt":{"const":"skill-terminal"}}},
+      "evidenceRefs":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/sessionRef"}},"findings":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}}
+    }}
+  },
+  "$defs":{"sha256":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"gitRef":{"type":"string","pattern":"^git:[0-9a-f]{7,64}$"},"sessionRef":{"type":"string","pattern":"^session://tasks/[A-Za-z0-9._-]+/.+$"}}
+}

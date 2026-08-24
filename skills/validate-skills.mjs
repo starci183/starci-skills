@@ -25,7 +25,6 @@ const cycleRequired = new Set([
   'starci-frontend-layout-delivery',
   'starci-frontend-surface-reconcile',
   'starci-quality-readiness',
-  'starci-quality-finding-repair',
   'starci-quality-debt-repay',
   'starci-deployment',
   'starci-deployment-monitor',

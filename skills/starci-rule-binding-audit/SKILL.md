@@ -19,7 +19,10 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 
 | State or phase | Allowed | Forbidden |
 | --- | --- | --- |
-| every state | current operator declaration only | undeclared context |
+| `diagnosis or inventory` | declared command fingerprints, cached green receipts and exact failing evidence | unrelated source, broad Qdrant and speculative fixes |
+| `approval` | one finding/debt identity, baseline, boundary and approval hash | source bodies and other findings |
+| `repair` | only approved exact files and narrow repair law | scope expansion, unrelated findings and whole-repository scans |
+| `verification + loop` | independent proof, prior fingerprint, loop counter and residual identity | stale observations and reloaded unrelated context |
 
 ## LOADS
 
