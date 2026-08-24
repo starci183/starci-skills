@@ -38,10 +38,12 @@ class RealCorpusTests(unittest.TestCase):
     def test_inventory_includes_full_archetype_shelf(self) -> None:
         self.assertGreaterEqual(self.summary["counts"]["archetype"], 301)
         self.assertEqual(self.summary["counts"]["principle"], 15)
+        self.assertGreaterEqual(self.summary["counts"]["operation-knowledge"], 11)
         self.assertGreaterEqual(self.summary["counts"]["grammar-owner"], 70)
         source_paths = [item.relative_path for item in discover_source_files(SOURCE_ROOT)]
         self.assertFalse(any(path.endswith("/en.md") or path.endswith("/vi.md") for path in source_paths))
         self.assertFalse(any("/templates/" in path for path in source_paths))
+        self.assertTrue(any(path == ".claude/v6/knowledge/grammar-complex-cases.md" for path in source_paths))
         self.assertEqual(self.summary["storage"]["engine"], "qdrant-edge")
         self.assertTrue((self.index_path / "shard").is_dir())
         manifest = json.loads((self.index_path / "manifest.json").read_text(encoding="utf-8"))
@@ -91,6 +93,21 @@ class RealCorpusTests(unittest.TestCase):
         )
         selected = [item["data"]["archetypeId"] for item in packet["selected"]["archetypes"]]
         self.assertEqual(selected[0], "operational-collection-workbench")
+
+    def test_v6_operation_knowledge_is_retrieved_from_qdrant(self) -> None:
+        packet = query_index(
+            self.index,
+            query_text="nested surface neutral affirmative check treatment complex case",
+            kinds=["operation-knowledge"],
+            top_k=3,
+            project=None,
+            grammar=None,
+            profile=None,
+            route=None,
+            embedding_model=None,
+        )
+        selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operationKnowledge"]]
+        self.assertEqual(selected[0], "fe.grammar-complex-cases")
 
     def test_read_only_query_does_not_create_missing_index(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

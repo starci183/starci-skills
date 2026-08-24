@@ -52,7 +52,9 @@ KIND_ARCHETYPE = "archetype"
 KIND_GRAMMAR = "grammar"
 KIND_GRAMMAR_OWNER = "grammar-owner"
 KIND_PRINCIPLE = "principle"
-PUBLIC_KINDS = {KIND_ARCHETYPE, KIND_GRAMMAR, KIND_PRINCIPLE}
+KIND_OPERATION_KNOWLEDGE = "operation-knowledge"
+DEFAULT_KINDS = {KIND_ARCHETYPE, KIND_GRAMMAR, KIND_PRINCIPLE}
+PUBLIC_KINDS = DEFAULT_KINDS | {KIND_OPERATION_KNOWLEDGE}
 INDEXED_KINDS = PUBLIC_KINDS | {KIND_GRAMMAR_OWNER}
 
 
@@ -279,7 +281,8 @@ def discover_source_files(source_root: Path) -> list[SourceFile]:
     archetype_root = source_root / ".claude" / "knowledge" / "archetypes"
     grammar_root = source_root / ".claude" / "knowledge" / "grammars"
     principle_root = source_root / ".claude" / "knowledge" / "compilers" / "principles"
-    for required in (archetype_root, grammar_root, principle_root):
+    operation_knowledge_root = source_root / ".claude" / "v6" / "knowledge"
+    for required in (archetype_root, grammar_root, principle_root, operation_knowledge_root):
         if not required.is_dir():
             raise DesignKnowledgeError(
                 f"Missing design authority root: {required}",
@@ -302,6 +305,7 @@ def discover_source_files(source_root: Path) -> list[SourceFile]:
                 paths.add(path)
         paths.update(grammar_dir.glob("profiles/*.json"))
         paths.update(grammar_dir.glob("cases/*.json"))
+    paths.update(operation_knowledge_root.glob("*.md"))
 
     return [
         SourceFile(path, relative_posix(path, source_root), file_hash(path))
@@ -535,6 +539,42 @@ def principle_record(source: SourceFile) -> dict[str, Any]:
     )
 
 
+def operation_knowledge_record(source: SourceFile) -> dict[str, Any]:
+    markdown = read_text(source.path)
+    identity = identity_table(markdown)
+    knowledge_id = identity.get("knowledge id", "")
+    if not knowledge_id or not re.fullmatch(r"fe\.[a-z0-9]+(?:-[a-z0-9]+)*", knowledge_id):
+        raise DesignKnowledgeError(
+            f"V6 operation knowledge needs a stable `Knowledge ID` row: {source.relative_path}",
+            code="operation-knowledge-id-invalid",
+            exit_code=3,
+        )
+    title_match = HEADING_RE.search(markdown)
+    title = title_match.group(1).strip() if title_match else knowledge_id
+    summary = first_paragraph(markdown, "Record") or first_paragraph(markdown)
+    ownership = identity.get("operations") or identity.get("operators", "")
+    operations = [item.strip() for item in ownership.split(",") if item.strip()]
+    if not operations:
+        raise DesignKnowledgeError(
+            f"V6 operation knowledge needs an `Operations` row: {source.relative_path}",
+            code="operation-knowledge-owner-missing",
+            exit_code=3,
+        )
+    tags = [item.strip() for item in identity.get("search tags", "").split(",") if item.strip()]
+    dependencies = [item.strip() for item in identity.get("dependencies", "").split(",") if item.strip() and item.strip() != "none"]
+    return make_record(
+        record_id=f"operation-knowledge:{knowledge_id}",
+        kind=KIND_OPERATION_KNOWLEDGE,
+        title=title,
+        search_text=f"{knowledge_id} {knowledge_id} {title} {title} {' '.join(tags)} {markdown}",
+        summary=summary,
+        source=source,
+        metadata={"knowledgeId": knowledge_id, "operations": operations, "tags": tags},
+        payload={"knowledgeId": knowledge_id, "operations": operations, "summary": summary},
+        dependencies=dependencies,
+    )
+
+
 def make_record(
     *,
     record_id: str,
@@ -580,6 +620,8 @@ def records_from_sources(files: Sequence[SourceFile], source_root: Path) -> list
                 records.append(grammar_markdown_record(source, grammar_id))
             else:
                 records.extend(grammar_json_records(source, grammar_id))
+        elif len(parts) == 4 and parts[1:3] == ("v6", "knowledge") and source.path.suffix == ".md":
+            records.append(operation_knowledge_record(source))
     ids = [record["id"] for record in records]
     duplicates = sorted(record_id for record_id, count in Counter(ids).items() if count > 1)
     if duplicates:
@@ -647,6 +689,7 @@ def build_index(source_root: Path, index_path: Path, embedding_model: Path | Non
             ".claude/knowledge/archetypes/**/context.md",
             ".claude/knowledge/grammars/*/{context.md,grammar.json,facts.json,capsules.json,rulings.json,design-system.json,profiles/*.json,cases/*.json}",
             ".claude/knowledge/compilers/principles/*/context.md",
+            ".claude/v6/knowledge/*.md",
         ],
         "embedding": provider,
         "counts": dict(sorted(counts.items())),
@@ -917,7 +960,7 @@ def bm25_scores(records: Sequence[dict[str, Any]], query_tokens: Sequence[str]) 
 
 def validate_kinds(kinds: Sequence[str] | None) -> set[str]:
     if not kinds:
-        return set(PUBLIC_KINDS)
+        return set(DEFAULT_KINDS)
     requested = set(kinds)
     unknown = sorted(requested - PUBLIC_KINDS)
     if unknown:
@@ -1162,6 +1205,7 @@ def query_index(
     grammar_hits: list[dict[str, Any]] = []
     owner_hits: list[dict[str, Any]] = []
     principle_hits: list[dict[str, Any]] = []
+    operation_knowledge_hits: list[dict[str, Any]] = []
 
     if KIND_ARCHETYPE in selected_kinds:
         candidates = [record for record in records if record["kind"] == KIND_ARCHETYPE]
@@ -1219,7 +1263,14 @@ def query_index(
                 )
             principle_hits.append(score_records([exact], query_text, vector_scores, vector_provider)[0])
 
-    selected_count = len(archetypes) + len(grammar_hits) + len(owner_hits) + len(principle_hits)
+    if KIND_OPERATION_KNOWLEDGE in selected_kinds:
+        operation_candidates = [record for record in records if record["kind"] == KIND_OPERATION_KNOWLEDGE]
+        operation_knowledge_hits = eligible_scores(
+            score_records(operation_candidates, query_text, vector_scores, vector_provider),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
+
+    selected_count = len(archetypes) + len(grammar_hits) + len(owner_hits) + len(principle_hits) + len(operation_knowledge_hits)
     if selected_count == 0:
         if KIND_GRAMMAR in selected_kinds and grammar is None:
             raise DesignKnowledgeError(
@@ -1255,6 +1306,7 @@ def query_index(
                 "records": [public_hit(hit) for hit in grammar_hits],
             },
             "principles": principle_public,
+            "operationKnowledge": [public_hit(hit) for hit in operation_knowledge_hits],
         },
         "dependencyClosure": {
             "grammarToPrinciples": [
@@ -1267,7 +1319,7 @@ def query_index(
             "sources": sorted(
                 {
                     (hit["record"]["source"]["path"], hit["record"]["source"]["sha256"])
-                    for hit in archetypes + grammar_hits + owner_hits + principle_hits
+                    for hit in archetypes + grammar_hits + owner_hits + principle_hits + operation_knowledge_hits
                 }
             ),
         },
