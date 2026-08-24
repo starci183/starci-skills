@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 6,
+  "id": "test/e2e",
+  "domain": "test",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.e2e-testing",
+    "fe.product-seeding",
+    "fe.state-modeling"
+  ],
+  "sourceReferenceRefs": [
+    "starci-academy-fe",
+    "starci-academy-be"
+  ],
+  "accepts": [
+    {
+      "stage": "test.e2e",
+      "status": "ready",
+      "allFacts": [
+        "unit-pass",
+        "unit-evidence",
+        "seed-evidence"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "when": "all connected journey scenarios pass and reset",
+      "stage": "test.ui",
+      "status": "ready",
+      "factsAdd": [
+        "e2e-pass",
+        "e2e-evidence"
+      ]
+    },
+    {
+      "when": "connected behavior fails inside the approved boundary",
+      "stage": "code.repair",
+      "status": "repair",
+      "factsAdd": [
+        "e2e-failed",
+        "in-boundary-repair"
+      ]
+    },
+    {
+      "when": "the environment or data boundary cannot produce a safe verdict",
+      "stage": "test.review",
+      "status": "blocked",
+      "factsAdd": [
+        "e2e-blocked"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "start declared test dependencies",
+    "materialize and reset isolated test data",
+    "run connected scenarios",
+    "write E2E evidence artifacts"
+  ],
+  "stopConditions": [
+    "production or shared data target",
+    "raw credential in artifact",
+    "stale workspace route",
+    "skipped scenario",
+    "response-code-only proof",
+    "incomplete reset",
+    "unsanitized logs"
+  ]
+}

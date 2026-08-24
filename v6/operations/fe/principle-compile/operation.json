@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/principle-compile",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.design-principles"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "principles.compile",
+      "status": "ready",
+      "allFacts": [
+        "source-fit-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "when": {
+        "result": "compiled"
+      },
+      "stage": "requests.review",
+      "status": "ready",
+      "factsAdd": [
+        "principles-compiled"
+      ],
+      "factsRemove": []
+    },
+    {
+      "when": {
+        "result": "blocked"
+      },
+      "stage": "requests.review",
+      "status": "blocked",
+      "factsAdd": [
+        "principle-boundary-failed"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "persist-principle-compile-receipt"
+  ],
+  "stopConditions": [
+    "invalid-input",
+    "closed-axis-requested",
+    "owner-substitution",
+    "missing-situation",
+    "missing-negative-boundary",
+    "unprovable-decision",
+    "product-semantic-leak",
+    "grammar-authority-leak"
+  ]
+}

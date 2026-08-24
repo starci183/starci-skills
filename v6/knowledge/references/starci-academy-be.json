@@ -1,0 +1,16 @@
+{
+  "$schema": "./reference.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-academy-be",
+  "role": "be",
+  "repository": "https://github.com/starci-lab/starci-academy-backend",
+  "commit": "88a3959084772f9eaa0f5dcbc4e480d4356210f0",
+  "sourcePath": "src",
+  "immutableRef": "git+https://github.com/starci-lab/starci-academy-backend@88a3959084772f9eaa0f5dcbc4e480d4356210f0:src",
+  "authority": "precedent-only",
+  "qdrant": {
+    "collection": "starci-context-v1",
+    "virtualRoot": "/be/starci-academy/",
+    "required": true
+  }
+}

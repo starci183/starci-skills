@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/knowledge/references/reference.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "role", "repository", "commit", "sourcePath", "immutableRef", "authority", "qdrant"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 6 },
+    "id": { "enum": ["starci-academy-fe", "starci-academy-be"] },
+    "role": { "enum": ["fe", "be"] },
+    "repository": { "type": "string", "pattern": "^https://github\\.com/" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sourcePath": { "const": "src" },
+    "immutableRef": { "type": "string", "pattern": "^git\\+https://github\\.com/.+@[0-9a-f]{40}:src$" },
+    "authority": { "const": "precedent-only" },
+    "qdrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collection", "virtualRoot", "required"],
+      "properties": {
+        "collection": { "const": "starci-context-v1" },
+        "virtualRoot": { "type": "string", "pattern": "^/(fe|be)/starci-academy/$" },
+        "required": { "const": true }
+      }
+    }
+  }
+}

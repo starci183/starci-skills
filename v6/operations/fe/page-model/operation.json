@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/page-model",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.page-model"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "flow.review",
+      "status": "approved",
+      "allFacts": [
+        "flow-approved"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "state.generate",
+      "status": "ready",
+      "factsAdd": [
+        "page-model-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write one hashed page-model artifact below the run workspace"
+  ],
+  "stopConditions": [
+    "flow approval id or batch hash does not match",
+    "an approved journey step has no page owner",
+    "a multi-page linear journey has zero or multiple progress owners",
+    "a Block depends on an unevidenced business fact"
+  ]
+}

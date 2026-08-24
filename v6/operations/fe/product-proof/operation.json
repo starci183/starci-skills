@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/product-proof",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.product-proof"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "proof.run",
+      "status": "ready",
+      "allFacts": [
+        "seed-evidence",
+        "unit-pass",
+        "unit-evidence",
+        "e2e-pass",
+        "e2e-evidence",
+        "ui-pass",
+        "ui-evidence"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "when": "all gates and browser scenarios pass",
+      "stage": "proof.review",
+      "status": "complete",
+      "factsAdd": [
+        "proof-pass"
+      ]
+    },
+    {
+      "when": "failures can be fixed inside the approved direction and source boundary",
+      "stage": "code.repair",
+      "status": "repair",
+      "factsAdd": [
+        "in-boundary-repair"
+      ]
+    },
+    {
+      "when": "a fix changes approved structure, ownership, responsive transformation or source boundary",
+      "stage": "layout.review",
+      "status": "rejected",
+      "factsAdd": [
+        "boundary-drift",
+        "layout-feedback-recorded"
+      ],
+      "factsRemove": [
+        "layout-approved"
+      ]
+    },
+    {
+      "when": "environment, evidence or safety prevents a valid verdict",
+      "stage": "proof.review",
+      "status": "blocked",
+      "factsAdd": [
+        "proof-blocked"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "run declared static gates",
+    "run browser interaction scenarios",
+    "write proof evidence artifacts"
+  ],
+  "stopConditions": [
+    "change outside exact approved source boundary",
+    "missing or stale seed evidence",
+    "approved hash mismatch",
+    "missing required gate or browser scenario",
+    "unsafe or unavailable proof environment",
+    "partial proof coverage"
+  ]
+}

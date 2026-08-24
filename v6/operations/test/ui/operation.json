@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 6,
+  "id": "test/ui",
+  "domain": "test",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.ui-testing",
+    "fe.customer-journey",
+    "fe.layout-composition",
+    "fe.state-modeling",
+    "fe.product-seeding"
+  ],
+  "sourceReferenceRefs": [
+    "starci-academy-fe"
+  ],
+  "accepts": [
+    {
+      "stage": "test.ui",
+      "status": "ready",
+      "allFacts": [
+        "unit-pass",
+        "e2e-pass",
+        "e2e-evidence",
+        "seed-evidence"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "when": "all real-user browser scenarios pass",
+      "stage": "proof.run",
+      "status": "ready",
+      "factsAdd": [
+        "ui-pass",
+        "ui-evidence"
+      ]
+    },
+    {
+      "when": "browser proof exposes an in-boundary product defect",
+      "stage": "code.repair",
+      "status": "repair",
+      "factsAdd": [
+        "ui-failed",
+        "in-boundary-repair"
+      ]
+    },
+    {
+      "when": "correction changes approved layout, ownership, responsive transformation or source boundary",
+      "stage": "layout.review",
+      "status": "rejected",
+      "factsAdd": [
+        "boundary-drift",
+        "layout-feedback-recorded"
+      ],
+      "factsRemove": [
+        "layout-approved"
+      ]
+    },
+    {
+      "when": "the app, browser, account, auth, data or evidence cannot produce a verdict",
+      "stage": "test.review",
+      "status": "blocked",
+      "factsAdd": [
+        "ui-blocked"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "open and control the running app in a real browser",
+    "authenticate with an approved test account",
+    "write sanitized UI evidence artifacts"
+  ],
+  "stopConditions": [
+    "raw credential in artifact",
+    "missing test account",
+    "app unavailable",
+    "authentication unavailable",
+    "browser shortcut or internal route bypass",
+    "missing viewport class",
+    "partial journey",
+    "unsanitized screenshot or trace"
+  ]
+}

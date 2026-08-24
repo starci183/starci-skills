@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/apps/fe-design-layout/schema.json",
+  "title": "FE design-layout app envelope",
+  "oneOf": [
+    { "$ref": "#/$defs/input" },
+    { "$ref": "#/$defs/output" }
+  ],
+  "$defs": {
+    "artifactRefs": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-zA-Z0-9.-]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "baseEnvelope": {
+      "type": "object",
+      "required": ["schemaVersion", "appId", "runId", "stage", "status", "facts", "artifactRefs", "payload"],
+      "properties": {
+        "schemaVersion": { "const": 6 },
+        "appId": { "const": "fe-design-layout" },
+        "runId": { "type": "string", "minLength": 1 },
+        "stage": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["ready", "pending", "approved", "rejected", "repair", "complete", "blocked"] },
+        "facts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "artifactRefs": { "$ref": "#/$defs/artifactRefs" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "input": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "stage": { "const": "request.received" },
+            "status": { "const": "ready" },
+            "payload": {
+              "type": "object",
+              "required": ["request", "businessEvidenceRefs", "workspaceRef"],
+              "properties": {
+                "request": { "type": "string", "minLength": 1 },
+                "businessEvidenceRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+                "workspaceRef": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    "output": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "status": { "enum": ["complete", "blocked"] },
+            "payload": {
+              "type": "object",
+              "required": ["result", "evidenceRefs"],
+              "properties": {
+                "result": { "enum": ["pass", "blocked"] },
+                "evidenceRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+                "blockers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

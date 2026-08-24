@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/state",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.state-modeling"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "state.generate",
+      "status": "ready",
+      "allFacts": [
+        "page-model-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "layout.generate",
+      "status": "ready",
+      "factsAdd": [
+        "state-model-ready",
+        "neutral-facts-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "state.result",
+      "status": "blocked",
+      "factsAdd": [
+        "sensitive-state-unknown"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write one hashed state-model artifact below the run workspace"
+  ],
+  "stopConditions": [
+    "page-model hash or identity does not match",
+    "a state has neither business nor derived-block provenance",
+    "a required sensitive fact is absent",
+    "a transition has no owning Block"
+  ]
+}

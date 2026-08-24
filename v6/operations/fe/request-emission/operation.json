@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/request-emission",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.request-lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "requests.review",
+      "status": "ready",
+      "allFacts": [
+        "grammar-gap"
+      ]
+    },
+    {
+      "stage": "requests.review",
+      "status": "ready",
+      "allFacts": [
+        "create-required"
+      ],
+      "noneFacts": [
+        "grammar-gap"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "when": "no Grammar gap exists",
+      "stage": "request.result",
+      "status": "ready",
+      "factsAdd": [
+        "requests-emitted"
+      ]
+    },
+    {
+      "when": "at least one Grammar gap exists",
+      "stage": "request.result",
+      "status": "blocked",
+      "factsAdd": [
+        "requests-emitted",
+        "grammar-gap"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "write .claude/requests/<stable-id>.request.json"
+  ],
+  "stopConditions": [
+    "invalid or missing evidence",
+    "unstable or escaping request path",
+    "conflicting content at a stable request path",
+    "approved source boundary mismatch",
+    "incomplete request persistence",
+    "Grammar gap blocks local reconstruction"
+  ]
+}

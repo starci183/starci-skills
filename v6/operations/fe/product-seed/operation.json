@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/product-seed",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.product-seeding"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "seed.materialize",
+      "status": "ready",
+      "allFacts": [
+        "source-written"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "when": "all required business states are reproducibly materialized",
+      "stage": "test.unit",
+      "status": "ready",
+      "factsAdd": [
+        "seed-evidence"
+      ]
+    },
+    {
+      "when": "any required state cannot be safely materialized",
+      "stage": "seed.result",
+      "status": "blocked",
+      "factsAdd": [
+        "seed-blocked"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "create or invoke isolated deterministic seed fixtures",
+    "materialize declared business states",
+    "reset seeded state after determinism checks"
+  ],
+  "stopConditions": [
+    "missing state owner or evidence",
+    "unknown sensitive state",
+    "non-deterministic materialization",
+    "missing reset operation",
+    "production credential or data requirement",
+    "state outside the approved business-state contract"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/preflight",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "request.received",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "flow.generate",
+      "status": "ready",
+      "factsAdd": [
+        "preflight-complete",
+        "source-context-ready",
+        "grammar-lock-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write immutable receipts and effective source context below the run workspace"
+  ],
+  "stopConditions": [
+    "workspace route is missing or stale",
+    "a product-facing request has no business evidence",
+    "effective source-contract export or validation fails",
+    "Grammar selection is missing or ambiguous",
+    "a requested write root is outside the verified workspace"
+  ]
+}

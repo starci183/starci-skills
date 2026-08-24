@@ -1,0 +1,18 @@
+# Design request lifecycle
+
+| Field | Value |
+| --- | --- |
+| Knowledge ID | `fe.request-lifecycle` |
+| Operations | `request-emission` |
+| Search tags | `request, stable id, create, grammar gap, persistence` |
+| Dependencies | `fe.source-fit` |
+
+## Record
+
+Every approved create decision becomes a durable request before implementation changes source.
+
+Use `.claude/requests/<stable-id>.request.json`. The stable ID derives from owner, responsibility, target tier, and reason; rerunning the same decision must address the same path and content identity. The request records evidence refs, selected flow/layout hashes, exact source boundary, fit verdict, intended owner, acceptance criteria, and blocking behavior.
+
+`create-block-or-above` authorizes only application-owned Block/layout/page work. A declared lower-tier extension names its base/effective hashes and allowed axis. `grammar-gap` requests the routed Grammar lifecycle and blocks local reconstruction until resolved.
+
+Fail closed on path escape, unstable identity, conflicting existing content, missing evidence, or a request that silently broadens the approved boundary. Writing a request is an explicit side effect and must be followed by a content-hash receipt.

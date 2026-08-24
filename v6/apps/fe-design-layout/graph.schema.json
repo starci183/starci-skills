@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/apps/fe-design-layout/graph.schema.json",
+  "type": "object",
+  "required": ["schemaVersion", "id", "operationRoot", "nodes", "routes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 6 },
+    "id": { "const": "fe-design-layout" },
+    "operationRoot": { "type": "string", "minLength": 1 },
+    "nodes": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "operation\\.json$" },
+      "minProperties": 1
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["when", "target"],
+        "properties": {
+          "when": {
+            "type": "object",
+            "required": ["stage", "status"],
+            "properties": {
+              "stage": { "type": "string", "minLength": 1 },
+              "status": { "type": "string", "minLength": 1 },
+              "allFacts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+              "noneFacts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+            },
+            "additionalProperties": false
+          },
+          "target": {
+            "type": "object",
+            "required": ["kind", "ref"],
+            "properties": {
+              "kind": { "enum": ["operation", "wait", "terminal"] },
+              "ref": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

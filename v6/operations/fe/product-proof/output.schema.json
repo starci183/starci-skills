@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operations/fe/product-proof/output.schema.json",
+  "title": "FE Product Proof operation output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "kind": {
+      "const": "fe.product-proof.output"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "proof.review",
+        "code.repair",
+        "layout.review"
+      ]
+    },
+    "status": {
+      "enum": [
+        "complete",
+        "repair",
+        "rejected",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "$ref": "#/$defs/factList"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proofRef",
+        "proofHash",
+        "result",
+        "checkResults",
+        "failedCheckIds",
+        "repairClass",
+        "boundaryDriftReasons",
+        "approvalRequired"
+      ],
+      "properties": {
+        "proofRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proofHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "repair",
+            "boundary-drift",
+            "blocked"
+          ]
+        },
+        "checkResults": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/checkResult"
+          }
+        },
+        "failedCheckIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "repairClass": {
+          "enum": [
+            "none",
+            "in-boundary",
+            "boundary-drift"
+          ]
+        },
+        "boundaryDriftReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "approvalRequired": {
+          "enum": [
+            "none",
+            "layout"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "complete"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "code.repair"
+          },
+          "payload": {
+            "properties": {
+              "result": {
+                "const": "pass"
+              },
+              "failedCheckIds": {
+                "maxItems": 0
+              },
+              "repairClass": {
+                "const": "none"
+              },
+              "boundaryDriftReasons": {
+                "maxItems": 0
+              },
+              "approvalRequired": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "repair"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "proof.review"
+          },
+          "payload": {
+            "properties": {
+              "result": {
+                "const": "repair"
+              },
+              "failedCheckIds": {
+                "minItems": 1
+              },
+              "repairClass": {
+                "const": "in-boundary"
+              },
+              "boundaryDriftReasons": {
+                "maxItems": 0
+              },
+              "approvalRequired": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "layout.review"
+          },
+          "payload": {
+            "properties": {
+              "result": {
+                "const": "boundary-drift"
+              },
+              "failedCheckIds": {
+                "minItems": 1
+              },
+              "repairClass": {
+                "const": "boundary-drift"
+              },
+              "boundaryDriftReasons": {
+                "minItems": 1
+              },
+              "approvalRequired": {
+                "const": "layout"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "proof.review"
+          },
+          "payload": {
+            "properties": {
+              "result": {
+                "const": "blocked"
+              },
+              "failedCheckIds": {
+                "minItems": 1
+              },
+              "repairClass": {
+                "const": "none"
+              },
+              "approvalRequired": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "factList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gateId",
+        "commandRef",
+        "required"
+      ],
+      "properties": {
+        "gateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commandRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "const": true
+        }
+      }
+    },
+    "browserScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "journeyPageIds",
+        "stateIds",
+        "viewportRefs",
+        "interactionRef",
+        "assertionRefs"
+      ],
+      "properties": {
+        "scenarioId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "journeyPageIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "stateIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "viewportRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "interactionRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertionRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "checkResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkId",
+        "kind",
+        "status",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "checkId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "gate",
+            "browser"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

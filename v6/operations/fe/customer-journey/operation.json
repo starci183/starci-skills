@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/customer-journey",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.customer-journey"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "flow.generate",
+      "status": "ready",
+      "allFacts": [
+        "preflight-complete"
+      ],
+      "noneFacts": []
+    },
+    {
+      "stage": "flow.review",
+      "status": "rejected",
+      "allFacts": [
+        "flow-feedback-recorded"
+      ],
+      "noneFacts": [
+        "flow-approved"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "stage": "flow.review",
+      "status": "pending",
+      "factsAdd": [
+        "flow-directions-ready"
+      ],
+      "factsRemove": [
+        "flow-feedback-recorded"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "write the hashed direction batch to cache-only run storage"
+  ],
+  "stopConditions": [
+    "actor goal or terminal outcome is not evidenced",
+    "the batch does not contain two or three directions",
+    "directions differ only cosmetically",
+    "a direction replaces a multi-page journey with tabs"
+  ]
+}

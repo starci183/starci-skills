@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/grammar-convergence",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.grammar-complex-cases"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "layout.review",
+      "status": "approved",
+      "allFacts": [
+        "layout-approved",
+        "grammar-lock-ready",
+        "neutral-facts-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "when": {
+        "gate": "pass"
+      },
+      "stage": "source-fit.resolve",
+      "status": "ready",
+      "factsAdd": [
+        "grammar-converged"
+      ],
+      "factsRemove": []
+    },
+    {
+      "when": {
+        "gate": "refused"
+      },
+      "stage": "source-fit.resolve",
+      "status": "blocked",
+      "factsAdd": [
+        "grammar-business-gate-failed"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "persist-grammar-convergence-receipt"
+  ],
+  "stopConditions": [
+    "invalid-input",
+    "non-neutral-fact",
+    "non-neutral-state",
+    "copy-semantic-branch",
+    "ambiguous-rule",
+    "unlocked-package",
+    "undeclared-package-dependency"
+  ]
+}

@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operations/fe/page-model/output.schema.json",
+  "title": "FE page model operation output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+    },
+    "stage": {
+      "const": "state.generate"
+    },
+    "status": {
+      "const": "ready"
+    },
+    "facts": {
+      "type": "array",
+      "contains": {
+        "const": "page-model-ready"
+      },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pageModelRef",
+        "pageModelHash",
+        "journey"
+      ],
+      "properties": {
+        "pageModelRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "pageModelHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "journey": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "actor",
+            "goal",
+            "entryCondition",
+            "terminalOutcome",
+            "globalBlocks",
+            "pages"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "actor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "goal": {
+              "type": "string",
+              "minLength": 1
+            },
+            "entryCondition": {
+              "type": "string",
+              "minLength": 1
+            },
+            "terminalOutcome": {
+              "type": "string",
+              "minLength": 1
+            },
+            "globalBlocks": {
+              "type": "array",
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "kind",
+                  "purpose",
+                  "stepIds"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  },
+                  "kind": {
+                    "const": "journey-progress"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "stepIds": {
+                    "type": "array",
+                    "minItems": 2,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]*$"
+                    },
+                    "uniqueItems": true
+                  }
+                }
+              }
+            },
+            "pages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/page"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "level",
+        "purpose",
+        "responsibility",
+        "userIntent",
+        "contentOwned",
+        "dataProfile",
+        "evidenceRefs",
+        "stateInputs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "level": {
+          "const": "product-block"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "userIntent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contentOwned": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dataProfile": {
+          "enum": [
+            "sparse",
+            "balanced",
+            "dense",
+            "repeating"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ref"
+          },
+          "uniqueItems": true
+        },
+        "stateInputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sequence",
+        "routeIntent",
+        "dominantTask",
+        "entryCondition",
+        "completionCondition",
+        "journeyProgressRef",
+        "blocks"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "routeIntent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dominantTask": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entryCondition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "completionCondition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "journeyProgressRef": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        }
+      }
+    }
+  }
+}

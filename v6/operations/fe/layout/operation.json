@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/layout",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.layout-composition"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "layout.generate",
+      "status": "ready",
+      "allFacts": [
+        "flow-approved",
+        "page-model-ready",
+        "state-model-ready"
+      ],
+      "noneFacts": []
+    },
+    {
+      "stage": "layout.review",
+      "status": "rejected",
+      "allFacts": [
+        "layout-feedback-recorded"
+      ],
+      "noneFacts": [
+        "layout-approved"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "stage": "layout.review",
+      "status": "pending",
+      "factsAdd": [
+        "layout-directions-ready"
+      ],
+      "factsRemove": [
+        "layout-feedback-recorded"
+      ]
+    }
+  ],
+  "sideEffects": [
+    "persist-content-addressed-layout-directions",
+    "open-layout-approval-checkpoint"
+  ],
+  "stopConditions": [
+    "invalid-input",
+    "missing-approved-flow",
+    "missing-block-owner",
+    "stale-artifact-hash",
+    "fewer-than-two-material-directions"
+  ]
+}

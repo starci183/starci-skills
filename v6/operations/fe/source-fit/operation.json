@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/source-fit",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.source-fit"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "source-fit.resolve",
+      "status": "ready",
+      "allFacts": [
+        "grammar-converged",
+        "source-context-ready"
+      ],
+      "noneFacts": [
+        "grammar-business-gate-failed"
+      ]
+    }
+  ],
+  "emits": [
+    {
+      "when": {
+        "hasGrammarGap": false,
+        "hasCreate": false
+      },
+      "stage": "principles.compile",
+      "status": "ready",
+      "factsAdd": [
+        "source-fit-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "when": {
+        "hasGrammarGap": false,
+        "hasCreate": true
+      },
+      "stage": "principles.compile",
+      "status": "ready",
+      "factsAdd": [
+        "source-fit-ready",
+        "create-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "when": {
+        "hasGrammarGap": true
+      },
+      "stage": "principles.compile",
+      "status": "ready",
+      "factsAdd": [
+        "source-fit-ready",
+        "grammar-gap"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "persist-source-fit-receipt"
+  ],
+  "stopConditions": [
+    "invalid-input",
+    "stale-source-context",
+    "unresolved-effective-contract",
+    "ambiguous-verdict",
+    "ai-merged-contract",
+    "closed-invariant-mutation",
+    "implicit-package-substitute"
+  ]
+}
