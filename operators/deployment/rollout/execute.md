@@ -2,18 +2,6 @@
 
 Roll out the approved immutable release. All intermediate data and evidence are task-session-only.
 
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@deployment-lifecycle` | `deployment.lifecycle` | qdrant | retrieve only deployment lifecycle law |
-| `@deployment-intent` | `payload.provided.deploymentIntentRef` | session | bind the pinned release and target |
-| `@execution-plan` | `payload.provided.executionPlanRef` | session | bind exact actions, proof, and rollback |
-| `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only declared deployment files |
-| `@declared-commands` | `payload.loads.commands.commandRefs` | exact-command | run only approved commands |
-| `@external-resources` | `payload.loads.external` | external-exact | bind exact resources and opaque credentials |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select sequential or read-only fan-out |
-
 ## Step 1 — Validate and freeze
 
 **Read:** complete input only.

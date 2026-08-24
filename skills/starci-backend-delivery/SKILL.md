@@ -24,11 +24,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | `approval + coding-scope freeze` | plan hash, source HEAD and exact target path/hash headers | file bodies and repository scans |
 | `implementation` | approved boundary, exact frozen files and be.implementation knowledge | undeclared files, broad Qdrant and adjacent business |
 | `quality + proof + reconcile` | changed-file receipts, declared commands, frozen pre-delivery receipt and immutable proof | new design context and unfrozen source discovery |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

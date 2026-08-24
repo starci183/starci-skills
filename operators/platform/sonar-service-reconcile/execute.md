@@ -45,14 +45,3 @@ This operator reconciles declared Sonar service and project enforcement. All inp
 **Session write:** `payload.session.outputRef`.
 **Stop:** never emit invalid or partially verified output.
 **Orchestration:** coordinator owns final validation and terminal purge.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve exact previous-state refs |
-| `@platform-operations` | `platform.sonar` | qdrant | retrieve only platform operations law |
-| `@sonar-resources` | `payload.loads.external` | provider | bind declared resources and opaque handles |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

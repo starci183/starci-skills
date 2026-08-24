@@ -49,14 +49,3 @@ This operator idempotently applies only one approved Cloudflare tunnel ingress a
 **Session write:** write to `payload.session.outputRef` and list all intermediates in `payload.cleanup.scratchRefs`.
 **Stop:** align root route, state, and exact manifest facts; run `validate-output.mjs`; never emit invalid output.
 **Orchestration:** the coordinator emits; the parent skill purges every session object at all terminal states.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session-exact | bind exactly the approved plan and credential receipt |
-| `@platform-operations` | `platform.tunnel` | qdrant | retrieve the only knowledge authority |
-| `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned route files |
-| `@declared-commands` | `payload.loads.commands.commandRefs` | declared-only | invoke only approved shared-helper envelopes |
-| `@external-bindings` | `payload.loads.external` | external-exact | bind exact Cloudflare resources, probe, and opaque handles |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select topology independently of provider mapping |

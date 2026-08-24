@@ -15,13 +15,3 @@
 | `approval` | one finding/debt identity, baseline, boundary and approval hash | source bodies and other findings |
 | `repair` | only approved exact files and narrow repair law | scope expansion, unrelated findings and whole-repository scans |
 | `verification + loop` | independent proof, prior fingerprint, loop counter and residual identity | stale observations and reloaded unrelated context |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | prove why this one-flow skill was selected |
-| `@machine` | `machine.json` | file | state, guard, branch, loop, wait and terminal ownership |
-| `@input-analysis` | `analyze-input.md` | file | normalize this invocation before its fixed first state |
-
-No Qdrant knowledge is loaded at skill scope.

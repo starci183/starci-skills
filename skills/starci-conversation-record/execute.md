@@ -13,13 +13,3 @@
 | --- | --- | --- |
 | `record` | redacted snapshot refs, provider-neutral identity and append head metadata | raw transcript, prompts, secrets and product reasoning |
 | `query` | bounded conversation identity, authorized index metadata and returned refs | raw transcript bodies and unrelated conversations |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | prove why this one-flow skill was selected |
-| `@machine` | `machine.json` | file | state, guard, branch, loop, wait and terminal ownership |
-| `@input-analysis` | `analyze-input.md` | file | normalize this invocation before its fixed first state |
-
-No Qdrant knowledge is loaded at skill scope.

@@ -21,11 +21,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | --- | --- | --- |
 | `record` | redacted snapshot refs, provider-neutral identity and append head metadata | raw transcript, prompts, secrets and product reasoning |
 | `query` | bounded conversation identity, authorized index metadata and returned refs | raw transcript bodies and unrelated conversations |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

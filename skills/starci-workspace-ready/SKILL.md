@@ -22,11 +22,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | `identity + freshness checks` | project id, repository root, commit, config hashes and receipt headers | business bodies, Qdrant bodies, product source bodies |
 | `initialize one stale layer` | only that layer manifest and exact initializer contract | later workspace layers and product context |
 | `route verification` | compiled route refs and hash metadata | business, design, source and deployment context |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

@@ -23,10 +23,3 @@
 **Session write:** `frozenScopeRef`, `preflightReceiptRef`, and validated output.
 **Stop:** reject an ambiguous target or a write root outside the routed workspace.
 **Orchestration:** coordinator registers all refs for terminal cleanup.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@receipt-headers` | `payload.loads.receipts` | session-metadata | prove request, workspace route, and fresh business agree without semantic loads |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | bind deterministic coordinator execution |

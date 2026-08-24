@@ -16,13 +16,3 @@
 | `monitor` | same release identity, declared probes, attempt counter and backoff metadata | new deployment context and unrelated telemetry |
 | `recover or rollback` | observed failure, bounded action plan and mutation receipts | different release targets and business reconciliation |
 | `proof + reconcile` | public steady/rolled-back proof and frozen business receipt when eligible | raw credentials and mutable intermediate plans |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | prove why this one-flow skill was selected |
-| `@machine` | `machine.json` | file | state, guard, branch, loop, wait and terminal ownership |
-| `@input-analysis` | `analyze-input.md` | file | normalize this invocation before its fixed first state |
-
-No Qdrant knowledge is loaded at skill scope.

@@ -44,14 +44,3 @@ This operator binds backend patterns to discovered responsibilities. Input, outp
 **Session write:** `payload.session.outputRef`; list every scratch ref in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined result.
 **Orchestration:** coordinator validates the final output and purges all intermediate session objects when the parent skill terminates.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `be.boundary-planning` | qdrant | retrieve only this operator law |
-| `@business-authority` | `payload.loads.business` | worktree-exact | bind one exact business revision |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select execution strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

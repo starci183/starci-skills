@@ -34,7 +34,7 @@ Execute only this operator's declared responsibility: run manifest-owned focused
 **Read:** `fe.unit-testing` and only hash-pinned target files needed to prepare or classify this run.
 **Context:** each read-only worker receives one disjoint target plus the minimum matching rule IDs; source files irrelevant to the selected test IDs remain unopened.
 **Analysis record:** value-safe observations and evidence refs.
-**Action:** economical is sequential; balanced permits three read-only workers; parallel permits five. The coordinator validates and joins; workers never execute tests or write.
+**Action:** resolve `payload.loads.orchestration` now; `economical` is sequential, `balanced` permits three read-only workers, and `parallel` permits five. The coordinator validates and joins; workers never execute tests or write.
 **Session write:** `scratchPrefix/workers/<worker-id>` and `scratchPrefix/join`.
 **Stop:** stop on overlap, out-of-scope reads, or incomplete join.
 
@@ -55,13 +55,3 @@ Execute only this operator's declared responsibility: run manifest-owned focused
 **Action:** build output, align `payload.state.emits`, run `validate-output.mjs`, and register all scratch refs.
 **Session write:** `payload.session.outputRef` and cleanup registration.
 **Stop:** never emit invalid output; purge input, output, loads, observations, receipts, evidence, and scratch at every parent-skill terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@fe-unit-testing` | `fe.unit-testing` | qdrant | retrieve only the pinned unit-testing law |
-| `@test-cache` | `payload.loads.cache` | session | validate one exact receipt candidate before knowledge or source loads |
-| `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only hash-pinned files needed after a cache miss |
-| `@test-commands` | `payload.loads.commands` | exact-command | execute only the declared unit-test commands |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded read-only preflight before coordinator execution |

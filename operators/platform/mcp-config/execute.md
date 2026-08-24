@@ -2,17 +2,6 @@
 
 Compile one approved MCP topology into one generated execution configuration. All input, output, context, observations, and receipts are task-session-only.
 
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@platform-operations` | `platform.mcp-publication` | qdrant | retrieve only the platform execution law required by this operator |
-| `@platform-plan` | `payload.provided.platformPlanRef` | session | bind the exact approved MCP topology and proof requirements |
-| `@config-target` | `payload.provided.configTargetRef` | session | bind the only writable generated-config target and baseline |
-| `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only declared plan, manifest, template, and config files |
-| `@validation-commands` | `payload.loads.commands.commandRefs` | exact-command | run only declared config validation commands |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | choose sequential or read-only fan-out preflight |
-
 ## Step 1 — Validate and freeze
 
 **Read:** complete input only.

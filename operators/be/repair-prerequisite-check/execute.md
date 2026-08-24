@@ -21,14 +21,3 @@ Emit exactly one typed decision. Do not repair or broaden any prerequisite here.
 Validate the output and register all scratch references for terminal purge.
 
 **Context:** no undeclared binding is allowed. **Session write:** output and evidence refs only. **Stop:** invalid or partially joined output. Orchestration is deterministic and sequential; no worker or model fan-out is permitted.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@route` | `payload.loads.route` | session-metadata | Bind one verified backend route. |
-| `@business-freshness` | `payload.loads.business` | session-metadata | Bind one project-scoped fresh business revision. |
-| `@approved-boundary` | `payload.loads.boundary` | session-metadata | Bind plan hash, approval and baseline identities. |
-| `@repair-finding` | `payload.loads.repair` | session-metadata | Bind one unresolved in-boundary finding. |
-
-Source content, source indexes, Qdrant and orchestration are forbidden.

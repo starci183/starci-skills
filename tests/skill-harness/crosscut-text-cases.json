@@ -156,7 +156,7 @@
       "evidence": [
         "operators/fe/grammar-convergence/input.schema.json: knowledge IDs are an enum with minItems=4 and maxItems=12.",
         "operators/fe/grammar-convergence/validate-input.mjs: selectedPrefix and otherPrefix checks enforce variant isolation.",
-        "operators/fe/grammar-convergence/execute.md: Step 3 and LOADS define conditional guide retrieval and npm authority."
+        "operators/fe/grammar-convergence/input.schema.json and execute.md Step 3 define conditional guide retrieval and npm authority."
       ]
     },
     {

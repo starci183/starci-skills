@@ -54,16 +54,3 @@ This operator indexes business authority and generated frontend-contract JSON by
 **Session write:** `payload.session.outputRef`.
 **Stop:** do not emit before reuse or atomic activation is proved.
 **Orchestration:** coordinator validates output and purges loaded bodies, chunks, embeddings, plans, and receipts at parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve exact MCP routing refs |
-| `@platform-operations` | `platform.source-index` | qdrant | retrieve only indexing operations law |
-| `@business-authority` | `payload.loads.business` | worktree-exact | load exact business heads only when hashes changed |
-| `@frontend-contract-json` | `payload.loads.frontendContracts` | generated-json | load generated contract JSON only when identity changed |
-| `@target-index-metadata` | `payload.loads.index` | qdrant-target | compare and commit one declared partition |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

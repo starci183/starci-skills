@@ -71,16 +71,3 @@ Workers write observations only to `scratchPrefix/source-checks/<worker-id>`. Wo
 **Action:** construct `output.schema.json`, ensure `payload.state` agrees with the root emitted state, validate with `validate-output.mjs`, and store it at `payload.session.outputRef`.
 **Context lineage:** return references and revisions actually used; never return copied context, worker prompts, full observations, or reasoning.
 **Cleanup:** list all scratch references in `payload.cleanup.scratchRefs`. The session runtime must purge input, output, loaded bindings, worker observations, patch plans, and receipts when the parent skill reaches any terminal state, including failure or rejection.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@approval-receipt` | `payload.loads.approval` | session | bind the exact approval identity and immutable revision before source access |
-| `@business-head` | `payload.loads.business` | worktree-exact | bind the approved business revision without loading unrelated features |
-| `@approved-boundary` | `payload.loads.boundary` | session | bind the exact approved paths, responsibilities, and exclusions |
-| `@be-implementation` | `be.implementation` | qdrant | retrieve only the source-mutation law required by this operator |
-| `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only approved checkout files after their hashes are pinned |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | choose sequential or read-only fan-out execution |
-
-No source-context load exists for this operator.

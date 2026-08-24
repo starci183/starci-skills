@@ -34,7 +34,7 @@ Execute only this operator's declared responsibility: control the running app in
 **Read:** `fe.ui-testing` and only hash-pinned targets required by the selected scenarios.
 **Context:** each worker receives only one disjoint preflight target and the matching rule IDs.
 **Analysis record:** value-safe observations and evidence refs.
-**Action:** economical is sequential; balanced permits three read-only workers; parallel permits five. Workers only read/analyze; the coordinator joins.
+**Action:** resolve `payload.loads.orchestration` now; `economical` is sequential, `balanced` permits three read-only workers, and `parallel` permits five. Workers only read/analyze; the coordinator joins.
 **Session write:** `scratchPrefix/workers/<worker-id>` and `scratchPrefix/join`.
 **Stop:** stop on overlap, out-of-scope reads, or incomplete join.
 
@@ -55,14 +55,3 @@ Execute only this operator's declared responsibility: control the running app in
 **Action:** build output, align `payload.state.emits`, run `validate-output.mjs`, and register all scratch refs.
 **Session write:** `payload.session.outputRef` and cleanup registration.
 **Stop:** never emit invalid output; purge input, output, loads, observations, receipts, evidence, and scratch at every parent-skill terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@fe-ui-testing` | `fe.ui-testing` | qdrant | retrieve only the pinned browser-proof law |
-| `@test-cache` | `payload.loads.cache` | session | validate one exact receipt candidate before Qdrant or source loads |
-| `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only hash-pinned test and implementation files |
-| `@browser-commands` | `payload.loads.commands` | exact-command | execute only declared application and browser commands |
-| `@browser-resources` | `payload.loads.external` | exact-external | bind only the declared app, account, and opaque credential handles |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded read-only preflight before coordinator browser control |

@@ -23,11 +23,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | `frame + current state` | exact business projection, canonical coding-context candidates and architecture law | raw source files and whole indexes |
 | `alternatives + challenge` | frozen constraints and two-to-four candidate summaries | reloading business, source or unrelated knowledge |
 | `selection + handoff` | option-set hash, selected decision and approval receipt | unselected bodies and new discovery |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

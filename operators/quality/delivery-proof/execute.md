@@ -36,14 +36,3 @@ This operator assembles final delivery proof. Input, output, loaded context, com
 **Session write:** `payload.session.outputRef`; list all scratch refs in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** coordinator validates output and purges all intermediate session objects at the parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.source-gates` | qdrant | retrieve only this quality law |
-| `@business-authority` | `payload.loads.business` | worktree-exact | bind one approved business revision |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

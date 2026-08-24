@@ -67,12 +67,3 @@ This operator's responsibility is to derive complete business and Block states p
 **Durable write:** none.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** the coordinator emits once. At every parent-skill terminal, purge input, output, loaded bindings, worker observations, drafts, evidence, and receipts.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@business-head` | `payload.loads.business` | worktree-exact | load the exact business revision without unrelated features |
-| `@upstream` | `payload.loads.upstream` | session | resolve only the accepted upstream artifacts |
-| `@fe-state-modeling` | `fe.state-modeling` | qdrant | retrieve only this operator law from the pinned generation |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded sequential or read-only fan-out execution |

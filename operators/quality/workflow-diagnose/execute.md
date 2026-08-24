@@ -36,13 +36,3 @@ This operator diagnoses one workflow invocation without changing it. Input, outp
 **Session write:** `payload.session.outputRef`; list all scratch refs in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** coordinator validates output and purges all intermediate session objects at the parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only after a proven divergence needs classification |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

@@ -14,13 +14,3 @@
 | `inspect + plan` | exact service identities, current revisions and declared target metadata | product source, broad provider discovery and raw credentials |
 | `approval + apply` | frozen delta, approval receipt and opaque handles | undeclared resources and new context |
 | `proof or partial recovery` | declared probes, before/after receipts and bounded retry state | adjacent services and unrelated tenant data |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | prove why this one-flow skill was selected |
-| `@machine` | `machine.json` | file | state, guard, branch, loop, wait and terminal ownership |
-| `@input-analysis` | `analyze-input.md` | file | normalize this invocation before its fixed first state |
-
-No Qdrant knowledge is loaded at skill scope.

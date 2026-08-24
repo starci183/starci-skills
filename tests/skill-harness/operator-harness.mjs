@@ -113,13 +113,14 @@ async function audit(directory) {
   const cleanup = outputPayload?.properties?.cleanup;
   const correlation = correlationAudit(output, validatorSource);
   const docs = docsAudit(directory);
+  const knowledgeContract = JSON.stringify(input);
   const inputIsolation = inputValidator.validateInput({ unexpected: true }).valid === false && input.additionalProperties === false && inputPayload?.additionalProperties === false && ['provided', 'loads', 'session'].every((key) => inputPayload.required?.includes(key)) && inputSession?.properties?.retention?.const === 'until-skill-terminal' && inputInventory.broadFields.length === 0;
   const outputIsolation = outputValidator.validateOutput({ unexpected: true }).valid === false && output.additionalProperties === false && outputPayload?.additionalProperties === false && ['decision', 'state', 'produced', 'context', 'cleanup', 'evidenceRefs', 'findings'].every((key) => outputPayload.required?.includes(key)) && cleanup?.properties?.retention?.const === 'until-skill-terminal' && cleanup?.properties?.purgeAt?.const === 'skill-terminal';
   const cases = [
     caseResult('input-isolation', inputIsolation, 'fail', `closed envelope + provided/loads/session + terminal retention; broad fields=${inputInventory.broadFields.length}`),
     caseResult('output-isolation', outputIsolation, 'fail', 'closed typed output + validator rejection + terminal cleanup'),
     caseResult('decision-state-route-correlation', correlation.pass, 'fail', correlation.evidence),
-    caseResult('execute-context-discipline', docs.pass && (manifest.knowledgeRefs ?? []).every((ref) => fs.readFileSync(path.join(directory, 'execute.md'), 'utf8').includes(`\`${ref}\``)), 'warning', `${docs.evidence}; unconstrained refs=${inputInventory.unconstrainedRefs.length + outputInventory.unconstrainedRefs.length}; unbounded arrays=${inputInventory.unboundedArrays.length + outputInventory.unboundedArrays.length}`)
+    caseResult('execute-context-discipline', docs.pass && (manifest.knowledgeRefs ?? []).every((ref) => knowledgeContract.includes(JSON.stringify(ref))), 'warning', `${docs.evidence}; unconstrained refs=${inputInventory.unconstrainedRefs.length + outputInventory.unconstrainedRefs.length}; unbounded arrays=${inputInventory.unboundedArrays.length + outputInventory.unboundedArrays.length}`)
   ];
   return { id, cases, summary: { pass: cases.filter((item) => item.verdict === 'pass').length, warning: cases.filter((item) => item.verdict === 'warning').length, fail: cases.filter((item) => item.verdict === 'fail').length }, metrics: { input: inputInventory, output: outputInventory } };
 }

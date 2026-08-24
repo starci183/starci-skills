@@ -15,13 +15,3 @@
 | `frame + current state` | exact business projection, canonical coding-context candidates and architecture law | raw source files and whole indexes |
 | `alternatives + challenge` | frozen constraints and two-to-four candidate summaries | reloading business, source or unrelated knowledge |
 | `selection + handoff` | option-set hash, selected decision and approval receipt | unselected bodies and new discovery |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | prove why this one-flow skill was selected |
-| `@machine` | `machine.json` | file | state, guard, branch, loop, wait and terminal ownership |
-| `@input-analysis` | `analyze-input.md` | file | normalize this invocation before its fixed first state |
-
-No Qdrant knowledge is loaded at skill scope.

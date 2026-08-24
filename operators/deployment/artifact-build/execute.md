@@ -53,15 +53,3 @@ This operator builds immutable release artifacts from pinned source revisions. I
 **Session write:** `payload.session.outputRef` and `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid, partially joined, or unhashed result.
 **Orchestration:** the coordinator validates final output and purges all intermediate session objects at every parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@deployment-lifecycle` | `deployment.lifecycle` | qdrant | retrieve only artifact-build lifecycle law |
-| `@exact-source` | `payload.loads.source.targetFiles` | exact-source | verify only hash-pinned build files |
-| `@declared-commands` | `payload.loads.commands` | command | bind exact commands and session-only capture |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

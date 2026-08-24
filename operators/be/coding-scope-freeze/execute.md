@@ -25,11 +25,3 @@ Verify target-set hash, repository-relative paths, operations and allowed change
 Emit and validate one typed result; register all scratch metadata for terminal purge.
 
 **Context:** no source body or undeclared binding is allowed. **Session write:** output, hash observations and evidence refs only. **Stop:** invalid or partially joined output. Orchestration is deterministic and sequential; no model or worker receives source bytes.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@repair-prerequisite` | `payload.loads.prerequisite` | session-exact | Bind the prerequisite verdict. |
-| `@approved-boundary` | `payload.loads.boundary` | session-exact | Bind approval, baseline and target-set hash. |
-| `@source-hashes` | `payload.loads.source` | metadata-and-hash-only | Freeze exact target identities without loading source content. |

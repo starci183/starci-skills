@@ -49,14 +49,3 @@ This operator reconciles only the declared cAdvisor, Prometheus, Grafana, and re
 **Session write:** write to `payload.session.outputRef` and list every intermediate in `payload.cleanup.scratchRefs`.
 **Stop:** align root route, state, and manifest facts; run `validate-output.mjs`; never emit invalid output.
 **Orchestration:** the coordinator emits; the parent skill purges all session objects at every terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session-exact | bind the three provided receipts exactly |
-| `@platform-operations` | `platform.observability` | qdrant | retrieve the only knowledge authority |
-| `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned observability configuration |
-| `@declared-commands` | `payload.loads.commands.commandRefs` | declared-only | execute only pre-authorized command envelopes |
-| `@external-bindings` | `payload.loads.external` | external-exact | bind exact stack, destination, probe, and credential resources |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select topology independently of provider mapping |

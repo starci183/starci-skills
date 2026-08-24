@@ -17,8 +17,10 @@
   },
   "scripts": {
     "materialize": "node operators/materialize.mjs && node skills/materialize.mjs",
+    "format:no-load-tables": "node scripts/remove-redundant-load-tables.mjs --write",
+    "check:no-load-tables": "node scripts/remove-redundant-load-tables.mjs",
     "check:orchestration": "node orchestration/validate-orchestration.mjs",
-    "check:operators": "node operators/validate-operators.mjs && node --test operators/be-implementation.spec.mjs",
+    "check:operators": "npm run check:no-load-tables && node operators/validate-operators.mjs && node --test operators/be-implementation.spec.mjs",
     "check:skills": "node skills/validate-skills.mjs",
     "check:release": "node scripts/validate-release.mjs",
     "test:routes": "node --test skills/route-machine.spec.mjs",

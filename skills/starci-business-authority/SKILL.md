@@ -23,11 +23,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | `evidence normalization` | exact declared evidence only | frontend/backend implementation and unrelated feature evidence |
 | `model + review` | normalized evidence, lifecycle law and current feature head | repository source and unrelated business heads |
 | `publish or reconcile` | approved revision or frozen pre-delivery receipt plus delivery proof | mutable session plans and broad source scans |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

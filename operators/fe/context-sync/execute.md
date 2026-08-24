@@ -41,13 +41,3 @@ The coding-context cache key is source commit plus dirty fingerprint, exporter h
 **Session write:** validated output at `payload.session.outputRef`.
 **Stop:** never claim ready without canonical JSON and index-generation proof.
 **Orchestration:** coordinator registers all loaded bodies, embeddings, plans, and receipts for skill-terminal purge.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@source-metadata` | `payload.loads.source` | source-metadata | compute freshness without source content |
-| `@coding-context-metadata` | `payload.loads.codingContext` | generated-json-metadata | reuse a matching canonical generation |
-| `@knowledge-index-metadata` | `payload.loads.knowledgeIndex` | qdrant-metadata | skip unchanged documents and prevent mixed generations |
-| `@exporter` | `payload.loads.exporter` | deterministic-script | validate and run the AST exporter only on cache miss |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | assign only changed documents and keep coordinator-only writes |

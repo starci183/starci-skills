@@ -47,15 +47,3 @@ This operator reconciles declared domain and TLS state with the provider. All in
 **Session write:** `payload.session.outputRef` and cleanup refs.
 **Stop:** do not emit invalid or partially joined output.
 **Orchestration:** coordinator validates output and purges all intermediates at parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve previous-state refs |
-| `@deployment-lifecycle` | `deployment.lifecycle` | qdrant | retrieve only this operator law |
-| `@declared-commands` | `payload.loads.commands` | command | bind commands and session capture |
-| `@external-resources` | `payload.loads.external` | provider | bind resources and opaque handles |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

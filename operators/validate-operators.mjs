@@ -31,6 +31,13 @@ function walkFiles(directory) {
 const knowledgeIds = new Set(walkFiles(path.join(releaseRoot, 'knowledge')).filter((file) => file.endsWith('.md')).map((file) => fs.readFileSync(file, 'utf8').match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1]).filter(Boolean));
 const sourceRefs = new Set(readJson(path.join(releaseRoot, 'knowledge', 'references', 'catalog.json')).references.map((item) => item.id));
 
+function collectStrings(value, found = new Set()) {
+  if (typeof value === 'string') found.add(value);
+  else if (Array.isArray(value)) for (const item of value) collectStrings(item, found);
+  else if (value && typeof value === 'object') for (const item of Object.values(value)) collectStrings(item, found);
+  return found;
+}
+
 for (const directory of operatorDirs) {
   const relative = path.relative(root, directory).replaceAll('\\', '/');
   const names = fs.readdirSync(directory).sort();
@@ -57,7 +64,9 @@ for (const directory of operatorDirs) {
   for (const ref of manifest.knowledgeRefs ?? []) if (!knowledgeIds.has(ref)) fail(`${relative}: missing Qdrant knowledge ${ref}`);
   for (const ref of manifest.sourceReferenceRefs ?? []) if (!sourceRefs.has(ref)) fail(`${relative}: missing source reference ${ref}`);
   const execute = fs.readFileSync(path.join(directory, 'execute.md'), 'utf8');
-  if (!execute.includes('## LOADS') || !/\|\s*Alias\s*\|\s*Target\s*\|\s*Kind\s*\|\s*Why\s*\|/i.test(execute)) fail(`${relative}: missing typed LOADS table`);
+  if (/^## LOADS\s*$/mi.test(execute) || /\|\s*Alias\s*\|\s*Target\s*\|\s*Kind\s*\|\s*Why\s*\|/i.test(execute)) {
+    fail(`${relative}: execute.md duplicates the passive input contract in a LOADS table`);
+  }
   if ((execute.match(/^## Step\s+\d+/gmi) ?? []).length < 2) fail(`${relative}: execute.md needs operator-specific numbered steps`);
   for (const marker of ['**Read:**','**Context:**','**Session write:**','**Stop:**']) if (!execute.includes(marker)) fail(`${relative}: execute.md is missing ${marker}`);
   if (!/orchestrat/i.test(execute)) fail(`${relative}: execute.md must declare orchestration behavior`);
@@ -67,8 +76,11 @@ for (const directory of operatorDirs) {
   if (!outputDoc.includes('## JSON architecture') || !/state/i.test(outputDoc) || !/skill-terminal/i.test(outputDoc)) fail(`${relative}: output.md must explain state and terminal cleanup`);
   const completeContract = [execute,inputDoc,outputDoc,JSON.stringify(inputSchema),JSON.stringify(outputSchema)].join('\n');
   for (const forbidden of ['@source-context','source-qdrant','/<role>/<project>/','.worktrees/runs/']) if (completeContract.includes(forbidden)) fail(`${relative}: forbidden broad or persistent context token ${forbidden}`);
-  const loadedKnowledge = [...execute.matchAll(/^\|\s*`@[^`]+`\s*\|\s*`([^`]+)`\s*\|\s*qdrant\s*\|/gmi)].map((match) => match[1]).sort();
-  if (JSON.stringify(loadedKnowledge) !== JSON.stringify([...(manifest.knowledgeRefs ?? [])].sort())) fail(`${relative}: LOADS/Qdrant knowledgeRefs drift`);
+  const schemaKnowledge = [...collectStrings(inputSchema)].filter((value) => knowledgeIds.has(value)).sort();
+  const manifestKnowledge = [...(manifest.knowledgeRefs ?? [])].sort();
+  if (JSON.stringify(schemaKnowledge) !== JSON.stringify(manifestKnowledge)) {
+    fail(`${relative}: input-schema/Qdrant knowledgeRefs drift; schema=${JSON.stringify(schemaKnowledge)}, manifest=${JSON.stringify(manifestKnowledge)}`);
+  }
   const input = await import(`${pathToFileURL(path.join(directory, 'validate-input.mjs')).href}?validate=${Date.now()}`);
   const output = await import(`${pathToFileURL(path.join(directory, 'validate-output.mjs')).href}?validate=${Date.now()}`);
   if (typeof input.validateInput !== 'function' || typeof output.validateOutput !== 'function') fail(`${relative}: validators must export validateInput/validateOutput`);

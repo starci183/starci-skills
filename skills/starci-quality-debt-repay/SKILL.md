@@ -23,11 +23,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | `approval` | one finding/debt identity, baseline, boundary and approval hash | source bodies and other findings |
 | `repair` | only approved exact files and narrow repair law | scope expansion, unrelated findings and whole-repository scans |
 | `verification + loop` | independent proof, prior fingerprint, loop counter and residual identity | stale observations and reloaded unrelated context |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

@@ -45,13 +45,3 @@ This operator verifies the durable worktree for the routed role. Input, output, 
 **Session write:** `payload.session.outputRef`; list every scratch ref in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined result.
 **Orchestration:** coordinator validates the final output and purges all intermediate session objects when the parent skill terminates.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `workspace.initialization` | qdrant | retrieve only this operator law |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select execution strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

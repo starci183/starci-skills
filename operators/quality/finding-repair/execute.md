@@ -54,14 +54,3 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 **Session write:** `payload.session.outputRef`; list all scratch refs in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** coordinator validates output and purges all intermediate session objects at the parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only this quality law |
-| `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect or mutate only approved targets |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

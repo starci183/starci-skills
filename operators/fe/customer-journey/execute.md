@@ -67,12 +67,3 @@ This operator derives three or four materially different end-to-end customer jou
 **Durable write:** none.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** the coordinator emits once. At every parent-skill terminal, purge input, output, loaded bindings, worker observations, drafts, evidence, and receipts.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@business-projection` | `payload.loads.business` | worktree-projection | load only journey-relevant authority from `.worktrees/<project>/businesses/` |
-| `@upstream` | `payload.loads.upstream` | session | resolve preflight, freshness, and optional feedback only |
-| `@fe-customer-journey` | `fe.customer-journey` | qdrant | retrieve only this operator law from the pinned generation |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded sequential or read-only fan-out execution |

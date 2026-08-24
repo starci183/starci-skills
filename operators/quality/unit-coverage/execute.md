@@ -45,15 +45,3 @@ This operator runs unit tests and coverage policy. Input, output, loaded context
 **Session write:** `payload.session.outputRef`; list all scratch refs in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined output.
 **Orchestration:** coordinator validates output and purges all intermediate session objects at the parent terminal.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.source-gates` | qdrant | retrieve only after a non-green or ambiguous command result |
-| `@exact-cache` | `payload.loads.cache` | session | validate one exact pass-receipt candidate before any Qdrant retrieval or command |
-| `@exact-command` | `payload.loads.execution` | command | run one pinned command and retain capture in session |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
-
-No repository source-context load exists for this operator.

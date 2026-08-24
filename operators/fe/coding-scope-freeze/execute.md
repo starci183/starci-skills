@@ -23,12 +23,3 @@
 **Session write:** immutable coding scope and validated output.
 **Stop:** stop on ambiguous owner, scan requirement, undeclared path, or write outside approved roots.
 **Orchestration:** coordinator joins a duplicate-free target list and registers terminal cleanup.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@approved-artifacts` | `payload.loads.artifacts` | session | bind the exact approved design boundary |
-| `@canonical-coding-context` | `payload.loads.codingContext` | generated-json | verify candidates against canonical authority |
-| `@source-file-headers` | `payload.loads.sourceMetadata` | source-metadata | freeze exact targets before any source body opens |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | allow only threshold-qualified read-only rebinding |

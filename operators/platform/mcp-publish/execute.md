@@ -49,14 +49,3 @@ This operator reconciles only the declared MCP and Qdrant runtime services, then
 **Session write:** write the candidate output to `payload.session.outputRef` and register every intermediate in `payload.cleanup.scratchRefs`.
 **Stop:** align the root route, `payload.state.emits`, and manifest facts; run `validate-output.mjs`; never emit an invalid or partially joined output.
 **Orchestration:** the coordinator emits the output. The parent skill purges input, output, loads, observations, receipts, evidence, and scratch at every terminal state.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@provided-artifacts` | `payload.loads.artifacts` | session-exact | resolve exactly the three provided receipts |
-| `@platform-operations` | `platform.mcp-publication` | qdrant | retrieve the only operator knowledge binding |
-| `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned runtime configuration files |
-| `@declared-commands` | `payload.loads.commands.commandRefs` | declared-only | run only pre-authorized command envelopes |
-| `@external-bindings` | `payload.loads.external` | external-exact | bind exact MCP, Qdrant, HTTPS, and opaque credential resources |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | choose execution topology independently of provider mapping |

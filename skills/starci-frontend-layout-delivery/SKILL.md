@@ -28,11 +28,3 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | `source fit + Principles + layout + Grammar` | approved session refs + exact Qdrant records + canonical JSON candidates | whole indexes, unrelated features, raw source |
 | `coding scope freeze` | approved refs, canonical candidate records, exact file headers | file bodies and repository scans |
 | `implementation + proof` | only frozen exact files, commands, seeds and receipts | undeclared files, broad Qdrant, unrelated business |
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
-| `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

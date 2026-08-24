@@ -31,11 +31,3 @@ Decision order:
 **Orchestration:** coordinator validates the output and registers terminal cleanup.
 
 Do not run this consumer-read comparison between implementation and business reconciliation. That phase uses the frozen pre-delivery receipt plus delivery proof so an expected source commit advance cannot trigger reinitialization.
-
-## LOADS
-
-| Alias | Target | Kind | Why |
-| --- | --- | --- | --- |
-| `@business-metadata` | `payload.loads.businessMetadata` | worktree-metadata | compare approved head, revision, and baseline without loading business body |
-| `@source-metadata` | `payload.loads.sourceMetadata` | source-metadata | compare routed repository commit and route revision without loading files |
-| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | bind execution policy without changing deterministic routing |

@@ -231,12 +231,19 @@ if (globalAnalyzer.validateAnalyzeInput({ analyzerVersion: 1, skillId: 'starci-m
 }
 
 for (const skillDir of skillDirs) {
+  const skillId = path.basename(skillDir);
   const present = new Set(readdirSync(skillDir, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name));
   const missing = requiredFiles.filter((file) => !present.has(file));
   if (missing.length) fail(`${path.basename(skillDir)}: missing ${missing.join(', ')}`);
   const machine = readJson(path.join(skillDir, 'machine.json'));
   const inputSchema = readJson(path.join(skillDir, 'input.schema.json'));
   const outputSchema = readJson(path.join(skillDir, 'output.schema.json'));
+  for (const document of ['SKILL.md', 'execute.md']) {
+    const source = readFileSync(path.join(skillDir, document), 'utf8');
+    if (/^## LOADS\s*$/mi.test(source) || /\|\s*Alias\s*\|\s*Target\s*\|\s*Kind\s*\|\s*Why\s*\|/i.test(source)) {
+      fail(`${skillId}: ${document} duplicates canonical contracts in a LOADS table`);
+    }
+  }
   assertStructure(skillDir, machine, inputSchema, outputSchema);
   assertOpenAiInterface(skillDir);
   await assertValidators(skillDir);
