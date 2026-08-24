@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/analyze-input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "analyzerVersion",
+    "skillId",
+    "confidence",
+    "activeInputRefs",
+    "passiveContextRefs"
+  ],
+  "properties": {
+    "analyzerVersion": {
+      "const": 1
+    },
+    "skillId": {
+      "enum": [
+        "starci-workspace-ready",
+        "starci-business-authority",
+        "starci-business-reconcile",
+        "starci-architecture-decide",
+        "starci-backend-delivery",
+        "starci-backend-repair",
+        "starci-frontend-layout-delivery",
+        "starci-frontend-block-reconcile",
+        "starci-frontend-maintenance-apply",
+        "starci-frontend-learning-resolve",
+        "starci-frontend-surface-reconcile",
+        "starci-workflow-diagnose",
+        "starci-quality-readiness",
+        "starci-quality-finding-repair",
+        "starci-quality-debt-repay",
+        "starci-rule-binding-audit",
+        "starci-deployment",
+        "starci-deployment-monitor",
+        "starci-deployment-recover",
+        "starci-deployment-rollback",
+        "starci-tunnel-reconcile",
+        "starci-source-index-publish",
+        "starci-sonar-service-reconcile",
+        "starci-observability-reconcile",
+        "starci-conversation-record",
+        "starci-conversation-query"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "exact",
+        "clarified"
+      ]
+    },
+    "activeInputRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "passiveContextRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

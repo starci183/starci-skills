@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend Layout Delivery"
+  short_description: "Design and deliver complete frontend journeys"
+  default_prompt: "Use $starci-frontend-layout-delivery for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

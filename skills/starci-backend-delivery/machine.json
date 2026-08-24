@@ -8,22 +8,9 @@
       "kind": "analysis",
       "on": [
         {
-          "when": {
-            "inputEquals": {
-              "mode": "deliver"
-            }
-          },
+          "when": {},
           "target": "route",
-          "label": "plan and deliver backend source"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "repair"
-            }
-          },
-          "target": "implement",
-          "label": "resume approved in-boundary repair"
+          "label": "enter route"
         }
       ]
     },
@@ -135,6 +122,23 @@
         }
       ]
     },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "source-discovery": {
+      "kind": "operator",
+      "ref": "architecture/source-discovery",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "pattern-bind",
+          "label": "ready"
+        }
+      ]
+    },
     "architecture-current": {
       "kind": "operator",
       "ref": "architecture/current-state",
@@ -148,6 +152,19 @@
         }
       ]
     },
+    "pattern-bind": {
+      "kind": "operator",
+      "ref": "architecture/pattern-bind",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-plan",
+          "label": "ready"
+        }
+      ]
+    },
     "architecture-alternatives": {
       "kind": "operator",
       "ref": "architecture/alternatives",
@@ -157,6 +174,19 @@
             "decision": "ready"
           },
           "target": "architecture-challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "boundary-plan": {
+      "kind": "operator",
+      "ref": "architecture/boundary-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-challenge",
           "label": "ready"
         }
       ]
@@ -188,58 +218,6 @@
         }
       ]
     },
-    "architecture-handoff": {
-      "kind": "operator",
-      "ref": "architecture/decision-handoff",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "source-discovery",
-          "label": "ready"
-        }
-      ]
-    },
-    "source-discovery": {
-      "kind": "operator",
-      "ref": "architecture/source-discovery",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "pattern-bind",
-          "label": "ready"
-        }
-      ]
-    },
-    "pattern-bind": {
-      "kind": "operator",
-      "ref": "architecture/pattern-bind",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "boundary-plan",
-          "label": "ready"
-        }
-      ]
-    },
-    "boundary-plan": {
-      "kind": "operator",
-      "ref": "architecture/boundary-plan",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "boundary-challenge",
-          "label": "ready"
-        }
-      ]
-    },
     "boundary-challenge": {
       "kind": "operator",
       "ref": "architecture/boundary-challenge",
@@ -264,6 +242,19 @@
           },
           "target": "blocked",
           "label": "blocked"
+        }
+      ]
+    },
+    "architecture-handoff": {
+      "kind": "operator",
+      "ref": "architecture/decision-handoff",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "source-discovery",
+          "label": "ready"
         }
       ]
     },
@@ -638,6 +629,10 @@
         }
       ]
     },
+    "deployment-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
     "business-reconcile": {
       "kind": "operator",
       "ref": "business/reconcile",
@@ -661,14 +656,6 @@
     "complete": {
       "kind": "terminal",
       "result": "complete"
-    },
-    "deployment-handoff": {
-      "kind": "terminal",
-      "result": "handoff"
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     }
   }
 }

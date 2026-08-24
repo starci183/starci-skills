@@ -8,7 +8,7 @@ const exists = (relative) => fs.existsSync(path.join(root, relative));
 const readJson = (relative) => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
 
 for (const required of [
-  'README.md', 'INDEX.md', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
+  'README.md', 'INDEX.md', 'analyze-input.md', 'analyze-input.schema.json', 'validate-analyze-input.mjs', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
   'package.json', 'skills', 'operators', 'orchestration', 'knowledge', 'runtime/knowledge-runtime', 'scripts/knowledge-query.py'
 ]) {
   if (!exists(required)) fail(`release is missing ${required}`);
@@ -28,7 +28,7 @@ const skills = fs.readdirSync(skillRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (skills.length !== 9) fail(`expected 9 skills, found ${skills.length}`);
+if (skills.length !== 26) fail(`expected 26 skills, found ${skills.length}`);
 for (const skill of skills) {
   if (!skill.startsWith('starci-')) fail(`skill lacks starci- prefix: ${skill}`);
   for (const required of ['SKILL.md', 'agents/openai.yaml', 'machine.json', 'input.schema.json', 'output.schema.json']) {
@@ -64,6 +64,9 @@ for (const manifestFile of operatorManifests) {
 
 const releaseTextFiles = [
   path.join(root, 'INDEX.md'),
+  path.join(root, 'analyze-input.md'),
+  path.join(root, 'analyze-input.schema.json'),
+  path.join(root, 'validate-analyze-input.mjs'),
   ...walk(path.join(root, 'skills')),
   ...walk(path.join(root, 'operators')),
   ...walk(path.join(root, 'orchestration')),

@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Observability Reconcile"
+  short_description: "Reconcile shared metrics and remote write"
+  default_prompt: "Use $starci-observability-reconcile for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

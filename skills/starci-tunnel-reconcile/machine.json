@@ -1,0 +1,59 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-tunnel-reconcile",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "tunnel-plan",
+          "label": "enter tunnel-plan"
+        }
+      ]
+    },
+    "tunnel-plan": {
+      "kind": "operator",
+      "ref": "platform/tunnel-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "tunnel-apply",
+          "label": "ready"
+        }
+      ]
+    },
+    "tunnel-apply": {
+      "kind": "operator",
+      "ref": "platform/tunnel-apply",
+      "on": [
+        {
+          "when": {
+            "decision": "proved"
+          },
+          "target": "complete",
+          "label": "proved"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

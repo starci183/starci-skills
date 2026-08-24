@@ -6,7 +6,8 @@ All notable changes are documented here. This project follows Semantic Versionin
 
 ### Added
 
-- Nine `starci-*` skills expressed as validated state machines.
+- Twenty-six one-flow `starci-*` skills expressed as validated state machines.
+- Global prompt analysis with a generated metadata catalog and schema-validated ephemeral skill selection.
 - Eighty atomic operators across frontend, backend, business, architecture, quality, deployment, platform, source, test, and workspace domains.
 - Closed input and output schemas plus fail-closed validators for every skill and operator.
 - Lazy Qdrant Edge retrieval for operator knowledge.
@@ -15,7 +16,7 @@ All notable changes are documented here. This project follows Semantic Versionin
 ### Changed
 
 - Promoted the release tree to the repository root for direct skill discovery.
-- Consolidated overlapping capabilities into analysis-driven machine branches with explicit choices, approvals, loops, and terminal states.
+- Split unrelated entry modes into narrowly discoverable skills; each skill now has one fixed first state while retaining explicit choices, approvals, loops, and terminals inside its flow.
 
 ### Removed
 

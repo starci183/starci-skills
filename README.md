@@ -2,14 +2,14 @@
 
 Release-grade agent skills composed as validated state machines.
 
-StarCi Skills turns one user request into a small, explicit execution graph. A skill analyzes the closed input, loads only the operators needed by the selected branch, retrieves operator knowledge lazily from local Qdrant Edge, validates every boundary, and follows declared choices, approvals, loops, or terminal states.
+StarCi Skills turns one natural-language request into a small, explicit execution graph. Global input analysis selects one skill from cheap metadata; that skill normalizes its closed input, loads only the operators needed by the selected branch, retrieves operator knowledge lazily from local Qdrant Edge, validates every boundary, and follows declared choices, approvals, loops, or terminal states.
 
 ```text
-request -> skill analysis -> operator -> validated result
-                      ^          |
-                      |-- loop --|
-                           |
-                  choice / wait / terminal
+request -> global analysis -> selected skill -> operator -> validated result
+                                      ^           |
+                                      |--- loop ---|
+                                             |
+                                  choice / wait / terminal
 ```
 
 ## Why this shape
@@ -25,14 +25,31 @@ request -> skill analysis -> operator -> validated result
 | Skill | Capability |
 | --- | --- |
 | `starci-workspace-ready` | Initialize, hydrate, or verify workspace identity and routes |
-| `starci-business-authority` | Refresh, publish, or reconcile business truth |
+| `starci-business-authority` | Model, approve, and publish one business feature head |
+| `starci-business-reconcile` | Reconcile immutable delivery proof with business truth |
 | `starci-architecture-decide` | Analyze difficult cross-system choices without source writes |
-| `starci-backend-delivery` | Plan, approve, implement, test, repair, and reconcile backend work |
-| `starci-frontend-design-delivery` | Deliver journeys, pages, layouts, blocks, maintenance, and design learning |
-| `starci-quality-readiness` | Diagnose, inventory, repair, and measure delivery quality |
-| `starci-deployment` | Adopt, deploy, monitor, recover, or roll back a release |
-| `starci-platform-services` | Reconcile tunnel, MCP/Qdrant, Sonar, and observability services |
-| `starci-conversation-provenance` | Record or query redacted conversation provenance |
+| `starci-backend-delivery` | Plan, approve, implement, test, and prove new backend work |
+| `starci-backend-repair` | Repair one approved backend boundary and rerun proof |
+| `starci-frontend-layout-delivery` | Design and deliver a complete customer journey and page set |
+| `starci-frontend-block-reconcile` | Reconcile one frontend block with its bounded consumers |
+| `starci-frontend-maintenance-apply` | Apply approved frontend maintenance and record learning |
+| `starci-frontend-learning-resolve` | Resolve one queued frontend design learning item |
+| `starci-frontend-surface-reconcile` | Align a closed surface set on durable design authority |
+| `starci-workflow-diagnose` | Diagnose one workflow without mutation |
+| `starci-quality-readiness` | Inventory and close measured readiness findings |
+| `starci-quality-finding-repair` | Repair one approved quality finding |
+| `starci-quality-debt-repay` | Repay one declared quality-debt item |
+| `starci-rule-binding-audit` | Audit executable rule ownership and binding |
+| `starci-deployment` | Adopt and deploy one immutable release |
+| `starci-deployment-monitor` | Monitor one existing rollout to proof |
+| `starci-deployment-recover` | Recover one observed failed rollout |
+| `starci-deployment-rollback` | Roll back one declared release identity |
+| `starci-tunnel-reconcile` | Reconcile one tunnel and DNS route |
+| `starci-source-index-publish` | Index and optionally publish generated context |
+| `starci-sonar-service-reconcile` | Reconcile shared Sonar enforcement |
+| `starci-observability-reconcile` | Reconcile shared metrics and remote write |
+| `starci-conversation-record` | Append one redacted provenance snapshot |
+| `starci-conversation-query` | Query one bounded provenance identity |
 
 The release currently contains 80 atomic operators across 10 domains and 33 operator-knowledge records.
 
@@ -56,26 +73,29 @@ Point the host repository's `AGENTS.md` or equivalent bootstrap at `.claude/INDE
 
 ## Use
 
-Invoke the narrowest matching skill, for example:
+Describe the work normally; global analysis selects the narrowest matching skill. For example:
 
 ```text
-Use $starci-frontend-design-delivery to design and implement this customer journey.
+Design and implement the complete VPS creation journey from plan selection through provisioning success.
 ```
 
 At runtime:
 
-1. The host reads only the selected `SKILL.md`.
-2. `validate-input.mjs` rejects malformed or extra input.
-3. `analyze-input.md` selects one declared mode.
-4. `machine.json` routes to an atomic operator.
-5. The operator retrieves only its `knowledgeRefs`, executes, and validates its output.
-6. The machine advances, waits for approval, loops, or terminates.
+1. The host reads global `analyze-input.md` and only the metadata in `skills/catalog.json`.
+2. Global analysis emits one ephemeral skill selection or asks one focused clarification.
+3. The host reads only the selected `SKILL.md`; `validate-input.mjs` rejects malformed or mismatched input.
+4. The skill's local `analyze-input.md` validates and normalizes scope, then enters its fixed first state.
+5. `machine.json` routes to an atomic operator.
+6. The operator retrieves only its `knowledgeRefs`, executes, and validates its output.
+7. The machine advances, waits for approval, loops, hands off, or terminates.
 
 See [INDEX.md](INDEX.md) for the binding load order.
 
 ## Repository layout
 
 ```text
+analyze-input.md              global intent-to-skill selection
+skills/catalog.json           generated pre-load skill metadata
 skills/                       user-facing state-machine skills
 operators/<domain>/<name>/    atomic execution contracts
 orchestration/                execution modes and provider mappings

@@ -7,7 +7,7 @@
     "schemaVersion",
     "runId",
     "project",
-    "mode",
+    "selection",
     "requestRef",
     "artifactRefs",
     "evidenceRefs",
@@ -26,14 +26,46 @@
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
-    "mode": {
-      "enum": [
-        "adopt",
-        "deploy",
-        "monitor",
-        "recover",
-        "rollback"
-      ]
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analyzerVersion",
+        "skillId",
+        "confidence",
+        "activeInputRefs",
+        "passiveContextRefs"
+      ],
+      "properties": {
+        "analyzerVersion": {
+          "const": 1
+        },
+        "skillId": {
+          "const": "starci-deployment"
+        },
+        "confidence": {
+          "enum": [
+            "exact",
+            "clarified"
+          ]
+        },
+        "activeInputRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "passiveContextRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     },
     "requestRef": {
       "type": "string",

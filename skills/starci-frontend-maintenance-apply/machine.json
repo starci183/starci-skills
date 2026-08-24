@@ -1,0 +1,66 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-maintenance-apply",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "maintenance-apply",
+          "label": "enter maintenance-apply"
+        }
+      ]
+    },
+    "maintenance-apply": {
+      "kind": "operator",
+      "ref": "fe/maintenance-apply",
+      "on": [
+        {
+          "when": {
+            "decision": "applied"
+          },
+          "target": "learning-request",
+          "label": "applied"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "learning-request": {
+      "kind": "operator",
+      "ref": "fe/learning-request",
+      "on": [
+        {
+          "when": {
+            "decision": "recorded"
+          },
+          "target": "complete",
+          "label": "recorded"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

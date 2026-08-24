@@ -1,0 +1,42 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-conversation-query",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "query",
+          "label": "enter query"
+        }
+      ]
+    },
+    "query": {
+      "kind": "operator",
+      "ref": "source/conversation-query",
+      "on": [
+        {
+          "when": {
+            "decision": "found"
+          },
+          "target": "complete",
+          "label": "found"
+        },
+        {
+          "when": {
+            "decision": "empty"
+          },
+          "target": "complete",
+          "label": "empty"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

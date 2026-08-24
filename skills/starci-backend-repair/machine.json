@@ -1,0 +1,461 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-backend-repair",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "implement",
+          "label": "enter implement"
+        }
+      ]
+    },
+    "implement": {
+      "kind": "operator",
+      "ref": "be/implementation",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "format",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "boundary-plan",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "format": {
+      "kind": "operator",
+      "ref": "quality/format",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "lint",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "boundary-plan": {
+      "kind": "operator",
+      "ref": "architecture/boundary-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "lint": {
+      "kind": "operator",
+      "ref": "quality/lint",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "typecheck",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "boundary-challenge": {
+      "kind": "operator",
+      "ref": "architecture/boundary-challenge",
+      "on": [
+        {
+          "when": {
+            "decision": "clean"
+          },
+          "target": "boundary-approval",
+          "label": "clean"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "boundary-plan",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "typecheck": {
+      "kind": "operator",
+      "ref": "quality/typecheck",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "build",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "boundary-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact backend plan hash and file boundary.",
+        "approve": "OK BACKEND <hash>",
+        "reject": "REJECT BACKEND <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "approved"
+          },
+          "target": "implement"
+        },
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "rejected"
+          },
+          "target": "boundary-plan"
+        }
+      ]
+    },
+    "build": {
+      "kind": "operator",
+      "ref": "quality/build",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "unit",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "unit": {
+      "kind": "operator",
+      "ref": "quality/unit-coverage",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "integration",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "integration": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "e2e",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "e2e": {
+      "kind": "operator",
+      "ref": "quality/e2e",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "sonar",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "sonar": {
+      "kind": "operator",
+      "ref": "quality/sonar",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "post-quality",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "post-quality": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.deploymentMode": "none"
+            }
+          },
+          "target": "source-proof"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.deploymentMode": "handoff"
+            }
+          },
+          "target": "deployment-handoff"
+        }
+      ]
+    },
+    "source-proof": {
+      "kind": "operator",
+      "ref": "quality/delivery-proof",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "business-reconcile",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "deployment-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "business-reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "implemented"
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "decision": "discrepancy"
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Workflow Diagnose"
+  short_description: "Trace one failing workflow without mutation"
+  default_prompt: "Use $starci-workflow-diagnose for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

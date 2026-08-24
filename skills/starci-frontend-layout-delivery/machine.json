@@ -1,0 +1,414 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-layout-delivery",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "preflight",
+          "label": "enter preflight"
+        }
+      ]
+    },
+    "preflight": {
+      "kind": "operator",
+      "ref": "fe/preflight",
+      "on": [
+        {
+          "when": {
+            "stage": "flow.generate",
+            "status": "ready"
+          },
+          "target": "journey"
+        }
+      ]
+    },
+    "journey": {
+      "kind": "operator",
+      "ref": "fe/customer-journey",
+      "on": [
+        {
+          "when": {
+            "stage": "flow.review",
+            "status": "pending"
+          },
+          "target": "flow-approval"
+        }
+      ]
+    },
+    "flow-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve one exact customer-journey direction.",
+        "approve": "OK FLOW <id>",
+        "reject": "REJECT FLOW <id>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "flow.review",
+            "status": "approved"
+          },
+          "target": "page-model"
+        },
+        {
+          "when": {
+            "stage": "flow.review",
+            "status": "rejected"
+          },
+          "target": "journey"
+        }
+      ]
+    },
+    "page-model": {
+      "kind": "operator",
+      "ref": "fe/page-model",
+      "on": [
+        {
+          "when": {
+            "stage": "state.generate",
+            "status": "ready"
+          },
+          "target": "state"
+        }
+      ]
+    },
+    "state": {
+      "kind": "operator",
+      "ref": "fe/state",
+      "on": [
+        {
+          "when": {
+            "stage": "layout.generate",
+            "status": "ready"
+          },
+          "target": "layout"
+        },
+        {
+          "when": {
+            "stage": "state.result",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "layout": {
+      "kind": "operator",
+      "ref": "fe/layout",
+      "on": [
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "pending"
+          },
+          "target": "layout-approval"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "layout-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve one exact layout direction and complete page set.",
+        "approve": "OK LAYOUT <id>",
+        "reject": "REJECT LAYOUT <id>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "approved"
+          },
+          "target": "grammar"
+        },
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "rejected"
+          },
+          "target": "layout"
+        }
+      ]
+    },
+    "grammar": {
+      "kind": "operator",
+      "ref": "fe/grammar-convergence",
+      "on": [
+        {
+          "when": {
+            "stage": "source-fit.resolve",
+            "status": "ready"
+          },
+          "target": "source-fit"
+        },
+        {
+          "when": {
+            "stage": "source-fit.resolve",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "source-fit": {
+      "kind": "operator",
+      "ref": "fe/source-fit",
+      "on": [
+        {
+          "when": {
+            "stage": "principles.compile",
+            "status": "ready"
+          },
+          "target": "principles"
+        }
+      ]
+    },
+    "principles": {
+      "kind": "operator",
+      "ref": "fe/principle-compile",
+      "on": [
+        {
+          "when": {
+            "stage": "requests.review",
+            "status": "ready"
+          },
+          "target": "request-choice"
+        },
+        {
+          "when": {
+            "stage": "requests.review",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "request-choice": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "allFacts": [
+              "grammar-gap"
+            ]
+          },
+          "target": "requests"
+        },
+        {
+          "when": {
+            "allFacts": [
+              "create-required"
+            ],
+            "noneFacts": [
+              "grammar-gap"
+            ]
+          },
+          "target": "requests"
+        },
+        {
+          "when": {
+            "noneFacts": [
+              "grammar-gap",
+              "create-required"
+            ]
+          },
+          "target": "implementation"
+        }
+      ]
+    },
+    "requests": {
+      "kind": "operator",
+      "ref": "fe/request-emission",
+      "on": [
+        {
+          "when": {
+            "stage": "request.result",
+            "status": "ready"
+          },
+          "target": "implementation"
+        },
+        {
+          "when": {
+            "stage": "request.result",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "implementation": {
+      "kind": "operator",
+      "ref": "fe/implementation",
+      "on": [
+        {
+          "when": {
+            "stage": "seed.materialize",
+            "status": "ready"
+          },
+          "target": "seed"
+        },
+        {
+          "when": {
+            "stage": "code.result",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "seed": {
+      "kind": "operator",
+      "ref": "fe/product-seed",
+      "on": [
+        {
+          "when": {
+            "stage": "test.unit",
+            "status": "ready"
+          },
+          "target": "unit-test"
+        },
+        {
+          "when": {
+            "stage": "seed.result",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "unit-test": {
+      "kind": "operator",
+      "ref": "test/unit",
+      "on": [
+        {
+          "when": {
+            "stage": "test.e2e",
+            "status": "ready"
+          },
+          "target": "e2e-test"
+        },
+        {
+          "when": {
+            "stage": "code.repair",
+            "status": "repair"
+          },
+          "target": "implementation"
+        },
+        {
+          "when": {
+            "stage": "test.review",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "e2e-test": {
+      "kind": "operator",
+      "ref": "test/e2e",
+      "on": [
+        {
+          "when": {
+            "stage": "test.ui",
+            "status": "ready"
+          },
+          "target": "ui-test"
+        },
+        {
+          "when": {
+            "stage": "code.repair",
+            "status": "repair"
+          },
+          "target": "implementation"
+        },
+        {
+          "when": {
+            "stage": "test.review",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "ui-test": {
+      "kind": "operator",
+      "ref": "test/ui",
+      "on": [
+        {
+          "when": {
+            "stage": "proof.run",
+            "status": "ready"
+          },
+          "target": "product-proof"
+        },
+        {
+          "when": {
+            "stage": "code.repair",
+            "status": "repair"
+          },
+          "target": "implementation"
+        },
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "rejected"
+          },
+          "target": "layout"
+        },
+        {
+          "when": {
+            "stage": "test.review",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "product-proof": {
+      "kind": "operator",
+      "ref": "fe/product-proof",
+      "on": [
+        {
+          "when": {
+            "stage": "proof.review",
+            "status": "complete"
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "stage": "code.repair",
+            "status": "repair"
+          },
+          "target": "implementation"
+        },
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "rejected"
+          },
+          "target": "layout"
+        },
+        {
+          "when": {
+            "stage": "proof.review",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

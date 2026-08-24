@@ -1,3 +1,3 @@
 # starci-workspace-ready input
 
-Provide one closed invocation validated by `input.schema.json`. Read `analyze-input.md` first; classification must select exactly one mode and first state before any operator is loaded.
+Provide one closed invocation validated by `input.schema.json`. The required `selection` object is the ephemeral output of global `/analyze-input.md`; it selects this skill directly. This package owns one fixed-entry flow and accepts no secondary mode.

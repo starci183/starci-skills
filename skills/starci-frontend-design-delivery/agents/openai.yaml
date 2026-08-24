@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi Frontend Design Delivery"
-  short_description: "Design and deliver complete frontend journeys"
-  default_prompt: "Use $starci-frontend-design-delivery to analyze this request and execute only the required state-machine branch."

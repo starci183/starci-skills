@@ -1,0 +1,136 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-source-index-publish",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "mcp-config",
+          "label": "enter mcp-config"
+        }
+      ]
+    },
+    "mcp-config": {
+      "kind": "operator",
+      "ref": "platform/mcp-config",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "source-index",
+          "label": "ready"
+        }
+      ]
+    },
+    "source-index": {
+      "kind": "operator",
+      "ref": "platform/source-index",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "mcp-publish-choice",
+          "label": "ready"
+        }
+      ]
+    },
+    "mcp-publish-choice": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.publishPublic": false
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.publishPublic": true,
+              "options.ensureTunnel": false
+            }
+          },
+          "target": "mcp-publish"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.publishPublic": true,
+              "options.ensureTunnel": true
+            }
+          },
+          "target": "mcp-tunnel-plan"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "mcp-publish": {
+      "kind": "operator",
+      "ref": "platform/mcp-publish",
+      "on": [
+        {
+          "when": {
+            "decision": "proved"
+          },
+          "target": "complete",
+          "label": "proved"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "mcp-tunnel-plan": {
+      "kind": "operator",
+      "ref": "platform/tunnel-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "mcp-tunnel-apply",
+          "label": "ready"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "mcp-tunnel-apply": {
+      "kind": "operator",
+      "ref": "platform/tunnel-apply",
+      "on": [
+        {
+          "when": {
+            "decision": "proved"
+          },
+          "target": "mcp-publish",
+          "label": "proved"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    }
+  }
+}

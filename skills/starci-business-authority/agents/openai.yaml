@@ -1,4 +1,6 @@
 interface:
   display_name: "StarCi Business Authority"
-  short_description: "Maintain evidence-backed StarCi business truth"
-  default_prompt: "Use $starci-business-authority to analyze this request and execute only the required state-machine branch."
+  short_description: "Model and publish approved StarCi business truth"
+  default_prompt: "Use $starci-business-authority for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

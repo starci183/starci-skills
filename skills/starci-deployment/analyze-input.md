@@ -1,27 +1,17 @@
 # Analyze starci-deployment input
 
-Input analysis runs before any operator or Qdrant retrieval. Validate the closed invocation, then perform these checks:
+Global `@selection` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify `selection.skillId` equals `starci-deployment`. Then perform these local checks:
 
-1. Classify adopt, deploy, monitor, recover or rollback against one immutable release identity.
-2. Resolve environment, manifest, artifact, provider/runtime evidence and public endpoint targets.
-3. Flag new external resources, destructive changes, credential rotation or undeclared rollback for approval.
+1. Resolve environment, manifest, artifact and provider identities.
+2. Confirm a new rollout is the outcome.
+3. Flag new resources, destructive changes and credential rotation for approval.
 
-Also reject an unknown mode, stale or missing authority/evidence identity, ambiguous target, write root outside scope, external mutation without an approval boundary, or option outside the closed schema.
+Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 
-## Modes
-
-| Mode | Meaning | First state |
-| --- | --- | --- |
-| `adopt` | adopt missing deployment intent | `route` |
-| `deploy` | execute declared release | `route` |
-| `monitor` | observe existing rollout | `monitor` |
-| `recover` | repair observed failure | `recover` |
-| `rollback` | restore declared rollback identity | `rollback` |
+The fixed first state is `route`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.
 
 ## Options
 
 | Option | Values | Decision effect |
 | --- | --- | --- |
-| `reconcileBusiness` | `boolean` | Reconcile delivery proof into the business head. |
-
-Analysis emits only the normalized scope, classification facts and first state. It does not copy operator knowledge into skill context.
+| `reconcileBusiness` | `boolean` | Reconcile final proof into the business head. |

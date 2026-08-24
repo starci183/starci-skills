@@ -8,31 +8,9 @@
       "kind": "analysis",
       "on": [
         {
-          "when": {
-            "inputEquals": {
-              "mode": "initialize"
-            }
-          },
+          "when": {},
           "target": "identity",
-          "label": "full initialization"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "hydrate"
-            }
-          },
-          "target": "routes",
-          "label": "hydrate declared routes"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "verify"
-            }
-          },
-          "target": "route",
-          "label": "verify one route only"
+          "label": "enter identity"
         }
       ]
     },

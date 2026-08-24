@@ -1,4 +1,0 @@
-interface:
-  display_name: "StarCi Conversation Provenance"
-  short_description: "Record and query safe conversation provenance"
-  default_prompt: "Use $starci-conversation-provenance to analyze this request and execute only the required state-machine branch."

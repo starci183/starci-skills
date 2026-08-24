@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Deployment Recover"
+  short_description: "Recover one observed failed rollout safely"
+  default_prompt: "Use $starci-deployment-recover for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

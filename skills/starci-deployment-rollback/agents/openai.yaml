@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Deployment Rollback"
+  short_description: "Roll back one declared release identity"
+  default_prompt: "Use $starci-deployment-rollback for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

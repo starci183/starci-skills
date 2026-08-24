@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 6,
+  "skills": [
+    {
+      "id": "starci-workspace-ready",
+      "description": "Use when a StarCi Source must be initialized or brought to one fully verified workspace-ready state before product work. Do not use for business modeling, implementation, quality repair, or deployment."
+    },
+    {
+      "id": "starci-business-authority",
+      "description": "Use when evidence-backed business truth must be modeled, approved, and published as one feature head. Do not use to reconcile delivered source, implement product code, or make architecture decisions."
+    },
+    {
+      "id": "starci-business-reconcile",
+      "description": "Use when immutable delivery evidence must be reconciled against one published business feature head. Do not use to create a business model or implement source."
+    },
+    {
+      "id": "starci-architecture-decide",
+      "description": "Use only for a genuinely difficult cross-system architecture choice with material alternatives or irreversible tradeoffs. Do not use for ordinary known-shape planning or implementation."
+    },
+    {
+      "id": "starci-backend-delivery",
+      "description": "Use to plan, approve, implement, test, and prove one new backend delivery from current business authority. Do not use for a pre-approved repair, frontend work, standalone diagnosis, or deployment."
+    },
+    {
+      "id": "starci-backend-repair",
+      "description": "Use to resume one already approved in-boundary backend repair and rerun independent quality proof. Do not use for new feature planning, unapproved boundary changes, frontend work, or deployment."
+    },
+    {
+      "id": "starci-frontend-layout-delivery",
+      "description": "Use to create or substantially redesign a complete frontend customer journey, page set, page models, layouts, implementation, and proof. Do not use for isolated blocks, approved maintenance, learning resolution, or cross-surface consistency."
+    },
+    {
+      "id": "starci-frontend-block-reconcile",
+      "description": "Use when one existing frontend block or component contract must be reconciled with its known consumers. Do not use for complete journey design, maintenance, learning resolution, or broad cross-surface authority changes."
+    },
+    {
+      "id": "starci-frontend-maintenance-apply",
+      "description": "Use to apply one already approved source-first frontend maintenance change and record its durable learning request. Do not use for design exploration, unapproved feedback, or cross-surface authority selection."
+    },
+    {
+      "id": "starci-frontend-learning-resolve",
+      "description": "Use to resolve one queued frontend design learning item into its declared durable authority. Do not use to apply ordinary feedback, redesign a journey, or reconcile consumers."
+    },
+    {
+      "id": "starci-frontend-surface-reconcile",
+      "description": "Use when a closed set of frontend pages or surfaces must converge on the smallest durable design authority. Do not use for a single block, isolated maintenance, or a new customer journey."
+    },
+    {
+      "id": "starci-workflow-diagnose",
+      "description": "Use to diagnose one failing workflow without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit."
+    },
+    {
+      "id": "starci-quality-readiness",
+      "description": "Use to inventory one delivery boundary and loop through explicitly approved measured repairs until readiness is green. Do not use for diagnosis-only work, debt repayment, or rule-binding audit."
+    },
+    {
+      "id": "starci-quality-finding-repair",
+      "description": "Use to repair one already measured quality finding after confirming its exact approval boundary, then re-inventory the target. Do not use for broad readiness assessment, diagnosis, or debt repayment."
+    },
+    {
+      "id": "starci-quality-debt-repay",
+      "description": "Use to repay one declared and approved quality-debt item through a measured progress loop. Do not use for ordinary findings, diagnosis, readiness inventory, or feature delivery."
+    },
+    {
+      "id": "starci-rule-binding-audit",
+      "description": "Use to audit whether declared rules have one accountable executable binding. Do not use to repair source, inventory readiness, diagnose a workflow, or repay debt."
+    },
+    {
+      "id": "starci-deployment",
+      "description": "Use to adopt deployment intent when needed and execute one immutable release through public steady-state proof. Do not use merely to monitor, recover, or roll back an existing rollout."
+    },
+    {
+      "id": "starci-deployment-monitor",
+      "description": "Use to monitor one existing rollout until steady state, recovery, rollback, or a bounded blocker is proved. Do not use to initiate a new deployment."
+    },
+    {
+      "id": "starci-deployment-recover",
+      "description": "Use to recover one observed failed rollout, then monitor the same release to proof or rollback. Do not use for a new deployment or a speculative failure."
+    },
+    {
+      "id": "starci-deployment-rollback",
+      "description": "Use to roll back one declared failed or rejected release identity and prove the resulting state. Do not use to deploy, monitor, or attempt recovery first."
+    },
+    {
+      "id": "starci-tunnel-reconcile",
+      "description": "Use to reconcile one bounded HTTP tunnel and DNS route. Do not use for source indexing, Sonar, observability, product deployment, or unrelated Cloudflare work."
+    },
+    {
+      "id": "starci-source-index-publish",
+      "description": "Use to configure and index StarCi business or generated-contract context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request."
+    },
+    {
+      "id": "starci-sonar-service-reconcile",
+      "description": "Use to reconcile the shared Sonar service and its quality-enforcement boundary. Do not use to fix product findings, deploy releases, index context, or configure observability."
+    },
+    {
+      "id": "starci-observability-reconcile",
+      "description": "Use to reconcile shared metrics collection and remote-write boundaries. Do not use for product diagnosis, deployment monitoring, Sonar, or context indexing."
+    },
+    {
+      "id": "starci-conversation-record",
+      "description": "Use only to append one provider-neutral redacted conversation-provenance snapshot head. Do not use to query provenance, store raw transcripts, or analyze product work."
+    },
+    {
+      "id": "starci-conversation-query",
+      "description": "Use only to query one bounded provider-neutral conversation-provenance identity. Do not use to record a snapshot, retrieve raw transcripts, or analyze product work."
+    }
+  ]
+}

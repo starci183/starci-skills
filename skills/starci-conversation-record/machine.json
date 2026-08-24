@@ -1,0 +1,35 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-conversation-record",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "record",
+          "label": "enter record"
+        }
+      ]
+    },
+    "record": {
+      "kind": "operator",
+      "ref": "source/conversation-record",
+      "on": [
+        {
+          "when": {
+            "decision": "recorded"
+          },
+          "target": "complete",
+          "label": "recorded"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

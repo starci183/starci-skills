@@ -1,0 +1,110 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-surface-reconcile",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "surface-audit",
+          "label": "enter surface-audit"
+        }
+      ]
+    },
+    "surface-audit": {
+      "kind": "operator",
+      "ref": "fe/surface-audit",
+      "on": [
+        {
+          "when": {
+            "decision": "audited"
+          },
+          "target": "authority-approval",
+          "label": "audited"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "authority-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the smallest durable design authority and closed consumer set.",
+        "approve": "OK AUTHORITY <hash>",
+        "reject": "REJECT AUTHORITY <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "fe.authority.review",
+            "status": "approved"
+          },
+          "target": "authority-reconcile"
+        },
+        {
+          "when": {
+            "stage": "fe.authority.review",
+            "status": "rejected"
+          },
+          "target": "surface-audit"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "authority-reconcile": {
+      "kind": "operator",
+      "ref": "fe/authority-reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "reconciled"
+          },
+          "target": "consumer-align",
+          "label": "reconciled"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "consumer-align": {
+      "kind": "operator",
+      "ref": "fe/consumer-align",
+      "on": [
+        {
+          "when": {
+            "decision": "aligned"
+          },
+          "target": "complete",
+          "label": "aligned"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

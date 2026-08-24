@@ -1,4 +1,6 @@
 interface:
   display_name: "StarCi Deployment"
-  short_description: "Deploy, monitor, recover, or roll back releases"
-  default_prompt: "Use $starci-deployment to analyze this request and execute only the required state-machine branch."
+  short_description: "Adopt and deploy one immutable release"
+  default_prompt: "Use $starci-deployment for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

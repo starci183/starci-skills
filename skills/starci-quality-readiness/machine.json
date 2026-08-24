@@ -8,62 +8,9 @@
       "kind": "analysis",
       "on": [
         {
-          "when": {
-            "inputEquals": {
-              "mode": "diagnose"
-            }
-          },
-          "target": "diagnose",
-          "label": "trace without mutation"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "inventory"
-            }
-          },
+          "when": {},
           "target": "inventory",
-          "label": "measure readiness"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "repair"
-            }
-          },
-          "target": "repair-approval",
-          "label": "repair an approved finding"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "debt"
-            }
-          },
-          "target": "debt",
-          "label": "repay approved debt"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "bindings"
-            }
-          },
-          "target": "bindings",
-          "label": "check rule accountability"
-        }
-      ]
-    },
-    "diagnose": {
-      "kind": "operator",
-      "ref": "quality/workflow-diagnose",
-      "on": [
-        {
-          "when": {
-            "decision": "diagnosed"
-          },
-          "target": "complete",
-          "label": "diagnosed"
+          "label": "enter inventory"
         }
       ]
     },
@@ -86,6 +33,10 @@
           "label": "findings"
         }
       ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
     },
     "repair-approval": {
       "kind": "wait",
@@ -130,57 +81,6 @@
           "label": "boundary-drift"
         }
       ]
-    },
-    "debt": {
-      "kind": "operator",
-      "ref": "quality/debt-repay",
-      "on": [
-        {
-          "when": {
-            "decision": "closed"
-          },
-          "target": "complete",
-          "label": "closed"
-        },
-        {
-          "when": {
-            "decision": "progress"
-          },
-          "target": "debt",
-          "label": "progress"
-        },
-        {
-          "when": {
-            "decision": "blocked"
-          },
-          "target": "blocked",
-          "label": "blocked"
-        }
-      ]
-    },
-    "bindings": {
-      "kind": "operator",
-      "ref": "quality/rule-binding-check",
-      "on": [
-        {
-          "when": {
-            "decision": "pass"
-          },
-          "target": "complete",
-          "label": "pass"
-        },
-        {
-          "when": {
-            "decision": "fail"
-          },
-          "target": "blocked",
-          "label": "fail"
-        }
-      ]
-    },
-    "complete": {
-      "kind": "terminal",
-      "result": "complete"
     },
     "rejected": {
       "kind": "terminal",

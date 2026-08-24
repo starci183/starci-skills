@@ -8,49 +8,9 @@
       "kind": "analysis",
       "on": [
         {
-          "when": {
-            "inputEquals": {
-              "mode": "adopt"
-            }
-          },
+          "when": {},
           "target": "route",
-          "label": "adopt missing deployment intent"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "deploy"
-            }
-          },
-          "target": "route",
-          "label": "execute declared release"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "monitor"
-            }
-          },
-          "target": "monitor",
-          "label": "observe existing rollout"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "recover"
-            }
-          },
-          "target": "recover",
-          "label": "repair observed failure"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "rollback"
-            }
-          },
-          "target": "rollback",
-          "label": "restore declared rollback identity"
+          "label": "enter route"
         }
       ]
     },
@@ -120,6 +80,19 @@
         }
       ]
     },
+    "execution-root": {
+      "kind": "operator",
+      "ref": "deployment/execution-root-init",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "credentials",
+          "label": "ready"
+        }
+      ]
+    },
     "approval": {
       "kind": "wait",
       "approval": {
@@ -144,18 +117,9 @@
         }
       ]
     },
-    "execution-root": {
-      "kind": "operator",
-      "ref": "deployment/execution-root-init",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "credentials",
-          "label": "ready"
-        }
-      ]
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
     },
     "credentials": {
       "kind": "operator",
@@ -169,6 +133,10 @@
           "label": "ready"
         }
       ]
+    },
+    "rejected": {
+      "kind": "terminal",
+      "result": "rejected"
     },
     "host": {
       "kind": "operator",
@@ -256,6 +224,26 @@
         }
       ]
     },
+    "rollback": {
+      "kind": "operator",
+      "ref": "deployment/rollback",
+      "on": [
+        {
+          "when": {
+            "decision": "rolled-back"
+          },
+          "target": "proof",
+          "label": "rolled-back"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
     "rollout": {
       "kind": "operator",
       "ref": "deployment/rollout",
@@ -266,6 +254,26 @@
           },
           "target": "monitor",
           "label": "ready"
+        }
+      ]
+    },
+    "proof": {
+      "kind": "operator",
+      "ref": "deployment/proof",
+      "on": [
+        {
+          "when": {
+            "decision": "complete"
+          },
+          "target": "reconcile-choice",
+          "label": "complete"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -303,6 +311,27 @@
         }
       ]
     },
+    "reconcile-choice": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.reconcileBusiness": true
+            }
+          },
+          "target": "business-reconcile"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.reconcileBusiness": false
+            }
+          },
+          "target": "complete"
+        }
+      ]
+    },
     "recover": {
       "kind": "operator",
       "ref": "deployment/recover",
@@ -337,67 +366,6 @@
         }
       ]
     },
-    "rollback": {
-      "kind": "operator",
-      "ref": "deployment/rollback",
-      "on": [
-        {
-          "when": {
-            "decision": "rolled-back"
-          },
-          "target": "proof",
-          "label": "rolled-back"
-        },
-        {
-          "when": {
-            "decision": "blocked"
-          },
-          "target": "blocked",
-          "label": "blocked"
-        }
-      ]
-    },
-    "proof": {
-      "kind": "operator",
-      "ref": "deployment/proof",
-      "on": [
-        {
-          "when": {
-            "decision": "complete"
-          },
-          "target": "reconcile-choice",
-          "label": "complete"
-        },
-        {
-          "when": {
-            "decision": "blocked"
-          },
-          "target": "blocked",
-          "label": "blocked"
-        }
-      ]
-    },
-    "reconcile-choice": {
-      "kind": "choice",
-      "on": [
-        {
-          "when": {
-            "inputEquals": {
-              "options.reconcileBusiness": true
-            }
-          },
-          "target": "business-reconcile"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "options.reconcileBusiness": false
-            }
-          },
-          "target": "complete"
-        }
-      ]
-    },
     "business-reconcile": {
       "kind": "operator",
       "ref": "business/reconcile",
@@ -421,14 +389,6 @@
     "complete": {
       "kind": "terminal",
       "result": "complete"
-    },
-    "rejected": {
-      "kind": "terminal",
-      "result": "rejected"
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     }
   }
 }

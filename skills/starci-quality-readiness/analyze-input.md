@@ -1,27 +1,17 @@
 # Analyze starci-quality-readiness input
 
-Input analysis runs before any operator or Qdrant retrieval. Validate the closed invocation, then perform these checks:
+Global `@selection` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify `selection.skillId` equals `starci-quality-readiness`. Then perform these local checks:
 
-1. Classify diagnosis, inventory, approved finding repair, debt repayment or rule-binding audit.
-2. Resolve the measured finding/debt identity and the exact source boundary, if mutation is requested.
-3. Route check-only work away from mutating operators and require approval before repair.
+1. Resolve one delivery boundary and required checks.
+2. Separate measured findings from speculative improvements.
+3. Require approval before every source repair.
 
-Also reject an unknown mode, stale or missing authority/evidence identity, ambiguous target, write root outside scope, external mutation without an approval boundary, or option outside the closed schema.
+Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 
-## Modes
-
-| Mode | Meaning | First state |
-| --- | --- | --- |
-| `diagnose` | trace without mutation | `diagnose` |
-| `inventory` | measure readiness | `inventory` |
-| `repair` | repair an approved finding | `repair-approval` |
-| `debt` | repay approved debt | `debt` |
-| `bindings` | check rule accountability | `bindings` |
+The fixed first state is `inventory`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.
 
 ## Options
 
 | Option | Values | Decision effect |
 | --- | --- | --- |
 | — | — | No additional option is loaded. |
-
-Analysis emits only the normalized scope, classification facts and first state. It does not copy operator knowledge into skill context.

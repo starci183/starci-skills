@@ -1,0 +1,46 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-block-reconcile",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "block-reconcile",
+          "label": "enter block-reconcile"
+        }
+      ]
+    },
+    "block-reconcile": {
+      "kind": "operator",
+      "ref": "fe/block-reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "reconciled"
+          },
+          "target": "complete",
+          "label": "reconciled"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

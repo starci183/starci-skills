@@ -1,0 +1,59 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-business-reconcile",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "reconcile-route",
+          "label": "enter reconcile-route"
+        }
+      ]
+    },
+    "reconcile-route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "reconcile",
+          "label": "ready"
+        }
+      ]
+    },
+    "reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "implemented"
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "decision": "discrepancy"
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

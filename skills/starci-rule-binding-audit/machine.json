@@ -1,0 +1,46 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-rule-binding-audit",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "bindings",
+          "label": "enter bindings"
+        }
+      ]
+    },
+    "bindings": {
+      "kind": "operator",
+      "ref": "quality/rule-binding-check",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "complete",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "fail"
+          },
+          "target": "blocked",
+          "label": "fail"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

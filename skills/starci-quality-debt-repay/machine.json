@@ -1,0 +1,53 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-quality-debt-repay",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "debt",
+          "label": "enter debt"
+        }
+      ]
+    },
+    "debt": {
+      "kind": "operator",
+      "ref": "quality/debt-repay",
+      "on": [
+        {
+          "when": {
+            "decision": "closed"
+          },
+          "target": "complete",
+          "label": "closed"
+        },
+        {
+          "when": {
+            "decision": "progress"
+          },
+          "target": "debt",
+          "label": "progress"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

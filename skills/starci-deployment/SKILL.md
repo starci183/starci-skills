@@ -1,23 +1,24 @@
 ---
 name: starci-deployment
-description: "Adopt, deploy, monitor, recover or roll back one declared release through immutable artifacts, provider/runtime evidence and public steady state."
+description: "Use to adopt deployment intent when needed and execute one immutable release through public steady-state proof. Do not use merely to monitor, recover, or roll back an existing rollout."
 ---
 
 # starci-deployment
 
-Adopt, deploy, monitor, recover or roll back one declared release through immutable artifacts, provider/runtime evidence and public steady state.
+Use to adopt deployment intent when needed and execute one immutable release through public steady-state proof. Do not use merely to monitor, recover, or roll back an existing rollout.
 
 ## INPUT ANALYSIS
 
-Read `input.md`, validate `input.schema.json`, then follow `analyze-input.md`. The analysis state must select one mode without loading operator knowledge.
+Require the ephemeral global selection, read `input.md`, validate `input.schema.json`, then follow local `analyze-input.md`. This skill owns one flow with fixed first state `route`; local analysis only validates and normalizes scope without loading operator knowledge.
 
 ## STATE MACHINE
 
-Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Stop at wait states for the exact displayed revision and finish only at a terminal state. Operator data is task-session-only; purge all intermediates at every terminal while preserving approved durable mutations.
+Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.
 
 ## LOADS
 
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
+| `@selection` | global `/analyze-input.md` output | task-session | bind prompt intent directly to this one-flow skill |
 | `@machine` | `machine.json` | file | executable state-machine graph |
-| `@analysis` | `analyze-input.md` | file | lazy branch selection before operator load |
+| `@analysis` | `analyze-input.md` | file | local validation and normalization before operator load |

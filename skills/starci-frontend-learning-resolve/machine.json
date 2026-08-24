@@ -1,0 +1,46 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-learning-resolve",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "learning-resolve",
+          "label": "enter learning-resolve"
+        }
+      ]
+    },
+    "learning-resolve": {
+      "kind": "operator",
+      "ref": "fe/learning-resolve",
+      "on": [
+        {
+          "when": {
+            "decision": "resolved"
+          },
+          "target": "complete",
+          "label": "resolved"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

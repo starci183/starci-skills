@@ -8,15 +8,18 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const machine = (id) => JSON.parse(readFileSync(path.join(root, id, 'machine.json'), 'utf8'));
 
 const backend = machine('starci-backend-delivery');
-assert.equal(nextState(backend, 'analyze-input', {}, { mode: 'deliver', options: {} }), 'route');
+assert.equal(nextState(backend, 'analyze-input', {}, { selection: { skillId: 'starci-backend-delivery' }, options: {} }), 'route');
 assert.equal(nextState(backend, 'architecture-choice', {}, { options: { architectureMode: 'required' } }), 'architecture-frame');
 assert.equal(nextState(backend, 'architecture-choice', {}, { options: { architectureMode: 'skip' } }), 'source-discovery');
 assert.equal(nextState(backend, 'architecture-challenge', { payload: { decision: 'revise' } }, {}), 'architecture-alternatives');
 
-const frontend = machine('starci-frontend-design-delivery');
-assert.equal(nextState(frontend, 'analyze-input', {}, { mode: 'feedback', options: {} }), 'maintenance-apply');
+const frontend = machine('starci-frontend-layout-delivery');
+assert.equal(nextState(frontend, 'analyze-input', {}, { selection: { skillId: 'starci-frontend-layout-delivery' }, options: {} }), 'preflight');
 assert.equal(nextState(frontend, 'request-choice', { facts: ['grammar-gap', 'create-required'] }, {}), 'requests');
 assert.equal(nextState(frontend, 'request-choice', { facts: [] }, {}), 'implementation');
+
+const maintenance = machine('starci-frontend-maintenance-apply');
+assert.equal(nextState(maintenance, 'analyze-input', {}, { selection: { skillId: 'starci-frontend-maintenance-apply' }, options: {} }), 'maintenance-apply');
 
 const deployment = machine('starci-deployment');
 assert.equal(nextState(deployment, 'monitor', { payload: { decision: 'recover' } }, {}), 'recover');

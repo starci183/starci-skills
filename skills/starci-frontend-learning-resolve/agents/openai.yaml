@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend Learning Resolve"
+  short_description: "Resolve one queued frontend design learning"
+  default_prompt: "Use $starci-frontend-learning-resolve for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

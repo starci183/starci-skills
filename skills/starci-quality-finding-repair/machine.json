@@ -1,0 +1,94 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-quality-finding-repair",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "repair-approval",
+          "label": "enter repair-approval"
+        }
+      ]
+    },
+    "repair-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve one exact measured finding and repair boundary.",
+        "approve": "OK REPAIR <finding>",
+        "reject": "REJECT REPAIR <finding>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "quality.repair.review",
+            "status": "approved"
+          },
+          "target": "repair"
+        },
+        {
+          "when": {
+            "stage": "quality.repair.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
+        }
+      ]
+    },
+    "repair": {
+      "kind": "operator",
+      "ref": "quality/finding-repair",
+      "on": [
+        {
+          "when": {
+            "decision": "repaired"
+          },
+          "target": "inventory",
+          "label": "repaired"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "blocked",
+          "label": "boundary-drift"
+        }
+      ]
+    },
+    "rejected": {
+      "kind": "terminal",
+      "result": "rejected"
+    },
+    "inventory": {
+      "kind": "operator",
+      "ref": "quality/readiness-inventory",
+      "on": [
+        {
+          "when": {
+            "decision": "green"
+          },
+          "target": "complete",
+          "label": "green"
+        },
+        {
+          "when": {
+            "decision": "findings"
+          },
+          "target": "repair-approval",
+          "label": "findings"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

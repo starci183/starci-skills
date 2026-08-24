@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Rule Binding Audit"
+  short_description: "Audit executable rule ownership and binding"
+  default_prompt: "Use $starci-rule-binding-audit for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

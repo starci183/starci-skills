@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Conversation Record"
+  short_description: "Record redacted conversation provenance safely"
+  default_prompt: "Use $starci-conversation-record for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

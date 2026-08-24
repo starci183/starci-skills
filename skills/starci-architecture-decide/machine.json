@@ -8,22 +8,9 @@
       "kind": "analysis",
       "on": [
         {
-          "when": {
-            "inputEquals": {
-              "mode": "analyze"
-            }
-          },
+          "when": {},
           "target": "route",
-          "label": "run architecture analysis"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "mode": "skip"
-            }
-          },
-          "target": "not-needed",
-          "label": "ordinary known-shape work"
+          "label": "enter route"
         }
       ]
     },
@@ -119,17 +106,13 @@
         }
       ]
     },
-    "complete": {
-      "kind": "terminal",
-      "result": "complete"
-    },
-    "not-needed": {
-      "kind": "terminal",
-      "result": "not-needed"
-    },
     "blocked": {
       "kind": "terminal",
       "result": "blocked"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
     }
   }
 }

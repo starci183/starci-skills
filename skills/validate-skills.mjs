@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nextState } from './route-machine.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const repositoryRoot = path.resolve(root, '..');
 const operatorsRoot = path.resolve(root, '..', 'operators');
 const requiredFiles = [
   'SKILL.md',
@@ -20,9 +21,15 @@ const requiredFiles = [
 const cycleRequired = new Set([
   'starci-architecture-decide',
   'starci-backend-delivery',
-  'starci-frontend-design-delivery',
+  'starci-backend-repair',
+  'starci-frontend-layout-delivery',
+  'starci-frontend-surface-reconcile',
   'starci-quality-readiness',
-  'starci-deployment'
+  'starci-quality-finding-repair',
+  'starci-quality-debt-repay',
+  'starci-deployment',
+  'starci-deployment-monitor',
+  'starci-deployment-recover'
 ]);
 
 const fail = (message) => { throw new Error(message); };
@@ -55,12 +62,6 @@ function hasCycle(machine) {
     return false;
   };
   return visit(machine.start);
-}
-
-function modesFrom(schema) {
-  const modes = schema?.properties?.mode?.enum;
-  if (!Array.isArray(modes) || modes.length === 0) fail('input schema must define a non-empty mode enum');
-  return modes;
 }
 
 function exactValues(property) {
@@ -139,18 +140,11 @@ function assertStructure(skillDir, machine, inputSchema, outputSchema) {
   if (![...reached].some((stateId) => machine.states[stateId].kind === 'terminal')) fail(`${skillId}: no reachable terminal`);
   if (cycleRequired.has(skillId) && !hasCycle(machine)) fail(`${skillId}: repair/review loop is required`);
 
-  const inputModes = new Set(modesFrom(inputSchema));
   const analysisEdges = machine.states['analyze-input'].on;
-  const routedModes = analysisEdges.map((edge) => edge.when?.inputEquals?.mode);
-  if (routedModes.some((mode) => typeof mode !== 'string')) fail(`${skillId}: analysis routes must compare input mode`);
-  if (new Set(routedModes).size !== routedModes.length) fail(`${skillId}: duplicate analysis mode route`);
-  if (inputModes.size !== routedModes.length || routedModes.some((mode) => !inputModes.has(mode))) {
-    fail(`${skillId}: analysis routes must exactly cover input mode enum`);
-  }
-  for (const mode of inputModes) {
-    const target = nextState(machine, 'analyze-input', {}, { mode, options: {} });
-    if (!machine.states[target]) fail(`${skillId}: mode ${mode} selected unknown target`);
-  }
+  if (analysisEdges.length !== 1 || Object.keys(analysisEdges[0].when ?? {}).length !== 0) fail(`${skillId}: one-flow analysis must have one unconditional entry edge`);
+  if (inputSchema.properties.selection.properties.mode !== undefined) fail(`${skillId}: one-flow selection must not expose a secondary mode`);
+  const target = nextState(machine, 'analyze-input', {}, { selection: { skillId }, options: {} });
+  if (!machine.states[target]) fail(`${skillId}: fixed analysis selected an unknown target`);
 }
 
 async function assertValidators(skillDir) {
@@ -166,7 +160,13 @@ async function assertValidators(skillDir) {
     schemaVersion: 6,
     runId: 'run-1',
     project: 'starci',
-    mode: inputSchema.properties.mode.enum[0],
+    selection: {
+      analyzerVersion: 1,
+      skillId,
+      confidence: 'exact',
+      activeInputRefs: ['request:1'],
+      passiveContextRefs: []
+    },
     requestRef: 'request:1',
     artifactRefs: [],
     evidenceRefs: ['evidence:1'],
@@ -188,11 +188,13 @@ function assertOpenAiInterface(skillDir) {
   const displayName = source.match(/^\s*display_name:\s*"([^"]+)"\s*$/m)?.[1];
   const shortDescription = source.match(/^\s*short_description:\s*"([^"]+)"\s*$/m)?.[1];
   const defaultPrompt = source.match(/^\s*default_prompt:\s*"([^"]+)"\s*$/m)?.[1];
+  const implicitInvocation = source.match(/^\s*allow_implicit_invocation:\s*(true|false)\s*$/m)?.[1];
   if (!displayName) fail(`${skillId}: openai.yaml needs a quoted display_name`);
   if (!shortDescription || shortDescription.length < 25 || shortDescription.length > 64) {
     fail(`${skillId}: short_description must contain 25-64 characters`);
   }
   if (!defaultPrompt?.includes(`$${skillId}`)) fail(`${skillId}: default_prompt must mention $${skillId}`);
+  if (implicitInvocation !== 'true') fail(`${skillId}: automatic prompt-based selection must remain enabled`);
 }
 
 const skillDirs = readdirSync(root, { withFileTypes: true })
@@ -201,6 +203,19 @@ const skillDirs = readdirSync(root, { withFileTypes: true })
   .sort();
 
 if (skillDirs.length === 0) fail('no state-machine skills found');
+
+const catalog = readJson(path.join(root, 'catalog.json'));
+const catalogIds = catalog.skills.map((skill) => skill.id).sort();
+const directoryIds = skillDirs.map((skillDir) => path.basename(skillDir)).sort();
+if (JSON.stringify(catalogIds) !== JSON.stringify(directoryIds)) fail('global skill catalog differs from materialized skill directories');
+const globalAnalyzer = await import(pathToFileURL(path.join(repositoryRoot, 'validate-analyze-input.mjs')).href);
+for (const entry of catalog.skills) {
+  const selection = { analyzerVersion: 1, skillId: entry.id, confidence: 'exact', activeInputRefs: ['request:1'], passiveContextRefs: ['skills/catalog.json'] };
+  if (!globalAnalyzer.validateAnalyzeInput(selection).valid) fail(`global analyzer rejects ${entry.id}`);
+}
+if (globalAnalyzer.validateAnalyzeInput({ analyzerVersion: 1, skillId: 'starci-missing', confidence: 'exact', activeInputRefs: [], passiveContextRefs: [] }).valid) {
+  fail('global analyzer accepts an unknown skill');
+}
 
 for (const skillDir of skillDirs) {
   const present = new Set(readdirSync(skillDir, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name));
