@@ -1,526 +1,319 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/source-fit/output.schema.json",
-  "title": "FE source-fit operator output",
+  "title": "fe/source-fit operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "appId",
     "runId",
     "stage",
     "status",
-    "decisions",
-    "summary",
-    "requestObligations",
-    "receipt",
-    "factsAdd"
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "principles.compile"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
   ],
   "properties": {
-    "$schema": {
-      "type": "string"
-    },
     "schemaVersion": {
       "const": 6
     },
-    "appId": {
-      "const": "fe-design-layout"
-    },
     "runId": {
-      "$ref": "#/$defs/slug"
+      "type": "string",
+      "minLength": 1
     },
     "stage": {
-      "const": "principles.compile"
+      "enum": [
+        "principles.compile"
+      ]
     },
     "status": {
-      "const": "ready"
+      "enum": [
+        "ready"
+      ]
     },
-    "decisions": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/decision"
-      }
-    },
-    "summary": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "reuse",
-        "extend",
-        "createBlockOrAbove",
-        "grammarGap",
-        "hasCreate",
-        "hasGrammarGap"
-      ],
-      "properties": {
-        "reuse": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "extend": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "createBlockOrAbove": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "grammarGap": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "hasCreate": {
-          "type": "boolean"
-        },
-        "hasGrammarGap": {
-          "type": "boolean"
-        }
-      }
-    },
-    "requestObligations": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "requestId",
-          "kind",
-          "ownerRef",
-          "reason"
-        ],
-        "properties": {
-          "requestId": {
-            "$ref": "#/$defs/slug"
-          },
-          "kind": {
-            "enum": [
-              "create-block-or-above",
-              "grammar-gap"
-            ]
-          },
-          "ownerRef": {
-            "$ref": "#/$defs/slug"
-          },
-          "reason": {
-            "$ref": "#/$defs/text"
-          }
-        }
-      }
-    },
-    "receipt": {
-      "$ref": "#/$defs/artifact"
-    },
-    "factsAdd": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "enum": [
-          "source-fit-ready",
-          "create-required",
-          "grammar-gap"
-        ]
-      },
-      "contains": {
-        "const": "source-fit-ready"
-      }
-    }
-  },
-  "$defs": {
-    "slug": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-    },
-    "hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "ref": {
-      "type": "string",
-      "minLength": 1
-    },
-    "text": {
-      "type": "string",
-      "minLength": 1
-    },
-    "slugSet": {
+    "facts": {
       "type": "array",
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/slug"
+        "type": "string",
+        "minLength": 1
       }
     },
-    "artifact": {
+    "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "ref",
-        "hash"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "ref": {
-          "$ref": "#/$defs/ref"
+        "decision": {
+          "enum": [
+            "reuse-only",
+            "create-required",
+            "grammar-gap"
+          ]
         },
-        "hash": {
-          "$ref": "#/$defs/hash"
-        }
-      }
-    },
-    "sourceDelta": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "boundSlots",
-        "boundStateInputs",
-        "resolvedVariableAxes",
-        "declaredExtensions",
-        "provenanceRef"
-      ],
-      "properties": {
-        "boundSlots": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "boundStateInputs": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "resolvedVariableAxes": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "declaredExtensions": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "provenanceRef": {
-          "$ref": "#/$defs/ref"
-        }
-      }
-    },
-    "effectiveContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "baseRef",
-        "baseHash",
-        "effectiveRef",
-        "effectiveHash",
-        "slots",
-        "stateInputs",
-        "variableAxes",
-        "extensionPolicy",
-        "closedInvariants",
-        "sourceDelta",
-        "resolvedBy"
-      ],
-      "properties": {
-        "baseRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "baseHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "effectiveRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "effectiveHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "slots": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "stateInputs": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "variableAxes": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "extensionPolicy": {
+        "state": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "allowed",
-            "forbidden"
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
           ],
           "properties": {
-            "allowed": {
-              "$ref": "#/$defs/slugSet"
+            "operator": {
+              "const": "fe/source-fit"
             },
-            "forbidden": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "anatomy",
-                  "closed-invariant",
-                  "owner-substitution"
-                ]
+            "status": {
+              "enum": [
+                "completed"
+              ]
+            },
+            "code": {
+              "enum": [
+                "fe-source-fit-reuse-only",
+                "fe-source-fit-create-required",
+                "fe-source-fit-grammar-gap"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "principles.compile"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ready"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
               }
             }
           }
         },
-        "closedInvariants": {
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
+          ],
+          "properties": {
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
+        },
+        "evidenceRefs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "$ref": "#/$defs/slug"
+            "$ref": "#/$defs/sessionRef"
           }
         },
-        "sourceDelta": {
-          "$ref": "#/$defs/sourceDelta"
-        },
-        "resolvedBy": {
-          "const": "source-context-script"
-        }
-      }
-    },
-    "candidate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "candidateId",
-        "sourceRef",
-        "tier",
-        "importPath",
-        "effectiveContract"
-      ],
-      "properties": {
-        "candidateId": {
-          "$ref": "#/$defs/slug"
-        },
-        "sourceRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "tier": {
-          "enum": [
-            "leaves",
-            "branch",
-            "composites",
-            "block",
-            "layout",
-            "page"
-          ]
-        },
-        "importPath": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "effectiveContract": {
-          "$ref": "#/$defs/effectiveContract"
-        }
-      }
-    },
-    "requirement": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "desiredTier",
-        "grammarSelectionRef",
-        "candidateIds",
-        "requiredAxes"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "desiredTier": {
-          "enum": [
-            "leaves",
-            "branch",
-            "composites",
-            "block",
-            "layout",
-            "page"
-          ]
-        },
-        "grammarSelectionRef": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "candidateIds": {
+        "findings": {
           "type": "array",
           "uniqueItems": true,
           "items": {
-            "$ref": "#/$defs/slug"
+            "type": "string",
+            "minLength": 1
           }
-        },
-        "requiredAxes": {
-          "$ref": "#/$defs/slugSet"
         }
       }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "reuseDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "candidateId",
-        "effectiveContract",
-        "exactImport",
-        "because"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "reuse"
-        },
-        "candidateId": {
-          "$ref": "#/$defs/slug"
-        },
-        "effectiveContract": {
-          "$ref": "#/$defs/effectiveContract"
-        },
-        "exactImport": {
-          "$ref": "#/$defs/ref"
-        },
-        "because": {
-          "$ref": "#/$defs/text"
-        }
-      }
-    },
-    "extendDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "candidateId",
-        "effectiveContract",
-        "axes",
-        "declaredDelta",
-        "because"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "extend"
-        },
-        "candidateId": {
-          "$ref": "#/$defs/slug"
-        },
-        "effectiveContract": {
-          "$ref": "#/$defs/effectiveContract"
-        },
-        "axes": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        },
-        "declaredDelta": {
-          "$ref": "#/$defs/sourceDelta"
-        },
-        "because": {
-          "$ref": "#/$defs/text"
-        }
-      }
-    },
-    "createDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "createTier",
-        "lowerTierOwnerRefs",
-        "requestId",
-        "because"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "create-block-or-above"
-        },
-        "createTier": {
-          "enum": [
-            "block",
-            "layout",
-            "page"
-          ]
-        },
-        "lowerTierOwnerRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/ref"
-          }
-        },
-        "requestId": {
-          "$ref": "#/$defs/slug"
-        },
-        "because": {
-          "$ref": "#/$defs/text"
-        }
-      }
-    },
-    "gapDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "missing",
-        "requestId",
-        "requestReason",
-        "localReconstructionBlocked"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "grammar-gap"
-        },
-        "missing": {
-          "enum": [
-            "lower-tier-owner",
-            "package-export",
-            "state-map",
-            "complex-case",
-            "extension-axis"
-          ]
-        },
-        "requestId": {
-          "$ref": "#/$defs/slug"
-        },
-        "requestReason": {
-          "$ref": "#/$defs/text"
-        },
-        "localReconstructionBlocked": {
-          "const": true
-        }
-      }
-    },
-    "decision": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/reuseDecision"
-        },
-        {
-          "$ref": "#/$defs/extendDecision"
-        },
-        {
-          "$ref": "#/$defs/createDecision"
-        },
-        {
-          "$ref": "#/$defs/gapDecision"
-        }
-      ]
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

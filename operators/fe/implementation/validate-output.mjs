@@ -1,48 +1,71 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-const topKeys = ["kind", "schemaVersion", "appId", "runId", "stage", "status", "facts", "payload"];
-const payloadKeys = ["changeSetRef", "changeSetHash", "changedFiles", "consumedContractRefs", "usedLowerTierExtensions", "staticChecks", "stopReasons"];
-const extensionKeys = ["path", "tier", "extensionAxis", "effectiveContractRef", "requestPath"];
-const checkKeys = ["name", "commandRef", "status", "evidenceRef"];
-const requestPattern = /^\.claude\/requests\/[a-z0-9]+(?:-[a-z0-9]+)*\.request\.json$/;
-function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
-function exact(value, keys, at, errors) { if (!object(value)) { errors.push(`${at}: expected object`); return false; } for (const key of keys) if (!(key in value)) errors.push(`${at}/${key}: required`); for (const key of Object.keys(value)) if (!keys.includes(key)) errors.push(`${at}/${key}: additional property is forbidden`); return true; }
-function text(value, at, errors) { if (typeof value !== "string" || value.length === 0) errors.push(`${at}: expected non-empty string`); }
-function strings(value, at, errors, min = 0) { if (!Array.isArray(value)) { errors.push(`${at}: expected array`); return []; } if (value.length < min) errors.push(`${at}: expected at least ${min} item(s)`); value.forEach((item, index) => text(item, `${at}/${index}`, errors)); if (new Set(value).size !== value.length) errors.push(`${at}: duplicate items are forbidden`); return value; }
-
-export function validateOutput(value) {
-  const errors = [];
-  if (!exact(value, topKeys, "", errors)) return { valid: false, errors };
-  if (value.kind !== "fe.implementation.output") errors.push("/kind: expected fe.implementation.output");
-  if (value.schemaVersion !== 6) errors.push("/schemaVersion: expected 6");
-  if (value.appId !== "fe-design-layout") errors.push("/appId: expected fe-design-layout");
-  text(value.runId, "/runId", errors);
-  const route = `${value.stage}/${value.status}`;
-  if (!["seed.materialize/ready", "code.result/blocked"].includes(route)) errors.push("/stage: stage and status do not form a declared emission");
-  const facts = strings(value.facts, "/facts", errors);
-  if (!exact(value.payload, payloadKeys, "/payload", errors)) return { valid: false, errors };
-  text(value.payload.changeSetRef, "/payload/changeSetRef", errors); text(value.payload.changeSetHash, "/payload/changeSetHash", errors);
-  const files = strings(value.payload.changedFiles, "/payload/changedFiles", errors);
-  strings(value.payload.consumedContractRefs, "/payload/consumedContractRefs", errors);
-  const stops = strings(value.payload.stopReasons, "/payload/stopReasons", errors);
-  const extensions = value.payload.usedLowerTierExtensions;
-  if (!Array.isArray(extensions)) errors.push("/payload/usedLowerTierExtensions: expected array");
-  if (Array.isArray(extensions)) extensions.forEach((item, index) => { const at = `/payload/usedLowerTierExtensions/${index}`; if (!exact(item, extensionKeys, at, errors)) return; text(item.path, `${at}/path`, errors); text(item.extensionAxis, `${at}/extensionAxis`, errors); text(item.effectiveContractRef, `${at}/effectiveContractRef`, errors); if (!["composite", "branch", "leaf"].includes(item.tier)) errors.push(`${at}/tier: unsupported tier`); if (typeof item.requestPath !== "string" || !requestPattern.test(item.requestPath)) errors.push(`${at}/requestPath: invalid request path`); });
-  const checks = value.payload.staticChecks;
-  if (!Array.isArray(checks)) errors.push("/payload/staticChecks: expected array");
-  if (Array.isArray(checks)) checks.forEach((item, index) => { const at = `/payload/staticChecks/${index}`; if (!exact(item, checkKeys, at, errors)) return; text(item.name, `${at}/name`, errors); text(item.commandRef, `${at}/commandRef`, errors); text(item.evidenceRef, `${at}/evidenceRef`, errors); if (!["pass", "fail"].includes(item.status)) errors.push(`${at}/status: expected pass or fail`); });
-  if (value.status === "ready") {
-    if (!facts.includes("source-written")) errors.push("/facts: ready output requires source-written");
-    if (files.length === 0 || stops.length) errors.push("/payload: ready output requires changed files and no stop reasons");
-    if (Array.isArray(checks) && checks.some((item) => object(item) && item.status !== "pass")) errors.push("/payload/staticChecks: ready output requires every check to pass");
-  } else {
-    if (!facts.includes("implementation-blocked")) errors.push("/facts: blocked output requires implementation-blocked");
-    if (stops.length === 0) errors.push("/payload/stopReasons: blocked output requires a reason");
+const outcomes = {
+  "ready": {
+    "key": "ready",
+    "stage": "seed.materialize",
+    "status": "ready",
+    "operatorStatus": "completed",
+    "code": "fe-implementation-ready",
+    "retryable": false,
+    "factsAdd": [
+      "source-written"
+    ],
+    "factsRemove": []
+  },
+  "blocked": {
+    "key": "blocked",
+    "stage": "code.result",
+    "status": "blocked",
+    "operatorStatus": "blocked",
+    "code": "fe-implementation-blocked",
+    "retryable": false,
+    "factsAdd": [
+      "implementation-blocked"
+    ],
+    "factsRemove": []
   }
-  return { valid: errors.length === 0, errors };
+};
+const successfulDecisions = new Set(["ready"]);
+
+function sameStrings(left, right) {
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.length === b.length && a.every((item, index) => item === b[index]);
 }
 
-async function cli() { const file = process.argv[2]; if (!file) throw new Error("usage: node validate-output.mjs <output.json>"); const result = validateOutput(JSON.parse(await readFile(path.resolve(file), "utf8"))); if (!result.valid) { console.error(result.errors.join("\n")); process.exitCode = 1; } }
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) cli().catch((error) => { console.error(error.message); process.exitCode = 1; });
+function semanticErrors(value) {
+  const errors = [];
+  const payload = value.payload;
+  const expected = outcomes[payload.decision];
+  if (!expected) return ['$.payload.decision: unknown decision'];
+  const state = payload.state;
+  if (value.stage !== expected.stage || value.status !== expected.status) errors.push('$: decision does not match root emitted state');
+  if (state.status !== expected.operatorStatus || state.code !== expected.code || state.retryable !== expected.retryable) errors.push('$.payload.state: status, code, or retryability does not match decision');
+  if (state.emits.stage !== expected.stage || state.emits.status !== expected.status) errors.push('$.payload.state.emits: does not match root emitted state');
+  if (!sameStrings(state.emits.factsAdd, expected.factsAdd) || !sameStrings(state.emits.factsRemove, expected.factsRemove)) errors.push('$.payload.state.emits: fact delta does not match decision');
+  for (const fact of expected.factsAdd) if (!value.facts.includes(fact)) errors.push(`$.facts: missing emitted fact ${fact}`);
+  for (const fact of expected.factsRemove) if (value.facts.includes(fact)) errors.push(`$.facts: retained removed fact ${fact}`);
+
+  const success = successfulDecisions.has(payload.decision);
+  const produced = payload.produced;
+  if (!success && (produced.mutations.length || produced.externalEffects.length)) errors.push('$.payload.produced: non-success output cannot claim a durable effect');
+  if (success && produced.mutations.length === 0) errors.push('$.payload.produced.mutations: successful source decision requires an exact mutation descriptor');
+
+
+
+  const taskMatch = payload.evidenceRefs[0]?.match(/^session:\/\/tasks\/([^/]+)\//);
+  if (!taskMatch) errors.push('$.payload.evidenceRefs: cannot determine task ownership');
+  else {
+    const prefix = `session://tasks/${taskMatch[1]}/`;
+    const refs = [...payload.evidenceRefs, ...payload.cleanup.scratchRefs, ...payload.produced.artifactRefs, ...payload.produced.externalEffects.map((item) => item.evidenceRef)];
+    for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside output task: ${ref}`);
+  }
+  return errors;
+}
+
+export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), semanticErrors);
+
+if (process.argv[1]?.endsWith('validate-output.mjs')) {
+  await runValidatorCli(validateOutput, 'node validate-output.mjs <artifact.json>');
+}

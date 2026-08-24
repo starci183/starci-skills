@@ -1,18 +1,41 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { runCli, validateAgainst } from './validate-output.mjs';
+import path from 'node:path';
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-const authorityLeak = /@starci\/|\bSurfaceCard\b|\bSurfaceListCard\b|\bcomplex[- ]case\b|\b(branch|composites)\//i;
-export function validateInput(value) {
-  const result = validateAgainst(value, 'input');
-  if (!result.ok) return result;
-  const errors = [];
-  const ids = value.openDecisions.map((decision) => decision.decisionId);
-  if (new Set(ids).size !== ids.length) errors.push('$.openDecisions: decisionId values must be unique');
-  for (const [index, decision] of value.openDecisions.entries()) {
-    if (decision.openedByGrammarRef === decision.openedBySourceFitRef) errors.push(`$.openDecisions[${index}]: Grammar and source-fit authorities must be independently traceable`);
-    for (const field of ['situation', 'axis']) if (authorityLeak.test(decision[field])) errors.push(`$.openDecisions[${index}].${field}: concrete Grammar authority is not an open Principle decision`);
+const guards = {
+  "principles.compile\u0000ready": {
+    "all": [
+      "source-fit-ready"
+    ],
+    "none": []
   }
-  return { ok: !errors.length, errors };
+};
+const profileByMode = {
+  economical: 'orchestration/modes/economical.json',
+  balanced: 'orchestration/modes/balanced.json',
+  parallel: 'orchestration/modes/parallel.json'
+};
+
+function semanticErrors(value) {
+  const errors = [];
+  const guard = guards[`${value.stage}\u0000${value.status}`] ?? { all: [], none: [] };
+  for (const fact of guard.all) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
+  for (const fact of guard.none) if (value.facts.includes(fact)) errors.push(`$.facts: forbidden ${fact}`);
+
+  const { provided, loads, session } = value.payload;
+  if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
+  if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
+
+  const prefix = `session://tasks/${session.taskId}/`;
+  const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
+  for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
+  for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
+
+
+  return errors;
 }
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) runCli(validateInput, 'principle-compile input');
+
+export const validateInput = validatorFor(new URL('./input.schema.json', import.meta.url), semanticErrors);
+
+if (process.argv[1]?.endsWith('validate-input.mjs')) {
+  await runValidatorCli(validateInput, 'node validate-input.mjs <artifact.json>');
+}

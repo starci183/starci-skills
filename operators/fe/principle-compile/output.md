@@ -1,16 +1,25 @@
-# Principle compile output
+# `fe/principle-compile` output
 
-Return one JSON value that validates against `output.schema.json`.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-Every open decision compiles into one strict principle record with six parts:
+## JSON architecture
 
-1. `situation`: the observable condition that makes a decision necessary;
-2. `decision`: one selected structural or interaction choice;
-3. `implementationIntent`: enough geometry, ownership and behavior intent for implementation without inventing policy;
-4. `negativeBoundary`: the nearest plausible but invalid choice;
-5. `proof`: observable evidence that distinguishes the decision from its negative boundary;
-6. `authority`: the open axis and invariant boundary that permit the decision.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-The result is detailed, but product-neutral. It can say that primary dense content receives the wider track, a lower-emphasis nested boundary contains a peer list, or sticky is disabled when viewport safety fails. It cannot name a business entity, choose `SurfaceCard`, map a domain status to a check mark, or redefine a Grammar complex case.
+## State contract
 
-If an open decision is actually closed, lacks a situation, has no negative boundary, or cannot be proved, the result is blocked rather than advisory prose.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `compiled` | `completed` | `requests.review / ready` | `principles-compiled` |
+| `blocked` | `blocked` | `requests.review / blocked` | `principle-boundary-failed` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

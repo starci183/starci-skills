@@ -1,7 +1,23 @@
-# E2E Test input
+# `test/e2e` input
 
-Validate with `validate-input.mjs` before starting services or creating test data.
+This closed JSON object is ephemeral task-session state and is purged on every parent-skill terminal state.
 
-Input stage is `test.e2e / ready` with `unit-pass`, `unit-evidence`, and `seed-evidence`. It binds verified FE and BE workspace routes, both immutable StarCi source references, current manifests, selected flow and seed hashes, exact journey scenarios, an isolated environment, and an evidence root.
+## JSON architecture
 
-Credentials are passed only by opaque provider reference. Raw secrets are forbidden in the input artifact.
+| Section | Owner | Meaning |
+| --- | --- | --- |
+| Root envelope | Skill machine | Accepted stage, status, and facts. |
+| `payload.provided` | Previous state | Immutable refs: `previousStateRef`, `testPlanRef`, `changeSetRef`, `seedEvidenceRef`. |
+| `payload.loads` | Runtime | Exact bindings to load. |
+| `payload.session` | Session runtime | Input, output, scratch, and cleanup lifetime. |
+
+## Runtime loads
+
+- `business`: must be `null`.
+- `knowledge`: exact pinned `fe.e2e-testing`, `fe.product-seeding`, `fe.state-modeling`.
+- `source`: exact hash-pinned files only; broad repository preloading is forbidden.
+- `commands`: declared argv, cwd, and environment-name allowlist only.
+- `external`: declared resources and opaque credential handles only.
+- `orchestration`: one mode and provider profile.
+
+Validate before loading. Never persist input, loaded values, scratch, observations, or receipts.

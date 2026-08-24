@@ -1,0 +1,15 @@
+{
+  "$schema": "../mode.schema.json",
+  "schemaVersion": 6,
+  "id": "parallel",
+  "strategy": "bounded-parallel",
+  "maxWorkers": 5,
+  "workerPermissions": {
+    "read": true,
+    "analyze": true,
+    "writeSource": false,
+    "externalMutation": false
+  },
+  "joinPolicy": "coordinator-validates-all",
+  "retention": "until-skill-terminal"
+}

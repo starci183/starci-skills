@@ -1,19 +1,27 @@
-# Product Proof output
+# `fe/product-proof` output
 
-The output validates against `output.schema.json` and has four possible routes.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-## Complete
+## JSON architecture
 
-`proof.review / complete` with `proof-pass` means all required gates and browser scenarios passed against the approved hashes, exact source boundary and seeded business states.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-## In-boundary repair
+## State contract
 
-`code.repair / repair` with `in-boundary-repair` returns precise failures to Implementation. This route is allowed only when the fix preserves the approved journey, page/block structure, responsive behavior, package ownership and source boundary. It requires no new approval.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `passed` | `completed` | `proof.review / complete` | `proof-pass` |
+| `repair` | `repair` | `code.repair / repair` | `in-boundary-repair` |
+| `boundary-drift` | `replan` | `layout.review / rejected` | `boundary-drift`, `layout-feedback-recorded` |
+| `blocked` | `blocked` | `proof.review / blocked` | `proof-blocked` |
 
-## Boundary drift
-
-`layout.review / rejected` with `boundary-drift` and `layout-feedback-recorded` sends the failure through Layout regeneration, then back to the existing layout approval checkpoint. It is the second app approval, not a third approval type. The output names the violated boundary and invalidates the old layout hash for further source writes.
-
-## Blocked
-
-`proof.review / blocked` records an environmental, evidence or safety condition that prevents a valid verdict. A blocked result never masquerades as repair or success.
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

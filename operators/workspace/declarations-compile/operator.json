@@ -29,10 +29,14 @@
     }
   ],
   "sideEffects": [
-    "write tracked portable workspace declarations only"
+    "write tracked portable workspace declarations only",
+    "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
+    "purge every intermediate session object at each parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "an intermediate input, output, scratch value, observation, analysis transcript, or receipt would be persisted outside the task session",
+    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
   ]
 }

@@ -30,7 +30,9 @@
     }
   ],
   "sideEffects": [
-    "mutate declared remote runtime and release workflow state"
+    "mutate declared remote runtime and release workflow state",
+    "keep input, output, context, observations, and receipts in task-session memory only",
+    "purge all intermediate session objects at every parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",

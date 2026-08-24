@@ -1,7 +1,7 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/customer-journey/output.schema.json",
-  "title": "FE customer journey operator output",
+  "title": "fe/customer-journey operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,213 +12,304 @@
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "flow.review"
+            },
+            "status": {
+              "const": "pending"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
     "schemaVersion": {
       "const": 6
     },
     "runId": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+      "minLength": 1
     },
     "stage": {
-      "const": "flow.review"
+      "enum": [
+        "flow.review"
+      ]
     },
     "status": {
-      "const": "pending"
+      "enum": [
+        "pending"
+      ]
     },
     "facts": {
       "type": "array",
-      "contains": {
-        "const": "flow-directions-ready"
-      },
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
+      }
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "directions",
-        "recommendedDirectionId",
-        "batchHash",
-        "approval"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "directions": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 3,
-          "items": {
-            "$ref": "#/$defs/direction"
-          }
+        "decision": {
+          "enum": [
+            "directions-ready"
+          ]
         },
-        "recommendedDirectionId": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
-        },
-        "batchHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "approval": {
+        "state": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "checkpoint",
+            "operator",
             "status",
-            "commandPattern"
+            "code",
+            "retryable",
+            "emits"
           ],
           "properties": {
-            "checkpoint": {
-              "const": "flow"
+            "operator": {
+              "const": "fe/customer-journey"
             },
             "status": {
-              "const": "pending"
+              "enum": [
+                "pending"
+              ]
             },
-            "commandPattern": {
-              "const": "OK FLOW <id>"
+            "code": {
+              "enum": [
+                "fe-customer-journey-directions-ready"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "flow.review"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "pending"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
+          }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
+          ],
+          "properties": {
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sessionRef"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
     }
   },
   "$defs": {
-    "ref": {
+    "sha256": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "hash": {
+    "sessionRef": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "journeyStep": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "sequence",
-        "pageIntent",
-        "userCommitment",
-        "systemResponse",
-        "recovery"
-      ],
-      "properties": {
-        "sequence": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "pageIntent": {
-          "type": "string",
-          "minLength": 1
-        },
-        "userCommitment": {
-          "type": "string",
-          "minLength": 1
-        },
-        "systemResponse": {
-          "type": "string",
-          "minLength": 1
-        },
-        "recovery": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "direction": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "thesis",
-        "actorGoal",
-        "entryCondition",
-        "terminalSuccess",
-        "materialAxis",
-        "journeyProgress",
-        "steps",
-        "benefits",
-        "costs",
-        "risks"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
-        },
-        "thesis": {
-          "type": "string",
-          "minLength": 1
-        },
-        "actorGoal": {
-          "type": "string",
-          "minLength": 1
-        },
-        "entryCondition": {
-          "type": "string",
-          "minLength": 1
-        },
-        "terminalSuccess": {
-          "type": "string",
-          "minLength": 1
-        },
-        "materialAxis": {
-          "type": "string",
-          "minLength": 1
-        },
-        "journeyProgress": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "required",
-            "ownerScope"
-          ],
-          "properties": {
-            "required": {
-              "type": "boolean"
-            },
-            "ownerScope": {
-              "enum": [
-                "none",
-                "global"
-              ]
-            }
-          }
-        },
-        "steps": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/journeyStep"
-          }
-        },
-        "benefits": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "costs": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "risks": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

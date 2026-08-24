@@ -1,4 +1,4 @@
-import { validatorFor, runValidatorCli } from '../../validation.mjs';
-const guards=[{"stage":"deployment.credentials","status":"ready","facts":["deployment-execution-root-ready"]}];
-export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(value)=>{const guard=guards.find((item)=>item.stage===value.stage&&item.status===value.status);if(!guard)return ['$: undeclared input state'];return guard.facts.filter((fact)=>!value.facts.includes(fact)).map((fact)=>`$.facts: missing ${fact}`);});
-if(process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');
+import {runValidatorCli,validatorFor} from '../../validation.mjs';
+const schemaUrl=new URL('./input.schema.json',import.meta.url),requiredFacts=["deployment-execution-root-ready"];
+function semantic(v){const e=[];for(const f of requiredFacts)if(!v.facts.includes(f))e.push(`/facts: missing ${f}`);const a=Object.values(v.payload.provided).flat(),b=v.payload.loads.artifacts.map(x=>x.ref);for(const x of a)if(!b.includes(x))e.push(`/payload/loads/artifacts: missing ${x}`);if(v.payload.loads.knowledge.length!==1||v.payload.loads.knowledge[0].id!=='deployment.lifecycle')e.push('/payload/loads/knowledge: exact deployment.lifecycle required');const q=`session://tasks/${v.payload.session.taskId}/`;for(const k of ['inputRef','outputRef','scratchPrefix'])if(!v.payload.session[k].startsWith(q))e.push(`/payload/session/${k}: wrong task`);return e}
+export const validateInput=validatorFor(schemaUrl,semantic);if(process.argv[1]&&import.meta.url===new URL(`file:///${process.argv[1].replaceAll('\\\\','/')}`).href)await runValidatorCli(validateInput,'usage: node validate-input.mjs <input.json>');

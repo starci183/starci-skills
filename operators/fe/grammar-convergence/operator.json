@@ -45,7 +45,8 @@
     }
   ],
   "sideEffects": [
-    "persist-grammar-convergence-receipt"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "invalid-input",
@@ -54,6 +55,9 @@
     "copy-semantic-branch",
     "ambiguous-rule",
     "unlocked-package",
-    "undeclared-package-dependency"
+    "undeclared-package-dependency",
+    "Refuse on business-specific Grammar content, an unlocked package, a missing neutral owner, or an undeclared package dependency.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

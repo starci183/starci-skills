@@ -1,19 +1,32 @@
-# Layout input
+# `fe/layout` input
 
-Layout starts after one customer-flow direction has been approved and its pages, global blocks, page-local blocks and states have been normalized.
+The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
 
-Provide one JSON value that validates against `input.schema.json`.
+## JSON architecture
 
-Required input:
+| Section | Authored by | Purpose |
+| --- | --- | --- |
+| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
+| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
+| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
+| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
 
-- the run identity and either the first `layout.generate/ready` transition or a rejected `layout.review` transition;
-- the immutable approved-flow artifact reference, hash and candidate ID;
-- the page-model artifact reference and hash;
-- the state-model artifact reference and hash;
-- a closed list of block summaries. Each summary states its page/global owner, task weight, content density, data volume, reading dependencies and visibility conditions;
-- journey-progress ownership when the approved flow has multiple ordered pages;
-- rejection feedback when regenerating directions.
+## Provided by the previous state
 
-The block summaries may describe observable structure and task relationships. They must not contain CSS classes, package imports, component names or a preselected visual answer. Source-contract and Grammar payloads are intentionally withheld here so that current implementation does not become a layout precedent.
+- `priorStateRef`: the accepted upstream state that authorizes compose approved journeys, pages, states, and available frontend Blocks into complete responsive layout directions.
+- `businessHeadRef`: the selected business authority reference.
+- `authorityRefs`: the exact approved flow, page model, state model, and Block ownership set references.
+- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
+- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
 
-Tabs are admitted only when panels are mutually exclusive views of the same page-level task. A multi-page journey uses one global journey-progress block referenced by every participating page; it is not converted into tabs.
+These fields are references, not copied documents. The operator must not infer substitutes.
+
+## Loaded by the runtime
+
+- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `upstream`: resolve only the declared session references for approved flow, page model, state model, and Block ownership set.
+- `knowledge`: retrieve `fe.layout-composition` from the pinned generation and content hash.
+- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
+
+`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

@@ -17,11 +17,12 @@
   },
   "scripts": {
     "materialize": "node operators/materialize.mjs && node skills/materialize.mjs",
-    "check:operators": "node operators/validate-operators.mjs",
+    "check:orchestration": "node orchestration/validate-orchestration.mjs",
+    "check:operators": "node operators/validate-operators.mjs && node --test operators/be-implementation.spec.mjs",
     "check:skills": "node skills/validate-skills.mjs",
     "check:release": "node scripts/validate-release.mjs",
     "test:routes": "node --test skills/route-machine.spec.mjs",
-    "test:node": "npm run check:operators && npm run check:skills && npm run test:routes && npm run check:release",
+    "test:node": "npm run check:orchestration && npm run check:operators && npm run check:skills && npm run test:routes && npm run check:release",
     "test:python": "python -m unittest discover -s runtime/knowledge-runtime/tests -v",
     "test": "npm run test:node && npm run test:python",
     "test:all": "npm test"

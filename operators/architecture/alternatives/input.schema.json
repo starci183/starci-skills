@@ -62,19 +62,164 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decisionFrameRef",
-        "currentStateRef"
+        "provided",
+        "loads",
+        "session"
       ],
       "properties": {
-        "decisionFrameRef": {
-          "type": "string",
-          "minLength": 1
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decisionFrameRef",
+            "currentStateRef"
+          ],
+          "properties": {
+            "decisionFrameRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "currentStateRef": {
+              "$ref": "#/$defs/sessionRef"
+            }
+          }
         },
-        "currentStateRef": {
-          "type": "string",
-          "minLength": 1
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifacts",
+            "knowledge",
+            "orchestration"
+          ],
+          "properties": {
+            "artifacts": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ref",
+                  "revision",
+                  "loadMode"
+                ],
+                "properties": {
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "revision": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "loadMode": {
+                    "const": "session-exact"
+                  }
+                }
+              }
+            },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "generation",
+                  "contentSha256",
+                  "loadMode"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "architecture.decision-analysis"
+                    ]
+                  },
+                  "generation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "contentSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "loadMode": {
+                    "const": "qdrant-exact"
+                  }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "profileRef",
+                "providerRef"
+              ],
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "economical",
+                    "balanced",
+                    "parallel"
+                  ]
+                },
+                "profileRef": {
+                  "enum": [
+                    "orchestration/modes/economical.json",
+                    "orchestration/modes/balanced.json",
+                    "orchestration/modes/parallel.json"
+                  ]
+                },
+                "providerRef": {
+                  "type": "string",
+                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
+                }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
+          }
         }
       }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

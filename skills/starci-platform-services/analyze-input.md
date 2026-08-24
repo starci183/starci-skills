@@ -13,7 +13,7 @@ Also reject an unknown mode, stale or missing authority/evidence identity, ambig
 | Mode | Meaning | First state |
 | --- | --- | --- |
 | `tunnel` | one HTTP tunnel/DNS route | `tunnel-plan` |
-| `mcp` | read-only source context | `mcp-config` |
+| `mcp` | business and generated-contract index | `mcp-config` |
 | `sonar` | shared Sonar enforcement | `sonar` |
 | `observability` | metrics collection/remote write | `observability` |
 

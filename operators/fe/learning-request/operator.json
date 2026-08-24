@@ -35,10 +35,15 @@
     }
   ],
   "sideEffects": [
-    "write only the approved design request or authority boundary"
+    "coordinator mutates only exact approved targets for fe/learning-request",
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "Stop when evidence is incomplete, identity collides with different content, or the approved request path changed.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

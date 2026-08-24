@@ -59,8 +59,9 @@
     }
   ],
   "sideEffects": [
-    "write approved product source files",
-    "run focused formatting, type and static checks"
+    "coordinator mutates only exact approved targets for fe/implementation",
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "Grammar gap",
@@ -71,6 +72,9 @@
     "local reconstruction of package-owned Grammar capability",
     "non-color structural change in global.css",
     "failed static check",
-    "boundary drift"
+    "boundary drift",
+    "Stop on Grammar gap, stale layout or source fingerprint, undeclared target, closed invariant change, non-color structural global CSS change, or failed focused check.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

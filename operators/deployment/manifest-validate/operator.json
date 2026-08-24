@@ -28,7 +28,10 @@
       "factsRemove": []
     }
   ],
-  "sideEffects": [],
+  "sideEffects": [
+    "keep input, output, context, observations, and receipts in task-session memory only",
+    "purge all intermediate session objects at every parent-skill terminal state"
+  ],
   "stopConditions": [
     "required evidence is missing or stale",
     "the result would cross the declared boundary"

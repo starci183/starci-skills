@@ -1,462 +1,329 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/source-fit/input.schema.json",
-  "title": "FE source-fit operator input",
+  "title": "fe/source-fit operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "appId",
     "runId",
     "stage",
     "status",
-    "grammarConvergence",
-    "sourceContext",
-    "sourceBoundary",
-    "requirements",
-    "candidates"
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "source-fit.resolve"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
   ],
   "properties": {
-    "$schema": {
-      "type": "string"
-    },
     "schemaVersion": {
       "const": 6
     },
-    "appId": {
-      "const": "fe-design-layout"
-    },
     "runId": {
-      "$ref": "#/$defs/slug"
+      "type": "string",
+      "minLength": 1
     },
     "stage": {
-      "const": "source-fit.resolve"
+      "enum": [
+        "source-fit.resolve"
+      ]
     },
     "status": {
-      "const": "ready"
+      "enum": [
+        "ready"
+      ]
     },
-    "grammarConvergence": {
-      "$ref": "#/$defs/artifact"
-    },
-    "sourceContext": {
-      "$ref": "#/$defs/artifact"
-    },
-    "sourceBoundary": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/ref"
-      }
-    },
-    "requirements": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/requirement"
-      }
-    },
-    "candidates": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/candidate"
-      }
-    }
-  },
-  "$defs": {
-    "slug": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-    },
-    "hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "ref": {
-      "type": "string",
-      "minLength": 1
-    },
-    "text": {
-      "type": "string",
-      "minLength": 1
-    },
-    "slugSet": {
+    "facts": {
       "type": "array",
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/slug"
+        "type": "string",
+        "minLength": 1
       }
     },
-    "artifact": {
+    "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "ref",
-        "hash"
+        "provided",
+        "loads",
+        "session"
       ],
       "properties": {
-        "ref": {
-          "$ref": "#/$defs/ref"
-        },
-        "hash": {
-          "$ref": "#/$defs/hash"
-        }
-      }
-    },
-    "sourceDelta": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "boundSlots",
-        "boundStateInputs",
-        "resolvedVariableAxes",
-        "declaredExtensions",
-        "provenanceRef"
-      ],
-      "properties": {
-        "boundSlots": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "boundStateInputs": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "resolvedVariableAxes": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "declaredExtensions": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "provenanceRef": {
-          "$ref": "#/$defs/ref"
-        }
-      }
-    },
-    "effectiveContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "baseRef",
-        "baseHash",
-        "effectiveRef",
-        "effectiveHash",
-        "slots",
-        "stateInputs",
-        "variableAxes",
-        "extensionPolicy",
-        "closedInvariants",
-        "sourceDelta",
-        "resolvedBy"
-      ],
-      "properties": {
-        "baseRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "baseHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "effectiveRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "effectiveHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "slots": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "stateInputs": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "variableAxes": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "extensionPolicy": {
+        "provided": {
           "type": "object",
+          "description": "References supplied by the previous state; workers cannot replace or broaden them.",
           "additionalProperties": false,
           "required": [
-            "allowed",
-            "forbidden"
+            "priorStateRef",
+            "businessHeadRef",
+            "authorityRefs",
+            "approvalRef",
+            "baselineRef"
           ],
           "properties": {
-            "allowed": {
-              "$ref": "#/$defs/slugSet"
+            "priorStateRef": {
+              "$ref": "#/$defs/sessionRef"
             },
-            "forbidden": {
+            "businessHeadRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "authorityRefs": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
               "items": {
-                "enum": [
-                  "anatomy",
-                  "closed-invariant",
-                  "owner-substitution"
-                ]
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "approvalRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "baselineRef": {
+              "type": "string",
+              "pattern": "^(git:[0-9a-f]{7,64}|sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "description": "Runtime-resolved bindings. They identify exact values to load and never carry broad copied context.",
+          "additionalProperties": false,
+          "required": [
+            "business",
+            "upstream",
+            "knowledge",
+            "frontendSource",
+            "orchestration"
+          ],
+          "properties": {
+            "business": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "authorityPath",
+                "revision"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "authorityPath": {
+                  "type": "string",
+                  "pattern": "^\\.worktrees/business/"
+                },
+                "revision": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "upstream": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "revision": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "generation",
+                  "contentSha256",
+                  "loadMode"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "fe.source-fit"
+                    ]
+                  },
+                  "generation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "contentSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "loadMode": {
+                    "const": "qdrant-exact"
+                  }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "profileRef",
+                "providerRef"
+              ],
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "economical",
+                    "balanced",
+                    "parallel"
+                  ]
+                },
+                "profileRef": {
+                  "enum": [
+                    "orchestration/modes/economical.json",
+                    "orchestration/modes/balanced.json",
+                    "orchestration/modes/parallel.json"
+                  ]
+                },
+                "providerRef": {
+                  "type": "string",
+                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
+                }
+              }
+            },
+            "frontendSource": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "snapshotPath",
+                "snapshotSha256",
+                "generatorSha256",
+                "generation",
+                "queryIds",
+                "loadMode",
+                "indexStatus",
+                "rawRepositoryContext"
+              ],
+              "properties": {
+                "snapshotPath": {
+                  "type": "string",
+                  "pattern": "^\\.worktrees/frontend-source/"
+                },
+                "snapshotSha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "generatorSha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "generation": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "queryIds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "loadMode": {
+                  "const": "hash-pinned-json-generation"
+                },
+                "indexStatus": {
+                  "enum": [
+                    "reused",
+                    "upserted"
+                  ]
+                },
+                "rawRepositoryContext": {
+                  "const": false
+                }
               }
             }
           }
         },
-        "closedInvariants": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
+        "session": {
+          "type": "object",
+          "description": "Ephemeral task-local storage, never a persistence path.",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
           }
-        },
-        "sourceDelta": {
-          "$ref": "#/$defs/sourceDelta"
-        },
-        "resolvedBy": {
-          "const": "source-context-script"
         }
       }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "candidate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "candidateId",
-        "sourceRef",
-        "tier",
-        "importPath",
-        "effectiveContract"
-      ],
-      "properties": {
-        "candidateId": {
-          "$ref": "#/$defs/slug"
-        },
-        "sourceRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "tier": {
-          "enum": [
-            "leaves",
-            "branch",
-            "composites",
-            "block",
-            "layout",
-            "page"
-          ]
-        },
-        "importPath": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "effectiveContract": {
-          "$ref": "#/$defs/effectiveContract"
-        }
-      }
-    },
-    "requirement": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "desiredTier",
-        "grammarSelectionRef",
-        "candidateIds",
-        "requiredAxes"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "desiredTier": {
-          "enum": [
-            "leaves",
-            "branch",
-            "composites",
-            "block",
-            "layout",
-            "page"
-          ]
-        },
-        "grammarSelectionRef": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "candidateIds": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        },
-        "requiredAxes": {
-          "$ref": "#/$defs/slugSet"
-        }
-      }
-    },
-    "reuseDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "candidateId",
-        "effectiveContract",
-        "exactImport",
-        "because"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "reuse"
-        },
-        "candidateId": {
-          "$ref": "#/$defs/slug"
-        },
-        "effectiveContract": {
-          "$ref": "#/$defs/effectiveContract"
-        },
-        "exactImport": {
-          "$ref": "#/$defs/ref"
-        },
-        "because": {
-          "$ref": "#/$defs/text"
-        }
-      }
-    },
-    "extendDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "candidateId",
-        "effectiveContract",
-        "axes",
-        "declaredDelta",
-        "because"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "extend"
-        },
-        "candidateId": {
-          "$ref": "#/$defs/slug"
-        },
-        "effectiveContract": {
-          "$ref": "#/$defs/effectiveContract"
-        },
-        "axes": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        },
-        "declaredDelta": {
-          "$ref": "#/$defs/sourceDelta"
-        },
-        "because": {
-          "$ref": "#/$defs/text"
-        }
-      }
-    },
-    "createDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "createTier",
-        "lowerTierOwnerRefs",
-        "requestId",
-        "because"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "create-block-or-above"
-        },
-        "createTier": {
-          "enum": [
-            "block",
-            "layout",
-            "page"
-          ]
-        },
-        "lowerTierOwnerRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/ref"
-          }
-        },
-        "requestId": {
-          "$ref": "#/$defs/slug"
-        },
-        "because": {
-          "$ref": "#/$defs/text"
-        }
-      }
-    },
-    "gapDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ownerRef",
-        "verdict",
-        "missing",
-        "requestId",
-        "requestReason",
-        "localReconstructionBlocked"
-      ],
-      "properties": {
-        "ownerRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "verdict": {
-          "const": "grammar-gap"
-        },
-        "missing": {
-          "enum": [
-            "lower-tier-owner",
-            "package-export",
-            "state-map",
-            "complex-case",
-            "extension-axis"
-          ]
-        },
-        "requestId": {
-          "$ref": "#/$defs/slug"
-        },
-        "requestReason": {
-          "$ref": "#/$defs/text"
-        },
-        "localReconstructionBlocked": {
-          "const": true
-        }
-      }
-    },
-    "decision": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/reuseDecision"
-        },
-        {
-          "$ref": "#/$defs/extendDecision"
-        },
-        {
-          "$ref": "#/$defs/createDecision"
-        },
-        {
-          "$ref": "#/$defs/gapDecision"
-        }
-      ]
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

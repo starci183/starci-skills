@@ -1,16 +1,24 @@
-# Customer journey output
+# `fe/customer-journey` output
 
-The operator returns exactly two or three materially different end-to-end flow directions at `flow.review / pending`.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-Every direction defines:
+## JSON architecture
 
-- a stable id and one-sentence thesis;
-- actor goal, entry condition and terminal success;
-- the ordered page intents from start to finish;
-- user commitment, system response and recovery at each step;
-- the trade-off that distinguishes it from the other directions;
-- whether one global journey-progress owner is required.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-A multi-page linear journey has one global progress owner. Each page later references that owner. Tabs are not journey steps; they are reserved for exclusive panels within one page.
+## State contract
 
-The batch is cache-only and bound by a stable hash. It asks for `OK FLOW <id>`. This is creative checkpoint one of exactly two. It does not write source, create product requests, choose components or generate layouts.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `directions-ready` | `pending` | `flow.review / pending` | `flow-directions-ready` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

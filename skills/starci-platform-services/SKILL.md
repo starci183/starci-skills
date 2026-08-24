@@ -1,11 +1,11 @@
 ---
 name: starci-platform-services
-description: "Reconcile bounded Cloudflare tunnel, source-context MCP/Qdrant, Sonar or observability services without inheriting product ownership."
+description: "Reconcile bounded Cloudflare tunnel, business and generated-contract indexing, Sonar or observability services without inheriting product ownership."
 ---
 
 # starci-platform-services
 
-Reconcile bounded Cloudflare tunnel, source-context MCP/Qdrant, Sonar or observability services without inheriting product ownership.
+Reconcile bounded Cloudflare tunnel, business and generated-contract indexing, Sonar or observability services without inheriting product ownership.
 
 ## INPUT ANALYSIS
 
@@ -13,7 +13,7 @@ Read `input.md`, validate `input.schema.json`, then follow `analyze-input.md`. T
 
 ## STATE MACHINE
 
-Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Stop at wait states for the exact displayed revision and finish only at a terminal state.
+Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Stop at wait states for the exact displayed revision and finish only at a terminal state. Operator data is task-session-only; purge all intermediates at every terminal while preserving approved durable mutations.
 
 ## LOADS
 

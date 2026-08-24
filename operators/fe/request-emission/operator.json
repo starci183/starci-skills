@@ -47,7 +47,9 @@
     }
   ],
   "sideEffects": [
-    "write .claude/requests/<stable-id>.request.json"
+    "coordinator mutates only exact approved targets for fe/request-emission",
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "invalid or missing evidence",
@@ -55,6 +57,9 @@
     "conflicting content at a stable request path",
     "approved source boundary mismatch",
     "incomplete request persistence",
-    "Grammar gap blocks local reconstruction"
+    "Grammar gap blocks local reconstruction",
+    "Stop on invalid evidence, unstable path, identity collision, incomplete persistence, or source-boundary mismatch.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

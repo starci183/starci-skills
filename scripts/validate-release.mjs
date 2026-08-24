@@ -9,7 +9,7 @@ const readJson = (relative) => JSON.parse(fs.readFileSync(path.join(root, relati
 
 for (const required of [
   'README.md', 'INDEX.md', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
-  'package.json', 'skills', 'operators', 'knowledge', 'runtime/knowledge-runtime', 'scripts/knowledge-query.py'
+  'package.json', 'skills', 'operators', 'orchestration', 'knowledge', 'runtime/knowledge-runtime', 'scripts/knowledge-query.py'
 ]) {
   if (!exists(required)) fail(`release is missing ${required}`);
 }
@@ -66,6 +66,7 @@ const releaseTextFiles = [
   path.join(root, 'INDEX.md'),
   ...walk(path.join(root, 'skills')),
   ...walk(path.join(root, 'operators')),
+  ...walk(path.join(root, 'orchestration')),
   ...walk(path.join(root, 'runtime')),
   ...walk(path.join(root, 'scripts'))
 ].filter((file) => /\.(?:md|mjs|py|json|yaml)$/.test(file));

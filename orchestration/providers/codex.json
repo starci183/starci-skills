@@ -1,0 +1,22 @@
+{
+  "$schema": "../provider.schema.json",
+  "schemaVersion": 6,
+  "provider": "codex",
+  "modeMappings": {
+    "economical": {
+      "coordinatorModel": "inherit",
+      "workerModel": null,
+      "maxWorkers": 0
+    },
+    "balanced": {
+      "coordinatorModel": "inherit",
+      "workerModel": "luna",
+      "maxWorkers": 3
+    },
+    "parallel": {
+      "coordinatorModel": "inherit",
+      "workerModel": "luna",
+      "maxWorkers": 5
+    }
+  }
+}

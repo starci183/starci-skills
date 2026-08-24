@@ -1,502 +1,159 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/grammar-convergence/output.schema.json",
-  "title": "FE Grammar convergence operator output",
-  "oneOf": [
+  "title": "fe/grammar-convergence operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
     {
-      "$ref": "#/$defs/successOutput"
-    },
-    {
-      "$ref": "#/$defs/blockedOutput"
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "source-fit.resolve"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "source-fit.resolve"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
     }
   ],
-  "$defs": {
-    "slug": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+  "properties": {
+    "schemaVersion": {
+      "const": 6
     },
-    "hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "integrity": {
-      "type": "string",
-      "pattern": "^sha512-[A-Za-z0-9+/]+={0,2}$"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
-    },
-    "ref": {
+    "runId": {
       "type": "string",
       "minLength": 1
     },
-    "slugSet": {
+    "stage": {
+      "enum": [
+        "source-fit.resolve"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "facts": {
       "type": "array",
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/slug"
+        "type": "string",
+        "minLength": 1
       }
     },
-    "artifact": {
+    "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "ref",
-        "hash"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "ref": {
-          "$ref": "#/$defs/ref"
-        },
-        "hash": {
-          "$ref": "#/$defs/hash"
-        }
-      }
-    },
-    "packageLock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "package",
-        "version",
-        "integrity"
-      ],
-      "properties": {
-        "package": {
-          "type": "string",
-          "pattern": "^@starci/(?:ui/common|grammar/[a-z0-9]+(?:-[a-z0-9]+)*)$"
-        },
-        "version": {
-          "$ref": "#/$defs/version"
-        },
-        "integrity": {
-          "$ref": "#/$defs/integrity"
-        }
-      }
-    },
-    "grammarLock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "common",
-        "grammar",
-        "declaredDependencies",
-        "manifestRef",
-        "manifestHash"
-      ],
-      "properties": {
-        "common": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "package",
-            "version",
-            "integrity"
-          ],
-          "properties": {
-            "package": {
-              "const": "@starci/ui/common"
-            },
-            "version": {
-              "$ref": "#/$defs/version"
-            },
-            "integrity": {
-              "$ref": "#/$defs/integrity"
-            }
-          }
-        },
-        "grammar": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "package",
-            "version",
-            "integrity"
-          ],
-          "properties": {
-            "package": {
-              "type": "string",
-              "pattern": "^@starci/grammar/[a-z0-9]+(?:-[a-z0-9]+)*$"
-            },
-            "version": {
-              "$ref": "#/$defs/version"
-            },
-            "integrity": {
-              "$ref": "#/$defs/integrity"
-            }
-          }
-        },
-        "declaredDependencies": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/packageLock"
-          }
-        },
-        "manifestRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "manifestHash": {
-          "$ref": "#/$defs/hash"
-        }
-      }
-    },
-    "neutralBlock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "blockRef",
-        "structuralFacts",
-        "interactionFacts",
-        "presentationFacts",
-        "presentationStates",
-        "decisionSlots"
-      ],
-      "properties": {
-        "blockRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "structuralFacts": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "interactionFacts": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "presentationFacts": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "presentationStates": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "decisionSlots": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        }
-      }
-    },
-    "owner": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "package",
-        "version",
-        "integrity",
-        "layer",
-        "exportPath",
-        "exportName"
-      ],
-      "properties": {
-        "package": {
-          "type": "string",
-          "pattern": "^@starci/(?:ui/common|grammar/[a-z0-9]+(?:-[a-z0-9]+)*)$"
-        },
-        "version": {
-          "$ref": "#/$defs/version"
-        },
-        "integrity": {
-          "$ref": "#/$defs/integrity"
-        },
-        "layer": {
+        "decision": {
           "enum": [
-            "leaves",
-            "branch",
-            "composites"
+            "converged",
+            "refused"
           ]
         },
-        "exportPath": {
-          "type": "string",
-          "pattern": "^@starci/(?:ui/common|grammar/[a-z0-9]+(?:-[a-z0-9]+)*)/(?:leaves|branch|composites)/[A-Z][A-Za-z0-9]*$"
-        },
-        "exportName": {
-          "type": "string",
-          "pattern": "^[A-Z][A-Za-z0-9]*$"
-        }
-      }
-    },
-    "selection": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "blockRef",
-        "decisionSlot",
-        "ruleId",
-        "owner",
-        "templateRef",
-        "templateHash",
-        "invariants",
-        "variableAxes",
-        "stateMappingRef",
-        "complexCaseRef",
-        "proofRefs",
-        "baseContractRef",
-        "baseContractHash"
-      ],
-      "properties": {
-        "blockRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "decisionSlot": {
-          "$ref": "#/$defs/slug"
-        },
-        "ruleId": {
-          "$ref": "#/$defs/slug"
-        },
-        "owner": {
-          "$ref": "#/$defs/owner"
-        },
-        "templateRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "templateHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "invariants": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        },
-        "variableAxes": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "stateMappingRef": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "complexCaseRef": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "proofRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/ref"
-          }
-        },
-        "baseContractRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "baseContractHash": {
-          "$ref": "#/$defs/hash"
-        }
-      }
-    },
-    "gap": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "gapId",
-        "blockRef",
-        "decisionSlot",
-        "missing",
-        "facts",
-        "reason"
-      ],
-      "properties": {
-        "gapId": {
-          "$ref": "#/$defs/slug"
-        },
-        "blockRef": {
-          "$ref": "#/$defs/slug"
-        },
-        "decisionSlot": {
-          "$ref": "#/$defs/slug"
-        },
-        "missing": {
-          "enum": [
-            "rule",
-            "owner",
-            "package-export",
-            "state-map",
-            "complex-case",
-            "extension-axis"
-          ]
-        },
-        "facts": {
-          "$ref": "#/$defs/slugSet"
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "successOutput": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schemaVersion",
-        "appId",
-        "runId",
-        "stage",
-        "status",
-        "gate",
-        "selections",
-        "gaps",
-        "receipt",
-        "factsAdd"
-      ],
-      "properties": {
-        "$schema": {
-          "type": "string"
-        },
-        "schemaVersion": {
-          "const": 6
-        },
-        "appId": {
-          "const": "fe-design-layout"
-        },
-        "runId": {
-          "$ref": "#/$defs/slug"
-        },
-        "stage": {
-          "const": "source-fit.resolve"
-        },
-        "status": {
-          "const": "ready"
-        },
-        "gate": {
+        "state": {
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "operator",
             "status",
-            "scannedRefs",
-            "refusals"
+            "code",
+            "retryable",
+            "emits"
           ],
           "properties": {
+            "operator": {
+              "const": "fe/grammar-convergence"
+            },
             "status": {
-              "const": "pass"
+              "enum": [
+                "completed",
+                "blocked"
+              ]
             },
-            "scannedRefs": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/ref"
-              }
+            "code": {
+              "enum": [
+                "fe-grammar-convergence-converged",
+                "fe-grammar-convergence-refused"
+              ]
             },
-            "refusals": {
-              "const": []
-            }
-          }
-        },
-        "selections": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/selection"
-          }
-        },
-        "gaps": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/gap"
-          }
-        },
-        "receipt": {
-          "$ref": "#/$defs/artifact"
-        },
-        "factsAdd": {
-          "type": "array",
-          "contains": {
-            "const": "grammar-converged"
-          },
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        }
-      }
-    },
-    "blockedOutput": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schemaVersion",
-        "appId",
-        "runId",
-        "stage",
-        "status",
-        "gate",
-        "factsAdd"
-      ],
-      "properties": {
-        "$schema": {
-          "type": "string"
-        },
-        "schemaVersion": {
-          "const": 6
-        },
-        "appId": {
-          "const": "fe-design-layout"
-        },
-        "runId": {
-          "$ref": "#/$defs/slug"
-        },
-        "stage": {
-          "const": "source-fit.resolve"
-        },
-        "status": {
-          "const": "blocked"
-        },
-        "gate": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "status",
-            "scannedRefs",
-            "refusals"
-          ],
-          "properties": {
-            "status": {
-              "const": "refused"
+            "retryable": {
+              "type": "boolean"
             },
-            "scannedRefs": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/ref"
-              }
-            },
-            "refusals": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "code",
-                  "ref",
-                  "token"
-                ],
-                "properties": {
-                  "code": {
-                    "enum": [
-                      "non-neutral-fact",
-                      "non-neutral-state",
-                      "copy-semantic-branch",
-                      "undeclared-package-dependency",
-                      "unlocked-package",
-                      "ambiguous-rule"
-                    ]
-                  },
-                  "ref": {
-                    "$ref": "#/$defs/ref"
-                  },
-                  "token": {
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "source-fit.resolve"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ready",
+                    "blocked"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
                     "type": "string",
                     "minLength": 1
                   }
@@ -505,12 +162,173 @@
             }
           }
         },
-        "factsAdd": {
-          "const": [
-            "grammar-business-gate-failed"
-          ]
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
+          ],
+          "properties": {
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sessionRef"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

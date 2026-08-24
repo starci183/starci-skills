@@ -27,7 +27,9 @@
     }
   ],
   "sideEffects": [
-    "write ignored generated MCP execution config"
+    "write only the approved ignored generated MCP execution config",
+    "keep input, output, context, observations, and receipts in task-session memory only",
+    "purge all intermediate session objects at every parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",

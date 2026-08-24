@@ -448,10 +448,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "reconciled"
           },
           "target": "complete",
-          "label": "complete"
+          "label": "reconciled"
         },
         {
           "when": {
@@ -468,10 +468,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "applied"
           },
           "target": "learning-request",
-          "label": "complete"
+          "label": "applied"
         },
         {
           "when": {
@@ -488,10 +488,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "recorded"
           },
           "target": "complete",
-          "label": "complete"
+          "label": "recorded"
         },
         {
           "when": {
@@ -508,10 +508,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "resolved"
           },
           "target": "complete",
-          "label": "complete"
+          "label": "resolved"
         },
         {
           "when": {
@@ -528,10 +528,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "audited"
           },
           "target": "authority-approval",
-          "label": "complete"
+          "label": "audited"
         },
         {
           "when": {
@@ -572,10 +572,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "reconciled"
           },
           "target": "consumer-align",
-          "label": "complete"
+          "label": "reconciled"
         },
         {
           "when": {
@@ -592,10 +592,10 @@
       "on": [
         {
           "when": {
-            "decision": "complete"
+            "decision": "aligned"
           },
           "target": "complete",
-          "label": "complete"
+          "label": "aligned"
         },
         {
           "when": {

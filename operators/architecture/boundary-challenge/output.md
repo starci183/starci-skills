@@ -1,3 +1,26 @@
-# architecture/boundary-challenge output
+# `architecture/boundary-challenge` output
 
-Return `boundaryChallengeRef`, one typed decision (`clean`, `revise`, `blocked`), evidence references, and findings. The skill state machine—not this operator—routes the emitted state.
+The output is an ephemeral task-session object consumed by the parent state machine. It is not a durable artifact and is purged with its input, loaded bindings, observations, and scratch values at every `skill-terminal`.
+
+## JSON architecture
+
+| Section | Purpose |
+| --- | --- |
+| Root route fields | State-machine compatibility envelope. |
+| `payload.decision` | Typed route key from this operator contract. |
+| `payload.state` | Explicit status, code, retryability, and emitted state. |
+| `payload.produced` | Session artifact `boundaryChallengeRef` plus explicitly approved durable effects only. |
+| `payload.context` | Minimal refs and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch refs and mandatory terminal purge. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts, not an analysis transcript. |
+
+## State contract
+
+| Decision | State status | Emitted state | Facts added |
+| --- | --- | --- | --- |
+| `clean` | `completed` | `architecture.boundary.review / pending` | backend-boundary-challenged |
+| `revise` | `replan` | `architecture.boundary / ready` | backend-boundary-feedback |
+| `blocked` | `blocked` | `architecture.blocked / blocked` | backend-boundary-blocked |
+
+`boundaryChallengeRef`, evidence, receipts, observations, and output use `session://`. Only a product/worktree effect explicitly declared by `operator.json` may survive the skill.

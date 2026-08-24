@@ -43,14 +43,17 @@
     }
   ],
   "sideEffects": [
-    "persist-content-addressed-layout-directions",
-    "open-layout-approval-checkpoint"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "invalid-input",
     "missing-approved-flow",
     "missing-block-owner",
     "stale-artifact-hash",
-    "fewer-than-two-material-directions"
+    "fewer-than-two-material-directions",
+    "Stop on a missing Block owner, stale approved hash, incomplete journey page, or fewer than two materially different requested directions.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

@@ -1,14 +1,32 @@
-# Source fit input
+# `fe/source-fit` input
 
-Source fit compares the approved block/layout intent and Grammar convergence result with the frontend source-contract export.
+The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
 
-Provide one JSON value that validates against `input.schema.json`.
+## JSON architecture
 
-For every source candidate, include a resolved effective contract, not a local delta for the model to merge. The effective contract records:
+| Section | Authored by | Purpose |
+| --- | --- | --- |
+| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
+| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
+| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
+| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
 
-- exact `baseRef` and `baseHash`;
-- slots, state inputs, variable axes, extension policy and closed invariants inherited from the base;
-- the source-owned delta with provenance;
-- exact `effectiveRef` and `effectiveHash` computed by the source-context script.
+## Provided by the previous state
 
-Also provide the Grammar selections and gaps, the desired block tier, the exact source boundary and any already declared local extensions. Missing base or effective provenance makes the candidate unusable for `reuse` or `extend`.
+- `priorStateRef`: the accepted upstream state that authorizes classify each required layout Block as reusable, extensible, creatable, or blocked by a Grammar gap.
+- `businessHeadRef`: the selected business authority reference.
+- `authorityRefs`: the exact Grammar convergence, approved layout Blocks, and pinned frontend contract generation references.
+- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
+- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
+
+These fields are references, not copied documents. The operator must not infer substitutes.
+
+## Loaded by the runtime
+
+- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `upstream`: resolve only the declared session references for Grammar convergence, approved layout Blocks, and pinned frontend contract generation.
+- `knowledge`: retrieve `fe.source-fit` from the pinned generation and content hash.
+- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
+
+`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

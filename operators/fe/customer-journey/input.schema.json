@@ -1,7 +1,7 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/customer-journey/input.schema.json",
-  "title": "FE customer journey operator input",
+  "title": "fe/customer-journey operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,13 +12,47 @@
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "flow.generate"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "flow.review"
+            },
+            "status": {
+              "const": "rejected"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
     "schemaVersion": {
       "const": 6
     },
     "runId": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+      "minLength": 1
     },
     "stage": {
       "enum": [
@@ -34,276 +68,226 @@
     },
     "facts": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
+      }
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "requestReceiptRef",
-        "businessEvidenceReceiptRef",
-        "actor",
-        "goal",
-        "scope",
-        "knownConditions"
+        "provided",
+        "loads",
+        "session"
       ],
       "properties": {
-        "requestReceiptRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "businessEvidenceReceiptRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "actor": {
-          "type": "string",
-          "minLength": 1
-        },
-        "goal": {
-          "type": "string",
-          "minLength": 1
-        },
-        "scope": {
-          "type": "string",
-          "minLength": 1
-        },
-        "knownConditions": {
+        "provided": {
           "type": "object",
+          "description": "References supplied by the previous state; workers cannot replace or broaden them.",
           "additionalProperties": false,
           "required": [
-            "entry",
-            "success",
-            "failure"
+            "priorStateRef",
+            "businessHeadRef",
+            "authorityRefs",
+            "approvalRef",
+            "baselineRef"
           ],
           "properties": {
-            "entry": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
+            "priorStateRef": {
+              "$ref": "#/$defs/sessionRef"
             },
-            "success": {
+            "businessHeadRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "authorityRefs": {
               "type": "array",
               "minItems": 1,
+              "uniqueItems": true,
               "items": {
-                "type": "string",
-                "minLength": 1
+                "$ref": "#/$defs/sessionRef"
               }
             },
-            "failure": {
+            "approvalRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "baselineRef": {
+              "type": "string",
+              "pattern": "^(git:[0-9a-f]{7,64}|sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "description": "Runtime-resolved bindings. They identify exact values to load and never carry broad copied context.",
+          "additionalProperties": false,
+          "required": [
+            "business",
+            "upstream",
+            "knowledge",
+            "orchestration"
+          ],
+          "properties": {
+            "business": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "authorityPath",
+                "revision"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "authorityPath": {
+                  "type": "string",
+                  "pattern": "^\\.worktrees/business/"
+                },
+                "revision": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "upstream": {
               "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
               "items": {
-                "type": "string",
-                "minLength": 1
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "revision": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "generation",
+                  "contentSha256",
+                  "loadMode"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "fe.customer-journey"
+                    ]
+                  },
+                  "generation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "contentSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "loadMode": {
+                    "const": "qdrant-exact"
+                  }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "profileRef",
+                "providerRef"
+              ],
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "economical",
+                    "balanced",
+                    "parallel"
+                  ]
+                },
+                "profileRef": {
+                  "enum": [
+                    "orchestration/modes/economical.json",
+                    "orchestration/modes/balanced.json",
+                    "orchestration/modes/parallel.json"
+                  ]
+                },
+                "providerRef": {
+                  "type": "string",
+                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
+                }
               }
             }
           }
         },
-        "constraints": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "feedback": {
-          "type": "string",
-          "minLength": 1
+        "session": {
+          "type": "object",
+          "description": "Ephemeral task-local storage, never a persistence path.",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
+          }
         }
       }
     }
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "stage": {
-            "const": "flow.generate"
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "status": {
-            "const": "ready"
-          },
-          "facts": {
-            "contains": {
-              "const": "preflight-complete"
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "stage": {
-            "const": "flow.review"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "payload"
-        ],
-        "properties": {
-          "status": {
-            "const": "rejected"
-          },
-          "facts": {
-            "contains": {
-              "const": "flow-feedback-recorded"
-            }
-          },
-          "payload": {
-            "required": [
-              "feedback"
-            ]
-          }
-        }
-      }
-    }
-  ],
   "$defs": {
-    "ref": {
+    "sha256": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "hash": {
+    "sessionRef": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "journeyStep": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "sequence",
-        "pageIntent",
-        "userCommitment",
-        "systemResponse",
-        "recovery"
-      ],
-      "properties": {
-        "sequence": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "pageIntent": {
-          "type": "string",
-          "minLength": 1
-        },
-        "userCommitment": {
-          "type": "string",
-          "minLength": 1
-        },
-        "systemResponse": {
-          "type": "string",
-          "minLength": 1
-        },
-        "recovery": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "direction": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "thesis",
-        "actorGoal",
-        "entryCondition",
-        "terminalSuccess",
-        "materialAxis",
-        "journeyProgress",
-        "steps",
-        "benefits",
-        "costs",
-        "risks"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
-        },
-        "thesis": {
-          "type": "string",
-          "minLength": 1
-        },
-        "actorGoal": {
-          "type": "string",
-          "minLength": 1
-        },
-        "entryCondition": {
-          "type": "string",
-          "minLength": 1
-        },
-        "terminalSuccess": {
-          "type": "string",
-          "minLength": 1
-        },
-        "materialAxis": {
-          "type": "string",
-          "minLength": 1
-        },
-        "journeyProgress": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "required",
-            "ownerScope"
-          ],
-          "properties": {
-            "required": {
-              "type": "boolean"
-            },
-            "ownerScope": {
-              "enum": [
-                "none",
-                "global"
-              ]
-            }
-          }
-        },
-        "steps": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/journeyStep"
-          }
-        },
-        "benefits": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "costs": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "risks": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

@@ -1,17 +1,32 @@
-# Preflight input
+# `fe/preflight` input
 
-Preflight accepts one normalized frontend design invocation at `request.received / ready`.
+The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
 
-The input contains:
+## JSON architecture
 
-- a stable run id and the current routing facts;
-- the user request, requested scope, actor and business-impact classification;
-- references to business evidence, never an invented summary presented as evidence;
-- the verified workspace and intended write roots;
-- the selected Grammar id and approval mode.
+| Section | Authored by | Purpose |
+| --- | --- | --- |
+| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
+| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
+| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
+| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
 
-The operator needs enough information to resolve the source boundary and freeze the invocation. It does not need a proposed journey, page model or layout.
+## Provided by the previous state
 
-`businessEvidenceRefs` may be empty only when `businessImpact` is `none`. A product-facing journey must have at least one evidence reference before it can continue.
+- `priorStateRef`: the accepted upstream state that authorizes freeze workspace, business, Grammar, frontend contract generation, and requested write boundaries before design work.
+- `businessHeadRef`: the selected business authority reference.
+- `authorityRefs`: the exact received request, verified workspace route, and selected business feature head references.
+- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
+- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
 
-The input is invalid when the workspace route, Grammar selection or write boundary is implicit.
+These fields are references, not copied documents. The operator must not infer substitutes.
+
+## Loaded by the runtime
+
+- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `upstream`: resolve only the declared session references for received request, verified workspace route, and selected business feature head.
+- `knowledge`: retrieve no knowledge record from the pinned generation and content hash.
+- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
+
+`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

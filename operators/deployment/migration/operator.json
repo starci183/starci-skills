@@ -53,7 +53,9 @@
     }
   ],
   "sideEffects": [
-    "apply declared migration or initialization job"
+    "apply declared migration or initialization job",
+    "keep input, output, context, observations, and receipts in task-session memory only",
+    "purge all intermediate session objects at every parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",

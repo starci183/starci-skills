@@ -78,29 +78,238 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "consumerAlignmentRef",
         "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
         "evidenceRefs",
         "findings"
       ],
       "properties": {
-        "consumerAlignmentRef": {
-          "type": "string",
-          "minLength": 1
-        },
         "decision": {
           "enum": [
-            "complete",
+            "aligned",
             "blocked"
           ]
+        },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "fe/consumer-align"
+            },
+            "status": {
+              "enum": [
+                "completed",
+                "blocked"
+              ]
+            },
+            "code": {
+              "enum": [
+                "fe-consumer-align-aligned",
+                "fe-consumer-align-blocked"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "fe.maintenance.complete",
+                    "fe.maintenance.blocked"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "complete",
+                    "blocked"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
+          ],
+          "properties": {
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
         },
         "evidenceRefs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/sessionRef"
           }
         },
         "findings": {
@@ -112,6 +321,16 @@
           }
         }
       }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

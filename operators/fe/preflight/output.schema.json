@@ -1,7 +1,7 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/preflight/output.schema.json",
-  "title": "FE preflight operator output",
+  "title": "fe/preflight operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,154 +12,304 @@
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "flow.generate"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
     "schemaVersion": {
       "const": 6
     },
     "runId": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+      "minLength": 1
     },
     "stage": {
-      "const": "flow.generate"
+      "enum": [
+        "flow.generate"
+      ]
     },
     "status": {
-      "const": "ready"
+      "enum": [
+        "ready"
+      ]
     },
     "facts": {
       "type": "array",
-      "allOf": [
-        {
-          "contains": {
-            "const": "preflight-complete"
-          }
-        },
-        {
-          "contains": {
-            "const": "source-context-ready"
-          }
-        },
-        {
-          "contains": {
-            "const": "grammar-lock-ready"
-          }
-        }
-      ],
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
+      }
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "requestReceipt",
-        "businessEvidenceReceipt",
-        "workspaceReceipt",
-        "sourceContextReceipt",
-        "grammarLockReceipt",
-        "writeRoots",
-        "approvalMode"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "requestReceipt": {
-          "$ref": "#/$defs/receipt"
+        "decision": {
+          "enum": [
+            "preflight-ready"
+          ]
         },
-        "businessEvidenceReceipt": {
-          "$ref": "#/$defs/receipt"
-        },
-        "workspaceReceipt": {
-          "$ref": "#/$defs/receipt"
-        },
-        "sourceContextReceipt": {
+        "state": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "artifactRef",
-            "hash",
-            "effectiveContractHash"
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
           ],
           "properties": {
-            "artifactRef": {
-              "$ref": "#/$defs/ref"
+            "operator": {
+              "const": "fe/preflight"
             },
-            "hash": {
-              "$ref": "#/$defs/hash"
+            "status": {
+              "enum": [
+                "completed"
+              ]
             },
-            "effectiveContractHash": {
-              "$ref": "#/$defs/hash"
+            "code": {
+              "enum": [
+                "fe-preflight-preflight-ready"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "flow.generate"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ready"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         },
-        "grammarLockReceipt": {
+        "produced": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "artifactRef",
-            "hash",
-            "grammarId",
-            "package"
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
           ],
           "properties": {
-            "artifactRef": {
-              "$ref": "#/$defs/ref"
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
             },
-            "hash": {
-              "$ref": "#/$defs/hash"
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
             },
-            "grammarId": {
-              "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$"
-            },
-            "package": {
-              "type": "string",
-              "pattern": "^@starci/grammar/[a-z0-9][a-z0-9-]*$"
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
             }
           }
         },
-        "writeRoots": {
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
+        },
+        "evidenceRefs": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": {
-            "$ref": "#/$defs/ref"
-          },
-          "uniqueItems": true
+            "$ref": "#/$defs/sessionRef"
+          }
         },
-        "approvalMode": {
-          "enum": [
-            "manual",
-            "auto"
-          ]
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }
   },
   "$defs": {
-    "ref": {
+    "sha256": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "hash": {
+    "sessionRef": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "receipt": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "artifactRef",
-        "hash"
-      ],
-      "properties": {
-        "artifactRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "hash": {
-          "$ref": "#/$defs/hash"
-        }
-      }
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

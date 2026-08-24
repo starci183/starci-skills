@@ -78,29 +78,185 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "ruleBindingReceiptRef",
         "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
         "evidenceRefs",
         "findings"
       ],
       "properties": {
-        "ruleBindingReceiptRef": {
-          "type": "string",
-          "minLength": 1
-        },
         "decision": {
           "enum": [
             "pass",
             "fail"
           ]
         },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "quality/rule-binding-check"
+            },
+            "status": {
+              "enum": [
+                "completed",
+                "replan",
+                "blocked"
+              ]
+            },
+            "code": {
+              "enum": [
+                "quality-rule-binding-check-pass",
+                "quality-rule-binding-check-fail"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "quality.rule-bindings.result",
+                    "quality.blocked"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "complete",
+                    "blocked"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ruleBindingReceiptRef",
+            "durableWrites"
+          ],
+          "properties": {
+            "ruleBindingReceiptRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "durableWrites": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "session-artifact",
+                      "worktree-business",
+                      "qdrant-knowledge",
+                      "exact-source",
+                      "exact-command"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
+        },
         "evidenceRefs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/sessionRef"
           }
         },
         "findings": {
@@ -112,6 +268,12 @@
           }
         }
       }
+    }
+  },
+  "$defs": {
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

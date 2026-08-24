@@ -1,19 +1,25 @@
-# Grammar convergence output
+# `fe/grammar-convergence` output
 
-Return one JSON value that validates against `output.schema.json`.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-For every selected block slot, the output either resolves one exact generic owner or records a Grammar gap. A resolved owner includes:
+## JSON architecture
 
-- its exact package, immutable version, integrity, layer and export path;
-- the selected rule and template hash;
-- closed anatomy and behavior invariants;
-- explicitly open variable axes;
-- neutral presentation-state mapping;
-- the applicable complex-case row and proof references;
-- its base-contract reference and hash.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-The only allowed package topology is shared mechanics from `@starci/ui/common` plus exactly one routed `@starci/grammar/<id>`. A routed Grammar may use another package only through an exact dependency declared in its own locked manifest. Never infer that `core`, `miamia` or another Grammar is inherited.
+## State contract
 
-Exports stay generic, for example `@starci/grammar/core/branch/SurfaceCard`, `@starci/grammar/core/branch/SurfaceListCard` or `@starci/grammar/core/composites/Sidebar`. They contain no business semantics. A complex case records how generic owners behave under difficult structural, interaction, content-count and neutral-state combinations.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `converged` | `completed` | `source-fit.resolve / ready` | `grammar-converged` |
+| `refused` | `blocked` | `source-fit.resolve / blocked` | `grammar-business-gate-failed` |
 
-An unresolved owner, state map, complex-case row, extension axis or package export becomes a named `grammar-gap`. A failed business-free gate blocks the run immediately and emits no usable selection.
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

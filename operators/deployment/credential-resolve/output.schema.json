@@ -62,28 +62,183 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "credentialReceiptRef",
         "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
         "evidenceRefs",
         "findings"
       ],
       "properties": {
-        "credentialReceiptRef": {
-          "type": "string",
-          "minLength": 1
-        },
         "decision": {
           "enum": [
             "ready"
           ]
+        },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "deployment/credential-resolve"
+            },
+            "status": {
+              "enum": [
+                "completed",
+                "waiting",
+                "blocked"
+              ]
+            },
+            "code": {
+              "enum": [
+                "deployment-credential-resolve-ready"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "deployment.host"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ready"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "credentialReceiptRef",
+            "durableWrites"
+          ],
+          "properties": {
+            "credentialReceiptRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "durableWrites": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "session-artifact",
+                      "worktree-business",
+                      "qdrant-knowledge",
+                      "exact-source",
+                      "exact-command",
+                      "external-resource",
+                      "credential-handle"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
         },
         "evidenceRefs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/sessionRef"
           }
         },
         "findings": {
@@ -95,6 +250,12 @@
           }
         }
       }
+    }
+  },
+  "$defs": {
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

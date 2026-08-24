@@ -1,28 +1,82 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/test/ui/output.schema.json",
-  "title": "UI Test operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "test/ui operator output",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "kind",
     "schemaVersion",
-    "appId",
     "runId",
     "stage",
     "status",
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "proof.run"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "code.repair"
+            },
+            "status": {
+              "const": "repair"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "layout.review"
+            },
+            "status": {
+              "const": "rejected"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "test.review"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
-    "kind": {
-      "const": "test.ui.output"
-    },
     "schemaVersion": {
       "const": 6
-    },
-    "appId": {
-      "const": "fe-design-layout"
     },
     "runId": {
       "type": "string",
@@ -30,18 +84,18 @@
     },
     "stage": {
       "enum": [
-        "proof.run",
         "code.repair",
-        "test.review",
-        "layout.review"
+        "layout.review",
+        "proof.run",
+        "test.review"
       ]
     },
     "status": {
       "enum": [
+        "blocked",
         "ready",
-        "repair",
         "rejected",
-        "blocked"
+        "repair"
       ]
     },
     "facts": {
@@ -51,151 +105,298 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "uiEvidenceRef",
-        "uiEvidenceHash",
-        "testAccountRef",
-        "scenarioReceipts",
-        "selected",
-        "passed",
-        "failed",
-        "skipped",
-        "failedScenarioIds",
-        "boundaryDriftReasons",
-        "stopReasons",
-        "secretsRedacted"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "uiEvidenceRef": {
-          "type": "string",
-          "minLength": 1
+        "decision": {
+          "enum": [
+            "pass",
+            "in-boundary",
+            "boundary-drift",
+            "blocked"
+          ]
         },
-        "uiEvidenceHash": {
-          "type": "string",
-          "minLength": 1
-        },
-        "testAccountRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "scenarioReceipts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/scenarioReceipt"
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "test/ui"
+            },
+            "status": {
+              "enum": [
+                "blocked",
+                "completed",
+                "repair",
+                "replan"
+              ]
+            },
+            "code": {
+              "enum": [
+                "test-ui-pass",
+                "test-ui-in-boundary",
+                "test-ui-boundary-drift",
+                "test-ui-blocked"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "code.repair",
+                    "layout.review",
+                    "proof.run",
+                    "test.review"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "blocked",
+                    "ready",
+                    "rejected",
+                    "repair"
+                  ]
+                },
+                "factsAdd": {
+                  "$ref": "#/$defs/strings"
+                },
+                "factsRemove": {
+                  "$ref": "#/$defs/strings"
+                }
+              }
+            }
           }
         },
-        "selected": {
-          "type": "integer",
-          "minimum": 0
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receiptRef",
+            "artifacts",
+            "mutations"
+          ],
+          "properties": {
+            "receiptRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "artifacts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "sha256"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "evidence",
+                      "report",
+                      "plan",
+                      "observation",
+                      "artifact"
+                    ]
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "sha256": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/sha256"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "kind",
+                  "beforeRevision",
+                  "afterRevision"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "enum": [
+                      "source",
+                      "filesystem",
+                      "provider",
+                      "runtime",
+                      "data",
+                      "record"
+                    ]
+                  },
+                  "beforeRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "afterRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
-        "passed": {
-          "type": "integer",
-          "minimum": 0
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-artifact",
+                      "qdrant-knowledge",
+                      "exact-source",
+                      "exact-command",
+                      "external-resource",
+                      "credential-handle",
+                      "orchestration"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
         },
-        "failed": {
-          "type": "integer",
-          "minimum": 0
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
         },
-        "skipped": {
-          "type": "integer",
-          "minimum": 0
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sessionRef"
+          }
         },
-        "failedScenarioIds": {
+        "findings": {
           "$ref": "#/$defs/strings"
-        },
-        "boundaryDriftReasons": {
-          "$ref": "#/$defs/strings"
-        },
-        "stopReasons": {
-          "$ref": "#/$defs/strings"
-        },
-        "secretsRedacted": {
-          "const": true
         }
       }
     }
   },
   "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    },
     "strings": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
-    },
-    "scenarioReceipt": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "scenarioId",
-        "pageIds",
-        "viewportIds",
-        "interactionCount",
-        "assertionCount",
-        "screenshotRefs",
-        "traceRef",
-        "accessibilityRef",
-        "status",
-        "ordinaryUserPath",
-        "secretsRedacted"
-      ],
-      "properties": {
-        "scenarioId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "pageIds": {
-          "$ref": "#/$defs/strings",
-          "minItems": 1
-        },
-        "viewportIds": {
-          "type": "array",
-          "prefixItems": [
-            {
-              "const": "wide"
-            },
-            {
-              "const": "intermediate"
-            },
-            {
-              "const": "compact"
-            }
-          ],
-          "items": false
-        },
-        "interactionCount": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "assertionCount": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "screenshotRefs": {
-          "$ref": "#/$defs/strings",
-          "minItems": 3
-        },
-        "traceRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "accessibilityRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "pass",
-            "fail",
-            "blocked"
-          ]
-        },
-        "ordinaryUserPath": {
-          "const": true
-        },
-        "secretsRedacted": {
-          "const": true
-        }
       }
     }
   }

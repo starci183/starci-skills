@@ -41,12 +41,16 @@
     }
   ],
   "sideEffects": [
-    "write the hashed direction batch to cache-only run storage"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "actor goal or terminal outcome is not evidenced",
     "the batch does not contain two or three directions",
     "directions differ only cosmetically",
-    "a direction replaces a multi-page journey with tabs"
+    "a direction replaces a multi-page journey with tabs",
+    "Stop when actor goal, terminal outcome, or a required business transition lacks authority.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

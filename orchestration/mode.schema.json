@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/orchestration/mode.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "strategy", "maxWorkers", "workerPermissions", "joinPolicy", "retention"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 6 },
+    "id": { "enum": ["economical", "balanced", "parallel"] },
+    "strategy": { "enum": ["sequential", "bounded-parallel"] },
+    "maxWorkers": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "workerPermissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read", "analyze", "writeSource", "externalMutation"],
+      "properties": {
+        "read": { "type": "boolean" },
+        "analyze": { "type": "boolean" },
+        "writeSource": { "const": false },
+        "externalMutation": { "const": false }
+      }
+    },
+    "joinPolicy": { "enum": ["coordinator-validates-all"] },
+    "retention": { "const": "until-skill-terminal" }
+  }
+}

@@ -1,90 +1,27 @@
 {
-  "$id": "https://starci.dev/v6/operators/platform/tunnel-plan/input.schema.json",
-  "title": "platform/tunnel-plan operator input",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "platform.tunnel.plan"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
-  ],
+  "$id": "https://starci.dev/v6/operators/platform/tunnel-plan/input.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "platform/tunnel-plan operator input",
+  "type": "object", "additionalProperties": false, "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "enum": [
-        "platform.tunnel.plan"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "routeReceiptRef",
-        "hostnameRef",
-        "originRef",
-        "ownershipRef"
-      ],
-      "properties": {
-        "routeReceiptRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "hostnameRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "originRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "ownershipRef": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    }
+    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 }, "stage": { "const": "platform.tunnel.plan" }, "status": { "const": "ready" }, "facts": { "$ref": "#/$defs/strings" },
+    "payload": { "type": "object", "additionalProperties": false, "required": ["provided", "loads", "session"], "properties": {
+      "provided": { "type": "object", "additionalProperties": false, "required": ["routeReceiptRef", "hostnameRef", "originRef", "ownershipRef"], "properties": { "routeReceiptRef": { "$ref": "#/$defs/sessionRef" }, "hostnameRef": { "$ref": "#/$defs/sessionRef" }, "originRef": { "$ref": "#/$defs/sessionRef" }, "ownershipRef": { "$ref": "#/$defs/sessionRef" } } },
+      "loads": { "type": "object", "additionalProperties": false, "required": ["artifacts", "knowledge", "source", "external", "orchestration"], "properties": {
+        "artifacts": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "$ref": "#/$defs/artifactLoad" } },
+        "knowledge": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/knowledgeLoad" } }, "source": { "$ref": "#/$defs/sourceLoad" }, "external": { "$ref": "#/$defs/externalLoad" }, "orchestration": { "$ref": "#/$defs/orchestration" }
+      } },
+      "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
+    } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }, "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "artifactLoad": { "type": "object", "additionalProperties": false, "required": ["ref", "revision", "loadMode"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "session-exact" } } },
+    "knowledgeLoad": { "type": "object", "additionalProperties": false, "required": ["id", "generation", "contentSha256", "loadMode"], "properties": { "id": { "const": "platform.operations" }, "generation": { "type": "string", "minLength": 1 }, "contentSha256": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "qdrant-exact" } } },
+    "sourceLoad": { "type": "object", "additionalProperties": false, "required": ["loadMode", "repositoryContext", "targetFiles"], "properties": { "loadMode": { "const": "exact-files" }, "repositoryContext": { "const": false }, "targetFiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["path", "beforeSha256", "access", "purpose"], "properties": { "path": { "type": "string", "minLength": 1 }, "beforeSha256": { "$ref": "#/$defs/sha256" }, "access": { "const": "read" }, "purpose": { "type": "string", "minLength": 1 } } } } } },
+    "externalLoad": { "type": "object", "additionalProperties": false, "required": ["loadMode", "resources", "credentialHandles"], "properties": {
+      "loadMode": { "const": "declared-only" },
+      "resources": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["ref", "revision", "kind", "access"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "type": "string", "minLength": 1 }, "kind": { "enum": ["cloudflare-account", "cloudflare-tunnel", "dns-hostname", "origin", "ownership-record"] }, "access": { "const": "read" } } } },
+      "credentialHandles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["ref", "provider", "access"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "provider": { "const": "cloudflare" }, "access": { "const": "opaque-read-handle" } } } }
+    } },
+    "orchestration": { "type": "object", "additionalProperties": false, "required": ["mode", "profileRef", "providerRef"], "properties": { "mode": { "enum": ["economical", "balanced", "parallel"] }, "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] }, "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" } } }
   }
 }

@@ -301,6 +301,27 @@
           },
           "target": "format",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "boundary-plan",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },

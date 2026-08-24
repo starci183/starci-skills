@@ -1,0 +1,15 @@
+{
+  "$schema": "../mode.schema.json",
+  "schemaVersion": 6,
+  "id": "economical",
+  "strategy": "sequential",
+  "maxWorkers": 0,
+  "workerPermissions": {
+    "read": false,
+    "analyze": false,
+    "writeSource": false,
+    "externalMutation": false
+  },
+  "joinPolicy": "coordinator-validates-all",
+  "retention": "until-skill-terminal"
+}

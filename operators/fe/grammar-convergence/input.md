@@ -1,15 +1,32 @@
-# Grammar convergence input
+# `fe/grammar-convergence` input
 
-Grammar convergence starts only after `OK LAYOUT <id>` binds one layout direction.
+The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
 
-Provide one JSON value that validates against `input.schema.json`.
+## JSON architecture
 
-The input contains:
+| Section | Authored by | Purpose |
+| --- | --- | --- |
+| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
+| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
+| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
+| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
 
-- the selected layout artifact, hash and direction ID;
-- one exact `@starci/ui/common` lock and exactly one routed `@starci/grammar/<id>` lock, both with immutable versions and integrity values;
-- block-level structural, interaction and presentation facts projected into a closed render-neutral vocabulary;
-- neutral presentation-state IDs translated upstream by opaque Product Blocks;
-- exact bundle manifests and base-contract references available to the selected route.
+## Provided by the previous state
 
-Do not provide actor, product entity, business operation, price, entitlement, domain state, policy or outcome. Copy may be passed only as opaque slot content and may never select a rule. The operator rejects business-bearing fields rather than learning them as new Grammar vocabulary.
+- `priorStateRef`: the accepted upstream state that authorizes bind an approved layout to the locked Grammar packages and refuse business semantics inside Grammar.
+- `businessHeadRef`: the selected business authority reference.
+- `authorityRefs`: the exact approved layout, neutral fact model, and Grammar lock references.
+- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
+- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
+
+These fields are references, not copied documents. The operator must not infer substitutes.
+
+## Loaded by the runtime
+
+- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `upstream`: resolve only the declared session references for approved layout, neutral fact model, and Grammar lock.
+- `knowledge`: retrieve `fe.grammar-complex-cases` from the pinned generation and content hash.
+- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
+
+`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

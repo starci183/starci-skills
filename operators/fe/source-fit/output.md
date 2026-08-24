@@ -1,14 +1,26 @@
-# Source fit output
+# `fe/source-fit` output
 
-Return one JSON value that validates against `output.schema.json`.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-Every required owner receives exactly one verdict:
+## JSON architecture
 
-- `reuse`: instantiate the exact existing effective contract without structural change;
-- `extend`: use only an axis opened by both Grammar and the resolved effective contract, with a declared source delta;
-- `create-block-or-above`: create an application Product Block, Layout or Page while reusing every required lower-tier owner;
-- `grammar-gap`: stop local lower-tier reconstruction and create a durable request for the missing generic owner, export, state map, complex-case row or extension axis.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-Application source normally authors from Product Block upward. Leaves, branches and composites may only be existing package exports or declared extensions. A missing lower-tier reusable owner is never permission to recreate it locally.
+## State contract
 
-The output summarizes which facts are added for routing: `create-required` when at least one block-or-above owner is new, and `grammar-gap` when package authority is incomplete. It carries request obligations forward without writing requests itself.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `reuse-only` | `completed` | `principles.compile / ready` | `source-fit-ready` |
+| `create-required` | `completed` | `principles.compile / ready` | `source-fit-ready`, `create-required` |
+| `grammar-gap` | `completed` | `principles.compile / ready` | `source-fit-ready`, `grammar-gap` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

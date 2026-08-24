@@ -29,12 +29,16 @@
     }
   ],
   "sideEffects": [
-    "write one hashed page-model artifact below the run workspace"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "flow approval id or batch hash does not match",
     "an approved journey step has no page owner",
     "a multi-page linear journey has zero or multiple progress owners",
-    "a Block depends on an unevidenced business fact"
+    "a Block depends on an unevidenced business fact",
+    "Stop on approval-hash mismatch, ownerless step, duplicate progress owner, or a page depending on an unevidenced fact.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

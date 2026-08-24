@@ -1,28 +1,68 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/implementation/input.schema.json",
-  "title": "FE implementation operator input",
+  "title": "fe/implementation operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "kind",
     "schemaVersion",
-    "appId",
     "runId",
     "stage",
     "status",
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "requests.review"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "request.result"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "code.repair"
+            },
+            "status": {
+              "const": "repair"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
-    "kind": {
-      "const": "fe.implementation.input"
-    },
     "schemaVersion": {
       "const": 6
-    },
-    "appId": {
-      "const": "fe-design-layout"
     },
     "runId": {
       "type": "string",
@@ -42,155 +82,316 @@
       ]
     },
     "facts": {
-      "$ref": "#/$defs/factList"
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "approvedLayoutRef",
-        "approvedLayoutHash",
-        "exactSourceBoundary",
-        "sourceFitRef",
-        "implementationPlanRef",
-        "effectiveContractRefs",
-        "permittedLowerTierExtensions",
-        "requestPaths",
-        "repairEvidenceRefs"
+        "provided",
+        "loads",
+        "session"
       ],
       "properties": {
-        "approvedLayoutRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "approvedLayoutHash": {
-          "type": "string",
-          "minLength": 1
-        },
-        "exactSourceBoundary": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "sourceFitRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "implementationPlanRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "effectiveContractRefs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "permittedLowerTierExtensions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/lowerTierExtension"
+        "provided": {
+          "type": "object",
+          "description": "References supplied by the previous state; workers cannot replace or broaden them.",
+          "additionalProperties": false,
+          "required": [
+            "priorStateRef",
+            "businessHeadRef",
+            "authorityRefs",
+            "approvalRef",
+            "baselineRef"
+          ],
+          "properties": {
+            "priorStateRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "businessHeadRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "authorityRefs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "approvalRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "baselineRef": {
+              "type": "string",
+              "pattern": "^(git:[0-9a-f]{7,64}|sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            }
           }
         },
-        "requestPaths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^\\.claude/requests/[a-z0-9]+(?:-[a-z0-9]+)*\\.request\\.json$"
-          },
-          "uniqueItems": true
+        "loads": {
+          "type": "object",
+          "description": "Runtime-resolved bindings. They identify exact values to load and never carry broad copied context.",
+          "additionalProperties": false,
+          "required": [
+            "business",
+            "upstream",
+            "knowledge",
+            "frontendSource",
+            "exactTargets",
+            "orchestration"
+          ],
+          "properties": {
+            "business": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "authorityPath",
+                "revision"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "authorityPath": {
+                  "type": "string",
+                  "pattern": "^\\.worktrees/business/"
+                },
+                "revision": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "upstream": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "revision": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "generation",
+                  "contentSha256",
+                  "loadMode"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "fe.implementation-boundaries"
+                    ]
+                  },
+                  "generation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "contentSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "loadMode": {
+                    "const": "qdrant-exact"
+                  }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "profileRef",
+                "providerRef"
+              ],
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "economical",
+                    "balanced",
+                    "parallel"
+                  ]
+                },
+                "profileRef": {
+                  "enum": [
+                    "orchestration/modes/economical.json",
+                    "orchestration/modes/balanced.json",
+                    "orchestration/modes/parallel.json"
+                  ]
+                },
+                "providerRef": {
+                  "type": "string",
+                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
+                }
+              }
+            },
+            "frontendSource": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "snapshotPath",
+                "snapshotSha256",
+                "generatorSha256",
+                "generation",
+                "queryIds",
+                "loadMode",
+                "indexStatus",
+                "rawRepositoryContext"
+              ],
+              "properties": {
+                "snapshotPath": {
+                  "type": "string",
+                  "pattern": "^\\.worktrees/frontend-source/"
+                },
+                "snapshotSha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "generatorSha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "generation": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "queryIds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "loadMode": {
+                  "const": "hash-pinned-json-generation"
+                },
+                "indexStatus": {
+                  "enum": [
+                    "reused",
+                    "upserted"
+                  ]
+                },
+                "rawRepositoryContext": {
+                  "const": false
+                }
+              }
+            },
+            "exactTargets": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "access",
+                  "allowedChanges"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "access": {
+                    "const": "write"
+                  },
+                  "allowedChanges": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
-        "repairEvidenceRefs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
+        "session": {
+          "type": "object",
+          "description": "Ephemeral task-local storage, never a persistence path.",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
+          }
         }
       }
     }
   },
   "$defs": {
-    "factList": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "uniqueItems": true
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "lowerTierExtension": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "path",
-        "tier",
-        "extensionAxis",
-        "effectiveContractRef",
-        "requestPath"
-      ],
-      "properties": {
-        "path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "tier": {
-          "enum": [
-            "composite",
-            "branch",
-            "leaf"
-          ]
-        },
-        "extensionAxis": {
-          "type": "string",
-          "minLength": 1
-        },
-        "effectiveContractRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "requestPath": {
-          "type": "string",
-          "pattern": "^\\.claude/requests/[a-z0-9]+(?:-[a-z0-9]+)*\\.request\\.json$"
-        }
-      }
-    },
-    "checkReceipt": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "name",
-        "commandRef",
-        "status",
-        "evidenceRef"
-      ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "commandRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "pass",
-            "fail"
-          ]
-        },
-        "evidenceRef": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

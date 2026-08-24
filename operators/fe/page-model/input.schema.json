@@ -1,7 +1,7 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/page-model/input.schema.json",
-  "title": "FE page model operator input",
+  "title": "fe/page-model operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,194 +12,266 @@
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "flow.review"
+            },
+            "status": {
+              "const": "approved"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
     "schemaVersion": {
       "const": 6
     },
     "runId": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+      "minLength": 1
     },
     "stage": {
-      "const": "flow.review"
+      "enum": [
+        "flow.review"
+      ]
     },
     "status": {
-      "const": "approved"
+      "enum": [
+        "approved"
+      ]
     },
     "facts": {
       "type": "array",
-      "contains": {
-        "const": "flow-approved"
-      },
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
+      }
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "selectedFlowRef",
-        "selectedFlowId",
-        "directionBatchHash",
-        "approvalReceiptRef",
-        "businessEvidenceReceiptRef"
+        "provided",
+        "loads",
+        "session"
       ],
       "properties": {
-        "selectedFlowRef": {
-          "$ref": "#/$defs/ref"
+        "provided": {
+          "type": "object",
+          "description": "References supplied by the previous state; workers cannot replace or broaden them.",
+          "additionalProperties": false,
+          "required": [
+            "priorStateRef",
+            "businessHeadRef",
+            "authorityRefs",
+            "approvalRef",
+            "baselineRef"
+          ],
+          "properties": {
+            "priorStateRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "businessHeadRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "authorityRefs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "approvalRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "baselineRef": {
+              "type": "string",
+              "pattern": "^(git:[0-9a-f]{7,64}|sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            }
+          }
         },
-        "selectedFlowId": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        "loads": {
+          "type": "object",
+          "description": "Runtime-resolved bindings. They identify exact values to load and never carry broad copied context.",
+          "additionalProperties": false,
+          "required": [
+            "business",
+            "upstream",
+            "knowledge",
+            "orchestration"
+          ],
+          "properties": {
+            "business": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "authorityPath",
+                "revision"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "authorityPath": {
+                  "type": "string",
+                  "pattern": "^\\.worktrees/business/"
+                },
+                "revision": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "upstream": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "revision": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "generation",
+                  "contentSha256",
+                  "loadMode"
+                ],
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "fe.page-model"
+                    ]
+                  },
+                  "generation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "contentSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "loadMode": {
+                    "const": "qdrant-exact"
+                  }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "profileRef",
+                "providerRef"
+              ],
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "economical",
+                    "balanced",
+                    "parallel"
+                  ]
+                },
+                "profileRef": {
+                  "enum": [
+                    "orchestration/modes/economical.json",
+                    "orchestration/modes/balanced.json",
+                    "orchestration/modes/parallel.json"
+                  ]
+                },
+                "providerRef": {
+                  "type": "string",
+                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
+                }
+              }
+            }
+          }
         },
-        "directionBatchHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "approvalReceiptRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "businessEvidenceReceiptRef": {
-          "$ref": "#/$defs/ref"
+        "session": {
+          "type": "object",
+          "description": "Ephemeral task-local storage, never a persistence path.",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
+          }
         }
       }
     }
   },
   "$defs": {
-    "ref": {
+    "sha256": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "hash": {
+    "sessionRef": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "block": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "level",
-        "purpose",
-        "responsibility",
-        "userIntent",
-        "contentOwned",
-        "dataProfile",
-        "evidenceRefs",
-        "stateInputs"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
-        },
-        "level": {
-          "const": "product-block"
-        },
-        "purpose": {
-          "type": "string",
-          "minLength": 1
-        },
-        "responsibility": {
-          "type": "string",
-          "minLength": 1
-        },
-        "userIntent": {
-          "type": "string",
-          "minLength": 1
-        },
-        "contentOwned": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "dataProfile": {
-          "enum": [
-            "sparse",
-            "balanced",
-            "dense",
-            "repeating"
-          ]
-        },
-        "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/ref"
-          },
-          "uniqueItems": true
-        },
-        "stateInputs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        }
-      }
-    },
-    "page": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "sequence",
-        "routeIntent",
-        "dominantTask",
-        "entryCondition",
-        "completionCondition",
-        "journeyProgressRef",
-        "blocks"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
-        },
-        "sequence": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "routeIntent": {
-          "type": "string",
-          "minLength": 1
-        },
-        "dominantTask": {
-          "type": "string",
-          "minLength": 1
-        },
-        "entryCondition": {
-          "type": "string",
-          "minLength": 1
-        },
-        "completionCondition": {
-          "type": "string",
-          "minLength": 1
-        },
-        "journeyProgressRef": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/ref"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "blocks": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/block"
-          }
-        }
-      }
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

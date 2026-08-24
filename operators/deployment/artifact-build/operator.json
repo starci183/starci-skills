@@ -4,35 +4,30 @@
   "domain": "deployment",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
+  "knowledgeRefs": ["deployment.lifecycle"],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.artifact.build",
-      "status": "ready",
-      "allFacts": [
-        "deployment-host-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.artifact.publish",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-artifacts-built"
-      ],
-      "factsRemove": []
-    }
-  ],
+  "accepts": [{
+    "stage": "deployment.artifact.build",
+    "status": "ready",
+    "allFacts": ["deployment-host-ready"],
+    "noneFacts": []
+  }],
+  "emits": [{
+    "stage": "deployment.artifact.publish",
+    "status": "ready",
+    "factsAdd": ["deployment-artifacts-built"],
+    "factsRemove": []
+  }],
   "sideEffects": [
-    "write ignored build outputs and immutable local artifacts"
+    "write ignored build outputs and immutable local artifacts declared by the execution plan",
+    "keep input, output, loaded source, command captures, worker observations, diagnostics, and receipts in task-session memory only",
+    "purge every intermediate session object at each parent-skill terminal state"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "a required execution-plan, source, knowledge, command, or artifact binding is missing or stale",
+    "a current source hash differs from the approved build revision",
+    "a build command or output crosses the declared boundary",
+    "an intermediate input, output, command capture, observation, diagnostic, analysis transcript, or receipt would be persisted outside the task session",
+    "repository source context, indexed source summaries, or an undeclared file or command would be loaded"
   ]
 }

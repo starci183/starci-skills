@@ -1,7 +1,23 @@
-# Unit Test input
+# `test/unit` input
 
-Validate with `validate-input.mjs` before reading source or running a command.
+This closed JSON object is ephemeral task-session state and is purged on every parent-skill terminal state.
 
-Input stage is `test.unit / ready` with `seed-evidence`. It binds the verified workspace route, one source role, the matching immutable StarCi reference, target manifests, the implementation change-set hash, exact unit targets, and a durable evidence root.
+## JSON architecture
 
-`sourceReferenceRef` must resolve through `../../../knowledge/references/catalog.json` to the same role as `sourceRole`. A reference supplies test-shape precedent only; current manifests and source own the command and behavior.
+| Section | Owner | Meaning |
+| --- | --- | --- |
+| Root envelope | Skill machine | Accepted stage, status, and facts. |
+| `payload.provided` | Previous state | Immutable refs: `previousStateRef`, `testPlanRef`, `changeSetRef`, `seedEvidenceRef`. |
+| `payload.loads` | Runtime | Exact bindings to load. |
+| `payload.session` | Session runtime | Input, output, scratch, and cleanup lifetime. |
+
+## Runtime loads
+
+- `business`: must be `null`.
+- `knowledge`: exact pinned `fe.unit-testing`.
+- `source`: exact hash-pinned files only; broad repository preloading is forbidden.
+- `commands`: declared argv, cwd, and environment-name allowlist only.
+- `external`: declared resources and opaque credential handles only.
+- `orchestration`: one mode and provider profile.
+
+Validate before loading. Never persist input, loaded values, scratch, observations, or receipts.

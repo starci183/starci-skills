@@ -1,27 +1,51 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { runCli, validateAgainst } from './validate-output.mjs';
+import path from 'node:path';
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-export function validateInput(value) {
-  const result = validateAgainst(value, 'input');
-  if (!result.ok) return result;
+const guards = {
+  "layout.generate\u0000ready": {
+    "all": [
+      "flow-approved",
+      "page-model-ready",
+      "state-model-ready"
+    ],
+    "none": []
+  },
+  "layout.review\u0000rejected": {
+    "all": [
+      "layout-feedback-recorded"
+    ],
+    "none": [
+      "layout-approved"
+    ]
+  }
+};
+const profileByMode = {
+  economical: 'orchestration/modes/economical.json',
+  balanced: 'orchestration/modes/balanced.json',
+  parallel: 'orchestration/modes/parallel.json'
+};
+
+function semanticErrors(value) {
   const errors = [];
-  const pageIds = new Set(value.pageIds);
-  if (pageIds.size !== value.pageIds.length) errors.push('$.pageIds: ids must be unique');
-  if (value.pageIds.length > 1 && !value.journeyProgressOwner) errors.push('$.journeyProgressOwner: required for an ordered multi-page journey');
-  const blockIds = value.blocks.map((block) => block.blockId);
-  const knownBlocks = new Set(blockIds);
-  if (knownBlocks.size !== blockIds.length) errors.push('$.blocks: blockId values must be unique');
-  for (const [index, block] of value.blocks.entries()) {
-    if (block.scope === 'page' && !pageIds.has(block.owner)) errors.push(`$.blocks[${index}].owner: page-scoped owner must name a pageId`);
-    for (const dependency of block.dependsOn) if (!knownBlocks.has(dependency)) errors.push(`$.blocks[${index}].dependsOn: unknown block ${dependency}`);
-  }
-  if (value.journeyProgressOwner && !knownBlocks.has(value.journeyProgressOwner)) errors.push('$.journeyProgressOwner: must name one supplied global block');
-  if (value.journeyProgressOwner) {
-    const owner = value.blocks.find((block) => block.blockId === value.journeyProgressOwner);
-    if (owner && owner.scope !== 'global') errors.push('$.journeyProgressOwner: journey progress must be globally owned');
-  }
-  return { ok: errors.length === 0, errors };
+  const guard = guards[`${value.stage}\u0000${value.status}`] ?? { all: [], none: [] };
+  for (const fact of guard.all) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
+  for (const fact of guard.none) if (value.facts.includes(fact)) errors.push(`$.facts: forbidden ${fact}`);
+
+  const { provided, loads, session } = value.payload;
+  if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
+  if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
+
+  const prefix = `session://tasks/${session.taskId}/`;
+  const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
+  for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
+  for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
+
+
+  return errors;
 }
 
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) runCli(validateInput, 'layout input');
+export const validateInput = validatorFor(new URL('./input.schema.json', import.meta.url), semanticErrors);
+
+if (process.argv[1]?.endsWith('validate-input.mjs')) {
+  await runValidatorCli(validateInput, 'node validate-input.mjs <artifact.json>');
+}

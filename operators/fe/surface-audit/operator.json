@@ -34,9 +34,15 @@
       "factsRemove": []
     }
   ],
-  "sideEffects": [],
+  "sideEffects": [
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
+  ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "Stop when the baseline, surface identity, contract generation, or proof is missing or stale.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

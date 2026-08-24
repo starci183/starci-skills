@@ -1,18 +1,24 @@
-# Layout output
+# `fe/layout` output
 
-Return one JSON value that validates against `output.schema.json`.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-The output contains two or three materially different layout directions. Every direction must:
+## JSON architecture
 
-- keep the same approved flow, page inventory, global-block ownership and evidenced states;
-- give every page a semantic reading order;
-- define wide, intermediate and compact tracks;
-- place every visible block in each viewport form and explain why its span, order and persistence match its task weight and content density;
-- state when a supporting block remains a narrow track, moves inline or becomes a named replacement control;
-- make every sticky choice explicit, including reason, scroll owner, release condition and compact behavior;
-- preserve one global journey-progress owner across the whole journey;
-- name its material differences, trade-offs and proof obligations.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-Directions differ in a consequential composition axis, not in colour, wording or arbitrary card decoration. They remain block-level: no class names, exact package exports or local component invention.
+## State contract
 
-The operator recommends one direction but does not approve it. It returns `layout.review/pending` and the exact commands `OK LAYOUT <direction-id>`. No implementation or third creative checkpoint begins until one command is received.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `directions-ready` | `pending` | `layout.review / pending` | `layout-directions-ready` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

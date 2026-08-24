@@ -4,28 +4,19 @@
   "domain": "be",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "be.boundary-planning"
-  ],
-  "sourceReferenceRefs": [
-    "starci-academy-be"
-  ],
+  "knowledgeRefs": ["be.boundary-planning"],
+  "sourceReferenceRefs": ["starci-academy-be"],
   "accepts": [
     {
       "stage": "architecture.boundary.review",
       "status": "approved",
-      "allFacts": [
-        "backend-boundary-approved"
-      ],
+      "allFacts": ["backend-boundary-approved"],
       "noneFacts": []
     },
     {
       "stage": "be.repair",
       "status": "ready",
-      "allFacts": [
-        "backend-boundary-approved",
-        "in-boundary-repair"
-      ],
+      "allFacts": ["backend-boundary-approved", "in-boundary-repair"],
       "noneFacts": []
     }
   ],
@@ -33,18 +24,36 @@
     {
       "stage": "quality.format",
       "status": "ready",
-      "factsAdd": [
-        "backend-source-written"
-      ],
+      "factsAdd": ["backend-source-written"],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": ["backend-boundary-feedback", "source-drift"],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": ["backend-boundary-feedback", "boundary-drift"],
+      "factsRemove": []
+    },
+    {
+      "stage": "be.blocked",
+      "status": "blocked",
+      "factsAdd": ["backend-implementation-blocked"],
       "factsRemove": []
     }
   ],
   "sideEffects": [
     "write only approved backend product-source paths",
-    "write immutable mutation receipt"
+    "keep operator input, output, context, observations, and receipts in task-session memory only",
+    "purge all intermediate session objects at every parent-skill terminal state"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "a required business, boundary, knowledge, approval, or source binding is missing or stale",
+    "a current source hash differs from the approved baseline",
+    "correct implementation would cross the approved boundary"
   ]
 }

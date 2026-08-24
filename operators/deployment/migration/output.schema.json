@@ -1,7 +1,7 @@
 {
   "$id": "https://starci.dev/v6/operators/deployment/migration/output.schema.json",
-  "title": "deployment/migration operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "deployment/migration operator output",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -70,39 +70,33 @@
     },
     "stage": {
       "enum": [
+        "deployment.blocked",
         "deployment.domain",
-        "deployment.rollback",
-        "deployment.blocked"
+        "deployment.rollback"
       ]
     },
     "status": {
       "enum": [
-        "ready",
-        "blocked"
+        "blocked",
+        "ready"
       ]
     },
     "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "$ref": "#/$defs/strings"
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "migrationReceiptRef",
         "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
         "evidenceRefs",
         "findings"
       ],
       "properties": {
-        "migrationReceiptRef": {
-          "type": "string",
-          "minLength": 1
-        },
         "decision": {
           "enum": [
             "applied",
@@ -111,23 +105,276 @@
             "blocked"
           ]
         },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "deployment/migration"
+            },
+            "status": {
+              "enum": [
+                "blocked",
+                "completed"
+              ]
+            },
+            "code": {
+              "enum": [
+                "deployment-migration-applied",
+                "deployment-migration-not-applicable",
+                "deployment-migration-rollback",
+                "deployment-migration-blocked"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "deployment.blocked",
+                    "deployment.domain",
+                    "deployment.rollback"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "blocked",
+                    "ready"
+                  ]
+                },
+                "factsAdd": {
+                  "$ref": "#/$defs/strings"
+                },
+                "factsRemove": {
+                  "$ref": "#/$defs/strings"
+                }
+              }
+            }
+          }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receiptRef",
+            "artifacts",
+            "mutations"
+          ],
+          "properties": {
+            "receiptRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "artifacts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "sha256"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "evidence",
+                      "report",
+                      "plan",
+                      "observation",
+                      "artifact"
+                    ]
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "sha256": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/sha256"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "kind",
+                  "beforeRevision",
+                  "afterRevision"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "enum": [
+                      "source",
+                      "filesystem",
+                      "provider",
+                      "runtime",
+                      "data",
+                      "record"
+                    ]
+                  },
+                  "beforeRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "afterRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-artifact",
+                      "qdrant-knowledge",
+                      "exact-source",
+                      "exact-command",
+                      "external-resource",
+                      "credential-handle",
+                      "orchestration"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
+        },
         "evidenceRefs": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/sessionRef"
           }
         },
         "findings": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
+          "$ref": "#/$defs/strings"
         }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    },
+    "strings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
       }
     }
   }

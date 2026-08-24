@@ -78,6 +78,7 @@ See [INDEX.md](INDEX.md) for the binding load order.
 ```text
 skills/                       user-facing state-machine skills
 operators/<domain>/<name>/    atomic execution contracts
+orchestration/                execution modes and provider mappings
 knowledge/                    Qdrant-indexed operator knowledge
 runtime/knowledge-runtime/    embedded index and retrieval runtime
 scripts/                      query and release validation commands

@@ -1,14 +1,24 @@
-# Preflight output
+# `fe/preflight` output
 
-Successful preflight returns `flow.generate / ready` with a frozen request reference and four receipts:
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-- workspace route receipt;
-- business evidence receipt;
-- effective source-contract receipt;
-- Grammar lock receipt.
+## JSON architecture
 
-Receipts contain stable artifact references and hashes. They do not inline source contracts, component inventories or Grammar instructions. Creative operators receive the product problem and evidence without carrying implementation vocabulary into their input.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-The output also records the exact allowed write roots and approval mode. No frontend source is changed by preflight.
+## State contract
 
-Failure is a stop, not a best-effort continuation. A stale route, failed contract export, unresolved Grammar, business request without evidence, or write boundary outside the verified workspace leaves no output artifact for the next stage.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `preflight-ready` | `completed` | `flow.generate / ready` | `preflight-complete`, `frontend-contract-generation-ready`, `grammar-lock-ready` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

@@ -1,9 +1,24 @@
-# Unit Test output
+# `test/unit` output
 
-Validate with `validate-output.mjs` before routing.
+This closed output is ephemeral task-session state and is purged with every intermediate at every parent `skill-terminal` state.
 
-- Pass: `test.e2e / ready` with `unit-pass` and `unit-evidence`.
-- Assertion or coverage failure: `code.repair / repair` with `unit-failed` and `in-boundary-repair`.
-- Missing harness, command authority, or executable environment: `test.review / blocked` with `unit-blocked`.
+## JSON architecture
 
-A pass requires at least one selected and passed test, zero failed tests, zero skipped target tests, one command receipt, and a durable evidence reference.
+| Section | Meaning |
+| --- | --- |
+| `payload.decision` | Typed route key. |
+| `payload.state` | Status, code, retryability, and emitted route. |
+| `payload.produced` | Session receipt/artifacts and approved durable-mutation metadata. |
+| `payload.context` | Refs and revisions used, never copied context or reasoning. |
+| `payload.cleanup` | Scratch inventory and terminal purge. |
+| `payload.evidenceRefs` / `findings` | Session evidence and concise unresolved facts. |
+
+## State contract
+
+| Decision | Operator state | Emitted state | Evidence |
+| --- | --- | --- | --- |
+| `pass` | `completed` | `test.e2e / ready` | Adds `unit-pass, unit-evidence`. |
+| `in-boundary` | `repair` | `code.repair / repair` | Adds `unit-failed, in-boundary-repair`. |
+| `blocked` | `blocked` | `test.review / blocked` | Adds `unit-blocked`. |
+
+`payload.state.emits` must exactly match the root route and manifest facts. All receipt and evidence refs use `session://`.

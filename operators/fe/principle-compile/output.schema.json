@@ -1,351 +1,334 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/principle-compile/output.schema.json",
-  "title": "FE Principle compile operator output",
-  "oneOf": [
+  "title": "fe/principle-compile operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
     {
-      "$ref": "#/$defs/compiledOutput"
-    },
-    {
-      "$ref": "#/$defs/blockedOutput"
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "requests.review"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "requests.review"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
     }
   ],
-  "$defs": {
-    "slug": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+  "properties": {
+    "schemaVersion": {
+      "const": 6
     },
-    "hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "ref": {
+    "runId": {
       "type": "string",
       "minLength": 1
     },
-    "text": {
-      "type": "string",
-      "minLength": 1
-    },
-    "concern": {
+    "stage": {
       "enum": [
-        "composition",
-        "spacing-boundary",
-        "hierarchy",
-        "responsive-persistence",
-        "state-interaction"
+        "requests.review"
       ]
     },
-    "artifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "ref",
-        "hash"
-      ],
-      "properties": {
-        "ref": {
-          "$ref": "#/$defs/ref"
-        },
-        "hash": {
-          "$ref": "#/$defs/hash"
-        }
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
       }
     },
-    "openDecision": {
+    "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decisionId",
-        "targetRef",
-        "concern",
-        "situation",
-        "axis",
-        "openedByGrammarRef",
-        "openedBySourceFitRef",
-        "preservedInvariants",
-        "proofEnvironment"
-      ],
-      "properties": {
-        "decisionId": {
-          "$ref": "#/$defs/slug"
-        },
-        "targetRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "concern": {
-          "$ref": "#/$defs/concern"
-        },
-        "situation": {
-          "$ref": "#/$defs/text"
-        },
-        "axis": {
-          "$ref": "#/$defs/slug"
-        },
-        "openedByGrammarRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "openedBySourceFitRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "preservedInvariants": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/slug"
-          }
-        },
-        "proofEnvironment": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "wide",
-              "intermediate",
-              "compact",
-              "keyboard",
-              "screen-reader",
-              "state-transition",
-              "content-volume",
-              "zoom"
-            ]
-          }
-        }
-      }
-    },
-    "principle": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "decisionId",
-        "targetRef",
-        "concern",
-        "situation",
         "decision",
-        "implementationIntent",
-        "negativeBoundary",
-        "proof",
-        "authority"
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "decisionId": {
-          "$ref": "#/$defs/slug"
-        },
-        "targetRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "concern": {
-          "$ref": "#/$defs/concern"
-        },
-        "situation": {
-          "$ref": "#/$defs/text"
-        },
         "decision": {
-          "$ref": "#/$defs/text"
-        },
-        "implementationIntent": {
-          "$ref": "#/$defs/text"
-        },
-        "negativeBoundary": {
-          "$ref": "#/$defs/text"
-        },
-        "proof": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "cases",
-            "observations",
-            "passCondition"
-          ],
-          "properties": {
-            "cases": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "wide",
-                  "intermediate",
-                  "compact",
-                  "keyboard",
-                  "screen-reader",
-                  "state-transition",
-                  "content-volume",
-                  "zoom"
-                ]
-              }
-            },
-            "observations": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/text"
-              }
-            },
-            "passCondition": {
-              "$ref": "#/$defs/text"
-            }
-          }
-        },
-        "authority": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "axis",
-            "grammarRef",
-            "sourceFitRef",
-            "preservedInvariants"
-          ],
-          "properties": {
-            "axis": {
-              "$ref": "#/$defs/slug"
-            },
-            "grammarRef": {
-              "$ref": "#/$defs/ref"
-            },
-            "sourceFitRef": {
-              "$ref": "#/$defs/ref"
-            },
-            "preservedInvariants": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/slug"
-              }
-            }
-          }
-        }
-      }
-    },
-    "compiledOutput": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schemaVersion",
-        "appId",
-        "runId",
-        "stage",
-        "status",
-        "result",
-        "principles",
-        "receipt",
-        "factsAdd"
-      ],
-      "properties": {
-        "$schema": {
-          "type": "string"
-        },
-        "schemaVersion": {
-          "const": 6
-        },
-        "appId": {
-          "const": "fe-design-layout"
-        },
-        "runId": {
-          "$ref": "#/$defs/slug"
-        },
-        "stage": {
-          "const": "requests.review"
-        },
-        "status": {
-          "const": "ready"
-        },
-        "result": {
-          "const": "compiled"
-        },
-        "principles": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/principle"
-          }
-        },
-        "receipt": {
-          "$ref": "#/$defs/artifact"
-        },
-        "factsAdd": {
-          "const": [
-            "principles-compiled"
+          "enum": [
+            "compiled",
+            "blocked"
           ]
-        }
-      }
-    },
-    "blockedOutput": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schemaVersion",
-        "appId",
-        "runId",
-        "stage",
-        "status",
-        "result",
-        "refusals",
-        "factsAdd"
-      ],
-      "properties": {
-        "$schema": {
-          "type": "string"
         },
-        "schemaVersion": {
-          "const": 6
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "fe/principle-compile"
+            },
+            "status": {
+              "enum": [
+                "completed",
+                "blocked"
+              ]
+            },
+            "code": {
+              "enum": [
+                "fe-principle-compile-compiled",
+                "fe-principle-compile-blocked"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "requests.review"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ready",
+                    "blocked"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
         },
-        "appId": {
-          "const": "fe-design-layout"
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
+          ],
+          "properties": {
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            }
+          }
         },
-        "runId": {
-          "$ref": "#/$defs/slug"
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
         },
-        "stage": {
-          "const": "requests.review"
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
         },
-        "status": {
-          "const": "blocked"
-        },
-        "result": {
-          "const": "blocked"
-        },
-        "refusals": {
+        "evidenceRefs": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "decisionId",
-              "code",
-              "reason"
-            ],
-            "properties": {
-              "decisionId": {
-                "$ref": "#/$defs/slug"
-              },
-              "code": {
-                "enum": [
-                  "closed-axis",
-                  "owner-substitution",
-                  "missing-situation",
-                  "missing-negative-boundary",
-                  "unprovable-decision",
-                  "product-semantic-leak",
-                  "grammar-authority-leak"
-                ]
-              },
-              "reason": {
-                "$ref": "#/$defs/text"
-              }
-            }
+            "$ref": "#/$defs/sessionRef"
           }
         },
-        "factsAdd": {
-          "const": [
-            "principle-boundary-failed"
-          ]
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

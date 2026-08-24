@@ -1,7 +1,7 @@
 {
   "$id": "https://starci.dev/v6/operators/deployment/manifest-validate/input.schema.json",
-  "title": "deployment/manifest-validate operator input",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "deployment/manifest-validate operator input",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -51,34 +51,272 @@
       ]
     },
     "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "$ref": "#/$defs/strings"
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "deploymentContractRef",
-        "manifestRef",
-        "routeReceiptRefs"
+        "provided",
+        "loads",
+        "session"
       ],
       "properties": {
-        "deploymentContractRef": {
-          "type": "string",
-          "minLength": 1
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "previousStateRef",
+            "deploymentIntentRef",
+            "executionPlanRef",
+            "approvalRef"
+          ],
+          "properties": {
+            "previousStateRef": {
+              "$ref": "#/$defs/sessionRef",
+              "description": "accepted previous-state output"
+            },
+            "deploymentIntentRef": {
+              "$ref": "#/$defs/sessionRef",
+              "description": "pinned release identity, target, environment, and desired state"
+            },
+            "executionPlanRef": {
+              "$ref": "#/$defs/sessionRef",
+              "description": "exact commands, provider actions, checkpoints, proof, and rollback route"
+            },
+            "approvalRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "approval for durable provider, runtime, data, or filesystem mutation, otherwise null"
+            }
+          }
         },
-        "manifestRef": {
-          "type": "string",
-          "minLength": 1
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "business",
+            "knowledge",
+            "source",
+            "commands",
+            "external",
+            "orchestration"
+          ],
+          "properties": {
+            "business": {
+              "type": "null"
+            },
+            "knowledge": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "generation",
+                    "contentSha256",
+                    "loadMode"
+                  ],
+                  "properties": {
+                    "id": {
+                      "const": "deployment.lifecycle"
+                    },
+                    "generation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "contentSha256": {
+                      "$ref": "#/$defs/sha256"
+                    },
+                    "loadMode": {
+                      "const": "qdrant-exact"
+                    }
+                  }
+                }
+              ],
+              "items": false
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "loadMode",
+                "repositoryContext",
+                "targetFiles"
+              ],
+              "properties": {
+                "loadMode": {
+                  "const": "exact-files"
+                },
+                "repositoryContext": {
+                  "const": false
+                },
+                "targetFiles": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "path",
+                      "beforeSha256",
+                      "access",
+                      "purpose"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "beforeSha256": {
+                        "$ref": "#/$defs/sha256"
+                      },
+                      "access": {
+                        "enum": [
+                          "read"
+                        ]
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "commands": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "loadMode",
+                "commandRefs"
+              ],
+              "properties": {
+                "loadMode": {
+                  "const": "declared-only"
+                },
+                "commandRefs": {
+                  "type": "array",
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resourceRefs",
+                "credentialHandleRefs"
+              ],
+              "properties": {
+                "resourceRefs": {
+                  "type": "array",
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                },
+                "credentialHandleRefs": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "profileRef",
+                "providerRef"
+              ],
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "economical",
+                    "balanced",
+                    "parallel"
+                  ]
+                },
+                "profileRef": {
+                  "enum": [
+                    "orchestration/modes/economical.json",
+                    "orchestration/modes/balanced.json",
+                    "orchestration/modes/parallel.json"
+                  ]
+                },
+                "providerRef": {
+                  "type": "string",
+                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
+                }
+              }
+            }
+          }
         },
-        "routeReceiptRefs": {
-          "type": "string",
-          "minLength": 1
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
+          }
         }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    },
+    "strings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
       }
     }
   }

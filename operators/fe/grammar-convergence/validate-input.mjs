@@ -1,22 +1,43 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { runCli, validateAgainst } from './validate-output.mjs';
+import path from 'node:path';
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-const forbidden = /(?:^|[-_./])(customer|user|student|course|vps|server|price|payment|order|subscription|entitlement|business|refund|purchase)(?:$|[-_./])/i;
-function scan(value, at, errors) { if (typeof value === 'string' && forbidden.test(value)) errors.push(`${at}: business-bearing token is forbidden in Grammar input`); else if (Array.isArray(value)) value.forEach((item, i) => scan(item, `${at}[${i}]`, errors)); else if (value && typeof value === 'object') for (const [key, item] of Object.entries(value)) scan(item, `${at}.${key}`, errors); }
-export function validateInput(value) {
-  const result = validateAgainst(value, 'input');
-  if (!result.ok) return result;
-  const errors = [];
-  const dependencies = value.grammarLock.declaredDependencies.map((item) => `${item.package}@${item.version}`);
-  if (new Set(dependencies).size !== dependencies.length) errors.push('$.grammarLock.declaredDependencies: package-version locks must be unique');
-  const blockRefs = value.neutralBlocks.map((block) => block.blockRef);
-  if (new Set(blockRefs).size !== blockRefs.length) errors.push('$.neutralBlocks: blockRef values must be unique');
-  for (const [index, block] of value.neutralBlocks.entries()) {
-    const facts = [...block.structuralFacts, ...block.interactionFacts, ...block.presentationFacts];
-    if (new Set(facts).size !== facts.length) errors.push(`$.neutralBlocks[${index}]: a fact may belong to only one vocabulary class`);
+const guards = {
+  "layout.review\u0000approved": {
+    "all": [
+      "layout-approved",
+      "grammar-lock-ready",
+      "neutral-facts-ready"
+    ],
+    "none": []
   }
-  scan(value.neutralBlocks, '$.neutralBlocks', errors);
-  return { ok: !errors.length, errors };
+};
+const profileByMode = {
+  economical: 'orchestration/modes/economical.json',
+  balanced: 'orchestration/modes/balanced.json',
+  parallel: 'orchestration/modes/parallel.json'
+};
+
+function semanticErrors(value) {
+  const errors = [];
+  const guard = guards[`${value.stage}\u0000${value.status}`] ?? { all: [], none: [] };
+  for (const fact of guard.all) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
+  for (const fact of guard.none) if (value.facts.includes(fact)) errors.push(`$.facts: forbidden ${fact}`);
+
+  const { provided, loads, session } = value.payload;
+  if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
+  if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
+
+  const prefix = `session://tasks/${session.taskId}/`;
+  const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
+  for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
+  for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
+
+
+  return errors;
 }
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) runCli(validateInput, 'grammar-convergence input');
+
+export const validateInput = validatorFor(new URL('./input.schema.json', import.meta.url), semanticErrors);
+
+if (process.argv[1]?.endsWith('validate-input.mjs')) {
+  await runValidatorCli(validateInput, 'node validate-input.mjs <artifact.json>');
+}

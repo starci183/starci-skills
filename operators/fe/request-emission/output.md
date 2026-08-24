@@ -1,15 +1,25 @@
-# Request emission output
+# `fe/request-emission` output
 
-The operator returns a complete receipt for the request files it wrote. The artifact must validate against `output.schema.json`.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-For every obligation, the receipt includes its stable ID, exact repository-relative path and content hash. `requestPaths` and `receipts` must describe the same set.
+## JSON architecture
 
-## Ready result
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-Ordinary Block creation or a declared lower-tier extension emits `request.result / ready` with `requests-emitted`. Implementation may start only from this receipt.
+## State contract
 
-## Blocked result
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `requests-emitted` | `completed` | `request.result / ready` | `requests-emitted` |
+| `grammar-gap` | `blocked` | `request.result / blocked` | `requests-emitted`, `grammar-gap` |
 
-A Grammar gap still emits its durable request, then returns `request.result / blocked` with `grammar-gap` and `requests-emitted`. The block is intentional: application source may not reconstruct a missing reusable leaf, branch, composite, invariant, variable axis or complex-case owner.
-
-Writing a request is not approval to publish a package, change Grammar, or widen the approved source boundary.
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Only a successful source decision may report exact approved mutations.

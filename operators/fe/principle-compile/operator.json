@@ -43,7 +43,8 @@
     }
   ],
   "sideEffects": [
-    "persist-principle-compile-receipt"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "invalid-input",
@@ -53,6 +54,9 @@
     "missing-negative-boundary",
     "unprovable-decision",
     "product-semantic-leak",
-    "grammar-authority-leak"
+    "grammar-authority-leak",
+    "Stop on a closed-axis request, owner substitution, missing situation, product semantic leak, or an unprovable decision.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

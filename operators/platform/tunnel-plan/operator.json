@@ -26,9 +26,14 @@
       "factsRemove": []
     }
   ],
-  "sideEffects": [],
+  "sideEffects": [
+    "keep input, output, loads, observations, plans, and evidence in task-session memory only",
+    "purge every session object at each parent-skill terminal state"
+  ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "a source, provider, runtime, DNS, tunnel, or record mutation would occur",
+    "an intermediate session object would be persisted"
   ]
 }

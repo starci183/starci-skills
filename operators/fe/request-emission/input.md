@@ -1,29 +1,33 @@
-# Request emission input
+# `fe/request-emission` input
 
-This operator receives unresolved creation obligations after source fit and principle compilation. It runs before any source write.
+The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
 
-## Required artifact
+## JSON architecture
 
-The input must validate against `input.schema.json` and provide:
+| Section | Authored by | Purpose |
+| --- | --- | --- |
+| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
+| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
+| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
+| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
 
-- the current run identity and router facts;
-- the approved source boundary;
-- one or more request obligations with a stable ID, evidence, intended owner and reason;
-- every detected Grammar gap, if any.
+## Provided by the previous state
 
-`stableId` is the final basename. The only permitted destination is:
+- `priorStateRef`: the accepted upstream state that authorizes emit stable extension or creation requests for approved frontend contract gaps without locally reconstructing Grammar.
+- `businessHeadRef`: the selected business authority reference.
+- `authorityRefs`: the exact source-fit verdicts, Principle compilation, exact request boundary, and supporting evidence references.
+- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
+- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
 
-```text
-.claude/requests/<stable-id>.request.json
-```
+These fields are references, not copied documents. The operator must not infer substitutes.
 
-An obligation may describe a new Product Block, an allowed lower-tier extension, or a missing reusable Grammar capability. It must not contain proposed source code or invent a local substitute for a Grammar gap.
+## Loaded by the runtime
 
-## Accepted routes
+- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `upstream`: resolve only the declared session references for source-fit verdicts, Principle compilation, exact request boundary, and supporting evidence.
+- `knowledge`: retrieve `fe.request-lifecycle` from the pinned generation and content hash.
+- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `exactTargets`: the coordinator may read and write only the approved repository-relative files after their hashes match.
+- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
 
-The operator accepts either:
-
-- `requests.review / ready` with `grammar-gap`; or
-- `requests.review / ready` with `create-required` and without `grammar-gap`.
-
-The input is invalid when two obligations resolve to the same path with different content, when a stable ID contains a path separator, or when the source boundary is not the boundary bound by layout approval.
+`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

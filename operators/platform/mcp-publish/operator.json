@@ -37,10 +37,14 @@
     }
   ],
   "sideEffects": [
-    "reconcile declared MCP/Qdrant runtime services"
+    "reconcile declared MCP/Qdrant runtime services through coordinator-owned commands",
+    "keep inputs, outputs, loads, observations, receipts, and evidence in task-session memory only",
+    "purge every session object at each parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "a worker would perform a mutation or receive an opaque credential handle",
+    "an intermediate session object would be persisted outside the task session"
   ]
 }

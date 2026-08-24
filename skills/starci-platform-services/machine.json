@@ -23,7 +23,7 @@
             }
           },
           "target": "mcp-config",
-          "label": "read-only source context"
+          "label": "business and generated-contract index"
         },
         {
           "when": {

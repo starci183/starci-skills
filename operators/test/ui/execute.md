@@ -1,23 +1,71 @@
-# Execute UI Test
+# Execute `test/ui`
+
+Execute only this operator's declared responsibility: control the running app in a real browser, authenticate with an approved test account, and produce sanitized task-session UI evidence. All intermediate data is session-only.
+
+## Step 1 — Validate and freeze
+
+**Read:** complete input only.
+**Context:** none before validation.
+**Analysis record:** route, facts, task ownership, and frozen refs; never chain-of-thought.
+**Action:** run `validate-input.mjs` and freeze all refs and profiles.
+**Session write:** `payload.session.inputRef`.
+**Stop:** stop on invalid or foreign-session input.
+
+## Step 2 — Resolve authority
+
+**Read:** `payload.provided`, business, and knowledge loads.
+**Context:** exact pinned bindings only; business, when required, comes only from `.worktrees/business/...`.
+**Analysis record:** revision matches and rule IDs.
+**Action:** normalize constraints without copying loaded content.
+**Session write:** `scratchPrefix/constraints`.
+**Stop:** stop on missing, stale, rejected, or mismatched authority.
+
+## Step 3 — Resolve boundary
+
+**Read:** source, command, and external loads.
+**Context:** exact files, declared commands/resources, and opaque handles only; no scan or discovery.
+**Analysis record:** hashes, argv, cwd, allowed environment names, and resource IDs.
+**Action:** verify without executing.
+**Session write:** `scratchPrefix/preflight`.
+**Stop:** stop on drift, traversal, undeclared scope, raw secret, or unavailable resource.
+
+## Step 4 — Orchestrate analysis
+
+**Read:** disjoint preflight assignments.
+**Context:** each worker receives only its assigned target and minimum rules.
+**Analysis record:** value-safe observations and evidence refs.
+**Action:** economical is sequential; balanced permits three read-only workers; parallel permits five. Workers only read/analyze; the coordinator joins.
+**Session write:** `scratchPrefix/workers/<worker-id>` and `scratchPrefix/join`.
+**Stop:** stop on overlap, out-of-scope reads, or incomplete join.
+
+## Step 5 — Execute and decide
+
+**Read:** joined preflight and resolved handles.
+**Context:** no new context.
+**Analysis record:** results, observables, and revision metadata only.
+**Action:** the coordinator alone controls the browser, authenticates through the ordinary user path, performs every declared journey at wide, intermediate, and compact viewports, and writes sanitized task-session screenshots, traces, and accessibility evidence. Workers never control the browser or account. Select one typed decision; success requires complete journey, interaction, responsive, visual, trace, and accessibility proof.
+**Session write:** `scratchPrefix/execution` and `scratchPrefix/decision`.
+**Stop:** stop on suppression, skip, stale revision, unsafe effect, or scope expansion.
+
+## Step 6 — Emit and cleanup
+
+**Read:** decision, used revisions, receipts, mutations, evidence, findings, and session inventory.
+**Context:** refs only; do not copy loaded values, logs, screenshots, prompts, or observations.
+**Analysis record:** schema, route, facts, and retention consistency.
+**Action:** build output, align `payload.state.emits`, run `validate-output.mjs`, and register all scratch refs.
+**Session write:** `payload.session.outputRef` and cleanup registration.
+**Stop:** never emit invalid output; purge input, output, loads, observations, receipts, evidence, and scratch at every parent-skill terminal.
 
 ## LOADS
 
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
-| `@ui-testing` | `fe.ui-testing` | qdrant | run the approved journey through a real browser and test account |
-| `@journey` | `fe.customer-journey` | qdrant | preserve page order, global progress ownership, and terminal outcome |
-| `@layout` | `fe.layout-composition` | qdrant | verify approved composition and responsive transformation |
-| `@state` | `fe.state-modeling` | qdrant | reach and prove required business-backed UI states |
-| `@seed` | `fe.product-seeding` | qdrant | use reproducible test data without inventing state |
-| `@source-fe` | `knowledge/references/starci-academy-fe.json` | file | inspect only established FE browser-harness precedent at the immutable commit |
-
-## Steps
-
-1. Run `validate-input.mjs`; stop before browser launch or credential resolution on failure.
-2. Verify the FE workspace route, current manifest, app URL, source hash, seed hash, `@source-fe` commit, and Qdrant virtual root.
-3. Open the running app in a real browser at its public entry route. Resolve the opaque test account through the approved credential provider without printing values.
-4. Sign in through visible UI, then navigate and act through visible controls exactly as an ordinary user. Do not inject cookies/storage, call internal APIs, script DOM state, or jump to private routes to bypass the journey.
-5. Execute every scenario at wide, intermediate, and compact viewports. Verify page order, global journey progress, text and controls, keyboard/focus path, accessible names, loading/error recovery, overflow, sticky fallback, final outcome, refresh persistence, and sign-out boundary.
-6. Capture sanitized screenshots, trace, console/network failures, accessibility results, scenario counts, approved hashes, and test-account reference. Redact secrets before persistence.
-7. Classify a failure as in-boundary repair, boundary drift, or blocked. Never change product source in this operator.
-8. Run `validate-output.mjs`; invalid, partial, shortcut-based, or unsanitized proof is not emitted.
+| `@fe-ui-testing` | `fe.ui-testing` | qdrant | retrieve only the pinned browser-proof law |
+| `@fe-customer-journey` | `fe.customer-journey` | qdrant | retrieve only the approved journey coverage law |
+| `@fe-layout-composition` | `fe.layout-composition` | qdrant | retrieve only responsive layout proof rules |
+| `@fe-state-modeling` | `fe.state-modeling` | qdrant | retrieve only the pinned state-transition proof law |
+| `@fe-product-seeding` | `fe.product-seeding` | qdrant | retrieve only the pinned fixture and seed law |
+| `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only hash-pinned test and implementation files |
+| `@browser-commands` | `payload.loads.commands` | exact-command | execute only declared application and browser commands |
+| `@browser-resources` | `payload.loads.external` | exact-external | bind only the declared app, account, and opaque credential handles |
+| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded read-only preflight before coordinator browser control |

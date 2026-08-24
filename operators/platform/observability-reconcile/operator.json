@@ -35,10 +35,14 @@
     }
   ],
   "sideEffects": [
-    "mutate declared observability stack and provider configuration"
+    "mutate declared observability stack and provider configuration through the coordinator only",
+    "keep all runtime inputs, loads, observations, receipts, evidence, and outputs in task-session memory",
+    "purge every session object at each parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "a worker would mutate runtime or receive a credential handle",
+    "an intermediate session object would be persisted"
   ]
 }

@@ -1,15 +1,25 @@
-# Implementation output
+# `fe/implementation` output
 
-The output validates against `output.schema.json` and records every source mutation.
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-A successful run emits `seed.materialize / ready` with `source-written`. It includes:
+## JSON architecture
 
-- the exact changed files;
-- the source change-set reference and hash;
-- the effective contracts consumed;
-- every lower-tier extension actually used;
-- static check receipts needed before business-state materialization.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-A blocked run emits `code.result / blocked` with machine-readable stop reasons and no claim of completion.
+## State contract
 
-The output does not approve visual proof. Source existence is only the prerequisite for Product Seed and Product Proof.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `ready` | `completed` | `seed.materialize / ready` | `source-written` |
+| `blocked` | `blocked` | `code.result / blocked` | `implementation-blocked` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Only a successful source decision may report exact approved mutations.

@@ -1,12 +1,25 @@
-# State output
+# `fe/state` output
 
-State returns one of two results:
+The output is a closed, ephemeral task-session object consumed by the parent skill state machine. It is never a durable artifact. Only explicitly approved product-source or external mutations survive; the output and every intermediate reference are purged at every skill terminal.
 
-- `layout.generate / ready` when the state model is complete enough for layout;
-- `state.result / blocked` when a sensitive state is required but business truth is missing.
+## JSON architecture
 
-The model is owned by product Blocks. It defines domain meaning, triggers, permitted actions, transitions and a neutral presentation state. Neutral presentation states such as `affirmative`, `caution`, `critical` and `pending` communicate intent without choosing a component or icon. A later Grammar maps them to generic treatment.
+| Section | Purpose |
+| --- | --- |
+| `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
+| `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
+| `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
+| `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
+| `payload.evidenceRefs` | Session-only evidence for the next state. |
+| `payload.findings` | Concise unresolved facts; never a chain-of-thought transcript. |
 
-Missing facts involving money, access, entitlement, data loss, legal consequence or terminal outcome are recorded as unknown and blocking. They are never filled with a plausible default. Non-sensitive unknowns may be recorded as non-blocking only when they cannot change the journey, commitment or outcome.
+## State contract
 
-No source code, layout direction or visual component is produced here.
+| Decision | Operator state | Emitted state | Required facts |
+| --- | --- | --- | --- |
+| `state-model-ready` | `completed` | `layout.generate / ready` | `state-model-ready`, `neutral-facts-ready` |
+| `blocked` | `blocked` | `state.result / blocked` | `sensitive-state-unknown` |
+
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

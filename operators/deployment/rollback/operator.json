@@ -37,7 +37,9 @@
     }
   ],
   "sideEffects": [
-    "apply declared rollback to provider and runtime state"
+    "apply declared rollback to provider and runtime state",
+    "keep input, output, context, observations, and receipts in task-session memory only",
+    "purge all intermediate session objects at every parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",

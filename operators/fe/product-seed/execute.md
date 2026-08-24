@@ -1,19 +1,78 @@
-# Execute Product Seed
+# Execute `fe/product-seed`
 
-1. Run `node validate-input.mjs <input.json>`. Continue only when the fail-closed validator confirms `seed.materialize / ready`, `source-written` and the closed state contract.
-2. Compare required state IDs with the state contract. Refuse duplicate, unowned or unevidenced states.
-3. Classify provenance. A business state must point to routed business evidence; a derived-block state must point to its owning Product Block rule.
-4. Stop when a sensitive state lacks exact evidence or a safe materialization mechanism. Never infer money, access, entitlement, loss, legal or terminal truth.
-5. Prepare isolated deterministic fixtures and controls. Prefer stable seed scripts, mocked service boundaries, test accounts and explicit clock controls over manual mutation.
-6. Materialize every state and verify it through an observable route or locator. Record setup and reset operations.
-7. Reset and repeat enough to prove determinism. Do not touch production credentials or data.
-8. Build `proof.run / ready` only when every required state has a complete receipt. Otherwise build blocked with the uncovered state IDs.
-9. Run `node validate-output.mjs <output.json>` before either result is emitted.
+This operator's responsibility is to materialize every approved business state as an isolated, deterministic frontend proof fixture. Its input, output, loaded bindings, worker observations, drafts, and evidence exist only inside the current task session.
 
-Product Seed may create test fixtures or invoke declared seed mechanisms. It may not change UI direction, component anatomy, Grammar, product rules or the approved source boundary.
+## Step 1 — Validate and freeze the invocation
+
+**Read:** the complete input object only.
+**Context:** none; do not resolve any binding before validation succeeds.
+**Decision evidence:** accepted `stage/status`, required and forbidden facts, task ownership of every session URI, and orchestration profile identity.
+**Action:** run `validate-input.mjs` and freeze the route, provided references, load declarations, and session slots.
+**Session write:** the validated envelope at `payload.session.inputRef`.
+**Durable write:** none.
+**Stop:** emit the operator's blocked or refusal decision when validation fails; a single-outcome operator stops the parent skill as invalid input rather than inventing another route.
+**Orchestration:** coordinator only.
+
+## Step 2 — Load business authority
+
+**Read:** `payload.loads.business` and `payload.provided.businessHeadRef`.
+**Context:** load exactly the declared revision under `.worktrees/business/`; never infer business behavior from frontend source.
+**Decision evidence:** reference equality, revision hash, accepted business status, and the specific facts needed to materialize every approved business state as an isolated, deterministic frontend proof fixture.
+**Action:** normalize only the applicable actor, outcome, rule, state, and constraint references.
+**Session write:** value-safe business bindings under `scratchPrefix/business`; do not copy the complete business document into output.
+**Durable write:** none.
+**Stop:** stop when the business head is missing, stale, rejected, or does not equal the provided reference.
+**Orchestration:** coordinator owns authority selection; workers cannot choose another business head.
+
+## Step 3 — Resolve upstream, knowledge, and source capability
+
+**Read:** `payload.loads.upstream`, `payload.loads.knowledge`, and every source binding declared by this schema.
+**Context:** resolve only state model, business authority, and approved seed boundary. Retrieve only the listed knowledge IDs at their pinned content hashes. This operator has no frontend capability or repository-file binding.
+**Decision evidence:** upstream identity and revision matches, knowledge generation matches, and every requested capability or exact target is inside the frozen boundary.
+**Action:** create a minimal constraint set containing IDs, revisions, applicable rules, target permissions, and required outcomes.
+**Session write:** normalized constraints at `scratchPrefix/constraints`.
+**Durable write:** none.
+**Stop:** stop on unknown sensitive state, production data or credential dependency, nondeterminism, missing reset, or state outside the approved contract.
+**Orchestration:** bindings are resolved once by the coordinator and passed to workers as minimal read-only slices.
+
+## Step 4 — Perform the operator decision
+
+**Read:** normalized business and authority constraints plus only the exact source-capability records or targets declared above.
+**Context:** do not load another feature, knowledge record, contract generation, file, service, or provider target.
+**Decision evidence:** Resolve each required state to its owning seed operation, create or invoke isolated fixtures, verify deterministic reproduction, and execute the declared reset.
+**Action:** execute that classification or preparation and attach evidence by stable input identity; record applied rules and observable conclusions, never hidden reasoning.
+**Session write:** a normalized draft at `scratchPrefix/product-seed-draft`.
+**Durable write:** none at this step.
+**Stop:** stop on unknown sensitive state, production data or credential dependency, nondeterminism, missing reset, or state outside the approved contract.
+**Orchestration:** Workers may prepare disjoint read-only seed plans. External seed mutations run through the coordinator in isolated namespaces; results join by state ID before reset verification.
+
+## Step 5 — Verify and commit the accepted result
+
+**Read:** the normalized draft, joined worker observations, frozen constraints, and expected emitted facts.
+**Context:** no new context may be loaded during verification.
+**Decision evidence:** Materialize each state twice from a clean baseline, compare observable identifiers, and prove cleanup returns the environment to its baseline.
+**Action:** validate completeness, conflict freedom, boundary compliance, and decision-to-route mapping. The coordinator rejects missing worker IDs or conflicting observations before any effect.
+**Session write:** accepted evidence and before/after descriptors under `scratchPrefix/accepted-result`.
+**Durable write:** The coordinator performs only the declared isolated external effect and records its before/after revisions as session evidence.
+**Stop:** stop on unknown sensitive state, production data or credential dependency, nondeterminism, missing reset, or state outside the approved contract.
+**Orchestration:** coordinator-only join and commit; workers remain read/analyze-only and cannot mutate source or external systems.
+
+## Step 6 — Emit output and register terminal cleanup
+
+**Read:** accepted result, minimal context lineage, emitted facts, and all allocated scratch references.
+**Context:** references and revisions actually used only; omit copied documents, prompts, worker transcripts, and reasoning.
+**Decision evidence:** selected decision exactly matches one manifest emit, `payload.state`, root stage/status, and facts additions/removals.
+**Action:** construct `output.schema.json`, validate it with `validate-output.mjs`, and place it at `payload.session.outputRef`.
+**Session write:** output, evidence refs, and complete cleanup inventory.
+**Durable write:** none.
+**Stop:** do not emit an invalid or partially joined output.
+**Orchestration:** the coordinator emits once. At every parent-skill terminal, purge input, output, loaded bindings, worker observations, drafts, evidence, and receipts.
 
 ## LOADS
 
 | Alias | Target | Kind | Why |
-|---|---|---|---|
-| `@product-seeding` | `fe.product-seeding` | qdrant | materialize evidenced business states safely and reproducibly for proof |
+| --- | --- | --- | --- |
+| `@business-head` | `payload.loads.business` | worktree-exact | load the exact business revision without unrelated features |
+| `@upstream` | `payload.loads.upstream` | session | resolve only the accepted upstream artifacts |
+| `@fe-product-seeding` | `fe.product-seeding` | qdrant | retrieve only this operator law from the pinned generation |
+| `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded sequential or read-only fan-out execution |

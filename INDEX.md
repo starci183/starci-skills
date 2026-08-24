@@ -31,11 +31,14 @@ request
 | --- | --- |
 | `skills/` | User-facing capability selection and state-machine composition |
 | `operators/` | Atomic, single-responsibility execution contracts |
+| `orchestration/` | Provider-neutral execution modes and provider model mappings |
 | `knowledge/` | Durable operator knowledge retrieved lazily through Qdrant |
 | `runtime/knowledge-runtime/` | Local knowledge indexing and retrieval |
 | `scripts/` | Repository-level validation and query entry points |
 
 Inputs and outputs are closed JSON Schema Draft 2020-12 contracts. Knowledge is advisory until an operator binds it to an evidenced decision. A skill may mutate source or external state only when its current operator and approval boundary explicitly allow that action.
+
+Operator inputs, outputs, loaded bindings, worker observations, patch plans, and receipts are ephemeral task-session objects. They are never written to a run directory and are purged when the parent skill reaches any terminal state. Only explicitly approved product-source or external mutations survive.
 
 ## Repository checks
 

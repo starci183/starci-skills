@@ -1,7 +1,23 @@
-# UI Test input
+# `test/ui` input
 
-Validate with `validate-input.mjs` before opening the browser or resolving credentials.
+This closed JSON object is ephemeral task-session state and is purged on every parent-skill terminal state.
 
-Input stage is `test.ui / ready` with unit, E2E, and seed evidence. It binds the verified FE workspace route, immutable FE reference, public app URL, opaque test-account and credential-provider references, approved flow/layout hashes, exact browser scenarios, three responsive viewports, and a durable evidence root.
+## JSON architecture
 
-No username, password, token, cookie, or authenticated storage value may be embedded in the artifact.
+| Section | Owner | Meaning |
+| --- | --- | --- |
+| Root envelope | Skill machine | Accepted stage, status, and facts. |
+| `payload.provided` | Previous state | Immutable refs: `previousStateRef`, `testPlanRef`, `changeSetRef`, `seedEvidenceRef`. |
+| `payload.loads` | Runtime | Exact bindings to load. |
+| `payload.session` | Session runtime | Input, output, scratch, and cleanup lifetime. |
+
+## Runtime loads
+
+- `business`: must be `null`.
+- `knowledge`: exact pinned `fe.ui-testing`, `fe.customer-journey`, `fe.layout-composition`, `fe.state-modeling`, `fe.product-seeding`.
+- `source`: exact hash-pinned files only; broad repository preloading is forbidden.
+- `commands`: declared argv, cwd, and environment-name allowlist only.
+- `external`: declared resources and opaque credential handles only.
+- `orchestration`: one mode and provider profile.
+
+Validate before loading. Never persist input, loaded values, scratch, observations, or receipts.

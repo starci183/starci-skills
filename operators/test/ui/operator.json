@@ -69,7 +69,7 @@
   "sideEffects": [
     "open and control the running app in a real browser",
     "authenticate with an approved test account",
-    "write sanitized UI evidence artifacts"
+    "write sanitized task-session UI evidence only"
   ],
   "stopConditions": [
     "raw credential in artifact",

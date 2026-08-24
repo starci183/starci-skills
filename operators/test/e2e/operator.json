@@ -56,7 +56,7 @@
     "start declared test dependencies",
     "materialize and reset isolated test data",
     "run connected scenarios",
-    "write E2E evidence artifacts"
+    "write task-session E2E evidence only"
   ],
   "stopConditions": [
     "production or shared data target",

@@ -29,10 +29,14 @@
     }
   ],
   "sideEffects": [
-    "apply only declared idempotent host setup"
+    "apply only declared idempotent host setup",
+    "keep all intermediate data in task-session memory only",
+    "purge every intermediate session object at each parent-skill terminal state"
   ],
   "stopConditions": [
     "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "the result would cross the declared boundary",
+    "intermediate data would persist outside the task session",
+    "broad source context, an undeclared command or resource, or a raw secret would be loaded"
   ]
 }

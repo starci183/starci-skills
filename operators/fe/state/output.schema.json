@@ -1,7 +1,7 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/state/output.schema.json",
-  "title": "FE state operator output",
+  "title": "fe/state operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,13 +12,47 @@
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "layout.generate"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "state.result"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
     "schemaVersion": {
       "const": 6
     },
     "runId": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+      "minLength": 1
     },
     "stage": {
       "enum": [
@@ -34,319 +68,269 @@
     },
     "facts": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
+      }
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "stateModelRef",
-        "stateModelHash",
-        "states",
-        "unknowns"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "stateModelRef": {
-          "$ref": "#/$defs/ref"
+        "decision": {
+          "enum": [
+            "state-model-ready",
+            "blocked"
+          ]
         },
-        "stateModelHash": {
-          "$ref": "#/$defs/hash"
-        },
-        "states": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/state"
-          }
-        },
-        "unknowns": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/unknown"
-          }
-        }
-      }
-    }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "stage": {
-            "const": "layout.generate"
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "status": {
-            "const": "ready"
-          },
-          "facts": {
-            "allOf": [
-              {
-                "contains": {
-                  "const": "state-model-ready"
-                }
-              },
-              {
-                "contains": {
-                  "const": "neutral-facts-ready"
-                }
-              }
-            ]
-          },
-          "payload": {
-            "properties": {
-              "unknowns": {
-                "items": {
-                  "properties": {
-                    "blocking": {
-                      "const": false
-                    }
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "fe/state"
+            },
+            "status": {
+              "enum": [
+                "completed",
+                "blocked"
+              ]
+            },
+            "code": {
+              "enum": [
+                "fe-state-state-model-ready",
+                "fe-state-blocked"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "layout.generate",
+                    "state.result"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ready",
+                    "blocked"
+                  ]
+                },
+                "factsAdd": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "factsRemove": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
             }
           }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "stage": {
-            "const": "state.result"
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "status": {
-            "const": "blocked"
-          },
-          "facts": {
-            "contains": {
-              "const": "sensitive-state-unknown"
-            }
-          },
-          "payload": {
-            "properties": {
-              "unknowns": {
-                "minItems": 1,
-                "contains": {
-                  "properties": {
-                    "blocking": {
-                      "const": true
-                    }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactRefs",
+            "mutations",
+            "externalEffects"
+          ],
+          "properties": {
+            "artifactRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "beforeSha256",
+                  "afterSha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
                   },
-                  "required": [
-                    "blocking"
-                  ]
+                  "beforeSha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "afterSha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            "externalEffects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "beforeRevision",
+                  "afterRevision",
+                  "evidenceRef"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "beforeRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "afterRevision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceRef": {
+                    "$ref": "#/$defs/sessionRef"
+                  }
                 }
               }
             }
           }
-        }
-      }
-    }
-  ],
-  "$defs": {
-    "ref": {
-      "type": "string",
-      "minLength": 1
-    },
-    "hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "sensitivity": {
-      "enum": [
-        "money",
-        "access",
-        "entitlement",
-        "data-loss",
-        "legal",
-        "terminal-outcome"
-      ]
-    },
-    "state": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "blockRef",
-        "meaning",
-        "trigger",
-        "provenance",
-        "evidenceRefs",
-        "derivedFromRefs",
-        "availableActions",
-        "transitionTargets",
-        "neutralPresentation"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
-        "blockRef": {
-          "$ref": "#/$defs/ref"
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-upstream",
+                      "qdrant-knowledge",
+                      "fe-contract-generation",
+                      "exact-source"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
         },
-        "meaning": {
-          "type": "string",
-          "minLength": 1
-        },
-        "trigger": {
-          "type": "string",
-          "minLength": 1
-        },
-        "provenance": {
-          "enum": [
-            "business",
-            "derived-block"
-          ]
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
         },
         "evidenceRefs": {
           "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
           "items": {
-            "$ref": "#/$defs/ref"
-          },
-          "uniqueItems": true
+            "$ref": "#/$defs/sessionRef"
+          }
         },
-        "derivedFromRefs": {
+        "findings": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/ref"
-          },
-          "uniqueItems": true
-        },
-        "availableActions": {
-          "type": "array",
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "transitionTargets": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
-          },
-          "uniqueItems": true
-        },
-        "neutralPresentation": {
-          "enum": [
-            "default",
-            "informative",
-            "affirmative",
-            "caution",
-            "critical",
-            "pending",
-            "disabled"
-          ]
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "provenance": {
-                "const": "business"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "evidenceRefs": {
-                "minItems": 1
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "provenance": {
-                "const": "derived-block"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "derivedFromRefs": {
-                "minItems": 1
-              }
-            }
           }
         }
-      ]
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "unknown": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "blockRef",
-        "question",
-        "sensitivity",
-        "blocking",
-        "requiredEvidence"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
-        },
-        "blockRef": {
-          "$ref": "#/$defs/ref"
-        },
-        "question": {
-          "type": "string",
-          "minLength": 1
-        },
-        "sensitivity": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/sensitivity"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "blocking": {
-          "type": "boolean"
-        },
-        "requiredEvidence": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "sensitivity": {
-                "$ref": "#/$defs/sensitivity"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "blocking": {
-                "const": true
-              }
-            }
-          }
-        }
-      ]
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

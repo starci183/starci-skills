@@ -1,21 +1,7 @@
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { exactObject, nonEmptyText, runValidatorCli, uniqueStrings, validateEnvelope } from '../../validation.mjs';
-
-const payloadKeys = ['workspaceRouteRef', 'sourceRole', 'sourceReferenceRef', 'manifestRefs', 'changeSetRef', 'changeSetHash', 'targetRefs', 'evidenceRoot'];
-export function validateInput(value) {
-  const errors = [];
-  const envelope = validateEnvelope(value, { kind: 'test.unit.input', routes: [['test.unit', 'ready']] }, errors);
-  if (!envelope) return { valid: false, errors };
-  if (!envelope.facts.includes('seed-evidence')) errors.push('/facts: seed-evidence is required');
-  if (!exactObject(value.payload, payloadKeys, '/payload', errors)) return { valid: false, errors };
-  for (const key of ['workspaceRouteRef', 'changeSetRef', 'changeSetHash', 'evidenceRoot']) nonEmptyText(value.payload[key], `/payload/${key}`, errors);
-  uniqueStrings(value.payload.manifestRefs, '/payload/manifestRefs', errors, { min: 1 });
-  uniqueStrings(value.payload.targetRefs, '/payload/targetRefs', errors, { min: 1 });
-  const match = { fe: 'starci-academy-fe', be: 'starci-academy-be' };
-  if (!(value.payload.sourceRole in match)) errors.push('/payload/sourceRole: expected fe or be');
-  else if (value.payload.sourceReferenceRef !== match[value.payload.sourceRole]) errors.push('/payload/sourceReferenceRef: must match sourceRole');
-  return { valid: errors.length === 0, errors };
-}
-
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) runValidatorCli(validateInput, 'usage: node validate-input.mjs <input.json>').catch((error) => { console.error(error.message); process.exitCode = 1; });
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+const guards=[{"stage": "test.unit", "status": "ready", "facts": ["seed-evidence"]}]; const profiles={economical:'orchestration/modes/economical.json',balanced:'orchestration/modes/balanced.json',parallel:'orchestration/modes/parallel.json'};
+const expectedKnowledge = ['fe.unit-testing'];
+function refs(v,o=[]){if(typeof v==='string'&&v.startsWith('session://'))o.push(v);else if(Array.isArray(v))for(const x of v)refs(x,o);else if(v&&typeof v==='object')for(const x of Object.values(v))refs(x,o);return o}
+function semanticErrors(v){const e=[];const g=guards.find(x=>x.stage===v.stage&&x.status===v.status);if(!g)return['$: undeclared input state'];for(const f of g.facts)if(!v.facts.includes(f))e.push('$.facts: missing '+f);const {loads,session}=v.payload;if(loads.orchestration.profileRef!==profiles[loads.orchestration.mode])e.push('$.payload.loads.orchestration.profileRef: does not match mode');const ids=loads.knowledge.map(x=>x.id);if(JSON.stringify(ids)!==JSON.stringify(expectedKnowledge))e.push('$.payload.loads.knowledge: exact ordered knowledge bindings required');const p='session://tasks/'+session.taskId+'/';for(const r of refs(v.payload))if(!r.startsWith(p))e.push('$: foreign session ref '+r);const ps=loads.source.targetFiles.map(x=>x.path.replaceAll('\\','/'));if(new Set(ps).size!==ps.length)e.push('$.payload.loads.source.targetFiles: duplicate path');for(const [i,x]of ps.entries())if(path.isAbsolute(x)||x==='..'||x.startsWith('../')||x.includes('/../'))e.push('$.payload.loads.source.targetFiles['+i+'].path: unsafe path');if(loads.source.repositoryContext!==false)e.push('$.payload.loads.source.repositoryContext: broad context forbidden');return e}
+export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),semanticErrors); if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');

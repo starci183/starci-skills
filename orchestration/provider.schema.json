@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/orchestration/provider.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "provider", "modeMappings"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 6 },
+    "provider": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "modeMappings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["economical", "balanced", "parallel"],
+      "properties": {
+        "economical": { "$ref": "#/$defs/mapping" },
+        "balanced": { "$ref": "#/$defs/mapping" },
+        "parallel": { "$ref": "#/$defs/mapping" }
+      }
+    }
+  },
+  "$defs": {
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinatorModel", "workerModel", "maxWorkers"],
+      "properties": {
+        "coordinatorModel": { "type": "string", "minLength": 1 },
+        "workerModel": { "type": ["string", "null"], "minLength": 1 },
+        "maxWorkers": { "type": "integer", "minimum": 0, "maximum": 5 }
+      }
+    }
+  }
+}

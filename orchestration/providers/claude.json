@@ -1,0 +1,22 @@
+{
+  "$schema": "../provider.schema.json",
+  "schemaVersion": 6,
+  "provider": "claude",
+  "modeMappings": {
+    "economical": {
+      "coordinatorModel": "inherit",
+      "workerModel": null,
+      "maxWorkers": 0
+    },
+    "balanced": {
+      "coordinatorModel": "inherit",
+      "workerModel": "sonnet",
+      "maxWorkers": 3
+    },
+    "parallel": {
+      "coordinatorModel": "inherit",
+      "workerModel": "sonnet",
+      "maxWorkers": 5
+    }
+  }
+}

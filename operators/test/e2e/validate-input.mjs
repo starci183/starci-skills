@@ -1,22 +1,7 @@
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { exactObject, nonEmptyText, runValidatorCli, uniqueStrings, validateEnvelope } from '../../validation.mjs';
-
-const payloadKeys = ['workspaceRouteRefs', 'sourceReferenceRefs', 'manifestRefs', 'selectedFlowRef', 'selectedFlowHash', 'seedEvidenceRef', 'seedEvidenceHash', 'scenarioRefs', 'environmentRef', 'credentialProviderRef', 'evidenceRoot'];
-export function validateInput(value) {
-  const errors = [];
-  const envelope = validateEnvelope(value, { kind: 'test.e2e.input', routes: [['test.e2e', 'ready']] }, errors);
-  if (!envelope) return { valid: false, errors };
-  for (const fact of ['unit-pass', 'unit-evidence', 'seed-evidence']) if (!envelope.facts.includes(fact)) errors.push(`/facts: ${fact} is required`);
-  if (!exactObject(value.payload, payloadKeys, '/payload', errors)) return { valid: false, errors };
-  if (exactObject(value.payload.workspaceRouteRefs, ['fe', 'be'], '/payload/workspaceRouteRefs', errors)) {
-    nonEmptyText(value.payload.workspaceRouteRefs.fe, '/payload/workspaceRouteRefs/fe', errors); nonEmptyText(value.payload.workspaceRouteRefs.be, '/payload/workspaceRouteRefs/be', errors);
-  }
-  const refs = uniqueStrings(value.payload.sourceReferenceRefs, '/payload/sourceReferenceRefs', errors, { min: 2 });
-  if (refs.length !== 2 || refs[0] !== 'starci-academy-fe' || refs[1] !== 'starci-academy-be') errors.push('/payload/sourceReferenceRefs: expected FE then BE immutable references');
-  uniqueStrings(value.payload.manifestRefs, '/payload/manifestRefs', errors, { min: 2 }); uniqueStrings(value.payload.scenarioRefs, '/payload/scenarioRefs', errors, { min: 1 });
-  for (const key of ['selectedFlowRef', 'selectedFlowHash', 'seedEvidenceRef', 'seedEvidenceHash', 'environmentRef', 'credentialProviderRef', 'evidenceRoot']) nonEmptyText(value.payload[key], `/payload/${key}`, errors);
-  if (JSON.stringify(value).match(/"(password|token|secret)"\s*:/i)) errors.push('/payload: raw credential-shaped fields are forbidden');
-  return { valid: errors.length === 0, errors };
-}
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) runValidatorCli(validateInput, 'usage: node validate-input.mjs <input.json>').catch((error) => { console.error(error.message); process.exitCode = 1; });
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+const guards=[{"stage": "test.e2e", "status": "ready", "facts": ["unit-pass", "unit-evidence", "seed-evidence"]}]; const profiles={economical:'orchestration/modes/economical.json',balanced:'orchestration/modes/balanced.json',parallel:'orchestration/modes/parallel.json'};
+const expectedKnowledge = ['fe.e2e-testing', 'fe.product-seeding', 'fe.state-modeling'];
+function refs(v,o=[]){if(typeof v==='string'&&v.startsWith('session://'))o.push(v);else if(Array.isArray(v))for(const x of v)refs(x,o);else if(v&&typeof v==='object')for(const x of Object.values(v))refs(x,o);return o}
+function semanticErrors(v){const e=[];const g=guards.find(x=>x.stage===v.stage&&x.status===v.status);if(!g)return['$: undeclared input state'];for(const f of g.facts)if(!v.facts.includes(f))e.push('$.facts: missing '+f);const {loads,session}=v.payload;if(loads.orchestration.profileRef!==profiles[loads.orchestration.mode])e.push('$.payload.loads.orchestration.profileRef: does not match mode');const ids=loads.knowledge.map(x=>x.id);if(JSON.stringify(ids)!==JSON.stringify(expectedKnowledge))e.push('$.payload.loads.knowledge: exact ordered knowledge bindings required');const p='session://tasks/'+session.taskId+'/';for(const r of refs(v.payload))if(!r.startsWith(p))e.push('$: foreign session ref '+r);const ps=loads.source.targetFiles.map(x=>x.path.replaceAll('\\','/'));if(new Set(ps).size!==ps.length)e.push('$.payload.loads.source.targetFiles: duplicate path');for(const [i,x]of ps.entries())if(path.isAbsolute(x)||x==='..'||x.startsWith('../')||x.includes('/../'))e.push('$.payload.loads.source.targetFiles['+i+'].path: unsafe path');if(loads.source.repositoryContext!==false)e.push('$.payload.loads.source.repositoryContext: broad context forbidden');return e}
+export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),semanticErrors); if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');

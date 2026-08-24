@@ -1,20 +1,44 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { runCli, validateAgainst } from './validate-output.mjs';
+import path from 'node:path';
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-function subset(values, allowed) { const set = new Set(allowed); return values.every((value) => set.has(value)); }
-function checkEffective(contract, at, errors) { if (!subset(contract.sourceDelta.boundSlots, contract.slots)) errors.push(`${at}.sourceDelta.boundSlots: unknown slot`); if (!subset(contract.sourceDelta.boundStateInputs, contract.stateInputs)) errors.push(`${at}.sourceDelta.boundStateInputs: unknown state input`); if (!subset(contract.sourceDelta.resolvedVariableAxes, contract.variableAxes)) errors.push(`${at}.sourceDelta.resolvedVariableAxes: closed axis`); for (const required of ['anatomy', 'closed-invariant', 'owner-substitution']) if (!contract.extensionPolicy.forbidden.includes(required)) errors.push(`${at}.extensionPolicy.forbidden: must include ${required}`); }
-export function validateInput(value) {
-  const result = validateAgainst(value, 'input');
-  if (!result.ok) return result;
+const guards = {
+  "source-fit.resolve\u0000ready": {
+    "all": [
+      "grammar-converged",
+      "frontend-contract-generation-ready"
+    ],
+    "none": [
+      "grammar-business-gate-failed"
+    ]
+  }
+};
+const profileByMode = {
+  economical: 'orchestration/modes/economical.json',
+  balanced: 'orchestration/modes/balanced.json',
+  parallel: 'orchestration/modes/parallel.json'
+};
+
+function semanticErrors(value) {
   const errors = [];
-  const candidateIds = value.candidates.map((candidate) => candidate.candidateId);
-  const knownCandidates = new Set(candidateIds);
-  if (knownCandidates.size !== candidateIds.length) errors.push('$.candidates: candidateId values must be unique');
-  const ownerRefs = value.requirements.map((requirement) => requirement.ownerRef);
-  if (new Set(ownerRefs).size !== ownerRefs.length) errors.push('$.requirements: ownerRef values must be unique');
-  value.candidates.forEach((candidate, index) => checkEffective(candidate.effectiveContract, `$.candidates[${index}].effectiveContract`, errors));
-  value.requirements.forEach((requirement, index) => requirement.candidateIds.forEach((candidateId) => { if (!knownCandidates.has(candidateId)) errors.push(`$.requirements[${index}].candidateIds: unknown candidate ${candidateId}`); }));
-  return { ok: !errors.length, errors };
+  const guard = guards[`${value.stage}\u0000${value.status}`] ?? { all: [], none: [] };
+  for (const fact of guard.all) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
+  for (const fact of guard.none) if (value.facts.includes(fact)) errors.push(`$.facts: forbidden ${fact}`);
+
+  const { provided, loads, session } = value.payload;
+  if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
+  if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
+
+  const prefix = `session://tasks/${session.taskId}/`;
+  const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
+  for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
+  for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
+
+
+  return errors;
 }
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) runCli(validateInput, 'source-fit input');
+
+export const validateInput = validatorFor(new URL('./input.schema.json', import.meta.url), semanticErrors);
+
+if (process.argv[1]?.endsWith('validate-input.mjs')) {
+  await runValidatorCli(validateInput, 'node validate-input.mjs <artifact.json>');
+}

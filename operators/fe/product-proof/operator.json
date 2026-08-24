@@ -62,9 +62,8 @@
     }
   ],
   "sideEffects": [
-    "run declared static gates",
-    "run browser interaction scenarios",
-    "write proof evidence artifacts"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "change outside exact approved source boundary",
@@ -72,6 +71,9 @@
     "approved hash mismatch",
     "missing required gate or browser scenario",
     "unsafe or unavailable proof environment",
-    "partial proof coverage"
+    "partial proof coverage",
+    "Stop on stale seed or source hashes, missing required scenario, unsafe environment, partial coverage, or any undeclared source change.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

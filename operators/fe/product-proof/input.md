@@ -1,17 +1,33 @@
-# Product Proof input
+# `fe/product-proof` input
 
-Product Proof receives implemented source, reproducible Product Seed evidence and the layout approval binding. It is the final judge of the FE app run.
+The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
 
-The input validates against `input.schema.json` and enters only at `proof.run / ready` with all seed, unit, E2E, and UI evidence facts.
+## JSON architecture
 
-It binds:
+| Section | Authored by | Purpose |
+| --- | --- | --- |
+| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
+| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
+| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
+| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
 
-- the selected flow and approved layout hashes;
-- the exact approved source boundary;
-- the source change set and seed evidence;
-- required static gates, browser scenarios, viewports and state IDs;
-- thresholds and evidence destinations.
+## Provided by the previous state
 
-Browser scenarios must exercise the product interaction that reveals each state. A screenshot alone is not interaction proof. Every required journey page, global journey-progress owner, responsive transformation and evidenced state must have an explicit assertion.
+- `priorStateRef`: the accepted upstream state that authorizes prove the implemented frontend journey through declared static gates, seeded states, and browser scenarios.
+- `businessHeadRef`: the selected business authority reference.
+- `authorityRefs`: the exact source change receipt, seed evidence, approved hashes, and declared proof matrix references.
+- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
+- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
 
-The input may define no new creative checkpoint. Flow approval and layout approval are the only approval types in this app.
+These fields are references, not copied documents. The operator must not infer substitutes.
+
+## Loaded by the runtime
+
+- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `upstream`: resolve only the declared session references for source change receipt, seed evidence, approved hashes, and declared proof matrix.
+- `knowledge`: retrieve `fe.product-proof` from the pinned generation and content hash.
+- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `exactTargets`: the coordinator may read only the approved repository-relative files after their hashes match.
+- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
+
+`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

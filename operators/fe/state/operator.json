@@ -38,12 +38,16 @@
     }
   ],
   "sideEffects": [
-    "write one hashed state-model artifact below the run workspace"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "page-model hash or identity does not match",
     "a state has neither business nor derived-block provenance",
     "a required sensitive fact is absent",
-    "a transition has no owning Block"
+    "a transition has no owning Block",
+    "Stop on stale page identity, ownerless transition, missing sensitive business fact, or a state without provenance.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

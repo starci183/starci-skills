@@ -20,20 +20,24 @@
       "status": "ready",
       "factsAdd": [
         "preflight-complete",
-        "source-context-ready",
+        "frontend-contract-generation-ready",
         "grammar-lock-ready"
       ],
       "factsRemove": []
     }
   ],
   "sideEffects": [
-    "write immutable receipts and effective source context below the run workspace"
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "workspace route is missing or stale",
     "a product-facing request has no business evidence",
     "effective source-contract export or validation fails",
     "Grammar selection is missing or ambiguous",
-    "a requested write root is outside the verified workspace"
+    "a requested write root is outside the verified workspace",
+    "Stop on stale workspace route, missing business evidence, invalid contract JSON, ambiguous Grammar, or an out-of-workspace write root.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }

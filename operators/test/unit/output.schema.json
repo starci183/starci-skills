@@ -1,28 +1,68 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/test/unit/output.schema.json",
-  "title": "Unit Test operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "test/unit operator output",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "kind",
     "schemaVersion",
-    "appId",
     "runId",
     "stage",
     "status",
     "facts",
     "payload"
   ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "test.e2e"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "code.repair"
+            },
+            "status": {
+              "const": "repair"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "test.review"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
   "properties": {
-    "kind": {
-      "const": "test.unit.output"
-    },
     "schemaVersion": {
       "const": 6
-    },
-    "appId": {
-      "const": "fe-design-layout"
     },
     "runId": {
       "type": "string",
@@ -30,16 +70,16 @@
     },
     "stage": {
       "enum": [
-        "test.e2e",
         "code.repair",
+        "test.e2e",
         "test.review"
       ]
     },
     "status": {
       "enum": [
+        "blocked",
         "ready",
-        "repair",
-        "blocked"
+        "repair"
       ]
     },
     "facts": {
@@ -49,109 +89,293 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "unitEvidenceRef",
-        "unitEvidenceHash",
-        "commandReceipts",
-        "selected",
-        "passed",
-        "failed",
-        "skipped",
-        "failedTargetRefs",
-        "stopReasons"
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings"
       ],
       "properties": {
-        "unitEvidenceRef": {
-          "type": "string",
-          "minLength": 1
+        "decision": {
+          "enum": [
+            "pass",
+            "in-boundary",
+            "blocked"
+          ]
         },
-        "unitEvidenceHash": {
-          "type": "string",
-          "minLength": 1
-        },
-        "commandReceipts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/commandReceipt"
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "status",
+            "code",
+            "retryable",
+            "emits"
+          ],
+          "properties": {
+            "operator": {
+              "const": "test/unit"
+            },
+            "status": {
+              "enum": [
+                "blocked",
+                "completed",
+                "repair"
+              ]
+            },
+            "code": {
+              "enum": [
+                "test-unit-pass",
+                "test-unit-in-boundary",
+                "test-unit-blocked"
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "status",
+                "factsAdd",
+                "factsRemove"
+              ],
+              "properties": {
+                "stage": {
+                  "enum": [
+                    "code.repair",
+                    "test.e2e",
+                    "test.review"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "blocked",
+                    "ready",
+                    "repair"
+                  ]
+                },
+                "factsAdd": {
+                  "$ref": "#/$defs/strings"
+                },
+                "factsRemove": {
+                  "$ref": "#/$defs/strings"
+                }
+              }
+            }
           }
         },
-        "selected": {
-          "type": "integer",
-          "minimum": 0
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receiptRef",
+            "artifacts",
+            "mutations"
+          ],
+          "properties": {
+            "receiptRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "artifacts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "sha256"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "evidence",
+                      "report",
+                      "plan",
+                      "observation",
+                      "artifact"
+                    ]
+                  },
+                  "ref": {
+                    "$ref": "#/$defs/sessionRef"
+                  },
+                  "sha256": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/sha256"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target",
+                  "kind",
+                  "beforeRevision",
+                  "afterRevision"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "enum": [
+                      "source",
+                      "filesystem",
+                      "provider",
+                      "runtime",
+                      "data",
+                      "record"
+                    ]
+                  },
+                  "beforeRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "afterRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         },
-        "passed": {
-          "type": "integer",
-          "minimum": 0
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used"
+          ],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "ref",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "worktree-business",
+                      "session-artifact",
+                      "qdrant-knowledge",
+                      "exact-source",
+                      "exact-command",
+                      "external-resource",
+                      "credential-handle",
+                      "orchestration"
+                    ]
+                  },
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
         },
-        "failed": {
-          "type": "integer",
-          "minimum": 0
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "scratchRefs",
+            "retention",
+            "purgeAt"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scratchRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sessionRef"
+              }
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            },
+            "purgeAt": {
+              "const": "skill-terminal"
+            }
+          }
         },
-        "skipped": {
-          "type": "integer",
-          "minimum": 0
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sessionRef"
+          }
         },
-        "failedTargetRefs": {
-          "$ref": "#/$defs/strings"
-        },
-        "stopReasons": {
+        "findings": {
           "$ref": "#/$defs/strings"
         }
       }
     }
   },
   "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    },
     "strings": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "minLength": 1
-      },
-      "uniqueItems": true
-    },
-    "commandReceipt": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "commandRef",
-        "status",
-        "selected",
-        "passed",
-        "failed",
-        "skipped",
-        "evidenceRef"
-      ],
-      "properties": {
-        "commandRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "pass",
-            "fail",
-            "blocked"
-          ]
-        },
-        "selected": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "passed": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "failed": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "skipped": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "evidenceRef": {
-          "type": "string",
-          "minLength": 1
-        }
       }
     }
   }

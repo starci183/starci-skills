@@ -36,9 +36,9 @@
     }
   ],
   "sideEffects": [
-    "create or invoke isolated deterministic seed fixtures",
-    "materialize declared business states",
-    "reset seeded state after determinism checks"
+    "coordinator performs only declared isolated external effects for fe/product-seed",
+    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "missing state owner or evidence",
@@ -46,6 +46,9 @@
     "non-deterministic materialization",
     "missing reset operation",
     "production credential or data requirement",
-    "state outside the approved business-state contract"
+    "state outside the approved business-state contract",
+    "Stop on unknown sensitive state, production data or credential dependency, nondeterminism, missing reset, or state outside the approved contract.",
+    "runtime binding revision or session ownership is invalid",
+    "the operation would broaden its approved authority, source, or external boundary"
   ]
 }
