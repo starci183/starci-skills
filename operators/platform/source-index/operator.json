@@ -1,7 +1,7 @@
 {
   "schemaVersion":6,"id":"platform/source-index","domain":"platform","inputSchema":"input.schema.json","outputSchema":"output.schema.json","knowledgeRefs":["platform.source-index"],"sourceReferenceRefs":[],
   "accepts":[{"stage":"platform.mcp.index","status":"ready","allFacts":["platform-mcp-config-ready"],"noneFacts":[]}],
-  "emits":[{"stage":"platform.mcp.publish","status":"ready","factsAdd":["platform-source-index-ready"],"factsRemove":[]}],
+  "emits":[{"stage":"platform.mcp.publish","status":"ready","factsAdd":["platform-source-index-ready"],"factsRemove":[]},{"stage":"platform.mcp.publish","status":"blocked","factsAdd":[],"factsRemove":[]}],
   "sideEffects":["replace only declared Qdrant source partitions","skip unchanged documents by complete content/generator identity","keep loaded bodies, chunks, embeddings, observations, and receipts in task-session memory only","purge every intermediate session object at each parent-skill terminal state"],
   "stopConditions":["required evidence is missing or stale","the result would cross the declared boundary","duplicate document IDs or inconsistent hashes exist","repository source context or source-Qdrant content would be loaded","an atomic partition generation cannot be proved"]
 }

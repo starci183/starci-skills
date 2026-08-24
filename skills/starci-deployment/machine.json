@@ -435,7 +435,7 @@
           "when": {
             "decision": "approval-required"
           },
-          "target": "approval",
+          "target": "recovery-approval",
           "label": "approval-required"
         },
         {
@@ -470,6 +470,30 @@
     "complete": {
       "kind": "terminal",
       "result": "complete"
+    },
+    "recovery-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact recovery boundary.",
+        "approve": "OK DEPLOY <hash>",
+        "reject": "REJECT DEPLOY <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "deployment.review",
+            "status": "approved"
+          },
+          "target": "recover"
+        },
+        {
+          "when": {
+            "stage": "deployment.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
+        }
+      ]
     }
   }
 }

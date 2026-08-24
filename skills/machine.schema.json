@@ -38,7 +38,7 @@
         "approval": { "type": "object", "additionalProperties": false, "required": ["prompt", "approve", "reject"],
           "properties": { "prompt": { "type": "string", "minLength": 1 }, "approve": { "type": "string", "minLength": 1 }, "reject": { "type": "string", "minLength": 1 } }
         },
-        "result": { "enum": ["complete", "blocked", "handoff", "not-needed", "rejected"] }
+        "result": { "enum": ["complete", "rolled-back", "blocked", "handoff", "not-needed", "rejected"] }
       },
       "allOf": [
         {

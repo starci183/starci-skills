@@ -149,6 +149,7 @@ function assertStructure(skillDir, machine, inputSchema, outputSchema) {
 async function assertValidators(skillDir) {
   const skillId = path.basename(skillDir);
   const inputSchema = readJson(path.join(skillDir, 'input.schema.json'));
+  const outputSchema = readJson(path.join(skillDir, 'output.schema.json'));
   const inputValidator = await import(pathToFileURL(path.join(skillDir, 'validate-input.mjs')).href);
   const outputValidator = await import(pathToFileURL(path.join(skillDir, 'validate-output.mjs')).href);
   const options = Object.fromEntries(Object.entries(inputSchema.properties.options.properties).map(([name, rule]) => [
@@ -172,7 +173,20 @@ async function assertValidators(skillDir) {
     scope: { targetRefs: ['target:1'], writeRoots: [], externalMutation: false, approvalRef: null },
     options
   };
-  const validOutput = { schemaVersion: 6, runId: 'run-1', skillId, result: 'complete', finalState: 'complete', receiptRefs: ['receipt:1'], findings: [] };
+  const terminalBranch = outputSchema.allOf.flatMap((item) => item.oneOf ?? []).find((item) => item.properties?.result?.const === 'complete') ?? outputSchema.allOf[0].oneOf[0];
+  const finalState = terminalBranch.properties.finalState.const;
+  const terminalState = terminalBranch.properties.state.properties;
+  const validOutput = {
+    schemaVersion: 6,
+    runId: 'run-1',
+    skillId,
+    result: terminalBranch.properties.result.const,
+    finalState,
+    state: { status: terminalState.status.const, code: terminalState.code.const, retryable: false, terminalState: finalState },
+    receiptRefs: [`receipt:sha256:${'a'.repeat(64)}`],
+    findings: [],
+    cleanup: { scratchRefs: [], retention: 'until-skill-terminal', purgeAt: 'skill-terminal' }
+  };
   if (!inputValidator.validateInput(validInput).valid) fail(`${skillId}: input validator rejects canonical input`);
   if (!outputValidator.validateOutput(validOutput).valid) fail(`${skillId}: output validator rejects canonical output`);
   if (inputValidator.validateInput({ junk: true }).valid) fail(`${skillId}: input validator accepts junk`);
@@ -209,7 +223,7 @@ const directoryIds = skillDirs.map((skillDir) => path.basename(skillDir)).sort()
 if (JSON.stringify(catalogIds) !== JSON.stringify(directoryIds)) fail('global skill catalog differs from materialized skill directories');
 const globalAnalyzer = await import(pathToFileURL(path.join(repositoryRoot, 'validate-analyze-input.mjs')).href);
 for (const entry of catalog.skills) {
-  const selection = { analyzerVersion: 1, skillId: entry.id, confidence: 'exact', activeInputRefs: ['request:1'], passiveContextRefs: ['skills/catalog.json'] };
+  const selection = { analyzerVersion: 1, skillId: entry.id, confidence: 'exact', activeInputRefs: ['request:1'], passiveContextRefs: ['file:skills/catalog.json'] };
   if (!globalAnalyzer.validateAnalyzeInput(selection).valid) fail(`global analyzer rejects ${entry.id}`);
 }
 if (globalAnalyzer.validateAnalyzeInput({ analyzerVersion: 1, skillId: 'starci-missing', confidence: 'exact', activeInputRefs: [], passiveContextRefs: [] }).valid) {

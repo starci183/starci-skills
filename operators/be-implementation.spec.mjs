@@ -24,6 +24,7 @@ function validInput() {
         codingScopeRef: `${session}coding-scope`
       },
       loads: {
+        approval: { ref: `${session}approval`, revision: hash('7'), loadMode: 'session-exact' },
         business: { ref: `${session}business`, authorityPath: '.worktrees/starci-academy/businesses/create-vps/model.json', revision: hash('a') },
         boundary: { ref: `${session}boundary`, revision: hash('b') },
         scope: { ref: `${session}coding-scope`, revision: hash('f'), sourceCommitRef: 'git:abcdef1', targetSetSha256: hash('9') },

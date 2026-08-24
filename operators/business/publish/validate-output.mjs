@@ -36,6 +36,8 @@ function semantic(value) {
   const blocked = value.payload.state.status === 'blocked';
   if (!blocked && value.payload.produced.businessHeadRef === null) errors.push('/payload/produced/businessHeadRef: successful output requires a session artifact');
   if (!blocked && value.payload.produced.durableWrites.length === 0) errors.push('/payload/produced/durableWrites: successful durable operator must name its approved effect');
+  if (!blocked && value.payload.produced.durableWrites.some((target) => !/^\.worktrees\/[a-z0-9][a-z0-9-]*\/businesses(?:\/|$)/.test(target))) errors.push('/payload/produced/durableWrites: business publication may write only project business authority');
+  if (blocked && (value.payload.produced.businessHeadRef !== null || value.payload.produced.durableWrites.length)) errors.push('/payload/produced: blocked output cannot claim publication effects');
   if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
   return errors;
 }

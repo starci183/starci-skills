@@ -123,11 +123,42 @@ function inspectSchema(schema, rule, value, at, errors) {
   }
 }
 
+function contractHygiene(value) {
+  const errors = [];
+  if (!isObject(value)) return errors;
+  const taskId = value.payload?.session?.taskId;
+  const project = value.payload?.provided?.project;
+  const expectedProfile = { economical: 'orchestration/modes/economical.json', balanced: 'orchestration/modes/balanced.json', parallel: 'orchestration/modes/parallel.json' };
+  const orchestration = value.payload?.loads?.orchestration;
+  if (orchestration && expectedProfile[orchestration.mode] !== orchestration.profileRef) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
+  const visit = (current, at) => {
+    if (typeof current === 'string') {
+      if (current.length > 4096) errors.push(`${at}: string exceeds the task-contract limit`);
+      if (taskId && current.startsWith('session://tasks/') && !current.startsWith(`session://tasks/${taskId}/`)) errors.push(`${at}: foreign task-session reference`);
+      if (project) {
+        const match = current.match(/^\.worktrees\/([a-z0-9][a-z0-9-]*)\//);
+        if (match && match[1] !== project) errors.push(`${at}: cross-project worktree reference`);
+      }
+      if (!at.endsWith('.$schema') && /(^|[\\/])\.\.([\\/]|$)/.test(current)) errors.push(`${at}: path traversal is forbidden`);
+      return;
+    }
+    if (Array.isArray(current)) {
+      if (current.length > 256) errors.push(`${at}: array exceeds the task-contract limit`);
+      current.forEach((item, index) => visit(item, `${at}[${index}]`));
+      return;
+    }
+    if (isObject(current)) for (const [key, child] of Object.entries(current)) visit(child, `${at}.${key}`);
+  };
+  visit(value, '$');
+  return errors;
+}
+
 export function validatorFor(schemaUrl, semantic = () => []) {
   const schema = JSON.parse(readFileSync(schemaUrl, 'utf8'));
   return (value) => {
     const errors = [];
     inspectSchema(schema, schema, value, '$', errors);
+    if (errors.length === 0) errors.push(...contractHygiene(value));
     if (errors.length === 0) errors.push(...semantic(value));
     return { valid: errors.length === 0, errors };
   };

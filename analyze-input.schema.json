@@ -52,18 +52,24 @@
     },
     "activeInputRefs": {
       "type": "array",
+      "maxItems": 8,
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 3,
+        "maxLength": 512,
+        "pattern": "^(?![^:]+:(?:\\/\\/)?(?:entire-repository|whole-repository|all-history|all-source|\\*)$)[a-z][a-z0-9+.-]*:[^\\s]+$"
       }
     },
     "passiveContextRefs": {
       "type": "array",
+      "maxItems": 8,
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 3,
+        "maxLength": 512,
+        "pattern": "^(?![^:]+:(?:\\/\\/)?(?:entire-repository|whole-repository|all-history|all-source|\\*)$)[a-z][a-z0-9+.-]*:[^\\s]+$"
       }
     }
   }

@@ -9,8 +9,90 @@
     "skillId",
     "result",
     "finalState",
+    "state",
     "receiptRefs",
-    "findings"
+    "findings",
+    "cleanup"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "result": {
+              "const": "blocked"
+            },
+            "finalState": {
+              "const": "blocked"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "blocked"
+                },
+                "code": {
+                  "const": "starci-business-reconcile-blocked"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "blocked"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "complete"
+            },
+            "finalState": {
+              "const": "complete"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "completed"
+                },
+                "code": {
+                  "const": "starci-business-reconcile-complete"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "complete"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        }
+      ]
+    }
   ],
   "properties": {
     "schemaVersion": {
@@ -18,39 +100,142 @@
     },
     "runId": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 128
     },
     "skillId": {
       "const": "starci-business-reconcile"
     },
     "result": {
       "enum": [
-        "complete",
-        "rolled-back",
         "blocked",
-        "handoff",
-        "not-needed",
-        "rejected"
+        "complete"
       ]
     },
     "finalState": {
-      "type": "string",
-      "minLength": 1
+      "enum": [
+        "blocked",
+        "complete"
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "code",
+        "retryable",
+        "terminalState"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "blocked",
+            "completed"
+          ]
+        },
+        "code": {
+          "enum": [
+            "starci-business-reconcile-blocked",
+            "starci-business-reconcile-complete"
+          ]
+        },
+        "retryable": {
+          "const": false
+        },
+        "terminalState": {
+          "enum": [
+            "blocked",
+            "complete"
+          ]
+        }
+      }
     },
     "receiptRefs": {
       "type": "array",
+      "minItems": 0,
+      "maxItems": 64,
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 3,
+        "maxLength": 512,
+        "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
       }
     },
     "findings": {
       "type": "array",
+      "maxItems": 20,
       "uniqueItems": true,
       "items": {
-        "type": "string",
-        "minLength": 1
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "severity",
+          "message",
+          "evidenceRefs"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+            "maxLength": 120
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 512,
+              "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            }
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scratchRefs",
+        "retention",
+        "purgeAt"
+      ],
+      "properties": {
+        "scratchRefs": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 512,
+            "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+          }
+        },
+        "retention": {
+          "const": "until-skill-terminal"
+        },
+        "purgeAt": {
+          "const": "skill-terminal"
+        }
       }
     }
   }

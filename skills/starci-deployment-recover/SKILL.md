@@ -1,11 +1,11 @@
 ---
 name: starci-deployment-recover
-description: "Use to recover one observed failed rollout, then monitor the same release to proof or rollback. Do not use for a new deployment or a speculative failure."
+description: "Use when recovery is the approved starting action for one observed failed rollout before any rollback, then monitor the same release to proof. Do not use for a new deployment or a speculative failure."
 ---
 
 # starci-deployment-recover
 
-Use to recover one observed failed rollout, then monitor the same release to proof or rollback. Do not use for a new deployment or a speculative failure.
+Use when recovery is the approved starting action for one observed failed rollout before any rollback, then monitor the same release to proof. Do not use for a new deployment or a speculative failure.
 
 ## INPUT ANALYSIS
 

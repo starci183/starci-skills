@@ -8,7 +8,7 @@ The input is an ephemeral object owned by the current task session. It is never 
 | --- | --- | --- |
 | `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind the operator to one accepted machine transition. |
 | `payload.provided` | Previous machine state | Supply immutable references already approved for this operation. |
-| `payload.loads` | Runtime resolver | Declare the exact business, boundary, knowledge, source-file, and orchestration bindings that the operator will load. |
+| `payload.loads` | Runtime resolver | Declare the exact approval, business, boundary, knowledge, source-file, and orchestration bindings that the operator will load. |
 | `payload.session` | Session runtime | Name task-local input, output, and scratch slots and their cleanup lifetime. |
 
 ### Provided data
@@ -26,6 +26,7 @@ The input is an ephemeral object owned by the current task session. It is never 
 `payload.loads` is produced by the runtime, not by the user or an implementation worker:
 
 - `business`: load the exact revision from `.worktrees/<project>/businesses/...` into session memory.
+- `approval`: load the exact approval receipt and its immutable revision from task-session storage.
 - `boundary`: load the approved boundary object from session memory.
 - `scope`: load the frozen coding scope and bind its source commit and target-set hash.
 - `knowledge`: retrieve only `be.implementation` from the pinned Qdrant generation; the approved boundary itself is loaded from session state.

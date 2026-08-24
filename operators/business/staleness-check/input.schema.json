@@ -41,7 +41,7 @@
               "properties": {
                 "authorityPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses(?:/|$)" },
                 "exists": { "type": "boolean" },
-                "headRef": { "type": ["string", "null"], "minLength": 1 },
+                "headRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] },
                 "status": { "enum": ["missing", "draft", "approved", "rejected", "invalid"] },
                 "revision": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
                 "contentSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
@@ -54,7 +54,7 @@
               "additionalProperties": false,
               "required": ["repositoryRef", "branch", "headCommit", "routeRevision", "loadMode"],
               "properties": {
-                "repositoryRef": { "type": "string", "minLength": 1 },
+                "repositoryRef": { "type": "string", "pattern": "^(?:repository|source|session):[^\\s]+$" },
                 "branch": { "type": "string", "minLength": 1 },
                 "headCommit": { "$ref": "#/$defs/gitCommit" },
                 "routeRevision": { "$ref": "#/$defs/sha256" },

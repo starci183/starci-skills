@@ -7,9 +7,9 @@
   "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
   "allOf": [{
     "oneOf": [
-      { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "const": "fresh" } } } }, "required": ["stage", "status", "payload"] },
-      { "properties": { "stage": { "const": "business.evidence" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "const": "initialize-required" } } } }, "required": ["stage", "status", "payload"] },
-      { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "blocked" }, "payload": { "properties": { "decision": { "const": "blocked" } } } }, "required": ["stage", "status", "payload"] }
+      { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "const": "fresh" }, "state": { "properties": { "status": { "const": "completed" }, "code": { "const": "business-staleness-fresh" }, "emits": { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "ready" } } } } } } } }, "required": ["stage", "status", "payload"] },
+      { "properties": { "stage": { "const": "business.evidence" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "const": "initialize-required" }, "state": { "properties": { "status": { "const": "replan" }, "code": { "const": "business-staleness-initialize-required" }, "emits": { "properties": { "stage": { "const": "business.evidence" }, "status": { "const": "ready" } } } } } } } }, "required": ["stage", "status", "payload"] },
+      { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "blocked" }, "payload": { "properties": { "decision": { "const": "blocked" }, "state": { "properties": { "status": { "const": "blocked" }, "code": { "const": "business-staleness-blocked" }, "emits": { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "blocked" } } } } } } } }, "required": ["stage", "status", "payload"] }
     ]
   }],
   "properties": {

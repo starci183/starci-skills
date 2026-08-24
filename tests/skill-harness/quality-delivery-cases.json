@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 1,
+  "family": "quality-delivery-platform",
+  "cases": [
+    {
+      "id": "quality-input-external-mutation-without-approval",
+      "targetType": "skill",
+      "target": "starci-observability-reconcile",
+      "scenario": "A structurally valid invocation declares externalMutation=true while scope.approvalRef is null and supplies only opaque string refs.",
+      "inputRisks": [
+        "The skill schema accepts external mutation without an approval reference.",
+        "Target, artifact, evidence, and passive-context refs are non-empty strings without authority or lineage constraints."
+      ],
+      "expectedBehavior": [
+        "Local input analysis rejects the invocation before the first platform operator is loaded.",
+        "No approval receipt is inferred, synthesized, or substituted from prompt wording.",
+        "The caller receives a precise missing-approval or ambiguous-authority finding."
+      ],
+      "forbiddenBehavior": [
+        "Enter platform/observability-reconcile with a fabricated session approval ref.",
+        "Treat schema validity as mutation authority.",
+        "Load platform or provider context before rejection."
+      ],
+      "verdict": "warning",
+      "findings": [
+        "The textual analyzer correctly says to reject external mutation without approval, but input.schema.json and validate-input.mjs do not encode that invariant; correctness depends on model adherence during analysis.",
+        "Moving this invariant into deterministic skill validation would make the active input cleaner and eliminate an avoidable hallucination boundary."
+      ],
+      "evidence": [
+        "skills/starci-observability-reconcile/analyze-input.md: rejects external mutation without approval",
+        "skills/starci-observability-reconcile/input.schema.json: scope.approvalRef permits null independently of scope.externalMutation",
+        "skills/starci-observability-reconcile/validate-input.mjs: schema-only validation",
+        "skills/starci-observability-reconcile/machine.json: first executable state is platform/observability-reconcile"
+      ]
+    },
+    {
+      "id": "quality-output-forged-terminal-completion",
+      "targetType": "skill",
+      "target": "starci-deployment",
+      "scenario": "A terminal aggregator emits result=complete, finalState=blocked, one arbitrary receipt string, and unresolved findings after a blocked deployment operator.",
+      "inputRisks": [
+        "A blocked operator result may be mislabeled as successful skill completion.",
+        "An arbitrary non-empty string can masquerade as an immutable receipt."
+      ],
+      "expectedBehavior": [
+        "Skill output validation rejects a result/finalState combination that is not a reachable terminal pair in machine.json.",
+        "Completion receipts must be current-task session refs or approved durable receipt identities with validated lineage.",
+        "A blocked machine route can emit only result=blocked."
+      ],
+      "forbiddenBehavior": [
+        "Accept complete solely because receiptRefs is non-empty.",
+        "Accept finalState names that contradict the selected result.",
+        "Accept fabricated receipt text as delivery proof."
+      ],
+      "verdict": "fail",
+      "findings": [
+        "The generic skill output schema does not bind result to a reachable terminal state.",
+        "The generated output validator only requires a non-empty receiptRefs array for complete; it does not validate receipt syntax, task ownership, terminal reachability, or operator lineage.",
+        "This is a direct unsupported-success and output-hallucination gap shared by the materialized skills."
+      ],
+      "evidence": [
+        "skills/starci-deployment/output.schema.json: finalState and receiptRefs are unconstrained non-empty strings",
+        "skills/starci-deployment/validate-output.mjs: completion check is limited to receiptRefs.length",
+        "skills/starci-deployment/machine.json: complete, blocked, rejected, and rolled-back are distinct terminals",
+        "skills/starci-deployment/output.md: claims immutable receipt references without schema enforcement"
+      ]
+    },
+    {
+      "id": "quality-workflow-incomplete-trace",
+      "targetType": "operator",
+      "target": "quality/workflow-diagnose",
+      "scenario": "The observed workflow trace is missing a join event and contains a stale environment revision, while downstream logs suggest a likely cause.",
+      "inputRisks": [
+        "The likely downstream symptom may tempt the evaluator to invent the missing transition.",
+        "Unrelated source or full logs could be loaded to compensate for incomplete evidence."
+      ],
+      "expectedBehavior": [
+        "Validate trace lineage and monotonic events before retrieving classification knowledge.",
+        "Emit decision=inconclusive with blocked state and exact stale/missing evidence findings.",
+        "Perform no source read and no mutation."
+      ],
+      "forbiddenBehavior": [
+        "Emit diagnosed from circumstantial evidence.",
+        "Invent the missing event or join.",
+        "Load repository source context or speculative fix knowledge."
+      ],
+      "verdict": "pass",
+      "findings": [
+        "The operator explicitly checks trace completeness before knowledge retrieval and defines inconclusive as a typed blocked outcome.",
+        "Output semantics require the inconclusive route, state code, emitted fact, session cleanup, and zero durable writes to agree."
+      ],
+      "evidence": [
+        "operators/quality/workflow-diagnose/execute.md: Steps 2-3 stop on stale, incomplete, or contradictory traces",
+        "operators/quality/workflow-diagnose/operator.json: no source references and no durable mutation effect",
+        "operators/quality/workflow-diagnose/output.schema.json: diagnosed, inconclusive, and external-blocker are separate decisions",
+        "operators/quality/workflow-diagnose/validate-output.mjs: enforces route/state/fact alignment and session-only evidence"
+      ]
+    },
+    {
+      "id": "quality-readiness-stale-registry",
+      "targetType": "operator",
+      "target": "quality/readiness-inventory",
+      "scenario": "All gate receipts appear green, but the route registry belongs to an older source revision and one receipt is expired.",
+      "inputRisks": [
+        "Green-looking receipt values may override stale authority.",
+        "Staleness may be misclassified as a repairable product finding."
+      ],
+      "expectedBehavior": [
+        "Check registry integrity, revision, and expiry before classifying product findings.",
+        "Emit blocked/inconclusive rather than green or findings.",
+        "Do not load source or command logs."
+      ],
+      "forbiddenBehavior": [
+        "Reuse stale green evidence.",
+        "Create a speculative repair finding.",
+        "Return readiness-green."
+      ],
+      "verdict": "pass",
+      "findings": [
+        "The execution contract gives freshness checks precedence and reserves blocked for stale or unreadable authority.",
+        "The semantic output validator prevents green without a receipt and enforces the typed blocked route."
+      ],
+      "evidence": [
+        "operators/quality/readiness-inventory/execute.md: Steps 2-3 distinguish stale authority from product findings",
+        "operators/quality/readiness-inventory/output.md: green, findings, and blocked are explicit states",
+        "operators/quality/readiness-inventory/validate-output.mjs: enforces decision/state/fact consistency and terminal cleanup"
+      ]
+    },
+    {
+      "id": "quality-debt-no-progress-loop",
+      "targetType": "operator",
+      "target": "quality/debt-repay",
+      "scenario": "A debt repayment iteration produces the same fingerprint and no reduction in the remaining metric, with the iteration budget at its limit.",
+      "inputRisks": [
+        "The operator could claim progress from a source mutation alone.",
+        "The skill machine loops progress back to the same operator."
+      ],
+      "expectedBehavior": [
+        "Restore this operator's exact before-images after a no-drift check when no strict progress is proven.",
+        "Emit blocked and preserve the debt as open.",
+        "Do not reset the loop fingerprint or iteration counter."
+      ],
+      "forbiddenBehavior": [
+        "Emit progress with an identical fingerprint.",
+        "Loop after maxIterations is reached.",
+        "Emit closed without independent green proof and atomic inventory closure."
+      ],
+      "verdict": "pass",
+      "findings": [
+        "The operator and semantic validator jointly require strict metric/remainder improvement, a new fingerprint, and remaining iteration capacity.",
+        "Closure is separately guarded by an independent verifier and a changed, proof-bound closed inventory."
+      ],
+      "evidence": [
+        "operators/quality/debt-repay/execute.md: Steps 2, 4, and 5 enforce fingerprint, budget, strict progress, and restore behavior",
+        "operators/quality/debt-repay/validate-output.mjs: rejects repeated fingerprints, exhausted budgets, unsupported progress, and self-verified closure",
+        "skills/starci-quality-debt-repay/machine.json: progress loop and independent debt-proof state are explicit"
+      ]
+    },
+    {
+      "id": "delivery-monitor-budget-exhaustion",
+      "targetType": "operator",
+      "target": "deployment/monitor",
+      "scenario": "A rollout remains progressing at maxAttempts, and an external observation timeout occurs after the deadline would be exceeded by another delay.",
+      "inputRisks": [
+        "Both progressing and external-error loop back to monitor.",
+        "An observation failure could silently reset the cursor or deadline."
+      ],
+      "expectedBehavior": [
+        "Emit blocked when no bounded poll remains.",
+        "Preserve the attempt, elapsed time, deadline, and backoff lineage.",
+        "Schedule no next delay for a terminal decision."
+      ],
+      "forbiddenBehavior": [
+        "Emit progressing or external-error at exhausted budget.",
+        "Reset attempt or elapsedSeconds.",
+        "Claim steady from missing observations."
+      ],
+      "verdict": "pass",
+      "findings": [
+        "The otherwise cyclic machine is bounded by a mandatory monitorBudget in output and deterministic semantic checks.",
+        "Waiting outcomes require capacity for exactly one delay; terminal outcomes must clear nextDelaySeconds."
+      ],
+      "evidence": [
+        "operators/deployment/monitor/execute.md: Step 6 forbids spinning and cursor reset",
+        "operators/deployment/monitor/output.schema.json: monitorBudget is mandatory",
+        "operators/deployment/monitor/validate-output.mjs: rejects exhausted waiting decisions and terminal delays",
+        "skills/starci-deployment-monitor/machine.json: progressing and external-error loop explicitly"
+      ]
+    },
+    {
+      "id": "delivery-rollback-partial-mutation",
+      "targetType": "operator",
+      "target": "deployment/rollback",
+      "scenario": "Rollback changes one runtime target, then a provider conflict prevents the remaining target from restoring to the safe release.",
+      "inputRisks": [
+        "A partially restored release may be mislabeled rolled-back.",
+        "A generic blocker may omit the durable mutation that already occurred."
+      ],
+      "expectedBehavior": [
+        "Emit decision=partial and blocked state.",
+        "Report every changed target with exact before/after revisions and evidence.",
+        "Do not route through deployment proof or delivery success."
+      ],
+      "forbiddenBehavior": [
+        "Emit rolled-back before all declared health checks pass.",
+        "Emit external-error or generic blocked while hiding mutations.",
+        "Continue outside the approved rollback boundary."
+      ],
+      "verdict": "pass",
+      "findings": [
+        "The rollback contract gives partial mutation a dedicated fail-closed truth and requires revision evidence.",
+        "The skill machine routes partial directly to blocked."
+      ],
+      "evidence": [
+        "operators/deployment/rollback/execute.md: Steps 5-6 distinguish partial, external-error, blocked, and rolled-back",
+        "operators/deployment/rollback/output.md: failed outcomes with mutations must be partial",
+        "operators/deployment/rollback/validate-output.mjs: binds mutation-bearing decisions to partial/rolled-back semantics",
+        "skills/starci-deployment/machine.json: rollback partial routes to blocked"
+      ]
+    },
+    {
+      "id": "platform-source-index-invalid-document-state",
+      "targetType": "operator",
+      "target": "platform/source-index",
+      "scenario": "A changed frontend contract snapshot has an invalid schema or a generator hash mismatch after metadata comparison and before generation activation.",
+      "inputRisks": [
+        "The operation must fail after entering the source-index state.",
+        "The machine needs a typed result to preserve the reason and cleanup contract."
+      ],
+      "expectedBehavior": [
+        "Emit a typed blocked state with the invalid document identity and no activated partial generation.",
+        "Keep the previous active generation unchanged.",
+        "Route the parent skill to a blocked terminal with evidence."
+      ],
+      "forbiddenBehavior": [
+        "Emit ready after skipping the invalid changed document.",
+        "Activate a mixed generation.",
+        "Abort outside the state machine without a typed output state."
+      ],
+      "verdict": "fail",
+      "findings": [
+        "The execution guide correctly stops on invalid schema/hash and protects atomic activation, but operator.json, output.schema.json, and validate-output.mjs expose only decision=ready.",
+        "The parent source-index skill also has only a ready edge, so a legitimate indexing failure has no typed blocked output or machine route.",
+        "This creates an output-state hole even though the context and caching behavior are otherwise precise."
+      ],
+      "evidence": [
+        "operators/platform/source-index/execute.md: Steps 4-5 stop on invalid schema, identity drift, or hash mismatch",
+        "operators/platform/source-index/operator.json: emits only platform.mcp.publish/ready",
+        "operators/platform/source-index/output.schema.json: only decision ready is representable",
+        "operators/platform/source-index/validate-output.mjs: requires ready publish route",
+        "skills/starci-source-index-publish/machine.json: source-index has only a ready transition"
+      ]
+    },
+    {
+      "id": "delivery-recovery-approval-resume-target",
+      "targetType": "skill",
+      "target": "starci-deployment",
+      "scenario": "During rollout recovery, deployment/recover emits approval-required for one exact recovery action and the user approves its hash.",
+      "inputRisks": [
+        "The full deployment machine reuses its initial deployment approval state for recovery approval.",
+        "Approval continuation may resume the wrong phase and replay earlier durable steps."
+      ],
+      "expectedBehavior": [
+        "Approval of a recovery plan returns to deployment/recover with the same recovery identity and cursor.",
+        "The execution root, credentials, host preparation, artifact publication, migration, and domain phases are not replayed.",
+        "The approval hash remains bound to the exact recovery boundary."
+      ],
+      "forbiddenBehavior": [
+        "Route a recovery approval to execution-root.",
+        "Replay deployment preparation under a recovery-only approval.",
+        "Lose recovery evidence or monitor budget lineage."
+      ],
+      "verdict": "fail",
+      "findings": [
+        "In starci-deployment, recover/approval-required targets the shared approval state, whose approved edge always targets execution-root instead of recover.",
+        "The standalone deployment-monitor and deployment-recover machines use a dedicated recovery-approval state and correctly resume recover, showing the full deployment route is inconsistent.",
+        "This is a concrete wrong-branch and repeated-side-effect risk."
+      ],
+      "evidence": [
+        "skills/starci-deployment/machine.json: recover approval-required -> approval -> execution-root",
+        "skills/starci-deployment-monitor/machine.json: recovery-approval approved -> recover",
+        "skills/starci-deployment-recover/machine.json: recovery-approval approved -> recover"
+      ]
+    },
+    {
+      "id": "quality-rule-binding-fail-terminal-semantics",
+      "targetType": "skill",
+      "target": "starci-rule-binding-audit",
+      "scenario": "Fresh, complete registries prove a missing executable gate binding, so quality/rule-binding-check emits decision=fail with exact evidence.",
+      "inputRisks": [
+        "The audit operation completed successfully, but the audited system failed.",
+        "A generic skill result may be mistaken for a passing rule-binding state."
+      ],
+      "expectedBehavior": [
+        "Preserve a distinct audit-outcome state that unambiguously means findings exist.",
+        "Expose the failed binding identities and never label rule bindings as passing.",
+        "Allow callers to distinguish completed-audit/fail from completed-audit/pass without inspecting free-text findings."
+      ],
+      "forbiddenBehavior": [
+        "Collapse pass and fail into an indistinguishable complete terminal result.",
+        "Omit the rule-binding receipt or exact defect references.",
+        "Treat a completed audit as readiness success."
+      ],
+      "verdict": "warning",
+      "findings": [
+        "The operator output is well typed and distinguishes pass from fail, but the skill machine routes both pass and findings terminals to result=complete.",
+        "The generic skill output has finalState and findings, so the distinction can survive, but consumers can easily interpret result=complete as a passing system state.",
+        "A dedicated result such as handoff/findings or a closed outcome field would be clearer."
+      ],
+      "evidence": [
+        "operators/quality/rule-binding-check/execute.md: fail requires fresh authority and a measured defect",
+        "operators/quality/rule-binding-check/validate-output.mjs: pass and fail have distinct route facts and codes",
+        "skills/starci-rule-binding-audit/machine.json: both complete and findings terminals use result complete",
+        "skills/starci-rule-binding-audit/output.schema.json: generic result does not encode audit pass/fail"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 5,
+    "warning": 2,
+    "fail": 3,
+    "topRisks": [
+      "Materialized skill output validation permits unsupported completion because it does not bind result, finalState, receipt lineage, and machine reachability.",
+      "The full deployment flow resumes recovery approval at execution-root, risking repeated durable deployment steps under the wrong approval boundary.",
+      "platform/source-index has no typed blocked outcome for documented schema, hash, or indexing failures.",
+      "Several skill-level input safety invariants are prose-only rather than deterministic validation rules."
+    ]
+  }
+}

@@ -6,8 +6,40 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
   "allOf": [{ "oneOf": [
-    { "properties": { "stage": { "const": "source-fit.resolve" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "enum": ["reused", "updated"] } } } }, "required": ["stage", "status", "payload"] },
-    { "properties": { "stage": { "const": "source-fit.resolve" }, "status": { "const": "blocked" }, "payload": { "properties": { "decision": { "const": "blocked" } } } }, "required": ["stage", "status", "payload"] }
+    {
+      "properties": {
+        "stage": { "const": "source-fit.resolve" }, "status": { "const": "ready" },
+        "payload": { "properties": {
+          "decision": { "const": "reused" },
+          "state": { "properties": { "status": { "const": "completed" }, "code": { "const": "fe-context-sync-reused" }, "emits": { "properties": { "stage": { "const": "source-fit.resolve" }, "status": { "const": "ready" } } } } },
+          "produced": { "properties": { "indexAction": { "const": "reused" }, "durableWrites": { "maxItems": 0 } } }
+        } }
+      },
+      "required": ["stage", "status", "payload"]
+    },
+    {
+      "properties": {
+        "stage": { "const": "source-fit.resolve" }, "status": { "const": "ready" },
+        "payload": { "properties": {
+          "decision": { "const": "updated" },
+          "state": { "properties": { "status": { "const": "completed" }, "code": { "const": "fe-context-sync-updated" }, "emits": { "properties": { "stage": { "const": "source-fit.resolve" }, "status": { "const": "ready" } } } } },
+          "produced": { "properties": { "indexAction": { "enum": ["upserted", "replaced"] }, "durableWrites": { "minItems": 1 } } }
+        } }
+      },
+      "required": ["stage", "status", "payload"]
+    },
+    {
+      "properties": {
+        "stage": { "const": "source-fit.resolve" }, "status": { "const": "blocked" },
+        "payload": { "properties": {
+          "decision": { "const": "blocked" },
+          "state": { "properties": { "status": { "const": "blocked" }, "code": { "const": "fe-context-sync-blocked" }, "emits": { "properties": { "stage": { "const": "source-fit.resolve" }, "status": { "const": "blocked" } } } } },
+          "produced": { "properties": { "codingContextGenerationRef": { "type": "null" }, "snapshotSha256": { "type": "null" }, "indexGenerationRef": { "type": "null" }, "indexAction": { "const": "none" }, "durableWrites": { "maxItems": 0 } } },
+          "findings": { "minItems": 1 }
+        } }
+      },
+      "required": ["stage", "status", "payload"]
+    }
   ] }],
   "properties": {
     "schemaVersion": { "const": 6 },

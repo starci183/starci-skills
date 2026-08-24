@@ -1,11 +1,11 @@
 ---
 name: starci-deployment-monitor
-description: "Use to monitor one existing rollout until steady state, recovery, rollback, or a bounded blocker is proved. Do not use to initiate a new deployment."
+description: "Use to watch one release that is already rolling out until steady state when observation is the starting action, continuing to recovery, rollback, or a bounded blocker only if evidence requires it. Do not use when recovery is already approved or to initiate a new deployment."
 ---
 
 # starci-deployment-monitor
 
-Use to monitor one existing rollout until steady state, recovery, rollback, or a bounded blocker is proved. Do not use to initiate a new deployment.
+Use to watch one release that is already rolling out until steady state when observation is the starting action, continuing to recovery, rollback, or a bounded blocker only if evidence requires it. Do not use when recovery is already approved or to initiate a new deployment.
 
 ## INPUT ANALYSIS
 

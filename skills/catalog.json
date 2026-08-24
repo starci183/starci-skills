@@ -47,7 +47,7 @@
     },
     {
       "id": "starci-workflow-diagnose",
-      "description": "Use to diagnose one failing workflow without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit."
+      "description": "Use to find why one workflow fails and return a report-only diagnosis without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit."
     },
     {
       "id": "starci-quality-readiness",
@@ -71,11 +71,11 @@
     },
     {
       "id": "starci-deployment-monitor",
-      "description": "Use to monitor one existing rollout until steady state, recovery, rollback, or a bounded blocker is proved. Do not use to initiate a new deployment."
+      "description": "Use to watch one release that is already rolling out until steady state when observation is the starting action, continuing to recovery, rollback, or a bounded blocker only if evidence requires it. Do not use when recovery is already approved or to initiate a new deployment."
     },
     {
       "id": "starci-deployment-recover",
-      "description": "Use to recover one observed failed rollout, then monitor the same release to proof or rollback. Do not use for a new deployment or a speculative failure."
+      "description": "Use when recovery is the approved starting action for one observed failed rollout before any rollback, then monitor the same release to proof. Do not use for a new deployment or a speculative failure."
     },
     {
       "id": "starci-deployment-rollback",

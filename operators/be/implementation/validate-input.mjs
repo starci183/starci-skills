@@ -18,6 +18,7 @@ function semanticErrors(value) {
   for (const fact of guard) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
 
   const { provided, loads, session } = value.payload;
+  if (provided.approvalReceiptRef !== loads.approval.ref) errors.push('$.payload.loads.approval.ref: must equal provided.approvalReceiptRef');
   if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
   if (provided.approvedBoundaryRef !== loads.boundary.ref) errors.push('$.payload.loads.boundary.ref: must equal provided.approvedBoundaryRef');
   if (provided.codingScopeRef !== loads.scope.ref) errors.push('$.payload.loads.scope.ref: must equal provided.codingScopeRef');
@@ -33,6 +34,7 @@ function semanticErrors(value) {
     provided.approvalReceiptRef,
     provided.businessHeadRef,
     provided.codingScopeRef,
+    loads.approval.ref,
     loads.business.ref,
     loads.boundary.ref,
     loads.scope.ref,

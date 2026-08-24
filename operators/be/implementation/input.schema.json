@@ -57,8 +57,18 @@
           "type": "object",
           "description": "Bindings resolved by the runtime. These fields declare what will be loaded; they are not caller-controlled content.",
           "additionalProperties": false,
-          "required": ["business", "boundary", "scope", "knowledge", "source", "orchestration"],
+          "required": ["approval", "business", "boundary", "scope", "knowledge", "source", "orchestration"],
           "properties": {
+            "approval": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "revision", "loadMode"],
+              "properties": {
+                "ref": { "$ref": "#/$defs/sessionRef" },
+                "revision": { "$ref": "#/$defs/sha256" },
+                "loadMode": { "const": "session-exact" }
+              }
+            },
             "business": {
               "type": "object",
               "additionalProperties": false,

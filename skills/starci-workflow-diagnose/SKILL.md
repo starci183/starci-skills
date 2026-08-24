@@ -1,11 +1,11 @@
 ---
 name: starci-workflow-diagnose
-description: "Use to diagnose one failing workflow without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit."
+description: "Use to find why one workflow fails and return a report-only diagnosis without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit."
 ---
 
 # starci-workflow-diagnose
 
-Use to diagnose one failing workflow without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit.
+Use to find why one workflow fails and return a report-only diagnosis without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit.
 
 ## INPUT ANALYSIS
 

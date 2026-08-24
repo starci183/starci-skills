@@ -76,6 +76,7 @@ Workers write observations only to `scratchPrefix/source-checks/<worker-id>`. Wo
 
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
+| `@approval-receipt` | `payload.loads.approval` | session | bind the exact approval identity and immutable revision before source access |
 | `@business-head` | `payload.loads.business` | worktree-exact | bind the approved business revision without loading unrelated features |
 | `@approved-boundary` | `payload.loads.boundary` | session | bind the exact approved paths, responsibilities, and exclusions |
 | `@be-implementation` | `be.implementation` | qdrant | retrieve only the source-mutation law required by this operator |

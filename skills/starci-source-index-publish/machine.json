@@ -37,6 +37,13 @@
           },
           "target": "mcp-publish-choice",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -70,6 +77,10 @@
           "target": "mcp-tunnel-plan"
         }
       ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
     },
     "complete": {
       "kind": "terminal",
@@ -107,10 +118,6 @@
           "label": "ready"
         }
       ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "mcp-tunnel-apply": {
       "kind": "operator",

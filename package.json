@@ -22,8 +22,10 @@
     "check:skills": "node skills/validate-skills.mjs",
     "check:release": "node scripts/validate-release.mjs",
     "test:routes": "node --test skills/route-machine.spec.mjs",
+    "test:skill-harness": "node tests/skill-harness/harness.mjs --write",
+    "test:operator-harness": "node tests/skill-harness/operator-harness.mjs --write",
     "test:frontend-context": "node --test scripts/build-frontend-coding-context.spec.mjs",
-    "test:node": "npm run check:orchestration && npm run check:operators && npm run check:skills && npm run test:routes && npm run test:frontend-context && npm run check:release",
+    "test:node": "npm run check:orchestration && npm run check:operators && npm run check:skills && npm run test:routes && npm run test:skill-harness && npm run test:operator-harness && npm run test:frontend-context && npm run check:release",
     "test:python": "python -m unittest discover -s runtime/knowledge-runtime/tests -v",
     "test": "npm run test:node && npm run test:python",
     "test:all": "npm test"

@@ -37,6 +37,10 @@ function semanticErrors(value) {
   const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
   for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
   for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
+  const roles = new Set(loads.upstream.map((item) => item.role));
+  for (const role of ['preflight', 'business-freshness']) if (!roles.has(role)) errors.push(`$.payload.loads.upstream: missing required role ${role}`);
+  if (value.stage === 'flow.generate' && roles.has('flow-feedback')) errors.push('$.payload.loads.upstream: initial generation cannot load flow feedback');
+  if (value.stage === 'flow.review' && !roles.has('flow-feedback')) errors.push('$.payload.loads.upstream: rejected review requires flow-feedback');
 
 
   return errors;
